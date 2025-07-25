@@ -169,6 +169,7 @@ export {
     constexpr SizeT HNSW_M = 16;
     constexpr SizeT HNSW_EF_CONSTRUCTION = 200;
     constexpr SizeT HNSW_BLOCK_SIZE = 8192;
+    constexpr SizeT DEFAULT_PREFETCH_SIZE = 4;
 
     constexpr SizeT BMP_BLOCK_SIZE = 16;
 
@@ -335,6 +336,7 @@ export {
 
     // IO related
     constexpr SizeT DEFAULT_READ_BUFFER_SIZE = 4096;
+    constexpr SizeT L1_CACHE_SIZE = 32 * KB;
 }
 
 } // namespace infinity

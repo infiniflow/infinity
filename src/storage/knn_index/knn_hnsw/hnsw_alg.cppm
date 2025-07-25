@@ -30,6 +30,7 @@ import data_store;
 import third_party;
 import serialize;
 import dist_func_lsg_wrapper;
+import default_values;
 
 // Fixme: some variable has implicit type conversion.
 // Fixme: some variable has confusing name.
@@ -64,16 +65,14 @@ public:
 
     constexpr static bool LSG = IsLSGDistance<Distance>;
 
-    constexpr static int prefetch_offset_ = 0;
-    constexpr static int prefetch_step_ = 2;
-
     static Pair<SizeT, SizeT> GetMmax(SizeT M) { return {2 * M, M}; }
 
 public:
-    KnnHnswBase() : M_(0), ef_construction_(0), mult_(0) {}
+    KnnHnswBase() : M_(0), ef_construction_(0), mult_(0), prefetch_step_(DEFAULT_PREFETCH_SIZE) {}
     KnnHnswBase(This &&other)
         : M_(std::exchange(other.M_, 0)), ef_construction_(std::exchange(other.ef_construction_, 0)), mult_(std::exchange(other.mult_, 0.0)),
-          data_store_(std::move(other.data_store_)), distance_(std::move(other.distance_)) {}
+          data_store_(std::move(other.data_store_)), distance_(std::move(other.distance_)),
+          prefetch_step_(L1_CACHE_SIZE / data_store_.vec_store_meta().GetVecSizeInBytes()) {}
     This &operator=(This &&other) {
         if (this != &other) {
             M_ = std::exchange(other.M_, 0);
@@ -178,21 +177,16 @@ protected:
             }
 
             const auto [neighbors_p, neighbor_size] = data_store_.GetNeighbors(c_idx, layer_idx);
-            int prefetch_start = neighbor_size - 1 - prefetch_offset_;
+            int prefetch_start = neighbor_size - 1;
             for (int i = neighbor_size - 1; i >= 0; --i) {
+                for (int j = prefetch_step_; prefetch_start >= 0 && j > 0; --j) {
+                    data_store_.PrefetchVec(neighbors_p[prefetch_start--]);
+                }
                 VertexType n_idx = neighbors_p[i];
                 if (n_idx >= (VertexType)cur_vec_num || visited[n_idx]) {
                     continue;
                 }
                 visited[n_idx] = true;
-                if (prefetch_start >= 0) {
-                    int lower = std::max(0, prefetch_start - prefetch_step_);
-                    for (int j = prefetch_start; j >= lower; --j) {
-                        VertexType prefetch_idx = neighbors_p[j];
-                        data_store_.PrefetchVec(prefetch_idx);
-                    }
-                    prefetch_start -= prefetch_step_;
-                }
                 auto dist = distance_(query, n_idx, data_store_, query_i);
                 if (result_handler.GetSize(0) < result_n || dist <= result_handler.GetDistance0(0)) {
                     candidate.emplace(-dist, n_idx);
@@ -439,6 +433,8 @@ protected:
 
     DataStore data_store_;
     Distance distance_;
+
+    SizeT prefetch_step_;
 
     // //---------------------------------------------- Following is the tmp debug function. ----------------------------------------------
 public:
