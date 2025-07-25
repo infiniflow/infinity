@@ -179,7 +179,7 @@ void FileWorker::SetData(void *data) {
 }
 
 void FileWorker::SetDataSize(SizeT size) {
-    UnRecoverableError("Not implemented");
+    UnrecoverableError("Not implemented");
 }
 
 // Get absolute file path. As key of buffer handle.
