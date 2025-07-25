@@ -21,7 +21,8 @@ export module lru;
 import stl;
 
 namespace infinity {
-template<typename K, typename V>
+
+export template <typename K, typename V>
 class lru_cache {
     struct kvp {
         K key;
@@ -33,50 +34,55 @@ class lru_cache {
     std::unordered_map<K, list_iterator> map_;
     std::optional<std::size_t> max_size_;
 
+    mutable std::mutex lock_;
+
 public:
     lru_cache() = default;
-    lru_cache(std::optional<std::size_t> max_size) : max_size_(max_size) {
-        assert(max_size_.has_value());
-    }
+    lru_cache(std::optional<std::size_t> max_size) : max_size_(max_size) { assert(max_size_.has_value()); }
 
     void set_max_size(std::optional<std::size_t> size) {
+        std::unique_lock<std::mutex> lk(lock_);
         assert(max_size_.has_value() && *size > 0);
         max_size_ = size;
         maybe_trim();
     }
 
-    void maybe_touch(const K& key) {
+    void maybe_touch(const K &key) {
+        std::unique_lock<std::mutex> lk(lock_);
         auto it = map_.find(key);
-        if(it == map_.end()) {
+        if (it == map_.end()) {
             return;
         }
         auto list_it = it->second;
         touch(list_it);
     }
 
-    std::optional<V&> maybe_get(const K& key) {
+    std::optional<V> maybe_get(const K &key) {
+        std::unique_lock<std::mutex> lk(lock_);
         auto it = map_.find(key);
-        if(it == map_.end()) {
-            return nullptr;
+        if (it == map_.end()) {
+            return std::nullopt;
         } else {
             touch(it->second);
             return it->second->value;
         }
     }
 
-    std::optional<const V&> maybe_get(const K& key) const {
+    std::optional<V> maybe_get(const K &key) const {
+        std::unique_lock<std::mutex> lk(lock_);
         auto it = map_.find(key);
-        if(it == map_.end()) {
-            return nullptr;
+        if (it == map_.end()) {
+            return std::nullopt;
         } else {
             touch(it->second);
             return it->second->value;
         }
     }
 
-    void set(const K& key, V value) {
+    void set(const K &key, V value) {
+        std::unique_lock<std::mutex> lk(lock_);
         auto it = map_.find(key);
-        if(it == map_.end()) {
+        if (it == map_.end()) {
             insert(key, std::move(value));
         } else {
             touch(it->second);
@@ -84,11 +90,26 @@ public:
         }
     }
 
-    std::optional<V&> insert(const K& key, V value) {
+    void unset(const K &key) {
+        std::unique_lock<std::mutex> lk(lock_);
+        auto it = map_.find(key);
+        if (it != map_.end()) {
+            // Doesn't remove the kv from the list, just from the map
+            map_.erase(it);
+        }
+    }
+
+    std::size_t size() const {
+        std::unique_lock<std::mutex> lk(lock_);
+        return lru.size();
+    }
+
+private:
+    std::optional<V> insert(const K &key, V value) {
         auto pair = map_.insert({key, lru.end()});
-        if(!pair.second) {
+        if (!pair.second) {
             // didn't insert
-            return nullptr;
+            return std::nullopt;
         }
         auto map_it = pair.first;
         lru.push_front({key, std::move(value)});
@@ -97,22 +118,15 @@ public:
         return lru.front().value;
     }
 
-    std::size_t size() const {
-        return lru.size();
-    }
-
-private:
-    void touch(list_iterator list_it) const {
-        lru.splice(lru.begin(), lru, list_it);
-    }
+    void touch(list_iterator list_it) const { lru.splice(lru.begin(), lru, list_it); }
 
     void maybe_trim() {
-        while(max_size_ && lru.size() > max_size_) {
-            const auto& to_remove = lru.back();
+        while (max_size_ && lru.size() > max_size_) {
+            const auto &to_remove = lru.back();
             map_.erase(to_remove.key);
             lru.pop_back();
         }
     }
 };
 
-}
+} // namespace infinity

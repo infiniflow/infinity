@@ -238,6 +238,9 @@ using std::endian;
 using std::align;
 
 using std::ptrdiff_t;
+using std::size_t;
+using std::optional;
+using std::nullopt;
 
 using std::dynamic_pointer_cast;
 using std::static_pointer_cast;
@@ -327,6 +330,9 @@ using std::strtoull;
 using std::construct_at;
 
 using std::set;
+using std::vector;
+using std::list;
+using std::unordered_map;
 
 using std::all_of;
 using std::any_of;
