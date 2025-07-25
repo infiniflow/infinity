@@ -170,13 +170,7 @@ void FileWorker::MoveFile() {
     }
 }
 
-void FileWorker::SetData(void *data) {
-    if (data_ != nullptr) {
-        String error_message = "Data has been set.";
-        UnrecoverableError(error_message);
-    }
-    data_ = data;
-}
+void FileWorker::SetData(void *data) { UnrecoverableError("Not implemented"); }
 
 void FileWorker::SetDataSize(SizeT size) {
     if (data_ == nullptr) {

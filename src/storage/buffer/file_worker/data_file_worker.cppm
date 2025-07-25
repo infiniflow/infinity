@@ -56,6 +56,6 @@ protected:
 
 private:
     const SizeT buffer_size_;
-    SizeT data_size_{};
+    Atomic<SizeT> data_size_{};
 };
 } // namespace infinity
