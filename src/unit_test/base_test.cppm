@@ -26,7 +26,6 @@ export module base_test;
 
 import infinity_core;
 import global_resource_usage;
-import infinity_exception;
 
 namespace fs = std::filesystem;
 
