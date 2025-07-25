@@ -445,7 +445,7 @@ TEST_P(WalReplayTest, wal_replay_append) {
             auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
             Status status;
 
-            Optional<DBMeeta> db_meta;
+            SharedPtr<DBMeeta> db_meta;
             Optional<TableMeeta> table_meta;
             status = txn->GetTableMeta("default_db", "tbl4", db_meta, table_meta);
             EXPECT_TRUE(status.ok());
@@ -649,7 +649,7 @@ TEST_P(WalReplayTest, wal_replay_import) {
                 auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
                 Status status;
 
-                Optional<DBMeeta> db_meta;
+                SharedPtr<DBMeeta> db_meta;
                 Optional<TableMeeta> table_meta;
                 status = txn->GetTableMeta("default_db", "tbl3", db_meta, table_meta);
                 EXPECT_TRUE(status.ok());

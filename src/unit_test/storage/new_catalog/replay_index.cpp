@@ -244,7 +244,7 @@ TEST_P(TestTxnReplayIndex, test_replay_append_with_index) {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>(fmt::format("check index {}", index_name)), TransactionType::kNormal);
 
         Status status;
-        Optional<DBMeeta> db_meta;
+        SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         Optional<TableIndexMeeta> table_index_meta;
         String table_key;
@@ -362,7 +362,7 @@ TEST_P(TestTxnReplayIndex, test_replay_append_with_index) {
     auto check_index2 = [&](const String &index_name, std::function<Pair<RowID, u32>(const SharedPtr<MemIndex> &)> check_mem_index) {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>(fmt::format("check merged index {}", index_name)), TransactionType::kNormal);
 
-        Optional<DBMeeta> db_meta;
+        SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         Optional<TableIndexMeeta> table_index_meta;
         String table_key;
@@ -620,7 +620,7 @@ TEST_P(TestTxnReplayIndex, test_populate_index) {
     auto check_index = [&](const String &index_name, std::function<Pair<RowID, u32>(const SharedPtr<MemIndex> &)> check_mem_index) {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>(fmt::format("check index {}", index_name)), TransactionType::kNormal);
 
-        Optional<DBMeeta> db_meta;
+        SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         Optional<TableIndexMeeta> table_index_meta;
         String table_key;

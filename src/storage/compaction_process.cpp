@@ -148,7 +148,7 @@ void CompactionProcessor::NewDoCompact() {
             }
         });
 
-        Optional<DBMeeta> db_meta;
+        SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         status = new_txn_shared->GetTableMeta(db_name, table_name, db_meta, table_meta);
         if (!status.ok()) {
@@ -220,7 +220,7 @@ Status CompactionProcessor::NewManualCompact(const String &db_name, const String
     auto *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
     auto *new_txn = new_txn_mgr->BeginTxn(MakeUnique<String>(fmt::format("compact table {}.{}", db_name, table_name)), TransactionType::kNormal);
 
-    Optional<DBMeeta> db_meta;
+    SharedPtr<DBMeeta> db_meta;
     Optional<TableMeeta> table_meta;
     Status status = new_txn->GetTableMeta(db_name, table_name, db_meta, table_meta);
     if (!status.ok()) {

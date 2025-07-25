@@ -189,7 +189,7 @@ Status NewTxn::Import(const String &db_name, const String &table_name, const Vec
     Status status;
     TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
 
-    Optional<DBMeeta> db_meta;
+    SharedPtr<DBMeeta> db_meta;
     Optional<TableMeeta> table_meta_opt;
     String table_key;
     status = GetTableMeta(db_name, table_name, db_meta, table_meta_opt, &table_key);
@@ -410,7 +410,7 @@ Status NewTxn::ReplayImport(WalCmdImportV2 *import_cmd, TxnTimeStamp commit_ts, 
             const WalSegmentInfo &segment_info = import_cmd->segment_info_;
             TxnTimeStamp fake_commit_ts = txn_context_ptr_->begin_ts_;
 
-            Optional<DBMeeta> db_meta;
+            SharedPtr<DBMeeta> db_meta;
             Optional<TableMeeta> table_meta_opt;
             status = GetTableMeta(import_cmd->db_name_, import_cmd->table_name_, db_meta, table_meta_opt);
             if (!status.ok()) {
@@ -437,7 +437,7 @@ Status NewTxn::ReplayImport(WalCmdImportV2 *import_cmd, TxnTimeStamp commit_ts, 
 
     TxnTimeStamp fake_commit_ts = txn_context_ptr_->begin_ts_;
 
-    Optional<DBMeeta> db_meta;
+    SharedPtr<DBMeeta> db_meta;
     Optional<TableMeeta> table_meta_opt;
     status = GetTableMeta(import_cmd->db_name_, import_cmd->table_name_, db_meta, table_meta_opt);
     if (!status.ok()) {
@@ -458,7 +458,7 @@ Status NewTxn::ReplayImport(WalCmdImportV2 *import_cmd, TxnTimeStamp commit_ts, 
 Status NewTxn::Append(const String &db_name, const String &table_name, const SharedPtr<DataBlock> &input_block) {
     this->CheckTxn(db_name);
 
-    Optional<DBMeeta> db_meta;
+    SharedPtr<DBMeeta> db_meta;
     Optional<TableMeeta> table_meta;
     String table_key;
     Status status = GetTableMeta(db_name, table_name, db_meta, table_meta, &table_key);
@@ -534,7 +534,7 @@ Status NewTxn::AppendInner(const String &db_name,
 Status NewTxn::Delete(const String &db_name, const String &table_name, const Vector<RowID> &row_ids) {
     this->CheckTxn(db_name);
 
-    Optional<DBMeeta> db_meta;
+    SharedPtr<DBMeeta> db_meta;
     Optional<TableMeeta> table_meta_opt;
     String table_key;
     Status status = GetTableMeta(db_name, table_name, db_meta, table_meta_opt, &table_key);
@@ -563,7 +563,7 @@ Status NewTxn::Delete(const String &db_name, const String &table_name, const Vec
 }
 
 Status NewTxn::ReplayDelete(WalCmdDeleteV2 *delete_cmd, TxnTimeStamp commit_ts, i64 txn_id) {
-    Optional<DBMeeta> db_meta;
+    SharedPtr<DBMeeta> db_meta;
     Optional<TableMeeta> table_meta;
     Status status = GetTableMeta(delete_cmd->db_name_, delete_cmd->table_name_, db_meta, table_meta);
     if (!status.ok()) {
@@ -592,7 +592,7 @@ Status NewTxn::DeleteInner(const String &db_name, const String &table_name, Tabl
 Status NewTxn::Update(const String &db_name, const String &table_name, const SharedPtr<DataBlock> &input_block, const Vector<RowID> &row_ids) {
     this->CheckTxn(db_name);
 
-    Optional<DBMeeta> db_meta;
+    SharedPtr<DBMeeta> db_meta;
     Optional<TableMeeta> table_meta;
     String table_key;
     Status status = GetTableMeta(db_name, table_name, db_meta, table_meta, &table_key);
@@ -651,7 +651,7 @@ Status NewTxn::Compact(const String &db_name, const String &table_name, const Ve
 
     TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
 
-    Optional<DBMeeta> db_meta;
+    SharedPtr<DBMeeta> db_meta;
     Optional<TableMeeta> table_meta_opt;
     String table_key;
     Status status = GetTableMeta(db_name, table_name, db_meta, table_meta_opt, &table_key);
@@ -809,7 +809,7 @@ Status NewTxn::ReplayCompact(WalCmdCompactV2 *compact_cmd) {
     Status status;
     TxnTimeStamp fake_commit_ts = txn_context_ptr_->begin_ts_;
 
-    Optional<DBMeeta> db_meta;
+    SharedPtr<DBMeeta> db_meta;
     Optional<TableMeeta> table_meta_opt;
     status = GetTableMeta(compact_cmd->db_name_, compact_cmd->table_name_, db_meta, table_meta_opt);
     if (!status.ok()) {
@@ -858,7 +858,7 @@ Status NewTxn::ReplayCompact(WalCmdCompactV2 *compact_cmd, TxnTimeStamp commit_t
                 for(const WalSegmentInfo &segment_info : compact_cmd->new_segment_infos_) {
                     TxnTimeStamp fake_commit_ts = txn_context_ptr_->begin_ts_;
 
-                    Optional<DBMeeta> db_meta;
+                    SharedPtr<DBMeeta> db_meta;
                     Optional<TableMeeta> table_meta_opt;
                     status = GetTableMeta(compact_cmd->db_name_, compact_cmd->table_name_, db_meta, table_meta_opt);
                     if (!status.ok()) {
@@ -891,7 +891,7 @@ Status NewTxn::ReplayCompact(WalCmdCompactV2 *compact_cmd, TxnTimeStamp commit_t
 
     TxnTimeStamp fake_commit_ts = txn_context_ptr_->begin_ts_;
 
-    Optional<DBMeeta> db_meta;
+    SharedPtr<DBMeeta> db_meta;
     Optional<TableMeeta> table_meta_opt;
     Status status = GetTableMeta(compact_cmd->db_name_, compact_cmd->table_name_, db_meta, table_meta_opt);
     if (!status.ok()) {

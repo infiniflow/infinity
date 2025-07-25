@@ -436,7 +436,7 @@ Status NewCatalog::AddNewDB(NewTxn *txn,
                             TxnTimeStamp commit_ts,
                             const String &db_name,
                             const String *db_comment,
-                            Optional<DBMeeta> &db_meta) {
+                            SharedPtr<DBMeeta> &db_meta) {
     KVInstance *kv_instance = txn->kv_instance();
 
     String db_key = KeyEncode::CatalogDbKey(db_name, commit_ts);
@@ -445,7 +445,7 @@ Status NewCatalog::AddNewDB(NewTxn *txn,
         return status;
     }
 
-    db_meta.emplace(db_id_str, txn);
+    db_meta = MakeShared<DBMeeta>(db_id_str, txn);
     status = db_meta->InitSet(db_comment);
     if (!status.ok()) {
         return status;

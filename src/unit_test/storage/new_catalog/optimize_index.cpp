@@ -190,7 +190,7 @@ TEST_P(TestTxnOptimizeIndex, optimize_index_rollback) {
     {
         auto check_opt_index = [this](const Vector<ChunkID> &my_chunk_ids) { // check optimize index
             auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check"), TransactionType::kNormal);
-            Optional<DBMeeta> db_meta;
+            SharedPtr<DBMeeta> db_meta;
             Optional<TableMeeta> table_meta;
             Optional<TableIndexMeeta> table_index_meta;
             String table_key;
@@ -683,7 +683,7 @@ TEST_P(TestTxnOptimizeIndex, optimize_index_and_optimize_index) {
     auto CheckTable = [&] {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check table"), TransactionType::kNormal);
 
-        Optional<DBMeeta> db_meta;
+        SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         Status status = txn->GetTableMeta(*db_name_, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
@@ -1695,7 +1695,7 @@ TEST_P(TestTxnOptimizeIndex, optimize_index_and_compact_table) {
     auto CheckTable = [&](Vector<ColumnID> column_idxes) {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check table"), TransactionType::kNormal);
 
-        Optional<DBMeeta> db_meta;
+        SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         Status status = txn->GetTableMeta(*db_name_, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());

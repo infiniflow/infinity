@@ -189,7 +189,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_db) {
     auto check_index0 = [&](const String &index_name, std::function<void(const SharedPtr<MemIndex> &)> check_mem_index) {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check index1"), TransactionType::kNormal);
 
-        Optional<DBMeeta> db_meta;
+        SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         Optional<TableIndexMeeta> table_index_meta;
         String table_key;
@@ -239,7 +239,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_db) {
     auto check_index = [&](const String &index_name, std::function<Pair<RowID, u32>(const SharedPtr<MemIndex> &)> check_mem_index) {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check index1"), TransactionType::kNormal);
 
-        Optional<DBMeeta> db_meta;
+        SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         Optional<TableIndexMeeta> table_index_meta;
         String table_key;
@@ -707,7 +707,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_table) {
     auto check_index0 = [&](const String &index_name, std::function<void(const SharedPtr<MemIndex> &)> check_mem_index) {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check index1"), TransactionType::kNormal);
 
-        Optional<DBMeeta> db_meta;
+        SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         Optional<TableIndexMeeta> table_index_meta;
         String table_key;
@@ -758,7 +758,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_table) {
     auto check_index = [&](const String &index_name, std::function<Pair<RowID, u32>(const SharedPtr<MemIndex> &)> check_mem_index) {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check index1"), TransactionType::kNormal);
 
-        Optional<DBMeeta> db_meta;
+        SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         Optional<TableIndexMeeta> table_index_meta;
         String table_key;
@@ -1307,7 +1307,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_add_column) {
     auto check_index0 = [&](const String &index_name, std::function<void(const SharedPtr<MemIndex> &)> check_mem_index) {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check index1"), TransactionType::kNormal);
 
-        Optional<DBMeeta> db_meta;
+        SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         Optional<TableIndexMeeta> table_index_meta;
         String table_key;
@@ -1358,7 +1358,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_add_column) {
     auto check_index = [&](const String &index_name, std::function<Pair<RowID, u32>(const SharedPtr<MemIndex> &)> check_mem_index) {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check index1"), TransactionType::kNormal);
 
-        Optional<DBMeeta> db_meta;
+        SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         Optional<TableIndexMeeta> table_index_meta;
         String table_key;
@@ -1925,7 +1925,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_column) {
     auto check_index0 = [&](const String &index_name, std::function<void(const SharedPtr<MemIndex> &)> check_mem_index) {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check index1"), TransactionType::kNormal);
 
-        Optional<DBMeeta> db_meta;
+        SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         Optional<TableIndexMeeta> table_index_meta;
         String table_key;
@@ -1976,7 +1976,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_column) {
     auto check_index = [&](const String &index_name, std::function<Pair<RowID, u32>(const SharedPtr<MemIndex> &)> check_mem_index) {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check index1"), TransactionType::kNormal);
 
-        Optional<DBMeeta> db_meta;
+        SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         Optional<TableIndexMeeta> table_index_meta;
         String table_key;
@@ -2505,7 +2505,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_rename_table) {
     auto check_index0 = [&](const String &index_name, std::function<void(const SharedPtr<MemIndex> &)> check_mem_index) {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check index1"), TransactionType::kNormal);
 
-        Optional<DBMeeta> db_meta;
+        SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         Optional<TableIndexMeeta> table_index_meta;
         String table_key;
@@ -2556,7 +2556,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_rename_table) {
     auto check_index = [&](const String &index_name, std::function<Pair<RowID, u32>(const SharedPtr<MemIndex> &)> check_mem_index) {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check index1"), TransactionType::kNormal);
 
-        Optional<DBMeeta> db_meta;
+        SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         Optional<TableIndexMeeta> table_index_meta;
         String table_key;
@@ -3040,7 +3040,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_create_index) {
     auto check_index0 = [&](const String &index_name, std::function<void(const SharedPtr<MemIndex> &)> check_mem_index) {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check index1"), TransactionType::kNormal);
 
-        Optional<DBMeeta> db_meta;
+        SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         Optional<TableIndexMeeta> table_index_meta;
         String table_key;
@@ -3091,7 +3091,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_create_index) {
     auto check_index = [&](const String &index_name, std::function<Pair<RowID, u32>(const SharedPtr<MemIndex> &)> check_mem_index) {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check index1"), TransactionType::kNormal);
 
-        Optional<DBMeeta> db_meta;
+        SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         Optional<TableIndexMeeta> table_index_meta;
         String table_key;
@@ -3317,7 +3317,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_index) {
     auto check_index0 = [&](const String &index_name, std::function<void(const SharedPtr<MemIndex> &)> check_mem_index) {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check index1"), TransactionType::kNormal);
 
-        Optional<DBMeeta> db_meta;
+        SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         Optional<TableIndexMeeta> table_index_meta;
         String table_key;
@@ -3368,7 +3368,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_index) {
     auto check_index = [&](const String &index_name, std::function<Pair<RowID, u32>(const SharedPtr<MemIndex> &)> check_mem_index) {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check index1"), TransactionType::kNormal);
 
-        Optional<DBMeeta> db_meta;
+        SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         Optional<TableIndexMeeta> table_index_meta;
         String table_key;
@@ -3859,7 +3859,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_import) {
     auto check_index0 = [&](const String &index_name, std::function<void(const SharedPtr<MemIndex> &)> check_mem_index) {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check index1"), TransactionType::kNormal);
 
-        Optional<DBMeeta> db_meta;
+        SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         Optional<TableIndexMeeta> table_index_meta;
         String table_key;
@@ -3910,7 +3910,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_import) {
     auto check_index1 = [&](const String &index_name, std::function<Pair<RowID, u32>(const SharedPtr<MemIndex> &)> check_mem_index) {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check index1"), TransactionType::kNormal);
 
-        Optional<DBMeeta> db_meta;
+        SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         Optional<TableIndexMeeta> table_index_meta;
         String table_key;
@@ -3960,7 +3960,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_import) {
     auto check_index2 = [&](const String &index_name, std::function<void(const SharedPtr<MemIndex> &)> check_mem_index) {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check index1"), TransactionType::kNormal);
 
-        Optional<DBMeeta> db_meta;
+        SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         Optional<TableIndexMeeta> table_index_meta;
         String table_key;
@@ -4011,7 +4011,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_import) {
     auto check_index3 = [&](const String &index_name, std::function<Pair<RowID, u32>(const SharedPtr<MemIndex> &)> check_mem_index) {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check index1"), TransactionType::kNormal);
 
-        Optional<DBMeeta> db_meta;
+        SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         Optional<TableIndexMeeta> table_index_meta;
         String table_key;
@@ -4599,7 +4599,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_append) {
     auto check_index0 = [&](const String &index_name, std::function<void(const SharedPtr<MemIndex> &)> check_mem_index) {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check index1"), TransactionType::kNormal);
 
-        Optional<DBMeeta> db_meta;
+        SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         Optional<TableIndexMeeta> table_index_meta;
         String table_key;
@@ -4650,7 +4650,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_append) {
     auto check_index1 = [&](const String &index_name, std::function<Pair<RowID, u32>(const SharedPtr<MemIndex> &)> check_mem_index) {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check index1"), TransactionType::kNormal);
 
-        Optional<DBMeeta> db_meta;
+        SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         Optional<TableIndexMeeta> table_index_meta;
         String table_key;
@@ -4700,7 +4700,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_append) {
     auto check_index3 = [&](const String &index_name, std::function<void(const SharedPtr<MemIndex> &)> check_mem_index) {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check index1"), TransactionType::kNormal);
 
-        Optional<DBMeeta> db_meta;
+        SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         Optional<TableIndexMeeta> table_index_meta;
         String table_key;
@@ -5179,7 +5179,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_delete) {
     auto check_index0 = [&](const String &index_name, std::function<void(const SharedPtr<MemIndex> &)> check_mem_index) {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check index1"), TransactionType::kNormal);
 
-        Optional<DBMeeta> db_meta;
+        SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         Optional<TableIndexMeeta> table_index_meta;
         String table_key;
@@ -5232,7 +5232,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_delete) {
         TxnTimeStamp begin_ts = txn->BeginTS();
         TxnTimeStamp commit_ts = txn->CommitTS();
 
-        Optional<DBMeeta> db_meta;
+        SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
@@ -5762,7 +5762,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_dump) {
     auto check_index0 = [&](const String &index_name, std::function<void(const SharedPtr<MemIndex> &)> check_mem_index) {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check index1"), TransactionType::kNormal);
 
-        Optional<DBMeeta> db_meta;
+        SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         Optional<TableIndexMeeta> table_index_meta;
         String table_key;
@@ -5813,7 +5813,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_dump) {
     auto check_index1 = [&](const String &index_name, std::function<Pair<RowID, u32>(const SharedPtr<MemIndex> &)> check_mem_index) {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check index1"), TransactionType::kNormal);
 
-        Optional<DBMeeta> db_meta;
+        SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         Optional<TableIndexMeeta> table_index_meta;
         String table_key;
@@ -6189,7 +6189,7 @@ TEST_P(TestTxnDumpMemIndex, test_dump_index_and_optimize_index) {
     auto CheckTable = [&](const Vector<SegmentID> &segment_ids, const Vector<ChunkID> &chunk_ids) { //
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check table"), TransactionType::kNormal);
 
-        Optional<DBMeeta> db_meta;
+        SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
@@ -6540,7 +6540,7 @@ TEST_P(TestTxnDumpMemIndex, test_dump_index_and_compact) {
     auto CheckTable = [&](const Vector<SegmentID> &segment_ids, SegmentID dump_segment_id, const Vector<ChunkID> &chunk_ids) {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check table"), TransactionType::kNormal);
 
-        Optional<DBMeeta> db_meta;
+        SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());

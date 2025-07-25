@@ -125,7 +125,7 @@ TEST_P(TestTxnReplayAppend, test_append0) {
         TxnTimeStamp begin_ts = txn->BeginTS();
         TxnTimeStamp commit_ts = txn->CommitTS();
 
-        Optional<DBMeeta> db_meta;
+        SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
@@ -231,7 +231,7 @@ TEST_P(TestTxnReplayAppend, test_replay_append_delete) {
         TxnTimeStamp begin_ts = txn->BeginTS();
         TxnTimeStamp commit_ts = txn->CommitTS();
 
-        Optional<DBMeeta> db_meta;
+        SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
@@ -365,7 +365,7 @@ TEST_P(TestTxnReplayAppend, test_replay_append_with_index0) {
     auto check_index = [&](const String &index_name, const std::function<Pair<RowID, u32>(const SharedPtr<MemIndex> &)> &check_mem_index) {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check index"), TransactionType::kNormal);
 
-        Optional<DBMeeta> db_meta;
+        SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         Optional<TableIndexMeeta> table_index_meta;
         String table_key;

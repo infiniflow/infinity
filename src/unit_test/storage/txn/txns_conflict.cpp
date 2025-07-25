@@ -54,7 +54,7 @@ public:
         TxnTimeStamp begin_ts = txn->BeginTS();
         TxnTimeStamp commit_ts = txn->CommitTS();
 
-        Optional<DBMeeta> db_meta;
+        SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         Status status = txn->GetTableMeta("default_db", "t1", db_meta, table_meta);
         EXPECT_TRUE(status.ok());

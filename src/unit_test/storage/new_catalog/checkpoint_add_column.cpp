@@ -161,7 +161,7 @@ TEST_P(TestTxnCheckpointAddColumnTest, addcol_checkpoint_insert) {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check"), TransactionType::kNormal);
 
         // Check table row count is 20
-        Optional<DBMeeta> db_meta;
+        SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         Status status1 = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status1.ok());

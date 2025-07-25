@@ -121,7 +121,7 @@ TEST_P(TestTxnImport, test_import1) {
         TxnTimeStamp begin_ts = txn->BeginTS();
         TxnTimeStamp commit_ts = txn->CommitTS();
 
-        Optional<DBMeeta> db_meta;
+        SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
@@ -269,7 +269,7 @@ TEST_P(TestTxnImport, test_import_with_index) {
     auto check_index = [&](const String &index_name) {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check index1"), TransactionType::kNormal);
 
-        Optional<DBMeeta> db_meta;
+        SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         Optional<TableIndexMeeta> table_index_meta;
         String table_key;
@@ -480,7 +480,7 @@ TEST_P(TestTxnImport, test_insert_and_import) {
     {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
 
-        Optional<DBMeeta> db_meta;
+        SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
@@ -514,7 +514,7 @@ TEST_P(TestTxnImport, test_insert_and_import) {
     {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
 
-        Optional<DBMeeta> db_meta;
+        SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
@@ -692,7 +692,7 @@ TEST_P(TestTxnImport, test_import_drop_db) {
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
 
-        Optional<DBMeeta> db_meta;
+        SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
@@ -747,7 +747,7 @@ TEST_P(TestTxnImport, test_import_drop_db) {
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
 
-        Optional<DBMeeta> db_meta;
+        SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
@@ -803,7 +803,7 @@ TEST_P(TestTxnImport, test_import_drop_db) {
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
 
-        Optional<DBMeeta> db_meta;
+        SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
@@ -859,7 +859,7 @@ TEST_P(TestTxnImport, test_import_drop_db) {
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
 
-        Optional<DBMeeta> db_meta;
+        SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
@@ -905,7 +905,7 @@ TEST_P(TestTxnImport, test_import_drop_db) {
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
 
-        Optional<DBMeeta> db_meta;
+        SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
@@ -951,7 +951,7 @@ TEST_P(TestTxnImport, test_import_drop_db) {
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
 
-        Optional<DBMeeta> db_meta;
+        SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
@@ -998,7 +998,7 @@ TEST_P(TestTxnImport, test_import_drop_db) {
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
 
-        Optional<DBMeeta> db_meta;
+        SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
@@ -1043,7 +1043,7 @@ TEST_P(TestTxnImport, test_import_drop_db) {
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
 
-        Optional<DBMeeta> db_meta;
+        SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
@@ -1231,7 +1231,7 @@ TEST_P(TestTxnImport, test_import_drop_table) {
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
 
-        Optional<DBMeeta> db_meta;
+        SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
@@ -1292,7 +1292,7 @@ TEST_P(TestTxnImport, test_import_drop_table) {
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
 
-        Optional<DBMeeta> db_meta;
+        SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
@@ -1354,7 +1354,7 @@ TEST_P(TestTxnImport, test_import_drop_table) {
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
 
-        Optional<DBMeeta> db_meta;
+        SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
@@ -1416,7 +1416,7 @@ TEST_P(TestTxnImport, test_import_drop_table) {
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
 
-        Optional<DBMeeta> db_meta;
+        SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_EQ(status.code(), ErrorCode::kTableNotExist);
@@ -1468,7 +1468,7 @@ TEST_P(TestTxnImport, test_import_drop_table) {
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
 
-        Optional<DBMeeta> db_meta;
+        SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_EQ(status.code(), ErrorCode::kTableNotExist);
@@ -1520,7 +1520,7 @@ TEST_P(TestTxnImport, test_import_drop_table) {
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
 
-        Optional<DBMeeta> db_meta;
+        SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_EQ(status.code(), ErrorCode::kTableNotExist);
@@ -1573,7 +1573,7 @@ TEST_P(TestTxnImport, test_import_drop_table) {
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
 
-        Optional<DBMeeta> db_meta;
+        SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_EQ(status.code(), ErrorCode::kTableNotExist);
@@ -1624,7 +1624,7 @@ TEST_P(TestTxnImport, test_import_drop_table) {
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
 
-        Optional<DBMeeta> db_meta;
+        SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_EQ(status.code(), ErrorCode::kTableNotExist);
@@ -1840,7 +1840,7 @@ TEST_P(TestTxnImport, test_import_add_columns) {
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
 
-        Optional<DBMeeta> db_meta;
+        SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
@@ -1900,7 +1900,7 @@ TEST_P(TestTxnImport, test_import_add_columns) {
 
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
-        Optional<DBMeeta> db_meta;
+        SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
@@ -1960,7 +1960,7 @@ TEST_P(TestTxnImport, test_import_add_columns) {
 
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
-        Optional<DBMeeta> db_meta;
+        SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
@@ -2019,7 +2019,7 @@ TEST_P(TestTxnImport, test_import_add_columns) {
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
 
-        Optional<DBMeeta> db_meta;
+        SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
@@ -2078,7 +2078,7 @@ TEST_P(TestTxnImport, test_import_add_columns) {
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
 
-        Optional<DBMeeta> db_meta;
+        SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
@@ -2137,7 +2137,7 @@ TEST_P(TestTxnImport, test_import_add_columns) {
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
 
-        Optional<DBMeeta> db_meta;
+        SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         status = new_txn_mgr->CommitTxn(txn5);
@@ -2196,7 +2196,7 @@ TEST_P(TestTxnImport, test_import_add_columns) {
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
 
-        Optional<DBMeeta> db_meta;
+        SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         status = new_txn_mgr->CommitTxn(txn5);
@@ -2252,7 +2252,7 @@ TEST_P(TestTxnImport, test_import_add_columns) {
 
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
-        Optional<DBMeeta> db_meta;
+        SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         status = new_txn_mgr->CommitTxn(txn5);
@@ -2454,7 +2454,7 @@ TEST_P(TestTxnImport, test_import_drop_columns) {
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
 
-        Optional<DBMeeta> db_meta;
+        SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
@@ -2509,7 +2509,7 @@ TEST_P(TestTxnImport, test_import_drop_columns) {
 
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
-        Optional<DBMeeta> db_meta;
+        SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
@@ -2564,7 +2564,7 @@ TEST_P(TestTxnImport, test_import_drop_columns) {
 
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
-        Optional<DBMeeta> db_meta;
+        SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
@@ -2618,7 +2618,7 @@ TEST_P(TestTxnImport, test_import_drop_columns) {
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
 
-        Optional<DBMeeta> db_meta;
+        SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
@@ -2672,7 +2672,7 @@ TEST_P(TestTxnImport, test_import_drop_columns) {
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
 
-        Optional<DBMeeta> db_meta;
+        SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
@@ -2726,7 +2726,7 @@ TEST_P(TestTxnImport, test_import_drop_columns) {
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
 
-        Optional<DBMeeta> db_meta;
+        SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         status = new_txn_mgr->CommitTxn(txn5);
@@ -2780,7 +2780,7 @@ TEST_P(TestTxnImport, test_import_drop_columns) {
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
 
-        Optional<DBMeeta> db_meta;
+        SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         status = new_txn_mgr->CommitTxn(txn5);
@@ -2831,7 +2831,7 @@ TEST_P(TestTxnImport, test_import_drop_columns) {
 
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
-        Optional<DBMeeta> db_meta;
+        SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         status = new_txn_mgr->CommitTxn(txn5);
@@ -2949,7 +2949,7 @@ TEST_P(TestTxnImport, test_import) {
         TxnTimeStamp begin_ts = txn->BeginTS();
         TxnTimeStamp commit_ts = txn->CommitTS();
 
-        Optional<DBMeeta> db_meta;
+        SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
@@ -3187,7 +3187,7 @@ TEST_P(TestTxnImport, test_import_append_table) {
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
 
-        Optional<DBMeeta> db_meta;
+        SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
@@ -3241,7 +3241,7 @@ TEST_P(TestTxnImport, test_import_append_table) {
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
 
-        Optional<DBMeeta> db_meta;
+        SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
@@ -3295,7 +3295,7 @@ TEST_P(TestTxnImport, test_import_append_table) {
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
 
-        Optional<DBMeeta> db_meta;
+        SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
@@ -3348,7 +3348,7 @@ TEST_P(TestTxnImport, test_import_append_table) {
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
 
-        Optional<DBMeeta> db_meta;
+        SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
@@ -3403,7 +3403,7 @@ TEST_P(TestTxnImport, test_import_append_table) {
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
 
-        Optional<DBMeeta> db_meta;
+        SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
@@ -3458,7 +3458,7 @@ TEST_P(TestTxnImport, test_import_append_table) {
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
 
-        Optional<DBMeeta> db_meta;
+        SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
@@ -3513,7 +3513,7 @@ TEST_P(TestTxnImport, test_import_append_table) {
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
 
-        Optional<DBMeeta> db_meta;
+        SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
@@ -3566,7 +3566,7 @@ TEST_P(TestTxnImport, test_import_append_table) {
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
 
-        Optional<DBMeeta> db_meta;
+        SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
@@ -3617,7 +3617,7 @@ TEST_P(TestTxnImport, test_import_append_table) {
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
 
-        Optional<DBMeeta> db_meta;
+        SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
@@ -3798,7 +3798,7 @@ TEST_P(TestTxnImport, test_import_import_table) {
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
 
-        Optional<DBMeeta> db_meta;
+        SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
@@ -3852,7 +3852,7 @@ TEST_P(TestTxnImport, test_import_import_table) {
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
 
-        Optional<DBMeeta> db_meta;
+        SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
@@ -3906,7 +3906,7 @@ TEST_P(TestTxnImport, test_import_import_table) {
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
 
-        Optional<DBMeeta> db_meta;
+        SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
@@ -3962,7 +3962,7 @@ TEST_P(TestTxnImport, test_import_import_table) {
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
 
-        Optional<DBMeeta> db_meta;
+        SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
@@ -4017,7 +4017,7 @@ TEST_P(TestTxnImport, test_import_import_table) {
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
 
-        Optional<DBMeeta> db_meta;
+        SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
@@ -4072,7 +4072,7 @@ TEST_P(TestTxnImport, test_import_import_table) {
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
 
-        Optional<DBMeeta> db_meta;
+        SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
@@ -4688,7 +4688,7 @@ TEST_P(TestTxnImport, test_import_and_create_index) {
 
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
-        Optional<DBMeeta> db_meta;
+        SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
@@ -4744,7 +4744,7 @@ TEST_P(TestTxnImport, test_import_and_create_index) {
 
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
-        Optional<DBMeeta> db_meta;
+        SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
@@ -4800,7 +4800,7 @@ TEST_P(TestTxnImport, test_import_and_create_index) {
 
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
-        Optional<DBMeeta> db_meta;
+        SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
@@ -4855,7 +4855,7 @@ TEST_P(TestTxnImport, test_import_and_create_index) {
 
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
-        Optional<DBMeeta> db_meta;
+        SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
@@ -4913,7 +4913,7 @@ TEST_P(TestTxnImport, test_import_and_create_index) {
 
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
-        Optional<DBMeeta> db_meta;
+        SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
@@ -4969,7 +4969,7 @@ TEST_P(TestTxnImport, test_import_and_create_index) {
 
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
-        Optional<DBMeeta> db_meta;
+        SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
@@ -5026,7 +5026,7 @@ TEST_P(TestTxnImport, test_import_and_create_index) {
 
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
-        Optional<DBMeeta> db_meta;
+        SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
@@ -5081,7 +5081,7 @@ TEST_P(TestTxnImport, test_import_and_create_index) {
 
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
-        Optional<DBMeeta> db_meta;
+        SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
@@ -5288,7 +5288,7 @@ TEST_P(TestTxnImport, test_import_and_drop_index) {
 
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
-        Optional<DBMeeta> db_meta;
+        SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
@@ -5351,7 +5351,7 @@ TEST_P(TestTxnImport, test_import_and_drop_index) {
 
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
-        Optional<DBMeeta> db_meta;
+        SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
@@ -5414,7 +5414,7 @@ TEST_P(TestTxnImport, test_import_and_drop_index) {
 
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
-        Optional<DBMeeta> db_meta;
+        SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
@@ -5476,7 +5476,7 @@ TEST_P(TestTxnImport, test_import_and_drop_index) {
 
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
-        Optional<DBMeeta> db_meta;
+        SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
@@ -5540,7 +5540,7 @@ TEST_P(TestTxnImport, test_import_and_drop_index) {
 
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
-        Optional<DBMeeta> db_meta;
+        SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
@@ -5602,7 +5602,7 @@ TEST_P(TestTxnImport, test_import_and_drop_index) {
 
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
-        Optional<DBMeeta> db_meta;
+        SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
@@ -5665,7 +5665,7 @@ TEST_P(TestTxnImport, test_import_and_drop_index) {
 
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
-        Optional<DBMeeta> db_meta;
+        SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
@@ -5726,7 +5726,7 @@ TEST_P(TestTxnImport, test_import_and_drop_index) {
 
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
-        Optional<DBMeeta> db_meta;
+        SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
@@ -5818,7 +5818,7 @@ TEST_P(TestTxnImport, test_import_and_compact) {
     auto CheckTable = [&](const Vector<SegmentID> &segment_ids) {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check table"), TransactionType::kNormal);
 
-        Optional<DBMeeta> db_meta;
+        SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
@@ -6181,7 +6181,7 @@ TEST_P(TestTxnImport, test_import_and_optimize_index) {
     auto CheckTable = [&](Vector<ColumnID> column_idxes) {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check table"), TransactionType::kNormal);
 
-        Optional<DBMeeta> db_meta;
+        SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());

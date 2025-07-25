@@ -621,7 +621,7 @@ TEST_F(BufferObjTest, test_hnsw_index_buffer_obj_shutdown) {
 
         auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("check index1"), TransactionType::kNormal);
 
-        Optional<DBMeeta> db_meta;
+        SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         Optional<TableIndexMeeta> table_index_meta;
         String table_key;
@@ -724,7 +724,7 @@ TEST_F(BufferObjTest, test_big_with_gc_and_cleanup) {
         TxnTimeStamp begin_ts = txn->BeginTS();
         TxnTimeStamp commit_ts = txn->CommitTS();
 
-        Optional<DBMeeta> db_meta;
+        SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
@@ -856,7 +856,7 @@ TEST_F(BufferObjTest, test_multiple_threads_read) {
             TxnTimeStamp begin_ts = txn->BeginTS();
             TxnTimeStamp commit_ts = txn->CommitTS();
 
-            Optional<DBMeeta> db_meta;
+            SharedPtr<DBMeeta> db_meta;
             Optional<TableMeeta> table_meta;
             Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
             EXPECT_TRUE(status.ok());

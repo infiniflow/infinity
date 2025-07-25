@@ -113,7 +113,7 @@ TEST_P(RepeatReplayTest, append) {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("get table"), TransactionType::kRead);
         Status status;
 
-        Optional<DBMeeta> db_meta;
+        SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());

@@ -98,7 +98,7 @@ TEST_P(TestTxnIndex, index_test1) {
         auto *txn3_1 = new_txn_mgr->BeginTxn(MakeUnique<String>("get index"), TransactionType::kNormal);
         SharedPtr<IndexBase> index_def1;
 
-        Optional<DBMeeta> db_meta;
+        SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         Optional<TableIndexMeeta> index_meta;
         String table_key;

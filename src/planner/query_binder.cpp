@@ -436,7 +436,7 @@ SharedPtr<BaseTableRef> QueryBinder::BuildBaseTable(QueryContext *query_context,
     SharedPtr<TableInfo> table_info;
     Status status;
     NewTxn *new_txn = query_context->GetNewTxn();
-    Optional<DBMeeta> db_meta;
+    SharedPtr<DBMeeta> db_meta;
     Optional<TableMeeta> tmp_table_meta;
     status = new_txn->GetTableMeta(db_name, table_name, db_meta, tmp_table_meta);
     if (!status.ok()) {
