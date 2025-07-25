@@ -154,6 +154,7 @@ public:
     void CheckState() const;
 
     void SetData(void *data);
+    void SetDataSize(SizeT size);
 
 protected:
     mutable std::mutex w_locker_{};

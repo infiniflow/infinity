@@ -52,7 +52,10 @@ protected:
 
     void FreeFromMmapImpl() override;
 
+    void SetDataSize(SizeT size) override;
+
 private:
     const SizeT buffer_size_;
+    SizeT data_size_{};
 };
 } // namespace infinity

@@ -178,6 +178,13 @@ void FileWorker::SetData(void *data) {
     data_ = data;
 }
 
+void FileWorker::SetDataSize(SizeT size) {
+    if (data_ == nullptr) {
+        String error_message = "Data has not been set.";
+        UnrecoverableError(error_message);
+    }
+}
+
 // Get absolute file path. As key of buffer handle.
 String FileWorker::GetFilePath() const { return Path(*data_dir_) / *file_dir_ / *file_name_; }
 
