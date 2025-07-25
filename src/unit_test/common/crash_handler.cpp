@@ -120,7 +120,7 @@ void CrashHandler::PrintCrashInfo(int signal, const char *test_name) {
     fmt::print(stderr, "         STACK TRACE\n");
     fmt::print(stderr, "=====================================\n");
 
-    // Use cpptrace directly (same as Infinity's PrintStacktrace)
+    // Use directly (same as Infinity's PrintStacktrace)
     try {
         std::string trace = to_string(std::stacktrace::current());
 
@@ -135,7 +135,7 @@ void CrashHandler::PrintCrashInfo(int signal, const char *test_name) {
         fmt::print(stderr, "{}\n", trace.c_str());
 
     } catch (...) {
-        fmt::print(stderr, "Failed to generate cpptrace stacktrace\n");
+        fmt::print(stderr, "Failed to generate stacktrace\n");
     }
 
     fmt::print(stderr, "=====================================\n");

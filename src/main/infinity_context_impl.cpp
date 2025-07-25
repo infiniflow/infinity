@@ -64,9 +64,9 @@ void InfinityContext::InitPhase1(const SharedPtr<String> &config_path, DefaultCo
         std::exit(static_cast<int>(status.code()));
     }
 
-    // Printing stack trace costs several seconds, so it's disabled by default.
+    // Printing stack trace costs several seconds
     SetPrintStacktrace(true);
-    // Uncomment the following line to see if cpptrace work.
+    // Uncomment the following line to see if work.
     // UnrecoverableError("InfinityContext::InitPhase1");
 
     resource_manager_ = MakeUnique<ResourceManager>(config_->CPULimit(), 0);
