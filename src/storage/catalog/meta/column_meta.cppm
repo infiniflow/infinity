@@ -20,6 +20,7 @@ import stl;
 import status;
 import new_catalog;
 import column_def;
+import base_meta;
 
 namespace infinity {
 
@@ -28,7 +29,7 @@ class KVInstance;
 class BufferObj;
 // class ColumnDef;
 
-export class ColumnMeta {
+export class ColumnMeta : public BaseMeta {
 public:
     ColumnMeta(SizeT column_idx, BlockMeta &block_meta);
 

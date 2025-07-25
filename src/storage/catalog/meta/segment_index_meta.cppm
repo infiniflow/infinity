@@ -21,6 +21,7 @@ import status;
 import third_party;
 import meta_info;
 import new_catalog;
+import base_meta;
 
 namespace infinity {
 
@@ -30,7 +31,7 @@ struct MemIndex;
 // struct SegmentIndexFtInfo;
 class NewTxn;
 
-export class SegmentIndexMeta {
+export class SegmentIndexMeta : public BaseMeta {
 public:
     SegmentIndexMeta(SegmentID segment_id, TableIndexMeeta &table_index_meta);
 

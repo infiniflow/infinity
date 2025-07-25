@@ -31,13 +31,13 @@ import data_file_worker;
 import var_file_worker;
 import vector_buffer;
 import column_vector;
-
+import meta_type;
 import logical_type;
 
 namespace infinity {
 
 ColumnMeta::ColumnMeta(SizeT column_idx, BlockMeta &block_meta)
-    : kv_instance_(block_meta.kv_instance()), block_meta_(block_meta), column_idx_(column_idx) {}
+    : BaseMeta(MetaType::kBlockColumn), kv_instance_(block_meta.kv_instance()), block_meta_(block_meta), column_idx_(column_idx) {}
 
 Status ColumnMeta::GetChunkOffset(SizeT &chunk_offset) {
     if (!chunk_offset_) {

@@ -28,10 +28,11 @@ import default_values;
 import new_txn;
 import utility;
 import kv_utility;
+import meta_type;
 
 namespace infinity {
 
-DBMeeta::DBMeeta(String db_id_str, NewTxn *txn) : db_id_str_(std::move(db_id_str)), txn_(txn) {
+DBMeeta::DBMeeta(String db_id_str, NewTxn *txn) : BaseMeta(MetaType::kDB), db_id_str_(std::move(db_id_str)), txn_(txn) {
     if (txn == nullptr) {
         UnrecoverableError("Null txn pointer");
     }
@@ -40,7 +41,7 @@ DBMeeta::DBMeeta(String db_id_str, NewTxn *txn) : db_id_str_(std::move(db_id_str
 }
 
 DBMeeta::DBMeeta(String db_id_str, KVInstance *kv_instance)
-    : db_id_str_(std::move(db_id_str)), txn_begin_ts_{MAX_TIMESTAMP}, kv_instance_{kv_instance} {}
+    : BaseMeta(MetaType::kDB), db_id_str_(std::move(db_id_str)), txn_begin_ts_{MAX_TIMESTAMP}, kv_instance_{kv_instance} {}
 
 const String &DBMeeta::db_id_str() const { return db_id_str_; }
 

@@ -21,6 +21,7 @@ import status;
 import default_values;
 import meta_info;
 import new_catalog;
+import base_meta;
 
 namespace infinity {
 
@@ -30,7 +31,7 @@ class SegmentMeta;
 class BufferObj;
 class FastRoughFilter;
 
-export class BlockMeta {
+export class BlockMeta : public BaseMeta {
 public:
     BlockMeta(BlockID block_id, SegmentMeta &segment_meta);
 
