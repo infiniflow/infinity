@@ -19,10 +19,7 @@
 #include <vector>
 
 import base_test;
-import stl;
-import standard_analyzer;
-import highlighter;
-import term;
+import infinity_core;
 
 using namespace infinity;
 

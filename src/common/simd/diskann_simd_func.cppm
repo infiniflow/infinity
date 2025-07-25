@@ -17,10 +17,10 @@ module;
 #include "simd_common_intrin_include.h"
 #include <cmath>
 
-import stl;
-import simd_common_tools;
+export module infinity_core:diskann_simd_func;
 
-export module diskann_simd_func;
+import :stl;
+import :simd_common_tools;
 
 namespace infinity {
 

@@ -14,25 +14,25 @@
 
 module;
 
-export module scalar_function;
+export module infinity_core:scalar_function;
 
-import stl;
-import function;
-import function_data;
-import column_vector;
+import :stl;
+import :function;
+import :function_data;
+import :column_vector;
 import internal_types;
-import infinity_exception;
+import :infinity_exception;
 import data_type;
-import data_block;
-import roaring_bitmap;
-import nullary_operation;
-import unary_operator;
-import binary_operator;
-import ternary_operator;
-import base_expression;
-import null_value;
-import logger;
-import third_party;
+import :data_block;
+import :roaring_bitmap;
+import :nullary_operation;
+import :unary_operator;
+import :binary_operator;
+import :ternary_operator;
+import :base_expression;
+import :null_value;
+import :logger;
+import :third_party;
 
 namespace infinity {
 

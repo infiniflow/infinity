@@ -14,13 +14,12 @@
 
 module;
 
-export module secondary_index_pgm;
+export module infinity_core:secondary_index_pgm;
 
-import stl;
-import logger;
-import third_party;
-import local_file_handle;
-import infinity_exception;
+import :stl;
+import :third_party;
+import :local_file_handle;
+import :infinity_exception;
 
 namespace infinity {
 

@@ -14,11 +14,11 @@
 
 module;
 
-export module cached_scan_base;
+export module infinity_core:cached_scan_base;
 
-import stl;
-import cached_node_base;
-import logical_node_type;
+import :stl;
+import :cached_node_base;
+import :logical_node_type;
 
 namespace infinity {
 

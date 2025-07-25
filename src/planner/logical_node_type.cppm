@@ -14,9 +14,9 @@
 
 module;
 
-export module logical_node_type;
+export module infinity_core:logical_node_type;
 
-import stl;
+import :stl;
 
 namespace infinity {
 

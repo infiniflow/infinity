@@ -14,19 +14,16 @@
 
 module;
 
-export module bg_query_state;
+export module infinity_core:bg_query_state;
 
-import stl;
-import logical_node;
-import physical_operator;
-import plan_fragment;
-import fragment_context;
-import query_context;
-import infinity_context;
-import session_manager;
-import session;
+import :stl;
+import :logical_node_visitor;
+import :logical_node;
 
 namespace infinity {
+class PhysicalOperator;
+class PlanFragment;
+class Notifier;
 
 export struct BGQueryState {
     Vector<SharedPtr<LogicalNode>> logical_plans{};

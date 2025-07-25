@@ -14,11 +14,11 @@
 
 module;
 
-export module knn_filter;
+export module infinity_core:knn_filter;
 
-import stl;
-import hnsw_common;
-import roaring_bitmap;
+import :stl;
+import :hnsw_common;
+import :roaring_bitmap;
 
 namespace infinity {
 

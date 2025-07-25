@@ -16,13 +16,9 @@
 #include <random>
 
 #include "gtest/gtest.h"
+
 import base_test;
-import dist_func_l2;
-import data_store;
-import vec_store_type;
-import hnsw_simd_func;
-import hnsw_common;
-import stl;
+import infinity_core;
 
 using namespace infinity;
 

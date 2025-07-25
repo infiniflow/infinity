@@ -15,36 +15,14 @@
 #include "gtest/gtest.h"
 
 import base_test;
-import stl;
-import third_party;
-import status;
-import new_catalog;
-import new_txn_manager;
-import infinity_context;
-import txn_state;
+import infinity_core;
 import extra_ddl_info;
-import data_block;
-import column_vector;
-import value;
-import new_txn;
-import db_meeta;
-import table_meeta;
-import table_index_meeta;
-import column_meta;
 import column_def;
 import data_type;
 import logical_type;
-import index_base;
-import index_secondary;
-import index_ivf;
-import index_full_text;
-import index_hnsw;
 import embedding_info;
 import sparse_info;
-import index_bmp;
-import table_def;
 import internal_types;
-import defer_op;
 import statement_common;
 
 using namespace infinity;

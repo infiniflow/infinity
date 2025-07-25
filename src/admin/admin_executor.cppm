@@ -13,18 +13,20 @@
 // limitations under the License.
 
 module;
-export module admin_executor;
+export module infinity_core:admin_executor;
 
 import admin_statement;
-import query_context;
-import query_result;
-import stl;
-import status;
+// import :query_context;
+// import query_result;
+import :stl;
+import :status;
 
 namespace infinity {
 
 struct WalEntry;
 class NewCatalog;
+class QueryContext;
+class QueryResult;
 
 export class AdminExecutor {
 public:

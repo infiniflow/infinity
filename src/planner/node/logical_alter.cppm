@@ -14,13 +14,13 @@
 
 module;
 
-export module logical_alter;
+export module infinity_core:logical_alter;
 
-import stl;
-import logical_node_type;
-import column_binding;
-import logical_node;
-import meta_info;
+import :stl;
+import :logical_node_type;
+import :column_binding;
+import :logical_node;
+import :meta_info;
 import internal_types;
 import data_type;
 import alter_statement;

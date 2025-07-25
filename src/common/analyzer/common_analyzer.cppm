@@ -14,11 +14,12 @@
 
 module;
 
-import stl;
-import term;
-import stemmer;
-import analyzer;
-export module common_analyzer;
+export module infinity_core:common_analyzer;
+
+import :stl;
+import :term;
+import :stemmer;
+import :analyzer;
 
 namespace infinity {
 export class CommonLanguageAnalyzer : public Analyzer {

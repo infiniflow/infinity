@@ -14,15 +14,15 @@
 
 module;
 
-export module index_bmp;
+export module infinity_core:index_bmp;
 
-import stl;
-import index_base;
+import :stl;
+import :index_base;
 import statement_common;
-import third_party;
-import base_table_ref;
+import :third_party;
+import :base_table_ref;
 import create_index_info;
-import bmp_util;
+import :bmp_util;
 
 namespace infinity {
 

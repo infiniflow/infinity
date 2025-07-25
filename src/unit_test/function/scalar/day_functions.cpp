@@ -11,40 +11,15 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+
 #include "gtest/gtest.h"
-import stl;
+
 import base_test;
-import infinity_exception;
-import infinity_context;
-
-import new_catalog;
-import logger;
-
-import default_values;
-import value;
-
-import base_expression;
-import column_expression;
-import column_vector;
-import data_block;
-
-import function_set;
-import function;
-
+import infinity_core;
 import global_resource_usage;
-
 import data_type;
 import internal_types;
 import logical_type;
-
-import scalar_function;
-import scalar_function_set;
-
-import day;
-import third_party;
-import config;
-import status;
-import kv_store;
 
 using namespace infinity;
 

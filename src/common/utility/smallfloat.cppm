@@ -14,9 +14,9 @@
 
 module;
 
-import stl;
+export module infinity_core:smallfloat;
 
-export module smallfloat;
+import :stl;
 
 namespace infinity {
 

@@ -16,35 +16,16 @@
 #include <thread>
 
 #include "gtest/gtest.h"
+
 import base_test;
-
-import stl;
-import storage;
+import infinity_core;
 import global_resource_usage;
-import infinity_context;
-import status;
-import buffer_manager;
-import column_vector;
-
-import table_def;
-import value;
-import physical_import;
-import default_values;
-import infinity_exception;
-import base_table_ref;
 import logical_type;
 import internal_types;
 import extra_ddl_info;
 import column_def;
 import data_type;
-import compaction_process;
 import compilation_config;
-import logger;
-import third_party;
-import txn_state;
-import data_block;
-import new_txn_manager;
-import new_txn;
 
 using namespace infinity;
 

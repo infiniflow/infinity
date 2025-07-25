@@ -15,10 +15,10 @@ module;
 
 #include <sstream>
 
-export module profiler;
+export module infinity_core:profiler;
 
-import stl;
-import third_party;
+import :stl;
+import :third_party;
 
 namespace infinity {
 
@@ -137,7 +137,7 @@ private:
 };
 
 class PhysicalOperator;
-class PlanFragment;
+export class PlanFragment;
 class OperatorState;
 
 export class TaskProfiler {

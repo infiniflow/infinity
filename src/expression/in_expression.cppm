@@ -13,14 +13,13 @@
 // limitations under the License.
 module;
 
-export module in_expression;
+export module infinity_core:in_expression;
 
-import column_binding;
-import base_expression;
+import :stl;
+import :value;
+import :infinity_exception;
+import :base_expression;
 import data_type;
-import value;
-import infinity_exception;
-import stl;
 import logical_type;
 import internal_types;
 

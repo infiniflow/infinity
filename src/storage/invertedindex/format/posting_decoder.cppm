@@ -1,15 +1,15 @@
 module;
 
-export module posting_decoder;
+export module infinity_core:posting_decoder;
 
-import stl;
-import byte_slice_reader;
-import posting_list_format;
-import term_meta;
-import index_defines;
-import posting_field;
-import doc_list_format_option;
-import position_list_format_option;
+import :stl;
+import :byte_slice_reader;
+import :posting_list_format;
+import :term_meta;
+import :index_defines;
+import :posting_field;
+import :doc_list_format_option;
+import :position_list_format_option;
 
 namespace infinity {
 export class PostingDecoder {

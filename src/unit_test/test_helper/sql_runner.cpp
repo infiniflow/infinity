@@ -18,34 +18,10 @@ module;
 
 module sql_runner;
 
-import stl;
-import data_table;
-import logger;
-import session;
-import query_context;
-import infinity_context;
-import third_party;
+import infinity_core;
 import sql_parser;
-import logical_planner;
-import optimizer;
-import physical_planner;
-import fragment_builder;
-import bind_context;
-import logical_node;
-import physical_operator;
-import task_scheduler;
-import fragment_context;
-import fragment_task;
-
-import infinity_exception;
-import singleton;
-import resource_manager;
-import storage;
-import query_result;
-import session_manager;
 import base_statement;
 import parser_result;
-import persistence_manager;
 
 namespace infinity {
 

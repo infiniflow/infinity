@@ -1,8 +1,8 @@
 module;
 
-export module segmenter;
+export module infinity_core:segmenter;
 
-import analyze_context;
+import :analyze_context;
 
 namespace infinity {
 

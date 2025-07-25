@@ -114,9 +114,9 @@ std::string TOutput::strerror_s(int errno_copy) {
 #ifdef STRERROR_R_CHAR_P
   char* b_error = ::strerror_r(errno_copy, b_errbuf, sizeof(b_errbuf));
 #else // STRERROR_R_CHAR_P
-  char* b_error = b_errbuf;
-  int rv = strerror_r(errno_copy, b_errbuf, sizeof(b_errbuf));
-  if (rv == -1) {
+  char *b_error = b_errbuf;
+  char *rv = strerror_r(errno_copy, b_errbuf, sizeof(b_errbuf));
+  if (b_errbuf != rv) {
     // strerror_r failed.  omgwtfbbq.
     return "XSI-compliant strerror_r() failed with errno = "
            + to_string(errno_copy);

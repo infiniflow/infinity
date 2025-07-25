@@ -14,10 +14,10 @@
 
 module;
 
-export module ring_buffer_iterator;
+export module infinity_core:ring_buffer_iterator;
 
-import stl;
-import default_values;
+import :stl;
+import :default_values;
 import global_resource_usage;
 
 namespace infinity {

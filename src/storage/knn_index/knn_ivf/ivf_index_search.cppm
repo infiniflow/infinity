@@ -16,26 +16,26 @@ module;
 
 #include <cassert>
 #include <functional>
-export module ivf_index_search;
+export module infinity_core:ivf_index_search;
 
-import stl;
+import :stl;
 import internal_types;
 import data_type;
 import knn_expr;
-import knn_scan_data;
+import :knn_scan_data;
 import logical_type;
-import knn_result_handler;
-import multivector_result_handler;
-import infinity_exception;
-import status;
-import third_party;
-import roaring_bitmap;
-import knn_filter;
-import ivf_index_data;
-import ivf_index_data_in_mem;
-import ivf_index_storage;
-import search_top_1;
-import search_top_k;
+import :knn_result_handler;
+import :multivector_result_handler;
+import :infinity_exception;
+import :status;
+import :third_party;
+import :roaring_bitmap;
+import :knn_filter;
+import :ivf_index_data;
+import :ivf_index_data_in_mem;
+import :ivf_index_storage;
+import :search_top_1;
+import :search_top_k;
 
 namespace infinity {
 

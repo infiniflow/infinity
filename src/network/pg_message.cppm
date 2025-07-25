@@ -14,9 +14,9 @@
 
 module;
 
-export module pg_message;
+export module infinity_core:pg_message;
 
-import stl;
+import :stl;
 
 export namespace infinity {
 

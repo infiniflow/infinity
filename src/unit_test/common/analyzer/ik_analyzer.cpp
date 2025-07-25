@@ -16,11 +16,7 @@
 #include <vector>
 
 import base_test;
-
-import stl;
-import term;
-import analyzer;
-import ik_analyzer;
+import infinity_core;
 
 using namespace infinity;
 

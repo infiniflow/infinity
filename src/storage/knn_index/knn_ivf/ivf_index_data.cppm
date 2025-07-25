@@ -14,17 +14,17 @@
 
 module;
 
-export module ivf_index_data;
+export module infinity_core:ivf_index_data;
 
-import stl;
-import index_ivf;
-import ivf_index_storage;
+import :stl;
+import :index_ivf;
+import :ivf_index_storage;
 import column_def;
 import embedding_info;
 import internal_types;
 import logical_type;
-import local_file_handle;
-import infinity_exception;
+import :local_file_handle;
+import :infinity_exception;
 
 namespace infinity {
 

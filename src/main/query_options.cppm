@@ -12,9 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-export module query_options;
+export module infinity_core:query_options;
 
-import stl;
+import :stl;
 import extra_ddl_info;
 import statement_common;
 

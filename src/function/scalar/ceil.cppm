@@ -1,8 +1,8 @@
 module;
 
-export module ceil;
+export module infinity_core:ceil;
 
-import stl;
+import :stl;
 
 namespace infinity {
 

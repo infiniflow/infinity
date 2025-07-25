@@ -1,16 +1,16 @@
 module;
 
-export module doc_list_encoder;
+export module infinity_core:doc_list_encoder;
 
-import stl;
+import :stl;
 
-import file_writer;
-import file_reader;
-import posting_byte_slice;
-import skiplist_writer;
-import inmem_doc_list_decoder;
-import index_defines;
-import doc_list_format_option;
+import :file_writer;
+import :file_reader;
+import :posting_byte_slice;
+import :skiplist_writer;
+import :inmem_doc_list_decoder;
+import :index_defines;
+import :doc_list_format_option;
 
 namespace infinity {
 

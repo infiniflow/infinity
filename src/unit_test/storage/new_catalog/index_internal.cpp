@@ -15,65 +15,22 @@
 #include "gtest/gtest.h"
 
 import base_test;
-import stl;
-import third_party;
-import status;
-import new_catalog;
-import new_txn_manager;
-import infinity_context;
-import txn_state;
+import infinity_core;
 import extra_ddl_info;
-import infinity_exception;
 import column_def;
 import data_type;
 import logical_type;
-import table_def;
-import index_base;
-import index_secondary;
-import index_ivf;
-import index_full_text;
-import index_hnsw;
 import embedding_info;
 import sparse_info;
-import index_bmp;
 import internal_types;
-import defer_op;
 import statement_common;
-import meta_info;
-import data_block;
-import column_vector;
-import value;
-import kv_code;
-import kv_store;
-import new_txn;
-import buffer_obj;
-import buffer_handle;
-import secondary_index_in_mem;
-import secondary_index_data;
-import segment_meta;
-import block_meta;
-import column_meta;
-import table_meeta;
-import table_index_meeta;
-import segment_index_meta;
-import chunk_index_meta;
-import db_meeta;
-import catalog_meta;
-import mem_index;
-import secondary_index_in_mem;
-import ivf_index_data_in_mem;
-import emvb_index_in_mem;
-import memory_indexer;
-#ifdef INDEX_HANDLER
-import hnsw_handler;
-import bmp_handler;
-#else
-import abstract_hnsw;
-import abstract_bmp;
-#endif
-import roaring_bitmap;
-import index_filter_evaluators;
-import index_emvb;
+// #ifdef INDEX_HANDLER
+// import hnsw_handler;
+// import bmp_handler;
+// #else
+// import abstract_hnsw;
+// import abstract_bmp;
+// #endif
 import constant_expr;
 
 using namespace infinity;

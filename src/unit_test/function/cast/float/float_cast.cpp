@@ -13,29 +13,11 @@
 // limitations under the License.
 
 #include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
+
 import base_test;
-
-import infinity_exception;
-
+import infinity_core;
 import global_resource_usage;
-import third_party;
-
-import logger;
-import stl;
-import infinity_context;
-
-import function_set;
-import aggregate_function_set;
-import aggregate_function;
-import function;
-import column_expression;
-import value;
-import default_values;
-import data_block;
-import cast_table;
-import column_vector;
-import float_cast;
-import bound_cast_func;
 import internal_types;
 import logical_type;
 import data_type;
@@ -51,7 +33,7 @@ TEST_F(FloatCastTest, float_cast0) {
     {
         FloatT source = 0;
         FloatT target;
-        EXPECT_THROW(FloatTryCastToFixlen::Run(source, target), UnrecoverableException);
+        EXPECT_THROW_WITHOUT_STACKTRACE(FloatTryCastToFixlen::Run(source, target), UnrecoverableException);
     }
 
     // FloatT to TinyInt
@@ -149,7 +131,7 @@ TEST_F(FloatCastTest, float_cast0) {
     {
         FloatT source = std::numeric_limits<FloatT>::lowest();
         HugeIntT target;
-        EXPECT_THROW(FloatTryCastToFixlen::Run(source, target), UnrecoverableException);
+        EXPECT_THROW_WITHOUT_STACKTRACE(FloatTryCastToFixlen::Run(source, target), UnrecoverableException);
     }
 
     // FloatT to Double
@@ -173,7 +155,7 @@ TEST_F(FloatCastTest, float_cast0) {
     {
         FloatT source = std::numeric_limits<FloatT>::lowest();
         DecimalT target;
-        EXPECT_THROW(FloatTryCastToFixlen::Run(source, target), UnrecoverableException);
+        EXPECT_THROW_WITHOUT_STACKTRACE(FloatTryCastToFixlen::Run(source, target), UnrecoverableException);
     }
 
     // FloatT to VarcharT
@@ -354,7 +336,7 @@ TEST_F(FloatCastTest, float_cast1) {
         CastParameters cast_parameters;
 
         //        bool result = float2hugeint_ptr.function(col_source, col_hugeint, DEFAULT_VECTOR_SIZE, cast_parameters);
-        EXPECT_THROW(float2hugeint_ptr.function(col_source, col_target, DEFAULT_VECTOR_SIZE, cast_parameters), UnrecoverableException);
+        EXPECT_THROW_WITHOUT_STACKTRACE(float2hugeint_ptr.function(col_source, col_target, DEFAULT_VECTOR_SIZE, cast_parameters), UnrecoverableException);
     }
 
     // cast float column vector to double column vector
@@ -403,6 +385,6 @@ TEST_F(FloatCastTest, float_cast1) {
     {
         DataType source(LogicalType::kFloat);
         DataType target(LogicalType::kTimestamp);
-        EXPECT_THROW(BindFloatCast<FloatT>(source, target), UnrecoverableException);
+        EXPECT_THROW_WITHOUT_STACKTRACE(BindFloatCast<FloatT>(source, target), UnrecoverableException);
     }
 }

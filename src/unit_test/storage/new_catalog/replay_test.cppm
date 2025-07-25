@@ -19,10 +19,7 @@ module;
 export module replay_test;
 
 import base_test;
-import stl;
-import new_txn_manager;
-import infinity_context;
-import wal_manager;
+import infinity_core;
 
 using namespace infinity;
 

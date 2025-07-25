@@ -13,33 +13,14 @@
 // limitations under the License.
 
 #include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
+
 import base_test;
-
-import infinity_exception;
-
+import infinity_core;
 import global_resource_usage;
-import third_party;
-
-import logger;
-import stl;
-import infinity_context;
-
-import function_set;
-import aggregate_function_set;
-import aggregate_function;
-import function;
-import column_expression;
-import value;
-import default_values;
-import data_block;
-import cast_table;
-import column_vector;
-import integer_cast;
-import bound_cast_func;
 import internal_types;
 import logical_type;
 import data_type;
-import infinity_exception;
 
 using namespace infinity;
 class HugeIntCastTest : public BaseTest {};
@@ -52,43 +33,43 @@ TEST_F(HugeIntCastTest, hugeint_cast0) {
         HugeIntT source{0, 0};
         HugeIntT target{0, 0};
 
-        EXPECT_THROW(IntegerTryCastToFixlen::Run(source, target), UnrecoverableException);
+        EXPECT_THROW_WITHOUT_STACKTRACE(IntegerTryCastToFixlen::Run(source, target), UnrecoverableException);
     }
 
     {
         HugeIntT source(std::numeric_limits<i64>::max(), std::numeric_limits<i64>::max());
         TinyIntT target;
-        EXPECT_THROW(IntegerTryCastToFixlen::Run(source, target), UnrecoverableException);
+        EXPECT_THROW_WITHOUT_STACKTRACE(IntegerTryCastToFixlen::Run(source, target), UnrecoverableException);
     }
     {
         HugeIntT source(std::numeric_limits<i64>::max(), std::numeric_limits<i64>::max());
         SmallIntT target;
-        EXPECT_THROW(IntegerTryCastToFixlen::Run(source, target), UnrecoverableException);
+        EXPECT_THROW_WITHOUT_STACKTRACE(IntegerTryCastToFixlen::Run(source, target), UnrecoverableException);
     }
     {
         HugeIntT source(std::numeric_limits<i64>::max(), std::numeric_limits<i64>::max());
         IntegerT target;
-        EXPECT_THROW(IntegerTryCastToFixlen::Run(source, target), UnrecoverableException);
+        EXPECT_THROW_WITHOUT_STACKTRACE(IntegerTryCastToFixlen::Run(source, target), UnrecoverableException);
     }
     {
         HugeIntT source(std::numeric_limits<i64>::max(), std::numeric_limits<i64>::max());
         BigIntT target;
-        EXPECT_THROW(IntegerTryCastToFixlen::Run(source, target), UnrecoverableException);
+        EXPECT_THROW_WITHOUT_STACKTRACE(IntegerTryCastToFixlen::Run(source, target), UnrecoverableException);
     }
     {
         HugeIntT source(std::numeric_limits<i64>::max(), std::numeric_limits<i64>::max());
         FloatT target;
-        EXPECT_THROW(IntegerTryCastToFixlen::Run(source, target), UnrecoverableException);
+        EXPECT_THROW_WITHOUT_STACKTRACE(IntegerTryCastToFixlen::Run(source, target), UnrecoverableException);
     }
     {
         HugeIntT source(std::numeric_limits<i64>::max(), std::numeric_limits<i64>::max());
         DoubleT target;
-        EXPECT_THROW(IntegerTryCastToFixlen::Run(source, target), UnrecoverableException);
+        EXPECT_THROW_WITHOUT_STACKTRACE(IntegerTryCastToFixlen::Run(source, target), UnrecoverableException);
     }
     {
         HugeIntT source(std::numeric_limits<i64>::max(), std::numeric_limits<i64>::max());
         DecimalT target;
-        EXPECT_THROW(IntegerTryCastToFixlen::Run(source, target), UnrecoverableException);
+        EXPECT_THROW_WITHOUT_STACKTRACE(IntegerTryCastToFixlen::Run(source, target), UnrecoverableException);
     }
     {
         HugeIntT source(std::numeric_limits<i64>::max(), std::numeric_limits<i64>::max());
@@ -98,14 +79,14 @@ TEST_F(HugeIntCastTest, hugeint_cast0) {
         SharedPtr<ColumnVector> col_varchar_ptr = MakeShared<ColumnVector>(data_type);
         col_varchar_ptr->Initialize();
 
-        EXPECT_THROW(IntegerTryCastToVarlen::Run(source, target, col_varchar_ptr.get()), UnrecoverableException);
+        EXPECT_THROW_WITHOUT_STACKTRACE(IntegerTryCastToVarlen::Run(source, target, col_varchar_ptr.get()), UnrecoverableException);
     }
     // HugeInt to Date, throw exception
     {
         HugeIntT source{0, 0};
         DateT target{0};
 
-        EXPECT_THROW(IntegerTryCastToFixlen::Run(source, target), UnrecoverableException);
+        EXPECT_THROW_WITHOUT_STACKTRACE(IntegerTryCastToFixlen::Run(source, target), UnrecoverableException);
     }
 }
 
@@ -138,7 +119,7 @@ TEST_F(HugeIntCastTest, hugeint_cast1) {
         col_target->Initialize();
 
         CastParameters cast_parameters;
-        EXPECT_THROW(hugeint2tiny_ptr.function(col_source, col_target, DEFAULT_VECTOR_SIZE, cast_parameters), UnrecoverableException);
+        EXPECT_THROW_WITHOUT_STACKTRACE(hugeint2tiny_ptr.function(col_source, col_target, DEFAULT_VECTOR_SIZE, cast_parameters), UnrecoverableException);
     }
 
     // cast hugeint column vector to small integer column vector
@@ -151,7 +132,7 @@ TEST_F(HugeIntCastTest, hugeint_cast1) {
         col_target->Initialize();
 
         CastParameters cast_parameters;
-        EXPECT_THROW(hugeint2small_ptr.function(col_source, col_target, DEFAULT_VECTOR_SIZE, cast_parameters), UnrecoverableException);
+        EXPECT_THROW_WITHOUT_STACKTRACE(hugeint2small_ptr.function(col_source, col_target, DEFAULT_VECTOR_SIZE, cast_parameters), UnrecoverableException);
     }
 
     // cast big int column vector to int column vector
@@ -164,7 +145,7 @@ TEST_F(HugeIntCastTest, hugeint_cast1) {
         col_target->Initialize();
 
         CastParameters cast_parameters;
-        EXPECT_THROW(hugeint2int_ptr.function(col_source, col_target, DEFAULT_VECTOR_SIZE, cast_parameters), UnrecoverableException);
+        EXPECT_THROW_WITHOUT_STACKTRACE(hugeint2int_ptr.function(col_source, col_target, DEFAULT_VECTOR_SIZE, cast_parameters), UnrecoverableException);
     }
 
     // cast hugeint column vector to big int column vector
@@ -177,7 +158,7 @@ TEST_F(HugeIntCastTest, hugeint_cast1) {
         col_target->Initialize();
 
         CastParameters cast_parameters;
-        EXPECT_THROW(hugeint2bigint_ptr.function(col_source, col_target, DEFAULT_VECTOR_SIZE, cast_parameters), UnrecoverableException);
+        EXPECT_THROW_WITHOUT_STACKTRACE(hugeint2bigint_ptr.function(col_source, col_target, DEFAULT_VECTOR_SIZE, cast_parameters), UnrecoverableException);
     }
 
     // cast hugeint column vector to float column vector
@@ -190,7 +171,7 @@ TEST_F(HugeIntCastTest, hugeint_cast1) {
         col_target->Initialize();
 
         CastParameters cast_parameters;
-        EXPECT_THROW(hugeint2float_ptr.function(col_source, col_target, DEFAULT_VECTOR_SIZE, cast_parameters), UnrecoverableException);
+        EXPECT_THROW_WITHOUT_STACKTRACE(hugeint2float_ptr.function(col_source, col_target, DEFAULT_VECTOR_SIZE, cast_parameters), UnrecoverableException);
     }
 
     // cast hugeint column vector to double column vector
@@ -203,7 +184,7 @@ TEST_F(HugeIntCastTest, hugeint_cast1) {
         col_target->Initialize();
 
         CastParameters cast_parameters;
-        EXPECT_THROW(hugeint2double_ptr.function(col_source, col_target, DEFAULT_VECTOR_SIZE, cast_parameters), UnrecoverableException);
+        EXPECT_THROW_WITHOUT_STACKTRACE(hugeint2double_ptr.function(col_source, col_target, DEFAULT_VECTOR_SIZE, cast_parameters), UnrecoverableException);
     }
 
     // cast big int column vector to decimal column vector
@@ -216,7 +197,7 @@ TEST_F(HugeIntCastTest, hugeint_cast1) {
         col_target->Initialize();
 
         CastParameters cast_parameters;
-        EXPECT_THROW(big2decimal_ptr.function(col_source, col_target, DEFAULT_VECTOR_SIZE, cast_parameters), UnrecoverableException);
+        EXPECT_THROW_WITHOUT_STACKTRACE(big2decimal_ptr.function(col_source, col_target, DEFAULT_VECTOR_SIZE, cast_parameters), UnrecoverableException);
     }
 
     // cast hugeint column vector to Varchar vector
@@ -229,13 +210,13 @@ TEST_F(HugeIntCastTest, hugeint_cast1) {
         col_target->Initialize();
 
         CastParameters cast_parameters;
-        EXPECT_THROW(hugeint2varchar_ptr.function(col_source, col_target, DEFAULT_VECTOR_SIZE, cast_parameters), UnrecoverableException);
+        EXPECT_THROW_WITHOUT_STACKTRACE(hugeint2varchar_ptr.function(col_source, col_target, DEFAULT_VECTOR_SIZE, cast_parameters), UnrecoverableException);
     }
 
     // Throw exception when cast int to other types.
     {
         DataType source(LogicalType::kBigInt);
         DataType target(LogicalType::kTimestamp);
-        EXPECT_THROW(BindIntegerCast<IntegerT>(source, target), RecoverableException);
+        EXPECT_THROW_WITHOUT_STACKTRACE(BindIntegerCast<IntegerT>(source, target), RecoverableException);
     }
 }

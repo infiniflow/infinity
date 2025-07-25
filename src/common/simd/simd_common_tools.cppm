@@ -15,8 +15,10 @@
 module;
 
 #include "simd_common_intrin_include.h"
-export module simd_common_tools;
-import stl;
+
+export module infinity_core:simd_common_tools;
+
+import :stl;
 
 namespace infinity {
 

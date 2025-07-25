@@ -14,13 +14,13 @@
 
 module;
 
-export module traditional_chinese_analyzer;
+#include "opencc/openccxx.h"
 
-import stl;
-import status;
-import chinese_analyzer;
+export module infinity_core:traditional_chinese_analyzer;
 
-class OpenCC;
+import :stl;
+import :status;
+import :chinese_analyzer;
 
 namespace infinity {
 

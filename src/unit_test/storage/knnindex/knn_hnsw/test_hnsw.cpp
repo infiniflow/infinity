@@ -15,24 +15,13 @@
 #include <thread>
 
 #include "gtest/gtest.h"
-import base_test;
 
-import stl;
-import hnsw_alg;
+import base_test;
+import infinity_core;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wunused-variable"
-import data_store;
 #pragma clang diagnostic pop
-
-import dist_func_l2;
-import dist_func_ip;
-import dist_func_cos;
-import vec_store_type;
-import hnsw_common;
-import infinity_exception;
-import virtual_store;
-import local_file_handle;
 
 using namespace infinity;
 

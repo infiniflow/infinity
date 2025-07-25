@@ -14,13 +14,13 @@
 
 module;
 
-export module index_filter_expression_info_tree;
+export module infinity_core:index_filter_expression_info_tree;
 
-import stl;
+import :stl;
 import logical_type;
-import base_expression;
-import infinity_exception;
-import third_party;
+import :base_expression;
+import :infinity_exception;
+import :third_party;
 
 namespace infinity {
 

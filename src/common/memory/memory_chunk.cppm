@@ -1,8 +1,8 @@
 module;
 
-import stl;
+export module infinity_core:memory_chunk;
 
-export module memory_chunk;
+import :stl;
 
 namespace infinity {
 

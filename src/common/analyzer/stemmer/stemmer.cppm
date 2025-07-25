@@ -14,9 +14,9 @@
 
 module;
 
-export module stemmer;
+export module infinity_core:stemmer;
 
-import stl;
+import :stl;
 
 namespace infinity {
 

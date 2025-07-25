@@ -14,12 +14,12 @@
 
 module;
 
-export module mem_index_appender;
+export module infinity_core:mem_index_appender;
 
-import stl;
-import bg_task_type;
-import blocking_queue;
-import status;
+import :stl;
+import :bg_task_type;
+import :blocking_queue;
+import :status;
 
 namespace infinity {
 

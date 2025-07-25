@@ -14,9 +14,9 @@
 
 module;
 
-export module explain_ast;
+export module infinity_core:explain_ast;
 
-import stl;
+import :stl;
 import base_statement;
 import create_statement;
 import insert_statement;
@@ -28,7 +28,7 @@ import flush_statement;
 import optimize_statement;
 import check_statement;
 import base_table_reference;
-import status;
+import :status;
 
 namespace infinity {
 

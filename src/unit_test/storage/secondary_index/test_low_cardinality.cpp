@@ -13,13 +13,11 @@
 // limitations under the License.
 
 #include "gtest/gtest.h"
+
 import base_test;
-import stl;
-import third_party;
-import secondary_index_data;
+import infinity_core;
 import data_type;
 import logical_type;
-import roaring_bitmap;
 
 using namespace infinity;
 

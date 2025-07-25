@@ -14,10 +14,10 @@
 
 module;
 
-export module peer_server_thrift_service;
+export module infinity_core:peer_server_thrift_service;
 
-import peer_server_thrift_types;
-import stl;
+import :peer_server_thrift_types;
+import :stl;
 import global_resource_usage;
 
 namespace infinity {

@@ -14,9 +14,10 @@
 
 module;
 
-export module simd_functions;
-import stl;
-import simd_init;
+export module infinity_core:simd_functions;
+
+import :stl;
+import :simd_init;
 
 namespace infinity {
 

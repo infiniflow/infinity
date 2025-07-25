@@ -14,11 +14,11 @@
 
 module;
 
-export module data_access_state;
+export module infinity_core:data_access_state;
 
-import stl;
-import data_block;
-import column_vector;
+import :stl;
+import :data_block;
+import :column_vector;
 
 import internal_types;
 

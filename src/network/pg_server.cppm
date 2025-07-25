@@ -14,12 +14,12 @@
 
 module;
 
-export module pg_server;
+export module infinity_core:pg_server;
 
-import stl;
-import singleton;
-import boost;
-import connection;
+import :stl;
+import :singleton;
+import :boost;
+import :connection;
 
 namespace infinity {
 

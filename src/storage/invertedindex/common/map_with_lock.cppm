@@ -14,8 +14,8 @@
 
 module;
 
-export module map_with_lock;
-import stl;
+export module infinity_core:map_with_lock;
+import :stl;
 
 namespace infinity {
 

@@ -13,24 +13,11 @@
 // limitations under the License.
 
 #include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
+
 import base_test;
-
-import infinity_exception;
-
+import infinity_core;
 import global_resource_usage;
-import third_party;
-
-import logger;
-import stl;
-import infinity_context;
-import default_values;
-import data_table;
-import table_def;
-import value;
-import data_block;
-import column_vector;
-import logger;
-import selection;
 import logical_type;
 import internal_types;
 import data_type;
@@ -135,5 +122,5 @@ TEST_F(ExpressionExecutorSelectTest, test3) {
                                true);
 #endif
     EXPECT_EQ(output_true_select->Size(), 0u);
-    EXPECT_THROW((*output_true_select)[0], UnrecoverableException);
+    EXPECT_THROW_WITHOUT_STACKTRACE((*output_true_select)[0], UnrecoverableException);
 }

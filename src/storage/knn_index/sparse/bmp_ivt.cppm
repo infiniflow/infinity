@@ -17,13 +17,13 @@ module;
 #include "common/simd/simd_common_intrin_include.h"
 #include <algorithm>
 
-export module bmp_ivt;
+export module infinity_core:bmp_ivt;
 
-import stl;
-import sparse_util;
-import local_file_handle;
-import bmp_util;
-import knn_result_handler;
+import :stl;
+import :sparse_util;
+import :local_file_handle;
+import :bmp_util;
+import :knn_result_handler;
 import serialize;
 
 namespace infinity {

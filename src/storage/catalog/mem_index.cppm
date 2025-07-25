@@ -14,11 +14,11 @@
 
 module;
 
-#include "type/complex/row_id.h"
+export module infinity_core:mem_index;
 
-export module mem_index;
+import row_id;
 
-import stl;
+import :stl;
 
 namespace infinity {
 

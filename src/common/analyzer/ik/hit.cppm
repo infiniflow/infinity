@@ -1,12 +1,12 @@
 module;
 
-export module hit;
+export module infinity_core:hit;
 
-import stl;
+import :stl;
 
 namespace infinity {
 
-class DictSegment;
+export class DictSegment;
 export class Hit {
 public:
     static constexpr int UNMATCH = 0x00000000;

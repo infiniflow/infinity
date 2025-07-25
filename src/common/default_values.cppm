@@ -14,9 +14,9 @@
 
 module;
 
-export module default_values;
+export module infinity_core:default_values;
 
-import stl;
+import :stl;
 
 namespace infinity {
 
@@ -336,6 +336,10 @@ export {
 
     // IO related
     constexpr SizeT DEFAULT_READ_BUFFER_SIZE = 4096;
+
+    constexpr u32 BATCH_OR_LEN = 128;
+
+    constexpr int MAX_TUPLE_LENGTH = 1024;
     constexpr SizeT L1_CACHE_SIZE = 32 * KB;
 }
 

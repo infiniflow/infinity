@@ -14,18 +14,18 @@
 
 module;
 
-export module physical_scan_base;
+export module infinity_core:physical_scan_base;
 
-import stl;
-import physical_operator;
-import physical_operator_type;
-import global_block_id;
-import base_table_ref;
-import load_meta;
+import :stl;
+import :physical_operator;
+import :physical_operator_type;
+import :global_block_id;
+import :base_table_ref;
+import :load_meta;
 import internal_types;
-import operator_state;
-import query_context;
-import meta_info;
+import :operator_state;
+import :query_context;
+import :meta_info;
 
 namespace infinity {
 

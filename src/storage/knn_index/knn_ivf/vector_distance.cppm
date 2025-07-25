@@ -14,10 +14,11 @@
 
 module;
 #include <type_traits>
-import stl;
-import simd_functions;
 
-export module vector_distance;
+export module infinity_core:vector_distance;
+
+import :stl;
+import :simd_functions;
 
 namespace infinity {
 export template <typename DiffType, typename ElemType1, typename ElemType2, typename DimType = u32>
@@ -27,7 +28,7 @@ DiffType L2Distance(const ElemType1 *vector1, const ElemType2 *vector2, const Di
     } else {
         DiffType distance{};
         for (u32 i = 0; i < dimension; ++i) {
-            auto diff = (DiffType)(vector1[i] - vector2[i]);
+            auto diff = static_cast<DiffType>(vector1[i] - vector2[i]);
             distance += diff * diff;
         }
         return distance;

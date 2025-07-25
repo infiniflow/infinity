@@ -14,9 +14,9 @@
 
 module;
 
-export module global_block_id;
+export module infinity_core:global_block_id;
 
-import stl;
+import :stl;
 
 namespace infinity {
 

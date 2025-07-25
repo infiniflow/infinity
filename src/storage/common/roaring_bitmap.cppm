@@ -14,13 +14,14 @@
 
 module;
 
-export module roaring_bitmap;
-import stl;
-import croaring;
-import infinity_exception;
+export module infinity_core:roaring_bitmap;
+
+import :stl;
+import :croaring;
+import :infinity_exception;
 import serialize;
-import logger;
-import third_party;
+import :third_party;
+import :logger;
 
 namespace infinity {
 

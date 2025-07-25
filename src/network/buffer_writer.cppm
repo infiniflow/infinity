@@ -14,13 +14,13 @@
 
 module;
 
-export module buffer_writer;
+export module infinity_core:buffer_writer;
 
-import boost;
-import pg_message;
-import ring_buffer_iterator;
-import default_values;
-import stl;
+import :boost;
+import :pg_message;
+import :ring_buffer_iterator;
+import :default_values;
+import :stl;
 import global_resource_usage;
 
 namespace infinity {

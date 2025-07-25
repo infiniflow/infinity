@@ -13,12 +13,9 @@
 // limitations under the License.
 
 #include "gtest/gtest.h"
-import base_test;
 
-import stl;
-import term;
-import ngram_analyzer;
-import standard_analyzer;
+import base_test;
+import infinity_core;
 
 using namespace infinity;
 

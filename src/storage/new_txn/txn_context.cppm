@@ -14,11 +14,11 @@
 
 module;
 
-export module txn_context;
+export module infinity_core:txn_context;
 
-import stl;
-import txn_state;
-import default_values;
+import :stl;
+import :txn_state;
+import :default_values;
 
 namespace infinity {
 

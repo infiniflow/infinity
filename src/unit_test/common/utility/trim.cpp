@@ -13,13 +13,10 @@
 // limitations under the License.
 
 #include "gtest/gtest.h"
+
 import base_test;
-
-import infinity_exception;
-
-import stl;
+import infinity_core;
 import global_resource_usage;
-import infinity_context;
 
 using namespace infinity;
 class TrimTest : public BaseTest {};

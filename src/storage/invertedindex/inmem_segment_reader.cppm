@@ -14,15 +14,15 @@
 
 module;
 
-export module inmem_index_segment_reader;
+export module infinity_core:inmem_index_segment_reader;
 
-import stl;
+import :stl;
 
-import segment_posting;
-import index_segment_reader;
-import index_defines;
-import posting_writer;
-import memory_indexer;
+import :segment_posting;
+import :index_segment_reader;
+import :index_defines;
+import :posting_writer;
+import :memory_indexer;
 import internal_types;
 
 namespace infinity {

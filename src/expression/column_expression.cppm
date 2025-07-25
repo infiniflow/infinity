@@ -14,13 +14,13 @@
 
 module;
 
-export module column_expression;
+export module infinity_core:column_expression;
 
-import column_binding;
-import base_expression;
+import :column_binding;
+import :base_expression;
 import data_type;
-import special_function;
-import stl;
+import :special_function;
+import :stl;
 import internal_types;
 
 namespace infinity {

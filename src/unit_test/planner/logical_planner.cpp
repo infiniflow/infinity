@@ -80,11 +80,11 @@ TEST_F(LogicalPlannerTest, test1) {
     }
     {
         const String sql_text = "select sum(b), b from t1 group by a;";
-        EXPECT_THROW(SQLRunner::Run(sql_text, true), UnrecoverableException);
+        EXPECT_THROW_WITHOUT_STACKTRACE(SQLRunner::Run(sql_text, true), UnrecoverableException);
     }
     {
         const String sql_text = "select sum(b), b from t1;";
-        EXPECT_THROW(SQLRunner::Run(sql_text, true), UnrecoverableException);
+        EXPECT_THROW_WITHOUT_STACKTRACE(SQLRunner::Run(sql_text, true), UnrecoverableException);
     }
 
     {

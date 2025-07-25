@@ -12,15 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-export module query_result;
+export module infinity_core:query_result;
 
-import stl;
-import data_table;
-import status;
-import logical_node_type;
+import :stl;
+import :status;
+import :logical_node_type;
 import global_resource_usage;
 
 namespace infinity {
+class DataTable;
 
 export struct BaseResult {
 public:

@@ -14,16 +14,16 @@
 
 module;
 
-export module binding;
+export module infinity_core:binding;
 
-import stl;
-import meta_info;
+import :stl;
+import :meta_info;
 import internal_types;
 import data_type;
 
 namespace infinity {
 
-class BlockIndex;
+struct BlockIndex;
 
 export enum class BindingType { kInvalid, kTable, kSubquery, kCTE, kView };
 

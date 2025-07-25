@@ -14,16 +14,9 @@
 
 #include "gtest/gtest.h"
 #include <random>
-import base_test;
 
-import dist_func_l2;
-import data_store;
-import vec_store_type;
-import stl;
-import infinity_exception;
-import hnsw_common;
-import virtual_store;
-import local_file_handle;
+import base_test;
+import infinity_core;
 
 using namespace infinity;
 

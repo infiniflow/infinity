@@ -16,10 +16,10 @@ module;
 
 #include <fstream>
 
-export module stream_reader;
+export module infinity_core:stream_reader;
 
-import stl;
-import status;
+import :stl;
+import :status;
 
 namespace infinity {
 

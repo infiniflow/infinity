@@ -14,15 +14,15 @@
 
 module;
 
-export module logical_aggregate;
+export module infinity_core:logical_aggregate;
 
-import stl;
-import logical_node_type;
-import column_binding;
-import logical_node;
-import base_expression;
+import :stl;
+import :logical_node_type;
+import :column_binding;
+import :logical_node;
+import :base_expression;
 
-import base_table_ref;
+import :base_table_ref;
 import internal_types;
 import data_type;
 

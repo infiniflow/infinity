@@ -13,8 +13,10 @@
 // limitations under the License.
 
 module;
-export module fst:registry;
-import stl;
+
+export module infinity_core:fst.registry;
+
+import :stl;
 
 namespace infinity {
 

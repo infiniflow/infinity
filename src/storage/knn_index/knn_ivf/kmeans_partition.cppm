@@ -16,14 +16,14 @@ module;
 
 #include <cstring>
 #include <random>
-export module kmeans_partition;
+export module infinity_core:kmeans_partition;
 
-import stl;
-import infinity_exception;
-import index_base;
-import vector_distance;
-import logger;
-import simd_functions;
+import :stl;
+import :infinity_exception;
+import :index_base;
+import :vector_distance;
+import :logger;
+import :simd_functions;
 
 namespace infinity {
 

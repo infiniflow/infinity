@@ -14,12 +14,12 @@
 
 module;
 
-export module raw_file_worker;
+export module infinity_core:raw_file_worker;
 
-import stl;
-import file_worker;
-import file_worker_type;
-import persistence_manager;
+import :stl;
+import :file_worker;
+import :file_worker_type;
+import :persistence_manager;
 
 namespace infinity {
 

@@ -14,20 +14,20 @@
 
 module;
 
-export module physical_merge_top;
+export module infinity_core:physical_merge_top;
 
-import stl;
+import :stl;
 
-import query_context;
-import operator_state;
-import expression_state;
-import physical_operator;
-import physical_operator_type;
-import base_expression;
-import load_meta;
-import infinity_exception;
-import base_table_ref;
-import physical_top;
+import :query_context;
+import :operator_state;
+import :expression_state;
+import :physical_operator;
+import :physical_operator_type;
+import :base_expression;
+import :load_meta;
+import :infinity_exception;
+import :base_table_ref;
+import :physical_top;
 import internal_types;
 import select_statement;
 import data_type;

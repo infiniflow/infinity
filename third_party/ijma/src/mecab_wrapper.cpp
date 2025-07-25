@@ -1,5 +1,6 @@
 #include "mecab_wrapper.h"
 #include "mecab.h"
+#include <cstring>
 
 namespace jma {
 

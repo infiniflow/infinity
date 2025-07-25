@@ -1,15 +1,15 @@
 module;
 
-export module index_decoder;
+export module infinity_core:index_decoder;
 
-import stl;
-import byte_slice;
+import :stl;
+import :byte_slice;
 
-import byte_slice_reader;
-import posting_decoder;
-import index_defines;
-import posting_field;
-import doc_list_format_option;
+import :byte_slice_reader;
+import :posting_decoder;
+import :index_defines;
+import :posting_field;
+import :doc_list_format_option;
 
 namespace infinity {
 

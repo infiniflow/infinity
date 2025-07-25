@@ -14,12 +14,12 @@
 
 module;
 
-export module emvb_search;
-import stl;
-import emvb_shared_vec;
-import simd_init;
-import simd_functions;
-import roaring_bitmap;
+export module infinity_core:emvb_search;
+import :stl;
+import :emvb_shared_vec;
+import :simd_init;
+import :simd_functions;
+import :roaring_bitmap;
 
 namespace infinity {
 

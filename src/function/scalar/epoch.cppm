@@ -12,9 +12,9 @@
 
 module;
 
-export module epoch;
+export module infinity_core:epoch;
 
-import stl;
+import :stl;
 
 namespace infinity {
 

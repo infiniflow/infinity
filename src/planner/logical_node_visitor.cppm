@@ -14,23 +14,23 @@
 
 module;
 
-export module logical_node_visitor;
+export module infinity_core:logical_node_visitor;
 
-import stl;
-import base_expression;
-import logical_node;
-import aggregate_expression;
-import between_expression;
-import case_expression;
-import cast_expression;
-import column_expression;
-import function_expression;
-import value_expression;
-import in_expression;
-import subquery_expression;
-import knn_expression;
-import conjunction_expression;
-import unnest_expression;
+import :stl;
+import :base_expression;
+import :logical_node;
+import :aggregate_expression;
+import :between_expression;
+import :case_expression;
+import :cast_expression;
+import :column_expression;
+import :function_expression;
+import :value_expression;
+import :in_expression;
+import :subquery_expression;
+import :knn_expression;
+import :conjunction_expression;
+import :unnest_expression;
 
 namespace infinity {
 

@@ -15,9 +15,7 @@
 #include "gtest/gtest.h"
 
 import base_test;
-import kv_utility;
-import kv_code;
-import stl;
+import infinity_core;
 
 using namespace infinity;
 

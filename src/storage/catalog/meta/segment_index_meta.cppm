@@ -14,13 +14,13 @@
 
 module;
 
-export module segment_index_meta;
+export module infinity_core:segment_index_meta;
 
-import stl;
-import status;
-import third_party;
-import meta_info;
-import new_catalog;
+import :stl;
+import :status;
+import :third_party;
+import :meta_info;
+import :new_catalog;
 
 namespace infinity {
 

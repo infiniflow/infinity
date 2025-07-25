@@ -14,21 +14,21 @@
 
 module;
 
-export module lazy_load;
+export module infinity_core:lazy_load;
 
-import stl;
-import logical_node_visitor;
-import logical_node;
-import logical_node_type;
-import base_expression;
-import column_binding;
-import query_context;
-import column_expression;
-import optimizer_rule;
-import load_meta;
+import :stl;
+import :logical_node_visitor;
+import :logical_node;
+import :logical_node_type;
+import :base_expression;
+import :column_binding;
+import :query_context;
+import :column_expression;
+import :optimizer_rule;
+import :load_meta;
 import internal_types;
 import data_type;
-import base_table_ref;
+import :base_table_ref;
 
 namespace infinity {
 

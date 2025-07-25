@@ -16,11 +16,11 @@ module;
 
 #include <cstdlib>
 
-export module darts_trie;
+export module infinity_core:darts_trie;
 
-import stl;
-import darts;
-import status;
+import :stl;
+import :darts;
+import :status;
 
 namespace infinity {
 

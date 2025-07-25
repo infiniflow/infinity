@@ -12,33 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "unit_test/gtest_expand.h"
 #include "gtest/gtest.h"
+
 import base_test;
-
-import infinity_exception;
-
+import infinity_core;
 import global_resource_usage;
-import third_party;
-
-import logger;
-import stl;
-import infinity_context;
-import new_catalog;
-import min;
-import function_set;
-import aggregate_function_set;
-import aggregate_function;
-import function;
-import column_expression;
-import value;
-import default_values;
-import data_block;
 import internal_types;
 import logical_type;
 import data_type;
-import config;
-import status;
-import kv_store;
 
 using namespace infinity;
 class MinFunctionTest : public BaseTest {};
@@ -298,6 +280,6 @@ TEST_F(MinFunctionTest, min_func) {
         DataType data_type(LogicalType::kVarchar);
         SharedPtr<ColumnExpression> col_expr_ptr = MakeShared<ColumnExpression>(data_type, "t1", 1, "c1", 0, 0);
 
-        EXPECT_THROW(aggregate_function_set->GetMostMatchFunction(col_expr_ptr), RecoverableException);
+        EXPECT_THROW_WITHOUT_STACKTRACE(aggregate_function_set->GetMostMatchFunction(col_expr_ptr), RecoverableException);
     }
 }

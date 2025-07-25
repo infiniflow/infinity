@@ -1,8 +1,8 @@
 module;
 
-export module log;
+export module infinity_core:log;
 
-import stl;
+import :stl;
 
 namespace infinity {
 

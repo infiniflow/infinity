@@ -16,24 +16,17 @@
 #include <cstdio>
 #include <random>
 
-import stl;
 import base_test;
-import hnsw_lsg_builder;
-import index_hnsw;
+import infinity_core;
 import column_def;
 import embedding_info;
 import data_type;
-import hnsw_common;
 import logical_type;
-import index_base;
 import internal_types;
 #ifdef INDEX_HANDLER
-import hnsw_handler;
 #else
-import abstract_hnsw;
+// import abstract_hnsw;
 #endif
-import infinity_exception;
-import hnsw_alg;
 
 using namespace infinity;
 

@@ -17,11 +17,11 @@ module;
 #include <limits>
 #include <utility>
 
-export module hnsw_common;
+export module infinity_core:hnsw_common;
 
-import stl;
-import infinity_exception;
-import sparse_util;
+import :stl;
+import :infinity_exception;
+import :sparse_util;
 
 namespace infinity {
 

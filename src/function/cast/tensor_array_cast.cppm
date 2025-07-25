@@ -14,27 +14,27 @@
 
 module;
 
-export module tensor_array_cast;
+export module infinity_core:tensor_array_cast;
 
-import stl;
-import column_vector;
-import vector_buffer;
-import bound_cast_func;
-import column_vector_cast;
-import float_cast;
-import integer_cast;
-import infinity_exception;
-import third_party;
-import logger;
-import status;
+import :stl;
+import :column_vector;
+import :vector_buffer;
+import :bound_cast_func;
+import :column_vector_cast;
+import :float_cast;
+import :integer_cast;
+import :infinity_exception;
+import :third_party;
+import :logger;
+import :status;
 import logical_type;
 import internal_types;
 import embedding_info;
 import knn_expr;
 import data_type;
-import default_values;
-import embedding_cast;
-import tensor_cast;
+import :default_values;
+import :embedding_cast;
+import :tensor_cast;
 
 namespace infinity {
 

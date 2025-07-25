@@ -3,8 +3,8 @@ module;
 #include <cstdio>
 #include <cstring>
 
-export module buf_writer;
-import stl;
+export module infinity_core:buf_writer;
+import :stl;
 
 namespace infinity {
 // A simple buffer writer that writes data to a file.

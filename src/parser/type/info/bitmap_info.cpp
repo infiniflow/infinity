@@ -21,12 +21,12 @@ namespace infinity {
 
 std::shared_ptr<BitmapInfo> BitmapInfo::Make(int64_t limit) {
     ParserAssert(limit % 8 == 0, "Bitmap size should be the times of eight.");
-    ParserAssert(limit >= 1 && limit <= MAX_BITMAP_SIZE_INTERNAL,
-                 "Bitmap type length can't be less than 1 or larger than " + std::to_string(MAX_BITMAP_SIZE_INTERNAL));
+    ParserAssert(limit >= 1 && limit <= PARSER_MAX_BITMAP_SIZE_INTERNAL,
+                 "Bitmap type length can't be less than 1 or larger than " + std::to_string(PARSER_MAX_BITMAP_SIZE_INTERNAL));
     return std::make_shared<BitmapInfo>(limit);
 }
 
-std::shared_ptr<BitmapInfo> BitmapInfo::Make() { return std::make_shared<BitmapInfo>(MAX_BITMAP_SIZE_INTERNAL); }
+std::shared_ptr<BitmapInfo> BitmapInfo::Make() { return std::make_shared<BitmapInfo>(PARSER_MAX_BITMAP_SIZE_INTERNAL); }
 
 bool BitmapInfo::operator==(const TypeInfo &other) const {
     if (other.type() != TypeInfoType::kBitmap)

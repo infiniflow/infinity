@@ -14,9 +14,9 @@
 
 module;
 
-export module current_timestamp;
+export module infinity_core:current_timestamp;
 
-import stl;
+import :stl;
 
 namespace infinity {
 

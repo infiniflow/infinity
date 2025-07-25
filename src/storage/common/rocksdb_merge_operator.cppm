@@ -14,10 +14,10 @@
 
 module;
 
-export module rocksdb_merge_operator;
+export module infinity_core:rocksdb_merge_operator;
 
-import stl;
-import third_party;
+import :stl;
+import :third_party;
 
 namespace infinity {
 

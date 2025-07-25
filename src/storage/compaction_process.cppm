@@ -14,12 +14,12 @@
 
 module;
 
-export module compaction_process;
+export module infinity_core:compaction_process;
 
-import stl;
-import bg_task_type;
-import blocking_queue;
-import status;
+import :stl;
+import :bg_task_type;
+import :blocking_queue;
+import :status;
 
 namespace infinity {
 

@@ -14,20 +14,21 @@
 
 module;
 
-export module buffer_manager;
+export module infinity_core:buffer_manager;
 
-import stl;
-import file_worker;
-// import specific_concurrent_queue;
-import default_values;
+import :stl;
+import :file_worker;
+// import :specific_concurrent_queue;
+import :default_values;
+import :buffer_obj;
 
 namespace infinity {
 
-class BufferObj;
-class BufferObjectInfo;
+// class BufferObj;
+struct BufferObjectInfo;
 class KVInstance;
 class PersistenceManager;
-class ObjAddr;
+struct ObjAddr;
 class Status;
 
 class LRUCache {

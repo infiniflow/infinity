@@ -14,16 +14,16 @@
 
 module;
 
-export module skiplist_reader;
-import stl;
-import byte_slice;
-import byte_slice_reader;
-import index_defines;
-import doc_list_format_option;
+export module infinity_core:skiplist_reader;
+import :stl;
+import :byte_slice;
+import :byte_slice_reader;
+import :index_defines;
+import :doc_list_format_option;
 
-import posting_byte_slice;
-import posting_byte_slice_reader;
-import position_list_format_option;
+import :posting_byte_slice;
+import :posting_byte_slice_reader;
+import :position_list_format_option;
 
 namespace infinity {
 

@@ -14,10 +14,10 @@
 
 module;
 
-export module bottom_executor;
+export module infinity_core:bottom_executor;
 
-import stl;
-import blocking_queue;
+import :stl;
+import :blocking_queue;
 
 namespace infinity {
 

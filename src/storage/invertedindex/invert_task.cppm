@@ -14,10 +14,10 @@
 
 module;
 
-export module invert_task;
+export module infinity_core:invert_task;
 
-import stl;
-import column_vector;
+import :stl;
+import :column_vector;
 import internal_types;
 
 namespace infinity {

@@ -2,14 +2,14 @@ module;
 
 #include <string>
 
-export module analyze_context;
+export module infinity_core:analyze_context;
 
-import stl;
-import quick_sort_set;
-import character_util;
-import lexeme;
-import lexeme_path;
-import ik_dict;
+import :stl;
+import :quick_sort_set;
+import :character_util;
+import :lexeme;
+import :lexeme_path;
+import :ik_dict;
 
 namespace infinity {
 

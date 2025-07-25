@@ -14,14 +14,15 @@
 
 module;
 
-export module optimizer_rule;
+export module infinity_core:optimizer_rule;
 
-import logical_node;
-import stl;
+import :logical_node;
+import :stl;
 
 namespace infinity {
-
 class QueryContext;
+
+// class QueryContext;
 export class OptimizerRule {
 public:
     virtual void ApplyToPlan(QueryContext *query_context_ptr, SharedPtr<LogicalNode> &logical_plan) = 0;

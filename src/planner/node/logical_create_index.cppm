@@ -14,15 +14,15 @@
 
 module;
 
-export module logical_create_index;
+export module infinity_core:logical_create_index;
 
-import stl;
-import logical_node_type;
-import column_binding;
-import logical_node;
+import :stl;
+import :logical_node_type;
+import :column_binding;
+import :logical_node;
 
-import base_table_ref;
-import index_base;
+import :base_table_ref;
+import :index_base;
 import internal_types;
 import extra_ddl_info;
 import data_type;

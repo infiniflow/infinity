@@ -12,9 +12,9 @@
 
 module;
 
-export module century;
+export module infinity_core:century;
 
-import stl;
+import :stl;
 
 namespace infinity {
 

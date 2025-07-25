@@ -14,16 +14,16 @@
 
 module;
 
-export module logical_fusion;
+export module infinity_core:logical_fusion;
 
-import stl;
-import logical_node_type;
-import column_binding;
-import logical_node;
+import :stl;
+import :logical_node_type;
+import :column_binding;
+import :logical_node;
 
-import fusion_expression;
-import match_expression;
-import base_table_ref;
+import :fusion_expression;
+import :match_expression;
+import :base_table_ref;
 
 import internal_types;
 import data_type;

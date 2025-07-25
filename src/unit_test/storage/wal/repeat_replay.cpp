@@ -15,41 +15,13 @@
 #include "gtest/gtest.h"
 
 import base_test;
-
-import stl;
+import infinity_core;
 import global_resource_usage;
-import storage;
-import infinity_context;
 import compilation_config;
 import extra_ddl_info;
-import infinity_exception;
-import log_file;
-import config;
-import bg_task;
-import background_process;
-import default_values;
-import status;
-import logger;
 import column_def;
-import column_vector;
 import data_type;
 import logical_type;
-import table_def;
-import data_block;
-import value;
-import internal_types;
-import buffer_manager;
-import physical_import;
-import txn_state;
-import new_txn;
-import new_txn_manager;
-import wal_manager;
-import segment_meta;
-import block_meta;
-import column_meta;
-import table_meeta;
-import db_meeta;
-import new_catalog;
 
 using namespace infinity;
 

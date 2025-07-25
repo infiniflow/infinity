@@ -14,10 +14,10 @@
 
 module;
 
-export module special_function;
+export module infinity_core:special_function;
 
-import stl;
-import function;
+import :stl;
+import :function;
 import data_type;
 import internal_types;
 

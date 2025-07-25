@@ -14,14 +14,12 @@
 
 module;
 
-export module corrlated_expr_detector;
+export module infinity_core:corrlated_expr_detector;
 
-import stl;
-import logical_node_visitor;
-import column_expression;
-import base_expression;
-import logical_node;
-import subquery_expression;
+import :stl;
+import :logical_node_visitor;
+import :logical_node;
+import :subquery_expression;
 
 namespace infinity {
 

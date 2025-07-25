@@ -14,16 +14,16 @@
 
 module;
 
-export module infinity_thrift_service;
+export module infinity_core:infinity_thrift_service;
 
-import infinity_thrift_types;
-import infinity;
-import stl;
-import query_options;
+import :infinity_thrift_types;
+import :infinity;
+import :stl;
+import :query_options;
 import column_def;
 import statement_common;
 import data_type;
-import status;
+import :status;
 import embedding_info;
 import constant_expr;
 import column_expr;
@@ -39,11 +39,11 @@ import update_statement;
 import search_expr;
 import explain_statement;
 import create_index_info;
-import data_block;
-import table_def;
+import :data_block;
+import :table_def;
 import internal_types;
-import column_vector;
-import query_result;
+import :column_vector;
+import :query_result;
 import select_statement;
 import global_resource_usage;
 

@@ -14,14 +14,14 @@
 
 module;
 
-export module join_binder;
+export module infinity_core:join_binder;
 
-import stl;
+import :stl;
 
-import base_expression;
-import bind_context;
-import expression_binder;
-import query_context;
+import :base_expression;
+import :bind_context;
+import :expression_binder;
+// import :query_context;
 import parsed_expr;
 import knn_expr;
 

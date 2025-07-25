@@ -12,9 +12,9 @@
 
 module;
 
-export module era;
+export module infinity_core:era;
 
-import stl;
+import :stl;
 
 namespace infinity {
 

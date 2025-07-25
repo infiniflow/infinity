@@ -13,29 +13,11 @@
 // limitations under the License.
 
 #include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
+
 import base_test;
-
-import infinity_exception;
-
+import infinity_core;
 import global_resource_usage;
-import third_party;
-
-import logger;
-import stl;
-import infinity_context;
-
-import function_set;
-import aggregate_function_set;
-import aggregate_function;
-import function;
-import column_expression;
-import value;
-import default_values;
-import data_block;
-import cast_table;
-import column_vector;
-import integer_cast;
-import bound_cast_func;
 import internal_types;
 import logical_type;
 import data_type;
@@ -51,7 +33,7 @@ TEST_F(TinyIntegerCastTest, tiny_integer_cast0) {
     {
         TinyIntT source = 0;
         TinyIntT target;
-        EXPECT_THROW(IntegerTryCastToFixlen::Run(source, target), UnrecoverableException);
+        EXPECT_THROW_WITHOUT_STACKTRACE(IntegerTryCastToFixlen::Run(source, target), UnrecoverableException);
     }
     // TinyInt to SmallInt
     {
@@ -152,7 +134,7 @@ TEST_F(TinyIntegerCastTest, tiny_integer_cast0) {
     {
         TinyIntT source = std::numeric_limits<TinyIntT>::lowest();
         DecimalT target;
-        EXPECT_THROW(IntegerTryCastToFixlen::Run(source, target), UnrecoverableException);
+        EXPECT_THROW_WITHOUT_STACKTRACE(IntegerTryCastToFixlen::Run(source, target), UnrecoverableException);
     }
 
     // TinyInt to VarcharT
@@ -362,7 +344,7 @@ TEST_F(TinyIntegerCastTest, tiny_integer_cast1) {
         col_target->Initialize();
 
         CastParameters cast_parameters;
-        EXPECT_THROW(tiny2decimal_ptr.function(col_source, col_target, DEFAULT_VECTOR_SIZE, cast_parameters), UnrecoverableException);
+        EXPECT_THROW_WITHOUT_STACKTRACE(tiny2decimal_ptr.function(col_source, col_target, DEFAULT_VECTOR_SIZE, cast_parameters), UnrecoverableException);
     }
 
     // cast tiny int column vector to Varchar vector
@@ -391,6 +373,6 @@ TEST_F(TinyIntegerCastTest, tiny_integer_cast1) {
     {
         DataType source(LogicalType::kTinyInt);
         DataType target(LogicalType::kTimestamp);
-        EXPECT_THROW(BindIntegerCast<SmallIntT>(source, target), RecoverableException);
+        EXPECT_THROW_WITHOUT_STACKTRACE(BindIntegerCast<SmallIntT>(source, target), RecoverableException);
     }
 }

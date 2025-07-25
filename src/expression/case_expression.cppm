@@ -14,10 +14,10 @@
 
 module;
 
-export module case_expression;
+export module infinity_core:case_expression;
 
-import stl;
-import base_expression;
+import :stl;
+import :base_expression;
 import logical_type;
 import internal_types;
 import data_type;

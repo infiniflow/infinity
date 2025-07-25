@@ -14,10 +14,10 @@
 
 module;
 
-export module http_server;
+export module infinity_core:http_server;
 
-import stl;
-import third_party;
+import :stl;
+import :third_party;
 
 namespace infinity {
 

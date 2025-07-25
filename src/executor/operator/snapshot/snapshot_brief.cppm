@@ -14,11 +14,11 @@
 
 module;
 
-export module snapshot_brief;
+export module infinity_core:snapshot_brief;
 
-import stl;
+import :stl;
 import command_statement;
-import status;
+import :status;
 
 namespace infinity {
 

@@ -1,45 +1,17 @@
 #include "gtest/gtest.h"
-import base_test;
 
-import stl;
+import base_test;
+import infinity_core;
 import logical_type;
-import third_party;
-import infinity_context;
-import storage;
-import table_def;
 import column_def;
 import data_type;
 import extra_ddl_info;
 import create_index_info;
-import index_full_text;
-import index_base;
-import block_index;
-import base_table_ref;
-import column_vector;
-import query_builder;
-import query_node;
-import doc_iterator;
-import analyzer;
-import term;
-import search_driver;
-import analyzer_pool;
-import index_defines;
 import logical_type;
-import status;
-import infinity_exception;
 import match_expr;
 import internal_types;
 import search_options;
-import phrase_doc_iterator;
 import global_resource_usage;
-import term_doc_iterator;
-import logger;
-import column_index_reader;
-import parse_fulltext_options;
-import txn_state;
-import new_txn_manager;
-import new_txn;
-import data_block;
 
 using namespace infinity;
 

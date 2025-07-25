@@ -14,11 +14,12 @@
 
 module;
 
-import stl;
+export module infinity_core:index_segment_reader;
 
-import segment_posting;
-import index_defines;
-export module index_segment_reader;
+import :stl;
+
+import :segment_posting;
+import :index_defines;
 
 namespace infinity {
 export class IndexSegmentReader {

@@ -20,8 +20,7 @@
     #include <string>
 
     // Import modules to get complete type definitions
-    import query_node;
-    import search_driver;
+    import infinity_core;
 
     namespace infinity {
         // Forward declaration for SearchScanner (defined in .h file)
@@ -48,9 +47,8 @@
     #include <vector>
 
     // Import modules for implementation
-    import search_driver;
+    import infinity_core;
     import search_scanner;
-    import query_node;
 
     #undef yylex
     #define yylex scanner.yylex

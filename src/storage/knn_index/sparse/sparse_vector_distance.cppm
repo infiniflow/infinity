@@ -14,9 +14,9 @@
 
 module;
 
-export module sparse_vector_distance;
+export module infinity_core:sparse_vector_distance;
 
-import stl;
+import :stl;
 
 namespace infinity {
 

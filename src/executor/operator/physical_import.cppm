@@ -14,26 +14,26 @@
 
 module;
 
-export module physical_import;
+export module infinity_core:physical_import;
 
-import stl;
+import :stl;
 
-import query_context;
-import operator_state;
-import physical_operator;
-import physical_operator_type;
-import third_party;
+import :query_context;
+import :operator_state;
+import :physical_operator;
+import :physical_operator_type;
+import :third_party;
 import constant_expr;
-import zsv;
-import load_meta;
-import infinity_exception;
-import column_vector;
+import :zsv;
+import :load_meta;
+import :infinity_exception;
+import :column_vector;
 import internal_types;
 import statement_common;
 import data_type;
-import logger;
+import :logger;
 import sparse_info;
-import meta_info;
+import :meta_info;
 
 namespace infinity {
 

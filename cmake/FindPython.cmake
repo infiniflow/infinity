@@ -1,14 +1,40 @@
 if(NOT DEFINED Python3_EXECUTABLE)
-    execute_process(
-            COMMAND which python3
-            RESULT_VARIABLE STATUS
-            OUTPUT_VARIABLE OUTPUT
-            ERROR_QUIET)
-    if(STATUS EQUAL 0)
-        string(STRIP ${OUTPUT} STRIPPED)
-        message(STATUS "Using Python3 from 'which python3': ${STRIPPED}")
-        set(Python3_EXECUTABLE ${STRIPPED})
+    # First check environment variable
+    if(DEFINED ENV{Python3_EXECUTABLE})
+        set(Python3_EXECUTABLE $ENV{Python3_EXECUTABLE})
+        message(STATUS "Using Python3 from environment variable: ${Python3_EXECUTABLE}")
+    else()
+        execute_process(
+                COMMAND which python3
+                RESULT_VARIABLE STATUS
+                OUTPUT_VARIABLE OUTPUT
+                ERROR_QUIET)
+        if(STATUS EQUAL 0)
+            string(STRIP ${OUTPUT} STRIPPED)
+            message(STATUS "Using Python3 from 'which python3': ${STRIPPED}")
+            set(Python3_EXECUTABLE ${STRIPPED})
+        endif()
     endif()
+endif()
+
+# Check for environment variables for include and library paths
+if(DEFINED ENV{Python3_INCLUDE_DIR} AND NOT DEFINED Python3_INCLUDE_DIR)
+    set(Python3_INCLUDE_DIR $ENV{Python3_INCLUDE_DIR})
+    message(STATUS "Using Python3 include dir from environment: ${Python3_INCLUDE_DIR}")
+    # Set the CMake cache variable that FindPython3 uses
+    set(Python3_INCLUDE_DIR ${Python3_INCLUDE_DIR} CACHE PATH "Python3 include directory" FORCE)
+endif()
+
+if(DEFINED ENV{Python3_LIBRARY} AND NOT DEFINED Python3_LIBRARY)
+    set(Python3_LIBRARY $ENV{Python3_LIBRARY})
+    message(STATUS "Using Python3 library from environment: ${Python3_LIBRARY}")
+endif()
+
+# Set library paths before calling find_package
+if(DEFINED Python3_LIBRARY)
+    set(Python3_LIBRARIES ${Python3_LIBRARY})
+    # Also set the CMake cache variables that FindPython3 uses
+    set(Python3_LIBRARY_RELEASE ${Python3_LIBRARY} CACHE FILEPATH "Python3 library" FORCE)
 endif()
 
 set (Python3_USE_STATIC_LIBS "ON")

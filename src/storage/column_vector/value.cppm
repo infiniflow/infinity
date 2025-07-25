@@ -13,20 +13,19 @@
 // limitations under the License.
 module;
 
-export module value;
+export module infinity_core:value;
 
-import stl;
+import :stl;
 import type_info;
 import logical_type;
-import infinity_exception;
+import :infinity_exception;
 import internal_types;
 import embedding_info;
 import sparse_info;
 import data_type;
 import knn_expr;
-import third_party;
-import logger;
-import status;
+import :third_party;
+import :status;
 import global_resource_usage;
 
 namespace infinity {

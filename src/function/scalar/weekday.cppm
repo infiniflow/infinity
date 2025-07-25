@@ -12,9 +12,9 @@
 
 module;
 
-export module weekday;
+export module infinity_core:weekday;
 
-import stl;
+import :stl;
 
 namespace infinity {
 

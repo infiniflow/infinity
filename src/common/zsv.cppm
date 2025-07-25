@@ -19,7 +19,7 @@ extern "C" {
 #include "zsv.h"
 }
 
-export module zsv;
+export module infinity_core:zsv;
 
 namespace infinity {
 

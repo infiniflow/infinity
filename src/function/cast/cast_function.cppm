@@ -14,9 +14,9 @@
 
 module;
 
-export module cast_function;
+export module infinity_core:cast_function;
 
-import bound_cast_func;
+import :bound_cast_func;
 import data_type;
 import internal_types;
 

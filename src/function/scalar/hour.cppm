@@ -14,9 +14,9 @@
 
 module;
 
-export module hour;
+export module infinity_core:hour;
 
-import stl;
+import :stl;
 
 namespace infinity {
 

@@ -13,9 +13,9 @@
 // limitations under the License.
 
 #include "gtest/gtest.h"
+
 import base_test;
-import stl;
-import fst;
+import infinity_core;
 
 using namespace infinity;
 
@@ -42,7 +42,7 @@ protected:
 
 TEST_F(FstTest, BuildMemEmpty) {
     Vector<u8> buffer;
-    BufferWriter wtr(buffer);
+    FstBufferWriter wtr(buffer);
     FstBuilder builder(wtr);
     builder.Finish();
     u64 written = builder.BytesWritten();
@@ -71,7 +71,7 @@ TEST_F(FstTest, BuildFileEmpty) {
 
 TEST_F(FstTest, BuildMem) {
     Vector<u8> buffer;
-    BufferWriter wtr(buffer);
+    FstBufferWriter wtr(buffer);
     FstBuilder builder(wtr);
     for (auto &month : months) {
         builder.Insert((u8 *)month.first.c_str(), month.first.length(), month.second);
@@ -97,7 +97,7 @@ TEST_F(FstTest, BuildFile) {
 
 TEST_F(FstTest, Get) {
     Vector<u8> buffer;
-    BufferWriter wtr(buffer);
+    FstBufferWriter wtr(buffer);
     FstBuilder builder(wtr);
     for (auto &month : months) {
         builder.Insert((u8 *)month.first.c_str(), month.first.length(), month.second);
@@ -119,7 +119,7 @@ TEST_F(FstTest, Get) {
 
 TEST_F(FstTest, Iterate) {
     Vector<u8> buffer;
-    BufferWriter wtr(buffer);
+    FstBufferWriter wtr(buffer);
     FstBuilder builder(wtr);
     for (auto &month : months) {
         builder.Insert((u8 *)month.first.c_str(), month.first.length(), month.second);

@@ -160,6 +160,8 @@ set(ARROW_DOC_DIR "share/doc/${PROJECT_NAME}")
 set(BUILD_SUPPORT_DIR "${CMAKE_SOURCE_DIR}/build-support")
 
 set(ARROW_LLVM_VERSIONS
+    "20.1"
+    "19.1"
     "18.1"
     "17.0"
     "16.0"
@@ -443,7 +445,7 @@ if(ARROW_EXTRA_ERROR_CONTEXT)
   add_definitions(-DARROW_EXTRA_ERROR_CONTEXT)
 endif()
 
-include(SetupCxxFlags)
+#include(SetupCxxFlags)
 
 #
 # Linker flags
@@ -722,13 +724,13 @@ message(STATUS "Found LLVM ${LLVM_PACKAGE_VERSION}")
 message(STATUS "Using LLVM Header in: ${LLVM_INCLUDE_DIRS}")
 message(STATUS "Using LLVM Library in: ${LLVM_LIBRARY_DIRS}")
 
-add_compile_options($<$<COMPILE_LANGUAGE:CXX>:-nostdinc++>)
-add_compile_options($<$<COMPILE_LANGUAGE:CXX>:-isystem>)
-add_compile_options($<$<COMPILE_LANGUAGE:CXX>:${LLVM_INCLUDE_DIRS}/c++/v1>)
+# add_compile_options($<$<COMPILE_LANGUAGE:CXX>:-nostdinc++>)
+# add_compile_options($<$<COMPILE_LANGUAGE:CXX>:-isystem>)
+# add_compile_options($<$<COMPILE_LANGUAGE:CXX>:${LLVM_INCLUDE_DIRS}/c++/v1>)
 
-add_link_options($<$<COMPILE_LANGUAGE:CXX>:-nostdlib++>)
-add_link_options($<$<COMPILE_LANGUAGE:CXX>:-L${LLVM_LIBRARY_DIRS}>)
-add_link_options($<$<COMPILE_LANGUAGE:CXX>:-Wl,-rpath,${LLVM_LIBRARY_DIRS}>)
+# add_link_options($<$<COMPILE_LANGUAGE:CXX>:-nostdlib++>)
+# add_link_options($<$<COMPILE_LANGUAGE:CXX>:-L${LLVM_LIBRARY_DIRS}>)
+# add_link_options($<$<COMPILE_LANGUAGE:CXX>:-Wl,-rpath,${LLVM_LIBRARY_DIRS}>)
 
 add_subdirectory(src/arrow)
 

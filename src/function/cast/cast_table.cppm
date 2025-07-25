@@ -14,10 +14,10 @@
 
 module;
 
-export module cast_table;
+export module infinity_core:cast_table;
 
-import singleton;
-import stl;
+import :singleton;
+import :stl;
 
 import logical_type;
 

@@ -13,17 +13,11 @@
 // limitations under the License.
 
 #include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
+
 import base_test;
-import stl;
-import buffer_manager;
-import data_file_worker;
-import buffer_obj;
-import infinity_exception;
+import infinity_core;
 import global_resource_usage;
-import infinity_context;
-import persistence_manager;
-import default_values;
-import storage;
 
 using namespace infinity;
 
@@ -70,7 +64,7 @@ TEST_P(BufferHandleTest, test1) {
         auto buf_handle2 = buf2->Load();
 
         // out of memory exception
-        EXPECT_THROW({ auto buf_handle3 = buf3->Load(); }, UnrecoverableException);
+        EXPECT_THROW_WITHOUT_STACKTRACE({ auto buf_handle3 = buf3->Load(); }, UnrecoverableException);
         EXPECT_EQ(buf3->rc(), 0u);
         EXPECT_EQ(buf3->status(), BufferStatus::kNew);
         EXPECT_EQ(buf3->type(), BufferType::kEphemeral);

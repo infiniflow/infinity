@@ -14,14 +14,14 @@
 
 module;
 
-export module cast_expression;
+export module infinity_core:cast_expression;
 
-import column_binding;
+import :column_binding;
 
-import stl;
-import expression_type;
-import bound_cast_func;
-import base_expression;
+import :stl;
+import :expression_type;
+import :bound_cast_func;
+import :base_expression;
 import internal_types;
 import data_type;
 

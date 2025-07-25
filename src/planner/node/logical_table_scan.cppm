@@ -14,18 +14,18 @@
 
 module;
 
-export module logical_table_scan;
+export module infinity_core:logical_table_scan;
 
-import stl;
-import logical_node_type;
-import column_binding;
-import logical_node;
+import :stl;
+import :logical_node_type;
+import :column_binding;
+import :logical_node;
 
-import base_table_ref;
-import meta_info;
+import :base_table_ref;
+import :meta_info;
 import internal_types;
 import data_type;
-import fast_rough_filter;
+import :fast_rough_filter;
 
 namespace infinity {
 

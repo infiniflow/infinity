@@ -14,14 +14,10 @@ add_library(jma STATIC ${jma_SRC})
 if(APPLE)
     target_link_libraries(jma
         z
-        c++.a
-        c++abi.a
         iconv.a
     )
 else()
     target_link_libraries(jma
         z
-        c++.a
-        c++abi.a
     )
 endif()

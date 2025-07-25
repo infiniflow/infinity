@@ -13,10 +13,10 @@
 // limitations under the License.
 module;
 
-import stl;
-import global_resource_usage;
+export module infinity_core:allocator;
 
-export module allocator;
+import :stl;
+import global_resource_usage;
 
 namespace infinity {
 

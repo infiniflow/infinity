@@ -14,12 +14,12 @@
 
 module;
 
-export module cached_match;
+export module infinity_core:cached_match;
 
-import stl;
-import cached_node_base;
-import cached_scan_base;
-import logical_node_type;
+import :stl;
+import :cached_node_base;
+import :cached_scan_base;
+import :logical_node_type;
 
 namespace infinity {
 

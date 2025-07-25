@@ -15,7 +15,7 @@
 module;
 
 #include "roaring.hh"
-export module croaring;
+export module infinity_core:croaring;
 
 namespace roaring {
 export using roaring::Roaring;

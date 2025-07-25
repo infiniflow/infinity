@@ -15,9 +15,8 @@
 #include "gtest/gtest.h"
 
 import base_test;
-import stl;
+import infinity_core;
 import internal_types;
-import catalog_cache;
 
 using namespace infinity;
 

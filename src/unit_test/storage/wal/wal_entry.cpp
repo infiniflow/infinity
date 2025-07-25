@@ -13,31 +13,16 @@
 // limitations under the License.
 
 #include "gtest/gtest.h"
+
 import base_test;
-import infinity_context;
-import infinity_exception;
-
-import stl;
+import infinity_core;
 import global_resource_usage;
-import third_party;
-import logger;
-import table_def;
-import wal_entry;
-import value;
-
-import data_block;
-import default_values;
-import index_base;
-import index_ivf;
 import logical_type;
 import internal_types;
 import column_def;
 import statement_common;
 import data_type;
-import persistence_manager;
 import embedding_info;
-import kv_store;
-import status;
 
 using namespace infinity;
 

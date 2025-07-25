@@ -14,12 +14,12 @@
 
 module;
 
-export module subquery_table_ref;
+export module infinity_core:subquery_table_ref;
 
-import stl;
+import :stl;
 
-import table_ref;
-import bound_statement;
+import :table_ref;
+import :bound_statement;
 import table_reference;
 
 namespace infinity {

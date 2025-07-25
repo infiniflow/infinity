@@ -14,9 +14,9 @@
 
 module;
 
-export module bmp_util;
+export module infinity_core:bmp_util;
 
-import stl;
+import :stl;
 import statement_common;
 
 namespace infinity {

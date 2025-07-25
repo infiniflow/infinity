@@ -14,12 +14,12 @@
 
 module;
 
-export module join_table_ref;
+export module infinity_core:join_table_ref;
 
-import stl;
+import :stl;
 
-import table_ref;
-import base_expression;
+import :table_ref;
+import :base_expression;
 import table_reference;
 import join_reference;
 

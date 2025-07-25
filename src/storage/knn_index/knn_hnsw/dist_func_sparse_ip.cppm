@@ -14,13 +14,13 @@
 
 module;
 
-export module dist_func_sparse_ip;
+export module infinity_core:dist_func_sparse_ip;
 
-import stl;
-import sparse_vec_store;
-import sparse_vector_distance;
-import sparse_util;
-import hnsw_common;
+import :stl;
+import :sparse_vec_store;
+import :sparse_vector_distance;
+import :sparse_util;
+import :hnsw_common;
 
 namespace infinity {
 

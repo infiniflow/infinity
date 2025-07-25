@@ -20,7 +20,7 @@ module;
 #include <cppjieba/Jieba.hpp>
 #pragma clang diagnostic pop
 
-export module jieba;
+export module infinity_core:jieba;
 
 export namespace cppjieba {
 

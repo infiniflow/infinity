@@ -13,24 +13,12 @@
 //  limitations under the License.
 
 #include "gtest/gtest.h"
+#include <algorithm>
+
 import base_test;
-import stl;
+import infinity_core;
 import internal_types;
-import index_defines;
-import default_values;
-import doc_iterator;
-import and_iterator;
-import or_iterator;
-import and_not_iterator;
-import column_index_reader;
-import query_builder;
-import query_node;
-import search_driver;
-import infinity_context;
 import global_resource_usage;
-import third_party;
-import logger;
-import parse_fulltext_options;
 
 namespace infinity {
 

@@ -13,29 +13,11 @@
 // limitations under the License.
 
 #include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
+
 import base_test;
-
-import infinity_exception;
-
+import infinity_core;
 import global_resource_usage;
-import third_party;
-
-import logger;
-import stl;
-import infinity_context;
-
-import function_set;
-import aggregate_function_set;
-import aggregate_function;
-import function;
-import column_expression;
-import value;
-import default_values;
-import data_block;
-import cast_table;
-import column_vector;
-import geography_cast;
-import bound_cast_func;
 import internal_types;
 import logical_type;
 import data_type;
@@ -53,7 +35,7 @@ TEST_F(BoxCastTest, line_seg_cast0) {
         PointT p2(2, 2);
         BoxT source(p1, p2);
         TinyIntT target;
-        EXPECT_THROW(GeographyTryCastToVarlen::Run(source, target, nullptr), UnrecoverableException);
+        EXPECT_THROW_WITHOUT_STACKTRACE(GeographyTryCastToVarlen::Run(source, target, nullptr), UnrecoverableException);
     }
     {
         PointT p1(1, 1);
@@ -65,7 +47,7 @@ TEST_F(BoxCastTest, line_seg_cast0) {
         SharedPtr<ColumnVector> col_varchar_ptr = MakeShared<ColumnVector>(data_type);
         col_varchar_ptr->Initialize();
 
-        EXPECT_THROW(GeographyTryCastToVarlen::Run(source, target, col_varchar_ptr.get()), UnrecoverableException);
+        EXPECT_THROW_WITHOUT_STACKTRACE(GeographyTryCastToVarlen::Run(source, target, col_varchar_ptr.get()), UnrecoverableException);
     }
 }
 
@@ -76,7 +58,7 @@ TEST_F(BoxCastTest, line_seg_cast1) {
     {
         DataType source_type(LogicalType::kBox);
         DataType target_type(LogicalType::kDecimal);
-        EXPECT_THROW(BindGeographyCast<BoxT>(source_type, target_type), UnrecoverableException);
+        EXPECT_THROW_WITHOUT_STACKTRACE(BindGeographyCast<BoxT>(source_type, target_type), UnrecoverableException);
     }
 
     SharedPtr<DataType> source_type = MakeShared<DataType>(LogicalType::kBox);
@@ -107,6 +89,6 @@ TEST_F(BoxCastTest, line_seg_cast1) {
         col_target->Initialize();
 
         CastParameters cast_parameters;
-        EXPECT_THROW(source2target_ptr.function(col_source, col_target, DEFAULT_VECTOR_SIZE, cast_parameters), UnrecoverableException);
+        EXPECT_THROW_WITHOUT_STACKTRACE(source2target_ptr.function(col_source, col_target, DEFAULT_VECTOR_SIZE, cast_parameters), UnrecoverableException);
     }
 }

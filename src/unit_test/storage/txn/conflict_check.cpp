@@ -12,27 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "type/complex/row_id.h"
 #include "gtest/gtest.h"
-import base_test;
 
-import stl;
+import base_test;
+import infinity_core;
 import compilation_config;
-import infinity_context;
-import table_def;
 import column_def;
 import data_type;
 import logical_type;
-import storage;
-import new_txn_manager;
-import new_txn;
 import extra_ddl_info;
-import column_vector;
-import data_block;
-import value;
-import infinity_exception;
-import status;
-import txn_state;
+import row_id;
 
 using namespace infinity;
 

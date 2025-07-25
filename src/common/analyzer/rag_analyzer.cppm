@@ -15,18 +15,18 @@
 module;
 
 #include <re2/re2.h>
+#include "opencc/openccxx.h"
 
-export module rag_analyzer;
+export module infinity_core:rag_analyzer;
 
-import stl;
-import term;
-import status;
-import darts_trie;
-import lemmatizer;
-import stemmer;
-import analyzer;
+import :stl;
+import :term;
+import :status;
+import :darts_trie;
+import :lemmatizer;
+import :stemmer;
+import :analyzer;
 
-class OpenCC;
 namespace infinity {
 
 // C++ reimplementation of

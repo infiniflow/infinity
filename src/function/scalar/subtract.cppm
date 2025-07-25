@@ -14,9 +14,9 @@
 
 module;
 
-export module substract;
+export module infinity_core:subtract;
 
-import stl;
+import :stl;
 
 namespace infinity {
 

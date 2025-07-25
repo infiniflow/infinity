@@ -15,11 +15,11 @@
 module;
 
 #include "simd_common_intrin_include.h"
-export module search_top_k;
+export module infinity_core:search_top_k;
 
-import stl;
-import simd_init;
-import search_top_k_sgemm;
+import :stl;
+import :simd_init;
+import :search_top_k_sgemm;
 
 namespace infinity {
 

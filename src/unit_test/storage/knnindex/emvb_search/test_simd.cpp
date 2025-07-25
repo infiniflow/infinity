@@ -16,10 +16,9 @@
 #include <cstdlib>
 
 #include "gtest/gtest.h"
+
 import base_test;
-import stl;
-import emvb_simd_funcs;
-import simd_common_tools;
+import infinity_core;
 
 using namespace infinity;
 

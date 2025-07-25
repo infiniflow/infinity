@@ -1,0 +1,64 @@
+# EPEL 8 - China Mirrors Configuration
+# This file provides faster EPEL mirror sources for users in China
+
+[epel]
+name=Extra Packages for Enterprise Linux $releasever - $basearch
+baseurl=https://mirrors.aliyun.com/epel/$releasever/Everything/$basearch
+        https://mirrors.tuna.tsinghua.edu.cn/epel/$releasever/Everything/$basearch
+        https://mirrors.ustc.edu.cn/epel/$releasever/Everything/$basearch
+        https://mirror.sjtu.edu.cn/epel/$releasever/Everything/$basearch
+enabled=1
+gpgcheck=1
+countme=1
+gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-EPEL-8
+
+[epel-debuginfo]
+name=Extra Packages for Enterprise Linux $releasever - $basearch - Debug
+baseurl=https://mirrors.aliyun.com/epel/$releasever/Everything/$basearch/debug
+        https://mirrors.tuna.tsinghua.edu.cn/epel/$releasever/Everything/$basearch/debug
+        https://mirrors.ustc.edu.cn/epel/$releasever/Everything/$basearch/debug
+        https://mirror.sjtu.edu.cn/epel/$releasever/Everything/$basearch/debug
+enabled=0
+gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-EPEL-8
+gpgcheck=1
+
+[epel-source]
+name=Extra Packages for Enterprise Linux $releasever - $basearch - Source
+baseurl=https://mirrors.aliyun.com/epel/$releasever/Everything/SRPMS
+        https://mirrors.tuna.tsinghua.edu.cn/epel/$releasever/Everything/SRPMS
+        https://mirrors.ustc.edu.cn/epel/$releasever/Everything/SRPMS
+        https://mirror.sjtu.edu.cn/epel/$releasever/Everything/SRPMS
+enabled=0
+gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-EPEL-8
+gpgcheck=1
+
+[epel-modular]
+name=Extra Packages for Enterprise Linux Modular $releasever - $basearch
+baseurl=https://mirrors.aliyun.com/epel/$releasever/Modular/$basearch
+        https://mirrors.tuna.tsinghua.edu.cn/epel/$releasever/Modular/$basearch
+        https://mirrors.ustc.edu.cn/epel/$releasever/Modular/$basearch
+        https://mirror.sjtu.edu.cn/epel/$releasever/Modular/$basearch
+enabled=1
+gpgcheck=1
+countme=1
+gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-EPEL-8
+
+[epel-modular-debuginfo]
+name=Extra Packages for Enterprise Linux Modular $releasever - $basearch - Debug
+baseurl=https://mirrors.aliyun.com/epel/$releasever/Modular/$basearch/debug
+        https://mirrors.tuna.tsinghua.edu.cn/epel/$releasever/Modular/$basearch/debug
+        https://mirrors.ustc.edu.cn/epel/$releasever/Modular/$basearch/debug
+        https://mirror.sjtu.edu.cn/epel/$releasever/Modular/$basearch/debug
+enabled=0
+gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-EPEL-8
+gpgcheck=1
+
+[epel-modular-source]
+name=Extra Packages for Enterprise Linux Modular $releasever - $basearch - Source
+baseurl=https://mirrors.aliyun.com/epel/$releasever/Modular/SRPMS
+        https://mirrors.tuna.tsinghua.edu.cn/epel/$releasever/Modular/SRPMS
+        https://mirrors.ustc.edu.cn/epel/$releasever/Modular/SRPMS
+        https://mirror.sjtu.edu.cn/epel/$releasever/Modular/SRPMS
+enabled=0
+gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-EPEL-8
+gpgcheck=1

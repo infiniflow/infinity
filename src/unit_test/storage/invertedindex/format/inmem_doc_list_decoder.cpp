@@ -1,13 +1,7 @@
 #include "gtest/gtest.h"
+
 import base_test;
-
-import stl;
-
-import index_defines;
-import posting_byte_slice;
-import inmem_doc_list_decoder;
-import doc_list_format_option;
-import doc_list_encoder;
+import infinity_core;
 
 using namespace infinity;
 constexpr u32 default_document_legnth = 10;

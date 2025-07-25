@@ -13,10 +13,9 @@
 // limitations under the License.
 
 #include "gtest/gtest.h"
-import base_test;
 
-import stl;
-import binary_fuse_filter;
+import base_test;
+import infinity_core;
 
 using namespace infinity;
 class BinaryFuseFilterTest : public BaseTest {};

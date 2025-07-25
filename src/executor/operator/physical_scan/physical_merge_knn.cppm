@@ -14,24 +14,24 @@
 
 module;
 
-export module physical_merge_knn;
+export module infinity_core:physical_merge_knn;
 
-import stl;
+import :stl;
 
-import query_context;
-import operator_state;
-import physical_operator;
-import physical_operator_type;
-import base_expression;
-import data_table;
-import base_table_ref;
-import load_meta;
-import knn_expression;
-import infinity_exception;
+import :query_context;
+import :operator_state;
+import :physical_operator;
+import :physical_operator_type;
+import :base_expression;
+import :data_table;
+import :base_table_ref;
+import :load_meta;
+import :knn_expression;
+import :infinity_exception;
 import internal_types;
 import data_type;
-import logger;
-import physical_scan_base;
+import :logger;
+import :physical_scan_base;
 
 namespace infinity {
 

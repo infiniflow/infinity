@@ -14,26 +14,27 @@
 
 module;
 #include <type_traits>
-import stl;
-import simd_functions;
-import mlas_matrix_multiply;
-import search_top_1;
-import diskann_simd_func;
-import infinity_exception;
 
-export module diskann_dist_func;
+export module infinity_core:diskann_dist_func;
+
+import :stl;
+// import :simd_functions;
+// import :mlas_matrix_multiply;
+import :search_top_1;
+// import :diskann_simd_func;
+import :infinity_exception;
 
 namespace infinity {
 export enum class DiskAnnMetricType { L2, Cosine, IP, Invalid };
 
 export template <typename DiffType, typename ElemType1, typename ElemType2, typename DimType = u32>
-DiffType L2Distance(const ElemType1 *vector1, const ElemType2 *vector2, const DimType dimension) {
+DiffType DiskL2Distance(const ElemType1 *vector1, const ElemType2 *vector2, const DimType dimension) {
     if constexpr (std::is_same_v<ElemType1, f32> && std::is_same_v<ElemType2, f32>) {
         return GetSIMD_FUNCTIONS().L2Distance_func_ptr_(vector1, vector2, static_cast<SizeT>(dimension));
     } else {
         DiffType distance{};
         for (u32 i = 0; i < dimension; ++i) {
-            auto diff = (DiffType)(vector1[i] - vector2[i]);
+            auto diff = static_cast<DiffType>(vector1[i] - vector2[i]);
             distance += diff * diff;
         }
         return distance;
@@ -41,7 +42,7 @@ DiffType L2Distance(const ElemType1 *vector1, const ElemType2 *vector2, const Di
 }
 
 export template <typename DiffType, typename ElemType1, typename ElemType2, typename DimType = u32>
-DiffType CosineDistance(const ElemType1 *vector1, const ElemType2 *vector2, const DimType dimension) {
+DiffType DiskCosineDistance(const ElemType1 *vector1, const ElemType2 *vector2, const DimType dimension) {
     if constexpr (std::is_same_v<ElemType1, f32> && std::is_same_v<ElemType2, f32>) {
         return GetSIMD_FUNCTIONS().CosineDistance_func_ptr_(vector1, vector2, static_cast<SizeT>(dimension));
     } else {
@@ -58,7 +59,7 @@ DiffType CosineDistance(const ElemType1 *vector1, const ElemType2 *vector2, cons
 }
 
 export template <typename DiffType, typename ElemType1, typename ElemType2, typename DimType = u32>
-DiffType IPDistance(const ElemType1 *vector1, const ElemType2 *vector2, const DimType dimension) {
+DiffType DiskIPDistance(const ElemType1 *vector1, const ElemType2 *vector2, const DimType dimension) {
     if constexpr (std::is_same_v<ElemType1, f32> && std::is_same_v<ElemType2, f32>) {
         return GetSIMD_FUNCTIONS().IPDistance_func_ptr_(vector1, vector2, static_cast<SizeT>(dimension));
     } else {
@@ -72,7 +73,7 @@ DiffType IPDistance(const ElemType1 *vector1, const ElemType2 *vector2, const Di
 
 // Compute the L2 squared norm of vector
 export template <typename ElemType = f32, typename DimType = u32>
-void ComputL2sq(ElemType *vecs_l2sq, ElemType *data, const DimType dim) {
+void DiskComputL2sq(ElemType *vecs_l2sq, ElemType *data, const DimType dim) {
     matrixA_multiply_transpose_matrixB_output_to_C(data, data, 1, 1, dim, vecs_l2sq);
     *vecs_l2sq = sqrt(*vecs_l2sq);
 }

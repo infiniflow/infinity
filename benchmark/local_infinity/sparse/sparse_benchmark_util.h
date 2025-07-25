@@ -16,15 +16,15 @@
 
 #include "CLI11.hpp"
 
-import stl;
-import virtual_store;
-import infinity_exception;
-import third_party;
-import infinity_exception;
-import sparse_util;
+import :stl;
+import :virtual_store;
+import :infinity_exception;
+import :third_party;
+import :infinity_exception;
+import :sparse_util;
 import compilation_config;
-import bmp_util;
-import local_file_handle;
+import :bmp_util;
+import :local_file_handle;
 
 using namespace infinity;
 

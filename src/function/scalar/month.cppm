@@ -14,9 +14,9 @@
 
 module;
 
-export module month;
+export module infinity_core:month;
 
-import stl;
+import :stl;
 
 namespace infinity {
 

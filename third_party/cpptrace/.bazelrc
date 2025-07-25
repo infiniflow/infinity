@@ -1,3 +1,0 @@
-test --strip=never
-test --test_output=all
-test --copt=-g
