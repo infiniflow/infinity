@@ -17,6 +17,7 @@
 import base_test;
 import infinity_core;
 import compilation_config;
+import crash_handler;
 
 using namespace infinity;
 

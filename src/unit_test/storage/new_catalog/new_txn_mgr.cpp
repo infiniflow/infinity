@@ -17,6 +17,9 @@
 import base_test;
 import infinity_core;
 import extra_ddl_info;
+import column_def;
+import data_type;
+import logical_type;
 
 using namespace infinity;
 
