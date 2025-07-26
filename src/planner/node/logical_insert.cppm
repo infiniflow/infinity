@@ -55,6 +55,9 @@ public:
 
     [[nodiscard]] inline u64 table_index() const { return table_index_; }
 
+    // Check if this insert uses a SELECT source (has child node) or direct values
+    [[nodiscard]] inline bool has_select_source() const { return left_node_.get() != nullptr; }
+
 public:
     static bool NeedCastInInsert(const DataType &from, const DataType &to) {
         if (from.type() == to.type()) {

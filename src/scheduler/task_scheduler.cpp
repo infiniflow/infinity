@@ -137,6 +137,7 @@ void TaskScheduler::Schedule(PlanFragment *plan_fragment, const BaseStatement *b
             use_scheduler = true; // continue;
             break;
         }
+
         case StatementType::kCreate: {
             const CreateStatement *create_statement = static_cast<const CreateStatement *>(base_statement);
             if (create_statement->create_info_->type_ == DDLType::kIndex) {
