@@ -143,6 +143,8 @@ public:
 
     void PrintAllKeyValue() const;
 
+    void PrintAllDroppedKeys() const;
+
     SizeT KeyValueNum() const;
 
     KVStore *kv_store() const { return kv_store_; }
