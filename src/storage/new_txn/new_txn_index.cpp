@@ -259,13 +259,12 @@ Status NewTxn::CommitBottomDumpMemIndex(WalCmdDumpIndexV2 *dump_index_cmd) {
         return status;
     }
 
-    TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
     auto [index_base, status2] = table_index_meta->GetIndexBase();
     if (!status2.ok()) {
         return status2;
     }
     if (index_base->index_type_ == IndexType::kFullText) {
-        table_index_meta->UpdateFulltextSegmentTS(commit_ts);
+        table_index_meta->table_meta().InvalidateFtIndexCache();
     }
 
     PersistenceManager *pm = InfinityContext::instance().persistence_manager();
@@ -766,7 +765,6 @@ NewTxn::AppendMemIndex(SegmentIndexMeta &segment_index_meta, BlockID block_id, c
     RowID base_row_id = RowID(segment_index_meta.segment_id(), block_offset + offset);
 
     TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
-    TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
     auto [index_base, index_status] = segment_index_meta.table_index_meta().GetIndexBase();
     if (!index_status.ok()) {
         return index_status;
@@ -837,7 +835,7 @@ NewTxn::AppendMemIndex(SegmentIndexMeta &segment_index_meta, BlockID block_id, c
                 // To avoid deadlock of mem index mutex and table index reader cache mutex, update the ts here.
                 // query will lock table index reader cache mutex first, then mem index mutex.
                 // append will lock mem index mutex first, then table index reader cache mutex.
-                segment_index_meta.table_index_meta().UpdateFulltextSegmentTS(commit_ts);
+                segment_index_meta.table_index_meta().table_meta().InvalidateFtIndexCache();
             }
             break;
         }
@@ -2111,15 +2109,13 @@ Status NewTxn::PrepareCommitCreateIndex(WalCmdCreateIndexV2 *create_index_cmd) {
         }
     }
     if (create_index_cmd->index_base_->index_type_ == IndexType::kFullText) {
-        auto ft_cache = MakeShared<TableIndexReaderCache>(db_id_str, table_id_str);
-        status = table_meta.AddFtIndexCache(ft_cache);
+        // Invalidate existing fulltext index cache
+        Status status = table_meta.InvalidateFtIndexCache();
         if (!status.ok()) {
-            if (status.code() != ErrorCode::kCatalogError) {
-                return status;
-            }
+            return status;
         }
 
-        table_index_meta.UpdateFulltextSegmentTS(commit_ts);
+        LOG_TRACE(fmt::format("Created new fulltext index cache for index: {}", *create_index_cmd->index_base_->index_name_));
     }
 
     return Status::OK();
@@ -2146,7 +2142,13 @@ Status NewTxn::PrepareCommitDropIndex(const WalCmdDropIndexV2 *drop_index_cmd) {
         return status;
     }
     if (index_base->index_type_ == IndexType::kFullText) {
-        table_index_meta.UpdateFulltextSegmentTS(commit_ts);
+        // Invalidate fulltext index cache when dropping fulltext index
+        SharedPtr<TableIndexReaderCache> ft_index_cache;
+        Status cache_status = table_meta.GetFtIndexCache(ft_index_cache);
+        if (cache_status.ok()) {
+            ft_index_cache->Invalidate();
+            LOG_TRACE(fmt::format("Invalidated fulltext index cache of table {} during drop index commit", drop_index_cmd->table_name_));
+        }
     }
 
     return Status::OK();
@@ -2169,7 +2171,7 @@ Status NewTxn::PrepareCommitDumpIndex(const WalCmdDumpIndexV2 *dump_index_cmd, K
         return status;
     }
     if (index_base->index_type_ == IndexType::kFullText) {
-        table_index_meta.UpdateFulltextSegmentTS(commit_ts);
+        table_index_meta.table_meta().InvalidateFtIndexCache();
     }
 
     for (ChunkID deprecate_id : dump_index_cmd->deprecate_ids_) {
