@@ -46,8 +46,8 @@ import :query_context;
 
 namespace infinity {
 
-Connection::Connection(boost::asio::io_service &io_service)
-    : socket_(MakeShared<boost::asio::ip::tcp::socket>(io_service)), pg_handler_(MakeShared<PGProtocolHandler>(socket())) {}
+Connection::Connection(boost::asio::io_context &io_context)
+    : socket_(MakeShared<boost::asio::ip::tcp::socket>(io_context)), pg_handler_(MakeShared<PGProtocolHandler>(socket())) {}
 
 Connection::~Connection() {
     if (session_ == nullptr) {

@@ -43,7 +43,7 @@ private:
 
     Atomic<PGServerStatus> status_{PGServerStatus::kStopped};
     atomic_u64 running_connection_count_{0};
-    UniquePtr<boost::asio::io_service> io_service_ptr_{};
+    UniquePtr<boost::asio::io_context> io_context_ptr_{};
     UniquePtr<boost::asio::ip::tcp::acceptor> acceptor_ptr_{};
 };
 

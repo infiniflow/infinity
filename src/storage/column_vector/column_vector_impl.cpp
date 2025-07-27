@@ -400,10 +400,10 @@ void ColumnVector::Initialize(const ColumnVector &other, const Selection &input_
                 CopyFrom<ArrayT>(other.buffer_.get(), this->buffer_.get(), tail_index, input_select);
                 break;
             }
-            case LogicalType::kTuple: {
-                CopyFrom<TupleT>(other.buffer_.get(), this->buffer_.get(), tail_index, input_select);
-                break;
-            }
+            // case LogicalType::kTuple: {
+            //    CopyFrom<TupleT>(other.buffer_.get(), this->buffer_.get(), tail_index, input_select);
+            //    break;
+            // }
             case LogicalType::kPoint: {
                 CopyFrom<PointT>(other.buffer_.get(), this->buffer_.get(), tail_index, input_select);
                 break;

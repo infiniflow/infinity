@@ -30,7 +30,7 @@ class QueryContext;
 
 export class Connection {
 public:
-    explicit Connection(boost::asio::io_service &io_service);
+    explicit Connection(boost::asio::io_context &io_context);
 
     ~Connection();
 
