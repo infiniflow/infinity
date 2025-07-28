@@ -55,7 +55,7 @@ public:
     static constexpr bool HasOptimize = false;
 
     template <typename CompressType>
-    static constexpr LVQCosVecStoreType<DataType, CompressType, LSG> ToLVQ() {
+    static constexpr LVQCosVecStoreType<DataType, CompressType> ToLVQ() {
         return {};
     }
 };
@@ -77,7 +77,7 @@ public:
     static constexpr bool HasOptimize = false;
 
     template <typename CompressType>
-    static constexpr LVQL2VecStoreType<DataType, CompressType, LSG> ToLVQ() {
+    static constexpr LVQL2VecStoreType<DataType, CompressType> ToLVQ() {
         return {};
     }
 };
@@ -99,7 +99,7 @@ public:
     static constexpr bool HasOptimize = false;
 
     template <typename CompressType>
-    static constexpr LVQIPVecStoreType<DataType, CompressType, LSG> ToLVQ() {
+    static constexpr LVQIPVecStoreType<DataType, CompressType> ToLVQ() {
         return {};
     }
 };

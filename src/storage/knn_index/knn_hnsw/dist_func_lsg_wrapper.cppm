@@ -70,7 +70,7 @@ public:
 
     LVQDist ToLVQDistance(SizeT dim) && {
         if constexpr (std::is_same_v<typename Dist::This, typename Dist::LVQDist>) {
-            return dist_;
+            return std::move(dist_);
         } else {
             return std::move(dist_).ToLVQDistance(dim);
         }
