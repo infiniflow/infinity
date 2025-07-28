@@ -151,6 +151,13 @@ struct NewTxnCompactState {
                 if (!status.ok()) {
                     return status;
                 }
+
+                auto [data_size, status2] = column_meta.GetColumnSize(cur_block_row_cnt_);
+                if (!status2.ok()) {
+                    return status;
+                }
+                buffer_obj->SetDataSize(data_size);
+
                 buffer_obj->Save();
                 if (outline_buffer_obj) {
                     outline_buffer_obj->Save();
@@ -299,6 +306,12 @@ Status NewTxn::Import(const String &db_name, const String &table_name, const Vec
             //         return status;
             //     }
             // }
+
+            auto [data_size, status2] = column_meta.GetColumnSize(row_cnt);
+            if (!status2.ok()) {
+                return status;
+            }
+            buffer_obj->SetDataSize(data_size);
 
             buffer_obj->Save();
             if (outline_buffer_obj) {
@@ -838,14 +851,14 @@ Status NewTxn::ReplayCompact(WalCmdCompactV2 *compact_cmd) {
 Status NewTxn::ReplayCompact(WalCmdCompactV2 *compact_cmd, TxnTimeStamp commit_ts, i64 txn_id) {
 
     Optional<bool> skip_cmd = None;
-    for(const WalSegmentInfo &segment_info : compact_cmd->new_segment_infos_) {
+    for (const WalSegmentInfo &segment_info : compact_cmd->new_segment_infos_) {
         String segment_id_key = KeyEncode::CatalogTableSegmentKey(compact_cmd->db_id_, compact_cmd->table_id_, segment_info.segment_id_);
         String commit_ts_str;
         Status status = kv_instance_->Get(segment_id_key, commit_ts_str);
         if (status.ok()) {
             TxnTimeStamp commit_ts_from_kv = std::stoull(commit_ts_str);
             if (commit_ts == commit_ts_from_kv) {
-                if(skip_cmd.has_value() && !skip_cmd.value()) {
+                if (skip_cmd.has_value() && !skip_cmd.value()) {
                     return Status::UnexpectedError("Compact segments replay are mismatched in timestamp");
                 }
                 LOG_WARN(fmt::format("Skipping replay compact: Segment {} already exists in table {} of database {} with commit ts {}, txn: {}.",
@@ -855,7 +868,7 @@ Status NewTxn::ReplayCompact(WalCmdCompactV2 *compact_cmd, TxnTimeStamp commit_t
                                      commit_ts,
                                      txn_id));
 
-                for(const WalSegmentInfo &segment_info : compact_cmd->new_segment_infos_) {
+                for (const WalSegmentInfo &segment_info : compact_cmd->new_segment_infos_) {
                     TxnTimeStamp fake_commit_ts = txn_context_ptr_->begin_ts_;
 
                     SharedPtr<DBMeeta> db_meta;
@@ -872,20 +885,21 @@ Status NewTxn::ReplayCompact(WalCmdCompactV2 *compact_cmd, TxnTimeStamp commit_t
                 }
                 skip_cmd = true;
             } else {
-                LOG_ERROR(fmt::format("Replay compact: Segment {} already exists in table {} of database {} with commit ts {}, but replaying with commit "
-                                      "ts {}, txn: {}.",
-                                      segment_info.segment_id_,
-                                      compact_cmd->table_name_,
-                                      compact_cmd->db_name_,
-                                      commit_ts_from_kv,
-                                      commit_ts,
-                                      txn_id));
+                LOG_ERROR(
+                    fmt::format("Replay compact: Segment {} already exists in table {} of database {} with commit ts {}, but replaying with commit "
+                                "ts {}, txn: {}.",
+                                segment_info.segment_id_,
+                                compact_cmd->table_name_,
+                                compact_cmd->db_name_,
+                                commit_ts_from_kv,
+                                commit_ts,
+                                txn_id));
                 return Status::UnexpectedError("Segment already exists with different commit timestamp");
             }
         }
     }
     // TODO: check if the removed segments and segment indexes are created.
-    if(skip_cmd) {
+    if (skip_cmd) {
         return Status::OK();
     }
 
@@ -970,6 +984,19 @@ Status NewTxn::AppendInColumn(ColumnMeta &column_meta, SizeT dest_offset, SizeT 
         }
     }
     dest_vec.AppendWith(column_vector, source_offset, append_rows);
+
+    BufferObj *buffer_obj = nullptr;
+    BufferObj *outline_buffer_obj = nullptr;
+    Status status = column_meta.GetColumnBuffer(buffer_obj, outline_buffer_obj);
+    if (!status.ok()) {
+        return status;
+    }
+
+    auto [data_size, status2] = column_meta.GetColumnSize(dest_vec.Size());
+    if (!status2.ok()) {
+        return status;
+    }
+    buffer_obj->SetDataSize(data_size);
 
     if (VarBufferManager *var_buffer_mgr = dest_vec.buffer_->var_buffer_mgr(); var_buffer_mgr != nullptr) {
         //     Ensure buffer obj is loaded.

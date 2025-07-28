@@ -53,6 +53,10 @@ public:
 
     Status GetColumnBuffer(BufferObj *&column_buffer, BufferObj *&outline_buffer);
 
+    Tuple<SharedPtr<ColumnDef>, Status> GetColumnDef() const;
+
+    Tuple<SizeT, Status> GetColumnSize(SizeT row_cnt) const;
+
     Status FilePaths(Vector<String> &paths);
 
 private:
