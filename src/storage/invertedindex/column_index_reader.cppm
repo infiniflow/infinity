@@ -132,8 +132,6 @@ export class TableIndexReaderCache {
 public:
     TableIndexReaderCache(String db_id_str, String table_id_str) : db_id_str_(db_id_str), table_id_str_(table_id_str) {}
 
-    void UpdateKnownUpdateTs(TxnTimeStamp ts, std::shared_mutex &segment_update_ts_mutex, TxnTimeStamp &segment_update_ts);
-
     SharedPtr<IndexReader> GetIndexReader(NewTxn *txn);
 
     // User shall call this function only once when all transactions using `GetIndexReader()` have finished.

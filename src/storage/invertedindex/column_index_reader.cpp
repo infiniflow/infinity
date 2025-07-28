@@ -225,16 +225,6 @@ void ColumnIndexReader::InvalidateChunk(SegmentID segment_id, ChunkID chunk_id) 
     }
 }
 
-void TableIndexReaderCache::UpdateKnownUpdateTs(TxnTimeStamp ts, std::shared_mutex &segment_update_ts_mutex, TxnTimeStamp &segment_update_ts) {
-    std::scoped_lock lock1(mutex_);
-    std::unique_lock lock2(segment_update_ts_mutex);
-    if (ts < segment_update_ts) {
-        // Optimize txn begin ts may be less than Insert txn commit ts
-        return;
-    }
-    segment_update_ts = ts;
-}
-
 SharedPtr<IndexReader> TableIndexReaderCache::GetIndexReader(NewTxn *txn) {
     TxnTimeStamp begin_ts = txn->BeginTS();
     SharedPtr<IndexReader> index_reader = MakeShared<IndexReader>();

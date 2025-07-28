@@ -528,6 +528,7 @@ Status TableMeeta::GetFtIndexCache(SharedPtr<TableIndexReaderCache> &ft_index_ca
     String ft_index_cache_key = GetTableTag("ft_index_cache");
     NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
 
+    ft_index_cache = MakeShared<TableIndexReaderCache>(db_id_str_, table_id_str_);
     Status status = new_catalog->GetFtIndexCache(ft_index_cache_key, ft_index_cache);
     if (!status.ok()) {
         return status;
@@ -548,7 +549,7 @@ Status TableMeeta::RemoveFtIndexCache() {
 Status TableMeeta::InvalidateFtIndexCache() {
     String ft_index_cache_key = GetTableTag("ft_index_cache");
     NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
-    SharedPtr<TableIndexReaderCache> ft_index_cache;
+    SharedPtr<TableIndexReaderCache> ft_index_cache = MakeShared<TableIndexReaderCache>(db_id_str_, table_id_str_);
     Status status = new_catalog->GetFtIndexCache(ft_index_cache_key, ft_index_cache);
     if (!status.ok()) {
         if (status.code() == ErrorCode::kCatalogError) {
