@@ -12,10 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+module;
+
 #include "gtest/gtest.h"
 
-import base_test;
-import infinity_core;
+module infinity_core:ut.fixed_dimensional_encoding;
+
+import :base_test1;
+import :stl;
+import :fixed_dimensional_encoding;
 
 using namespace infinity;
 
