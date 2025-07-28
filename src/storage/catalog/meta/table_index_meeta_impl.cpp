@@ -178,19 +178,6 @@ Status TableIndexMeeta::GetSegmentUpdateTS(SharedPtr<SegmentUpdateTS> &segment_u
     return Status::OK();
 }
 
-Status TableIndexMeeta::UpdateFulltextSegmentTS(TxnTimeStamp ts) {
-    SharedPtr<SegmentUpdateTS> segment_update_ts;
-    Status status = GetSegmentUpdateTS(segment_update_ts);
-    if (!status.ok()) {
-        return status;
-    }
-    status = table_meta_.UpdateFulltextSegmentTS(ts, *segment_update_ts);
-    if (!status.ok()) {
-        return status;
-    }
-    return Status::OK();
-}
-
 Status TableIndexMeeta::InitSet1(const SharedPtr<IndexBase> &index_base, NewCatalog *new_catalog) {
     {
         Status status = SetIndexBase(index_base);

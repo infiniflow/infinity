@@ -26,6 +26,7 @@ import :index_defines;
 import internal_types;
 import :logger;
 import :status;
+import :default_values;
 
 namespace infinity {
 export class TermDocIterator;
@@ -131,28 +132,17 @@ export class TableIndexReaderCache {
 public:
     TableIndexReaderCache(String db_id_str, String table_id_str) : db_id_str_(db_id_str), table_id_str_(table_id_str) {}
 
-    void UpdateKnownUpdateTs(TxnTimeStamp ts, std::shared_mutex &segment_update_ts_mutex, TxnTimeStamp &segment_update_ts);
-
     SharedPtr<IndexReader> GetIndexReader(NewTxn *txn);
 
     // User shall call this function only once when all transactions using `GetIndexReader()` have finished.
     void Invalidate();
-
-    void InvalidateColumn(u64 column_id, const String &column_name);
-
-    void InvalidateSegmentColumn(u64 column_id, SegmentID segment_id);
-
-    void InvalidateChunkColumn(u64 column_id, SegmentID segment_id, ChunkID chunk_id);
 
 private:
     std::mutex mutex_;
     String db_id_str_;
     String table_id_str_;
 
-    TxnTimeStamp first_known_update_ts_ = 0;
-    TxnTimeStamp last_known_update_ts_ = 0;
-    TxnTimeStamp cache_ts_ = 0;
-    FlatHashMap<u64, TxnTimeStamp, detail::Hash<u64>> cache_column_ts_;
+    TxnTimeStamp cache_ts_ = UNCOMMIT_TS;
     SharedPtr<FlatHashMap<u64, SharedPtr<Map<String, SharedPtr<ColumnIndexReader>>>, detail::Hash<u64>>> cache_column_readers_;
 };
 
