@@ -201,7 +201,11 @@ NewBuildFastRoughFilterArg::NewBuildFastRoughFilterArg(SegmentMeta *segment_meta
                                                        UniquePtr<u64[]> &distinct_keys_backup,
                                                        BuildingSegmentFastFilters *segment_filters)
     : segment_meta_(segment_meta), column_id_(column_id), distinct_keys_(distinct_keys), distinct_keys_backup_(distinct_keys_backup),
-      segment_filters_(segment_filters) {}
+      segment_filters_(segment_filters) {
+    begin_ts_ = &segment_filters->begin_ts_;
+    commit_ts_ = &segment_filters->commit_ts_;
+    kv_instance_ = segment_filters->kv_instance_;
+}
 
 NewBuildFastRoughFilterArg::~NewBuildFastRoughFilterArg() = default;
 
