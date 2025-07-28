@@ -56,7 +56,7 @@ set(GCC15_SUFFIXES
 )
 
 find_library(STDCXX15_STATIC
-        NAMES stdc++.a
+        NAMES libstdc++.a
         PATHS ${GCC_SEARCH_ROOTS}
         PATH_SUFFIXES ${GCC15_SUFFIXES}
         REQUIRED
@@ -64,7 +64,7 @@ find_library(STDCXX15_STATIC
 )
 
 find_library(STDCXX15EXP_STATIC
-        NAMES stdc++exp.a
+        NAMES libstdc++exp.a
         PATHS ${GCC_SEARCH_ROOTS}
         PATH_SUFFIXES ${GCC15_SUFFIXES}
         REQUIRED
