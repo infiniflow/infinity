@@ -12,11 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+
+#if 0
+
 module;
 
 module infinity_core:ut.user_defined_term_weight;
-
-#if 0
 #include "gtest/gtest.h"
 import :ut.base_test;
 

@@ -541,160 +541,76 @@ target_include_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/third_party/thri
 ### unit test
 
 file(GLOB_RECURSE
-        ut_test_main_cpp
+        test_main_cpp
         CONFIGURE_DEPENDS
         unit_test/main.cpp
 )
 
 file(GLOB_RECURSE
-        ut_common_cpp1
+        common_ut
         CONFIGURE_DEPENDS
         unit_test/common/*_ut.cpp
 )
-message(STATUS "*******${ut_common_cpp1}")
-file(GLOB_RECURSE
-        ut_common_cpp2
-        CONFIGURE_DEPENDS
-        unit_test/common/*_impl.cpp
-)
-message(STATUS "*******${ut_common_cpp2}")
-file(GLOB_RECURSE
-        ut_common_cpp
-        CONFIGURE_DEPENDS
-        unit_test/common/*.cpp
-)
-list(FILTER ut_common_cpp EXCLUDE REGEX .*_ut.cpp)
-list(FILTER ut_common_cpp EXCLUDE REGEX .*_impl.cpp)
 
 file(GLOB_RECURSE
-        ut_parser_cpp1
+        parser_ut
         CONFIGURE_DEPENDS
         unit_test/parser/*_ut.cpp
 )
-file(GLOB_RECURSE
-        ut_parser_cpp
-        CONFIGURE_DEPENDS
-        unit_test/parser/*.cpp
-)
-list(FILTER ut_parser_cpp EXCLUDE REGEX .*_ut.cpp)
 
 file(GLOB_RECURSE
-        ut_storage_cpp1
+        storage_ut
         CONFIGURE_DEPENDS
         unit_test/storage/*_ut.cpp
 )
-file(GLOB_RECURSE
-        ut_storage_cpp
-        CONFIGURE_DEPENDS
-        unit_test/storage/*.cpp
-)
-list(FILTER ut_storage_cpp EXCLUDE REGEX .*_ut.cpp)
 
 file(GLOB_RECURSE
-        ut_executor_cpp1
+        executor_ut
         CONFIGURE_DEPENDS
         unit_test/executor/*_ut.cpp
 )
-file(GLOB_RECURSE
-        ut_executor_cpp
-        CONFIGURE_DEPENDS
-        unit_test/executor/*.cpp
-)
-list(FILTER ut_executor_cpp EXCLUDE REGEX .*_ut.cpp)
 
 file(GLOB_RECURSE
-        ut_test_helper_cpp2
-        CONFIGURE_DEPENDS
-        unit_test/test_helper/*_impl.cpp
-)
-file(GLOB_RECURSE
-        ut_test_helper_cpp
-        CONFIGURE_DEPENDS
-        unit_test/test_helper/*.cpp
-)
-list(FILTER ut_test_helper_cpp EXCLUDE REGEX .*_impl.cpp)
-
-file(GLOB_RECURSE
-        ut_main_cpp1
+        main_ut
         CONFIGURE_DEPENDS
         unit_test/main/*_ut.cpp
 )
-file(GLOB_RECURSE
-        ut_main_cpp
-        CONFIGURE_DEPENDS
-        unit_test/main/*.cpp
-)
-list(FILTER ut_main_cpp EXCLUDE REGEX .*_ut.cpp)
 
 file(GLOB_RECURSE
-        ut_planner_cpp1
+        planner_ut
         CONFIGURE_DEPENDS
         unit_test/planner/*_ut.cpp
 )
-file(GLOB_RECURSE
-        ut_planner_cpp
-        CONFIGURE_DEPENDS
-        unit_test/planner/*.cpp
-)
-list(FILTER ut_planner_cpp EXCLUDE REGEX .*_ut.cpp)
 
 file(GLOB_RECURSE
-        ut_function_cpp1
+        function_ut
         CONFIGURE_DEPENDS
         unit_test/function/*_ut.cpp
 )
-file(GLOB_RECURSE
-        ut_function_cpp
-        CONFIGURE_DEPENDS
-        unit_test/function/*.cpp
-)
-list(FILTER ut_function_cpp EXCLUDE REGEX .*_ut.cpp)
 
 file(GLOB_RECURSE
-        ut_parallel_cpp1
+        parallel_ut
         CONFIGURE_DEPENDS
         unit_test/parallel/*_ut.cpp
 )
-file(GLOB_RECURSE
-        ut_parallel_cpp
-        CONFIGURE_DEPENDS
-        unit_test/parallel/*.cpp
-)
-list(FILTER ut_parallel_cpp EXCLUDE REGEX .*_ut.cpp)
 
 file(GLOB_RECURSE
-        ut_thirdparty_cpp1
+        thirdparty_ut
         CONFIGURE_DEPENDS
         unit_test/third_party/*_ut.cpp
 )
-file(GLOB_RECURSE
-        ut_thirdparty_cpp
-        CONFIGURE_DEPENDS
-        unit_test/third_party/*.cpp
-)
-list(FILTER ut_thirdparty_cpp EXCLUDE REGEX .*_ut.cpp)
 
 file(GLOB_RECURSE
-        ut_dependent_cppm
+        test_dependent_cppm
         CONFIGURE_DEPENDS
-        unit_test/base_test1.cppm
+        unit_test/base_test.cppm
         unit_test/test_helper/sql_runner.cppm
         unit_test/*.cppm
+        unit_test/*_impl.cpp
 )
 
 add_executable(unit_test
-        ${ut_test_main_cpp}
-        ${ut_common_cpp}
-        ${ut_storage_cpp}
-        ${ut_main_cpp}
-        ${ut_parser_cpp}
-        ${ut_function_cpp}
-        ${ut_thirdparty_cpp}
-        ${ut_executor_cpp}
-        ${ut_test_helper_cpp}
-        ${ut_planner_cpp}
-        ${ut_function_cpp}
-        ${ut_parallel_cpp}
+        ${test_main_cpp}
 )
 
 set_target_properties(unit_test PROPERTIES OUTPUT_NAME test_main)
@@ -751,18 +667,17 @@ target_link_directories(unit_test PUBLIC "/usr/local/openssl30/lib64")
 target_sources(unit_test
         PRIVATE
         FILE_SET core_cxx_modules TYPE CXX_MODULES FILES
-        ${ut_dependent_cppm}
+        ${test_dependent_cppm}
 
-        ${ut_common_cpp1}
-        ${ut_common_cpp2}
-        ${ut_parser_cpp1}
-        ${ut_storage_cpp1}
-        ${ut_executor_cpp1}
-        ${ut_planner_cpp1}
-        ${ut_function_cpp1}
-        ${ut_parralel_cpp1}
-        ${ut_thirdparty_cpp1}
-        ${ut_test_helper_cpp2}
+        ${common_ut}
+        ${parser_ut}
+        ${storage_ut}
+        ${executor_ut}
+        ${planner_ut}
+        ${function_ut}
+        ${parralel_ut}
+        ${thirdparty_ut}
+        ${main_ut}
 )
 
 target_include_directories(unit_test PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
