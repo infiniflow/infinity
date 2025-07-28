@@ -19,7 +19,7 @@ module;
 module infinity_core:ut.year_functions;
 
 import :stl;
-import base_test;
+import :base_test1;
 import :infinity_exception;
 import :infinity_context;
 import :new_catalog;

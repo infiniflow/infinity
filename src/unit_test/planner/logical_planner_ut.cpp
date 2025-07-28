@@ -20,17 +20,17 @@ module infinity_core:ut.logical_planner;
 
 #include "gtest/gtest.h"
 
-import base_test;
+import :base_test1;
 
-import infinity_exception;
+import :infinity_exception
 
 import global_resource_usage;
-import third_party;
+import :third_party;
 
-import logger;
-import stl;
-import infinity_context;
-import sql_runner;
+import :logger;
+import :stl;
+import :infinity_context;
+import :ut.sql_runner;
 
 class LogicalPlannerTest : public BaseTest {};
 

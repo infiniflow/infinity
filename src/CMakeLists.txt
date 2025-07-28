@@ -551,11 +551,13 @@ file(GLOB_RECURSE
         CONFIGURE_DEPENDS
         unit_test/common/*_ut.cpp
 )
+message(STATUS "*******${ut_common_cpp1}")
 file(GLOB_RECURSE
         ut_common_cpp2
         CONFIGURE_DEPENDS
         unit_test/common/*_impl.cpp
 )
+message(STATUS "*******${ut_common_cpp2}")
 file(GLOB_RECURSE
         ut_common_cpp
         CONFIGURE_DEPENDS
@@ -601,10 +603,16 @@ file(GLOB_RECURSE
 list(FILTER ut_executor_cpp EXCLUDE REGEX .*_ut.cpp)
 
 file(GLOB_RECURSE
+        ut_test_helper_cpp2
+        CONFIGURE_DEPENDS
+        unit_test/test_helper/*_impl.cpp
+)
+file(GLOB_RECURSE
         ut_test_helper_cpp
         CONFIGURE_DEPENDS
         unit_test/test_helper/*.cpp
 )
+list(FILTER ut_test_helper_cpp EXCLUDE REGEX .*_impl.cpp)
 
 file(GLOB_RECURSE
         ut_main_cpp1
@@ -669,7 +677,7 @@ list(FILTER ut_thirdparty_cpp EXCLUDE REGEX .*_ut.cpp)
 file(GLOB_RECURSE
         ut_dependent_cppm
         CONFIGURE_DEPENDS
-        unit_test/base_test.cppm
+        unit_test/base_test1.cppm
         unit_test/test_helper/sql_runner.cppm
         unit_test/*.cppm
 )
@@ -754,6 +762,7 @@ target_sources(unit_test
         ${ut_function_cpp1}
         ${ut_parralel_cpp1}
         ${ut_thirdparty_cpp1}
+        ${ut_test_helper_cpp2}
 )
 
 target_include_directories(unit_test PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")

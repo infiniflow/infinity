@@ -16,7 +16,6 @@ module;
 export module infinity_core:logger;
 
 import :stl;
-// import infinity_core;
 import :status;
 import :third_party;
 

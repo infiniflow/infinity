@@ -23,10 +23,9 @@ import :third_party;
 import :logger;
 import :stl;
 import :infinity_context;
-
 import :base_test1;
 import global_resource_usage;
-import sql_runner;
+import :ut.sql_runner;
 
 using namespace infinity;
 class FragmentTest : public BaseTest {

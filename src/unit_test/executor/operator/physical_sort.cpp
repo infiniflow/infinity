@@ -14,23 +14,23 @@
 
 #if 0
 #include "gtest/gtest.h"
-import base_test;
+import :base_test1;
 
-import infinity_exception;
+import :infinity_exception
 
 import global_resource_usage;
-import third_party;
+import :third_party;
 
-import logger;
-import stl;
-import infinity_context;
-import default_values;
-import data_table;
-import table_def;
-import value;
-import data_block;
+import :logger;
+import :stl;
+import :infinity_context;
+import :default_values;
+import :data_table;
+import :table_def;
+import :value;
+import :data_block;
 import physical_sort;
-//import sql_runner;
+//import :ut.sql_runner;
 
 using namespace infinity;
 class PhysicalSortTest : public BaseTest {};

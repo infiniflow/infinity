@@ -14,9 +14,10 @@
 
 module;
 
-export module sql_runner;
+export module infinity_core:ut.sql_runner;
 
-import infinity_core;
+import :stl;
+import :data_table;
 
 namespace infinity {
 

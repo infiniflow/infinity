@@ -29,6 +29,7 @@ import global_resource_usage;
 import :infinity_context;
 import :logger;
 import :third_party;
+import :ut.log_helper;
 
 using namespace infinity;
 
@@ -48,18 +49,6 @@ class SearchDriverTest : public BaseTest {
 #endif
         BaseTest::TearDown();
     }
-};
-
-struct LogHelper {
-    void Reset() {
-        //        LOG_INFO(std::move(oss).str());
-        oss.str("");
-        oss.clear();
-    }
-    ~LogHelper() {
-        //        LOG_INFO(std::move(oss).str());
-    }
-    OStringStream oss;
 };
 
 int ParseStream(const SearchDriver &driver, std::istream &ist) {

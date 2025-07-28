@@ -16,7 +16,6 @@ module;
 
 export module infinity_core:infinity_context;
 
-// import infinity_core;
 import :stl;
 import :status;
 import :singleton;

@@ -16,10 +16,10 @@ module;
 
 #include "gtest/gtest.h"
 
-export module replay_test;
+export module infinity_core:ut.replay_test;
 
-import base_test;
-import infinity_core;
+import :base_test1;
+import :new_txn_manager;
 
 using namespace infinity;
 

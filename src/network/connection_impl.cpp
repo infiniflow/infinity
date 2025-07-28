@@ -33,7 +33,7 @@ import :third_party;
 import :data_table;
 
 import :logical_node_type;
-// import query_result;
+// import :query_result;
 // import session_manager;
 import type_info;
 import logical_type;

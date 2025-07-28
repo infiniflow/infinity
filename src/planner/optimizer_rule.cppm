@@ -20,7 +20,7 @@ import :logical_node;
 import :stl;
 
 namespace infinity {
-class QueryContext;
+export class QueryContext;
 
 // class QueryContext;
 export class OptimizerRule {

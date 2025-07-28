@@ -58,9 +58,9 @@ import :session_manager;
 // import extra_ddl_info;
 
 // import drop_table_info;
-// import third_party;
-// import defer_op;
-// import infinity_exception;
+// import :third_party;
+// import :defer_op;
+// import :infinity_exception
 
 namespace infinity {
 

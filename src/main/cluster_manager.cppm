@@ -16,7 +16,6 @@ module;
 
 export module infinity_core:cluster_manager;
 
-// import infinity_core;
 import :stl;
 import :status;
 import :node_info;

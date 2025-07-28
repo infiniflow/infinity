@@ -25,11 +25,11 @@ import base_statement;
 import admin_statement;
 import :profiler;
 import sql_parser;
+import :optimizer;
 
 namespace infinity {
 enum class QueryPhase : i8;
 class TaskProfiler;
-class Optimizer;
 class SessionManager;
 class ResourceManager;
 

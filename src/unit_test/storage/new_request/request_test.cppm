@@ -16,10 +16,12 @@ module;
 
 #include "gtest/gtest.h"
 
-export module request_test;
+export module infinity_core:ut.request_test;
 
-import base_test;
-import infinity_core;
+import :base_test1;
+import :query_context;
+import :data_table;
+import :session_manager;
 
 using namespace infinity;
 

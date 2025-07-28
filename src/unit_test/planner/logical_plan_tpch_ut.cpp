@@ -34,7 +34,7 @@ module infinity_core:ut.logical_plan_tpch;
 
 #include "gtest/gtest.h"
 
-import base_test;
+import :base_test1;
 
 using namespace infinity;
 class LogicalPlannerTpchTest : public BaseTest {};
