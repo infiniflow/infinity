@@ -87,10 +87,10 @@ TEST_P(TestTxnTableMeeta, table_meeta) {
         // EXPECT_EQ(segment_id, 0);
         {
             SegmentMeta segment_meta(0, table_meta);
-            segment_meta.InitSet();
+            segment_meta.InitSet(txn2->kv_instance());
             // segment_meta.SetRowCnt(1048);
             {
-                auto [blocks, block_status] = segment_meta.GetBlockIDs1();
+                auto [blocks, block_status] = segment_meta.GetBlockIDs1(txn2->kv_instance(), txn2->BeginTS(), txn2->CommitTS());
                 EXPECT_TRUE(block_status.ok());
                 EXPECT_EQ(blocks->size(), 0);
             }
@@ -98,17 +98,17 @@ TEST_P(TestTxnTableMeeta, table_meeta) {
                 TxnTimeStamp commit_ts = 1;
 
                 BlockID block_id = 0;
-                std::tie(block_id, status) = segment_meta.AddBlockID1(commit_ts);
+                std::tie(block_id, status) = segment_meta.AddBlockID1(txn2->kv_instance(), txn2->BeginTS(), commit_ts);
                 EXPECT_TRUE(status.ok());
                 EXPECT_EQ(block_id, 0);
 
-                std::tie(block_id, status) = segment_meta.AddBlockID1(commit_ts);
+                std::tie(block_id, status) = segment_meta.AddBlockID1(txn2->kv_instance(), txn2->BeginTS(), commit_ts);
                 EXPECT_TRUE(status.ok());
                 EXPECT_EQ(block_id, 1);
             }
 
             {
-                auto [blocks, block_status] = segment_meta.GetBlockIDs1();
+                auto [blocks, block_status] = segment_meta.GetBlockIDs1(txn2->kv_instance(), txn2->BeginTS(), txn2->CommitTS());
                 EXPECT_TRUE(block_status.ok());
                 EXPECT_EQ(*blocks, std::vector<BlockID>({0, 1}));
             }

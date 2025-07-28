@@ -5243,7 +5243,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_delete) {
         SegmentMeta segment_meta(segment_id, *table_meta);
 
         Vector<BlockID> *block_ids_ptr = nullptr;
-        std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1();
+        std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(*block_ids_ptr, Vector<BlockID>({0}));
         for (const auto block_id : *block_ids_ptr) {

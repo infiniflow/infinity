@@ -385,6 +385,9 @@ Status NewTxn::GetTables(const String &db_name, Vector<SharedPtr<TableDetail>> &
     if (!status.ok()) {
         return status;
     }
+    KVInstance *kv_instance = this->kv_instance();
+    TxnTimeStamp begin_ts = this->BeginTS();
+    TxnTimeStamp commit_ts = this->CommitTS();
     for (const String &table_name : table_names) {
         SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
@@ -394,7 +397,7 @@ Status NewTxn::GetTables(const String &db_name, Vector<SharedPtr<TableDetail>> &
         }
         output_table_array.push_back(MakeShared<TableDetail>());
         table_meta->SetDBTableName(db_name, table_name);
-        status = table_meta->GetTableDetail(*output_table_array.back());
+        status = table_meta->GetTableDetail(kv_instance, begin_ts, commit_ts, *output_table_array.back());
         if (!status.ok()) {
             return status;
         }
@@ -1341,7 +1344,7 @@ Tuple<SharedPtr<SegmentInfo>, Status> NewTxn::GetSegmentInfo(const String &db_na
         return {nullptr, status};
     }
     SegmentMeta segment_meta(segment_id, table_meta.value());
-    std::tie(segment_info, status) = segment_meta.GetSegmentInfo();
+    std::tie(segment_info, status) = segment_meta.GetSegmentInfo(kv_instance_.get(), txn_context_ptr_->begin_ts_, txn_context_ptr_->commit_ts_);
     if (!status.ok()) {
         return {nullptr, status};
     }
@@ -1364,7 +1367,7 @@ Tuple<Vector<SharedPtr<SegmentInfo>>, Status> NewTxn::GetSegmentsInfo(const Stri
     for (SegmentID segment_id : *segment_ids_ptr) {
         SegmentMeta segment_meta(segment_id, table_meta.value());
         auto segment_info = MakeShared<SegmentInfo>();
-        std::tie(segment_info, status) = segment_meta.GetSegmentInfo();
+        std::tie(segment_info, status) = segment_meta.GetSegmentInfo(kv_instance_.get(), txn_context_ptr_->begin_ts_, txn_context_ptr_->commit_ts_);
         if (!status.ok()) {
             return {segment_info_list, status};
         }
@@ -1397,7 +1400,7 @@ Tuple<Vector<SharedPtr<BlockInfo>>, Status> NewTxn::GetBlocksInfo(const String &
     }
     SegmentMeta segment_meta(segment_id, table_meta.value());
     Vector<BlockID> *block_ids_ptr = nullptr;
-    std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1();
+    std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1(kv_instance_.get(), txn_context_ptr_->begin_ts_, txn_context_ptr_->commit_ts_);
     if (!status.ok()) {
         return {block_info_list, status};
     }
@@ -4879,7 +4882,7 @@ Status NewTxn::GetDBFilePaths(const String &db_name, Vector<String> &file_paths)
     }
     TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
     TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
-    return NewCatalog::GetDBFilePaths(begin_ts, commit_ts, *db_meta, file_paths);
+    return NewCatalog::GetDBFilePaths(kv_instance_.get(), begin_ts, commit_ts, *db_meta, file_paths);
 }
 
 Status NewTxn::GetTableFilePaths(const String &db_name, const String &table_name, Vector<String> &file_paths) {
@@ -4890,7 +4893,8 @@ Status NewTxn::GetTableFilePaths(const String &db_name, const String &table_name
         return status;
     }
     TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
-    return NewCatalog::GetTableFilePaths(begin_ts, *table_meta, file_paths);
+    TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
+    return NewCatalog::GetTableFilePaths(kv_instance_.get(), begin_ts, commit_ts, *table_meta, file_paths);
 }
 
 Status NewTxn::GetSegmentFilePaths(const String &db_name, const String &table_name, SegmentID segment_id, Vector<String> &file_paths) {
@@ -4902,7 +4906,8 @@ Status NewTxn::GetSegmentFilePaths(const String &db_name, const String &table_na
     }
     SegmentMeta segment_meta(segment_id, *table_meta);
     TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
-    return NewCatalog::GetSegmentFilePaths(begin_ts, segment_meta, file_paths);
+    TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
+    return NewCatalog::GetSegmentFilePaths(kv_instance_.get(), begin_ts, commit_ts, segment_meta, file_paths);
 }
 
 Status
@@ -4960,7 +4965,8 @@ Status NewTxn::GetColumnFilePaths(const String &db_name, const String &table_nam
         }
     }
     TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
-    return NewCatalog::GetColumnFilePaths(begin_ts, *table_meta, column_def, file_paths);
+    TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
+    return NewCatalog::GetColumnFilePaths(kv_instance_.get(), begin_ts, commit_ts, *table_meta, column_def, file_paths);
 }
 
 Status NewTxn::GetTableIndexFilePaths(const String &db_name, const String &table_name, const String &index_name, Vector<String> &file_paths) {

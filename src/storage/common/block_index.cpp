@@ -36,8 +36,11 @@ import segment_index_meta;
 
 namespace infinity {
 
+NewSegmentSnapshot::NewSegmentSnapshot(KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts)
+    : kv_instance_(kv_instance), begin_ts_(begin_ts), commit_ts_(commit_ts) {}
+
 SegmentOffset NewSegmentSnapshot::segment_offset() const {
-    auto [segment_offset_, status] = segment_meta_->GetRowCnt1();
+    auto [segment_offset_, status] = segment_meta_->GetRowCnt1(kv_instance_, begin_ts_, commit_ts_);
     if (!status.ok()) {
         RecoverableError(status);
     }
@@ -48,7 +51,7 @@ const Vector<UniquePtr<BlockMeta>> &NewSegmentSnapshot::block_map() const {
     if (block_map_.size()) {
         return block_map_;
     }
-    auto [block_ids_ptr, status] = segment_meta_->GetBlockIDs1();
+    auto [block_ids_ptr, status] = segment_meta_->GetBlockIDs1(kv_instance_, begin_ts_, commit_ts_);
     if (!status.ok()) {
         RecoverableError(status);
     }
@@ -63,7 +66,7 @@ BlockIndex::BlockIndex() = default;
 
 BlockIndex::~BlockIndex() = default;
 
-void BlockIndex::NewInit(UniquePtr<TableMeeta> table_meta) {
+void BlockIndex::NewInit(UniquePtr<TableMeeta> table_meta, KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts) {
     table_meta_ = std::move(table_meta);
     Status status = Status::OK();
     Vector<SegmentID> *segment_ids_ptr = nullptr;
@@ -72,7 +75,8 @@ void BlockIndex::NewInit(UniquePtr<TableMeeta> table_meta) {
         RecoverableError(status);
     }
     for (SegmentID segment_id : *segment_ids_ptr) {
-        NewSegmentSnapshot &segment_snapshot = new_segment_block_index_.emplace(segment_id, NewSegmentSnapshot()).first->second;
+        NewSegmentSnapshot &segment_snapshot =
+            new_segment_block_index_.emplace(segment_id, NewSegmentSnapshot(kv_instance, begin_ts, commit_ts)).first->second;
         segment_snapshot.segment_meta_ = MakeUnique<SegmentMeta>(segment_id, *table_meta_);
     }
 }
@@ -85,9 +89,7 @@ SizeT BlockIndex::BlockCount() const {
     return count;
 }
 
-SizeT BlockIndex::SegmentCount() const {
-    return new_segment_block_index_.size();
-}
+SizeT BlockIndex::SegmentCount() const { return new_segment_block_index_.size(); }
 
 SegmentOffset BlockIndex::GetSegmentOffset(SegmentID segment_id) const {
     auto seg_it = new_segment_block_index_.find(segment_id);

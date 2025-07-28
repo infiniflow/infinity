@@ -63,8 +63,6 @@ public:
 
     Vector<SizeT> &ColumnIDs() const;
 
-    SizeT BlockEntryCount() const;
-
     void PlanWithIndex(QueryContext *query_context);
 
     SizeT BlockScanTaskCount() const;

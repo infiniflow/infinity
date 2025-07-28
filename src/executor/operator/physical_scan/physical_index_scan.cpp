@@ -40,6 +40,7 @@ import status;
 import new_catalog;
 import new_txn;
 import segment_meta;
+import kv_store;
 
 namespace infinity {
 
@@ -115,6 +116,7 @@ void PhysicalIndexScan::ExecuteInternal(QueryContext *query_context, IndexScanOp
     NewTxn *new_txn = query_context->GetNewTxn();
     TxnTimeStamp begin_ts = new_txn->BeginTS();
     TxnTimeStamp commit_ts = new_txn->CommitTS();
+    KVInstance *kv_instance = new_txn->kv_instance();
 
     auto &output_data_blocks = index_scan_operator_state->data_block_array_;
     auto &segment_ids = *(index_scan_operator_state->segment_ids_);
@@ -198,12 +200,11 @@ void PhysicalIndexScan::ExecuteInternal(QueryContext *query_context, IndexScanOp
 
     // check FastRoughFilter
     SharedPtr<FastRoughFilter> segment_filter;
-    Status status = segment_meta->GetFastRoughFilter(segment_filter);
+    Status status = segment_meta->GetFastRoughFilter(kv_instance, segment_filter);
     if (status.ok()) {
         if (fast_rough_filter_evaluator_ and !fast_rough_filter_evaluator_->Evaluate(begin_ts, *segment_filter)) {
             // skip this segment
-            LOG_TRACE(
-                fmt::format("IndexScan: job number: {}, segment_ids.size(): {}, skipped after FastRoughFilter", next_idx, segment_ids.size()));
+            LOG_TRACE(fmt::format("IndexScan: job number: {}, segment_ids.size(): {}, skipped after FastRoughFilter", next_idx, segment_ids.size()));
             Bitmask result_empty(segment_row_count);
             result_empty.SetAllFalse();
             OutputBitmaskResult(result_empty, segment_row_count);
@@ -217,7 +218,7 @@ void PhysicalIndexScan::ExecuteInternal(QueryContext *query_context, IndexScanOp
     if (result_elem.CountTrue() > 0) {
         // Remove deleted rows from the result
         // segment_entry->CheckRowsVisible(result_elem, begin_ts);
-        status = NewCatalog::CheckSegmentRowsVisible(*segment_meta, begin_ts, commit_ts, result_elem);
+        status = NewCatalog::CheckSegmentRowsVisible(*segment_meta, kv_instance, begin_ts, commit_ts, result_elem);
         if (!status.ok()) {
             UnrecoverableError(status.message());
         }

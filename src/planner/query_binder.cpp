@@ -479,9 +479,13 @@ SharedPtr<BaseTableRef> QueryBinder::BuildBaseTable(QueryContext *query_context,
         }
     }
 
+    TxnTimeStamp begin_ts = new_txn->BeginTS();
+    TxnTimeStamp commit_ts = new_txn->CommitTS();
+    KVInstance *kv_instance = new_txn->kv_instance();
+
     SharedPtr<BlockIndex> block_index;
     block_index = MakeShared<BlockIndex>();
-    block_index->NewInit(std::move(table_meta));
+    block_index->NewInit(std::move(table_meta), kv_instance, begin_ts, commit_ts);
 
     u64 table_index = bind_context_ptr_->GenerateTableIndex();
     auto table_ref = MakeShared<BaseTableRef>(table_info, std::move(columns), block_index, alias, table_index, names_ptr, types_ptr);

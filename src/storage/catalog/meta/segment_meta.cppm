@@ -57,54 +57,43 @@ export class SegmentMeta : public BaseMeta {
 public:
     SegmentMeta(SegmentID segment_id, TableMeeta &table_meta);
 
-    TxnTimeStamp begin_ts() const { return begin_ts_; }
-    TxnTimeStamp commit_ts() const { return commit_ts_; }
-
-    KVInstance &kv_instance() { return kv_instance_; }
-
     TableMeeta &table_meta() { return table_meta_; }
 
     SegmentID segment_id() const { return segment_id_; }
 
     SizeT segment_capacity() const { return DEFAULT_SEGMENT_CAPACITY; }
 
-    Status SetFirstDeleteTS(TxnTimeStamp first_delete_ts);
+    Status SetFirstDeleteTS(KVInstance *kv_instance, TxnTimeStamp first_delete_ts);
 
-    Status InitSet();
+    Status InitSet(KVInstance *kv_instance);
 
-    Status UninitSet(UsageFlag usage_flag);
+    Status UninitSet(UsageFlag usage_flag, KVInstance *kv_instance, TxnTimeStamp begin_ts);
 
-    Status UninitSet(UsageFlag usage_flag, TxnTimeStamp begin_ts);
+    Pair<BlockID, Status> AddBlockID1(KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts);
+    Status AddBlockWithID(KVInstance *kv_instance, TxnTimeStamp commit_ts, BlockID block_id);
 
-    Pair<BlockID, Status> AddBlockID1(TxnTimeStamp commit_ts);
-    Status AddBlockWithID(TxnTimeStamp commit_ts, BlockID block_id);
+    Status CommitBlock(KVInstance *kv_instance, BlockID block_id, TxnTimeStamp commit_ts);
 
-    Status CommitBlock(BlockID block_id, TxnTimeStamp commit_ts);
+    Tuple<SharedPtr<String>, Status> GetSegmentDir(KVInstance *kv_instance);
 
-    Tuple<SharedPtr<String>, Status> GetSegmentDir();
+    Tuple<Vector<BlockID> *, Status> GetBlockIDs1(KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts);
 
-    Tuple<Vector<BlockID> *, Status> GetBlockIDs1();
-    Tuple<Vector<BlockID> *, Status> GetBlockIDs1(TxnTimeStamp commit_ts);
+    Tuple<SizeT, Status> GetRowCnt1(KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts);
 
-    Tuple<SizeT, Status> GetRowCnt1();
+    Status GetFirstDeleteTS(KVInstance *kv_instance, TxnTimeStamp &first_delete_ts, TxnTimeStamp begin_ts);
 
-    Status GetFirstDeleteTS(TxnTimeStamp &first_delete_ts);
+    Tuple<SharedPtr<SegmentInfo>, Status> GetSegmentInfo(KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts);
 
-    Tuple<SharedPtr<SegmentInfo>, Status> GetSegmentInfo();
+    Status GetFastRoughFilter(KVInstance *kv_instance, SharedPtr<FastRoughFilter> &fast_rough_filter);
 
-    Status GetFastRoughFilter(SharedPtr<FastRoughFilter> &fast_rough_filter);
-
-    Status SetFastRoughFilter(SharedPtr<FastRoughFilter> fast_rough_filter);
+    Status SetFastRoughFilter(KVInstance *kv_instance, SharedPtr<FastRoughFilter> fast_rough_filter);
 
 private:
-    Status LoadFirstDeleteTS();
+    Status LoadFirstDeleteTS(KVInstance *kv_instance);
 
     String GetSegmentTag(const String &tag) const;
 
 private:
-    TxnTimeStamp begin_ts_;
-    TxnTimeStamp commit_ts_;
-    KVInstance &kv_instance_;
     TableMeeta &table_meta_;
     SegmentID segment_id_;
     Optional<String> segment_dir_;

@@ -44,6 +44,7 @@ import db_meeta;
 import constant_expr;
 import default_values;
 import internal_types;
+import kv_store;
 
 class TestTxnReplayAlter : public NewReplayTest {
 public:
@@ -132,11 +133,11 @@ TEST_P(TestTxnReplayAlter, test_add_column) {
         SegmentMeta segment_meta(segment_id, *table_meta);
 
         SizeT segment_row_cnt = 0;
-        std::tie(segment_row_cnt, status) = segment_meta.GetRowCnt1();
+        std::tie(segment_row_cnt, status) = segment_meta.GetRowCnt1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
         EXPECT_EQ(segment_row_cnt, row_cnt);
 
         Vector<BlockID> *block_ids_ptr = nullptr;
-        std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1();
+        std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(*block_ids_ptr, Vector<BlockID>({0}));
 

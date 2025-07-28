@@ -487,8 +487,6 @@ void PhysicalKnnScan::PlanWithIndex(QueryContext *query_context) { // TODO: retu
     return;
 }
 
-SizeT PhysicalKnnScan::BlockEntryCount() const { return base_table_ref_->block_index_->BlockCount(); }
-
 template <LogicalType t, typename ColumnDataType, typename QueryDataType, template <typename, typename> typename C, typename DistanceDataType>
 struct BruteForceBlockScan;
 

@@ -82,8 +82,6 @@ String PhysicalTableScan::table_alias() const { return base_table_ref_->alias_; 
 
 u64 PhysicalTableScan::TableIndex() const { return base_table_ref_->table_index_; }
 
-SizeT PhysicalTableScan::BlockEntryCount() const { return base_table_ref_->block_index_->BlockCount(); }
-
 Vector<SizeT> &PhysicalTableScan::ColumnIDs() const {
     if (!add_row_id_)
         return base_table_ref_->column_ids_;

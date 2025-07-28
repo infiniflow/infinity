@@ -55,6 +55,7 @@ import chunk_index_meta;
 import db_meeta;
 import constant_expr;
 import logger;
+import kv_store;
 
 using namespace infinity;
 
@@ -126,6 +127,7 @@ TEST_P(TestTxnAlter, add_column0) {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
         TxnTimeStamp begin_ts = txn->BeginTS();
         TxnTimeStamp commit_ts = txn->CommitTS();
+        KVInstance *kv_instance = txn->kv_instance();
 
         SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
@@ -172,7 +174,7 @@ TEST_P(TestTxnAlter, add_column0) {
         };
 
         auto check_segment = [&](SegmentMeta &segment_meta) {
-            auto [block_ids, status] = segment_meta.GetBlockIDs1();
+            auto [block_ids, status] = segment_meta.GetBlockIDs1(kv_instance, begin_ts, commit_ts);
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*block_ids, Vector<BlockID>({0, 1}));
 
@@ -255,6 +257,7 @@ TEST_P(TestTxnAlter, drop_column0) {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
         TxnTimeStamp begin_ts = txn->BeginTS();
         TxnTimeStamp commit_ts = txn->CommitTS();
+        KVInstance *kv_instance = txn->kv_instance();
 
         SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
@@ -296,7 +299,7 @@ TEST_P(TestTxnAlter, drop_column0) {
         };
 
         auto check_segment = [&](SegmentMeta &segment_meta) {
-            auto [block_ids, status] = segment_meta.GetBlockIDs1();
+            auto [block_ids, status] = segment_meta.GetBlockIDs1(kv_instance, begin_ts, commit_ts);
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*block_ids, Vector<BlockID>({0, 1}));
 

@@ -1162,9 +1162,13 @@ Status LogicalPlanner::BuildExport(const CopyStatement *statement, SharedPtr<Bin
         }
     }
 
+    KVInstance *kv_instance = new_txn->kv_instance();
+    TxnTimeStamp begin_ts = new_txn->BeginTS();
+    TxnTimeStamp commit_ts = new_txn->CommitTS();
+
     SharedPtr<BlockIndex> block_index;
     block_index = MakeShared<BlockIndex>();
-    block_index->NewInit(std::move(table_meta));
+    block_index->NewInit(std::move(table_meta), kv_instance, begin_ts, commit_ts);
 
     SharedPtr<LogicalNode> logical_export = MakeShared<LogicalExport>(bind_context_ptr->GetNewLogicalNodeId(),
                                                                       table_info,

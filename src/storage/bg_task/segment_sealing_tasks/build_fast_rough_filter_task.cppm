@@ -32,8 +32,12 @@ export struct BuildingSegmentFastFilters {
     SegmentMeta *segment_meta_ = nullptr;
     SharedPtr<FastRoughFilter> segment_filter_;
     HashMap<BlockID, SharedPtr<FastRoughFilter>> block_filters_;
+    KVInstance *kv_instance_{};
+    TxnTimeStamp begin_ts_{};
+    TxnTimeStamp commit_ts_{};
 
-    static UniquePtr<BuildingSegmentFastFilters> Make(SegmentMeta *segment_meta);
+    static UniquePtr<BuildingSegmentFastFilters>
+    Make(KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts, SegmentMeta *segment_meta);
 
     ~BuildingSegmentFastFilters();
 

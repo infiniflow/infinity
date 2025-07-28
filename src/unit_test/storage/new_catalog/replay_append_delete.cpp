@@ -53,6 +53,7 @@ import index_base;
 import buffer_obj;
 import secondary_index_in_mem;
 import memory_indexer;
+import kv_store;
 
 class TestTxnReplayAppend : public NewReplayTest {
 public:
@@ -139,11 +140,11 @@ TEST_P(TestTxnReplayAppend, test_append0) {
         SegmentMeta segment_meta(segment_id, *table_meta);
 
         SizeT segment_row_cnt = 0;
-        std::tie(segment_row_cnt, status) = segment_meta.GetRowCnt1();
+        std::tie(segment_row_cnt, status) = segment_meta.GetRowCnt1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
         EXPECT_EQ(segment_row_cnt, 8);
 
         Vector<BlockID> *block_ids_ptr = nullptr;
-        std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1();
+        std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(*block_ids_ptr, Vector<BlockID>({0}));
 
@@ -245,11 +246,11 @@ TEST_P(TestTxnReplayAppend, test_replay_append_delete) {
         SegmentMeta segment_meta(segment_id, *table_meta);
 
         SizeT segment_row_cnt = 0;
-        std::tie(segment_row_cnt, status) = segment_meta.GetRowCnt1();
+        std::tie(segment_row_cnt, status) = segment_meta.GetRowCnt1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
         EXPECT_EQ(segment_row_cnt, 4);
 
         Vector<BlockID> *block_ids_ptr = nullptr;
-        std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1();
+        std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(*block_ids_ptr, Vector<BlockID>({0}));
         BlockID block_id = (*block_ids_ptr)[0];

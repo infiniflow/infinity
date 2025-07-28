@@ -472,7 +472,7 @@ Status TableMeeta::GetTableInfo(TableInfo &table_info) {
     return Status::OK();
 }
 
-Status TableMeeta::GetTableDetail(TableDetail &table_detail) {
+Status TableMeeta::GetTableDetail(KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts, TableDetail &table_detail) {
     TableInfo table_info;
     Status status = GetTableInfo(table_info);
     if (!status.ok()) {
@@ -497,7 +497,7 @@ Status TableMeeta::GetTableDetail(TableDetail &table_detail) {
     for (SegmentID segment_id : *segment_ids_ptr) {
         SegmentMeta segment_meta(segment_id, *this);
         Vector<BlockID> *block_ids_ptr = nullptr;
-        std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1();
+        std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1(kv_instance, begin_ts, commit_ts);
         if (!status.ok()) {
             return status;
         }
@@ -907,33 +907,6 @@ Tuple<SharedPtr<Vector<SharedPtr<ColumnDef>>>, Status> TableMeeta::GetColumnDefs
         }
     }
     return {MakeShared<Vector<SharedPtr<ColumnDef>>>(column_defs_.value()), Status::OK()};
-}
-
-Status TableMeeta::GetNextRowID(RowID &next_row_id) {
-    SegmentID unsealed_segment_id = 0;
-    Status status = GetUnsealedSegmentID(unsealed_segment_id);
-    if (!status.ok()) {
-        if (status.code() != ErrorCode::kNotFound) {
-            return status;
-        }
-        Vector<SegmentID> *segment_ids_ptr = nullptr;
-        std::tie(segment_ids_ptr, status) = GetSegmentIDs1();
-        if (!status.ok()) {
-            return status;
-        }
-        SegmentID segment_id = segment_ids_ptr->empty() ? 0 : segment_ids_ptr->back() + 1;
-        next_row_id = RowID(segment_id, 0);
-        return Status::OK();
-    }
-
-    SegmentMeta segment_meta(unsealed_segment_id, *this);
-    SizeT seg_row_cnt = 0;
-    std::tie(seg_row_cnt, status) = segment_meta.GetRowCnt1();
-    if (!status.ok()) {
-        return status;
-    }
-    next_row_id = RowID(unsealed_segment_id, seg_row_cnt);
-    return Status::OK();
 }
 
 Tuple<String, Status> TableMeeta::GetNextIndexID() {

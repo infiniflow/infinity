@@ -1222,7 +1222,7 @@ Status NewTxn::ReplayDumpIndex(WalCmdDumpIndexV2 *dump_index_cmd) {
 Status NewTxn::ReplayDumpIndex(WalCmdDumpIndexV2 *dump_cmd, TxnTimeStamp commit_ts, i64 txn_id) { return Status::OK(); }
 
 Status NewTxn::PopulateIndexToMem(SegmentIndexMeta &segment_index_meta, SegmentMeta &segment_meta, ColumnID column_id, SizeT segment_row_cnt) {
-    auto [block_ids, status] = segment_meta.GetBlockIDs1();
+    auto [block_ids, status] = segment_meta.GetBlockIDs1(kv_instance_.get(), txn_context_ptr_->begin_ts_, txn_context_ptr_->commit_ts_);
     if (!status.ok()) {
         return status;
     }
@@ -1272,7 +1272,7 @@ Status NewTxn::PopulateFtIndexInner(SharedPtr<IndexBase> index_base,
 
     Vector<BlockID> *block_ids_ptr = nullptr;
 
-    std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1();
+    std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1(kv_instance_.get(), txn_context_ptr_->begin_ts_, txn_context_ptr_->commit_ts_);
     if (!status.ok()) {
         return status;
     }
@@ -1317,7 +1317,7 @@ Status NewTxn::PopulateIvfIndexInner(SharedPtr<IndexBase> index_base,
     RowID base_row_id(segment_index_meta.segment_id(), 0);
     u32 row_count = 0;
     {
-        auto [rc, status] = segment_meta.GetRowCnt1();
+        auto [rc, status] = segment_meta.GetRowCnt1(kv_instance_.get(), txn_context_ptr_->begin_ts_, txn_context_ptr_->commit_ts_);
         if (!status.ok()) {
             return status;
         }
@@ -1374,7 +1374,7 @@ Status NewTxn::PopulateEmvbIndexInner(SharedPtr<IndexBase> index_base,
     RowID base_row_id(segment_index_meta.segment_id(), 0);
     u32 row_count = 0;
     {
-        auto [rc, status] = segment_meta.GetRowCnt1();
+        auto [rc, status] = segment_meta.GetRowCnt1(kv_instance_.get(), txn_context_ptr_->begin_ts_, txn_context_ptr_->commit_ts_);
         if (!status.ok()) {
             return status;
         }
@@ -1506,7 +1506,7 @@ Status NewTxn::OptimizeVecIndex(SharedPtr<IndexBase> index_base,
                                 RowID base_rowid,
                                 u32 total_row_cnt,
                                 BufferObj *buffer_obj) {
-    auto [block_ids, status] = segment_meta.GetBlockIDs1();
+    auto [block_ids, status] = segment_meta.GetBlockIDs1(kv_instance_.get(), txn_context_ptr_->begin_ts_, txn_context_ptr_->commit_ts_);
     if (!status.ok()) {
         return status;
     }
@@ -1924,7 +1924,7 @@ Status NewTxn::CountMemIndexGapInSegment(SegmentIndexMeta &segment_index_meta, S
     }
 
     Vector<BlockID> *block_ids_ptr = nullptr;
-    std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1();
+    std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1(kv_instance_.get(), txn_context_ptr_->begin_ts_, txn_context_ptr_->commit_ts_);
     if (!status.ok()) {
         return status;
     }
@@ -2099,7 +2099,7 @@ Status NewTxn::PrepareCommitCreateIndex(WalCmdCreateIndexV2 *create_index_cmd) {
     } else {
         for (SegmentID segment_id : *segment_ids_ptr) {
             SegmentMeta segment_meta(segment_id, table_meta);
-            auto [segment_row_cnt, status] = segment_meta.GetRowCnt1();
+            auto [segment_row_cnt, status] = segment_meta.GetRowCnt1(kv_instance_.get(), txn_context_ptr_->begin_ts_, txn_context_ptr_->commit_ts_);
             if (!status.ok()) {
                 return status;
             }

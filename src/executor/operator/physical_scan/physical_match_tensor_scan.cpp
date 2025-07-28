@@ -311,8 +311,9 @@ void PhysicalMatchTensorScan::ExecuteInner(QueryContext *query_context, MatchTen
 
     Status status;
     NewTxn *new_txn = query_context->GetNewTxn();
-    const TxnTimeStamp begin_ts = new_txn->BeginTS();
-    const TxnTimeStamp commit_ts = new_txn->CommitTS();
+    TxnTimeStamp begin_ts = new_txn->BeginTS();
+    TxnTimeStamp commit_ts = new_txn->CommitTS();
+    KVInstance *kv_instance = new_txn->kv_instance();
     if (!common_query_filter_->TryFinishBuild()) {
         // not ready, abort and wait for next time
         return;
@@ -337,7 +338,7 @@ void PhysicalMatchTensorScan::ExecuteInner(QueryContext *query_context, MatchTen
         } else {
             // segment_entry = iter->second.segment_entry_;
             segment_meta = iter->second.segment_meta_.get();
-            std::tie(segment_row_count, status) = segment_meta->GetRowCnt1();
+            std::tie(segment_row_count, status) = segment_meta->GetRowCnt1(kv_instance, begin_ts, commit_ts);
             if (!status.ok()) {
                 String error_message = fmt::format("GetRowCnt1 failed: {}", status.message());
                 UnrecoverableError(error_message);

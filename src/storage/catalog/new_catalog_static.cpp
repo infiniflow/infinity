@@ -144,7 +144,7 @@ Status NewCatalog::InitCatalog(KVInstance *kv_instance, TxnTimeStamp checkpoint_
         return block_meta.LoadSet(checkpoint_ts);
     };
     auto InitSegment = [&](SegmentMeta &segment_meta) {
-        auto [block_ids, blocks_status] = segment_meta.GetBlockIDs1();
+        auto [block_ids, blocks_status] = segment_meta.GetBlockIDs1(kv_instance, 0, UNCOMMIT_TS);
         if (!blocks_status.ok()) {
             return blocks_status;
         }
@@ -611,7 +611,7 @@ Status NewCatalog::CleanTableIndex(TableIndexMeeta &table_index_meta, UsageFlag 
 //     return Status::OK();
 // }
 
-Status NewCatalog::AddNewSegment1(TableMeeta &table_meta, TxnTimeStamp commit_ts, Optional<SegmentMeta> &segment_meta) {
+Status NewCatalog::AddNewSegment1(TableMeeta &table_meta, KVInstance *kv_instance, TxnTimeStamp commit_ts, Optional<SegmentMeta> &segment_meta) {
     Status status;
     SegmentID segment_id = 0;
     std::tie(segment_id, status) = table_meta.AddSegmentID1(commit_ts);
@@ -619,55 +619,39 @@ Status NewCatalog::AddNewSegment1(TableMeeta &table_meta, TxnTimeStamp commit_ts
         return status;
     }
     segment_meta.emplace(segment_id, table_meta);
-    return segment_meta->InitSet();
+    return segment_meta->InitSet(kv_instance);
 }
 
-Status NewCatalog::AddNewSegmentWithID(TableMeeta &table_meta, TxnTimeStamp commit_ts, Optional<SegmentMeta> &segment_meta, SegmentID segment_id) {
+Status NewCatalog::AddNewSegmentWithID(TableMeeta &table_meta,
+                                       KVInstance *kv_instance,
+                                       TxnTimeStamp commit_ts,
+                                       Optional<SegmentMeta> &segment_meta,
+                                       SegmentID segment_id) {
     Status status = table_meta.AddSegmentWithID(commit_ts, segment_id);
     if (!status.ok()) {
         return status;
     }
     segment_meta.emplace(segment_id, table_meta);
-    return segment_meta->InitSet();
+    return segment_meta->InitSet(kv_instance);
 }
 
-Status NewCatalog::LoadFlushedSegment1(TableMeeta &table_meta, const WalSegmentInfo &segment_info, TxnTimeStamp checkpoint_ts) {
-    Status status;
-
-    SegmentID segment_id = 0;
-    std::tie(segment_id, status) = table_meta.AddSegmentID1(checkpoint_ts);
-    if (!status.ok()) {
-        return status;
-    }
-
-    SegmentMeta segment_meta(segment_id, table_meta);
-    status = segment_meta.InitSet();
-    if (!status.ok()) {
-        return status;
-    }
-    for (const WalBlockInfo &block_info : segment_info.block_infos_) {
-        status = NewCatalog::LoadFlushedBlock1(segment_meta, block_info, checkpoint_ts);
-        if (!status.ok()) {
-            return status;
-        }
-    }
-
-    return Status::OK();
-}
-
-Status NewCatalog::LoadFlushedSegment2(TableMeeta &table_meta, const WalSegmentInfo &segment_info, TxnTimeStamp checkpoint_ts) {
-    Status status = table_meta.AddSegmentWithID(checkpoint_ts, segment_info.segment_id_);
+Status NewCatalog::LoadFlushedSegment2(TableMeeta &table_meta,
+                                       const WalSegmentInfo &segment_info,
+                                       KVInstance *kv_instance,
+                                       TxnTimeStamp begin_ts,
+                                       TxnTimeStamp commit_ts) {
+    Status status = table_meta.AddSegmentWithID(begin_ts, segment_info.segment_id_);
     if (!status.ok()) {
         return status;
     }
 
     SegmentMeta segment_meta(segment_info.segment_id_, table_meta);
-    status = segment_meta.InitSet();
+    status = segment_meta.InitSet(kv_instance);
     if (!status.ok()) {
         return status;
     }
     for (const WalBlockInfo &block_info : segment_info.block_infos_) {
-        status = NewCatalog::LoadFlushedBlock1(segment_meta, block_info, checkpoint_ts);
+        status = NewCatalog::LoadFlushedBlock1(segment_meta, block_info, kv_instance, begin_ts, commit_ts);
         if (!status.ok()) {
             return status;
         }
@@ -676,9 +660,9 @@ Status NewCatalog::LoadFlushedSegment2(TableMeeta &table_meta, const WalSegmentI
     return Status::OK();
 }
 
-Status NewCatalog::CleanSegment(KVInstance *kv_instance, SegmentMeta &segment_meta, TxnTimeStamp commit_ts, UsageFlag usage_flag) {
+Status NewCatalog::CleanSegment(KVInstance *kv_instance, SegmentMeta &segment_meta, TxnTimeStamp begin_ts, UsageFlag usage_flag) {
     LOG_TRACE(fmt::format("CleanSegment: cleaning table: {}, segment_id: {}", segment_meta.table_meta().table_id_str(), segment_meta.segment_id()));
-    auto [block_ids, status] = segment_meta.GetBlockIDs1();
+    auto [block_ids, status] = segment_meta.GetBlockIDs1(kv_instance, begin_ts, begin_ts);
     if (!status.ok()) {
         return status;
     }
@@ -689,7 +673,7 @@ Status NewCatalog::CleanSegment(KVInstance *kv_instance, SegmentMeta &segment_me
             return status;
         }
     }
-    segment_meta.UninitSet(usage_flag, commit_ts);
+    segment_meta.UninitSet(usage_flag, kv_instance, begin_ts);
 
     return Status::OK();
 }
@@ -727,11 +711,15 @@ Status NewCatalog::CleanSegment(KVInstance *kv_instance, SegmentMeta &segment_me
 //     return Status::OK();
 // }
 
-Status NewCatalog::AddNewBlock1(SegmentMeta &segment_meta, TxnTimeStamp commit_ts, Optional<BlockMeta> &block_meta) {
+Status NewCatalog::AddNewBlock1(SegmentMeta &segment_meta,
+                                KVInstance *kv_instance,
+                                TxnTimeStamp begin_ts,
+                                TxnTimeStamp commit_ts,
+                                Optional<BlockMeta> &block_meta) {
     Status status;
 
     BlockID block_id;
-    std::tie(block_id, status) = segment_meta.AddBlockID1(commit_ts);
+    std::tie(block_id, status) = segment_meta.AddBlockID1(kv_instance, begin_ts, commit_ts);
     if (!status.ok()) {
         return status;
     }
@@ -817,8 +805,12 @@ Status NewCatalog::LoadImportedOrCompactedSegment(TableMeeta &table_meta, const 
     return Status::OK();
 }
 
-Status NewCatalog::AddNewBlockWithID(SegmentMeta &segment_meta, TxnTimeStamp commit_ts, Optional<BlockMeta> &block_meta, BlockID block_id) {
-    Status status = segment_meta.AddBlockWithID(commit_ts, block_id);
+Status NewCatalog::AddNewBlockWithID(SegmentMeta &segment_meta,
+                                     KVInstance *kv_instance,
+                                     TxnTimeStamp commit_ts,
+                                     Optional<BlockMeta> &block_meta,
+                                     BlockID block_id) {
+    Status status = segment_meta.AddBlockWithID(kv_instance, commit_ts, block_id);
     if (!status.ok()) {
         return status;
     }
@@ -845,21 +837,6 @@ Status NewCatalog::AddNewBlockWithID(SegmentMeta &segment_meta, TxnTimeStamp com
     return Status::OK();
 }
 
-Status NewCatalog::AddNewBlockForTransform(SegmentMeta &segment_meta, TxnTimeStamp commit_ts, Optional<BlockMeta> &block_meta) {
-    Status status;
-
-    BlockID block_id;
-    std::tie(block_id, status) = segment_meta.AddBlockID1(commit_ts);
-    if (!status.ok()) {
-        return status;
-    }
-    block_meta.emplace(block_id, segment_meta);
-    // status = block_meta->InitSet();
-    // if (!status.ok()) {
-    //     return status;
-    // }
-    return Status::OK();
-}
 //
 // Status NewCatalog::AddNewTableIndexForTransform(TableMeeta &table_meta, TxnTimeStamp commit_ts, Optional<TableIndexMeta> &table_index_meta) {
 //     Status status;
@@ -868,7 +845,11 @@ Status NewCatalog::AddNewBlockForTransform(SegmentMeta &segment_meta, TxnTimeSta
 //     return Status::OK();
 // }
 
-Status NewCatalog::LoadFlushedBlock1(SegmentMeta &segment_meta, const WalBlockInfo &block_info, TxnTimeStamp checkpoint_ts) {
+Status NewCatalog::LoadFlushedBlock1(SegmentMeta &segment_meta,
+                                     const WalBlockInfo &block_info,
+                                     KVInstance *kv_instance,
+                                     TxnTimeStamp begin_ts,
+                                     TxnTimeStamp commit_ts) {
     Status status;
 
     auto *pm = InfinityContext::instance().persistence_manager();
@@ -877,7 +858,7 @@ Status NewCatalog::LoadFlushedBlock1(SegmentMeta &segment_meta, const WalBlockIn
     }
 
     BlockID block_id = 0;
-    std::tie(block_id, status) = segment_meta.AddBlockID1(checkpoint_ts);
+    std::tie(block_id, status) = segment_meta.AddBlockID1(kv_instance, begin_ts, commit_ts);
     if (!status.ok()) {
         return status;
     }
@@ -886,7 +867,7 @@ Status NewCatalog::LoadFlushedBlock1(SegmentMeta &segment_meta, const WalBlockIn
     }
 
     BlockMeta block_meta(block_id, segment_meta);
-    status = block_meta.LoadSet(checkpoint_ts);
+    status = block_meta.LoadSet(begin_ts);
     if (!status.ok()) {
         return status;
     }
@@ -1227,7 +1208,8 @@ Status NewCatalog::GetDeleteTSVector(BlockMeta &block_meta, SizeT offset, SizeT 
     return Status::OK();
 }
 
-Status NewCatalog::GetDBFilePaths(TxnTimeStamp begin_ts, TxnTimeStamp commit_ts, DBMeeta &db_meta, Vector<String> &file_paths) {
+Status
+NewCatalog::GetDBFilePaths(KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts, DBMeeta &db_meta, Vector<String> &file_paths) {
     Vector<String> *table_id_strs_ptr = nullptr;
     Status status = db_meta.GetTableIDs(table_id_strs_ptr);
     if (!status.ok()) {
@@ -1235,7 +1217,7 @@ Status NewCatalog::GetDBFilePaths(TxnTimeStamp begin_ts, TxnTimeStamp commit_ts,
     }
     for (const String &table_id_str : *table_id_strs_ptr) {
         TableMeeta table_meta(db_meta.db_id_str(), table_id_str, db_meta.kv_instance(), begin_ts, commit_ts);
-        status = GetTableFilePaths(begin_ts, table_meta, file_paths);
+        status = GetTableFilePaths(kv_instance, begin_ts, commit_ts, table_meta, file_paths);
         if (!status.ok()) {
             return status;
         }
@@ -1243,7 +1225,12 @@ Status NewCatalog::GetDBFilePaths(TxnTimeStamp begin_ts, TxnTimeStamp commit_ts,
     return Status::OK();
 }
 
-Status NewCatalog::GetTableFilePaths(TxnTimeStamp begin_ts, TableMeeta &table_meta, Vector<String> &file_paths, SharedPtr<ColumnDef> column_def) {
+Status NewCatalog::GetTableFilePaths(KVInstance *kv_instance,
+                                     TxnTimeStamp begin_ts,
+                                     TxnTimeStamp commit_ts,
+                                     TableMeeta &table_meta,
+                                     Vector<String> &file_paths,
+                                     SharedPtr<ColumnDef> column_def) {
     Vector<SegmentID> *segment_ids_ptr = nullptr;
     Status status;
     std::tie(segment_ids_ptr, status) = table_meta.GetSegmentIDs1();
@@ -1252,7 +1239,7 @@ Status NewCatalog::GetTableFilePaths(TxnTimeStamp begin_ts, TableMeeta &table_me
     }
     for (SegmentID segment_id : *segment_ids_ptr) {
         SegmentMeta segment_meta(segment_id, table_meta);
-        status = GetSegmentFilePaths(begin_ts, segment_meta, file_paths, column_def);
+        status = GetSegmentFilePaths(kv_instance, begin_ts, commit_ts, segment_meta, file_paths, column_def);
         if (!status.ok()) {
             return status;
         }
@@ -1272,11 +1259,15 @@ Status NewCatalog::GetTableFilePaths(TxnTimeStamp begin_ts, TableMeeta &table_me
     return Status::OK();
 }
 
-Status
-NewCatalog::GetSegmentFilePaths(TxnTimeStamp begin_ts, SegmentMeta &segment_meta, Vector<String> &file_paths, SharedPtr<ColumnDef> column_def) {
+Status NewCatalog::GetSegmentFilePaths(KVInstance *kv_instance,
+                                       TxnTimeStamp begin_ts,
+                                       TxnTimeStamp commit_ts,
+                                       SegmentMeta &segment_meta,
+                                       Vector<String> &file_paths,
+                                       SharedPtr<ColumnDef> column_def) {
     Vector<BlockID> *block_ids_ptr = nullptr;
     Status status;
-    std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1();
+    std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1(kv_instance, begin_ts, commit_ts);
     if (!status.ok()) {
         return status;
     }
@@ -1328,8 +1319,13 @@ Status NewCatalog::GetBlockColumnFilePaths(ColumnMeta &column_meta, Vector<Strin
     return Status::OK();
 }
 
-Status NewCatalog::GetColumnFilePaths(TxnTimeStamp begin_ts, TableMeeta &table_meta, SharedPtr<ColumnDef> column_def, Vector<String> &file_paths) {
-    return NewCatalog::GetTableFilePaths(begin_ts, table_meta, file_paths, column_def);
+Status NewCatalog::GetColumnFilePaths(KVInstance *kv_instance,
+                                      TxnTimeStamp begin_ts,
+                                      TxnTimeStamp commit_ts,
+                                      TableMeeta &table_meta,
+                                      SharedPtr<ColumnDef> column_def,
+                                      Vector<String> &file_paths) {
+    return NewCatalog::GetTableFilePaths(kv_instance, begin_ts, commit_ts, table_meta, file_paths, column_def);
 }
 
 Status NewCatalog::GetTableIndexFilePaths(TableIndexMeeta &table_index_meta, Vector<String> &file_paths) {
@@ -1400,7 +1396,7 @@ Status NewCatalog::CheckColumnIfIndexed(TableMeeta &table_meta, ColumnID column_
     return Status::OK();
 }
 
-Status NewCatalog::CheckTableIfDelete(TableMeeta &table_meta, TxnTimeStamp begin_ts, bool &has_delete) {
+Status NewCatalog::CheckTableIfDelete(TableMeeta &table_meta, KVInstance *kv_instance, TxnTimeStamp begin_ts, bool &has_delete) {
     Status status;
     Vector<SegmentID> *segment_ids_ptr = nullptr;
     std::tie(segment_ids_ptr, status) = table_meta.GetSegmentIDs1();
@@ -1410,7 +1406,7 @@ Status NewCatalog::CheckTableIfDelete(TableMeeta &table_meta, TxnTimeStamp begin
     for (SegmentID segment_id : *segment_ids_ptr) {
         SegmentMeta segment_meta(segment_id, table_meta);
         TxnTimeStamp first_delete_ts = 0;
-        status = segment_meta.GetFirstDeleteTS(first_delete_ts);
+        status = segment_meta.GetFirstDeleteTS(kv_instance, first_delete_ts, begin_ts);
         if (!status.ok()) {
             return status;
         }
@@ -1449,9 +1445,13 @@ Status NewCatalog::SetBlockDeleteBitmask(BlockMeta &block_meta, TxnTimeStamp beg
     return Status::OK();
 }
 
-Status NewCatalog::CheckSegmentRowsVisible(SegmentMeta &segment_meta, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts, Bitmask &bitmask) {
+Status NewCatalog::CheckSegmentRowsVisible(SegmentMeta &segment_meta,
+                                           KVInstance *kv_instance,
+                                           TxnTimeStamp begin_ts,
+                                           TxnTimeStamp commit_ts,
+                                           Bitmask &bitmask) {
     TxnTimeStamp first_delete_ts = 0;
-    Status status = segment_meta.GetFirstDeleteTS(first_delete_ts);
+    Status status = segment_meta.GetFirstDeleteTS(kv_instance, first_delete_ts, begin_ts);
     if (!status.ok()) {
         return status;
     }
@@ -1459,7 +1459,7 @@ Status NewCatalog::CheckSegmentRowsVisible(SegmentMeta &segment_meta, TxnTimeSta
         return Status::OK();
     }
     Vector<BlockID> *block_ids_ptr = nullptr;
-    std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1();
+    std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1(kv_instance, begin_ts, commit_ts);
     if (!status.ok()) {
         return status;
     }

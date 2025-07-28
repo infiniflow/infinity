@@ -60,8 +60,6 @@ public:
 
     u64 TableIndex() const;
 
-    SizeT BlockEntryCount() const;
-
     Vector<SizeT> &ColumnIDs() const;
 
     bool ParallelExchange() const override { return true; }

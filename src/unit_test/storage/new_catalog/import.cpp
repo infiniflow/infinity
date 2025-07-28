@@ -46,6 +46,7 @@ import chunk_index_meta;
 import db_meeta;
 import constant_expr;
 import create_index_info;
+import kv_store;
 
 using namespace infinity;
 
@@ -175,7 +176,7 @@ TEST_P(TestTxnImport, test_import1) {
         };
 
         auto check_segment = [&](SegmentMeta &segment_meta) {
-            auto [block_ids, status] = segment_meta.GetBlockIDs1();
+            auto [block_ids, status] = segment_meta.GetBlockIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*block_ids, Vector<BlockID>({0, 1}));
 
@@ -525,19 +526,19 @@ TEST_P(TestTxnImport, test_insert_and_import) {
 
         {
             SegmentMeta segment_meta(0, *table_meta);
-            auto [block_ids_ptr, status] = segment_meta.GetBlockIDs1();
+            auto [block_ids_ptr, status] = segment_meta.GetBlockIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*block_ids_ptr, Vector<BlockID>({0, 1}));
         }
         {
             SegmentMeta segment_meta(1, *table_meta);
-            auto [block_ids_ptr, status] = segment_meta.GetBlockIDs1();
+            auto [block_ids_ptr, status] = segment_meta.GetBlockIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*block_ids_ptr, Vector<BlockID>({0, 1}));
         }
         {
             SegmentMeta segment_meta(2, *table_meta);
-            auto [block_ids_ptr, status] = segment_meta.GetBlockIDs1();
+            auto [block_ids_ptr, status] = segment_meta.GetBlockIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*block_ids_ptr, Vector<BlockID>({0, 1}));
         }
@@ -633,7 +634,7 @@ TEST_P(TestTxnImport, test_import_drop_db) {
         TxnTimeStamp begin_ts = txn->BeginTS();
         TxnTimeStamp commit_ts = txn->CommitTS();
 
-        auto [block_ids, status] = segment_meta.GetBlockIDs1();
+        auto [block_ids, status] = segment_meta.GetBlockIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(*block_ids, Vector<BlockID>({0, 1}));
 
@@ -1172,7 +1173,7 @@ TEST_P(TestTxnImport, test_import_drop_table) {
         TxnTimeStamp begin_ts = txn->BeginTS();
         TxnTimeStamp commit_ts = txn->CommitTS();
 
-        auto [block_ids, status] = segment_meta.GetBlockIDs1();
+        auto [block_ids, status] = segment_meta.GetBlockIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(*block_ids, Vector<BlockID>({0, 1}));
 
@@ -1767,7 +1768,7 @@ TEST_P(TestTxnImport, test_import_add_columns) {
         TxnTimeStamp begin_ts = txn->BeginTS();
         TxnTimeStamp commit_ts = txn->CommitTS();
 
-        auto [block_ids, status] = segment_meta.GetBlockIDs1();
+        auto [block_ids, status] = segment_meta.GetBlockIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(*block_ids, Vector<BlockID>({0, 1}));
 
@@ -2386,7 +2387,7 @@ TEST_P(TestTxnImport, test_import_drop_columns) {
     auto check_segment = [&](SegmentMeta &segment_meta, NewTxn *txn) {
         TxnTimeStamp begin_ts = txn->BeginTS();
         TxnTimeStamp commit_ts = txn->CommitTS();
-        auto [block_ids, status] = segment_meta.GetBlockIDs1();
+        auto [block_ids, status] = segment_meta.GetBlockIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(*block_ids, Vector<BlockID>({0, 1}));
 
@@ -2999,7 +3000,7 @@ TEST_P(TestTxnImport, test_import) {
         };
 
         auto check_segment = [&](SegmentMeta &segment_meta) {
-            auto [block_ids, status] = segment_meta.GetBlockIDs1();
+            auto [block_ids, status] = segment_meta.GetBlockIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*block_ids, Vector<BlockID>({0, 1}));
 
@@ -3112,7 +3113,7 @@ TEST_P(TestTxnImport, test_import_append_table) {
         TxnTimeStamp begin_ts = txn->BeginTS();
         TxnTimeStamp commit_ts = txn->CommitTS();
 
-        auto [block_ids, status] = segment_meta.GetBlockIDs1();
+        auto [block_ids, status] = segment_meta.GetBlockIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
         EXPECT_TRUE(status.ok());
         //        EXPECT_EQ(*block_ids, Vector<BlockID>({0, 1}));
 
@@ -3723,7 +3724,7 @@ TEST_P(TestTxnImport, test_import_import_table) {
         TxnTimeStamp begin_ts = txn->BeginTS();
         TxnTimeStamp commit_ts = txn->CommitTS();
 
-        auto [block_ids, status] = segment_meta.GetBlockIDs1();
+        auto [block_ids, status] = segment_meta.GetBlockIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
         EXPECT_TRUE(status.ok());
         //        EXPECT_EQ(*block_ids, Vector<BlockID>({0, 1}));
 
@@ -4566,7 +4567,7 @@ TEST_P(TestTxnImport, test_import_and_create_index) {
         TxnTimeStamp begin_ts = txn->BeginTS();
         TxnTimeStamp commit_ts = txn->CommitTS();
 
-        auto [block_ids, status] = segment_meta.GetBlockIDs1();
+        auto [block_ids, status] = segment_meta.GetBlockIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
         EXPECT_TRUE(status.ok());
         //        EXPECT_EQ(*block_ids, Vector<BlockID>({0, 1}));
 
@@ -5186,7 +5187,7 @@ TEST_P(TestTxnImport, test_import_and_drop_index) {
         TxnTimeStamp begin_ts = txn->BeginTS();
         TxnTimeStamp commit_ts = txn->CommitTS();
 
-        auto [block_ids, status] = segment_meta.GetBlockIDs1();
+        auto [block_ids, status] = segment_meta.GetBlockIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
         EXPECT_TRUE(status.ok());
         //        EXPECT_EQ(*block_ids, Vector<BlockID>({0, 1}));
 

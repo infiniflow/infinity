@@ -44,6 +44,7 @@ import db_meeta;
 import segment_meta;
 import bg_task;
 import base_txn_store;
+import kv_store;
 
 namespace infinity {
 
@@ -186,9 +187,13 @@ void CompactionProcessor::NewDoCompact() {
 
         auto compaction_alg = NewCompactionAlg::GetInstance();
 
+        TxnTimeStamp begin_ts = new_txn_shared->BeginTS();
+        TxnTimeStamp commit_ts = new_txn_shared->CommitTS();
+        KVInstance *kv_instance = new_txn_shared->kv_instance();
+
         for (SegmentID segment_id : segment_ids) {
             SegmentMeta segment_meta(segment_id, *table_meta);
-            auto [segment_row_cnt, segment_status] = segment_meta.GetRowCnt1();
+            auto [segment_row_cnt, segment_status] = segment_meta.GetRowCnt1(kv_instance, begin_ts, commit_ts);
             if (!segment_status.ok()) {
                 UnrecoverableError(segment_status.message());
             }

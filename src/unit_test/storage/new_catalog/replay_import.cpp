@@ -50,6 +50,7 @@ import index_full_text;
 import statement_common;
 import mem_index;
 import index_base;
+import kv_store;
 
 class TestTxnReplayImport : public NewReplayTest {
 public:
@@ -171,7 +172,7 @@ TEST_P(TestTxnReplayImport, test_import0) {
         };
 
         auto check_segment = [&](SegmentMeta &segment_meta) {
-            auto [block_ids, status] = segment_meta.GetBlockIDs1();
+            auto [block_ids, status] = segment_meta.GetBlockIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*block_ids, Vector<BlockID>({0, 1}));
 

@@ -63,6 +63,7 @@ import segment_meta;
 import block_meta;
 import column_meta;
 import new_catalog;
+import kv_store;
 
 using namespace infinity;
 
@@ -737,7 +738,7 @@ TEST_F(BufferObjTest, test_big_with_gc_and_cleanup) {
         SegmentMeta segment_meta(segment_id, *table_meta);
 
         Vector<BlockID> *block_ids_ptr = nullptr;
-        std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1();
+        std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
 
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(block_ids_ptr->size(), kInsertN);
@@ -869,7 +870,7 @@ TEST_F(BufferObjTest, test_multiple_threads_read) {
             SegmentMeta segment_meta(segment_id, *table_meta);
 
             Vector<BlockID> *block_ids_ptr = nullptr;
-            std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1();
+            std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
 
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(block_ids_ptr->size(), kInsertN);

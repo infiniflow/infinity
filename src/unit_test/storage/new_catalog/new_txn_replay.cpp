@@ -995,11 +995,11 @@ TEST_P(TestTxnReplayTest, test_replay_flush_gap_append_append) {
         SegmentMeta segment_meta(segment_id, *table_meta);
 
         SizeT segment_row_cnt = 0;
-        std::tie(segment_row_cnt, status) = segment_meta.GetRowCnt1();
+        std::tie(segment_row_cnt, status) = segment_meta.GetRowCnt1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
         EXPECT_EQ(segment_row_cnt, 8192 * 2);
 
         Vector<BlockID> *block_ids_ptr = nullptr;
-        std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1();
+        std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(*block_ids_ptr, Vector<BlockID>({0, 1}));
 
@@ -1264,11 +1264,11 @@ TEST_P(TestTxnReplayTest, test_replay_flush_gap_compact) {
         SegmentMeta segment_meta(segment_id, *table_meta);
 
         SizeT segment_row_cnt = 0;
-        std::tie(segment_row_cnt, status) = segment_meta.GetRowCnt1();
+        std::tie(segment_row_cnt, status) = segment_meta.GetRowCnt1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
         EXPECT_EQ(segment_row_cnt, 8192 * 2);
 
         Vector<BlockID> *block_ids_ptr = nullptr;
-        std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1();
+        std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(*block_ids_ptr, Vector<BlockID>({0, 1}));
 

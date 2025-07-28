@@ -171,7 +171,7 @@ TEST_P(TestTxnCheckpointAddColumnTest, addcol_checkpoint_insert) {
 
         for (SegmentID segment_id : *segment_ids) {
             SegmentMeta segment_meta(segment_id, *table_meta);
-            auto [block_ids, block_status] = segment_meta.GetBlockIDs1();
+            auto [block_ids, block_status] = segment_meta.GetBlockIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
             EXPECT_TRUE(block_status.ok());
 
             for (BlockID block_id : *block_ids) {

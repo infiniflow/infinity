@@ -166,7 +166,7 @@ TEST_P(TestTxnCompactInternal, test_compact) {
 
         SegmentMeta segment_meta((*segment_ids)[0], *table_meta);
 
-        auto [block_ids, block_status] = segment_meta.GetBlockIDs1();
+        auto [block_ids, block_status] = segment_meta.GetBlockIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
         EXPECT_TRUE(block_status.ok());
         EXPECT_EQ(*block_ids, Vector<BlockID>({0, 1, 2, 3}));
 
@@ -354,7 +354,7 @@ TEST_P(TestTxnCompactInternal, test_compact_with_index) {
 
         SegmentMeta segment_meta((*segment_ids)[0], *table_meta);
 
-        auto [block_ids, block_status] = segment_meta.GetBlockIDs1();
+        auto [block_ids, block_status] = segment_meta.GetBlockIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
         EXPECT_TRUE(block_status.ok());
         EXPECT_EQ(*block_ids, Vector<BlockID>({0, 1, 2, 3}));
 

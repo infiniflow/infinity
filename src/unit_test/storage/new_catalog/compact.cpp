@@ -508,7 +508,7 @@ TEST_P(TestTxnCompact, compact_and_add_columns) {
         };
 
         auto check_segment = [&](SegmentMeta &segment_meta, NewTxn *txn) {
-            auto [block_ids_ptr, status] = segment_meta.GetBlockIDs1();
+            auto [block_ids_ptr, status] = segment_meta.GetBlockIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*block_ids_ptr, Vector<BlockID>({0, 1}));
 
@@ -564,7 +564,7 @@ TEST_P(TestTxnCompact, compact_and_add_columns) {
         };
 
         auto check_segment = [&](SegmentMeta &segment_meta, NewTxn *txn) {
-            auto [block_ids_ptr, status] = segment_meta.GetBlockIDs1(txn->CommitTS());
+            auto [block_ids_ptr, status] = segment_meta.GetBlockIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*block_ids_ptr, Vector<BlockID>({0}));
 
@@ -775,7 +775,7 @@ TEST_P(TestTxnCompact, compact_and_drop_columns) {
         };
 
         auto check_segment = [&](SegmentMeta &segment_meta, NewTxn *txn) {
-            auto [block_ids_ptr, status] = segment_meta.GetBlockIDs1();
+            auto [block_ids_ptr, status] = segment_meta.GetBlockIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
             EXPECT_TRUE(status.ok());
 
             for (auto block_id : *block_ids_ptr) {

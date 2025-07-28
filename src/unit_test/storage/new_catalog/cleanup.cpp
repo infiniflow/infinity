@@ -756,11 +756,11 @@ TEST_P(TestTxnCleanup, cleanup_and_append) {
             SegmentMeta segment_meta(segment_id, *table_meta);
 
             SizeT segment_row_cnt = 0;
-            std::tie(segment_row_cnt, status) = segment_meta.GetRowCnt1();
+            std::tie(segment_row_cnt, status) = segment_meta.GetRowCnt1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
             EXPECT_EQ(segment_row_cnt, 1);
 
             Vector<BlockID> *block_ids_ptr = nullptr;
-            std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1();
+            std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*block_ids_ptr, Vector<BlockID>({0}));
 
@@ -889,11 +889,11 @@ TEST_P(TestTxnCleanup, cleanup_and_delete) {
             SegmentMeta segment_meta(segment_id, *table_meta);
 
             SizeT segment_row_cnt;
-            std::tie(segment_row_cnt, status) = segment_meta.GetRowCnt1();
+            std::tie(segment_row_cnt, status) = segment_meta.GetRowCnt1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
             EXPECT_EQ(segment_row_cnt, 8191);
 
             Vector<BlockID> *block_ids_ptr = nullptr;
-            std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1();
+            std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*block_ids_ptr, Vector<BlockID>({0}));
 
@@ -1026,11 +1026,11 @@ TEST_P(TestTxnCleanup, cleanup_and_update) {
             SegmentMeta segment_meta(segment_id, *table_meta);
 
             SizeT segment_row_cnt = 0;
-            std::tie(segment_row_cnt, status) = segment_meta.GetRowCnt1();
+            std::tie(segment_row_cnt, status) = segment_meta.GetRowCnt1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
             EXPECT_EQ(segment_row_cnt, 8192);
 
             Vector<BlockID> *block_ids_ptr = nullptr;
-            std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1();
+            std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*block_ids_ptr, Vector<BlockID>({0}));
 
