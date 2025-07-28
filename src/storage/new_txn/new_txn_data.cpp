@@ -104,17 +104,6 @@ struct NewTxnCompactState {
             block_meta_.reset();
         }
 
-        // BlockID block_id = 0;
-        // {
-        //     std::tie(block_id, status) = new_segment_meta_->GetNextBlockID();
-        //     if (!status.ok()) {
-        //         return status;
-        //     }
-        //     status = new_segment_meta_->SetNextBlockID(block_id + 1);
-        //     if (!status.ok()) {
-        //         return status;
-        //     }
-        // }
         status = NewCatalog::AddNewBlock1(*new_segment_meta_, commit_ts_, block_meta_);
         if (!status.ok()) {
             return status;

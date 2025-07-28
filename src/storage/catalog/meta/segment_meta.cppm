@@ -68,11 +68,7 @@ public:
 
     SizeT segment_capacity() const { return DEFAULT_SEGMENT_CAPACITY; }
 
-    // Status SetBlockIDs(const Vector<BlockID> &block_ids);
-
     Status SetNextBlockID(BlockID next_block_id);
-
-    // Status SetRowCnt(SizeT row_cnt);
 
     Status SetFirstDeleteTS(TxnTimeStamp first_delete_ts);
 
@@ -91,14 +87,11 @@ public:
     Status CommitBlock(BlockID block_id, TxnTimeStamp commit_ts);
 
     Tuple<SharedPtr<String>, Status> GetSegmentDir();
-    // Tuple<SharedPtr<Vector<BlockID>>, Status> GetBlockIDs();
 
     Tuple<Vector<BlockID> *, Status> GetBlockIDs1();
     Tuple<Vector<BlockID> *, Status> GetBlockIDs1(TxnTimeStamp commit_ts);
 
-    // Tuple<SizeT, Status> GetRowCnt();
     Tuple<SizeT, Status> GetRowCnt1();
-    Tuple<BlockID, Status> GetNextBlockID();
 
     Status GetFirstDeleteTS(TxnTimeStamp &first_delete_ts);
 
@@ -109,15 +102,7 @@ public:
     Status SetFastRoughFilter(SharedPtr<FastRoughFilter> fast_rough_filter);
 
 private:
-    // Status LoadBlockIDs();
-
-    Status LoadBlockIDs1();
-
-    Status LoadNextBlockID();
-
     Status LoadFirstDeleteTS();
-
-    // Status LoadRowCnt();
 
     String GetSegmentTag(const String &tag) const;
 
@@ -129,9 +114,7 @@ private:
     SegmentID segment_id_;
     Optional<String> segment_dir_;
 
-    // SharedPtr<Vector<BlockID>> block_ids_;
     Optional<BlockID> next_block_id_;
-    // Optional<SizeT> row_cnt_;
 
     Optional<Vector<BlockID>> block_ids1_;
     Optional<SizeT> row_cnt_;
