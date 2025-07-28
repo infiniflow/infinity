@@ -11,8 +11,15 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+
+module;
+
+module infinity_core:ut.logical_planner;
+
 #if 0
+
 #include "gtest/gtest.h"
+
 import base_test;
 
 import infinity_exception;
@@ -80,11 +87,11 @@ TEST_F(LogicalPlannerTest, test1) {
     }
     {
         const String sql_text = "select sum(b), b from t1 group by a;";
-        EXPECT_THROW_WITHOUT_STACKTRACE(SQLRunner::Run(sql_text, true), UnrecoverableException);
+        EXPECT_THROW(SQLRunner::Run(sql_text, true), UnrecoverableException);
     }
     {
         const String sql_text = "select sum(b), b from t1;";
-        EXPECT_THROW_WITHOUT_STACKTRACE(SQLRunner::Run(sql_text, true), UnrecoverableException);
+        EXPECT_THROW(SQLRunner::Run(sql_text, true), UnrecoverableException);
     }
 
     {

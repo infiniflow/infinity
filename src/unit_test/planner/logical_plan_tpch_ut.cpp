@@ -11,6 +11,11 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+
+module;
+
+module infinity_core:ut.logical_plan_tpch;
+
 #if 0
 
 #include "bin/compilation_config.h"
@@ -28,8 +33,8 @@
 #include "test_helper/sql_runner.h"
 
 #include "gtest/gtest.h"
-import base_test;
 
+import base_test;
 
 using namespace infinity;
 class LogicalPlannerTpchTest : public BaseTest {};
