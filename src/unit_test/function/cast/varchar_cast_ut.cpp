@@ -43,7 +43,7 @@ import data_type;
 import logical_type;
 
 using namespace infinity;
-class VarcharTest : public BaseTest {};
+class VarcharCastTest : public BaseTest {};
 
 using namespace infinity;
 
@@ -57,7 +57,7 @@ void InitVarcharAsInline(VarcharT &varchar, const std::string_view sv) {
     }
 }
 
-TEST_F(VarcharTest, varchar_cast0) {
+TEST_F(VarcharCastTest, varchar_cast0) {
     {
 
         DataType source_type(LogicalType::kVarchar);
@@ -158,7 +158,7 @@ TEST_F(VarcharTest, varchar_cast0) {
     }
 }
 
-TEST_F(VarcharTest, varchar_cast1) {
+TEST_F(VarcharCastTest, varchar_cast1) {
     using namespace infinity;
 
     {

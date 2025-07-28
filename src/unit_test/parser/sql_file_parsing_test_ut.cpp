@@ -12,19 +12,22 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+module;
+
 #include "gtest/gtest.h"
-import base_test;
 
+module infinity_core:ut.sql_file_parsing_test;
+
+import :base_test1;
 import compilation_config;
-import infinity_context;
-import infinity_exception;
-
+import :infinity_context;
+import :infinity_exception;
 import global_resource_usage;
-import third_party;
+import :third_party;
 import sql_parser;
-import logger;
-import null_value;
-import stl;
+import :logger;
+import :null_value;
+import :stl;
 import parser_result;
 
 using namespace infinity;

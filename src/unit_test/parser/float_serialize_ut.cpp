@@ -1,3 +1,5 @@
+module;
+
 #include "gtest/gtest.h"
 #include <cassert>
 #include <charconv>
@@ -5,12 +7,13 @@
 #include <iostream>
 #include <limits>
 #include <string>
-import base_test;
 
-import infinity_exception;
+module infinity_core:ut.float_serialize;
 
-import third_party;
-import stl;
+import :base_test1;
+import :infinity_exception;
+import :third_party;
+import :stl;
 import data_type;
 
 using namespace infinity;

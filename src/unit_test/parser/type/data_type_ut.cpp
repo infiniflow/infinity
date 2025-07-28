@@ -12,17 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+module;
+
 #include "gtest/gtest.h"
-import base_test;
 
-import infinity_exception;
+module infinity_core:ut.data_type;
 
+import :base_test1;
+import :infinity_exception;
 import global_resource_usage;
-import third_party;
-
-import logger;
-import stl;
-import infinity_context;
+import :third_party;
+import :logger;
+import :stl;
+import :infinity_context;
 import internal_types;
 import logical_type;
 import type_info;

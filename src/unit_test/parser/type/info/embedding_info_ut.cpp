@@ -12,18 +12,21 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+module;
+
 #include "json.hpp"
 #include "gtest/gtest.h"
-import base_test;
 
-import infinity_exception;
+module infinity_core:ut.embedding_info;
 
+import :base_test1;
+import :infinity_exception;
 import global_resource_usage;
-import third_party;
+import :third_party;
 import internal_types;
-import logger;
-import stl;
-import infinity_context;
+import :logger;
+import :stl;
+import :infinity_context;
 import embedding_info;
 import knn_expr;
 import parser_assert;

@@ -12,19 +12,22 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+module;
+
 #include "base_statement.h"
 #include "statement/show_statement.h"
 #include "gtest/gtest.h"
-import base_test;
 
-import infinity_exception;
+module infinity_core:ut.sql_statement;
 
+import :base_test1;
+import :infinity_exception;
 import global_resource_usage;
-import third_party;
+import :third_party;
 import sql_parser;
-import logger;
-import stl;
-import infinity_context;
+import :logger;
+import :stl;
+import :infinity_context;
 import base_statement;
 import create_statement;
 import drop_statement;

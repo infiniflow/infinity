@@ -12,16 +12,42 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "parser/type/complex/varchar.h"
+module;
+
 #include "gtest/gtest.h"
-import base_test;
+
+module infinity_core:ut.point_type;
+
+import :base_test1;
+import :infinity_exception;
+import global_resource_usage;
+import :third_party;
+import :logger;
+import :stl;
+import :infinity_context;
+import internal_types;
 
 using namespace infinity;
-class VarcharTest : public BaseTest {};
+class PointTypeTest : public BaseTest {};
 
-TEST_F(VarcharTest, structure_check) {
+TEST_F(PointTypeTest, point1) {
     using namespace infinity;
-    EXPECT_EQ(sizeof(InlineVarchar), 13u);
-    EXPECT_EQ(sizeof(VectorVarchar), 13u);
-    EXPECT_EQ(sizeof(Varchar), 16u);
+
+    PointT p1;
+    p1.x = 1.0f;
+    p1.y = 2.0f;
+
+    PointT p2(1.0f, 2.0f);
+
+    EXPECT_EQ(p1.x, 1.0f);
+    EXPECT_EQ(p1.y, 2.0f);
+    EXPECT_EQ(p2.x, 1.0f);
+    EXPECT_EQ(p2.y, 2.0f);
+
+    EXPECT_EQ(p1, p2);
+
+    p2.Reset();
+
+    EXPECT_EQ(p2.x, 0);
+    EXPECT_EQ(p2.y, 0);
 }

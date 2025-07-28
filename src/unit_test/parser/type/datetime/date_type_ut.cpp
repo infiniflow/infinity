@@ -1,15 +1,16 @@
+module;
+
 #include "gtest/gtest.h"
 
-import base_test;
+module infinity_core:ut.date_type;
 
-import infinity_exception;
-
+import :base_test1;
+import :infinity_exception;
 import global_resource_usage;
-import third_party;
-
-import logger;
-import stl;
-import infinity_context;
+import :third_party;
+import :logger;
+import :stl;
+import :infinity_context;
 import internal_types;
 import parser_assert;
 

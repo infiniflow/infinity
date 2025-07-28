@@ -12,19 +12,23 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "gtest/gtest.h"
-import base_test;
+module;
 
-import stl;
-import search_driver;
-import query_node;
-import term;
-import analyzer;
-import infinity_exception;
+#include "gtest/gtest.h"
+
+module infinity_core:ut.search_driver;
+
+import :base_test1;
+import :stl;
+import :search_driver;
+import :query_node;
+import :term;
+import :analyzer;
+import :infinity_exception;
 import global_resource_usage;
-import infinity_context;
-import logger;
-import third_party;
+import :infinity_context;
+import :logger;
+import :third_party;
 
 using namespace infinity;
 
