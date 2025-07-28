@@ -37,11 +37,11 @@ import logical_type;
 namespace infinity {
 
 ColumnMeta::ColumnMeta(SizeT column_idx, BlockMeta &block_meta)
-    : BaseMeta(MetaType::kBlockColumn), kv_instance_(block_meta.kv_instance()), block_meta_(block_meta), column_idx_(column_idx) {}
+    : BaseMeta(MetaType::kBlockColumn), block_meta_(block_meta), column_idx_(column_idx) {}
 
-Status ColumnMeta::GetChunkOffset(SizeT &chunk_offset) {
+Status ColumnMeta::GetChunkOffset(SizeT &chunk_offset, KVInstance *kv_instance) {
     if (!chunk_offset_) {
-        Status status = LoadChunkOffset();
+        Status status = LoadChunkOffset(kv_instance);
         if (!status.ok()) {
             return status;
         }
@@ -50,10 +50,10 @@ Status ColumnMeta::GetChunkOffset(SizeT &chunk_offset) {
     return Status::OK();
 }
 
-Status ColumnMeta::SetChunkOffset(SizeT chunk_offset) {
+Status ColumnMeta::SetChunkOffset(SizeT chunk_offset, KVInstance *kv_instance) {
     chunk_offset_ = chunk_offset;
     String chunk_offset_key = GetColumnTag("last_chunk_offset");
-    Status status = kv_instance_.Put(chunk_offset_key, fmt::format("{}", *chunk_offset_));
+    Status status = kv_instance->Put(chunk_offset_key, fmt::format("{}", *chunk_offset_));
     if (!status.ok()) {
         return status;
     }
@@ -177,7 +177,7 @@ Status ColumnMeta::LoadSet() {
     return Status::OK();
 }
 
-Status ColumnMeta::RestoreSet(const ColumnDef *column_def) {
+Status ColumnMeta::RestoreSet(const ColumnDef *column_def, KVInstance *kv_instance) {
     Status status;
 
     auto *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
@@ -210,7 +210,7 @@ Status ColumnMeta::RestoreSet(const ColumnDef *column_def) {
         auto filename = MakeShared<String>(fmt::format("col_{}_out", column_def->id()));
 
         SizeT chunk_offset = 0;
-        status = this->GetChunkOffset(chunk_offset);
+        status = this->GetChunkOffset(chunk_offset, kv_instance);
         if (!status.ok()) {
             return status;
         }
@@ -294,7 +294,7 @@ Tuple<SizeT, Status> ColumnMeta::GetColumnSize(SizeT row_cnt) const {
     return {total_data_size, Status::OK()};
 }
 
-Status ColumnMeta::UninitSet(const ColumnDef *column_def, UsageFlag usage_flag) {
+Status ColumnMeta::UninitSet(const ColumnDef *column_def, KVInstance *kv_instance, UsageFlag usage_flag) {
     Status status;
 
     if (usage_flag == UsageFlag::kOther) {
@@ -309,7 +309,7 @@ Status ColumnMeta::UninitSet(const ColumnDef *column_def, UsageFlag usage_flag) 
     }
 
     String chunk_offset_key = GetColumnTag("last_chunk_offset");
-    status = kv_instance_.Delete(chunk_offset_key);
+    status = kv_instance->Delete(chunk_offset_key);
     if (!status.ok()) {
         return status;
     }
@@ -317,10 +317,10 @@ Status ColumnMeta::UninitSet(const ColumnDef *column_def, UsageFlag usage_flag) 
     return Status::OK();
 }
 
-Status ColumnMeta::LoadChunkOffset() {
+Status ColumnMeta::LoadChunkOffset(KVInstance *kv_instance) {
     String chunk_offset_key = GetColumnTag("last_chunk_offset");
     String chunk_offset_str;
-    Status status = kv_instance_.Get(chunk_offset_key, chunk_offset_str);
+    Status status = kv_instance->Get(chunk_offset_key, chunk_offset_str);
     if (!status.ok()) {
         return status;
     }

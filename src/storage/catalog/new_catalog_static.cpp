@@ -454,7 +454,7 @@ Status NewCatalog::AddNewDB(NewTxn *txn,
     return Status::OK();
 }
 
-Status NewCatalog::CleanDB(DBMeeta &db_meta, TxnTimeStamp begin_ts, UsageFlag usage_flag) {
+Status NewCatalog::CleanDB(KVInstance *kv_instance, DBMeeta &db_meta, TxnTimeStamp begin_ts, UsageFlag usage_flag) {
     LOG_TRACE(fmt::format("CleanDB: cleaning db_id: {}", db_meta.db_id_str()));
 
     Status status;
@@ -469,7 +469,7 @@ Status NewCatalog::CleanDB(DBMeeta &db_meta, TxnTimeStamp begin_ts, UsageFlag us
     for (SizeT i = 0; i < table_id_strs_ptr->size(); ++i) {
         const String &table_id_str = (*table_id_strs_ptr)[i];
         TableMeeta table_meta(db_meta.db_id_str(), table_id_str, db_meta.kv_instance(), begin_ts, MAX_TIMESTAMP);
-        status = NewCatalog::CleanTable(table_meta, begin_ts, usage_flag);
+        status = NewCatalog::CleanTable(kv_instance, table_meta, begin_ts, usage_flag);
         if (!status.ok()) {
             return status;
         }
@@ -506,7 +506,7 @@ Status NewCatalog::AddNewTable(DBMeeta &db_meta,
     return status;
 }
 
-Status NewCatalog::CleanTable(TableMeeta &table_meta, TxnTimeStamp begin_ts, UsageFlag usage_flag) {
+Status NewCatalog::CleanTable(KVInstance *kv_instance, TableMeeta &table_meta, TxnTimeStamp begin_ts, UsageFlag usage_flag) {
     LOG_TRACE(fmt::format("CleanTable: cleaning table_id: {}", table_meta.table_id_str()));
 
     Status status;
@@ -518,7 +518,7 @@ Status NewCatalog::CleanTable(TableMeeta &table_meta, TxnTimeStamp begin_ts, Usa
     }
     for (SegmentID segment_id : *segment_ids_ptr) {
         SegmentMeta segment_meta(segment_id, table_meta);
-        status = NewCatalog::CleanSegment(segment_meta, begin_ts, usage_flag);
+        status = NewCatalog::CleanSegment(kv_instance, segment_meta, begin_ts, usage_flag);
         if (!status.ok()) {
             return status;
         }
@@ -676,7 +676,7 @@ Status NewCatalog::LoadFlushedSegment2(TableMeeta &table_meta, const WalSegmentI
     return Status::OK();
 }
 
-Status NewCatalog::CleanSegment(SegmentMeta &segment_meta, TxnTimeStamp commit_ts, UsageFlag usage_flag) {
+Status NewCatalog::CleanSegment(KVInstance *kv_instance, SegmentMeta &segment_meta, TxnTimeStamp commit_ts, UsageFlag usage_flag) {
     LOG_TRACE(fmt::format("CleanSegment: cleaning table: {}, segment_id: {}", segment_meta.table_meta().table_id_str(), segment_meta.segment_id()));
     auto [block_ids, status] = segment_meta.GetBlockIDs1();
     if (!status.ok()) {
@@ -684,7 +684,7 @@ Status NewCatalog::CleanSegment(SegmentMeta &segment_meta, TxnTimeStamp commit_t
     }
     for (BlockID block_id : *block_ids) {
         BlockMeta block_meta(block_id, segment_meta);
-        status = NewCatalog::CleanBlock(block_meta, usage_flag);
+        status = NewCatalog::CleanBlock(kv_instance, block_meta, usage_flag);
         if (!status.ok()) {
             return status;
         }
@@ -922,7 +922,7 @@ Status NewCatalog::LoadFlushedBlock1(SegmentMeta &segment_meta, const WalBlockIn
     return Status::OK();
 }
 
-Status NewCatalog::CleanBlock(BlockMeta &block_meta, UsageFlag usage_flag) {
+Status NewCatalog::CleanBlock(KVInstance *kv_instance, BlockMeta &block_meta, UsageFlag usage_flag) {
     LOG_TRACE(fmt::format("CleanBlock: cleaning table id: {}, segment_id: {}, block_id: {}",
                           block_meta.segment_meta().table_meta().table_id_str(),
                           block_meta.segment_meta().segment_id(),
@@ -939,7 +939,7 @@ Status NewCatalog::CleanBlock(BlockMeta &block_meta, UsageFlag usage_flag) {
 
     for (const auto &column_def : *column_defs_ptr) {
         ColumnMeta column_meta(column_def->id(), block_meta);
-        status = NewCatalog::CleanBlockColumn(column_meta, column_def.get(), usage_flag);
+        status = NewCatalog::CleanBlockColumn(kv_instance, column_meta, column_def.get(), usage_flag);
         if (!status.ok()) {
             return status;
         }
@@ -982,16 +982,16 @@ Status NewCatalog::AddNewBlockColumnForTransform(BlockMeta &block_meta, SizeT co
     return Status::OK();
 }
 
-Status NewCatalog::CleanBlockColumn(ColumnMeta &column_meta, const ColumnDef *column_def, UsageFlag usage_flag) {
+Status NewCatalog::CleanBlockColumn(KVInstance *kv_instance, ColumnMeta &column_meta, const ColumnDef *column_def, UsageFlag usage_flag) {
     LOG_TRACE(fmt::format("CleanBlockColumn: cleaning table id: {}, segment_id: {}, block_id: {}, column_id: {}",
                           column_meta.block_meta().segment_meta().table_meta().table_id_str(),
                           column_meta.block_meta().segment_meta().segment_id(),
                           column_meta.block_meta().block_id(),
                           column_def->id()));
-    column_meta.RestoreSet(column_def);
+    column_meta.RestoreSet(column_def, kv_instance);
     Status status;
 
-    status = column_meta.UninitSet(column_def, usage_flag);
+    status = column_meta.UninitSet(column_def, kv_instance, usage_flag);
     if (!status.ok()) {
         return status;
     }

@@ -4565,7 +4565,7 @@ Status NewTxn::CleanupInner(const Vector<UniquePtr<MetaKey>> &metas) {
                 }
 
                 DBMeeta db_meta(db_meta_key->db_id_str_, kv_instance);
-                status = NewCatalog::CleanDB(db_meta, begin_ts, UsageFlag::kOther);
+                status = NewCatalog::CleanDB(kv_instance, db_meta, begin_ts, UsageFlag::kOther);
                 if (!status.ok()) {
                     return status;
                 }
@@ -4579,7 +4579,7 @@ Status NewTxn::CleanupInner(const Vector<UniquePtr<MetaKey>> &metas) {
                     return status;
                 }
                 TableMeeta table_meta(table_meta_key->db_id_str_, table_meta_key->table_id_str_, kv_instance, begin_ts, MAX_TIMESTAMP);
-                status = NewCatalog::CleanTable(table_meta, begin_ts, UsageFlag::kOther);
+                status = NewCatalog::CleanTable(kv_instance, table_meta, begin_ts, UsageFlag::kOther);
                 if (!status.ok()) {
                     return status;
                 }
@@ -4603,7 +4603,7 @@ Status NewTxn::CleanupInner(const Vector<UniquePtr<MetaKey>> &metas) {
                 }
 
                 SegmentMeta segment_meta(segment_meta_key->segment_id_, table_meta);
-                status = NewCatalog::CleanSegment(segment_meta, begin_ts, UsageFlag::kOther);
+                status = NewCatalog::CleanSegment(kv_instance, segment_meta, begin_ts, UsageFlag::kOther);
                 if (!status.ok()) {
                     return status;
                 }
@@ -4614,7 +4614,7 @@ Status NewTxn::CleanupInner(const Vector<UniquePtr<MetaKey>> &metas) {
                 TableMeeta table_meta(block_meta_key->db_id_str_, block_meta_key->table_id_str_, kv_instance, begin_ts, MAX_TIMESTAMP);
                 SegmentMeta segment_meta(block_meta_key->segment_id_, table_meta);
                 BlockMeta block_meta(block_meta_key->block_id_, segment_meta);
-                Status status = NewCatalog::CleanBlock(block_meta, UsageFlag::kOther);
+                Status status = NewCatalog::CleanBlock(kv_instance, block_meta, UsageFlag::kOther);
                 if (!status.ok()) {
                     return status;
                 }
@@ -4638,7 +4638,7 @@ Status NewTxn::CleanupInner(const Vector<UniquePtr<MetaKey>> &metas) {
                 SegmentMeta segment_meta(column_meta_key->segment_id_, table_meta);
                 BlockMeta block_meta(column_meta_key->block_id_, segment_meta);
                 ColumnMeta column_meta(column_meta_key->column_def_->id(), block_meta);
-                Status status = NewCatalog::CleanBlockColumn(column_meta, column_meta_key->column_def_.get(), UsageFlag::kOther);
+                Status status = NewCatalog::CleanBlockColumn(kv_instance, column_meta, column_meta_key->column_def_.get(), UsageFlag::kOther);
                 if (!status.ok()) {
                     return status;
                 }

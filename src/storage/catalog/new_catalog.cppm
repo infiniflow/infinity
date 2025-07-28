@@ -251,7 +251,7 @@ public:
                            const String *db_comment,
                            SharedPtr<DBMeeta> &db_meta);
 
-    static Status CleanDB(DBMeeta &db_meta, TxnTimeStamp begin_ts, UsageFlag usage_flag);
+    static Status CleanDB(KVInstance *kv_instance, DBMeeta &db_meta, TxnTimeStamp begin_ts, UsageFlag usage_flag);
 
     static Status AddNewTable(DBMeeta &db_meta,
                               const String &table_id_str,
@@ -260,7 +260,7 @@ public:
                               const SharedPtr<TableDef> &table_def,
                               Optional<TableMeeta> &table_meta);
 
-    static Status CleanTable(TableMeeta &table_meta, TxnTimeStamp begin_ts, UsageFlag usage_flag);
+    static Status CleanTable(KVInstance* kv_instance, TableMeeta &table_meta, TxnTimeStamp begin_ts, UsageFlag usage_flag);
 
     Status AddNewTableIndex(TableMeeta &table_meta,
                             String &index_id_str,
@@ -280,7 +280,7 @@ public:
 
     static Status LoadFlushedSegment2(TableMeeta &table_meta, const WalSegmentInfo &segment_info, TxnTimeStamp checkpoint_ts);
 
-    static Status CleanSegment(SegmentMeta &segment_meta, TxnTimeStamp begin_ts, UsageFlag usage_flag);
+    static Status CleanSegment(KVInstance *kv_instance, SegmentMeta &segment_meta, TxnTimeStamp begin_ts, UsageFlag usage_flag);
 
     // static Status AddNewBlock(SegmentMeta &segment_meta, BlockID block_id, Optional<BlockMeta> &block_meta);
 
@@ -294,13 +294,13 @@ public:
 
     static Status LoadFlushedBlock1(SegmentMeta &segment_meta, const WalBlockInfo &block_info, TxnTimeStamp checkpoint_ts);
 
-    static Status CleanBlock(BlockMeta &block_meta, UsageFlag usage_flag);
+    static Status CleanBlock(KVInstance *kv_instance, BlockMeta &block_meta, UsageFlag usage_flag);
 
     static Status AddNewBlockColumn(BlockMeta &block_meta, SizeT column_idx, Optional<ColumnMeta> &column_meta);
 
     static Status AddNewBlockColumnForTransform(BlockMeta &block_meta, SizeT column_idx, Optional<ColumnMeta> &column_meta, TxnTimeStamp commit_ts);
 
-    static Status CleanBlockColumn(ColumnMeta &column_meta, const ColumnDef *column_def, UsageFlag usage_flag);
+    static Status CleanBlockColumn(KVInstance *kv_instance, ColumnMeta &column_meta, const ColumnDef *column_def, UsageFlag usage_flag);
 
     static Status AddNewSegmentIndex(TableIndexMeeta &table_index_meta, SegmentID segment_id, Optional<SegmentIndexMeta> &segment_index_meta);
 

@@ -33,23 +33,21 @@ export class ColumnMeta : public BaseMeta {
 public:
     ColumnMeta(SizeT column_idx, BlockMeta &block_meta);
 
-    KVInstance &kv_instance() const { return kv_instance_; }
-
     BlockMeta &block_meta() const { return block_meta_; }
 
     SizeT column_idx() const { return column_idx_; }
 
-    Status GetChunkOffset(SizeT &chunk_offset);
+    Status GetChunkOffset(SizeT &chunk_offset, KVInstance* kv_instance);
 
-    Status SetChunkOffset(SizeT chunk_offset);
+    Status SetChunkOffset(SizeT chunk_offset, KVInstance* kv_instance);
 
     Status InitSet();
 
     Status LoadSet();
 
-    Status RestoreSet(const ColumnDef *column_def);
+    Status RestoreSet(const ColumnDef *column_def, KVInstance* kv_instance);
 
-    Status UninitSet(const ColumnDef *column_def, UsageFlag usage_flag);
+    Status UninitSet(const ColumnDef *column_def, KVInstance* kv_instance, UsageFlag usage_flag);
 
     Status GetColumnBuffer(BufferObj *&column_buffer, BufferObj *&outline_buffer);
 
@@ -62,14 +60,13 @@ public:
 private:
     Status GetColumnBuffer(BufferObj *&column_buffer, BufferObj *&outline_buffer, const ColumnDef *column_def);
 
-    Status LoadChunkOffset();
+    Status LoadChunkOffset(KVInstance* kv_instance);
 
     Status LoadColumnBuffer(const ColumnDef *col_def);
 
     String GetColumnTag(const String &tag) const;
 
 private:
-    KVInstance &kv_instance_;
     BlockMeta &block_meta_;
     SizeT column_idx_;
 
