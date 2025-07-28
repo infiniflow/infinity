@@ -18,7 +18,7 @@ module;
 
 module infinity_core:ut.var_buffer;
 
-import :base_test1;
+import :ut.base_test;
 import :stl;
 import :var_buffer;
 import :infinity_exception;

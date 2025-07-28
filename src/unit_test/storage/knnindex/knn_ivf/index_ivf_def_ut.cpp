@@ -19,7 +19,7 @@ module;
 
 module infinity_core:ut.index_ivf_def;
 
-import :base_test1;
+import :ut.base_test;
 import :infinity_exception;
 import :stl;
 import :index_ivf;

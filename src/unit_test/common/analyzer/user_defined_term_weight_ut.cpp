@@ -18,7 +18,7 @@ module infinity_core:ut.user_defined_term_weight;
 
 #if 0
 #include "gtest/gtest.h"
-import :base_test1;
+import :ut.base_test;
 
 import :stl;
 import user_defined_term_weight;

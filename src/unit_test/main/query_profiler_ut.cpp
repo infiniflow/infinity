@@ -18,7 +18,7 @@ module;
 
 module infinity_core:ut.query_profiler;
 
-import :base_test1;
+import :ut.base_test;
 import :stl;
 import :profiler;
 import :infinity_context;

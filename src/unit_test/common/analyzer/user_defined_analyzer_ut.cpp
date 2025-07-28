@@ -20,7 +20,7 @@ module infinity_core:ut.user_defined_analyzer;
 
 #if 0
 
-import :base_test1;
+import :ut.base_test;
 
 import :stl;
 import user_defined_analyzer;

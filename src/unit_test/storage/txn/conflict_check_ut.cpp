@@ -17,7 +17,7 @@ module;
 #include "gtest/gtest.h"
 
 module infinity_core:ut.conflict_check;
-import :base_test1;
+import :ut.base_test;
 
 import :stl;
 import compilation_config;

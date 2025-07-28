@@ -18,7 +18,7 @@ module;
 
 module infinity_core:ut.replay_append_delete;
 
-import :base_test1;
+import :ut.base_test;
 import :ut.replay_test;
 import :stl;
 import :third_party;

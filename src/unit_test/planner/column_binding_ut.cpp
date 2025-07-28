@@ -18,7 +18,7 @@ module;
 
 module infinity_core:ut.column_binding;
 
-import :base_test1;
+import :ut.base_test;
 import :infinity_exception;
 import global_resource_usage;
 import :third_party;

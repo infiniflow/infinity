@@ -18,7 +18,7 @@ module;
 
 module infinity_core:ut.file_write_read;
 
-import :base_test1;
+import :ut.base_test;
 import :infinity_exception;
 import :stl;
 import global_resource_usage;

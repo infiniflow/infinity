@@ -18,7 +18,7 @@ module;
 
 module infinity_core:ut.json;
 
-import :base_test1;
+import :ut.base_test;
 import global_resource_usage;
 import compilation_config;
 

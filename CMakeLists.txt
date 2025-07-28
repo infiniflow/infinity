@@ -30,7 +30,7 @@ if (CLANG_VERSION_STRING VERSION_GREATER 16)
     # add_compile_options(-ftime-trace)
 
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Wno-unused-parameter -Wno-unused-private-field")
-    # add_link_options(-fuse-ld=mold)
+    add_link_options(-fuse-ld=mold)
     set(CMAKE_FIND_PACKAGE_SORT_ORDER NATURAL)
     set(CMAKE_FIND_PACKAGE_SORT_DIRECTION DEC)
 
@@ -46,9 +46,9 @@ set(GCC_SEARCH_ROOTS
 )
 
 set(GCC15_SUFFIXES
-        lib
-        lib/gcc/x86_64-linux-gnu/15
+#        lib
         lib/gcc/15
+        lib/gcc/x86_64-linux-gnu/15
         lib/gcc/x86_64-pc-linux-gnu/15.1.0
         lib64/gcc/x86_64-linux-gnu/15
         lib64/gcc/15
@@ -56,7 +56,7 @@ set(GCC15_SUFFIXES
 )
 
 find_library(STDCXX15_STATIC
-        NAMES libstdc++.a
+        NAMES stdc++.a
         PATHS ${GCC_SEARCH_ROOTS}
         PATH_SUFFIXES ${GCC15_SUFFIXES}
         REQUIRED
@@ -64,7 +64,7 @@ find_library(STDCXX15_STATIC
 )
 
 find_library(STDCXX15EXP_STATIC
-        NAMES libstdc++exp.a
+        NAMES stdc++exp.a
         PATHS ${GCC_SEARCH_ROOTS}
         PATH_SUFFIXES ${GCC15_SUFFIXES}
         REQUIRED
@@ -73,7 +73,10 @@ find_library(STDCXX15EXP_STATIC
 
 get_filename_component(GCC15_LIB_DIR ${STDCXX15_STATIC} DIRECTORY)
 
-set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -L${GCC15_LIB_DIR} -static-libstdc++ -static-libgcc")
+message(STATUS "***${STDCXX15_STATIC}")
+message(STATUS "****${GCC15_LIB_DIR}")
+
+set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -L${GCC15_LIB_DIR} -static-libstdc++ -L${GCC15_LIB_DIR} -static-libgcc")
 
 # Get current system time and print the build time
 execute_process(COMMAND "date" +"%Y-%m-%d %H:%M.%S" OUTPUT_VARIABLE CURRENT_SYS_TIME)

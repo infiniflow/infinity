@@ -19,7 +19,7 @@ module;
 module infinity_core:ut.new_txn_mgr;
 
 import :stl;
-import :base_test1;
+import :ut.base_test;
 import :status;
 import :new_txn_manager;
 import :infinity_context;

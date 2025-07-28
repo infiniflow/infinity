@@ -25,7 +25,7 @@ import :term;
 import :analyzer;
 import :ik_analyzer;
 
-import :base_test1;
+import :ut.base_test;
 
 using namespace infinity;
 

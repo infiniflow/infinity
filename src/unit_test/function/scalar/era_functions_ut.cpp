@@ -19,7 +19,7 @@ module;
 module infinity_core:ut.era_functions;
 
 import :stl;
-import :base_test1;
+import :ut.base_test;
 import :infinity_exception;
 import :infinity_context;
 import :new_catalog;

@@ -7,7 +7,7 @@ module infinity_core:ut.test_simd;
 import :stl;
 import :simd_init;
 
-import :base_test1;
+import :ut.base_test;
 
 using namespace infinity;
 

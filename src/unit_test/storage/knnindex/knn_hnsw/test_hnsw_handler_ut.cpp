@@ -20,7 +20,7 @@ module;
 module infinity_core:ut.test_hnsw_handler;
 
 import :stl;
-import :base_test1;
+import :ut.base_test;
 import column_def;
 import embedding_info;
 import logical_type;

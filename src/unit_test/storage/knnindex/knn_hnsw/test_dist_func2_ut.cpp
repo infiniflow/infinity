@@ -21,7 +21,7 @@ module;
 
 module infinity_core:ut.test_dist_func2;
 
-import :base_test1;
+import :ut.base_test;
 import :dist_func_ip;
 import :data_store;
 import :vec_store_type;

@@ -24,7 +24,7 @@ module;
 
 module infinity_core:ut.test_rcu_multimap;
 
-import :base_test1;
+import :ut.base_test;
 import :stl;
 import :third_party;
 import :rcu_multimap;

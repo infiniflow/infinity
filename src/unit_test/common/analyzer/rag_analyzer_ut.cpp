@@ -28,7 +28,7 @@ import :darts_trie;
 import :darts;
 import :lemmatizer;
 
-import :base_test1;
+import :ut.base_test;
 
 using namespace infinity;
 

@@ -4,7 +4,7 @@ module;
 
 module infinity_core:ut.position_list_decoder;
 
-import :base_test1;
+import :ut.base_test;
 import :stl;
 import :file_reader;
 import :file_writer;

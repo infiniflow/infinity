@@ -18,7 +18,7 @@ module;
 
 module infinity_core:ut.search_driver;
 
-import :base_test1;
+import :ut.base_test;
 import :stl;
 import :search_driver;
 import :query_node;

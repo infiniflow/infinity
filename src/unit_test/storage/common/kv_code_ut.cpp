@@ -18,7 +18,7 @@ module;
 
 module infinity_core:ut.kv_code;
 
-import :base_test1;
+import :ut.base_test;
 import :kv_code;
 import :stl;
 

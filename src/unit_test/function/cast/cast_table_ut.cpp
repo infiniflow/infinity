@@ -34,7 +34,7 @@ import :data_block;
 import :cast_table;
 import :column_vector;
 
-import :base_test1;
+import :ut.base_test;
 
 using namespace infinity;
 class CastTableTest : public BaseTest {};

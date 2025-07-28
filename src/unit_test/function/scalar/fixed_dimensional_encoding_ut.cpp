@@ -18,7 +18,7 @@ module;
 
 module infinity_core:ut.fixed_dimensional_encoding;
 
-import :base_test1;
+import :ut.base_test;
 import :stl;
 import :fixed_dimensional_encoding;
 

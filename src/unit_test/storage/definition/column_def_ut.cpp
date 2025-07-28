@@ -18,7 +18,7 @@ module;
 
 module infinity_core:ut.column_def;
 
-import :base_test1;
+import :ut.base_test;
 
 import :infinity_exception;
 import :stl;

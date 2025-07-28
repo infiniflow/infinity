@@ -19,7 +19,7 @@ module;
 module infinity_core:ut.checkpoint1;
 
 import :ut.replay_test;
-import :base_test1;
+import :ut.base_test;
 import :stl;
 import :third_party;
 import :status;

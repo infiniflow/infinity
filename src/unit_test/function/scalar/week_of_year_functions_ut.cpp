@@ -19,7 +19,7 @@ module;
 module infinity_core:ut.week_of_year_functions;
 
 import :stl;
-import :base_test1;
+import :ut.base_test;
 import :infinity_exception;
 import :infinity_context;
 import :new_catalog;

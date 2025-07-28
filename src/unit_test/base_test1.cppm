@@ -22,7 +22,7 @@ module;
 #include <type_traits>
 #include <unistd.h>
 
-export module infinity_core:base_test1;
+export module infinity_core:ut.base_test;
 
 import :stl;
 import :infinity_context;

@@ -18,7 +18,7 @@ module;
 
 module infinity_core:ut.and_functions;
 
-import :base_test1;
+import :ut.base_test;
 
 import :infinity_exception;
 import global_resource_usage;

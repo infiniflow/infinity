@@ -24,7 +24,7 @@ import :stemmer;
 import :standard_analyzer;
 import :tokenizer;
 
-import :base_test1;
+import :ut.base_test;
 
 using namespace infinity;
 

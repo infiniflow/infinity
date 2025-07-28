@@ -25,7 +25,7 @@ module infinity_core:ut.chinese_analyzer;
 // import :chinese_analyzer;
 import :core;
 
-import :base_test1;
+import :ut.base_test;
 
 using namespace infinity;
 

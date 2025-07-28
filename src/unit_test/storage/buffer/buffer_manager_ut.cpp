@@ -19,7 +19,7 @@ module;
 
 module infinity_core:ut.buffer_manager;
 
-import :base_test1;
+import :ut.base_test;
 import :stl;
 import :buffer_manager;
 import :buffer_obj;

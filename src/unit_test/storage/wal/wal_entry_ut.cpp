@@ -18,7 +18,7 @@ module;
 
 module infinity_core:ut.wal_entry;
 
-import :base_test1;
+import :ut.base_test;
 import :infinity_context;
 import :infinity_exception;
 import :stl;

@@ -22,7 +22,7 @@ import :infinity_exception;
 import :stl;
 import :infinity_context;
 
-import :base_test1;
+import :ut.base_test;
 import global_resource_usage;
 
 using namespace infinity;

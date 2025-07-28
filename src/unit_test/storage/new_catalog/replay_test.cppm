@@ -18,7 +18,7 @@ module;
 
 export module infinity_core:ut.replay_test;
 
-import :base_test1;
+import :ut.base_test;
 import :new_txn_manager;
 
 using namespace infinity;

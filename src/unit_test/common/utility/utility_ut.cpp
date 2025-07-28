@@ -23,7 +23,7 @@ import :stl;
 import :utility;
 import :infinity_context;
 
-import :base_test1;
+import :ut.base_test;
 
 using namespace infinity;
 class UtilityTest : public BaseTest {};

@@ -18,7 +18,7 @@ module;
 
 module infinity_core:ut.test_optimize;
 
-import :base_test1;
+import :ut.base_test;
 import compilation_config;
 import :stl;
 import :logger;

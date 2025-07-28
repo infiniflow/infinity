@@ -18,7 +18,7 @@ module;
 
 module infinity_core:ut.registry;
 
-import :base_test1;
+import :ut.base_test;
 import :stl;
 import :fst.registry;
 

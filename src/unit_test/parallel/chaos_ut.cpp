@@ -19,7 +19,7 @@ module;
 
 module infinity_core:ut.chaos;
 
-import :base_test1;
+import :ut.base_test;
 import :new_txn_manager;
 import :new_txn;
 import :status;

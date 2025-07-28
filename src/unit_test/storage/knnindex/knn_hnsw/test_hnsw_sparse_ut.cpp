@@ -18,7 +18,7 @@ module;
 
 module infinity_core:ut.test_hnsw_sparse;
 
-import :base_test1;
+import :ut.base_test;
 import :stl;
 import :hnsw_alg;
 import :vec_store_type;

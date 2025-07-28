@@ -4,7 +4,7 @@ module;
 
 module infinity_core:ut.query_match;
 
-import :base_test1;
+import :ut.base_test;
 import :stl;
 import logical_type;
 import :third_party;

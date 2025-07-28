@@ -17,7 +17,7 @@ module;
 #include "gtest/gtest.h"
 
 module infinity_core:ut.knn_flat_l2_reservoir;
-import :base_test1;
+import :ut.base_test;
 import :infinity_exception;
 import :stl;
 import global_resource_usage;

@@ -18,7 +18,7 @@ module;
 
 module infinity_core:ut.recycle_log;
 
-import :base_test1;
+import :ut.base_test;
 import :stl;
 import global_resource_usage;
 import :storage;

@@ -38,7 +38,7 @@ import :interval_cast;
 import :bound_cast_func;
 import :time_cast;
 
-import :base_test1;
+import :ut.base_test;
 import global_resource_usage;
 import internal_types;
 import logical_type;

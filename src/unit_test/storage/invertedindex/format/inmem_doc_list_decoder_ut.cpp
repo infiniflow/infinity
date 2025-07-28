@@ -4,7 +4,7 @@ module;
 
 module infinity_core:ut.inmem_doc_list_decoder;
 
-import :base_test1;
+import :ut.base_test;
 
 import :stl;
 import :index_defines;

@@ -16,7 +16,7 @@ module;
 #include "gtest/gtest.h"
 module infinity_core:ut.ddl_request;
 
-import :base_test1;
+import :ut.base_test;
 import :stl;
 import :infinity_context;
 import :ut.request_test;

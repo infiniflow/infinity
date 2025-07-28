@@ -36,7 +36,7 @@ import :cast_table;
 import :column_vector;
 import :geography_cast;
 
-import :base_test1;
+import :ut.base_test;
 import global_resource_usage;
 import internal_types;
 import logical_type;

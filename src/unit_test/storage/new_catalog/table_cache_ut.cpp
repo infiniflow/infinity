@@ -18,7 +18,7 @@ module;
 
 module infinity_core:ut.table_cache;
 
-import :base_test1;
+import :ut.base_test;
 import :stl;
 import internal_types;
 import :catalog_cache;

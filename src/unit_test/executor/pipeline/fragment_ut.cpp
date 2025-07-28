@@ -23,7 +23,7 @@ import :third_party;
 import :logger;
 import :stl;
 import :infinity_context;
-import :base_test1;
+import :ut.base_test;
 import global_resource_usage;
 import :ut.sql_runner;
 

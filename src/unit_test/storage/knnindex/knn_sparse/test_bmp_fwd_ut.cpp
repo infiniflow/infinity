@@ -21,7 +21,7 @@ module infinity_core:ut.test_bmp_fwd;
 import :stl;
 import :sparse_util;
 import :bmp_util;
-import :base_test1;
+import :ut.base_test;
 import :sparse_test_util;
 import :bmp_fwd;
 import compilation_config;

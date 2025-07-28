@@ -4,7 +4,7 @@ module;
 
 module infinity_core:ut.skiplist_reader;
 
-import :base_test1;
+import :ut.base_test;
 import :stl;
 import :posting_byte_slice;
 import :in_doc_pos_state;

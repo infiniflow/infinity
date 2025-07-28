@@ -18,7 +18,7 @@ module;
 
 module infinity_core:ut.test_hnsw_bitmask;
 
-import :base_test1;
+import :ut.base_test;
 import :stl;
 import :roaring_bitmap;
 import :data_store;

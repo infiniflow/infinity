@@ -20,7 +20,7 @@ module infinity_core:ut.column_vector_mixed;
 
 #include "gtest/gtest.h"
 
-import :base_test1;
+import :ut.base_test;
 
 import :infinity_exception
 

@@ -19,7 +19,7 @@ module;
 
 module infinity_core:ut.varchar;
 
-import :base_test1;
+import :ut.base_test;
 
 using namespace infinity;
 class VarcharTest : public BaseTest {};

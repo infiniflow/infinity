@@ -21,7 +21,7 @@ module;
 module infinity_core:ut.test_lsg_build;
 
 import :stl;
-import :base_test1;
+import :ut.base_test;
 import :hnsw_lsg_builder;
 import :index_hnsw;
 import column_def;

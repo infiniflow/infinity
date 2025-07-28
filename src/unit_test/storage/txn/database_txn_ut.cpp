@@ -18,7 +18,7 @@ module;
 
 module infinity_core:ut.database_txn;
 
-import :base_test1;
+import :ut.base_test;
 import :infinity_context;
 import :infinity_exception;
 import :stl;

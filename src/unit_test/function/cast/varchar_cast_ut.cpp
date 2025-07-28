@@ -35,7 +35,7 @@ import :default_values;
 import :data_block;
 import :varchar_cast;
 
-import :base_test1;
+import :ut.base_test;
 import global_resource_usage;
 import internal_types;
 import logical_type;

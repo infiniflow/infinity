@@ -18,7 +18,7 @@ module;
 
 module infinity_core:ut.binary_fuse_filter_test;
 
-import :base_test1;
+import :ut.base_test;
 
 import :stl;
 import :binary_fuse_filter;

@@ -21,7 +21,7 @@ module;
 
 module infinity_core:ut.memory_indexer;
 
-import :base_test1;
+import :ut.base_test;
 import :stl;
 import :analyzer;
 import :analyzer_pool;

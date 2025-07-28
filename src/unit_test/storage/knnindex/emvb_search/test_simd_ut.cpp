@@ -21,7 +21,7 @@ module;
 
 module infinity_core:ut.emvb_search_test_simd;
 
-import :base_test1;
+import :ut.base_test;
 import :stl;
 import :emvb_simd_funcs;
 import :simd_common_tools;

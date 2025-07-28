@@ -18,7 +18,7 @@ module;
 
 module infinity_core:ut.column_vector_integer;
 
-import :base_test1;
+import :ut.base_test;
 import :infinity_exception;
 import internal_types;
 import logical_type;

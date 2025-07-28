@@ -4,7 +4,7 @@ module;
 
 module infinity_core:ut.posting_merger;
 
-import :base_test1;
+import :ut.base_test;
 import :posting_merger;
 import :stl;
 import :segment_term_posting;

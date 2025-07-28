@@ -21,7 +21,7 @@ module infinity_core:ut.exception;
 import :infinity_exception;
 import :status;
 
-import :base_test1;
+import :ut.base_test;
 
 using namespace infinity;
 class ExceptionTest : public BaseTest {};

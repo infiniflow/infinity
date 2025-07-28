@@ -5,7 +5,7 @@ module;
 
 module infinity_core:ut.term_meta;
 
-import :base_test1;
+import :ut.base_test;
 import :stl;
 import :posting_byte_slice;
 import :posting_byte_slice_reader;

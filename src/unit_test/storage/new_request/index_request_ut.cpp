@@ -18,7 +18,7 @@ module;
 
 module infinity_core:ut.index_request;
 
-import :base_test1;
+import :ut.base_test;
 import :stl;
 import :infinity_context;
 import :ut.request_test;

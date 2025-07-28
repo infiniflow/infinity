@@ -22,7 +22,7 @@ module;
 
 module infinity_core:ut.highlighter;
 
-import :base_test1;
+import :ut.base_test;
 import :stl;
 import :standard_analyzer;
 import :highlighter;

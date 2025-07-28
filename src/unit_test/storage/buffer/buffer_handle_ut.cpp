@@ -18,7 +18,7 @@ module;
 
 module infinity_core:ut.buffer_handle;
 
-import :base_test1;
+import :ut.base_test;
 import :stl;
 import :buffer_manager;
 import :data_file_worker;

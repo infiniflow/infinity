@@ -23,7 +23,7 @@ import :term;
 import :ngram_analyzer;
 import :standard_analyzer;
 
-import :base_test1;
+import :ut.base_test;
 
 using namespace infinity;
 

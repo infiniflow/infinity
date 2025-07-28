@@ -18,7 +18,7 @@ module;
 
 module infinity_core:ut.cleanup_task;
 
-import :base_test1;
+import :ut.base_test;
 import :stl;
 import :logger;
 import :infinity_context;

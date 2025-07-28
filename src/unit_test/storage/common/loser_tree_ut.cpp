@@ -4,7 +4,7 @@ module;
 
 module infinity_core:ut.loser_tree;
 
-import :base_test1;
+import :ut.base_test;
 import :stl;
 import :random;
 import :third_party;

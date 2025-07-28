@@ -20,7 +20,7 @@ module;
 
 module infinity_core:ut.test_hnsw;
 
-import :base_test1;
+import :ut.base_test;
 
 import :stl;
 import :hnsw_alg;

@@ -18,7 +18,7 @@ module;
 
 module infinity_core:ut.posting_writer;
 
-import :base_test1;
+import :ut.base_test;
 import :stl;
 import :index_defines;
 import :posting_list_format;

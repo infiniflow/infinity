@@ -19,7 +19,7 @@ module;
 
 module infinity_core:ut.test_lvq;
 
-import :base_test1;
+import :ut.base_test;
 import :dist_func_l2;
 import :data_store;
 import :vec_store_type;

@@ -18,7 +18,7 @@ module;
 
 module infinity_core:ut.test_croaring;
 
-import :base_test1;
+import :ut.base_test;
 
 class CRoaringTest : public infinity::BaseTest {};
 

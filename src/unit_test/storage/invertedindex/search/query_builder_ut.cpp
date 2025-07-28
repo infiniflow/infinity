@@ -18,7 +18,7 @@ module;
 
 module infinity_core:ut.query_builder;
 
-import :base_test1;
+import :ut.base_test;
 import :stl;
 import internal_types;
 import :index_defines;

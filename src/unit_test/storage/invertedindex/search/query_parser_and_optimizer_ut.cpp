@@ -18,7 +18,7 @@ module;
 
 module infinity_core:ut.query_parser_and_optimizer;
 
-import :base_test1;
+import :ut.base_test;
 import :stl;
 import :search_driver;
 import :query_node;

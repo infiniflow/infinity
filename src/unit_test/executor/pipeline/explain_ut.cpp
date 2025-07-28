@@ -21,7 +21,7 @@ module infinity_core:ut.explain;
 import :stl;
 import :physical_explain;
 
-import :base_test1;
+import :ut.base_test;
 
 using namespace infinity;
 class ExplainTest : public BaseTest {};

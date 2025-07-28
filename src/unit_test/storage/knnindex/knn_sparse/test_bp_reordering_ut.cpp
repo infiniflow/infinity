@@ -19,7 +19,7 @@ module;
 
 module infinity_core:ut.test_bp_reordering;
 
-import :base_test1;
+import :ut.base_test;
 import :stl;
 import :bp_reordering;
 import :third_party;

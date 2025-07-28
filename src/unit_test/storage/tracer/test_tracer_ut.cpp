@@ -29,7 +29,7 @@ import :logger;
 import :new_txn;
 import :infinity_context;
 
-import :base_test1;
+import :ut.base_test;
 import compilation_config;
 import :ut.crash_handler;
 

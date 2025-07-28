@@ -18,7 +18,7 @@ module;
 
 module infinity_core:ut.block_version;
 
-import :base_test1;
+import :ut.base_test;
 import :infinity;
 import :infinity_exception;
 import :status;

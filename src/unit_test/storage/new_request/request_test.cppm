@@ -18,7 +18,7 @@ module;
 
 export module infinity_core:ut.request_test;
 
-import :base_test1;
+import :ut.base_test;
 import :query_context;
 import :data_table;
 import :session_manager;

@@ -46,7 +46,7 @@ import :config;
 import :status;
 import :kv_store;
 
-import :base_test1;
+import :ut.base_test;
 import global_resource_usage;
 import logical_type;
 import internal_types;

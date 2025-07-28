@@ -18,7 +18,7 @@ module;
 
 module infinity_core:ut.test_emvb;
 
-import :base_test1;
+import :ut.base_test;
 import :infinity_exception;
 import :stl;
 import :emvb_search;

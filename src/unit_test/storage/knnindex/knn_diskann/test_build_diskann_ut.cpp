@@ -22,7 +22,7 @@ module infinity_core:ut.test_build_diskann;
 #include <gtest/gtest.h>
 
 import :stl;
-import :base_test1;
+import :ut.base_test;
 import :infinity_exception
 import knn_diskann;
 import internal_types;
