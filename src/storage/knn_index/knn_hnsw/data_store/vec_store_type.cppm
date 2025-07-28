@@ -29,13 +29,13 @@ import dist_func_lsg_wrapper;
 
 namespace infinity {
 
-export template <typename DataT, typename CompressT>
+export template <typename DataT, typename CompressT, bool LSG = false>
 class LVQCosVecStoreType;
 
-export template <typename DataT, typename CompressT>
+export template <typename DataT, typename CompressT, bool LSG = false>
 class LVQL2VecStoreType;
 
-export template <typename DataT, typename CompressT>
+export template <typename DataT, typename CompressT, bool LSG = false>
 class LVQIPVecStoreType;
 
 export template <typename DataT, bool LSG = false>
@@ -55,7 +55,7 @@ public:
     static constexpr bool HasOptimize = false;
 
     template <typename CompressType>
-    static constexpr LVQCosVecStoreType<DataType, CompressType> ToLVQ() {
+    static constexpr LVQCosVecStoreType<DataType, CompressType, LSG> ToLVQ() {
         return {};
     }
 };
@@ -77,7 +77,7 @@ public:
     static constexpr bool HasOptimize = false;
 
     template <typename CompressType>
-    static constexpr LVQL2VecStoreType<DataType, CompressType> ToLVQ() {
+    static constexpr LVQL2VecStoreType<DataType, CompressType, LSG> ToLVQ() {
         return {};
     }
 };
@@ -99,7 +99,7 @@ public:
     static constexpr bool HasOptimize = false;
 
     template <typename CompressType>
-    static constexpr LVQIPVecStoreType<DataType, CompressType> ToLVQ() {
+    static constexpr LVQIPVecStoreType<DataType, CompressType, LSG> ToLVQ() {
         return {};
     }
 };
@@ -126,71 +126,74 @@ public:
     }
 };
 
-export template <typename DataT, typename CompressT>
+export template <typename DataT, typename CompressT, bool LSG = false>
 class LVQCosVecStoreType {
 public:
     using DataType = DataT;
     using CompressType = CompressT;
+    using LVQCacheType = LVQCosCache<DataType, CompressType>;
     template <bool OwnMem>
-    using Meta = LVQVecStoreMeta<DataType, CompressType, LVQCosCache<DataType, CompressType>, OwnMem>;
+    using Meta = LVQVecStoreMeta<DataType, CompressType, LVQCacheType, OwnMem>;
     template <bool OwnMem>
-    using Inner = LVQVecStoreInner<DataType, CompressType, LVQCosCache<DataType, CompressType>, OwnMem>;
+    using Inner = LVQVecStoreInner<DataType, CompressType, LVQCacheType, OwnMem>;
     using QueryVecType = const DataType *;
-    using MetaType = LVQVecStoreMetaType<DataType, CompressType, LVQCosCache<DataType, CompressType>>;
+    using MetaType = LVQVecStoreMetaType<DataType, CompressType, LVQCacheType>;
     using StoreType = typename MetaType::StoreType;
     using QueryType = typename MetaType::QueryType;
-    using Distance = LVQCosDist<DataType, CompressType>;
+    using Distance = std::conditional_t<LSG, LVQCosLSGDist<DataType, CompressType, LVQCacheType>, LVQCosDist<DataType, CompressType>>;
 
     static constexpr bool HasOptimize = true;
 
     template <typename CompressType>
-    static constexpr LVQCosVecStoreType<DataType, CompressType> ToLVQ() {
+    static constexpr LVQCosVecStoreType<DataType, CompressType, LSG> ToLVQ() {
         return {};
     }
 };
 
-export template <typename DataT, typename CompressT>
+export template <typename DataT, typename CompressT, bool LSG = false>
 class LVQL2VecStoreType {
 public:
     using DataType = DataT;
     using CompressType = CompressT;
+    using LVQCacheType = LVQL2Cache<DataType, CompressType>;
     template <bool OwnMem>
-    using Meta = LVQVecStoreMeta<DataType, CompressType, LVQL2Cache<DataType, CompressType>, OwnMem>;
+    using Meta = LVQVecStoreMeta<DataType, CompressType, LVQCacheType, OwnMem>;
     template <bool OwnMem>
-    using Inner = LVQVecStoreInner<DataType, CompressType, LVQL2Cache<DataType, CompressType>, OwnMem>;
+    using Inner = LVQVecStoreInner<DataType, CompressType, LVQCacheType, OwnMem>;
     using QueryVecType = const DataType *;
-    using MetaType = LVQVecStoreMetaType<DataType, CompressType, LVQL2Cache<DataType, CompressType>>;
+    using MetaType = LVQVecStoreMetaType<DataType, CompressType, LVQCacheType>;
     using StoreType = typename MetaType::StoreType;
     using QueryType = typename MetaType::QueryType;
-    using Distance = LVQL2Dist<DataType, CompressType>;
+    using Distance = std::conditional_t<LSG, LVQL2LSGDist<DataType, CompressType, LVQCacheType>, LVQL2Dist<DataType, CompressType>>;
 
     static constexpr bool HasOptimize = true;
 
     template <typename CompressType>
-    static constexpr LVQL2VecStoreType<DataType, CompressType> ToLVQ() {
+    static constexpr LVQL2VecStoreType<DataType, CompressType, LSG> ToLVQ() {
         return {};
     }
 };
 
-export template <typename DataT, typename CompressT>
+export template <typename DataT, typename CompressT, bool LSG = false>
 class LVQIPVecStoreType {
 public:
     using DataType = DataT;
     using CompressType = CompressT;
+    using LVQCacheType = LVQIPCache<DataType, CompressType>;
     template <bool OwnMem>
-    using Meta = LVQVecStoreMeta<DataType, CompressType, LVQIPCache<DataType, CompressType>, OwnMem>;
+    using Meta = LVQVecStoreMeta<DataType, CompressType, LVQCacheType, OwnMem>;
     template <bool OwnMem>
-    using Inner = LVQVecStoreInner<DataType, CompressType, LVQIPCache<DataType, CompressType>, OwnMem>;
+    using Inner = LVQVecStoreInner<DataType, CompressType, LVQCacheType, OwnMem>;
     using QueryVecType = const DataType *;
-    using MetaType = LVQVecStoreMetaType<DataType, CompressType, LVQIPCache<DataType, CompressType>>;
+    using MetaType = LVQVecStoreMetaType<DataType, CompressType, LVQCacheType>;
     using StoreType = typename MetaType::StoreType;
     using QueryType = typename MetaType::QueryType;
-    using Distance = LVQIPDist<DataType, CompressType>;
+    using Distance = std::conditional_t<LSG, LVQIPLSGDist<DataType, CompressType, LVQCacheType>, LVQIPDist<DataType, CompressType>>;
 
     static constexpr bool HasOptimize = true;
 
     template <typename CompressType>
-    static constexpr LVQIPVecStoreType<DataType, CompressType> ToLVQ() {
+    static constexpr LVQIPVecStoreType<DataType, CompressType, LSG> ToLVQ() {
         return {};
     }
 };

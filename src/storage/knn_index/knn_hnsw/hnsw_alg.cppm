@@ -504,12 +504,17 @@ public:
             return MakeUnique<This>(std::move(*this));
         } else {
             using CompressedDistance = typename CompressVecStoreType::Distance;
-            CompressedDistance distance = std::move(this->distance_).ToLVQDistance(this->data_store_.dim());
-            auto compressed_datastore = std::move(this->data_store_).template CompressToLVQ<CompressVecStoreType>();
-            return MakeUnique<KnnHnsw<CompressVecStoreType, LabelType>>(this->M_,
-                                                                        this->ef_construction_,
-                                                                        std::move(compressed_datastore),
-                                                                        std::move(distance));
+            if constexpr (std::is_same_v<typename Distance::LVQDist, CompressedDistance>) {
+                CompressedDistance distance = std::move(this->distance_).ToLVQDistance(this->data_store_.dim());
+                auto compressed_datastore = std::move(this->data_store_).template CompressToLVQ<CompressVecStoreType>();
+                return MakeUnique<KnnHnsw<CompressVecStoreType, LabelType>>(this->M_,
+                                                                            this->ef_construction_,
+                                                                            std::move(compressed_datastore),
+                                                                            std::move(distance));
+            } else {
+                UnrecoverableError("KnnHnsw::CompressedDistance not equal with Distance::LVQDist");
+                return nullptr;
+            }
         }
     }
 };
