@@ -19,10 +19,11 @@ module;
 
 module infinity_core:ut.chinese_analyzer;
 
-import :stl;
-import :term;
-import :analyzer;
-import :chinese_analyzer;
+// import :stl;
+// import :term;
+// import :analyzer;
+// import :chinese_analyzer;
+import :core;
 
 import :base_test1;
 
