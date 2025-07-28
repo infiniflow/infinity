@@ -40,17 +40,6 @@ SegmentMeta::SegmentMeta(SegmentID segment_id, TableMeeta &table_meta)
     : BaseMeta(MetaType::kSegment), begin_ts_(table_meta.begin_ts()), commit_ts_(table_meta.commit_ts()), kv_instance_(*table_meta.kv_instance()),
       table_meta_(table_meta), segment_id_(segment_id) {}
 
-Status SegmentMeta::SetNextBlockID(BlockID next_block_id) {
-    next_block_id_ = next_block_id;
-    String next_block_id_key = GetSegmentTag(String(NEXT_BLOCK_ID));
-    String next_block_id_str = fmt::format("{}", next_block_id);
-    Status status = kv_instance_.Put(next_block_id_key, next_block_id_str);
-    if (!status.ok()) {
-        return status;
-    }
-    return Status::OK();
-}
-
 Status SegmentMeta::SetFirstDeleteTS(TxnTimeStamp first_delete_ts) {
     String first_delete_ts_key = GetSegmentTag("first_delete_ts");
     String first_delete_ts_str = fmt::format("{}", first_delete_ts);
@@ -63,12 +52,6 @@ Status SegmentMeta::SetFirstDeleteTS(TxnTimeStamp first_delete_ts) {
 }
 
 Status SegmentMeta::InitSet() {
-    {
-        Status status = SetNextBlockID(0);
-        if (!status.ok()) {
-            return status;
-        }
-    }
     {
         Status status = SetFirstDeleteTS(UNCOMMIT_TS);
         if (!status.ok()) {
@@ -107,13 +90,6 @@ Status SegmentMeta::UninitSet(UsageFlag usage_flag, TxnTimeStamp begin_ts) {
             }
         }
         block_ids1_.reset();
-    }
-    {
-        String next_block_id_key = GetSegmentTag(String(NEXT_BLOCK_ID));
-        Status status = kv_instance_.Delete(next_block_id_key);
-        if (!status.ok()) {
-            return status;
-        }
     }
     {
         String first_delete_ts_key = GetSegmentTag("first_delete_ts");

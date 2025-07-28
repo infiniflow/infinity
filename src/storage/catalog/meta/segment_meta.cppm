@@ -68,8 +68,6 @@ public:
 
     SizeT segment_capacity() const { return DEFAULT_SEGMENT_CAPACITY; }
 
-    Status SetNextBlockID(BlockID next_block_id);
-
     Status SetFirstDeleteTS(TxnTimeStamp first_delete_ts);
 
     Status InitSet();
