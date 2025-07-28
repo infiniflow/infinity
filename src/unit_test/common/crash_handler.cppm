@@ -14,7 +14,7 @@
 
 module;
 
-export module crash_handler;
+export module infinity_core:ut.crash_handler;
 
 export namespace infinity {
 

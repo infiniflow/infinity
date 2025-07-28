@@ -547,28 +547,58 @@ file(GLOB_RECURSE
 )
 
 file(GLOB_RECURSE
+        ut_common_cpp1
+        CONFIGURE_DEPENDS
+        unit_test/common/*_ut.cpp
+)
+file(GLOB_RECURSE
+        ut_common_cpp2
+        CONFIGURE_DEPENDS
+        unit_test/common/*_impl.cpp
+)
+file(GLOB_RECURSE
         ut_common_cpp
         CONFIGURE_DEPENDS
         unit_test/common/*.cpp
 )
+list(FILTER ut_common_cpp EXCLUDE REGEX .*_ut.cpp)
+list(FILTER ut_common_cpp EXCLUDE REGEX .*_impl.cpp)
 
+file(GLOB_RECURSE
+        ut_parser_cpp1
+        CONFIGURE_DEPENDS
+        unit_test/parser/*_ut.cpp
+)
 file(GLOB_RECURSE
         ut_parser_cpp
         CONFIGURE_DEPENDS
         unit_test/parser/*.cpp
 )
+list(FILTER ut_parser_cpp EXCLUDE REGEX .*_ut.cpp)
 
+file(GLOB_RECURSE
+        ut_storage_cpp1
+        CONFIGURE_DEPENDS
+        unit_test/storage/*_ut.cpp
+)
 file(GLOB_RECURSE
         ut_storage_cpp
         CONFIGURE_DEPENDS
         unit_test/storage/*.cpp
 )
+list(FILTER ut_storage_cpp EXCLUDE REGEX .*_ut.cpp)
 
+file(GLOB_RECURSE
+        ut_executor_cpp1
+        CONFIGURE_DEPENDS
+        unit_test/executor/*_ut.cpp
+)
 file(GLOB_RECURSE
         ut_executor_cpp
         CONFIGURE_DEPENDS
         unit_test/executor/*.cpp
 )
+list(FILTER ut_executor_cpp EXCLUDE REGEX .*_ut.cpp)
 
 file(GLOB_RECURSE
         ut_test_helper_cpp
@@ -577,34 +607,64 @@ file(GLOB_RECURSE
 )
 
 file(GLOB_RECURSE
+        ut_main_cpp1
+        CONFIGURE_DEPENDS
+        unit_test/main/*_ut.cpp
+)
+file(GLOB_RECURSE
         ut_main_cpp
         CONFIGURE_DEPENDS
         unit_test/main/*.cpp
 )
+list(FILTER ut_main_cpp EXCLUDE REGEX .*_ut.cpp)
 
+file(GLOB_RECURSE
+        ut_planner_cpp1
+        CONFIGURE_DEPENDS
+        unit_test/planner/*_ut.cpp
+)
 file(GLOB_RECURSE
         ut_planner_cpp
         CONFIGURE_DEPENDS
         unit_test/planner/*.cpp
 )
+list(FILTER ut_planner_cpp EXCLUDE REGEX .*_ut.cpp)
 
+file(GLOB_RECURSE
+        ut_function_cpp1
+        CONFIGURE_DEPENDS
+        unit_test/function/*_ut.cpp
+)
 file(GLOB_RECURSE
         ut_function_cpp
         CONFIGURE_DEPENDS
         unit_test/function/*.cpp
 )
+list(FILTER ut_function_cpp EXCLUDE REGEX .*_ut.cpp)
 
+file(GLOB_RECURSE
+        ut_parallel_cpp1
+        CONFIGURE_DEPENDS
+        unit_test/parallel/*_ut.cpp
+)
 file(GLOB_RECURSE
         ut_parallel_cpp
         CONFIGURE_DEPENDS
         unit_test/parallel/*.cpp
 )
+list(FILTER ut_parallel_cpp EXCLUDE REGEX .*_ut.cpp)
 
+file(GLOB_RECURSE
+        ut_thirdparty_cpp1
+        CONFIGURE_DEPENDS
+        unit_test/third_party/*_ut.cpp
+)
 file(GLOB_RECURSE
         ut_thirdparty_cpp
         CONFIGURE_DEPENDS
         unit_test/third_party/*.cpp
 )
+list(FILTER ut_thirdparty_cpp EXCLUDE REGEX .*_ut.cpp)
 
 file(GLOB_RECURSE
         ut_dependent_cppm
@@ -684,6 +744,16 @@ target_sources(unit_test
         PRIVATE
         FILE_SET core_cxx_modules TYPE CXX_MODULES FILES
         ${ut_dependent_cppm}
+
+        ${ut_common_cpp1}
+        ${ut_common_cpp2}
+        ${ut_parser_cpp1}
+        ${ut_storage_cpp1}
+        ${ut_executor_cpp1}
+        ${ut_planner_cpp1}
+        ${ut_function_cpp1}
+        ${ut_parralel_cpp1}
+        ${ut_thirdparty_cpp1}
 )
 
 target_include_directories(unit_test PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
