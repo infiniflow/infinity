@@ -1,15 +1,16 @@
+#include "gtest/gtest.h"
 #include <cassert>
 #include <charconv>
 #include <cstdio>
 #include <iostream>
 #include <limits>
 #include <string>
-
-#include "unit_test/gtest_expand.h"
-#include "gtest/gtest.h"
-
 import base_test;
-import infinity_core;
+
+import infinity_exception;
+
+import third_party;
+import stl;
 import data_type;
 
 using namespace infinity;
@@ -224,7 +225,7 @@ TEST_F(FloatSerializeTest, test_json_hex_float) {
     const char *hex_float_json_invalid = R"(
 { "f1": 0x1.fffffcp+9, "f2": 0x1.fffffep+9 }
 )";
-    EXPECT_THROW_WITHOUT_STACKTRACE((void)nlohmann::json::parse(hex_float_json_invalid), nlohmann::json::parse_error);
+    EXPECT_THROW((void)nlohmann::json::parse(hex_float_json_invalid), nlohmann::json::parse_error);
     const char *hex_float_json_valid_1 = R"(
 { "f1": 1023.9999, "f2": 1023.99994 }
 )";

@@ -12,11 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+module;
+
 #include "gtest/gtest.h"
 
-import base_test;
-import infinity_core;
+module infinity_core:ut.query_profiler;
+
+import :base_test1;
+import :stl;
+import :profiler;
+import :infinity_context;
 import global_resource_usage;
+import :infinity_exception;
 
 using namespace infinity;
 class QueryProfilerTest : public BaseTest {

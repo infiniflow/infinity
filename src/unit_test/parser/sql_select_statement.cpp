@@ -13,11 +13,16 @@
 // limitations under the License.
 
 #include "gtest/gtest.h"
-
 import base_test;
-import infinity_core;
+
+import infinity_exception;
+
 import global_resource_usage;
+import third_party;
 import sql_parser;
+import logger;
+import stl;
+import infinity_context;
 import logical_type;
 import internal_types;
 import base_statement;

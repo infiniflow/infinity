@@ -12,10 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+module;
+
 #include "gtest/gtest.h"
 
-import base_test;
-import infinity_core;
+module infinity_core:ut.global_resource_usage;
+
+import :base_test1;
+import :stl;
 import global_resource_usage;
 
 using namespace infinity;

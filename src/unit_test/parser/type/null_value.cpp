@@ -13,10 +13,17 @@
 // limitations under the License.
 
 #include "gtest/gtest.h"
-
 import base_test;
-import infinity_core;
+
+import infinity_exception;
+
 import global_resource_usage;
+import third_party;
+
+import logger;
+import null_value;
+import stl;
+import infinity_context;
 import internal_types;
 
 using namespace infinity;

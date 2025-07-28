@@ -12,10 +12,21 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+module;
+
 #include "gtest/gtest.h"
 
-import base_test;
-import infinity_core;
+module infinity_core:ut.table;
+
+import :base_test1;
+import :stl;
+import :infinity;
+import :query_result;
+import :data_block;
+import :value;
+import :query_options;
+import :status;
+import :third_party;
 import logical_type;
 import internal_types;
 import embedding_info;

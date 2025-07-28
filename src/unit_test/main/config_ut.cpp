@@ -12,11 +12,21 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+module;
+
 #include <gtest/gtest.h>
 
-import base_test;
-import infinity_core;
+module infinity_core:ut.config;
+
+import :base_test1;
+import :stl;
+import :config;
+import :infinity_exception;
+import :third_party;
+import :status;
 import compilation_config;
+import :virtual_store;
+import :default_values;
 
 using namespace infinity;
 class ConfigTest : public BaseTest {};
