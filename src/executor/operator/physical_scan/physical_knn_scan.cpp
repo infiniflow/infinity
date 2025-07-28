@@ -75,6 +75,7 @@ import index_base;
 import new_catalog;
 import mem_index;
 import chunk_index_meta;
+import kv_store;
 
 namespace infinity {
 
@@ -539,6 +540,7 @@ void PhysicalKnnScan::ExecuteInternalByColumnDataTypeAndQueryDataType(QueryConte
     NewTxn *new_txn = query_context->GetNewTxn();
     TxnTimeStamp begin_ts = new_txn->BeginTS();
     TxnTimeStamp commit_ts = new_txn->CommitTS();
+    KVInstance *kv_instance = new_txn->kv_instance();
 
     BlockIndex *block_index = knn_scan_shared_data->table_ref_->block_index_.get();
     SizeT knn_column_id = GetColumnID();
@@ -555,7 +557,7 @@ void PhysicalKnnScan::ExecuteInternalByColumnDataTypeAndQueryDataType(QueryConte
             ColumnMeta column_meta(knn_column_id, *block_meta);
             BlockID block_id = block_meta->block_id();
             SegmentID segment_id = block_meta->segment_meta().segment_id();
-            auto [row_count, status] = block_meta->GetRowCnt1();
+            auto [row_count, status] = block_meta->GetRowCnt1(kv_instance, begin_ts, commit_ts);
             if (!status.ok()) {
                 UnrecoverableError(status.message());
             }
@@ -781,7 +783,7 @@ void PhysicalKnnScan::ExecuteInternalByColumnDataTypeAndQueryDataType(QueryConte
                                         if (block_id != prev_block_id) {
                                             prev_block_id = block_id;
                                             BlockMeta *block_meta = block_index->GetBlockMeta(segment_id, block_id);
-                                            auto [block_row_cnt, status] = block_meta->GetRowCnt1();
+                                            auto [block_row_cnt, status] = block_meta->GetRowCnt1(kv_instance, begin_ts, commit_ts);
                                             ColumnMeta column_meta(knn_column_id, *block_meta);
                                             status =
                                                 NewCatalog::GetColumnVector(column_meta, block_row_cnt, ColumnVectorMode::kReadOnly, column_vector);

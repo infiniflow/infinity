@@ -35,8 +35,6 @@ export class BlockMeta : public BaseMeta {
 public:
     BlockMeta(BlockID block_id, SegmentMeta &segment_meta);
 
-    KVInstance &kv_instance() const { return kv_instance_; }
-
     SegmentMeta &segment_meta() const { return segment_meta_; }
 
     BlockID block_id() const { return block_id_; }
@@ -55,36 +53,32 @@ public:
 
     Status RestoreSet();
 
-    Status UninitSet(UsageFlag usage_flag);
+    Status UninitSet(KVInstance *kv_instance, UsageFlag usage_flag);
 
     // Tuple<SizeT, Status> GetRowCnt();
 
-    Tuple<SizeT, Status> GetRowCnt1();
+    Tuple<SizeT, Status> GetRowCnt1(KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts);
 
     Tuple<BufferObj *, Status> GetVersionBuffer();
 
     Vector<String> FilePaths();
 
-    Tuple<SharedPtr<BlockInfo>, Status> GetBlockInfo();
+    Tuple<SharedPtr<BlockInfo>, Status> GetBlockInfo(KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts);
 
     Tuple<SharedPtr<BlockColumnInfo>, Status> GetBlockColumnInfo(ColumnID column_id);
 
-    // Pair<ColumnID, Status> AddBlockColumnID1(TxnTimeStamp commit_ts);
-    //
-    Tuple<Vector<ColumnID> *, Status> GetBlockColumnIDs1();
-
     String GetBlockTag(const String &tag) const;
 
-    Status GetFastRoughFilter(SharedPtr<FastRoughFilter> &fast_rough_filter);
+    Status GetFastRoughFilter(KVInstance *kv_instance, SharedPtr<FastRoughFilter> &fast_rough_filter);
 
-    Status SetFastRoughFilter(SharedPtr<FastRoughFilter> fast_rough_filter);
+    Status SetFastRoughFilter(KVInstance *kv_instance, SharedPtr<FastRoughFilter> fast_rough_filter);
 
 private:
     mutable std::mutex mtx_;
 
-    TxnTimeStamp begin_ts_ = 0;
-    TxnTimeStamp commit_ts_;
-    KVInstance &kv_instance_;
+    //    TxnTimeStamp begin_ts_ = 0;
+    //    TxnTimeStamp commit_ts_;
+    //    KVInstance &kv_instance_;
     SegmentMeta &segment_meta_;
     BlockID block_id_;
     Optional<Vector<ColumnID>> column_ids1_;

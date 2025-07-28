@@ -68,6 +68,7 @@ import cached_match;
 import filter_iterator;
 import score_threshold_iterator;
 import new_txn;
+import kv_store;
 
 namespace infinity {
 
@@ -309,9 +310,15 @@ bool PhysicalMatch::ExecuteInner(QueryContext *query_context, OperatorState *ope
             ++output_block_row_id;
         }
         output_block_ptr->Finalize();
+        TxnTimeStamp begin_ts = query_context->GetNewTxn()->BeginTS();
+        TxnTimeStamp commit_ts = query_context->GetNewTxn()->CommitTS();
+        KVInstance *kv_instance = query_context->GetNewTxn()->kv_instance();
         output_to_data_block_helper.OutputToDataBlock(query_context->storage()->buffer_manager(),
                                                       base_table_ref_->block_index_.get(),
-                                                      output_data_blocks);
+                                                      output_data_blocks,
+                                                      kv_instance,
+                                                      begin_ts,
+                                                      commit_ts);
     }
     operator_state->SetComplete();
     ResultCacheManager *cache_mgr = query_context->storage()->result_cache_manager();

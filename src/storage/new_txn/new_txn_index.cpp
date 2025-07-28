@@ -447,6 +447,10 @@ Status NewTxn::OptimizeIndexInner(SegmentIndexMeta &segment_index_meta,
         }
     }
 
+    KVInstance *kv_instance = kv_instance_.get();
+    TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
+    TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
+
     switch (index_base->index_type_) {
         case IndexType::kSecondary: {
             Vector<Pair<u32, BufferObj *>> old_buffers;
@@ -487,7 +491,7 @@ Status NewTxn::OptimizeIndexInner(SegmentIndexMeta &segment_index_meta,
 
             BufferHandle buffer_handle = buffer_obj->Load();
             auto *data_ptr = static_cast<IVFIndexInChunk *>(buffer_handle.GetDataMut());
-            data_ptr->BuildIVFIndex(segment_meta, row_cnt, column_def);
+            data_ptr->BuildIVFIndex(segment_meta, row_cnt, column_def, kv_instance, begin_ts, commit_ts);
             break;
         }
         case IndexType::kHnsw:
@@ -1351,9 +1355,12 @@ Status NewTxn::PopulateIvfIndexInner(SharedPtr<IndexBase> index_base,
         }
     }
     {
+        KVInstance *kv_instance = kv_instance_.get();
+        TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
+        TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
         BufferHandle buffer_handle = buffer_obj->Load();
         auto *data_ptr = static_cast<IVFIndexInChunk *>(buffer_handle.GetDataMut());
-        data_ptr->BuildIVFIndex(segment_meta, row_count, column_def);
+        data_ptr->BuildIVFIndex(segment_meta, row_count, column_def, kv_instance, begin_ts, commit_ts);
     }
     buffer_obj->Save();
     return Status::OK();
@@ -1515,7 +1522,7 @@ Status NewTxn::OptimizeVecIndex(SharedPtr<IndexBase> index_base,
             BlockMeta block_meta(block_id, segment_meta);
             SizeT block_row_cnt = 0;
             // std::tie(block_row_cnt, status) = block_meta.GetRowCnt();
-            std::tie(block_row_cnt, status) = block_meta.GetRowCnt1();
+            std::tie(block_row_cnt, status) = block_meta.GetRowCnt1(kv_instance_.get(), txn_context_ptr_->begin_ts_, txn_context_ptr_->commit_ts_);
             if (!status.ok()) {
                 return status;
             }
@@ -1539,7 +1546,7 @@ Status NewTxn::OptimizeVecIndex(SharedPtr<IndexBase> index_base,
             BlockMeta block_meta(block_id, segment_meta);
             SizeT block_row_cnt = 0;
             // std::tie(block_row_cnt, status) = block_meta.GetRowCnt();
-            std::tie(block_row_cnt, status) = block_meta.GetRowCnt1();
+            std::tie(block_row_cnt, status) = block_meta.GetRowCnt1(kv_instance_.get(), txn_context_ptr_->begin_ts_, txn_context_ptr_->commit_ts_);
             if (!status.ok()) {
                 return status;
             }
@@ -1936,7 +1943,7 @@ Status NewTxn::CountMemIndexGapInSegment(SegmentIndexMeta &segment_index_meta, S
             BlockMeta block_meta(block_id, segment_meta);
             SizeT block_row_cnt = 0;
             // std::tie(block_row_cnt, status) = block_meta.GetRowCnt();
-            std::tie(block_row_cnt, status) = block_meta.GetRowCnt1();
+            std::tie(block_row_cnt, status) = block_meta.GetRowCnt1(kv_instance_.get(), txn_context_ptr_->begin_ts_, txn_context_ptr_->commit_ts_);
             if (!status.ok() || block_row_cnt == block_offset) {
                 return status;
             }

@@ -160,7 +160,7 @@ TEST_P(TestTxnCheckpointInternalTest, test_checkpoint0) {
 
             SizeT row_count = 0;
             // std::tie(row_count, status) = block_meta.GetRowCnt();
-            std::tie(row_count, status) = block_meta.GetRowCnt1();
+            std::tie(row_count, status) = block_meta.GetRowCnt1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(row_count, block_row_cnt);
 

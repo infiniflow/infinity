@@ -49,6 +49,7 @@ import table_meeta;
 import segment_meta;
 import block_meta;
 import new_txn;
+import kv_store;
 
 namespace infinity {
 
@@ -145,7 +146,16 @@ void PhysicalScanBase::SetOutput(const Vector<char *> &raw_result_dists_list,
         }
     }
     output_block_ptr->Finalize();
-    output_to_data_block_helper.OutputToDataBlock(query_context->storage()->buffer_manager(), block_index, operator_state->data_block_array_);
+
+    KVInstance *kv_instance = query_context->GetNewTxn()->kv_instance();
+    TxnTimeStamp begin_ts = query_context->GetNewTxn()->BeginTS();
+    TxnTimeStamp commit_ts = query_context->GetNewTxn()->CommitTS();
+    output_to_data_block_helper.OutputToDataBlock(query_context->storage()->buffer_manager(),
+                                                  block_index,
+                                                  operator_state->data_block_array_,
+                                                  kv_instance,
+                                                  begin_ts,
+                                                  commit_ts);
     ResultCacheManager *cache_mgr = query_context->storage()->result_cache_manager();
     if (cache_result_ && cache_mgr != nullptr) {
         AddCache(query_context, cache_mgr, operator_state->data_block_array_);

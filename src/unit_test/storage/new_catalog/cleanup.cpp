@@ -47,6 +47,7 @@ import chunk_index_meta;
 import buffer_obj;
 import secondary_index_in_mem;
 import embedding_info;
+import kv_store;
 
 using namespace infinity;
 
@@ -766,7 +767,7 @@ TEST_P(TestTxnCleanup, cleanup_and_append) {
             BlockID block_id = block_ids_ptr->back();
             BlockMeta block_meta(block_id, segment_meta);
             SizeT block_row_cnt = 0;
-            std::tie(block_row_cnt, status) = block_meta.GetRowCnt1();
+            std::tie(block_row_cnt, status) = block_meta.GetRowCnt1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
             EXPECT_EQ(block_row_cnt, 1);
 
             status = new_txn_mgr_->CommitTxn(txn);
@@ -899,7 +900,7 @@ TEST_P(TestTxnCleanup, cleanup_and_delete) {
             BlockID block_id = (*block_ids_ptr)[0];
             BlockMeta block_meta(block_id, segment_meta);
             SizeT block_row_cnt;
-            std::tie(block_row_cnt, status) = block_meta.GetRowCnt1();
+            std::tie(block_row_cnt, status) = block_meta.GetRowCnt1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
             EXPECT_EQ(block_row_cnt, 8191);
 
             status = new_txn_mgr_->CommitTxn(txn);
@@ -1036,7 +1037,7 @@ TEST_P(TestTxnCleanup, cleanup_and_update) {
             BlockID block_id = (*block_ids_ptr)[0];
             BlockMeta block_meta(block_id, segment_meta);
             SizeT block_row_cnt = 0;
-            std::tie(block_row_cnt, status) = block_meta.GetRowCnt1();
+            std::tie(block_row_cnt, status) = block_meta.GetRowCnt1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
             EXPECT_EQ(block_row_cnt, 8192);
 
             status = new_txn_mgr_->CommitTxn(txn);

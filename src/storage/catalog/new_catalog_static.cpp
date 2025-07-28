@@ -944,7 +944,7 @@ Status NewCatalog::CleanBlock(KVInstance *kv_instance, BlockMeta &block_meta, Us
             return status;
         }
     }
-    block_meta.UninitSet(usage_flag);
+    block_meta.UninitSet(kv_instance, usage_flag);
 
     return Status::OK();
 }
@@ -957,28 +957,6 @@ Status NewCatalog::AddNewBlockColumn(BlockMeta &block_meta, SizeT column_idx, Op
             return status;
         }
     }
-    return Status::OK();
-}
-
-Status NewCatalog::AddNewBlockColumnForTransform(BlockMeta &block_meta, SizeT column_idx, Optional<ColumnMeta> &column_meta, TxnTimeStamp commit_ts) {
-    auto &kv_instance = block_meta.kv_instance();
-    column_meta.emplace(column_idx, block_meta);
-    auto &segment_meta = block_meta.segment_meta();
-    auto &table_meta = segment_meta.table_meta();
-    String block_id_key = KeyEncode::CatalogTableSegmentBlockColumnKey(table_meta.db_id_str(),
-                                                                       table_meta.table_id_str(),
-                                                                       segment_meta.segment_id(),
-                                                                       block_meta.block_id(),
-                                                                       column_idx,
-                                                                       commit_ts);
-    String commit_ts_str = fmt::format("{}", commit_ts);
-    Status status = kv_instance.Put(block_id_key, commit_ts_str);
-    // {
-    //     Status status = column_meta->InitSet();
-    //     if (!status.ok()) {
-    //         return status;
-    //     }
-    // }
     return Status::OK();
 }
 

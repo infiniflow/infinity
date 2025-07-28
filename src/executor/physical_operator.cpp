@@ -40,6 +40,8 @@ import block_meta;
 import column_meta;
 import new_catalog;
 import status;
+import new_txn;
+import kv_store;
 
 namespace infinity {
 
@@ -94,9 +96,16 @@ void PhysicalOperator::InputLoad(QueryContext *query_context, OperatorState *ope
             }
         }
     }
+    KVInstance *kv_instance = query_context->GetNewTxn()->kv_instance();
+    TxnTimeStamp begin_ts = query_context->GetNewTxn()->BeginTS();
+    TxnTimeStamp commit_ts = query_context->GetNewTxn()->CommitTS();
+
     output_to_data_block_helper.OutputToDataBlock(query_context->storage()->buffer_manager(),
                                                   table_ref->block_index_.get(),
-                                                  operator_state->prev_op_state_->data_block_array_);
+                                                  operator_state->prev_op_state_->data_block_array_,
+                                                  kv_instance,
+                                                  begin_ts,
+                                                  commit_ts);
 }
 
 SharedPtr<Vector<String>> PhysicalCommonFunctionUsingLoadMeta::GetOutputNames(const PhysicalOperator &op) {
@@ -123,9 +132,12 @@ SharedPtr<Vector<SharedPtr<DataType>>> PhysicalCommonFunctionUsingLoadMeta::GetO
 
 void OutputToDataBlockHelper::OutputToDataBlock(BufferManager *buffer_mgr,
                                                 const BlockIndex *block_index,
-                                                const Vector<UniquePtr<DataBlock>> &output_data_blocks) {
+                                                const Vector<UniquePtr<DataBlock>> &output_data_blocks,
+                                                KVInstance *kv_instance,
+                                                TxnTimeStamp begin_ts,
+                                                TxnTimeStamp commit_ts) {
     std::sort(output_job_infos.begin(), output_job_infos.end());
-    
+
     Status status;
 
     auto cache_segment_id = std::numeric_limits<SegmentID>::max();
@@ -140,7 +152,7 @@ void OutputToDataBlockHelper::OutputToDataBlock(BufferManager *buffer_mgr,
             cache_segment_id = segment_id;
             cache_block_id = block_id;
             cached_block_meta = block_index->GetBlockMeta(segment_id, block_id);
-            std::tie(cached_block_row_cnt, status) = cached_block_meta->GetRowCnt1();
+            std::tie(cached_block_row_cnt, status) = cached_block_meta->GetRowCnt1(kv_instance, begin_ts, commit_ts);
             if (!status.ok()) {
                 RecoverableError(status);
             }

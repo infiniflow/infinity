@@ -39,6 +39,7 @@ import column_meta;
 import table_meeta;
 import status;
 import default_values;
+import kv_store;
 
 template <>
 class std::numeric_limits<infinity::InnerMinMaxDataFilterVarcharType> {
@@ -177,10 +178,10 @@ void BuildingSegmentFastFilters::SetSegmentFinishBuildMinMaxFilterTask() {
     ApplyToAllFastRoughFilterInSegment([](FastRoughFilter *filter) { filter->FinishBuildMinMaxFilterTask(); });
 }
 
-void BuildingSegmentFastFilters::SetFilter() {
+void BuildingSegmentFastFilters::SetFilter(KVInstance *kv_instance) {
     for (auto &[block_id, block_filter] : block_filters_) {
         BlockMeta block_meta(block_id, *segment_meta_);
-        Status status = block_meta.SetFastRoughFilter(block_filter);
+        Status status = block_meta.SetFastRoughFilter(kv_instance, block_filter);
         if (!status.ok()) {
             UnrecoverableError(status.message());
         }
@@ -206,6 +207,7 @@ void BuildFastRoughFilterTask::BuildOnlyBloomFilter(NewBuildFastRoughFilterArg &
     LOG_TRACE(fmt::format("BuildFastRoughFilterTask: BuildOnlyBloomFilter job begin for column: {}", arg.column_id_));
     TxnTimeStamp begin_ts = arg.segment_meta_->begin_ts();
     TxnTimeStamp commit_ts = arg.segment_meta_->commit_ts();
+    KVInstance *kv_instance = arg.kv_instance_;
     auto [block_ids_ptr, status] = arg.segment_meta_->GetBlockIDs1();
     if (!status.ok()) {
         UnrecoverableError(status.message());
@@ -219,7 +221,7 @@ void BuildFastRoughFilterTask::BuildOnlyBloomFilter(NewBuildFastRoughFilterArg &
     for (BlockID block_id : *block_ids_ptr) {
         BlockMeta block_meta(block_id, *arg.segment_meta_);
         // check row count
-        auto [block_row_cnt, status] = block_meta.GetRowCnt1();
+        auto [block_row_cnt, status] = block_meta.GetRowCnt1(kv_instance, begin_ts, commit_ts);
         if (!status.ok()) {
             UnrecoverableError(status.message());
         }
@@ -306,6 +308,7 @@ void BuildFastRoughFilterTask::BuildOnlyMinMaxFilter(NewBuildFastRoughFilterArg 
     LOG_TRACE(fmt::format("BuildFastRoughFilterTask: BuildOnlyMinMaxFilter job begin for column: {}", arg.column_id_));
     TxnTimeStamp begin_ts = arg.segment_meta_->begin_ts();
     TxnTimeStamp commit_ts = arg.segment_meta_->commit_ts();
+    KVInstance *kv_instance = arg.kv_instance_;
     using MinMaxHelper = InnerMinMaxDataFilterInfo<ValueType>;
     using MinMaxInnerValueType = MinMaxHelper::InnerValueType;
     // step 0. prepare min and max value
@@ -318,7 +321,7 @@ void BuildFastRoughFilterTask::BuildOnlyMinMaxFilter(NewBuildFastRoughFilterArg 
     for (BlockID block_id : *block_ids_ptr) {
         BlockMeta block_meta(block_id, *arg.segment_meta_);
         // check row count
-        auto [block_row_cnt, status] = block_meta.GetRowCnt1();
+        auto [block_row_cnt, status] = block_meta.GetRowCnt1(kv_instance, begin_ts, commit_ts);
         if (!status.ok()) {
             UnrecoverableError(status.message());
         }
@@ -372,6 +375,7 @@ void BuildFastRoughFilterTask::BuildMinMaxAndBloomFilter(NewBuildFastRoughFilter
     LOG_TRACE(fmt::format("BuildFastRoughFilterTask: BuildMinMaxAndBloomFilter job begin for column: {}", arg.column_id_));
     TxnTimeStamp begin_ts = arg.segment_meta_->begin_ts();
     TxnTimeStamp commit_ts = arg.segment_meta_->commit_ts();
+    KVInstance *kv_instance = arg.kv_instance_;
     using MinMaxHelper = InnerMinMaxDataFilterInfo<ValueType>;
     using MinMaxInnerValueType = MinMaxHelper::InnerValueType;
     // step 0. prepare min and max value
@@ -390,7 +394,7 @@ void BuildFastRoughFilterTask::BuildMinMaxAndBloomFilter(NewBuildFastRoughFilter
     for (BlockID block_id : *block_ids_ptr) {
         BlockMeta block_meta(block_id, *arg.segment_meta_);
         // check row count
-        auto [block_row_cnt, status] = block_meta.GetRowCnt1();
+        auto [block_row_cnt, status] = block_meta.GetRowCnt1(kv_instance, begin_ts, commit_ts);
         if (!status.ok()) {
             UnrecoverableError(status.message());
         }
@@ -457,7 +461,10 @@ void BuildFastRoughFilterTask::BuildMinMaxAndBloomFilter(NewBuildFastRoughFilter
 }
 
 // deprecate except this
-void BuildFastRoughFilterTask::ExecuteOnNewSealedSegment(SegmentMeta *segment_meta) {
+void BuildFastRoughFilterTask::ExecuteOnNewSealedSegment(SegmentMeta *segment_meta,
+                                                         KVInstance *kv_instance,
+                                                         TxnTimeStamp begin_ts,
+                                                         TxnTimeStamp commit_ts) {
     LOG_TRACE(fmt::format("BuildFastRoughFilterTask: build fast rough filter for segment {}, job begin.", segment_meta->segment_id()));
 
     auto segment_filters = BuildingSegmentFastFilters::Make(segment_meta);
@@ -479,7 +486,7 @@ void BuildFastRoughFilterTask::ExecuteOnNewSealedSegment(SegmentMeta *segment_me
     segment_filters->SetSegmentFinishBuildMinMaxFilterTask();
     LOG_TRACE(fmt::format("BuildFastRoughFilterTask: build fast rough filter for segment {}, job end.", segment_meta->segment_id()));
 
-    segment_filters->SetFilter();
+    segment_filters->SetFilter(kv_instance);
 }
 
 void BuildFastRoughFilterTask::ExecuteInner(SegmentMeta *segment_meta, BuildingSegmentFastFilters *segment_filters) {

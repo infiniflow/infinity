@@ -44,6 +44,7 @@ import block_meta;
 import new_catalog;
 import column_meta;
 import status;
+import kv_store;
 
 namespace infinity {
 
@@ -117,6 +118,7 @@ void PhysicalTableScan::ExecuteInternal(QueryContext *query_context, TableScanOp
 
     TxnTimeStamp begin_ts = query_context->GetNewTxn()->BeginTS();
     TxnTimeStamp commit_ts = query_context->GetNewTxn()->CommitTS();
+    KVInstance *kv_instance = query_context->GetNewTxn()->kv_instance();
 
 #ifdef INFINITY_DEBUG
     // This part has performance issue
@@ -148,7 +150,7 @@ void PhysicalTableScan::ExecuteInternal(QueryContext *query_context, TableScanOp
 
             // new block, check FastRoughFilter
             SharedPtr<FastRoughFilter> block_filter;
-            status = current_block_meta->GetFastRoughFilter(block_filter);
+            status = current_block_meta->GetFastRoughFilter(kv_instance, block_filter);
             if (status.ok()) {
                 if (fast_rough_filter_evaluator_ and !fast_rough_filter_evaluator_->Evaluate(begin_ts, *block_filter)) {
                     // skip this block

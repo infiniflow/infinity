@@ -1383,7 +1383,7 @@ Tuple<SharedPtr<BlockInfo>, Status> NewTxn::GetBlockInfo(const String &db_name, 
     }
     SegmentMeta segment_meta(segment_id, table_meta.value());
     BlockMeta block_meta(block_id, segment_meta);
-    return block_meta.GetBlockInfo();
+    return block_meta.GetBlockInfo(kv_instance_.get(), txn_context_ptr_->begin_ts_, txn_context_ptr_->commit_ts_);
 }
 
 Tuple<Vector<SharedPtr<BlockInfo>>, Status> NewTxn::GetBlocksInfo(const String &db_name, const String &table_name, SegmentID segment_id) {
@@ -1404,7 +1404,7 @@ Tuple<Vector<SharedPtr<BlockInfo>>, Status> NewTxn::GetBlocksInfo(const String &
     for (BlockID block_id : *block_ids_ptr) {
         BlockMeta block_meta(block_id, segment_meta);
         auto block_info = MakeShared<BlockInfo>();
-        std::tie(block_info, status) = block_meta.GetBlockInfo();
+        std::tie(block_info, status) = block_meta.GetBlockInfo(kv_instance_.get(), txn_context_ptr_->begin_ts_, txn_context_ptr_->commit_ts_);
         if (!status.ok()) {
             return {block_info_list, status};
         }

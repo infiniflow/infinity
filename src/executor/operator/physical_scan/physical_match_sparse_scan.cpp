@@ -74,6 +74,7 @@ import new_catalog;
 import index_base;
 import column_meta;
 import mem_index;
+import kv_store;
 
 namespace infinity {
 
@@ -400,6 +401,7 @@ void PhysicalMatchSparseScan::ExecuteInnerT(DistFunc *dist_func,
     NewTxn *new_txn = query_context->GetNewTxn();
     TxnTimeStamp begin_ts = new_txn->BeginTS();
     TxnTimeStamp commit_ts = new_txn->CommitTS();
+    KVInstance *kv_instance = new_txn->kv_instance();
     if (!common_query_filter_->TryFinishBuild()) {
         // not ready, abort and wait for next time
         return;
@@ -448,7 +450,7 @@ void PhysicalMatchSparseScan::ExecuteInnerT(DistFunc *dist_func,
         BlockMeta *block_meta = block_index->GetBlockMeta(segment_id, block_id);
         LOG_DEBUG(fmt::format("MatchSparseScan: segment_id: {}, block_id: {}", segment_id, block_id));
 
-        std::tie(row_cnt, status) = block_meta->GetRowCnt1();
+        std::tie(row_cnt, status) = block_meta->GetRowCnt1(kv_instance, begin_ts, commit_ts);
         if (!status.ok()) {
             UnrecoverableError(status.message());
         }

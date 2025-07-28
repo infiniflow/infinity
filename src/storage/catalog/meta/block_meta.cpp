@@ -41,9 +41,7 @@ import meta_type;
 
 namespace infinity {
 
-BlockMeta::BlockMeta(BlockID block_id, SegmentMeta &segment_meta)
-    : BaseMeta(MetaType::kBlock), begin_ts_(segment_meta.begin_ts()), commit_ts_(segment_meta.commit_ts()), kv_instance_(segment_meta.kv_instance()),
-      segment_meta_(segment_meta), block_id_(block_id) {}
+BlockMeta::BlockMeta(BlockID block_id, SegmentMeta &segment_meta) : BaseMeta(MetaType::kBlock), segment_meta_(segment_meta), block_id_(block_id) {}
 
 Status BlockMeta::GetBlockLock(SharedPtr<BlockLock> &block_lock) {
     NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
@@ -134,7 +132,7 @@ Status BlockMeta::RestoreSet() {
     return Status::OK();
 }
 
-Status BlockMeta::UninitSet(UsageFlag usage_flag) {
+Status BlockMeta::UninitSet(KVInstance *kv_instance, UsageFlag usage_flag) {
     if (usage_flag == UsageFlag::kOther) {
         NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
         {
@@ -149,7 +147,7 @@ Status BlockMeta::UninitSet(UsageFlag usage_flag) {
     {
         String filter_key = GetBlockTag("fast_rough_filter");
         LOG_TRACE(fmt::format("UninitSet: fast rough filter key: {}", filter_key));
-        Status status = kv_instance_.Delete(filter_key);
+        Status status = kv_instance->Delete(filter_key);
         if (!status.ok()) {
             if (status.code() != ErrorCode::kNotFound) {
                 return status;
@@ -206,24 +204,12 @@ SharedPtr<String> BlockMeta::GetBlockDir() {
     return block_dir_;
 }
 
-Tuple<Vector<ColumnID> *, Status> BlockMeta::GetBlockColumnIDs1() {
-    if (!column_ids1_) {
-        column_ids1_ = infinity::GetTableSegmentBlockColumns(&kv_instance_,
-                                                             segment_meta_.table_meta().db_id_str(),
-                                                             segment_meta_.table_meta().table_id_str(),
-                                                             segment_meta_.segment_id(),
-                                                             block_id_,
-                                                             begin_ts_);
-    }
-    return {&*column_ids1_, Status::OK()};
-}
-
 String BlockMeta::GetBlockTag(const String &tag) const {
     TableMeeta &table_meta = segment_meta_.table_meta();
     return KeyEncode::CatalogTableSegmentBlockTagKey(table_meta.db_id_str(), table_meta.table_id_str(), segment_meta_.segment_id(), block_id_, tag);
 }
 
-Tuple<SizeT, Status> BlockMeta::GetRowCnt1() {
+Tuple<SizeT, Status> BlockMeta::GetRowCnt1(KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts) {
     std::lock_guard<std::mutex> lock(mtx_);
     if (row_cnt_) {
         return {*row_cnt_, Status::OK()};
@@ -231,13 +217,13 @@ Tuple<SizeT, Status> BlockMeta::GetRowCnt1() {
 
 #if 1
     TableMeeta &table_meta = segment_meta_.table_meta();
-    row_cnt_ = infinity::GetBlockRowCount(&kv_instance_,
+    row_cnt_ = infinity::GetBlockRowCount(kv_instance,
                                           table_meta.db_id_str(),
                                           table_meta.table_id_str(),
                                           segment_meta_.segment_id(),
                                           block_id_,
-                                          begin_ts_,
-                                          commit_ts_);
+                                          begin_ts,
+                                          commit_ts);
     return {*row_cnt_, Status::OK()};
 #else
     Status status;
@@ -259,16 +245,16 @@ Tuple<SizeT, Status> BlockMeta::GetRowCnt1() {
     SizeT row_cnt = 0;
     {
         std::shared_lock lock(block_lock->mtx_);
-        row_cnt = block_version->GetRowCount(begin_ts_);
+        row_cnt = block_version->GetRowCount(begin_ts);
     }
     row_cnt_ = row_cnt;
     return {row_cnt, Status::OK()};
 #endif
 }
 
-Tuple<SharedPtr<BlockInfo>, Status> BlockMeta::GetBlockInfo() {
+Tuple<SharedPtr<BlockInfo>, Status> BlockMeta::GetBlockInfo(KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts) {
     SharedPtr<BlockInfo> block_info = MakeShared<BlockInfo>();
-    auto [row_count, status] = this->GetRowCnt1();
+    auto [row_count, status] = this->GetRowCnt1(kv_instance, begin_ts, commit_ts);
     if (!status.ok()) {
         return {nullptr, status};
     }
@@ -323,7 +309,7 @@ Tuple<SharedPtr<BlockColumnInfo>, Status> BlockMeta::GetBlockColumnInfo(ColumnID
     return {block_column_info, Status::OK()};
 }
 
-Status BlockMeta::GetFastRoughFilter(SharedPtr<FastRoughFilter> &fast_rough_filter) {
+Status BlockMeta::GetFastRoughFilter(KVInstance *kv_instance, SharedPtr<FastRoughFilter> &fast_rough_filter) {
     std::lock_guard<std::mutex> lock(mtx_);
     fast_rough_filter.reset();
     if (fast_rough_filter_) {
@@ -333,7 +319,7 @@ Status BlockMeta::GetFastRoughFilter(SharedPtr<FastRoughFilter> &fast_rough_filt
 
     String filter_key = GetBlockTag("fast_rough_filter");
     String filter_str;
-    Status status = kv_instance_.Get(filter_key, filter_str);
+    Status status = kv_instance->Get(filter_key, filter_str);
     if (!status.ok()) {
         return status;
     }
@@ -344,11 +330,11 @@ Status BlockMeta::GetFastRoughFilter(SharedPtr<FastRoughFilter> &fast_rough_filt
     return Status::OK();
 }
 
-Status BlockMeta::SetFastRoughFilter(SharedPtr<FastRoughFilter> fast_rough_filter) {
+Status BlockMeta::SetFastRoughFilter(KVInstance *kv_instance, SharedPtr<FastRoughFilter> fast_rough_filter) {
     std::lock_guard<std::mutex> lock(mtx_);
     String filter_key = GetBlockTag("fast_rough_filter");
     String filter_str = fast_rough_filter->SerializeToString();
-    Status status = kv_instance_.Put(filter_key, filter_str);
+    Status status = kv_instance->Put(filter_key, filter_str);
     if (!status.ok()) {
         return status;
     }

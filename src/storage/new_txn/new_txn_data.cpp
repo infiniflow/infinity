@@ -1245,7 +1245,11 @@ NewTxn::AddColumnsDataInSegment(SegmentMeta &segment_meta, const Vector<SharedPt
 
 Status NewTxn::AddColumnsDataInBlock(BlockMeta &block_meta, const Vector<SharedPtr<ColumnDef>> &column_defs, const Vector<Value> &default_values) {
     // auto [block_row_count, status] = block_meta.GetRowCnt();
-    auto [block_row_count, status] = block_meta.GetRowCnt1();
+    TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
+    TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
+    KVInstance *kv_instance = kv_instance_.get();
+
+    auto [block_row_count, status] = block_meta.GetRowCnt1(kv_instance, begin_ts, commit_ts);
     if (!status.ok()) {
         return status;
     }
@@ -1367,6 +1371,10 @@ Status NewTxn::CheckpointTable(TableMeeta &table_meta, const CheckpointOption &o
         return status;
     }
 
+    KVInstance *kv_instance = kv_instance_.get();
+    TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
+    TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
+
     Vector<BlockID> *block_ids_ptr = nullptr;
     for (SegmentID segment_id : *segment_ids_ptr) {
         SegmentMeta segment_meta(segment_id, table_meta);
@@ -1408,7 +1416,7 @@ Status NewTxn::CheckpointTable(TableMeeta &table_meta, const CheckpointOption &o
                     return status;
                 }
                 bool to_mmap = false;
-                status = TryToMmap(block_meta, option.checkpoint_ts_, &to_mmap);
+                status = TryToMmap(block_meta, option.checkpoint_ts_, kv_instance, begin_ts, commit_ts, &to_mmap);
                 if (!status.ok()) {
                     return status;
                 }
@@ -1451,6 +1459,9 @@ Status NewTxn::CheckpointTable(TableMeeta &table_meta, const CheckpointOption &o
 Status NewTxn::PrepareCommitImport(WalCmdImportV2 *import_cmd) {
     Status status;
     TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
+    TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
+    KVInstance *kv_instance = kv_instance_.get();
+
     const String &db_id_str = import_cmd->db_id_;
     const String &table_id_str = import_cmd->table_id_;
 
@@ -1475,7 +1486,7 @@ Status NewTxn::PrepareCommitImport(WalCmdImportV2 *import_cmd) {
         return status;
     }
 
-    BuildFastRoughFilterTask::ExecuteOnNewSealedSegment(&segment_meta);
+    BuildFastRoughFilterTask::ExecuteOnNewSealedSegment(&segment_meta, kv_instance, begin_ts, commit_ts);
 
     PersistenceManager *pm = InfinityContext::instance().persistence_manager();
     if (pm != nullptr) {
@@ -1494,7 +1505,10 @@ Status NewTxn::CommitBottomAppend(WalCmdAppendV2 *append_cmd) {
     const String &table_name = append_cmd->table_name_;
     const String &db_id_str = append_cmd->db_id_;
     const String &table_id_str = append_cmd->table_id_;
-    TxnTimeStamp commit_ts = CommitTS();
+    TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
+    TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
+    KVInstance *kv_instance = kv_instance_.get();
+
     TableMeeta table_meta(db_id_str, table_id_str, this);
     Optional<SegmentMeta> segment_meta;
     Optional<BlockMeta> block_meta;
@@ -1574,7 +1588,7 @@ Status NewTxn::CommitBottomAppend(WalCmdAppendV2 *append_cmd) {
             block_meta.emplace(block_id, segment_meta.value());
         }
         SizeT block_row_cnt;
-        std::tie(block_row_cnt, status) = block_meta->GetRowCnt1();
+        std::tie(block_row_cnt, status) = block_meta->GetRowCnt1(kv_instance, begin_ts, commit_ts);
         if (!status.ok()) {
             return status;
         }
@@ -1594,7 +1608,7 @@ Status NewTxn::CommitBottomAppend(WalCmdAppendV2 *append_cmd) {
         // If reach the end of segment, set it to sealed and build fast rough filter
         if (range.first.segment_offset_ + range.second == DEFAULT_SEGMENT_CAPACITY) {
             table_meta.DelUnsealedSegmentID();
-            BuildFastRoughFilterTask::ExecuteOnNewSealedSegment(&segment_meta.value());
+            BuildFastRoughFilterTask::ExecuteOnNewSealedSegment(&segment_meta.value(), kv_instance, begin_ts, commit_ts);
 
             for (SizeT i = 0; i < table_index_metas.size(); ++i) {
                 const String &index_name = (*index_name_strs)[i];
@@ -1698,6 +1712,8 @@ Status NewTxn::PrepareCommitCompact(WalCmdCompactV2 *compact_cmd) {
     const String &db_id_str = compact_cmd->db_id_;
     const String &table_id_str = compact_cmd->table_id_;
     TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
+    TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
+    KVInstance *kv_instance = kv_instance_.get();
 
     Vector<WalSegmentInfo> &segment_infos = compact_cmd->new_segment_infos_;
     if (segment_infos.empty()) {
@@ -1729,7 +1745,7 @@ Status NewTxn::PrepareCommitCompact(WalCmdCompactV2 *compact_cmd) {
         return status;
     }
 
-    BuildFastRoughFilterTask::ExecuteOnNewSealedSegment(&segment_meta);
+    BuildFastRoughFilterTask::ExecuteOnNewSealedSegment(&segment_meta, kv_instance, begin_ts, commit_ts);
 
     const Vector<SegmentID> &deprecated_ids = compact_cmd->deprecated_segment_ids_;
 
@@ -1912,11 +1928,16 @@ Status NewTxn::FlushColumnFiles(BlockMeta &block_meta, TxnTimeStamp save_ts) {
     return Status::OK();
 }
 
-Status NewTxn::TryToMmap(BlockMeta &block_meta, TxnTimeStamp save_ts, bool *to_mmap_ptr) {
+Status NewTxn::TryToMmap(BlockMeta &block_meta,
+                         TxnTimeStamp save_ts,
+                         KVInstance *kv_instance,
+                         TxnTimeStamp begin_ts,
+                         TxnTimeStamp commit_ts,
+                         bool *to_mmap_ptr) {
     Status status;
 
     SizeT row_cnt;
-    std::tie(row_cnt, status) = block_meta.GetRowCnt1();
+    std::tie(row_cnt, status) = block_meta.GetRowCnt1(kv_instance, begin_ts, commit_ts);
     if (!status.ok()) {
         return status;
     }

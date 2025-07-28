@@ -59,6 +59,7 @@ import column_meta;
 import table_meeta;
 import db_meeta;
 import new_catalog;
+import kv_store;
 
 using namespace infinity;
 
@@ -450,14 +451,14 @@ TEST_P(WalReplayTest, wal_replay_append) {
             status = txn->GetTableMeta("default_db", "tbl4", db_meta, table_meta);
             EXPECT_TRUE(status.ok());
 
-            auto check_block = [&](BlockMeta &block_meta) {
+            auto check_block = [&](BlockMeta &block_meta, NewTxn *txn) {
                 Value v1 = Value::MakeTinyInt(5);
                 Value v2 = Value::MakeBigInt(1000);
                 Value v3 = Value::MakeDouble(0.1);
 
                 SizeT block_row_count = 0;
                 // std::tie(row_count, status) = block_meta.GetRowCnt();
-                std::tie(block_row_count, status) = block_meta.GetRowCnt1();
+                std::tie(block_row_count, status) = block_meta.GetRowCnt1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
                 EXPECT_TRUE(status.ok());
                 EXPECT_EQ(block_row_count, row_count);
 
@@ -477,7 +478,7 @@ TEST_P(WalReplayTest, wal_replay_append) {
                 check_column(2, v3);
             };
 
-            auto check_segment = [&](SegmentMeta &segment_meta) {
+            auto check_segment = [&](SegmentMeta &segment_meta, NewTxn *txn) {
                 Vector<BlockID> *block_ids_ptr = nullptr;
                 std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1();
                 EXPECT_TRUE(status.ok());
@@ -485,7 +486,7 @@ TEST_P(WalReplayTest, wal_replay_append) {
 
                 for (BlockID block_id : *block_ids_ptr) {
                     BlockMeta block_meta(block_id, segment_meta);
-                    check_block(block_meta);
+                    check_block(block_meta, txn);
                 }
             };
 
@@ -497,7 +498,7 @@ TEST_P(WalReplayTest, wal_replay_append) {
                 EXPECT_EQ(*segment_ids_ptr, Vector<SegmentID>({0}));
                 SegmentID segment_id = (*segment_ids_ptr)[0];
                 SegmentMeta segment_meta(segment_id, *table_meta);
-                check_segment(segment_meta);
+                check_segment(segment_meta, txn);
             }
         };
 
@@ -661,7 +662,7 @@ TEST_P(WalReplayTest, wal_replay_import) {
 
                     SizeT block_row_count = 0;
                     // std::tie(row_count, status) = block_meta.GetRowCnt();
-                    std::tie(block_row_count, status) = block_meta.GetRowCnt1();
+                    std::tie(block_row_count, status) = block_meta.GetRowCnt1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
                     EXPECT_TRUE(status.ok());
                     EXPECT_EQ(block_row_count, row_count);
 

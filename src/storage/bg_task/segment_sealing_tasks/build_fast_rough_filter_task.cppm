@@ -26,6 +26,7 @@ namespace infinity {
 
 class SegmentMeta;
 class FastRoughFilter;
+class KVInstance;
 
 export struct BuildingSegmentFastFilters {
     SegmentMeta *segment_meta_ = nullptr;
@@ -44,7 +45,7 @@ export struct BuildingSegmentFastFilters {
 
     void SetSegmentFinishBuildMinMaxFilterTask();
 
-    void SetFilter();
+    void SetFilter(KVInstance *kv_instance);
 };
 
 struct TotalRowCount {
@@ -57,6 +58,9 @@ struct TotalRowCount {
 
 struct NewBuildFastRoughFilterArg {
     SegmentMeta *segment_meta_{};
+    KVInstance *kv_instance_{};
+    TxnTimeStamp *begin_ts_{};
+    TxnTimeStamp *commit_ts_{};
     ColumnID column_id_{};
     UniquePtr<u64[]> &distinct_keys_;
     UniquePtr<u64[]> &distinct_keys_backup_;
@@ -74,7 +78,7 @@ struct NewBuildFastRoughFilterArg {
 
 export class BuildFastRoughFilterTask {
 public:
-    static void ExecuteOnNewSealedSegment(SegmentMeta *segment_meta);
+    static void ExecuteOnNewSealedSegment(SegmentMeta *segment_meta, KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts);
 
 private:
     static void ExecuteInner(SegmentMeta *sement_meta, BuildingSegmentFastFilters *segment_filters);
@@ -87,7 +91,6 @@ private:
 
     template <CanBuildMinMaxFilterAndBloomFilter ValueType>
     static void BuildMinMaxAndBloomFilter(NewBuildFastRoughFilterArg &arg);
-
 
     template <typename ValueType>
     static void BuildFilter(NewBuildFastRoughFilterArg &arg, bool build_min_max_filter, bool build_bloom_filter);

@@ -90,8 +90,7 @@ protected:
 
 INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
                          TestTxnCheckpointAddColumnTest,
-                         ::testing::Values(
-                                           TestTxnCheckpointAddColumnTest::NEW_VFS_OFF_BG_OFF_PATH));
+                         ::testing::Values(TestTxnCheckpointAddColumnTest::NEW_VFS_OFF_BG_OFF_PATH));
 
 TEST_P(TestTxnCheckpointAddColumnTest, addcol_checkpoint_insert) {
     SharedPtr<String> db_name = std::make_shared<String>("default_db");
@@ -177,7 +176,7 @@ TEST_P(TestTxnCheckpointAddColumnTest, addcol_checkpoint_insert) {
 
             for (BlockID block_id : *block_ids) {
                 BlockMeta block_meta(block_id, segment_meta);
-                auto [block_info, info_status] = block_meta.GetBlockInfo();
+                auto [block_info, info_status] = block_meta.GetBlockInfo(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
                 EXPECT_TRUE(info_status.ok());
                 row_count += block_info->row_count_;
             }

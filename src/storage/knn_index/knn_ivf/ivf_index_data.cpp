@@ -48,25 +48,25 @@ class NewIVFDataAccessor : public IVFDataAccessorBase {
 public:
     NewIVFDataAccessor(SegmentMeta &segment_meta, ColumnID column_id) : segment_meta_(segment_meta), column_id_(column_id) {}
 
-    const_ptr_t GetEmbedding(SizeT offset) override {
-        SizeT block_offset = UpdateColumnVector(offset);
+    const_ptr_t GetEmbedding(SizeT offset, KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts) override {
+        SizeT block_offset = UpdateColumnVector(offset, kv_instance, begin_ts, commit_ts);
         return cur_column_vector_.data() + block_offset * cur_column_vector_.data_type_size_;
     }
 
-    Pair<Span<const char>, SizeT> GetMultiVector(SizeT offset) override {
-        SizeT block_offset = UpdateColumnVector(offset);
+    Pair<Span<const char>, SizeT> GetMultiVector(SizeT offset, KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts) override {
+        SizeT block_offset = UpdateColumnVector(offset, kv_instance, begin_ts, commit_ts);
         return cur_column_vector_.GetMultiVectorRaw(block_offset);
     }
 
 private:
-    SizeT UpdateColumnVector(SizeT offset) {
+    SizeT UpdateColumnVector(SizeT offset, KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts) {
         SizeT block_offset = offset % DEFAULT_BLOCK_CAPACITY;
         BlockID block_id = offset / DEFAULT_BLOCK_CAPACITY;
         if (block_id != last_block_id_) {
             last_block_id_ = block_id;
             BlockMeta block_meta(block_id, segment_meta_);
             // auto [row_cnt, status] = block_meta.GetRowCnt();
-            auto [row_cnt, status] = block_meta.GetRowCnt1();
+            auto [row_cnt, status] = block_meta.GetRowCnt1(kv_instance, begin_ts, commit_ts);
             if (!status.ok()) {
                 UnrecoverableError("Get row count failed");
             }
@@ -88,17 +88,28 @@ private:
     ColumnVector cur_column_vector_;
 };
 
-void IVFIndexInChunk::BuildIVFIndex(SegmentMeta &segment_meta, u32 row_count, SharedPtr<ColumnDef> column_def) {
+void IVFIndexInChunk::BuildIVFIndex(SegmentMeta &segment_meta,
+                                    u32 row_count,
+                                    SharedPtr<ColumnDef> column_def,
+                                    KVInstance *kv_instance,
+                                    TxnTimeStamp begin_ts,
+                                    TxnTimeStamp commit_ts) {
     RowID base_rowid(segment_meta.segment_id(), 0);
     NewIVFDataAccessor data_accessor(segment_meta, column_def->id());
-    BuildIVFIndex(base_rowid, row_count, &data_accessor, column_def);
+    BuildIVFIndex(base_rowid, row_count, &data_accessor, column_def, kv_instance, begin_ts, commit_ts);
 }
 
-void IVFIndexInChunk::BuildIVFIndex(RowID base_rowid, u32 row_count, IVFDataAccessorBase *data_accessor, const SharedPtr<ColumnDef> &column_def) {
+void IVFIndexInChunk::BuildIVFIndex(RowID base_rowid,
+                                    u32 row_count,
+                                    IVFDataAccessorBase *data_accessor,
+                                    const SharedPtr<ColumnDef> &column_def,
+                                    KVInstance *kv_instance,
+                                    TxnTimeStamp begin_ts,
+                                    TxnTimeStamp commit_ts) {
     auto Call = [&]<LogicalType column_t> {
         static_assert(column_t == LogicalType::kEmbedding || column_t == LogicalType::kMultiVector);
         auto CallT = [&]<EmbeddingDataType embedding_t> {
-            return BuildIVFIndexT<column_t, embedding_t>(base_rowid, row_count, data_accessor, column_def);
+            return BuildIVFIndexT<column_t, embedding_t>(base_rowid, row_count, data_accessor, column_def, kv_instance, begin_ts, commit_ts);
         };
         switch (static_cast<const EmbeddingInfo *>(column_def->type()->type_info().get())->Type()) {
             case EmbeddingDataType::kElemUInt8: {
@@ -141,7 +152,10 @@ template <LogicalType column_t, EmbeddingDataType embedding_t>
 void IVFIndexInChunk::BuildIVFIndexT(const RowID base_rowid,
                                      const u32 row_count,
                                      IVFDataAccessorBase *data_accessor,
-                                     const SharedPtr<ColumnDef> &column_def) {
+                                     const SharedPtr<ColumnDef> &column_def,
+                                     KVInstance *kv_instance,
+                                     TxnTimeStamp begin_ts,
+                                     TxnTimeStamp commit_ts) {
     if (row_count <= 0) [[unlikely]] {
         UnrecoverableError("Empty input row count");
     }
@@ -155,7 +169,7 @@ void IVFIndexInChunk::BuildIVFIndexT(const RowID base_rowid,
         static_assert(column_t == LogicalType::kMultiVector);
         // read the segment to get total embedding count
         for (u32 i = 0; i < row_count; ++i) {
-            auto [raw_data, embedding_num] = data_accessor->GetMultiVector(i);
+            auto [raw_data, embedding_num] = data_accessor->GetMultiVector(i, kv_instance, begin_ts, commit_ts);
             embedding_count += embedding_num;
             for (u32 j = 0; j < embedding_num; ++j) {
                 all_embedding_pos.emplace_back(i, j);
@@ -187,7 +201,8 @@ void IVFIndexInChunk::BuildIVFIndexT(const RowID base_rowid,
         assert(sample_result.size() == training_embedding_num);
         for (u64 i = 0; i < training_embedding_num; ++i) {
             const auto sample_offset = sample_result[i];
-            const auto *raw_data = reinterpret_cast<const EmbeddingElementT *>(data_accessor->GetEmbedding(sample_offset));
+            const auto *raw_data =
+                reinterpret_cast<const EmbeddingElementT *>(data_accessor->GetEmbedding(sample_offset, kv_instance, begin_ts, commit_ts));
             if constexpr (std::is_same_v<EmbeddingElementT, f32>) {
                 std::copy_n(raw_data, embedding_dimension(), training_data.get() + i * embedding_dimension());
             } else {
@@ -215,7 +230,7 @@ void IVFIndexInChunk::BuildIVFIndexT(const RowID base_rowid,
         assert(sample_result.size() == training_embedding_num);
         for (u64 i = 0; i < training_embedding_num; ++i) {
             const auto [sample_row, sample_id] = sample_result[i];
-            auto [raw_data, _] = data_accessor->GetMultiVector(sample_row);
+            auto [raw_data, _] = data_accessor->GetMultiVector(sample_row, kv_instance, begin_ts, commit_ts);
             if constexpr (std::is_same_v<EmbeddingElementT, f32>) {
                 std::copy_n(reinterpret_cast<const f32 *>(raw_data.data()) + sample_id * embedding_dimension(),
                             embedding_dimension(),
@@ -247,13 +262,14 @@ void IVFIndexInChunk::BuildIVFIndexT(const RowID base_rowid,
             const auto block_row_to_read = std::min<u32>(segment_row_to_read, DEFAULT_BLOCK_CAPACITY - block_offset);
             if constexpr (column_t == LogicalType::kEmbedding) {
                 for (u32 i = 0; i < block_row_to_read; ++i) {
-                    const auto *raw_data = reinterpret_cast<const EmbeddingElementT *>(data_accessor->GetEmbedding(current_segment_offset + i));
+                    const auto *raw_data = reinterpret_cast<const EmbeddingElementT *>(
+                        data_accessor->GetEmbedding(current_segment_offset + i, kv_instance, begin_ts, commit_ts));
                     AddEmbedding(current_segment_offset + i, raw_data);
                 }
                 // AddEmbeddingBatch(current_segment_offset, column_vector.data(), block_row_to_read);
             } else if constexpr (column_t == LogicalType::kMultiVector) {
                 for (u32 i = 0; i < block_row_to_read; ++i) {
-                    auto [raw_data, embedding_num] = data_accessor->GetMultiVector(current_segment_offset + i);
+                    auto [raw_data, embedding_num] = data_accessor->GetMultiVector(current_segment_offset + i, kv_instance, begin_ts, commit_ts);
                     AddMultiVector(current_segment_offset + i, raw_data.data(), embedding_num);
                 }
             } else {

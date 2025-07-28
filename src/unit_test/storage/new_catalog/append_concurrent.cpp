@@ -44,6 +44,7 @@ import default_values;
 import index_secondary;
 import create_index_info;
 import index_base;
+import kv_store;
 
 using namespace infinity;
 
@@ -192,7 +193,7 @@ TEST_P(TestTxnAppendConcurrent, test_append0) {
         BlockID block_id = (*block_ids_ptr)[0];
         BlockMeta block_meta(block_id, segment_meta);
         SizeT block_row_cnt = 0;
-        std::tie(block_row_cnt, status) = block_meta.GetRowCnt1();
+        std::tie(block_row_cnt, status) = block_meta.GetRowCnt1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
         EXPECT_EQ(block_row_cnt, 8);
 
         status = new_txn_mgr->CommitTxn(txn);

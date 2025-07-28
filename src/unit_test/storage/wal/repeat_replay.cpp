@@ -50,6 +50,7 @@ import column_meta;
 import table_meeta;
 import db_meeta;
 import new_catalog;
+import kv_store;
 
 using namespace infinity;
 
@@ -139,7 +140,7 @@ TEST_P(RepeatReplayTest, append) {
 
             SizeT row_count = 0;
             // std::tie(row_count, status) = block_meta.GetRowCnt();
-            std::tie(row_count, status) = block_meta.GetRowCnt1();
+            std::tie(row_count, status) = block_meta.GetRowCnt1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(row_count, row_cnt);
 

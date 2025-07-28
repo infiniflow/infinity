@@ -52,6 +52,7 @@ import segment_meta;
 import block_meta;
 import column_meta;
 import new_catalog;
+import kv_store;
 
 namespace infinity {
 
@@ -154,6 +155,7 @@ void CommonQueryFilter::NewBuildFilter(u32 task_id) {
     SegmentMeta *segment_meta = segment_index.at(segment_id).segment_meta_.get();
     TxnTimeStamp begin_ts = new_txn_ptr_->BeginTS();
     TxnTimeStamp commit_ts = new_txn_ptr_->CommitTS();
+    KVInstance* kv_instance = new_txn_ptr_->kv_instance();
     {
         SharedPtr<FastRoughFilter> segment_filter;
         Status status = segment_meta->GetFastRoughFilter(segment_filter);
@@ -203,7 +205,7 @@ void CommonQueryFilter::NewBuildFilter(u32 task_id) {
         for (BlockID block_id : *block_ids_ptr) {
             BlockMeta block_meta(block_id, *segment_meta);
 
-            auto [block_row_count, status] = block_meta.GetRowCnt1();
+            auto [block_row_count, status] = block_meta.GetRowCnt1(kv_instance, begin_ts, commit_ts);
             if (!status.ok()) {
                 UnrecoverableError(status.message());
             }
