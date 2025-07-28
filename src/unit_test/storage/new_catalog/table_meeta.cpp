@@ -87,7 +87,7 @@ TEST_P(TestTxnTableMeeta, table_meeta) {
         // EXPECT_EQ(segment_id, 0);
         {
             SegmentMeta segment_meta(0, table_meta);
-            segment_meta.Init();
+            segment_meta.InitSet();
             // segment_meta.SetRowCnt(1048);
             {
                 auto [blocks, block_status] = segment_meta.GetBlockIDs1();

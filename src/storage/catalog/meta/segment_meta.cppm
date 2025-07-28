@@ -78,9 +78,6 @@ public:
 
     Status UninitSet(UsageFlag usage_flag, TxnTimeStamp begin_ts);
 
-    // New
-    Status Init();
-
     Pair<BlockID, Status> AddBlockID1(TxnTimeStamp commit_ts);
     Status AddBlockWithID(TxnTimeStamp commit_ts, BlockID block_id);
 

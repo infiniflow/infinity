@@ -149,39 +149,6 @@ String SegmentMeta::GetSegmentTag(const String &tag) const {
     return KeyEncode::CatalogTableSegmentTagKey(table_meta_.db_id_str(), table_meta_.table_id_str(), segment_id_, tag);
 }
 
-Status SegmentMeta::Init() {
-    {
-        String latest_block_id_key = GetSegmentTag(String(NEXT_BLOCK_ID));
-        String latest_block_id_str;
-        Status status = kv_instance_.Get(latest_block_id_key, latest_block_id_str);
-        if (!status.ok()) {
-            if (status.code() != ErrorCode::kNotFound) {
-                return status;
-            }
-            status = kv_instance_.Put(latest_block_id_key, "0");
-            if (!status.ok()) {
-                return status;
-            }
-        }
-    }
-    {
-
-        String row_cnt_key = GetSegmentTag("row_cnt");
-        String row_cnt_str;
-        Status status = kv_instance_.Get(row_cnt_key, row_cnt_str);
-        if (!status.ok()) {
-            if (status.code() != ErrorCode::kNotFound) {
-                return status;
-            }
-            status = kv_instance_.Put(row_cnt_key, "0");
-            if (!status.ok()) {
-                return status;
-            }
-        }
-    }
-    return Status::OK();
-}
-
 Status SegmentMeta::AddBlockWithID(TxnTimeStamp commit_ts, BlockID block_id) {
     Status status;
     String block_id_key = KeyEncode::CatalogTableSegmentBlockKey(table_meta_.db_id_str(), table_meta_.table_id_str(), segment_id_, block_id);
