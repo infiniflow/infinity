@@ -144,7 +144,7 @@ Status NewCatalog::InitCatalog(KVInstance *kv_instance, TxnTimeStamp checkpoint_
         return block_meta.LoadSet(checkpoint_ts);
     };
     auto InitSegment = [&](SegmentMeta &segment_meta) {
-        auto [block_ids, blocks_status] = segment_meta.GetBlockIDs1(kv_instance, 0, UNCOMMIT_TS);
+        auto [block_ids, blocks_status] = segment_meta.GetBlockIDs1(kv_instance, checkpoint_ts, UNCOMMIT_TS);
         if (!blocks_status.ok()) {
             return blocks_status;
         }
