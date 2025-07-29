@@ -46,7 +46,7 @@ set(GCC_SEARCH_ROOTS
 )
 
 set(GCC15_SUFFIXES
-        lib
+#        lib
         lib/gcc/x86_64-linux-gnu/15
         lib/gcc/15
         lib/gcc/x86_64-pc-linux-gnu/15.1.0
