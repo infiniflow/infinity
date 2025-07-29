@@ -60,6 +60,9 @@ export using AbstractHnsw = std::variant<UniquePtr<KnnHnsw<PlainCosVecStoreType<
                                   UniquePtr<KnnHnsw<PlainCosVecStoreType<i8, true>, SegmentOffset>>,
                                   UniquePtr<KnnHnsw<PlainIPVecStoreType<i8, true>, SegmentOffset>>,
                                   UniquePtr<KnnHnsw<PlainL2VecStoreType<i8, true>, SegmentOffset>>,
+                                  UniquePtr<KnnHnsw<LVQCosVecStoreType<float, i8, true>, SegmentOffset>>,
+                                  UniquePtr<KnnHnsw<LVQIPVecStoreType<float, i8, true>, SegmentOffset>>,
+                                  UniquePtr<KnnHnsw<LVQL2VecStoreType<float, i8, true>, SegmentOffset>>,
 
                                   UniquePtr<KnnHnsw<PlainCosVecStoreType<float>, SegmentOffset, false>>,
                                   UniquePtr<KnnHnsw<PlainIPVecStoreType<float>, SegmentOffset, false>>,
@@ -82,6 +85,9 @@ export using AbstractHnsw = std::variant<UniquePtr<KnnHnsw<PlainCosVecStoreType<
                                   UniquePtr<KnnHnsw<PlainCosVecStoreType<i8, true>, SegmentOffset, false>>,
                                   UniquePtr<KnnHnsw<PlainIPVecStoreType<i8, true>, SegmentOffset, false>>,
                                   UniquePtr<KnnHnsw<PlainL2VecStoreType<i8, true>, SegmentOffset, false>>,
+                                  UniquePtr<KnnHnsw<LVQCosVecStoreType<float, i8, true>, SegmentOffset, false>>,
+                                  UniquePtr<KnnHnsw<LVQIPVecStoreType<float, i8, true>, SegmentOffset, false>>,
+                                  UniquePtr<KnnHnsw<LVQL2VecStoreType<float, i8, true>, SegmentOffset, false>>,
                                   std::nullptr_t>;
 
 export struct HnswHandler {

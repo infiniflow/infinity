@@ -35,6 +35,7 @@ class PlainLSL2Dist;
 export template <typename DataType>
 class PlainL2Dist {
 public:
+    using This = PlainL2Dist<DataType>;
     using VecStoreMeta = PlainVecStoreMeta<DataType>;
     using StoreType = typename VecStoreMeta::StoreType;
     using DistanceType = typename VecStoreMeta::DistanceType;
@@ -133,6 +134,7 @@ export template <typename DataType, typename CompressType>
 class LVQL2Dist {
 public:
     using This = LVQL2Dist<DataType, CompressType>;
+    using LVQDist = This;
     using VecStoreMetaType = LVQVecStoreMetaType<DataType, CompressType, LVQL2Cache<DataType, CompressType>>;
     using StoreType = typename VecStoreMetaType::StoreType;
     using DistanceType = typename VecStoreMetaType::DistanceType;

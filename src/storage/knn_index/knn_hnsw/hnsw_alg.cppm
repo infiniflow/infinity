@@ -14,6 +14,8 @@
 
 module;
 
+#include "util/logging.h"
+
 #include <ostream>
 #include <random>
 

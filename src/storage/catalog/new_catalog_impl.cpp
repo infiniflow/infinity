@@ -228,15 +228,11 @@ Status NewCatalog::AddFtIndexCache(String ft_index_cache_key, SharedPtr<TableInd
 }
 
 Status NewCatalog::GetFtIndexCache(const String &ft_index_cache_key, SharedPtr<TableIndexReaderCache> &ft_index_cache) {
-    ft_index_cache = nullptr;
-    {
-        std::shared_lock<std::shared_mutex> lck(ft_index_cache_mtx_);
-        if (auto iter = ft_index_cache_map_.find(ft_index_cache_key); iter != ft_index_cache_map_.end()) {
-            ft_index_cache = iter->second;
-        }
-    }
-    if (ft_index_cache == nullptr) {
-        return Status::CatalogError(fmt::format("FtIndexCache key: {} not found", ft_index_cache_key));
+    std::unique_lock<std::shared_mutex> lck(ft_index_cache_mtx_);
+    if (auto iter = ft_index_cache_map_.find(ft_index_cache_key); iter != ft_index_cache_map_.end()) {
+        ft_index_cache = iter->second;
+    } else {
+        ft_index_cache_map_.emplace(ft_index_cache_key, ft_index_cache);
     }
     return Status::OK();
 }
@@ -339,7 +335,7 @@ Status NewCatalog::GetCleanedMeta(TxnTimeStamp ts, KVInstance *kv_instance, Vect
         }
     };
 
-    static constexpr std::string drop_prefix = "drop";
+    constexpr std::string drop_prefix = "drop";
     auto iter = kv_instance->GetIterator();
     iter->Seek(drop_prefix);
     String drop_key, commit_ts_str;

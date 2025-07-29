@@ -181,22 +181,15 @@ int main(int argc, char *argv[]) {
             index_param_list->emplace_back(new InitParameter("m", std::to_string(args.M_)));
             index_param_list->emplace_back(new InitParameter("ef_construction", std::to_string(args.ef_construction_)));
             index_param_list->emplace_back(new InitParameter("metric", "l2"));
-            if (args.build_type_ == BuildType::LSG) {
-                if (args.encode_type_ == EncodeType::LVQ) {
-                    UnrecoverableError("Invalid encode type");
-                }
+            if (args.encode_type_ == EncodeType::LVQ) {
+                index_param_list->emplace_back(new InitParameter("encode", "lvq"));
+            } else if (args.encode_type_ == EncodeType::PLAIN || args.encode_type_ == EncodeType::CompressToLVQ) {
                 index_param_list->emplace_back(new InitParameter("encode", "plain"));
-                index_param_list->emplace_back(new InitParameter("build_type", "lsg"));
-            } else if (args.build_type_ == BuildType::PLAIN) {
-                if (args.encode_type_ == EncodeType::LVQ) {
-                    index_param_list->emplace_back(new InitParameter("encode", "lvq"));
-                } else if (args.encode_type_ == EncodeType::PLAIN || args.encode_type_ == EncodeType::CompressToLVQ) {
-                    index_param_list->emplace_back(new InitParameter("encode", "plain"));
-                } else {
-                    UnrecoverableError("Invalid encode type");
-                }
             } else {
-                UnrecoverableError("Invalid build type");
+                UnrecoverableError("Invalid encode type");
+            }
+            if (args.build_type_ == BuildType::LSG) {
+                index_param_list->emplace_back(new InitParameter("build_type", "lsg"));
             }
             index_info->index_param_list_ = index_param_list;
         }
