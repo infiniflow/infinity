@@ -34,6 +34,7 @@ class LVQCosDist;
 export template <typename DataType>
 class PlainCosDist {
 public:
+    using This = PlainCosDist<DataType>;
     using VecStoreMeta = PlainVecStoreMeta<DataType>;
     using StoreType = typename VecStoreMeta::StoreType;
     using DistanceType = typename VecStoreMeta::DistanceType;
@@ -124,6 +125,7 @@ export template <typename DataType, typename CompressType>
 class LVQCosDist {
 public:
     using This = LVQCosDist<DataType, CompressType>;
+    using LVQDist = This;
     using VecStoreMetaType = LVQVecStoreMetaType<DataType, CompressType, LVQCosCache<DataType, CompressType>>;
     using StoreType = typename VecStoreMetaType::StoreType;
     using DistanceType = typename VecStoreMetaType::DistanceType;
