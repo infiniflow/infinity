@@ -50,7 +50,7 @@
     #include <vector>
 
     // Import modules for implementation
-    import infinity_core;
+
     import search_scanner;
 
     #undef yylex

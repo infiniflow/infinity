@@ -32,6 +32,7 @@ class LVQIPDist;
 export template <typename DataType>
 class PlainIPDist {
 public:
+    using This = PlainIPDist<DataType>;
     using VecStoreMeta = PlainVecStoreMeta<DataType>;
     using StoreType = typename VecStoreMeta::StoreType;
     using DistanceType = typename VecStoreMeta::DistanceType;
@@ -139,6 +140,7 @@ export template <typename DataType, typename CompressType>
 class LVQIPDist {
 public:
     using This = LVQIPDist<DataType, CompressType>;
+    using LVQDist = This;
     using VecStoreMetaType = LVQVecStoreMetaType<DataType, CompressType, LVQIPCache<DataType, CompressType>>;
     using StoreType = typename VecStoreMetaType::StoreType;
     using DistanceType = typename VecStoreMetaType::DistanceType;
