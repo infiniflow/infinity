@@ -32,7 +32,7 @@ import meta_type;
 
 namespace infinity {
 
-DBMeeta::DBMeeta(String db_id_str) : BaseMeta(MetaType::kDB), db_id_str_(std::move(db_id_str)), txn_begin_ts_{MAX_TIMESTAMP} {}
+DBMeeta::DBMeeta(String db_id_str) : BaseMeta(MetaType::kDB), db_id_str_(std::move(db_id_str)) {}
 
 const String &DBMeeta::db_id_str() const { return db_id_str_; }
 
@@ -105,10 +105,10 @@ Status DBMeeta::GetComment(KVInstance *kv_instance, String *&comment) {
     return Status::OK();
 }
 
-Status DBMeeta::GetTableIDs(KVInstance *kv_instance, Vector<String> *&table_id_strs, Vector<String> **table_names) {
+Status DBMeeta::GetTableIDs(KVInstance *kv_instance, TxnTimeStamp begin_ts, Vector<String> *&table_id_strs, Vector<String> **table_names) {
     std::lock_guard<std::mutex> lock(mtx_);
     if (!table_id_strs_ || !table_names_) {
-        Status status = LoadTableIDs(kv_instance);
+        Status status = LoadTableIDs(kv_instance, begin_ts);
         if (!status.ok()) {
             return status;
         }
@@ -120,8 +120,12 @@ Status DBMeeta::GetTableIDs(KVInstance *kv_instance, Vector<String> *&table_id_s
     return Status::OK();
 }
 
-Status
-DBMeeta::GetTableID(KVInstance *kv_instance, const String &table_name, String &table_key, String &table_id_str, TxnTimeStamp &create_table_ts) {
+Status DBMeeta::GetTableID(KVInstance *kv_instance,
+                           TxnTimeStamp begin_ts,
+                           const String &table_name,
+                           String &table_key,
+                           String &table_id_str,
+                           TxnTimeStamp &create_table_ts) {
 
     String table_key_prefix = KeyEncode::CatalogTablePrefix(db_id_str_, table_name);
     auto iter2 = kv_instance->GetIterator();
@@ -141,7 +145,7 @@ DBMeeta::GetTableID(KVInstance *kv_instance, const String &table_name, String &t
     TxnTimeStamp max_commit_ts = 0;
     for (SizeT i = 0; i < table_kvs.size(); ++i) {
         TxnTimeStamp commit_ts = infinity::GetTimestampFromKey(table_kvs[i].first);
-        if (commit_ts <= txn_begin_ts_ && commit_ts > max_commit_ts) {
+        if (commit_ts <= begin_ts && commit_ts > max_commit_ts) {
             max_commit_ts = commit_ts;
             max_visible_table_index = i;
         }
@@ -160,8 +164,8 @@ DBMeeta::GetTableID(KVInstance *kv_instance, const String &table_name, String &t
     String rename_table_ts{};
     kv_instance->Get(KeyEncode::RenameTableKey(db_id_str_, table_name, table_id_str, max_commit_ts), rename_table_ts);
 
-    if ((!drop_table_ts.empty() && std::stoull(drop_table_ts) <= txn_begin_ts_) ||
-        (!rename_table_ts.empty() && std::stoull(rename_table_ts) <= txn_begin_ts_)) {
+    if ((!drop_table_ts.empty() && std::stoull(drop_table_ts) <= begin_ts) ||
+        (!rename_table_ts.empty() && std::stoull(rename_table_ts) <= begin_ts)) {
         return Status::TableNotExist(table_name);
     }
 
@@ -203,7 +207,7 @@ Tuple<String, Status> DBMeeta::GetNextTableID(KVInstance *kv_instance) {
     return {next_table_id_str, Status::OK()};
 }
 
-Status DBMeeta::LoadTableIDs(KVInstance *kv_instance) {
+Status DBMeeta::LoadTableIDs(KVInstance *kv_instance, TxnTimeStamp begin_ts) {
     table_id_strs_ = Vector<String>();
     table_names_ = Vector<String>();
 
@@ -228,7 +232,7 @@ Status DBMeeta::LoadTableIDs(KVInstance *kv_instance) {
         for (SizeT i = 0; i < table_kv.size(); ++i) {
             String commit_ts_str = GetLastPartOfKey(table_kv[i].first, '|');
             TxnTimeStamp commit_ts = std::stoull(commit_ts_str);
-            if (commit_ts <= txn_begin_ts_ && commit_ts > max_commit_ts) {
+            if (commit_ts <= begin_ts && commit_ts > max_commit_ts) {
                 max_commit_ts = commit_ts;
                 max_visible_table_index = i;
             }
@@ -242,8 +246,8 @@ Status DBMeeta::LoadTableIDs(KVInstance *kv_instance) {
             String rename_table_ts{};
             kv_instance->Get(KeyEncode::RenameTableKey(db_id_str_, table_name, table_id_ref, max_commit_ts), rename_table_ts);
 
-            if ((drop_table_ts.empty() || std::stoull(drop_table_ts) > txn_begin_ts_) &&
-                (rename_table_ts.empty() || std::stoull(rename_table_ts) > txn_begin_ts_)) {
+            if ((drop_table_ts.empty() || std::stoull(drop_table_ts) > begin_ts) &&
+                (rename_table_ts.empty() || std::stoull(rename_table_ts) > begin_ts)) {
                 table_id_strs_->emplace_back(table_id_ref);
                 table_names_->emplace_back(table_name);
             }

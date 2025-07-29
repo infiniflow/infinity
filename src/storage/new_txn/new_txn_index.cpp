@@ -294,7 +294,7 @@ Status NewTxn::OptimizeAllIndexes() {
         DBMeeta db_meta(db_id_str);
         Vector<String> *table_id_strs_ptr = nullptr;
         Vector<String> *table_names_ptr = nullptr;
-        status = db_meta.GetTableIDs(kv_instance, table_id_strs_ptr, &table_names_ptr);
+        status = db_meta.GetTableIDs(kv_instance, txn_context_ptr_->begin_ts_, table_id_strs_ptr, &table_names_ptr);
         if (!status.ok()) {
             return status;
         }

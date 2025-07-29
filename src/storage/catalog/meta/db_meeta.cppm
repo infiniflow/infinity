@@ -37,9 +37,14 @@ public:
 
     Status UninitSet(KVInstance *kv_instance, UsageFlag usage_flag);
 
-    Status GetTableIDs(KVInstance *kv_instance, Vector<String> *&table_id_strs, Vector<String> **table_names = nullptr);
+    Status GetTableIDs(KVInstance *kv_instance, TxnTimeStamp begin_ts, Vector<String> *&table_id_strs, Vector<String> **table_names = nullptr);
 
-    Status GetTableID(KVInstance *kv_instance, const String &table_name, String &table_key, String &table_id_str, TxnTimeStamp &create_table_ts);
+    Status GetTableID(KVInstance *kv_instance,
+                      TxnTimeStamp begin_ts,
+                      const String &table_name,
+                      String &table_key,
+                      String &table_id_str,
+                      TxnTimeStamp &create_table_ts);
 
     Tuple<SharedPtr<DatabaseInfo>, Status> GetDatabaseInfo(KVInstance *kv_instance);
 
@@ -47,7 +52,7 @@ public:
 
 private:
     Status GetComment(KVInstance *kv_instance, String *&comment);
-    Status LoadTableIDs(KVInstance *kv_instance);
+    Status LoadTableIDs(KVInstance *kv_instance, TxnTimeStamp begin_ts);
     String GetDBTag(const String &tag) const;
 
 private:
@@ -55,8 +60,6 @@ private:
 
     String db_id_str_{};
     String db_name_{};
-    NewTxn *txn_{};
-    TxnTimeStamp txn_begin_ts_{};
 
     Optional<String> comment_;
     Optional<Vector<String>> table_id_strs_;

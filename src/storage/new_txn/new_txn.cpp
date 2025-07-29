@@ -427,7 +427,7 @@ Status NewTxn::CreateTable(const String &db_name, const SharedPtr<TableDef> &tab
     String table_id_str;
     String table_key;
     TxnTimeStamp create_table_ts;
-    status = db_meta->GetTableID(kv_instance_.get(), *table_def->table_name(), table_key, table_id_str, create_table_ts);
+    status = db_meta->GetTableID(kv_instance_.get(), txn_context_ptr_->begin_ts_, *table_def->table_name(), table_key, table_id_str, create_table_ts);
 
     if (status.ok()) {
         if (conflict_type == ConflictType::kIgnore) {
@@ -550,7 +550,7 @@ Status NewTxn::DropTable(const String &db_name, const String &table_name, Confli
     String table_key;
     String table_id_str;
     TxnTimeStamp table_create_ts;
-    status = db_meta->GetTableID(kv_instance_.get(), table_name, table_key, table_id_str, table_create_ts);
+    status = db_meta->GetTableID(kv_instance_.get(), txn_context_ptr_->begin_ts_, table_name, table_key, table_id_str, table_create_ts);
     if (!status.ok()) {
         if (status.code() != ErrorCode::kTableNotExist) {
             return status;
@@ -645,7 +645,7 @@ Status NewTxn::RenameTable(const String &db_name, const String &old_table_name, 
         String table_id;
         String table_key;
         TxnTimeStamp create_table_ts;
-        status = db_meta->GetTableID(kv_instance_.get(), new_table_name, table_key, table_id, create_table_ts);
+        status = db_meta->GetTableID(kv_instance_.get(), txn_context_ptr_->begin_ts_, new_table_name, table_key, table_id, create_table_ts);
 
         if (status.ok()) {
             return Status::DuplicateTable(new_table_name);
@@ -657,7 +657,7 @@ Status NewTxn::RenameTable(const String &db_name, const String &old_table_name, 
     String table_id_str;
     String table_key;
     TxnTimeStamp create_table_ts;
-    status = db_meta->GetTableID(kv_instance_.get(), old_table_name, table_key, table_id_str, create_table_ts);
+    status = db_meta->GetTableID(kv_instance_.get(), txn_context_ptr_->begin_ts_, old_table_name, table_key, table_id_str, create_table_ts);
     if (!status.ok()) {
         return status;
     }
@@ -991,7 +991,7 @@ Status NewTxn::ListTable(const String &db_name, Vector<String> &table_names) {
     }
     Vector<String> *table_id_strs_ptr = nullptr;
     Vector<String> *table_names_ptr = nullptr;
-    status = db_meta->GetTableIDs(kv_instance_.get(), table_id_strs_ptr, &table_names_ptr);
+    status = db_meta->GetTableIDs(kv_instance_.get(), txn_context_ptr_->begin_ts_, table_id_strs_ptr, &table_names_ptr);
     if (!status.ok()) {
         return status;
     }
@@ -1519,7 +1519,7 @@ Status NewTxn::ReplayCheckpoint(WalCmdCheckpointV2 *optimize_cmd, TxnTimeStamp c
 
 Status NewTxn::CheckpointDB(DBMeeta &db_meta, const CheckpointOption &option, CheckpointTxnStore *ckp_txn_store) {
     Vector<String> *table_id_strs_ptr;
-    Status status = db_meta.GetTableIDs(kv_instance_.get(), table_id_strs_ptr);
+    Status status = db_meta.GetTableIDs(kv_instance_.get(), txn_context_ptr_->begin_ts_, table_id_strs_ptr);
     if (!status.ok()) {
         return status;
     }
@@ -2055,7 +2055,7 @@ Status NewTxn::GetTableMeta(const String &table_name, DBMeeta &db_meta, Optional
     String table_key;
     String table_id_str;
     TxnTimeStamp create_table_ts;
-    Status status = db_meta.GetTableID(kv_instance_.get(), table_name, table_key, table_id_str, create_table_ts);
+    Status status = db_meta.GetTableID(kv_instance_.get(), txn_context_ptr_->begin_ts_, table_name, table_key, table_id_str, create_table_ts);
     if (!status.ok()) {
         return status;
     }
@@ -2172,7 +2172,13 @@ Status NewTxn::PrepareCommitCreateTable(const WalCmdCreateTableV2 *create_table_
     }
 
     Optional<TableMeeta> table_meta;
-    status = NewCatalog::AddNewTable(*db_meta, create_table_cmd->table_id_, kv_instance_.get(), begin_ts, commit_ts, create_table_cmd->table_def_, table_meta);
+    status = NewCatalog::AddNewTable(*db_meta,
+                                     create_table_cmd->table_id_,
+                                     kv_instance_.get(),
+                                     begin_ts,
+                                     commit_ts,
+                                     create_table_cmd->table_def_,
+                                     table_meta);
     if (!status.ok()) {
         return status;
     }
@@ -2297,7 +2303,7 @@ Status NewTxn::PrepareCommitCheckpoint(const WalCmdCheckpointV2 *checkpoint_cmd)
 
 Status NewTxn::CommitCheckpointDB(DBMeeta &db_meta, const WalCmdCheckpointV2 *checkpoint_cmd) {
     Vector<String> *table_id_strs_ptr;
-    Status status = db_meta.GetTableIDs(kv_instance_.get(), table_id_strs_ptr);
+    Status status = db_meta.GetTableIDs(kv_instance_.get(), txn_context_ptr_->begin_ts_, table_id_strs_ptr);
     if (!status.ok()) {
         return status;
     }

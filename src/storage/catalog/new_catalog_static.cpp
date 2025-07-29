@@ -241,7 +241,7 @@ Status NewCatalog::InitCatalog(KVInstance *kv_instance, TxnTimeStamp checkpoint_
         DBMeeta db_meta(db_id_str);
 
         Vector<String> *table_id_strs_ptr = nullptr;
-        status = db_meta.GetTableIDs(kv_instance, table_id_strs_ptr);
+        status = db_meta.GetTableIDs(kv_instance, checkpoint_ts, table_id_strs_ptr);
         if (!status.ok()) {
             return status;
         }
@@ -289,7 +289,7 @@ Status NewCatalog::MemIndexRecover(NewTxn *txn) {
     };
     auto IndexRecoverDB = [&](DBMeeta &db_meta) {
         Vector<String> *table_id_strs_ptr = nullptr;
-        status = db_meta.GetTableIDs(kv_instance, table_id_strs_ptr);
+        status = db_meta.GetTableIDs(kv_instance, txn->BeginTS(), table_id_strs_ptr);
         if (!status.ok()) {
             return status;
         }
@@ -338,7 +338,7 @@ Status NewCatalog::MemIndexCommit(NewTxn *new_txn) {
     };
     auto IndexCommitDB = [&](DBMeeta &db_meta) {
         Vector<String> *table_id_strs_ptr = nullptr;
-        status = db_meta.GetTableIDs(kv_instance, table_id_strs_ptr);
+        status = db_meta.GetTableIDs(kv_instance, new_txn->BeginTS(), table_id_strs_ptr);
         if (!status.ok()) {
             return status;
         }
@@ -401,7 +401,7 @@ Status NewCatalog::GetAllMemIndexes(NewTxn *txn, Vector<SharedPtr<MemIndex>> &me
     auto TraverseDB = [&](DBMeeta &db_meta, const String &db_name) {
         Vector<String> *table_id_strs_ptr = nullptr;
         Vector<String> *table_names_ptr = nullptr;
-        Status status = db_meta.GetTableIDs(kv_instance, table_id_strs_ptr, &table_names_ptr);
+        Status status = db_meta.GetTableIDs(kv_instance, txn->BeginTS(), table_id_strs_ptr, &table_names_ptr);
         if (!status.ok()) {
             return status;
         }
@@ -465,7 +465,7 @@ Status NewCatalog::CleanDB(KVInstance *kv_instance, DBMeeta &db_meta, TxnTimeSta
 
     Vector<String> *table_id_strs_ptr = nullptr;
     Vector<String> *table_names_ptr = nullptr;
-    status = db_meta.GetTableIDs(kv_instance, table_id_strs_ptr, &table_names_ptr);
+    status = db_meta.GetTableIDs(kv_instance, begin_ts, table_id_strs_ptr, &table_names_ptr);
     if (!status.ok()) {
         return status;
     }
@@ -1215,7 +1215,7 @@ Status NewCatalog::GetDeleteTSVector(BlockMeta &block_meta, SizeT offset, SizeT 
 Status
 NewCatalog::GetDBFilePaths(KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts, DBMeeta &db_meta, Vector<String> &file_paths) {
     Vector<String> *table_id_strs_ptr = nullptr;
-    Status status = db_meta.GetTableIDs(kv_instance, table_id_strs_ptr);
+    Status status = db_meta.GetTableIDs(kv_instance, begin_ts, table_id_strs_ptr);
     if (!status.ok()) {
         return status;
     }
