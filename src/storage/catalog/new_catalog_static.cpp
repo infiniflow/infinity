@@ -238,10 +238,10 @@ Status NewCatalog::InitCatalog(KVInstance *kv_instance, TxnTimeStamp checkpoint_
         return Status::OK();
     };
     auto InitDB = [&](const String &db_id_str) {
-        DBMeeta db_meta(db_id_str, kv_instance);
+        DBMeeta db_meta(db_id_str);
 
         Vector<String> *table_id_strs_ptr = nullptr;
-        status = db_meta.GetTableIDs(table_id_strs_ptr);
+        status = db_meta.GetTableIDs(kv_instance, table_id_strs_ptr);
         if (!status.ok()) {
             return status;
         }
@@ -266,6 +266,7 @@ Status NewCatalog::InitCatalog(KVInstance *kv_instance, TxnTimeStamp checkpoint_
 Status NewCatalog::MemIndexRecover(NewTxn *txn) {
     Status status;
     Vector<String> *db_id_strs_ptr;
+    KVInstance *kv_instance = txn->kv_instance();
     CatalogMeta catalog_meta(txn);
     status = catalog_meta.GetDBIDs(db_id_strs_ptr);
     if (!status.ok()) {
@@ -288,7 +289,7 @@ Status NewCatalog::MemIndexRecover(NewTxn *txn) {
     };
     auto IndexRecoverDB = [&](DBMeeta &db_meta) {
         Vector<String> *table_id_strs_ptr = nullptr;
-        status = db_meta.GetTableIDs(table_id_strs_ptr);
+        status = db_meta.GetTableIDs(kv_instance, table_id_strs_ptr);
         if (!status.ok()) {
             return status;
         }
@@ -302,7 +303,7 @@ Status NewCatalog::MemIndexRecover(NewTxn *txn) {
         return Status::OK();
     };
     for (const String &db_id_str : *db_id_strs_ptr) {
-        DBMeeta db_meta(db_id_str, txn);
+        DBMeeta db_meta(db_id_str);
         status = IndexRecoverDB(db_meta);
         if (!status.ok()) {
             return status;
@@ -314,6 +315,7 @@ Status NewCatalog::MemIndexRecover(NewTxn *txn) {
 Status NewCatalog::MemIndexCommit(NewTxn *new_txn) {
     Status status;
     Vector<String> *db_id_strs_ptr;
+    KVInstance *kv_instance = new_txn->kv_instance();
     CatalogMeta catalog_meta(new_txn);
     status = catalog_meta.GetDBIDs(db_id_strs_ptr);
     if (!status.ok()) {
@@ -336,7 +338,7 @@ Status NewCatalog::MemIndexCommit(NewTxn *new_txn) {
     };
     auto IndexCommitDB = [&](DBMeeta &db_meta) {
         Vector<String> *table_id_strs_ptr = nullptr;
-        status = db_meta.GetTableIDs(table_id_strs_ptr);
+        status = db_meta.GetTableIDs(kv_instance, table_id_strs_ptr);
         if (!status.ok()) {
             return status;
         }
@@ -350,7 +352,7 @@ Status NewCatalog::MemIndexCommit(NewTxn *new_txn) {
         return Status::OK();
     };
     for (const String &db_id_str : *db_id_strs_ptr) {
-        DBMeeta db_meta(db_id_str, new_txn);
+        DBMeeta db_meta(db_id_str);
         status = IndexCommitDB(db_meta);
         if (!status.ok()) {
             return status;
@@ -360,6 +362,8 @@ Status NewCatalog::MemIndexCommit(NewTxn *new_txn) {
 }
 
 Status NewCatalog::GetAllMemIndexes(NewTxn *txn, Vector<SharedPtr<MemIndex>> &mem_indexes, Vector<MemIndexID> &mem_index_ids) {
+    KVInstance *kv_instance = txn->kv_instance();
+
     auto TraverseTableIndex = [&](TableIndexMeeta &table_index_meta, const String &db_name, const String &table_name, const String &index_name) {
         auto [index_segment_ids_ptr, status] = table_index_meta.GetSegmentIndexIDs1();
         if (!status.ok()) {
@@ -397,7 +401,7 @@ Status NewCatalog::GetAllMemIndexes(NewTxn *txn, Vector<SharedPtr<MemIndex>> &me
     auto TraverseDB = [&](DBMeeta &db_meta, const String &db_name) {
         Vector<String> *table_id_strs_ptr = nullptr;
         Vector<String> *table_names_ptr = nullptr;
-        Status status = db_meta.GetTableIDs(table_id_strs_ptr, &table_names_ptr);
+        Status status = db_meta.GetTableIDs(kv_instance, table_id_strs_ptr, &table_names_ptr);
         if (!status.ok()) {
             return status;
         }
@@ -422,7 +426,7 @@ Status NewCatalog::GetAllMemIndexes(NewTxn *txn, Vector<SharedPtr<MemIndex>> &me
     for (SizeT i = 0; i < db_id_strs_ptr->size(); ++i) {
         const String &db_id_str = (*db_id_strs_ptr)[i];
         const String &db_name = (*db_names_ptr)[i];
-        DBMeeta db_meta(db_id_str, txn);
+        DBMeeta db_meta(db_id_str);
         status = TraverseDB(db_meta, db_name);
         if (!status.ok()) {
             return status;
@@ -445,8 +449,8 @@ Status NewCatalog::AddNewDB(NewTxn *txn,
         return status;
     }
 
-    db_meta = MakeShared<DBMeeta>(db_id_str, txn);
-    status = db_meta->InitSet(db_comment);
+    db_meta = MakeShared<DBMeeta>(db_id_str);
+    status = db_meta->InitSet(kv_instance, db_comment);
     if (!status.ok()) {
         return status;
     }
@@ -461,21 +465,21 @@ Status NewCatalog::CleanDB(KVInstance *kv_instance, DBMeeta &db_meta, TxnTimeSta
 
     Vector<String> *table_id_strs_ptr = nullptr;
     Vector<String> *table_names_ptr = nullptr;
-    status = db_meta.GetTableIDs(table_id_strs_ptr, &table_names_ptr);
+    status = db_meta.GetTableIDs(kv_instance, table_id_strs_ptr, &table_names_ptr);
     if (!status.ok()) {
         return status;
     }
 
     for (SizeT i = 0; i < table_id_strs_ptr->size(); ++i) {
         const String &table_id_str = (*table_id_strs_ptr)[i];
-        TableMeeta table_meta(db_meta.db_id_str(), table_id_str, db_meta.kv_instance(), begin_ts, MAX_TIMESTAMP);
+        TableMeeta table_meta(db_meta.db_id_str(), table_id_str, kv_instance, begin_ts, MAX_TIMESTAMP);
         status = NewCatalog::CleanTable(kv_instance, table_meta, begin_ts, usage_flag);
         if (!status.ok()) {
             return status;
         }
     }
 
-    status = db_meta.UninitSet(usage_flag);
+    status = db_meta.UninitSet(kv_instance, usage_flag);
     if (!status.ok()) {
         return status;
     }
@@ -485,12 +489,12 @@ Status NewCatalog::CleanDB(KVInstance *kv_instance, DBMeeta &db_meta, TxnTimeSta
 
 Status NewCatalog::AddNewTable(DBMeeta &db_meta,
                                const String &table_id_str,
+                               KVInstance *kv_instance,
                                TxnTimeStamp begin_ts,
                                TxnTimeStamp commit_ts,
                                const SharedPtr<TableDef> &table_def,
                                Optional<TableMeeta> &table_meta) {
     // Create table a key value pair
-    KVInstance *kv_instance = db_meta.kv_instance();
     String table_key = KeyEncode::CatalogTableKey(db_meta.db_id_str(), *table_def->table_name(), commit_ts);
     Status status = kv_instance->Put(table_key, table_id_str);
     if (!status.ok()) {
@@ -1211,12 +1215,12 @@ Status NewCatalog::GetDeleteTSVector(BlockMeta &block_meta, SizeT offset, SizeT 
 Status
 NewCatalog::GetDBFilePaths(KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts, DBMeeta &db_meta, Vector<String> &file_paths) {
     Vector<String> *table_id_strs_ptr = nullptr;
-    Status status = db_meta.GetTableIDs(table_id_strs_ptr);
+    Status status = db_meta.GetTableIDs(kv_instance, table_id_strs_ptr);
     if (!status.ok()) {
         return status;
     }
     for (const String &table_id_str : *table_id_strs_ptr) {
-        TableMeeta table_meta(db_meta.db_id_str(), table_id_str, db_meta.kv_instance(), begin_ts, commit_ts);
+        TableMeeta table_meta(db_meta.db_id_str(), table_id_str, kv_instance, begin_ts, commit_ts);
         status = GetTableFilePaths(kv_instance, begin_ts, commit_ts, table_meta, file_paths);
         if (!status.ok()) {
             return status;

@@ -354,7 +354,7 @@ Tuple<SharedPtr<DatabaseInfo>, Status> NewTxn::GetDatabaseInfo(const String &db_
         return {nullptr, status};
     }
 
-    auto [db_info, info_status] = db_meta->GetDatabaseInfo();
+    auto [db_info, info_status] = db_meta->GetDatabaseInfo(kv_instance_.get());
     if (!info_status.ok()) {
         return {nullptr, info_status};
     }
@@ -427,7 +427,7 @@ Status NewTxn::CreateTable(const String &db_name, const SharedPtr<TableDef> &tab
     String table_id_str;
     String table_key;
     TxnTimeStamp create_table_ts;
-    status = db_meta->GetTableID(*table_def->table_name(), table_key, table_id_str, create_table_ts);
+    status = db_meta->GetTableID(kv_instance_.get(), *table_def->table_name(), table_key, table_id_str, create_table_ts);
 
     if (status.ok()) {
         if (conflict_type == ConflictType::kIgnore) {
@@ -439,7 +439,7 @@ Status NewTxn::CreateTable(const String &db_name, const SharedPtr<TableDef> &tab
     }
 
     // Get the latest table id
-    std::tie(table_id_str, status) = db_meta->GetNextTableID();
+    std::tie(table_id_str, status) = db_meta->GetNextTableID(kv_instance_.get());
     if (!status.ok()) {
         return status;
     }
@@ -550,7 +550,7 @@ Status NewTxn::DropTable(const String &db_name, const String &table_name, Confli
     String table_key;
     String table_id_str;
     TxnTimeStamp table_create_ts;
-    status = db_meta->GetTableID(table_name, table_key, table_id_str, table_create_ts);
+    status = db_meta->GetTableID(kv_instance_.get(), table_name, table_key, table_id_str, table_create_ts);
     if (!status.ok()) {
         if (status.code() != ErrorCode::kTableNotExist) {
             return status;
@@ -645,7 +645,7 @@ Status NewTxn::RenameTable(const String &db_name, const String &old_table_name, 
         String table_id;
         String table_key;
         TxnTimeStamp create_table_ts;
-        status = db_meta->GetTableID(new_table_name, table_key, table_id, create_table_ts);
+        status = db_meta->GetTableID(kv_instance_.get(), new_table_name, table_key, table_id, create_table_ts);
 
         if (status.ok()) {
             return Status::DuplicateTable(new_table_name);
@@ -657,7 +657,7 @@ Status NewTxn::RenameTable(const String &db_name, const String &old_table_name, 
     String table_id_str;
     String table_key;
     TxnTimeStamp create_table_ts;
-    status = db_meta->GetTableID(old_table_name, table_key, table_id_str, create_table_ts);
+    status = db_meta->GetTableID(kv_instance_.get(), old_table_name, table_key, table_id_str, create_table_ts);
     if (!status.ok()) {
         return status;
     }
@@ -991,7 +991,7 @@ Status NewTxn::ListTable(const String &db_name, Vector<String> &table_names) {
     }
     Vector<String> *table_id_strs_ptr = nullptr;
     Vector<String> *table_names_ptr = nullptr;
-    status = db_meta->GetTableIDs(table_id_strs_ptr, &table_names_ptr);
+    status = db_meta->GetTableIDs(kv_instance_.get(), table_id_strs_ptr, &table_names_ptr);
     if (!status.ok()) {
         return status;
     }
@@ -1491,7 +1491,7 @@ Status NewTxn::Checkpoint(TxnTimeStamp last_ckp_ts) {
     base_txn_store_ = MakeShared<CheckpointTxnStore>();
     CheckpointTxnStore *txn_store = static_cast<CheckpointTxnStore *>(base_txn_store_.get());
     for (const String &db_id_str : *db_id_strs_ptr) {
-        DBMeeta db_meta(db_id_str, this);
+        DBMeeta db_meta(db_id_str);
         status = this->CheckpointDB(db_meta, option, txn_store);
         if (!status.ok()) {
             return status;
@@ -1519,7 +1519,7 @@ Status NewTxn::ReplayCheckpoint(WalCmdCheckpointV2 *optimize_cmd, TxnTimeStamp c
 
 Status NewTxn::CheckpointDB(DBMeeta &db_meta, const CheckpointOption &option, CheckpointTxnStore *ckp_txn_store) {
     Vector<String> *table_id_strs_ptr;
-    Status status = db_meta.GetTableIDs(table_id_strs_ptr);
+    Status status = db_meta.GetTableIDs(kv_instance_.get(), table_id_strs_ptr);
     if (!status.ok()) {
         return status;
     }
@@ -2026,7 +2026,7 @@ Status NewTxn::GetDBMeta(const String &db_name, SharedPtr<DBMeeta> &db_meta_ptr,
     if (!status.ok()) {
         return status;
     }
-    db_meta_ptr = MakeShared<DBMeeta>(db_id_str, this);
+    db_meta_ptr = MakeShared<DBMeeta>(db_id_str);
     if (db_key_ptr) {
         *db_key_ptr = db_key;
     }
@@ -2055,7 +2055,7 @@ Status NewTxn::GetTableMeta(const String &table_name, DBMeeta &db_meta, Optional
     String table_key;
     String table_id_str;
     TxnTimeStamp create_table_ts;
-    Status status = db_meta.GetTableID(table_name, table_key, table_id_str, create_table_ts);
+    Status status = db_meta.GetTableID(kv_instance_.get(), table_name, table_key, table_id_str, create_table_ts);
     if (!status.ok()) {
         return status;
     }
@@ -2172,7 +2172,7 @@ Status NewTxn::PrepareCommitCreateTable(const WalCmdCreateTableV2 *create_table_
     }
 
     Optional<TableMeeta> table_meta;
-    status = NewCatalog::AddNewTable(*db_meta, create_table_cmd->table_id_, begin_ts, commit_ts, create_table_cmd->table_def_, table_meta);
+    status = NewCatalog::AddNewTable(*db_meta, create_table_cmd->table_id_, kv_instance_.get(), begin_ts, commit_ts, create_table_cmd->table_def_, table_meta);
     if (!status.ok()) {
         return status;
     }
@@ -2286,7 +2286,7 @@ Status NewTxn::PrepareCommitCheckpoint(const WalCmdCheckpointV2 *checkpoint_cmd)
         return status;
     }
     for (const String &db_id_str : *db_id_strs_ptr) {
-        DBMeeta db_meta(db_id_str, this);
+        DBMeeta db_meta(db_id_str);
         status = this->CommitCheckpointDB(db_meta, checkpoint_cmd);
         if (!status.ok()) {
             return status;
@@ -2297,7 +2297,7 @@ Status NewTxn::PrepareCommitCheckpoint(const WalCmdCheckpointV2 *checkpoint_cmd)
 
 Status NewTxn::CommitCheckpointDB(DBMeeta &db_meta, const WalCmdCheckpointV2 *checkpoint_cmd) {
     Vector<String> *table_id_strs_ptr;
-    Status status = db_meta.GetTableIDs(table_id_strs_ptr);
+    Status status = db_meta.GetTableIDs(kv_instance_.get(), table_id_strs_ptr);
     if (!status.ok()) {
         return status;
     }
@@ -4567,7 +4567,7 @@ Status NewTxn::CleanupInner(const Vector<UniquePtr<MetaKey>> &metas) {
                     return status;
                 }
 
-                DBMeeta db_meta(db_meta_key->db_id_str_, kv_instance);
+                DBMeeta db_meta(db_meta_key->db_id_str_);
                 status = NewCatalog::CleanDB(kv_instance, db_meta, begin_ts, UsageFlag::kOther);
                 if (!status.ok()) {
                     return status;

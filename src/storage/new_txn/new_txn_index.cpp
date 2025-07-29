@@ -279,7 +279,7 @@ Status NewTxn::CommitBottomDumpMemIndex(WalCmdDumpIndexV2 *dump_index_cmd) {
 }
 
 Status NewTxn::OptimizeAllIndexes() {
-    // TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
+    KVInstance *kv_instance = kv_instance_.get();
     CatalogMeta catalog_meta(this);
     Vector<String> *db_id_strs_ptr = nullptr;
     Vector<String> *db_names_ptr = nullptr;
@@ -291,10 +291,10 @@ Status NewTxn::OptimizeAllIndexes() {
         const String &db_id_str = (*db_id_strs_ptr)[i];
         const String &db_name = (*db_names_ptr)[i];
 
-        DBMeeta db_meta(db_id_str, this);
+        DBMeeta db_meta(db_id_str);
         Vector<String> *table_id_strs_ptr = nullptr;
         Vector<String> *table_names_ptr = nullptr;
-        status = db_meta.GetTableIDs(table_id_strs_ptr, &table_names_ptr);
+        status = db_meta.GetTableIDs(kv_instance, table_id_strs_ptr, &table_names_ptr);
         if (!status.ok()) {
             return status;
         }
