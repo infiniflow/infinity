@@ -1582,6 +1582,7 @@ Status NewTxn::RestoreTableSnapshot(const String &db_name, const SharedPtr<Table
     return Status::OK();
 }
 
+// TODO: address serializer issue exist!!!
 Status NewTxn::RestoreDatabaseSnapshot(const SharedPtr<DatabaseSnapshotInfo> &database_snapshot_info) {
     // Cleanup();
     this->SetTxnType(TransactionType::kRestoreDatabase);
@@ -1646,6 +1647,7 @@ Status NewTxn::RestoreDatabaseSnapshot(const SharedPtr<DatabaseSnapshotInfo> &da
     return Status::OK();
 }
 
+
 Status NewTxn::RestoreSystemSnapshot(const SharedPtr<SystemSnapshotInfo> &system_snapshot_info) {
     // Cleanup();
     this->SetTxnType(TransactionType::kRestoreSystem);
@@ -1682,9 +1684,9 @@ Status NewTxn::RestoreSystemSnapshot(const SharedPtr<SystemSnapshotInfo> &system
             );
 
             String snapshot_dir = InfinityContext::instance().config()->SnapshotDir();
-            String snapshot_name = database_snapshot_info->snapshot_name_;
+            // String snapshot_name = database_snapshot_info->snapshot_name_;
             Vector<String> restored_file_paths;    
-            status = table_snapshot_info->RestoreSnapshotFiles(snapshot_dir, snapshot_name, table_snapshot_info->GetFiles(), table_snapshot_info->table_id_str_, db_id_str, restored_file_paths,false);
+            status = table_snapshot_info->RestoreSnapshotFiles(snapshot_dir, system_snapshot_info->snapshot_name_, table_snapshot_info->GetFiles(), table_snapshot_info->table_id_str_, db_id_str, restored_file_paths,false);
         
             if (!status.ok()) {
                 return status;
@@ -1693,11 +1695,12 @@ Status NewTxn::RestoreSystemSnapshot(const SharedPtr<SystemSnapshotInfo> &system
             SharedPtr<RestoreTableTxnStore> tmp_txn_store_ = MakeShared<RestoreTableTxnStore>();
             
             // Use the helper function to process snapshot restoration data
-            status = ProcessSnapshotRestorationData(db_txn_store_->db_name_, db_id_str, table_name, table_snapshot_info->table_id_str_, table_def, table_snapshot_info, snapshot_name, tmp_txn_store_.get());
+            status = ProcessSnapshotRestorationData(db_txn_store_->db_name_, db_id_str, table_name, table_snapshot_info->table_id_str_, table_def, table_snapshot_info, system_snapshot_info->snapshot_name_, tmp_txn_store_.get());
 
             if (!status.ok()) {
                 return status;
             }
+            tmp_txn_store_->files_ = restored_file_paths;
             db_txn_store_->restore_table_txn_stores_.push_back(std::move(tmp_txn_store_));
         }
         txn_store->restore_db_txn_stores_.push_back(std::move(db_txn_store_));
@@ -5472,6 +5475,24 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
             }
             break;
         }
+        case TransactionType::kRestoreSystem: {
+            Config *config = InfinityContext::instance().config();
+            String data_dir = config->DataDir();
+            RestoreSystemTxnStore *restore_system_txn_store = static_cast<RestoreSystemTxnStore *>(base_txn_store_.get());
+            for (const auto &restore_db_txn_store : restore_system_txn_store->restore_db_txn_stores_) {
+                String db_dir = fmt::format("{}/db_{}", 
+                                          data_dir, 
+                                          restore_db_txn_store->db_id_str_);
+                
+                if (VirtualStore::Exists(db_dir)) {
+                    Status remove_status = VirtualStore::RemoveDirectory(db_dir);
+                    if (!remove_status.ok()) {
+                        LOG_WARN(fmt::format("Failed to remove database directory during rollback: {}", db_dir));
+                    }
+                }
+            }
+            break;
+        }
         case TransactionType::kCreateSnapshot: {
             break;
         }
@@ -5902,6 +5923,14 @@ Status NewTxn::ReplayWalCmd(const SharedPtr<WalCmd> &command, TxnTimeStamp commi
         case WalCommandType::RESTORE_DATABASE_SNAPSHOT: {
             auto *restore_database_cmd = static_cast<WalCmdRestoreDatabaseSnapshot *>(command.get());
             Status status = ReplayRestoreDatabaseSnapshot(restore_database_cmd, commit_ts, txn_id);
+            if (!status.ok()) {
+                return status;
+            }
+            break;
+        }
+        case WalCommandType::RESTORE_SYSTEM_SNAPSHOT: {
+            auto *restore_system_cmd = static_cast<WalCmdRestoreSystemSnapshot *>(command.get());
+            Status status = this->ReplayRestoreSystemSnapshot(restore_system_cmd, commit_ts, txn_id);
             if (!status.ok()) {
                 return status;
             }
@@ -6394,6 +6423,26 @@ Status NewTxn::ReplayRestoreDatabaseSnapshot(WalCmdRestoreDatabaseSnapshot *rest
         LOG_TRACE(fmt::format("Update next db id to {}.", next_db_id_str));
     }
     
+
+    return Status::OK();
+}
+
+
+
+Status NewTxn::ReplayRestoreSystemSnapshot(WalCmdRestoreSystemSnapshot *restore_system_cmd, TxnTimeStamp commit_ts, i64 txn_id) {
+    for (const auto &drop_database_cmd : restore_system_cmd->drop_database_wal_cmds_) {
+        Status status = this->ReplayDropDb(const_cast<WalCmdDropDatabaseV2*>(&drop_database_cmd), commit_ts, txn_id);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+
+    for (const auto &restore_database_cmd : restore_system_cmd->restore_database_wal_cmds_) {
+        Status status = this->ReplayRestoreDatabaseSnapshot(const_cast<WalCmdRestoreDatabaseSnapshot*>(&restore_database_cmd), commit_ts, txn_id);
+        if (!status.ok()) {
+            return status;
+        }
+    }
 
     return Status::OK();
 }

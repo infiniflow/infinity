@@ -963,6 +963,24 @@ SharedPtr<WalCmd> WalCmd::ReadAdv(const char *&ptr, i32 max_bytes) {
             cmd = MakeShared<WalCmdRestoreDatabaseSnapshot>(db_name, db_id, db_comment, restore_table_wal_cmds);
             break;
         }
+        case WalCommandType::RESTORE_SYSTEM_SNAPSHOT: {
+            String snapshot_name = ReadBufAdv<String>(ptr);
+            i32 restore_db_n = ReadBufAdv<i32>(ptr);
+            Vector<WalCmdRestoreDatabaseSnapshot> restore_db_wal_cmds;
+            for (i32 i = 0; i < restore_db_n; ++i) {
+                ReadBufAdv<WalCommandType>(ptr);
+                restore_db_wal_cmds.push_back(WalCmdRestoreDatabaseSnapshot::ReadBufferAdv(ptr, max_bytes));
+            }
+            i32 drop_db_n = ReadBufAdv<i32>(ptr);
+            Vector<WalCmdDropDatabaseV2> drop_db_wal_cmds;
+            for (i32 i = 0; i < drop_db_n; ++i) {
+                ReadBufAdv<WalCommandType>(ptr);
+                drop_db_wal_cmds.push_back(WalCmdDropDatabaseV2::ReadBufferAdv(ptr, max_bytes));
+            }
+            
+            cmd = MakeShared<WalCmdRestoreSystemSnapshot>(snapshot_name, restore_db_wal_cmds, drop_db_wal_cmds);
+            break;
+        }
         default: {
             String error_message = fmt::format("UNIMPLEMENTED ReadAdv for WAL command {}", int(cmd_type));
             UnrecoverableError(error_message);
@@ -1042,6 +1060,14 @@ WalCmdRestoreDatabaseSnapshot WalCmdRestoreDatabaseSnapshot::ReadBufferAdv(const
     }
     return WalCmdRestoreDatabaseSnapshot(db_name, db_id, db_comment, restore_table_wal_cmds);
 }
+
+WalCmdDropDatabaseV2 WalCmdDropDatabaseV2::ReadBufferAdv(const char *&ptr, i32 max_bytes) {
+    String db_name = ReadBufAdv<String>(ptr);
+    String db_id = ReadBufAdv<String>(ptr);
+    TxnTimeStamp create_ts = ReadBufAdv<TxnTimeStamp>(ptr);
+    return WalCmdDropDatabaseV2(db_name, db_id, create_ts);
+}
+
 
 bool WalCmdCreateDatabase::operator==(const WalCmd &other) const {
     const auto *other_cmd = dynamic_cast<const WalCmdCreateDatabase *>(&other);
@@ -1397,11 +1423,16 @@ bool WalCmdRestoreDatabaseSnapshot::operator==(const WalCmd &other) const {
 
 bool WalCmdRestoreSystemSnapshot::operator==(const WalCmd &other) const {
     auto other_cmd = dynamic_cast<const WalCmdRestoreSystemSnapshot *>(&other);
-    if (other_cmd == nullptr || snapshot_name_ != other_cmd->snapshot_name_ || restore_database_wal_cmds_.size() != other_cmd->restore_database_wal_cmds_.size()) {
+    if (other_cmd == nullptr || snapshot_name_ != other_cmd->snapshot_name_ || restore_database_wal_cmds_.size() != other_cmd->restore_database_wal_cmds_.size() || drop_database_wal_cmds_.size() != other_cmd->drop_database_wal_cmds_.size()) {
         return false;
     }
     for (SizeT i = 0; i < restore_database_wal_cmds_.size(); i++) {
         if (restore_database_wal_cmds_[i] != other_cmd->restore_database_wal_cmds_[i]) {
+            return false;
+        }
+    }
+    for (SizeT i = 0; i < drop_database_wal_cmds_.size(); i++) {
+        if (drop_database_wal_cmds_[i] != other_cmd->drop_database_wal_cmds_[i]) {
             return false;
         }
     }
@@ -1414,8 +1445,13 @@ i32 WalCmdRestoreSystemSnapshot::GetSizeInBytes() const {
     for (const auto &restore_database_wal_cmd : restore_database_wal_cmds_) {
         size += restore_database_wal_cmd.GetSizeInBytes();
     }
+    size += sizeof(i32);
+    for (const auto &drop_database_wal_cmd : drop_database_wal_cmds_) {
+        size += drop_database_wal_cmd.GetSizeInBytes();
+    }
     return size;
 }
+
 i32 WalCmdCreateDatabase::GetSizeInBytes() const {
     return sizeof(WalCommandType) + sizeof(i32) + this->db_name_.size() + sizeof(i32) + this->db_dir_tail_.size() + sizeof(i32) +
            this->db_comment_.size();
@@ -2173,6 +2209,10 @@ void WalCmdRestoreSystemSnapshot::WriteAdv(char *&buf) const {
     WriteBufAdv(buf, static_cast<i32>(this->restore_database_wal_cmds_.size()));
     for (const auto &restore_database_wal_cmd : this->restore_database_wal_cmds_) {
         restore_database_wal_cmd.WriteAdv(buf);
+    }
+    WriteBufAdv(buf, static_cast<i32>(this->drop_database_wal_cmds_.size()));
+    for (const auto &drop_database_wal_cmd : this->drop_database_wal_cmds_) {
+        drop_database_wal_cmd.WriteAdv(buf);
     }
 }
 
@@ -3370,6 +3410,9 @@ String WalCmd::WalCommandTypeToString(WalCommandType type) {
             break;
         case WalCommandType::CREATE_SNAPSHOT:
             command = "CREATE_SNAPSHOT";
+            break;
+        case WalCommandType::RESTORE_SYSTEM_SNAPSHOT:
+            command = "RESTORE_SYSTEM_SNAPSHOT";
             break;
         default: {
             String error_message = "Unknown command type";

@@ -481,6 +481,11 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
                     switch (snapshot_scope) {
                         case SnapshotScope::kSystem: {
                             LOG_INFO(fmt::format("Execute snapshot system"));
+                            NewTxn *new_txn = query_context->GetNewTxn();
+                            Status snapshot_status = new_txn->CreateSnapshot("", "", snapshot_name, SnapshotScope::kSystem);
+                            if (!snapshot_status.ok()) {
+                                RecoverableError(snapshot_status);
+                            }
                             break;
                         }
                         case SnapshotScope::kDatabase: {
@@ -530,6 +535,10 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
                     switch (snapshot_scope) {
                         case SnapshotScope::kSystem: {
                             LOG_INFO(fmt::format("Execute snapshot system restore"));
+                            Status snapshot_status = Snapshot::RestoreSystemSnapshot(query_context, snapshot_name);
+                            if (!snapshot_status.ok()) {
+                                RecoverableError(snapshot_status);
+                            }
                             break;
                         }
                         case SnapshotScope::kDatabase: {

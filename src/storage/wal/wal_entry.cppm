@@ -332,6 +332,7 @@ export struct WalCmdDropDatabaseV2 final : public WalCmd {
     void WriteAdv(char *&buf) const final;
     String ToString() const final;
     String CompactInfo() const final;
+    static WalCmdDropDatabaseV2 ReadBufferAdv(const char *&ptr, i32 max_bytes);
 
     String db_name_{};
     String db_id_{};

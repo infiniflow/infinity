@@ -508,6 +508,29 @@ void NewTxnManager::UpdateCatalogCache(NewTxn *txn) {
             }
             break;
         }
+        case TransactionType::kRestoreSystem: {
+            BaseTxnStore *base_txn_store = txn->GetTxnStore();
+            if (base_txn_store != nullptr) {
+                RestoreSystemTxnStore *txn_store = static_cast<RestoreSystemTxnStore *>(base_txn_store);
+                for (const auto &drop_db_txn_store : txn_store->drop_db_txn_stores_) {
+                    system_cache_->DropDbCache(std::stoull(drop_db_txn_store->db_id_str_));
+                }
+                for (const auto &restore_db_txn_store : txn_store->restore_db_txn_stores_) {
+                    u64 db_id = std::stoull(restore_db_txn_store->db_id_str_);
+                    system_cache_->AddNewDbCache(restore_db_txn_store->db_name_, db_id);
+                    for (const auto &restore_table_txn_store : restore_db_txn_store->restore_table_txn_stores_) {
+                        system_cache_->AddNewTableCache(db_id,restore_table_txn_store->table_id_, restore_table_txn_store->table_name_);
+                        if (!restore_table_txn_store->segment_infos_.empty()) {
+                            system_cache_->ApplySegmentIDs(db_id, restore_table_txn_store->table_id_, restore_table_txn_store->segment_infos_.back().segment_id_+1);
+                        }
+                        for (const auto &index_cmd : restore_table_txn_store->index_cmds_) {
+                            system_cache_->AddNewIndexCache(db_id, restore_table_txn_store->table_id_, index_cmd.index_id_);
+                        }
+                    }
+                }
+            }
+            break;
+        }
         case TransactionType::kDropTable: {
             BaseTxnStore *base_txn_store = txn->GetTxnStore();
             // base_txn_store means the drop with ignore
