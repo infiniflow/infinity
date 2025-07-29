@@ -12,6 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#ifdef CI
+import infinity_core;
+#else
 module;
 
 #include <filesystem>
@@ -19,9 +22,6 @@ module;
 
 module infinity_core:ut.chinese_analyzer;
 
-#ifdef CI
-import infinity_core;
-#else
 import :stl;
 import :term;
 import :analyzer;

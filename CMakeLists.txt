@@ -73,9 +73,6 @@ find_library(STDCXX15EXP_STATIC
 
 get_filename_component(GCC15_LIB_DIR ${STDCXX15_STATIC} DIRECTORY)
 
-message(STATUS "***${STDCXX15_STATIC}")
-message(STATUS "****${GCC15_LIB_DIR}")
-
 set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -L${GCC15_LIB_DIR} -static-libstdc++ -L${GCC15_LIB_DIR} -static-libgcc")
 
 # Get current system time and print the build time

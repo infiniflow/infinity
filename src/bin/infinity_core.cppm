@@ -1,4 +1,4 @@
-module infinity_core:core;
+module infinity_core;
 
 export import :data_block;
 export import :allocator;
