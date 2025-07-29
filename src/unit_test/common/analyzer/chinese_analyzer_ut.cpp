@@ -14,16 +14,20 @@
 
 module;
 
-#include "gtest/gtest.h"
 #include <filesystem>
+#include "gtest/gtest.h"
 
 module infinity_core:ut.chinese_analyzer;
 
-// import :stl;
-// import :term;
-// import :analyzer;
-// import :chinese_analyzer;
-import :core;
+#ifdef CI
+import infinity_core;
+#else
+import :stl;
+import :term;
+import :analyzer;
+import :chinese_analyzer;
+// import :core;
+#endif
 
 import :ut.base_test;
 

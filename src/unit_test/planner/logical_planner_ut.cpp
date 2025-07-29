@@ -19,6 +19,7 @@ module infinity_core:ut.logical_planner;
 #if 0
 
 #include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 
 import :ut.base_test;
 
@@ -87,11 +88,11 @@ TEST_F(LogicalPlannerTest, test1) {
     }
     {
         const String sql_text = "select sum(b), b from t1 group by a;";
-        EXPECT_THROW(SQLRunner::Run(sql_text, true), UnrecoverableException);
+        EXPECT_THROW_WITHOUT_STACKTRACE(SQLRunner::Run(sql_text, true), UnrecoverableException);
     }
     {
         const String sql_text = "select sum(b), b from t1;";
-        EXPECT_THROW(SQLRunner::Run(sql_text, true), UnrecoverableException);
+        EXPECT_THROW_WITHOUT_STACKTRACE(SQLRunner::Run(sql_text, true), UnrecoverableException);
     }
 
     {

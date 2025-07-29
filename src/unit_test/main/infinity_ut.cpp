@@ -19,13 +19,16 @@ module;
 
 module infinity_core:ut.infinity;
 
-import :ut.base_test;
+
 import :stl;
 import :infinity;
 import :query_result;
 import :data_block;
 import :value;
 import :query_options;
+import :data_table;
+
+import :ut.base_test;
 import logical_type;
 import internal_types;
 import parsed_expr;

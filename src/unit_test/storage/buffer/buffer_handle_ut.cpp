@@ -15,6 +15,7 @@
 module;
 
 #include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 
 module infinity_core:ut.buffer_handle;
 
@@ -75,7 +76,7 @@ TEST_P(BufferHandleTest, test1) {
         auto buf_handle2 = buf2->Load();
 
         // out of memory exception
-        EXPECT_THROW({ auto buf_handle3 = buf3->Load(); }, UnrecoverableException);
+        EXPECT_THROW_WITHOUT_STACKTRACE({ auto buf_handle3 = buf3->Load(); }, UnrecoverableException);
         EXPECT_EQ(buf3->rc(), 0u);
         EXPECT_EQ(buf3->status(), BufferStatus::kNew);
         EXPECT_EQ(buf3->type(), BufferType::kEphemeral);

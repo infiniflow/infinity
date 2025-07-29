@@ -15,6 +15,7 @@
 module;
 
 #include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 
 module infinity_core:ut.bitmap_type;
 
@@ -47,8 +48,8 @@ TEST_F(BitmapTypeTest, bitmap1) {
         }
     }
 
-    EXPECT_THROW(bt1.GetBit(100), ParserException);
-    EXPECT_THROW(bt1.SetBit(100, false), ParserException);
+    EXPECT_THROW_WITHOUT_STACKTRACE(bt1.GetBit(100), ParserException);
+    EXPECT_THROW_WITHOUT_STACKTRACE(bt1.SetBit(100, false), ParserException);
 
     for (u64 i = 0; i < 100; ++i) {
         if (i % 2 == 0) {
@@ -92,8 +93,8 @@ TEST_F(BitmapTypeTest, bitmap1) {
         }
     }
 
-    EXPECT_THROW(bt3.GetBit(50), ParserException);
-    EXPECT_THROW(bt3.SetBit(50, false), ParserException);
+    EXPECT_THROW_WITHOUT_STACKTRACE(bt3.GetBit(50), ParserException);
+    EXPECT_THROW_WITHOUT_STACKTRACE(bt3.SetBit(50, false), ParserException);
 
     bt3 = bt1;
 
@@ -137,8 +138,8 @@ TEST_F(BitmapTypeTest, bitmap1) {
         }
     }
 
-    EXPECT_THROW(bt5.GetBit(50), ParserException);
-    EXPECT_THROW(bt5.SetBit(50, false), ParserException);
+    EXPECT_THROW_WITHOUT_STACKTRACE(bt5.GetBit(50), ParserException);
+    EXPECT_THROW_WITHOUT_STACKTRACE(bt5.SetBit(50, false), ParserException);
 
     bt5 = std::move(bt2);
 
@@ -173,8 +174,8 @@ TEST_F(BitmapTypeTest, bitmap1) {
         }
     }
 
-    EXPECT_THROW(bt6.GetBit(100), ParserException);
-    EXPECT_THROW(bt6.SetBit(100, false), ParserException);
+    EXPECT_THROW_WITHOUT_STACKTRACE(bt6.GetBit(100), ParserException);
+    EXPECT_THROW_WITHOUT_STACKTRACE(bt6.SetBit(100, false), ParserException);
 }
 
 TEST_F(BitmapTypeTest, bitmap2) {
@@ -192,8 +193,8 @@ TEST_F(BitmapTypeTest, bitmap2) {
         }
     }
 
-    EXPECT_THROW(bt1.GetBit(100), ParserException);
-    EXPECT_THROW(bt1.SetBit(100, false), ParserException);
+    EXPECT_THROW_WITHOUT_STACKTRACE(bt1.GetBit(100), ParserException);
+    EXPECT_THROW_WITHOUT_STACKTRACE(bt1.SetBit(100, false), ParserException);
 
     for (u64 i = 0; i < 100; ++i) {
         if (i % 2 == 0) {
@@ -237,8 +238,8 @@ TEST_F(BitmapTypeTest, bitmap2) {
         }
     }
 
-    EXPECT_THROW(bt3.GetBit(50), ParserException);
-    EXPECT_THROW(bt3.SetBit(50, false), ParserException);
+    EXPECT_THROW_WITHOUT_STACKTRACE(bt3.GetBit(50), ParserException);
+    EXPECT_THROW_WITHOUT_STACKTRACE(bt3.SetBit(50, false), ParserException);
 
     bt3 = bt1;
 
@@ -282,8 +283,8 @@ TEST_F(BitmapTypeTest, bitmap2) {
         }
     }
 
-    EXPECT_THROW(bt5.GetBit(50), ParserException);
-    EXPECT_THROW(bt5.SetBit(50, false), ParserException);
+    EXPECT_THROW_WITHOUT_STACKTRACE(bt5.GetBit(50), ParserException);
+    EXPECT_THROW_WITHOUT_STACKTRACE(bt5.SetBit(50, false), ParserException);
 
     bt5 = std::move(bt2);
 
@@ -318,8 +319,8 @@ TEST_F(BitmapTypeTest, bitmap2) {
         }
     }
 
-    EXPECT_THROW(bt6.GetBit(100), ParserException);
-    EXPECT_THROW(bt6.SetBit(100, false), ParserException);
+    EXPECT_THROW_WITHOUT_STACKTRACE(bt6.GetBit(100), ParserException);
+    EXPECT_THROW_WITHOUT_STACKTRACE(bt6.SetBit(100, false), ParserException);
 }
 
 TEST_F(BitmapTypeTest, bitmap33) {

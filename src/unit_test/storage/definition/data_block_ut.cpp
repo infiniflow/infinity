@@ -15,6 +15,7 @@
 module;
 
 #include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 
 module infinity_core:ut.data_block;
 
@@ -162,8 +163,8 @@ TEST_P(DataBlockTest, test2) {
     for (u16 i = 0; i < row_count; ++i) {
         data_block.AppendValue(0, Value::MakeBool(i % 2 == 0));
     }
-    EXPECT_THROW(data_block.AppendValue(1, Value::MakeBool(true)), UnrecoverableException);
-    EXPECT_THROW(data_block.AppendValue(0, Value::MakeBool(true)), UnrecoverableException);
+    EXPECT_THROW_WITHOUT_STACKTRACE(data_block.AppendValue(1, Value::MakeBool(true)), UnrecoverableException);
+    EXPECT_THROW_WITHOUT_STACKTRACE(data_block.AppendValue(0, Value::MakeBool(true)), UnrecoverableException);
 
     EXPECT_FALSE(data_block.Finalized());
     data_block.Finalize();
@@ -199,10 +200,10 @@ TEST_P(DataBlockTest, test3) {
     std::cout << "Initialize data block cost: " << profiler.ElapsedToString() << std::endl;
 
     // Test to store value into invalid column
-    EXPECT_THROW(data_block.SetValue(1, 0, Value::MakeTinyInt(static_cast<i8>(1))), UnrecoverableException);
+    EXPECT_THROW_WITHOUT_STACKTRACE(data_block.SetValue(1, 0, Value::MakeTinyInt(static_cast<i8>(1))), UnrecoverableException);
 
     // Test to store value into valid column but invalid row
-    EXPECT_THROW(data_block.SetValue(0, 1, Value::MakeTinyInt(static_cast<i8>(1))), UnrecoverableException);
+    EXPECT_THROW_WITHOUT_STACKTRACE(data_block.SetValue(0, 1, Value::MakeTinyInt(static_cast<i8>(1))), UnrecoverableException);
 
     // Test DataBlock::AppendValue
     profiler.Begin();

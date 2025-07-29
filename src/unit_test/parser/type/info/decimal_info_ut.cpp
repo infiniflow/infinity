@@ -14,8 +14,8 @@
 
 module;
 
-#include "json.hpp"
 #include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 
 module infinity_core:ut.decimal_info;
 
@@ -35,8 +35,8 @@ class DecimalInfoTest : public BaseTest {};
 TEST_F(DecimalInfoTest, decimal_info_A) {
     using namespace infinity;
 
-    EXPECT_THROW(DecimalInfo::Make(39, 39), ParserException);
-    EXPECT_THROW(DecimalInfo::Make(38, 39), ParserException);
+    EXPECT_THROW_WITHOUT_STACKTRACE(DecimalInfo::Make(39, 39), ParserException);
+    EXPECT_THROW_WITHOUT_STACKTRACE(DecimalInfo::Make(38, 39), ParserException);
 
     auto decimal_info = DecimalInfo::Make(38, 38);
     EXPECT_EQ(decimal_info->scale(), 38);

@@ -1,6 +1,7 @@
 module;
 
 #include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 
 module infinity_core:ut.date_type;
 
@@ -34,11 +35,11 @@ TEST_F(DateTypeTest, TestFromString) {
     EXPECT_NO_THROW(date_std.FromString("2024-9/4"));
     EXPECT_NO_THROW(date_std.FromString("2024/9-4"));
 
-    EXPECT_THROW(date_std.FromString("2018/2/29"), ParserException);
-    EXPECT_THROW(date_std.FromString("20-1233/45"), ParserException);
-    EXPECT_THROW(date_std.FromString("-12354--56f1--ade"), ParserException);
-    EXPECT_THROW(date_std.FromString("1234@56.789"), ParserException);
-    EXPECT_THROW(date_std.FromString("qwlssmabz"), ParserException);
+    EXPECT_THROW_WITHOUT_STACKTRACE(date_std.FromString("2018/2/29"), ParserException);
+    EXPECT_THROW_WITHOUT_STACKTRACE(date_std.FromString("20-1233/45"), ParserException);
+    EXPECT_THROW_WITHOUT_STACKTRACE(date_std.FromString("-12354--56f1--ade"), ParserException);
+    EXPECT_THROW_WITHOUT_STACKTRACE(date_std.FromString("1234@56.789"), ParserException);
+    EXPECT_THROW_WITHOUT_STACKTRACE(date_std.FromString("qwlssmabz"), ParserException);
 }
 
 TEST_F(DateTypeTest, TestAddSubstract) {
@@ -88,7 +89,7 @@ TEST_F(DateTypeTest, TestNegativeYears) {
     interval.unit = kYear;
     interval.value = 3;
 
-    EXPECT_EQ(date.ToString(), "-0001-05-04");
+    EXPECT_EQ(date.ToString(), "-001-05-04");
     EXPECT_EQ(DateT::GetDatePart(date, kYear), -1);
     EXPECT_EQ(DateT::GetDatePart(date, kMonth), 5);
     EXPECT_EQ(DateT::GetDatePart(date, kDay), 4);
@@ -97,7 +98,7 @@ TEST_F(DateTypeTest, TestNegativeYears) {
     EXPECT_EQ(date_shift.ToString(), "0002-05-04");
 
     EXPECT_TRUE(DateT::Subtract(date_shift, interval, date_shift));
-    EXPECT_EQ(date_shift.ToString(), "-0001-05-04");
+    EXPECT_EQ(date_shift.ToString(), "-001-05-04");
 }
 
 // TEST_F(DateTypeTest, TestComparator) {

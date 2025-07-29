@@ -19,6 +19,7 @@ module infinity_core:ut.string_chunk;
 #if 0
 
 #include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 
 import :ut.base_test;
 
@@ -41,7 +42,7 @@ TEST_F(StringChunkTest, string_chunk_a) {
 
     StringHeapMgr string_chunk_mgr;
 
-    EXPECT_THROW(string_chunk_mgr.Allocate(0), UnrecoverableException);
+    EXPECT_THROW_WITHOUT_STACKTRACE(string_chunk_mgr.Allocate(0), UnrecoverableException);
 
     for (u64 i = 256; i <= 8192; i += 256) {
         string_chunk_mgr.Allocate(i);
