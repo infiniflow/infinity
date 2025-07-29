@@ -125,7 +125,7 @@ void OutputToDataBlockHelper::OutputToDataBlock(BufferManager *buffer_mgr,
                                                 const BlockIndex *block_index,
                                                 const Vector<UniquePtr<DataBlock>> &output_data_blocks) {
     std::sort(output_job_infos.begin(), output_job_infos.end());
-    
+
     Status status;
 
     auto cache_segment_id = std::numeric_limits<SegmentID>::max();
@@ -135,16 +135,22 @@ void OutputToDataBlockHelper::OutputToDataBlock(BufferManager *buffer_mgr,
     SizeT cached_block_row_cnt = 0;
     auto cache_column_id = std::numeric_limits<ColumnID>::max();
     ColumnVector cache_column_vector;
+    Vector<Pair<SegmentID, BlockID>> segment_block_ids_without_blockmeta;
     for (const auto [segment_id, block_id, column_id, block_offset, output_block_id, output_column_id, output_row_id] : output_job_infos) {
         if (segment_id != cache_segment_id || block_id != cache_block_id) {
             cache_segment_id = segment_id;
             cache_block_id = block_id;
             cached_block_meta = block_index->GetBlockMeta(segment_id, block_id);
-            std::tie(cached_block_row_cnt, status) = cached_block_meta->GetRowCnt1();
-            if (!status.ok()) {
-                RecoverableError(status);
+            if (cached_block_meta != nullptr) {
+                std::tie(cached_block_row_cnt, status) = cached_block_meta->GetRowCnt1();
+                if (!status.ok()) {
+                    RecoverableError(status);
+                }
+                cache_column_id = std::numeric_limits<ColumnID>::max();
+            } else {
+                segment_block_ids_without_blockmeta.emplace_back(segment_id, block_id);
+                continue;
             }
-            cache_column_id = std::numeric_limits<ColumnID>::max();
         }
         if (column_id != cache_column_id) {
             // LOG_TRACE(fmt::format("Get column vector from segment_id: {}, block_id: {}, column_id: {}", segment_id, block_id, column_id));
@@ -157,6 +163,14 @@ void OutputToDataBlockHelper::OutputToDataBlock(BufferManager *buffer_mgr,
         output_data_blocks[output_block_id]->column_vectors[output_column_id]->SetValueByIndex(output_row_id, val_for_update);
     }
     output_job_infos.clear();
+
+    if (segment_block_ids_without_blockmeta.size() > 0) {
+        OStringStream oss;
+        for (auto &segment_block_id : segment_block_ids_without_blockmeta) {
+            oss << fmt::format("({}, {}) ", segment_block_id.first, segment_block_id.second);
+        }
+        LOG_WARN(fmt::format("BlockMeta not found. (segment_id, block_id): [ {}]", oss.str()));
+    }
 }
 
 } // namespace infinity
