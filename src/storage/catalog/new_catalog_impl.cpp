@@ -335,7 +335,7 @@ Status NewCatalog::GetCleanedMeta(TxnTimeStamp ts, KVInstance *kv_instance, Vect
         }
     };
 
-    constexpr std::string drop_prefix = "drop";
+    static constexpr std::string drop_prefix = "drop";
     auto iter = kv_instance->GetIterator();
     iter->Seek(drop_prefix);
     String drop_key, commit_ts_str;
