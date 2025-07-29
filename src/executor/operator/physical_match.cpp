@@ -109,7 +109,7 @@ QueryIterators CreateQueryIterators(QueryBuilder &query_builder,
                 iter = std::move(new_iter);
             }
         } else {
-            LOG_WARN("physical_match: iter is nullptr");
+            // LOG_WARN("physical_match: iter is nullptr");
         }
         return iter;
     };

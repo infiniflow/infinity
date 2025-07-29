@@ -1000,7 +1000,7 @@ Status NewCatalog::CleanSegmentIndex(SegmentIndexMeta &segment_index_meta, Usage
     if (usage_flag != UsageFlag::kTransform) {
         // Invalidate the fulltext index cache for this segment
         TableMeeta &table_meta = segment_index_meta.table_index_meta().table_meta();
-        Status status = table_meta.InvalidateFtIndexCache(segment_index_meta.segment_id());
+        Status status = table_meta.InvalidateFtIndexCache();
         if (!status.ok()) {
             return status;
         }

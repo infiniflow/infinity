@@ -341,8 +341,6 @@ Status TableMeeta::LoadSet() {
             if (!status.ok()) {
                 return status;
             }
-
-            table_index_meta.UpdateFulltextSegmentTS(commit_ts_);
             break;
         }
     }
@@ -532,6 +530,7 @@ Status TableMeeta::GetFtIndexCache(SharedPtr<TableIndexReaderCache> &ft_index_ca
     String ft_index_cache_key = GetTableTag("ft_index_cache");
     NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
 
+    ft_index_cache = MakeShared<TableIndexReaderCache>(db_id_str_, table_id_str_);
     Status status = new_catalog->GetFtIndexCache(ft_index_cache_key, ft_index_cache);
     if (!status.ok()) {
         return status;
@@ -549,10 +548,10 @@ Status TableMeeta::RemoveFtIndexCache() {
     return Status::OK();
 }
 
-Status TableMeeta::InvalidateFtIndexCache(SegmentID segment_id) {
+Status TableMeeta::InvalidateFtIndexCache() {
     String ft_index_cache_key = GetTableTag("ft_index_cache");
     NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
-    SharedPtr<TableIndexReaderCache> ft_index_cache;
+    SharedPtr<TableIndexReaderCache> ft_index_cache = MakeShared<TableIndexReaderCache>(db_id_str_, table_id_str_);
     Status status = new_catalog->GetFtIndexCache(ft_index_cache_key, ft_index_cache);
     if (!status.ok()) {
         if (status.code() == ErrorCode::kCatalogError) {
@@ -560,14 +559,7 @@ Status TableMeeta::InvalidateFtIndexCache(SegmentID segment_id) {
         }
         return status;
     }
-    ColumnID next_column_id;
-    status = GetNextColumnID(next_column_id);
-    if (!status.ok()) {
-        return status;
-    }
-    for (ColumnID column_id = 0; column_id < next_column_id; ++column_id) {
-        ft_index_cache->InvalidateSegmentColumn(column_id, segment_id);
-    }
+    ft_index_cache->Invalidate();
     return Status::OK();
 }
 
@@ -590,17 +582,6 @@ Status TableMeeta::SetNextColumnID(ColumnID next_column_id) {
         return status;
     }
     next_column_id_ = next_column_id;
-    return Status::OK();
-}
-
-Status TableMeeta::UpdateFulltextSegmentTS(TxnTimeStamp ts, SegmentUpdateTS &segment_update_ts) {
-    SharedPtr<TableIndexReaderCache> ft_index_cache;
-    Status status = GetFtIndexCache(ft_index_cache);
-    if (!status.ok()) {
-        return status;
-    }
-    ft_index_cache->UpdateKnownUpdateTs(ts, segment_update_ts.mtx_, segment_update_ts.ts_);
-
     return Status::OK();
 }
 
