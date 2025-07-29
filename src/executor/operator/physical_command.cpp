@@ -445,9 +445,9 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
             SnapshotScope snapshot_scope = snapshot_cmd->scope();
             const String &snapshot_name = snapshot_cmd->name();
 
-            // auto new_txn_mgr = InfinityContext::instance().storage()-> new_txn_manager();
+            auto new_txn_mgr = InfinityContext::instance().storage()-> new_txn_manager();
 
-            // new_txn_mgr->PrintAllKeyValue();
+            new_txn_mgr->PrintAllKeyValue();
 
             switch (snapshot_operation) {
                 case SnapshotOp::kCreate: {

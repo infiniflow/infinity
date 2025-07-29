@@ -143,6 +143,8 @@ public:
 
     void PrintAllKeyValue() const;
 
+    void PrintPMKeyValue() const;
+
     void PrintAllDroppedKeys() const;
 
     SizeT KeyValueNum() const;

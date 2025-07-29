@@ -625,6 +625,21 @@ void NewTxnManager::PrintAllKeyValue() const {
     std::cout << String(" -------------- ") << std::endl;
 }
 
+void NewTxnManager::PrintPMKeyValue() const {
+    std::cout << String("Persistence Manager keys and values: ") << std::endl;
+    
+    // Get all key-value pairs from the KV store
+    Vector<Pair<String, String>> all_key_values = kv_store_->GetAllKeyValue();
+    
+    for (const auto& [key, value] : all_key_values) {
+        // Check if the key is a PM key by looking for "pm|" prefix
+        if (key.find("pm|") == 0) {
+            std::cout << "PM Key: " << key << " -> Value: " << value << std::endl;
+        }
+    }
+    std::cout << String(" -------------- ") << std::endl;
+}
+
 void NewTxnManager::PrintAllDroppedKeys() const {
     std::cout << String("All dropped keys: ") << std::endl;
     
