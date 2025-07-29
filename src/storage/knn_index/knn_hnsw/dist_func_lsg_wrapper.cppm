@@ -16,6 +16,7 @@ module;
 
 import stl;
 import plain_vec_store;
+import lvq_vec_store;
 import dist_func_l2;
 import dist_func_ip;
 import dist_func_cos;
@@ -67,7 +68,13 @@ public:
         avg_ = std::move(avg);
     }
 
-    LVQDist ToLVQDistance(SizeT dim) && { return std::move(dist_).ToLVQDistance(dim); }
+    LVQDist ToLVQDistance(SizeT dim) && {
+        if constexpr (std::is_same_v<typename Dist::This, typename Dist::LVQDist>) {
+            return std::move(dist_);
+        } else {
+            return std::move(dist_).ToLVQDistance(dim);
+        }
+    }
 
 private:
     DistanceType Inner(DistanceType d, float gt1, float gt2) const {
@@ -92,6 +99,15 @@ using PlainIPLSGDist = LSGDistWrapper<PlainIPDist<DataType>, PlainVecStoreMeta<D
 
 export template <typename DataType>
 using PlainCosLSGDist = LSGDistWrapper<PlainCosDist<DataType>, PlainVecStoreMeta<DataType>>;
+
+export template <typename DataType, typename CompressType, typename LVQCache>
+using LVQL2LSGDist = LSGDistWrapper<LVQL2Dist<DataType, CompressType>, LVQVecStoreMeta<DataType, CompressType, LVQCache, true>>;
+
+export template <typename DataType, typename CompressType, typename LVQCache>
+using LVQIPLSGDist = LSGDistWrapper<LVQIPDist<DataType, CompressType>, LVQVecStoreMeta<DataType, CompressType, LVQCache, true>>;
+
+export template <typename DataType, typename CompressType, typename LVQCache>
+using LVQCosLSGDist = LSGDistWrapper<LVQCosDist<DataType, CompressType>, LVQVecStoreMeta<DataType, CompressType, LVQCache, true>>;
 
 export template <typename Distance>
 concept IsLSGDistance = requires { typename Distance::LSG; };
