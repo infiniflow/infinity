@@ -76,6 +76,9 @@ public:
     using GlobalCacheType = LVQCache::GlobalCacheType;
     using LVQData = LVQVecStoreMetaType<DataType, CompressType, LVQCache>::LVQData;
     using LVQQuery = LVQVecStoreMetaType<DataType, CompressType, LVQCache>::LVQQuery;
+    using StoreType = LVQVecStoreMetaType<DataType, CompressType, LVQCache>::StoreType;
+    using QueryType = LVQVecStoreMetaType<DataType, CompressType, LVQCache>::QueryType;
+    using DistanceType = f32;
 
 public:
     LVQVecStoreMetaBase() : dim_(0), compress_data_size_(0), normalize_(false) {}
@@ -94,6 +97,9 @@ public:
     }
 
     SizeT GetSizeInBytes() const { return sizeof(dim_) + sizeof(MeanType) * dim_ + sizeof(GlobalCacheType); }
+
+    // Get size of vector in search
+    SizeT GetVecSizeInBytes() const { return compress_data_size_; }
 
     void Save(LocalFileHandle &file_handle) const {
         file_handle.Append(&dim_, sizeof(dim_));

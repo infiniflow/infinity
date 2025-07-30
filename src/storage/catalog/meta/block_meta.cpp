@@ -281,8 +281,13 @@ String BlockMeta::GetBlockTag(const String &tag) const {
 Tuple<SizeT, Status> BlockMeta::GetRowCnt1() {
     std::lock_guard<std::mutex> lock(mtx_);
     if (row_cnt_) {
+        LOG_TRACE(fmt::format("BlockMeta::GetRowCnt1 cached result: segment={}, block={}, row_count={}", 
+                             segment_meta_.segment_id(), block_id_, *row_cnt_));
         return {*row_cnt_, Status::OK()};
     }
+
+    LOG_INFO(fmt::format("BlockMeta::GetRowCnt1 called: segment={}, block={}, begin_ts={}, commit_ts={}", 
+                        segment_meta_.segment_id(), block_id_, begin_ts_, commit_ts_));
 
 #if 1
     TableMeeta &table_meta = segment_meta_.table_meta();
@@ -293,6 +298,10 @@ Tuple<SizeT, Status> BlockMeta::GetRowCnt1() {
                                           block_id_,
                                           begin_ts_,
                                           commit_ts_);
+    
+    LOG_INFO(fmt::format("BlockMeta::GetRowCnt1 result: segment={}, block={}, row_count={}", 
+                        segment_meta_.segment_id(), block_id_, *row_cnt_));
+    
     return {*row_cnt_, Status::OK()};
 #else
     Status status;

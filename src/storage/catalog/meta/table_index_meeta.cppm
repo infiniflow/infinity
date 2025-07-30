@@ -76,7 +76,6 @@ private:
     Status GetSegmentUpdateTS(SharedPtr<SegmentUpdateTS> &segment_update_ts);
 
 public:
-    Status UpdateFulltextSegmentTS(TxnTimeStamp ts);
 
     Status InitSet1(const SharedPtr<IndexBase> &index_base, NewCatalog *new_catalog);
 

@@ -58,17 +58,7 @@ public:
 
     SegmentIndexMeta &segment_index_meta() const { return segment_index_meta_; }
 
-    Status GetChunkInfo(ChunkIndexMetaInfo *&chunk_info) {
-        std::lock_guard<std::mutex> lock(mtx_);
-        if (!chunk_info_) {
-            Status status = LoadChunkInfo();
-            if (!status.ok()) {
-                return status;
-            }
-        }
-        chunk_info = &chunk_info_.value();
-        return Status::OK();
-    }
+    Status GetChunkInfo(ChunkIndexMetaInfo *&chunk_info);
 
     Status GetIndexBuffer(BufferObj *&index_buffer);
 

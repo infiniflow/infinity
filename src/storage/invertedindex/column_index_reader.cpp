@@ -225,192 +225,69 @@ void ColumnIndexReader::InvalidateChunk(SegmentID segment_id, ChunkID chunk_id) 
     }
 }
 
-void TableIndexReaderCache::UpdateKnownUpdateTs(TxnTimeStamp ts, std::shared_mutex &segment_update_ts_mutex, TxnTimeStamp &segment_update_ts) {
-    std::scoped_lock lock1(mutex_);
-    std::unique_lock lock2(segment_update_ts_mutex);
-    if (ts < segment_update_ts) {
-        // Optimize txn begin ts may be less than Insert txn commit ts
-        return;
-    }
-    segment_update_ts = ts;
-    first_known_update_ts_ = std::min(first_known_update_ts_, ts);
-    last_known_update_ts_ = std::max(last_known_update_ts_, ts);
-}
-
 SharedPtr<IndexReader> TableIndexReaderCache::GetIndexReader(NewTxn *txn) {
     TxnTimeStamp begin_ts = txn->BeginTS();
     SharedPtr<IndexReader> index_reader = MakeShared<IndexReader>();
     std::scoped_lock lock(mutex_);
-    
-    // Debug: Print cache key information
-    LOG_INFO(fmt::format("DEBUG: Cache key - db_id_str_: '{}', table_id_str_: '{}'", db_id_str_, table_id_str_));
-    LOG_INFO(fmt::format("DEBUG: Looking up cache for table_id: '{}', begin_ts: {}", table_id_str_, begin_ts));
-    LOG_INFO(fmt::format("DEBUG: Cache state - cache_ts_: {}, first_known_update_ts_: {}, last_known_update_ts_: {}", 
-        cache_ts_, first_known_update_ts_, last_known_update_ts_));
-    
-    assert(cache_ts_ <= first_known_update_ts_);
-    assert(first_known_update_ts_ == MAX_TIMESTAMP || first_known_update_ts_ <= last_known_update_ts_);
-    if (first_known_update_ts_ != 0 && begin_ts >= cache_ts_ && begin_ts < first_known_update_ts_) [[likely]] {
+    if (begin_ts >= cache_ts_) [[likely]] {
         // no need to build, use cache
         LOG_INFO(fmt::format("DEBUG: Using cached index readers for table_id: '{}'", table_id_str_));
         index_reader->column_index_readers_ = cache_column_readers_;
-        // result.column2analyzer_ = column2analyzer_;
-    } else {
-        FlatHashMap<u64, TxnTimeStamp, detail::Hash<u64>> cache_column_ts;
-        index_reader->column_index_readers_ = MakeShared<FlatHashMap<u64, SharedPtr<Map<String, SharedPtr<ColumnIndexReader>>>, detail::Hash<u64>>>();
-        // result.column2analyzer_ = MakeShared<Map<String, String>>();
+        return index_reader;
+    }
 
-        LOG_INFO(fmt::format("DEBUG: Building new index readers for table_id: '{}'", table_id_str_));
-        
-        TableMeeta table_meta(db_id_str_, table_id_str_, txn);
-        Vector<String> *index_id_strs = nullptr;
-        {
-            Status status = table_meta.GetIndexIDs(index_id_strs, nullptr);
-            if (!status.ok()) {
-                UnrecoverableError("GetIndexIDs failed");
-            }
+    index_reader->column_index_readers_ = MakeShared<FlatHashMap<u64, SharedPtr<Map<String, SharedPtr<ColumnIndexReader>>>, detail::Hash<u64>>>();
+
+    TableMeeta table_meta(db_id_str_, table_id_str_, txn);
+    Vector<String> *index_id_strs = nullptr;
+    {
+        Status status = table_meta.GetIndexIDs(index_id_strs, nullptr);
+        if (!status.ok()) {
+            UnrecoverableError("GetIndexIDs failed");
         }
-        
-        LOG_INFO(fmt::format("DEBUG: Found {} indexes for table_id: '{}'", 
-            index_id_strs ? index_id_strs->size() : 0, table_id_str_));
-        for (const String &index_id_str : *index_id_strs) {
-            LOG_INFO(fmt::format("DEBUG: Processing index_id_str: '{}' for table_id: '{}'", index_id_str, table_id_str_));
-            
-            TableIndexMeeta table_index_meta(index_id_str, table_meta);
-            auto [index_base, index_status] = table_index_meta.GetIndexBase();
-            if (!index_status.ok()) {
-                UnrecoverableError("Fail to get index definition");
-            }
-            if (index_base->index_type_ != IndexType::kFullText) {
-                // non-fulltext index
-                LOG_INFO(fmt::format("DEBUG: Skipping non-fulltext index: '{}'", index_id_str));
-                continue;
-            }
-
-            String column_name = index_base->column_name();
-            auto [column_def, col_def_status] = table_index_meta.GetColumnDef();
-            u64 column_id = column_def->id();
-            if (index_reader->column_index_readers_->find(column_id) == index_reader->column_index_readers_->end()) {
-                (*index_reader->column_index_readers_)[column_id] = MakeShared<Map<String, SharedPtr<ColumnIndexReader>>>();
-            }
-            auto column_index_map = (*index_reader->column_index_readers_)[column_id];
-
-            // assert(table_index_entry->GetFulltextSegmentUpdateTs() <= last_known_update_ts_);
-            if (auto &target_ts = cache_column_ts[column_id]; target_ts < begin_ts) {
-                // need update result
-                target_ts = begin_ts;
-                const IndexFullText *index_full_text = reinterpret_cast<const IndexFullText *>(index_base.get());
-                // update column2analyzer_
-                // (*result.column2analyzer_)[column_name] = index_full_text->analyzer_;
-                // Debug: Print the whole cache_column_ts_ map
-                LOG_INFO(fmt::format("DEBUG: cache_column_ts_ map contents:"));
-                for (const auto& [key, value] : cache_column_ts_) {
-                    LOG_INFO(fmt::format("  column_id: {}, ts: {}", key, value));
-                }
-                LOG_INFO(fmt::format("DEBUG: Looking for column_id: {}, begin_ts: {}", column_id, begin_ts));
-                
-                if (auto it = cache_column_ts_.find(column_id); it != cache_column_ts_.end() and it->second == begin_ts) {
-                    // reuse cache
-                    LOG_INFO(fmt::format("DEBUG: Found in cache, reusing for column_id: {}", column_id));
-                    
-                    // Debug: Print cache_column_readers_ map contents
-                    LOG_INFO(fmt::format("DEBUG: cache_column_readers_ map contents:"));
-                    if (cache_column_readers_) {
-                        for (const auto& [key, value] : *cache_column_readers_) {
-                            LOG_INFO(fmt::format("  column_id: {}, readers_count: {}", key, value ? value->size() : 0));
-                        }
-                    } else {
-                        LOG_INFO("DEBUG: cache_column_readers_ is null");
-                    }
-                    
-                    // Check if column_id exists in cache_column_readers_
-                    if (cache_column_readers_ && cache_column_readers_->find(column_id) != cache_column_readers_->end()) {
-                        auto& column_readers = cache_column_readers_->at(column_id);
-                        if (column_readers && column_readers->find(index_id_str) != column_readers->end()) {
-                            (*column_index_map)[index_id_str] = column_readers->at(index_id_str);
-                        } else {
-                            LOG_ERROR(fmt::format("DEBUG: index_id_str '{}' not found in column_readers for column_id: {}", index_id_str, column_id));
-                        }
-                    } else {
-                        LOG_ERROR(fmt::format("DEBUG: column_id {} not found in cache_column_readers_", column_id));
-                    }
-                } else {
-                    // new column_index_reader
-                    LOG_INFO(fmt::format("DEBUG: Not found in cache, creating new column_index_reader for column_id: {}", column_id));
-                    auto column_index_reader = MakeShared<ColumnIndexReader>();
-                    optionflag_t flag = index_full_text->flag_;
-                    column_index_reader->Open(flag, table_index_meta);
-                    column_index_reader->analyzer_ = index_full_text->analyzer_;
-                    column_index_reader->column_name_ = column_name;
-                    (*column_index_map)[index_id_str] = std::move(column_index_reader);
-                }
-            }
-            if (begin_ts >= last_known_update_ts_) {
-                // need to update cache
-                LOG_INFO(fmt::format("DEBUG: Updating cache with new column_index_readers"));
-                LOG_INFO(fmt::format("DEBUG: index_reader->column_index_readers_ size: {}", 
-                    index_reader->column_index_readers_ ? index_reader->column_index_readers_->size() : 0));
-                
-                cache_ts_ = last_known_update_ts_;
-                first_known_update_ts_ = MAX_TIMESTAMP;
-                last_known_update_ts_ = 0;
-                cache_column_ts_ = std::move(cache_column_ts);
-                cache_column_readers_ = index_reader->column_index_readers_;
-                // column2analyzer_ = result.column2analyzer_;
-                
-                LOG_INFO(fmt::format("DEBUG: Cache updated, cache_column_readers_ size: {}", 
-                    cache_column_readers_ ? cache_column_readers_->size() : 0));
-            }
+    }
+    for (const String &index_id_str : *index_id_strs) {
+        TableIndexMeeta table_index_meta(index_id_str, table_meta);
+        auto [index_base, index_status] = table_index_meta.GetIndexBase();
+        if (!index_status.ok()) {
+            UnrecoverableError("Fail to get index definition");
         }
+        if (index_base->index_type_ != IndexType::kFullText) {
+            // non-fulltext index
+            continue;
+        }
+
+        String column_name = index_base->column_name();
+        auto [column_def, col_def_status] = table_index_meta.GetColumnDef();
+        u64 column_id = column_def->id();
+        if (index_reader->column_index_readers_->find(column_id) == index_reader->column_index_readers_->end()) {
+            (*index_reader->column_index_readers_)[column_id] = MakeShared<Map<String, SharedPtr<ColumnIndexReader>>>();
+        }
+        auto column_index_map = (*index_reader->column_index_readers_)[column_id];
+
+        // assert(table_index_entry->GetFulltextSegmentUpdateTs() <= last_known_update_ts_);
+        const IndexFullText *index_full_text = reinterpret_cast<const IndexFullText *>(index_base.get());
+        // new column_index_reader
+        auto column_index_reader = MakeShared<ColumnIndexReader>();
+        optionflag_t flag = index_full_text->flag_;
+        column_index_reader->Open(flag, table_index_meta);
+        column_index_reader->analyzer_ = index_full_text->analyzer_;
+        column_index_reader->column_name_ = column_name;
+        (*column_index_map)[index_id_str] = std::move(column_index_reader);
+    }
+
+    if (cache_ts_ == UNCOMMIT_TS || begin_ts > cache_ts_) {
+        // need to update cache
+        cache_ts_ = begin_ts;
+        cache_column_readers_ = index_reader->column_index_readers_;
     }
     return index_reader;
 }
 
 void TableIndexReaderCache::Invalidate() {
     std::scoped_lock lock(mutex_);
-    first_known_update_ts_ = 0;
-    last_known_update_ts_ = std::max(last_known_update_ts_, cache_ts_);
-    cache_ts_ = 0;
-    cache_column_ts_.clear();
+    cache_ts_ = UNCOMMIT_TS;
     cache_column_readers_.reset();
-    // column2analyzer_.reset();
-}
-
-void TableIndexReaderCache::InvalidateColumn(u64 column_id, const String &column_name) {
-    std::scoped_lock lock(mutex_);
-    cache_column_ts_.erase(column_id);
-    if (cache_column_readers_.get() != nullptr) {
-        cache_column_readers_->erase(column_id);
-    }
-    // if (column2analyzer_.get() != nullptr) {
-    //     column2analyzer_->erase(column_name);
-    // }
-}
-
-void TableIndexReaderCache::InvalidateSegmentColumn(u64 column_id, SegmentID segment_id) {
-    std::scoped_lock lock(mutex_);
-    if (!cache_column_readers_.get()) {
-        return;
-    }
-    auto iter = cache_column_readers_->find(column_id);
-    if (iter != cache_column_readers_->end()) {
-        for (auto index_reader : (*iter->second)) {
-            index_reader.second->InvalidateSegment(segment_id);
-        }
-    }
-}
-
-void TableIndexReaderCache::InvalidateChunkColumn(u64 column_id, SegmentID segment_id, ChunkID chunk_id) {
-    std::scoped_lock lock(mutex_);
-    if (!cache_column_readers_.get()) {
-        return;
-    }
-    auto iter = cache_column_readers_->find(column_id);
-    if (iter != cache_column_readers_->end()) {
-        for (auto index_reader : (*iter->second)) {
-            index_reader.second->InvalidateChunk(segment_id, chunk_id);
-        }
-    }
 }
 
 } // namespace infinity

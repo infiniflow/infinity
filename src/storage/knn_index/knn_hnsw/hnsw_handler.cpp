@@ -43,30 +43,49 @@ AbstractHnsw InitAbstractIndexT(const IndexHnsw *index_hnsw) {
                         return nullptr;
                     }
                 }
-            } else if (index_hnsw->build_type_ != HnswBuildType::kPlain) {
+            } else if (index_hnsw->build_type_ == HnswBuildType::kPlain) {
+                switch (index_hnsw->metric_type_) {
+                    case MetricType::kMetricL2: {
+                        using HnswIndex = KnnHnsw<PlainL2VecStoreType<DataType>, SegmentOffset, OwnMem>;
+                        return UniquePtr<HnswIndex>();
+                    }
+                    case MetricType::kMetricInnerProduct: {
+                        using HnswIndex = KnnHnsw<PlainIPVecStoreType<DataType>, SegmentOffset, OwnMem>;
+                        return UniquePtr<HnswIndex>();
+                    }
+                    case MetricType::kMetricCosine: {
+                        using HnswIndex = KnnHnsw<PlainCosVecStoreType<DataType>, SegmentOffset, OwnMem>;
+                        return UniquePtr<HnswIndex>();
+                    }
+                    default: {
+                        return nullptr;
+                    }
+                }
+            } else {
                 return nullptr;
-            }
-            switch (index_hnsw->metric_type_) {
-                case MetricType::kMetricL2: {
-                    using HnswIndex = KnnHnsw<PlainL2VecStoreType<DataType>, SegmentOffset, OwnMem>;
-                    return UniquePtr<HnswIndex>();
-                }
-                case MetricType::kMetricInnerProduct: {
-                    using HnswIndex = KnnHnsw<PlainIPVecStoreType<DataType>, SegmentOffset, OwnMem>;
-                    return UniquePtr<HnswIndex>();
-                }
-                case MetricType::kMetricCosine: {
-                    using HnswIndex = KnnHnsw<PlainCosVecStoreType<DataType>, SegmentOffset, OwnMem>;
-                    return UniquePtr<HnswIndex>();
-                }
-                default: {
-                    return nullptr;
-                }
             }
         }
         case HnswEncodeType::kLVQ: {
             if constexpr (std::is_same_v<DataType, u8> || std::is_same_v<DataType, i8>) {
                 return nullptr;
+            } else if (index_hnsw->build_type_ == HnswBuildType::kLSG) {
+                switch (index_hnsw->metric_type_) {
+                    case MetricType::kMetricL2: {
+                        using HnswIndex = KnnHnsw<LVQL2VecStoreType<DataType, i8, true>, SegmentOffset, OwnMem>;
+                        return UniquePtr<HnswIndex>();
+                    }
+                    case MetricType::kMetricInnerProduct: {
+                        using HnswIndex = KnnHnsw<LVQIPVecStoreType<DataType, i8, true>, SegmentOffset, OwnMem>;
+                        return UniquePtr<HnswIndex>();
+                    }
+                    case MetricType::kMetricCosine: {
+                        using HnswIndex = KnnHnsw<LVQCosVecStoreType<DataType, i8, true>, SegmentOffset, OwnMem>;
+                        return UniquePtr<HnswIndex>();
+                    }
+                    default: {
+                        return nullptr;
+                    }
+                }
             } else if (index_hnsw->build_type_ == HnswBuildType::kPlain) {
                 switch (index_hnsw->metric_type_) {
                     case MetricType::kMetricL2: {
@@ -85,6 +104,8 @@ AbstractHnsw InitAbstractIndexT(const IndexHnsw *index_hnsw) {
                         return nullptr;
                     }
                 }
+            } else {
+                return nullptr;
             }
         }
         default: {

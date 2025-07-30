@@ -58,6 +58,9 @@ public:
 
     SizeT GetSizeInBytes() const { return sizeof(SizeT); }
 
+    // Get size of vector in search
+    SizeT GetVecSizeInBytes() const { return sizeof(DataType) * dim_; }
+
     void Save(LocalFileHandle &file_handle) const { file_handle.Append(&dim_, sizeof(dim_)); }
 
     static This Load(LocalFileHandle &file_handle) {

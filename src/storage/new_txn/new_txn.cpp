@@ -1439,21 +1439,21 @@ NewTxn::GetBlockColumnInfo(const String &db_name, const String &table_name, Segm
 
 
 Status NewTxn::CreateTableSnapshot(const String &db_name, const String &table_name, const String &snapshot_name) {
-    // Check if the DB is valid
+        // Check if the DB is valid
     this->SetTxnType(TransactionType::kCreateTableSnapshot);
-    this->CheckTxn(db_name);
+        this->CheckTxn(db_name);
 
     SharedPtr<TableSnapshotInfo> table_snapshot_info;
 
     // First, get the meta info of the table
-    Optional<DBMeeta> db_meta;
-    Optional<TableMeeta> table_meta_opt;
+        Optional<DBMeeta> db_meta;
+        Optional<TableMeeta> table_meta_opt;
     Optional<SegmentMeta> segment_meta_opt;
-    String table_key;
-    Status status = GetTableMeta(db_name, table_name, db_meta, table_meta_opt, &table_key);
-    
-    if (!status.ok()) {
-        return status;
+        String table_key;
+        Status status = GetTableMeta(db_name, table_name, db_meta, table_meta_opt, &table_key);
+
+        if (!status.ok()) {
+            return status;
     }
 
    
@@ -1599,36 +1599,36 @@ Status NewTxn::RestoreDatabaseSnapshot(const SharedPtr<DatabaseSnapshotInfo> &da
     txn_store->db_id_str_ = db_id_str;
     txn_store->db_comment_ = database_snapshot_info->db_comment_;
     // Copy database snapshot files
-    String snapshot_dir = InfinityContext::instance().config()->SnapshotDir();
-    String snapshot_name = database_snapshot_info->snapshot_name_;
+        String snapshot_dir = InfinityContext::instance().config()->SnapshotDir();
+        String snapshot_name = database_snapshot_info->snapshot_name_;
     Vector<String> files_to_restore = database_snapshot_info->GetFiles();
-    Vector<String> restored_file_paths;
+        Vector<String> restored_file_paths;    
     status = database_snapshot_info->RestoreSnapshotFiles(snapshot_dir, snapshot_name, files_to_restore, db_id_str, db_id_str, restored_file_paths, true);
-    if (!status.ok()) {
-        return status;
-    }
-    
-    
-    // Process each table snapshot within the database
-    for (const auto &table_snapshot_info : database_snapshot_info->table_snapshots_) {
-        const String &table_name = table_snapshot_info->table_name_;
-        
-        // Create table definition
-        SharedPtr<TableDef> table_def = TableDef::Make(
-            MakeShared<String>(db_name), 
-            MakeShared<String>(table_name), 
-            MakeShared<String>(table_snapshot_info->table_comment_), 
-            table_snapshot_info->columns_
-        );
-        
-
-        SharedPtr<RestoreTableTxnStore> tmp_txn_store_ = MakeShared<RestoreTableTxnStore>();
-        
-        // Use the helper function to process snapshot restoration data
-        status = ProcessSnapshotRestorationData(db_name, db_id_str, table_name, table_snapshot_info->table_id_str_, table_def, table_snapshot_info, snapshot_name, tmp_txn_store_.get());
         if (!status.ok()) {
             return status;
         }
+        
+        
+        // Process each table snapshot within the database
+        for (const auto &table_snapshot_info : database_snapshot_info->table_snapshots_) {
+            const String &table_name = table_snapshot_info->table_name_;
+            
+            // Create table definition
+            SharedPtr<TableDef> table_def = TableDef::Make(
+            MakeShared<String>(db_name), 
+                MakeShared<String>(table_name), 
+                MakeShared<String>(table_snapshot_info->table_comment_), 
+                table_snapshot_info->columns_
+            );
+
+            
+            SharedPtr<RestoreTableTxnStore> tmp_txn_store_ = MakeShared<RestoreTableTxnStore>();
+            
+            // Use the helper function to process snapshot restoration data
+        status = ProcessSnapshotRestorationData(db_name, db_id_str, table_name, table_snapshot_info->table_id_str_, table_def, table_snapshot_info, snapshot_name, tmp_txn_store_.get());
+            if (!status.ok()) {
+                return status;
+            }
         txn_store->restore_table_txn_stores_.push_back(std::move(tmp_txn_store_));
     }
     
@@ -1659,6 +1659,7 @@ Status NewTxn::Checkpoint(TxnTimeStamp last_ckp_ts) {
     if (last_ckp_ts % 2 == 0 and last_ckp_ts > 0) {
         UnrecoverableError(fmt::format("last checkpoint ts isn't correct: {}", last_ckp_ts));
     }
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
     Status status;
     TxnTimeStamp checkpoint_ts = txn_context_ptr_->begin_ts_;
@@ -1962,7 +1963,6 @@ Status NewTxn::Commit() {
                 break;
             }
             case TxnState::kRollbacking: {
-                txn_mgr_->RemoveFromAllocation(commit_ts);
                 break;
             }
             default: {
@@ -2156,6 +2156,7 @@ Status NewTxn::PrepareCommit() {
                 break;
             }
             case WalCommandType::APPEND_V2: {
+                // LOG_INFO(fmt::format("txn: {}  prepare commit append", txn_context_ptr_->txn_id_));
                 break;
             }
             case WalCommandType::DELETE_V2: {
@@ -2927,7 +2928,7 @@ bool NewTxn::CheckConflictTxnStore(const CreateDBTxnStore &txn_store, NewTxn *pr
             break;
         }
         case TransactionType::kCreateTableSnapshot: {
-            retry_query = true;
+                retry_query = true;
             conflict = true;
             break;
         }
@@ -2963,7 +2964,7 @@ bool NewTxn::CheckConflictTxnStore(const RestoreDatabaseTxnStore &txn_store, New
             break;
         }
         case TransactionType::kCreateTableSnapshot: {
-            retry_query = true;
+                retry_query = true;
             conflict = true;
             break;
         }
@@ -3095,8 +3096,8 @@ bool NewTxn::CheckConflictTxnStore(const CreateTableTxnStore &txn_store, NewTxn 
             break;
         }
         case TransactionType::kCreateTableSnapshot: {
-            retry_query = true;
-            conflict = true;
+                retry_query = true;
+                conflict = true;
             break;
         }
         default: {
@@ -4825,8 +4826,8 @@ void NewTxn::CommitBottom() {
                 }
                 auto *create_table_snapshot_cmd = static_cast<WalCmdCreateTableSnapshot *>(command.get());                
                 Status status = CommitBottomCreateTableSnapshot(create_table_snapshot_cmd);
-                if (!status.ok()) {
-                    UnrecoverableError(fmt::format("CommitBottomCreateTableSnapshot failed: {}", status.message()));
+                    if (!status.ok()) {
+                        UnrecoverableError(fmt::format("CommitBottomCreateTableSnapshot failed: {}", status.message()));
                 }
                 break;
             }

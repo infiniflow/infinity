@@ -62,6 +62,7 @@ enum class BuildType : i8 {
     LVQ,
     CompressToLVQ,
     LSGBuild,
+    LSGLVQBuild,
     LSGCompressToLVQ,
 };
 
@@ -75,6 +76,8 @@ String BuildTypeToString(BuildType build_type) {
             return "clvq";
         case BuildType::LSGBuild:
             return "lsg";
+        case BuildType::LSGLVQBuild:
+            return "lvq_lsg";
         case BuildType::LSGCompressToLVQ:
             return "clvq_lsg";
     }
@@ -96,6 +99,7 @@ public:
             {"lvq", BuildType::LVQ},
             {"clvq", BuildType::CompressToLVQ},
             {"lsg", BuildType::LSGBuild},
+            {"lvq_lsg", BuildType::LSGLVQBuild},
             {"clvq_lsg", BuildType::LSGCompressToLVQ},
         };
 
@@ -176,6 +180,7 @@ using LabelT = u32;
 using Hnsw = KnnHnsw<PlainL2VecStoreType<float>, LabelT>;
 using HnswLSG = KnnHnsw<PlainL2VecStoreType<float, true>, LabelT>;
 using HnswLVQ = KnnHnsw<LVQL2VecStoreType<float, i8>, LabelT>;
+using HnswLVQLSG = KnnHnsw<LVQL2VecStoreType<float, i8, true>, LabelT>;
 
 // SharedPtr<String> index_name = MakeShared<String>("index_name");
 // String filename = "filename";
@@ -250,7 +255,7 @@ void Build(const BenchmarkOption &option) {
     profiler.Begin();
     auto hnsw = HnswT::Make(option.chunk_size_, option.max_chunk_num_, dim, option.M_, option.ef_construction_);
 
-    if constexpr (std::is_same_v<HnswT, HnswLSG>) {
+    if constexpr (std::is_same_v<HnswT, HnswLSG> || std::is_same_v<HnswT, HnswLVQLSG>) {
         // auto column_def = MakeColumnDef(dim);
         // auto index_hnsw = MakeLSGIndexHnsw(option);
         // LSGConfig lsg_config;
@@ -443,6 +448,10 @@ int main(int argc, char *argv[]) {
                     Build<HnswLSG, HnswLSG>(option);
                     break;
                 }
+                case BuildType::LSGLVQBuild: {
+                    Build<HnswLVQLSG, HnswLVQLSG>(option);
+                    break;
+                }
                 case BuildType::LSGCompressToLVQ: {
                     Build<HnswLSG, HnswLVQ>(option);
                     break;
@@ -464,6 +473,10 @@ int main(int argc, char *argv[]) {
                 }
                 case BuildType::LSGBuild: {
                     Query<HnswLSG>(option);
+                    break;
+                }
+                case BuildType::LSGLVQBuild: {
+                    Query<HnswLVQLSG>(option);
                     break;
                 }
             }

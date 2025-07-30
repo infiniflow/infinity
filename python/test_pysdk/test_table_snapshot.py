@@ -425,8 +425,8 @@ class TestSnapshot:
         # Create table and insert large amount of data
         table_obj = self.create_comprehensive_table(table_name)
         self._create_indexes(table_obj)
-        actual_inserted = self.insert_comprehensive_data(table_obj, 30000)  # 30k rows - should be fine with small dimensions
-        print(f"Successfully inserted {actual_inserted} out of 30000 rows")
+        actual_inserted = self.insert_comprehensive_data(table_obj, 100000)  # 30k rows - should be fine with small dimensions
+        print(f"Successfully inserted {actual_inserted} out of 100000 rows")
 
         #check count
         count_result, extra_result = table_obj.output(["count(*)"]).to_df()

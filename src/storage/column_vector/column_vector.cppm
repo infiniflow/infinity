@@ -100,7 +100,7 @@ private:
 
     SizeT capacity_{0};
 
-    SizeT tail_index_{0};
+    Atomic<SizeT> tail_index_{0};
 
 public:
     ColumnVector();
@@ -265,7 +265,7 @@ public:
 
     template <typename DataT, typename IdxT>
     void AppendSparse(SizeT nnz, const DataT *data, const IdxT *index) {
-        SizeT dst_off = tail_index_++;
+        SizeT dst_off = tail_index_.fetch_add(1);
         AppendSparseInner(nnz, data, index, dst_off);
     }
 
@@ -311,14 +311,14 @@ public:
 
     [[nodiscard]] inline SizeT capacity() const { return capacity_; }
 
-    [[nodiscard]] inline SizeT Size() const { return tail_index_; }
+    [[nodiscard]] inline SizeT Size() const { return tail_index_.load(); }
 };
 
 template <typename T>
 void ColumnVector::CopyValue(ColumnVector &dst, const ColumnVector &src, SizeT from, SizeT count) {
     auto *src_ptr = (T *)(src.data_ptr_);
-    T *dst_ptr = &((T *)(dst.data_ptr_))[dst.tail_index_];
-    if (src.vector_type() == ColumnVectorType::kConstant && src.tail_index_ == 1) {
+    T *dst_ptr = &((T *)(dst.data_ptr_))[dst.tail_index_.load()];
+    if (src.vector_type() == ColumnVectorType::kConstant && src.tail_index_.load() == 1) {
         for (SizeT idx = 0; idx < count; ++idx) {
             dst_ptr[idx] = src_ptr[from];
         }
@@ -557,7 +557,7 @@ void CopyArray(ArrayT &dst_array,
 
 template <>
 void ColumnVector::CopyValue<BooleanT>(ColumnVector &dst, const ColumnVector &src, SizeT from, SizeT count) {
-    auto dst_tail = dst.tail_index_;
+    auto dst_tail = dst.tail_index_.load();
     const VectorBuffer *src_buffer = src.buffer_.get();
     auto dst_buffer = dst.buffer_.get();
     if (dst_tail % 8 == 0 && from % 8 == 0) {

@@ -83,16 +83,7 @@ public:
 
     // Status SetNextSegmentID(SegmentID next_segment_id);
 
-    Status GetUnsealedSegmentID(SegmentID &unsealed_segment_id) {
-        if (!unsealed_segment_id_) {
-            Status status = LoadUnsealedSegmentID();
-            if (!status.ok()) {
-                return status;
-            }
-        }
-        unsealed_segment_id = *unsealed_segment_id_;
-        return Status::OK();
-    }
+    Status GetUnsealedSegmentID(SegmentID &unsealed_segment_id);
 
     Status SetUnsealedSegmentID(SegmentID unsealed_segment_id);
 
@@ -139,14 +130,12 @@ public:
 
     Status RemoveFtIndexCache();
 
-    Status InvalidateFtIndexCache(SegmentID segment_id);
+    Status InvalidateFtIndexCache();
 
     Status GetNextColumnID(ColumnID &next_column_id);
 
     Status SetNextColumnID(ColumnID next_column_id);
     
-    Status UpdateFulltextSegmentTS(TxnTimeStamp ts, SegmentUpdateTS &segment_update_ts);
-
     Status GetNextRowID(RowID &next_row_id);
 
     Tuple<String, Status> GetNextIndexID();

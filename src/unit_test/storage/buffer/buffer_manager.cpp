@@ -126,6 +126,7 @@ TEST_F(BufferManagerTest, cleanup_test) {
                 for (SizeT j = 0; j < file_size; ++j) {
                     data[j] = 'a' + (i + j) % 26;
                 }
+                buffer_obj->SetDataSize(file_size);
             }
         }
         CheckFileNum(0, file_num - k);
@@ -392,6 +393,7 @@ public:
         for (SizeT i = 0; i < file_info.file_size_; ++i) {
             data[i] = 'a' + (visit_cnt % 26);
         }
+        file_info.buffer_obj_->SetDataSize(file_info.file_size_);
     }
 
     void Check(const FileInfo &file_info) override {
@@ -473,7 +475,7 @@ public:
         file_info.file_size_ += var_file_step;
 
         ASSERT_EQ(file_info.buffer_obj_->GetBufferSize(), file_info.file_size_);
-        LOG_INFO(fmt::format("Write file {} size {}", file_info.file_id_, file_info.file_size_));
+        LOG_DEBUG(fmt::format("Write file {} size {}", file_info.file_id_, file_info.file_size_));
     }
 
     void Check(const FileInfo &file_info) override {

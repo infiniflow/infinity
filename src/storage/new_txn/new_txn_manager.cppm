@@ -155,8 +155,6 @@ public:
 
     void SubmitForAllocation(SharedPtr<TxnAllocatorTask> txn_allocator_task);
 
-    void RemoveFromAllocation(TxnTimeStamp commit_ts);
-
     void SetSystemCache(UniquePtr<SystemCache> system_cache);
 
     void RemoveMapElementForRollbackNoLock(TxnTimeStamp commit_ts, NewTxn *txn_ptr);
