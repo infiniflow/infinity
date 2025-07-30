@@ -114,18 +114,20 @@ Tuple<i32, Status> BlockVersion::GetRowCountForUpdate(TxnTimeStamp begin_ts) con
     return {row_count, Status::OK()};
 }
 
-void BlockVersion::SaveToFile(TxnTimeStamp checkpoint_ts, LocalFileHandle &file_handle) const {
+bool BlockVersion::SaveToFile(TxnTimeStamp checkpoint_ts, LocalFileHandle &file_handle) const {
     std::unique_lock<std::shared_mutex> lock(rw_mutex_);
     BlockOffset create_size = created_.size();
     while (create_size > 0 && created_[create_size - 1].create_ts_ > checkpoint_ts) {
         --create_size;
     }
-
+ 
+ 
     file_handle.Append(&create_size, sizeof(create_size));
     for (SizeT j = 0; j < create_size; ++j) {
         created_[j].SaveToFile(&file_handle);
     }
-
+ 
+ 
     BlockOffset capacity = deleted_.size();
     file_handle.Append(&capacity, sizeof(capacity));
     TxnTimeStamp dump_ts = 0;
@@ -138,8 +140,28 @@ void BlockVersion::SaveToFile(TxnTimeStamp checkpoint_ts, LocalFileHandle &file_
             file_handle.Append(&dump_ts, sizeof(dump_ts));
         }
     }
-    LOG_TRACE(fmt::format("Flush block version, ckp ts: {}, write create: {}, delete {}", checkpoint_ts, create_size, deleted_row_count));
-}
+   
+    // Check if the version file is full by calculating row count before checkpoint timestamp
+    i64 total_row_count = 0;
+    if (create_size > 0) {
+        // Get the row count before checkpoint_ts using the same logic as GetRowCount()
+        auto iter = std::upper_bound(created_.begin(), created_.begin() + create_size, checkpoint_ts, 
+                                   [](TxnTimeStamp ts, const CreateField &field) { return ts < field.create_ts_; });
+        if (iter != created_.begin()) {
+            --iter;
+            total_row_count = iter->row_count_;
+        }
+    }
+ 
+ 
+    bool is_full = total_row_count >= DEFAULT_BLOCK_CAPACITY;
+   
+    LOG_TRACE(fmt::format("Flush block version, ckp ts: {}, write create: {}, delete {}, total_rows: {}, is_full: {}",
+                          checkpoint_ts, create_size, deleted_row_count, total_row_count, is_full));
+   
+    return is_full;
+ }
+ 
 
 void BlockVersion::SpillToFile(LocalFileHandle *file_handle) const {
     std::unique_lock<std::shared_mutex> lock(rw_mutex_);
