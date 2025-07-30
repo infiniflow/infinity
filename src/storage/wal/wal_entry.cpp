@@ -258,9 +258,9 @@ String WalSegmentInfo::ToString() const {
     return std::move(ss).str();
 }
 
-WalChunkIndexInfo::WalChunkIndexInfo(ChunkIndexMeta &chunk_index_meta) : chunk_id_(chunk_index_meta.chunk_id()) {
+WalChunkIndexInfo::WalChunkIndexInfo(ChunkIndexMeta &chunk_index_meta, KVInstance *kv_instance) : chunk_id_(chunk_index_meta.chunk_id()) {
     ChunkIndexMetaInfo *chunk_info_ptr = nullptr;
-    Status status = chunk_index_meta.GetChunkInfo(chunk_info_ptr);
+    Status status = chunk_index_meta.GetChunkInfo(kv_instance, chunk_info_ptr);
     if (!status.ok()) {
         UnrecoverableError("Failed to get chunk info from chunk index meta.");
     }

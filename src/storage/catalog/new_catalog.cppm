@@ -269,7 +269,7 @@ public:
                             const SharedPtr<IndexBase> &index_base,
                             Optional<TableIndexMeeta> &table_index_meta);
 
-    static Status CleanTableIndex(TableIndexMeeta &table_index_meta, UsageFlag usage_flag);
+    static Status CleanTableIndex(TableIndexMeeta &table_index_meta, KVInstance *kv_instance, UsageFlag usage_flag);
 
     // static Status AddNewSegment(TableMeeta &table_meta, SegmentID segment_id, Optional<SegmentMeta> &segment_meta);
 
@@ -294,7 +294,8 @@ public:
     static Status
     AddNewBlock1(SegmentMeta &segment_meta, KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts, Optional<BlockMeta> &block_meta);
 
-    static Status LoadImportedOrCompactedSegment(TableMeeta &table_meta, const WalSegmentInfo &segment_info, TxnTimeStamp commit_ts);
+    static Status
+    LoadImportedOrCompactedSegment(TableMeeta &table_meta, KVInstance *kv_instance, const WalSegmentInfo &segment_info, TxnTimeStamp commit_ts);
 
     static Status
     AddNewBlockWithID(SegmentMeta &segment_meta, KVInstance *kv_instance, TxnTimeStamp commit_ts, Optional<BlockMeta> &block_meta, BlockID block_id);
@@ -316,7 +317,7 @@ public:
     static Status
     AddNewSegmentIndex1(TableIndexMeeta &table_index_meta, NewTxn *new_txn, SegmentID segment_id, Optional<SegmentIndexMeta> &segment_index_meta);
 
-    static Status CleanSegmentIndex(SegmentIndexMeta &segment_index_meta, UsageFlag usage_flag);
+    static Status CleanSegmentIndex(SegmentIndexMeta &segment_index_meta, KVInstance *kv_instance, UsageFlag usage_flag);
 
     static Status AddNewChunkIndex1(SegmentIndexMeta &segment_index_meta,
                                     NewTxn *new_txn,
@@ -327,9 +328,10 @@ public:
                                     SizeT index_size,
                                     Optional<ChunkIndexMeta> &chunk_index_meta);
 
-    static Status LoadFlushedChunkIndex1(SegmentIndexMeta &segment_index_meta, const WalChunkIndexInfo &chunk_info, NewTxn *new_txn);
+    static Status
+    LoadFlushedChunkIndex1(SegmentIndexMeta &segment_index_meta, KVInstance *kv_instance, const WalChunkIndexInfo &chunk_info, NewTxn *new_txn);
 
-    static Status CleanChunkIndex(ChunkIndexMeta &chunk_index_meta, UsageFlag usage_flag);
+    static Status CleanChunkIndex(ChunkIndexMeta &chunk_index_meta, KVInstance *kv_instance, UsageFlag usage_flag);
 
     static Status GetColumnVector(ColumnMeta &column_meta, SizeT row_count, const ColumnVectorMode &tipe, ColumnVector &column_vector);
 
@@ -367,11 +369,11 @@ public:
                                      SharedPtr<ColumnDef> column_def,
                                      Vector<String> &file_paths);
 
-    static Status GetTableIndexFilePaths(TableIndexMeeta &table_index_meta, Vector<String> &file_paths);
+    static Status GetTableIndexFilePaths(TableIndexMeeta &table_index_meta, KVInstance *kv_instance, Vector<String> &file_paths);
 
-    static Status GetSegmentIndexFilepaths(SegmentIndexMeta &segment_index_meta, Vector<String> &file_paths);
+    static Status GetSegmentIndexFilepaths(SegmentIndexMeta &segment_index_meta, KVInstance *kv_instance, Vector<String> &file_paths);
 
-    static Status GetChunkIndexFilePaths(ChunkIndexMeta &chunk_index_meta, Vector<String> &file_paths);
+    static Status GetChunkIndexFilePaths(ChunkIndexMeta &chunk_index_meta, KVInstance *kv_instance, Vector<String> &file_paths);
 
     static Status CheckColumnIfIndexed(TableMeeta &table_meta, ColumnID column_id, bool &has_index);
 

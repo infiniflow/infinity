@@ -71,12 +71,12 @@ void ChunkIndexMetaInfo::FromJson(std::string_view json_str) {
 }
 
 ChunkIndexMeta::ChunkIndexMeta(ChunkID chunk_id, SegmentIndexMeta &segment_index_meta)
-    : BaseMeta(MetaType::kChunkIndex), kv_instance_(segment_index_meta.kv_instance()), segment_index_meta_(segment_index_meta), chunk_id_(chunk_id) {}
+    : BaseMeta(MetaType::kChunkIndex), segment_index_meta_(segment_index_meta), chunk_id_(chunk_id) {}
 
-Status ChunkIndexMeta::GetChunkInfo(ChunkIndexMetaInfo *&chunk_info) {
+Status ChunkIndexMeta::GetChunkInfo(KVInstance *kv_instance, ChunkIndexMetaInfo *&chunk_info) {
     std::lock_guard<std::mutex> lock(mtx_);
     if (!chunk_info_) {
-        Status status = LoadChunkInfo();
+        Status status = LoadChunkInfo(kv_instance);
         if (!status.ok()) {
             return status;
         }
@@ -85,9 +85,9 @@ Status ChunkIndexMeta::GetChunkInfo(ChunkIndexMetaInfo *&chunk_info) {
     return Status::OK();
 }
 
-Status ChunkIndexMeta::GetIndexBuffer(BufferObj *&index_buffer) {
+Status ChunkIndexMeta::GetIndexBuffer(KVInstance *kv_instance, BufferObj *&index_buffer) {
     if (!index_buffer_) {
-        Status status = LoadIndexBuffer();
+        Status status = LoadIndexBuffer(kv_instance);
         if (!status.ok()) {
             return status;
         }
@@ -96,13 +96,13 @@ Status ChunkIndexMeta::GetIndexBuffer(BufferObj *&index_buffer) {
     return Status::OK();
 }
 
-Status ChunkIndexMeta::InitSet(const ChunkIndexMetaInfo &chunk_info) {
+Status ChunkIndexMeta::InitSet(KVInstance *kv_instance, const ChunkIndexMetaInfo &chunk_info) {
     chunk_info_ = chunk_info;
     {
         String chunk_info_key = GetChunkIndexTag("chunk_info");
         nlohmann::json chunk_info_json;
         chunk_info_->ToJson(chunk_info_json);
-        Status status = kv_instance_.Put(chunk_info_key, chunk_info_json.dump());
+        Status status = kv_instance->Put(chunk_info_key, chunk_info_json.dump());
         if (!status.ok()) {
             return status;
         }
@@ -221,12 +221,12 @@ Status ChunkIndexMeta::InitSet(const ChunkIndexMetaInfo &chunk_info) {
     return Status::OK();
 }
 
-Status ChunkIndexMeta::LoadSet() {
+Status ChunkIndexMeta::LoadSet(KVInstance *kv_instance) {
     BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
     TableIndexMeeta &table_index_meta = segment_index_meta_.table_index_meta();
 
     ChunkIndexMetaInfo *chunk_info_ptr = nullptr;
-    Status status = this->GetChunkInfo(chunk_info_ptr);
+    Status status = this->GetChunkInfo(kv_instance, chunk_info_ptr);
     if (!status.ok()) {
         return status;
     }
@@ -333,12 +333,12 @@ Status ChunkIndexMeta::LoadSet() {
     return Status::OK();
 }
 
-Status ChunkIndexMeta::RestoreSet() {
+Status ChunkIndexMeta::RestoreSet(KVInstance *kv_instance) {
     BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
     TableIndexMeeta &table_index_meta = segment_index_meta_.table_index_meta();
 
     ChunkIndexMetaInfo *chunk_info_ptr = nullptr;
-    Status status = this->GetChunkInfo(chunk_info_ptr);
+    Status status = this->GetChunkInfo(kv_instance, chunk_info_ptr);
     if (!status.ok()) {
         return status;
     }
@@ -445,9 +445,9 @@ Status ChunkIndexMeta::RestoreSet() {
     return Status::OK();
 }
 
-Status ChunkIndexMeta::UninitSet(UsageFlag usage_flag) {
+Status ChunkIndexMeta::UninitSet(KVInstance *kv_instance, UsageFlag usage_flag) {
     auto *kv_store = InfinityContext::instance().storage()->kv_store();
-    Status status = this->GetIndexBuffer(index_buffer_);
+    Status status = this->GetIndexBuffer(kv_instance, index_buffer_);
     if (!status.ok()) {
         return status;
     }
@@ -461,7 +461,7 @@ Status ChunkIndexMeta::UninitSet(UsageFlag usage_flag) {
     if (usage_flag == UsageFlag::kOther) {
         if (index_def->index_type_ == IndexType::kFullText) {
             ChunkIndexMetaInfo *chunk_info_ptr = nullptr;
-            status = this->GetChunkInfo(chunk_info_ptr);
+            status = this->GetChunkInfo(kv_instance, chunk_info_ptr);
             if (!status.ok()) {
                 return status;
             }
@@ -496,7 +496,7 @@ Status ChunkIndexMeta::UninitSet(UsageFlag usage_flag) {
     }
     {
         String chunk_info_key = GetChunkIndexTag("chunk_info");
-        status = kv_instance_.Delete(chunk_info_key);
+        status = kv_instance->Delete(chunk_info_key);
         if (!status.ok()) {
             return status;
         }
@@ -504,13 +504,13 @@ Status ChunkIndexMeta::UninitSet(UsageFlag usage_flag) {
     return Status::OK();
 }
 
-Status ChunkIndexMeta::SetChunkInfo(const ChunkIndexMetaInfo &chunk_info) {
+Status ChunkIndexMeta::SetChunkInfo(KVInstance *kv_instance, const ChunkIndexMetaInfo &chunk_info) {
     chunk_info_ = chunk_info;
     {
         String chunk_info_key = GetChunkIndexTag("chunk_info");
         nlohmann::json chunk_info_json;
         chunk_info_->ToJson(chunk_info_json);
-        Status status = kv_instance_.Put(chunk_info_key, chunk_info_json.dump());
+        Status status = kv_instance->Put(chunk_info_key, chunk_info_json.dump());
         if (!status.ok()) {
             return status;
         }
@@ -523,7 +523,7 @@ Status ChunkIndexMeta::SetChunkInfoNoPutKV(const ChunkIndexMetaInfo &chunk_info)
     return Status::OK();
 }
 
-Status ChunkIndexMeta::FilePaths(Vector<String> &paths) {
+Status ChunkIndexMeta::FilePaths(KVInstance *kv_instance, Vector<String> &paths) {
     Status status;
     TableIndexMeeta &table_index_meta = segment_index_meta_.table_index_meta();
     auto [index_def, index_status] = table_index_meta.GetIndexBase();
@@ -531,7 +531,7 @@ Status ChunkIndexMeta::FilePaths(Vector<String> &paths) {
         return index_status;
     }
     ChunkIndexMetaInfo *chunk_info_ptr = nullptr;
-    status = this->GetChunkInfo(chunk_info_ptr);
+    status = this->GetChunkInfo(kv_instance, chunk_info_ptr);
     if (!status.ok()) {
         return status;
     }
@@ -561,10 +561,10 @@ Status ChunkIndexMeta::FilePaths(Vector<String> &paths) {
     return Status::OK();
 }
 
-Status ChunkIndexMeta::LoadChunkInfo() {
+Status ChunkIndexMeta::LoadChunkInfo(KVInstance *kv_instance) {
     String chunk_info_key = GetChunkIndexTag("chunk_info");
     String chunk_info_str;
-    Status s = kv_instance_.Get(chunk_info_key, chunk_info_str);
+    Status s = kv_instance->Get(chunk_info_key, chunk_info_str);
     if (!s.ok()) {
         return s;
     }
@@ -573,7 +573,7 @@ Status ChunkIndexMeta::LoadChunkInfo() {
     return Status::OK();
 }
 
-Status ChunkIndexMeta::LoadIndexBuffer() {
+Status ChunkIndexMeta::LoadIndexBuffer(KVInstance *kv_instance) {
     TableIndexMeeta &table_index_meta = segment_index_meta_.table_index_meta();
 
     String index_dir = fmt::format("{}/{}", InfinityContext::instance().config()->DataDir(), segment_index_meta_.GetSegmentIndexDir()->c_str());
@@ -600,7 +600,7 @@ Status ChunkIndexMeta::LoadIndexBuffer() {
         case IndexType::kFullText: {
             ChunkIndexMetaInfo *chunk_info_ptr = nullptr;
             {
-                Status status = this->GetChunkInfo(chunk_info_ptr);
+                Status status = this->GetChunkInfo(kv_instance, chunk_info_ptr);
                 if (!status.ok()) {
                     return status;
                 }

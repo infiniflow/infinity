@@ -53,35 +53,34 @@ public:
 
     SegmentIndexMeta &segment_index_meta() const { return segment_index_meta_; }
 
-    Status GetChunkInfo(ChunkIndexMetaInfo *&chunk_info);
+    Status GetChunkInfo(KVInstance *kv_instance, ChunkIndexMetaInfo *&chunk_info);
 
-    Status GetIndexBuffer(BufferObj *&index_buffer);
+    Status GetIndexBuffer(KVInstance *kv_instance, BufferObj *&index_buffer);
 
-    Status InitSet(const ChunkIndexMetaInfo &chunk_info);
+    Status InitSet(KVInstance *kv_instance, const ChunkIndexMetaInfo &chunk_info);
 
-    Status LoadSet();
+    Status LoadSet(KVInstance *kv_instance);
 
-    Status RestoreSet();
+    Status RestoreSet(KVInstance *kv_instance);
 
-    Status UninitSet(UsageFlag usage_flag);
+    Status UninitSet(KVInstance *kv_instance, UsageFlag usage_flag);
 
-    Status SetChunkInfo(const ChunkIndexMetaInfo &chunk_info);
+    Status SetChunkInfo(KVInstance *kv_instance, const ChunkIndexMetaInfo &chunk_info);
 
     Status SetChunkInfoNoPutKV(const ChunkIndexMetaInfo &chunk_info);
 
-    Status FilePaths(Vector<String> &paths);
+    Status FilePaths(KVInstance *kv_instance, Vector<String> &paths);
 
 private:
-    Status LoadChunkInfo();
+    Status LoadChunkInfo(KVInstance *kv_instance);
 
-    Status LoadIndexBuffer();
+    Status LoadIndexBuffer(KVInstance *kv_instance);
 
     String GetChunkIndexTag(const String &tag) const;
 
 private:
     mutable std::mutex mtx_;
 
-    KVInstance &kv_instance_;
     SegmentIndexMeta &segment_index_meta_;
     ChunkID chunk_id_;
 

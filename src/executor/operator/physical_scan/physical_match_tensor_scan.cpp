@@ -437,7 +437,7 @@ void PhysicalMatchTensorScan::ExecuteInner(QueryContext *query_context, MatchTen
             for (ChunkID chunk_id : *chunk_ids_ptr) {
                 ChunkIndexMeta chunk_index_meta(chunk_id, segment_index_meta);
                 BufferObj *index_buffer = nullptr;
-                Status status = chunk_index_meta.GetIndexBuffer(index_buffer);
+                Status status = chunk_index_meta.GetIndexBuffer(kv_instance, index_buffer);
                 if (!status.ok()) {
                     UnrecoverableError(status.message());
                 }

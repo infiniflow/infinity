@@ -641,7 +641,7 @@ void PhysicalKnnScan::ExecuteInternalByColumnDataTypeAndQueryDataType(QueryConte
                     for (ChunkID chunk_id : *chunk_ids_ptr) {
                         ChunkIndexMeta chunk_index_meta(chunk_id, *segment_index_meta);
                         BufferObj *index_buffer = nullptr;
-                        status = chunk_index_meta.GetIndexBuffer(index_buffer);
+                        status = chunk_index_meta.GetIndexBuffer(kv_instance, index_buffer);
                         if (!status.ok()) {
                             UnrecoverableError(status.message());
                         }
@@ -862,7 +862,7 @@ void PhysicalKnnScan::ExecuteInternalByColumnDataTypeAndQueryDataType(QueryConte
                         for (ChunkID chunk_id : *chunk_ids_ptr) {
                             ChunkIndexMeta chunk_index_meta(chunk_id, *segment_index_meta);
                             BufferObj *index_buffer = nullptr;
-                            status = chunk_index_meta.GetIndexBuffer(index_buffer);
+                            status = chunk_index_meta.GetIndexBuffer(kv_instance, index_buffer);
                             if (!status.ok()) {
                                 UnrecoverableError(status.message());
                             }

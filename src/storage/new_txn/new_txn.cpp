@@ -1323,7 +1323,7 @@ NewTxn::GetChunkIndexInfo(const String &db_name, const String &table_name, const
     SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta);
     ChunkIndexMeta chunk_index_meta(chunk_id, segment_index_meta);
     ChunkIndexMetaInfo *chunk_index_info_ptr;
-    status = chunk_index_meta.GetChunkInfo(chunk_index_info_ptr);
+    status = chunk_index_meta.GetChunkInfo(this->kv_instance(), chunk_index_info_ptr);
     if (!status.ok()) {
         return {nullptr, status};
     }
@@ -4666,7 +4666,7 @@ Status NewTxn::CleanupInner(const Vector<UniquePtr<MetaKey>> &metas) {
 
                 TableMeeta table_meta(table_index_meta_key->db_id_str_, table_index_meta_key->table_id_str_, kv_instance, begin_ts, MAX_TIMESTAMP);
                 TableIndexMeeta table_index_meta(table_index_meta_key->index_id_str_, table_meta);
-                status = NewCatalog::CleanTableIndex(table_index_meta, UsageFlag::kOther);
+                status = NewCatalog::CleanTableIndex(table_index_meta, kv_instance, UsageFlag::kOther);
                 if (!status.ok()) {
                     return status;
                 }
@@ -4681,7 +4681,7 @@ Status NewTxn::CleanupInner(const Vector<UniquePtr<MetaKey>> &metas) {
                                       MAX_TIMESTAMP);
                 TableIndexMeeta table_index_meta(segment_index_meta_key->index_id_str_, table_meta);
                 SegmentIndexMeta segment_index_meta(segment_index_meta_key->segment_id_, table_index_meta);
-                Status status = NewCatalog::CleanSegmentIndex(segment_index_meta, UsageFlag::kOther);
+                Status status = NewCatalog::CleanSegmentIndex(segment_index_meta, kv_instance, UsageFlag::kOther);
                 if (!status.ok()) {
                     return status;
                 }
@@ -4693,7 +4693,7 @@ Status NewTxn::CleanupInner(const Vector<UniquePtr<MetaKey>> &metas) {
                 TableIndexMeeta table_index_meta(chunk_index_meta_key->index_id_str_, table_meta);
                 SegmentIndexMeta segment_index_meta(chunk_index_meta_key->segment_id_, table_index_meta);
                 ChunkIndexMeta chunk_index_meta(chunk_index_meta_key->chunk_id_, segment_index_meta);
-                Status status = NewCatalog::CleanChunkIndex(chunk_index_meta, UsageFlag::kOther);
+                Status status = NewCatalog::CleanChunkIndex(chunk_index_meta, kv_instance, UsageFlag::kOther);
                 if (!status.ok()) {
                     return status;
                 }
@@ -4985,7 +4985,7 @@ Status NewTxn::GetTableIndexFilePaths(const String &db_name, const String &table
     if (!status.ok()) {
         return status;
     }
-    return NewCatalog::GetTableIndexFilePaths(*table_index_meta, file_paths);
+    return NewCatalog::GetTableIndexFilePaths(*table_index_meta, kv_instance_.get(), file_paths);
 }
 
 Status NewTxn::GetSegmentIndexFilepaths(const String &db_name,
@@ -5003,7 +5003,7 @@ Status NewTxn::GetSegmentIndexFilepaths(const String &db_name,
         return status;
     }
     SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta);
-    return NewCatalog::GetSegmentIndexFilepaths(segment_index_meta, file_paths);
+    return NewCatalog::GetSegmentIndexFilepaths(segment_index_meta, kv_instance_.get(), file_paths);
 }
 
 Status NewTxn::GetChunkIndexFilePaths(const String &db_name,
@@ -5023,7 +5023,7 @@ Status NewTxn::GetChunkIndexFilePaths(const String &db_name,
     }
     SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta);
     ChunkIndexMeta chunk_index_meta(chunk_id, segment_index_meta);
-    return NewCatalog::GetChunkIndexFilePaths(chunk_index_meta, file_paths);
+    return NewCatalog::GetChunkIndexFilePaths(chunk_index_meta, kv_instance_.get(), file_paths);
 }
 
 Status NewTxn::Dummy() {

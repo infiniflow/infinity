@@ -54,6 +54,7 @@ import column_def;
 import index_full_text;
 import extra_ddl_info;
 import status;
+import kv_store;
 
 using namespace infinity;
 
@@ -143,16 +144,15 @@ public:
     }
 
     void Check() {
-        {
-            String table_key;
-            String index_key;
-            NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
-            auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("dummy"), TransactionType::kNormal);
-            Status status = txn->GetTableIndexMeta("db1", "tb1", "idx1", db_meta_, table_meta_, index_meta_, &table_key, &index_key);
-            EXPECT_TRUE(status.ok());
-        }
+
+        String table_key;
+        String index_key;
+        NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("dummy"), TransactionType::kNormal);
+        Status status = txn->GetTableIndexMeta("db1", "tb1", "idx1", db_meta_, table_meta_, index_meta_, &table_key, &index_key);
+        EXPECT_TRUE(status.ok());
         ColumnIndexReader reader;
-        reader.Open(flag_, *index_meta_);
+        reader.Open(flag_, *index_meta_, txn->kv_instance());
         // Pair<u64, float> res = reader.GetTotalDfAndAvgColumnLength();
         // ASSERT_GT(res.first, 0);     // row count
         // ASSERT_GT(res.second, 0.0f); // avg column length
@@ -181,6 +181,8 @@ public:
                 ASSERT_EQ(doc_id, INVALID_ROWID);
             }
         }
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
     }
 };
 

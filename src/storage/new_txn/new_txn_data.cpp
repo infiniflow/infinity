@@ -424,7 +424,7 @@ Status NewTxn::ReplayImport(WalCmdImportV2 *import_cmd, TxnTimeStamp commit_ts, 
                 return status;
             }
             TableMeeta &table_meta = *table_meta_opt;
-            status = NewCatalog::LoadImportedOrCompactedSegment(table_meta, segment_info, fake_commit_ts);
+            status = NewCatalog::LoadImportedOrCompactedSegment(table_meta, kv_instance_.get(), segment_info, fake_commit_ts);
             if (!status.ok()) {
                 return status;
             }
@@ -873,7 +873,7 @@ Status NewTxn::ReplayCompact(WalCmdCompactV2 *compact_cmd, TxnTimeStamp commit_t
                         return status;
                     }
                     TableMeeta &table_meta = *table_meta_opt;
-                    status = NewCatalog::LoadImportedOrCompactedSegment(table_meta, segment_info, fake_commit_ts);
+                    status = NewCatalog::LoadImportedOrCompactedSegment(table_meta, kv_instance_.get(), segment_info, fake_commit_ts);
                     if (!status.ok()) {
                         return status;
                     }

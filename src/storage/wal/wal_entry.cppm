@@ -164,7 +164,7 @@ export struct WalChunkIndexInfo {
 
     WalChunkIndexInfo() = default;
 
-    explicit WalChunkIndexInfo(ChunkIndexMeta &chunk_index_meta);
+    explicit WalChunkIndexInfo(ChunkIndexMeta &chunk_index_meta, KVInstance *kv_instance);
 
     bool operator==(const WalChunkIndexInfo &other) const;
 

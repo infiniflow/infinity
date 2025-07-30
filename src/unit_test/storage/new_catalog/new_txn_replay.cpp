@@ -1139,13 +1139,13 @@ TEST_P(TestTxnReplayTest, test_replay_flush_gap_dump_index) {
             for (const auto &chunk_id : *chunk_ids) {
                 ChunkIndexMeta chunk_index_meta(chunk_id, segment_index_meta);
                 ChunkIndexMetaInfo *chunk_info = nullptr;
-                status = chunk_index_meta.GetChunkInfo(chunk_info);
+                status = chunk_index_meta.GetChunkInfo(txn->kv_instance(), chunk_info);
                 EXPECT_TRUE(status.ok());
                 EXPECT_EQ(chunk_info->row_cnt_, block_row_cnt);
                 EXPECT_EQ(chunk_info->base_row_id_, RowID(0, chunk_id * block_row_cnt));
 
                 BufferObj *buffer_obj = nullptr;
-                status = chunk_index_meta.GetIndexBuffer(buffer_obj);
+                status = chunk_index_meta.GetIndexBuffer(txn->kv_instance(), buffer_obj);
                 EXPECT_TRUE(status.ok());
             }
         }
@@ -1422,13 +1422,13 @@ TEST_P(TestTxnReplayTest, test_replay_flush_gap_optimize_index) {
             ChunkID chunk_id = 2;
             ChunkIndexMeta chunk_index_meta(chunk_id, segment_index_meta);
             ChunkIndexMetaInfo *chunk_info = nullptr;
-            status = chunk_index_meta.GetChunkInfo(chunk_info);
+            status = chunk_index_meta.GetChunkInfo(txn->kv_instance(), chunk_info);
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(chunk_info->row_cnt_, block_row_cnt * 2);
             EXPECT_EQ(chunk_info->base_row_id_, RowID(0, 0));
 
             BufferObj *buffer_obj = nullptr;
-            status = chunk_index_meta.GetIndexBuffer(buffer_obj);
+            status = chunk_index_meta.GetIndexBuffer(txn->kv_instance(), buffer_obj);
             EXPECT_TRUE(status.ok());
         }
 

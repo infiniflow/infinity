@@ -456,7 +456,7 @@ SharedPtr<SegmentIndexInfo> SegmentIndexMeta::GetSegmentIndexInfo() {
     for (auto &chunk_id : *chunk_ids_) {
         ChunkIndexMeta chunk_index_meta(chunk_id, *this);
         Vector<String> chunk_index_files;
-        status = chunk_index_meta.FilePaths(chunk_index_files);
+        status = chunk_index_meta.FilePaths(&kv_instance_, chunk_index_files);
         if (!status.ok()) {
             return nullptr;
         }

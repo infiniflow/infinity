@@ -256,24 +256,24 @@ TEST_P(TestTxnReplayImport, test_import_with_index) {
 
     RestartTxnMgr();
 
-    auto check_chunk_index = [&](ChunkIndexMeta &chunk_index_meta) {
+    auto check_chunk_index = [&](NewTxn* txn, ChunkIndexMeta &chunk_index_meta) {
         SegmentID segment_id = chunk_index_meta.segment_index_meta().segment_id();
 
         ChunkIndexMetaInfo *chunk_info_ptr = nullptr;
-        Status status = chunk_index_meta.GetChunkInfo(chunk_info_ptr);
+        Status status = chunk_index_meta.GetChunkInfo(txn->kv_instance(), chunk_info_ptr);
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(chunk_info_ptr->base_row_id_, RowID(segment_id, 0));
         EXPECT_EQ(chunk_info_ptr->row_cnt_, block_row_cnt * 2);
     };
 
-    auto check_segment_index = [&](SegmentIndexMeta &segment_index_meta) {
+    auto check_segment_index = [&](NewTxn* txn, SegmentIndexMeta &segment_index_meta) {
         auto [chunk_ids_ptr, status] = segment_index_meta.GetChunkIDs1();
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(*chunk_ids_ptr, Vector<ChunkID>({0}));
 
         for (ChunkID chunk_id : *chunk_ids_ptr) {
             ChunkIndexMeta chunk_index_meta(chunk_id, segment_index_meta);
-            check_chunk_index(chunk_index_meta);
+            check_chunk_index(txn, chunk_index_meta);
         }
     };
 
@@ -295,7 +295,7 @@ TEST_P(TestTxnReplayImport, test_import_with_index) {
 
         for (SegmentID segment_id : *segment_ids_ptr) {
             SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta);
-            check_segment_index(segment_index_meta);
+            check_segment_index(txn, segment_index_meta);
         }
 
         status = new_txn_mgr->CommitTxn(txn);
