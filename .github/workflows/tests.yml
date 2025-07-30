@@ -458,7 +458,7 @@ jobs:
 
       - name: Collect infinity unit test release output
         if: ${{ !cancelled() }}
-        run: tail -n 20000000 unittest_release.log 2>/dev/null &&  || true
+        run: tail -n 20000000 unittest_release.log 2>/dev/null || true
 
 #      - name: Start infinity release version
 #        if: ${{ !cancelled() && !failure() }}
