@@ -142,9 +142,8 @@ bool BlockVersion::SaveToFile(TxnTimeStamp checkpoint_ts, LocalFileHandle &file_
         }
     }
      
-   
-    LOG_TRACE(fmt::format("Flush block version, ckp ts: {}, write create: {}, delete {}, total_rows: {}, is_modified: {}",
-                          checkpoint_ts, create_size, deleted_row_count, total_row_count, is_modified));
+    LOG_TRACE(fmt::format("Flush block version, ckp ts: {}, write create: {}, delete {}, is_modified: {}",
+                          checkpoint_ts, create_size, deleted_row_count, is_modified));
    
     return !is_modified;
 }
