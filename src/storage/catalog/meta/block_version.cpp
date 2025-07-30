@@ -139,17 +139,24 @@ bool BlockVersion::SaveToFile(TxnTimeStamp checkpoint_ts, LocalFileHandle &file_
         }
     }
     
-    // Check if the version file is full by calculating total row count from created data
+    // Check if the version file is full by calculating row count before checkpoint timestamp
     i64 total_row_count = 0;
-    for (SizeT j = 0; j < create_size; ++j) {
-        total_row_count += created_[j].row_count_;
+    if (create_size > 0) {
+        // Get the row count before checkpoint_ts using the same logic as GetRowCount()
+        auto iter = std::upper_bound(created_.begin(), created_.begin() + create_size, checkpoint_ts, 
+                                   [](TxnTimeStamp ts, const CreateField &field) { return ts < field.create_ts_; });
+        if (iter != created_.begin()) {
+            --iter;
+            total_row_count = iter->row_count_;
+        }
     }
-
+ 
+ 
     bool is_full = total_row_count >= DEFAULT_BLOCK_CAPACITY;
-    
-    LOG_TRACE(fmt::format("Flush block version, ckp ts: {}, write create: {}, delete {}, total_rows: {}, is_full: {}", 
+   
+    LOG_TRACE(fmt::format("Flush block version, ckp ts: {}, write create: {}, delete {}, total_rows: {}, is_full: {}",
                           checkpoint_ts, create_size, deleted_row_count, total_row_count, is_full));
-    
+   
     return is_full;
 }
 
