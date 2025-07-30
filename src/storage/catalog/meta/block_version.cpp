@@ -114,7 +114,7 @@ Tuple<i32, Status> BlockVersion::GetRowCountForUpdate(TxnTimeStamp begin_ts) con
     return {row_count, Status::OK()};
 }
 
-void BlockVersion::SaveToFile(TxnTimeStamp checkpoint_ts, LocalFileHandle &file_handle) const {
+bool BlockVersion::SaveToFile(TxnTimeStamp checkpoint_ts, LocalFileHandle &file_handle) const {
     std::unique_lock<std::shared_mutex> lock(rw_mutex_);
     BlockOffset create_size = created_.size();
     while (create_size > 0 && created_[create_size - 1].create_ts_ > checkpoint_ts) {
@@ -138,7 +138,19 @@ void BlockVersion::SaveToFile(TxnTimeStamp checkpoint_ts, LocalFileHandle &file_
             file_handle.Append(&dump_ts, sizeof(dump_ts));
         }
     }
-    LOG_TRACE(fmt::format("Flush block version, ckp ts: {}, write create: {}, delete {}", checkpoint_ts, create_size, deleted_row_count));
+    
+    // Check if the version file is full by calculating total row count from created data
+    i64 total_row_count = 0;
+    for (SizeT j = 0; j < create_size; ++j) {
+        total_row_count += created_[j].row_count_;
+    }
+
+    bool is_full = total_row_count >= DEFAULT_BLOCK_CAPACITY;
+    
+    LOG_TRACE(fmt::format("Flush block version, ckp ts: {}, write create: {}, delete {}, total_rows: {}, is_full: {}", 
+                          checkpoint_ts, create_size, deleted_row_count, total_row_count, is_full));
+    
+    return is_full;
 }
 
 void BlockVersion::SpillToFile(LocalFileHandle *file_handle) const {

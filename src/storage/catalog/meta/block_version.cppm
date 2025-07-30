@@ -55,7 +55,7 @@ export struct BlockVersion {
 
     Tuple<i32, Status> GetRowCountForUpdate(TxnTimeStamp begin_ts) const;
 
-    void SaveToFile(TxnTimeStamp checkpoint_ts, LocalFileHandle &file_handler) const;
+    bool SaveToFile(TxnTimeStamp checkpoint_ts, LocalFileHandle &file_handler) const;
 
     void SpillToFile(LocalFileHandle *file_handle) const;
     static UniquePtr<BlockVersion> LoadFromFile(LocalFileHandle *file_handle);
