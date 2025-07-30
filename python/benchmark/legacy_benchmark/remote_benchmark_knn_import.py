@@ -24,19 +24,19 @@ from infinity.remote_thrift.client import ThriftInfinityClient
 from infinity.remote_thrift.table import RemoteTable
 
 
-def import_data(path, dataset: str, m: int, ef_construction: int, remote: bool):
+def import_data(path, dataset: str, m: int, ef_construction: int, build_type: str, encode_type: str, remote: bool):
     print(
         f"dataset: {dataset}, m: {m}, ef_construction: {ef_construction}, remote: {remote}"
     )
     if dataset == "sift_1m":
-        import_sift_1m(path + "/sift_base.fvecs", m, ef_construction, remote)
+        import_sift_1m(path + "/sift_base.fvecs", m, ef_construction, build_type, encode_type, remote)
     elif dataset == "gist_1m":
-        import_gist_1m(path + "/gist_base.fvecs", m, ef_construction, remote)
+        import_gist_1m(path + "/gist_base.fvecs", m, ef_construction, build_type, encode_type, remote)
     else:
         raise Exception("Invalid data set")
 
 
-def import_sift_1m(path, m: int, ef_construction: int, remote: bool):
+def import_sift_1m(path, m: int, ef_construction: int, build_type: str, encode_type: str, remote: bool):
     infinity_obj = None
     if remote:
         infinity_obj = infinity.connect(LOCAL_HOST)
@@ -46,9 +46,10 @@ def import_sift_1m(path, m: int, ef_construction: int, remote: bool):
 
     db_obj = infinity_obj.get_database("default_db")
     assert db_obj
-    db_obj.drop_table("sift_benchmark")
-    db_obj.create_table("sift_benchmark", {"col1": {"type": "vector,128,float"}})
-    table_obj = db_obj.get_table("sift_benchmark")
+    table_name = f"sift_{build_type}_{encode_type}_benchmark"
+    db_obj.drop_table(table_name)
+    db_obj.create_table(table_name, {"col1": {"type": "vector,128,float"}})
+    table_obj = db_obj.get_table(table_name)
     assert table_obj
 
     assert os.path.exists(path)
@@ -62,13 +63,13 @@ def import_sift_1m(path, m: int, ef_construction: int, remote: bool):
     assert res.error_code == ErrorCode.OK
 
     start = time.time()
-    create_index(table_obj, m, ef_construction, remote)
+    create_index(table_obj, m, ef_construction, build_type, encode_type)
     end = time.time()
     dur = end - start
     print(f"Create index on sift_1m cost time: {dur} s")
 
 
-def import_gist_1m(path, m: int, ef_construction: int, remote: bool):
+def import_gist_1m(path, m: int, ef_construction: int, build_type: str, encode_type: str, remote: bool):
     infinity_obj = None
     if remote:
         infinity_obj = infinity.connect(LOCAL_HOST)
@@ -78,9 +79,10 @@ def import_gist_1m(path, m: int, ef_construction: int, remote: bool):
 
     db_obj = infinity_obj.get_database("default_db")
     assert db_obj
-    db_obj.drop_table("gist_benchmark")
-    db_obj.create_table("gist_benchmark", {"col1": {"type": "vector,960,float"}})
-    table_obj = db_obj.get_table("gist_benchmark")
+    table_name = f"gist_{build_type}_{encode_type}_benchmark"
+    db_obj.drop_table(table_name)
+    db_obj.create_table(table_name, {"col1": {"type": "vector,960,float"}})
+    table_obj = db_obj.get_table(table_name)
     assert table_obj
 
     assert os.path.exists(path)
@@ -94,13 +96,13 @@ def import_gist_1m(path, m: int, ef_construction: int, remote: bool):
     assert res.error_code == ErrorCode.OK
 
     start = time.time()
-    create_index(table_obj, m, ef_construction, remote)
+    create_index(table_obj, m, ef_construction, build_type, encode_type)
     end = time.time()
     dur = end - start
     print(f"Create index on gist_1m cost time: {dur} s")
 
 
-def create_index(table_obj, m: int, ef_construction: int, remote: bool):
+def create_index(table_obj, m: int, ef_construction: int, build_type: str, encode_type: str):
     res = table_obj.create_index(
         "hnsw_index",
         index.IndexInfo(
@@ -110,7 +112,8 @@ def create_index(table_obj, m: int, ef_construction: int, remote: bool):
                 "m": str(m),
                 "ef_construction": str(ef_construction),
                 "metric": "l2",
-                "encode": "lvq"
+                "build_type": build_type,
+                "encode": encode_type
             },
         )
     )
@@ -134,17 +137,11 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description="Benchmark Infinity")
 
-    parser.add_argument(
-        "-d",
-        "--data",
-        type=str,
-        default="sift_1m",  # gist_1m
-        dest="data_set",
-    )
+    parser.add_argument("-d", "--data", type=str, default="sift_1m", dest="data_set")
     parser.add_argument("--m", type=int, default=16, dest="m")
-    parser.add_argument(
-        "--ef_construction", type=int, default=200, dest="ef_construction"
-    )
+    parser.add_argument("--ef_construction", type=int, default=200, dest="ef_construction")
+    parser.add_argument("-b", "--build", type=str, default="plain", dest="build_type") # plain
+    parser.add_argument("-e", "--encode", type=str, default="lvq", dest="encode_type") # plain, lvq
     parser.add_argument("-R", "--remote", type=str2bool, default=True, dest="remote")
 
     args = parser.parse_args()
@@ -152,4 +149,4 @@ if __name__ == "__main__":
     data_dir = current_path + "/test/data/benchmark/" + args.data_set
     print(f"Data Dir: {data_dir}")
 
-    import_data(data_dir, args.data_set, args.m, args.ef_construction, args.remote)
+    import_data(data_dir, args.data_set, args.m, args.ef_construction, args.build_type, args.encode_type, args.remote)
