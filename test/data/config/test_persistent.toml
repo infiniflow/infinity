@@ -1,0 +1,32 @@
+[general]
+version                  = "0.6.0"
+time_zone                = "utc-8"
+
+[network]
+server_address           = "0.0.0.0"
+
+[log]
+log_filename             = "infinity.log"
+log_dir                  = "/var/infinity/log"
+log_level                = "info"
+
+[storage]
+optimize_interval        = "0s"
+compact_interval         = "0s"
+cleanup_interval         = "0s"
+data_dir                 = "/var/infinity/data"
+snapshot_dir             = "/var/infinity/snapshot"
+
+[buffer]
+buffer_manager_size      = "8GB"
+temp_dir                 = "/var/infinity/tmp"
+
+[wal]
+wal_dir                  = "/var/infinity/wal"
+
+[resource]
+resource_dir             = "/var/infinity/resource"
+
+[persistence]
+enabled                  = true
+persistence_dir          = "/var/infinity/persistence" 

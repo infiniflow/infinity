@@ -13,6 +13,7 @@
 // limitations under the License.
 
 module;
+#include <string> 
 
 module node_info;
 

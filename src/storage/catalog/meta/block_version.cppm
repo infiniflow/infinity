@@ -55,7 +55,7 @@ export struct BlockVersion {
 
     Tuple<i32, Status> GetRowCountForUpdate(TxnTimeStamp begin_ts) const;
 
-    void SaveToFile(TxnTimeStamp checkpoint_ts, LocalFileHandle &file_handler) const;
+    bool SaveToFile(TxnTimeStamp checkpoint_ts, LocalFileHandle &file_handler) const;
 
     void SpillToFile(LocalFileHandle *file_handle) const;
     static UniquePtr<BlockVersion> LoadFromFile(LocalFileHandle *file_handle);
@@ -71,6 +71,8 @@ export struct BlockVersion {
     Status Delete(i32 offset, TxnTimeStamp commit_ts);
 
     void RollbackDelete(i32 offset);
+
+    void RestoreFromSnapshot(TxnTimeStamp commit_ts); // restore from snapshot, only used by block meta
 
     bool CheckDelete(i32 offset, TxnTimeStamp check_ts) const;
 

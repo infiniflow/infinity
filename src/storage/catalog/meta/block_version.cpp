@@ -114,11 +114,13 @@ Tuple<i32, Status> BlockVersion::GetRowCountForUpdate(TxnTimeStamp begin_ts) con
     return {row_count, Status::OK()};
 }
 
-void BlockVersion::SaveToFile(TxnTimeStamp checkpoint_ts, LocalFileHandle &file_handle) const {
+bool BlockVersion::SaveToFile(TxnTimeStamp checkpoint_ts, LocalFileHandle &file_handle) const {
+    bool is_modified = false;
     std::unique_lock<std::shared_mutex> lock(rw_mutex_);
     BlockOffset create_size = created_.size();
     while (create_size > 0 && created_[create_size - 1].create_ts_ > checkpoint_ts) {
         --create_size;
+        is_modified = true;
     }
 
     file_handle.Append(&create_size, sizeof(create_size));
@@ -135,11 +137,18 @@ void BlockVersion::SaveToFile(TxnTimeStamp checkpoint_ts, LocalFileHandle &file_
             ++deleted_row_count;
             file_handle.Append(&ts, sizeof(ts));
         } else {
+            is_modified = true;
             file_handle.Append(&dump_ts, sizeof(dump_ts));
         }
     }
-    LOG_TRACE(fmt::format("Flush block version, ckp ts: {}, write create: {}, delete {}", checkpoint_ts, create_size, deleted_row_count));
+     
+   
+    LOG_TRACE(fmt::format("Flush block version, ckp ts: {}, write create: {}, delete {}, is_modified: {}",
+                          checkpoint_ts, create_size, deleted_row_count, is_modified));
+   
+    return !is_modified;
 }
+ 
 
 void BlockVersion::SpillToFile(LocalFileHandle *file_handle) const {
     std::unique_lock<std::shared_mutex> lock(rw_mutex_);
@@ -276,6 +285,19 @@ Status BlockVersion::Print(TxnTimeStamp begin_ts, i32 offset, bool ignore_invisi
         row_count += created_range.row_count_;
     }
     return Status::UnexpectedError(fmt::format("Offset {} out of range", offset));
+}
+
+void BlockVersion::RestoreFromSnapshot(TxnTimeStamp commit_ts) {
+    // set all the create timestamp to commit_ts
+    auto row_count = created_.back().row_count_;
+    created_.clear();
+    created_.emplace_back(commit_ts,row_count);
+    for(auto &ts:deleted_){
+        if(ts!=0){
+            ts = commit_ts;
+        }
+    }
+    latest_change_ts_ = commit_ts;
 }
 
 } // namespace infinity

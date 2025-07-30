@@ -824,5 +824,7 @@ TEST_P(TestTxnsConflictTest, delete_append) {
         EXPECT_TRUE(ok);
         LOG_INFO(query_result.ToString());
     }
+
 }
 */
+
