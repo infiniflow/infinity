@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#ifndef CI
 module;
 
 #include "gtest/gtest.h"
@@ -27,10 +28,6 @@ import :new_catalog;
 import :new_txn_manager;
 import :infinity_context;
 import :txn_state;
-import extra_ddl_info;
-import column_def;
-import data_type;
-import logical_type;
 import :table_def;
 import :data_block;
 import :column_vector;
@@ -44,17 +41,28 @@ import :table_index_meeta;
 import :segment_index_meta;
 import :chunk_index_meta;
 import :db_meeta;
-import constant_expr;
 import :default_values;
-import internal_types;
 import :index_secondary;
 import :index_full_text;
-import statement_common;
 import :mem_index;
 import :index_base;
 import :buffer_obj;
 import :secondary_index_in_mem;
 import :memory_indexer;
+#else
+#include "gtest/gtest.h"
+module infinity_core;
+import base_test;
+import replay_test;
+#endif
+
+import extra_ddl_info;
+import column_def;
+import data_type;
+import logical_type;
+import constant_expr;
+import internal_types;
+import statement_common;
 
 class TestTxnReplayAppend : public NewReplayTest {
 public:

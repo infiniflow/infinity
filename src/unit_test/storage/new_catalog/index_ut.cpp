@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#ifndef CI
 module;
 
 #include "gtest/gtest.h"
@@ -26,7 +27,6 @@ import :new_catalog;
 import :new_txn_manager;
 import :infinity_context;
 import :txn_state;
-import extra_ddl_info;
 import :data_block;
 import :column_vector;
 import :value;
@@ -35,20 +35,27 @@ import :db_meeta;
 import :table_meeta;
 import :table_index_meeta;
 import :column_meta;
-import column_def;
-import data_type;
-import logical_type;
 import :index_base;
 import :index_secondary;
 import :index_ivf;
 import :index_full_text;
 import :index_hnsw;
-import embedding_info;
-import sparse_info;
 import :index_bmp;
 import :table_def;
-import internal_types;
 import :defer_op;
+#else
+#include "gtest/gtest.h"
+module infinity_core;
+import base_test;
+#endif
+
+import extra_ddl_info;
+import column_def;
+import data_type;
+import logical_type;
+import embedding_info;
+import sparse_info;
+import internal_types;
 import statement_common;
 
 using namespace infinity;

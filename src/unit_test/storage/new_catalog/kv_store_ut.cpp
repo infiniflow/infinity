@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#ifndef CI
 module;
 
 #include "gtest/gtest.h"
@@ -23,6 +24,11 @@ import :stl;
 import :third_party;
 import :status;
 import :kv_store;
+#else
+#include "gtest/gtest.h"
+module infinity_core;
+import base_test;
+#endif
 
 using namespace infinity;
 

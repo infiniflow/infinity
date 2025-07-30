@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#ifndef CI
 module;
 
 #include "gtest/gtest.h"
@@ -20,6 +21,11 @@ export module infinity_core:ut.replay_test;
 
 import :ut.base_test;
 import :new_txn_manager;
+#else
+#include "gtest/gtest.h"
+export module replay_test;
+import base_test;
+#endif
 
 using namespace infinity;
 

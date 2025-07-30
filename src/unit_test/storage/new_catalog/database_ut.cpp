@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#ifndef CI
 module;
 
 #include "gtest/gtest.h"
@@ -26,12 +27,18 @@ import :new_catalog;
 import :new_txn_manager;
 import :infinity_context;
 import :txn_state;
-import extra_ddl_info;
 import :data_block;
 import :column_vector;
 import :value;
 import :new_txn;
 import :db_meeta;
+#else
+#include "gtest/gtest.h"
+module infinity_core;
+import base_test;
+#endif
+
+import extra_ddl_info;
 
 using namespace infinity;
 

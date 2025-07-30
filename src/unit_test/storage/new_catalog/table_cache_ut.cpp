@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#ifndef CI
 module;
 
 #include "gtest/gtest.h"
@@ -20,8 +21,14 @@ module infinity_core:ut.table_cache;
 
 import :ut.base_test;
 import :stl;
-import internal_types;
 import :catalog_cache;
+#else
+#include "gtest/gtest.h"
+module infinity_core;
+import base_test;
+#endif
+
+import internal_types;
 
 using namespace infinity;
 
