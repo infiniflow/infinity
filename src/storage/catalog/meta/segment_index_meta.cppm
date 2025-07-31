@@ -45,13 +45,9 @@ public:
 
     Status GetNextChunkID(ChunkID &chunk_id);
 
-    Tuple<ChunkID, Status> GetNextChunkID1();
-
     Tuple<Vector<ChunkID> *, Status> GetChunkIDs1();
 
     Status GetFtInfo(SharedPtr<SegmentIndexFtInfo> &ft_info);
-
-    Status SetChunkIDs(const Vector<ChunkID> &chunk_ids);
 
     Status RemoveChunkIDs(const Vector<ChunkID> &chunk_ids);
 
@@ -61,15 +57,9 @@ public:
 
     Status UpdateFtInfo(u64 column_len_sum, u32 column_len_cnt);
 
-    Status SetNoMemIndex();
-
-    Status InitSet();
-
     Status InitSet1();
 
     Status LoadSet();
-
-    Status UninitSet(UsageFlag usage_flag);
 
     Status UninitSet1(UsageFlag usage_flag);
 
@@ -93,8 +83,6 @@ private:
 private:
     mutable std::mutex mtx_;
 
-    TxnTimeStamp begin_ts_;
-    TxnTimeStamp commit_ts_;
     KVInstance &kv_instance_;
     TableIndexMeeta &table_index_meta_;
     SegmentID segment_id_{};
