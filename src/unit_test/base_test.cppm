@@ -11,8 +11,6 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-
-#ifndef CI
 module;
 
 #include <filesystem>
@@ -22,19 +20,16 @@ module;
 #include <unistd.h>
 #include "gtest/gtest.h"
 
+#ifndef CI
 export module infinity_core:ut.base_test;
 
 import :stl;
 import :infinity_context;
 import :infinity_exception;
 #else
-#include <filesystem>
-#include <stdlib.h>
-#include <sys/stat.h>
-#include <type_traits>
-#include <unistd.h>
-#include "gtest/gtest.h"
 export module base_test;
+
+import infinity_core;
 #endif
 
 import global_resource_usage;

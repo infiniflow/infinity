@@ -11,7 +11,7 @@ import :stl;
 import :logger;
 #endif
 
-namespace infinity {
+export namespace infinity {
 struct LogHelper {
     void Reset() {
         LOG_INFO(std::move(oss).str());

@@ -46,7 +46,7 @@ import :chunk_index_meta;
 import :db_meeta;
 #else
 #include "gtest/gtest.h"
-module infinity_core;
+import infinity_core;
 import base_test;
 #endif
 

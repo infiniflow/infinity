@@ -12,15 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifdef CI
-#include <memory>
-import infinity_core;
-import sql_runner;
-#else
 module;
 
 #include <memory>
 
+#ifdef CI
+module sql_runner;
+
+import infinity_core;
+#else
 module infinity_core:ut.sql_runner.impl;
 
 import :ut.sql_runner;

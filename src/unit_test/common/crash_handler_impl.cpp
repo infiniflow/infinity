@@ -12,16 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifdef CI
-#include <csignal>
-#include <cstdio>
-#include <cstdlib>
-#include <cstring>
-#include <ctime>
-#include <stacktrace>
-import infinity_core;
-import crash_handler;
-#else
 module;
 
 #include <csignal>
@@ -31,6 +21,11 @@ module;
 #include <ctime>
 #include <stacktrace>
 
+#ifdef CI
+module crash_handler;
+
+import infinity_core;
+#else
 module infinity_core:ut.crash_handler.impl;
 
 import :ut.crash_handler;

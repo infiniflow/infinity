@@ -65,6 +65,7 @@ import logical_type;
 import global_resource_usage;
 import column_def;
 import extra_ddl_info;
+import statement_common;
 
 using namespace infinity;
 

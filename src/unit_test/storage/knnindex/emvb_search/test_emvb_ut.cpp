@@ -32,17 +32,17 @@ import :emvb_shared_vec;
 import :local_file_handle;
 #endif
 
-namespace infinity {
-extern template class EMVBSharedVec<u32>;
-extern template class EMVBSearch<32>;
-extern template class EMVBSearch<64>;
-extern template class EMVBSearch<96>;
-extern template class EMVBSearch<128>;
-extern template class EMVBSearch<160>;
-extern template class EMVBSearch<192>;
-extern template class EMVBSearch<224>;
-extern template class EMVBSearch<256>;
-} // namespace infinity
+// namespace infinity {
+// extern template class EMVBSharedVec<u32>;
+// extern template class EMVBSearch<32>;
+// extern template class EMVBSearch<64>;
+// extern template class EMVBSearch<96>;
+// extern template class EMVBSearch<128>;
+// extern template class EMVBSearch<160>;
+// extern template class EMVBSearch<192>;
+// extern template class EMVBSearch<224>;
+// extern template class EMVBSearch<256>;
+// } // namespace infinity
 
 using namespace infinity;
 

@@ -322,6 +322,7 @@ target_sources(infinity_core
         ${admin_cppm}
         ${network_cppm}
 
+        # for cmake bug
         ${infinity_impl_cpp}
         ${planner_impl_cpp}
         ${scheduler_impl_cpp}
@@ -540,6 +541,7 @@ target_include_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/third_party/thri
 
 ### unit test
 
+
 file(GLOB_RECURSE
         test_main_cpp
         CONFIGURE_DEPENDS
@@ -601,17 +603,80 @@ file(GLOB_RECURSE
 )
 
 file(GLOB_RECURSE
-        test_dependent_cppm
+        ut_impl
         CONFIGURE_DEPENDS
-        unit_test/base_test.cppm
-        unit_test/test_helper/sql_runner.cppm
-        unit_test/*.cppm
         unit_test/*_impl.cpp
 )
 
-add_executable(unit_test
-        ${test_main_cpp}
-)
+if (CI)
+    file(GLOB_RECURSE
+            test_dependent_cppm
+            CONFIGURE_DEPENDS
+            unit_test/*.cppm
+    )
+    add_executable(unit_test
+            ${test_main_cpp}
+
+            ${common_ut}
+            ${storage_ut}
+            ${main_ut}
+            ${parser_ut}
+            ${function_ut}
+            ${thirdparty_ut}
+            ${executor_ut}
+            ${test_helper_ut}
+            ${planner_ut}
+            ${function_ut}
+            ${parallel_ut}
+
+            ${ut_impl}
+    )
+    target_sources(unit_test
+            PRIVATE
+            FILE_SET ut_cxx_modules TYPE CXX_MODULES FILES
+            ${test_dependent_cppm}
+    )
+else ()
+    file(GLOB_RECURSE
+            test_dependent_cppm
+            CONFIGURE_DEPENDS
+            unit_test/base_test.cppm
+            unit_test/test_helper/sql_runner.cppm
+            unit_test/*.cppm
+            unit_test/*_impl.cpp
+    )
+    add_executable(unit_test
+            ${test_main_cpp}
+
+            ${ut_test_main_cpp}
+            ${ut_common_cpp}
+            ${ut_storage_cpp}
+            ${ut_main_cpp}
+            ${ut_parser_cpp}
+            ${ut_function_cpp}
+            ${ut_thirdparty_cpp}
+            ${ut_executor_cpp}
+            ${ut_test_helper_cpp}
+            ${ut_planner_cpp}
+            ${ut_function_cpp}
+            ${ut_parallel_cpp}
+    )
+    target_sources(unit_test
+            PRIVATE
+            FILE_SET core_cxx_modules TYPE CXX_MODULES FILES
+            ${test_dependent_cppm}
+
+            ${common_ut}
+            ${parser_ut}
+            ${storage_ut}
+            ${executor_ut}
+            ${planner_ut}
+            ${function_ut}
+            ${parralel_ut}
+            ${thirdparty_ut}
+            ${main_ut}
+    )
+endif ()
 
 set_target_properties(unit_test PROPERTIES OUTPUT_NAME test_main)
 add_dependencies(unit_test oatpp miniocpp pugixml-static curlpp_static inih libcurl_static re2 pcre2-8-static rocksdb infinity_core)
@@ -663,22 +728,6 @@ target_link_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/third_party/pcre2/
 target_link_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/third_party/rocksdb/")
 target_link_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/third_party/")
 target_link_directories(unit_test PUBLIC "/usr/local/openssl30/lib64")
-
-target_sources(unit_test
-        PRIVATE
-        FILE_SET core_cxx_modules TYPE CXX_MODULES FILES
-        ${test_dependent_cppm}
-
-        ${common_ut}
-        ${parser_ut}
-        ${storage_ut}
-        ${executor_ut}
-        ${planner_ut}
-        ${function_ut}
-        ${parralel_ut}
-        ${thirdparty_ut}
-        ${main_ut}
-)
 
 target_include_directories(unit_test PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/third_party")

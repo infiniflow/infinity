@@ -41,6 +41,8 @@ import :cast_table;
 import :column_vector;
 #endif
 
+import logical_type;
+
 using namespace infinity;
 class CastTableTest : public BaseTest {};
 

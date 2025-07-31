@@ -44,7 +44,7 @@ import :db_meeta;
 import :default_values;
 #else
 #include "gtest/gtest.h"
-module infinity_core;
+import infinity_core;
 import base_test;
 import replay_test;
 #endif

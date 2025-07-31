@@ -56,7 +56,7 @@ import :buffer_handle;
 import :logger;
 #else
 #include "gtest/gtest.h"
-module infinity_core;
+import infinity_core;
 import base_test;
 import replay_test;
 #endif

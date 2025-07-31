@@ -34,7 +34,7 @@ import :column_vector;
 import :value;
 #else
 #include "gtest/gtest.h"
-module infinity_core;
+import infinity_core;
 import base_test;
 #endif
 

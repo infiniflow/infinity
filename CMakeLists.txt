@@ -20,6 +20,12 @@ set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+option(CI "Build in CI mode" OFF)
+
+if (CI)
+    add_definitions(-DCI=1)
+endif ()
+
 message(STATUS "CXX: ${CMAKE_CXX_COMPILER}")
 execute_process(COMMAND ${CMAKE_CXX_COMPILER} --version OUTPUT_VARIABLE clang_full_version_string)
 string(REGEX REPLACE ".*clang version ([0-9]+\\.[0-9]+).*" "\\1" CLANG_VERSION_STRING ${clang_full_version_string})
@@ -30,7 +36,7 @@ if (CLANG_VERSION_STRING VERSION_GREATER 16)
     # add_compile_options(-ftime-trace)
 
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Wno-unused-parameter -Wno-unused-private-field")
-#    add_link_options(-fuse-ld=mold)
+    #    add_link_options(-fuse-ld=mold)
     set(CMAKE_FIND_PACKAGE_SORT_ORDER NATURAL)
     set(CMAKE_FIND_PACKAGE_SORT_DIRECTION DEC)
 
@@ -46,7 +52,7 @@ set(GCC_SEARCH_ROOTS
 )
 
 set(GCC15_SUFFIXES
-#        lib
+        #        lib
         lib/gcc/15
         lib/gcc/x86_64-linux-gnu/15
         lib/gcc/x86_64-pc-linux-gnu/15.1.0
