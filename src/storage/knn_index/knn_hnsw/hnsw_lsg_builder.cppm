@@ -296,7 +296,7 @@ private:
         auto ivf_index = MakeIVFIndex();
         ivf_index->BuildIVFIndex(RowID(0, 0), ivf_sample_iter_.size(), &ivf_sample_iter_, column_def_);
 
-        Vector<DistanceType> avg(row_count);
+        ivf_avg_.resize(ivf_avg_.size() + row_count);
 
         IVF_Search_Params ivf_search_params = MakeIVFSearchParams();
 
@@ -316,11 +316,9 @@ private:
             ivf_result_handler->Search(ivf_index.get());
             auto [result_n, d_ptr, offset_ptr] = ivf_result_handler->EndWithoutSort();
 
-            avg[offset] = GetDistMean(d_ptr.get(), result_n);
+            ivf_avg_[offset] = GetDistMean(d_ptr.get(), result_n);
         }
 
-        ivf_avg_.reserve(ivf_avg_.size() + avg.size());
-        ivf_avg_.insert(ivf_avg_.end(), avg.begin(), avg.end());
     }
 
     template <typename Iter, template <typename, typename> typename Compare>
@@ -332,7 +330,7 @@ private:
         const SizeT sample_count = bf_sample_vecs_.size() / dim;
         const auto &sample_data = bf_sample_vecs_;
 
-        Vector<DistanceType> avg(row_count);
+        bf_avg_.resize(bf_avg_.size() + row_count);
         KnnDistanceType dist_type = KnnDistanceType::kInvalid;
         switch (index_hnsw_->metric_type_) {
             case MetricType::kMetricL2:
@@ -369,10 +367,10 @@ private:
                         merge_heap.End();
 
                         auto dist = merge_heap.GetDistances();
-                        if (avg[offset] != 0) {
-                            UnrecoverableError(fmt::format("Invalid avg value: {} at {}", avg[offset], offset));
+                        if (bf_avg_[offset] != 0) {
+                            UnrecoverableError(fmt::format("Invalid avg value: {} at {}", bf_avg_[offset], offset));
                         }
-                        avg[offset] = GetDistMean(dist, ls_k);
+                        bf_avg_[offset] = GetDistMean(dist, ls_k);
                     }
                 }));
             }
@@ -397,12 +395,9 @@ private:
 
                 auto dist = merge_heap.GetDistances();
                 auto avg_v = GetDistMean(dist, ls_k);
-                avg[offset] = avg_v;
+                bf_avg_[offset] = avg_v;
             }
         }
-
-        bf_avg_.reserve(bf_avg_.size() + avg.size());
-        bf_avg_.insert(bf_avg_.end(), avg.begin(), avg.end());
     }
 
 private:
