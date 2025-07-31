@@ -3433,9 +3433,6 @@ TEST_P(TestTxnAppend, test_append_append) {
     }
 }
 
-#if 0
-
-// FIXME: Open it when append is refactored.
 TEST_P(TestTxnAppend, test_append_append_concurrent) {
     using namespace infinity;
 
@@ -3614,8 +3611,6 @@ TEST_P(TestTxnAppend, test_append_append_concurrent) {
         EXPECT_TRUE(status.ok());
     }
 }
-
-#endif
 
 TEST_P(TestTxnAppend, test_append_and_create_index) {
 
