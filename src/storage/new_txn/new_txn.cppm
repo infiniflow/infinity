@@ -462,6 +462,8 @@ private:
 
     Status ReplayDumpIndex(WalCmdDumpIndexV2 *dump_index_cmd);
 
+    Status InitSegmentIndex(SegmentIndexMeta &segment_index_meta, SegmentMeta &segment_meta);
+
     Status PopulateIndexToMem(SegmentIndexMeta &segment_index_meta, SegmentMeta &segment_meta, ColumnID column_id, SizeT segment_row_cnt);
 
     Status PopulateFtIndexInner(SharedPtr<IndexBase> index_base,

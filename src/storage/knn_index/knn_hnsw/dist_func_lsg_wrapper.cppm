@@ -57,15 +57,15 @@ public:
     template <typename DataStore>
     DistanceType operator()(const StoreType &v1, VertexType v2_i, const DataStore &data_store, VertexType v1_i = kInvalidVertex) const {
         DistanceType d = dist_(v1, v2_i, data_store, v1_i);
-        if (v1_i == kInvalidVertex || avg_.get() == nullptr) {
+        if (v1_i == kInvalidVertex || avg_ == nullptr) {
             return d;
         }
         return Inner(d, avg_[v1_i], avg_[v2_i]);
     }
 
-    void SetLSGParam(float alpha, UniquePtr<float[]> avg) {
+    void SetLSGParam(float alpha, float *avg) {
         alpha_ = alpha;
-        avg_ = std::move(avg);
+        avg_ = avg;
     }
 
     LVQDist ToLVQDistance(SizeT dim) && {
@@ -86,7 +86,7 @@ private:
     }
 
 private:
-    UniquePtr<float[]> avg_;
+    float *avg_ = nullptr;
     float alpha_ = 1.0;
     Dist dist_;
 };

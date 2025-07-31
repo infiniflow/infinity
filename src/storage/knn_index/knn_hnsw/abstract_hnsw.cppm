@@ -187,7 +187,7 @@ public:
         }
     }
 
-    void SetLSGParam(float alpha, UniquePtr<float[]> avg);
+    void SetLSGParam(float alpha, float *avg);
 
     void Dump(BufferObj *buffer_obj, SizeT *dump_size = nullptr);
 
