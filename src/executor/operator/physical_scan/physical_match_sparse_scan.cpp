@@ -147,6 +147,10 @@ void PhysicalMatchSparseScan::PlanWithIndex(QueryContext *query_context) {
     if (!status.ok()) {
         RecoverableError(status);
     }
+
+    NewTxn* new_txn = query_context->GetNewTxn();
+    KVInstance* kv_instance = new_txn->kv_instance();
+
     if (match_sparse_expr_->index_name_.empty()) {
         for (SizeT i = 0; i < index_id_strs_ptr->size(); ++i) {
             const String &index_id_str = (*index_id_strs_ptr)[i];
@@ -154,7 +158,7 @@ void PhysicalMatchSparseScan::PlanWithIndex(QueryContext *query_context) {
             auto table_index_meta = MakeShared<TableIndexMeeta>(index_id_str, *table_meta);
 
             SharedPtr<IndexBase> index_base;
-            std::tie(index_base, status) = table_index_meta->GetIndexBase();
+            std::tie(index_base, status) = table_index_meta->GetIndexBase(kv_instance);
             if (!status.ok()) {
                 RecoverableError(status);
             }
@@ -169,7 +173,7 @@ void PhysicalMatchSparseScan::PlanWithIndex(QueryContext *query_context) {
                 base_table_ref_->index_index_ = MakeShared<IndexIndex>();
             }
             IndexIndex *index_index = base_table_ref_->index_index_.get();
-            auto index_snapshot = index_index->Insert(index_name, table_index_meta);
+            auto index_snapshot = index_index->Insert(kv_instance, index_name, table_index_meta);
             break;
         }
     } else {
@@ -183,7 +187,7 @@ void PhysicalMatchSparseScan::PlanWithIndex(QueryContext *query_context) {
         auto table_index_meta = MakeShared<TableIndexMeeta>(index_id_str, *table_meta);
 
         SharedPtr<IndexBase> index_base;
-        std::tie(index_base, status) = table_index_meta->GetIndexBase();
+        std::tie(index_base, status) = table_index_meta->GetIndexBase(kv_instance);
         if (!status.ok()) {
             RecoverableError(status);
         }
@@ -203,7 +207,7 @@ void PhysicalMatchSparseScan::PlanWithIndex(QueryContext *query_context) {
             base_table_ref_->index_index_ = MakeShared<IndexIndex>();
         }
         IndexIndex *index_index = base_table_ref_->index_index_.get();
-        auto index_snapshot = index_index->Insert(index_name, table_index_meta);
+        auto index_snapshot = index_index->Insert(kv_instance, index_name, table_index_meta);
     }
     return;
 }

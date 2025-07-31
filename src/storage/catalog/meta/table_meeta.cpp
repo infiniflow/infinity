@@ -155,18 +155,6 @@ Tuple<SharedPtr<ColumnDef>, Status> TableMeeta::GetColumnDefByColumnID(const Siz
     return {(*column_defs_)[column_idx], Status::OK()};
 }
 
-// Status TableMeeta::SetSegmentIDs(const Vector<SegmentID> &segment_ids) {
-//     segment_ids_ = segment_ids;
-//     String segment_ids_key = GetTableTag("segment_ids");
-//     String segment_ids_str = nlohmann::json(segment_ids).dump();
-//     Status status = kv_instance_.Put(segment_ids_key, segment_ids_str);
-//     if (!status.ok()) {
-//         LOG_ERROR(fmt::format("Fail to set segment ids to kv store, key: {}, cause: {}", segment_ids_key, status.message()));
-//         return status;
-//     }
-//     return Status::OK();
-// }
-
 Status TableMeeta::RemoveSegmentIDs1(const Vector<SegmentID> &segment_ids) {
     HashSet<SegmentID> segment_ids_set(segment_ids.begin(), segment_ids.end());
 
@@ -291,7 +279,7 @@ Status TableMeeta::InitSet(SharedPtr<TableDef> table_def) {
     return Status::OK();
 }
 
-Status TableMeeta::LoadSet() {
+Status TableMeeta::LoadSet(KVInstance* kv_instance) {
     Vector<String> *index_id_strs_ptr = nullptr;
     Status status = GetIndexIDs(index_id_strs_ptr);
     if (!status.ok()) {
@@ -299,7 +287,7 @@ Status TableMeeta::LoadSet() {
     }
     for (const String &index_id_str : *index_id_strs_ptr) {
         TableIndexMeeta table_index_meta(index_id_str, *this);
-        auto [index_def, status] = table_index_meta.GetIndexBase();
+        auto [index_def, status] = table_index_meta.GetIndexBase(kv_instance);
         if (!status.ok()) {
             return status;
         }

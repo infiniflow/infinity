@@ -193,7 +193,7 @@ SecondaryIndexDataBase<CardinalityTag> *
 GetSecondaryIndexDataWithCardinality(const SharedPtr<DataType> &data_type, u32 chunk_row_count, bool allocate);
 
 // Factory function that determines cardinality from TableIndexMeeta
-export void *
-GetSecondaryIndexDataWithMeeta(const SharedPtr<DataType> &data_type, u32 chunk_row_count, bool allocate, TableIndexMeeta *table_index_meeta);
+//export void *
+//GetSecondaryIndexDataWithMeeta(const SharedPtr<DataType> &data_type, u32 chunk_row_count, bool allocate, TableIndexMeeta *table_index_meeta);
 
 } // namespace infinity

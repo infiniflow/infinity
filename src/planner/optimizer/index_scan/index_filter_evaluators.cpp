@@ -422,7 +422,7 @@ UniquePtr<IndexFilterEvaluatorSecondary> IndexFilterEvaluatorSecondary::Make(con
                                                                              FilterCompareType compare_type,
                                                                              const Value &val) {
     ColumnDef *column_def;
-    auto [column_def_ptr, status] = new_secondary_index->GetColumnDef();
+    auto [column_def_ptr, status] = new_secondary_index->GetColumnDef(kv_instance);
     if (!status.ok()) {
         UnrecoverableError(status.message());
     }
@@ -917,7 +917,7 @@ Bitmask IndexFilterEvaluatorSecondaryT<ColumnValueT>::Evaluate(const SegmentID s
     index_meta.emplace(segment_id, *new_secondary_index_);
 
     // Check cardinality to determine which execution path to use
-    auto [cardinality, status] = new_secondary_index_->GetSecondaryIndexCardinality();
+    auto [cardinality, status] = new_secondary_index_->GetSecondaryIndexCardinality(kv_instance_);
     if (!status.ok()) {
         // Default to HighCardinality if unable to determine
         cardinality = SecondaryIndexCardinality::kHighCardinality;

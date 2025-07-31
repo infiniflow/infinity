@@ -376,7 +376,7 @@ TEST_P(TestTxnReplayAppend, test_replay_append_with_index0) {
         EXPECT_TRUE(status.ok());
 
         Vector<SegmentID> *segment_ids_ptr = nullptr;
-        std::tie(segment_ids_ptr, status) = table_index_meta->GetSegmentIndexIDs1();
+        std::tie(segment_ids_ptr, status) = table_index_meta->GetSegmentIndexIDs1(txn->kv_instance());
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(*segment_ids_ptr, Vector<SegmentID>({0}));
 

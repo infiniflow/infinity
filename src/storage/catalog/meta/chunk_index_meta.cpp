@@ -110,14 +110,14 @@ Status ChunkIndexMeta::InitSet(KVInstance *kv_instance, const ChunkIndexMetaInfo
 
     TableIndexMeeta &table_index_meta = segment_index_meta_.table_index_meta();
 
-    auto [index_base, index_status] = table_index_meta.GetIndexBase();
+    auto [index_base, index_status] = table_index_meta.GetIndexBase(kv_instance);
     if (!index_status.ok()) {
         return index_status;
     }
 
     SharedPtr<ColumnDef> column_def;
     {
-        auto [col_def, status] = table_index_meta.GetColumnDef();
+        auto [col_def, status] = table_index_meta.GetColumnDef(kv_instance);
         if (!status.ok()) {
             return status;
         }
@@ -235,11 +235,11 @@ Status ChunkIndexMeta::LoadSet(KVInstance *kv_instance) {
     const String &base_name = chunk_info_ptr->base_name_;
     SizeT index_size = chunk_info_ptr->index_size_;
 
-    auto [index_base, index_status] = table_index_meta.GetIndexBase();
+    auto [index_base, index_status] = table_index_meta.GetIndexBase(kv_instance);
     if (!index_status.ok()) {
         return index_status;
     }
-    auto [column_def, col_status] = table_index_meta.GetColumnDef();
+    auto [column_def, col_status] = table_index_meta.GetColumnDef(kv_instance);
     if (!col_status.ok()) {
         return status;
     }
@@ -347,11 +347,11 @@ Status ChunkIndexMeta::RestoreSet(KVInstance *kv_instance) {
     const String &base_name = chunk_info_ptr->base_name_;
     SizeT index_size = chunk_info_ptr->index_size_;
 
-    auto [index_base, index_status] = table_index_meta.GetIndexBase();
+    auto [index_base, index_status] = table_index_meta.GetIndexBase(kv_instance);
     if (!index_status.ok()) {
         return index_status;
     }
-    auto [column_def, col_status] = table_index_meta.GetColumnDef();
+    auto [column_def, col_status] = table_index_meta.GetColumnDef(kv_instance);
     if (!col_status.ok()) {
         return status;
     }
@@ -454,7 +454,7 @@ Status ChunkIndexMeta::UninitSet(KVInstance *kv_instance, UsageFlag usage_flag) 
     index_buffer_->PickForCleanup();
 
     TableIndexMeeta &table_index_meta = segment_index_meta_.table_index_meta();
-    auto [index_def, index_status] = table_index_meta.GetIndexBase();
+    auto [index_def, index_status] = table_index_meta.GetIndexBase(kv_instance);
     if (!index_status.ok()) {
         return index_status;
     }
@@ -526,7 +526,7 @@ Status ChunkIndexMeta::SetChunkInfoNoPutKV(const ChunkIndexMetaInfo &chunk_info)
 Status ChunkIndexMeta::FilePaths(KVInstance *kv_instance, Vector<String> &paths) {
     Status status;
     TableIndexMeeta &table_index_meta = segment_index_meta_.table_index_meta();
-    auto [index_def, index_status] = table_index_meta.GetIndexBase();
+    auto [index_def, index_status] = table_index_meta.GetIndexBase(kv_instance);
     if (!index_status.ok()) {
         return index_status;
     }
@@ -579,7 +579,7 @@ Status ChunkIndexMeta::LoadIndexBuffer(KVInstance *kv_instance) {
     String index_dir = fmt::format("{}/{}", InfinityContext::instance().config()->DataDir(), segment_index_meta_.GetSegmentIndexDir()->c_str());
     BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
 
-    auto [index_def, index_status] = table_index_meta.GetIndexBase();
+    auto [index_def, index_status] = table_index_meta.GetIndexBase(kv_instance);
     if (!index_status.ok()) {
         return index_status;
     }

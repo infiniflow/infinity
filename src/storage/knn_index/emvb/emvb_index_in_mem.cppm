@@ -77,7 +77,7 @@ public:
 
     u32 GetRowCount() const;
 
-    void Insert(const ColumnVector &col, u32 row_offset, u32 row_count, KVInstance &kv_instance, TxnTimeStamp begin_ts);
+    void Insert(const ColumnVector &col, u32 row_offset, u32 row_count, KVInstance* kv_instance, TxnTimeStamp begin_ts);
 
     void Dump(BufferObj *buffer_obj);
 

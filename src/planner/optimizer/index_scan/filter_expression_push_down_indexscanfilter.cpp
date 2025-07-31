@@ -107,6 +107,7 @@ struct ExpressionIndexScanInfo {
         if (!base_table_ref->index_index_) {
             base_table_ref->index_index_ = MakeShared<IndexIndex>();
         }
+        KVInstance* kv_instance = new_txn->kv_instance();
         for (SizeT i = 0; i < index_id_strs_ptr->size(); ++i) {
             const String &index_id_str = (*index_id_strs_ptr)[i];
             if (table_index_meta_map.size() <= i) {
@@ -116,7 +117,7 @@ struct ExpressionIndexScanInfo {
             SharedPtr<TableIndexMeeta> &it = table_index_meta_map[i];
 
             SharedPtr<IndexBase> index_base;
-            std::tie(index_base, status) = it->GetIndexBase();
+            std::tie(index_base, status) = it->GetIndexBase(kv_instance);
             if (!status.ok()) {
                 RecoverableError(status);
             }

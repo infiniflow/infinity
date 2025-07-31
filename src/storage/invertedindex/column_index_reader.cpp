@@ -61,14 +61,13 @@ Status ColumnIndexReader::Open(optionflag_t flag, TableIndexMeeta &table_index_m
     Vector<SegmentID> *segment_ids_ptr = nullptr;
     {
         Status status;
-        std::tie(segment_ids_ptr, status) = table_index_meta.GetSegmentIndexIDs1();
+        std::tie(segment_ids_ptr, status) = table_index_meta.GetSegmentIndexIDs1(kv_instance);
         if (!status.ok()) {
             return status;
         }
     }
     if (segment_ids_ptr->empty()) {
-        KVInstance &kv_instance = table_index_meta.kv_instance();
-        LOG_INFO(fmt::format("All kv_instance key and value: {}", kv_instance.ToString()));
+        LOG_INFO(fmt::format("All kv_instance key and value: {}", kv_instance->ToString()));
     }
     u64 column_len_sum = 0;
     u32 column_len_cnt = 0;
@@ -248,7 +247,7 @@ SharedPtr<IndexReader> TableIndexReaderCache::GetIndexReader(NewTxn *txn) {
     }
     for (const String &index_id_str : *index_id_strs) {
         TableIndexMeeta table_index_meta(index_id_str, table_meta);
-        auto [index_base, index_status] = table_index_meta.GetIndexBase();
+        auto [index_base, index_status] = table_index_meta.GetIndexBase(kv_instance);
         if (!index_status.ok()) {
             UnrecoverableError("Fail to get index definition");
         }
@@ -258,7 +257,7 @@ SharedPtr<IndexReader> TableIndexReaderCache::GetIndexReader(NewTxn *txn) {
         }
 
         String column_name = index_base->column_name();
-        auto [column_def, col_def_status] = table_index_meta.GetColumnDef();
+        auto [column_def, col_def_status] = table_index_meta.GetColumnDef(kv_instance);
         u64 column_id = column_def->id();
         if (index_reader->column_index_readers_->find(column_id) == index_reader->column_index_readers_->end()) {
             (*index_reader->column_index_readers_)[column_id] = MakeShared<Map<String, SharedPtr<ColumnIndexReader>>>();

@@ -26,7 +26,6 @@ import query_context;
 import operator_state;
 import physical_operator;
 import physical_operator_type;
-import query_context;
 import operator_state;
 import data_block;
 import column_vector;
@@ -188,6 +187,8 @@ void PhysicalMatchTensorScan::PlanWithIndex(QueryContext *query_context) {
     TableMeeta *table_meta = base_table_ref_->block_index_->table_meta_.get();
 
     Set<SegmentID> index_entry_map;
+    NewTxn *new_txn = query_context->GetNewTxn();
+    KVInstance *kv_instance = new_txn->kv_instance();
 
     if (!src_match_tensor_expr_->ignore_index_) {
         Vector<String> *index_id_strs_ptr = nullptr;
@@ -204,7 +205,7 @@ void PhysicalMatchTensorScan::PlanWithIndex(QueryContext *query_context) {
                 auto table_index_meta = MakeUnique<TableIndexMeeta>(index_id_str, *table_meta);
 
                 SharedPtr<IndexBase> index_base;
-                std::tie(index_base, status) = table_index_meta->GetIndexBase();
+                std::tie(index_base, status) = table_index_meta->GetIndexBase(kv_instance);
                 if (!status.ok()) {
                     RecoverableError(status);
                 }
@@ -232,7 +233,7 @@ void PhysicalMatchTensorScan::PlanWithIndex(QueryContext *query_context) {
             auto table_index_meta = MakeUnique<TableIndexMeeta>(index_id_str, *table_meta);
 
             SharedPtr<IndexBase> index_base;
-            std::tie(index_base, status) = table_index_meta->GetIndexBase();
+            std::tie(index_base, status) = table_index_meta->GetIndexBase(kv_instance);
             if (!status.ok()) {
                 RecoverableError(status);
             }
@@ -253,7 +254,7 @@ void PhysicalMatchTensorScan::PlanWithIndex(QueryContext *query_context) {
         // Fill the segment with index
         if (table_index_meta_) {
             Vector<SegmentID> *segment_ids_ptr = nullptr;
-            std::tie(segment_ids_ptr, status) = table_index_meta_->GetSegmentIndexIDs1();
+            std::tie(segment_ids_ptr, status) = table_index_meta_->GetSegmentIndexIDs1(kv_instance);
             if (!status.ok()) {
                 RecoverableError(status);
             }

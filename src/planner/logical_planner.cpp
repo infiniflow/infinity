@@ -1242,7 +1242,7 @@ Status LogicalPlanner::BuildAlter(AlterStatement *statement, SharedPtr<BindConte
     }
     table_info->db_name_ = MakeShared<String>(statement->schema_name_);
     table_info->table_name_ = MakeShared<String>(statement->table_name_);
-
+    KVInstance* kv_instance = new_txn->kv_instance();
     switch (statement->type_) {
         case AlterStatementType::kRenameTable: {
             auto *rename_table_statement = static_cast<RenameTableStatement *>(statement);
@@ -1284,7 +1284,7 @@ Status LogicalPlanner::BuildAlter(AlterStatement *statement, SharedPtr<BindConte
                     RecoverableError(Status::ColumnNotExist(column_name));
                 }
                 bool has_index = false;
-                status = NewCatalog::CheckColumnIfIndexed(*table_meta, column_id, has_index);
+                status = NewCatalog::CheckColumnIfIndexed(*table_meta, kv_instance, column_id, has_index);
                 if (!status.ok()) {
                     RecoverableError(status);
                 }

@@ -262,7 +262,7 @@ TEST_P(TestTxnReplayCompact, test_compact_with_index) {
 
         SegmentID segment_id = 0;
         {
-            auto[segment_ids_ptr, status] = table_index_meta->GetSegmentIndexIDs1();
+            auto[segment_ids_ptr, status] = table_index_meta->GetSegmentIndexIDs1(txn->kv_instance());
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*segment_ids_ptr, Vector<SegmentID>({2}));
             segment_id = (*segment_ids_ptr)[0];

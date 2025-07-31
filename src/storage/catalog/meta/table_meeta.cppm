@@ -56,7 +56,7 @@ public:
 
     Status InitSet(SharedPtr<TableDef> table_def);
 
-    Status LoadSet();
+    Status LoadSet(KVInstance* kv_instance);
 
     Status UninitSet(UsageFlag usage_flag);
 

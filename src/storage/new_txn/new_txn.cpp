@@ -385,7 +385,7 @@ Status NewTxn::GetTables(const String &db_name, Vector<SharedPtr<TableDetail>> &
     if (!status.ok()) {
         return status;
     }
-    KVInstance *kv_instance = this->kv_instance();
+    KVInstance *kv_instance = kv_instance_.get();
     TxnTimeStamp begin_ts = this->BeginTS();
     TxnTimeStamp commit_ts = this->CommitTS();
     for (const String &table_name : table_names) {
@@ -888,9 +888,10 @@ Status NewTxn::DropColumns(const String &db_name, const String &table_name, cons
         return status;
     }
 
+    KVInstance *kv_instance = kv_instance_.get();
     for (const String &index_id : *index_id_strs_ptr) {
         TableIndexMeeta table_index_meta(index_id, *table_meta);
-        auto [index_base, index_status] = table_index_meta.GetIndexBase();
+        auto [index_base, index_status] = table_index_meta.GetIndexBase(kv_instance);
         if (!index_status.ok()) {
             return index_status;
         }
@@ -1155,8 +1156,9 @@ Status NewTxn::DropIndexByName(const String &db_name, const String &table_name, 
         return status;
     }
 
+    KVInstance *kv_instance = kv_instance_.get();
     TableIndexMeeta table_index_meta(index_id, *table_meta);
-    auto [index_base, index_status] = table_index_meta.GetIndexBase();
+    auto [index_base, index_status] = table_index_meta.GetIndexBase(kv_instance);
     if (!index_status.ok()) {
         return index_status;
     }
@@ -1285,9 +1287,9 @@ Tuple<SharedPtr<TableIndexInfo>, Status> NewTxn::GetTableIndexInfo(const String 
     if (!status.ok()) {
         return {nullptr, status};
     }
-
+    KVInstance *kv_instance = this->kv_instance_.get();
     SharedPtr<TableIndexInfo> table_index_info = MakeShared<TableIndexInfo>();
-    status = table_index_meta->GetTableIndexInfo(*table_index_info);
+    status = table_index_meta->GetTableIndexInfo(kv_instance, *table_index_info);
     return {std::move(table_index_info), Status::OK()};
 }
 

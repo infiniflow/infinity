@@ -41,8 +41,6 @@ public:
 
     TableIndexMeeta &table_index_meta() const { return table_index_meta_; }
 
-    KVInstance &kv_instance() const { return kv_instance_; }
-
     Status GetNextChunkID(KVInstance* kv_instance, ChunkID &chunk_id);
 
     Tuple<Vector<ChunkID> *, Status> GetChunkIDs1(KVInstance* kv_instance);
@@ -59,7 +57,7 @@ public:
 
     Status InitSet1(KVInstance* kv_instance);
 
-    Status LoadSet();
+    Status LoadSet(KVInstance *kv_instance);
 
     Status UninitSet1(KVInstance* kv_instance, UsageFlag usage_flag);
 

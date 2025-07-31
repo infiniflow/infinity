@@ -440,26 +440,26 @@ GetSecondaryIndexDataWithCardinality<LowCardinalityTag>(const SharedPtr<DataType
     }
 }
 
-void *GetSecondaryIndexDataWithMeeta(const SharedPtr<DataType> &data_type,
-                                     const u32 chunk_row_count,
-                                     const bool allocate,
-                                     TableIndexMeeta *table_index_meeta) {
-    if (!table_index_meeta) {
-        // Default to HighCardinality if no meeta provided
-        return static_cast<void *>(GetSecondaryIndexData(data_type, chunk_row_count, allocate));
-    }
-
-    auto [cardinality, status] = table_index_meeta->GetSecondaryIndexCardinality();
-    if (!status.ok()) {
-        // Default to HighCardinality if unable to determine
-        cardinality = SecondaryIndexCardinality::kHighCardinality;
-    }
-
-    if (cardinality == SecondaryIndexCardinality::kHighCardinality) {
-        return static_cast<void *>(GetSecondaryIndexDataWithCardinality<HighCardinalityTag>(data_type, chunk_row_count, allocate));
-    } else {
-        return static_cast<void *>(GetSecondaryIndexDataWithCardinality<LowCardinalityTag>(data_type, chunk_row_count, allocate));
-    }
-}
+//void *GetSecondaryIndexDataWithMeeta(const SharedPtr<DataType> &data_type,
+//                                     const u32 chunk_row_count,
+//                                     const bool allocate,
+//                                     TableIndexMeeta *table_index_meeta) {
+//    if (!table_index_meeta) {
+//        // Default to HighCardinality if no meeta provided
+//        return static_cast<void *>(GetSecondaryIndexData(data_type, chunk_row_count, allocate));
+//    }
+//
+//    auto [cardinality, status] = table_index_meeta->GetSecondaryIndexCardinality();
+//    if (!status.ok()) {
+//        // Default to HighCardinality if unable to determine
+//        cardinality = SecondaryIndexCardinality::kHighCardinality;
+//    }
+//
+//    if (cardinality == SecondaryIndexCardinality::kHighCardinality) {
+//        return static_cast<void *>(GetSecondaryIndexDataWithCardinality<HighCardinalityTag>(data_type, chunk_row_count, allocate));
+//    } else {
+//        return static_cast<void *>(GetSecondaryIndexDataWithCardinality<LowCardinalityTag>(data_type, chunk_row_count, allocate));
+//    }
+//}
 
 } // namespace infinity

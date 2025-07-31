@@ -373,7 +373,7 @@ public:
 
     static Status GetChunkIndexFilePaths(ChunkIndexMeta &chunk_index_meta, KVInstance *kv_instance, Vector<String> &file_paths);
 
-    static Status CheckColumnIfIndexed(TableMeeta &table_meta, ColumnID column_id, bool &has_index);
+    static Status CheckColumnIfIndexed(TableMeeta &table_meta, KVInstance *kv_instance, ColumnID column_id, bool &has_index);
 
     static Status CheckTableIfDelete(TableMeeta &table_meta, KVInstance *kv_instance, TxnTimeStamp begin_ts, bool &has_delete);
 

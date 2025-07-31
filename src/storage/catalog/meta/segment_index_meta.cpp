@@ -169,9 +169,9 @@ Status SegmentIndexMeta::InitSet1(KVInstance *kv_instance) {
     return Status::OK();
 }
 
-Status SegmentIndexMeta::LoadSet() {
+Status SegmentIndexMeta::LoadSet(KVInstance *kv_instance) {
     {
-        auto [index_base, status] = table_index_meta_.GetIndexBase();
+        auto [index_base, status] = table_index_meta_.GetIndexBase(kv_instance);
         if (!status.ok()) {
             return status;
         }
@@ -326,7 +326,7 @@ SharedPtr<String> SegmentIndexMeta::GetSegmentIndexDir() const {
 SharedPtr<SegmentIndexInfo> SegmentIndexMeta::GetSegmentIndexInfo(KVInstance *kv_instance) {
     SharedPtr<IndexBase> index_def;
     Status status;
-    std::tie(index_def, status) = table_index_meta_.GetIndexBase();
+    std::tie(index_def, status) = table_index_meta_.GetIndexBase(kv_instance);
     if (!status.ok()) {
         return nullptr;
     }

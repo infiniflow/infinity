@@ -124,13 +124,7 @@ TEST_P(TestTxnTableMeeta, table_meeta) {
     //     Status status = table_meta.SetNextSegmentID(1);
     //     EXPECT_TRUE(status.ok());
 
-    //     status = table_meta.AddSegmentID(1);
-    //     EXPECT_TRUE(status.ok());
-
     //     status = table_meta.SetNextSegmentID(2);
-    //     EXPECT_TRUE(status.ok());
-
-    //     status = table_meta.AddSegmentID(2);
     //     EXPECT_TRUE(status.ok());
 
     //     SegmentID segment_id = 0;

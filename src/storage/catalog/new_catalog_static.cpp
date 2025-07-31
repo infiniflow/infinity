@@ -168,7 +168,7 @@ Status NewCatalog::InitCatalog(KVInstance *kv_instance, TxnTimeStamp checkpoint_
     };
     auto InitSegmentIndex = [&](SegmentID segment_id, TableIndexMeeta &table_index_meta) {
         SegmentIndexMeta segment_index_meta(segment_id, table_index_meta);
-        status = segment_index_meta.LoadSet();
+        status = segment_index_meta.LoadSet(kv_instance);
         if (!status.ok()) {
             return status;
         }
@@ -189,7 +189,7 @@ Status NewCatalog::InitCatalog(KVInstance *kv_instance, TxnTimeStamp checkpoint_
         TableIndexMeeta table_index_meta(index_id_str, table_meta);
 
         Vector<SegmentID> *segment_ids_ptr = nullptr;
-        std::tie(segment_ids_ptr, status) = table_index_meta.GetSegmentIndexIDs1();
+        std::tie(segment_ids_ptr, status) = table_index_meta.GetSegmentIndexIDs1(kv_instance);
         if (!status.ok()) {
             return status;
         }
@@ -230,7 +230,7 @@ Status NewCatalog::InitCatalog(KVInstance *kv_instance, TxnTimeStamp checkpoint_
             }
         }
 
-        status = table_meta.LoadSet();
+        status = table_meta.LoadSet(kv_instance);
         if (!status.ok()) {
             return status;
         }
@@ -365,7 +365,7 @@ Status NewCatalog::GetAllMemIndexes(NewTxn *txn, Vector<SharedPtr<MemIndex>> &me
     KVInstance *kv_instance = txn->kv_instance();
 
     auto TraverseTableIndex = [&](TableIndexMeeta &table_index_meta, const String &db_name, const String &table_name, const String &index_name) {
-        auto [index_segment_ids_ptr, status] = table_index_meta.GetSegmentIndexIDs1();
+        auto [index_segment_ids_ptr, status] = table_index_meta.GetSegmentIndexIDs1(kv_instance);
         if (!status.ok()) {
             return status;
         }
@@ -566,7 +566,7 @@ Status NewCatalog::AddNewTableIndex(TableMeeta &table_meta,
     }
 
     table_index_meta.emplace(index_id_str, table_meta);
-    status = table_index_meta->InitSet1(index_base, this);
+    status = table_index_meta->InitSet1(kv_instance, index_base, this);
     if (!status.ok()) {
         return status;
     }
@@ -578,7 +578,7 @@ Status NewCatalog::CleanTableIndex(TableIndexMeeta &table_index_meta, KVInstance
                           table_index_meta.table_meta().table_id_str(),
                           table_index_meta.index_id_str()));
 
-    auto [segment_ids_ptr, status] = table_index_meta.GetSegmentIndexIDs1();
+    auto [segment_ids_ptr, status] = table_index_meta.GetSegmentIndexIDs1(kv_instance);
     if (!status.ok()) {
         return status;
     }
@@ -590,30 +590,13 @@ Status NewCatalog::CleanTableIndex(TableIndexMeeta &table_index_meta, KVInstance
         }
     }
 
-    status = table_index_meta.UninitSet1(usage_flag);
+    status = table_index_meta.UninitSet1(kv_instance, usage_flag);
     if (!status.ok()) {
         return status;
     }
 
     return Status::OK();
 }
-
-// Status NewCatalog::AddNewSegment(TableMeeta &table_meta, SegmentID segment_id, Optional<SegmentMeta> &segment_meta) {
-//     {
-//         Status status = table_meta.AddSegmentID(segment_id);
-//         if (!status.ok()) {
-//             return status;
-//         }
-//     }
-//     segment_meta.emplace(segment_id, table_meta);
-//     {
-//         Status status = segment_meta->InitSet();
-//         if (!status.ok()) {
-//             return status;
-//         }
-//     }
-//     return Status::OK();
-// }
 
 Status NewCatalog::AddNewSegment1(TableMeeta &table_meta, KVInstance *kv_instance, TxnTimeStamp commit_ts, Optional<SegmentMeta> &segment_meta) {
     Status status;
@@ -791,7 +774,7 @@ Status NewCatalog::LoadImportedOrCompactedSegment(TableMeeta &table_meta,
     for (const String &index_id_str : *index_id_strs_ptr) {
         TableIndexMeeta table_index_meta(index_id_str, table_meta);
         SegmentIndexMeta segment_index_meta(segment_info.segment_id_, table_index_meta);
-        status = segment_index_meta.LoadSet();
+        status = segment_index_meta.LoadSet(kv_instance);
         if (!status.ok()) {
             return status;
         }
@@ -969,13 +952,14 @@ Status NewCatalog::AddNewSegmentIndex1(TableIndexMeeta &table_index_meta,
                                        NewTxn *new_txn,
                                        SegmentID segment_id,
                                        Optional<SegmentIndexMeta> &segment_index_meta) {
-    Status status = table_index_meta.AddSegmentIndexID1(segment_id, new_txn);
+    KVInstance* kv_instance = new_txn->kv_instance();
+    Status status = table_index_meta.AddSegmentIndexID1(kv_instance, segment_id, new_txn);
     if (!status.ok()) {
         return status;
     }
 
     segment_index_meta.emplace(segment_id, table_index_meta);
-    status = segment_index_meta->InitSet1(new_txn->kv_instance());
+    status = segment_index_meta->InitSet1(kv_instance);
     if (!status.ok()) {
         return status;
     }
@@ -1323,7 +1307,7 @@ Status NewCatalog::GetColumnFilePaths(KVInstance *kv_instance,
 
 Status NewCatalog::GetTableIndexFilePaths(TableIndexMeeta &table_index_meta, KVInstance *kv_instance, Vector<String> &file_paths) {
 
-    auto [segment_ids_ptr, status] = table_index_meta.GetSegmentIndexIDs1();
+    auto [segment_ids_ptr, status] = table_index_meta.GetSegmentIndexIDs1(kv_instance);
     if (!status.ok()) {
         return status;
     }
@@ -1362,7 +1346,7 @@ Status NewCatalog::GetChunkIndexFilePaths(ChunkIndexMeta &chunk_index_meta, KVIn
     return Status::OK();
 }
 
-Status NewCatalog::CheckColumnIfIndexed(TableMeeta &table_meta, ColumnID column_id, bool &has_index) {
+Status NewCatalog::CheckColumnIfIndexed(TableMeeta &table_meta, KVInstance *kv_instance, ColumnID column_id, bool &has_index) {
     Vector<String> *index_id_strs_ptr = nullptr;
     Status status = table_meta.GetIndexIDs(index_id_strs_ptr);
     if (!status.ok()) {
@@ -1371,7 +1355,7 @@ Status NewCatalog::CheckColumnIfIndexed(TableMeeta &table_meta, ColumnID column_
     for (const String &index_id_str : *index_id_strs_ptr) {
         TableIndexMeeta table_index_meta(index_id_str, table_meta);
         SharedPtr<IndexBase> index_base;
-        std::tie(index_base, status) = table_index_meta.GetIndexBase();
+        std::tie(index_base, status) = table_index_meta.GetIndexBase(kv_instance);
         if (!status.ok()) {
             return status;
         }

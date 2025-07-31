@@ -1758,7 +1758,7 @@ Status NewTxn::PrepareCommitCompact(WalCmdCompactV2 *compact_cmd) {
         for (const String &index_id_str : *index_id_strs_ptr) {
             TableIndexMeeta table_index_meta(index_id_str, table_meta);
             Vector<SegmentID> *segment_ids_ptr = nullptr;
-            std::tie(segment_ids_ptr, status) = table_index_meta.GetSegmentIndexIDs1();
+            std::tie(segment_ids_ptr, status) = table_index_meta.GetSegmentIndexIDs1(kv_instance_.get());
             if (!status.ok()) {
                 return status;
             }
@@ -1769,14 +1769,10 @@ Status NewTxn::PrepareCommitCompact(WalCmdCompactV2 *compact_cmd) {
                     kv_instance_->Put(KeyEncode::DropSegmentIndexKey(db_id_str, table_id_str, index_id_str, segment_id), ts_str);
                 }
             }
-            status = table_index_meta.RemoveSegmentIndexIDs(deprecated_ids);
+            status = table_index_meta.RemoveSegmentIndexIDs(kv_instance_.get(), deprecated_ids);
             if (!status.ok()) {
                 return status;
             }
-            //  status = table_index_meta.SetSegmentIDs(new_segment_ids);
-            //  if (!status.ok()) {
-            //      return status;
-            //  }
         }
     }
 

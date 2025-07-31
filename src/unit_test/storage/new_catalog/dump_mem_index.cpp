@@ -6199,12 +6199,12 @@ TEST_P(TestTxnDumpMemIndex, test_dump_index_and_optimize_index) {
         EXPECT_TRUE(status.ok());
 
         SharedPtr<IndexBase> index_base;
-        std::tie(index_base, status) = table_index_meta->GetIndexBase();
+        std::tie(index_base, status) = table_index_meta->GetIndexBase(txn->kv_instance());
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(*index_base->index_name_, *index_name1);
 
         Vector<SegmentID> *index_segment_ids_ptr = nullptr;
-        std::tie(index_segment_ids_ptr, status) = table_index_meta->GetSegmentIndexIDs1();
+        std::tie(index_segment_ids_ptr, status) = table_index_meta->GetSegmentIndexIDs1(txn->kv_instance());
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(*index_segment_ids_ptr, Vector<SegmentID>({0}));
 
@@ -6550,12 +6550,12 @@ TEST_P(TestTxnDumpMemIndex, test_dump_index_and_compact) {
         EXPECT_TRUE(status.ok());
 
         SharedPtr<IndexBase> index_base;
-        std::tie(index_base, status) = table_index_meta->GetIndexBase();
+        std::tie(index_base, status) = table_index_meta->GetIndexBase(txn->kv_instance());
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(*index_base->index_name_, *index_name1);
 
         Vector<SegmentID> *index_segment_ids_ptr = nullptr;
-        std::tie(index_segment_ids_ptr, status) = table_index_meta->GetSegmentIndexIDs1();
+        std::tie(index_segment_ids_ptr, status) = table_index_meta->GetSegmentIndexIDs1(txn->kv_instance());
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(*index_segment_ids_ptr, segment_ids);
 
