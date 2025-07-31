@@ -51,29 +51,25 @@ import logger;
 
 namespace infinity {
 
-template <typename DataType>
-DataType GetMean(const DataType *data, u32 size) {
-    DataType sum = 0;
-    for (u32 i = 0; i < size; ++i) {
-        sum += data[i];
-    }
-    return sum / size;
-}
+// #define use_ivf
 
 class IterIVFDataAccessor : public IVFDataAccessorBase {
 public:
     IterIVFDataAccessor() {}
 
     template <typename Iter>
-    void InitEmbedding(Iter iter) {
-        while (true) {
+    SizeT InsertEmbedding(Iter iter, SizeT sample_num) {
+        SizeT count = 0;
+        while (count < sample_num) {
             if (auto ret = iter.Next(); ret) {
                 auto &[embedding, offset] = *ret;
                 embeddings_.emplace_back(reinterpret_cast<const_ptr_t>(embedding), offset);
+                ++count;
             } else {
                 break;
             }
         }
+        return count;
     }
 
     const_ptr_t GetEmbedding(SizeT offset) override { return embeddings_[offset].first; }
@@ -153,9 +149,9 @@ public:
     ~HnswLSGBuilder() = default;
 
 public:
-
     template <typename Iter>
     UniquePtr<HnswIndexInMem> MakeImplIter(Iter iter, SizeT row_count, bool trace) {
+        InsertSampleVec(iter, row_count);
         Iter iter_copy = iter;
         auto avg = GetLSAvg<Iter>(std::move(iter_copy), row_count);
         auto hnsw_index = HnswIndexInMem::Make(index_hnsw_, column_def_.get(), trace);
@@ -164,6 +160,28 @@ public:
         hnsw_index->SetLSGParam(alpha, std::move(avg));
         hnsw_index->InsertVecs(std::move(iter), kDefaultHnswInsertConfig, false);
         return hnsw_index;
+    }
+
+    template <typename Iter>
+    SizeT InsertSampleVec(Iter iter, SizeT sample_num = std::numeric_limits<SizeT>::max()) {
+        float sample_ratio = index_hnsw_->lsg_config_->sample_ratio_;
+        SizeT count = 0;
+#ifdef use_ivf
+        SampleIter<Iter> sample_iter(iter, sample_ratio);
+        count = ivf_sample_iter_.InsertEmbedding(std::move(sample_iter), sample_num);
+#else
+        SizeT dim = static_cast<EmbeddingInfo *>(column_def_->type()->type_info().get())->Dimension();
+        SampleIter<Iter> sample_iter(iter, sample_ratio);
+        for (; count < sample_num; ++count) {
+            auto next_opt = sample_iter.Next();
+            if (!next_opt.has_value()) {
+                break;
+            }
+            const auto &[embedding, offset] = next_opt.value();
+            bf_sample_vecs_.insert(bf_sample_vecs_.end(), embedding, embedding + dim);
+        }
+#endif
+        return count;
     }
 
     template <typename Iter>
@@ -194,9 +212,16 @@ public:
     }
 
 private:
+    DistanceType GetDistMean(const DistanceType *data, u32 size) {
+        DistanceType sum = 0;
+        for (u32 i = 0; i < size; ++i) {
+            sum += data[i];
+        }
+        return sum / size;
+    }
+
     UniquePtr<IVFIndexInChunk> MakeIVFIndex() {
-        const DataType *column_type = column_def_->type().get();
-        auto *embedding_info = static_cast<EmbeddingInfo *>(column_type->type_info().get());
+        auto *embedding_info = static_cast<EmbeddingInfo *>(column_def_->type().get()->type_info().get());
 
         auto index_name = MakeShared<String>("tmp_index_name");
         String filename = "tmp_index_file";
@@ -238,8 +263,7 @@ private:
     }
 
     IVF_Search_Params MakeIVFSearchParams() const {
-        const DataType *column_type = column_def_->type().get();
-        auto *embedding_info = static_cast<EmbeddingInfo *>(column_type->type_info().get());
+        auto *embedding_info = static_cast<EmbeddingInfo *>(column_def_->type().get()->type_info().get());
         const LSGConfig &lsg_config = *index_hnsw_->lsg_config_;
 
         IVF_Search_Params ivf_search_params;
@@ -262,14 +286,7 @@ private:
     template <typename Iter, template <typename, typename> typename Compare>
     UniquePtr<DistanceType[]> GetAvgByIVF(Iter iter, SizeT row_count) {
         auto ivf_index = MakeIVFIndex();
-        const LSGConfig &lsg_config = *index_hnsw_->lsg_config_;
-
-        IterIVFDataAccessor iter_accessor;
-        SampleIter<Iter> sample_iter(iter, lsg_config.sample_ratio_);
-        iter_accessor.InitEmbedding(std::move(sample_iter));
-        SizeT sample_count = iter_accessor.size();
-        RowID base_row_id(0, 0);
-        ivf_index->BuildIVFIndex(base_row_id, sample_count, &iter_accessor, column_def_);
+        ivf_index->BuildIVFIndex(RowID(0, 0), ivf_sample_iter_.size(), &ivf_sample_iter_, column_def_);
 
         auto avg = MakeUnique<DistanceType[]>(row_count);
 
@@ -288,10 +305,10 @@ private:
             auto ivf_result_handler =
                 GetIVFSearchHandler<LogicalType::kEmbedding, Compare, DistanceType>(ivf_search_params, use_bitmask, bitmask, row_count);
             ivf_result_handler->Begin();
-            ivf_result_handler->Search(ivf_index);
+            ivf_result_handler->Search(ivf_index.get());
             auto [result_n, d_ptr, offset_ptr] = ivf_result_handler->EndWithoutSort();
 
-            avg[offset] = GetMean(d_ptr.get(), result_n);
+            avg[offset] = GetDistMean(d_ptr.get(), result_n);
         }
         return avg;
     }
@@ -302,22 +319,8 @@ private:
         SizeT dim = embedding_info->Dimension();
         const LSGConfig &lsg_config = *index_hnsw_->lsg_config_;
 
-        SampleIter<Iter> sample_iter(iter, lsg_config.sample_ratio_);
-        SizeT sample_count = row_count * lsg_config.sample_ratio_;
-        auto sample_data = MakeUnique<DataType[]>(sample_count * dim);
-        {
-            SizeT i;
-            for (i = 0; i < sample_count;) {
-                auto next_opt = sample_iter.Next();
-                if (!next_opt.has_value()) {
-                    break;
-                }
-                const auto &[embedding, offset] = next_opt.value();
-                std::memcpy(sample_data.get() + i * dim, embedding, dim * sizeof(DataType));
-                ++i;
-            }
-            sample_count = i;
-        }
+        const SizeT sample_count = bf_sample_vecs_.size() / dim;
+        const auto &sample_data = bf_sample_vecs_;
 
         auto avg = MakeUnique<DistanceType[]>(row_count);
         KnnDistanceType dist_type = KnnDistanceType::kInvalid;
@@ -352,14 +355,14 @@ private:
                         merge_heap.Begin();
                         const auto &[data, offset] = next_opt.value();
                         const auto *query = reinterpret_cast<const DataType *>(data);
-                        merge_heap.Search(query, sample_data.get(), dim, dist_f.dist_func_, sample_count, 0 /*segment_id*/, 0 /*block_id*/);
+                        merge_heap.Search(query, sample_data.data(), dim, dist_f.dist_func_, sample_count, 0 /*segment_id*/, 0 /*block_id*/);
                         merge_heap.End();
 
                         auto dist = merge_heap.GetDistances();
                         if (avg[offset] != 0) {
                             UnrecoverableError(fmt::format("Invalid avg value: {} at {}", avg[offset], offset));
                         }
-                        avg[offset] = GetMean(dist, ls_k);
+                        avg[offset] = GetDistMean(dist, ls_k);
                     }
                 }));
             }
@@ -379,11 +382,11 @@ private:
                 merge_heap.Begin();
                 const auto &[data, offset] = next_opt.value();
                 const auto *query = reinterpret_cast<const DataType *>(data);
-                merge_heap.Search(query, sample_data.get(), dim, dist_f.dist_func_, sample_count, 0 /*segment_id*/, 0 /*block_id*/);
+                merge_heap.Search(query, sample_data.data(), dim, dist_f.dist_func_, sample_count, 0 /*segment_id*/, 0 /*block_id*/);
                 merge_heap.End();
 
                 auto dist = merge_heap.GetDistances();
-                auto avg_v = GetMean(dist, ls_k);
+                auto avg_v = GetDistMean(dist, ls_k);
                 avg[offset] = avg_v;
             }
         }
@@ -396,6 +399,9 @@ private:
     const SharedPtr<ColumnDef> column_def_ = nullptr;
 
     UniquePtr<KnnDistanceBase1> knn_distance_;
+
+    Vector<DataType> bf_sample_vecs_;
+    IterIVFDataAccessor ivf_sample_iter_;
 };
 
 } // namespace infinity

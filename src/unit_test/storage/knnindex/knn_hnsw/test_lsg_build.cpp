@@ -103,6 +103,7 @@ TEST_F(LSGBuildTest, test_avg) {
 
     HnswLSGBuilder<f32, f32> lsg_builder(index_hnsw.get(), std::move(column_def));
 
+    lsg_builder.InsertSampleVec(iter);
     auto avg = lsg_builder.GetLSAvg<decltype(iter)>(std::move(iter), element_size);
 
     auto avg_gt = MakeUnique<float[]>(element_size);
