@@ -610,7 +610,7 @@ file(GLOB_RECURSE
 
 if (CI)
     file(GLOB_RECURSE
-            test_dependent_cppm
+            ut_mod
             CONFIGURE_DEPENDS
             unit_test/*.cppm
     )
@@ -634,14 +634,12 @@ if (CI)
     target_sources(unit_test
             PRIVATE
             FILE_SET ut_cxx_modules TYPE CXX_MODULES FILES
-            ${test_dependent_cppm}
+            ${ut_mod}
     )
 else ()
     file(GLOB_RECURSE
-            test_dependent_cppm
+            test_dependent_mod
             CONFIGURE_DEPENDS
-            unit_test/base_test.cppm
-            unit_test/test_helper/sql_runner.cppm
             unit_test/*.cppm
             unit_test/*_impl.cpp
     )
@@ -664,7 +662,7 @@ else ()
     target_sources(unit_test
             PRIVATE
             FILE_SET core_cxx_modules TYPE CXX_MODULES FILES
-            ${test_dependent_cppm}
+            ${ut_mod}
 
             ${common_ut}
             ${parser_ut}
