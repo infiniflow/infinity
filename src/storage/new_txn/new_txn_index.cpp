@@ -1247,6 +1247,9 @@ Status NewTxn::InitSegmentIndex(SegmentIndexMeta &segment_index_meta, SegmentMet
             {
                 float sample_radio = index_hnsw->lsg_config_->sample_ratio_;
                 SizeT max_sample_num = segment_row_cnt * sample_radio;
+                if (max_sample_num <= 0) {
+                    return Status::OK();
+                }
                 for (BlockID block_id : *block_ids_ptr) {
                     if (max_sample_num <= 0) {
                         break;
