@@ -36,9 +36,9 @@ import :value;
 import array_info;
 import :third_party;
 import embedding_info;
-import function_set;
-import base_expression;
-import function;
+import :function_set;
+import :base_expression;
+import :function;
 
 namespace infinity {
 
