@@ -101,9 +101,9 @@ TEST_F(LSGBuildTest, test_avg) {
     auto index_hnsw = MakeIndexHnsw();
     auto column_def = MakeColumnDef();
 
-    HnswLSGBuilder lsg_builder(index_hnsw.get(), std::move(column_def));
+    HnswLSGBuilder<f32, f32> lsg_builder(index_hnsw.get(), std::move(column_def));
 
-    auto avg = lsg_builder.GetLSAvg<decltype(iter), f32, f32>(std::move(iter), element_size, RowID(0, 0));
+    auto avg = lsg_builder.GetLSAvg<decltype(iter)>(std::move(iter), element_size, RowID(0, 0));
 
     auto avg_gt = MakeUnique<float[]>(element_size);
     {
@@ -153,11 +153,11 @@ TEST_F(LSGBuildTest, test1) {
     auto index_hnsw = MakeIndexHnsw();
     auto column_def = MakeColumnDef();
 
-    HnswLSGBuilder lsg_builder(index_hnsw.get(), std::move(column_def));
+    HnswLSGBuilder<f32, f32> lsg_builder(index_hnsw.get(), std::move(column_def));
 
     auto iter = DenseVectorIter<f32, LabelT>(data.get(), dim, element_size);
 
-    UniquePtr<HnswIndexInMem> hnsw_index = lsg_builder.MakeImplIter<decltype(iter), f32, f32>(std::move(iter), element_size, RowID(0, 0), false);
+    UniquePtr<HnswIndexInMem> hnsw_index = lsg_builder.MakeImplIter<decltype(iter)>(std::move(iter), element_size, RowID(0, 0), false);
 #ifdef INDEX_HANDLER
 #else
     auto search_index =
