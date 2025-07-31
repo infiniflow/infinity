@@ -1,0 +1,114 @@
+# Rocky Linux 8 - China Mirrors Configuration
+# This file provides faster mirror sources for users in China
+
+[baseos]
+name=Rocky Linux $releasever - BaseOS
+baseurl=https://mirrors.aliyun.com/rockylinux/$releasever/BaseOS/$basearch/os/
+        https://mirrors.tuna.tsinghua.edu.cn/rocky/$releasever/BaseOS/$basearch/os/
+        https://mirrors.ustc.edu.cn/rocky/$releasever/BaseOS/$basearch/os/
+gpgcheck=1
+enabled=1
+countme=1
+gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-rockyofficial
+
+[baseos-debug]
+name=Rocky Linux $releasever - BaseOS - Debug
+baseurl=https://mirrors.aliyun.com/rockylinux/$releasever/BaseOS/$basearch/debug/tree/
+        https://mirrors.tuna.tsinghua.edu.cn/rocky/$releasever/BaseOS/$basearch/debug/tree/
+        https://mirrors.ustc.edu.cn/rocky/$releasever/BaseOS/$basearch/debug/tree/
+gpgcheck=1
+enabled=0
+gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-rockyofficial
+
+[baseos-source]
+name=Rocky Linux $releasever - BaseOS - Source
+baseurl=https://mirrors.aliyun.com/rockylinux/$releasever/BaseOS/source/tree/
+        https://mirrors.tuna.tsinghua.edu.cn/rocky/$releasever/BaseOS/source/tree/
+        https://mirrors.ustc.edu.cn/rocky/$releasever/BaseOS/source/tree/
+gpgcheck=1
+enabled=0
+gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-rockyofficial
+
+[appstream]
+name=Rocky Linux $releasever - AppStream
+baseurl=https://mirrors.aliyun.com/rockylinux/$releasever/AppStream/$basearch/os/
+        https://mirrors.tuna.tsinghua.edu.cn/rocky/$releasever/AppStream/$basearch/os/
+        https://mirrors.ustc.edu.cn/rocky/$releasever/AppStream/$basearch/os/
+gpgcheck=1
+enabled=1
+countme=1
+gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-rockyofficial
+
+[appstream-debug]
+name=Rocky Linux $releasever - AppStream - Debug
+baseurl=https://mirrors.aliyun.com/rockylinux/$releasever/AppStream/$basearch/debug/tree/
+        https://mirrors.tuna.tsinghua.edu.cn/rocky/$releasever/AppStream/$basearch/debug/tree/
+        https://mirrors.ustc.edu.cn/rocky/$releasever/AppStream/$basearch/debug/tree/
+gpgcheck=1
+enabled=0
+gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-rockyofficial
+
+[appstream-source]
+name=Rocky Linux $releasever - AppStream - Source
+baseurl=https://mirrors.aliyun.com/rockylinux/$releasever/AppStream/source/tree/
+        https://mirrors.tuna.tsinghua.edu.cn/rocky/$releasever/AppStream/source/tree/
+        https://mirrors.ustc.edu.cn/rocky/$releasever/AppStream/source/tree/
+gpgcheck=1
+enabled=0
+gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-rockyofficial
+
+[powertools]
+name=Rocky Linux $releasever - PowerTools
+baseurl=https://mirrors.aliyun.com/rockylinux/$releasever/PowerTools/$basearch/os/
+        https://mirrors.tuna.tsinghua.edu.cn/rocky/$releasever/PowerTools/$basearch/os/
+        https://mirrors.ustc.edu.cn/rocky/$releasever/PowerTools/$basearch/os/
+gpgcheck=1
+enabled=0
+countme=1
+gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-rockyofficial
+
+[powertools-debug]
+name=Rocky Linux $releasever - PowerTools - Debug
+baseurl=https://mirrors.aliyun.com/rockylinux/$releasever/PowerTools/$basearch/debug/tree/
+        https://mirrors.tuna.tsinghua.edu.cn/rocky/$releasever/PowerTools/$basearch/debug/tree/
+        https://mirrors.ustc.edu.cn/rocky/$releasever/PowerTools/$basearch/debug/tree/
+gpgcheck=1
+enabled=0
+gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-rockyofficial
+
+[powertools-source]
+name=Rocky Linux $releasever - PowerTools - Source
+baseurl=https://mirrors.aliyun.com/rockylinux/$releasever/PowerTools/source/tree/
+        https://mirrors.tuna.tsinghua.edu.cn/rocky/$releasever/PowerTools/source/tree/
+        https://mirrors.ustc.edu.cn/rocky/$releasever/PowerTools/source/tree/
+gpgcheck=1
+enabled=0
+gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-rockyofficial
+
+[extras]
+name=Rocky Linux $releasever - Extras
+baseurl=https://mirrors.aliyun.com/rockylinux/$releasever/extras/$basearch/os/
+        https://mirrors.tuna.tsinghua.edu.cn/rocky/$releasever/extras/$basearch/os/
+        https://mirrors.ustc.edu.cn/rocky/$releasever/extras/$basearch/os/
+gpgcheck=1
+enabled=1
+countme=1
+gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-rockyofficial
+
+[extras-debug]
+name=Rocky Linux $releasever - Extras - Debug
+baseurl=https://mirrors.aliyun.com/rockylinux/$releasever/extras/$basearch/debug/tree/
+        https://mirrors.tuna.tsinghua.edu.cn/rocky/$releasever/extras/$basearch/debug/tree/
+        https://mirrors.ustc.edu.cn/rocky/$releasever/extras/$basearch/debug/tree/
+gpgcheck=1
+enabled=0
+gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-rockyofficial
+
+[extras-source]
+name=Rocky Linux $releasever - Extras - Source
+baseurl=https://mirrors.aliyun.com/rockylinux/$releasever/extras/source/tree/
+        https://mirrors.tuna.tsinghua.edu.cn/rocky/$releasever/extras/source/tree/
+        https://mirrors.ustc.edu.cn/rocky/$releasever/extras/source/tree/
+gpgcheck=1
+enabled=0
+gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-rockyofficial

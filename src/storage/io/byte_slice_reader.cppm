@@ -1,11 +1,11 @@
 module;
 
-export module byte_slice_reader;
+export module infinity_core:byte_slice_reader;
 
-import stl;
-import byte_slice;
+import :stl;
+import :byte_slice;
 
-import infinity_exception;
+import :infinity_exception;
 
 namespace infinity {
 

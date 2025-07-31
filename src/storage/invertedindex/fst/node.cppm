@@ -13,13 +13,16 @@
 // limitations under the License.
 
 module;
+
 #include <cassert>
-import stl;
-import third_party;
-export module fst:node;
-import :common_inputs;
-import :writer;
-import :bytes;
+
+export module infinity_core:fst.node;
+
+import :stl;
+import :third_party;
+import :fst.common_inputs;
+import :fst.writer;
+import :fst.bytes;
 
 namespace infinity {
 

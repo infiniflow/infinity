@@ -1,8 +1,8 @@
 module;
 
-import stl;
+export module infinity_core:random;
 
-export module random;
+import :stl;
 
 namespace infinity {
 

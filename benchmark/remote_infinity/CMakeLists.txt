@@ -6,8 +6,6 @@ add_executable(remote_query_benchmark
         ${CMAKE_SOURCE_DIR}/src/network/infinity_thrift/infinity_types.cpp
 )
 
-add_dependencies(remote_query_benchmark miniocpp pugixml-static curlpp_static inih libcurl_static cpptrace-lib)
-
 target_include_directories(remote_query_benchmark PUBLIC "${CMAKE_SOURCE_DIR}/src")
 target_include_directories(remote_query_benchmark PUBLIC "${CMAKE_SOURCE_DIR}/src/network/infinity_thrift")
 target_include_directories(remote_query_benchmark PUBLIC "${CMAKE_SOURCE_DIR}/third_party/thrift/lib/cpp/src")
@@ -23,7 +21,6 @@ target_link_directories(remote_query_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third
 target_link_directories(remote_query_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/pcre2/")
 target_link_directories(remote_query_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/")
 target_link_directories(remote_query_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/rocksdb/")
-target_link_directories(remote_query_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/cpptrace/")
 target_link_directories(remote_query_benchmark PUBLIC "/usr/local/openssl30/lib64")
 
 target_link_libraries(
@@ -39,10 +36,8 @@ target_link_libraries(
         opencc
         dl
         lz4.a
-        atomic.a
         thrift.a
-        c++.a
-        c++abi.a
+        ${STDCXX15EXP_STATIC}
         parquet.a
         arrow.a
         snappy.a
@@ -57,22 +52,20 @@ target_link_libraries(
         ssl.a
         crypto.a
         rocksdb.a
-        cpptrace.a
-        backtrace.a
 )
 
 # add_definitions(-march=native)
 # add_definitions(-msse4.2 -mfma)
 # add_definitions(-mavx2 -mf16c -mpopcnt)
 
-# execute_process(COMMAND grep -q avx2 /proc/cpuinfo  
-#                 RESULT_VARIABLE SUPPORT_AVX2  
-#                 OUTPUT_QUIET  
-#                 ERROR_QUIET)  
+# execute_process(COMMAND grep -q avx2 /proc/cpuinfo
+#                 RESULT_VARIABLE SUPPORT_AVX2
+#                 OUTPUT_QUIET
+#                 ERROR_QUIET)
 
-# execute_process(COMMAND grep -q avx512 /proc/cpuinfo  
-# RESULT_VARIABLE SUPPORT_AVX512  
-# OUTPUT_QUIET  
+# execute_process(COMMAND grep -q avx512 /proc/cpuinfo
+# RESULT_VARIABLE SUPPORT_AVX512
+# OUTPUT_QUIET
 # ERROR_QUIET)
 
 # if (SUPPORT_AVX2 EQUAL 0 OR SUPPORT_AVX512 EQUAL 0)

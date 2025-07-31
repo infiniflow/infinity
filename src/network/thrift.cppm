@@ -22,7 +22,7 @@ module;
 #include <thrift/transport/TBufferTransports.h>
 #include <thrift/transport/TSocket.h>
 
-export module thrift;
+export module infinity_core:thrift;
 
 export namespace apache {
 namespace thrift {

@@ -14,12 +14,12 @@
 
 module;
 
-export module data_file_worker;
+export module infinity_core:data_file_worker;
 
-import stl;
-import file_worker;
-import file_worker_type;
-import persistence_manager;
+import :stl;
+import :file_worker;
+import :file_worker_type;
+import :persistence_manager;
 
 namespace infinity {
 
@@ -52,7 +52,10 @@ protected:
 
     void FreeFromMmapImpl() override;
 
+    void SetDataSize(SizeT size) override;
+
 private:
     const SizeT buffer_size_;
+    Atomic<SizeT> data_size_{};
 };
 } // namespace infinity

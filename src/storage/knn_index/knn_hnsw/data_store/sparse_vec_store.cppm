@@ -21,12 +21,12 @@ module;
 #include <simde/x86/sse.h>
 #endif
 
-export module sparse_vec_store;
+export module infinity_core:sparse_vec_store;
 
-import stl;
-import local_file_handle;
-import hnsw_common;
-import sparse_util;
+import :stl;
+import :local_file_handle;
+import :hnsw_common;
+import :sparse_util;
 
 namespace infinity {
 
@@ -54,6 +54,9 @@ public:
         file_handle.Read(&max_dim, sizeof(max_dim));
         return This(max_dim);
     }
+
+    // Get size of vector in search
+    SizeT GetVecSizeInBytes() const { return sizeof(DataType) * max_dim_; }
 
     QueryType MakeQuery(QueryVecType vec) const { return vec; }
 

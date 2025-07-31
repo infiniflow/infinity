@@ -14,10 +14,10 @@
 
 module;
 
-export module bm25_ranker;
+export module infinity_core:bm25_ranker;
 
-import stl;
-import index_defines;
+import :stl;
+import :index_defines;
 
 namespace infinity {
 export class BM25Ranker {

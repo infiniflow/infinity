@@ -14,20 +14,19 @@
 
 module;
 
-#include "type/complex/row_id.h"
+export module infinity_core:table_meeta;
 
-export module table_meeta;
-
-import stl;
-import status;
+import :stl;
+import :status;
 import column_def;
-import new_catalog;
+import :new_catalog;
+import row_id;
 
 namespace infinity {
 
 class KVInstance;
 class TableDef;
-class TableInfo;
+struct TableInfo;
 class TableIndexReaderCache;
 class NewTxn;
 // struct SegmentUpdateTS;
@@ -73,16 +72,7 @@ public:
 
     // Status SetNextSegmentID(SegmentID next_segment_id);
 
-    Status GetUnsealedSegmentID(SegmentID &unsealed_segment_id) {
-        if (!unsealed_segment_id_) {
-            Status status = LoadUnsealedSegmentID();
-            if (!status.ok()) {
-                return status;
-            }
-        }
-        unsealed_segment_id = *unsealed_segment_id_;
-        return Status::OK();
-    }
+    Status GetUnsealedSegmentID(SegmentID &unsealed_segment_id);
 
     Status SetUnsealedSegmentID(SegmentID unsealed_segment_id);
 
@@ -129,13 +119,11 @@ public:
 
     Status RemoveFtIndexCache();
 
-    Status InvalidateFtIndexCache(SegmentID segment_id);
+    Status InvalidateFtIndexCache();
 
     Status GetNextColumnID(ColumnID &next_column_id);
 
     Status SetNextColumnID(ColumnID next_column_id);
-
-    Status UpdateFulltextSegmentTS(TxnTimeStamp ts, SegmentUpdateTS &segment_update_ts);
 
     Status GetNextRowID(RowID &next_row_id);
 

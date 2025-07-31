@@ -14,8 +14,10 @@
 
 module;
 
-import stl;
-export module heap_twin_operation;
+export module infinity_core:heap_twin_operation;
+
+import :stl;
+
 namespace infinity {
 
 // assume that distances have been initialized

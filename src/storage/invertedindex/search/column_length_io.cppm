@@ -16,19 +16,19 @@ module;
 
 #include <cassert>
 
-export module column_length_io;
+export module infinity_core:column_length_io;
 
-import stl;
-import index_defines;
+import :stl;
+import :index_defines;
 import internal_types;
-import memory_indexer;
-import buffer_obj;
-import buffer_handle;
-import column_index_reader;
+import :memory_indexer;
+import :buffer_obj;
+import :buffer_handle;
+import :column_index_reader;
 
 namespace infinity {
 class FileSystem;
-class ColumnReaderChunkInfo;
+struct ColumnReaderChunkInfo;
 
 export class FullTextColumnLengthReader {
 public:

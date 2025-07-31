@@ -15,6 +15,7 @@
 #pragma once
 
 #include "base_statement.h"
+#include <optional>
 
 namespace infinity {
 

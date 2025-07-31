@@ -14,36 +14,36 @@
 
 module;
 
-export module new_catalog;
+export module infinity_core:new_catalog;
 
-import stl;
-import status;
-import meta_info;
+import :stl;
+import :status;
+import :meta_info;
 import extra_ddl_info;
-import default_values;
+import :default_values;
 import internal_types;
-import buffer_handle;
+import :buffer_handle;
 import column_def;
-import profiler;
-import third_party;
-import storage;
-import meta_tree;
+import :profiler;
+import :third_party;
+import :storage;
+import :meta_tree;
 
 namespace infinity {
 
 class NewTxn;
 struct MemIndex;
 class TableIndexReaderCache;
-class DBMeeta;
-class TableMeeta;
-class SegmentMeta;
-class BlockMeta;
-class ColumnMeta;
-class TableIndexMeeta;
-class SegmentIndexMeta;
-class ChunkIndexMeta;
+export class DBMeeta;
+export class TableMeeta;
+export class SegmentMeta;
+export class BlockMeta;
+export class ColumnMeta;
+export class TableIndexMeeta;
+export class SegmentIndexMeta;
+export class ChunkIndexMeta;
 class BufferObj;
-class ColumnVector;
+export struct ColumnVector;
 struct MetaKey;
 class KVStore;
 class KVInstance;
@@ -53,7 +53,7 @@ class IndexBase;
 struct WalSegmentInfo;
 struct WalBlockInfo;
 struct WalChunkIndexInfo;
-class Config;
+struct Config;
 struct MemIndexID;
 class TableCache;
 class DbCache;
@@ -309,14 +309,6 @@ public:
 
     static Status CleanSegmentIndex(SegmentIndexMeta &segment_index_meta, UsageFlag usage_flag);
 
-    static Status AddNewChunkIndex(SegmentIndexMeta &segment_index_meta,
-                                   ChunkID chunk_id,
-                                   RowID base_row_id,
-                                   SizeT row_count,
-                                   const String &base_name,
-                                   SizeT index_size,
-                                   Optional<ChunkIndexMeta> &chunk_index_meta);
-
     static Status AddNewChunkIndex1(SegmentIndexMeta &segment_index_meta,
                                     NewTxn *new_txn,
                                     ChunkID chunk_id,
@@ -325,8 +317,6 @@ public:
                                     const String &base_name,
                                     SizeT index_size,
                                     Optional<ChunkIndexMeta> &chunk_index_meta);
-
-    static Status LoadFlushedChunkIndex(SegmentIndexMeta &segment_index_meta, const WalChunkIndexInfo &chunk_info);
 
     static Status LoadFlushedChunkIndex1(SegmentIndexMeta &segment_index_meta, const WalChunkIndexInfo &chunk_info, NewTxn *new_txn);
 

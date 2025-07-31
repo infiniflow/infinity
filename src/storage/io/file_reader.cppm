@@ -14,13 +14,13 @@
 
 module;
 
-export module file_reader;
+export module infinity_core:file_reader;
 
-import stl;
-import status;
-import infinity_exception;
-import local_file_handle;
-import virtual_store;
+import :stl;
+import :status;
+import :infinity_exception;
+import :local_file_handle;
+import :virtual_store;
 
 namespace infinity {
 

@@ -1,10 +1,10 @@
 module;
 
-import stl;
-import byte_slice_reader;
-import byte_slice_writer;
+export module infinity_core:vbyte_compress_encoder;
 
-export module vbyte_compress_encoder;
+import :stl;
+import :byte_slice_reader;
+import :byte_slice_writer;
 
 namespace infinity {
 

@@ -14,11 +14,11 @@
 
 module;
 
-export module column_meta;
+export module infinity_core:column_meta;
 
-import stl;
-import status;
-import new_catalog;
+import :stl;
+import :status;
+import :new_catalog;
 import column_def;
 
 namespace infinity {
@@ -38,16 +38,7 @@ public:
 
     SizeT column_idx() const { return column_idx_; }
 
-    Status GetChunkOffset(SizeT &chunk_offset) {
-        if (!chunk_offset_) {
-            Status status = LoadChunkOffset();
-            if (!status.ok()) {
-                return status;
-            }
-        }
-        chunk_offset = *chunk_offset_;
-        return Status::OK();
-    }
+    Status GetChunkOffset(SizeT &chunk_offset);
 
     Status SetChunkOffset(SizeT chunk_offset);
 
@@ -60,6 +51,10 @@ public:
     Status UninitSet(const ColumnDef *column_def, UsageFlag usage_flag);
 
     Status GetColumnBuffer(BufferObj *&column_buffer, BufferObj *&outline_buffer);
+
+    Tuple<SharedPtr<ColumnDef>, Status> GetColumnDef() const;
+
+    Tuple<SizeT, Status> GetColumnSize(SizeT row_cnt) const;
 
     Status FilePaths(Vector<String> &paths);
 

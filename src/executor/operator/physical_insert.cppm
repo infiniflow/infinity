@@ -14,21 +14,21 @@
 
 module;
 
-export module physical_insert;
+export module infinity_core:physical_insert;
 
-import stl;
+import :stl;
 
-import query_context;
-import operator_state;
-import physical_operator;
-import physical_operator_type;
-import base_expression;
-import load_meta;
-import infinity_exception;
-import meta_info;
+import :query_context;
+import :operator_state;
+import :physical_operator;
+import :physical_operator_type;
+import :base_expression;
+import :load_meta;
+import :infinity_exception;
+import :meta_info;
 import internal_types;
 import data_type;
-import logger;
+import :logger;
 
 namespace infinity {
 

@@ -14,9 +14,9 @@
 
 module;
 
-#include "simd_common_intrin_include.h"
-export module distance_simd_functions;
-import stl;
+export module infinity_core:distance_simd_functions;
+
+import :stl;
 
 namespace infinity {
 

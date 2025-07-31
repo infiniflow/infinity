@@ -14,13 +14,13 @@
 
 module;
 
-export module file_worker;
+export module infinity_core:file_worker;
 
-import stl;
-import third_party;
-import file_worker_type;
-import persistence_manager;
-import defer_op;
+import :stl;
+import :third_party;
+import :file_worker_type;
+import :persistence_manager;
+import :defer_op;
 
 namespace infinity {
 
@@ -60,6 +60,8 @@ public:
     void *GetData() const { return data_; }
 
     void SetData(void *data);
+
+    virtual void SetDataSize(SizeT size);
 
     // Get an absolute file path. As key of a buffer handle.
     String GetFilePath() const;

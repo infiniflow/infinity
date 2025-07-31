@@ -14,9 +14,9 @@
 
 module;
 
-export module kv_code;
+export module infinity_core:kv_code;
 
-import stl;
+import :stl;
 import column_def;
 
 namespace infinity {

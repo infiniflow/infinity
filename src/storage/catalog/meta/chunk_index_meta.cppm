@@ -14,13 +14,13 @@
 
 module;
 
-export module chunk_index_meta;
+export module infinity_core:chunk_index_meta;
 
-import stl;
-import status;
+import :stl;
+import :status;
 import internal_types;
-import third_party;
-import new_catalog;
+import :third_party;
+import :new_catalog;
 
 namespace infinity {
 
@@ -52,17 +52,7 @@ public:
 
     SegmentIndexMeta &segment_index_meta() const { return segment_index_meta_; }
 
-    Status GetChunkInfo(ChunkIndexMetaInfo *&chunk_info) {
-        std::lock_guard<std::mutex> lock(mtx_);
-        if (!chunk_info_) {
-            Status status = LoadChunkInfo();
-            if (!status.ok()) {
-                return status;
-            }
-        }
-        chunk_info = &chunk_info_.value();
-        return Status::OK();
-    }
+    Status GetChunkInfo(ChunkIndexMetaInfo *&chunk_info);
 
     Status GetIndexBuffer(BufferObj *&index_buffer);
 

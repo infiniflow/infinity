@@ -14,12 +14,12 @@
 
 module;
 
-export module blockmax_leaf_iterator;
+export module infinity_core:blockmax_leaf_iterator;
 
-import stl;
+import :stl;
 import internal_types;
-import doc_iterator;
-import column_length_io;
+import :doc_iterator;
+import :column_length_io;
 
 namespace infinity {
 

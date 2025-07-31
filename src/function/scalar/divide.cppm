@@ -14,9 +14,9 @@
 
 module;
 
-export module divide;
+export module infinity_core:divide;
 
-import stl;
+import :stl;
 
 namespace infinity {
 

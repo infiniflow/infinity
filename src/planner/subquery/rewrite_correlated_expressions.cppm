@@ -14,15 +14,15 @@
 
 module;
 
-export module rewrite_correlated_expression;
+export module infinity_core:rewrite_correlated_expression;
 
-import stl;
-import logical_node_visitor;
-import logical_node;
-import column_binding;
-import base_expression;
-import column_expression;
-import subquery_expression;
+import :stl;
+import :logical_node_visitor;
+import :logical_node;
+import :column_binding;
+import :base_expression;
+import :column_expression;
+import :subquery_expression;
 
 namespace infinity {
 

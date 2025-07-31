@@ -14,17 +14,17 @@
 
 module;
 
-export module buffer_obj;
+export module infinity_core:buffer_obj;
 
-import stl;
-import file_worker;
-import buffer_handle;
-import file_worker_type;
+import :stl;
+import :file_worker;
+import :buffer_handle;
+import :file_worker_type;
 
 namespace infinity {
 
-class BufferManager;
-class VarBuffer;
+export class BufferManager;
+export class VarBuffer;
 class KVInstance;
 class Status;
 
@@ -154,6 +154,7 @@ public:
     void CheckState() const;
 
     void SetData(void *data);
+    void SetDataSize(SizeT size);
 
 protected:
     mutable std::mutex w_locker_{};

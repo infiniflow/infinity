@@ -14,13 +14,13 @@
 
 module;
 
-export module version_file_worker;
+export module infinity_core:version_file_worker;
 
-import stl;
-import file_worker;
-import file_worker_type;
-import buffer_obj;
-import persistence_manager;
+import :stl;
+import :file_worker;
+import :file_worker_type;
+import :buffer_obj;
+import :persistence_manager;
 
 namespace infinity {
 

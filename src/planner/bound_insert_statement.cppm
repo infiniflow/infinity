@@ -14,15 +14,15 @@
 
 module;
 
-export module bound_insert_statement;
+export module infinity_core:bound_insert_statement;
 
-import bound_statement;
-import table_ref;
-import base_expression;
-import bind_context;
-import logical_node;
-import query_context;
-import stl;
+import :bound_statement;
+import :table_ref;
+import :base_expression;
+import :bind_context;
+import :logical_node;
+import :query_context;
+import :stl;
 
 namespace infinity {
 

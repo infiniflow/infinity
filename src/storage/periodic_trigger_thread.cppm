@@ -14,10 +14,10 @@
 
 module;
 
-export module periodic_trigger_thread;
+export module infinity_core:periodic_trigger_thread;
 
-import stl;
-import periodic_trigger;
+import :stl;
+import :periodic_trigger;
 
 namespace infinity {
 

@@ -137,9 +137,9 @@ module;
 
 #include "builtin.h"
 
-export module spinlock;
+export module infinity_core:spinlock;
 
-import stl;
+import :stl;
 
 namespace infinity {
 

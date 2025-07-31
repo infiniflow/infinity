@@ -16,17 +16,17 @@ module;
 
 #include <functional>
 
-export module deprecated_knn_flat_l2;
+export module infinity_core:deprecated_knn_flat_l2;
 
-import stl;
-import deprecated_knn_distance;
-import logger;
+import :stl;
+import :deprecated_knn_distance;
+import :logger;
 
-import knn_result_handler;
-import infinity_exception;
-import default_values;
-import vector_distance;
-import roaring_bitmap;
+import :knn_result_handler;
+import :infinity_exception;
+import :default_values;
+import :vector_distance;
+import :roaring_bitmap;
 import knn_expr;
 import internal_types;
 

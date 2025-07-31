@@ -14,14 +14,14 @@
 
 module;
 
-export module peer_thrift_client;
+export module infinity_core:peer_thrift_client;
 
-import peer_server_thrift_types;
-import stl;
-import thrift;
-import status;
-import blocking_queue;
-import peer_task;
+import :peer_server_thrift_types;
+import :stl;
+import :thrift;
+import :status;
+import :blocking_queue;
+import :peer_task;
 import global_resource_usage;
 
 namespace infinity {

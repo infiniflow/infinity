@@ -2,13 +2,13 @@ module;
 
 #include <string>
 
-export module cn_quantifier_segmenter;
+export module infinity_core:cn_quantifier_segmenter;
 
-import stl;
-import hit;
-import segmenter;
-import analyze_context;
-import ik_dict;
+import :stl;
+import :hit;
+import :segmenter;
+import :analyze_context;
+import :ik_dict;
 
 namespace infinity {
 

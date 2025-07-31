@@ -24,11 +24,8 @@
 #include <thrift/transport/TTransportUtils.h>
 #include <unordered_set>
 
+import infinity_core;
 import compilation_config;
-
-import profiler;
-import virtual_store;
-import third_party;
 import statement_common;
 import internal_types;
 
@@ -41,7 +38,7 @@ struct InfinityClient {
     std::shared_ptr<TTransport> socket;
     std::shared_ptr<TTransport> transport;
     std::shared_ptr<TProtocol> protocol;
-    std::unique_ptr<InfinityServiceClient> client;
+    UniquePtr<InfinityServiceClient> client;
     int64_t session_id;
     InfinityClient() {
         socket.reset(new TSocket("127.0.0.1", 23817));
@@ -51,7 +48,7 @@ struct InfinityClient {
         transport->open();
         CommonResponse response;
         ConnectRequest request;
-        request.__set_client_version(30); // 0.6.0.dev4
+        request.__set_client_version(30); // 0.6.0.dev4 and 0.6.0.dev5
         client->Connect(response, request);
         session_id = response.session_id;
     }
@@ -65,7 +62,7 @@ struct InfinityClient {
 };
 
 template <typename T>
-std::unique_ptr<T[]> load_data(const std::string &filename, size_t &num, int &dim) {
+UniquePtr<T[]> load_data(const std::string &filename, size_t &num, int &dim) {
     std::ifstream in(filename, std::ios::binary);
     if (!in.is_open()) {
         std::cout << "open file error" << std::endl;
@@ -139,7 +136,7 @@ int main() {
         std::cerr << "File: " << sift_groundtruth_path << " doesn't exist" << std::endl;
         exit(-1);
     }
-    std::unique_ptr<float[]> queries_ptr;
+    UniquePtr<float[]> queries_ptr;
     size_t query_count;
     int64_t dimension = 128;
     {
@@ -151,7 +148,7 @@ int main() {
     int64_t topk = 100;
     std::vector<std::unordered_set<int>> ground_truth_sets_1, ground_truth_sets_10, ground_truth_sets_100;
     {
-        std::unique_ptr<int[]> gt;
+        UniquePtr<int[]> gt;
         size_t gt_count;
         int gt_top_k;
         {

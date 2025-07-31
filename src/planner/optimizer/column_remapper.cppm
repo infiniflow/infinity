@@ -14,20 +14,14 @@
 
 module;
 
-export module column_remapper;
+export module infinity_core:column_remapper;
 
-import internal_types;
-import stl;
-import logical_node_visitor;
-import logical_node;
-import base_expression;
-import column_binding;
-import query_context;
-import column_expression;
+import :stl;
+import :logical_node_visitor;
+import :logical_node;
+import :column_binding;
 import data_type;
-
-import optimizer_rule;
-import logical_node_type;
+import :optimizer_rule;
 
 namespace infinity {
 

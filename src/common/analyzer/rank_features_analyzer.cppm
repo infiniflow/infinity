@@ -14,10 +14,10 @@
 
 module;
 
-export module rank_features_analyzer;
-import stl;
-import term;
-import analyzer;
+export module infinity_core:rank_features_analyzer;
+import :stl;
+import :term;
+import :analyzer;
 
 namespace infinity {
 

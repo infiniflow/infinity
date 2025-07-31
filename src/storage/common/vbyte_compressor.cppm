@@ -1,8 +1,8 @@
 module;
 
-export module vbyte_compressor;
+export module infinity_core:vbyte_compressor;
 
-import stl;
+import :stl;
 
 namespace infinity {
 
