@@ -31,6 +31,9 @@ import third_party;
 import serialize;
 import dist_func_lsg_wrapper;
 import default_values;
+import hnsw_lsg_builder;
+import column_def;
+import index_hnsw;
 
 // Fixme: some variable has implicit type conversion.
 // Fixme: some variable has confusing name.
@@ -326,6 +329,46 @@ protected:
     }
 
 public:
+    void InitLSGBuilder(const IndexHnsw *index_hnsw, SharedPtr<ColumnDef>column_def) {
+        if (!LSG) {
+            UnrecoverableError("InsertSampleVecs when LSG not use!");
+        }
+        lsg_builder_ = HnswLSGBuilder<DataType, DistanceType>(index_hnsw, column_def);
+    }
+
+    template <typename Iter>
+    SizeT InsertSampleVecs(Iter iter, SizeT sample_num = std::numeric_limits<SizeT>::max()) {
+        if (!LSG) {
+            UnrecoverableError("InsertSampleVecs when LSG not use!");
+        }
+        if (!lsg_builder_.has_value()) {
+            UnrecoverableError("lsg_builder_ not exist, maybe not Init!");
+        }
+        return lsg_builder_->InsertSampleVec(std::move(iter), sample_num);
+    }
+
+    template <typename Iter>
+    void InsertLSAvg(Iter iter, SizeT row_count) {
+        if (!LSG) {
+            UnrecoverableError("InsertLSAvg when LSG not use!");
+        }
+        if (!lsg_builder_.has_value()) {
+            UnrecoverableError("lsg_builder_ not exist, maybe not Init!");
+        }
+        lsg_builder_->InsertLSAvg(std::move(iter), row_count);
+    }
+
+    void SetLSGParam() {
+        if (!LSG) {
+            UnrecoverableError("InsertSampleVecs when LSG not use!");
+        }
+        if (!lsg_builder_.has_value()) {
+            UnrecoverableError("lsg_builder_ not exist, maybe not Init!");
+        }
+        distance_.SetLSGParam(lsg_builder_->alpha(), lsg_builder_->avg());
+    }
+
+public:
     template <DataIteratorConcept<QueryVecType, LabelType> Iterator>
     Pair<SizeT, SizeT> InsertVecs(Iterator &&iter, const HnswInsertConfig &config = kDefaultHnswInsertConfig) {
         auto [start_i, end_i] = StoreData(std::move(iter), config);
@@ -435,6 +478,8 @@ protected:
     Distance distance_;
 
     SizeT prefetch_step_;
+
+    Optional<HnswLSGBuilder<DataType, DistanceType>> lsg_builder_{};
 
     // //---------------------------------------------- Following is the tmp debug function. ----------------------------------------------
 public:

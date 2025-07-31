@@ -154,7 +154,7 @@ void HnswFileWorker::ReadFromFileImpl(SizeT file_size, bool from_spill) {
         UnrecoverableError("Data is already allocated.");
     }
 #ifdef INDEX_HANDLER
-    data_ = static_cast<void *>(new HnswHandlerPtr(HnswHandler::Make(index_base_.get(), column_def_.get()).release()));
+    data_ = static_cast<void *>(new HnswHandlerPtr(HnswHandler::Make(index_base_.get(), column_def_).release()));
     auto *hnsw_handler = reinterpret_cast<HnswHandlerPtr *>(data_);
     if (from_spill) {
         (*hnsw_handler)->Load(*file_handle_);
@@ -191,11 +191,11 @@ bool HnswFileWorker::ReadFromMmapImpl(const void *ptr, SizeT size) {
         UnrecoverableError("Mmap data is already allocated.");
     }
 #ifdef INDEX_HANDLER
-    mmap_data_ = reinterpret_cast<u8 *>(new HnswHandlerPtr(HnswHandler::Make(index_base_.get(), column_def_.get(), false).release()));
+    mmap_data_ = reinterpret_cast<u8 *>(new HnswHandlerPtr(HnswHandler::Make(index_base_.get(), column_def_, false).release()));
     auto *hnsw_handler = reinterpret_cast<HnswHandlerPtr *>(mmap_data_);
     (*hnsw_handler)->LoadFromPtr(static_cast<const char *>(ptr), size);
 #else
-    mmap_data_ = reinterpret_cast<u8 *>(new AbstractHnsw(HnswIndexInMem::InitAbstractIndex(index_base_.get(), column_def_.get(), false)));
+    mmap_data_ = reinterpret_cast<u8 *>(new AbstractHnsw(HnswIndexInMem::InitAbstractIndex(index_base_.get(), column_def_, false)));
     auto *hnsw_index = reinterpret_cast<AbstractHnsw *>(mmap_data_);
     std::visit(
         [&](auto &&index) {

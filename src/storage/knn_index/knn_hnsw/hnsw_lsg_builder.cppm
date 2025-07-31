@@ -20,11 +20,6 @@ module;
 export module hnsw_lsg_builder;
 
 import stl;
-#ifdef INDEX_HANDLER
-import hnsw_handler;
-#else
-import abstract_hnsw;
-#endif
 import column_def;
 import index_hnsw;
 import index_ivf;
@@ -120,6 +115,8 @@ private:
 export template <typename DataType, typename DistanceType>
 class HnswLSGBuilder {
 public:
+    using This = HnswLSGBuilder<DataType, DistanceType>;
+
     HnswLSGBuilder(const IndexHnsw *index_hnsw, SharedPtr<ColumnDef> column_def) : index_hnsw_(index_hnsw), column_def_(column_def) {
         if (index_hnsw_->build_type_ != HnswBuildType::kLSG) {
             RecoverableError(Status::NotSupport("Only support LSG build type"));
@@ -145,23 +142,26 @@ public:
         }
         knn_distance_ = KnnDistanceBase1::Make(embedding_info->Type(), distance_type);
     }
+    HnswLSGBuilder(This &&other)
+        : index_hnsw_(other.index_hnsw_), column_def_(other.column_def_), knn_distance_(std::move(other.knn_distance_)),
+          bf_sample_vecs_(std::move(other.bf_sample_vecs_)), bf_avg_(std::move(other.bf_avg_)), ivf_sample_iter_(std::move(other.ivf_sample_iter_)),
+          ivf_avg_(std::move(other.ivf_avg_)) {}
+    This &operator=(This &&other) {
+        if (this != &other) {
+            index_hnsw_ = other.index_hnsw_;
+            column_def_ = other.column_def_;
+            knn_distance_ = std::move(other.knn_distance_);
+            bf_sample_vecs_ = std::move(other.bf_sample_vecs_);
+            bf_avg_ = std::move(other.bf_avg_);
+            ivf_sample_iter_ = std::move(other.ivf_sample_iter_);
+            ivf_avg_ = std::move(other.ivf_avg_);
+        }
+        return *this;
+    }
 
     ~HnswLSGBuilder() = default;
 
 public:
-    template <typename Iter>
-    UniquePtr<HnswIndexInMem> MakeImplIter(Iter iter, SizeT row_count, bool trace) {
-        InsertSampleVec(iter, row_count);
-        Iter iter_copy = iter;
-        auto avg = GetLSAvg<Iter>(std::move(iter_copy), row_count);
-        auto hnsw_index = HnswIndexInMem::Make(index_hnsw_, column_def_.get(), trace);
-        const LSGConfig &lsg_config = *index_hnsw_->lsg_config_;
-        float alpha = lsg_config.alpha_;
-        hnsw_index->SetLSGParam(alpha, std::move(avg));
-        hnsw_index->InsertVecs(std::move(iter), kDefaultHnswInsertConfig, false);
-        return hnsw_index;
-    }
-
     template <typename Iter>
     SizeT InsertSampleVec(Iter iter, SizeT sample_num = std::numeric_limits<SizeT>::max()) {
         float sample_ratio = index_hnsw_->lsg_config_->sample_ratio_;
@@ -185,8 +185,7 @@ public:
     }
 
     template <typename Iter>
-    UniquePtr<DistanceType[]> GetLSAvg(Iter iter, SizeT row_count) {
-
+    void InsertLSAvg(Iter iter, SizeT row_count) {
 #ifdef use_ivf
         switch (index_hnsw_->metric_type_) {
             case MetricType::kMetricL2:
@@ -208,8 +207,17 @@ public:
                 UnrecoverableError(fmt::format("Invalid metric type: {}", MetricTypeToString(index_hnsw_->metric_type_)));
         }
 #endif
-        return nullptr;
     }
+
+    DistanceType *avg() {
+#ifdef use_ivf
+        return ivf_avg_.data();
+#else
+        return bf_avg_.data();
+#endif
+    }
+
+    float alpha() { return index_hnsw_->lsg_config_->alpha_; }
 
 private:
     DistanceType GetDistMean(const DistanceType *data, u32 size) {
@@ -284,11 +292,11 @@ private:
     }
 
     template <typename Iter, template <typename, typename> typename Compare>
-    UniquePtr<DistanceType[]> GetAvgByIVF(Iter iter, SizeT row_count) {
+    void GetAvgByIVF(Iter iter, SizeT row_count) {
         auto ivf_index = MakeIVFIndex();
         ivf_index->BuildIVFIndex(RowID(0, 0), ivf_sample_iter_.size(), &ivf_sample_iter_, column_def_);
 
-        auto avg = MakeUnique<DistanceType[]>(row_count);
+        Vector<DistanceType> avg(row_count);
 
         IVF_Search_Params ivf_search_params = MakeIVFSearchParams();
 
@@ -310,11 +318,13 @@ private:
 
             avg[offset] = GetDistMean(d_ptr.get(), result_n);
         }
-        return avg;
+
+        ivf_avg_.reserve(ivf_avg_.size() + avg.size());
+        ivf_avg_.insert(ivf_avg_.end(), avg.begin(), avg.end());
     }
 
     template <typename Iter, template <typename, typename> typename Compare>
-    UniquePtr<DistanceType[]> GetAvgBF(Iter iter, SizeT row_count) {
+    void GetAvgBF(Iter iter, SizeT row_count) {
         const auto *embedding_info = static_cast<EmbeddingInfo *>(column_def_->type()->type_info().get());
         SizeT dim = embedding_info->Dimension();
         const LSGConfig &lsg_config = *index_hnsw_->lsg_config_;
@@ -322,7 +332,7 @@ private:
         const SizeT sample_count = bf_sample_vecs_.size() / dim;
         const auto &sample_data = bf_sample_vecs_;
 
-        auto avg = MakeUnique<DistanceType[]>(row_count);
+        Vector<DistanceType> avg(row_count);
         KnnDistanceType dist_type = KnnDistanceType::kInvalid;
         switch (index_hnsw_->metric_type_) {
             case MetricType::kMetricL2:
@@ -391,17 +401,20 @@ private:
             }
         }
 
-        return avg;
+        bf_avg_.reserve(bf_avg_.size() + avg.size());
+        bf_avg_.insert(bf_avg_.end(), avg.begin(), avg.end());
     }
 
 private:
     const IndexHnsw *index_hnsw_ = nullptr;
-    const SharedPtr<ColumnDef> column_def_ = nullptr;
+    SharedPtr<ColumnDef> column_def_ = nullptr;
 
     UniquePtr<KnnDistanceBase1> knn_distance_;
 
     Vector<DataType> bf_sample_vecs_;
+    Vector<DistanceType> bf_avg_;
     IterIVFDataAccessor ivf_sample_iter_;
+    Vector<DistanceType> ivf_avg_;
 };
 
 } // namespace infinity

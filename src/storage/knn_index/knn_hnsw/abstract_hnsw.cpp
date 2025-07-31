@@ -280,14 +280,14 @@ void HnswIndexInMem::InsertVecs(SegmentOffset block_offset,
         hnsw_);
 }
 
-void HnswIndexInMem::SetLSGParam(float alpha, UniquePtr<float[]> avg) {
+void HnswIndexInMem::SetLSGParam(float alpha, float *avg) {
     std::visit(
         [&](auto &&index) {
             using T = std::decay_t<decltype(index)>;
             if constexpr (!std::is_same_v<T, std::nullptr_t>) {
                 using IndexT = std::decay_t<decltype(*index)>;
                 if constexpr (IndexT::LSG) {
-                    index->distance().SetLSGParam(alpha, std::move(avg));
+                    index->distance().SetLSGParam(alpha, avg);
                 } else {
                     UnrecoverableError("Invalid index type.");
                 }
