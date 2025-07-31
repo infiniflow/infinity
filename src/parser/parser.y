@@ -2817,7 +2817,7 @@ MATCH TENSOR '(' column_expr ',' common_array_expr ',' STRING ',' STRING ',' STR
 }
 //                  MATCH VECTOR (column_name, query_vec, data_type, metric_type, topn             optional_filter          ) USING INDEX ( index_name )  extra options
 //                   1      2         4         6              8          10           12                13                                        18             20
-match_vector_expr : MATCH VECTOR '(' expr ',' array_expr ',' STRING ',' STRING ',' LONG_VALUE optional_search_filter_expr ')' USING INDEX '(' IDENTIFIER ')' with_index_param_list {
+match_vector_expr : MATCH VECTOR '(' expr ',' expr ',' STRING ',' STRING ',' LONG_VALUE optional_search_filter_expr ')' USING INDEX '(' IDENTIFIER ')' with_index_param_list {
     infinity::KnnExpr* match_vector_expr = new infinity::KnnExpr();
     $$ = match_vector_expr;
 
@@ -2831,15 +2831,22 @@ match_vector_expr : MATCH VECTOR '(' expr ',' array_expr ',' STRING ',' STRING '
         goto Error1;
     }
 
-    // vector data type
+    // vector data type and query embedding expression
     ParserHelper::ToLower($8);
-    check = match_vector_expr->InitEmbedding($8, $6);
-    if (!check) {
-        goto Error1;
+    // For backward compatibility, try to handle as array_expr first, then as general expr
+    if (auto* const_expr = dynamic_cast<infinity::ConstantExpr*>($6)) {
+        check = match_vector_expr->InitEmbedding($8, const_expr);
+        if (!check) {
+            goto Error1;
+        }
+        delete $6;
+    } else {
+        // Store the expression for later evaluation during execution
+        match_vector_expr->query_embedding_expr_.reset($6);
+        match_vector_expr->embedding_data_type_str_ = $8;
     }
     free($8);
     free($10);
-    delete $6;
 
     match_vector_expr->index_name_ = $18;
     free($18);
@@ -2855,7 +2862,11 @@ Error1:
     free($8);
     free($10);
     free($18);
-    delete $6;
+    if (auto* const_expr = dynamic_cast<infinity::ConstantExpr*>($6)) {
+        delete $6;
+    } else {
+        delete $6;
+    }
     delete $$;
     yyerror(&yyloc, scanner, result, "Invalid vector search distance type");
     YYERROR;
@@ -2863,7 +2874,7 @@ Return1:
     ;
 }
 |
-MATCH VECTOR '(' expr ',' array_expr ',' STRING ',' STRING ',' LONG_VALUE optional_search_filter_expr ')' IGNORE INDEX {
+MATCH VECTOR '(' expr ',' expr ',' STRING ',' STRING ',' LONG_VALUE optional_search_filter_expr ')' IGNORE INDEX {
     infinity::KnnExpr* match_vector_expr = new infinity::KnnExpr();
     $$ = match_vector_expr;
 
@@ -2877,15 +2888,22 @@ MATCH VECTOR '(' expr ',' array_expr ',' STRING ',' STRING ',' LONG_VALUE option
         goto Error2;
     }
 
-    // vector data type
+    // vector data type and query embedding expression
     ParserHelper::ToLower($8);
-    check = match_vector_expr->InitEmbedding($8, $6);
-    if (!check) {
-        goto Error2;
+    // For backward compatibility, try to handle as array_expr first, then as general expr
+    if (auto* const_expr = dynamic_cast<infinity::ConstantExpr*>($6)) {
+        check = match_vector_expr->InitEmbedding($8, const_expr);
+        if (!check) {
+            goto Error2;
+        }
+        delete $6;
+    } else {
+        // Store the expression for later evaluation during execution
+        match_vector_expr->query_embedding_expr_.reset($6);
+        match_vector_expr->embedding_data_type_str_ = $8;
     }
     free($8);
     free($10);
-    delete $6;
 
     match_vector_expr->topn_ = $12;
     match_vector_expr->filter_expr_.reset($13);
@@ -2894,7 +2912,11 @@ MATCH VECTOR '(' expr ',' array_expr ',' STRING ',' STRING ',' LONG_VALUE option
 Error2:
     free($8);
     free($10);
-    delete $6;
+    if (auto* const_expr = dynamic_cast<infinity::ConstantExpr*>($6)) {
+        delete $6;
+    } else {
+        delete $6;
+    }
     delete $$;
     yyerror(&yyloc, scanner, result, "Invalid vector search distance type");
     YYERROR;
@@ -2902,7 +2924,7 @@ Return2:
     ;
 }
 |
-MATCH VECTOR '(' expr ',' array_expr ',' STRING ',' STRING ',' LONG_VALUE optional_search_filter_expr ')' with_index_param_list {
+MATCH VECTOR '(' expr ',' expr ',' STRING ',' STRING ',' LONG_VALUE optional_search_filter_expr ')' with_index_param_list {
     infinity::KnnExpr* match_vector_expr = new infinity::KnnExpr();
     $$ = match_vector_expr;
 
@@ -2916,15 +2938,22 @@ MATCH VECTOR '(' expr ',' array_expr ',' STRING ',' STRING ',' LONG_VALUE option
         goto Error3;
     }
 
-    // vector data type
+    // vector data type and query embedding expression
     ParserHelper::ToLower($8);
-    check = match_vector_expr->InitEmbedding($8, $6);
-    if (!check) {
-        goto Error3;
+    // For backward compatibility, try to handle as array_expr first, then as general expr
+    if (auto* const_expr = dynamic_cast<infinity::ConstantExpr*>($6)) {
+        check = match_vector_expr->InitEmbedding($8, const_expr);
+        if (!check) {
+            goto Error3;
+        }
+        delete $6;
+    } else {
+        // Store the expression for later evaluation during execution
+        match_vector_expr->query_embedding_expr_.reset($6);
+        match_vector_expr->embedding_data_type_str_ = $8;
     }
     free($8);
     free($10);
-    delete $6;
 
     match_vector_expr->topn_ = $12;
     match_vector_expr->filter_expr_.reset($13);
@@ -2937,7 +2966,11 @@ Error3:
     delete $15;
     free($8);
     free($10);
-    delete $6;
+    if (auto* const_expr = dynamic_cast<infinity::ConstantExpr*>($6)) {
+        delete $6;
+    } else {
+        delete $6;
+    }
     delete $$;
     yyerror(&yyloc, scanner, result, "Invalid vector search distance type");
     YYERROR;
@@ -2945,7 +2978,7 @@ Return3:
     ;
 }
 |
-MATCH VECTOR '(' expr ',' array_expr ',' STRING ',' STRING optional_search_filter_expr ')' with_index_param_list {
+MATCH VECTOR '(' expr ',' expr ',' STRING ',' STRING optional_search_filter_expr ')' with_index_param_list {
     infinity::KnnExpr* match_vector_expr = new infinity::KnnExpr();
     $$ = match_vector_expr;
 
@@ -2959,15 +2992,22 @@ MATCH VECTOR '(' expr ',' array_expr ',' STRING ',' STRING optional_search_filte
         goto Error4;
     }
 
-    // vector search data type
+    // vector search data type and query embedding expression
     ParserHelper::ToLower($8);
-    check = match_vector_expr->InitEmbedding($8, $6);
-    if (!check) {
-        goto Error4;
+    // For backward compatibility, try to handle as array_expr first, then as general expr
+    if (auto* const_expr = dynamic_cast<infinity::ConstantExpr*>($6)) {
+        check = match_vector_expr->InitEmbedding($8, const_expr);
+        if (!check) {
+            goto Error4;
+        }
+        delete $6;
+    } else {
+        // Store the expression for later evaluation during execution
+        match_vector_expr->query_embedding_expr_.reset($6);
+        match_vector_expr->embedding_data_type_str_ = $8;
     }
     free($8);
     free($10);
-    delete $6;
 
     match_vector_expr->topn_ = infinity::DEFAULT_MATCH_VECTOR_TOP_N;
     match_vector_expr->filter_expr_.reset($11);
@@ -2981,7 +3021,11 @@ Error4:
     delete $13;
     free($8);
     free($10);
-    delete $6;
+    if (auto* const_expr = dynamic_cast<infinity::ConstantExpr*>($6)) {
+        delete $6;
+    } else {
+        delete $6;
+    }
     delete $$;
     yyerror(&yyloc, scanner, result, "Invalid vector search distance type");
     YYERROR;

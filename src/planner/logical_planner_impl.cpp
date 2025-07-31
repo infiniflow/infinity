@@ -458,9 +458,44 @@ Status LogicalPlanner::BuildInsertValue(const InsertStatement *statement, Shared
     return Status::OK();
 }
 
-Status LogicalPlanner::BuildInsertSelect(const InsertStatement *, SharedPtr<BindContext> &) {
-    Status status = Status::NotSupport("Not supported");
-    RecoverableError(status);
+Status LogicalPlanner::BuildInsertSelect(const InsertStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
+    String schema_name = statement->schema_name_;
+    BindSchemaName(schema_name);
+
+    // Get table info
+    const String &table_name = statement->table_name_;
+
+    SharedPtr<TableInfo> table_info;
+    NewTxn *new_txn = query_context_ptr_->GetNewTxn();
+    Optional<DBMeeta> db_meta;
+    Optional<TableMeeta> table_meta;
+    String table_key;
+    Status status = new_txn->GetTableMeta(schema_name, table_name, db_meta, table_meta, &table_key);
+    if (!status.ok()) {
+        RecoverableError(status);
+    }
+    table_info = MakeShared<TableInfo>();
+    status = table_meta->GetTableInfo(*table_info);
+    if (!status.ok()) {
+        RecoverableError(status);
+    }
+    table_info->db_name_ = MakeShared<String>(schema_name);
+    table_info->table_name_ = MakeShared<String>(table_name);
+    table_info->table_key_ = table_key;
+
+    // Build SELECT plan - use the exact same approach as BuildSelect
+    UniquePtr<QueryBinder> query_binder_ptr = MakeUnique<QueryBinder>(this->query_context_ptr_, bind_context_ptr);
+    UniquePtr<BoundSelectStatement> bound_statement_ptr = query_binder_ptr->BindSelect(*statement->select_);
+    SharedPtr<LogicalNode> select_plan = bound_statement_ptr->BuildPlan(query_context_ptr_);
+
+    // Create INSERT node with SELECT as child
+    auto logical_insert = MakeShared<LogicalInsert>(bind_context_ptr->GetNewLogicalNodeId(),
+                                                    table_info,
+                                                    bind_context_ptr->GenerateTableIndex(),
+                                                    Vector<Vector<SharedPtr<BaseExpression>>>{});
+    logical_insert->set_left_node(select_plan);
+
+    this->logical_plan_ = logical_insert;
     return Status::OK();
 }
 

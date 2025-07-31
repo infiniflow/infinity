@@ -759,8 +759,22 @@ void FragmentContext::MakeSourceState(i64 parallel_count) {
                 // Only one operator and it's project
                 tasks_[0]->source_state_ = MakeUnique<EmptySourceState>();
             } else {
-                String error_message = "Project shouldn't be the first operator of the fragment";
-                UnrecoverableError(error_message);
+                // Check if this is part of an INSERT SELECT operation
+                bool is_insert_select = false;
+                for (const auto &op : this->GetOperators()) {
+                    if (op->operator_type() == PhysicalOperatorType::kInsert) {
+                        is_insert_select = true;
+                        break;
+                    }
+                }
+
+                if (is_insert_select) {
+                    // Allow Project operator in INSERT SELECT case
+                    tasks_[0]->source_state_ = MakeUnique<EmptySourceState>();
+                } else {
+                    String error_message = "Project shouldn't be the first operator of the fragment";
+                    UnrecoverableError(error_message);
+                }
             }
             break;
         }

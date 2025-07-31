@@ -41,7 +41,11 @@ String LogicalInsert::ToString(i64 &space) const {
         space -= 4;
         arrow_str = "->  ";
     }
-    ss << String(space, ' ') << arrow_str << "Insert Table: " << *table_info_->table_name_;
+    if (has_select_source()) {
+        ss << String(space, ' ') << arrow_str << "Insert Table: " << *table_info_->table_name_ << " (from SELECT)";
+    } else {
+        ss << String(space, ' ') << arrow_str << "Insert Table: " << *table_info_->table_name_ << " (from VALUES)";
+    }
     space += arrow_str.size();
 
     return ss.str();

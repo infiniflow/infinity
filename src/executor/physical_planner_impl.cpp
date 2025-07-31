@@ -485,10 +485,21 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildDropView(const SharedPtr<Logic
 UniquePtr<PhysicalOperator> PhysicalPlanner::BuildInsert(const SharedPtr<LogicalNode> &logical_operator) const {
 
     SharedPtr<LogicalInsert> logical_insert_ptr = dynamic_pointer_cast<LogicalInsert>(logical_operator);
+
+    // Check if this is INSERT SELECT (has a child) or INSERT VALUES (no child)
+    auto input_logical_node = logical_operator->left_node();
+    UniquePtr<PhysicalOperator> input_physical_operator = nullptr;
+
+    if (input_logical_node.get() != nullptr) {
+        // INSERT SELECT case: build the child operator (SELECT)
+        input_physical_operator = BuildPhysicalOperator(input_logical_node);
+    }
+
     return MakeUnique<PhysicalInsert>(logical_operator->node_id(),
                                       logical_insert_ptr->table_info(),
                                       logical_insert_ptr->table_index(),
                                       logical_insert_ptr->value_list(),
+                                      std::move(input_physical_operator),
                                       logical_operator->load_metas());
 }
 

@@ -30,6 +30,7 @@ import :base_table_ref;
 import :query_context;
 import :binding;
 import :bound_select_statement;
+import :bound_insert_statement;
 import :bound_delete_statement;
 import :bound_update_statement;
 import :bound_compact_statement;
@@ -1115,6 +1116,25 @@ UniquePtr<BoundUpdateStatement> QueryBinder::BindUpdate(const UpdateStatement &s
         }
     }
     return bound_update_statement;
+}
+
+UniquePtr<BoundInsertStatement> QueryBinder::BindInsert(const InsertStatement &statement) {
+    UniquePtr<BoundInsertStatement> bound_insert_statement = BoundInsertStatement::Make(bind_context_ptr_);
+
+    // Get the target table reference
+    SharedPtr<BaseTableRef> base_table_ref = GetTableRef(statement.schema_name_, statement.table_name_);
+    if (base_table_ref.get() == nullptr) {
+        Status status = Status::SyntaxError(fmt::format("Cannot bind {}.{} to a table", statement.schema_name_, statement.table_name_));
+        RecoverableError(status);
+    }
+    bound_insert_statement->table_ref_ptr_ = base_table_ref;
+
+    // Handle column names for SELECT
+    if (!statement.columns_for_select_.empty()) {
+        bound_insert_statement->columns_for_select_ = statement.columns_for_select_;
+    }
+
+    return bound_insert_statement;
 }
 
 UniquePtr<BoundCompactStatement> QueryBinder::BindCompact(const CompactStatement &statement) {

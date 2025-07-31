@@ -119,6 +119,18 @@ void FragmentBuilder::BuildFragments(PhysicalOperator *phys_op, PlanFragment *cu
         case PhysicalOperatorType::kCreateCollection:
         case PhysicalOperatorType::kCreateDatabase:
         case PhysicalOperatorType::kCreateView:
+        case PhysicalOperatorType::kInsert: {
+            current_fragment_ptr->AddOperator(phys_op);
+            if (phys_op->left() != nullptr) {
+                // INSERT SELECT case: build child operators in the same fragment (like UPDATE/DELETE)
+                BuildFragments(phys_op->left(), current_fragment_ptr);
+            } else {
+                // INSERT VALUES case: no child needed
+                current_fragment_ptr->SetSourceNode(query_context_ptr_, SourceType::kEmpty, phys_op->GetOutputNames(), phys_op->GetOutputTypes());
+            }
+            current_fragment_ptr->SetFragmentType(FragmentType::kSerialMaterialize);
+            return;
+        }
         case PhysicalOperatorType::kDropTable:
         case PhysicalOperatorType::kDropIndex:
         case PhysicalOperatorType::kDropCollection:
@@ -128,7 +140,6 @@ void FragmentBuilder::BuildFragments(PhysicalOperator *phys_op, PlanFragment *cu
         case PhysicalOperatorType::kShow:
         case PhysicalOperatorType::kFlush:
         case PhysicalOperatorType::kOptimize:
-        case PhysicalOperatorType::kInsert:
         case PhysicalOperatorType::kImport:
         case PhysicalOperatorType::kExport:
         case PhysicalOperatorType::kReadCache:

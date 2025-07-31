@@ -114,13 +114,26 @@ i64 ScalarFunctionSet::MatchFunctionCost(const ScalarFunction &func, const Vecto
             const auto *arg_info = static_cast<const EmbeddingInfo *>(arg_type.type_info().get());
             const auto *param_info = static_cast<const EmbeddingInfo *>(param_type.type_info().get());
 
-            if (arg_info->Type() != param_info->Type() || arg_info->Dimension() != param_info->Dimension()) {
-                // Different embedding data type or dimension
-                return -1;
+            // Special handling for FDE function - allow any dimension but require matching data type
+            if (func.name() == "FDE") {
+                if (arg_info->Type() != param_info->Type()) {
+                    // Different embedding data type
+                    return -1;
+                }
+                // For FDE, dimension mismatch is allowed - add small cost for dimension difference
+                i32 arg_dim = arg_info->Dimension();
+                i32 param_dim = param_info->Dimension();
+                i32 dim_diff = (arg_dim > param_dim) ? (arg_dim - param_dim) : (param_dim - arg_dim);
+                total_cost += dim_diff;
+            } else {
+                // For other functions, require exact match
+                if (arg_info->Type() != param_info->Type() || arg_info->Dimension() != param_info->Dimension()) {
+                    // Different embedding data type or dimension
+                    return -1;
+                }
+                // Exact match for tensor/embedding types
+                total_cost += 0;
             }
-
-            // Exact match for tensor/embedding types
-            total_cost += 0;
         } else {
             // For other types, use the standard cast cost
             i64 type_cast_cost = CastTable::instance().GetCastCost(arg_type.type(), param_type.type());

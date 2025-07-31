@@ -50,6 +50,7 @@ import :unnest_expression;
 import :function;
 import :aggregate_function;
 import :aggregate_function_set;
+import embedding_info;
 
 import :column_identifier;
 
@@ -490,7 +491,10 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildFuncExpr(const FunctionExpr &ex
             ScalarFunction scalar_function = scalar_function_set_ptr->GetMostMatchFunction(arguments);
 
             for (SizeT idx = 0; idx < arguments.size(); ++idx) {
-                if (arguments[idx]->Type().type() == LogicalType::kEmbedding) {
+                // Check if the argument is an embedding type but the function doesn't expect it
+                if (arguments[idx]->Type().type() == LogicalType::kEmbedding &&
+                    scalar_function.parameter_types_[idx].type() != LogicalType::kEmbedding &&
+                    scalar_function.parameter_types_[idx].type() != LogicalType::kArray) {
                     return nullptr;
                 }
                 // check if the argument types are matched to the scalar function parameter types
@@ -498,6 +502,16 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildFuncExpr(const FunctionExpr &ex
                 if (arguments[idx]->Type() == scalar_function.parameter_types_[idx]) {
                     continue;
                 }
+
+                // Special handling for FDE function - skip casting for embedding/tensor types with different dimensions
+                if (scalar_function.name() == "FDE" && idx == 0 &&
+                    (arguments[idx]->Type().type() == LogicalType::kEmbedding || arguments[idx]->Type().type() == LogicalType::kTensor) &&
+                    (scalar_function.parameter_types_[idx].type() == LogicalType::kEmbedding ||
+                     scalar_function.parameter_types_[idx].type() == LogicalType::kTensor)) {
+                    // For FDE function, skip casting between embedding/tensor types - let the function handle it at runtime
+                    continue;
+                }
+
                 String name = arguments[idx]->Name();
                 arguments[idx] = CastExpression::AddCastToType(arguments[idx], scalar_function.parameter_types_[idx]);
                 // reset the alias name
@@ -505,6 +519,24 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildFuncExpr(const FunctionExpr &ex
             }
 
             SharedPtr<FunctionExpression> function_expr_ptr = MakeShared<FunctionExpression>(scalar_function, arguments);
+
+            // Special handling for FDE function - adjust return type based on target dimension parameter
+            if (scalar_function.name() == "FDE" && arguments.size() >= 2) {
+                // Extract target dimension from the second argument if it's a constant
+                if (arguments[1]->type() == ExpressionType::kValue) {
+                    auto value_expr = std::static_pointer_cast<ValueExpression>(arguments[1]);
+                    Value target_dim_value = value_expr->GetValue();
+                    if (target_dim_value.type().type() == LogicalType::kBigInt) {
+                        i32 target_dimension = static_cast<i32>(target_dim_value.GetValue<BigIntT>());
+                        // Create the correct return type with the target dimension
+                        auto target_embedding_info = EmbeddingInfo::Make(EmbeddingDataType::kElemFloat, target_dimension);
+                        auto target_return_type = DataType(LogicalType::kEmbedding, target_embedding_info);
+                        // Update the scalar function's return type
+                        function_expr_ptr->func_.return_type_ = target_return_type;
+                    }
+                }
+            }
+
             return function_expr_ptr;
         }
         case FunctionType::kAggregate: {
@@ -801,46 +833,103 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildKnnExpr(const KnnExpr &parsed_k
         RecoverableError(status);
     } else {
         EmbeddingInfo *embedding_info = (EmbeddingInfo *)type_info;
-        if ((i64)embedding_info->Dimension() != parsed_knn_expr.dimension_) {
-            Status status = Status::SyntaxError(fmt::format("Query embedding with dimension: {} which doesn't not matched with {}",
-                                                            parsed_knn_expr.dimension_,
-                                                            embedding_info->Dimension()));
-            RecoverableError(status);
+
+        // For function expressions (like FDE), skip dimension validation at parse time
+        // The dimension will be validated at execution time when the function is evaluated
+        if (!parsed_knn_expr.query_embedding_expr_) {
+            // Traditional array case - validate dimension
+            if ((i64)embedding_info->Dimension() != parsed_knn_expr.dimension_) {
+                Status status = Status::SyntaxError(fmt::format("Query embedding with dimension: {} which doesn't not matched with {}",
+                                                                parsed_knn_expr.dimension_,
+                                                                embedding_info->Dimension()));
+                RecoverableError(status);
+            }
+            if (const auto column_embedding_type = embedding_info->Type(), query_embedding_type = parsed_knn_expr.embedding_data_type_;
+                !EmbeddingEmbeddingQueryTypeValidated(column_embedding_type, query_embedding_type)) {
+                Status status =
+                    Status::SyntaxError(fmt::format("Query embedding with data type: {} which doesn't match with column embedding type {}.",
+                                                    EmbeddingInfo::EmbeddingDataTypeToString(query_embedding_type),
+                                                    EmbeddingInfo::EmbeddingDataTypeToString(column_embedding_type)));
+                RecoverableError(std::move(status));
+            }
         }
-        if (const auto column_embedding_type = embedding_info->Type(), query_embedding_type = parsed_knn_expr.embedding_data_type_;
-            !EmbeddingEmbeddingQueryTypeValidated(column_embedding_type, query_embedding_type)) {
-            Status status = Status::SyntaxError(fmt::format("Query embedding with data type: {} which doesn't match with column embedding type {}.",
-                                                            EmbeddingInfo::EmbeddingDataTypeToString(query_embedding_type),
-                                                            EmbeddingInfo::EmbeddingDataTypeToString(column_embedding_type)));
-            RecoverableError(std::move(status));
-        }
+        // For function expressions, we'll validate compatibility at execution time
     }
 
     arguments.emplace_back(expr_ptr);
 
-    // Create query embedding
-    EmbeddingT query_embedding((ptr_t)parsed_knn_expr.embedding_data_ptr_, false);
+    // Handle query embedding - either from array or function expression
+    EmbeddingDataType embedding_data_type;
+    i64 dimension;
 
-    if (parsed_knn_expr.ignore_index_ && !parsed_knn_expr.index_name_.empty()) {
-        Status status = Status::SyntaxError(fmt::format("Force to use index {} conflicts with Ignore index flag.", parsed_knn_expr.index_name_));
-        RecoverableError(std::move(status));
+    if (parsed_knn_expr.query_embedding_expr_) {
+        // Function expression case (e.g., FDE function)
+        // Bind the function expression and add it to arguments
+        auto bound_func_expr = Bind(*parsed_knn_expr.query_embedding_expr_, bind_context_ptr, depth, false);
+        arguments.emplace_back(bound_func_expr);
+
+        // Try to infer embedding data type from string, default to float
+        if (parsed_knn_expr.embedding_data_type_str_ == "float") {
+            embedding_data_type = EmbeddingDataType::kElemFloat;
+        } else if (parsed_knn_expr.embedding_data_type_str_ == "double") {
+            embedding_data_type = EmbeddingDataType::kElemDouble;
+        } else {
+            embedding_data_type = EmbeddingDataType::kElemFloat; // default
+        }
+
+        // Use placeholder dimension - will be determined at execution time
+        dimension = 0;
+
+        // Create a placeholder embedding - the actual embedding will be computed at execution time
+        EmbeddingT query_embedding(static_cast<char *>(nullptr), false);
+
+        if (parsed_knn_expr.ignore_index_ && !parsed_knn_expr.index_name_.empty()) {
+            Status status = Status::SyntaxError(fmt::format("Force to use index {} conflicts with Ignore index flag.", parsed_knn_expr.index_name_));
+            RecoverableError(std::move(status));
+        }
+
+        // create optional filter
+        auto optional_filter = BuildSearchSubExprOptionalFilter(this, parsed_knn_expr.filter_expr_.get(), bind_context_ptr, depth);
+
+        SharedPtr<KnnExpression> bound_knn_expr = MakeShared<KnnExpression>(embedding_data_type,
+                                                                            dimension,
+                                                                            parsed_knn_expr.distance_type_,
+                                                                            std::move(query_embedding),
+                                                                            std::move(arguments),
+                                                                            parsed_knn_expr.topn_,
+                                                                            parsed_knn_expr.opt_params_,
+                                                                            std::move(optional_filter),
+                                                                            parsed_knn_expr.index_name_,
+                                                                            parsed_knn_expr.ignore_index_);
+        return bound_knn_expr;
+    } else {
+        // Traditional array case
+        embedding_data_type = parsed_knn_expr.embedding_data_type_;
+        dimension = parsed_knn_expr.dimension_;
+
+        // Create query embedding from array data
+        EmbeddingT query_embedding((ptr_t)parsed_knn_expr.embedding_data_ptr_, false);
+
+        if (parsed_knn_expr.ignore_index_ && !parsed_knn_expr.index_name_.empty()) {
+            Status status = Status::SyntaxError(fmt::format("Force to use index {} conflicts with Ignore index flag.", parsed_knn_expr.index_name_));
+            RecoverableError(std::move(status));
+        }
+
+        // create optional filter
+        auto optional_filter = BuildSearchSubExprOptionalFilter(this, parsed_knn_expr.filter_expr_.get(), bind_context_ptr, depth);
+
+        SharedPtr<KnnExpression> bound_knn_expr = MakeShared<KnnExpression>(embedding_data_type,
+                                                                            dimension,
+                                                                            parsed_knn_expr.distance_type_,
+                                                                            std::move(query_embedding),
+                                                                            std::move(arguments),
+                                                                            parsed_knn_expr.topn_,
+                                                                            parsed_knn_expr.opt_params_,
+                                                                            std::move(optional_filter),
+                                                                            parsed_knn_expr.index_name_,
+                                                                            parsed_knn_expr.ignore_index_);
+        return bound_knn_expr;
     }
-
-    // create optional filter
-    auto optional_filter = BuildSearchSubExprOptionalFilter(this, parsed_knn_expr.filter_expr_.get(), bind_context_ptr, depth);
-
-    SharedPtr<KnnExpression> bound_knn_expr = MakeShared<KnnExpression>(parsed_knn_expr.embedding_data_type_,
-                                                                        parsed_knn_expr.dimension_,
-                                                                        parsed_knn_expr.distance_type_,
-                                                                        std::move(query_embedding),
-                                                                        std::move(arguments),
-                                                                        parsed_knn_expr.topn_,
-                                                                        parsed_knn_expr.opt_params_,
-                                                                        std::move(optional_filter),
-                                                                        parsed_knn_expr.index_name_,
-                                                                        parsed_knn_expr.ignore_index_);
-
-    return bound_knn_expr;
 }
 
 SharedPtr<BaseExpression> ExpressionBinder::BuildMatchTextExpr(const MatchExpr &expr, BindContext *bind_context_ptr, i64 depth, bool) {
