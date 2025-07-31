@@ -75,13 +75,20 @@ bool VersionFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_success, co
     }
     auto *data = static_cast<BlockVersion *>(data_);
 
+    // if spill to file, return true if success
     if (to_spill) {
         data->SpillToFile(file_handle_.get());
+        return true;
     } else {
         const auto &ctx = static_cast<const VersionFileWorkerSaveCtx &>(base_ctx);
-        data->SaveToFile(ctx.checkpoint_ts_, *file_handle_);
+        bool is_full = data->SaveToFile(ctx.checkpoint_ts_, *file_handle_);
+        if (is_full) {
+            LOG_TRACE(fmt::format("Version file is full: {}", GetFilePath()));
+            // if the version file is full, return true to spill to file
+            return true;
+        }
     }
-    return true;
+    return false;
 }
 
 void VersionFileWorker::ReadFromFileImpl(SizeT file_size, bool from_spill) {
