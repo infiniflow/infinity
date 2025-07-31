@@ -121,7 +121,7 @@ private:
     float ratio_;
 };
 
-export template <typename DataType, typename DistanceDataType>
+export template <typename DataType, typename DistanceType>
 class HnswLSGBuilder {
 public:
     HnswLSGBuilder(const IndexHnsw *index_hnsw, SharedPtr<ColumnDef> column_def) : index_hnsw_(index_hnsw), column_def_(column_def) {
@@ -155,9 +155,9 @@ public:
 public:
 
     template <typename Iter>
-    UniquePtr<HnswIndexInMem> MakeImplIter(Iter iter, SizeT row_count, const RowID &base_row_id, bool trace) {
+    UniquePtr<HnswIndexInMem> MakeImplIter(Iter iter, SizeT row_count, bool trace) {
         Iter iter_copy = iter;
-        auto avg = GetLSAvg<Iter>(std::move(iter_copy), row_count, base_row_id);
+        auto avg = GetLSAvg<Iter>(std::move(iter_copy), row_count);
         auto hnsw_index = HnswIndexInMem::Make(index_hnsw_, column_def_.get(), trace);
         const LSGConfig &lsg_config = *index_hnsw_->lsg_config_;
         float alpha = lsg_config.alpha_;
@@ -167,7 +167,7 @@ public:
     }
 
     template <typename Iter>
-    UniquePtr<float[]> GetLSAvg(Iter iter, SizeT row_count, const RowID &base_row_id) {
+    UniquePtr<DistanceType[]> GetLSAvg(Iter iter, SizeT row_count) {
 
 #ifdef use_ivf
         switch (index_hnsw_->metric_type_) {
@@ -260,7 +260,7 @@ private:
     }
 
     template <typename Iter, template <typename, typename> typename Compare>
-    UniquePtr<float[]> GetAvgByIVF(Iter iter, SizeT row_count) {
+    UniquePtr<DistanceType[]> GetAvgByIVF(Iter iter, SizeT row_count) {
         auto ivf_index = MakeIVFIndex();
         const LSGConfig &lsg_config = *index_hnsw_->lsg_config_;
 
@@ -271,7 +271,7 @@ private:
         RowID base_row_id(0, 0);
         ivf_index->BuildIVFIndex(base_row_id, sample_count, &iter_accessor, column_def_);
 
-        auto avg = MakeUnique<float[]>(row_count);
+        auto avg = MakeUnique<DistanceType[]>(row_count);
 
         IVF_Search_Params ivf_search_params = MakeIVFSearchParams();
 
@@ -286,7 +286,7 @@ private:
             ivf_search_params.query_embedding_ = reinterpret_cast<const void *>(data);
 
             auto ivf_result_handler =
-                GetIVFSearchHandler<LogicalType::kEmbedding, Compare, DistanceDataType>(ivf_search_params, use_bitmask, bitmask, row_count);
+                GetIVFSearchHandler<LogicalType::kEmbedding, Compare, DistanceType>(ivf_search_params, use_bitmask, bitmask, row_count);
             ivf_result_handler->Begin();
             ivf_result_handler->Search(ivf_index);
             auto [result_n, d_ptr, offset_ptr] = ivf_result_handler->EndWithoutSort();
@@ -297,7 +297,7 @@ private:
     }
 
     template <typename Iter, template <typename, typename> typename Compare>
-    UniquePtr<float[]> GetAvgBF(Iter iter, SizeT row_count) {
+    UniquePtr<DistanceType[]> GetAvgBF(Iter iter, SizeT row_count) {
         const auto *embedding_info = static_cast<EmbeddingInfo *>(column_def_->type()->type_info().get());
         SizeT dim = embedding_info->Dimension();
         const LSGConfig &lsg_config = *index_hnsw_->lsg_config_;
@@ -319,7 +319,7 @@ private:
             sample_count = i;
         }
 
-        auto avg = MakeUnique<float[]>(row_count);
+        auto avg = MakeUnique<DistanceType[]>(row_count);
         KnnDistanceType dist_type = KnnDistanceType::kInvalid;
         switch (index_hnsw_->metric_type_) {
             case MetricType::kMetricL2:
@@ -334,7 +334,7 @@ private:
             default:
                 UnrecoverableError(fmt::format("Invalid metric type: {}", MetricTypeToString(index_hnsw_->metric_type_)));
         }
-        KnnDistance1<DataType, DistanceDataType> dist_f(dist_type);
+        KnnDistance1<DataType, DistanceType> dist_f(dist_type);
         SizeT ls_k = std::min(lsg_config.ls_k_, sample_count);
         if constexpr (SplitIter<Iter>) {
             Iter iter_copy = iter;
@@ -343,7 +343,7 @@ private:
             Vector<std::future<void>> futs;
             for (auto &splited_iter : iters) {
                 futs.emplace_back(thread_pool.push([&](int id) {
-                    MergeKnn<DataType, Compare, DistanceDataType> merge_heap(1, ls_k, None);
+                    MergeKnn<DataType, Compare, DistanceType> merge_heap(1, ls_k, None);
                     while (true) {
                         auto next_opt = splited_iter.Next();
                         if (!next_opt.has_value()) {
@@ -370,7 +370,7 @@ private:
             }
 
         } else {
-            MergeKnn<DataType, Compare, DistanceDataType> merge_heap(1, ls_k, None);
+            MergeKnn<DataType, Compare, DistanceType> merge_heap(1, ls_k, None);
             while (true) {
                 auto next_opt = iter.Next();
                 if (!next_opt.has_value()) {
