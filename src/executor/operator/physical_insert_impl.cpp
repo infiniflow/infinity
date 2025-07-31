@@ -49,8 +49,8 @@ import :cast_function;
 import :bound_cast_func;
 import :column_vector;
 import :value;
-import :embedding_info;
-import :logical_type;
+import embedding_info;
+import logical_type;
 
 namespace infinity {
 
