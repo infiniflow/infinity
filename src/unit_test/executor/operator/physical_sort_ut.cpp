@@ -11,16 +11,24 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+// import :ut.sql_runner;
 
-#if 0
+#ifdef CI
 #include "gtest/gtest.h"
+import infinity_core;
+import base_test;
+import sql_runner;
+#else
+module;
+
+#include "gtest/gtest.h"
+
+module infinity_core:ut.physical_sort;
+
 import :ut.base_test;
-
-import :infinity_exception
-
-import global_resource_usage;
+import :ut.sql_runner;
+import :infinity_exception;
 import :third_party;
-
 import :logger;
 import :stl;
 import :infinity_context;
@@ -29,8 +37,15 @@ import :data_table;
 import :table_def;
 import :value;
 import :data_block;
-import physical_sort;
-//import :ut.sql_runner;
+import :physical_sort;
+#endif
+
+import global_resource_usage;
+
+#if 0
+
+
+
 
 using namespace infinity;
 class PhysicalSortTest : public BaseTest {};

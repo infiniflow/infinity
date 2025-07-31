@@ -12,24 +12,26 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#ifdef CI
+#include "gtest/gtest.h"
+#include <thread>
+import infinity_core;
+import base_test;
+#else
 module;
 
-#include <thread>
-
 #include "gtest/gtest.h"
+#include <thread>
 
 module infinity_core:ut.test_hnsw;
 
 import :ut.base_test;
-
 import :stl;
 import :hnsw_alg;
-
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wunused-variable"
 import :data_store;
 #pragma clang diagnostic pop
-
 import :dist_func_l2;
 import :dist_func_ip;
 import :dist_func_cos;
@@ -38,6 +40,7 @@ import :hnsw_common;
 import :infinity_exception;
 import :virtual_store;
 import :local_file_handle;
+#endif
 
 using namespace infinity;
 

@@ -12,18 +12,23 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#ifdef CI
+#include "gtest/gtest.h"
+import infinity_core;
+import base_test;
+#else
 module;
 
 #include "gtest/gtest.h"
 
 module infinity_core:ut.utility;
 
+import :ut.base_test;
 import :infinity_exception;
 import :stl;
 import :utility;
 import :infinity_context;
-
-import :ut.base_test;
+#endif
 
 using namespace infinity;
 class UtilityTest : public BaseTest {};
@@ -39,4 +44,3 @@ TEST_F(UtilityTest, test1) {
     EXPECT_EQ(segment_id, 10);
     EXPECT_EQ(is_segment_id, true);
 }
-

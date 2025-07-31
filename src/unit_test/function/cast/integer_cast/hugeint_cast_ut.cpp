@@ -12,13 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#ifdef CI
+#include "unit_test/gtest_expand.h"
+#include "gtest/gtest.h"
+import infinity_core;
+import base_test;
+#else
 module;
 
-#include "gtest/gtest.h"
 #include "unit_test/gtest_expand.h"
+#include "gtest/gtest.h"
 
 module infinity_core:ut.hugeint_cast;
 
+import :ut.base_test;
 import :infinity_exception;
 import :third_party;
 import :logger;
@@ -36,8 +43,8 @@ import :cast_table;
 import :column_vector;
 import :integer_cast;
 import :bound_cast_func;
+#endif
 
-import :ut.base_test;
 import global_resource_usage;
 import internal_types;
 import logical_type;
@@ -140,7 +147,8 @@ TEST_F(HugeIntCastTest, hugeint_cast1) {
         col_target->Initialize();
 
         CastParameters cast_parameters;
-        EXPECT_THROW_WITHOUT_STACKTRACE(hugeint2tiny_ptr.function(col_source, col_target, DEFAULT_VECTOR_SIZE, cast_parameters), UnrecoverableException);
+        EXPECT_THROW_WITHOUT_STACKTRACE(hugeint2tiny_ptr.function(col_source, col_target, DEFAULT_VECTOR_SIZE, cast_parameters),
+                                        UnrecoverableException);
     }
 
     // cast hugeint column vector to small integer column vector
@@ -153,7 +161,8 @@ TEST_F(HugeIntCastTest, hugeint_cast1) {
         col_target->Initialize();
 
         CastParameters cast_parameters;
-        EXPECT_THROW_WITHOUT_STACKTRACE(hugeint2small_ptr.function(col_source, col_target, DEFAULT_VECTOR_SIZE, cast_parameters), UnrecoverableException);
+        EXPECT_THROW_WITHOUT_STACKTRACE(hugeint2small_ptr.function(col_source, col_target, DEFAULT_VECTOR_SIZE, cast_parameters),
+                                        UnrecoverableException);
     }
 
     // cast big int column vector to int column vector
@@ -166,7 +175,8 @@ TEST_F(HugeIntCastTest, hugeint_cast1) {
         col_target->Initialize();
 
         CastParameters cast_parameters;
-        EXPECT_THROW_WITHOUT_STACKTRACE(hugeint2int_ptr.function(col_source, col_target, DEFAULT_VECTOR_SIZE, cast_parameters), UnrecoverableException);
+        EXPECT_THROW_WITHOUT_STACKTRACE(hugeint2int_ptr.function(col_source, col_target, DEFAULT_VECTOR_SIZE, cast_parameters),
+                                        UnrecoverableException);
     }
 
     // cast hugeint column vector to big int column vector
@@ -179,7 +189,8 @@ TEST_F(HugeIntCastTest, hugeint_cast1) {
         col_target->Initialize();
 
         CastParameters cast_parameters;
-        EXPECT_THROW_WITHOUT_STACKTRACE(hugeint2bigint_ptr.function(col_source, col_target, DEFAULT_VECTOR_SIZE, cast_parameters), UnrecoverableException);
+        EXPECT_THROW_WITHOUT_STACKTRACE(hugeint2bigint_ptr.function(col_source, col_target, DEFAULT_VECTOR_SIZE, cast_parameters),
+                                        UnrecoverableException);
     }
 
     // cast hugeint column vector to float column vector
@@ -192,7 +203,8 @@ TEST_F(HugeIntCastTest, hugeint_cast1) {
         col_target->Initialize();
 
         CastParameters cast_parameters;
-        EXPECT_THROW_WITHOUT_STACKTRACE(hugeint2float_ptr.function(col_source, col_target, DEFAULT_VECTOR_SIZE, cast_parameters), UnrecoverableException);
+        EXPECT_THROW_WITHOUT_STACKTRACE(hugeint2float_ptr.function(col_source, col_target, DEFAULT_VECTOR_SIZE, cast_parameters),
+                                        UnrecoverableException);
     }
 
     // cast hugeint column vector to double column vector
@@ -205,7 +217,8 @@ TEST_F(HugeIntCastTest, hugeint_cast1) {
         col_target->Initialize();
 
         CastParameters cast_parameters;
-        EXPECT_THROW_WITHOUT_STACKTRACE(hugeint2double_ptr.function(col_source, col_target, DEFAULT_VECTOR_SIZE, cast_parameters), UnrecoverableException);
+        EXPECT_THROW_WITHOUT_STACKTRACE(hugeint2double_ptr.function(col_source, col_target, DEFAULT_VECTOR_SIZE, cast_parameters),
+                                        UnrecoverableException);
     }
 
     // cast big int column vector to decimal column vector
@@ -218,7 +231,8 @@ TEST_F(HugeIntCastTest, hugeint_cast1) {
         col_target->Initialize();
 
         CastParameters cast_parameters;
-        EXPECT_THROW_WITHOUT_STACKTRACE(big2decimal_ptr.function(col_source, col_target, DEFAULT_VECTOR_SIZE, cast_parameters), UnrecoverableException);
+        EXPECT_THROW_WITHOUT_STACKTRACE(big2decimal_ptr.function(col_source, col_target, DEFAULT_VECTOR_SIZE, cast_parameters),
+                                        UnrecoverableException);
     }
 
     // cast hugeint column vector to Varchar vector
@@ -231,7 +245,8 @@ TEST_F(HugeIntCastTest, hugeint_cast1) {
         col_target->Initialize();
 
         CastParameters cast_parameters;
-        EXPECT_THROW_WITHOUT_STACKTRACE(hugeint2varchar_ptr.function(col_source, col_target, DEFAULT_VECTOR_SIZE, cast_parameters), UnrecoverableException);
+        EXPECT_THROW_WITHOUT_STACKTRACE(hugeint2varchar_ptr.function(col_source, col_target, DEFAULT_VECTOR_SIZE, cast_parameters),
+                                        UnrecoverableException);
     }
 
     // Throw exception when cast int to other types.

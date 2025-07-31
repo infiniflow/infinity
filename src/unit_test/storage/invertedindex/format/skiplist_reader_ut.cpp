@@ -1,3 +1,9 @@
+
+#ifdef CI
+#include "gtest/gtest.h"
+import infinity_core;
+import base_test;
+#else
 module;
 
 #include "gtest/gtest.h"
@@ -19,6 +25,7 @@ import :posting_list_format;
 import :third_party;
 import :byte_slice_reader;
 import :random;
+#endif
 
 using namespace infinity;
 

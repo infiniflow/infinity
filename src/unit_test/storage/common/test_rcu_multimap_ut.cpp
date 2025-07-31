@@ -12,15 +12,24 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
+#ifdef CI
+#include "gtest/gtest.h"
 #include <atomic>
 #include <chrono>
 #include <iomanip>
 #include <random>
 #include <thread>
+import infinity_core;
+import base_test;
+#else
+module;
 
 #include "gtest/gtest.h"
+#include <atomic>
+#include <chrono>
+#include <iomanip>
+#include <random>
+#include <thread>
 
 module infinity_core:ut.test_rcu_multimap;
 
@@ -29,23 +38,18 @@ import :stl;
 import :third_party;
 import :rcu_multimap;
 import :map_with_lock;
+#endif
 
 using namespace infinity;
-
-// RcuMultiMap now works with POD types directly, so we'll use simple integers for testing
 
 class RcuMultiMapTest : public BaseTest {
 public:
     RcuMultiMapTest() = default;
     ~RcuMultiMapTest() = default;
 
-    void SetUp() override {
-        BaseTest::SetUp();
-    }
+    void SetUp() override { BaseTest::SetUp(); }
 
-    void TearDown() override {
-        BaseTest::TearDown();
-    }
+    void TearDown() override { BaseTest::TearDown(); }
 
 protected:
     // Helper function to verify values in vector
@@ -316,7 +320,6 @@ TEST_F(RcuMultiMapTest, TestDeleteFunctionality) {
     EXPECT_GE(new_key_values.size(), 1);
 }
 
-// Test with different value types
 TEST_F(RcuMultiMapTest, TestDifferentValueTypes) {
     // Test with pointer to int
     RcuMultiMap<String, i32> int_map;
@@ -336,7 +339,6 @@ TEST_F(RcuMultiMapTest, TestDifferentValueTypes) {
     EXPECT_EQ(values2[0], 84);
 }
 
-// Multi-threading test cases
 TEST_F(RcuMultiMapTest, TestConcurrentInsertAndRead) {
     RcuMultiMap<i32, i32> map;
 
@@ -786,7 +788,6 @@ TEST_F(RcuMultiMapTest, TestRcuBehavior) {
     VerifyValues(final_values, {100});
 }
 
-// RcuMap Test Class
 class RcuMapTest : public BaseTest {
 public:
     RcuMapTest() = default;
@@ -1093,7 +1094,6 @@ TEST_F(RcuMapTest, TestStressInsertAndRetrieve) {
     EXPECT_EQ(map.size(), num_operations);
 }
 
-// Multi-threading tests for RcuMap
 TEST_F(RcuMapTest, TestConcurrentInsertAndRead) {
     RcuMap<i32, i32> map;
 
@@ -1450,9 +1450,6 @@ TEST_F(RcuMapTest, TestMapVsMultiMapBehavior) {
     EXPECT_GE(map_count, 3); // At least key1, key2, key3
 }
 #if 0
-// ============================================================================
-// BENCHMARK TESTS: RcuMap vs MapWithLock Performance Comparison
-// ============================================================================
 
 class RcuMapBenchmarkTest : public BaseTest {
 public:
@@ -1488,7 +1485,6 @@ protected:
     }
 };
 
-// Benchmark 1: Read-Heavy Workload (90% reads, 10% writes)
 TEST_F(RcuMapBenchmarkTest, ReadHeavyWorkload) {
     const i32 num_threads = 8;
     const i32 operations_per_thread = 5000; // Increased for more data
@@ -1599,7 +1595,6 @@ TEST_F(RcuMapBenchmarkTest, ReadHeavyWorkload) {
     EXPECT_LT(rcu_time, lock_time * 1.2); // Allow 20% margin for variance
 }
 
-// Benchmark 2: Write-Heavy Workload (30% reads, 70% writes)
 TEST_F(RcuMapBenchmarkTest, WriteHeavyWorkload) {
     const i32 num_threads = 8;
     const i32 operations_per_thread = 2000; // Increased for more data
@@ -1706,7 +1701,6 @@ TEST_F(RcuMapBenchmarkTest, WriteHeavyWorkload) {
     EXPECT_GT(lock_time, 0);
 }
 
-// Benchmark 3: Read-Only Workload (100% reads)
 TEST_F(RcuMapBenchmarkTest, ReadOnlyWorkload) {
     const i32 num_threads = 12;
     const i32 operations_per_thread = 10000; // Increased for more operations
@@ -1797,7 +1791,6 @@ TEST_F(RcuMapBenchmarkTest, ReadOnlyWorkload) {
     // EXPECT_LT(rcu_time, lock_time * 0.8); // RcuMap should be at least 25% faster
 }
 
-// Benchmark 4: High Contention Scenario (Many threads, moderate key space)
 TEST_F(RcuMapBenchmarkTest, HighContentionWorkload) {
     const i32 num_threads = 16;
     const i32 operations_per_thread = 2000; // Increased operations
@@ -1897,7 +1890,6 @@ TEST_F(RcuMapBenchmarkTest, HighContentionWorkload) {
     EXPECT_GT(lock_time, 0);
 }
 
-// Benchmark 5: Scalability Test (Varying thread counts)
 TEST_F(RcuMapBenchmarkTest, ScalabilityTest) {
     const i32 operations_per_thread = 5000; // Increased operations
     const i32 key_range = 100000;           // 100K records
@@ -2005,7 +1997,6 @@ TEST_F(RcuMapBenchmarkTest, ScalabilityTest) {
     }
 }
 
-// Benchmark 6: Memory Overhead and GC Performance
 TEST_F(RcuMapBenchmarkTest, MemoryAndGcPerformance) {
     const i32 num_operations = 100000; // 100K operations
     const i32 key_range = 100000;      // 100K key range
@@ -2068,7 +2059,6 @@ TEST_F(RcuMapBenchmarkTest, MemoryAndGcPerformance) {
     EXPECT_GE(gc_time, 0);
 }
 
-// Benchmark Summary Test - Comprehensive comparison
 TEST_F(RcuMapBenchmarkTest, ComprehensiveBenchmarkSummary) {
     std::cout << "\n=== COMPREHENSIVE BENCHMARK SUMMARY ===" << std::endl;
     std::cout << "This test provides a summary of RcuMap vs MapWithLock performance characteristics:" << std::endl;
@@ -2201,7 +2191,6 @@ TEST_F(RcuMapBenchmarkTest, ComprehensiveBenchmarkSummary) {
     }
 }
 
-// Quick performance verification test
 TEST_F(RcuMapBenchmarkTest, QuickPerformanceVerification) {
     const i32 num_threads = 4;
     const i32 operations_per_thread = 1000;

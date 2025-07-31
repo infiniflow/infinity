@@ -12,13 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
+#ifdef CI
+#include "gtest/gtest.h"
 #include <deque>
 #include <iostream>
 #include <vector>
+import infinity_core;
+import base_test;
+#else
+module;
 
 #include "gtest/gtest.h"
+#include <deque>
+#include <iostream>
+#include <vector>
 
 module infinity_core:ut.highlighter;
 
@@ -27,6 +34,7 @@ import :stl;
 import :standard_analyzer;
 import :highlighter;
 import :term;
+#endif
 
 using namespace infinity;
 

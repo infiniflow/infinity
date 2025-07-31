@@ -1,3 +1,9 @@
+
+#ifdef CI
+#include "gtest/gtest.h"
+import infinity_core;
+import base_test;
+#else
 module;
 
 #include "gtest/gtest.h"
@@ -6,13 +12,15 @@ module infinity_core:ut.byte_slice_write_read;
 
 import :ut.base_test;
 import :stl;
-import global_resource_usage;
 import :third_party;
 import :file_writer;
 import :file_reader;
 import :byte_slice;
 import :byte_slice_reader;
 import :byte_slice_writer;
+#endif
+
+import global_resource_usage;
 
 using namespace infinity;
 
@@ -168,32 +176,3 @@ TEST_F(ByteSliceReaderWriterTest, TestDataConsistency) {
     ASSERT_EQ(reader.ReadInt32(), 123456789);
     ASSERT_EQ(reader.ReadUInt32(), 987654321);
 }
-
-// TEST_F(ByteSliceReaderWriterTest, TestWriterDumpAndLoad) {
-//     using namespace infinity;
-//     LocalFileSystem local_file_system;
-//     String path = String(GetFullTmpDir()) + "/test_byteslice_dump";
-
-//     ByteSliceWriter writer;
-
-//     i64 i = 0;
-//     for (i = 0; i < 10000; i++) {
-//         writer.WriteVLong(i);
-//     }
-
-//     auto filewriter = MakeShared<FileWriter>(local_file_system, path, 128);
-
-//     std::cout << writer.GetSize() << std::endl;
-
-//     writer.Dump(filewriter);
-//     filewriter->Sync();
-
-//     ByteSliceWriter loader;
-//     auto filereader = MakeShared<FileReader>(local_file_system, path, 128);
-
-//     std::cout << writer.GetSize() << std::endl;
-
-//     loader.Load(filereader, writer.GetSize());
-
-//     ASSERT_TRUE(CheckListEq(writer.GetByteSliceList(), loader.GetByteSliceList()));
-// }

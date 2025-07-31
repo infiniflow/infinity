@@ -1,3 +1,8 @@
+#ifdef CI
+#include "gtest/gtest.h"
+import infinity_core;
+import base_test;
+#else
 module;
 
 #include "gtest/gtest.h"
@@ -13,6 +18,7 @@ import :persist_result_handler;
 import :local_file_handle;
 import :kv_store;
 import :status;
+#endif
 
 using namespace infinity;
 namespace fs = std::filesystem;

@@ -12,16 +12,25 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
+#ifdef CI
 #include "gtest/gtest.h"
+import infinity_core;
+import base_test;
+import request_test;
+#else
+module;
+
+#include "gtest/gtest.h"
+
 module infinity_core:ut.ddl_request;
 
 import :ut.base_test;
+import :ut.request_test;
 import :stl;
 import :infinity_context;
-import :ut.request_test;
 import :query_context;
 import :query_result;
+#endif
 
 using namespace infinity;
 

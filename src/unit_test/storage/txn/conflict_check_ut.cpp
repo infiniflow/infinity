@@ -12,30 +12,37 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#ifdef CI
+#include "gtest/gtest.h"
+import infinity_core;
+import base_test;
+#else
 module;
 
 #include "gtest/gtest.h"
 
 module infinity_core:ut.conflict_check;
-import :ut.base_test;
 
+import :ut.base_test;
 import :stl;
-import compilation_config;
 import :infinity_context;
 import :table_def;
-import column_def;
-import data_type;
-import logical_type;
 import :storage;
 import :new_txn_manager;
 import :new_txn;
-import extra_ddl_info;
 import :column_vector;
 import :data_block;
 import :value;
 import :infinity_exception;
 import :status;
 import :txn_state;
+#endif
+
+import compilation_config;
+import column_def;
+import data_type;
+import logical_type;
+import extra_ddl_info;
 import row_id;
 
 using namespace infinity;

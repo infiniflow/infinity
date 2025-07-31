@@ -12,6 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#ifdef CI
+#include "gtest/gtest.h"
+import infinity_core;
+import base_test;
+#else
 module;
 
 #include "gtest/gtest.h"
@@ -24,12 +29,14 @@ import :hnsw_alg;
 import :vec_store_type;
 import :hnsw_common;
 import :sparse_util;
-import compilation_config;
 import :infinity_exception;
 import :third_party;
 import :sparse_test_util;
 import :virtual_store;
 import :local_file_handle;
+#endif
+
+import compilation_config;
 
 using namespace infinity;
 

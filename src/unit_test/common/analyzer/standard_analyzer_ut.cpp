@@ -12,19 +12,24 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#ifdef CI
+#include "gtest/gtest.h"
+import infinity_core;
+import base_test;
+#else
 module;
 
 #include "gtest/gtest.h"
 
 module infinity_core:ut.standard_analyzer;
 
+import :ut.base_test;
 import :stl;
 import :term;
 import :stemmer;
 import :standard_analyzer;
 import :tokenizer;
-
-import :ut.base_test;
+#endif
 
 using namespace infinity;
 

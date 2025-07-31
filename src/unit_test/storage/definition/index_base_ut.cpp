@@ -12,6 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#ifdef CI
+#include "statement/statement_common.h"
+#include "gtest/gtest.h"
+import infinity_core;
+import base_test;
+#else
 module;
 
 #include "statement/statement_common.h"
@@ -25,6 +31,7 @@ import :index_base;
 import :index_ivf;
 import :index_hnsw;
 import :index_full_text;
+#endif
 
 import statement_common;
 

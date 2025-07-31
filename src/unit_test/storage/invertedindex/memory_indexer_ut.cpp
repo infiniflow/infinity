@@ -12,12 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
+#ifdef CI
+#include "gtest/gtest.h"
 #include <iostream>
 #include <unistd.h>
+import infinity_core;
+import base_test;
+#else
+module;
 
 #include "gtest/gtest.h"
+#include <iostream>
+#include <unistd.h>
 
 module infinity_core:ut.memory_indexer;
 
@@ -28,21 +34,17 @@ import :analyzer_pool;
 import :index_defines;
 import :posting_list_format;
 import :column_vector;
-import data_type;
 import :value;
 import :memory_indexer;
 import :column_index_reader;
 import :posting_iterator;
 import :column_inverter;
-import internal_types;
-import logical_type;
 import :column_index_merger;
 import :third_party;
 import :inmem_posting_decoder;
 import :inmem_position_list_decoder;
 import :inmem_index_segment_reader;
 import :segment_posting;
-import global_resource_usage;
 import :infinity_context;
 import :third_party;
 import :db_meeta;
@@ -53,10 +55,16 @@ import :txn_state;
 import :new_txn_manager;
 import :data_block;
 import :table_def;
-import column_def;
 import :index_full_text;
-import extra_ddl_info;
 import :status;
+#endif
+
+import data_type;
+import internal_types;
+import logical_type;
+import global_resource_usage;
+import column_def;
+import extra_ddl_info;
 
 using namespace infinity;
 

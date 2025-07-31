@@ -12,6 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#ifdef CI
+#include "gtest/gtest.h"
+import infinity_core;
+import base_test;
+#else
 module;
 
 #include "gtest/gtest.h"
@@ -23,7 +28,6 @@ import :infinity;
 import :infinity_exception;
 import :status;
 import :stl;
-import global_resource_usage;
 import :third_party;
 import :infinity_context;
 import :block_version;
@@ -31,11 +35,14 @@ import :virtual_store;
 import :buffer_manager;
 import :version_file_worker;
 import :column_vector;
-import data_type;
-import logical_type;
 import :persistence_manager;
 import :default_values;
 import :local_file_handle;
+#endif
+
+import global_resource_usage;
+import data_type;
+import logical_type;
 
 using namespace infinity;
 

@@ -12,12 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#ifdef CI
+#include "gtest/gtest.h"
+import infinity_core;
+import base_test;
+import crash_handler;
+#else
 module;
 
 #include "gtest/gtest.h"
 
 module infinity_core:ut.test_tracer;
 
+import :ut.base_test;
+import :ut.crash_handler;
 import :stl;
 import :base_memindex;
 import :mem_index;
@@ -28,10 +36,9 @@ import :third_party;
 import :logger;
 import :new_txn;
 import :infinity_context;
+#endif
 
-import :ut.base_test;
 import compilation_config;
-import :ut.crash_handler;
 
 using namespace infinity;
 

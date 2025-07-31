@@ -12,6 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#ifdef CI
+#include "gtest/gtest.h"
+import infinity_core;
+import base_test;
+#else
 module;
 
 #include "gtest/gtest.h"
@@ -20,11 +25,8 @@ module infinity_core:ut.recycle_log;
 
 import :ut.base_test;
 import :stl;
-import global_resource_usage;
 import :storage;
 import :infinity_context;
-import compilation_config;
-import extra_ddl_info;
 import :infinity_exception;
 import :log_file;
 import :config;
@@ -37,6 +39,11 @@ import :txn_state;
 import :new_txn;
 import :new_txn_manager;
 import :wal_manager;
+#endif
+
+import global_resource_usage;
+import compilation_config;
+import extra_ddl_info;
 
 using namespace infinity;
 
@@ -53,9 +60,7 @@ protected:
     void TearDown() override {}
 };
 
-INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
-                         RecycleLogTest,
-                         ::testing::Values(BaseTestParamStr::NULL_CONFIG_PATH));
+INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams, RecycleLogTest, ::testing::Values(BaseTestParamStr::NULL_CONFIG_PATH));
 
 TEST_P(RecycleLogTest, recycle_wal_after_delta_checkpoint) {
     {
@@ -71,8 +76,8 @@ TEST_P(RecycleLogTest, recycle_wal_after_delta_checkpoint) {
 
         Storage *storage = infinity::InfinityContext::instance().storage();
         Config *config = storage->config();
-        //TxnManager *txn_mgr = storage->txn_manager();
-        //BGTaskProcessor *bg_processor = storage->bg_processor();
+        // TxnManager *txn_mgr = storage->txn_manager();
+        // BGTaskProcessor *bg_processor = storage->bg_processor();
 
         const String &wal_dir = config->WALDir();
         {
@@ -117,7 +122,7 @@ TEST_P(RecycleLogTest, recycle_wal_after_delta_checkpoint) {
             auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check point"), TransactionType::kNewCheckpoint);
             Status status = txn->Checkpoint(wal_manager_->LastCheckpointTS());
             EXPECT_TRUE(status.ok());
-            status = new_txn_mgr->CommitTxn(txn,ckp_commit_ts.get());
+            status = new_txn_mgr->CommitTxn(txn, ckp_commit_ts.get());
             EXPECT_TRUE(status.ok());
         }
         //        {

@@ -12,6 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#ifdef CI
+#include "statement/command_statement.h"
+#include "gtest/gtest.h"
+import infinity_core;
+import base_test;
+#else
 module;
 
 #include "statement/command_statement.h"
@@ -19,7 +25,7 @@ module;
 
 module infinity_core:ut.infinity;
 
-
+import :ut.base_test;
 import :stl;
 import :infinity;
 import :query_result;
@@ -27,8 +33,8 @@ import :data_block;
 import :value;
 import :query_options;
 import :data_table;
+#endif
 
-import :ut.base_test;
 import logical_type;
 import internal_types;
 import parsed_expr;
@@ -211,7 +217,9 @@ TEST_F(InfinityTest, test1) {
 
         SearchExpr *search_expr = nullptr;
 
-        result = infinity->Search("default_db", "table1", search_expr, nullptr, nullptr, nullptr, output_columns, nullptr, nullptr, nullptr, nullptr, false);
+        result =
+            infinity
+                ->Search("default_db", "table1", search_expr, nullptr, nullptr, nullptr, output_columns, nullptr, nullptr, nullptr, nullptr, false);
         SharedPtr<DataBlock> data_block = result.result_table_->GetDataBlockById(0);
         EXPECT_EQ(data_block->row_count(), 1);
         Value value = data_block->GetValue(0, 0);

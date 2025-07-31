@@ -12,29 +12,35 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#ifdef CI
+#include <memory>
+import infinity_core;
+import sql_runner;
+#else
 module;
 
 #include <memory>
 
 module infinity_core:ut.sql_runner.impl;
 
+import :ut.sql_runner;
 import :stl;
-
 import :fragment_builder;
 import :data_table;
-import :ut.sql_runner;
 import :infinity_context;
 import :logical_node;
 import :bind_context;
 import :session_manager;
 import :query_result;
 import :fragment_context;
-import sql_parser;
-import base_statement;
-import parser_result;
 import :logical_planner;
 import :query_context;
 import :physical_planner;
+#endif
+
+import sql_parser;
+import base_statement;
+import parser_result;
 
 namespace infinity {
 

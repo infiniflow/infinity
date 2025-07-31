@@ -12,6 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#ifdef CI
+#include <gtest/gtest.h>
+import infinity_core;
+import base_test;
+#else
 module;
 
 #include <gtest/gtest.h>
@@ -21,19 +26,20 @@ module infinity_core:ut.file_write_read;
 import :ut.base_test;
 import :infinity_exception;
 import :stl;
-import global_resource_usage;
 import :third_party;
 import :logger;
 import :file_writer;
 import :file_reader;
 import :infinity_context;
 import :virtual_store;
+#endif
+
+import global_resource_usage;
 
 using namespace infinity;
 
 class FileWriteReadTest : public BaseTest {};
 
-// write in abcabcabc...for 128 times, then read first 4 bytes
 TEST_F(FileWriteReadTest, test1) {
     using namespace infinity;
     String path = String(GetFullTmpDir()) + "/test_file1.abc";
@@ -56,7 +62,6 @@ TEST_F(FileWriteReadTest, test1) {
     VirtualStore::DeleteFile(path);
 }
 
-// write vint then read vint
 TEST_F(FileWriteReadTest, test2) {
     using namespace infinity;
     String path = String(GetFullTmpDir()) + "/test_file2.abc";
@@ -75,7 +80,6 @@ TEST_F(FileWriteReadTest, test2) {
     VirtualStore::DeleteFile(path);
 }
 
-// hybrid datatype
 TEST_F(FileWriteReadTest, test3) {
     using namespace infinity;
     String path = String(GetFullTmpDir()) + "/test_file3.abc";
@@ -109,8 +113,6 @@ TEST_F(FileWriteReadTest, test3) {
     VirtualStore::DeleteFile(path);
 }
 
-// test total written bytes and GetFileSize()
-// plus exceed case for reader/writer buffer
 TEST_F(FileWriteReadTest, TestExceedWriterTotalSize) {
     using namespace infinity;
     String path = String(GetFullTmpDir()) + "/test_file_write_bytes.abc";
@@ -138,9 +140,6 @@ TEST_F(FileWriteReadTest, TestExceedWriterTotalSize) {
     EXPECT_EQ(file_writer.TotalWrittenBytes(), 4 * 1024 + buffer.size());
 }
 
-// write byte in '0', '1'...'1023'
-// read to '254', get pointer a, finish the read
-// seek a, finish
 TEST_F(FileWriteReadTest, TestFilePointerSeek) {
     using namespace infinity;
     String path = String(GetFullTmpDir()) + "/test_file_write_bytes.abc";
@@ -170,7 +169,6 @@ TEST_F(FileWriteReadTest, TestFilePointerSeek) {
     EXPECT_EQ(exp, 1024);
 }
 
-// test if ReFill works fine.
 TEST_F(FileWriteReadTest, TestFileReadOverflowBuffer) {
     using namespace infinity;
     String path = String(GetFullTmpDir()) + "/test_file_write_bytes.abc";
@@ -192,7 +190,6 @@ TEST_F(FileWriteReadTest, TestFileReadOverflowBuffer) {
     EXPECT_STREQ(s.c_str(), read_s.c_str());
 }
 
-// test all types of data of reader and writer
 TEST_F(FileWriteReadTest, TestFileIODataTypes) {
 
     using namespace infinity;

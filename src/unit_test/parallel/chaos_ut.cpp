@@ -12,6 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#ifdef CI
+#include "gtest/gtest.h"
+#include <chrono>
+import infinity_core;
+import base_test;
+#else
 module;
 
 #include "gtest/gtest.h"
@@ -27,15 +33,18 @@ import :infinity_context;
 import :stl;
 import :txn_state;
 import :infinity;
+import :query_options;
+import :logger;
+import :third_party;
+import :profiler;
+import :virtual_store;
+#endif
+
 import search_expr;
 import match_expr;
 import function_expr;
 import parsed_expr;
-import :query_options;
-import :logger;
-import :third_party;
 import compilation_config;
-import :profiler;
 import internal_types;
 import logical_type;
 import create_index_info;
@@ -45,7 +54,6 @@ import extra_ddl_info;
 import statement_common;
 import constant_expr;
 import column_expr;
-import :virtual_store;
 import insert_row_expr;
 import embedding_info;
 import compilation_config;

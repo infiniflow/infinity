@@ -12,19 +12,27 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#ifdef CI
+#include "gtest/gtest.h"
+import infinity_core;
+import base_test;
+#else
 module;
 
 #include "gtest/gtest.h"
 
 module infinity_core:ut.knn_flat_l2_reservoir;
+
 import :ut.base_test;
 import :infinity_exception;
 import :stl;
-import global_resource_usage;
 import :third_party;
 import :logger;
 import :deprecated_knn_flat_l2_reservoir;
 import :infinity_context;
+#endif
+
+import global_resource_usage;
 import knn_expr;
 import internal_types;
 

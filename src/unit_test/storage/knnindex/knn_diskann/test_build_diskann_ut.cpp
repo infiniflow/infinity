@@ -12,26 +12,33 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#ifdef CI
+#include <fstream>
+#include <gtest/gtest.h>
+import infinity_core;
+import base_test;
+#else
 module;
-
-module infinity_core:ut.test_build_diskann;
-
-#if 0
 
 #include <fstream>
 #include <gtest/gtest.h>
+module infinity_core:ut.test_build_diskann;
 
-import :stl;
 import :ut.base_test;
-import :infinity_exception
-import knn_diskann;
-import internal_types;
+import :stl;
+import :infinity_exception;
 import :virtual_store;
 import :index_base;
-import diskann_index_data;
 import :local_file_handle;
-import pq_flash_index;
-import diskann_dist_func;
+import :diskann_index_data;
+import :pq_flash_index;
+import :diskann_dist_func;
+import :knn_diskann;
+#endif
+
+import internal_types;
+
+#if 0
 
 using namespace infinity;
 

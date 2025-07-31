@@ -12,10 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#ifdef CI
+#include <cassert>
+#include "gtest/gtest.h"
+import infinity_core;
+import base_test;
+#else
 module;
 
 #include <cassert>
-
 #include "gtest/gtest.h"
 
 module infinity_core:ut.test_bmp_index;
@@ -26,11 +31,13 @@ import :bmp_alg;
 import :bmp_util;
 import :sparse_util;
 import :third_party;
-import compilation_config;
 import :sparse_test_util;
 import :infinity_exception;
 import :virtual_store;
 import :local_file_handle;
+#endif
+
+import compilation_config;
 
 using namespace infinity;
 

@@ -12,6 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#ifdef CI
+#include "gtest/gtest.h"
+import infinity_core;
+import base_test;
+#else
 module;
 
 #include "gtest/gtest.h"
@@ -20,7 +25,6 @@ module infinity_core:ut.subtract_functions;
 
 import :ut.base_test;
 import :infinity_exception;
-import global_resource_usage;
 import :third_party;
 import :logger;
 import :stl;
@@ -37,13 +41,16 @@ import :base_expression;
 import :column_vector;
 import :value_expression;
 import :subtract;
-import logical_type;
-import internal_types;
-import data_type;
 import :new_catalog;
 import :config;
 import :status;
 import :kv_store;
+#endif
+
+import global_resource_usage;
+import logical_type;
+import internal_types;
+import data_type;
 
 using namespace infinity;
 class SubtractFunctionsTest : public BaseTest {};

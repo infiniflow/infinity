@@ -12,6 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#ifdef CI
+#include "gtest/gtest.h"
+import infinity_core;
+import base_test;
+#else
 module;
 
 #include "gtest/gtest.h"
@@ -19,15 +24,17 @@ module;
 module infinity_core:ut.sql_file_parsing_test;
 
 import :ut.base_test;
-import compilation_config;
 import :infinity_context;
 import :infinity_exception;
-import global_resource_usage;
 import :third_party;
-import sql_parser;
 import :logger;
 import :null_value;
 import :stl;
+#endif
+
+import compilation_config;
+import global_resource_usage;
+import sql_parser;
 import parser_result;
 
 using namespace infinity;

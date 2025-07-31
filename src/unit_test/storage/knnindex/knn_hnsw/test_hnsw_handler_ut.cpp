@@ -12,30 +12,29 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#ifdef CI
+#include "gtest/gtest.h"
+#include <thread>
+import infinity_core;
+import base_test;
+#else
 module;
 
-#include <thread>
 #include "gtest/gtest.h"
+#include <thread>
 
 module infinity_core:ut.test_hnsw_handler;
 
-import :stl;
 import :ut.base_test;
-import column_def;
-import embedding_info;
-import logical_type;
-import internal_types;
-import data_type;
+import :stl;
 import :hnsw_alg;
 import :hnsw_handler;
 import :index_hnsw;
 import :index_base;
-
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wunused-variable"
 import :data_store;
 #pragma clang diagnostic pop
-
 import :dist_func_l2;
 import :dist_func_ip;
 import :dist_func_cos;
@@ -44,6 +43,13 @@ import :hnsw_common;
 import :infinity_exception;
 import :virtual_store;
 import :local_file_handle;
+#endif
+
+import column_def;
+import embedding_info;
+import logical_type;
+import internal_types;
+import data_type;
 
 using namespace infinity;
 
@@ -80,9 +86,8 @@ public:
 
     UniquePtr<IndexHnsw> MakeIndexHnsw(bool compress = false) {
         HnswEncodeType tmp_encode_type = compress ? HnswEncodeType::kLVQ : encode_type;
-        return MakeUnique<IndexHnsw>(index_name, nullptr, filename,
-                                column_names, metric_type, tmp_encode_type,
-                                build_type, M, ef_construction, chunk_size, None);
+        return MakeUnique<
+            IndexHnsw>(index_name, nullptr, filename, column_names, metric_type, tmp_encode_type, build_type, M, ef_construction, chunk_size, None);
     }
 
     UniquePtr<ColumnDef> MakeColumnDef() {
@@ -91,7 +96,7 @@ public:
         return MakeUnique<ColumnDef>(0, data_type, column_names[0], std::set<ConstraintType>());
     }
 
-    void SearchHnswHandler(HnswHandler* hnsw_handler) {
+    void SearchHnswHandler(HnswHandler *hnsw_handler) {
         hnsw_handler->Check();
 
         KnnSearchOption search_option{.ef_ = 10};

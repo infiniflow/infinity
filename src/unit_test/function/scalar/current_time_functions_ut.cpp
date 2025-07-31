@@ -12,14 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#ifdef CI
+#include "gtest/gtest.h"
+import infinity_core;
+import base_test;
+#else
 module;
 
 #include "gtest/gtest.h"
 
 module infinity_core:ut.current_time_functions;
 
-import :stl;
 import :ut.base_test;
+import :stl;
 import :infinity_exception;
 import :infinity_context;
 import :new_catalog;
@@ -32,10 +37,6 @@ import :column_vector;
 import :data_block;
 import :function_set;
 import :function;
-import global_resource_usage;
-import data_type;
-import internal_types;
-import logical_type;
 import :scalar_function;
 import :scalar_function_set;
 import :current_time;
@@ -43,6 +44,12 @@ import :third_party;
 import :config;
 import :status;
 import :kv_store;
+#endif
+
+import global_resource_usage;
+import data_type;
+import internal_types;
+import logical_type;
 
 using namespace infinity;
 
@@ -73,7 +80,6 @@ TEST_F(CurrentTimeFunctionsTest, current_time_func) {
         DataType data_type1(LogicalType::kVarchar);
         SharedPtr<DataType> result_type = MakeShared<DataType>(LogicalType::kTime);
 
-
         ScalarFunction func = scalar_function_set->GetMostMatchFunction(inputs);
         EXPECT_STREQ("current_time()", func.ToString().c_str());
 
@@ -82,7 +88,6 @@ TEST_F(CurrentTimeFunctionsTest, current_time_func) {
 
         DataBlock data_block;
         data_block.Init(column_types);
-
 
         SharedPtr<ColumnVector> result = MakeShared<ColumnVector>(result_type);
         result->Initialize();

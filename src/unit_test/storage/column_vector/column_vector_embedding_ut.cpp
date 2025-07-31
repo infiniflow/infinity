@@ -12,10 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#ifdef CI
+#include "unit_test/gtest_expand.h"
+#include "gtest/gtest.h"
+import infinity_core;
+import base_test;
+#else
 module;
 
-#include "gtest/gtest.h"
 #include "unit_test/gtest_expand.h"
+#include "gtest/gtest.h"
 
 module infinity_core:ut.column_vector_embedding;
 
@@ -30,6 +36,8 @@ import :stl;
 import :selection;
 import :vector_buffer;
 import :infinity_context;
+#endif
+
 import global_resource_usage;
 import internal_types;
 import logical_type;

@@ -1,7 +1,14 @@
+
+#ifdef CI
+#include "gtest/gtest.h"
+#include <cassert>
+import infinity_core;
+import base_test;
+#else
 module;
 
-#include <cassert>
 #include "gtest/gtest.h"
+#include <cassert>
 
 module infinity_core:ut.term_meta;
 
@@ -15,8 +22,10 @@ import :file_reader;
 import :index_defines;
 import :posting_list_format;
 import :virtual_store;
-import global_resource_usage;
 import :infinity_context;
+#endif
+
+import global_resource_usage;
 
 using namespace infinity;
 

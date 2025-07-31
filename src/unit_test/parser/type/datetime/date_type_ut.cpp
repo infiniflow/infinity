@@ -1,17 +1,26 @@
+
+#ifdef CI
+#include "unit_test/gtest_expand.h"
+#include "gtest/gtest.h"
+import infinity_core;
+import base_test;
+#else
 module;
 
-#include "gtest/gtest.h"
 #include "unit_test/gtest_expand.h"
+#include "gtest/gtest.h"
 
 module infinity_core:ut.date_type;
 
 import :ut.base_test;
 import :infinity_exception;
-import global_resource_usage;
 import :third_party;
 import :logger;
 import :stl;
 import :infinity_context;
+#endif
+
+import global_resource_usage;
 import internal_types;
 import parser_assert;
 
@@ -75,10 +84,6 @@ TEST_F(DateTypeTest, TestAddSubstract) {
     EXPECT_EQ(date_std_output.ToString(), "2018-02-28");
 }
 
-// TEST_F(DateTypeTest, TestLeapYear) {
-//     using namespace infinity;
-// }
-
 TEST_F(DateTypeTest, TestNegativeYears) {
     using namespace infinity;
     DateT date;
@@ -100,10 +105,3 @@ TEST_F(DateTypeTest, TestNegativeYears) {
     EXPECT_TRUE(DateT::Subtract(date_shift, interval, date_shift));
     EXPECT_EQ(date_shift.ToString(), "-001-05-04");
 }
-
-// TEST_F(DateTypeTest, TestComparator) {
-//     using namespace infinity;
-//     DateT d1;
-//     DateT d2;
-
-// }

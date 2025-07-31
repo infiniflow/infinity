@@ -12,6 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#ifdef CI
+#include <gtest/gtest.h>
+import infinity_core;
+import base_test;
+#else
 module;
 
 #include <gtest/gtest.h>
@@ -24,18 +29,14 @@ import :config;
 import :infinity_exception;
 import :third_party;
 import :status;
-import compilation_config;
 import :virtual_store;
 import :default_values;
+#endif
+
+import compilation_config;
 
 using namespace infinity;
 class ConfigTest : public BaseTest {};
-
-// static size_t GetAvailableMem() {
-//     size_t pages = sysconf(_SC_PHYS_PAGES);
-//     size_t page_size = sysconf(_SC_PAGE_SIZE); // Byte
-//     return pages * page_size;
-// }
 
 TEST_F(ConfigTest, test1) {
     using namespace infinity;

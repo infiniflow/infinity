@@ -12,6 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#ifdef CI
+#include "gtest/gtest.h"
+import infinity_core;
+import base_test;
+#else
 module;
 
 #include "gtest/gtest.h"
@@ -20,7 +25,6 @@ module infinity_core:ut.wal_replay;
 
 import :ut.base_test;
 import :stl;
-import global_resource_usage;
 import :storage;
 import :infinity_context;
 import :table_def;
@@ -40,15 +44,6 @@ import :bg_task;
 import :background_process;
 import :default_values;
 import :base_table_ref;
-import internal_types;
-import logical_type;
-import embedding_info;
-import extra_ddl_info;
-import knn_expr;
-import column_def;
-import statement_common;
-import data_type;
-import compilation_config;
 import :compaction_process;
 import :txn_state;
 import :new_txn;
@@ -60,6 +55,18 @@ import :column_meta;
 import :table_meeta;
 import :db_meeta;
 import :new_catalog;
+#endif
+
+import global_resource_usage;
+import internal_types;
+import logical_type;
+import embedding_info;
+import extra_ddl_info;
+import knn_expr;
+import column_def;
+import statement_common;
+import data_type;
+import compilation_config;
 import embedding_type;
 
 using namespace infinity;
@@ -719,8 +726,6 @@ TEST_P(WalReplayTest, wal_replay_import) {
     }
 }
 
-// FIXME: The test case diverges from the original intent.
-// TODO: Support compact for vfs
 TEST_F(WalReplayTest, wal_replay_compact) {
     std::shared_ptr<std::string> config_path = std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_close_ckp.toml");
     u64 test_segment_n = 2;

@@ -12,6 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#ifdef CI
+#include "parser/type/complex/varchar.h"
+#include "gtest/gtest.h"
+import infinity_core;
+import base_test;
+#else
 module;
 
 #include "parser/type/complex/varchar.h"
@@ -20,6 +26,7 @@ module;
 module infinity_core:ut.varchar;
 
 import :ut.base_test;
+#endif
 
 using namespace infinity;
 class VarcharTest : public BaseTest {};

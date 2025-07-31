@@ -12,6 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#ifdef CI
+#include "gtest/gtest.h"
+import infinity_core;
+import base_test;
+#else
 module;
 
 #include "gtest/gtest.h"
@@ -27,6 +32,8 @@ import :value;
 import :query_options;
 import :status;
 import :third_party;
+#endif
+
 import logical_type;
 import internal_types;
 import embedding_info;

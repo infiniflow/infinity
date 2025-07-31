@@ -12,7 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#ifdef CI
+import infinity_core;
+#else
 module;
+
+#endif
 
 export module infinity_core:ut.crash_handler;
 
@@ -42,7 +47,6 @@ private:
     static void (*old_sigbus_)(int);
 };
 
-// RAII wrapper for crash handler
 class CrashHandlerGuard {
 public:
     explicit CrashHandlerGuard(const char *test_name = nullptr) { CrashHandler::InstallForTest(test_name); }

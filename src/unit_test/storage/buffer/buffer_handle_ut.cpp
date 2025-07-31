@@ -12,10 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#ifdef CI
+#include "unit_test/gtest_expand.h"
+#include "gtest/gtest.h"
+import infinity_core;
+import base_test;
+#else
 module;
 
-#include "gtest/gtest.h"
 #include "unit_test/gtest_expand.h"
+#include "gtest/gtest.h"
 
 module infinity_core:ut.buffer_handle;
 
@@ -25,11 +31,13 @@ import :buffer_manager;
 import :data_file_worker;
 import :buffer_obj;
 import :infinity_exception;
-import global_resource_usage;
 import :infinity_context;
 import :persistence_manager;
 import :default_values;
 import :storage;
+#endif
+
+import global_resource_usage;
 
 using namespace infinity;
 

@@ -12,26 +12,31 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#ifdef CI
+#include "gtest/gtest.h"
+import infinity_core;
+import base_test;
+import request_test;
+#else
 module;
 
 #include "gtest/gtest.h"
 
 module infinity_core:ut.txns_conflict;
 
-import :stl;
 import :ut.base_test;
+import :ut.request_test;
+import :stl;
 import :status;
 import :new_txn_manager;
 import :infinity_context;
 import :new_txn;
 import :txn_state;
-import extra_ddl_info;
 import :table_def;
 import :data_block;
 import :column_vector;
 import :query_result;
 import :query_context;
-import :ut.request_test;
 import :data_table;
 import :value;
 import :logger;
@@ -42,6 +47,9 @@ import :column_meta;
 import :table_meeta;
 import :db_meeta;
 import :new_catalog;
+#endif
+
+import extra_ddl_info;
 
 using namespace infinity;
 

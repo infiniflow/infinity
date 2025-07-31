@@ -12,12 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
+#ifdef CI
+#include "gtest/gtest.h"
 #include <cstdint>
 #include <random>
+import infinity_core;
+import base_test;
+#else
+module;
 
 #include "gtest/gtest.h"
+#include <cstdint>
+#include <random>
 
 module infinity_core:ut.test_dist_func2;
 
@@ -27,6 +33,7 @@ import :data_store;
 import :vec_store_type;
 import :stl;
 import :hnsw_common;
+#endif
 
 using namespace infinity;
 

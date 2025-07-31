@@ -12,6 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#ifdef CI
+#include "gtest/gtest.h"
+import infinity_core;
+import base_test;
+#else
 module;
 
 #include "gtest/gtest.h"
@@ -22,7 +27,6 @@ import :ut.base_test;
 import :infinity_context;
 import :infinity_exception;
 import :stl;
-import global_resource_usage;
 import :third_party;
 import :logger;
 import :table_def;
@@ -30,10 +34,13 @@ import :value;
 import :data_block;
 import :default_values;
 import :status;
-import extra_ddl_info;
 import :txn_state;
 import :new_txn_manager;
 import :new_txn;
+#endif
+
+import global_resource_usage;
+import extra_ddl_info;
 
 using namespace infinity;
 
@@ -176,11 +183,6 @@ TEST_P(DBTxnTest, test2) {
     txn_mgr->CommitTxn(new_txn);
 }
 
-// ----------+------------+---------------+-------------------+----------------------+-----------+->
-//           |            |               |                   |                      |           |
-//       TXN1 Begin       |      TXN1 Create db1              |                  TXN1 Commit     |
-//                    TXN2 Begin                    TXN2 Create db1(WW-Conflict)            TXN2 Commit
-// The diagram above may be outdated.
 TEST_P(DBTxnTest, test3) {
     using namespace infinity;
     NewTxnManager *txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
@@ -202,11 +204,6 @@ TEST_P(DBTxnTest, test3) {
     txn_mgr->CommitTxn(new_txn2);
 }
 
-// ----------+------------+---------------+-------------------+----------------------+-----------+->
-//           |            |               |                   |                      |           |
-//       TXN2 Begin       |      TXN2 Create db1              |                      |      TXN2 Commit
-//                    TXN1 Begin                    TXN1 Create db1(WW-Conflict)  TXN1 Commit
-// The diagram above may be outdated.
 TEST_P(DBTxnTest, test4) {
     using namespace infinity;
     NewTxnManager *txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
@@ -253,10 +250,6 @@ TEST_P(DBTxnTest, test5) {
     txn_mgr->CommitTxn(new_txn);
 }
 
-// ----------+------------+---------------+-------------------+----------------------+-----------+----------------+--->
-//           |            |               |                   |                      |           |                |
-//       TXN1 Begin       |      TXN1 Create db1              |                  TXN1 Rollback   |                |
-//                    TXN2 Begin                    TXN2 Create db1(WW-Conflict)         TXN2 Create db1 OK  TXN2 Commit
 TEST_P(DBTxnTest, test6) {
     using namespace infinity;
     NewTxnManager *txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
@@ -293,11 +286,6 @@ TEST_P(DBTxnTest, test6) {
     txn_mgr->CommitTxn(new_txn3);
 }
 
-// ----------+------------+---------------+-------------------+----------------------+-----------+-------+---------+--->
-//           |            |               |                   |                      |           |       |         |
-//       TXN1 Begin       |      TXN1 Create db1              |                  TXN1 Drop db1   |   TXN1 Commit   |
-//                    TXN2 Begin                    TXN2 Create db1(WW-Conflict)         TXN2 Create db1 OK  TXN2 Commit
-// The diagram above may be outdated.
 TEST_P(DBTxnTest, test7) {
     using namespace infinity;
     NewTxnManager *txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();

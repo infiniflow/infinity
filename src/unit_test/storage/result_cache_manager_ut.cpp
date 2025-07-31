@@ -1,3 +1,8 @@
+
+#ifdef CI
+#include "gtest/gtest.h"
+import infinity_core;
+#else
 module;
 
 #include "gtest/gtest.h"
@@ -8,15 +13,17 @@ import :stl;
 import :result_cache_manager;
 import :logical_node;
 import :physical_operator;
-import data_type;
 import :cached_node_base;
 import :column_binding;
 import :logical_node_type;
 import :physical_operator_type;
 import :query_context;
 import :operator_state;
-import logical_type;
 import :data_block;
+#endif
+
+import data_type;
+import logical_type;
 
 using namespace infinity;
 

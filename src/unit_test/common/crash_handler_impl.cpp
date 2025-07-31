@@ -12,6 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#ifdef CI
+#include <csignal>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include <ctime>
+#include <stacktrace>
+import infinity_core;
+import crash_handler;
+#else
 module;
 
 #include <csignal>
@@ -25,10 +35,10 @@ module infinity_core:ut.crash_handler.impl;
 
 import :ut.crash_handler;
 import :third_party;
+#endif
 
 namespace infinity {
 
-// Static member definitions
 bool CrashHandler::enabled_ = true;
 const char *CrashHandler::current_test_name_ = nullptr;
 void (*CrashHandler::old_sigsegv_)(int) = nullptr;

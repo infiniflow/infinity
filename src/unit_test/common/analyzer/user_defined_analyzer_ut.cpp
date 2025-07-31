@@ -12,21 +12,26 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#ifdef CI
+import infinity_core;
+import base_test;
+#else
 module;
-
-// #include "gtest/gtest.h"
 
 module infinity_core:ut.user_defined_analyzer;
 
+import :ut.base_test;
+import :stl;
+import :status;
+import :user_defined_analyzer;
+import :python_instance;
+#endif
+
+import compilation_config;
+
 #if 0
 
-import :ut.base_test;
 
-import :stl;
-import user_defined_analyzer;
-import compilation_config;
-import :status;
-import python_instance;
 
 using namespace infinity;
 

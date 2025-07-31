@@ -12,27 +12,31 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#ifdef CI
+#include "unit_test/gtest_expand.h"
+#include "gtest/gtest.h"
+import infinity_core;
+import base_test;
+#else
 module;
+
+#include "unit_test/gtest_expand.h"
+#include "gtest/gtest.h"
 
 module infinity_core:ut.string_chunk;
 
-#if 0
-
-#include "gtest/gtest.h"
-#include "unit_test/gtest_expand.h"
-
 import :ut.base_test;
-
-import :infinity_exception
-
+import :infinity_exception;
 import :logger;
-import heap_chunk;
 import :third_party;
 import :stl;
-import global_resource_usage;
 import :infinity_context;
 import :default_values;
+#endif
 
+import global_resource_usage;
+
+#if 0
 using namespace infinity;
 
 class StringChunkTest : public BaseTest {};

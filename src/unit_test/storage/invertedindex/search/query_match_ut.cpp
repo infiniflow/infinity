@@ -1,3 +1,9 @@
+
+#ifdef CI
+#include "gtest/gtest.h"
+import infinity_core;
+import base_test;
+#else
 module;
 
 #include "gtest/gtest.h"
@@ -6,15 +12,10 @@ module infinity_core:ut.query_match;
 
 import :ut.base_test;
 import :stl;
-import logical_type;
 import :third_party;
 import :infinity_context;
 import :storage;
 import :table_def;
-import column_def;
-import data_type;
-import extra_ddl_info;
-import create_index_info;
 import :index_full_text;
 import :index_base;
 import :block_index;
@@ -28,14 +29,9 @@ import :term;
 import :search_driver;
 import :analyzer_pool;
 import :index_defines;
-import logical_type;
 import :status;
 import :infinity_exception;
-import match_expr;
-import internal_types;
-import search_options;
 import :phrase_doc_iterator;
-import global_resource_usage;
 import :term_doc_iterator;
 import :logger;
 import :column_index_reader;
@@ -44,6 +40,18 @@ import :txn_state;
 import :new_txn_manager;
 import :new_txn;
 import :data_block;
+#endif
+
+import logical_type;
+import column_def;
+import data_type;
+import extra_ddl_info;
+import create_index_info;
+import logical_type;
+import match_expr;
+import internal_types;
+import search_options;
+import global_resource_usage;
 
 using namespace infinity;
 

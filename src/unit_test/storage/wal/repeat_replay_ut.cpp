@@ -12,6 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#ifdef CI
+#include "gtest/gtest.h"
+import infinity_core;
+import base_test;
+#else
 module;
 
 #include "gtest/gtest.h"
@@ -20,11 +25,8 @@ module infinity_core:ut.repeat_replay;
 
 import :ut.base_test;
 import :stl;
-import global_resource_usage;
 import :storage;
 import :infinity_context;
-import compilation_config;
-import extra_ddl_info;
 import :infinity_exception;
 import :log_file;
 import :config;
@@ -33,14 +35,10 @@ import :background_process;
 import :default_values;
 import :status;
 import :logger;
-import column_def;
 import :column_vector;
-import data_type;
-import logical_type;
 import :table_def;
 import :data_block;
 import :value;
-import internal_types;
 import :buffer_manager;
 import :physical_import;
 import :txn_state;
@@ -53,6 +51,15 @@ import :column_meta;
 import :table_meeta;
 import :db_meeta;
 import :new_catalog;
+#endif
+
+import global_resource_usage;
+import compilation_config;
+import extra_ddl_info;
+import column_def;
+import data_type;
+import logical_type;
+import internal_types;
 
 using namespace infinity;
 

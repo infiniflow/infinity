@@ -12,6 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#ifdef CI
+#include "gtest/gtest.h"
+import infinity_core;
+import base_test;
+#else
 module;
 
 #include "gtest/gtest.h"
@@ -19,6 +24,8 @@ module;
 module infinity_core:ut.json;
 
 import :ut.base_test;
+#endif
+
 import global_resource_usage;
 import compilation_config;
 
@@ -92,7 +99,8 @@ TEST_F(JsonTest, simdjson_test) {
                 case simdjson::json_type::array: {
                     std::cout << "[";
                     for (int i = 0; auto item : doc.get_array()) {
-                        if (i++) std::cout << ",";
+                        if (i++)
+                            std::cout << ",";
                         std::cout << (i64)item.get<i64>();
                     }
                     std::cout << "]" << std::endl;
@@ -117,4 +125,3 @@ TEST_F(JsonTest, simdjson_test) {
         PrintDocument(text);
     }
 }
-

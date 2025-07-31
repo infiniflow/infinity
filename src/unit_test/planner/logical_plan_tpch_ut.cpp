@@ -12,30 +12,47 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#ifdef CI
+// #include "bin/compilation_config.h"
+// #include "common/column_vector/column_vector.h"
+// #include "common/types/value.h"
+// #include "executor/physical_planner.h"
+// #include "legacy_sched/operator_pipeline.h"
+// #include "main/infinity.h"
+// #include "main/logger.h"
+// #include "main/profiler/show_logical_plan.h"
+// #include "main/session.h"
+// #include "parser/sql_parser.h"
+// #include "planner/logical_planner.h"
+// #include "planner/optimizer.h"
+// #include "test_helper/sql_runner.h"
+#include "gtest/gtest.h"
+import infinity_core;
+import base_test;
+#else
 module;
+
+// #include "bin/compilation_config.h"
+// #include "common/column_vector/column_vector.h"
+// #include "common/types/value.h"
+// #include "executor/physical_planner.h"
+// #include "legacy_sched/operator_pipeline.h"
+// #include "main/infinity.h"
+// #include "main/logger.h"
+// #include "main/profiler/show_logical_plan.h"
+// #include "main/session.h"
+// #include "parser/sql_parser.h"
+// #include "planner/logical_planner.h"
+// #include "planner/optimizer.h"
+// #include "test_helper/sql_runner.h"
+// #include "gtest/gtest.h"
 
 module infinity_core:ut.logical_plan_tpch;
 
-#if 0
-
-#include "bin/compilation_config.h"
-#include "common/column_vector/column_vector.h"
-#include "common/types/value.h"
-#include "executor/physical_planner.h"
-#include "legacy_sched/operator_pipeline.h"
-#include "main/infinity.h"
-#include "main/logger.h"
-#include "main/profiler/show_logical_plan.h"
-#include "main/session.h"
-#include "parser/sql_parser.h"
-#include "planner/logical_planner.h"
-#include "planner/optimizer.h"
-#include "test_helper/sql_runner.h"
-
-#include "gtest/gtest.h"
-
 import :ut.base_test;
+#endif
 
+#if 0
 using namespace infinity;
 class LogicalPlannerTpchTest : public BaseTest {};
 
@@ -62,7 +79,6 @@ TEST_F(LogicalPlannerTpchTest, test1) {
         String input_sql((std::istreambuf_iterator<char>(t)), std::istreambuf_iterator<char>());
         SQLRunner::Run(input_sql, false);
     }
-//
     // Insert LINEITEM table
     {
         String ddl_sql = String(TEST_DATA_PATH) + "/tpch/insert_lineitem.sql";
@@ -70,7 +86,6 @@ TEST_F(LogicalPlannerTpchTest, test1) {
         String input_sql((std::istreambuf_iterator<char>(t)), std::istreambuf_iterator<char>());
         SQLRunner::Run(input_sql, false);
     }
-//
     // Insert NATION table
     {
         String ddl_sql = String(TEST_DATA_PATH) + "/tpch/insert_nation.sql";
@@ -124,41 +139,17 @@ TEST_F(LogicalPlannerTpchTest, test1) {
         String sql_text = String(TEST_DATA_PATH) + "/tpch/q01.sql";
         std::ifstream t(sql_text.c_str());
         String input_sql((std::istreambuf_iterator<char>(t)), std::istreambuf_iterator<char>());
-//        SQLRunner::Run(input_sql, false);
     }
 
-//    Not executable
-//    {
-//        // Q3
-//        String sql_text = String(TEST_DATA_PATH) + "/tpch/q03.sql";
-//        std::ifstream t(sql_text.c_str());
-//        String input_sql((std::istreambuf_iterator<char>(t)), std::istreambuf_iterator<char>());
-//        SQLRunner::Run(input_sql, false);
-//    }
 
-//    {
-//        // Q5
-//        String sql_text = String(TEST_DATA_PATH) + "/tpch/q05.sql";
-//        std::ifstream t(sql_text.c_str());
-//        String input_sql((std::istreambuf_iterator<char>(t)), std::istreambuf_iterator<char>());
-//        SQLRunner::Run(input_sql, false);
-//    }
 
     {
         // Q6
         String sql_text = String(TEST_DATA_PATH) + "/tpch/q06.sql";
         std::ifstream t(sql_text.c_str());
         String input_sql((std::istreambuf_iterator<char>(t)), std::istreambuf_iterator<char>());
-//        SQLRunner::Run(input_sql, false);
     }
 
-//    {
-//        // Q10
-//        String sql_text = String(TEST_DATA_PATH) + "/tpch/q10.sql";
-//        std::ifstream t(sql_text.c_str());
-//        String input_sql((std::istreambuf_iterator<char>(t)), std::istreambuf_iterator<char>());
-//        SQLRunner::Run(input_sql, false);
-//    }
 
     // DROP tables;
     {

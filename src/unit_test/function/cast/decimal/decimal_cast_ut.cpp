@@ -12,13 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#ifdef CI
+#include "unit_test/gtest_expand.h"
+#include "gtest/gtest.h"
+import infinity_core;
+import base_test;
+#else
 module;
 
-#include "gtest/gtest.h"
 #include "unit_test/gtest_expand.h"
+#include "gtest/gtest.h"
 
 module infinity_core:ut.decimal_cast;
 
+import :ut.base_test;
 import :infinity_exception;
 import :third_party;
 import :logger;
@@ -36,8 +43,8 @@ import :cast_table;
 import :column_vector;
 import :decimal_cast;
 import :bound_cast_func;
+#endif
 
-import :ut.base_test;
 import global_resource_usage;
 import internal_types;
 import logical_type;

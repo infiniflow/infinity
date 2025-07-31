@@ -1,8 +1,14 @@
+
+#ifdef CI
+#include "gtest/gtest.h"
+#include <cassert>
+import infinity_core;
+import base_test;
+#else
 module;
 
-#include <cassert>
-
 #include "gtest/gtest.h"
+#include <cassert>
 
 module infinity_core:ut.posting_byte_slice_reader;
 
@@ -12,6 +18,7 @@ import :posting_byte_slice;
 import :posting_byte_slice_reader;
 import :doc_list_format_option;
 import :index_defines;
+#endif
 
 using namespace infinity;
 

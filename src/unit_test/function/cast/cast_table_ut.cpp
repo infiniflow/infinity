@@ -12,12 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#ifdef CI
+#include "gtest/gtest.h"
+import infinity_core;
+import base_test;
+#else
 module;
 
 #include "gtest/gtest.h"
 
 module infinity_core:ut.cast_table;
 
+import :ut.base_test;
 import :infinity_exception;
 import :third_party;
 import :logger;
@@ -33,8 +39,7 @@ import :default_values;
 import :data_block;
 import :cast_table;
 import :column_vector;
-
-import :ut.base_test;
+#endif
 
 using namespace infinity;
 class CastTableTest : public BaseTest {};

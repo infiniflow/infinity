@@ -12,6 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#ifdef CI
+#include "gtest/gtest.h"
+import infinity_core;
+import base_test;
+#else
 module;
 
 #include "gtest/gtest.h"
@@ -21,17 +26,18 @@ module infinity_core:ut.definition_table;
 import :ut.base_test;
 import :infinity_exception;
 import :stl;
-import global_resource_usage;
 import :third_party;
 import :logger;
 import :data_table;
 import :table_def;
 import :value;
-
 import :data_block;
 import :default_values;
 import :column_vector;
 import :infinity_context;
+#endif
+
+import global_resource_usage;
 import internal_types;
 import logical_type;
 import column_def;

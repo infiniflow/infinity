@@ -12,6 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#ifdef CI
+#include "gtest/gtest.h"
+import infinity_core;
+import base_test;
+import log_helper;
+#else
 module;
 
 #include "gtest/gtest.h"
@@ -19,17 +25,19 @@ module;
 module infinity_core:ut.search_driver;
 
 import :ut.base_test;
+import :ut.log_helper;
 import :stl;
 import :search_driver;
 import :query_node;
 import :term;
 import :analyzer;
 import :infinity_exception;
-import global_resource_usage;
 import :infinity_context;
 import :logger;
 import :third_party;
-import :ut.log_helper;
+#endif
+
+import global_resource_usage;
 
 using namespace infinity;
 

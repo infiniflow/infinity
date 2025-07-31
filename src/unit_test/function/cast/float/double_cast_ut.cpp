@@ -12,13 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#ifdef CI
+#include "unit_test/gtest_expand.h"
+#include "gtest/gtest.h"
+import infinity_core;
+import base_test;
+#else
 module;
 
-#include "gtest/gtest.h"
 #include "unit_test/gtest_expand.h"
+#include "gtest/gtest.h"
 
 module infinity_core:ut.double_cast;
 
+import :ut.base_test;
 import :infinity_exception;
 import :third_party;
 import :logger;
@@ -36,8 +43,8 @@ import :cast_table;
 import :column_vector;
 import :float_cast;
 import :bound_cast_func;
+#endif
 
-import :ut.base_test;
 import global_resource_usage;
 import internal_types;
 import logical_type;
@@ -368,7 +375,8 @@ TEST_F(DoubleCastTest, double_cast1) {
         CastParameters cast_parameters;
 
         //        bool result = double2hugeint_ptr.function(col_float, col_hugeint, DEFAULT_VECTOR_SIZE, cast_parameters);
-        EXPECT_THROW_WITHOUT_STACKTRACE(double2hugeint_ptr.function(col_source, col_target, DEFAULT_VECTOR_SIZE, cast_parameters), UnrecoverableException);
+        EXPECT_THROW_WITHOUT_STACKTRACE(double2hugeint_ptr.function(col_source, col_target, DEFAULT_VECTOR_SIZE, cast_parameters),
+                                        UnrecoverableException);
     }
 
     // cast double column vector to float column vector

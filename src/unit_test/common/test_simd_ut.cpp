@@ -1,13 +1,19 @@
+
+#ifdef CI
+#include "gtest/gtest.h"
+import infinity_core;
+import base_test;
+#else
 module;
 
 #include "gtest/gtest.h"
 
 module infinity_core:ut.test_simd;
 
+import :ut.base_test;
 import :stl;
 import :simd_init;
-
-import :ut.base_test;
+#endif
 
 using namespace infinity;
 

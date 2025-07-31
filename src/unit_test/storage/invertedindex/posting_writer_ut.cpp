@@ -12,6 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#ifdef CI
+#include "gtest/gtest.h"
+import infinity_core;
+import base_test;
+#else
 module;
 
 #include "gtest/gtest.h"
@@ -22,16 +27,18 @@ import :ut.base_test;
 import :stl;
 import :index_defines;
 import :posting_list_format;
-import data_type;
 import :file_writer;
 import :file_reader;
 import :posting_writer;
 import :term_meta;
-import internal_types;
 import :segment_posting;
 import :posting_iterator;
 import :vector_with_lock;
 import :infinity_context;
+#endif
+
+import data_type;
+import internal_types;
 
 using namespace infinity;
 

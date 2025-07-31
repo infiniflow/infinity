@@ -12,6 +12,11 @@
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
 
+#ifdef CI
+#include "gtest/gtest.h"
+import infinity_core;
+import base_test;
+#else
 module;
 
 #include "gtest/gtest.h"
@@ -20,7 +25,6 @@ module infinity_core:ut.query_builder;
 
 import :ut.base_test;
 import :stl;
-import internal_types;
 import :index_defines;
 import :default_values;
 import :doc_iterator;
@@ -32,10 +36,13 @@ import :query_builder;
 import :query_node;
 import :search_driver;
 import :infinity_context;
-import global_resource_usage;
 import :third_party;
 import :logger;
 import :parse_fulltext_options;
+#endif
+
+import internal_types;
+import global_resource_usage;
 
 namespace infinity {
 
@@ -89,7 +96,6 @@ public:
     String column_;
 };
 
-// treat it as TERM in optimization
 struct MockQueryNode : public TermQueryNode {
     Vector<RowID> doc_ids_;
     MockQueryNode(Vector<RowID> doc_ids, const String &term, const String &column) : TermQueryNode(), doc_ids_(std::move(doc_ids)) {
@@ -127,8 +133,6 @@ constexpr int TestAndVecN = 70'000;
 constexpr int TestOrVecN = 10'000;
 constexpr int TestNotVecN = 5'000;
 
-// doc id: 0-100'000
-// output length: in range [0, param_len]
 auto get_random_doc_ids = [](std::mt19937 &rng, u32 param_len) -> Vector<RowID> {
     // generate random doc ids
     Vector<RowID> doc_ids;
@@ -145,12 +149,6 @@ auto get_random_doc_ids = [](std::mt19937 &rng, u32 param_len) -> Vector<RowID> 
     return doc_ids;
 };
 
-// test: flatten and, flatten or, flatten and_not
-// 1. (A and B) and ((C and D) and E) -> A and B and C and D and E
-// 2. (A or B) or ((C or D) or E) -> A or B or C or D or E
-// 3. (((A or B) or C) and not D) and not E -> (A or B or C) and not (D, E)
-// 4. (((A and B) and not C) and D) and not E -> (A and B and D) and not (C, E)
-
 class QueryBuilderTest : public BaseTest {};
 
 union FakeQueryBuilder {
@@ -160,7 +158,6 @@ union FakeQueryBuilder {
     ~FakeQueryBuilder() {}
 };
 
-// 1. (A and B) and ((C and D) and E) -> A and B and C and D and E
 TEST_F(QueryBuilderTest, test_and) {
     // prepare random seed
     std::random_device rd;
@@ -232,7 +229,6 @@ TEST_F(QueryBuilderTest, test_and) {
     }
 }
 
-// 2. (A or B) or ((C or D) or E) -> A or B or C or D or E
 TEST_F(QueryBuilderTest, test_or) {
     // prepare random seed
     std::random_device rd;
@@ -306,7 +302,6 @@ TEST_F(QueryBuilderTest, test_or) {
     }
 }
 
-// 3. (((A or B) or C) and not D) and not E -> (A or B or C) and not (D, E)
 TEST_F(QueryBuilderTest, test_and_not) {
     // prepare random seed
     std::random_device rd;
@@ -390,7 +385,6 @@ TEST_F(QueryBuilderTest, test_and_not) {
     }
 }
 
-// 4. (((A and B) and not C) and D) and not E -> (A and B and D) and not (C, E)
 TEST_F(QueryBuilderTest, test_and_not2) {
     // prepare random seed
     std::random_device rd;

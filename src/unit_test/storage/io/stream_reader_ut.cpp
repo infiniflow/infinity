@@ -1,3 +1,9 @@
+
+#ifdef CI
+#include <gtest/gtest.h>
+import infinity_core;
+import base_test;
+#else
 module;
 
 #include <gtest/gtest.h>
@@ -7,7 +13,6 @@ module infinity_core:ut.stream_reader;
 import :ut.base_test;
 import :infinity_exception;
 import :stl;
-import global_resource_usage;
 import :third_party;
 import :logger;
 import :file_writer;
@@ -15,6 +20,9 @@ import :file_reader;
 import :infinity_context;
 import :stream_reader;
 import :virtual_store;
+#endif
+
+import global_resource_usage;
 
 using namespace infinity;
 

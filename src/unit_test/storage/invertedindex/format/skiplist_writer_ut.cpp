@@ -1,3 +1,9 @@
+
+#ifdef CI
+#include "gtest/gtest.h"
+import infinity_core;
+import base_test;
+#else
 module;
 
 #include "gtest/gtest.h"
@@ -12,6 +18,7 @@ import :posting_byte_slice;
 import :index_defines;
 import :posting_field;
 import :file_writer;
+#endif
 
 using namespace infinity;
 

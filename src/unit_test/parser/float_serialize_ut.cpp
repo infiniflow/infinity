@@ -1,7 +1,20 @@
+
+#ifdef CI
+#include "unit_test/gtest_expand.h"
+#include "gtest/gtest.h"
+#include <cassert>
+#include <charconv>
+#include <cstdio>
+#include <iostream>
+#include <limits>
+#include <string>
+import infinity_core;
+import base_test;
+#else
 module;
 
-#include "gtest/gtest.h"
 #include "unit_test/gtest_expand.h"
+#include "gtest/gtest.h"
 #include <cassert>
 #include <charconv>
 #include <cstdio>
@@ -15,6 +28,8 @@ import :ut.base_test;
 import :infinity_exception;
 import :third_party;
 import :stl;
+#endif
+
 import data_type;
 
 using namespace infinity;

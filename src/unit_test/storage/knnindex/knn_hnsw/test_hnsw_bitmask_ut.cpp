@@ -12,6 +12,11 @@
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
 
+#ifdef CI
+#include "gtest/gtest.h"
+import infinity_core;
+import base_test;
+#else
 module;
 
 #include "gtest/gtest.h"
@@ -28,6 +33,7 @@ import :dist_func_ip;
 import :hnsw_alg;
 import :knn_filter;
 import :hnsw_common;
+#endif
 
 using namespace infinity;
 

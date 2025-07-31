@@ -12,13 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#ifdef CI
+#include "unit_test/gtest_expand.h"
+#include "gtest/gtest.h"
+import infinity_core;
+import base_test;
+#else
 module;
 
-#include "gtest/gtest.h"
 #include "unit_test/gtest_expand.h"
+#include "gtest/gtest.h"
 
 module infinity_core:ut.bigint_cast;
 
+import :ut.base_test;
 import :infinity_exception;
 import :third_party;
 import :logger;
@@ -36,8 +43,8 @@ import :cast_table;
 import :column_vector;
 import :integer_cast;
 import :bound_cast_func;
+#endif
 
-import :ut.base_test;
 import global_resource_usage;
 import internal_types;
 import logical_type;
@@ -395,7 +402,8 @@ TEST_F(BigIntCastTest, bigint_cast1) {
         col_target->Initialize();
 
         CastParameters cast_parameters;
-        EXPECT_THROW_WITHOUT_STACKTRACE(big2decimal_ptr.function(col_source, col_target, DEFAULT_VECTOR_SIZE, cast_parameters), UnrecoverableException);
+        EXPECT_THROW_WITHOUT_STACKTRACE(big2decimal_ptr.function(col_source, col_target, DEFAULT_VECTOR_SIZE, cast_parameters),
+                                        UnrecoverableException);
     }
 
     // cast bigint column vector to Varchar vector

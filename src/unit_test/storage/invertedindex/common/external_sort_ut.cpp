@@ -12,10 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#ifdef CI
+#include "gtest/gtest.h"
+#include <cassert>
+import infinity_core;
+import base_test;
+#else
 module;
 
-#include <cassert>
 #include "gtest/gtest.h"
+#include <cassert>
 
 module infinity_core:ut.external_sort;
 
@@ -23,6 +29,7 @@ import :ut.base_test;
 import :stl;
 import :third_party;
 import :external_sort_merger;
+#endif
 
 using namespace infinity;
 

@@ -12,14 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#ifdef CI
+#include "gtest/gtest.h"
+import infinity_core;
+import base_test;
+#else
 module;
 
 #include "gtest/gtest.h"
 
 module infinity_core:ut.day_functions;
 
-import :stl;
 import :ut.base_test;
+import :stl;
 import :infinity_exception;
 import :infinity_context;
 import :new_catalog;
@@ -32,10 +37,6 @@ import :column_vector;
 import :data_block;
 import :function_set;
 import :function;
-import global_resource_usage;
-import data_type;
-import internal_types;
-import logical_type;
 import :scalar_function;
 import :scalar_function_set;
 import :day;
@@ -43,6 +44,12 @@ import :third_party;
 import :config;
 import :status;
 import :kv_store;
+#endif
+
+import global_resource_usage;
+import data_type;
+import internal_types;
+import logical_type;
 
 using namespace infinity;
 

@@ -12,27 +12,32 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#ifdef CI
+#include "unit_test/gtest_expand.h"
+#include "gtest/gtest.h"
+import infinity_core;
+import base_test;
+import sql_runner;
+#else
 module;
+
+#include "unit_test/gtest_expand.h"
+#include "gtest/gtest.h"
 
 module infinity_core:ut.logical_planner;
 
-#if 0
-
-#include "gtest/gtest.h"
-#include "unit_test/gtest_expand.h"
-
 import :ut.base_test;
-
-import :infinity_exception
-
-import global_resource_usage;
+import :ut.sql_runner;
+import :infinity_exception;
 import :third_party;
-
 import :logger;
 import :stl;
 import :infinity_context;
-import :ut.sql_runner;
+#endif
 
+import global_resource_usage;
+
+#if 0
 class LogicalPlannerTest : public BaseTest {};
 
 TEST_F(LogicalPlannerTest, test1) {
@@ -110,16 +115,8 @@ TEST_F(LogicalPlannerTest, test1) {
         SQLRunner::Run(sql_text, true);
     }
 #endif
-//    {
-//        // Only check the ast.
-//        const String sql_text = "(SELECT * FROM students INTERSECT SELECT * FROM students_2) UNION SELECT * FROM students_3 ORDER BY grade ASC;";
-//        SQLRunner::Run(sql_text, true);
-//    }
 
-//    SQLRunner::Run("WITH cte AS (SELECT 42 AS i), cte2 AS (SELECT i*100 AS x FROM cte) SELECT * FROM cte2;");
 
-//    BuiltinFunctions builtin_functions(catalog_ptr);
-//    builtin_functions.Init();
 }
 
 #endif

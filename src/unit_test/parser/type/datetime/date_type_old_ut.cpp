@@ -12,16 +12,22 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#ifdef CI
+#include "unit_test/gtest_expand.h"
+#include "gtest/gtest.h"
+import infinity_core;
+import base_test;
+#else
 module;
 
-#include "gtest/gtest.h"
 #include "unit_test/gtest_expand.h"
+#include "gtest/gtest.h"
 
 module infinity_core:ut.date_type_old;
 
-// import :core;
-
 import :ut.base_test;
+#endif
+
 import global_resource_usage;
 import internal_types;
 import parser_assert;
@@ -29,7 +35,6 @@ import parser_assert;
 using namespace infinity;
 class DateTypeOldTest : public BaseTest {};
 
-//
 TEST_F(DateTypeOldTest, test1) {
     using namespace infinity;
 

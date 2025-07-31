@@ -1,3 +1,8 @@
+#ifdef CI
+#include "gtest/gtest.h"
+import infinity_core;
+import base_test;
+#else
 module;
 
 #include "gtest/gtest.h"
@@ -8,6 +13,7 @@ import :ut.base_test;
 import :stl;
 import :obj_stat_accessor;
 import :obj_status;
+#endif
 
 using namespace infinity;
 

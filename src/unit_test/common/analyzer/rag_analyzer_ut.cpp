@@ -12,6 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#ifdef CI
+#include "gtest/gtest.h"
+#include <filesystem>
+#include <vector>
+import infinity_core;
+import base_test;
+#else
 module;
 
 #include "gtest/gtest.h"
@@ -20,6 +27,7 @@ module;
 
 module infinity_core:ut.rag_analyzer;
 
+import :ut.base_test;
 import :stl;
 import :term;
 import :analyzer;
@@ -27,8 +35,7 @@ import :rag_analyzer;
 import :darts_trie;
 import :darts;
 import :lemmatizer;
-
-import :ut.base_test;
+#endif
 
 using namespace infinity;
 

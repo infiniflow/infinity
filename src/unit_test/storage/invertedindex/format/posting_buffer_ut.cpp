@@ -1,3 +1,9 @@
+
+#ifdef CI
+#include "gtest/gtest.h"
+import infinity_core;
+import base_test;
+#else
 module;
 
 #include "gtest/gtest.h"
@@ -9,6 +15,7 @@ import :stl;
 import :index_defines;
 import :posting_field;
 import :posting_buffer;
+#endif
 
 using namespace infinity;
 
@@ -203,7 +210,6 @@ TEST_F(PostingBufferTest, test7) {
 TEST_F(PostingBufferTest, test8) {
     using namespace infinity;
 
-// TODO some type order might fail when using memory pool
 #define NUMBER_TYPE_HELPER_FOR_TEST(macro)                                                                                                           \
     macro(u32);                                                                                                                                      \
     macro(u32);                                                                                                                                      \

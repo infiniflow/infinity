@@ -12,12 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#ifdef CI
+#include "common/simd/simd_common_intrin_include.h"
+#include "gtest/gtest.h"
+#include <cstdlib>
+import infinity_core;
+import base_test;
+#else
 module;
 
-#include <cstdlib>
-
-#include "gtest/gtest.h"
 #include "common/simd/simd_common_intrin_include.h"
+#include "gtest/gtest.h"
+#include <cstdlib>
 
 module infinity_core:ut.emvb_search_test_simd;
 
@@ -25,6 +31,7 @@ import :ut.base_test;
 import :stl;
 import :emvb_simd_funcs;
 import :simd_common_tools;
+#endif
 
 using namespace infinity;
 

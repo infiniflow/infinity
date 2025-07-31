@@ -12,10 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#ifdef CI
+#include "gtest/gtest.h"
+#include <future>
+import infinity_core;
+import base_test;
+#else
 module;
 
-#include <future>
 #include "gtest/gtest.h"
+#include <future>
 
 module infinity_core:ut.buffer_manager;
 
@@ -26,7 +32,6 @@ import :buffer_obj;
 import :data_file_worker;
 import :var_file_worker;
 import :var_buffer;
-import compilation_config;
 import :third_party;
 import :buffer_handle;
 import :infinity_context;
@@ -37,6 +42,9 @@ import :infinity_exception;
 import :persistence_manager;
 import :default_values;
 import :kv_store;
+#endif
+
+import compilation_config;
 
 using namespace infinity;
 

@@ -12,6 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#ifdef CI
+#include "gtest/gtest.h"
+#include <cstdio>
+#include <random>
+import infinity_core;
+import base_test;
+#else
 module;
 
 #include "gtest/gtest.h"
@@ -20,17 +27,12 @@ module;
 
 module infinity_core:ut.test_lsg_build;
 
-import :stl;
 import :ut.base_test;
+import :stl;
 import :hnsw_lsg_builder;
 import :index_hnsw;
-import column_def;
-import embedding_info;
-import data_type;
 import :hnsw_common;
-import logical_type;
 import :index_base;
-import internal_types;
 #ifdef INDEX_HANDLER
 import :hnsw_handler;
 #else
@@ -38,6 +40,13 @@ import :abstract_hnsw;
 #endif
 import :infinity_exception;
 import :hnsw_alg;
+#endif
+
+import column_def;
+import embedding_info;
+import data_type;
+import logical_type;
+import internal_types;
 
 using namespace infinity;
 

@@ -13,23 +13,24 @@
 // limitations under the License.
 
 #ifdef CI
+#include "gtest/gtest.h"
+#include <filesystem>
 import infinity_core;
+import base_test;
 #else
 module;
 
-#include <filesystem>
 #include "gtest/gtest.h"
+#include <filesystem>
 
 module infinity_core:ut.chinese_analyzer;
 
+import :ut.base_test;
 import :stl;
 import :term;
 import :analyzer;
 import :chinese_analyzer;
-// import :core;
 #endif
-
-import :ut.base_test;
 
 using namespace infinity;
 
