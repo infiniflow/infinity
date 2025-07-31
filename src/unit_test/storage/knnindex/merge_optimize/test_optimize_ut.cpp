@@ -61,7 +61,7 @@ import :new_txn;
 #ifdef INDEX_HANDLER
 import :hnsw_handler;
 #else
-import abstract_hnsw;
+import :abstract_hnsw;
 #endif
 import :buffer_obj;
 

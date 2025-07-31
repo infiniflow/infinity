@@ -12,21 +12,30 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#ifndef CI
 module;
-
-#include "gtest/gtest.h"
 
 #include <filesystem>
 #include <stdlib.h>
 #include <sys/stat.h>
 #include <type_traits>
 #include <unistd.h>
+#include "gtest/gtest.h"
 
 export module infinity_core:ut.base_test;
 
 import :stl;
 import :infinity_context;
 import :infinity_exception;
+#else
+#include <filesystem>
+#include <stdlib.h>
+#include <sys/stat.h>
+#include <type_traits>
+#include <unistd.h>
+#include "gtest/gtest.h"
+export module base_test;
+#endif
 
 import global_resource_usage;
 
