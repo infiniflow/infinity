@@ -42,8 +42,6 @@ public:
 
     ~TableIndexMeeta();
 
-    KVInstance &kv_instance() const { return kv_instance_; }
-
     TableMeeta &table_meta() const { return table_meta_; }
 
     const String &index_id_str() const { return index_id_str_; }
@@ -86,7 +84,6 @@ public:
 private:
     mutable std::mutex mtx_;
 
-    KVInstance &kv_instance_;
     TableMeeta &table_meta_;
     String index_id_str_;
 
