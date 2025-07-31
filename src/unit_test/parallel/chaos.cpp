@@ -289,7 +289,7 @@ void Update(const String &db_name, const String &table_name) {
     update_expr1->value = value1;
 
     auto *value2 = new ConstantExpr(LiteralType::kString);
-    value2->str_value_ = const_cast<char *>("infinity");
+    value2->str_value_ = strdup("infinity");
     UpdateExpr *update_expr2 = new UpdateExpr();
     update_expr2->column_name = "body";
     update_expr2->value = value2;
@@ -326,7 +326,7 @@ void ChaosTestExecution(const String &db_name, const String &table_name) {
                 VectorSearch(db_name, table_name);
                 break;
             case 2:
-                // Update(db_name, table_name);
+                Update(db_name, table_name);
                 break;
             default:
                 FullTextSearch(db_name, table_name);
@@ -420,7 +420,6 @@ TEST_P(ParallelTest, ChaosTest) {
     }
 
     RunChaosTestInParallel("default_db", "chaos_test");
-    // Update(db_name, table_name);
 
     {
         SharedPtr<Infinity> infinity = Infinity::LocalConnect();

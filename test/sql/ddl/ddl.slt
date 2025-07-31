@@ -11,16 +11,13 @@ CREATE TABLE ddl2 (id BIGINT PRIMARY KEY, name VARCHAR, age INTEGER);
 statement ok
 CREATE TABLE ddl3 (i INTEGER);
 
-# not supported
-#statement ok
-#INSERT INTO ddl3 VALUES (42);
+statement ok
+INSERT INTO ddl3 VALUES (42);
 
-# not supported
-#query I
-#SELECT COUNT(*) FROM ddl3;
-#----
-#1
-
+query I
+SELECT COUNT(*) FROM ddl3;
+----
+1
 
 statement error
 CREATE TABLE ddl1 (i INTEGER);
