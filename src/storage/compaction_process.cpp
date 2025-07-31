@@ -44,6 +44,7 @@ import db_meeta;
 import segment_meta;
 import bg_task;
 import base_txn_store;
+import kv_store;
 
 namespace infinity {
 
@@ -148,7 +149,7 @@ void CompactionProcessor::NewDoCompact() {
             }
         });
 
-        Optional<DBMeeta> db_meta;
+        SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         status = new_txn_shared->GetTableMeta(db_name, table_name, db_meta, table_meta);
         if (!status.ok()) {
@@ -186,9 +187,13 @@ void CompactionProcessor::NewDoCompact() {
 
         auto compaction_alg = NewCompactionAlg::GetInstance();
 
+        TxnTimeStamp begin_ts = new_txn_shared->BeginTS();
+        TxnTimeStamp commit_ts = new_txn_shared->CommitTS();
+        KVInstance *kv_instance = new_txn_shared->kv_instance();
+
         for (SegmentID segment_id : segment_ids) {
             SegmentMeta segment_meta(segment_id, *table_meta);
-            auto [segment_row_cnt, segment_status] = segment_meta.GetRowCnt1();
+            auto [segment_row_cnt, segment_status] = segment_meta.GetRowCnt1(kv_instance, begin_ts, commit_ts);
             if (!segment_status.ok()) {
                 UnrecoverableError(segment_status.message());
             }
@@ -220,7 +225,7 @@ Status CompactionProcessor::NewManualCompact(const String &db_name, const String
     auto *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
     auto *new_txn = new_txn_mgr->BeginTxn(MakeUnique<String>(fmt::format("compact table {}.{}", db_name, table_name)), TransactionType::kNormal);
 
-    Optional<DBMeeta> db_meta;
+    SharedPtr<DBMeeta> db_meta;
     Optional<TableMeeta> table_meta;
     Status status = new_txn->GetTableMeta(db_name, table_name, db_meta, table_meta);
     if (!status.ok()) {

@@ -51,6 +51,7 @@ import block_meta;
 import column_meta;
 import new_catalog;
 import roaring_bitmap;
+import kv_store;
 
 namespace infinity {
 
@@ -275,6 +276,7 @@ SizeT PhysicalExport::ExportToFileInner(QueryContext *query_context,
     NewTxn *new_txn = query_context->GetNewTxn();
     TxnTimeStamp begin_ts = new_txn->BeginTS();
     TxnTimeStamp commit_ts = new_txn->CommitTS();
+    KVInstance *kv_instance = new_txn->kv_instance();
 
     const Map<SegmentID, NewSegmentSnapshot> &segment_block_index_ref = block_index_->new_segment_block_index_;
     LOG_DEBUG(fmt::format("Going to export segment count: {}", segment_block_index_ref.size()));
@@ -288,7 +290,7 @@ SizeT PhysicalExport::ExportToFileInner(QueryContext *query_context,
             BlockMeta *block_meta = segment_snapshot.block_map()[block_idx].get();
             Vector<ColumnVector> column_vectors;
             column_vectors.resize(select_column_count);
-            auto [block_row_count, status] = block_meta->GetRowCnt1();
+            auto [block_row_count, status] = block_meta->GetRowCnt1(kv_instance, begin_ts, commit_ts);
             if (!status.ok()) {
                 UnrecoverableError(status.message());
             }
@@ -430,6 +432,8 @@ SizeT PhysicalExport::ExportToFVECS(QueryContext *query_context, ExportOperatorS
     NewTxn *new_txn = query_context->GetNewTxn();
     TxnTimeStamp begin_ts = new_txn->BeginTS();
     TxnTimeStamp commit_ts = new_txn->CommitTS();
+    KVInstance *kv_instance = new_txn->kv_instance();
+
     Map<SegmentID, NewSegmentSnapshot> &new_segment_block_index_ref = block_index_->new_segment_block_index_;
     LOG_DEBUG(fmt::format("Going to export segment count: {}", new_segment_block_index_ref.size()));
     for (auto &[segment_id, segment_snapshot] : new_segment_block_index_ref) {
@@ -439,7 +443,7 @@ SizeT PhysicalExport::ExportToFVECS(QueryContext *query_context, ExportOperatorS
             LOG_DEBUG(fmt::format("Export block_idx: {}", block_idx));
             BlockMeta *block_meta = segment_snapshot.block_map()[block_idx].get();
 
-            auto [block_row_count, status] = block_meta->GetRowCnt1();
+            auto [block_row_count, status] = block_meta->GetRowCnt1(kv_instance, begin_ts, commit_ts);
             if (!status.ok()) {
                 UnrecoverableError(status.message());
             }
@@ -592,6 +596,7 @@ SizeT PhysicalExport::ExportToPARQUET(QueryContext *query_context, ExportOperato
     NewTxn *new_txn = query_context->GetNewTxn();
     TxnTimeStamp begin_ts = new_txn->BeginTS();
     TxnTimeStamp commit_ts = new_txn->CommitTS();
+    KVInstance *kv_instance = new_txn->kv_instance();
 
     for (auto &[segment_id, segment_snapshot] : segment_block_index_ref) {
         SizeT block_count = segment_snapshot.block_map().size();
@@ -599,7 +604,7 @@ SizeT PhysicalExport::ExportToPARQUET(QueryContext *query_context, ExportOperato
         for (SizeT block_idx = 0; block_idx < block_count; ++block_idx) {
             LOG_DEBUG(fmt::format("Export block_idx: {}", block_idx));
             BlockMeta *block_meta = segment_snapshot.block_map()[block_idx].get();
-            auto [block_row_count, status] = block_meta->GetRowCnt1();
+            auto [block_row_count, status] = block_meta->GetRowCnt1(kv_instance, begin_ts, commit_ts);
             if (!status.ok()) {
                 RecoverableError(status);
             }

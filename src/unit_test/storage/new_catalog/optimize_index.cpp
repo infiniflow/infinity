@@ -190,7 +190,7 @@ TEST_P(TestTxnOptimizeIndex, optimize_index_rollback) {
     {
         auto check_opt_index = [this](const Vector<ChunkID> &my_chunk_ids) { // check optimize index
             auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check"), TransactionType::kNormal);
-            Optional<DBMeeta> db_meta;
+            SharedPtr<DBMeeta> db_meta;
             Optional<TableMeeta> table_meta;
             Optional<TableIndexMeeta> table_index_meta;
             String table_key;
@@ -208,14 +208,14 @@ TEST_P(TestTxnOptimizeIndex, optimize_index_rollback) {
             SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta);
 
             {
-                auto [chunk_ids, status] = segment_index_meta.GetChunkIDs1();
+                auto [chunk_ids, status] = segment_index_meta.GetChunkIDs1(txn->kv_instance());
                 EXPECT_TRUE(status.ok());
                 EXPECT_EQ(*chunk_ids, my_chunk_ids);
             }
             for (const auto chunk_id : my_chunk_ids) {
                 ChunkIndexMeta chunk_index_meta(chunk_id, segment_index_meta);
                 BufferObj *buffer_obj = nullptr;
-                status = chunk_index_meta.GetIndexBuffer(buffer_obj);
+                status = chunk_index_meta.GetIndexBuffer(txn->kv_instance(), buffer_obj);
                 EXPECT_TRUE(status.ok());
             }
             status = new_txn_mgr->CommitTxn(txn);
@@ -683,7 +683,7 @@ TEST_P(TestTxnOptimizeIndex, optimize_index_and_optimize_index) {
     auto CheckTable = [&] {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check table"), TransactionType::kNormal);
 
-        Optional<DBMeeta> db_meta;
+        SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         Status status = txn->GetTableMeta(*db_name_, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
@@ -704,7 +704,7 @@ TEST_P(TestTxnOptimizeIndex, optimize_index_and_optimize_index) {
 
         SegmentIndexMeta segment_index_meta((*index_segment_ids_ptr)[0], *table_index_meta);
         Vector<ChunkID> *chunk_ids_ptr = nullptr;
-        std::tie(chunk_ids_ptr, status) = segment_index_meta.GetChunkIDs1();
+        std::tie(chunk_ids_ptr, status) = segment_index_meta.GetChunkIDs1(txn->kv_instance());
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(*chunk_ids_ptr, Vector<ChunkID>({2}));
     };
@@ -1695,7 +1695,7 @@ TEST_P(TestTxnOptimizeIndex, optimize_index_and_compact_table) {
     auto CheckTable = [&](Vector<ColumnID> column_idxes) {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check table"), TransactionType::kNormal);
 
-        Optional<DBMeeta> db_meta;
+        SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         Status status = txn->GetTableMeta(*db_name_, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());

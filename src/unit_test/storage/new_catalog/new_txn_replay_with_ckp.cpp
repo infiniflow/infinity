@@ -279,7 +279,7 @@ TEST_P(TxnReplayExceptionTest, test_replay_import) {
         TxnTimeStamp begin_ts = txn->BeginTS();
         TxnTimeStamp commit_ts = txn->CommitTS();
 
-        Optional<DBMeeta> db_meta;
+        SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
@@ -333,7 +333,7 @@ TEST_P(TxnReplayExceptionTest, test_replay_import) {
         };
 
         auto check_segment = [&](SegmentMeta &segment_meta) {
-            auto [block_ids, status] = segment_meta.GetBlockIDs1();
+            auto [block_ids, status] = segment_meta.GetBlockIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*block_ids, Vector<BlockID>({0, 1}));
 
@@ -350,31 +350,31 @@ TEST_P(TxnReplayExceptionTest, test_replay_import) {
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
 
-        auto check_chunk_index = [&](ChunkIndexMeta &chunk_index_meta) {
+        auto check_chunk_index = [&](ChunkIndexMeta &chunk_index_meta, NewTxn* txn) {
             SegmentID segment_id = chunk_index_meta.segment_index_meta().segment_id();
 
             ChunkIndexMetaInfo *chunk_info_ptr = nullptr;
-            Status status = chunk_index_meta.GetChunkInfo(chunk_info_ptr);
+            Status status = chunk_index_meta.GetChunkInfo(txn->kv_instance(), chunk_info_ptr);
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(chunk_info_ptr->base_row_id_, RowID(segment_id, 0));
             EXPECT_EQ(chunk_info_ptr->row_cnt_, block_row_cnt * 2);
         };
 
-        auto check_segment_index = [&](SegmentIndexMeta &segment_index_meta) {
-            auto [chunk_ids_ptr, status] = segment_index_meta.GetChunkIDs1();
+        auto check_segment_index = [&](SegmentIndexMeta &segment_index_meta, NewTxn* txn) {
+            auto [chunk_ids_ptr, status] = segment_index_meta.GetChunkIDs1(txn->kv_instance());
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*chunk_ids_ptr, Vector<ChunkID>({0}));
 
             for (ChunkID chunk_id : *chunk_ids_ptr) {
                 ChunkIndexMeta chunk_index_meta(chunk_id, segment_index_meta);
-                check_chunk_index(chunk_index_meta);
+                check_chunk_index(chunk_index_meta, txn);
             }
         };
 
         auto check_index = [&](const String &index_name) {
             auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check index"), TransactionType::kNormal);
 
-            Optional<DBMeeta> db_meta;
+            SharedPtr<DBMeeta> db_meta;
             Optional<TableMeeta> table_meta;
             Optional<TableIndexMeeta> table_index_meta;
             String table_key;
@@ -389,7 +389,7 @@ TEST_P(TxnReplayExceptionTest, test_replay_import) {
 
             for (SegmentID segment_id : *segment_ids_ptr) {
                 SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta);
-                check_segment_index(segment_index_meta);
+                check_segment_index(segment_index_meta, txn);
             }
 
             status = new_txn_mgr->CommitTxn(txn);
@@ -480,7 +480,7 @@ TEST_P(TxnReplayExceptionTest, test_replay_compact) {
         TxnTimeStamp begin_ts = txn->BeginTS();
         TxnTimeStamp commit_ts = txn->CommitTS();
 
-        Optional<DBMeeta> db_meta;
+        SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
@@ -490,7 +490,7 @@ TEST_P(TxnReplayExceptionTest, test_replay_compact) {
         EXPECT_EQ(*segment_ids, Vector<SegmentID>({2}));
 
         SegmentMeta segment_meta((*segment_ids)[0], *table_meta);
-        auto [block_ids, block_status] = segment_meta.GetBlockIDs1();
+        auto [block_ids, block_status] = segment_meta.GetBlockIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
         EXPECT_TRUE(block_status.ok());
 
         auto check_block = [&](BlockID block_id, const Value &v1, const Value &v2) {

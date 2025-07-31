@@ -50,6 +50,7 @@ import column_meta;
 import table_meeta;
 import db_meeta;
 import new_catalog;
+import kv_store;
 
 using namespace infinity;
 
@@ -113,7 +114,7 @@ TEST_P(RepeatReplayTest, append) {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("get table"), TransactionType::kRead);
         Status status;
 
-        Optional<DBMeeta> db_meta;
+        SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
@@ -127,7 +128,7 @@ TEST_P(RepeatReplayTest, append) {
         SegmentMeta segment_meta(segment_id, *table_meta);
 
         Vector<BlockID> *block_ids_ptr = nullptr;
-        std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1();
+        std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(*block_ids_ptr, Vector<BlockID>({0}));
 
@@ -139,7 +140,7 @@ TEST_P(RepeatReplayTest, append) {
 
             SizeT row_count = 0;
             // std::tie(row_count, status) = block_meta.GetRowCnt();
-            std::tie(row_count, status) = block_meta.GetRowCnt1();
+            std::tie(row_count, status) = block_meta.GetRowCnt1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(row_count, row_cnt);
 

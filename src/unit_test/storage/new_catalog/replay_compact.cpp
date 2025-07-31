@@ -50,6 +50,7 @@ import index_full_text;
 import statement_common;
 import mem_index;
 import index_base;
+import kv_store;
 
 class TestTxnReplayCompact : public NewReplayTest {
 public:
@@ -128,7 +129,7 @@ TEST_P(TestTxnReplayCompact, test_compact0) {
         TxnTimeStamp begin_ts = txn->BeginTS();
         TxnTimeStamp commit_ts = txn->CommitTS();
 
-        Optional<DBMeeta> db_meta;
+        SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
@@ -138,7 +139,7 @@ TEST_P(TestTxnReplayCompact, test_compact0) {
         EXPECT_EQ(*segment_ids, Vector<SegmentID>({2}));
 
         SegmentMeta segment_meta((*segment_ids)[0], *table_meta);
-        auto [block_ids, block_status] = segment_meta.GetBlockIDs1();
+        auto [block_ids, block_status] = segment_meta.GetBlockIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
         EXPECT_TRUE(block_status.ok());
 
         auto check_block = [&](BlockID block_id, const Value &v1, const Value &v2) {
@@ -251,7 +252,7 @@ TEST_P(TestTxnReplayCompact, test_compact_with_index) {
     auto check_index = [&](const String &index_name) {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check index"), TransactionType::kNormal);
 
-        Optional<DBMeeta> db_meta;
+        SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         Optional<TableIndexMeeta> table_index_meta;
         String table_key;
@@ -271,7 +272,7 @@ TEST_P(TestTxnReplayCompact, test_compact_with_index) {
         ChunkID chunk_id = 0;
         {
             Vector<ChunkID> *chunk_ids_ptr = nullptr;
-            std::tie(chunk_ids_ptr, status) = segment_index_meta.GetChunkIDs1();
+            std::tie(chunk_ids_ptr, status) = segment_index_meta.GetChunkIDs1(txn->kv_instance());
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*chunk_ids_ptr, Vector<ChunkID>({0}));
             chunk_id = (*chunk_ids_ptr)[0];
@@ -279,7 +280,7 @@ TEST_P(TestTxnReplayCompact, test_compact_with_index) {
         ChunkIndexMeta chunk_index_meta(chunk_id, segment_index_meta);
         {
             ChunkIndexMetaInfo *chunk_info_ptr = nullptr;
-            Status status = chunk_index_meta.GetChunkInfo(chunk_info_ptr);
+            Status status = chunk_index_meta.GetChunkInfo(txn->kv_instance(), chunk_info_ptr);
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(chunk_info_ptr->base_row_id_, RowID(segment_id, 0));
             EXPECT_EQ(chunk_info_ptr->row_cnt_, block_row_cnt * 4);

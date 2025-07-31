@@ -38,6 +38,7 @@ import value;
 import logical_type;
 import meta_tree;
 import db_meeta;
+import kv_store;
 
 namespace infinity {
 
@@ -139,7 +140,7 @@ void PhysicalCheck::ExecuteCheckTable(QueryContext *query_context, CheckOperator
     //     schema_name = "default_db";
     // }
 
-    Optional<DBMeeta> db_meta;
+    SharedPtr<DBMeeta> db_meta;
     TxnTimeStamp db_create_ts;
     Status status = new_txn->GetDBMeta(schema_name, db_meta, db_create_ts);
 
@@ -173,7 +174,7 @@ void PhysicalCheck::ExecuteCheckTable(QueryContext *query_context, CheckOperator
     String table_id_str;
     String table_key;
     TxnTimeStamp create_table_ts;
-    status = db_meta->GetTableID(table_name, table_key, table_id_str, create_table_ts);
+    status = db_meta->GetTableID(new_txn->kv_instance(), new_txn->BeginTS(), table_name, table_key, table_id_str, create_table_ts);
 
     if (!status.ok()) {
         output_names_->reserve(1);

@@ -18,6 +18,7 @@ export module block_index;
 
 import stl;
 import global_block_id;
+import default_values;
 
 namespace infinity {
 
@@ -28,15 +29,21 @@ class BlockMeta;
 class NewTxn;
 class TableIndexMeeta;
 class SegmentIndexMeta;
+class KVInstance;
 
 export struct NewSegmentSnapshot {
 public:
+    NewSegmentSnapshot(KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts);
+
     SegmentOffset segment_offset() const;
     const Vector<UniquePtr<BlockMeta>> &block_map() const;
     UniquePtr<SegmentMeta> segment_meta_;
 
 private:
     mutable Vector<UniquePtr<BlockMeta>> block_map_;
+    KVInstance *kv_instance_{};
+    TxnTimeStamp begin_ts_{};
+    TxnTimeStamp commit_ts_{UNCOMMIT_TS};
 };
 
 export struct BlockIndex {
@@ -45,7 +52,7 @@ public:
 
     ~BlockIndex();
 
-    void NewInit(UniquePtr<TableMeeta> table_meta);
+    void NewInit(UniquePtr<TableMeeta> table_meta, KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts);
 
     SizeT BlockCount() const;
 

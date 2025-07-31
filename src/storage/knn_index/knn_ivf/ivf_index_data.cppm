@@ -31,12 +31,13 @@ namespace infinity {
 class IndexBase;
 class BufferManager;
 class SegmentMeta;
+class KVInstance;
 
 export class IVFDataAccessorBase {
 public:
-    virtual const_ptr_t GetEmbedding(SizeT offset) = 0;
+    virtual const_ptr_t GetEmbedding(SizeT offset, KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts) = 0;
 
-    virtual Pair<Span<const char>, SizeT> GetMultiVector(SizeT offset) = 0;
+    virtual Pair<Span<const char>, SizeT> GetMultiVector(SizeT offset, KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts) = 0;
 };
 
 export class IVFIndexInChunk : protected IVF_Index_Storage {
@@ -49,9 +50,20 @@ public:
 
     const IVF_Index_Storage *GetIVFIndexStoragePtr() const { return this; }
 
-    void BuildIVFIndex(SegmentMeta &segment_meta, u32 row_count, SharedPtr<ColumnDef> column_def);
+    void BuildIVFIndex(SegmentMeta &segment_meta,
+                       u32 row_count,
+                       SharedPtr<ColumnDef> column_def,
+                       KVInstance *kv_instance,
+                       TxnTimeStamp begin_ts,
+                       TxnTimeStamp commit_ts);
 
-    void BuildIVFIndex(RowID base_rowid, u32 row_count, IVFDataAccessorBase *data_accessor, const SharedPtr<ColumnDef> &column_def);
+    void BuildIVFIndex(RowID base_rowid,
+                       u32 row_count,
+                       IVFDataAccessorBase *data_accessor,
+                       const SharedPtr<ColumnDef> &column_def,
+                       KVInstance *kv_instance,
+                       TxnTimeStamp begin_ts,
+                       TxnTimeStamp commit_ts);
 
     void SaveIndexInner(LocalFileHandle &file_handle) const;
 
@@ -61,7 +73,13 @@ public:
 
 private:
     template <LogicalType column_t, EmbeddingDataType embedding_t>
-    void BuildIVFIndexT(RowID base_rowid, u32 row_count, IVFDataAccessorBase *data_accessor, const SharedPtr<ColumnDef> &column_def);
+    void BuildIVFIndexT(RowID base_rowid,
+                        u32 row_count,
+                        IVFDataAccessorBase *data_accessor,
+                        const SharedPtr<ColumnDef> &column_def,
+                        KVInstance *kv_instance,
+                        TxnTimeStamp begin_ts,
+                        TxnTimeStamp commit_ts);
 };
 
 } // namespace infinity

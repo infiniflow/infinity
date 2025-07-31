@@ -33,11 +33,12 @@ import txn_state;
 import infinity_exception;
 import utility;
 import kv_utility;
+import meta_type;
 
 namespace infinity {
 
 TableIndexMeeta::TableIndexMeeta(String index_id_str, TableMeeta &table_meta)
-    : kv_instance_(*table_meta.kv_instance()), table_meta_(table_meta), index_id_str_(std::move(index_id_str)) {}
+    : BaseMeta(MetaType::kTableIndex), kv_instance_(*table_meta.kv_instance()), table_meta_(table_meta), index_id_str_(std::move(index_id_str)) {}
 
 TableIndexMeeta::~TableIndexMeeta() = default;
 

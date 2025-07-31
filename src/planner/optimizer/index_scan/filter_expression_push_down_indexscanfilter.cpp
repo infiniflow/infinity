@@ -402,6 +402,8 @@ private:
     }
 
     inline UniquePtr<IndexFilterEvaluator> BuildIndexFilterEvaluator(const TreeT &index_filter_tree_node) const {
+        NewTxn *new_txn = query_context_->GetNewTxn();
+        KVInstance *kv_instance = new_txn->kv_instance();
         switch (index_filter_tree_node.info) {
             case Enum::kVarcharSecondaryIndexColumnExprOrAfterCast:
             case Enum::kSecondaryIndexColumnExprOrAfterCast:
@@ -451,7 +453,12 @@ private:
                         case FilterCompareType::kLessEqual:
                         case FilterCompareType::kGreaterEqual: {
                             SharedPtr<TableIndexMeeta> secondary_index = tree_info_.new_candidate_column_index_map_.at(column_id);
-                            return IndexFilterEvaluatorSecondary::Make(function_expression, column_id, secondary_index, compare_type, value);
+                            return IndexFilterEvaluatorSecondary::Make(function_expression,
+                                                                       column_id,
+                                                                       secondary_index,
+                                                                       kv_instance,
+                                                                       compare_type,
+                                                                       value);
                         }
                         case FilterCompareType::kAlwaysTrue: {
                             return MakeUnique<IndexFilterEvaluatorAllTrue>();

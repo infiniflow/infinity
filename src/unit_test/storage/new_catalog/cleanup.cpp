@@ -47,6 +47,7 @@ import chunk_index_meta;
 import buffer_obj;
 import secondary_index_in_mem;
 import embedding_info;
+import kv_store;
 
 using namespace infinity;
 
@@ -273,7 +274,7 @@ TEST_P(TestTxnCleanup, cleanup_with_drop_db) {
     validity_function_ = [this] {
         { // check drop db
             auto txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("get db"), TransactionType::kRead);
-            Optional<DBMeeta> db_meta;
+            SharedPtr<DBMeeta> db_meta;
             TxnTimeStamp db_create_ts;
             Status status = txn->GetDBMeta(*db_name_, db_meta, db_create_ts);
             EXPECT_FALSE(status.ok());
@@ -302,7 +303,7 @@ TEST_P(TestTxnCleanup, cleanup_and_drop_table) {
     validity_function_ = [this] {
         { // check drop table
             auto txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("get table"), TransactionType::kRead);
-            Optional<DBMeeta> db_meta;
+            SharedPtr<DBMeeta> db_meta;
             Optional<TableMeeta> table_meta;
             Status status = txn->GetTableMeta(*db_name_, *table_name_, db_meta, table_meta);
             EXPECT_FALSE(status.ok());
@@ -336,7 +337,7 @@ TEST_P(TestTxnCleanup, cleanup_and_add_columns) {
     validity_function_ = [this] {
         { // check clean
             auto txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("get segment"), TransactionType::kRead);
-            Optional<DBMeeta> db_meta;
+            SharedPtr<DBMeeta> db_meta;
             Optional<TableMeeta> table_meta;
             Status status = txn->GetTableMeta(*db_name_, *table_name_, db_meta, table_meta);
             EXPECT_TRUE(status.ok());
@@ -352,7 +353,7 @@ TEST_P(TestTxnCleanup, cleanup_and_add_columns) {
         }
         { // check add column
             auto txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("get column"), TransactionType::kRead);
-            Optional<DBMeeta> db_meta;
+            SharedPtr<DBMeeta> db_meta;
             Optional<TableMeeta> table_meta;
             String table_key;
             Status status = txn->GetTableMeta(*db_name_, *table_name_, db_meta, table_meta);
@@ -394,7 +395,7 @@ TEST_P(TestTxnCleanup, cleanup_and_drop_columns) {
     validity_function_ = [this] {
         { // check clean
             auto txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("get segment"), TransactionType::kRead);
-            Optional<DBMeeta> db_meta;
+            SharedPtr<DBMeeta> db_meta;
             Optional<TableMeeta> table_meta;
             Status status = txn->GetTableMeta(*db_name_, *table_name_, db_meta, table_meta);
             EXPECT_TRUE(status.ok());
@@ -409,7 +410,7 @@ TEST_P(TestTxnCleanup, cleanup_and_drop_columns) {
         }
         { // check drop column
             auto txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("drop column"), TransactionType::kRead);
-            Optional<DBMeeta> db_meta;
+            SharedPtr<DBMeeta> db_meta;
             Optional<TableMeeta> table_meta;
             String table_key;
             Status status = txn->GetTableMeta(*db_name_, *table_name_, db_meta, table_meta);
@@ -449,7 +450,7 @@ TEST_P(TestTxnCleanup, cleanup_and_rename_table) {
     validity_function_ = [&, this] {
         { // check clean
             auto txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("get segment"), TransactionType::kRead);
-            Optional<DBMeeta> db_meta;
+            SharedPtr<DBMeeta> db_meta;
             Optional<TableMeeta> table_meta;
             Status status = txn->GetTableMeta(*db_name_, *new_table_name, db_meta, table_meta);
             EXPECT_TRUE(status.ok());
@@ -464,7 +465,7 @@ TEST_P(TestTxnCleanup, cleanup_and_rename_table) {
         }
         { // check rename table
             auto txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("get table"), TransactionType::kRead);
-            Optional<DBMeeta> db_meta;
+            SharedPtr<DBMeeta> db_meta;
             Optional<TableMeeta> table_meta;
             Status status = txn->GetTableMeta(*db_name_, *new_table_name, db_meta, table_meta);
             EXPECT_TRUE(status.ok());
@@ -494,7 +495,7 @@ TEST_P(TestTxnCleanup, cleanup_and_compact) {
     validity_function_ = [this] {
         { // check clean & compact
             auto txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("get segment"), TransactionType::kRead);
-            Optional<DBMeeta> db_meta;
+            SharedPtr<DBMeeta> db_meta;
             Optional<TableMeeta> table_meta;
             Status status = txn->GetTableMeta(*db_name_, *table_name_, db_meta, table_meta);
             EXPECT_TRUE(status.ok());
@@ -530,7 +531,7 @@ TEST_P(TestTxnCleanup, cleanup_and_drop_index) {
     validity_function_ = [this] {
         { // check clean
             auto txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("get segment"), TransactionType::kRead);
-            Optional<DBMeeta> db_meta;
+            SharedPtr<DBMeeta> db_meta;
             Optional<TableMeeta> table_meta;
             Status status = txn->GetTableMeta(*db_name_, *table_name_, db_meta, table_meta);
             EXPECT_TRUE(status.ok());
@@ -546,7 +547,7 @@ TEST_P(TestTxnCleanup, cleanup_and_drop_index) {
         {
             // check drop index
             auto txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("get index"), TransactionType::kRead);
-            Optional<DBMeeta> db_meta;
+            SharedPtr<DBMeeta> db_meta;
             Optional<TableMeeta> table_meta;
             String table_key;
             Status status = txn->GetTableMeta(*db_name_, *table_name_, db_meta, table_meta);
@@ -608,7 +609,7 @@ TEST_P(TestTxnCleanup, cleanup_and_optimize_index) {
         { // check optimize index
             auto *txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("check"), TransactionType::kNormal);
             SizeT block_row_cnt = 2;
-            Optional<DBMeeta> db_meta;
+            SharedPtr<DBMeeta> db_meta;
             Optional<TableMeeta> table_meta;
             Optional<TableIndexMeeta> table_index_meta;
             String table_key;
@@ -626,7 +627,7 @@ TEST_P(TestTxnCleanup, cleanup_and_optimize_index) {
             SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta);
 
             {
-                auto [chunk_ids, status] = segment_index_meta.GetChunkIDs1();
+                auto [chunk_ids, status] = segment_index_meta.GetChunkIDs1(txn->kv_instance());
                 EXPECT_TRUE(status.ok());
                 EXPECT_EQ(*chunk_ids, Vector<ChunkID>({2}));
             }
@@ -634,14 +635,14 @@ TEST_P(TestTxnCleanup, cleanup_and_optimize_index) {
             ChunkIndexMeta chunk_index_meta(chunk_id, segment_index_meta);
             {
                 ChunkIndexMetaInfo *chunk_info = nullptr;
-                Status status = chunk_index_meta.GetChunkInfo(chunk_info);
+                Status status = chunk_index_meta.GetChunkInfo(txn->kv_instance(), chunk_info);
                 EXPECT_TRUE(status.ok());
                 EXPECT_EQ(chunk_info->row_cnt_, block_row_cnt);
                 EXPECT_EQ(chunk_info->base_row_id_, RowID(0, 0));
             }
 
             BufferObj *buffer_obj = nullptr;
-            status = chunk_index_meta.GetIndexBuffer(buffer_obj);
+            status = chunk_index_meta.GetIndexBuffer(txn->kv_instance(), buffer_obj);
             EXPECT_TRUE(status.ok());
 
             status = new_txn_mgr_->CommitTxn(txn);
@@ -725,7 +726,7 @@ TEST_P(TestTxnCleanup, cleanup_and_append) {
     validity_function_ = [this] {
         { // check clean
             auto txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("get segment"), TransactionType::kRead);
-            Optional<DBMeeta> db_meta;
+            SharedPtr<DBMeeta> db_meta;
             Optional<TableMeeta> table_meta;
             Status status = txn->GetTableMeta(*db_name_, *table_name_, db_meta, table_meta);
             EXPECT_TRUE(status.ok());
@@ -741,7 +742,7 @@ TEST_P(TestTxnCleanup, cleanup_and_append) {
         { // check append
             auto *txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("check"), TransactionType::kNormal);
 
-            Optional<DBMeeta> db_meta;
+            SharedPtr<DBMeeta> db_meta;
             Optional<TableMeeta> table_meta;
             Status status = txn->GetTableMeta(*db_name_, *table_name_, db_meta, table_meta);
             EXPECT_TRUE(status.ok());
@@ -755,18 +756,18 @@ TEST_P(TestTxnCleanup, cleanup_and_append) {
             SegmentMeta segment_meta(segment_id, *table_meta);
 
             SizeT segment_row_cnt = 0;
-            std::tie(segment_row_cnt, status) = segment_meta.GetRowCnt1();
+            std::tie(segment_row_cnt, status) = segment_meta.GetRowCnt1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
             EXPECT_EQ(segment_row_cnt, 1);
 
             Vector<BlockID> *block_ids_ptr = nullptr;
-            std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1();
+            std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*block_ids_ptr, Vector<BlockID>({0}));
 
             BlockID block_id = block_ids_ptr->back();
             BlockMeta block_meta(block_id, segment_meta);
             SizeT block_row_cnt = 0;
-            std::tie(block_row_cnt, status) = block_meta.GetRowCnt1();
+            std::tie(block_row_cnt, status) = block_meta.GetRowCnt1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
             EXPECT_EQ(block_row_cnt, 1);
 
             status = new_txn_mgr_->CommitTxn(txn);
@@ -851,7 +852,7 @@ TEST_P(TestTxnCleanup, cleanup_and_delete) {
     validity_function_ = [this] {
         { // check clean
             auto txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("get segment"), TransactionType::kRead);
-            Optional<DBMeeta> db_meta;
+            SharedPtr<DBMeeta> db_meta;
             Optional<TableMeeta> table_meta;
             Status status = txn->GetTableMeta(*db_name_, *table_name_, db_meta, table_meta);
             EXPECT_TRUE(status.ok());
@@ -874,7 +875,7 @@ TEST_P(TestTxnCleanup, cleanup_and_delete) {
 
             auto *txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("check"), TransactionType::kNormal);
 
-            Optional<DBMeeta> db_meta;
+            SharedPtr<DBMeeta> db_meta;
             Optional<TableMeeta> table_meta;
             status = txn->GetTableMeta(*db_name_, *table_name_, db_meta, table_meta);
             EXPECT_TRUE(status.ok());
@@ -888,18 +889,18 @@ TEST_P(TestTxnCleanup, cleanup_and_delete) {
             SegmentMeta segment_meta(segment_id, *table_meta);
 
             SizeT segment_row_cnt;
-            std::tie(segment_row_cnt, status) = segment_meta.GetRowCnt1();
+            std::tie(segment_row_cnt, status) = segment_meta.GetRowCnt1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
             EXPECT_EQ(segment_row_cnt, 8191);
 
             Vector<BlockID> *block_ids_ptr = nullptr;
-            std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1();
+            std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*block_ids_ptr, Vector<BlockID>({0}));
 
             BlockID block_id = (*block_ids_ptr)[0];
             BlockMeta block_meta(block_id, segment_meta);
             SizeT block_row_cnt;
-            std::tie(block_row_cnt, status) = block_meta.GetRowCnt1();
+            std::tie(block_row_cnt, status) = block_meta.GetRowCnt1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
             EXPECT_EQ(block_row_cnt, 8191);
 
             status = new_txn_mgr_->CommitTxn(txn);
@@ -987,7 +988,7 @@ TEST_P(TestTxnCleanup, cleanup_and_update) {
     validity_function_ = [this] {
         { // check clean
             auto txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("get segment"), TransactionType::kRead);
-            Optional<DBMeeta> db_meta;
+            SharedPtr<DBMeeta> db_meta;
             Optional<TableMeeta> table_meta;
             Status status = txn->GetTableMeta(*db_name_, *table_name_, db_meta, table_meta);
             EXPECT_TRUE(status.ok());
@@ -1011,7 +1012,7 @@ TEST_P(TestTxnCleanup, cleanup_and_update) {
 
             auto *txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("check"), TransactionType::kNormal);
 
-            Optional<DBMeeta> db_meta;
+            SharedPtr<DBMeeta> db_meta;
             Optional<TableMeeta> table_meta;
             status = txn->GetTableMeta(*db_name_, *table_name_, db_meta, table_meta);
             EXPECT_TRUE(status.ok());
@@ -1025,18 +1026,18 @@ TEST_P(TestTxnCleanup, cleanup_and_update) {
             SegmentMeta segment_meta(segment_id, *table_meta);
 
             SizeT segment_row_cnt = 0;
-            std::tie(segment_row_cnt, status) = segment_meta.GetRowCnt1();
+            std::tie(segment_row_cnt, status) = segment_meta.GetRowCnt1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
             EXPECT_EQ(segment_row_cnt, 8192);
 
             Vector<BlockID> *block_ids_ptr = nullptr;
-            std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1();
+            std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*block_ids_ptr, Vector<BlockID>({0}));
 
             BlockID block_id = (*block_ids_ptr)[0];
             BlockMeta block_meta(block_id, segment_meta);
             SizeT block_row_cnt = 0;
-            std::tie(block_row_cnt, status) = block_meta.GetRowCnt1();
+            std::tie(block_row_cnt, status) = block_meta.GetRowCnt1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
             EXPECT_EQ(block_row_cnt, 8192);
 
             status = new_txn_mgr_->CommitTxn(txn);
@@ -1120,7 +1121,7 @@ TEST_P(TestTxnCleanup, cleanup_and_dump_index) {
     validity_function_ = [&, this] {
         { // check clean
             auto txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("get segment"), TransactionType::kRead);
-            Optional<DBMeeta> db_meta;
+            SharedPtr<DBMeeta> db_meta;
             Optional<TableMeeta> table_meta;
             Status status = txn->GetTableMeta(*db_name_, *table_name_, db_meta, table_meta);
             EXPECT_TRUE(status.ok());
@@ -1136,7 +1137,7 @@ TEST_P(TestTxnCleanup, cleanup_and_dump_index) {
         { // check dump index
             auto *txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("check"), TransactionType::kNormal);
             SizeT block_row_cnt = 8192;
-            Optional<DBMeeta> db_meta;
+            SharedPtr<DBMeeta> db_meta;
             Optional<TableMeeta> table_meta;
             Optional<TableIndexMeeta> table_index_meta;
             String table_key;
@@ -1158,7 +1159,7 @@ TEST_P(TestTxnCleanup, cleanup_and_dump_index) {
             ASSERT_EQ(mem_index->GetSecondaryIndex(), nullptr);
 
             {
-                auto [chunk_ids, status] = segment_index_meta.GetChunkIDs1();
+                auto [chunk_ids, status] = segment_index_meta.GetChunkIDs1(txn->kv_instance());
                 EXPECT_TRUE(status.ok());
                 EXPECT_EQ(*chunk_ids, Vector<ChunkID>({0}));
             }
@@ -1166,14 +1167,14 @@ TEST_P(TestTxnCleanup, cleanup_and_dump_index) {
             ChunkIndexMeta chunk_index_meta(chunk_id, segment_index_meta);
             {
                 ChunkIndexMetaInfo *chunk_info = nullptr;
-                Status status = chunk_index_meta.GetChunkInfo(chunk_info);
+                Status status = chunk_index_meta.GetChunkInfo(txn->kv_instance(), chunk_info);
                 EXPECT_TRUE(status.ok());
                 EXPECT_EQ(chunk_info->row_cnt_, block_row_cnt);
                 EXPECT_EQ(chunk_info->base_row_id_, RowID(2, 0));
             }
 
             BufferObj *buffer_obj = nullptr;
-            status = chunk_index_meta.GetIndexBuffer(buffer_obj);
+            status = chunk_index_meta.GetIndexBuffer(txn->kv_instance(), buffer_obj);
             EXPECT_TRUE(status.ok());
 
             status = new_txn_mgr_->CommitTxn(txn);

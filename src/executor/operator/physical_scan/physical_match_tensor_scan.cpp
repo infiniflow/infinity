@@ -83,6 +83,7 @@ import new_catalog;
 import index_base;
 import column_meta;
 import mem_index;
+import kv_store;
 
 namespace infinity {
 
@@ -310,8 +311,9 @@ void PhysicalMatchTensorScan::ExecuteInner(QueryContext *query_context, MatchTen
 
     Status status;
     NewTxn *new_txn = query_context->GetNewTxn();
-    const TxnTimeStamp begin_ts = new_txn->BeginTS();
-    const TxnTimeStamp commit_ts = new_txn->CommitTS();
+    TxnTimeStamp begin_ts = new_txn->BeginTS();
+    TxnTimeStamp commit_ts = new_txn->CommitTS();
+    KVInstance *kv_instance = new_txn->kv_instance();
     if (!common_query_filter_->TryFinishBuild()) {
         // not ready, abort and wait for next time
         return;
@@ -336,7 +338,7 @@ void PhysicalMatchTensorScan::ExecuteInner(QueryContext *query_context, MatchTen
         } else {
             // segment_entry = iter->second.segment_entry_;
             segment_meta = iter->second.segment_meta_.get();
-            std::tie(segment_row_count, status) = segment_meta->GetRowCnt1();
+            std::tie(segment_row_count, status) = segment_meta->GetRowCnt1(kv_instance, begin_ts, commit_ts);
             if (!status.ok()) {
                 String error_message = fmt::format("GetRowCnt1 failed: {}", status.message());
                 UnrecoverableError(error_message);
@@ -365,7 +367,7 @@ void PhysicalMatchTensorScan::ExecuteInner(QueryContext *query_context, MatchTen
             LOG_TRACE(
                 fmt::format("MatchTensorScan: index {}/{} not skipped after common_query_filter", task_job_index, segment_index_metas_->size()));
             // TODO: now only have EMVB index
-            auto [chunk_ids_ptr, status] = segment_index_meta.GetChunkIDs1();
+            auto [chunk_ids_ptr, status] = segment_index_meta.GetChunkIDs1(kv_instance);
             if (!status.ok()) {
                 UnrecoverableError(status.message());
             }
@@ -435,7 +437,7 @@ void PhysicalMatchTensorScan::ExecuteInner(QueryContext *query_context, MatchTen
             for (ChunkID chunk_id : *chunk_ids_ptr) {
                 ChunkIndexMeta chunk_index_meta(chunk_id, segment_index_meta);
                 BufferObj *index_buffer = nullptr;
-                Status status = chunk_index_meta.GetIndexBuffer(index_buffer);
+                Status status = chunk_index_meta.GetIndexBuffer(kv_instance, index_buffer);
                 if (!status.ok()) {
                     UnrecoverableError(status.message());
                 }
@@ -954,14 +956,20 @@ struct RerankerParameterPack {
     const ColumnID column_id_;
     const BlockIndex *block_index_;
     const MatchTensorExpression &match_tensor_expr_;
+    KVInstance *kv_instance_;
+    TxnTimeStamp begin_ts_;
+    TxnTimeStamp commit_ts_;
     RerankerParameterPack(Vector<MatchTensorRerankDoc> &rerank_docs,
                           BufferManager *buffer_mgr,
                           const DataType *column_data_type,
                           const ColumnID column_id,
                           const BlockIndex *block_index,
-                          const MatchTensorExpression &match_tensor_expr)
+                          const MatchTensorExpression &match_tensor_expr,
+                          KVInstance *kv_instance,
+                          TxnTimeStamp begin_ts,
+                          TxnTimeStamp commit_ts)
         : rerank_docs_(rerank_docs), buffer_mgr_(buffer_mgr), column_data_type_(column_data_type), column_id_(column_id), block_index_(block_index),
-          match_tensor_expr_(match_tensor_expr) {}
+          match_tensor_expr_(match_tensor_expr), kv_instance_(kv_instance), begin_ts_(begin_ts), commit_ts_(commit_ts) {}
 };
 
 template <typename CalcutateScoreOfRowOp>
@@ -971,7 +979,10 @@ void GetRerankerScore(Vector<MatchTensorRerankDoc> &rerank_docs,
                       const BlockIndex *block_index,
                       const char *query_tensor_ptr,
                       const u32 query_embedding_num,
-                      const u32 basic_embedding_dimension) {
+                      const u32 basic_embedding_dimension,
+                      KVInstance *kv_instance,
+                      TxnTimeStamp begin_ts,
+                      TxnTimeStamp commit_ts) {
     for (auto &doc : rerank_docs) {
         const RowID row_id = doc.row_id_;
         const SegmentID segment_id = row_id.segment_id_;
@@ -981,7 +992,7 @@ void GetRerankerScore(Vector<MatchTensorRerankDoc> &rerank_docs,
         ColumnVector column_vec;
         BlockMeta *block_meta = block_index->new_segment_block_index_.at(segment_id).block_map().at(block_id).get();
         ColumnMeta column_meta(column_id, *block_meta);
-        auto [block_row_cnt, status] = block_meta->GetRowCnt1();
+        auto [block_row_cnt, status] = block_meta->GetRowCnt1(kv_instance, begin_ts, commit_ts);
         if (!status.ok()) {
             UnrecoverableError("GetRowCnt1 failed!");
         }
@@ -1007,7 +1018,10 @@ void RerankerScoreT(RerankerParameterPack &parameter_pack) {
                                                                                             parameter_pack.block_index_,
                                                                                             query_tensor_ptr,
                                                                                             query_embedding_num,
-                                                                                            basic_embedding_dimension);
+                                                                                            basic_embedding_dimension,
+                                                                                            parameter_pack.kv_instance_,
+                                                                                            parameter_pack.begin_ts_,
+                                                                                            parameter_pack.commit_ts_);
         }
         case MatchTensorSearchMethod::kInvalid: {
             const auto error_message = "Invalid search method!";
@@ -1037,6 +1051,7 @@ struct ExecuteMatchTensorRerankerTypes {
 
 void CalculateFusionMatchTensorRerankerScores(Vector<MatchTensorRerankDoc> &rerank_docs,
                                               BufferManager *buffer_mgr,
+                                              NewTxn *txn,
                                               const DataType *column_data_type,
                                               const ColumnID column_id,
                                               const BlockIndex *block_index,
@@ -1044,7 +1059,15 @@ void CalculateFusionMatchTensorRerankerScores(Vector<MatchTensorRerankDoc> &rera
     const auto column_elem_type = static_cast<const EmbeddingInfo *>(column_data_type->type_info().get())->Type();
     const auto [new_search_ptr, new_search_expr] = GetMatchTensorExprForCalculation(src_match_tensor_expr, column_elem_type);
     const auto *match_tensor_expr_ptr = new_search_expr ? new_search_expr.get() : &src_match_tensor_expr;
-    RerankerParameterPack parameter_pack(rerank_docs, buffer_mgr, column_data_type, column_id, block_index, *match_tensor_expr_ptr);
+    RerankerParameterPack parameter_pack(rerank_docs,
+                                         buffer_mgr,
+                                         column_data_type,
+                                         column_id,
+                                         block_index,
+                                         *match_tensor_expr_ptr,
+                                         txn->kv_instance(),
+                                         txn->BeginTS(),
+                                         txn->CommitTS());
     const auto query_elem_type = parameter_pack.match_tensor_expr_.embedding_data_type_;
     ElemTypeDispatch<ExecuteMatchTensorRerankerTypes, TypeList<>>(parameter_pack, column_elem_type, query_elem_type);
 }

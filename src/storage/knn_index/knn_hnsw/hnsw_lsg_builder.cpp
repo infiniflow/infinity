@@ -48,6 +48,7 @@ import status;
 import merge_knn;
 import infinity_context;
 import logger;
+import kv_store;
 
 namespace infinity {
 
@@ -78,9 +79,11 @@ public:
         }
     }
 
-    const_ptr_t GetEmbedding(SizeT offset) override { return embeddings_[offset].first; }
+    const_ptr_t GetEmbedding(SizeT offset, KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts) override {
+        return embeddings_[offset].first;
+    }
 
-    Pair<Span<const char>, SizeT> GetMultiVector(SizeT offset) override {
+    Pair<Span<const char>, SizeT> GetMultiVector(SizeT offset, KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts) override {
         UnrecoverableError("Not implemented");
         return {};
     }
@@ -261,7 +264,7 @@ IVF_Search_Params HnswLSGBuilder::MakeIVFSearchParams() const {
 }
 
 template <typename Iter, typename DataType, template <typename, typename> typename Compare, typename DistanceDataType>
-UniquePtr<float[]> HnswLSGBuilder::GetAvgByIVF(Iter iter, SizeT row_count) {
+UniquePtr<float[]> HnswLSGBuilder::GetAvgByIVF(Iter iter, SizeT row_count, KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts) {
     auto ivf_index = MakeIVFIndex();
     const LSGConfig &lsg_config = *index_hnsw_->lsg_config_;
 
@@ -270,7 +273,7 @@ UniquePtr<float[]> HnswLSGBuilder::GetAvgByIVF(Iter iter, SizeT row_count) {
     iter_accessor.InitEmbedding(std::move(sample_iter));
     SizeT sample_count = iter_accessor.size();
     RowID base_row_id(0, 0);
-    ivf_index->BuildIVFIndex(base_row_id, sample_count, &iter_accessor, column_def_);
+    ivf_index->BuildIVFIndex(base_row_id, sample_count, &iter_accessor, column_def_, kv_instance, begin_ts, commit_ts);
 
     auto avg = MakeUnique<float[]>(row_count);
 

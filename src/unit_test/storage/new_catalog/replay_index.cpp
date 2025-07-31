@@ -244,7 +244,7 @@ TEST_P(TestTxnReplayIndex, test_replay_append_with_index) {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>(fmt::format("check index {}", index_name)), TransactionType::kNormal);
 
         Status status;
-        Optional<DBMeeta> db_meta;
+        SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         Optional<TableIndexMeeta> table_index_meta;
         String table_key;
@@ -270,7 +270,7 @@ TEST_P(TestTxnReplayIndex, test_replay_append_with_index) {
 
         {
             Vector<ChunkID> *chunk_ids_ptr = nullptr;
-            std::tie(chunk_ids_ptr, status) = segment_index_meta.GetChunkIDs1();
+            std::tie(chunk_ids_ptr, status) = segment_index_meta.GetChunkIDs1(txn->kv_instance());
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*chunk_ids_ptr, Vector<ChunkID>({}));
         }
@@ -362,7 +362,7 @@ TEST_P(TestTxnReplayIndex, test_replay_append_with_index) {
     auto check_index2 = [&](const String &index_name, std::function<Pair<RowID, u32>(const SharedPtr<MemIndex> &)> check_mem_index) {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>(fmt::format("check merged index {}", index_name)), TransactionType::kNormal);
 
-        Optional<DBMeeta> db_meta;
+        SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         Optional<TableIndexMeeta> table_index_meta;
         String table_key;
@@ -382,7 +382,7 @@ TEST_P(TestTxnReplayIndex, test_replay_append_with_index) {
         }
 
         {
-            auto [chunk_ids, status] = segment_index_meta.GetChunkIDs1();
+            auto [chunk_ids, status] = segment_index_meta.GetChunkIDs1(txn->kv_instance());
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*chunk_ids, Vector<ChunkID>({2}));
         }
@@ -390,7 +390,7 @@ TEST_P(TestTxnReplayIndex, test_replay_append_with_index) {
         ChunkIndexMeta chunk_index_meta(chunk_id, segment_index_meta);
         {
             ChunkIndexMetaInfo *chunk_info = nullptr;
-            Status status = chunk_index_meta.GetChunkInfo(chunk_info);
+            Status status = chunk_index_meta.GetChunkInfo(txn->kv_instance(), chunk_info);
             ASSERT_TRUE(status.ok());
             EXPECT_EQ(chunk_info->row_cnt_, 2 * block_row_cnt);
             EXPECT_EQ(chunk_info->base_row_id_, RowID(0, 0));
@@ -400,7 +400,7 @@ TEST_P(TestTxnReplayIndex, test_replay_append_with_index) {
         // int32_t end_val = 3;
 
         BufferObj *buffer_obj = nullptr;
-        status = chunk_index_meta.GetIndexBuffer(buffer_obj);
+        status = chunk_index_meta.GetIndexBuffer(txn->kv_instance(), buffer_obj);
         EXPECT_TRUE(status.ok());
 
         // {
@@ -620,7 +620,7 @@ TEST_P(TestTxnReplayIndex, test_populate_index) {
     auto check_index = [&](const String &index_name, std::function<Pair<RowID, u32>(const SharedPtr<MemIndex> &)> check_mem_index) {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>(fmt::format("check index {}", index_name)), TransactionType::kNormal);
 
-        Optional<DBMeeta> db_meta;
+        SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         Optional<TableIndexMeeta> table_index_meta;
         String table_key;
@@ -647,7 +647,7 @@ TEST_P(TestTxnReplayIndex, test_populate_index) {
 
         ChunkID chunk_id = 0;
         {
-            auto [chunk_ids, status] = segment_index_meta.GetChunkIDs1();
+            auto [chunk_ids, status] = segment_index_meta.GetChunkIDs1(txn->kv_instance());
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(chunk_ids->size(), 1);
             chunk_id = chunk_ids->at(0);
@@ -656,14 +656,14 @@ TEST_P(TestTxnReplayIndex, test_populate_index) {
         ChunkIndexMeta chunk_index_meta(chunk_id, segment_index_meta);
         {
             ChunkIndexMetaInfo *chunk_info = nullptr;
-            Status status = chunk_index_meta.GetChunkInfo(chunk_info);
+            Status status = chunk_index_meta.GetChunkInfo(txn->kv_instance(), chunk_info);
             ASSERT_TRUE(status.ok());
             EXPECT_EQ(chunk_info->row_cnt_, 2 * block_row_cnt);
             EXPECT_EQ(chunk_info->base_row_id_, RowID(0, 0));
         }
 
         BufferObj *buffer_obj = nullptr;
-        status = chunk_index_meta.GetIndexBuffer(buffer_obj);
+        status = chunk_index_meta.GetIndexBuffer(txn->kv_instance(), buffer_obj);
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn);

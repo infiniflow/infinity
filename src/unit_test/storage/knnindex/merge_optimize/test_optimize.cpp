@@ -60,6 +60,7 @@ import hnsw_handler;
 import abstract_hnsw;
 #endif
 import buffer_obj;
+import kv_store;
 
 using namespace infinity;
 
@@ -186,7 +187,7 @@ TEST_P(OptimizeKnnTest, test_hnsw_optimize) {
     {
         auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("check index1"), TransactionType::kNormal);
 
-        Optional<DBMeeta> db_meta;
+        SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         Optional<TableIndexMeeta> table_index_meta;
         String table_key;
@@ -207,7 +208,7 @@ TEST_P(OptimizeKnnTest, test_hnsw_optimize) {
         EXPECT_EQ(mem_index->GetHnswIndex(), nullptr);
         txn_mgr->PrintAllKeyValue();
         {
-            auto [chunk_ids, status] = segment_index_meta.GetChunkIDs1();
+            auto [chunk_ids, status] = segment_index_meta.GetChunkIDs1(txn->kv_instance());
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*chunk_ids, Vector<ChunkID>({3}));
         }
@@ -215,14 +216,14 @@ TEST_P(OptimizeKnnTest, test_hnsw_optimize) {
         ChunkIndexMeta chunk_index_meta(chunk_id, segment_index_meta);
         {
             ChunkIndexMetaInfo *chunk_info = nullptr;
-            Status status = chunk_index_meta.GetChunkInfo(chunk_info);
+            Status status = chunk_index_meta.GetChunkInfo(txn->kv_instance(), chunk_info);
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(chunk_info->row_cnt_, 24);
             EXPECT_EQ(chunk_info->base_row_id_, RowID(0, 0));
         }
 
         BufferObj *buffer_obj = nullptr;
-        status = chunk_index_meta.GetIndexBuffer(buffer_obj);
+        status = chunk_index_meta.GetIndexBuffer(txn->kv_instance(), buffer_obj);
         EXPECT_TRUE(status.ok());
 
         status = txn_mgr->CommitTxn(txn);
@@ -305,7 +306,7 @@ TEST_P(OptimizeKnnTest, test_secondary_index_optimize) {
     {
         auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("check index1"), TransactionType::kNormal);
 
-        Optional<DBMeeta> db_meta;
+        SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         Optional<TableIndexMeeta> table_index_meta;
         String table_key;
@@ -326,7 +327,7 @@ TEST_P(OptimizeKnnTest, test_secondary_index_optimize) {
         EXPECT_EQ(mem_index->GetSecondaryIndex(), nullptr);
         txn_mgr->PrintAllKeyValue();
         {
-            auto [chunk_ids, status] = segment_index_meta.GetChunkIDs1();
+            auto [chunk_ids, status] = segment_index_meta.GetChunkIDs1(txn->kv_instance());
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*chunk_ids, Vector<ChunkID>({3}));
         }
@@ -334,14 +335,14 @@ TEST_P(OptimizeKnnTest, test_secondary_index_optimize) {
         ChunkIndexMeta chunk_index_meta(chunk_id, segment_index_meta);
         {
             ChunkIndexMetaInfo *chunk_info = nullptr;
-            Status status = chunk_index_meta.GetChunkInfo(chunk_info);
+            Status status = chunk_index_meta.GetChunkInfo(txn->kv_instance(), chunk_info);
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(chunk_info->row_cnt_, 24);
             EXPECT_EQ(chunk_info->base_row_id_, RowID(0, 0));
         }
 
         BufferObj *buffer_obj = nullptr;
-        status = chunk_index_meta.GetIndexBuffer(buffer_obj);
+        status = chunk_index_meta.GetIndexBuffer(txn->kv_instance(), buffer_obj);
         EXPECT_TRUE(status.ok());
 
         status = txn_mgr->CommitTxn(txn);

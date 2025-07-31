@@ -55,7 +55,7 @@ namespace infinity {
 
 ColumnIndexReader::~ColumnIndexReader() = default;
 
-Status ColumnIndexReader::Open(optionflag_t flag, TableIndexMeeta &table_index_meta) {
+Status ColumnIndexReader::Open(optionflag_t flag, TableIndexMeeta &table_index_meta, KVInstance* kv_instance) {
     flag_ = flag;
 
     Vector<SegmentID> *segment_ids_ptr = nullptr;
@@ -77,14 +77,14 @@ Status ColumnIndexReader::Open(optionflag_t flag, TableIndexMeeta &table_index_m
         SegmentIndexMeta segment_index_meta(segment_id, table_index_meta);
         SharedPtr<String> index_dir = segment_index_meta.GetSegmentIndexDir();
         SharedPtr<SegmentIndexFtInfo> ft_info_ptr;
-        Status status = segment_index_meta.GetFtInfo(ft_info_ptr);
+        Status status = segment_index_meta.GetFtInfo(kv_instance, ft_info_ptr);
         if (!status.ok()) {
             return status;
         }
         RowID ft_info_next_rowid = RowID(segment_index_meta.segment_id(), ft_info_ptr->ft_column_len_cnt_);
 
         Vector<ChunkID> *chunk_ids_ptr = nullptr;
-        std::tie(chunk_ids_ptr, status) = segment_index_meta.GetChunkIDs1();
+        std::tie(chunk_ids_ptr, status) = segment_index_meta.GetChunkIDs1(kv_instance);
         if (!status.ok()) {
             return status;
         }
@@ -93,7 +93,7 @@ Status ColumnIndexReader::Open(optionflag_t flag, TableIndexMeeta &table_index_m
             ChunkIndexMeta chunk_index_meta(chunk_id, segment_index_meta);
             ChunkIndexMetaInfo *chunk_info_ptr = nullptr;
             {
-                status = chunk_index_meta.GetChunkInfo(chunk_info_ptr);
+                status = chunk_index_meta.GetChunkInfo(kv_instance, chunk_info_ptr);
                 if (!status.ok()) {
                     return status;
                 }
@@ -103,7 +103,7 @@ Status ColumnIndexReader::Open(optionflag_t flag, TableIndexMeeta &table_index_m
             segment_readers_.push_back(std::move(segment_reader));
 
             BufferObj *index_buffer = nullptr;
-            status = chunk_index_meta.GetIndexBuffer(index_buffer);
+            status = chunk_index_meta.GetIndexBuffer(kv_instance, index_buffer);
             if (!status.ok()) {
                 return status;
             }
@@ -126,7 +126,7 @@ Status ColumnIndexReader::Open(optionflag_t flag, TableIndexMeeta &table_index_m
             }
         }
 
-        status = segment_index_meta.GetFtInfo(ft_info_ptr);
+        status = segment_index_meta.GetFtInfo(kv_instance, ft_info_ptr);
         if (!status.ok()) {
             return status;
         }
@@ -227,6 +227,7 @@ void ColumnIndexReader::InvalidateChunk(SegmentID segment_id, ChunkID chunk_id) 
 
 SharedPtr<IndexReader> TableIndexReaderCache::GetIndexReader(NewTxn *txn) {
     TxnTimeStamp begin_ts = txn->BeginTS();
+    KVInstance* kv_instance = txn->kv_instance();
     SharedPtr<IndexReader> index_reader = MakeShared<IndexReader>();
     std::scoped_lock lock(mutex_);
     if (begin_ts >= cache_ts_) [[likely]] {
@@ -269,7 +270,7 @@ SharedPtr<IndexReader> TableIndexReaderCache::GetIndexReader(NewTxn *txn) {
         // new column_index_reader
         auto column_index_reader = MakeShared<ColumnIndexReader>();
         optionflag_t flag = index_full_text->flag_;
-        column_index_reader->Open(flag, table_index_meta);
+        column_index_reader->Open(flag, table_index_meta, kv_instance);
         column_index_reader->analyzer_ = index_full_text->analyzer_;
         column_index_reader->column_name_ = column_name;
         (*column_index_map)[index_id_str] = std::move(column_index_reader);

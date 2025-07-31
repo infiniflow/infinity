@@ -400,11 +400,11 @@ private:
     void CheckTxn(const String &db_name);
 
 public:
-    Status GetDBMeta(const String &db_name, Optional<DBMeeta> &db_meta, TxnTimeStamp &db_create_ts, String *db_key = nullptr);
+    Status GetDBMeta(const String &db_name, SharedPtr<DBMeeta> &db_meta_ptr, TxnTimeStamp &db_create_ts, String *db_key = nullptr);
 
     Status GetTableMeta(const String &db_name,
                         const String &table_name,
-                        Optional<DBMeeta> &db_meta,
+                        SharedPtr<DBMeeta> &db_meta,
                         Optional<TableMeeta> &table_meta,
                         String *table_key = nullptr);
 
@@ -413,7 +413,7 @@ public:
     Status GetTableIndexMeta(const String &db_name,
                              const String &table_name,
                              const String &index_name,
-                             Optional<DBMeeta> &db_meta,
+                             SharedPtr<DBMeeta> &db_meta,
                              Optional<TableMeeta> &table_meta,
                              Optional<TableIndexMeeta> &table_index_meta,
                              String *table_key,
@@ -536,7 +536,12 @@ private:
     Status CommitSegmentVersion(WalSegmentInfo &segment_info, SegmentMeta &segment_meta);
     Status FlushVersionFile(BlockMeta &block_meta, TxnTimeStamp save_ts);
     Status FlushColumnFiles(BlockMeta &block_meta, TxnTimeStamp save_ts);
-    Status TryToMmap(BlockMeta &block_meta, TxnTimeStamp save_ts, bool *to_mmap = nullptr);
+    Status TryToMmap(BlockMeta &block_meta,
+                     TxnTimeStamp save_ts,
+                     KVInstance *kv_instance,
+                     TxnTimeStamp begin_ts,
+                     TxnTimeStamp commit_ts,
+                     bool *to_mmap = nullptr);
 
     Status IncrLatestID(String &id_str, std::string_view id_name) const;
 

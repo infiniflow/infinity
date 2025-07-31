@@ -90,8 +90,7 @@ protected:
 
 INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
                          TestTxnCheckpointAddColumnTest,
-                         ::testing::Values(
-                                           TestTxnCheckpointAddColumnTest::NEW_VFS_OFF_BG_OFF_PATH));
+                         ::testing::Values(TestTxnCheckpointAddColumnTest::NEW_VFS_OFF_BG_OFF_PATH));
 
 TEST_P(TestTxnCheckpointAddColumnTest, addcol_checkpoint_insert) {
     SharedPtr<String> db_name = std::make_shared<String>("default_db");
@@ -161,7 +160,7 @@ TEST_P(TestTxnCheckpointAddColumnTest, addcol_checkpoint_insert) {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check"), TransactionType::kNormal);
 
         // Check table row count is 20
-        Optional<DBMeeta> db_meta;
+        SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         Status status1 = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status1.ok());
@@ -172,12 +171,12 @@ TEST_P(TestTxnCheckpointAddColumnTest, addcol_checkpoint_insert) {
 
         for (SegmentID segment_id : *segment_ids) {
             SegmentMeta segment_meta(segment_id, *table_meta);
-            auto [block_ids, block_status] = segment_meta.GetBlockIDs1();
+            auto [block_ids, block_status] = segment_meta.GetBlockIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
             EXPECT_TRUE(block_status.ok());
 
             for (BlockID block_id : *block_ids) {
                 BlockMeta block_meta(block_id, segment_meta);
-                auto [block_info, info_status] = block_meta.GetBlockInfo();
+                auto [block_info, info_status] = block_meta.GetBlockInfo(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
                 EXPECT_TRUE(info_status.ok());
                 row_count += block_info->row_count_;
             }

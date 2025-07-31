@@ -52,6 +52,7 @@ import segment_meta;
 import block_meta;
 import column_meta;
 import new_catalog;
+import kv_store;
 
 namespace infinity {
 
@@ -154,9 +155,10 @@ void CommonQueryFilter::NewBuildFilter(u32 task_id) {
     SegmentMeta *segment_meta = segment_index.at(segment_id).segment_meta_.get();
     TxnTimeStamp begin_ts = new_txn_ptr_->BeginTS();
     TxnTimeStamp commit_ts = new_txn_ptr_->CommitTS();
+    KVInstance *kv_instance = new_txn_ptr_->kv_instance();
     {
         SharedPtr<FastRoughFilter> segment_filter;
-        Status status = segment_meta->GetFastRoughFilter(segment_filter);
+        Status status = segment_meta->GetFastRoughFilter(kv_instance, segment_filter);
         if (status.ok()) {
             if (!fast_rough_filter_evaluator_->Evaluate(begin_ts, *segment_filter)) {
                 // skip this segment
@@ -196,14 +198,14 @@ void CommonQueryFilter::NewBuildFilter(u32 task_id) {
         // filter and build bitmask, if filter_expression_ != nullptr
         ExpressionEvaluator expr_evaluator;
 
-        auto [block_ids_ptr, status] = segment_meta->GetBlockIDs1();
+        auto [block_ids_ptr, status] = segment_meta->GetBlockIDs1(kv_instance, begin_ts, commit_ts);
         if (!status.ok()) {
             UnrecoverableError(status.message());
         }
         for (BlockID block_id : *block_ids_ptr) {
             BlockMeta block_meta(block_id, *segment_meta);
 
-            auto [block_row_count, status] = block_meta.GetRowCnt1();
+            auto [block_row_count, status] = block_meta.GetRowCnt1(kv_instance, begin_ts, commit_ts);
             if (!status.ok()) {
                 UnrecoverableError(status.message());
             }
@@ -227,7 +229,7 @@ void CommonQueryFilter::NewBuildFilter(u32 task_id) {
         }
     }
     // Remove deleted rows from the result
-    Status status = NewCatalog::CheckSegmentRowsVisible(*segment_meta, begin_ts, commit_ts, result_elem);
+    Status status = NewCatalog::CheckSegmentRowsVisible(*segment_meta, kv_instance, begin_ts, commit_ts, result_elem);
     if (!status.ok()) {
         UnrecoverableError(status.message());
     }

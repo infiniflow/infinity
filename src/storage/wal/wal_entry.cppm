@@ -36,6 +36,7 @@ enum class SegmentStatus;
 class ChunkIndexMeta;
 class BlockMeta;
 class SegmentMeta;
+class KVInstance;
 
 export enum class WalCommandType : i8 {
     INVALID = 0,
@@ -138,7 +139,7 @@ export struct WalSegmentInfo {
 
     WalSegmentInfo() = default;
 
-    explicit WalSegmentInfo(SegmentMeta &segment_meta, TxnTimeStamp begin_ts);
+    explicit WalSegmentInfo(SegmentMeta &segment_meta, KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts);
 
     bool operator==(const WalSegmentInfo &other) const;
 
@@ -163,7 +164,7 @@ export struct WalChunkIndexInfo {
 
     WalChunkIndexInfo() = default;
 
-    explicit WalChunkIndexInfo(ChunkIndexMeta &chunk_index_meta);
+    explicit WalChunkIndexInfo(ChunkIndexMeta &chunk_index_meta, KVInstance *kv_instance);
 
     bool operator==(const WalChunkIndexInfo &other) const;
 

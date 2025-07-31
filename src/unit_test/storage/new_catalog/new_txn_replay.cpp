@@ -62,6 +62,7 @@ import buffer_obj;
 import buffer_handle;
 import constant_expr;
 import logger;
+import kv_store;
 
 using namespace infinity;
 
@@ -980,7 +981,7 @@ TEST_P(TestTxnReplayTest, test_replay_flush_gap_append_append) {
     {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check"), TransactionType::kNormal);
 
-        Optional<DBMeeta> db_meta;
+        SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
@@ -994,18 +995,18 @@ TEST_P(TestTxnReplayTest, test_replay_flush_gap_append_append) {
         SegmentMeta segment_meta(segment_id, *table_meta);
 
         SizeT segment_row_cnt = 0;
-        std::tie(segment_row_cnt, status) = segment_meta.GetRowCnt1();
+        std::tie(segment_row_cnt, status) = segment_meta.GetRowCnt1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
         EXPECT_EQ(segment_row_cnt, 8192 * 2);
 
         Vector<BlockID> *block_ids_ptr = nullptr;
-        std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1();
+        std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(*block_ids_ptr, Vector<BlockID>({0, 1}));
 
         SizeT block_row_cnt = 0;
         for (const auto &block_id : *block_ids_ptr) {
             BlockMeta block_meta(block_id, segment_meta);
-            std::tie(block_row_cnt, status) = block_meta.GetRowCnt1();
+            std::tie(block_row_cnt, status) = block_meta.GetRowCnt1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
             EXPECT_EQ(block_row_cnt, 8192);
         }
 
@@ -1114,7 +1115,7 @@ TEST_P(TestTxnReplayTest, test_replay_flush_gap_dump_index) {
     {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check index"), TransactionType::kNormal);
 
-        Optional<DBMeeta> db_meta;
+        SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         Optional<TableIndexMeeta> table_index_meta;
         String table_key;
@@ -1131,20 +1132,20 @@ TEST_P(TestTxnReplayTest, test_replay_flush_gap_dump_index) {
         SegmentID segment_id = 0;
         SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta);
         {
-            auto [chunk_ids, status] = segment_index_meta.GetChunkIDs1();
+            auto [chunk_ids, status] = segment_index_meta.GetChunkIDs1(txn->kv_instance());
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*chunk_ids, Vector<ChunkID>({0, 1}));
 
             for (const auto &chunk_id : *chunk_ids) {
                 ChunkIndexMeta chunk_index_meta(chunk_id, segment_index_meta);
                 ChunkIndexMetaInfo *chunk_info = nullptr;
-                status = chunk_index_meta.GetChunkInfo(chunk_info);
+                status = chunk_index_meta.GetChunkInfo(txn->kv_instance(), chunk_info);
                 EXPECT_TRUE(status.ok());
                 EXPECT_EQ(chunk_info->row_cnt_, block_row_cnt);
                 EXPECT_EQ(chunk_info->base_row_id_, RowID(0, chunk_id * block_row_cnt));
 
                 BufferObj *buffer_obj = nullptr;
-                status = chunk_index_meta.GetIndexBuffer(buffer_obj);
+                status = chunk_index_meta.GetIndexBuffer(txn->kv_instance(), buffer_obj);
                 EXPECT_TRUE(status.ok());
             }
         }
@@ -1249,7 +1250,7 @@ TEST_P(TestTxnReplayTest, test_replay_flush_gap_compact) {
     {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check"), TransactionType::kNormal);
 
-        Optional<DBMeeta> db_meta;
+        SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
@@ -1263,18 +1264,18 @@ TEST_P(TestTxnReplayTest, test_replay_flush_gap_compact) {
         SegmentMeta segment_meta(segment_id, *table_meta);
 
         SizeT segment_row_cnt = 0;
-        std::tie(segment_row_cnt, status) = segment_meta.GetRowCnt1();
+        std::tie(segment_row_cnt, status) = segment_meta.GetRowCnt1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
         EXPECT_EQ(segment_row_cnt, 8192 * 2);
 
         Vector<BlockID> *block_ids_ptr = nullptr;
-        std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1();
+        std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(*block_ids_ptr, Vector<BlockID>({0, 1}));
 
         SizeT block_row_cnt = 0;
         for (const auto &block_id : *block_ids_ptr) {
             BlockMeta block_meta(block_id, segment_meta);
-            std::tie(block_row_cnt, status) = block_meta.GetRowCnt1();
+            std::tie(block_row_cnt, status) = block_meta.GetRowCnt1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
             EXPECT_EQ(block_row_cnt, 8192);
         }
 
@@ -1397,7 +1398,7 @@ TEST_P(TestTxnReplayTest, test_replay_flush_gap_optimize_index) {
     {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check index"), TransactionType::kNormal);
 
-        Optional<DBMeeta> db_meta;
+        SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         Optional<TableIndexMeeta> table_index_meta;
         String table_key;
@@ -1414,20 +1415,20 @@ TEST_P(TestTxnReplayTest, test_replay_flush_gap_optimize_index) {
         SegmentID segment_id = 0;
         SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta);
         {
-            auto [chunk_ids, status] = segment_index_meta.GetChunkIDs1();
+            auto [chunk_ids, status] = segment_index_meta.GetChunkIDs1(txn->kv_instance());
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*chunk_ids, Vector<ChunkID>({2}));
 
             ChunkID chunk_id = 2;
             ChunkIndexMeta chunk_index_meta(chunk_id, segment_index_meta);
             ChunkIndexMetaInfo *chunk_info = nullptr;
-            status = chunk_index_meta.GetChunkInfo(chunk_info);
+            status = chunk_index_meta.GetChunkInfo(txn->kv_instance(), chunk_info);
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(chunk_info->row_cnt_, block_row_cnt * 2);
             EXPECT_EQ(chunk_info->base_row_id_, RowID(0, 0));
 
             BufferObj *buffer_obj = nullptr;
-            status = chunk_index_meta.GetIndexBuffer(buffer_obj);
+            status = chunk_index_meta.GetIndexBuffer(txn->kv_instance(), buffer_obj);
             EXPECT_TRUE(status.ok());
         }
 

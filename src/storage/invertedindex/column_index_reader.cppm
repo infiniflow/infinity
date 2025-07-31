@@ -35,6 +35,7 @@ class MemoryIndexer;
 class TableIndexMeeta;
 class BufferObj;
 struct SegmentIndexFtInfo;
+class KVInstance;
 
 struct ColumnReaderChunkInfo {
     BufferObj *index_buffer_ = nullptr;
@@ -49,7 +50,7 @@ export class ColumnIndexReader {
 public:
     ~ColumnIndexReader();
 
-    Status Open(optionflag_t flag, TableIndexMeeta &table_index_meta);
+    Status Open(optionflag_t flag, TableIndexMeeta &table_index_meta, KVInstance* kv_instance);
 
     UniquePtr<PostingIterator> Lookup(const String &term, bool fetch_position = true);
 

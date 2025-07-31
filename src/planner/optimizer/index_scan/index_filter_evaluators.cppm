@@ -34,6 +34,8 @@ import table_index_meeta;
 
 namespace infinity {
 
+class KVInstance;
+
 export struct IndexFilterEvaluatorAllTrue : IndexFilterEvaluator {
     IndexFilterEvaluatorAllTrue() : IndexFilterEvaluator(Type::kAllTrue) {}
     Bitmask Evaluate(const SegmentID segment_id, const SegmentOffset segment_row_count) const override {
@@ -62,6 +64,7 @@ export struct IndexFilterEvaluatorSecondary : IndexFilterEvaluator {
     ColumnID column_id_ = std::numeric_limits<ColumnID>::max();
     LogicalType column_logical_type_ = LogicalType::kInvalid;
     SharedPtr<TableIndexMeeta> new_secondary_index_ = nullptr;
+    KVInstance *kv_instance_{};
 
     ColumnID column_id() const { return column_id_; }
     virtual bool IsValid() const = 0;
@@ -69,6 +72,7 @@ export struct IndexFilterEvaluatorSecondary : IndexFilterEvaluator {
     static UniquePtr<IndexFilterEvaluatorSecondary> Make(const BaseExpression *src_filter_secondary_index_expressions,
                                                          ColumnID column_id,
                                                          SharedPtr<TableIndexMeeta> new_secondary_index,
+                                                         KVInstance* kv_instance,
                                                          FilterCompareType compare_type,
                                                          const Value &val);
 
@@ -76,9 +80,8 @@ protected:
     IndexFilterEvaluatorSecondary(const BaseExpression *src_expr,
                                   const ColumnID column_id,
                                   const LogicalType column_logical_type,
-                                  SharedPtr<TableIndexMeeta> new_secondary_index)
-        : IndexFilterEvaluator(Type::kSecondaryIndex), src_filter_secondary_index_expressions_({src_expr}), column_id_(column_id),
-          column_logical_type_(column_logical_type), new_secondary_index_(std::move(new_secondary_index)) {}
+                                  SharedPtr<TableIndexMeeta> new_secondary_index,
+                                  KVInstance *kv_instance);
 };
 
 // maybe combined from multiple filter_fulltext exprs

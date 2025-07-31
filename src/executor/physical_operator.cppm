@@ -31,6 +31,8 @@ import global_resource_usage;
 
 namespace infinity {
 
+class KVInstance;
+
 export class PhysicalOperator : public EnableSharedFromThis<PhysicalOperator> {
 
 public:
@@ -53,7 +55,7 @@ public:
 #endif
     }
 
-    virtual void Init(QueryContext* query_context) = 0;
+    virtual void Init(QueryContext *query_context) = 0;
 
     virtual SizeT TaskletCount();
 
@@ -151,7 +153,12 @@ export struct OutputToDataBlockHelper {
                           const u32 output_row_id) {
         output_job_infos.emplace_back(segment_id, block_id, column_id, block_offset, output_block_id, output_column_id, output_row_id);
     }
-    void OutputToDataBlock(BufferManager *buffer_mgr, const BlockIndex *block_index, const Vector<UniquePtr<DataBlock>> &output_data_blocks);
+    void OutputToDataBlock(BufferManager *buffer_mgr,
+                           const BlockIndex *block_index,
+                           const Vector<UniquePtr<DataBlock>> &output_data_blocks,
+                           KVInstance *kv_instance,
+                           TxnTimeStamp begin_ts,
+                           TxnTimeStamp commit_ts);
 };
 
 } // namespace infinity

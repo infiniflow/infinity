@@ -155,7 +155,7 @@ TEST_P(TestTxnCompactInternal, test_compact) {
         TxnTimeStamp begin_ts = txn->BeginTS();
         TxnTimeStamp commit_ts = txn->CommitTS();
 
-        Optional<DBMeeta> db_meta;
+        SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
@@ -166,7 +166,7 @@ TEST_P(TestTxnCompactInternal, test_compact) {
 
         SegmentMeta segment_meta((*segment_ids)[0], *table_meta);
 
-        auto [block_ids, block_status] = segment_meta.GetBlockIDs1();
+        auto [block_ids, block_status] = segment_meta.GetBlockIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
         EXPECT_TRUE(block_status.ok());
         EXPECT_EQ(*block_ids, Vector<BlockID>({0, 1, 2, 3}));
 
@@ -343,7 +343,7 @@ TEST_P(TestTxnCompactInternal, test_compact_with_index) {
         TxnTimeStamp begin_ts = txn->BeginTS();
         TxnTimeStamp commit_ts = txn->CommitTS();
 
-        Optional<DBMeeta> db_meta;
+        SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
@@ -354,7 +354,7 @@ TEST_P(TestTxnCompactInternal, test_compact_with_index) {
 
         SegmentMeta segment_meta((*segment_ids)[0], *table_meta);
 
-        auto [block_ids, block_status] = segment_meta.GetBlockIDs1();
+        auto [block_ids, block_status] = segment_meta.GetBlockIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
         EXPECT_TRUE(block_status.ok());
         EXPECT_EQ(*block_ids, Vector<BlockID>({0, 1, 2, 3}));
 
@@ -437,7 +437,7 @@ TEST_P(TestTxnCompactInternal, test_compact_with_index) {
     auto check_index = [&](const String &index_name) {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check index1"), TransactionType::kNormal);
 
-        Optional<DBMeeta> db_meta;
+        SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         Optional<TableIndexMeeta> table_index_meta;
         String table_key;
@@ -456,7 +456,7 @@ TEST_P(TestTxnCompactInternal, test_compact_with_index) {
         SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta);
 
         {
-            auto [chunk_ids, status] = segment_index_meta.GetChunkIDs1();
+            auto [chunk_ids, status] = segment_index_meta.GetChunkIDs1(txn->kv_instance());
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*chunk_ids, Vector<ChunkID>({0}));
         }
@@ -464,14 +464,14 @@ TEST_P(TestTxnCompactInternal, test_compact_with_index) {
         ChunkIndexMeta chunk_index_meta(chunk_id, segment_index_meta);
         {
             ChunkIndexMetaInfo *chunk_info = nullptr;
-            Status status = chunk_index_meta.GetChunkInfo(chunk_info);
+            Status status = chunk_index_meta.GetChunkInfo(txn->kv_instance(), chunk_info);
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(chunk_info->row_cnt_, block_row_cnt * 4 - block_row_cnt / 2);
             EXPECT_EQ(chunk_info->base_row_id_, RowID(segment_id, 0));
         }
 
         BufferObj *buffer_obj = nullptr;
-        status = chunk_index_meta.GetIndexBuffer(buffer_obj);
+        status = chunk_index_meta.GetIndexBuffer(txn->kv_instance(), buffer_obj);
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn);

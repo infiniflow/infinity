@@ -53,6 +53,7 @@ import index_base;
 import buffer_obj;
 import secondary_index_in_mem;
 import memory_indexer;
+import kv_store;
 
 class TestTxnReplayAppend : public NewReplayTest {
 public:
@@ -125,7 +126,7 @@ TEST_P(TestTxnReplayAppend, test_append0) {
         TxnTimeStamp begin_ts = txn->BeginTS();
         TxnTimeStamp commit_ts = txn->CommitTS();
 
-        Optional<DBMeeta> db_meta;
+        SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
@@ -139,11 +140,11 @@ TEST_P(TestTxnReplayAppend, test_append0) {
         SegmentMeta segment_meta(segment_id, *table_meta);
 
         SizeT segment_row_cnt = 0;
-        std::tie(segment_row_cnt, status) = segment_meta.GetRowCnt1();
+        std::tie(segment_row_cnt, status) = segment_meta.GetRowCnt1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
         EXPECT_EQ(segment_row_cnt, 8);
 
         Vector<BlockID> *block_ids_ptr = nullptr;
-        std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1();
+        std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(*block_ids_ptr, Vector<BlockID>({0}));
 
@@ -231,7 +232,7 @@ TEST_P(TestTxnReplayAppend, test_replay_append_delete) {
         TxnTimeStamp begin_ts = txn->BeginTS();
         TxnTimeStamp commit_ts = txn->CommitTS();
 
-        Optional<DBMeeta> db_meta;
+        SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
@@ -245,11 +246,11 @@ TEST_P(TestTxnReplayAppend, test_replay_append_delete) {
         SegmentMeta segment_meta(segment_id, *table_meta);
 
         SizeT segment_row_cnt = 0;
-        std::tie(segment_row_cnt, status) = segment_meta.GetRowCnt1();
+        std::tie(segment_row_cnt, status) = segment_meta.GetRowCnt1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
         EXPECT_EQ(segment_row_cnt, 4);
 
         Vector<BlockID> *block_ids_ptr = nullptr;
-        std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1();
+        std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(*block_ids_ptr, Vector<BlockID>({0}));
         BlockID block_id = (*block_ids_ptr)[0];
@@ -349,8 +350,9 @@ TEST_P(TestTxnReplayAppend, test_replay_append_with_index0) {
     new_txn_mgr->PrintAllKeyValue();
 
     auto check_segment_index = [&](SegmentIndexMeta &segment_index_meta,
-                                   const std::function<Pair<RowID, u32>(const SharedPtr<MemIndex> &)> &check_mem_index) {
-        auto [chunk_ids_ptr, status] = segment_index_meta.GetChunkIDs1();
+                                   const std::function<Pair<RowID, u32>(const SharedPtr<MemIndex> &)> &check_mem_index,
+                                   NewTxn* txn) {
+        auto [chunk_ids_ptr, status] = segment_index_meta.GetChunkIDs1(txn->kv_instance());
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(*chunk_ids_ptr, Vector<ChunkID>({}));
 
@@ -365,7 +367,7 @@ TEST_P(TestTxnReplayAppend, test_replay_append_with_index0) {
     auto check_index = [&](const String &index_name, const std::function<Pair<RowID, u32>(const SharedPtr<MemIndex> &)> &check_mem_index) {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check index"), TransactionType::kNormal);
 
-        Optional<DBMeeta> db_meta;
+        SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         Optional<TableIndexMeeta> table_index_meta;
         String table_key;
@@ -380,7 +382,7 @@ TEST_P(TestTxnReplayAppend, test_replay_append_with_index0) {
 
         for (SegmentID segment_id : *segment_ids_ptr) {
             SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta);
-            check_segment_index(segment_index_meta, check_mem_index);
+            check_segment_index(segment_index_meta, check_mem_index, txn);
         }
 
         status = new_txn_mgr->CommitTxn(txn);

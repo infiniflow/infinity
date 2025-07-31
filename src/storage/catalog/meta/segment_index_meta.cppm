@@ -21,6 +21,7 @@ import status;
 import third_party;
 import meta_info;
 import new_catalog;
+import base_meta;
 
 namespace infinity {
 
@@ -30,7 +31,7 @@ struct MemIndex;
 // struct SegmentIndexFtInfo;
 class NewTxn;
 
-export class SegmentIndexMeta {
+export class SegmentIndexMeta : public BaseMeta {
 public:
     SegmentIndexMeta(SegmentID segment_id, TableIndexMeeta &table_index_meta);
 
@@ -42,35 +43,25 @@ public:
 
     KVInstance &kv_instance() const { return kv_instance_; }
 
-    Status GetNextChunkID(ChunkID &chunk_id);
+    Status GetNextChunkID(KVInstance* kv_instance, ChunkID &chunk_id);
 
-    Tuple<ChunkID, Status> GetNextChunkID1();
+    Tuple<Vector<ChunkID> *, Status> GetChunkIDs1(KVInstance* kv_instance);
 
-    Tuple<Vector<ChunkID> *, Status> GetChunkIDs1();
+    Status GetFtInfo(KVInstance* kv_instance, SharedPtr<SegmentIndexFtInfo> &ft_info);
 
-    Status GetFtInfo(SharedPtr<SegmentIndexFtInfo> &ft_info);
+    Status RemoveChunkIDs(KVInstance* kv_instance, const Vector<ChunkID> &chunk_ids);
 
-    Status SetChunkIDs(const Vector<ChunkID> &chunk_ids);
+    Status AddChunkIndexID1(KVInstance* kv_instance, ChunkID chunk_id, NewTxn *new_txn);
 
-    Status RemoveChunkIDs(const Vector<ChunkID> &chunk_ids);
+    Status SetNextChunkID(KVInstance* kv_instance, ChunkID chunk_id);
 
-    Status AddChunkIndexID1(ChunkID chunk_id, NewTxn *new_txn);
+    Status UpdateFtInfo(KVInstance* kv_instance, u64 column_len_sum, u32 column_len_cnt);
 
-    Status SetNextChunkID(ChunkID chunk_id);
-
-    Status UpdateFtInfo(u64 column_len_sum, u32 column_len_cnt);
-
-    Status SetNoMemIndex();
-
-    Status InitSet();
-
-    Status InitSet1();
+    Status InitSet1(KVInstance* kv_instance);
 
     Status LoadSet();
 
-    Status UninitSet(UsageFlag usage_flag);
-
-    Status UninitSet1(UsageFlag usage_flag);
+    Status UninitSet1(KVInstance* kv_instance, UsageFlag usage_flag);
 
     SharedPtr<MemIndex> GetMemIndex();
     SharedPtr<MemIndex> PopMemIndex();
@@ -78,22 +69,20 @@ public:
 
     SharedPtr<String> GetSegmentIndexDir() const;
 
-    SharedPtr<SegmentIndexInfo> GetSegmentIndexInfo();
+    SharedPtr<SegmentIndexInfo> GetSegmentIndexInfo(KVInstance* kv_instance);
 
 private:
-    Status LoadChunkIDs1();
+    Status LoadChunkIDs1(KVInstance* kv_instance);
 
-    Status LoadNextChunkID();
+    Status LoadNextChunkID(KVInstance* kv_instance);
 
-    Status LoadFtInfo();
+    Status LoadFtInfo(KVInstance* kv_instance);
 
     String GetSegmentIndexTag(const String &tag);
 
 private:
     mutable std::mutex mtx_;
 
-    TxnTimeStamp begin_ts_;
-    TxnTimeStamp commit_ts_;
     KVInstance &kv_instance_;
     TableIndexMeeta &table_index_meta_;
     SegmentID segment_id_{};

@@ -45,6 +45,7 @@ import block_meta;
 import column_meta;
 import default_values;
 import status;
+import kv_store;
 
 namespace infinity {
 
@@ -174,7 +175,8 @@ String WalBlockInfo::ToString() const {
     return std::move(ss).str();
 }
 
-WalSegmentInfo::WalSegmentInfo(SegmentMeta &segment_meta, TxnTimeStamp begin_ts) : segment_id_(segment_meta.segment_id()) {
+WalSegmentInfo::WalSegmentInfo(SegmentMeta &segment_meta, KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts)
+    : segment_id_(segment_meta.segment_id()) {
     Status status;
 
     SharedPtr<Vector<SharedPtr<ColumnDef>>> column_defs_ptr;
@@ -185,7 +187,7 @@ WalSegmentInfo::WalSegmentInfo(SegmentMeta &segment_meta, TxnTimeStamp begin_ts)
     column_count_ = column_defs_ptr->size();
 
     Vector<BlockID> *block_ids_ptr = nullptr;
-    std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1();
+    std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1(kv_instance, begin_ts, commit_ts);
     if (!status.ok()) {
         UnrecoverableError(status.message());
     }
@@ -256,9 +258,9 @@ String WalSegmentInfo::ToString() const {
     return std::move(ss).str();
 }
 
-WalChunkIndexInfo::WalChunkIndexInfo(ChunkIndexMeta &chunk_index_meta) : chunk_id_(chunk_index_meta.chunk_id()) {
+WalChunkIndexInfo::WalChunkIndexInfo(ChunkIndexMeta &chunk_index_meta, KVInstance *kv_instance) : chunk_id_(chunk_index_meta.chunk_id()) {
     ChunkIndexMetaInfo *chunk_info_ptr = nullptr;
-    Status status = chunk_index_meta.GetChunkInfo(chunk_info_ptr);
+    Status status = chunk_index_meta.GetChunkInfo(kv_instance, chunk_info_ptr);
     if (!status.ok()) {
         UnrecoverableError("Failed to get chunk info from chunk index meta.");
     }

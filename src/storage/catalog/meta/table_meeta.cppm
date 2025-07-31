@@ -22,6 +22,7 @@ import stl;
 import status;
 import column_def;
 import new_catalog;
+import base_meta;
 
 namespace infinity {
 
@@ -33,9 +34,8 @@ class NewTxn;
 // struct SegmentUpdateTS;
 struct TableDetail;
 
-export class TableMeeta {
+export class TableMeeta : public BaseMeta {
 public:
-    // TableMeeta(const String &db_id_str, const String &table_id_str, KVInstance &kv_instance, TxnTimeStamp begin_ts, UsageEnum usage);
     TableMeeta(const String &db_id_str, const String &table_id_str, KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts);
 
     TableMeeta(const String &db_id_str, const String &table_id_str, NewTxn *txn);
@@ -60,30 +60,13 @@ public:
 
     Status UninitSet(UsageFlag usage_flag);
 
-    // Status GetNextSegmentID(SegmentID &next_segment_id) {
-    //     if (!next_segment_id_) {
-    //         Status status = LoadNextSegmentID();
-    //         if (!status.ok()) {
-    //             return status;
-    //         }
-    //     }
-    //     next_segment_id = *next_segment_id_;
-    //     return Status::OK();
-    // }
-
-    // Status SetNextSegmentID(SegmentID next_segment_id);
-
     Status GetUnsealedSegmentID(SegmentID &unsealed_segment_id);
 
     Status SetUnsealedSegmentID(SegmentID unsealed_segment_id);
 
     Status DelUnsealedSegmentID();
 
-    // Status SetSegmentIDs(const Vector<SegmentID> &segment_ids);
-
     Status RemoveSegmentIDs1(const Vector<SegmentID> &segment_ids);
-
-    // Status AddSegmentID(SegmentID segment_id);
 
     Pair<SegmentID, Status> AddSegmentID1(TxnTimeStamp commit_ts);
     Status AddSegmentWithID(TxnTimeStamp commit_ts, SegmentID segment_id);
@@ -93,7 +76,6 @@ public:
     Tuple<ColumnID, Status> GetColumnIDByColumnName(const String &column_name);
     Tuple<String, Status> GetColumnKeyByColumnName(const String &column_name) const;
     SharedPtr<String> GetTableDir();
-    // Tuple<SharedPtr<Vector<SegmentID>>, Status> GetSegmentIndexIDs1();
 
     Tuple<Vector<SegmentID> *, Status> GetSegmentIDs1();
     Status CheckSegments(const Vector<SegmentID> &segment_ids);
@@ -104,13 +86,10 @@ public:
 
     Status GetTableInfo(TableInfo &table_info);
 
-    Status GetTableDetail(TableDetail &table_detail);
+    Status GetTableDetail(KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts, TableDetail &table_detail);
 
-    Pair<String, String> GetDBTableName() const { return MakePair(db_name_, table_name_); }
-    void SetDBTableName(const String &db_name, const String &table_name) {
-        db_name_ = db_name;
-        table_name_ = table_name;
-    }
+    Pair<String, String> GetDBTableName() const;
+    void SetDBTableName(const String &db_name, const String &table_name);
 
     Status AddColumn(const ColumnDef &column_def);
 
@@ -126,7 +105,7 @@ public:
 
     Status SetNextColumnID(ColumnID next_column_id);
 
-    Status GetNextRowID(RowID &next_row_id);
+    Status UpdateFulltextSegmentTS(TxnTimeStamp ts, SegmentUpdateTS &segment_update_ts);
 
     Tuple<String, Status> GetNextIndexID();
 
@@ -137,13 +116,9 @@ private:
 
     Status LoadColumnDefs();
 
-    // Status LoadSegmentIDs();
-
     Status LoadSegmentIDs1();
 
     Status LoadIndexIDs();
-
-    // Status LoadNextSegmentID();
 
     Status LoadUnsealedSegmentID();
 

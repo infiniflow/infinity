@@ -496,8 +496,8 @@ TEST_P(TestTxnCompact, compact_and_add_columns) {
             }
         };
 
-        auto check_block = [&](BlockMeta &block_meta) {
-            auto [row_cnt, status] = block_meta.GetRowCnt1();
+        auto check_block = [&](BlockMeta &block_meta, NewTxn *txn) {
+            auto [row_cnt, status] = block_meta.GetRowCnt1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(row_cnt, 8192);
 
@@ -507,20 +507,20 @@ TEST_P(TestTxnCompact, compact_and_add_columns) {
             }
         };
 
-        auto check_segment = [&](SegmentMeta &segment_meta) {
-            auto [block_ids_ptr, status] = segment_meta.GetBlockIDs1();
+        auto check_segment = [&](SegmentMeta &segment_meta, NewTxn *txn) {
+            auto [block_ids_ptr, status] = segment_meta.GetBlockIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*block_ids_ptr, Vector<BlockID>({0, 1}));
 
             for (auto block_id : *block_ids_ptr) {
                 BlockMeta block_meta(block_id, segment_meta);
-                check_block(block_meta);
+                check_block(block_meta, txn);
             }
         };
 
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check table"), TransactionType::kNormal);
 
-        Optional<DBMeeta> db_meta;
+        SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
@@ -533,7 +533,7 @@ TEST_P(TestTxnCompact, compact_and_add_columns) {
         {
             SegmentID segment_id = (*segment_ids_ptr)[0];
             SegmentMeta segment_meta(segment_id, *table_meta);
-            check_segment(segment_meta);
+            check_segment(segment_meta, txn);
         }
 
         status = new_txn_mgr->CommitTxn(txn);
@@ -552,8 +552,8 @@ TEST_P(TestTxnCompact, compact_and_add_columns) {
             }
         };
 
-        auto check_block = [&](BlockMeta &block_meta) {
-            auto [row_cnt, status] = block_meta.GetRowCnt1();
+        auto check_block = [&](BlockMeta &block_meta, NewTxn *txn) {
+            auto [row_cnt, status] = block_meta.GetRowCnt1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(row_cnt, 8192);
 
@@ -563,20 +563,20 @@ TEST_P(TestTxnCompact, compact_and_add_columns) {
             }
         };
 
-        auto check_segment = [&](SegmentMeta &segment_meta) {
-            auto [block_ids_ptr, status] = segment_meta.GetBlockIDs1();
+        auto check_segment = [&](SegmentMeta &segment_meta, NewTxn *txn) {
+            auto [block_ids_ptr, status] = segment_meta.GetBlockIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*block_ids_ptr, Vector<BlockID>({0}));
 
             for (auto block_id : *block_ids_ptr) {
                 BlockMeta block_meta(block_id, segment_meta);
-                check_block(block_meta);
+                check_block(block_meta, txn);
             }
         };
 
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check table"), TransactionType::kNormal);
 
-        Optional<DBMeeta> db_meta;
+        SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
@@ -589,13 +589,13 @@ TEST_P(TestTxnCompact, compact_and_add_columns) {
         {
             SegmentID segment_id = (*segment_ids_ptr)[0];
             SegmentMeta segment_meta(segment_id, *table_meta);
-            check_segment(segment_meta);
+            check_segment(segment_meta, txn);
         }
 
         {
             SegmentID segment_id = (*segment_ids_ptr)[1];
             SegmentMeta segment_meta(segment_id, *table_meta);
-            check_segment(segment_meta);
+            check_segment(segment_meta, txn);
         }
 
         status = new_txn_mgr->CommitTxn(txn);
@@ -763,8 +763,8 @@ TEST_P(TestTxnCompact, compact_and_drop_columns) {
             // EXPECT_NE(outline_buffer, nullptr);
         };
 
-        auto check_block = [&](BlockMeta &block_meta) {
-            auto [row_cnt, status] = block_meta.GetRowCnt1();
+        auto check_block = [&](BlockMeta &block_meta, NewTxn *txn) {
+            auto [row_cnt, status] = block_meta.GetRowCnt1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(row_cnt, 8192);
 
@@ -774,19 +774,19 @@ TEST_P(TestTxnCompact, compact_and_drop_columns) {
             }
         };
 
-        auto check_segment = [&](SegmentMeta &segment_meta) {
-            auto [block_ids_ptr, status] = segment_meta.GetBlockIDs1();
+        auto check_segment = [&](SegmentMeta &segment_meta, NewTxn *txn) {
+            auto [block_ids_ptr, status] = segment_meta.GetBlockIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
             EXPECT_TRUE(status.ok());
 
             for (auto block_id : *block_ids_ptr) {
                 BlockMeta block_meta(block_id, segment_meta);
-                check_block(block_meta);
+                check_block(block_meta, txn);
             }
         };
 
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check table"), TransactionType::kNormal);
 
-        Optional<DBMeeta> db_meta;
+        SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
@@ -799,7 +799,7 @@ TEST_P(TestTxnCompact, compact_and_drop_columns) {
         {
             SegmentID segment_id = (*segment_ids_ptr)[0];
             SegmentMeta segment_meta(segment_id, *table_meta);
-            check_segment(segment_meta);
+            check_segment(segment_meta, txn);
         }
 
         status = new_txn_mgr->CommitTxn(txn);
@@ -1179,7 +1179,7 @@ TEST_P(TestTxnCompact, compact_and_compact) {
     auto CheckTable = [&] {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check table"), TransactionType::kNormal);
 
-        Optional<DBMeeta> db_meta;
+        SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
@@ -1303,7 +1303,7 @@ TEST_P(TestTxnCompact, compact_and_create_index) {
     auto CheckTable = [&](const Vector<SegmentID> &segment_ids = {2}) {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check table"), TransactionType::kNormal);
 
-        Optional<DBMeeta> db_meta;
+        SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
@@ -1337,7 +1337,7 @@ TEST_P(TestTxnCompact, compact_and_create_index) {
     auto CheckWithNoIndex = [&] {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check table"), TransactionType::kNormal);
 
-        Optional<DBMeeta> db_meta;
+        SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
@@ -1515,7 +1515,7 @@ TEST_P(TestTxnCompact, compact_and_drop_index) {
     [[maybe_unused]] auto CheckTable = [&](const Vector<SegmentID> &segment_ids = {2}) {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check table"), TransactionType::kNormal);
 
-        Optional<DBMeeta> db_meta;
+        SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
@@ -1549,7 +1549,7 @@ TEST_P(TestTxnCompact, compact_and_drop_index) {
     auto CheckWithNoIndex = [&](const Vector<SegmentID> &segment_ids) {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check table"), TransactionType::kNormal);
 
-        Optional<DBMeeta> db_meta;
+        SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
@@ -1626,7 +1626,7 @@ TEST_P(TestTxnCompact, compact_and_drop_index) {
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_FALSE(status.ok());
 
-        CheckWithNoIndex({0,1});
+        CheckWithNoIndex({0, 1});
         DropDB();
     }
     {
@@ -1651,7 +1651,7 @@ TEST_P(TestTxnCompact, compact_and_drop_index) {
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_FALSE(status.ok());
 
-        CheckWithNoIndex({0,1});
+        CheckWithNoIndex({0, 1});
         DropDB();
     }
     {

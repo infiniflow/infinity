@@ -19,6 +19,7 @@ export module db_meeta;
 import stl;
 import status;
 import new_catalog;
+import base_meta;
 
 namespace infinity {
 
@@ -26,35 +27,32 @@ class KVInstance;
 class DatabaseInfo;
 class NewTxn;
 
-export class DBMeeta {
+export class DBMeeta : public BaseMeta {
 public:
-    DBMeeta(String db_id_str, NewTxn *txn);
-    DBMeeta(String db_id_str, KVInstance *kv_instance);
+    explicit DBMeeta(String db_id_str);
 
     const String &db_id_str() const;
 
-    KVInstance *kv_instance() const { return kv_instance_; }
+    Status InitSet(KVInstance *kv_instance, const String *comment = nullptr);
 
-    Status InitSet(const String *comment = nullptr);
+    Status UninitSet(KVInstance *kv_instance, UsageFlag usage_flag);
 
-    Status UninitSet(UsageFlag usage_flag);
+    Status GetTableIDs(KVInstance *kv_instance, TxnTimeStamp begin_ts, Vector<String> *&table_id_strs, Vector<String> **table_names = nullptr);
 
-    Status GetTableIDs(Vector<String> *&table_id_strs, Vector<String> **table_names = nullptr);
+    Status GetTableID(KVInstance *kv_instance,
+                      TxnTimeStamp begin_ts,
+                      const String &table_name,
+                      String &table_key,
+                      String &table_id_str,
+                      TxnTimeStamp &create_table_ts);
 
-    Status GetTableID(const String &table_name, String &table_key, String &table_id_str, TxnTimeStamp& create_table_ts);
+    Tuple<SharedPtr<DatabaseInfo>, Status> GetDatabaseInfo(KVInstance *kv_instance);
 
-    Tuple<SharedPtr<DatabaseInfo>, Status> GetDatabaseInfo();
-
-    Tuple<String, Status> GetNextTableID();
-
-    Status SetNextTableID(const String &table_id_str);
-
-    String GetDBName() const { return db_name_; }
-    void SetDBName(const String &db_name) { db_name_ = db_name; }
+    Tuple<String, Status> GetNextTableID(KVInstance *kv_instance);
 
 private:
-    Status GetComment(String *&comment);
-    Status LoadTableIDs();
+    Status GetComment(KVInstance *kv_instance, String *&comment);
+    Status LoadTableIDs(KVInstance *kv_instance, TxnTimeStamp begin_ts);
     String GetDBTag(const String &tag) const;
 
 private:
@@ -62,9 +60,6 @@ private:
 
     String db_id_str_{};
     String db_name_{};
-    NewTxn *txn_{};
-    TxnTimeStamp txn_begin_ts_{};
-    KVInstance *kv_instance_{};
 
     Optional<String> comment_;
     Optional<Vector<String>> table_id_strs_;

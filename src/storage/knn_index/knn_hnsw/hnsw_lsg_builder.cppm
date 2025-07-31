@@ -31,6 +31,7 @@ struct IVF_Search_Params;
 class KnnDistanceBase1;
 class IVFIndexInChunk;
 class IndexHnsw;
+class KVInstance;
 
 export class HnswLSGBuilder {
 public:
@@ -51,7 +52,7 @@ private:
     IVF_Search_Params MakeIVFSearchParams() const;
 
     template <typename Iter, typename DataType, template <typename, typename> typename Compare, typename DistanceDataType>
-    UniquePtr<float[]> GetAvgByIVF(Iter iter, SizeT row_count);
+    UniquePtr<float[]> GetAvgByIVF(Iter iter, SizeT row_count, KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts);
 
     template <typename Iter, typename DataType, template <typename, typename> typename Compare, typename DistanceDataType>
     UniquePtr<float[]> GetAvgBF(Iter iter, SizeT row_count);

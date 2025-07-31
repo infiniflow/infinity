@@ -44,6 +44,7 @@ import block_meta;
 import new_catalog;
 import column_meta;
 import status;
+import kv_store;
 
 namespace infinity {
 
@@ -81,8 +82,6 @@ String PhysicalTableScan::table_alias() const { return base_table_ref_->alias_; 
 
 u64 PhysicalTableScan::TableIndex() const { return base_table_ref_->table_index_; }
 
-SizeT PhysicalTableScan::BlockEntryCount() const { return base_table_ref_->block_index_->BlockCount(); }
-
 Vector<SizeT> &PhysicalTableScan::ColumnIDs() const {
     if (!add_row_id_)
         return base_table_ref_->column_ids_;
@@ -117,6 +116,7 @@ void PhysicalTableScan::ExecuteInternal(QueryContext *query_context, TableScanOp
 
     TxnTimeStamp begin_ts = query_context->GetNewTxn()->BeginTS();
     TxnTimeStamp commit_ts = query_context->GetNewTxn()->CommitTS();
+    KVInstance *kv_instance = query_context->GetNewTxn()->kv_instance();
 
 #ifdef INFINITY_DEBUG
     // This part has performance issue
@@ -148,7 +148,7 @@ void PhysicalTableScan::ExecuteInternal(QueryContext *query_context, TableScanOp
 
             // new block, check FastRoughFilter
             SharedPtr<FastRoughFilter> block_filter;
-            status = current_block_meta->GetFastRoughFilter(block_filter);
+            status = current_block_meta->GetFastRoughFilter(kv_instance, block_filter);
             if (status.ok()) {
                 if (fast_rough_filter_evaluator_ and !fast_rough_filter_evaluator_->Evaluate(begin_ts, *block_filter)) {
                     // skip this block

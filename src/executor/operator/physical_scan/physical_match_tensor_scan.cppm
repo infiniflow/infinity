@@ -29,6 +29,7 @@ import global_block_id;
 import logical_match_tensor_scan;
 import internal_types;
 import meta_info;
+import new_txn;
 
 namespace infinity {
 struct LoadMeta;
@@ -113,6 +114,7 @@ struct MatchTensorRerankDoc;
 class BufferManager;
 export void CalculateFusionMatchTensorRerankerScores(Vector<MatchTensorRerankDoc> &rerank_docs,
                                                      BufferManager *buffer_mgr,
+                                                     NewTxn* txn,
                                                      const DataType *column_data_type,
                                                      ColumnID column_id,
                                                      const BlockIndex *block_index,

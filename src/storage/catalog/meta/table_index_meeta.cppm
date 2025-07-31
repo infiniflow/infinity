@@ -21,6 +21,7 @@ import status;
 import column_def;
 import meta_info;
 import new_catalog;
+import base_meta;
 
 namespace infinity {
 
@@ -35,7 +36,7 @@ class NewTxn;
 // Enum for secondary index cardinality
 export enum class SecondaryIndexCardinality : u8 { kHighCardinality = 0, kLowCardinality = 1, kInvalid = 255 };
 
-export class TableIndexMeeta {
+export class TableIndexMeeta : public BaseMeta {
 public:
     TableIndexMeeta(String index_id_str, TableMeeta &table_meta);
 
