@@ -83,7 +83,6 @@ private:
 private:
     mutable std::mutex mtx_;
 
-    KVInstance &kv_instance_;
     TableIndexMeeta &table_index_meta_;
     SegmentID segment_id_{};
 
