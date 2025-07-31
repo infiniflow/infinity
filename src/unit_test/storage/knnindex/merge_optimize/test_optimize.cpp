@@ -208,7 +208,7 @@ TEST_P(OptimizeKnnTest, test_hnsw_optimize) {
         EXPECT_EQ(mem_index->GetHnswIndex(), nullptr);
         txn_mgr->PrintAllKeyValue();
         {
-            auto [chunk_ids, status] = segment_index_meta.GetChunkIDs1();
+            auto [chunk_ids, status] = segment_index_meta.GetChunkIDs1(txn->kv_instance());
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*chunk_ids, Vector<ChunkID>({3}));
         }
@@ -327,7 +327,7 @@ TEST_P(OptimizeKnnTest, test_secondary_index_optimize) {
         EXPECT_EQ(mem_index->GetSecondaryIndex(), nullptr);
         txn_mgr->PrintAllKeyValue();
         {
-            auto [chunk_ids, status] = segment_index_meta.GetChunkIDs1();
+            auto [chunk_ids, status] = segment_index_meta.GetChunkIDs1(txn->kv_instance());
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*chunk_ids, Vector<ChunkID>({3}));
         }

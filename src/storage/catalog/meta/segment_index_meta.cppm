@@ -43,25 +43,25 @@ public:
 
     KVInstance &kv_instance() const { return kv_instance_; }
 
-    Status GetNextChunkID(ChunkID &chunk_id);
+    Status GetNextChunkID(KVInstance* kv_instance, ChunkID &chunk_id);
 
-    Tuple<Vector<ChunkID> *, Status> GetChunkIDs1();
+    Tuple<Vector<ChunkID> *, Status> GetChunkIDs1(KVInstance* kv_instance);
 
-    Status GetFtInfo(SharedPtr<SegmentIndexFtInfo> &ft_info);
+    Status GetFtInfo(KVInstance* kv_instance, SharedPtr<SegmentIndexFtInfo> &ft_info);
 
-    Status RemoveChunkIDs(const Vector<ChunkID> &chunk_ids);
+    Status RemoveChunkIDs(KVInstance* kv_instance, const Vector<ChunkID> &chunk_ids);
 
-    Status AddChunkIndexID1(ChunkID chunk_id, NewTxn *new_txn);
+    Status AddChunkIndexID1(KVInstance* kv_instance, ChunkID chunk_id, NewTxn *new_txn);
 
-    Status SetNextChunkID(ChunkID chunk_id);
+    Status SetNextChunkID(KVInstance* kv_instance, ChunkID chunk_id);
 
-    Status UpdateFtInfo(u64 column_len_sum, u32 column_len_cnt);
+    Status UpdateFtInfo(KVInstance* kv_instance, u64 column_len_sum, u32 column_len_cnt);
 
-    Status InitSet1();
+    Status InitSet1(KVInstance* kv_instance);
 
     Status LoadSet();
 
-    Status UninitSet1(UsageFlag usage_flag);
+    Status UninitSet1(KVInstance* kv_instance, UsageFlag usage_flag);
 
     SharedPtr<MemIndex> GetMemIndex();
     SharedPtr<MemIndex> PopMemIndex();
@@ -69,14 +69,14 @@ public:
 
     SharedPtr<String> GetSegmentIndexDir() const;
 
-    SharedPtr<SegmentIndexInfo> GetSegmentIndexInfo();
+    SharedPtr<SegmentIndexInfo> GetSegmentIndexInfo(KVInstance* kv_instance);
 
 private:
-    Status LoadChunkIDs1();
+    Status LoadChunkIDs1(KVInstance* kv_instance);
 
-    Status LoadNextChunkID();
+    Status LoadNextChunkID(KVInstance* kv_instance);
 
-    Status LoadFtInfo();
+    Status LoadFtInfo(KVInstance* kv_instance);
 
     String GetSegmentIndexTag(const String &tag);
 

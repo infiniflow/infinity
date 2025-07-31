@@ -350,8 +350,9 @@ TEST_P(TestTxnReplayAppend, test_replay_append_with_index0) {
     new_txn_mgr->PrintAllKeyValue();
 
     auto check_segment_index = [&](SegmentIndexMeta &segment_index_meta,
-                                   const std::function<Pair<RowID, u32>(const SharedPtr<MemIndex> &)> &check_mem_index) {
-        auto [chunk_ids_ptr, status] = segment_index_meta.GetChunkIDs1();
+                                   const std::function<Pair<RowID, u32>(const SharedPtr<MemIndex> &)> &check_mem_index,
+                                   NewTxn* txn) {
+        auto [chunk_ids_ptr, status] = segment_index_meta.GetChunkIDs1(txn->kv_instance());
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(*chunk_ids_ptr, Vector<ChunkID>({}));
 
@@ -381,7 +382,7 @@ TEST_P(TestTxnReplayAppend, test_replay_append_with_index0) {
 
         for (SegmentID segment_id : *segment_ids_ptr) {
             SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta);
-            check_segment_index(segment_index_meta, check_mem_index);
+            check_segment_index(segment_index_meta, check_mem_index, txn);
         }
 
         status = new_txn_mgr->CommitTxn(txn);

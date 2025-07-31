@@ -115,6 +115,8 @@ Status NewTxn::DumpMemIndex(const String &db_name, const String &table_name, con
     txn_store->segment_ids_ = *segment_ids_ptr;
     txn_store->table_key_ = table_key;
 
+    KVInstance *kv_instance = kv_instance_.get();
+
     for (SegmentID segment_id : *segment_ids_ptr) {
         SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta);
 
@@ -125,11 +127,11 @@ Status NewTxn::DumpMemIndex(const String &db_name, const String &table_name, con
 
         ChunkID chunk_id = 0;
         {
-            status = segment_index_meta.GetNextChunkID(chunk_id);
+            status = segment_index_meta.GetNextChunkID(kv_instance, chunk_id);
             if (!status.ok()) {
                 return status;
             }
-            status = segment_index_meta.SetNextChunkID(chunk_id + 1);
+            status = segment_index_meta.SetNextChunkID(kv_instance, chunk_id + 1);
             if (!status.ok()) {
                 return status;
             }
@@ -186,14 +188,16 @@ Status NewTxn::DumpMemIndex(const String &db_name, const String &table_name, con
         return Status::OK();
     }
 
+    KVInstance *kv_instance = kv_instance_.get();
+
     // Get chunk id of the chunk index to dump mem index to.
     ChunkID chunk_id = 0;
     {
-        Status status = segment_index_meta.GetNextChunkID(chunk_id);
+        Status status = segment_index_meta.GetNextChunkID(kv_instance, chunk_id);
         if (!status.ok()) {
             return status;
         }
-        status = segment_index_meta.SetNextChunkID(chunk_id + 1);
+        status = segment_index_meta.SetNextChunkID(kv_instance, chunk_id + 1);
         if (!status.ok()) {
             return status;
         }
@@ -378,7 +382,9 @@ Status NewTxn::OptimizeIndexInner(SegmentIndexMeta &segment_index_meta,
     TableMeeta &table_meta = table_index_meta.table_meta();
     SegmentID segment_id = segment_index_meta.segment_id();
 
-    auto [old_chunk_ids_ptr, status] = segment_index_meta.GetChunkIDs1();
+    KVInstance *kv_instance = kv_instance_.get();
+
+    auto [old_chunk_ids_ptr, status] = segment_index_meta.GetChunkIDs1(kv_instance);
     if (!status.ok()) {
         return status;
     }
@@ -423,11 +429,11 @@ Status NewTxn::OptimizeIndexInner(SegmentIndexMeta &segment_index_meta,
     Vector<ChunkID> deprecate_ids = *old_chunk_ids_ptr;
     ChunkID chunk_id = 0;
     {
-        status = segment_index_meta.GetNextChunkID(chunk_id);
+        status = segment_index_meta.GetNextChunkID(kv_instance, chunk_id);
         if (!status.ok()) {
             return status;
         }
-        status = segment_index_meta.SetNextChunkID(chunk_id + 1);
+        status = segment_index_meta.SetNextChunkID(kv_instance, chunk_id + 1);
         if (!status.ok()) {
             return status;
         }
@@ -446,7 +452,6 @@ Status NewTxn::OptimizeIndexInner(SegmentIndexMeta &segment_index_meta,
         }
     }
 
-    KVInstance *kv_instance = kv_instance_.get();
     TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
     TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
 
@@ -532,7 +537,7 @@ Status NewTxn::OptimizeIndexInner(SegmentIndexMeta &segment_index_meta,
     }
     {
         // To delete deprecated chunk ids
-        status = segment_index_meta.RemoveChunkIDs(deprecate_ids);
+        status = segment_index_meta.RemoveChunkIDs(kv_instance, deprecate_ids);
         if (!status.ok()) {
             return status;
         }
@@ -959,9 +964,11 @@ Status NewTxn::PopulateIndex(const String &db_name,
         column_def = column_def_;
         column_id = column_def->id();
     }
+
+    KVInstance *kv_instance = kv_instance_.get();
     Vector<ChunkID> old_chunk_ids;
     {
-        auto [old_chunk_ids_ptr, status] = segment_index_meta->GetChunkIDs1();
+        auto [old_chunk_ids_ptr, status] = segment_index_meta->GetChunkIDs1(kv_instance);
         if (!status.ok()) {
             return status;
         }
@@ -1006,11 +1013,11 @@ Status NewTxn::PopulateIndex(const String &db_name,
             }
         }
         {
-            Status status = segment_index_meta->GetNextChunkID(new_chunk_id);
+            Status status = segment_index_meta->GetNextChunkID(kv_instance, new_chunk_id);
             if (!status.ok()) {
                 return status;
             }
-            status = segment_index_meta->SetNextChunkID(new_chunk_id + 1);
+            status = segment_index_meta->SetNextChunkID(kv_instance, new_chunk_id + 1);
             if (!status.ok()) {
                 return status;
             }
@@ -1092,11 +1099,13 @@ Status NewTxn::ReplayDumpIndex(WalCmdDumpIndexV2 *dump_index_cmd) {
     }
     SegmentIndexMeta &segment_index_meta = *segment_index_meta_opt;
 
+    KVInstance *kv_instance = kv_instance_.get();
+
     Vector<ChunkID> chunk_ids_to_delete;
     Vector<ChunkID> *chunk_ids_ptr = nullptr;
     {
         HashSet<ChunkID> deprecate_chunk_ids(dump_index_cmd->deprecate_ids_.begin(), dump_index_cmd->deprecate_ids_.end());
-        std::tie(chunk_ids_ptr, status) = segment_index_meta.GetChunkIDs1();
+        std::tie(chunk_ids_ptr, status) = segment_index_meta.GetChunkIDs1(kv_instance);
         if (!status.ok()) {
             return status;
         }
@@ -1108,7 +1117,7 @@ Status NewTxn::ReplayDumpIndex(WalCmdDumpIndexV2 *dump_index_cmd) {
     }
 
     // Remove old ones;
-    status = segment_index_meta.RemoveChunkIDs(chunk_ids_to_delete);
+    status = segment_index_meta.RemoveChunkIDs(kv_instance, chunk_ids_to_delete);
     if (!status.ok()) {
         return status;
     }
@@ -1193,7 +1202,7 @@ Status NewTxn::ReplayDumpIndex(WalCmdDumpIndexV2 *dump_index_cmd) {
     }
 
     ChunkID next_chunk_id = 0;
-    status = segment_index_meta.GetNextChunkID(next_chunk_id);
+    status = segment_index_meta.GetNextChunkID(kv_instance, next_chunk_id);
     if (!status.ok()) {
         return status;
     }
@@ -1205,7 +1214,7 @@ Status NewTxn::ReplayDumpIndex(WalCmdDumpIndexV2 *dump_index_cmd) {
         }
 
         if (next_chunk_id <= max_chunk_id) {
-            status = segment_index_meta.SetNextChunkID(max_chunk_id + 1);
+            status = segment_index_meta.SetNextChunkID(kv_instance, max_chunk_id + 1);
             if (!status.ok()) {
                 return status;
             }
@@ -1319,13 +1328,16 @@ Status NewTxn::PopulateIvfIndexInner(SharedPtr<IndexBase> index_base,
         }
         row_count = rc;
     }
+
+    KVInstance *kv_instance = kv_instance_.get();
+
     ChunkID chunk_id = 0;
     {
-        Status status = segment_index_meta.GetNextChunkID(chunk_id);
+        Status status = segment_index_meta.GetNextChunkID(kv_instance, chunk_id);
         if (!status.ok()) {
             return status;
         }
-        status = segment_index_meta.SetNextChunkID(chunk_id + 1);
+        status = segment_index_meta.SetNextChunkID(kv_instance, chunk_id + 1);
         if (!status.ok()) {
             return status;
         }
@@ -1376,13 +1388,14 @@ Status NewTxn::PopulateEmvbIndexInner(SharedPtr<IndexBase> index_base,
         }
         row_count = rc;
     }
+    KVInstance *kv_instance = kv_instance_.get();
     ChunkID chunk_id = 0;
     {
-        Status status = segment_index_meta.GetNextChunkID(chunk_id);
+        Status status = segment_index_meta.GetNextChunkID(kv_instance, chunk_id);
         if (!status.ok()) {
             return status;
         }
-        status = segment_index_meta.SetNextChunkID(chunk_id + 1);
+        status = segment_index_meta.SetNextChunkID(kv_instance, chunk_id + 1);
         if (!status.ok()) {
             return status;
         }
@@ -1419,10 +1432,10 @@ Status NewTxn::OptimizeFtIndex(SharedPtr<IndexBase> index_base,
                                u32 &row_cnt_out,
                                String &base_name_out) {
     const auto *index_fulltext = static_cast<const IndexFullText *>(index_base.get());
-
+    KVInstance *kv_instance = kv_instance_.get();
     Vector<ChunkID> chunk_ids;
     {
-        auto [chunk_ids_ptr, status] = segment_index_meta.GetChunkIDs1();
+        auto [chunk_ids_ptr, status] = segment_index_meta.GetChunkIDs1(kv_instance);
         if (!status.ok()) {
             return status;
         }
@@ -1572,8 +1585,9 @@ Status NewTxn::OptimizeSegmentIndexByParams(SegmentIndexMeta &segment_index_meta
     if (!status.ok()) {
         return status;
     }
+    KVInstance *kv_instance = kv_instance_.get();
     Vector<ChunkID> *chunk_ids_ptr = nullptr;
-    std::tie(chunk_ids_ptr, status) = segment_index_meta.GetChunkIDs1();
+    std::tie(chunk_ids_ptr, status) = segment_index_meta.GetChunkIDs1(kv_instance);
     if (!status.ok()) {
         return status;
     }
@@ -1830,6 +1844,9 @@ Status NewTxn::DumpSegmentMemIndex(SegmentIndexMeta &segment_index_meta, const C
             return status;
         }
     }
+
+    KVInstance *kv_instance = kv_instance_.get();
+
     switch (index_base->index_type_) {
         case IndexType::kSecondary: {
             memory_secondary_index->Dump(buffer_obj);
@@ -1840,7 +1857,7 @@ Status NewTxn::DumpSegmentMemIndex(SegmentIndexMeta &segment_index_meta, const C
             memory_indexer->Dump(false /*offline*/, false /*spill*/);
             u64 len_sum = memory_indexer->GetColumnLengthSum();
             u32 len_cnt = memory_indexer->GetDocCount();
-            Status status = segment_index_meta.UpdateFtInfo(len_sum, len_cnt);
+            Status status = segment_index_meta.UpdateFtInfo(kv_instance, len_sum, len_cnt);
             if (!status.ok()) {
                 return status;
             }
@@ -1889,8 +1906,9 @@ Status NewTxn::DumpSegmentMemIndex(SegmentIndexMeta &segment_index_meta, const C
 
 Status NewTxn::CountMemIndexGapInSegment(SegmentIndexMeta &segment_index_meta, SegmentMeta &segment_meta, Vector<Pair<RowID, u64>> &append_ranges) {
     Status status;
+    KVInstance *kv_instance = kv_instance_.get();
     Vector<ChunkID> *chunk_ids_ptr = nullptr;
-    std::tie(chunk_ids_ptr, status) = segment_index_meta.GetChunkIDs1();
+    std::tie(chunk_ids_ptr, status) = segment_index_meta.GetChunkIDs1(kv_instance);
     if (!status.ok()) {
         return status;
     }

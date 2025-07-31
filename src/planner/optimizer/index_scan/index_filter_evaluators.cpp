@@ -836,7 +836,7 @@ Bitmask ExecuteSingleRangeHighCardinalityT(KVInstance *kv_instance,
                                            SegmentIndexMeta *index_meta,
                                            const SegmentOffset segment_row_count) {
     Vector<UniquePtr<TrunkReader<ColumnValueType, HighCardinalityTag>>> trunk_readers;
-    auto [chunk_ids_ptr, status] = index_meta->GetChunkIDs1();
+    auto [chunk_ids_ptr, status] = index_meta->GetChunkIDs1(kv_instance);
     if (!status.ok()) {
         UnrecoverableError(status.message());
     }
@@ -876,7 +876,7 @@ Bitmask ExecuteSingleRangeLowCardinalityT(KVInstance *kv_instance,
                                           SegmentIndexMeta *index_meta,
                                           const SegmentOffset segment_row_count) {
     Vector<UniquePtr<TrunkReader<ColumnValueType, LowCardinalityTag>>> trunk_readers;
-    auto [chunk_ids_ptr, status] = index_meta->GetChunkIDs1();
+    auto [chunk_ids_ptr, status] = index_meta->GetChunkIDs1(kv_instance);
     if (!status.ok()) {
         UnrecoverableError(status.message());
     }

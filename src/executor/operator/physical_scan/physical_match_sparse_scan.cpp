@@ -560,7 +560,7 @@ void PhysicalMatchSparseScan::ExecuteInnerT(DistFunc *dist_func,
         };
 #endif
         auto bmp_scan = [&](const auto &filter) {
-            auto [chunk_ids_ptr, status] = segment_index_meta->GetChunkIDs1();
+            auto [chunk_ids_ptr, status] = segment_index_meta->GetChunkIDs1(kv_instance);
             if (!status.ok()) {
                 UnrecoverableError(status.message());
             }

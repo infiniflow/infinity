@@ -1302,9 +1302,9 @@ NewTxn::GetSegmentIndexInfo(const String &db_name, const String &table_name, con
     if (!status.ok()) {
         return {nullptr, status};
     }
-
+    KVInstance *kv_instance = kv_instance_.get();
     SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta);
-    SharedPtr<SegmentIndexInfo> segment_index_info = segment_index_meta.GetSegmentIndexInfo();
+    SharedPtr<SegmentIndexInfo> segment_index_info = segment_index_meta.GetSegmentIndexInfo(kv_instance);
     return {std::move(segment_index_info), Status::OK()};
 }
 

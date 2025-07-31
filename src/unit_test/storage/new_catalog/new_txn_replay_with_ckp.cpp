@@ -361,7 +361,7 @@ TEST_P(TxnReplayExceptionTest, test_replay_import) {
         };
 
         auto check_segment_index = [&](SegmentIndexMeta &segment_index_meta, NewTxn* txn) {
-            auto [chunk_ids_ptr, status] = segment_index_meta.GetChunkIDs1();
+            auto [chunk_ids_ptr, status] = segment_index_meta.GetChunkIDs1(txn->kv_instance());
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*chunk_ids_ptr, Vector<ChunkID>({0}));
 

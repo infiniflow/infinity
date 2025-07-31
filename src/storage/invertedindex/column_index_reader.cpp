@@ -77,14 +77,14 @@ Status ColumnIndexReader::Open(optionflag_t flag, TableIndexMeeta &table_index_m
         SegmentIndexMeta segment_index_meta(segment_id, table_index_meta);
         SharedPtr<String> index_dir = segment_index_meta.GetSegmentIndexDir();
         SharedPtr<SegmentIndexFtInfo> ft_info_ptr;
-        Status status = segment_index_meta.GetFtInfo(ft_info_ptr);
+        Status status = segment_index_meta.GetFtInfo(kv_instance, ft_info_ptr);
         if (!status.ok()) {
             return status;
         }
         RowID ft_info_next_rowid = RowID(segment_index_meta.segment_id(), ft_info_ptr->ft_column_len_cnt_);
 
         Vector<ChunkID> *chunk_ids_ptr = nullptr;
-        std::tie(chunk_ids_ptr, status) = segment_index_meta.GetChunkIDs1();
+        std::tie(chunk_ids_ptr, status) = segment_index_meta.GetChunkIDs1(kv_instance);
         if (!status.ok()) {
             return status;
         }
@@ -126,7 +126,7 @@ Status ColumnIndexReader::Open(optionflag_t flag, TableIndexMeeta &table_index_m
             }
         }
 
-        status = segment_index_meta.GetFtInfo(ft_info_ptr);
+        status = segment_index_meta.GetFtInfo(kv_instance, ft_info_ptr);
         if (!status.ok()) {
             return status;
         }

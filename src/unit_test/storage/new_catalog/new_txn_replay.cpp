@@ -1132,7 +1132,7 @@ TEST_P(TestTxnReplayTest, test_replay_flush_gap_dump_index) {
         SegmentID segment_id = 0;
         SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta);
         {
-            auto [chunk_ids, status] = segment_index_meta.GetChunkIDs1();
+            auto [chunk_ids, status] = segment_index_meta.GetChunkIDs1(txn->kv_instance());
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*chunk_ids, Vector<ChunkID>({0, 1}));
 
@@ -1415,7 +1415,7 @@ TEST_P(TestTxnReplayTest, test_replay_flush_gap_optimize_index) {
         SegmentID segment_id = 0;
         SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta);
         {
-            auto [chunk_ids, status] = segment_index_meta.GetChunkIDs1();
+            auto [chunk_ids, status] = segment_index_meta.GetChunkIDs1(txn->kv_instance());
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*chunk_ids, Vector<ChunkID>({2}));
 
