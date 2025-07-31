@@ -14,18 +14,19 @@
 
 module;
 
-import stl;
-import wal_manager;
-import log_file;
-import status;
-import buffer_manager;
+export module infinity_core:storage;
 
-export module storage;
+import :stl;
+import :wal_manager;
+import :log_file;
+import :status;
+import :buffer_manager;
+import :config;
 
 namespace infinity {
 
 class ResultCacheManager;
-class NewCatalog;
+export struct NewCatalog;
 class NewTxnManager;
 class KVStore;
 class KVInstance;
@@ -36,7 +37,7 @@ class MemIndexAppender;
 class BGTaskProcessor;
 class BGMemIndexTracer;
 class ObjectStorageProcess;
-class Config;
+// export class Config;
 class PersistenceManager;
 
 export enum class ReaderInitPhase {

@@ -14,9 +14,9 @@
 
 module;
 
-export module bound_cast_func;
+export module infinity_core:bound_cast_func;
 
-import stl;
+import :stl;
 
 namespace infinity {
 

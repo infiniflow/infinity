@@ -14,11 +14,11 @@
 
 module;
 
-export module dummy_table_ref;
+export module infinity_core:dummy_table_ref;
 
-import stl;
+import :stl;
 
-import table_ref;
+import :table_ref;
 import table_reference;
 
 namespace infinity {

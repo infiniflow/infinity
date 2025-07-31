@@ -14,17 +14,17 @@
 
 module;
 
-export module group_binder;
+export module infinity_core:group_binder;
 
-import stl;
+import :stl;
 
-import base_expression;
-import subquery_expression;
-import bind_context;
-import expression_binder;
-import query_context;
-import function;
-import bind_alias_proxy;
+import :base_expression;
+import :subquery_expression;
+import :bind_context;
+import :expression_binder;
+// import :query_context;
+import :function;
+import :bind_alias_proxy;
 import parsed_expr;
 import column_expr;
 import constant_expr;

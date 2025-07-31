@@ -14,9 +14,9 @@
 
 module;
 
-export module builtin_functions;
+export module infinity_core:builtin_functions;
 
-import stl;
+import :stl;
 
 namespace infinity {
 

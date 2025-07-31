@@ -14,19 +14,19 @@
 
 module;
 
-export module data_table;
+export module infinity_core:data_table;
 
-import table_def;
-import base_table;
-import stl;
+import :table_def;
+import :base_table;
+import :stl;
 import data_type;
-import data_block;
-import infinity_exception;
+import :data_block;
+import :infinity_exception;
 import internal_types;
-import third_party;
+import :third_party;
 import column_def;
-import logger;
-import default_values;
+import :logger;
+import :default_values;
 
 namespace infinity {
 

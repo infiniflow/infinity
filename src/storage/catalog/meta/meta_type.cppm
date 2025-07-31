@@ -14,7 +14,7 @@
 
 module;
 
-export module meta_type;
+export module infinity_core:meta_type;
 
 namespace infinity {
 

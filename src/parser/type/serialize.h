@@ -45,7 +45,7 @@ template <typename T>
 inline T ReadBufAdv(const char *&buf) {
     static_assert(std::is_standard_layout_v<T>, "T must be POD");
     T value;
-    std::memcpy(&value, buf, sizeof(T));
+    std::memcpy(static_cast<void *>(&value), buf, sizeof(T));
     buf += sizeof(T);
     return value;
 }

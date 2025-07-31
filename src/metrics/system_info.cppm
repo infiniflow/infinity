@@ -14,9 +14,9 @@
 
 module;
 
-export module system_info;
+export module infinity_core:system_info;
 
-import stl;
+import :stl;
 
 namespace infinity {
 

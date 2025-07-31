@@ -14,17 +14,17 @@
 
 module;
 
-export module logical_project;
+export module infinity_core:logical_project;
 
-import stl;
-import logical_node_type;
-import column_binding;
-import logical_node;
+import :stl;
+import :logical_node_type;
+import :column_binding;
+import :logical_node;
 import data_type;
-import third_party;
-import base_expression;
+import :third_party;
+import :base_expression;
 import internal_types;
-import highlighter;
+import :highlighter;
 
 namespace infinity {
 

@@ -14,12 +14,12 @@
 
 module;
 
-export module function_set;
+export module infinity_core:function_set;
 
-import stl;
+import :stl;
 
-import function;
-import base_expression;
+import :function;
+import :base_expression;
 import function_expr;
 
 namespace infinity {

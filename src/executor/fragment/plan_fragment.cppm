@@ -14,16 +14,15 @@
 
 module;
 
-export module plan_fragment;
+export module infinity_core:plan_fragment;
 
-import stl;
-
-import data_table;
-import fragment_context;
-import physical_operator;
-import physical_source;
-import physical_sink;
-import query_context;
+import :stl;
+import :data_table;
+import :fragment_context;
+import :physical_operator;
+import :physical_source;
+import :physical_sink;
+import :query_context;
 import internal_types;
 import data_type;
 import global_resource_usage;

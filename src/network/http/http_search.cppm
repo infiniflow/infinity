@@ -14,24 +14,25 @@
 
 module;
 
-export module http_search;
+export module infinity_core:http_search;
 
-import stl;
-import status;
-import third_party;
+import :stl;
+import :status;
+import :third_party;
 import parsed_expr;
 import knn_expr;
 import match_expr;
 import fusion_expr;
 import match_tensor_expr;
 import match_sparse_expr;
-import infinity;
+// import infinity;
 import internal_types;
 import constant_expr;
 import search_expr;
 import select_statement;
 
 namespace infinity {
+class Infinity;
 
 export class HTTPSearch {
 public:

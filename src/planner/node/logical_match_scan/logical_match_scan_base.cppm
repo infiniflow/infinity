@@ -14,19 +14,19 @@
 
 module;
 
-export module logical_match_scan_base;
+export module infinity_core:logical_match_scan_base;
 
-import stl;
-import logical_node_type;
-import column_binding;
-import logical_node;
-import base_expression;
-import base_table_ref;
-import meta_info;
+import :stl;
+import :logical_node_type;
+import :column_binding;
+import :logical_node;
+import :base_expression;
+import :base_table_ref;
+import :meta_info;
 import internal_types;
 import data_type;
-import fast_rough_filter;
-import common_query_filter;
+import :fast_rough_filter;
+import :common_query_filter;
 
 namespace infinity {
 

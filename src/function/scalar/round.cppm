@@ -1,8 +1,8 @@
 module;
 
-export module round;
+export module infinity_core:round;
 
-import stl;
+import :stl;
 
 namespace infinity {
 

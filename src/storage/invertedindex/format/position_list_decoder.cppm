@@ -1,16 +1,16 @@
 module;
 
-export module position_list_decoder;
+export module infinity_core:position_list_decoder;
 
-import stl;
-import byte_slice;
-import byte_slice_reader;
+import :stl;
+import :byte_slice;
+import :byte_slice_reader;
 
-import skiplist_reader;
-import posting_list_format;
-import position_list_format_option;
-import posting_field;
-import index_defines;
+import :skiplist_reader;
+import :posting_list_format;
+import :position_list_format_option;
+import :posting_field;
+import :index_defines;
 
 namespace infinity {
 

@@ -15,11 +15,13 @@
 module;
 
 #include "simd_common_intrin_include.h"
+// #include <immintrin.h>
 
-export module search_top_1_sgemm;
-import stl;
-import mlas_matrix_multiply;
-import vector_distance;
+export module infinity_core:search_top_1_sgemm;
+
+import :stl;
+import :mlas_matrix_multiply;
+import :vector_distance;
 
 namespace infinity {
 

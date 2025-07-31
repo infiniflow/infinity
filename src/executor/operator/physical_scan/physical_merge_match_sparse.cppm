@@ -14,18 +14,18 @@
 
 module;
 
-export module physical_merge_match_sparse;
+export module infinity_core:physical_merge_match_sparse;
 
-import stl;
-import query_context;
-import operator_state;
-import physical_operator;
-import match_sparse_expression;
-import base_table_ref;
+import :stl;
+import :query_context;
+import :operator_state;
+import :physical_operator;
+import :match_sparse_expression;
+import :base_table_ref;
 import data_type;
-import physical_scan_base;
+import :physical_scan_base;
 import match_sparse_expr;
-import base_expression;
+import :base_expression;
 
 namespace infinity {
 struct LoadMeta;

@@ -2,11 +2,10 @@ module;
 
 #include <cstddef>
 
-export module aho_corasick;
+export module infinity_core:aho_corasick;
 
-import stl;
-import logger;
-import darts;
+import :stl;
+import :darts;
 
 namespace infinity {
 

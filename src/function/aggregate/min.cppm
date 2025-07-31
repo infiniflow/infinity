@@ -14,9 +14,9 @@
 
 module;
 
-export module min;
+export module infinity_core:min;
 
-import stl;
+import :stl;
 
 namespace infinity {
 

@@ -1,20 +1,21 @@
 module;
 
 #include <cassert>
-import stl;
 
-import byte_slice_reader;
-import posting_list_format;
-import term_meta;
-import in_doc_pos_iterator;
-import in_doc_pos_state;
-import multi_posting_decoder;
-import segment_posting;
-import index_defines;
+export module infinity_core:posting_iterator;
+
+import :stl;
+
+import :byte_slice_reader;
+import :posting_list_format;
+import :term_meta;
+import :in_doc_pos_iterator;
+import :in_doc_pos_state;
+import :multi_posting_decoder;
+import :segment_posting;
+import :index_defines;
 import internal_types;
-import third_party;
-
-export module posting_iterator;
+import :third_party;
 
 namespace infinity {
 export class PostingIterator {

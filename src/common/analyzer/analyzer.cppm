@@ -14,12 +14,12 @@
 
 module;
 
-export module analyzer;
+export module infinity_core:analyzer;
 
-import jieba;
-import stl;
-import term;
-import tokenizer;
+import :jieba;
+import :stl;
+import :term;
+import :tokenizer;
 
 namespace infinity {
 

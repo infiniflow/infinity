@@ -1,8 +1,8 @@
 module;
 
-export module reverse;
+export module infinity_core:reverse;
 
-import stl;
+import :stl;
 
 namespace infinity {
 
