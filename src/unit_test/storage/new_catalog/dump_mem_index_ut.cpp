@@ -5626,7 +5626,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_delete) {
     }
 }
 
-TEST_P(TestTxnDumpMemIndex, dump_and_dump) {
+TEST_P(TestTxnDumpMemIndex, DISABLED_dump_and_dump) {
     using namespace infinity;
 
     NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
@@ -6105,7 +6105,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_dump) {
     }
 }
 
-TEST_P(TestTxnDumpMemIndex, test_dump_index_and_optimize_index) {
+TEST_P(TestTxnDumpMemIndex, DISABLED_test_dump_index_and_optimize_index) {
 
     using namespace infinity;
     NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();

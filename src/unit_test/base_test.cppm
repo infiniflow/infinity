@@ -43,8 +43,7 @@ class BaseTestWithParam : public std::conditional_t<std::is_same_v<T, void>, ::t
 public:
     BaseTestWithParam() {
         const char *infinity_home_ = GetHomeDir();
-        bool ok = ValidateDirPermission(infinity_home_);
-        if (!ok) {
+        if (bool ok = ValidateDirPermission(infinity_home_); !ok) {
             std::cerr << "Please create directory " << infinity_home_ << " and ensure current user has RWX permission of it." << std::endl;
             abort();
         }
@@ -53,7 +52,9 @@ public:
 
     ~BaseTestWithParam() override = default;
 
-    void SetUp() override { SetPrintStacktrace(false); }
+    void SetUp() override {
+        // SetPrintStacktrace(false);
+    }
     void TearDown() override {}
 
 public:
@@ -188,7 +189,7 @@ public:
         auto config_path = std::make_shared<std::string>(BaseTestNoParam::NULL_CONFIG_PATH);
         infinity::InfinityContext::instance().InitPhase1(config_path);
         infinity::InfinityContext::instance().InitPhase2();
-        SetPrintStacktrace(false);
+        // SetPrintStacktrace(false);
     }
 
     void TearDown() override {
@@ -214,7 +215,7 @@ public:
         auto config_path = std::make_shared<std::string>(BaseTestNoParam::NEW_CONFIG_PATH);
         infinity::InfinityContext::instance().InitPhase1(config_path);
         infinity::InfinityContext::instance().InitPhase2();
-        SetPrintStacktrace(false);
+        // SetPrintStacktrace(false);
     }
 
     void TearDown() override {
@@ -244,7 +245,7 @@ public:
         }
         infinity::InfinityContext::instance().InitPhase1(config_path);
         infinity::InfinityContext::instance().InitPhase2();
-        SetPrintStacktrace(false);
+        // SetPrintStacktrace(false);
     }
 
     void TearDown() override {
