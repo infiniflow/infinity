@@ -19,7 +19,7 @@ module;
 #include <string>
 #include <vector>
 
-#include "json.hpp"
+#include "nlohmann/json.hpp"
 
 module infinity_core:index_ivf.impl;
 
