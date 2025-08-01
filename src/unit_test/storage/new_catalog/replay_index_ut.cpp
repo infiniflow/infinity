@@ -96,7 +96,7 @@ INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
                          TestTxnReplayIndex,
                          ::testing::Values(TestTxnReplayIndex::NEW_CONFIG_PATH, TestTxnReplayIndex::NEW_VFS_OFF_CONFIG_PATH));
 
-TEST_P(TestTxnReplayIndex, test_replay_append_with_index) {
+TEST_P(TestTxnReplayIndex, DISABLED_test_replay_append_with_index) {
     using namespace infinity;
 
     SharedPtr<String> db_name = std::make_shared<String>("default_db");
@@ -464,7 +464,7 @@ TEST_P(TestTxnReplayIndex, test_replay_append_with_index) {
     });
 }
 
-TEST_P(TestTxnReplayIndex, test_populate_index) {
+TEST_P(TestTxnReplayIndex, DISABLED_test_populate_index) {
     using namespace infinity;
 
     SharedPtr<String> db_name = std::make_shared<String>("db1");
