@@ -59,30 +59,13 @@ public:
 
     Status UninitSet(UsageFlag usage_flag);
 
-    // Status GetNextSegmentID(SegmentID &next_segment_id) {
-    //     if (!next_segment_id_) {
-    //         Status status = LoadNextSegmentID();
-    //         if (!status.ok()) {
-    //             return status;
-    //         }
-    //     }
-    //     next_segment_id = *next_segment_id_;
-    //     return Status::OK();
-    // }
-
-    // Status SetNextSegmentID(SegmentID next_segment_id);
-
     Status GetUnsealedSegmentID(SegmentID &unsealed_segment_id);
 
     Status SetUnsealedSegmentID(SegmentID unsealed_segment_id);
 
     Status DelUnsealedSegmentID();
 
-    // Status SetSegmentIDs(const Vector<SegmentID> &segment_ids);
-
     Status RemoveSegmentIDs1(const Vector<SegmentID> &segment_ids);
-
-    // Status AddSegmentID(SegmentID segment_id);
 
     Pair<SegmentID, Status> AddSegmentID1(TxnTimeStamp commit_ts);
     Status AddSegmentWithID(TxnTimeStamp commit_ts, SegmentID segment_id);
@@ -92,7 +75,6 @@ public:
     Tuple<ColumnID, Status> GetColumnIDByColumnName(const String &column_name);
     Tuple<String, Status> GetColumnKeyByColumnName(const String &column_name) const;
     SharedPtr<String> GetTableDir();
-    // Tuple<SharedPtr<Vector<SegmentID>>, Status> GetSegmentIndexIDs1();
 
     Tuple<Vector<SegmentID> *, Status> GetSegmentIDs1();
     Status CheckSegments(const Vector<SegmentID> &segment_ids);
@@ -136,13 +118,9 @@ private:
 
     Status LoadColumnDefs();
 
-    // Status LoadSegmentIDs();
-
     Status LoadSegmentIDs1();
 
     Status LoadIndexIDs();
-
-    // Status LoadNextSegmentID();
 
     Status LoadUnsealedSegmentID();
 

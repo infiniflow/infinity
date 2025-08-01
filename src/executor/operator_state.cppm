@@ -404,6 +404,7 @@ export struct CompactOperatorState : public OperatorState {
 
     SizeT compact_idx_{};
     SharedPtr<CompactStateData> compact_state_data_{};
+    UniquePtr<String> result_msg_{};
 };
 
 // Unnest
