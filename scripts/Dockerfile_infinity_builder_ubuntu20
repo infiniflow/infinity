@@ -222,6 +222,14 @@ RUN --mount=type=bind,source=vectorscan-master.zip,target=/root/vectorscan-maste
     && make -j 12 install \
     && rm -rf ../../vectorscan-master
 
+# Install mold-2.40.3
+RUN --mount=type=bind,source=mold-2.40.3-x86_64-linux.tar.gz,target=/root/mold-2.40.3-x86_64-linux.tar.gz \
+    cd /root && tar xf mold-2.40.3-x86_64-linux.tar.gz \
+    && cp -rf mold-2.40.3-x86_64-linux/bin/* /usr/local/bin \
+    && cp -rf mold-2.40.3-x86_64-linux/lib/* /usr/local/lib \
+    && cp -rf mold-2.40.3-x86_64-linux/libexec/* /usr/local/libexec \
+    && rm -rf mold-2.40.3-x86_64-linux
+
 RUN pip3 config set global.index-url https://mirrors.aliyun.com/pypi/simple && pip3 config set global.trusted-host mirrors.aliyun.com
 
 # Create a python virtual environment for 3.11

@@ -36,7 +36,9 @@ if (CLANG_VERSION_STRING VERSION_GREATER 16)
     # add_compile_options(-ftime-trace)
 
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Wno-unused-parameter -Wno-unused-private-field")
-    #    add_link_options(-fuse-ld=mold)
+    add_link_options(-fuse-ld=mold)
+    # Add library search paths for mold linker
+    add_link_options(-L/usr/local/lib)
     set(CMAKE_FIND_PACKAGE_SORT_ORDER NATURAL)
     set(CMAKE_FIND_PACKAGE_SORT_DIRECTION DEC)
 
