@@ -638,7 +638,7 @@ if (CI)
     )
 else ()
     file(GLOB_RECURSE
-            test_dependent_mod
+            ut_mod
             CONFIGURE_DEPENDS
             unit_test/*.cppm
             unit_test/*_impl.cpp
@@ -661,7 +661,7 @@ else ()
     )
     target_sources(unit_test
             PRIVATE
-            FILE_SET core_cxx_modules TYPE CXX_MODULES FILES
+            FILE_SET mod_cxx_modules TYPE CXX_MODULES FILES
             ${ut_mod}
 
             ${common_ut}

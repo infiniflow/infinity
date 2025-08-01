@@ -31,8 +31,6 @@ import compilation_config;
 
 #if 0
 
-
-
 using namespace infinity;
 
 class UserDefinedAnalyzerTest : public BaseTest {};
