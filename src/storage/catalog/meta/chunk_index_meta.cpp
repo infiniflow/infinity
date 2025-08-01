@@ -96,7 +96,7 @@ Status ChunkIndexMeta::GetIndexBuffer(KVInstance *kv_instance, BufferObj *&index
     return Status::OK();
 }
 
-Status ChunkIndexMeta::InitSet(KVInstance *kv_instance, const ChunkIndexMetaInfo &chunk_info) {
+Status ChunkIndexMeta::InitSet(KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts, const ChunkIndexMetaInfo &chunk_info) {
     chunk_info_ = chunk_info;
     {
         String chunk_info_key = GetChunkIndexTag("chunk_info");
@@ -117,7 +117,7 @@ Status ChunkIndexMeta::InitSet(KVInstance *kv_instance, const ChunkIndexMetaInfo
 
     SharedPtr<ColumnDef> column_def;
     {
-        auto [col_def, status] = table_index_meta.GetColumnDef(kv_instance);
+        auto [col_def, status] = table_index_meta.GetColumnDef(kv_instance, begin_ts, commit_ts);
         if (!status.ok()) {
             return status;
         }
@@ -221,7 +221,7 @@ Status ChunkIndexMeta::InitSet(KVInstance *kv_instance, const ChunkIndexMetaInfo
     return Status::OK();
 }
 
-Status ChunkIndexMeta::LoadSet(KVInstance *kv_instance) {
+Status ChunkIndexMeta::LoadSet(KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts) {
     BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
     TableIndexMeeta &table_index_meta = segment_index_meta_.table_index_meta();
 
@@ -239,7 +239,7 @@ Status ChunkIndexMeta::LoadSet(KVInstance *kv_instance) {
     if (!index_status.ok()) {
         return index_status;
     }
-    auto [column_def, col_status] = table_index_meta.GetColumnDef(kv_instance);
+    auto [column_def, col_status] = table_index_meta.GetColumnDef(kv_instance, begin_ts, commit_ts);
     if (!col_status.ok()) {
         return status;
     }
@@ -333,7 +333,7 @@ Status ChunkIndexMeta::LoadSet(KVInstance *kv_instance) {
     return Status::OK();
 }
 
-Status ChunkIndexMeta::RestoreSet(KVInstance *kv_instance) {
+Status ChunkIndexMeta::RestoreSet(KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts) {
     BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
     TableIndexMeeta &table_index_meta = segment_index_meta_.table_index_meta();
 
@@ -351,7 +351,7 @@ Status ChunkIndexMeta::RestoreSet(KVInstance *kv_instance) {
     if (!index_status.ok()) {
         return index_status;
     }
-    auto [column_def, col_status] = table_index_meta.GetColumnDef(kv_instance);
+    auto [column_def, col_status] = table_index_meta.GetColumnDef(kv_instance, begin_ts, commit_ts);
     if (!col_status.ok()) {
         return status;
     }

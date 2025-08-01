@@ -6187,6 +6187,7 @@ TEST_P(TestTxnDelete, test_delete_and_compact) {
 
     auto CheckTable = [&](const Vector<SegmentID> &segment_ids) {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check table"), TransactionType::kNormal);
+        KVInstance *kv_instance = txn->kv_instance();
         TxnTimeStamp begin_ts = txn->BeginTS();
         TxnTimeStamp commit_ts = txn->CommitTS();
 
@@ -6196,7 +6197,7 @@ TEST_P(TestTxnDelete, test_delete_and_compact) {
         EXPECT_TRUE(status.ok());
 
         Vector<SegmentID> *segment_ids_ptr = nullptr;
-        std::tie(segment_ids_ptr, status) = table_meta->GetSegmentIDs1();
+        std::tie(segment_ids_ptr, status) = table_meta->GetSegmentIDs1(kv_instance, begin_ts, commit_ts);
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(*segment_ids_ptr, segment_ids);
         EXPECT_EQ(segment_ids_ptr->size(), 1);
@@ -6204,7 +6205,7 @@ TEST_P(TestTxnDelete, test_delete_and_compact) {
 
         NewTxnGetVisibleRangeState state;
         Vector<BlockID> *block_ids_ptr = nullptr;
-        std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
+        std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1(kv_instance, begin_ts, commit_ts);
         EXPECT_EQ(block_ids_ptr->size(), 1);
         for (const auto block_id : *block_ids_ptr) {
             BlockMeta block_meta(block_id, segment_meta);
@@ -6226,6 +6227,9 @@ TEST_P(TestTxnDelete, test_delete_and_compact) {
 
     auto CheckTableNoCompact = [&](const Vector<SegmentID> &segment_ids) {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check table"), TransactionType::kNormal);
+        KVInstance *kv_instance = txn->kv_instance();
+        TxnTimeStamp begin_ts = txn->BeginTS();
+        TxnTimeStamp commit_ts = txn->CommitTS();
 
         SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
@@ -6233,7 +6237,7 @@ TEST_P(TestTxnDelete, test_delete_and_compact) {
         EXPECT_TRUE(status.ok());
 
         Vector<SegmentID> *segment_ids_ptr = nullptr;
-        std::tie(segment_ids_ptr, status) = table_meta->GetSegmentIDs1();
+        std::tie(segment_ids_ptr, status) = table_meta->GetSegmentIDs1(kv_instance, begin_ts, commit_ts);
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(*segment_ids_ptr, segment_ids);
         EXPECT_EQ(segment_ids_ptr->size(), 2);
@@ -6241,6 +6245,9 @@ TEST_P(TestTxnDelete, test_delete_and_compact) {
 
     auto CheckTableCompactedWithoutDelete = [&](const Vector<SegmentID> &segment_ids) {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check table"), TransactionType::kNormal);
+        KVInstance *kv_instance = txn->kv_instance();
+        TxnTimeStamp begin_ts = txn->BeginTS();
+        TxnTimeStamp commit_ts = txn->CommitTS();
 
         SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
@@ -6248,7 +6255,7 @@ TEST_P(TestTxnDelete, test_delete_and_compact) {
         EXPECT_TRUE(status.ok());
 
         Vector<SegmentID> *segment_ids_ptr = nullptr;
-        std::tie(segment_ids_ptr, status) = table_meta->GetSegmentIDs1();
+        std::tie(segment_ids_ptr, status) = table_meta->GetSegmentIDs1(kv_instance, begin_ts, commit_ts);
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(*segment_ids_ptr, segment_ids);
         EXPECT_EQ(segment_ids_ptr->size(), 1);
@@ -6627,6 +6634,7 @@ TEST_P(TestTxnDelete, test_delete_and_optimize_index) {
 
     auto CheckTable = [&](const Vector<SegmentID> &segment_ids) {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check table"), TransactionType::kNormal);
+        KVInstance *kv_instance = txn->kv_instance();
         TxnTimeStamp begin_ts = txn->BeginTS();
         TxnTimeStamp commit_ts = txn->CommitTS();
 
@@ -6636,7 +6644,7 @@ TEST_P(TestTxnDelete, test_delete_and_optimize_index) {
         EXPECT_TRUE(status.ok());
 
         Vector<SegmentID> *segment_ids_ptr = nullptr;
-        std::tie(segment_ids_ptr, status) = table_meta->GetSegmentIDs1();
+        std::tie(segment_ids_ptr, status) = table_meta->GetSegmentIDs1(kv_instance, begin_ts, commit_ts);
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(*segment_ids_ptr, segment_ids);
         EXPECT_EQ(segment_ids_ptr->size(), 1);
@@ -6644,7 +6652,7 @@ TEST_P(TestTxnDelete, test_delete_and_optimize_index) {
 
         NewTxnGetVisibleRangeState state;
         Vector<BlockID> *block_ids_ptr = nullptr;
-        std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
+        std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1(kv_instance, begin_ts, commit_ts);
         EXPECT_EQ(block_ids_ptr->size(), 3);
         for (const auto block_id : *block_ids_ptr) {
             BlockMeta block_meta(block_id, segment_meta);

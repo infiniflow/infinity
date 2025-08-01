@@ -48,50 +48,63 @@ public:
     const String &table_id_str() const { return table_id_str_; }
     const String &db_id_str() const { return db_id_str_; }
 
-    Status GetComment(TableInfo &table_info);
+    Status GetComment(KVInstance *kv_instance, TableInfo &table_info);
 
-    Status GetIndexIDs(Vector<String> *&index_id_strs, Vector<String> **index_names = nullptr);
+    Status GetIndexIDs(KVInstance *kv_instance, TxnTimeStamp begin_ts, Vector<String> *&index_id_strs, Vector<String> **index_names = nullptr);
 
-    Status GetIndexID(const String &index_name, String &index_key, String &index_id_str, TxnTimeStamp &create_index_ts);
+    Status GetIndexID(KVInstance *kv_instance,
+                      TxnTimeStamp begin_ts,
+                      TxnTimeStamp commit_ts,
+                      const String &index_name,
+                      String &index_key,
+                      String &index_id_str,
+                      TxnTimeStamp &create_index_ts);
 
-    Status InitSet(SharedPtr<TableDef> table_def);
+    Status InitSet(KVInstance *kv_instance, TxnTimeStamp commit_ts, SharedPtr<TableDef> table_def);
 
-    Status LoadSet(KVInstance* kv_instance);
+    Status LoadSet(KVInstance *kv_instance, TxnTimeStamp begin_ts);
 
-    Status UninitSet(UsageFlag usage_flag);
+    Status UninitSet(KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts, UsageFlag usage_flag);
 
-    Status GetUnsealedSegmentID(SegmentID &unsealed_segment_id);
+    Status GetUnsealedSegmentID(KVInstance *kv_instance, SegmentID &unsealed_segment_id);
 
-    Status SetUnsealedSegmentID(SegmentID unsealed_segment_id);
+    Status SetUnsealedSegmentID(KVInstance *kv_instance, SegmentID unsealed_segment_id);
 
-    Status DelUnsealedSegmentID();
+    Status DelUnsealedSegmentID(KVInstance *kv_instance);
 
-    Status RemoveSegmentIDs1(const Vector<SegmentID> &segment_ids);
+    Status RemoveSegmentIDs1(KVInstance *kv_instance, const Vector<SegmentID> &segment_ids);
 
-    Pair<SegmentID, Status> AddSegmentID1(TxnTimeStamp commit_ts);
-    Status AddSegmentWithID(TxnTimeStamp commit_ts, SegmentID segment_id);
+    Pair<SegmentID, Status> AddSegmentID1(KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts);
+    Status AddSegmentWithID(KVInstance *kv_instance, TxnTimeStamp commit_ts, SegmentID segment_id);
 
-    Status CommitSegment(SegmentID segment_id, TxnTimeStamp commit_ts);
+    Status CommitSegment(KVInstance *kv_instance, SegmentID segment_id, TxnTimeStamp commit_ts);
 
-    Tuple<ColumnID, Status> GetColumnIDByColumnName(const String &column_name);
-    Tuple<String, Status> GetColumnKeyByColumnName(const String &column_name) const;
+    Tuple<ColumnID, Status>
+    GetColumnIDByColumnName(KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts, const String &column_name);
+    Tuple<String, Status>
+    GetColumnKeyByColumnName(KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts, const String &column_name) const;
     SharedPtr<String> GetTableDir();
 
-    Tuple<Vector<SegmentID> *, Status> GetSegmentIDs1();
-    Status CheckSegments(const Vector<SegmentID> &segment_ids);
+    Tuple<Vector<SegmentID> *, Status> GetSegmentIDs1(KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts);
+    Status CheckSegments(KVInstance *kv_instance, TxnTimeStamp begin_ts, const Vector<SegmentID> &segment_ids);
 
-    Tuple<SharedPtr<Vector<SharedPtr<ColumnDef>>>, Status> GetColumnDefs();
-    Tuple<SharedPtr<ColumnDef>, Status> GetColumnDefByColumnName(const String &column_name, SizeT *column_idx = nullptr);
-    Tuple<SharedPtr<ColumnDef>, Status> GetColumnDefByColumnID(const SizeT &column_idx);
+    Tuple<SharedPtr<Vector<SharedPtr<ColumnDef>>>, Status> GetColumnDefs(KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts);
+    Tuple<SharedPtr<ColumnDef>, Status> GetColumnDefByColumnName(KVInstance *kv_instance,
+                                                                 TxnTimeStamp begin_ts,
+                                                                 TxnTimeStamp commit_ts,
+                                                                 const String &column_name,
+                                                                 SizeT *column_idx = nullptr);
+    Tuple<SharedPtr<ColumnDef>, Status>
+    GetColumnDefByColumnID(KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts, const SizeT &column_idx);
 
-    Status GetTableInfo(TableInfo &table_info);
+    Status GetTableInfo(KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts, TableInfo &table_info);
 
     Status GetTableDetail(KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts, TableDetail &table_detail);
 
     Pair<String, String> GetDBTableName() const;
     void SetDBTableName(const String &db_name, const String &table_name);
 
-    Status AddColumn(const ColumnDef &column_def);
+    Status AddColumn(KVInstance *kv_instance, TxnTimeStamp commit_ts, const ColumnDef &column_def);
 
     Status AddFtIndexCache(SharedPtr<TableIndexReaderCache> ft_index_cache);
 
@@ -101,28 +114,26 @@ public:
 
     Status InvalidateFtIndexCache();
 
-    Status GetNextColumnID(ColumnID &next_column_id);
+    Status GetNextColumnID(KVInstance *kv_instance, ColumnID &next_column_id);
 
-    Status SetNextColumnID(ColumnID next_column_id);
+    Status SetNextColumnID(KVInstance *kv_instance, ColumnID next_column_id);
 
     Status UpdateFulltextSegmentTS(TxnTimeStamp ts, SegmentUpdateTS &segment_update_ts);
 
-    Tuple<String, Status> GetNextIndexID();
+    Tuple<String, Status> GetNextIndexID(KVInstance *kv_instance);
 
-    Status SetNextIndexID(const String &index_id_str);
+    Status SetNextIndexID(KVInstance *kv_instance, const String &index_id_str);
 
 private:
-    Status LoadComment();
+    Status LoadComment(KVInstance *kv_instance);
 
-    Status LoadColumnDefs();
+    Status LoadColumnDefs(KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts);
 
-    Status LoadSegmentIDs1();
+    Status LoadIndexIDs(KVInstance *kv_instance, TxnTimeStamp begin_ts);
 
-    Status LoadIndexIDs();
+    Status LoadUnsealedSegmentID(KVInstance *kv_instance);
 
-    Status LoadUnsealedSegmentID();
-
-    Status LoadNextColumnID();
+    Status LoadNextColumnID(KVInstance *kv_instance);
 
     String GetTableTag(const String &tag) const;
 

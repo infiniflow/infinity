@@ -160,7 +160,7 @@ TEST_P(TestTxnCompactInternal, test_compact) {
         Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
 
-        auto [segment_ids, seg_status] = table_meta->GetSegmentIDs1();
+        auto [segment_ids, seg_status] = table_meta->GetSegmentIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
         EXPECT_TRUE(seg_status.ok());
         EXPECT_EQ(*segment_ids, Vector<SegmentID>({2}));
 
@@ -192,7 +192,13 @@ TEST_P(TestTxnCompactInternal, test_compact) {
                 ColumnMeta column_meta(column_idx, block_meta);
                 ColumnVector col;
 
-                Status status = NewCatalog::GetColumnVector(column_meta, state.block_offset_end(), ColumnVectorMode::kReadOnly, col);
+                Status status = NewCatalog::GetColumnVector(column_meta,
+                                                            txn->kv_instance(),
+                                                            txn->BeginTS(),
+                                                            txn->CommitTS(),
+                                                            state.block_offset_end(),
+                                                            ColumnVectorMode::kReadOnly,
+                                                            col);
                 EXPECT_TRUE(status.ok());
 
                 EXPECT_EQ(col.GetValueByIndex(0), Value::MakeInt(1));
@@ -231,7 +237,13 @@ TEST_P(TestTxnCompactInternal, test_compact) {
                 ColumnMeta column_meta(column_idx, block_meta);
                 ColumnVector col;
 
-                Status status = NewCatalog::GetColumnVector(column_meta, state.block_offset_end(), ColumnVectorMode::kReadOnly, col);
+                Status status = NewCatalog::GetColumnVector(column_meta,
+                                                            txn->kv_instance(),
+                                                            txn->BeginTS(),
+                                                            txn->CommitTS(),
+                                                            state.block_offset_end(),
+                                                            ColumnVectorMode::kReadOnly,
+                                                            col);
                 EXPECT_TRUE(status.ok());
 
                 EXPECT_EQ(col.GetValueByIndex(0), Value::MakeInt(1));
@@ -348,7 +360,7 @@ TEST_P(TestTxnCompactInternal, test_compact_with_index) {
         Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
 
-        auto [segment_ids, seg_status] = table_meta->GetSegmentIDs1();
+        auto [segment_ids, seg_status] = table_meta->GetSegmentIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
         EXPECT_TRUE(seg_status.ok());
         EXPECT_EQ(*segment_ids, Vector<SegmentID>({2}));
 
@@ -380,7 +392,13 @@ TEST_P(TestTxnCompactInternal, test_compact_with_index) {
                 ColumnMeta column_meta(column_idx, block_meta);
                 ColumnVector col;
 
-                Status status = NewCatalog::GetColumnVector(column_meta, state.block_offset_end(), ColumnVectorMode::kReadOnly, col);
+                Status status = NewCatalog::GetColumnVector(column_meta,
+                                                            txn->kv_instance(),
+                                                            txn->BeginTS(),
+                                                            txn->CommitTS(),
+                                                            state.block_offset_end(),
+                                                            ColumnVectorMode::kReadOnly,
+                                                            col);
                 EXPECT_TRUE(status.ok());
 
                 EXPECT_EQ(col.GetValueByIndex(0), Value::MakeInt(1));
@@ -419,7 +437,13 @@ TEST_P(TestTxnCompactInternal, test_compact_with_index) {
                 ColumnMeta column_meta(column_idx, block_meta);
                 ColumnVector col;
 
-                Status status = NewCatalog::GetColumnVector(column_meta, state.block_offset_end(), ColumnVectorMode::kReadOnly, col);
+                Status status = NewCatalog::GetColumnVector(column_meta,
+                                                            txn->kv_instance(),
+                                                            txn->BeginTS(),
+                                                            txn->CommitTS(),
+                                                            state.block_offset_end(),
+                                                            ColumnVectorMode::kReadOnly,
+                                                            col);
                 EXPECT_TRUE(status.ok());
 
                 EXPECT_EQ(col.GetValueByIndex(0), Value::MakeInt(1));
@@ -447,7 +471,7 @@ TEST_P(TestTxnCompactInternal, test_compact_with_index) {
 
         SegmentID segment_id = 0;
         {
-            auto [segment_ids, status] = table_meta->GetSegmentIDs1();
+            auto [segment_ids, status] = table_meta->GetSegmentIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*segment_ids, Vector<SegmentID>({2}));
             segment_id = (*segment_ids)[0];

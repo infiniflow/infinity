@@ -485,10 +485,10 @@ TEST_P(TestTxnCompact, compact_and_add_columns) {
     auto column_def3 =
         std::make_shared<ColumnDef>(2, std::make_shared<DataType>(LogicalType::kVarchar), "col3", std::set<ConstraintType>(), default_varchar);
     auto CheckTable = [&](Vector<ColumnID> column_idxes) {
-        auto check_column = [&](ColumnMeta &column_meta) {
+        auto check_column = [&](ColumnMeta &column_meta, NewTxn *txn) {
             BufferObj *column_buffer = nullptr;
             BufferObj *outline_buffer = nullptr;
-            Status status = column_meta.GetColumnBuffer(column_buffer, outline_buffer);
+            Status status = column_meta.GetColumnBuffer(txn->kv_instance(), txn->BeginTS(), txn->CommitTS(), column_buffer, outline_buffer);
             EXPECT_TRUE(status.ok());
             EXPECT_NE(column_buffer, nullptr);
             if (column_meta.column_idx() != 0) {
@@ -503,7 +503,7 @@ TEST_P(TestTxnCompact, compact_and_add_columns) {
 
             for (auto column_id : column_idxes) {
                 ColumnMeta column_meta(column_id, block_meta);
-                check_column(column_meta);
+                check_column(column_meta, txn);
             }
         };
 
@@ -526,7 +526,7 @@ TEST_P(TestTxnCompact, compact_and_add_columns) {
         EXPECT_TRUE(status.ok());
 
         Vector<SegmentID> *segment_ids_ptr = nullptr;
-        std::tie(segment_ids_ptr, status) = table_meta->GetSegmentIDs1();
+        std::tie(segment_ids_ptr, status) = table_meta->GetSegmentIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(*segment_ids_ptr, Vector<SegmentID>{2});
 
@@ -541,10 +541,10 @@ TEST_P(TestTxnCompact, compact_and_add_columns) {
     };
 
     auto CheckTable1 = [&](Vector<ColumnID> column_idxes) {
-        auto check_column = [&](ColumnMeta &column_meta) {
+        auto check_column = [&](ColumnMeta &column_meta, NewTxn *txn) {
             BufferObj *column_buffer = nullptr;
             BufferObj *outline_buffer = nullptr;
-            Status status = column_meta.GetColumnBuffer(column_buffer, outline_buffer);
+            Status status = column_meta.GetColumnBuffer(txn->kv_instance(), txn->BeginTS(), txn->CommitTS(), column_buffer, outline_buffer);
             EXPECT_TRUE(status.ok());
             EXPECT_NE(column_buffer, nullptr);
             if (column_meta.column_idx() != 0) {
@@ -559,7 +559,7 @@ TEST_P(TestTxnCompact, compact_and_add_columns) {
 
             for (auto column_id : column_idxes) {
                 ColumnMeta column_meta(column_id, block_meta);
-                check_column(column_meta);
+                check_column(column_meta, txn);
             }
         };
 
@@ -582,7 +582,7 @@ TEST_P(TestTxnCompact, compact_and_add_columns) {
         EXPECT_TRUE(status.ok());
 
         Vector<SegmentID> *segment_ids_ptr = nullptr;
-        std::tie(segment_ids_ptr, status) = table_meta->GetSegmentIDs1();
+        std::tie(segment_ids_ptr, status) = table_meta->GetSegmentIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(segment_ids_ptr->size(), 2);
 
@@ -754,10 +754,10 @@ TEST_P(TestTxnCompact, compact_and_add_columns) {
 
 TEST_P(TestTxnCompact, compact_and_drop_columns) {
     auto CheckTable = [&](const Vector<ColumnID> &column_idxes, const Vector<SegmentID> &segment_ids) {
-        auto check_column = [&](ColumnMeta &column_meta) {
+        auto check_column = [&](ColumnMeta &column_meta, NewTxn *txn) {
             BufferObj *column_buffer = nullptr;
             BufferObj *outline_buffer = nullptr;
-            Status status = column_meta.GetColumnBuffer(column_buffer, outline_buffer);
+            Status status = column_meta.GetColumnBuffer(txn->kv_instance(), txn->BeginTS(), txn->CommitTS(), column_buffer, outline_buffer);
             EXPECT_TRUE(status.ok());
             EXPECT_NE(column_buffer, nullptr);
             // EXPECT_NE(outline_buffer, nullptr);
@@ -770,7 +770,7 @@ TEST_P(TestTxnCompact, compact_and_drop_columns) {
 
             for (auto column_id : column_idxes) {
                 ColumnMeta column_meta(column_id, block_meta);
-                check_column(column_meta);
+                check_column(column_meta, txn);
             }
         };
 
@@ -792,7 +792,7 @@ TEST_P(TestTxnCompact, compact_and_drop_columns) {
         EXPECT_TRUE(status.ok());
 
         Vector<SegmentID> *segment_ids_ptr = nullptr;
-        std::tie(segment_ids_ptr, status) = table_meta->GetSegmentIDs1();
+        std::tie(segment_ids_ptr, status) = table_meta->GetSegmentIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(*segment_ids_ptr, segment_ids);
 
@@ -1185,7 +1185,7 @@ TEST_P(TestTxnCompact, compact_and_compact) {
         EXPECT_TRUE(status.ok());
 
         Vector<SegmentID> *segment_ids_ptr = nullptr;
-        std::tie(segment_ids_ptr, status) = table_meta->GetSegmentIDs1();
+        std::tie(segment_ids_ptr, status) = table_meta->GetSegmentIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(segment_ids_ptr->size(), 1);
     };
@@ -1309,13 +1309,13 @@ TEST_P(TestTxnCompact, compact_and_create_index) {
         EXPECT_TRUE(status.ok());
 
         Vector<SegmentID> *segment_ids_ptr = nullptr;
-        std::tie(segment_ids_ptr, status) = table_meta->GetSegmentIDs1();
+        std::tie(segment_ids_ptr, status) = table_meta->GetSegmentIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(*segment_ids_ptr, segment_ids);
 
         Vector<String> *index_ids_strs_ptr = nullptr;
         Vector<String> *index_names_ptr = nullptr;
-        status = table_meta->GetIndexIDs(index_ids_strs_ptr, &index_names_ptr);
+        status = table_meta->GetIndexIDs(txn->kv_instance(), txn->BeginTS(), index_ids_strs_ptr, &index_names_ptr);
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(*index_names_ptr, Vector<String>({*index_name1}));
         TableIndexMeeta table_index_meta((*index_ids_strs_ptr)[0], *table_meta);
@@ -1343,13 +1343,13 @@ TEST_P(TestTxnCompact, compact_and_create_index) {
         EXPECT_TRUE(status.ok());
 
         Vector<SegmentID> *segment_ids_ptr = nullptr;
-        std::tie(segment_ids_ptr, status) = table_meta->GetSegmentIDs1();
+        std::tie(segment_ids_ptr, status) = table_meta->GetSegmentIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(*segment_ids_ptr, Vector<SegmentID>({2}));
 
         Vector<String> *index_ids_strs_ptr = nullptr;
         Vector<String> *index_names_ptr = nullptr;
-        status = table_meta->GetIndexIDs(index_ids_strs_ptr, &index_names_ptr);
+        status = table_meta->GetIndexIDs(txn->kv_instance(), txn->BeginTS(), index_ids_strs_ptr, &index_names_ptr);
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(*index_ids_strs_ptr, Vector<String>({}));
     };
@@ -1521,13 +1521,13 @@ TEST_P(TestTxnCompact, compact_and_drop_index) {
         EXPECT_TRUE(status.ok());
 
         Vector<SegmentID> *segment_ids_ptr = nullptr;
-        std::tie(segment_ids_ptr, status) = table_meta->GetSegmentIDs1();
+        std::tie(segment_ids_ptr, status) = table_meta->GetSegmentIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(*segment_ids_ptr, segment_ids);
 
         Vector<String> *index_ids_strs_ptr = nullptr;
         Vector<String> *index_names_ptr = nullptr;
-        status = table_meta->GetIndexIDs(index_ids_strs_ptr, &index_names_ptr);
+        status = table_meta->GetIndexIDs(txn->kv_instance(), txn->BeginTS(), index_ids_strs_ptr, &index_names_ptr);
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(*index_names_ptr, Vector<String>({*index_name1}));
         TableIndexMeeta table_index_meta((*index_ids_strs_ptr)[0], *table_meta);
@@ -1555,13 +1555,13 @@ TEST_P(TestTxnCompact, compact_and_drop_index) {
         EXPECT_TRUE(status.ok());
 
         Vector<SegmentID> *segment_ids_ptr = nullptr;
-        std::tie(segment_ids_ptr, status) = table_meta->GetSegmentIDs1();
+        std::tie(segment_ids_ptr, status) = table_meta->GetSegmentIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(*segment_ids_ptr, segment_ids);
 
         Vector<String> *index_ids_strs_ptr = nullptr;
         Vector<String> *index_names_ptr = nullptr;
-        status = table_meta->GetIndexIDs(index_ids_strs_ptr, &index_names_ptr);
+        status = table_meta->GetIndexIDs(txn->kv_instance(), txn->BeginTS(), index_ids_strs_ptr, &index_names_ptr);
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(*index_ids_strs_ptr, Vector<String>({}));
     };

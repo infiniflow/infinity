@@ -987,7 +987,7 @@ TEST_P(TestTxnReplayTest, test_replay_flush_gap_append_append) {
         EXPECT_TRUE(status.ok());
 
         Vector<SegmentID> *segment_ids_ptr = nullptr;
-        std::tie(segment_ids_ptr, status) = table_meta->GetSegmentIDs1();
+        std::tie(segment_ids_ptr, status) = table_meta->GetSegmentIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(*segment_ids_ptr, Vector<SegmentID>({0}));
         SegmentID segment_id = (*segment_ids_ptr)[0];
@@ -1124,7 +1124,7 @@ TEST_P(TestTxnReplayTest, test_replay_flush_gap_dump_index) {
         EXPECT_TRUE(status.ok());
 
         {
-            auto [segment_ids, status] = table_meta->GetSegmentIDs1();
+            auto [segment_ids, status] = table_meta->GetSegmentIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*segment_ids, Vector<SegmentID>({0}));
         }
@@ -1256,7 +1256,7 @@ TEST_P(TestTxnReplayTest, test_replay_flush_gap_compact) {
         EXPECT_TRUE(status.ok());
 
         Vector<SegmentID> *segment_ids_ptr = nullptr;
-        std::tie(segment_ids_ptr, status) = table_meta->GetSegmentIDs1();
+        std::tie(segment_ids_ptr, status) = table_meta->GetSegmentIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(*segment_ids_ptr, Vector<SegmentID>({2}));
         SegmentID segment_id = (*segment_ids_ptr)[0];
@@ -1407,7 +1407,7 @@ TEST_P(TestTxnReplayTest, test_replay_flush_gap_optimize_index) {
         EXPECT_TRUE(status.ok());
 
         {
-            auto [segment_ids, status] = table_meta->GetSegmentIDs1();
+            auto [segment_ids, status] = table_meta->GetSegmentIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*segment_ids, Vector<SegmentID>({0}));
         }

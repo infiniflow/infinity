@@ -70,7 +70,7 @@ void BlockIndex::NewInit(UniquePtr<TableMeeta> table_meta, KVInstance *kv_instan
     table_meta_ = std::move(table_meta);
     Status status = Status::OK();
     Vector<SegmentID> *segment_ids_ptr = nullptr;
-    std::tie(segment_ids_ptr, status) = table_meta_->GetSegmentIDs1();
+    std::tie(segment_ids_ptr, status) = table_meta_->GetSegmentIDs1(kv_instance, begin_ts, commit_ts);
     if (!status.ok()) {
         RecoverableError(status);
     }

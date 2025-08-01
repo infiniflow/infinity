@@ -46,40 +46,40 @@ public:
 
     const String &index_id_str() const { return index_id_str_; }
 
-    Tuple<SharedPtr<IndexBase>, Status> GetIndexBase(KVInstance* kv_instance);
+    Tuple<SharedPtr<IndexBase>, Status> GetIndexBase(KVInstance *kv_instance);
 
-    Status SetIndexBase(KVInstance* kv_instance, const SharedPtr<IndexBase> &index_base);
+    Status SetIndexBase(KVInstance *kv_instance, const SharedPtr<IndexBase> &index_base);
 
     SharedPtr<String> GetTableIndexDir();
 
-    Tuple<SharedPtr<ColumnDef>, Status> GetColumnDef(KVInstance* kv_instance);
+    Tuple<SharedPtr<ColumnDef>, Status> GetColumnDef(KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts);
 
-    Status GetTableIndexInfo(KVInstance* kv_instance, TableIndexInfo &table_index_info);
+    Status GetTableIndexInfo(KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts, TableIndexInfo &table_index_info);
 
-    Tuple<Vector<SegmentID> *, Status> GetSegmentIndexIDs1(KVInstance* kv_instance);
+    Tuple<Vector<SegmentID> *, Status> GetSegmentIndexIDs1(KVInstance *kv_instance);
 
-    bool HasSegmentIndexID(KVInstance* kv_instance, SegmentID segment_id);
+    bool HasSegmentIndexID(KVInstance *kv_instance, SegmentID segment_id);
 
-    Status AddSegmentIndexID1(KVInstance* kv_instance, SegmentID segment_id, NewTxn *new_txn);
+    Status AddSegmentIndexID1(KVInstance *kv_instance, SegmentID segment_id, NewTxn *new_txn);
 
-    Status RemoveSegmentIndexIDs(KVInstance* kv_instance, const Vector<SegmentID> &segment_ids);
+    Status RemoveSegmentIndexIDs(KVInstance *kv_instance, const Vector<SegmentID> &segment_ids);
 
 private:
     Status GetSegmentUpdateTS(SharedPtr<SegmentUpdateTS> &segment_update_ts);
 
 public:
-    Status InitSet1(KVInstance* kv_instance, const SharedPtr<IndexBase> &index_base, NewCatalog *new_catalog);
+    Status InitSet1(KVInstance *kv_instance, const SharedPtr<IndexBase> &index_base, NewCatalog *new_catalog);
 
-    Status UninitSet1(KVInstance* kv_instance, UsageFlag usage_flag);
+    Status UninitSet1(KVInstance *kv_instance, UsageFlag usage_flag);
 
 private:
-    Status LoadSegmentIDs(KVInstance* kv_instance);
+    Status LoadSegmentIDs(KVInstance *kv_instance);
 
     String GetTableIndexTag(const String &tag) const;
 
 public:
     // Methods for secondary index cardinality
-    Tuple<SecondaryIndexCardinality, Status> GetSecondaryIndexCardinality(KVInstance* kv_instance);
+    Tuple<SecondaryIndexCardinality, Status> GetSecondaryIndexCardinality(KVInstance *kv_instance);
 
 private:
     mutable std::mutex mtx_;

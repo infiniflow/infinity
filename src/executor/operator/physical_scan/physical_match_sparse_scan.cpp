@@ -141,15 +141,17 @@ void PhysicalMatchSparseScan::PlanWithIndex(QueryContext *query_context) {
     Status status;
     TableMeeta *table_meta = table_meta = base_table_ref_->block_index_->table_meta_.get();
 
+    NewTxn *new_txn = query_context->GetNewTxn();
+    KVInstance *kv_instance = new_txn->kv_instance();
+    TxnTimeStamp begin_ts = new_txn->BeginTS();
+    //    TxnTimeStamp commit_ts = new_txn->CommitTS();
+
     Vector<String> *index_id_strs_ptr = nullptr;
     Vector<String> *index_names_ptr = nullptr;
-    status = table_meta->GetIndexIDs(index_id_strs_ptr, &index_names_ptr);
+    status = table_meta->GetIndexIDs(kv_instance, begin_ts, index_id_strs_ptr, &index_names_ptr);
     if (!status.ok()) {
         RecoverableError(status);
     }
-
-    NewTxn* new_txn = query_context->GetNewTxn();
-    KVInstance* kv_instance = new_txn->kv_instance();
 
     if (match_sparse_expr_->index_name_.empty()) {
         for (SizeT i = 0; i < index_id_strs_ptr->size(); ++i) {
@@ -467,7 +469,7 @@ void PhysicalMatchSparseScan::ExecuteInnerT(DistFunc *dist_func,
         }
 
         ColumnMeta column_meta(search_column_id_, *block_meta);
-        status = NewCatalog::GetColumnVector(column_meta, row_cnt, ColumnVectorMode::kReadOnly, column_vector);
+        status = NewCatalog::GetColumnVector(column_meta, kv_instance, begin_ts, commit_ts, row_cnt, ColumnVectorMode::kReadOnly, column_vector);
         if (!status.ok()) {
             UnrecoverableError(status.message());
         }

@@ -198,7 +198,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_db) {
         EXPECT_TRUE(status.ok());
 
         {
-            auto [segment_ids, status] = table_meta->GetSegmentIDs1();
+            auto [segment_ids, status] = table_meta->GetSegmentIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*segment_ids, Vector<SegmentID>({0}));
         }
@@ -248,7 +248,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_db) {
         EXPECT_TRUE(status.ok());
 
         {
-            auto [segment_ids, status] = table_meta->GetSegmentIDs1();
+            auto [segment_ids, status] = table_meta->GetSegmentIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*segment_ids, Vector<SegmentID>({0}));
         }
@@ -716,7 +716,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_table) {
         EXPECT_TRUE(status.ok());
 
         {
-            auto [segment_ids, status] = table_meta->GetSegmentIDs1();
+            auto [segment_ids, status] = table_meta->GetSegmentIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*segment_ids, Vector<SegmentID>({0}));
         }
@@ -767,7 +767,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_table) {
         EXPECT_TRUE(status.ok());
 
         {
-            auto [segment_ids, status] = table_meta->GetSegmentIDs1();
+            auto [segment_ids, status] = table_meta->GetSegmentIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*segment_ids, Vector<SegmentID>({0}));
         }
@@ -1316,7 +1316,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_add_column) {
         EXPECT_TRUE(status.ok());
 
         {
-            auto [segment_ids, status] = table_meta->GetSegmentIDs1();
+            auto [segment_ids, status] = table_meta->GetSegmentIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*segment_ids, Vector<SegmentID>({0}));
         }
@@ -1367,7 +1367,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_add_column) {
         EXPECT_TRUE(status.ok());
 
         {
-            auto [segment_ids, status] = table_meta->GetSegmentIDs1();
+            auto [segment_ids, status] = table_meta->GetSegmentIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*segment_ids, Vector<SegmentID>({0}));
         }
@@ -1934,7 +1934,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_column) {
         EXPECT_TRUE(status.ok());
 
         {
-            auto [segment_ids, status] = table_meta->GetSegmentIDs1();
+            auto [segment_ids, status] = table_meta->GetSegmentIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*segment_ids, Vector<SegmentID>({0}));
         }
@@ -1985,7 +1985,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_column) {
         EXPECT_TRUE(status.ok());
 
         {
-            auto [segment_ids, status] = table_meta->GetSegmentIDs1();
+            auto [segment_ids, status] = table_meta->GetSegmentIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*segment_ids, Vector<SegmentID>({0}));
         }
@@ -2514,7 +2514,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_rename_table) {
         EXPECT_TRUE(status.ok());
 
         {
-            auto [segment_ids, status] = table_meta->GetSegmentIDs1();
+            auto [segment_ids, status] = table_meta->GetSegmentIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*segment_ids, Vector<SegmentID>({0}));
         }
@@ -2565,7 +2565,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_rename_table) {
         EXPECT_TRUE(status.ok());
 
         {
-            auto [segment_ids, status] = table_meta->GetSegmentIDs1();
+            auto [segment_ids, status] = table_meta->GetSegmentIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*segment_ids, Vector<SegmentID>({0}));
         }
@@ -3049,7 +3049,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_create_index) {
         EXPECT_TRUE(status.ok());
 
         {
-            auto [segment_ids, status] = table_meta->GetSegmentIDs1();
+            auto [segment_ids, status] = table_meta->GetSegmentIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*segment_ids, Vector<SegmentID>({0}));
         }
@@ -3100,7 +3100,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_create_index) {
         EXPECT_TRUE(status.ok());
 
         {
-            auto [segment_ids, status] = table_meta->GetSegmentIDs1();
+            auto [segment_ids, status] = table_meta->GetSegmentIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*segment_ids, Vector<SegmentID>({0}));
         }
@@ -3326,7 +3326,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_index) {
         EXPECT_TRUE(status.ok());
 
         {
-            auto [segment_ids, status] = table_meta->GetSegmentIDs1();
+            auto [segment_ids, status] = table_meta->GetSegmentIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*segment_ids, Vector<SegmentID>({0}));
         }
@@ -3377,7 +3377,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_index) {
         EXPECT_TRUE(status.ok());
 
         {
-            auto [segment_ids, status] = table_meta->GetSegmentIDs1();
+            auto [segment_ids, status] = table_meta->GetSegmentIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*segment_ids, Vector<SegmentID>({0}));
         }
@@ -3868,7 +3868,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_import) {
         EXPECT_TRUE(status.ok());
 
         {
-            auto [segment_ids, status] = table_meta->GetSegmentIDs1();
+            auto [segment_ids, status] = table_meta->GetSegmentIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*segment_ids, Vector<SegmentID>({0}));
         }
@@ -3919,7 +3919,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_import) {
         EXPECT_TRUE(status.ok());
 
         {
-            auto [segment_ids, status] = table_meta->GetSegmentIDs1();
+            auto [segment_ids, status] = table_meta->GetSegmentIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*segment_ids, Vector<SegmentID>({0}));
         }
@@ -3969,7 +3969,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_import) {
         EXPECT_TRUE(status.ok());
 
         {
-            auto [segment_ids, status] = table_meta->GetSegmentIDs1();
+            auto [segment_ids, status] = table_meta->GetSegmentIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*segment_ids, Vector<SegmentID>({0, 1}));
         }
@@ -4020,7 +4020,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_import) {
         EXPECT_TRUE(status.ok());
 
         {
-            auto [segment_ids, status] = table_meta->GetSegmentIDs1();
+            auto [segment_ids, status] = table_meta->GetSegmentIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*segment_ids, Vector<SegmentID>({0, 1}));
         }
@@ -4608,7 +4608,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_append) {
         EXPECT_TRUE(status.ok());
 
         {
-            auto [segment_ids, status] = table_meta->GetSegmentIDs1();
+            auto [segment_ids, status] = table_meta->GetSegmentIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*segment_ids, Vector<SegmentID>({0}));
         }
@@ -4659,7 +4659,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_append) {
         EXPECT_TRUE(status.ok());
 
         {
-            auto [segment_ids, status] = table_meta->GetSegmentIDs1();
+            auto [segment_ids, status] = table_meta->GetSegmentIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*segment_ids, Vector<SegmentID>({0}));
         }
@@ -4709,7 +4709,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_append) {
         EXPECT_TRUE(status.ok());
 
         {
-            auto [segment_ids, status] = table_meta->GetSegmentIDs1();
+            auto [segment_ids, status] = table_meta->GetSegmentIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*segment_ids, Vector<SegmentID>({0}));
         }
@@ -5188,7 +5188,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_delete) {
         EXPECT_TRUE(status.ok());
 
         {
-            auto [segment_ids, status] = table_meta->GetSegmentIDs1();
+            auto [segment_ids, status] = table_meta->GetSegmentIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*segment_ids, Vector<SegmentID>({0}));
         }
@@ -5771,7 +5771,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_dump) {
         EXPECT_TRUE(status.ok());
 
         {
-            auto [segment_ids, status] = table_meta->GetSegmentIDs1();
+            auto [segment_ids, status] = table_meta->GetSegmentIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*segment_ids, Vector<SegmentID>({0}));
         }
@@ -5822,7 +5822,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_dump) {
         EXPECT_TRUE(status.ok());
 
         {
-            auto [segment_ids, status] = table_meta->GetSegmentIDs1();
+            auto [segment_ids, status] = table_meta->GetSegmentIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*segment_ids, Vector<SegmentID>({0}));
         }

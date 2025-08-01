@@ -99,15 +99,18 @@ struct ExpressionIndexScanInfo {
         table_meta_ = base_table_ref->block_index_->table_meta_.get();
         auto &table_index_meta_map = base_table_ref->block_index_->table_index_meta_map_;
 
+        KVInstance *kv_instance = new_txn->kv_instance();
+        TxnTimeStamp begin_ts = new_txn->BeginTS();
+        TxnTimeStamp commit_ts = new_txn->CommitTS();
         Vector<String> *index_id_strs_ptr = nullptr;
-        status = table_meta_->GetIndexIDs(index_id_strs_ptr);
+        status = table_meta_->GetIndexIDs(kv_instance, begin_ts, index_id_strs_ptr);
         if (!status.ok()) {
             RecoverableError(status);
         }
         if (!base_table_ref->index_index_) {
             base_table_ref->index_index_ = MakeShared<IndexIndex>();
         }
-        KVInstance* kv_instance = new_txn->kv_instance();
+
         for (SizeT i = 0; i < index_id_strs_ptr->size(); ++i) {
             const String &index_id_str = (*index_id_strs_ptr)[i];
             if (table_index_meta_map.size() <= i) {
@@ -126,7 +129,7 @@ struct ExpressionIndexScanInfo {
             }
             auto column_name = index_base->column_name();
             ColumnID column_id = 0;
-            std::tie(column_id, status) = table_meta_->GetColumnIDByColumnName(column_name);
+            std::tie(column_id, status) = table_meta_->GetColumnIDByColumnName(kv_instance, begin_ts, commit_ts, column_name);
             if (!status.ok()) {
                 RecoverableError(status);
             }
@@ -405,6 +408,8 @@ private:
     inline UniquePtr<IndexFilterEvaluator> BuildIndexFilterEvaluator(const TreeT &index_filter_tree_node) const {
         NewTxn *new_txn = query_context_->GetNewTxn();
         KVInstance *kv_instance = new_txn->kv_instance();
+        TxnTimeStamp begin_ts = new_txn->BeginTS();
+        TxnTimeStamp commit_ts = new_txn->CommitTS();
         switch (index_filter_tree_node.info) {
             case Enum::kVarcharSecondaryIndexColumnExprOrAfterCast:
             case Enum::kSecondaryIndexColumnExprOrAfterCast:
@@ -458,6 +463,8 @@ private:
                                                                        column_id,
                                                                        secondary_index,
                                                                        kv_instance,
+                                                                       begin_ts,
+                                                                       commit_ts,
                                                                        compare_type,
                                                                        value);
                         }

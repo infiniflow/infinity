@@ -137,7 +137,7 @@ TEST_P(TestTxnAlter, add_column0) {
         auto check_column = [&](ColumnMeta &column_meta, const Value &v, SizeT row_count) {
             ColumnVector col;
 
-            Status status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorMode::kReadOnly, col);
+            Status status = NewCatalog::GetColumnVector(column_meta, kv_instance, begin_ts, commit_ts, row_count, ColumnVectorMode::kReadOnly, col);
             EXPECT_TRUE(status.ok());
 
             for (SizeT i = 0; i < row_count; ++i) {
@@ -184,7 +184,7 @@ TEST_P(TestTxnAlter, add_column0) {
             }
         };
 
-        auto [segment_ids, seg_status] = table_meta->GetSegmentIDs1();
+        auto [segment_ids, seg_status] = table_meta->GetSegmentIDs1(kv_instance, begin_ts, commit_ts);
         EXPECT_TRUE(seg_status.ok());
         EXPECT_EQ(*segment_ids, Vector<SegmentID>({0}));
 
@@ -267,7 +267,7 @@ TEST_P(TestTxnAlter, drop_column0) {
         auto check_column = [&](ColumnMeta &column_meta, const Value &v, SizeT row_count) {
             ColumnVector col;
 
-            Status status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorMode::kReadOnly, col);
+            Status status = NewCatalog::GetColumnVector(column_meta, kv_instance, begin_ts, commit_ts, row_count, ColumnVectorMode::kReadOnly, col);
             EXPECT_TRUE(status.ok());
 
             for (SizeT i = 0; i < row_count; ++i) {
@@ -309,7 +309,7 @@ TEST_P(TestTxnAlter, drop_column0) {
             }
         };
 
-        auto [segment_ids, seg_status] = table_meta->GetSegmentIDs1();
+        auto [segment_ids, seg_status] = table_meta->GetSegmentIDs1(kv_instance, begin_ts, commit_ts);
         EXPECT_TRUE(seg_status.ok());
         EXPECT_EQ(*segment_ids, Vector<SegmentID>({0}));
 

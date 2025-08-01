@@ -281,6 +281,9 @@ Status LogicalPlanner::BuildInsertValue(const InsertStatement *statement, Shared
 
     SharedPtr<TableInfo> table_info;
     NewTxn *new_txn = query_context_ptr_->GetNewTxn();
+    KVInstance *kv_instance = new_txn->kv_instance();
+    TxnTimeStamp begin_ts = new_txn->BeginTS();
+    TxnTimeStamp commit_ts = new_txn->CommitTS();
     SharedPtr<DBMeeta> db_meta;
     Optional<TableMeeta> table_meta;
     String table_key;
@@ -289,7 +292,7 @@ Status LogicalPlanner::BuildInsertValue(const InsertStatement *statement, Shared
         RecoverableError(status);
     }
     table_info = MakeShared<TableInfo>();
-    status = table_meta->GetTableInfo(*table_info);
+    status = table_meta->GetTableInfo(kv_instance, begin_ts, commit_ts, *table_info);
     if (!status.ok()) {
         RecoverableError(status);
     }
@@ -1029,6 +1032,9 @@ Status LogicalPlanner::BuildExport(const CopyStatement *statement, SharedPtr<Bin
     SharedPtr<TableInfo> table_info;
     Status status;
     NewTxn *new_txn = query_context_ptr_->GetNewTxn();
+    KVInstance *kv_instance = new_txn->kv_instance();
+    TxnTimeStamp begin_ts = new_txn->BeginTS();
+    TxnTimeStamp commit_ts = new_txn->CommitTS();
     SharedPtr<DBMeeta> db_meta;
     Optional<TableMeeta> tmp_table_meta;
     status = new_txn->GetTableMeta(statement->schema_name_, statement->table_name_, db_meta, tmp_table_meta);
@@ -1041,7 +1047,7 @@ Status LogicalPlanner::BuildExport(const CopyStatement *statement, SharedPtr<Bin
                                              tmp_table_meta->begin_ts(),
                                              tmp_table_meta->commit_ts());
     table_info = MakeShared<TableInfo>();
-    status = table_meta->GetTableInfo(*table_info);
+    status = table_meta->GetTableInfo(kv_instance, begin_ts, commit_ts, *table_info);
     if (!status.ok()) {
         RecoverableError(status);
     }
@@ -1162,10 +1168,6 @@ Status LogicalPlanner::BuildExport(const CopyStatement *statement, SharedPtr<Bin
         }
     }
 
-    KVInstance *kv_instance = new_txn->kv_instance();
-    TxnTimeStamp begin_ts = new_txn->BeginTS();
-    TxnTimeStamp commit_ts = new_txn->CommitTS();
-
     SharedPtr<BlockIndex> block_index;
     block_index = MakeShared<BlockIndex>();
     block_index->NewInit(std::move(table_meta), kv_instance, begin_ts, commit_ts);
@@ -1198,8 +1200,12 @@ Status LogicalPlanner::BuildImport(const CopyStatement *statement, SharedPtr<Bin
     if (!status.ok()) {
         RecoverableError(status);
     }
+
+    KVInstance *kv_instance = new_txn->kv_instance();
+    TxnTimeStamp begin_ts = new_txn->BeginTS();
+    TxnTimeStamp commit_ts = new_txn->CommitTS();
     table_info = MakeShared<TableInfo>();
-    status = table_meta->GetTableInfo(*table_info);
+    status = table_meta->GetTableInfo(kv_instance, begin_ts, commit_ts, *table_info);
     if (!status.ok()) {
         RecoverableError(status);
     }
@@ -1235,14 +1241,16 @@ Status LogicalPlanner::BuildAlter(AlterStatement *statement, SharedPtr<BindConte
     if (!status.ok()) {
         RecoverableError(status);
     }
+    KVInstance *kv_instance = new_txn->kv_instance();
+    TxnTimeStamp begin_ts = new_txn->BeginTS();
+    TxnTimeStamp commit_ts = new_txn->CommitTS();
     SharedPtr<TableInfo> table_info = MakeShared<TableInfo>();
-    status = table_meta->GetTableInfo(*table_info);
+    status = table_meta->GetTableInfo(kv_instance, begin_ts, commit_ts, *table_info);
     if (!status.ok()) {
         RecoverableError(status);
     }
     table_info->db_name_ = MakeShared<String>(statement->schema_name_);
     table_info->table_name_ = MakeShared<String>(statement->table_name_);
-    KVInstance* kv_instance = new_txn->kv_instance();
     switch (statement->type_) {
         case AlterStatementType::kRenameTable: {
             auto *rename_table_statement = static_cast<RenameTableStatement *>(statement);
@@ -1260,7 +1268,7 @@ Status LogicalPlanner::BuildAlter(AlterStatement *statement, SharedPtr<BindConte
                 }
                 bool found = true;
                 ColumnID column_id = 0;
-                std::tie(column_id, status) = table_meta->GetColumnIDByColumnName(column_def->name());
+                std::tie(column_id, status) = table_meta->GetColumnIDByColumnName(kv_instance, begin_ts, commit_ts, column_def->name());
                 if (!status.ok()) {
                     if (status.code() != ErrorCode::kColumnNotExist) {
                         RecoverableError(status);
@@ -1279,12 +1287,12 @@ Status LogicalPlanner::BuildAlter(AlterStatement *statement, SharedPtr<BindConte
             Vector<String> column_names = drop_columns_statement->column_names_;
             for (const auto &column_name : column_names) {
                 ColumnID column_id = 0;
-                std::tie(column_id, status) = table_meta->GetColumnIDByColumnName(column_name);
+                std::tie(column_id, status) = table_meta->GetColumnIDByColumnName(kv_instance, begin_ts, commit_ts, column_name);
                 if (!status.ok()) {
                     RecoverableError(Status::ColumnNotExist(column_name));
                 }
                 bool has_index = false;
-                status = NewCatalog::CheckColumnIfIndexed(*table_meta, kv_instance, column_id, has_index);
+                status = NewCatalog::CheckColumnIfIndexed(*table_meta, kv_instance, begin_ts, commit_ts, column_id, has_index);
                 if (!status.ok()) {
                     RecoverableError(status);
                 }

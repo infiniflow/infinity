@@ -60,17 +60,12 @@ Status ColumnMeta::SetChunkOffset(SizeT chunk_offset, KVInstance *kv_instance) {
     return Status::OK();
 }
 
-Status ColumnMeta::InitSet() {
-    // Status status = SetChunkOffset(0);
-    // if (!status.ok()) {
-    //     return status;
-    // }
-
+Status ColumnMeta::InitSet(KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts) {
     Status status;
     SharedPtr<ColumnDef> col_def;
     {
         SharedPtr<Vector<SharedPtr<ColumnDef>>> column_defs_ptr;
-        std::tie(column_defs_ptr, status) = block_meta_.segment_meta().table_meta().GetColumnDefs();
+        std::tie(column_defs_ptr, status) = block_meta_.segment_meta().table_meta().GetColumnDefs(kv_instance, begin_ts, commit_ts);
         if (!status.ok()) {
             return status;
         }
@@ -118,12 +113,12 @@ Status ColumnMeta::InitSet() {
     return Status::OK();
 }
 
-Status ColumnMeta::LoadSet() {
+Status ColumnMeta::LoadSet(KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts) {
     Status status;
     SharedPtr<ColumnDef> col_def;
     {
         SharedPtr<Vector<SharedPtr<ColumnDef>>> column_defs_ptr;
-        std::tie(column_defs_ptr, status) = block_meta_.segment_meta().table_meta().GetColumnDefs();
+        std::tie(column_defs_ptr, status) = block_meta_.segment_meta().table_meta().GetColumnDefs(kv_instance, begin_ts, commit_ts);
         if (!status.ok()) {
             return status;
         }
@@ -233,12 +228,16 @@ Status ColumnMeta::RestoreSet(const ColumnDef *column_def, KVInstance *kv_instan
     return Status::OK();
 }
 
-Status ColumnMeta::GetColumnBuffer(BufferObj *&column_buffer, BufferObj *&outline_buffer) {
-    return GetColumnBuffer(column_buffer, outline_buffer, nullptr);
+Status ColumnMeta::GetColumnBuffer(KVInstance *kv_instance,
+                                   TxnTimeStamp begin_ts,
+                                   TxnTimeStamp commit_ts,
+                                   BufferObj *&column_buffer,
+                                   BufferObj *&outline_buffer) {
+    return GetColumnBuffer(kv_instance, begin_ts, commit_ts, column_buffer, outline_buffer, nullptr);
 }
 
-Status ColumnMeta::FilePaths(Vector<String> &paths) {
-    auto [column_defs_ptr, status] = block_meta_.segment_meta().table_meta().GetColumnDefs();
+Status ColumnMeta::FilePaths(KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts, Vector<String> &paths) {
+    auto [column_defs_ptr, status] = block_meta_.segment_meta().table_meta().GetColumnDefs(kv_instance, begin_ts, commit_ts);
     if (!status.ok()) {
         return status;
     }
@@ -259,9 +258,14 @@ Status ColumnMeta::FilePaths(Vector<String> &paths) {
     return Status::OK();
 }
 
-Status ColumnMeta::GetColumnBuffer(BufferObj *&column_buffer, BufferObj *&outline_buffer, const ColumnDef *column_def) {
+Status ColumnMeta::GetColumnBuffer(KVInstance *kv_instance,
+                                   TxnTimeStamp begin_ts,
+                                   TxnTimeStamp commit_ts,
+                                   BufferObj *&column_buffer,
+                                   BufferObj *&outline_buffer,
+                                   const ColumnDef *column_def) {
     if (!column_buffer_) {
-        Status status = LoadColumnBuffer(column_def);
+        Status status = LoadColumnBuffer(kv_instance, begin_ts, commit_ts, column_def);
         if (!status.ok()) {
             return status;
         }
@@ -271,16 +275,16 @@ Status ColumnMeta::GetColumnBuffer(BufferObj *&column_buffer, BufferObj *&outlin
     return Status::OK();
 }
 
-Tuple<SharedPtr<ColumnDef>, Status> ColumnMeta::GetColumnDef() const {
-    auto [column_defs_ptr, status] = block_meta_.segment_meta().table_meta().GetColumnDefs();
+Tuple<SharedPtr<ColumnDef>, Status> ColumnMeta::GetColumnDef(KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts) const {
+    auto [column_defs_ptr, status] = block_meta_.segment_meta().table_meta().GetColumnDefs(kv_instance, begin_ts, commit_ts);
     if (!status.ok()) {
         return {nullptr, status};
     }
     return {(*column_defs_ptr)[column_idx_], Status::OK()};
 }
 
-Tuple<SizeT, Status> ColumnMeta::GetColumnSize(SizeT row_cnt) const {
-    auto [col_def, status2] = GetColumnDef();
+Tuple<SizeT, Status> ColumnMeta::GetColumnSize(KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts, SizeT row_cnt) const {
+    auto [col_def, status2] = GetColumnDef(kv_instance, begin_ts, commit_ts);
     if (!status2.ok()) {
         return {0, status2};
     }
@@ -294,11 +298,12 @@ Tuple<SizeT, Status> ColumnMeta::GetColumnSize(SizeT row_cnt) const {
     return {total_data_size, Status::OK()};
 }
 
-Status ColumnMeta::UninitSet(const ColumnDef *column_def, KVInstance *kv_instance, UsageFlag usage_flag) {
+Status
+ColumnMeta::UninitSet(const ColumnDef *column_def, KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts, UsageFlag usage_flag) {
     Status status;
 
     if (usage_flag == UsageFlag::kOther) {
-        status = this->GetColumnBuffer(column_buffer_, outline_buffer_, column_def);
+        status = this->GetColumnBuffer(kv_instance, begin_ts, commit_ts, column_buffer_, outline_buffer_, column_def);
         if (!status.ok()) {
             return status;
         }
@@ -328,10 +333,10 @@ Status ColumnMeta::LoadChunkOffset(KVInstance *kv_instance) {
     return Status::OK();
 }
 
-Status ColumnMeta::LoadColumnBuffer(const ColumnDef *col_def) {
+Status ColumnMeta::LoadColumnBuffer(KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts, const ColumnDef *col_def) {
     SharedPtr<String> block_dir_ptr = block_meta_.GetBlockDir();
     if (!col_def) {
-        auto [column_defs_ptr, status] = block_meta_.segment_meta().table_meta().GetColumnDefs();
+        auto [column_defs_ptr, status] = block_meta_.segment_meta().table_meta().GetColumnDefs(kv_instance, begin_ts, commit_ts);
         if (!status.ok()) {
             return status;
         }

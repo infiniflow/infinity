@@ -155,10 +155,15 @@ void CompactionProcessor::NewDoCompact() {
         if (!status.ok()) {
             return;
         }
+
+        TxnTimeStamp begin_ts = new_txn_shared->BeginTS();
+        TxnTimeStamp commit_ts = new_txn_shared->CommitTS();
+        KVInstance *kv_instance = new_txn_shared->kv_instance();
+
         Vector<SegmentID> segment_ids;
         {
             Vector<SegmentID> *segment_ids_ptr = nullptr;
-            std::tie(segment_ids_ptr, status) = table_meta->GetSegmentIDs1();
+            std::tie(segment_ids_ptr, status) = table_meta->GetSegmentIDs1(kv_instance, begin_ts, commit_ts);
             if (!status.ok()) {
                 UnrecoverableError(status.message());
             }
@@ -168,7 +173,7 @@ void CompactionProcessor::NewDoCompact() {
                 return;
             }
             SegmentID unsealed_id = 0;
-            status = table_meta->GetUnsealedSegmentID(unsealed_id);
+            status = table_meta->GetUnsealedSegmentID(kv_instance, unsealed_id);
             if (!status.ok()) {
                 if (status.code() == ErrorCode::kNotFound) {
                     status = Status::OK(); // Ignore the error.
@@ -186,10 +191,6 @@ void CompactionProcessor::NewDoCompact() {
         }
 
         auto compaction_alg = NewCompactionAlg::GetInstance();
-
-        TxnTimeStamp begin_ts = new_txn_shared->BeginTS();
-        TxnTimeStamp commit_ts = new_txn_shared->CommitTS();
-        KVInstance *kv_instance = new_txn_shared->kv_instance();
 
         for (SegmentID segment_id : segment_ids) {
             SegmentMeta segment_meta(segment_id, *table_meta);
@@ -224,6 +225,9 @@ Status CompactionProcessor::NewManualCompact(const String &db_name, const String
     //    LOG_TRACE(fmt::format("Compact command triggered compaction: {}.{}", db_name, table_name));
     auto *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
     auto *new_txn = new_txn_mgr->BeginTxn(MakeUnique<String>(fmt::format("compact table {}.{}", db_name, table_name)), TransactionType::kNormal);
+    KVInstance *kv_instance = new_txn->kv_instance();
+    TxnTimeStamp begin_ts = new_txn->BeginTS();
+    TxnTimeStamp commit_ts = new_txn->CommitTS();
 
     SharedPtr<DBMeeta> db_meta;
     Optional<TableMeeta> table_meta;
@@ -234,13 +238,13 @@ Status CompactionProcessor::NewManualCompact(const String &db_name, const String
     Vector<SegmentID> segment_ids;
     {
         Vector<SegmentID> *segment_ids_ptr = nullptr;
-        std::tie(segment_ids_ptr, status) = table_meta->GetSegmentIDs1();
+        std::tie(segment_ids_ptr, status) = table_meta->GetSegmentIDs1(kv_instance, begin_ts, commit_ts);
         if (!status.ok()) {
             return status;
         }
         segment_ids = *segment_ids_ptr;
         SegmentID unsealed_id = 0;
-        status = table_meta->GetUnsealedSegmentID(unsealed_id);
+        status = table_meta->GetUnsealedSegmentID(kv_instance, unsealed_id);
         if (!status.ok()) {
             if (status.code() != ErrorCode::kNotFound) {
                 return status;

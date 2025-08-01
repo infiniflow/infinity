@@ -59,7 +59,7 @@ public:
         Status status = txn->GetTableMeta("default_db", "t1", db_meta, table_meta);
         EXPECT_TRUE(status.ok());
 
-        auto [segment_ids, seg_status] = table_meta->GetSegmentIDs1();
+        auto [segment_ids, seg_status] = table_meta->GetSegmentIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
         EXPECT_TRUE(seg_status.ok());
         EXPECT_EQ(*segment_ids, Vector<SegmentID>{0});
         SegmentMeta segment_meta((*segment_ids)[0], *table_meta);

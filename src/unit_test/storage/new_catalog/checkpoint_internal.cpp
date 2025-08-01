@@ -167,7 +167,13 @@ TEST_P(TestTxnCheckpointInternalTest, test_checkpoint0) {
             auto check_column = [&](ColumnID column_id, const Value &v) {
                 ColumnMeta column_meta(column_id, block_meta);
                 ColumnVector col1;
-                status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorMode::kReadOnly, col1);
+                status = NewCatalog::GetColumnVector(column_meta,
+                                                     txn->kv_instance(),
+                                                     txn->BeginTS(),
+                                                     txn->CommitTS(),
+                                                     row_count,
+                                                     ColumnVectorMode::kReadOnly,
+                                                     col1);
                 EXPECT_TRUE(status.ok());
 
                 for (u32 i = 0; i < row_count; ++i) {
@@ -193,7 +199,7 @@ TEST_P(TestTxnCheckpointInternalTest, test_checkpoint0) {
 
         {
             Vector<SegmentID> *segment_ids_ptr = nullptr;
-            std::tie(segment_ids_ptr, status) = table_meta->GetSegmentIDs1();
+            std::tie(segment_ids_ptr, status) = table_meta->GetSegmentIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
             EXPECT_TRUE(status.ok());
 
             EXPECT_EQ(*segment_ids_ptr, Vector<SegmentID>({0}));
@@ -764,7 +770,7 @@ TEST_P(TestTxnCheckpointInternalTest, test_checkpoint4) {
             TxnTimeStamp db_create_ts;
             status = txn->GetDBMeta(*db_name, db_meta, db_create_ts);
             status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
-            auto [segment_ids, status1] = table_meta->GetSegmentIDs1();
+            auto [segment_ids, status1] = table_meta->GetSegmentIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
             EXPECT_TRUE(status1.ok());
             EXPECT_EQ(*segment_ids, Vector<SegmentID>({0}));
         }

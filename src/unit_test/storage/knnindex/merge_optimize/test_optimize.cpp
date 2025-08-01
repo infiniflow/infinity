@@ -196,7 +196,7 @@ TEST_P(OptimizeKnnTest, test_hnsw_optimize) {
         EXPECT_TRUE(status.ok());
 
         {
-            auto [segment_ids, status] = table_meta->GetSegmentIDs1();
+            auto [segment_ids, status] = table_meta->GetSegmentIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*segment_ids, Vector<SegmentID>({0}));
         }
@@ -315,7 +315,7 @@ TEST_P(OptimizeKnnTest, test_secondary_index_optimize) {
         EXPECT_TRUE(status.ok());
 
         {
-            auto [segment_ids, status] = table_meta->GetSegmentIDs1();
+            auto [segment_ids, status] = table_meta->GetSegmentIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*segment_ids, Vector<SegmentID>({0}));
         }

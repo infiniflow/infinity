@@ -49,7 +49,8 @@ import kv_store;
 
 namespace infinity {
 
-WalBlockInfo::WalBlockInfo(BlockMeta &block_meta) : block_id_(block_meta.block_id()) {
+WalBlockInfo::WalBlockInfo(BlockMeta &block_meta, KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts)
+    : block_id_(block_meta.block_id()) {
     Status status;
     // auto [row_count, status] = block_meta.GetRowCnt();
     // if (!status.ok()) {
@@ -60,7 +61,7 @@ WalBlockInfo::WalBlockInfo(BlockMeta &block_meta) : block_id_(block_meta.block_i
     row_capacity_ = block_meta.block_capacity();
 
     SharedPtr<Vector<SharedPtr<ColumnDef>>> column_defs_ptr;
-    std::tie(column_defs_ptr, status) = block_meta.segment_meta().table_meta().GetColumnDefs();
+    std::tie(column_defs_ptr, status) = block_meta.segment_meta().table_meta().GetColumnDefs(kv_instance, begin_ts, commit_ts);
     if (!status.ok()) {
         UnrecoverableError(status.message());
     }
@@ -75,7 +76,7 @@ WalBlockInfo::WalBlockInfo(BlockMeta &block_meta) : block_id_(block_meta.block_i
         // }
         outline_infos_[column_idx] = {1, chunk_offset};
 
-        Status status = column_meta.FilePaths(paths);
+        Status status = column_meta.FilePaths(kv_instance, begin_ts, commit_ts, paths);
         if (!status.ok()) {
             UnrecoverableError(status.message());
         }
@@ -180,7 +181,7 @@ WalSegmentInfo::WalSegmentInfo(SegmentMeta &segment_meta, KVInstance *kv_instanc
     Status status;
 
     SharedPtr<Vector<SharedPtr<ColumnDef>>> column_defs_ptr;
-    std::tie(column_defs_ptr, status) = segment_meta.table_meta().GetColumnDefs();
+    std::tie(column_defs_ptr, status) = segment_meta.table_meta().GetColumnDefs(kv_instance, begin_ts, commit_ts);
     if (!status.ok()) {
         UnrecoverableError(status.message());
     }
@@ -195,7 +196,7 @@ WalSegmentInfo::WalSegmentInfo(SegmentMeta &segment_meta, KVInstance *kv_instanc
     // SizeT row_count = 0;
     for (BlockID block_id : *block_ids_ptr) {
         BlockMeta block_meta(block_id, segment_meta);
-        block_infos_.emplace_back(block_meta);
+        block_infos_.emplace_back(block_meta, kv_instance, begin_ts, commit_ts);
 
         // SizeT block_row_cnt = 0;
         // std::tie(block_row_cnt, status) = block_meta.GetRowCnt();

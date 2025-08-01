@@ -85,7 +85,11 @@ public:
     static void ExecuteOnNewSealedSegment(SegmentMeta *segment_meta, KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts);
 
 private:
-    static void ExecuteInner(SegmentMeta *sement_meta, BuildingSegmentFastFilters *segment_filters);
+    static void ExecuteInner(SegmentMeta *sement_meta,
+                             KVInstance *kv_instance,
+                             TxnTimeStamp begin_ts,
+                             TxnTimeStamp commit_ts,
+                             BuildingSegmentFastFilters *segment_filters);
 
     template <CanBuildBloomFilter ValueType>
     static void BuildOnlyBloomFilter(NewBuildFastRoughFilterArg &arg);

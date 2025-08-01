@@ -116,7 +116,7 @@ export struct WalBlockInfo {
 
     WalBlockInfo() = default;
 
-    explicit WalBlockInfo(BlockMeta &block_meta);
+    explicit WalBlockInfo(BlockMeta &block_meta, KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts);
 
     bool operator==(const WalBlockInfo &other) const;
 

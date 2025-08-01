@@ -37,32 +37,38 @@ public:
 
     SizeT column_idx() const { return column_idx_; }
 
-    Status GetChunkOffset(SizeT &chunk_offset, KVInstance* kv_instance);
+    Status GetChunkOffset(SizeT &chunk_offset, KVInstance *kv_instance);
 
-    Status SetChunkOffset(SizeT chunk_offset, KVInstance* kv_instance);
+    Status SetChunkOffset(SizeT chunk_offset, KVInstance *kv_instance);
 
-    Status InitSet();
+    Status InitSet(KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts);
 
-    Status LoadSet();
+    Status LoadSet(KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts);
 
-    Status RestoreSet(const ColumnDef *column_def, KVInstance* kv_instance);
+    Status RestoreSet(const ColumnDef *column_def, KVInstance *kv_instance);
 
-    Status UninitSet(const ColumnDef *column_def, KVInstance* kv_instance, UsageFlag usage_flag);
+    Status UninitSet(const ColumnDef *column_def, KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts, UsageFlag usage_flag);
 
-    Status GetColumnBuffer(BufferObj *&column_buffer, BufferObj *&outline_buffer);
+    Status
+    GetColumnBuffer(KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts, BufferObj *&column_buffer, BufferObj *&outline_buffer);
 
-    Tuple<SharedPtr<ColumnDef>, Status> GetColumnDef() const;
+    Tuple<SharedPtr<ColumnDef>, Status> GetColumnDef(KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts) const;
 
-    Tuple<SizeT, Status> GetColumnSize(SizeT row_cnt) const;
+    Tuple<SizeT, Status> GetColumnSize(KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts, SizeT row_cnt) const;
 
-    Status FilePaths(Vector<String> &paths);
+    Status FilePaths(KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts, Vector<String> &paths);
 
 private:
-    Status GetColumnBuffer(BufferObj *&column_buffer, BufferObj *&outline_buffer, const ColumnDef *column_def);
+    Status GetColumnBuffer(KVInstance *kv_instance,
+                           TxnTimeStamp begin_ts,
+                           TxnTimeStamp commit_ts,
+                           BufferObj *&column_buffer,
+                           BufferObj *&outline_buffer,
+                           const ColumnDef *column_def);
 
-    Status LoadChunkOffset(KVInstance* kv_instance);
+    Status LoadChunkOffset(KVInstance *kv_instance);
 
-    Status LoadColumnBuffer(const ColumnDef *col_def);
+    Status LoadColumnBuffer(KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts, const ColumnDef *col_def);
 
     String GetColumnTag(const String &tag) const;
 

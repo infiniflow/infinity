@@ -237,12 +237,12 @@ Tuple<SharedPtr<SegmentInfo>, Status> SegmentMeta::GetSegmentInfo(KVInstance *kv
     i64 column_count = 0;
     SegmentID unsealed_segment_id = 0;
     Status status;
-    std::tie(column_defs, status) = table_meta_.GetColumnDefs();
+    std::tie(column_defs, status) = table_meta_.GetColumnDefs(kv_instance, begin_ts, commit_ts);
     if (!status.ok()) {
         return {nullptr, status};
     }
     column_count = column_defs->size();
-    status = table_meta_.GetUnsealedSegmentID(unsealed_segment_id);
+    status = table_meta_.GetUnsealedSegmentID(kv_instance, unsealed_segment_id);
     if (!status.ok()) {
         unsealed_segment_id = INVALID_SEGMENT_ID;
     }
@@ -267,7 +267,7 @@ Tuple<SharedPtr<SegmentInfo>, Status> SegmentMeta::GetSegmentInfo(KVInstance *kv
     for (BlockID block_id : *block_ids_ptr) {
         BlockMeta block_meta(block_id, *this);
         Vector<String> file_paths;
-        status = NewCatalog::GetBlockFilePaths(block_meta, file_paths, nullptr);
+        status = NewCatalog::GetBlockFilePaths(kv_instance, begin_ts, commit_ts, block_meta, file_paths, nullptr);
         if (!status.ok()) {
             return {nullptr, status};
         }

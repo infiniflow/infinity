@@ -148,17 +148,17 @@ TEST_P(TestTxnTableMeeta, table_meeta) {
     // }
 
     {
-        auto [def_vectors, def_status] = table_meta.GetColumnDefs();
+        auto [def_vectors, def_status] = table_meta.GetColumnDefs(txn2->kv_instance(), txn2->BeginTS(), txn2->CommitTS());
         EXPECT_TRUE(def_status.ok());
         EXPECT_EQ(def_vectors->size(), 2);
     }
 
     {
-        auto [column_id1, column_status1] = table_meta.GetColumnIDByColumnName("col1");
+        auto [column_id1, column_status1] = table_meta.GetColumnIDByColumnName(txn2->kv_instance(), txn2->BeginTS(), txn2->CommitTS(), "col1");
         EXPECT_TRUE(column_status1.ok());
         EXPECT_EQ(column_id1, 0);
 
-        auto [column_id2, column_status2] = table_meta.GetColumnIDByColumnName("col2");
+        auto [column_id2, column_status2] = table_meta.GetColumnIDByColumnName(txn2->kv_instance(), txn2->BeginTS(), txn2->CommitTS(), "col2");
         EXPECT_TRUE(column_status2.ok());
         EXPECT_EQ(column_id2, 1);
     }

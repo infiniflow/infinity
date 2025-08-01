@@ -276,6 +276,7 @@ TEST_P(TxnReplayExceptionTest, test_replay_import) {
 
     {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
+        KVInstance* kv_instance = txn->kv_instance();
         TxnTimeStamp begin_ts = txn->BeginTS();
         TxnTimeStamp commit_ts = txn->CommitTS();
 
@@ -284,7 +285,7 @@ TEST_P(TxnReplayExceptionTest, test_replay_import) {
         Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
 
-        auto [segment_ids, seg_status] = table_meta->GetSegmentIDs1();
+        auto [segment_ids, seg_status] = table_meta->GetSegmentIDs1(kv_instance, begin_ts, commit_ts);
         EXPECT_TRUE(seg_status.ok());
         EXPECT_EQ(*segment_ids, Vector<SegmentID>({0, 1}));
 
@@ -309,7 +310,7 @@ TEST_P(TxnReplayExceptionTest, test_replay_import) {
                 ColumnMeta column_meta(column_idx, block_meta);
                 ColumnVector col;
 
-                status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorMode::kReadOnly, col);
+                status = NewCatalog::GetColumnVector(column_meta, kv_instance, begin_ts, commit_ts, row_count, ColumnVectorMode::kReadOnly, col);
                 EXPECT_TRUE(status.ok());
 
                 EXPECT_EQ(col.GetValueByIndex(0), Value::MakeInt(1));
@@ -322,7 +323,7 @@ TEST_P(TxnReplayExceptionTest, test_replay_import) {
                 ColumnMeta column_meta(column_idx, block_meta);
                 ColumnVector col;
 
-                status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorMode::kReadOnly, col);
+                status = NewCatalog::GetColumnVector(column_meta, kv_instance, begin_ts, commit_ts, row_count, ColumnVectorMode::kReadOnly, col);
                 EXPECT_TRUE(status.ok());
 
                 EXPECT_EQ(col.GetValueByIndex(0), Value::MakeVarchar("abc"));
@@ -477,6 +478,7 @@ TEST_P(TxnReplayExceptionTest, test_replay_compact) {
 
     {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
+        KVInstance* kv_instance = txn->kv_instance();
         TxnTimeStamp begin_ts = txn->BeginTS();
         TxnTimeStamp commit_ts = txn->CommitTS();
 
@@ -485,12 +487,12 @@ TEST_P(TxnReplayExceptionTest, test_replay_compact) {
         Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
 
-        auto [segment_ids, seg_status] = table_meta->GetSegmentIDs1();
+        auto [segment_ids, seg_status] = table_meta->GetSegmentIDs1(kv_instance, begin_ts, commit_ts);
         EXPECT_TRUE(seg_status.ok());
         EXPECT_EQ(*segment_ids, Vector<SegmentID>({2}));
 
         SegmentMeta segment_meta((*segment_ids)[0], *table_meta);
-        auto [block_ids, block_status] = segment_meta.GetBlockIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
+        auto [block_ids, block_status] = segment_meta.GetBlockIDs1(kv_instance, begin_ts, commit_ts);
         EXPECT_TRUE(block_status.ok());
 
         auto check_block = [&](BlockID block_id, const Value &v1, const Value &v2) {

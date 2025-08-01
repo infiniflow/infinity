@@ -271,13 +271,14 @@ Tuple<SharedPtr<BlockInfo>, Status> BlockMeta::GetBlockInfo(KVInstance *kv_insta
     return {block_info, Status::OK()};
 }
 
-Tuple<SharedPtr<BlockColumnInfo>, Status> BlockMeta::GetBlockColumnInfo(ColumnID column_id) {
+Tuple<SharedPtr<BlockColumnInfo>, Status>
+BlockMeta::GetBlockColumnInfo(KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts, ColumnID column_id) {
     SharedPtr<BlockColumnInfo> block_column_info = MakeShared<BlockColumnInfo>();
     SharedPtr<Vector<SharedPtr<ColumnDef>>> column_defs = nullptr;
     SharedPtr<ColumnDef> column_def = nullptr;
     Status status;
     SizeT select_column_idx = 0;
-    std::tie(column_defs, status) = segment_meta_.table_meta().GetColumnDefs();
+    std::tie(column_defs, status) = segment_meta_.table_meta().GetColumnDefs(kv_instance, begin_ts, commit_ts);
     if (!status.ok()) {
         return {nullptr, status};
     }
@@ -293,7 +294,7 @@ Tuple<SharedPtr<BlockColumnInfo>, Status> BlockMeta::GetBlockColumnInfo(ColumnID
     }
     ColumnMeta column_meta(select_column_idx, *this);
     Vector<String> file_paths;
-    status = column_meta.FilePaths(file_paths);
+    status = column_meta.FilePaths(kv_instance, begin_ts, commit_ts, file_paths);
     if (!status.ok()) {
         return {nullptr, status};
     }

@@ -465,7 +465,7 @@ TEST_P(WalReplayTest, wal_replay_append) {
                 auto check_column = [&](ColumnID column_id, const Value &v) {
                     ColumnMeta column_meta(column_id, block_meta);
                     ColumnVector col1;
-                    status = NewCatalog::GetColumnVector(column_meta, block_row_count, ColumnVectorMode::kReadOnly, col1);
+                    status = NewCatalog::GetColumnVector(column_meta, txn->kv_instance(), txn->BeginTS(), txn->CommitTS(), block_row_count, ColumnVectorMode::kReadOnly, col1);
                     EXPECT_TRUE(status.ok());
 
                     for (u32 i = 0; i < block_row_count; ++i) {
@@ -492,7 +492,7 @@ TEST_P(WalReplayTest, wal_replay_append) {
 
             {
                 Vector<SegmentID> *segment_ids_ptr = nullptr;
-                std::tie(segment_ids_ptr, status) = table_meta->GetSegmentIDs1();
+                std::tie(segment_ids_ptr, status) = table_meta->GetSegmentIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
                 EXPECT_TRUE(status.ok());
 
                 EXPECT_EQ(*segment_ids_ptr, Vector<SegmentID>({0}));
@@ -669,7 +669,7 @@ TEST_P(WalReplayTest, wal_replay_import) {
                     auto check_column = [&](ColumnID column_id, const Value &v) {
                         ColumnMeta column_meta(column_id, block_meta);
                         ColumnVector col1;
-                        status = NewCatalog::GetColumnVector(column_meta, block_row_count, ColumnVectorMode::kReadOnly, col1);
+                        status = NewCatalog::GetColumnVector(column_meta, txn->kv_instance(), txn->BeginTS(), txn->CommitTS(), block_row_count, ColumnVectorMode::kReadOnly, col1);
                         EXPECT_TRUE(status.ok());
 
                         for (u32 i = 0; i < block_row_count; ++i) {
@@ -696,7 +696,7 @@ TEST_P(WalReplayTest, wal_replay_import) {
 
                 {
                     Vector<SegmentID> *segment_ids_ptr = nullptr;
-                    std::tie(segment_ids_ptr, status) = table_meta->GetSegmentIDs1();
+                    std::tie(segment_ids_ptr, status) = table_meta->GetSegmentIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
                     EXPECT_TRUE(status.ok());
 
                     EXPECT_EQ(*segment_ids_ptr, Vector<SegmentID>({0}));

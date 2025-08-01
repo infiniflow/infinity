@@ -56,9 +56,9 @@ TableMeeta::TableMeeta(const String &db_id_str, const String &table_id_str, NewT
     kv_instance_ = txn->kv_instance();
 }
 
-Status TableMeeta::GetComment(TableInfo &table_info) {
+Status TableMeeta::GetComment(KVInstance *kv_instance, TableInfo &table_info) {
     if (!comment_) {
-        Status status = LoadComment();
+        Status status = LoadComment(kv_instance);
         if (!status.ok()) {
             return status;
         }
@@ -67,9 +67,9 @@ Status TableMeeta::GetComment(TableInfo &table_info) {
     return Status::OK();
 }
 
-Status TableMeeta::GetIndexIDs(Vector<String> *&index_id_strs, Vector<String> **index_names) {
+Status TableMeeta::GetIndexIDs(KVInstance *kv_instance, TxnTimeStamp begin_ts, Vector<String> *&index_id_strs, Vector<String> **index_names) {
     if (!index_id_strs_ || !index_names_) {
-        Status status = LoadIndexIDs();
+        Status status = LoadIndexIDs(kv_instance, begin_ts);
         if (!status.ok()) {
             return status;
         }
@@ -81,7 +81,13 @@ Status TableMeeta::GetIndexIDs(Vector<String> *&index_id_strs, Vector<String> **
     return Status::OK();
 }
 
-Status TableMeeta::GetIndexID(const String &index_name, String &index_key, String &index_id_str, TxnTimeStamp &create_index_ts) {
+Status TableMeeta::GetIndexID(KVInstance *kv_instance,
+                              TxnTimeStamp begin_ts,
+                              TxnTimeStamp commit_ts,
+                              const String &index_name,
+                              String &index_key,
+                              String &index_id_str,
+                              TxnTimeStamp &create_index_ts) {
     String index_key_prefix = KeyEncode::CatalogIndexPrefix(db_id_str_, table_id_str_, index_name);
     auto iter2 = kv_instance_->GetIterator();
     iter2->Seek(index_key_prefix);
@@ -124,9 +130,13 @@ Status TableMeeta::GetIndexID(const String &index_name, String &index_key, Strin
     return Status::OK();
 }
 
-Tuple<SharedPtr<ColumnDef>, Status> TableMeeta::GetColumnDefByColumnName(const String &column_name, SizeT *column_idx_ptr) {
+Tuple<SharedPtr<ColumnDef>, Status> TableMeeta::GetColumnDefByColumnName(KVInstance *kv_instance,
+                                                                         TxnTimeStamp begin_ts,
+                                                                         TxnTimeStamp commit_ts,
+                                                                         const String &column_name,
+                                                                         SizeT *column_idx_ptr) {
     if (!column_defs_) {
-        Status status = LoadColumnDefs();
+        Status status = LoadColumnDefs(kv_instance, begin_ts, commit_ts);
         if (!status.ok()) {
             return {nullptr, status};
         }
@@ -142,9 +152,10 @@ Tuple<SharedPtr<ColumnDef>, Status> TableMeeta::GetColumnDefByColumnName(const S
     return {nullptr, Status::ColumnNotExist(column_name)};
 }
 
-Tuple<SharedPtr<ColumnDef>, Status> TableMeeta::GetColumnDefByColumnID(const SizeT &column_idx) {
+Tuple<SharedPtr<ColumnDef>, Status>
+TableMeeta::GetColumnDefByColumnID(KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts, const SizeT &column_idx) {
     if (!column_defs_) {
-        Status status = LoadColumnDefs();
+        Status status = LoadColumnDefs(kv_instance, begin_ts, commit_ts);
         if (!status.ok()) {
             return {nullptr, status};
         }
@@ -155,7 +166,7 @@ Tuple<SharedPtr<ColumnDef>, Status> TableMeeta::GetColumnDefByColumnID(const Siz
     return {(*column_defs_)[column_idx], Status::OK()};
 }
 
-Status TableMeeta::RemoveSegmentIDs1(const Vector<SegmentID> &segment_ids) {
+Status TableMeeta::RemoveSegmentIDs1(KVInstance *kv_instance, const Vector<SegmentID> &segment_ids) {
     HashSet<SegmentID> segment_ids_set(segment_ids.begin(), segment_ids.end());
 
     String segment_id_prefix = KeyEncode::CatalogTableSegmentKeyPrefix(db_id_str_, table_id_str_);
@@ -167,8 +178,7 @@ Status TableMeeta::RemoveSegmentIDs1(const Vector<SegmentID> &segment_ids) {
         SegmentID segment_id = std::stoull(iter->Key().ToString().substr(segment_id_prefix.size()));
         if (segment_ids_set.contains(segment_id)) {
             if (commit_ts > begin_ts_ and commit_ts != std::numeric_limits<TxnTimeStamp>::max()) {
-                UnrecoverableError(
-                    fmt::format("Segment id: {} is not allowed to be removed. commit_ts: {}, begin_ts: {}", segment_id, commit_ts, begin_ts_));
+                UnrecoverableError(fmt::format("Segment id: {} is not allowed to be removed. commit_ts: {}", segment_id, commit_ts));
             }
             // the key is committed before the txn or the key isn't committed
             delete_keys.push_back(iter->Key().ToString());
@@ -195,13 +205,13 @@ Status TableMeeta::RemoveSegmentIDs1(const Vector<SegmentID> &segment_ids) {
     return Status::OK();
 }
 
-Pair<SegmentID, Status> TableMeeta::AddSegmentID1(TxnTimeStamp commit_ts) {
+Pair<SegmentID, Status> TableMeeta::AddSegmentID1(KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts) {
     Status status;
 
     SegmentID segment_id = 0;
     {
         Vector<SegmentID> *segment_ids_ptr = nullptr;
-        std::tie(segment_ids_ptr, status) = GetSegmentIDs1();
+        std::tie(segment_ids_ptr, status) = GetSegmentIDs1(kv_instance, begin_ts, commit_ts);
         if (!status.ok()) {
             return {0, status};
         }
@@ -218,13 +228,13 @@ Pair<SegmentID, Status> TableMeeta::AddSegmentID1(TxnTimeStamp commit_ts) {
     return {segment_id, Status::OK()};
 }
 
-Status TableMeeta::AddSegmentWithID(TxnTimeStamp commit_ts, SegmentID segment_id) {
+Status TableMeeta::AddSegmentWithID(KVInstance *kv_instance, TxnTimeStamp commit_ts, SegmentID segment_id) {
     String segment_id_key = KeyEncode::CatalogTableSegmentKey(db_id_str_, table_id_str_, segment_id);
     String commit_ts_str = fmt::format("{}", commit_ts);
     return kv_instance_->Put(segment_id_key, commit_ts_str);
 }
 
-Status TableMeeta::CommitSegment(SegmentID segment_id, TxnTimeStamp commit_ts) {
+Status TableMeeta::CommitSegment(KVInstance *kv_instance, SegmentID segment_id, TxnTimeStamp commit_ts) {
     String segment_id_key = KeyEncode::CatalogTableSegmentKey(db_id_str_, table_id_str_, segment_id);
     String commit_ts_str = fmt::format("{}", commit_ts);
     Status status = kv_instance_->Put(segment_id_key, commit_ts_str);
@@ -234,7 +244,7 @@ Status TableMeeta::CommitSegment(SegmentID segment_id, TxnTimeStamp commit_ts) {
     return Status::OK();
 }
 
-Status TableMeeta::InitSet(SharedPtr<TableDef> table_def) {
+Status TableMeeta::InitSet(KVInstance *kv_instance, TxnTimeStamp commit_ts, SharedPtr<TableDef> table_def) {
     Status status;
 
     // Create table comment;
@@ -249,7 +259,7 @@ Status TableMeeta::InitSet(SharedPtr<TableDef> table_def) {
 
     // Create table column id;
     SizeT column_size = table_def->column_count();
-    status = SetNextColumnID(column_size);
+    status = SetNextColumnID(kv_instance, column_size);
     if (!status.ok()) {
         return status;
     }
@@ -279,25 +289,25 @@ Status TableMeeta::InitSet(SharedPtr<TableDef> table_def) {
     return Status::OK();
 }
 
-Status TableMeeta::LoadSet(KVInstance* kv_instance) {
+Status TableMeeta::LoadSet(KVInstance *kv_instance, TxnTimeStamp begin_ts) {
     Vector<String> *index_id_strs_ptr = nullptr;
-    Status status = GetIndexIDs(index_id_strs_ptr);
+    Status status = GetIndexIDs(kv_instance, begin_ts, index_id_strs_ptr);
     if (!status.ok()) {
         return status;
     }
     for (const String &index_id_str : *index_id_strs_ptr) {
         TableIndexMeeta table_index_meta(index_id_str, *this);
-        auto [index_def, status] = table_index_meta.GetIndexBase(kv_instance);
-        if (!status.ok()) {
-            return status;
+        auto [index_def, index_status] = table_index_meta.GetIndexBase(kv_instance);
+        if (!index_status.ok()) {
+            return index_status;
         }
         if (index_def->index_type_ == IndexType::kFullText) {
             NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
             String ft_index_cache_key = GetTableTag("ft_index_cache");
             auto ft_index_cache = MakeShared<TableIndexReaderCache>(db_id_str_, table_id_str_);
-            status = new_catalog->AddFtIndexCache(std::move(ft_index_cache_key), std::move(ft_index_cache));
-            if (!status.ok()) {
-                return status;
+            index_status = new_catalog->AddFtIndexCache(std::move(ft_index_cache_key), std::move(ft_index_cache));
+            if (!index_status.ok()) {
+                return index_status;
             }
             break;
         }
@@ -305,7 +315,7 @@ Status TableMeeta::LoadSet(KVInstance* kv_instance) {
     return Status::OK();
 }
 
-Status TableMeeta::UninitSet(UsageFlag usage_flag) {
+Status TableMeeta::UninitSet(KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts, UsageFlag usage_flag) {
     Status status;
 
     // Create next index id;
@@ -338,11 +348,11 @@ Status TableMeeta::UninitSet(UsageFlag usage_flag) {
 
     {
         Vector<SegmentID> *segment_ids_ptr = nullptr;
-        std::tie(segment_ids_ptr, status) = GetSegmentIDs1();
+        std::tie(segment_ids_ptr, status) = GetSegmentIDs1(kv_instance, begin_ts, commit_ts);
         if (!status.ok()) {
             return status;
         }
-        status = RemoveSegmentIDs1(*segment_ids_ptr);
+        status = RemoveSegmentIDs1(kv_instance, *segment_ids_ptr);
         if (!status.ok()) {
             return status;
         }
@@ -394,14 +404,14 @@ Status TableMeeta::UninitSet(UsageFlag usage_flag) {
     return Status::OK();
 }
 
-Status TableMeeta::GetTableInfo(TableInfo &table_info) {
+Status TableMeeta::GetTableInfo(KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts, TableInfo &table_info) {
     Status status;
 
     table_info.table_full_dir_ =
         MakeShared<String>(fmt::format("{}/db_{}/tbl_{}", InfinityContext::instance().config()->DataDir(), db_id_str_, table_id_str_));
 
     SharedPtr<Vector<SharedPtr<ColumnDef>>> column_defs;
-    std::tie(column_defs, status) = this->GetColumnDefs();
+    std::tie(column_defs, status) = this->GetColumnDefs(kv_instance, begin_ts, commit_ts);
     if (!status.ok()) {
         return status;
     }
@@ -415,7 +425,7 @@ Status TableMeeta::GetTableInfo(TableInfo &table_info) {
     table_info.table_id_ = table_id_str_;
 
     Vector<SegmentID> *segment_ids_ptr = nullptr;
-    std::tie(segment_ids_ptr, status) = GetSegmentIDs1();
+    std::tie(segment_ids_ptr, status) = GetSegmentIDs1(kv_instance, begin_ts, commit_ts);
     if (!status.ok()) {
         return status;
     }
@@ -425,11 +435,11 @@ Status TableMeeta::GetTableInfo(TableInfo &table_info) {
 
 Status TableMeeta::GetTableDetail(KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts, TableDetail &table_detail) {
     TableInfo table_info;
-    Status status = GetTableInfo(table_info);
+    Status status = GetTableInfo(kv_instance, begin_ts, commit_ts, table_info);
     if (!status.ok()) {
         return status;
     }
-    status = GetComment(table_info);
+    status = GetComment(kv_instance, table_info);
     if (!status.ok()) {
         return status;
     }
@@ -440,7 +450,7 @@ Status TableMeeta::GetTableDetail(KVInstance *kv_instance, TxnTimeStamp begin_ts
     table_detail.row_count_ = table_info.row_count_;
 
     Vector<SegmentID> *segment_ids_ptr = nullptr;
-    std::tie(segment_ids_ptr, status) = GetSegmentIDs1();
+    std::tie(segment_ids_ptr, status) = GetSegmentIDs1(kv_instance, begin_ts, commit_ts);
     if (!status.ok()) {
         return status;
     }
@@ -469,7 +479,7 @@ void TableMeeta::SetDBTableName(const String &db_name, const String &table_name)
     table_name_ = table_name;
 }
 
-Status TableMeeta::AddColumn(const ColumnDef &column_def) {
+Status TableMeeta::AddColumn(KVInstance *kv_instance, TxnTimeStamp commit_ts, const ColumnDef &column_def) {
     String column_key = KeyEncode::TableColumnKey(db_id_str_, table_id_str_, column_def.name(), commit_ts_);
     String column_name_value;
     Status status = kv_instance_->Put(column_key, column_def.ToJson().dump());
@@ -523,9 +533,9 @@ Status TableMeeta::InvalidateFtIndexCache() {
     return Status::OK();
 }
 
-Status TableMeeta::GetNextColumnID(ColumnID &next_column_id) {
+Status TableMeeta::GetNextColumnID(KVInstance *kv_instance, ColumnID &next_column_id) {
     if (!next_column_id_) {
-        Status status = LoadNextColumnID();
+        Status status = LoadNextColumnID(kv_instance);
         if (!status.ok()) {
             return status;
         }
@@ -534,7 +544,7 @@ Status TableMeeta::GetNextColumnID(ColumnID &next_column_id) {
     return Status::OK();
 }
 
-Status TableMeeta::SetNextColumnID(ColumnID next_column_id) {
+Status TableMeeta::SetNextColumnID(KVInstance *kv_instance, ColumnID next_column_id) {
     String table_latest_column_id_key = GetTableTag(NEXT_COLUMN_ID.data());
     String next_column_id_str = fmt::format("{}", next_column_id);
     Status status = kv_instance_->Put(table_latest_column_id_key, next_column_id_str);
@@ -545,7 +555,7 @@ Status TableMeeta::SetNextColumnID(ColumnID next_column_id) {
     return Status::OK();
 }
 
-Status TableMeeta::LoadComment() {
+Status TableMeeta::LoadComment(KVInstance *kv_instance) {
     String table_comment_key = GetTableTag("comment");
     String table_comment;
     Status status = kv_instance_->Get(table_comment_key, table_comment);
@@ -557,7 +567,7 @@ Status TableMeeta::LoadComment() {
     return Status::OK();
 }
 
-Status TableMeeta::LoadColumnDefs() {
+Status TableMeeta::LoadColumnDefs(KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts) {
     Vector<SharedPtr<ColumnDef>> column_defs;
     Map<String, Vector<Pair<String, String>>> column_kvs_map;
     String column_prefix = KeyEncode::TableColumnPrefix(db_id_str_, table_id_str_);
@@ -604,12 +614,7 @@ Status TableMeeta::LoadColumnDefs() {
     return Status::OK();
 }
 
-Status TableMeeta::LoadSegmentIDs1() {
-    segment_ids1_ = infinity::GetTableSegments(kv_instance_, db_id_str_, table_id_str_, begin_ts_, commit_ts_);
-    return Status::OK();
-}
-
-Status TableMeeta::LoadIndexIDs() {
+Status TableMeeta::LoadIndexIDs(KVInstance *kv_instance, TxnTimeStamp begin_ts) {
     Vector<String> index_id_strs;
     Vector<String> index_names;
     Map<String, Vector<Pair<String, String>>> index_kvs_map;
@@ -655,7 +660,7 @@ Status TableMeeta::LoadIndexIDs() {
     return Status::OK();
 }
 
-Status TableMeeta::LoadUnsealedSegmentID() {
+Status TableMeeta::LoadUnsealedSegmentID(KVInstance *kv_instance) {
     String unsealed_seg_id_key = GetTableTag("unsealed_segment_id");
     String unsealed_seg_id_str;
     Status status = kv_instance_->Get(unsealed_seg_id_key, unsealed_seg_id_str);
@@ -667,7 +672,7 @@ Status TableMeeta::LoadUnsealedSegmentID() {
     return Status::OK();
 }
 
-Status TableMeeta::LoadNextColumnID() {
+Status TableMeeta::LoadNextColumnID(KVInstance *kv_instance) {
     String table_latest_column_id_key = GetTableTag(NEXT_COLUMN_ID.data());
     String next_column_id_str;
     Status status = kv_instance_->Get(table_latest_column_id_key, next_column_id_str);
@@ -681,9 +686,9 @@ Status TableMeeta::LoadNextColumnID() {
 
 String TableMeeta::GetTableTag(const String &tag) const { return KeyEncode::CatalogTableTagKey(db_id_str_, table_id_str_, tag); }
 
-Status TableMeeta::GetUnsealedSegmentID(SegmentID &unsealed_segment_id) {
+Status TableMeeta::GetUnsealedSegmentID(KVInstance *kv_instance, SegmentID &unsealed_segment_id) {
     if (!unsealed_segment_id_) {
-        Status status = LoadUnsealedSegmentID();
+        Status status = LoadUnsealedSegmentID(kv_instance);
         if (!status.ok()) {
             return status;
         }
@@ -692,7 +697,7 @@ Status TableMeeta::GetUnsealedSegmentID(SegmentID &unsealed_segment_id) {
     return Status::OK();
 }
 
-Status TableMeeta::SetUnsealedSegmentID(SegmentID unsealed_segment_id) {
+Status TableMeeta::SetUnsealedSegmentID(KVInstance *kv_instance, SegmentID unsealed_segment_id) {
     unsealed_segment_id_ = unsealed_segment_id;
     String unsealed_id_key = GetTableTag("unsealed_segment_id");
     String unsealed_id_str = fmt::format("{}", unsealed_segment_id);
@@ -704,16 +709,17 @@ Status TableMeeta::SetUnsealedSegmentID(SegmentID unsealed_segment_id) {
     return Status::OK();
 }
 
-Status TableMeeta::DelUnsealedSegmentID() {
+Status TableMeeta::DelUnsealedSegmentID(KVInstance *kv_instance) {
     String unsealed_id_key = GetTableTag("unsealed_segment_id");
     Status status = kv_instance_->Delete(unsealed_id_key);
     return status;
 }
 
-Tuple<ColumnID, Status> TableMeeta::GetColumnIDByColumnName(const String &column_name) {
+Tuple<ColumnID, Status>
+TableMeeta::GetColumnIDByColumnName(KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts, const String &column_name) {
     Status status;
     SharedPtr<ColumnDef> column_def = nullptr;
-    std::tie(column_def, status) = GetColumnDefByColumnName(column_name);
+    std::tie(column_def, status) = GetColumnDefByColumnName(kv_instance, begin_ts, commit_ts, column_name);
     if (!status.ok()) {
         return {INVALID_COLUMN_ID, status};
     }
@@ -721,7 +727,8 @@ Tuple<ColumnID, Status> TableMeeta::GetColumnIDByColumnName(const String &column
     return {column_def->id_, Status::OK()};
 }
 
-Tuple<String, Status> TableMeeta::GetColumnKeyByColumnName(const String &column_name) const {
+Tuple<String, Status>
+TableMeeta::GetColumnKeyByColumnName(KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts, const String &column_name) const {
     Vector<SharedPtr<ColumnDef>> column_defs;
     String column_prefix = KeyEncode::TableColumnPrefix(db_id_str_, table_id_str_, column_name);
     auto iter = kv_instance_->GetIterator();
@@ -762,7 +769,7 @@ Tuple<String, Status> TableMeeta::GetColumnKeyByColumnName(const String &column_
 
 SharedPtr<String> TableMeeta::GetTableDir() { return {MakeShared<String>(table_id_str_)}; }
 
-Tuple<Vector<SegmentID> *, Status> TableMeeta::GetSegmentIDs1() {
+Tuple<Vector<SegmentID> *, Status> TableMeeta::GetSegmentIDs1(KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts) {
     std::lock_guard<std::mutex> lock(mtx_);
     if (!segment_ids1_) {
         segment_ids1_ = infinity::GetTableSegments(kv_instance_, db_id_str_, table_id_str_, begin_ts_, commit_ts_);
@@ -770,7 +777,7 @@ Tuple<Vector<SegmentID> *, Status> TableMeeta::GetSegmentIDs1() {
     return {&*segment_ids1_, Status::OK()};
 }
 
-Status TableMeeta::CheckSegments(const Vector<SegmentID> &segment_ids) {
+Status TableMeeta::CheckSegments(KVInstance *kv_instance, TxnTimeStamp begin_ts, const Vector<SegmentID> &segment_ids) {
     for (SegmentID segment_id : segment_ids) {
         String segment_key = KeyEncode::CatalogTableSegmentKey(db_id_str_, table_id_str_, segment_id);
         String commit_ts_str;
@@ -788,11 +795,12 @@ Status TableMeeta::CheckSegments(const Vector<SegmentID> &segment_ids) {
     return Status::OK();
 }
 
-Tuple<SharedPtr<Vector<SharedPtr<ColumnDef>>>, Status> TableMeeta::GetColumnDefs() {
+Tuple<SharedPtr<Vector<SharedPtr<ColumnDef>>>, Status>
+TableMeeta::GetColumnDefs(KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts) {
     std::unique_lock<std::mutex> lock(mtx_);
 
     if (!column_defs_) {
-        auto status = LoadColumnDefs();
+        auto status = LoadColumnDefs(kv_instance, begin_ts, commit_ts);
         if (!status.ok()) {
             return {nullptr, status};
         }
@@ -800,7 +808,7 @@ Tuple<SharedPtr<Vector<SharedPtr<ColumnDef>>>, Status> TableMeeta::GetColumnDefs
     return {MakeShared<Vector<SharedPtr<ColumnDef>>>(column_defs_.value()), Status::OK()};
 }
 
-Tuple<String, Status> TableMeeta::GetNextIndexID() {
+Tuple<String, Status> TableMeeta::GetNextIndexID(KVInstance *kv_instance) {
     String next_index_id_key = GetTableTag(NEXT_INDEX_ID.data());
     String next_index_id_str;
     Status status = kv_instance_->Get(next_index_id_key, next_index_id_str);
@@ -818,7 +826,7 @@ Tuple<String, Status> TableMeeta::GetNextIndexID() {
     return {next_index_id, Status::OK()};
 }
 
-Status TableMeeta::SetNextIndexID(const String &index_id_str) {
+Status TableMeeta::SetNextIndexID(KVInstance *kv_instance, const String &index_id_str) {
     String next_index_id_key = GetTableTag(NEXT_INDEX_ID.data());
     Status status = kv_instance_->Put(next_index_id_key, index_id_str);
     if (!status.ok()) {

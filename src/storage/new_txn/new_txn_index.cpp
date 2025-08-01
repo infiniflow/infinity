@@ -324,14 +324,15 @@ Status NewTxn::OptimizeTableIndexes(const String &db_name, const String &table_n
     if (!status.ok()) {
         return status;
     }
+    KVInstance *kv_instance = kv_instance_.get();
+    TxnTimeStamp begin_ts = BeginTS();
     Vector<String> *index_id_strs_ptr = nullptr;
     Vector<String> *index_names_ptr = nullptr;
-    status = table_meta->GetIndexIDs(index_id_strs_ptr, &index_names_ptr);
+    status = table_meta->GetIndexIDs(kv_instance, begin_ts, index_id_strs_ptr, &index_names_ptr);
     if (!status.ok()) {
         return status;
     }
 
-    KVInstance *kv_instance = kv_instance_.get();
     for (SizeT i = 0; i < index_id_strs_ptr->size(); ++i) {
         const String &index_id_str = (*index_id_strs_ptr)[i];
         const String &index_name = (*index_names_ptr)[i];
@@ -384,6 +385,8 @@ Status NewTxn::OptimizeIndexInner(SegmentIndexMeta &segment_index_meta,
     SegmentID segment_id = segment_index_meta.segment_id();
 
     KVInstance *kv_instance = kv_instance_.get();
+    TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
+    TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
 
     auto [old_chunk_ids_ptr, status] = segment_index_meta.GetChunkIDs1(kv_instance);
     if (!status.ok()) {
@@ -453,9 +456,6 @@ Status NewTxn::OptimizeIndexInner(SegmentIndexMeta &segment_index_meta,
         }
     }
 
-    TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
-    TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
-
     switch (index_base->index_type_) {
         case IndexType::kSecondary: {
             Vector<Pair<u32, BufferObj *>> old_buffers;
@@ -487,7 +487,7 @@ Status NewTxn::OptimizeIndexInner(SegmentIndexMeta &segment_index_meta,
             SegmentMeta segment_meta(segment_id, table_meta);
             SharedPtr<ColumnDef> column_def;
             {
-                auto [col_def, status] = table_index_meta.GetColumnDef(kv_instance);
+                auto [col_def, status] = table_index_meta.GetColumnDef(kv_instance, begin_ts, commit_ts);
                 if (!status.ok()) {
                     return status;
                 }
@@ -504,7 +504,7 @@ Status NewTxn::OptimizeIndexInner(SegmentIndexMeta &segment_index_meta,
             SegmentMeta segment_meta(segment_id, table_meta);
             SharedPtr<ColumnDef> column_def;
             {
-                auto [col_def, status] = table_index_meta.GetColumnDef(kv_instance);
+                auto [col_def, status] = table_index_meta.GetColumnDef(kv_instance, begin_ts, commit_ts);
                 if (!status.ok()) {
                     return status;
                 }
@@ -520,7 +520,7 @@ Status NewTxn::OptimizeIndexInner(SegmentIndexMeta &segment_index_meta,
             SegmentMeta segment_meta(segment_id, table_meta);
             SharedPtr<ColumnDef> column_def;
             {
-                auto [col_def, status] = table_index_meta.GetColumnDef(kv_instance);
+                auto [col_def, status] = table_index_meta.GetColumnDef(kv_instance, begin_ts, commit_ts);
                 if (!status.ok()) {
                     return status;
                 }
@@ -529,7 +529,7 @@ Status NewTxn::OptimizeIndexInner(SegmentIndexMeta &segment_index_meta,
 
             BufferHandle buffer_handle = buffer_obj->Load();
             auto *data_ptr = static_cast<EMVBIndex *>(buffer_handle.GetDataMut());
-            data_ptr->BuildEMVBIndex(base_rowid, row_cnt, segment_meta, column_def);
+            data_ptr->BuildEMVBIndex(base_rowid, row_cnt, segment_meta, kv_instance, begin_ts, commit_ts, column_def);
             break;
         }
         default: {
@@ -694,9 +694,11 @@ Status NewTxn::ListIndex(const String &db_name, const String &table_name, Vector
     if (!status.ok()) {
         return status;
     }
+    KVInstance *kv_instance = kv_instance_.get();
+    TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
     Vector<String> *index_id_strs_ptr = nullptr;
     Vector<String> *index_names_ptr = nullptr;
-    status = table_meta->GetIndexIDs(index_id_strs_ptr, &index_names_ptr);
+    status = table_meta->GetIndexIDs(kv_instance, begin_ts, index_id_strs_ptr, &index_names_ptr);
     if (!status.ok()) {
         return status;
     }
@@ -706,13 +708,16 @@ Status NewTxn::ListIndex(const String &db_name, const String &table_name, Vector
 
 Status NewTxn::AppendIndex(TableIndexMeeta &table_index_meta, const Pair<RowID, u64> &append_range) {
     KVInstance *kv_instance = kv_instance_.get();
+    TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
+    TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
     auto [index_base, index_status] = table_index_meta.GetIndexBase(kv_instance);
     if (!index_status.ok()) {
         return index_status;
     }
     SizeT column_idx = 0;
     {
-        auto [column_def, status] = table_index_meta.table_meta().GetColumnDefByColumnName(index_base->column_name(), &column_idx);
+        auto [column_def, status] =
+            table_index_meta.table_meta().GetColumnDefByColumnName(kv_instance, begin_ts, commit_ts, index_base->column_name(), &column_idx);
         if (!status.ok()) {
             return status;
         }
@@ -727,7 +732,13 @@ Status NewTxn::AppendIndex(TableIndexMeeta &table_index_meta, const Pair<RowID, 
     auto append_in_column = [&]() {
         ColumnVector col;
         {
-            Status status = NewCatalog::GetColumnVector(*column_meta, cur_offset + cur_row_cnt, ColumnVectorMode::kReadOnly, col);
+            Status status = NewCatalog::GetColumnVector(*column_meta,
+                                                        kv_instance,
+                                                        begin_ts,
+                                                        commit_ts,
+                                                        cur_offset + cur_row_cnt,
+                                                        ColumnVectorMode::kReadOnly,
+                                                        col);
             if (!status.ok()) {
                 return status;
             }
@@ -776,6 +787,7 @@ NewTxn::AppendMemIndex(SegmentIndexMeta &segment_index_meta, BlockID block_id, c
 
     KVInstance *kv_instance = kv_instance_.get();
     TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
+    TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
     auto [index_base, index_status] = segment_index_meta.table_index_meta().GetIndexBase(kv_instance);
     if (!index_status.ok()) {
         return index_status;
@@ -786,7 +798,7 @@ NewTxn::AppendMemIndex(SegmentIndexMeta &segment_index_meta, BlockID block_id, c
         case IndexType::kSecondary: {
             SharedPtr<SecondaryIndexInMem> memory_secondary_index;
             if (is_null) {
-                auto [column_def, status] = segment_index_meta.table_index_meta().GetColumnDef(kv_instance);
+                auto [column_def, status] = segment_index_meta.table_index_meta().GetColumnDef(kv_instance, begin_ts, commit_ts);
                 if (!status.ok()) {
                     return status;
                 }
@@ -804,7 +816,7 @@ NewTxn::AppendMemIndex(SegmentIndexMeta &segment_index_meta, BlockID block_id, c
             SharedPtr<MemoryIndexer> memory_indexer;
             bool need_to_update_ft_segment_ts = false;
             if (is_null) {
-                auto [column_def, status] = segment_index_meta.table_index_meta().GetColumnDef(kv_instance);
+                auto [column_def, status] = segment_index_meta.table_index_meta().GetColumnDef(kv_instance, begin_ts, commit_ts);
                 if (!status.ok()) {
                     return status;
                 }
@@ -853,7 +865,7 @@ NewTxn::AppendMemIndex(SegmentIndexMeta &segment_index_meta, BlockID block_id, c
         case IndexType::kIVF: {
             SharedPtr<IVFIndexInMem> memory_ivf_index;
             if (is_null) {
-                auto [column_def, status] = segment_index_meta.table_index_meta().GetColumnDef(kv_instance);
+                auto [column_def, status] = segment_index_meta.table_index_meta().GetColumnDef(kv_instance, begin_ts, commit_ts);
                 if (!status.ok()) {
                     return status;
                 }
@@ -869,7 +881,7 @@ NewTxn::AppendMemIndex(SegmentIndexMeta &segment_index_meta, BlockID block_id, c
         case IndexType::kHnsw: {
             SharedPtr<HnswIndexInMem> memory_hnsw_index;
             if (is_null) {
-                auto [column_def, status] = segment_index_meta.table_index_meta().GetColumnDef(kv_instance);
+                auto [column_def, status] = segment_index_meta.table_index_meta().GetColumnDef(kv_instance, begin_ts, commit_ts);
                 if (!status.ok()) {
                     return status;
                 }
@@ -884,7 +896,7 @@ NewTxn::AppendMemIndex(SegmentIndexMeta &segment_index_meta, BlockID block_id, c
         case IndexType::kBMP: {
             SharedPtr<BMPIndexInMem> memory_bmp_index;
             if (is_null) {
-                auto [column_def, status] = segment_index_meta.table_index_meta().GetColumnDef(kv_instance);
+                auto [column_def, status] = segment_index_meta.table_index_meta().GetColumnDef(kv_instance, begin_ts, commit_ts);
                 if (!status.ok()) {
                     return status;
                 }
@@ -899,7 +911,7 @@ NewTxn::AppendMemIndex(SegmentIndexMeta &segment_index_meta, BlockID block_id, c
         case IndexType::kEMVB: {
             SharedPtr<EMVBIndexInMem> memory_emvb_index;
             if (is_null) {
-                auto [column_def, status] = segment_index_meta.table_index_meta().GetColumnDef(kv_instance);
+                auto [column_def, status] = segment_index_meta.table_index_meta().GetColumnDef(kv_instance, begin_ts, commit_ts);
                 if (!status.ok()) {
                     return status;
                 }
@@ -910,7 +922,7 @@ NewTxn::AppendMemIndex(SegmentIndexMeta &segment_index_meta, BlockID block_id, c
             } else {
                 memory_emvb_index = mem_index->GetEMVBIndex();
             }
-            memory_emvb_index->Insert(col, offset, row_cnt, kv_instance, begin_ts);
+            memory_emvb_index->Insert(col, offset, row_cnt, kv_instance, begin_ts, commit_ts);
             break;
         }
         default: {
@@ -955,6 +967,8 @@ Status NewTxn::PopulateIndex(const String &db_name,
         }
     }
     KVInstance *kv_instance = kv_instance_.get();
+    TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
+    TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
     auto [index_base, index_status] = table_index_meta.GetIndexBase(kv_instance);
     if (!index_status.ok()) {
         return index_status;
@@ -962,7 +976,8 @@ Status NewTxn::PopulateIndex(const String &db_name,
     SharedPtr<ColumnDef> column_def;
     ColumnID column_id = 0;
     {
-        auto [column_def_, status] = table_index_meta.table_meta().GetColumnDefByColumnName(index_base->column_name());
+        auto [column_def_, status] =
+            table_index_meta.table_meta().GetColumnDefByColumnName(kv_instance, begin_ts, commit_ts, index_base->column_name());
         if (!status.ok()) {
             return status;
         }
@@ -1144,7 +1159,7 @@ Status NewTxn::ReplayDumpIndex(WalCmdDumpIndexV2 *dump_index_cmd) {
 
     if (dump_success) {
         for (const WalChunkIndexInfo &chunk_info : dump_index_cmd->chunk_infos_) {
-            status = NewCatalog::LoadFlushedChunkIndex1(segment_index_meta, kv_instance_.get(), chunk_info, this);
+            status = NewCatalog::LoadFlushedChunkIndex1(segment_index_meta, chunk_info, this);
             if (!status.ok()) {
                 return status;
             }
@@ -1234,6 +1249,11 @@ Status NewTxn::PopulateIndexToMem(SegmentIndexMeta &segment_index_meta, SegmentM
     if (!status.ok()) {
         return status;
     }
+
+    KVInstance *kv_instance = kv_instance_.get();
+    TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
+    TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
+
     SizeT block_capacity = DEFAULT_BLOCK_CAPACITY;
     for (BlockID block_id : *block_ids) {
         BlockMeta block_meta(block_id, segment_meta);
@@ -1242,7 +1262,7 @@ Status NewTxn::PopulateIndexToMem(SegmentIndexMeta &segment_index_meta, SegmentM
         SizeT row_cnt = block_id == block_ids->back() ? segment_row_cnt - block_capacity * (block_ids->size() - 1) : block_capacity;
 
         ColumnVector col;
-        status = NewCatalog::GetColumnVector(column_meta, row_cnt, ColumnVectorMode::kReadOnly, col);
+        status = NewCatalog::GetColumnVector(column_meta, kv_instance, begin_ts, commit_ts, row_cnt, ColumnVectorMode::kReadOnly, col);
         if (!status.ok()) {
             return status;
         }
@@ -1278,9 +1298,13 @@ Status NewTxn::PopulateFtIndexInner(SharedPtr<IndexBase> index_base,
         MakeShared<MemoryIndexer>(full_path, base_name, base_row_id, index_fulltext->flag_, index_fulltext->analyzer_);
     mem_index->SetFulltextIndex(memory_indexer);
 
+    KVInstance *kv_instance = kv_instance_.get();
+    TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
+    TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
+
     Vector<BlockID> *block_ids_ptr = nullptr;
 
-    std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1(kv_instance_.get(), txn_context_ptr_->begin_ts_, txn_context_ptr_->commit_ts_);
+    std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1(kv_instance, begin_ts, commit_ts);
     if (!status.ok()) {
         return status;
     }
@@ -1293,7 +1317,7 @@ Status NewTxn::PopulateFtIndexInner(SharedPtr<IndexBase> index_base,
         SizeT row_cnt = block_id == block_ids_ptr->back() ? segment_row_cnt - block_capacity * (block_ids_ptr->size() - 1) : block_capacity;
 
         ColumnVector col;
-        status = NewCatalog::GetColumnVector(column_meta, row_cnt, ColumnVectorMode::kReadOnly, col);
+        status = NewCatalog::GetColumnVector(column_meta, kv_instance, begin_ts, commit_ts, row_cnt, ColumnVectorMode::kReadOnly, col);
         if (!status.ok()) {
             return status;
         }
@@ -1392,6 +1416,8 @@ Status NewTxn::PopulateEmvbIndexInner(SharedPtr<IndexBase> index_base,
         row_count = rc;
     }
     KVInstance *kv_instance = kv_instance_.get();
+    TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
+    TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
     ChunkID chunk_id = 0;
     {
         Status status = segment_index_meta.GetNextChunkID(kv_instance, chunk_id);
@@ -1423,7 +1449,7 @@ Status NewTxn::PopulateEmvbIndexInner(SharedPtr<IndexBase> index_base,
     {
         BufferHandle buffer_handle = buffer_obj->Load();
         auto *data_ptr = static_cast<EMVBIndex *>(buffer_handle.GetDataMut());
-        data_ptr->BuildEMVBIndex(base_row_id, row_count, segment_meta, column_def);
+        data_ptr->BuildEMVBIndex(base_row_id, row_count, segment_meta, kv_instance, begin_ts, commit_ts, column_def);
     }
     buffer_obj->Save();
     return Status::OK();
@@ -1523,6 +1549,10 @@ Status NewTxn::OptimizeVecIndex(SharedPtr<IndexBase> index_base,
         return status;
     }
 
+    KVInstance *kv_instance = kv_instance_.get();
+    TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
+    TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
+
     if (index_base->index_type_ == IndexType::kHnsw) {
         const auto *index_hnsw = static_cast<const IndexHnsw *>(index_base.get());
         if (index_hnsw->build_type_ == HnswBuildType::kLSG) {
@@ -1534,7 +1564,7 @@ Status NewTxn::OptimizeVecIndex(SharedPtr<IndexBase> index_base,
             BlockMeta block_meta(block_id, segment_meta);
             SizeT block_row_cnt = 0;
             // std::tie(block_row_cnt, status) = block_meta.GetRowCnt();
-            std::tie(block_row_cnt, status) = block_meta.GetRowCnt1(kv_instance_.get(), txn_context_ptr_->begin_ts_, txn_context_ptr_->commit_ts_);
+            std::tie(block_row_cnt, status) = block_meta.GetRowCnt1(kv_instance, begin_ts, commit_ts);
             if (!status.ok()) {
                 return status;
             }
@@ -1542,7 +1572,7 @@ Status NewTxn::OptimizeVecIndex(SharedPtr<IndexBase> index_base,
             SizeT row_cnt = std::min(block_row_cnt, SizeT(total_row_cnt));
             total_row_cnt -= row_cnt;
             ColumnVector col;
-            status = NewCatalog::GetColumnVector(column_meta, row_cnt, ColumnVectorMode::kReadOnly, col);
+            status = NewCatalog::GetColumnVector(column_meta, kv_instance, begin_ts, commit_ts, row_cnt, ColumnVectorMode::kReadOnly, col);
             if (!status.ok()) {
                 return status;
             }
@@ -1558,7 +1588,7 @@ Status NewTxn::OptimizeVecIndex(SharedPtr<IndexBase> index_base,
             BlockMeta block_meta(block_id, segment_meta);
             SizeT block_row_cnt = 0;
             // std::tie(block_row_cnt, status) = block_meta.GetRowCnt();
-            std::tie(block_row_cnt, status) = block_meta.GetRowCnt1(kv_instance_.get(), txn_context_ptr_->begin_ts_, txn_context_ptr_->commit_ts_);
+            std::tie(block_row_cnt, status) = block_meta.GetRowCnt1(kv_instance, begin_ts, commit_ts);
             if (!status.ok()) {
                 return status;
             }
@@ -1566,7 +1596,7 @@ Status NewTxn::OptimizeVecIndex(SharedPtr<IndexBase> index_base,
             SizeT row_cnt = std::min(block_row_cnt, SizeT(total_row_cnt));
             total_row_cnt -= row_cnt;
             ColumnVector col;
-            status = NewCatalog::GetColumnVector(column_meta, row_cnt, ColumnVectorMode::kReadOnly, col);
+            status = NewCatalog::GetColumnVector(column_meta, kv_instance, begin_ts, commit_ts, row_cnt, ColumnVectorMode::kReadOnly, col);
             if (!status.ok()) {
                 return status;
             }
@@ -1978,10 +2008,12 @@ Status NewTxn::RecoverMemIndex(TableIndexMeeta &table_index_meta) {
     Status status;
     TableMeeta &table_meta = table_index_meta.table_meta();
 
-    KVInstance* kv_instance = kv_instance_.get();
+    KVInstance *kv_instance = kv_instance_.get();
+    TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
+    TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
 
     Vector<SegmentID> *segment_ids_ptr = nullptr;
-    std::tie(segment_ids_ptr, status) = table_meta.GetSegmentIDs1();
+    std::tie(segment_ids_ptr, status) = table_meta.GetSegmentIDs1(kv_instance, begin_ts, commit_ts);
     if (!status.ok()) {
         return status;
     }
@@ -2027,7 +2059,7 @@ Status NewTxn::RecoverMemIndex(TableIndexMeeta &table_index_meta) {
 Status NewTxn::CommitMemIndex(TableIndexMeeta &table_index_meta) {
     Status status;
 
-    KVInstance* kv_instance = kv_instance_.get();
+    KVInstance *kv_instance = kv_instance_.get();
 
     SharedPtr<IndexBase> index_base;
     std::tie(index_base, status) = table_index_meta.GetIndexBase(kv_instance);
@@ -2076,7 +2108,10 @@ Status NewTxn::GetFullTextIndexReader(const String &db_name, const String &table
 }
 
 Status NewTxn::PrepareCommitCreateIndex(WalCmdCreateIndexV2 *create_index_cmd) {
+    KVInstance *kv_instance = kv_instance_.get();
+    TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
     TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
+
     String db_name = create_index_cmd->db_name_;
     String table_name = create_index_cmd->table_name_;
     String index_name = *create_index_cmd->index_base_->index_name_;
@@ -2094,7 +2129,7 @@ Status NewTxn::PrepareCommitCreateIndex(WalCmdCreateIndexV2 *create_index_cmd) {
     TableIndexMeeta &table_index_meta = *table_index_meta_opt;
 
     Vector<SegmentID> *segment_ids_ptr = nullptr;
-    std::tie(segment_ids_ptr, status) = table_meta.GetSegmentIDs1();
+    std::tie(segment_ids_ptr, status) = table_meta.GetSegmentIDs1(kv_instance, begin_ts, commit_ts);
     if (!status.ok()) {
         return status;
     }

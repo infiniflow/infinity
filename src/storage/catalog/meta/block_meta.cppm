@@ -65,7 +65,8 @@ public:
 
     Tuple<SharedPtr<BlockInfo>, Status> GetBlockInfo(KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts);
 
-    Tuple<SharedPtr<BlockColumnInfo>, Status> GetBlockColumnInfo(ColumnID column_id);
+    Tuple<SharedPtr<BlockColumnInfo>, Status>
+    GetBlockColumnInfo(KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts, ColumnID column_id);
 
     String GetBlockTag(const String &tag) const;
 

@@ -57,11 +57,11 @@ public:
 
     Status GetIndexBuffer(KVInstance *kv_instance, BufferObj *&index_buffer);
 
-    Status InitSet(KVInstance *kv_instance, const ChunkIndexMetaInfo &chunk_info);
+    Status InitSet(KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts, const ChunkIndexMetaInfo &chunk_info);
 
-    Status LoadSet(KVInstance *kv_instance);
+    Status LoadSet(KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts);
 
-    Status RestoreSet(KVInstance *kv_instance);
+    Status RestoreSet(KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts);
 
     Status UninitSet(KVInstance *kv_instance, UsageFlag usage_flag);
 

@@ -238,7 +238,8 @@ void BuildFastRoughFilterTask::BuildOnlyBloomFilter(NewBuildFastRoughFilterArg &
         }
         ColumnMeta column_meta(arg.column_id_, block_meta);
         ColumnVector column_vector;
-        status = NewCatalog::GetColumnVector(column_meta, block_row_cnt, ColumnVectorMode::kReadOnly, column_vector);
+        status =
+            NewCatalog::GetColumnVector(column_meta, kv_instance, begin_ts, commit_ts, block_row_cnt, ColumnVectorMode::kReadOnly, column_vector);
         if (!status.ok()) {
             UnrecoverableError(status.message());
         }
@@ -342,7 +343,8 @@ void BuildFastRoughFilterTask::BuildOnlyMinMaxFilter(NewBuildFastRoughFilterArg 
 
         ColumnMeta column_meta(arg.column_id_, block_meta);
         ColumnVector column_vector;
-        status = NewCatalog::GetColumnVector(column_meta, block_row_cnt, ColumnVectorMode::kReadOnly, column_vector);
+        status =
+            NewCatalog::GetColumnVector(column_meta, kv_instance, begin_ts, commit_ts, block_row_cnt, ColumnVectorMode::kReadOnly, column_vector);
         if (!status.ok()) {
             UnrecoverableError(status.message());
         }
@@ -413,7 +415,8 @@ void BuildFastRoughFilterTask::BuildMinMaxAndBloomFilter(NewBuildFastRoughFilter
         input_data.clear();
         ColumnMeta column_meta(arg.column_id_, block_meta);
         ColumnVector column_vector;
-        status = NewCatalog::GetColumnVector(column_meta, block_row_cnt, ColumnVectorMode::kReadOnly, column_vector);
+        status =
+            NewCatalog::GetColumnVector(column_meta, kv_instance, begin_ts, commit_ts, block_row_cnt, ColumnVectorMode::kReadOnly, column_vector);
         if (!status.ok()) {
             UnrecoverableError(status.message());
         }
@@ -480,7 +483,7 @@ void BuildFastRoughFilterTask::ExecuteOnNewSealedSegment(SegmentMeta *segment_me
     // step2. when building minmax, init filters to size of column_count
     u32 column_count = 0;
     {
-        auto [column_defs, status] = segment_meta->table_meta().GetColumnDefs();
+        auto [column_defs, status] = segment_meta->table_meta().GetColumnDefs(kv_instance, begin_ts, commit_ts);
         if (!status.ok()) {
             UnrecoverableError(status.message());
         }
@@ -488,7 +491,7 @@ void BuildFastRoughFilterTask::ExecuteOnNewSealedSegment(SegmentMeta *segment_me
     }
     segment_filters->SetSegmentBeginBuildMinMaxFilterTask(column_count);
     // step 3. build filter
-    ExecuteInner(segment_meta, segment_filters.get());
+    ExecuteInner(segment_meta, kv_instance, begin_ts, commit_ts, segment_filters.get());
     // step 4. set finish build MinMax atomic flag
     segment_filters->SetSegmentFinishBuildMinMaxFilterTask();
     LOG_TRACE(fmt::format("BuildFastRoughFilterTask: build fast rough filter for segment {}, job end.", segment_meta->segment_id()));
@@ -496,10 +499,14 @@ void BuildFastRoughFilterTask::ExecuteOnNewSealedSegment(SegmentMeta *segment_me
     segment_filters->SetFilter(kv_instance);
 }
 
-void BuildFastRoughFilterTask::ExecuteInner(SegmentMeta *segment_meta, BuildingSegmentFastFilters *segment_filters) {
+void BuildFastRoughFilterTask::ExecuteInner(SegmentMeta *segment_meta,
+                                            KVInstance *kv_instance,
+                                            TxnTimeStamp begin_ts,
+                                            TxnTimeStamp commit_ts,
+                                            BuildingSegmentFastFilters *segment_filters) {
     UniquePtr<u64[]> distinct_keys = nullptr;
     UniquePtr<u64[]> distinct_keys_backup = nullptr;
-    auto [column_defs, status] = segment_meta->table_meta().GetColumnDefs();
+    auto [column_defs, status] = segment_meta->table_meta().GetColumnDefs(kv_instance, begin_ts, commit_ts);
     if (!status.ok()) {
         UnrecoverableError(status.message());
     }

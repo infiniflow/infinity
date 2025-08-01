@@ -125,7 +125,7 @@ TEST_P(TestTxnReplayAlter, test_add_column) {
         EXPECT_TRUE(status.ok());
 
         Vector<SegmentID> *segment_ids_ptr = nullptr;
-        std::tie(segment_ids_ptr, status) = table_meta->GetSegmentIDs1();
+        std::tie(segment_ids_ptr, status) = table_meta->GetSegmentIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(*segment_ids_ptr, Vector<SegmentID>({0}));
         SegmentID segment_id = (*segment_ids_ptr)[0];
@@ -141,7 +141,7 @@ TEST_P(TestTxnReplayAlter, test_add_column) {
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(*block_ids_ptr, Vector<BlockID>({0}));
 
-        auto [column_defs, status1] = table_meta->GetColumnDefs();
+        auto [column_defs, status1] = table_meta->GetColumnDefs(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
         EXPECT_TRUE(status1.ok());
         EXPECT_EQ(column_defs->size(), 2);
 
@@ -150,7 +150,13 @@ TEST_P(TestTxnReplayAlter, test_add_column) {
             ColumnMeta column_meta(1, block_meta);
             ColumnVector column_vector;
 
-            Status status = NewCatalog::GetColumnVector(column_meta, row_cnt, ColumnVectorMode::kReadOnly, column_vector);
+            Status status = NewCatalog::GetColumnVector(column_meta,
+                                                        txn->kv_instance(),
+                                                        txn->BeginTS(),
+                                                        txn->CommitTS(),
+                                                        row_cnt,
+                                                        ColumnVectorMode::kReadOnly,
+                                                        column_vector);
             EXPECT_TRUE(status.ok());
 
             for (SizeT i = 0; i < row_cnt; ++i) {
@@ -231,7 +237,7 @@ TEST_P(TestTxnReplayAlter, test_drop_column) {
         Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
 
-        auto [column_defs, status1] = table_meta->GetColumnDefs();
+        auto [column_defs, status1] = table_meta->GetColumnDefs(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
         EXPECT_TRUE(status1.ok());
         EXPECT_EQ(column_defs->size(), 1);
     }

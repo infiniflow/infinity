@@ -225,8 +225,10 @@ void ColumnIndexReader::InvalidateChunk(SegmentID segment_id, ChunkID chunk_id) 
 }
 
 SharedPtr<IndexReader> TableIndexReaderCache::GetIndexReader(NewTxn *txn) {
-    TxnTimeStamp begin_ts = txn->BeginTS();
     KVInstance* kv_instance = txn->kv_instance();
+    TxnTimeStamp begin_ts = txn->BeginTS();
+    TxnTimeStamp commit_ts = txn->CommitTS();
+
     SharedPtr<IndexReader> index_reader = MakeShared<IndexReader>();
     std::scoped_lock lock(mutex_);
     if (begin_ts >= cache_ts_) [[likely]] {
@@ -240,7 +242,7 @@ SharedPtr<IndexReader> TableIndexReaderCache::GetIndexReader(NewTxn *txn) {
     TableMeeta table_meta(db_id_str_, table_id_str_, txn);
     Vector<String> *index_id_strs = nullptr;
     {
-        Status status = table_meta.GetIndexIDs(index_id_strs, nullptr);
+        Status status = table_meta.GetIndexIDs(kv_instance, begin_ts, index_id_strs, nullptr);
         if (!status.ok()) {
             UnrecoverableError("GetIndexIDs failed");
         }
@@ -257,7 +259,7 @@ SharedPtr<IndexReader> TableIndexReaderCache::GetIndexReader(NewTxn *txn) {
         }
 
         String column_name = index_base->column_name();
-        auto [column_def, col_def_status] = table_index_meta.GetColumnDef(kv_instance);
+        auto [column_def, col_def_status] = table_index_meta.GetColumnDef(kv_instance, begin_ts, commit_ts);
         u64 column_id = column_def->id();
         if (index_reader->column_index_readers_->find(column_id) == index_reader->column_index_readers_->end()) {
             (*index_reader->column_index_readers_)[column_id] = MakeShared<Map<String, SharedPtr<ColumnIndexReader>>>();

@@ -56,6 +56,7 @@ public:
 Tuple<SizeT, Status> TestTxnAppend::GetTableRowCount(const String &db_name, const String &table_name) {
     NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
     auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("get row count"), TransactionType::kNormal);
+    KVInstance *kv_instance = txn->kv_instance();
     TxnTimeStamp begin_ts = txn->BeginTS();
     TxnTimeStamp commit_ts = txn->CommitTS();
 
@@ -67,7 +68,7 @@ Tuple<SizeT, Status> TestTxnAppend::GetTableRowCount(const String &db_name, cons
     }
 
     SizeT row_count = 0;
-    auto [segment_ids, seg_status] = table_meta->GetSegmentIDs1();
+    auto [segment_ids, seg_status] = table_meta->GetSegmentIDs1(kv_instance, begin_ts, commit_ts);
     if (!status.ok()) {
         return {0, status};
     }
@@ -174,7 +175,7 @@ TEST_P(TestTxnAppend, test_append0) {
         EXPECT_TRUE(status.ok());
 
         Vector<SegmentID> *segment_ids_ptr = nullptr;
-        std::tie(segment_ids_ptr, status) = table_meta->GetSegmentIDs1();
+        std::tie(segment_ids_ptr, status) = table_meta->GetSegmentIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(*segment_ids_ptr, Vector<SegmentID>({0}));
         SegmentID segment_id = (*segment_ids_ptr)[0];
@@ -294,6 +295,7 @@ TEST_P(TestTxnAppend, test_append1) {
     // Check the appended data.
     {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
+        KVInstance* kv_instance = txn->kv_instance();
         TxnTimeStamp begin_ts = txn->BeginTS();
         TxnTimeStamp commit_ts = txn->CommitTS();
 
@@ -302,7 +304,7 @@ TEST_P(TestTxnAppend, test_append1) {
         Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
 
-        auto [segment_ids, seg_status] = table_meta->GetSegmentIDs1();
+        auto [segment_ids, seg_status] = table_meta->GetSegmentIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
         EXPECT_TRUE(seg_status.ok());
         EXPECT_EQ(*segment_ids, Vector<SegmentID>{0});
         SegmentMeta segment_meta((*segment_ids)[0], *table_meta);
@@ -336,7 +338,7 @@ TEST_P(TestTxnAppend, test_append1) {
             ColumnMeta column_meta(column_idx, block_meta);
             ColumnVector col;
 
-            status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorMode::kReadOnly, col);
+            status = NewCatalog::GetColumnVector(column_meta, kv_instance, begin_ts, commit_ts, row_count, ColumnVectorMode::kReadOnly, col);
             EXPECT_TRUE(status.ok());
 
             Value v1 = col.GetValueByIndex(0);
@@ -349,7 +351,7 @@ TEST_P(TestTxnAppend, test_append1) {
             SizeT column_idx = 1;
             ColumnMeta column_meta(column_idx, block_meta);
             ColumnVector col;
-            status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorMode::kReadOnly, col);
+            status = NewCatalog::GetColumnVector(column_meta, kv_instance, begin_ts, commit_ts, row_count, ColumnVectorMode::kReadOnly, col);
 
             EXPECT_TRUE(status.ok());
             Value v1 = col.GetValueByIndex(0);
@@ -486,7 +488,7 @@ TEST_P(TestTxnAppend, test_append2) {
         Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
 
-        auto [segment_ids, seg_status] = table_meta->GetSegmentIDs1();
+        auto [segment_ids, seg_status] = table_meta->GetSegmentIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
         EXPECT_TRUE(seg_status.ok());
         EXPECT_EQ(segment_ids->size(), 1);
         SegmentID segment_id = segment_ids->at(0);
@@ -529,7 +531,7 @@ TEST_P(TestTxnAppend, test_append2) {
                 ColumnMeta column_meta(column_idx, block_meta);
                 ColumnVector col;
 
-                status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorMode::kReadOnly, col);
+                status = NewCatalog::GetColumnVector(column_meta, txn->kv_instance(), txn->BeginTS(), txn->CommitTS(), row_count, ColumnVectorMode::kReadOnly, col);
                 EXPECT_TRUE(status.ok());
 
                 if (idx % 2 == 0) {
@@ -549,7 +551,7 @@ TEST_P(TestTxnAppend, test_append2) {
                 SizeT column_idx = 1;
                 ColumnMeta column_meta(column_idx, block_meta);
                 ColumnVector col;
-                status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorMode::kReadOnly, col);
+                status = NewCatalog::GetColumnVector(column_meta, txn->kv_instance(), txn->BeginTS(), txn->CommitTS(), row_count, ColumnVectorMode::kReadOnly, col);
                 EXPECT_TRUE(status.ok());
 
                 if (idx % 2 == 0) {
@@ -2908,7 +2910,7 @@ TEST_P(TestTxnAppend, test_append_append) {
             Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
             EXPECT_TRUE(status.ok());
 
-            auto [segment_ids, seg_status] = table_meta->GetSegmentIDs1();
+            auto [segment_ids, seg_status] = table_meta->GetSegmentIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
             EXPECT_TRUE(seg_status.ok());
             EXPECT_EQ(*segment_ids, Vector<SegmentID>({0}));
             SegmentMeta segment_meta(0, *table_meta);
@@ -3055,7 +3057,7 @@ TEST_P(TestTxnAppend, test_append_append) {
             Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
             EXPECT_TRUE(status.ok());
 
-            auto [segment_ids, seg_status] = table_meta->GetSegmentIDs1();
+            auto [segment_ids, seg_status] = table_meta->GetSegmentIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
             EXPECT_TRUE(seg_status.ok());
             EXPECT_EQ(*segment_ids, Vector<SegmentID>({0}));
             SegmentMeta segment_meta(0, *table_meta);
@@ -3202,7 +3204,7 @@ TEST_P(TestTxnAppend, test_append_append) {
             Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
             EXPECT_TRUE(status.ok());
 
-            auto [segment_ids, seg_status] = table_meta->GetSegmentIDs1();
+            auto [segment_ids, seg_status] = table_meta->GetSegmentIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
             EXPECT_TRUE(seg_status.ok());
             EXPECT_EQ(*segment_ids, Vector<SegmentID>{0});
             SegmentMeta segment_meta(0, *table_meta);
@@ -3293,7 +3295,7 @@ TEST_P(TestTxnAppend, test_append_append) {
             Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
             EXPECT_TRUE(status.ok());
 
-            auto [segment_ids, seg_status] = table_meta->GetSegmentIDs1();
+            auto [segment_ids, seg_status] = table_meta->GetSegmentIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
             EXPECT_TRUE(seg_status.ok());
             EXPECT_EQ(*segment_ids, Vector<SegmentID>{0});
             SegmentMeta segment_meta(0, *table_meta);
@@ -3385,7 +3387,7 @@ TEST_P(TestTxnAppend, test_append_append) {
             Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
             EXPECT_TRUE(status.ok());
 
-            auto [segment_ids, seg_status] = table_meta->GetSegmentIDs1();
+            auto [segment_ids, seg_status] = table_meta->GetSegmentIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
             EXPECT_TRUE(seg_status.ok());
             EXPECT_EQ(*segment_ids, Vector<SegmentID>{0});
             SegmentMeta segment_meta(0, *table_meta);
@@ -3526,7 +3528,7 @@ TEST_P(TestTxnAppend, test_append_append_concurrent) {
             Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
             EXPECT_TRUE(status.ok());
 
-            auto [segment_ids, seg_status] = table_meta->GetSegmentIDs1();
+            auto [segment_ids, seg_status] = table_meta->GetSegmentIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
             EXPECT_TRUE(seg_status.ok());
             EXPECT_EQ(segment_ids->size(), 1);
             {
@@ -3564,7 +3566,7 @@ TEST_P(TestTxnAppend, test_append_append_concurrent) {
                             ColumnMeta column_meta(column_idx, block_meta);
                             ColumnVector col;
 
-                            Status status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorMode::kReadOnly, col);
+                            Status status = NewCatalog::GetColumnVector(column_meta, txn->kv_instance(), txn->BeginTS(), txn->CommitTS(), row_count, ColumnVectorMode::kReadOnly, col);
                             EXPECT_TRUE(status.ok());
 
                             for (SizeT row_id = 0; row_id < 4096; ++row_id) {
@@ -3579,7 +3581,7 @@ TEST_P(TestTxnAppend, test_append_append_concurrent) {
                             ColumnMeta column_meta(column_idx, block_meta);
                             ColumnVector col;
 
-                            Status status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorMode::kReadOnly, col);
+                            Status status = NewCatalog::GetColumnVector(column_meta, txn->kv_instance(), txn->BeginTS(), txn->CommitTS(), row_count, ColumnVectorMode::kReadOnly, col);
                             EXPECT_TRUE(status.ok());
 
                             for (SizeT row_id = 0; row_id < 4096; ++row_id) {
@@ -3693,7 +3695,7 @@ TEST_P(TestTxnAppend, test_append_and_create_index) {
         Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
 
-        auto [segment_ids, seg_status] = table_meta->GetSegmentIDs1();
+        auto [segment_ids, seg_status] = table_meta->GetSegmentIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
         EXPECT_TRUE(seg_status.ok());
         EXPECT_EQ(*segment_ids, Vector<SegmentID>({0}));
         SegmentMeta segment_meta(0, *table_meta);
@@ -3702,7 +3704,7 @@ TEST_P(TestTxnAppend, test_append_and_create_index) {
 
         Vector<String> *index_id_strs_ptr = nullptr;
         Vector<String> *index_names_ptr = nullptr;
-        status = table_meta->GetIndexIDs(index_id_strs_ptr, &index_names_ptr);
+        status = table_meta->GetIndexIDs(txn->kv_instance(), txn->BeginTS(), index_id_strs_ptr, &index_names_ptr);
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(index_id_strs_ptr->size(), 1);
         EXPECT_EQ(index_names_ptr->size(), 1);
@@ -3728,7 +3730,7 @@ TEST_P(TestTxnAppend, test_append_and_create_index) {
         Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
 
-        auto [segment_ids, seg_status] = table_meta->GetSegmentIDs1();
+        auto [segment_ids, seg_status] = table_meta->GetSegmentIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
         EXPECT_TRUE(seg_status.ok());
         EXPECT_EQ(*segment_ids, Vector<SegmentID>({0}));
         SegmentMeta segment_meta(0, *table_meta);
@@ -3737,7 +3739,7 @@ TEST_P(TestTxnAppend, test_append_and_create_index) {
 
         Vector<String> *index_id_strs_ptr = nullptr;
         Vector<String> *index_names_ptr = nullptr;
-        status = table_meta->GetIndexIDs(index_id_strs_ptr, &index_names_ptr);
+        status = table_meta->GetIndexIDs(txn->kv_instance(), txn->BeginTS(), index_id_strs_ptr, &index_names_ptr);
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(index_id_strs_ptr->size(), 0);
     };
@@ -3750,13 +3752,13 @@ TEST_P(TestTxnAppend, test_append_and_create_index) {
         Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
 
-        auto [segment_ids, seg_status] = table_meta->GetSegmentIDs1();
+        auto [segment_ids, seg_status] = table_meta->GetSegmentIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
         EXPECT_TRUE(seg_status.ok());
         EXPECT_EQ(*segment_ids, Vector<SegmentID>({}));
 
         Vector<String> *index_id_strs_ptr = nullptr;
         Vector<String> *index_names_ptr = nullptr;
-        status = table_meta->GetIndexIDs(index_id_strs_ptr, &index_names_ptr);
+        status = table_meta->GetIndexIDs(txn->kv_instance(), txn->BeginTS(), index_id_strs_ptr, &index_names_ptr);
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(*index_names_ptr, Vector<String>({"idx1"}));
     };
@@ -4191,7 +4193,7 @@ TEST_P(TestTxnAppend, test_append_and_drop_index) {
         Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
 
-        auto [segment_ids, seg_status] = table_meta->GetSegmentIDs1();
+        auto [segment_ids, seg_status] = table_meta->GetSegmentIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
         EXPECT_TRUE(seg_status.ok());
         EXPECT_EQ(*segment_ids, Vector<SegmentID>({0}));
         SegmentMeta segment_meta(0, *table_meta);
@@ -4200,7 +4202,7 @@ TEST_P(TestTxnAppend, test_append_and_drop_index) {
 
         Vector<String> *index_id_strs_ptr = nullptr;
         Vector<String> *index_names_ptr = nullptr;
-        status = table_meta->GetIndexIDs(index_id_strs_ptr, &index_names_ptr);
+        status = table_meta->GetIndexIDs(txn->kv_instance(), txn->BeginTS(), index_id_strs_ptr, &index_names_ptr);
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(index_id_strs_ptr->size(), 1);
         EXPECT_EQ(index_names_ptr->size(), 1);
@@ -4227,7 +4229,7 @@ TEST_P(TestTxnAppend, test_append_and_drop_index) {
         Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
 
-        auto [segment_ids, seg_status] = table_meta->GetSegmentIDs1();
+        auto [segment_ids, seg_status] = table_meta->GetSegmentIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
         EXPECT_TRUE(seg_status.ok());
         EXPECT_EQ(*segment_ids, Vector<SegmentID>({0}));
         SegmentMeta segment_meta(0, *table_meta);
@@ -4236,7 +4238,7 @@ TEST_P(TestTxnAppend, test_append_and_drop_index) {
 
         Vector<String> *index_id_strs_ptr = nullptr;
         Vector<String> *index_names_ptr = nullptr;
-        status = table_meta->GetIndexIDs(index_id_strs_ptr, &index_names_ptr);
+        status = table_meta->GetIndexIDs(txn->kv_instance(), txn->BeginTS(), index_id_strs_ptr, &index_names_ptr);
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(*index_id_strs_ptr, Vector<String>({}));
         EXPECT_EQ(*index_names_ptr, Vector<String>({}));
@@ -4713,7 +4715,7 @@ TEST_P(TestTxnAppend, test_append_and_compact) {
         EXPECT_TRUE(status.ok());
 
         Vector<SegmentID> *segment_ids_ptr = nullptr;
-        std::tie(segment_ids_ptr, status) = table_meta->GetSegmentIDs1();
+        std::tie(segment_ids_ptr, status) = table_meta->GetSegmentIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(*segment_ids_ptr, segment_ids);
     };

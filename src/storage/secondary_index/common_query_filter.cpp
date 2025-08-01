@@ -59,6 +59,9 @@ namespace infinity {
 void ReadDataBlock(DataBlock *output,
                    const SizeT row_count,
                    BlockMeta &block_meta,
+                   KVInstance *kv_instance,
+                   TxnTimeStamp begin_ts,
+                   TxnTimeStamp commit_ts,
                    const Vector<SizeT> &column_ids,
                    const Vector<bool> &column_should_load) {
     const BlockID block_id = block_meta.block_id();
@@ -70,7 +73,8 @@ void ReadDataBlock(DataBlock *output,
         } else if (column_should_load[i]) {
             ColumnMeta column_meta(column_id, block_meta);
             ColumnVector column_vector;
-            Status status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorMode::kReadOnly, column_vector);
+            Status status =
+                NewCatalog::GetColumnVector(column_meta, kv_instance, begin_ts, commit_ts, row_count, ColumnVectorMode::kReadOnly, column_vector);
             if (!status.ok()) {
                 UnrecoverableError(status.message());
             }
@@ -211,7 +215,7 @@ void CommonQueryFilter::NewBuildFilter(u32 task_id) {
             }
             const auto row_count = std::min<SizeT>(segment_row_count - segment_row_count_read, block_row_count);
             db_for_filter->Reset(row_count);
-            ReadDataBlock(db_for_filter, row_count, block_meta, column_ids, column_should_load);
+            ReadDataBlock(db_for_filter, row_count, block_meta, kv_instance, begin_ts, commit_ts, column_ids, column_should_load);
             bool_column->Initialize(ColumnVectorType::kCompactBit, row_count);
             expr_evaluator.Init(db_for_filter);
             expr_evaluator.Execute(leftover_filter_, filter_state, bool_column);

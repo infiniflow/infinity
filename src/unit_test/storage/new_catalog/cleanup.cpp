@@ -341,11 +341,11 @@ TEST_P(TestTxnCleanup, cleanup_and_add_columns) {
             Optional<TableMeeta> table_meta;
             Status status = txn->GetTableMeta(*db_name_, *table_name_, db_meta, table_meta);
             EXPECT_TRUE(status.ok());
-            status = table_meta->CheckSegments({0 /* segment_id */});
+            status = table_meta->CheckSegments(txn->kv_instance(), txn->BeginTS(), {0 /* segment_id */});
             EXPECT_FALSE(status.ok());
-            status = table_meta->CheckSegments({1 /* segment_id */});
+            status = table_meta->CheckSegments(txn->kv_instance(), txn->BeginTS(), {1 /* segment_id */});
             EXPECT_TRUE(status.ok());
-            status = table_meta->CheckSegments({2 /* segment_id */});
+            status = table_meta->CheckSegments(txn->kv_instance(), txn->BeginTS(), {2 /* segment_id */});
             EXPECT_FALSE(status.ok());
 
             status = new_txn_mgr_->CommitTxn(txn);
@@ -360,7 +360,7 @@ TEST_P(TestTxnCleanup, cleanup_and_add_columns) {
             EXPECT_TRUE(status.ok());
 
             SharedPtr<Vector<SharedPtr<ColumnDef>>> column_defs;
-            std::tie(column_defs, status) = table_meta->GetColumnDefs();
+            std::tie(column_defs, status) = table_meta->GetColumnDefs(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
             EXPECT_TRUE(status.ok());
 
             bool has_column = false;
@@ -399,11 +399,11 @@ TEST_P(TestTxnCleanup, cleanup_and_drop_columns) {
             Optional<TableMeeta> table_meta;
             Status status = txn->GetTableMeta(*db_name_, *table_name_, db_meta, table_meta);
             EXPECT_TRUE(status.ok());
-            status = table_meta->CheckSegments({0 /* segment_id */});
+            status = table_meta->CheckSegments(txn->kv_instance(), txn->BeginTS(), {0 /* segment_id */});
             EXPECT_FALSE(status.ok());
-            status = table_meta->CheckSegments({1 /* segment_id */});
+            status = table_meta->CheckSegments(txn->kv_instance(), txn->BeginTS(), {1 /* segment_id */});
             EXPECT_TRUE(status.ok());
-            status = table_meta->CheckSegments({2 /* segment_id */});
+            status = table_meta->CheckSegments(txn->kv_instance(), txn->BeginTS(), {2 /* segment_id */});
             EXPECT_FALSE(status.ok());
             status = new_txn_mgr_->CommitTxn(txn);
             EXPECT_TRUE(status.ok());
@@ -417,7 +417,7 @@ TEST_P(TestTxnCleanup, cleanup_and_drop_columns) {
             EXPECT_TRUE(status.ok());
 
             SharedPtr<Vector<SharedPtr<ColumnDef>>> column_defs;
-            std::tie(column_defs, status) = table_meta->GetColumnDefs();
+            std::tie(column_defs, status) = table_meta->GetColumnDefs(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
             EXPECT_TRUE(status.ok());
 
             for (const auto &column_def : *column_defs) {
@@ -454,11 +454,11 @@ TEST_P(TestTxnCleanup, cleanup_and_rename_table) {
             Optional<TableMeeta> table_meta;
             Status status = txn->GetTableMeta(*db_name_, *new_table_name, db_meta, table_meta);
             EXPECT_TRUE(status.ok());
-            status = table_meta->CheckSegments({0 /* segment_id */});
+            status = table_meta->CheckSegments(txn->kv_instance(), txn->BeginTS(), {0 /* segment_id */});
             EXPECT_FALSE(status.ok());
-            status = table_meta->CheckSegments({1 /* segment_id */});
+            status = table_meta->CheckSegments(txn->kv_instance(), txn->BeginTS(), {1 /* segment_id */});
             EXPECT_TRUE(status.ok());
-            status = table_meta->CheckSegments({2 /* segment_id */});
+            status = table_meta->CheckSegments(txn->kv_instance(), txn->BeginTS(), {2 /* segment_id */});
             EXPECT_FALSE(status.ok());
             status = new_txn_mgr_->CommitTxn(txn);
             EXPECT_TRUE(status.ok());
@@ -499,11 +499,11 @@ TEST_P(TestTxnCleanup, cleanup_and_compact) {
             Optional<TableMeeta> table_meta;
             Status status = txn->GetTableMeta(*db_name_, *table_name_, db_meta, table_meta);
             EXPECT_TRUE(status.ok());
-            status = table_meta->CheckSegments({0 /* segment_id */});
+            status = table_meta->CheckSegments(txn->kv_instance(), txn->BeginTS(), {0 /* segment_id */});
             EXPECT_FALSE(status.ok());
-            status = table_meta->CheckSegments({1 /* segment_id */});
+            status = table_meta->CheckSegments(txn->kv_instance(), txn->BeginTS(), {1 /* segment_id */});
             EXPECT_TRUE(status.ok());
-            status = table_meta->CheckSegments({2 /* segment_id */});
+            status = table_meta->CheckSegments(txn->kv_instance(), txn->BeginTS(), {2 /* segment_id */});
             EXPECT_FALSE(status.ok());
             status = new_txn_mgr_->CommitTxn(txn);
             EXPECT_TRUE(status.ok());
@@ -535,11 +535,11 @@ TEST_P(TestTxnCleanup, cleanup_and_drop_index) {
             Optional<TableMeeta> table_meta;
             Status status = txn->GetTableMeta(*db_name_, *table_name_, db_meta, table_meta);
             EXPECT_TRUE(status.ok());
-            status = table_meta->CheckSegments({0 /* segment_id */});
+            status = table_meta->CheckSegments(txn->kv_instance(), txn->BeginTS(), {0 /* segment_id */});
             EXPECT_FALSE(status.ok());
-            status = table_meta->CheckSegments({1 /* segment_id */});
+            status = table_meta->CheckSegments(txn->kv_instance(), txn->BeginTS(), {1 /* segment_id */});
             EXPECT_TRUE(status.ok());
-            status = table_meta->CheckSegments({2 /* segment_id */});
+            status = table_meta->CheckSegments(txn->kv_instance(), txn->BeginTS(), {2 /* segment_id */});
             EXPECT_FALSE(status.ok());
             status = new_txn_mgr_->CommitTxn(txn);
             EXPECT_TRUE(status.ok());
@@ -556,7 +556,7 @@ TEST_P(TestTxnCleanup, cleanup_and_drop_index) {
             String index_key;
             String index_id;
             TxnTimeStamp create_index_ts;
-            status = table_meta->GetIndexID(*index_name1_, index_key, index_id, create_index_ts);
+            status = table_meta->GetIndexID(txn->kv_instance(), txn->BeginTS(), txn->CommitTS(), *index_name1_, index_key, index_id, create_index_ts);
             EXPECT_FALSE(status.ok());
         }
     };
@@ -619,7 +619,7 @@ TEST_P(TestTxnCleanup, cleanup_and_optimize_index) {
             EXPECT_TRUE(status.ok());
 
             {
-                auto [segment_ids, status] = table_meta->GetSegmentIDs1();
+                auto [segment_ids, status] = table_meta->GetSegmentIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
                 EXPECT_TRUE(status.ok());
                 EXPECT_EQ(*segment_ids, Vector<SegmentID>({0}));
             }
@@ -730,11 +730,11 @@ TEST_P(TestTxnCleanup, cleanup_and_append) {
             Optional<TableMeeta> table_meta;
             Status status = txn->GetTableMeta(*db_name_, *table_name_, db_meta, table_meta);
             EXPECT_TRUE(status.ok());
-            status = table_meta->CheckSegments({0 /* segment_id */});
+            status = table_meta->CheckSegments(txn->kv_instance(), txn->BeginTS(), {0 /* segment_id */});
             EXPECT_FALSE(status.ok());
-            status = table_meta->CheckSegments({1 /* segment_id */});
+            status = table_meta->CheckSegments(txn->kv_instance(), txn->BeginTS(), {1 /* segment_id */});
             EXPECT_FALSE(status.ok());
-            status = table_meta->CheckSegments({2 /* segment_id */});
+            status = table_meta->CheckSegments(txn->kv_instance(), txn->BeginTS(), {2 /* segment_id */});
             EXPECT_TRUE(status.ok());
             status = new_txn_mgr_->CommitTxn(txn);
             EXPECT_TRUE(status.ok());
@@ -748,7 +748,7 @@ TEST_P(TestTxnCleanup, cleanup_and_append) {
             EXPECT_TRUE(status.ok());
 
             Vector<SegmentID> *segment_ids_ptr = nullptr;
-            std::tie(segment_ids_ptr, status) = table_meta->GetSegmentIDs1();
+            std::tie(segment_ids_ptr, status) = table_meta->GetSegmentIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*segment_ids_ptr, Vector<SegmentID>({2, 3}));
             SegmentID segment_id = segment_ids_ptr->back();
@@ -856,11 +856,11 @@ TEST_P(TestTxnCleanup, cleanup_and_delete) {
             Optional<TableMeeta> table_meta;
             Status status = txn->GetTableMeta(*db_name_, *table_name_, db_meta, table_meta);
             EXPECT_TRUE(status.ok());
-            status = table_meta->CheckSegments({0 /* segment_id */});
+            status = table_meta->CheckSegments(txn->kv_instance(), txn->BeginTS(), {0 /* segment_id */});
             EXPECT_FALSE(status.ok());
-            status = table_meta->CheckSegments({1 /* segment_id */});
+            status = table_meta->CheckSegments(txn->kv_instance(), txn->BeginTS(), {1 /* segment_id */});
             EXPECT_FALSE(status.ok());
-            status = table_meta->CheckSegments({2 /* segment_id */});
+            status = table_meta->CheckSegments(txn->kv_instance(), txn->BeginTS(), {2 /* segment_id */});
             EXPECT_TRUE(status.ok());
             status = new_txn_mgr_->CommitTxn(txn);
             EXPECT_TRUE(status.ok());
@@ -881,7 +881,7 @@ TEST_P(TestTxnCleanup, cleanup_and_delete) {
             EXPECT_TRUE(status.ok());
 
             Vector<SegmentID> *segment_ids_ptr = nullptr;
-            std::tie(segment_ids_ptr, status) = table_meta->GetSegmentIDs1();
+            std::tie(segment_ids_ptr, status) = table_meta->GetSegmentIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*segment_ids_ptr, Vector<SegmentID>({3}));
             SegmentID segment_id = segment_ids_ptr->back();
@@ -992,13 +992,13 @@ TEST_P(TestTxnCleanup, cleanup_and_update) {
             Optional<TableMeeta> table_meta;
             Status status = txn->GetTableMeta(*db_name_, *table_name_, db_meta, table_meta);
             EXPECT_TRUE(status.ok());
-            status = table_meta->CheckSegments({0 /* segment_id */});
+            status = table_meta->CheckSegments(txn->kv_instance(), txn->BeginTS(), {0 /* segment_id */});
             EXPECT_FALSE(status.ok());
-            status = table_meta->CheckSegments({1 /* segment_id */});
+            status = table_meta->CheckSegments(txn->kv_instance(), txn->BeginTS(), {1 /* segment_id */});
             EXPECT_FALSE(status.ok());
-            status = table_meta->CheckSegments({2 /* segment_id */});
+            status = table_meta->CheckSegments(txn->kv_instance(), txn->BeginTS(), {2 /* segment_id */});
             EXPECT_TRUE(status.ok());
-            status = table_meta->CheckSegments({3 /* segment_id */});
+            status = table_meta->CheckSegments(txn->kv_instance(), txn->BeginTS(), {3 /* segment_id */});
             EXPECT_TRUE(status.ok());
             status = new_txn_mgr_->CommitTxn(txn);
             EXPECT_TRUE(status.ok());
@@ -1018,7 +1018,7 @@ TEST_P(TestTxnCleanup, cleanup_and_update) {
             EXPECT_TRUE(status.ok());
 
             Vector<SegmentID> *segment_ids_ptr = nullptr;
-            std::tie(segment_ids_ptr, status) = table_meta->GetSegmentIDs1();
+            std::tie(segment_ids_ptr, status) = table_meta->GetSegmentIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*segment_ids_ptr, Vector<SegmentID>({4}));
             SegmentID segment_id = segment_ids_ptr->back();
@@ -1125,11 +1125,11 @@ TEST_P(TestTxnCleanup, cleanup_and_dump_index) {
             Optional<TableMeeta> table_meta;
             Status status = txn->GetTableMeta(*db_name_, *table_name_, db_meta, table_meta);
             EXPECT_TRUE(status.ok());
-            status = table_meta->CheckSegments({0 /* segment_id */});
+            status = table_meta->CheckSegments(txn->kv_instance(), txn->BeginTS(), {0 /* segment_id */});
             EXPECT_FALSE(status.ok());
-            status = table_meta->CheckSegments({1 /* segment_id */});
+            status = table_meta->CheckSegments(txn->kv_instance(), txn->BeginTS(), {1 /* segment_id */});
             EXPECT_FALSE(status.ok());
-            status = table_meta->CheckSegments({2 /* segment_id */});
+            status = table_meta->CheckSegments(txn->kv_instance(), txn->BeginTS(), {2 /* segment_id */});
             EXPECT_TRUE(status.ok());
             status = new_txn_mgr_->CommitTxn(txn);
             EXPECT_TRUE(status.ok());
@@ -1147,7 +1147,7 @@ TEST_P(TestTxnCleanup, cleanup_and_dump_index) {
             EXPECT_TRUE(status.ok());
 
             {
-                auto [segment_ids, status] = table_meta->GetSegmentIDs1();
+                auto [segment_ids, status] = table_meta->GetSegmentIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
                 EXPECT_TRUE(status.ok());
                 EXPECT_EQ(*segment_ids, Vector<SegmentID>({2}));
             }

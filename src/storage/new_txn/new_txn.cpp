@@ -745,8 +745,11 @@ Status NewTxn::AddColumns(const String &db_name, const String &table_name, const
         column_name_set.insert(column_def->name());
     }
 
+    KVInstance *kv_instance = kv_instance_.get();
+    TxnTimeStamp begin_ts = this->BeginTS();
+    TxnTimeStamp commit_ts = this->CommitTS();
     SharedPtr<Vector<SharedPtr<ColumnDef>>> old_column_defs;
-    std::tie(old_column_defs, status) = table_meta->GetColumnDefs();
+    std::tie(old_column_defs, status) = table_meta->GetColumnDefs(kv_instance, begin_ts, commit_ts);
     if (!status.ok()) {
         return status;
     }
@@ -797,8 +800,10 @@ Status NewTxn::ReplayAddColumns(WalCmdAddColumnsV2 *add_columns_cmd, TxnTimeStam
         column_name_set.insert(column_def->name());
     }
 
+    KVInstance *kv_instance = kv_instance_.get();
+    TxnTimeStamp begin_ts = this->BeginTS();
     SharedPtr<Vector<SharedPtr<ColumnDef>>> old_column_defs;
-    std::tie(old_column_defs, status) = table_meta->GetColumnDefs();
+    std::tie(old_column_defs, status) = table_meta->GetColumnDefs(kv_instance, begin_ts, commit_ts);
     if (!status.ok()) {
         return status;
     }
@@ -850,8 +855,11 @@ Status NewTxn::DropColumns(const String &db_name, const String &table_name, cons
         return status;
     }
 
+    KVInstance *kv_instance = kv_instance_.get();
+    TxnTimeStamp begin_ts = this->BeginTS();
+    TxnTimeStamp commit_ts = this->CommitTS();
     SharedPtr<Vector<SharedPtr<ColumnDef>>> old_column_defs;
-    std::tie(old_column_defs, status) = table_meta->GetColumnDefs();
+    std::tie(old_column_defs, status) = table_meta->GetColumnDefs(kv_instance, begin_ts, commit_ts);
     if (!status.ok()) {
         return status;
     }
@@ -875,7 +883,7 @@ Status NewTxn::DropColumns(const String &db_name, const String &table_name, cons
     Vector<String> column_keys;
     for (const auto &column_name : column_names) {
         String column_key;
-        std::tie(column_key, status) = table_meta->GetColumnKeyByColumnName(column_name);
+        std::tie(column_key, status) = table_meta->GetColumnKeyByColumnName(kv_instance, begin_ts, commit_ts, column_name);
         if (!status.ok()) {
             return status;
         }
@@ -883,12 +891,11 @@ Status NewTxn::DropColumns(const String &db_name, const String &table_name, cons
     }
 
     Vector<String> *index_id_strs_ptr = nullptr;
-    status = table_meta->GetIndexIDs(index_id_strs_ptr);
+    status = table_meta->GetIndexIDs(kv_instance, begin_ts, index_id_strs_ptr);
     if (!status.ok()) {
         return status;
     }
 
-    KVInstance *kv_instance = kv_instance_.get();
     for (const String &index_id : *index_id_strs_ptr) {
         TableIndexMeeta table_index_meta(index_id, *table_meta);
         auto [index_base, index_status] = table_index_meta.GetIndexBase(kv_instance);
@@ -1021,10 +1028,13 @@ Status NewTxn::CreateIndex(const String &db_name, const String &table_name, cons
         return status;
     }
 
+    KVInstance *kv_instance = kv_instance_.get();
+    TxnTimeStamp begin_ts = this->BeginTS();
+    TxnTimeStamp commit_ts = this->CommitTS();
     String index_key;
     String index_id;
     TxnTimeStamp create_index_ts;
-    status = table_meta->GetIndexID(*index_base->index_name_, index_key, index_id, create_index_ts);
+    status = table_meta->GetIndexID(kv_instance, begin_ts, commit_ts, *index_base->index_name_, index_key, index_id, create_index_ts);
     if (status.ok()) {
         if (conflict_type == ConflictType::kIgnore) {
             return Status::OK();
@@ -1037,7 +1047,7 @@ Status NewTxn::CreateIndex(const String &db_name, const String &table_name, cons
 
     // Get the latest index id and lock the id
     String index_id_str;
-    std::tie(index_id_str, status) = table_meta->GetNextIndexID();
+    std::tie(index_id_str, status) = table_meta->GetNextIndexID(kv_instance);
     if (!status.ok()) {
         return status;
     }
@@ -1145,10 +1155,13 @@ Status NewTxn::DropIndexByName(const String &db_name, const String &table_name, 
         return status;
     }
 
+    KVInstance *kv_instance = kv_instance_.get();
+    TxnTimeStamp begin_ts = this->BeginTS();
+    TxnTimeStamp commit_ts = this->CommitTS();
     String index_key;
     String index_id;
     TxnTimeStamp create_index_ts;
-    status = table_meta->GetIndexID(index_name, index_key, index_id, create_index_ts);
+    status = table_meta->GetIndexID(kv_instance, begin_ts, commit_ts, index_name, index_key, index_id, create_index_ts);
     if (!status.ok()) {
         if (conflict_type == ConflictType::kIgnore) {
             return Status::OK();
@@ -1156,7 +1169,6 @@ Status NewTxn::DropIndexByName(const String &db_name, const String &table_name, 
         return status;
     }
 
-    KVInstance *kv_instance = kv_instance_.get();
     TableIndexMeeta table_index_meta(index_id, *table_meta);
     auto [index_base, index_status] = table_index_meta.GetIndexBase(kv_instance);
     if (!index_status.ok()) {
@@ -1164,7 +1176,7 @@ Status NewTxn::DropIndexByName(const String &db_name, const String &table_name, 
     }
 
     SharedPtr<Vector<SharedPtr<ColumnDef>>> column_defs;
-    std::tie(column_defs, status) = table_meta->GetColumnDefs();
+    std::tie(column_defs, status) = table_meta->GetColumnDefs(kv_instance, begin_ts, commit_ts);
     if (!status.ok()) {
         return status;
     }
@@ -1266,11 +1278,15 @@ Tuple<SharedPtr<TableInfo>, Status> NewTxn::GetTableInfo(const String &db_name, 
     if (!status.ok()) {
         return {nullptr, status};
     }
-    status = table_meta->GetTableInfo(*table_info);
+
+    KVInstance *kv_instance = kv_instance_.get();
+    TxnTimeStamp begin_ts = this->BeginTS();
+    TxnTimeStamp commit_ts = this->CommitTS();
+    status = table_meta->GetTableInfo(kv_instance, begin_ts, commit_ts, *table_info);
     if (!status.ok()) {
         return {nullptr, status};
     }
-    status = table_meta->GetComment(*table_info);
+    status = table_meta->GetComment(kv_instance, *table_info);
     if (!status.ok()) {
         return {nullptr, status};
     }
@@ -1287,9 +1303,11 @@ Tuple<SharedPtr<TableIndexInfo>, Status> NewTxn::GetTableIndexInfo(const String 
     if (!status.ok()) {
         return {nullptr, status};
     }
-    KVInstance *kv_instance = this->kv_instance_.get();
+    KVInstance *kv_instance = kv_instance_.get();
+    TxnTimeStamp begin_ts = this->BeginTS();
+    TxnTimeStamp commit_ts = this->CommitTS();
     SharedPtr<TableIndexInfo> table_index_info = MakeShared<TableIndexInfo>();
-    status = table_index_meta->GetTableIndexInfo(kv_instance, *table_index_info);
+    status = table_index_meta->GetTableIndexInfo(kv_instance, begin_ts, commit_ts, *table_index_info);
     return {std::move(table_index_info), Status::OK()};
 }
 
@@ -1341,7 +1359,11 @@ Tuple<SharedPtr<SegmentInfo>, Status> NewTxn::GetSegmentInfo(const String &db_na
     if (!status.ok()) {
         return {nullptr, status};
     }
-    status = table_meta->CheckSegments({segment_id});
+
+    KVInstance *kv_instance = kv_instance_.get();
+    TxnTimeStamp begin_ts = this->BeginTS();
+
+    status = table_meta->CheckSegments(kv_instance, begin_ts, {segment_id});
     if (!status.ok()) {
         return {nullptr, status};
     }
@@ -1362,14 +1384,18 @@ Tuple<Vector<SharedPtr<SegmentInfo>>, Status> NewTxn::GetSegmentsInfo(const Stri
     if (!status.ok()) {
         return {segment_info_list, status};
     }
-    std::tie(segment_ids_ptr, status) = table_meta->GetSegmentIDs1();
+    KVInstance *kv_instance = kv_instance_.get();
+    TxnTimeStamp begin_ts = this->BeginTS();
+    TxnTimeStamp commit_ts = this->CommitTS();
+
+    std::tie(segment_ids_ptr, status) = table_meta->GetSegmentIDs1(kv_instance, begin_ts, commit_ts);
     if (!status.ok()) {
         return {segment_info_list, status};
     }
     for (SegmentID segment_id : *segment_ids_ptr) {
         SegmentMeta segment_meta(segment_id, table_meta.value());
         auto segment_info = MakeShared<SegmentInfo>();
-        std::tie(segment_info, status) = segment_meta.GetSegmentInfo(kv_instance_.get(), txn_context_ptr_->begin_ts_, txn_context_ptr_->commit_ts_);
+        std::tie(segment_info, status) = segment_meta.GetSegmentInfo(kv_instance, begin_ts, commit_ts);
         if (!status.ok()) {
             return {segment_info_list, status};
         }
@@ -1427,9 +1453,12 @@ NewTxn::GetBlockColumnInfo(const String &db_name, const String &table_name, Segm
     if (!status.ok()) {
         return {nullptr, status};
     }
+    KVInstance *kv_instance = kv_instance_.get();
+    TxnTimeStamp begin_ts = this->BeginTS();
+    TxnTimeStamp commit_ts = this->CommitTS();
     SegmentMeta segment_meta(segment_id, table_meta.value());
     BlockMeta block_meta(block_id, segment_meta);
-    return block_meta.GetBlockColumnInfo(column_id);
+    return block_meta.GetBlockColumnInfo(kv_instance, begin_ts, commit_ts, column_id);
 }
 
 TxnTimeStamp NewTxn::GetCurrentCkpTS() const {
@@ -2096,10 +2125,13 @@ Status NewTxn::GetTableIndexMeta(const String &db_name,
 
 Status
 NewTxn::GetTableIndexMeta(const String &index_name, TableMeeta &table_meta, Optional<TableIndexMeeta> &table_index_meta, String *index_key_ptr) {
+    KVInstance *kv_instance = kv_instance_.get();
+    TxnTimeStamp begin_ts = this->BeginTS();
+    TxnTimeStamp commit_ts = this->CommitTS();
     String index_key;
     String index_id_str;
     TxnTimeStamp create_index_ts;
-    Status status = table_meta.GetIndexID(index_name, index_key, index_id_str, create_index_ts);
+    Status status = table_meta.GetIndexID(kv_instance, begin_ts, commit_ts, index_name, index_key, index_id_str, create_index_ts);
     if (!status.ok()) {
         return status;
     }
@@ -2234,19 +2266,21 @@ Status NewTxn::PrepareCommitAddColumns(const WalCmdAddColumnsV2 *add_columns_cmd
         return status;
     }
 
+    KVInstance *kv_instance = kv_instance_.get();
+    TxnTimeStamp commit_ts = this->CommitTS();
     ColumnID next_column_id = 0;
-    status = table_meta->GetNextColumnID(next_column_id);
+    status = table_meta->GetNextColumnID(kv_instance, next_column_id);
     if (!status.ok()) {
         return status;
     }
     for (const auto &column : add_columns_cmd->column_defs_) {
         column->id_ = next_column_id++;
-        status = table_meta->AddColumn(*column);
+        status = table_meta->AddColumn(kv_instance, commit_ts, *column);
         if (!status.ok()) {
             return status;
         }
     }
-    status = table_meta->SetNextColumnID(next_column_id);
+    status = table_meta->SetNextColumnID(kv_instance, next_column_id);
     if (!status.ok()) {
         return status;
     }
@@ -4301,6 +4335,10 @@ void NewTxn::CancelCommitBottom() {
 }
 
 Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
+
+    KVInstance *kv_instance = kv_instance_.get();
+    TxnTimeStamp begin_ts = this->BeginTS();
+
     TransactionType txn_type = TransactionType::kInvalid;
     if (base_txn_store_ != nullptr) {
         txn_type = base_txn_store_->type_;
@@ -4380,7 +4418,7 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
                                   abort_ts,
                                   MAX_TIMESTAMP);
             Vector<String> *index_id_strs_ptr = nullptr;
-            Status status = table_meta.GetIndexIDs(index_id_strs_ptr);
+            Status status = table_meta.GetIndexIDs(kv_instance, begin_ts, index_id_strs_ptr);
             if (!status.ok()) {
                 RecoverableError(status);
             }
@@ -4564,6 +4602,7 @@ Status NewTxn::ReplayCleanup(WalCmdCleanup *cleanup_cmd, TxnTimeStamp commit_ts,
 Status NewTxn::CleanupInner(const Vector<UniquePtr<MetaKey>> &metas) {
     KVInstance *kv_instance = kv_instance_.get();
     TxnTimeStamp begin_ts = BeginTS();
+    TxnTimeStamp commit_ts = CommitTS();
     BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
     for (auto &meta : metas) {
         switch (meta->type_) {
@@ -4576,7 +4615,7 @@ Status NewTxn::CleanupInner(const Vector<UniquePtr<MetaKey>> &metas) {
                 }
 
                 DBMeeta db_meta(db_meta_key->db_id_str_);
-                status = NewCatalog::CleanDB(kv_instance, db_meta, begin_ts, UsageFlag::kOther);
+                status = NewCatalog::CleanDB(kv_instance, begin_ts, commit_ts, db_meta, UsageFlag::kOther);
                 if (!status.ok()) {
                     return status;
                 }
@@ -4590,7 +4629,7 @@ Status NewTxn::CleanupInner(const Vector<UniquePtr<MetaKey>> &metas) {
                     return status;
                 }
                 TableMeeta table_meta(table_meta_key->db_id_str_, table_meta_key->table_id_str_, kv_instance, begin_ts, MAX_TIMESTAMP);
-                status = NewCatalog::CleanTable(kv_instance, table_meta, begin_ts, UsageFlag::kOther);
+                status = NewCatalog::CleanTable(kv_instance, begin_ts, commit_ts, table_meta, UsageFlag::kOther);
                 if (!status.ok()) {
                     return status;
                 }
@@ -4608,13 +4647,13 @@ Status NewTxn::CleanupInner(const Vector<UniquePtr<MetaKey>> &metas) {
             case MetaType::kSegment: {
                 auto *segment_meta_key = static_cast<SegmentMetaKey *>(meta.get());
                 TableMeeta table_meta(segment_meta_key->db_id_str_, segment_meta_key->table_id_str_, kv_instance, begin_ts, MAX_TIMESTAMP);
-                Status status = table_meta.RemoveSegmentIDs1({segment_meta_key->segment_id_});
+                Status status = table_meta.RemoveSegmentIDs1(kv_instance, {segment_meta_key->segment_id_});
                 if (!status.ok()) {
                     return status;
                 }
 
                 SegmentMeta segment_meta(segment_meta_key->segment_id_, table_meta);
-                status = NewCatalog::CleanSegment(kv_instance, segment_meta, begin_ts, UsageFlag::kOther);
+                status = NewCatalog::CleanSegment(kv_instance, begin_ts, segment_meta, UsageFlag::kOther);
                 if (!status.ok()) {
                     return status;
                 }
@@ -4625,7 +4664,7 @@ Status NewTxn::CleanupInner(const Vector<UniquePtr<MetaKey>> &metas) {
                 TableMeeta table_meta(block_meta_key->db_id_str_, block_meta_key->table_id_str_, kv_instance, begin_ts, MAX_TIMESTAMP);
                 SegmentMeta segment_meta(block_meta_key->segment_id_, table_meta);
                 BlockMeta block_meta(block_meta_key->block_id_, segment_meta);
-                Status status = NewCatalog::CleanBlock(kv_instance, block_meta, UsageFlag::kOther);
+                Status status = NewCatalog::CleanBlock(kv_instance, begin_ts, MAX_TIMESTAMP, block_meta, UsageFlag::kOther);
                 if (!status.ok()) {
                     return status;
                 }
@@ -4649,7 +4688,7 @@ Status NewTxn::CleanupInner(const Vector<UniquePtr<MetaKey>> &metas) {
                 SegmentMeta segment_meta(column_meta_key->segment_id_, table_meta);
                 BlockMeta block_meta(column_meta_key->block_id_, segment_meta);
                 ColumnMeta column_meta(column_meta_key->column_def_->id(), block_meta);
-                Status status = NewCatalog::CleanBlockColumn(kv_instance, column_meta, column_meta_key->column_def_.get(), UsageFlag::kOther);
+                Status status = NewCatalog::CleanBlockColumn(kv_instance, begin_ts, MAX_TIMESTAMP, column_meta, column_meta_key->column_def_.get(), UsageFlag::kOther);
                 if (!status.ok()) {
                     return status;
                 }
@@ -4668,7 +4707,7 @@ Status NewTxn::CleanupInner(const Vector<UniquePtr<MetaKey>> &metas) {
 
                 TableMeeta table_meta(table_index_meta_key->db_id_str_, table_index_meta_key->table_id_str_, kv_instance, begin_ts, MAX_TIMESTAMP);
                 TableIndexMeeta table_index_meta(table_index_meta_key->index_id_str_, table_meta);
-                status = NewCatalog::CleanTableIndex(table_index_meta, kv_instance, UsageFlag::kOther);
+                status = NewCatalog::CleanTableIndex(table_index_meta, kv_instance, begin_ts, MAX_TIMESTAMP, UsageFlag::kOther);
                 if (!status.ok()) {
                     return status;
                 }
@@ -4683,7 +4722,7 @@ Status NewTxn::CleanupInner(const Vector<UniquePtr<MetaKey>> &metas) {
                                       MAX_TIMESTAMP);
                 TableIndexMeeta table_index_meta(segment_index_meta_key->index_id_str_, table_meta);
                 SegmentIndexMeta segment_index_meta(segment_index_meta_key->segment_id_, table_index_meta);
-                Status status = NewCatalog::CleanSegmentIndex(segment_index_meta, kv_instance, UsageFlag::kOther);
+                Status status = NewCatalog::CleanSegmentIndex(segment_index_meta, kv_instance, begin_ts, commit_ts, UsageFlag::kOther);
                 if (!status.ok()) {
                     return status;
                 }
@@ -4695,7 +4734,7 @@ Status NewTxn::CleanupInner(const Vector<UniquePtr<MetaKey>> &metas) {
                 TableIndexMeeta table_index_meta(chunk_index_meta_key->index_id_str_, table_meta);
                 SegmentIndexMeta segment_index_meta(chunk_index_meta_key->segment_id_, table_index_meta);
                 ChunkIndexMeta chunk_index_meta(chunk_index_meta_key->chunk_id_, segment_index_meta);
-                Status status = NewCatalog::CleanChunkIndex(chunk_index_meta, kv_instance, UsageFlag::kOther);
+                Status status = NewCatalog::CleanChunkIndex(chunk_index_meta, kv_instance, begin_ts, commit_ts, UsageFlag::kOther);
                 if (!status.ok()) {
                     return status;
                 }
@@ -4928,7 +4967,11 @@ NewTxn::GetBlockFilePaths(const String &db_name, const String &table_name, Segme
     }
     SegmentMeta segment_meta(segment_id, *table_meta);
     BlockMeta block_meta(block_id, segment_meta);
-    return NewCatalog::GetBlockFilePaths(block_meta, file_paths);
+
+    KVInstance *kv_instance = kv_instance_.get();
+    TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
+    TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
+    return NewCatalog::GetBlockFilePaths(kv_instance, begin_ts, commit_ts, block_meta, file_paths);
 }
 
 Status NewTxn::GetBlockColumnFilePaths(const String &db_name,
@@ -4943,10 +4986,13 @@ Status NewTxn::GetBlockColumnFilePaths(const String &db_name,
     if (!status.ok()) {
         return status;
     }
+    KVInstance *kv_instance = kv_instance_.get();
+    TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
+    TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
     SegmentMeta segment_meta(segment_id, *table_meta);
     BlockMeta block_meta(block_id, segment_meta);
     ColumnMeta column_meta(column_id, block_meta);
-    return NewCatalog::GetBlockColumnFilePaths(column_meta, file_paths);
+    return NewCatalog::GetBlockColumnFilePaths(kv_instance, begin_ts, commit_ts, column_meta, file_paths);
 }
 
 Status NewTxn::GetColumnFilePaths(const String &db_name, const String &table_name, const String &column_name, Vector<String> &file_paths) {
@@ -4956,9 +5002,12 @@ Status NewTxn::GetColumnFilePaths(const String &db_name, const String &table_nam
     if (!status.ok()) {
         return status;
     }
+    KVInstance *kv_instance = kv_instance_.get();
+    TxnTimeStamp begin_ts = this->BeginTS();
+    TxnTimeStamp commit_ts = this->CommitTS();
     SharedPtr<ColumnDef> column_def;
     {
-        auto [column_defs, col_status] = table_meta->GetColumnDefs();
+        auto [column_defs, col_status] = table_meta->GetColumnDefs(kv_instance, begin_ts, commit_ts);
         if (!col_status.ok()) {
             return col_status;
         }
@@ -4972,9 +5021,7 @@ Status NewTxn::GetColumnFilePaths(const String &db_name, const String &table_nam
             UnrecoverableError(fmt::format("Column {} not found in table {}", column_name, table_name));
         }
     }
-    TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
-    TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
-    return NewCatalog::GetColumnFilePaths(kv_instance_.get(), begin_ts, commit_ts, *table_meta, column_def, file_paths);
+    return NewCatalog::GetColumnFilePaths(kv_instance, begin_ts, commit_ts, *table_meta, column_def, file_paths);
 }
 
 Status NewTxn::GetTableIndexFilePaths(const String &db_name, const String &table_name, const String &index_name, Vector<String> &file_paths) {

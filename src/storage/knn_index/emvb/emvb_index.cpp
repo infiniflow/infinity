@@ -76,7 +76,13 @@ u32 EMVBIndex::GetTotalEmbeddingNum() const {
     return n_total_embeddings_;
 }
 
-void EMVBIndex::BuildEMVBIndex(const RowID base_rowid, const u32 row_count, SegmentMeta &segment_meta, const SharedPtr<ColumnDef> &column_def) {
+void EMVBIndex::BuildEMVBIndex(const RowID base_rowid,
+                               const u32 row_count,
+                               SegmentMeta &segment_meta,
+                               KVInstance *kv_instance,
+                               TxnTimeStamp begin_ts,
+                               TxnTimeStamp commit_ts,
+                               const SharedPtr<ColumnDef> &column_def) {
     const auto time_0 = std::chrono::high_resolution_clock::now();
     {
         const SegmentID expected_segment_id = base_rowid.segment_id_;
@@ -98,7 +104,8 @@ void EMVBIndex::BuildEMVBIndex(const RowID base_rowid, const u32 row_count, Segm
         ColumnMeta column_meta(column_id, block_meta);
         ColumnVector column_vector;
         u32 block_row_count = std::min(DEFAULT_BLOCK_CAPACITY, i64(start_segment_offset + row_count - block_id * DEFAULT_BLOCK_CAPACITY));
-        Status status = NewCatalog::GetColumnVector(column_meta, block_row_count, ColumnVectorMode::kReadOnly, column_vector);
+        Status status =
+            NewCatalog::GetColumnVector(column_meta, kv_instance, begin_ts, commit_ts, block_row_count, ColumnVectorMode::kReadOnly, column_vector);
         if (!status.ok()) {
             UnrecoverableError("EMVBIndex::BuildEMVBIndex: GetColumnVector failed!");
         }
@@ -114,7 +121,13 @@ void EMVBIndex::BuildEMVBIndex(const RowID base_rowid, const u32 row_count, Segm
 
                     BlockMeta block_meta(block_id, segment_meta);
                     ColumnMeta column_meta(column_id, block_meta);
-                    Status status = NewCatalog::GetColumnVector(column_meta, block_row_count, ColumnVectorMode::kReadOnly, column_vector);
+                    status = NewCatalog::GetColumnVector(column_meta,
+                                                         kv_instance,
+                                                         begin_ts,
+                                                         commit_ts,
+                                                         block_row_count,
+                                                         ColumnVectorMode::kReadOnly,
+                                                         column_vector);
                     if (!status.ok()) {
                         UnrecoverableError("EMVBIndex::BuildEMVBIndex: GetColumnVector failed!");
                     }
@@ -176,7 +189,13 @@ void EMVBIndex::BuildEMVBIndex(const RowID base_rowid, const u32 row_count, Segm
                 ColumnMeta column_meta(column_id, block_meta);
                 ColumnVector column_vector;
                 u32 block_row_count = std::min(DEFAULT_BLOCK_CAPACITY, i64(start_segment_offset + row_count - block_id * DEFAULT_BLOCK_CAPACITY));
-                Status status = NewCatalog::GetColumnVector(column_meta, block_row_count, ColumnVectorMode::kReadOnly, column_vector);
+                Status status = NewCatalog::GetColumnVector(column_meta,
+                                                            kv_instance,
+                                                            begin_ts,
+                                                            commit_ts,
+                                                            block_row_count,
+                                                            ColumnVectorMode::kReadOnly,
+                                                            column_vector);
                 if (!status.ok()) {
                     UnrecoverableError("EMVBIndex::BuildEMVBIndex: GetColumnVector failed!");
                 }
@@ -214,7 +233,8 @@ void EMVBIndex::BuildEMVBIndex(const RowID base_rowid, const u32 row_count, Segm
 
         u32 block_row_count = std::min(DEFAULT_BLOCK_CAPACITY, i64(start_segment_offset + row_count - block_id * DEFAULT_BLOCK_CAPACITY));
         ColumnVector column_vector;
-        Status status = NewCatalog::GetColumnVector(column_meta, block_row_count, ColumnVectorMode::kReadOnly, column_vector);
+        Status status =
+            NewCatalog::GetColumnVector(column_meta, kv_instance, begin_ts, commit_ts, block_row_count, ColumnVectorMode::kReadOnly, column_vector);
         if (!status.ok()) {
             UnrecoverableError("EMVBIndex::BuildEMVBIndex: GetColumnVector failed!");
         }
@@ -230,7 +250,13 @@ void EMVBIndex::BuildEMVBIndex(const RowID base_rowid, const u32 row_count, Segm
                     ColumnMeta column_meta(column_id, block_meta);
 
                     u32 block_row_count = std::min(DEFAULT_BLOCK_CAPACITY, i64(start_segment_offset + row_count - block_id * DEFAULT_BLOCK_CAPACITY));
-                    Status status = NewCatalog::GetColumnVector(column_meta, block_row_count, ColumnVectorMode::kReadOnly, column_vector);
+                    Status status = NewCatalog::GetColumnVector(column_meta,
+                                                                kv_instance,
+                                                                begin_ts,
+                                                                commit_ts,
+                                                                block_row_count,
+                                                                ColumnVectorMode::kReadOnly,
+                                                                column_vector);
                 }
             }
             auto [raw_data, embedding_num] = column_vector.GetTensorRaw(block_offset);

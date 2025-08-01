@@ -394,14 +394,15 @@ void PhysicalKnnScan::PlanWithIndex(QueryContext *query_context) { // TODO: retu
     TableMeeta *table_meta = base_table_ref_->block_index_->table_meta_.get();
 
     Set<SegmentID> index_entry_map;
-    NewTxn* new_txn = query_context->GetNewTxn();
-    KVInstance* kv_instance = new_txn->kv_instance();
+    NewTxn *new_txn = query_context->GetNewTxn();
+    KVInstance *kv_instance = new_txn->kv_instance();
+    TxnTimeStamp begin_ts = new_txn->BeginTS();
     if (knn_expression_->ignore_index_) {
         LOG_TRACE("Not use index"); // No index need to check
     } else {
         Vector<String> *index_id_strs_ptr = nullptr;
         Vector<String> *index_names_ptr = nullptr;
-        status = table_meta->GetIndexIDs(index_id_strs_ptr, &index_names_ptr);
+        status = table_meta->GetIndexIDs(kv_instance, begin_ts, index_id_strs_ptr, &index_names_ptr);
         if (!status.ok()) {
             RecoverableError(status);
         }
@@ -567,7 +568,8 @@ void PhysicalKnnScan::ExecuteInternalByColumnDataTypeAndQueryDataType(QueryConte
                     UnrecoverableError(status.message());
                 }
                 ColumnVector column_vector;
-                status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorMode::kReadOnly, column_vector);
+                status =
+                    NewCatalog::GetColumnVector(column_meta, kv_instance, begin_ts, commit_ts, row_count, ColumnVectorMode::kReadOnly, column_vector);
                 if (!status.ok()) {
                     UnrecoverableError(status.message());
                 }
@@ -784,8 +786,13 @@ void PhysicalKnnScan::ExecuteInternalByColumnDataTypeAndQueryDataType(QueryConte
                                             BlockMeta *block_meta = block_index->GetBlockMeta(segment_id, block_id);
                                             auto [block_row_cnt, status] = block_meta->GetRowCnt1(kv_instance, begin_ts, commit_ts);
                                             ColumnMeta column_meta(knn_column_id, *block_meta);
-                                            status =
-                                                NewCatalog::GetColumnVector(column_meta, block_row_cnt, ColumnVectorMode::kReadOnly, column_vector);
+                                            status = NewCatalog::GetColumnVector(column_meta,
+                                                                                 kv_instance,
+                                                                                 begin_ts,
+                                                                                 commit_ts,
+                                                                                 block_row_cnt,
+                                                                                 ColumnVectorMode::kReadOnly,
+                                                                                 column_vector);
                                             if (!status.ok()) {
                                                 UnrecoverableError(status.message());
                                             }

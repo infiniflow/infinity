@@ -166,7 +166,7 @@ TEST_P(TestTxnCheckpointAddColumnTest, addcol_checkpoint_insert) {
         EXPECT_TRUE(status1.ok());
 
         SizeT row_count = 0;
-        auto [segment_ids, seg_status] = table_meta->GetSegmentIDs1();
+        auto [segment_ids, seg_status] = table_meta->GetSegmentIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
         EXPECT_TRUE(seg_status.ok());
 
         for (SegmentID segment_id : *segment_ids) {

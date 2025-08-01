@@ -251,7 +251,7 @@ public:
                            const String *db_comment,
                            SharedPtr<DBMeeta> &db_meta);
 
-    static Status CleanDB(KVInstance *kv_instance, DBMeeta &db_meta, TxnTimeStamp begin_ts, UsageFlag usage_flag);
+    static Status CleanDB(KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts, DBMeeta &db_meta, UsageFlag usage_flag);
 
     static Status AddNewTable(DBMeeta &db_meta,
                               const String &table_id_str,
@@ -261,7 +261,7 @@ public:
                               const SharedPtr<TableDef> &table_def,
                               Optional<TableMeeta> &table_meta);
 
-    static Status CleanTable(KVInstance *kv_instance, TableMeeta &table_meta, TxnTimeStamp begin_ts, UsageFlag usage_flag);
+    static Status CleanTable(KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts, TableMeeta &table_meta, UsageFlag usage_flag);
 
     Status AddNewTableIndex(TableMeeta &table_meta,
                             String &index_id_str,
@@ -269,11 +269,16 @@ public:
                             const SharedPtr<IndexBase> &index_base,
                             Optional<TableIndexMeeta> &table_index_meta);
 
-    static Status CleanTableIndex(TableIndexMeeta &table_index_meta, KVInstance *kv_instance, UsageFlag usage_flag);
+    static Status
+    CleanTableIndex(TableIndexMeeta &table_index_meta, KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts, UsageFlag usage_flag);
 
     // static Status AddNewSegment(TableMeeta &table_meta, SegmentID segment_id, Optional<SegmentMeta> &segment_meta);
 
-    static Status AddNewSegment1(TableMeeta &table_meta, KVInstance *kv_instance, TxnTimeStamp commit_ts, Optional<SegmentMeta> &segment_meta);
+    static Status AddNewSegment1(TableMeeta &table_meta,
+                                 KVInstance *kv_instance,
+                                 TxnTimeStamp begin_ts,
+                                 TxnTimeStamp commit_ts,
+                                 Optional<SegmentMeta> &segment_meta);
 
     static Status AddNewSegmentWithID(TableMeeta &table_meta,
                                       KVInstance *kv_instance,
@@ -287,18 +292,25 @@ public:
                                       TxnTimeStamp begin_ts,
                                       TxnTimeStamp commit_ts);
 
-    static Status CleanSegment(KVInstance *kv_instance, SegmentMeta &segment_meta, TxnTimeStamp begin_ts, UsageFlag usage_flag);
+    static Status CleanSegment(KVInstance *kv_instance, TxnTimeStamp begin_ts, SegmentMeta &segment_meta, UsageFlag usage_flag);
 
     // static Status AddNewBlock(SegmentMeta &segment_meta, BlockID block_id, Optional<BlockMeta> &block_meta);
 
     static Status
     AddNewBlock1(SegmentMeta &segment_meta, KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts, Optional<BlockMeta> &block_meta);
 
-    static Status
-    LoadImportedOrCompactedSegment(TableMeeta &table_meta, KVInstance *kv_instance, const WalSegmentInfo &segment_info, TxnTimeStamp commit_ts);
+    static Status LoadImportedOrCompactedSegment(TableMeeta &table_meta,
+                                                 KVInstance *kv_instance,
+                                                 TxnTimeStamp begin_ts,
+                                                 TxnTimeStamp commit_ts,
+                                                 const WalSegmentInfo &segment_info);
 
-    static Status
-    AddNewBlockWithID(SegmentMeta &segment_meta, KVInstance *kv_instance, TxnTimeStamp commit_ts, Optional<BlockMeta> &block_meta, BlockID block_id);
+    static Status AddNewBlockWithID(SegmentMeta &segment_meta,
+                                    KVInstance *kv_instance,
+                                    TxnTimeStamp begin_ts,
+                                    TxnTimeStamp commit_ts,
+                                    Optional<BlockMeta> &block_meta,
+                                    BlockID block_id);
 
     static Status LoadFlushedBlock1(SegmentMeta &segment_meta,
                                     const WalBlockInfo &block_info,
@@ -306,16 +318,30 @@ public:
                                     TxnTimeStamp begin_ts,
                                     TxnTimeStamp commit_ts);
 
-    static Status CleanBlock(KVInstance *kv_instance, BlockMeta &block_meta, UsageFlag usage_flag);
+    static Status CleanBlock(KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts, BlockMeta &block_meta, UsageFlag usage_flag);
 
-    static Status AddNewBlockColumn(BlockMeta &block_meta, SizeT column_idx, Optional<ColumnMeta> &column_meta);
+    static Status AddNewBlockColumn(KVInstance *kv_instance,
+                                    TxnTimeStamp begin_ts,
+                                    TxnTimeStamp commit_ts,
+                                    BlockMeta &block_meta,
+                                    SizeT column_idx,
+                                    Optional<ColumnMeta> &column_meta);
 
-    static Status CleanBlockColumn(KVInstance *kv_instance, ColumnMeta &column_meta, const ColumnDef *column_def, UsageFlag usage_flag);
+    static Status CleanBlockColumn(KVInstance *kv_instance,
+                                   TxnTimeStamp begin_ts,
+                                   TxnTimeStamp commit_ts,
+                                   ColumnMeta &column_meta,
+                                   const ColumnDef *column_def,
+                                   UsageFlag usage_flag);
 
     static Status
     AddNewSegmentIndex1(TableIndexMeeta &table_index_meta, NewTxn *new_txn, SegmentID segment_id, Optional<SegmentIndexMeta> &segment_index_meta);
 
-    static Status CleanSegmentIndex(SegmentIndexMeta &segment_index_meta, KVInstance *kv_instance, UsageFlag usage_flag);
+    static Status CleanSegmentIndex(SegmentIndexMeta &segment_index_meta,
+                                    KVInstance *kv_instance,
+                                    TxnTimeStamp begin_ts,
+                                    TxnTimeStamp commit_ts,
+                                    UsageFlag usage_flag);
 
     static Status AddNewChunkIndex1(SegmentIndexMeta &segment_index_meta,
                                     NewTxn *new_txn,
@@ -326,12 +352,18 @@ public:
                                     SizeT index_size,
                                     Optional<ChunkIndexMeta> &chunk_index_meta);
 
+    static Status LoadFlushedChunkIndex1(SegmentIndexMeta &segment_index_meta, const WalChunkIndexInfo &chunk_info, NewTxn *new_txn);
+
     static Status
-    LoadFlushedChunkIndex1(SegmentIndexMeta &segment_index_meta, KVInstance *kv_instance, const WalChunkIndexInfo &chunk_info, NewTxn *new_txn);
+    CleanChunkIndex(ChunkIndexMeta &chunk_index_meta, KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts, UsageFlag usage_flag);
 
-    static Status CleanChunkIndex(ChunkIndexMeta &chunk_index_meta, KVInstance *kv_instance, UsageFlag usage_flag);
-
-    static Status GetColumnVector(ColumnMeta &column_meta, SizeT row_count, const ColumnVectorMode &tipe, ColumnVector &column_vector);
+    static Status GetColumnVector(ColumnMeta &column_meta,
+                                  KVInstance *kv_instance,
+                                  TxnTimeStamp begin_ts,
+                                  TxnTimeStamp commit_ts,
+                                  SizeT row_count,
+                                  const ColumnVectorMode &tipe,
+                                  ColumnVector &column_vector);
 
     static Status GetBlockVisibleRange(BlockMeta &block_meta, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts, NewTxnGetVisibleRangeState &state);
 
@@ -356,9 +388,18 @@ public:
                                       Vector<String> &file_paths,
                                       SharedPtr<ColumnDef> column_def = nullptr);
 
-    static Status GetBlockFilePaths(BlockMeta &block_meta, Vector<String> &file_paths, SharedPtr<ColumnDef> column_def = nullptr);
+    static Status GetBlockFilePaths(KVInstance *kv_instance,
+                                    TxnTimeStamp begin_ts,
+                                    TxnTimeStamp commit_ts,
+                                    BlockMeta &block_meta,
+                                    Vector<String> &file_paths,
+                                    SharedPtr<ColumnDef> column_def = nullptr);
 
-    static Status GetBlockColumnFilePaths(ColumnMeta &column_meta, Vector<String> &file_paths);
+    static Status GetBlockColumnFilePaths(KVInstance *kv_instance,
+                                          TxnTimeStamp begin_ts,
+                                          TxnTimeStamp commit_ts,
+                                          ColumnMeta &column_meta,
+                                          Vector<String> &file_paths);
 
     static Status GetColumnFilePaths(KVInstance *kv_instance,
                                      TxnTimeStamp begin_ts,
@@ -373,9 +414,15 @@ public:
 
     static Status GetChunkIndexFilePaths(ChunkIndexMeta &chunk_index_meta, KVInstance *kv_instance, Vector<String> &file_paths);
 
-    static Status CheckColumnIfIndexed(TableMeeta &table_meta, KVInstance *kv_instance, ColumnID column_id, bool &has_index);
+    static Status CheckColumnIfIndexed(TableMeeta &table_meta,
+                                       KVInstance *kv_instance,
+                                       TxnTimeStamp begin_ts,
+                                       TxnTimeStamp commit_ts,
+                                       ColumnID column_id,
+                                       bool &has_index);
 
-    static Status CheckTableIfDelete(TableMeeta &table_meta, KVInstance *kv_instance, TxnTimeStamp begin_ts, bool &has_delete);
+    static Status
+    CheckTableIfDelete(TableMeeta &table_meta, KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts, bool &has_delete);
 
     static Status SetBlockDeleteBitmask(BlockMeta &block_meta, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts, Bitmask &bitmask);
 

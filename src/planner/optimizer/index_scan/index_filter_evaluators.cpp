@@ -418,11 +418,13 @@ struct IndexFilterEvaluatorSecondaryT final : IndexFilterEvaluatorSecondary {
 UniquePtr<IndexFilterEvaluatorSecondary> IndexFilterEvaluatorSecondary::Make(const BaseExpression *src_expr,
                                                                              ColumnID column_id,
                                                                              SharedPtr<TableIndexMeeta> new_secondary_index,
-                                                                             KVInstance* kv_instance,
+                                                                             KVInstance *kv_instance,
+                                                                             TxnTimeStamp begin_ts,
+                                                                             TxnTimeStamp commit_ts,
                                                                              FilterCompareType compare_type,
                                                                              const Value &val) {
     ColumnDef *column_def;
-    auto [column_def_ptr, status] = new_secondary_index->GetColumnDef(kv_instance);
+    auto [column_def_ptr, status] = new_secondary_index->GetColumnDef(kv_instance, begin_ts, commit_ts);
     if (!status.ok()) {
         UnrecoverableError(status.message());
     }

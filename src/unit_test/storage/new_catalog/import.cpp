@@ -127,7 +127,7 @@ TEST_P(TestTxnImport, test_import1) {
         Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
 
-        auto [segment_ids, seg_status] = table_meta->GetSegmentIDs1();
+        auto [segment_ids, seg_status] = table_meta->GetSegmentIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
         EXPECT_TRUE(seg_status.ok());
         EXPECT_EQ(*segment_ids, Vector<SegmentID>({0, 1}));
 
@@ -152,7 +152,13 @@ TEST_P(TestTxnImport, test_import1) {
                 ColumnMeta column_meta(column_idx, block_meta);
                 ColumnVector col;
 
-                Status status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorMode::kReadOnly, col);
+                Status status = NewCatalog::GetColumnVector(column_meta,
+                                                            txn->kv_instance(),
+                                                            txn->BeginTS(),
+                                                            txn->CommitTS(),
+                                                            row_count,
+                                                            ColumnVectorMode::kReadOnly,
+                                                            col);
                 EXPECT_TRUE(status.ok());
 
                 EXPECT_EQ(col.GetValueByIndex(0), Value::MakeInt(1));
@@ -165,7 +171,13 @@ TEST_P(TestTxnImport, test_import1) {
                 ColumnMeta column_meta(column_idx, block_meta);
                 ColumnVector col;
 
-                Status status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorMode::kReadOnly, col);
+                Status status = NewCatalog::GetColumnVector(column_meta,
+                                                            txn->kv_instance(),
+                                                            txn->BeginTS(),
+                                                            txn->CommitTS(),
+                                                            row_count,
+                                                            ColumnVectorMode::kReadOnly,
+                                                            col);
                 EXPECT_TRUE(status.ok());
 
                 EXPECT_EQ(col.GetValueByIndex(0), Value::MakeVarchar("abc"));
@@ -302,7 +314,7 @@ TEST_P(TestTxnImport, test_import_with_index) {
             EXPECT_TRUE(status.ok());
         };
         {
-            auto [segment_ids, status] = table_meta->GetSegmentIDs1();
+            auto [segment_ids, status] = table_meta->GetSegmentIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*segment_ids, Vector<SegmentID>({0, 1}));
 
@@ -486,7 +498,7 @@ TEST_P(TestTxnImport, test_insert_and_import) {
         Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
 
-        auto [segment_ids, seg_status] = table_meta->GetSegmentIDs1();
+        auto [segment_ids, seg_status] = table_meta->GetSegmentIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
         EXPECT_TRUE(seg_status.ok());
         EXPECT_EQ(*segment_ids, Vector<SegmentID>({0, 1}));
 
@@ -520,7 +532,7 @@ TEST_P(TestTxnImport, test_insert_and_import) {
         Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
 
-        auto [segment_ids, seg_status] = table_meta->GetSegmentIDs1();
+        auto [segment_ids, seg_status] = table_meta->GetSegmentIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
         EXPECT_TRUE(seg_status.ok());
         EXPECT_EQ(*segment_ids, Vector<SegmentID>({0, 1, 2}));
 
@@ -586,7 +598,7 @@ TEST_P(TestTxnImport, test_import_drop_db) {
         return input_block;
     };
 
-    auto check_block = [&](BlockMeta &block_meta, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts) {
+    auto check_block = [&](BlockMeta &block_meta, KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts) {
         NewTxnGetVisibleRangeState state;
         Status status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, commit_ts, state);
         EXPECT_TRUE(status.ok());
@@ -607,7 +619,7 @@ TEST_P(TestTxnImport, test_import_drop_db) {
             ColumnMeta column_meta(column_idx, block_meta);
             ColumnVector col;
 
-            Status status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorMode::kReadOnly, col);
+            Status status = NewCatalog::GetColumnVector(column_meta, kv_instance, begin_ts, commit_ts, row_count, ColumnVectorMode::kReadOnly, col);
             EXPECT_TRUE(status.ok());
 
             EXPECT_EQ(col.GetValueByIndex(0), Value::MakeInt(1));
@@ -620,7 +632,7 @@ TEST_P(TestTxnImport, test_import_drop_db) {
             ColumnMeta column_meta(column_idx, block_meta);
             ColumnVector col;
 
-            Status status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorMode::kReadOnly, col);
+            Status status = NewCatalog::GetColumnVector(column_meta, kv_instance, begin_ts, commit_ts, row_count, ColumnVectorMode::kReadOnly, col);
             EXPECT_TRUE(status.ok());
 
             EXPECT_EQ(col.GetValueByIndex(0), Value::MakeVarchar("abc"));
@@ -631,20 +643,21 @@ TEST_P(TestTxnImport, test_import_drop_db) {
     };
 
     auto check_segment = [&](SegmentMeta &segment_meta, NewTxn *txn) {
+        KVInstance *kv_instance = txn->kv_instance();
         TxnTimeStamp begin_ts = txn->BeginTS();
         TxnTimeStamp commit_ts = txn->CommitTS();
 
-        auto [block_ids, status] = segment_meta.GetBlockIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
+        auto [block_ids, status] = segment_meta.GetBlockIDs1(kv_instance, begin_ts, commit_ts);
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(*block_ids, Vector<BlockID>({0, 1}));
 
         for (auto block_id : *block_ids) {
             BlockMeta block_meta(block_id, segment_meta);
-            check_block(block_meta, begin_ts, commit_ts);
+            check_block(block_meta, kv_instance, begin_ts, commit_ts);
         }
     };
     auto check_table_2segments = [&](TableMeeta &table_meta, NewTxn *txn) {
-        auto [segment_ids, seg_status] = table_meta.GetSegmentIDs1();
+        auto [segment_ids, seg_status] = table_meta.GetSegmentIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
         EXPECT_TRUE(seg_status.ok());
         EXPECT_EQ(*segment_ids, Vector<SegmentID>({0, 1}));
 
@@ -654,7 +667,7 @@ TEST_P(TestTxnImport, test_import_drop_db) {
         }
     };
     auto check_table_1segment = [&](TableMeeta &table_meta, NewTxn *txn) {
-        auto [segment_ids, seg_status] = table_meta.GetSegmentIDs1();
+        auto [segment_ids, seg_status] = table_meta.GetSegmentIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
         EXPECT_TRUE(seg_status.ok());
         EXPECT_EQ(*segment_ids, Vector<SegmentID>({0}));
 
@@ -1125,7 +1138,7 @@ TEST_P(TestTxnImport, test_import_drop_table) {
         return input_block;
     };
 
-    auto check_block = [&](BlockMeta &block_meta, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts) {
+    auto check_block = [&](BlockMeta &block_meta, KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts) {
         NewTxnGetVisibleRangeState state;
         Status status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, commit_ts, state);
         EXPECT_TRUE(status.ok());
@@ -1146,7 +1159,7 @@ TEST_P(TestTxnImport, test_import_drop_table) {
             ColumnMeta column_meta(column_idx, block_meta);
             ColumnVector col;
 
-            Status status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorMode::kReadOnly, col);
+            Status status = NewCatalog::GetColumnVector(column_meta, kv_instance, begin_ts, commit_ts, row_count, ColumnVectorMode::kReadOnly, col);
             EXPECT_TRUE(status.ok());
 
             EXPECT_EQ(col.GetValueByIndex(0), Value::MakeInt(1));
@@ -1159,7 +1172,7 @@ TEST_P(TestTxnImport, test_import_drop_table) {
             ColumnMeta column_meta(column_idx, block_meta);
             ColumnVector col;
 
-            Status status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorMode::kReadOnly, col);
+            Status status = NewCatalog::GetColumnVector(column_meta, kv_instance, begin_ts, commit_ts, row_count, ColumnVectorMode::kReadOnly, col);
             EXPECT_TRUE(status.ok());
 
             EXPECT_EQ(col.GetValueByIndex(0), Value::MakeVarchar("abc"));
@@ -1170,20 +1183,21 @@ TEST_P(TestTxnImport, test_import_drop_table) {
     };
 
     auto check_segment = [&](SegmentMeta &segment_meta, NewTxn *txn) {
+        KVInstance *kv_instance = txn->kv_instance();
         TxnTimeStamp begin_ts = txn->BeginTS();
         TxnTimeStamp commit_ts = txn->CommitTS();
 
-        auto [block_ids, status] = segment_meta.GetBlockIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
+        auto [block_ids, status] = segment_meta.GetBlockIDs1(kv_instance, begin_ts, commit_ts);
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(*block_ids, Vector<BlockID>({0, 1}));
 
         for (auto block_id : *block_ids) {
             BlockMeta block_meta(block_id, segment_meta);
-            check_block(block_meta, begin_ts, commit_ts);
+            check_block(block_meta, kv_instance, begin_ts, commit_ts);
         }
     };
     auto check_table_2segments = [&](TableMeeta &table_meta, NewTxn *txn) {
-        auto [segment_ids, seg_status] = table_meta.GetSegmentIDs1();
+        auto [segment_ids, seg_status] = table_meta.GetSegmentIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
         EXPECT_TRUE(seg_status.ok());
         EXPECT_EQ(*segment_ids, Vector<SegmentID>({0, 1}));
 
@@ -1193,7 +1207,7 @@ TEST_P(TestTxnImport, test_import_drop_table) {
         }
     };
     auto check_table_1segment = [&](TableMeeta &table_meta, NewTxn *txn) {
-        auto [segment_ids, seg_status] = table_meta.GetSegmentIDs1();
+        auto [segment_ids, seg_status] = table_meta.GetSegmentIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
         EXPECT_TRUE(seg_status.ok());
         EXPECT_EQ(*segment_ids, Vector<SegmentID>({0}));
 
@@ -1720,7 +1734,7 @@ TEST_P(TestTxnImport, test_import_add_columns) {
         return input_block;
     };
 
-    auto check_block = [&](BlockMeta &block_meta, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts) {
+    auto check_block = [&](BlockMeta &block_meta, KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts) {
         NewTxnGetVisibleRangeState state;
         Status status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, commit_ts, state);
         EXPECT_TRUE(status.ok());
@@ -1741,7 +1755,7 @@ TEST_P(TestTxnImport, test_import_add_columns) {
             ColumnMeta column_meta(column_idx, block_meta);
             ColumnVector col;
 
-            Status status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorMode::kReadOnly, col);
+            Status status = NewCatalog::GetColumnVector(column_meta, kv_instance, begin_ts, commit_ts, row_count, ColumnVectorMode::kReadOnly, col);
             EXPECT_TRUE(status.ok());
 
             EXPECT_EQ(col.GetValueByIndex(0), Value::MakeInt(1));
@@ -1754,7 +1768,7 @@ TEST_P(TestTxnImport, test_import_add_columns) {
             ColumnMeta column_meta(column_idx, block_meta);
             ColumnVector col;
 
-            Status status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorMode::kReadOnly, col);
+            Status status = NewCatalog::GetColumnVector(column_meta, kv_instance, begin_ts, commit_ts, row_count, ColumnVectorMode::kReadOnly, col);
             EXPECT_TRUE(status.ok());
 
             EXPECT_EQ(col.GetValueByIndex(0), Value::MakeVarchar("abc"));
@@ -1765,6 +1779,7 @@ TEST_P(TestTxnImport, test_import_add_columns) {
     };
 
     auto check_segment = [&](SegmentMeta &segment_meta, NewTxn *txn) {
+        KVInstance *kv_instance = txn->kv_instance();
         TxnTimeStamp begin_ts = txn->BeginTS();
         TxnTimeStamp commit_ts = txn->CommitTS();
 
@@ -1774,11 +1789,11 @@ TEST_P(TestTxnImport, test_import_add_columns) {
 
         for (auto block_id : *block_ids) {
             BlockMeta block_meta(block_id, segment_meta);
-            check_block(block_meta, begin_ts, commit_ts);
+            check_block(block_meta, kv_instance, begin_ts, commit_ts);
         }
     };
     auto check_table_2segments = [&](TableMeeta &table_meta, NewTxn *txn) {
-        auto [segment_ids, seg_status] = table_meta.GetSegmentIDs1();
+        auto [segment_ids, seg_status] = table_meta.GetSegmentIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
         EXPECT_TRUE(seg_status.ok());
         EXPECT_EQ(*segment_ids, Vector<SegmentID>({0, 1}));
 
@@ -1788,7 +1803,7 @@ TEST_P(TestTxnImport, test_import_add_columns) {
         }
     };
     auto check_table_1segment = [&](TableMeeta &table_meta, NewTxn *txn) {
-        auto [segment_ids, seg_status] = table_meta.GetSegmentIDs1();
+        auto [segment_ids, seg_status] = table_meta.GetSegmentIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
         EXPECT_TRUE(seg_status.ok());
         EXPECT_EQ(*segment_ids, Vector<SegmentID>({0}));
 
@@ -2353,7 +2368,7 @@ TEST_P(TestTxnImport, test_import_drop_columns) {
         return input_block;
     };
 
-    auto check_block = [&](BlockMeta &block_meta, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts) {
+    auto check_block = [&](BlockMeta &block_meta, KVInstance* kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts) {
         NewTxnGetVisibleRangeState state;
         Status status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, commit_ts, state);
         EXPECT_TRUE(status.ok());
@@ -2374,7 +2389,13 @@ TEST_P(TestTxnImport, test_import_drop_columns) {
             ColumnMeta column_meta(column_idx, block_meta);
             ColumnVector col;
 
-            Status status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorMode::kReadOnly, col);
+            Status status = NewCatalog::GetColumnVector(column_meta,
+                                                        kv_instance,
+                                                        begin_ts,
+                                                        commit_ts,
+                                                        row_count,
+                                                        ColumnVectorMode::kReadOnly,
+                                                        col);
             EXPECT_TRUE(status.ok());
 
             EXPECT_EQ(col.GetValueByIndex(0), Value::MakeInt(1));
@@ -2385,6 +2406,7 @@ TEST_P(TestTxnImport, test_import_drop_columns) {
     };
 
     auto check_segment = [&](SegmentMeta &segment_meta, NewTxn *txn) {
+        KVInstance *kv_instance = txn->kv_instance();
         TxnTimeStamp begin_ts = txn->BeginTS();
         TxnTimeStamp commit_ts = txn->CommitTS();
         auto [block_ids, status] = segment_meta.GetBlockIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
@@ -2393,11 +2415,11 @@ TEST_P(TestTxnImport, test_import_drop_columns) {
 
         for (auto block_id : *block_ids) {
             BlockMeta block_meta(block_id, segment_meta);
-            check_block(block_meta, begin_ts, commit_ts);
+            check_block(block_meta, kv_instance, begin_ts, commit_ts);
         }
     };
     auto check_table_2segments = [&](TableMeeta &table_meta, NewTxn *txn) {
-        auto [segment_ids, seg_status] = table_meta.GetSegmentIDs1();
+        auto [segment_ids, seg_status] = table_meta.GetSegmentIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
         EXPECT_TRUE(seg_status.ok());
         EXPECT_EQ(*segment_ids, Vector<SegmentID>({0, 1}));
 
@@ -2407,7 +2429,7 @@ TEST_P(TestTxnImport, test_import_drop_columns) {
         }
     };
     auto check_table_1segment = [&](TableMeeta &table_meta, NewTxn *txn) {
-        auto [segment_ids, seg_status] = table_meta.GetSegmentIDs1();
+        auto [segment_ids, seg_status] = table_meta.GetSegmentIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
         EXPECT_TRUE(seg_status.ok());
         EXPECT_EQ(*segment_ids, Vector<SegmentID>({0}));
 
@@ -2947,6 +2969,7 @@ TEST_P(TestTxnImport, test_import) {
     }
     {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
+        KVInstance* kv_instance = txn->kv_instance();
         TxnTimeStamp begin_ts = txn->BeginTS();
         TxnTimeStamp commit_ts = txn->CommitTS();
 
@@ -2976,7 +2999,13 @@ TEST_P(TestTxnImport, test_import) {
                 ColumnMeta column_meta(column_idx, block_meta);
                 ColumnVector col;
 
-                Status status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorMode::kReadOnly, col);
+                Status status = NewCatalog::GetColumnVector(column_meta,
+                                                            kv_instance,
+                                                            begin_ts,
+                                                            commit_ts,
+                                                            row_count,
+                                                            ColumnVectorMode::kReadOnly,
+                                                            col);
                 EXPECT_TRUE(status.ok());
 
                 EXPECT_EQ(col.GetValueByIndex(0), Value::MakeInt(1));
@@ -2989,7 +3018,13 @@ TEST_P(TestTxnImport, test_import) {
                 ColumnMeta column_meta(column_idx, block_meta);
                 ColumnVector col;
 
-                Status status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorMode::kReadOnly, col);
+                Status status = NewCatalog::GetColumnVector(column_meta,
+                                                            kv_instance,
+                                                            begin_ts,
+                                                            commit_ts,
+                                                            row_count,
+                                                            ColumnVectorMode::kReadOnly,
+                                                            col);
                 EXPECT_TRUE(status.ok());
 
                 EXPECT_EQ(col.GetValueByIndex(0), Value::MakeVarchar("abc"));
@@ -3011,7 +3046,7 @@ TEST_P(TestTxnImport, test_import) {
         };
 
         auto check_table = [&](TableMeeta &table_meta) {
-            auto [segment_ids, seg_status] = table_meta.GetSegmentIDs1();
+            auto [segment_ids, seg_status] = table_meta.GetSegmentIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
             EXPECT_TRUE(seg_status.ok());
             EXPECT_EQ(*segment_ids, Vector<SegmentID>({0, 1}));
 
@@ -3065,7 +3100,7 @@ TEST_P(TestTxnImport, test_import_append_table) {
         return input_block;
     };
 
-    auto check_block = [&](BlockMeta &block_meta, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts) {
+    auto check_block = [&](BlockMeta &block_meta, KVInstance* kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts) {
         NewTxnGetVisibleRangeState state;
         Status status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, commit_ts, state);
         EXPECT_TRUE(status.ok());
@@ -3086,7 +3121,13 @@ TEST_P(TestTxnImport, test_import_append_table) {
             ColumnMeta column_meta(column_idx, block_meta);
             ColumnVector col;
 
-            Status status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorMode::kReadOnly, col);
+            Status status = NewCatalog::GetColumnVector(column_meta,
+                                                        kv_instance,
+                                                        begin_ts,
+                                                        commit_ts,
+                                                        row_count,
+                                                        ColumnVectorMode::kReadOnly,
+                                                        col);
             EXPECT_TRUE(status.ok());
 
             EXPECT_EQ(col.GetValueByIndex(0), Value::MakeInt(1));
@@ -3099,7 +3140,13 @@ TEST_P(TestTxnImport, test_import_append_table) {
             ColumnMeta column_meta(column_idx, block_meta);
             ColumnVector col;
 
-            Status status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorMode::kReadOnly, col);
+            Status status = NewCatalog::GetColumnVector(column_meta,
+                                                        kv_instance,
+                                                        begin_ts,
+                                                        commit_ts,
+                                                        row_count,
+                                                        ColumnVectorMode::kReadOnly,
+                                                        col);
             EXPECT_TRUE(status.ok());
 
             EXPECT_EQ(col.GetValueByIndex(0), Value::MakeVarchar("abc"));
@@ -3110,6 +3157,7 @@ TEST_P(TestTxnImport, test_import_append_table) {
     };
 
     auto check_segment = [&](SegmentMeta &segment_meta, NewTxn *txn) {
+        KVInstance *kv_instance = txn->kv_instance();
         TxnTimeStamp begin_ts = txn->BeginTS();
         TxnTimeStamp commit_ts = txn->CommitTS();
 
@@ -3119,12 +3167,12 @@ TEST_P(TestTxnImport, test_import_append_table) {
 
         for (auto block_id : *block_ids) {
             BlockMeta block_meta(block_id, segment_meta);
-            check_block(block_meta, begin_ts, commit_ts);
+            check_block(block_meta, kv_instance, begin_ts, commit_ts);
         }
     };
 
     auto check_table = [&](TableMeeta &table_meta, NewTxn *txn, const Vector<SegmentID> &segment_ids) {
-        auto [segment_ids_ptr, seg_status] = table_meta.GetSegmentIDs1();
+        auto [segment_ids_ptr, seg_status] = table_meta.GetSegmentIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
         EXPECT_TRUE(seg_status.ok());
         EXPECT_EQ(*segment_ids_ptr, segment_ids);
 
@@ -3676,7 +3724,7 @@ TEST_P(TestTxnImport, test_import_import_table) {
         return input_block;
     };
 
-    auto check_block = [&](BlockMeta &block_meta, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts) {
+    auto check_block = [&](BlockMeta &block_meta, KVInstance* kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts) {
         NewTxnGetVisibleRangeState state;
         Status status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, commit_ts, state);
         EXPECT_TRUE(status.ok());
@@ -3697,7 +3745,13 @@ TEST_P(TestTxnImport, test_import_import_table) {
             ColumnMeta column_meta(column_idx, block_meta);
             ColumnVector col;
 
-            Status status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorMode::kReadOnly, col);
+            Status status = NewCatalog::GetColumnVector(column_meta,
+                                                        kv_instance,
+                                                        begin_ts,
+                                                        commit_ts,
+                                                        row_count,
+                                                        ColumnVectorMode::kReadOnly,
+                                                        col);
             EXPECT_TRUE(status.ok());
 
             EXPECT_EQ(col.GetValueByIndex(0), Value::MakeInt(1));
@@ -3710,7 +3764,13 @@ TEST_P(TestTxnImport, test_import_import_table) {
             ColumnMeta column_meta(column_idx, block_meta);
             ColumnVector col;
 
-            Status status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorMode::kReadOnly, col);
+            Status status = NewCatalog::GetColumnVector(column_meta,
+                                                        kv_instance,
+                                                        begin_ts,
+                                                        commit_ts,
+                                                        row_count,
+                                                        ColumnVectorMode::kReadOnly,
+                                                        col);
             EXPECT_TRUE(status.ok());
 
             EXPECT_EQ(col.GetValueByIndex(0), Value::MakeVarchar("abc"));
@@ -3721,6 +3781,7 @@ TEST_P(TestTxnImport, test_import_import_table) {
     };
 
     auto check_segment = [&](SegmentMeta &segment_meta, NewTxn *txn) {
+        KVInstance *kv_instance = txn->kv_instance();
         TxnTimeStamp begin_ts = txn->BeginTS();
         TxnTimeStamp commit_ts = txn->CommitTS();
 
@@ -3730,14 +3791,14 @@ TEST_P(TestTxnImport, test_import_import_table) {
 
         for (auto block_id : *block_ids) {
             BlockMeta block_meta(block_id, segment_meta);
-            check_block(block_meta, begin_ts, commit_ts);
+            check_block(block_meta, kv_instance, begin_ts, commit_ts);
         }
     };
 
     auto check_table = [&](TableMeeta &table_meta, NewTxn *txn, Vector<SegmentID> segment_ids) {
         new_txn_mgr->PrintAllKeyValue();
 
-        auto [seg_ids, seg_status] = table_meta.GetSegmentIDs1();
+        auto [seg_ids, seg_status] = table_meta.GetSegmentIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
         EXPECT_TRUE(seg_status.ok());
         EXPECT_EQ(*seg_ids, segment_ids);
 
@@ -3912,7 +3973,7 @@ TEST_P(TestTxnImport, test_import_import_table) {
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
 
-        auto [segment_ids, seg_status] = table_meta->GetSegmentIDs1();
+        auto [segment_ids, seg_status] = table_meta->GetSegmentIDs1(txn5->kv_instance(), txn5->BeginTS(), txn5->CommitTS());
         EXPECT_TRUE(seg_status.ok());
 
         check_table(*table_meta, txn5, {0, 1});
@@ -4519,7 +4580,7 @@ TEST_P(TestTxnImport, test_import_and_create_index) {
         return input_block;
     };
 
-    auto check_block = [&](BlockMeta &block_meta, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts) {
+    auto check_block = [&](BlockMeta &block_meta, KVInstance* kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts) {
         NewTxnGetVisibleRangeState state;
         Status status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, commit_ts, state);
         EXPECT_TRUE(status.ok());
@@ -4540,7 +4601,13 @@ TEST_P(TestTxnImport, test_import_and_create_index) {
             ColumnMeta column_meta(column_idx, block_meta);
             ColumnVector col;
 
-            Status status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorMode::kReadOnly, col);
+            Status status = NewCatalog::GetColumnVector(column_meta,
+                                                        kv_instance,
+                                                        begin_ts,
+                                                        commit_ts,
+                                                        row_count,
+                                                        ColumnVectorMode::kReadOnly,
+                                                        col);
             EXPECT_TRUE(status.ok());
 
             EXPECT_EQ(col.GetValueByIndex(0), Value::MakeInt(1));
@@ -4553,7 +4620,13 @@ TEST_P(TestTxnImport, test_import_and_create_index) {
             ColumnMeta column_meta(column_idx, block_meta);
             ColumnVector col;
 
-            Status status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorMode::kReadOnly, col);
+            Status status = NewCatalog::GetColumnVector(column_meta,
+                                                        kv_instance,
+                                                        begin_ts,
+                                                        commit_ts,
+                                                        row_count,
+                                                        ColumnVectorMode::kReadOnly,
+                                                        col);
             EXPECT_TRUE(status.ok());
 
             EXPECT_EQ(col.GetValueByIndex(0), Value::MakeVarchar("abc"));
@@ -4564,6 +4637,7 @@ TEST_P(TestTxnImport, test_import_and_create_index) {
     };
 
     auto check_segment = [&](SegmentMeta &segment_meta, NewTxn *txn) {
+        KVInstance *kv_instance = txn->kv_instance();
         TxnTimeStamp begin_ts = txn->BeginTS();
         TxnTimeStamp commit_ts = txn->CommitTS();
 
@@ -4573,12 +4647,12 @@ TEST_P(TestTxnImport, test_import_and_create_index) {
 
         for (auto block_id : *block_ids) {
             BlockMeta block_meta(block_id, segment_meta);
-            check_block(block_meta, begin_ts, commit_ts);
+            check_block(block_meta, kv_instance, begin_ts, commit_ts);
         }
     };
 
     auto check_table = [&](TableMeeta &table_meta, NewTxn *txn, const Vector<SegmentID> &segment_ids) {
-        auto [segment_ids_ptr, seg_status] = table_meta.GetSegmentIDs1();
+        auto [segment_ids_ptr, seg_status] = table_meta.GetSegmentIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
         EXPECT_TRUE(seg_status.ok());
         EXPECT_EQ(*segment_ids_ptr, segment_ids);
 
@@ -4589,7 +4663,7 @@ TEST_P(TestTxnImport, test_import_and_create_index) {
 
         Vector<String> *index_id_strs_ptr = nullptr;
         Vector<String> *index_names_ptr = nullptr;
-        Status status = table_meta.GetIndexIDs(index_id_strs_ptr, &index_names_ptr);
+        Status status = table_meta.GetIndexIDs(txn->kv_instance(), txn->BeginTS(), index_id_strs_ptr, &index_names_ptr);
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(index_id_strs_ptr->size(), 1);
         EXPECT_EQ(index_names_ptr->size(), 1);
@@ -4607,7 +4681,7 @@ TEST_P(TestTxnImport, test_import_and_create_index) {
         EXPECT_EQ(index_segment_ids_ptr->size(), 1);
     };
     auto check_no_index = [&](TableMeeta &table_meta, NewTxn *txn, const Vector<SegmentID> &segment_ids) {
-        auto [segment_ids_ptr, seg_status] = table_meta.GetSegmentIDs1();
+        auto [segment_ids_ptr, seg_status] = table_meta.GetSegmentIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
         EXPECT_TRUE(seg_status.ok());
         EXPECT_EQ(*segment_ids_ptr, segment_ids);
 
@@ -4618,18 +4692,18 @@ TEST_P(TestTxnImport, test_import_and_create_index) {
 
         Vector<String> *index_id_strs_ptr = nullptr;
         Vector<String> *index_names_ptr = nullptr;
-        Status status = table_meta.GetIndexIDs(index_id_strs_ptr, &index_names_ptr);
+        Status status = table_meta.GetIndexIDs(txn->kv_instance(), txn->BeginTS(), index_id_strs_ptr, &index_names_ptr);
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(*index_id_strs_ptr, Vector<String>({}));
     };
     auto check_no_data = [&](TableMeeta &table_meta, NewTxn *txn) {
-        auto [segment_ids_ptr, seg_status] = table_meta.GetSegmentIDs1();
+        auto [segment_ids_ptr, seg_status] = table_meta.GetSegmentIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
         EXPECT_TRUE(seg_status.ok());
         EXPECT_EQ(*segment_ids_ptr, Vector<SegmentID>({}));
 
         Vector<String> *index_id_strs_ptr = nullptr;
         Vector<String> *index_names_ptr = nullptr;
-        Status status = table_meta.GetIndexIDs(index_id_strs_ptr, &index_names_ptr);
+        Status status = table_meta.GetIndexIDs(txn->kv_instance(), txn->BeginTS(), index_id_strs_ptr, &index_names_ptr);
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(*index_names_ptr, Vector<String>({"idx1"}));
     };
@@ -5139,7 +5213,7 @@ TEST_P(TestTxnImport, test_import_and_drop_index) {
         return input_block;
     };
 
-    auto check_block = [&](BlockMeta &block_meta, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts) {
+    auto check_block = [&](BlockMeta &block_meta, KVInstance* kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts) {
         NewTxnGetVisibleRangeState state;
         Status status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, commit_ts, state);
         EXPECT_TRUE(status.ok());
@@ -5160,7 +5234,13 @@ TEST_P(TestTxnImport, test_import_and_drop_index) {
             ColumnMeta column_meta(column_idx, block_meta);
             ColumnVector col;
 
-            Status status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorMode::kReadOnly, col);
+            Status status = NewCatalog::GetColumnVector(column_meta,
+                                                        kv_instance,
+                                                        begin_ts,
+                                                        commit_ts,
+                                                        row_count,
+                                                        ColumnVectorMode::kReadOnly,
+                                                        col);
             EXPECT_TRUE(status.ok());
 
             EXPECT_EQ(col.GetValueByIndex(0), Value::MakeInt(1));
@@ -5173,7 +5253,13 @@ TEST_P(TestTxnImport, test_import_and_drop_index) {
             ColumnMeta column_meta(column_idx, block_meta);
             ColumnVector col;
 
-            Status status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorMode::kReadOnly, col);
+            Status status = NewCatalog::GetColumnVector(column_meta,
+                                                        kv_instance,
+                                                        begin_ts,
+                                                        commit_ts,
+                                                        row_count,
+                                                        ColumnVectorMode::kReadOnly,
+                                                        col);
             EXPECT_TRUE(status.ok());
 
             EXPECT_EQ(col.GetValueByIndex(0), Value::MakeVarchar("abc"));
@@ -5184,6 +5270,7 @@ TEST_P(TestTxnImport, test_import_and_drop_index) {
     };
 
     auto check_segment = [&](SegmentMeta &segment_meta, NewTxn *txn) {
+        KVInstance *kv_instance = txn->kv_instance();
         TxnTimeStamp begin_ts = txn->BeginTS();
         TxnTimeStamp commit_ts = txn->CommitTS();
 
@@ -5193,12 +5280,12 @@ TEST_P(TestTxnImport, test_import_and_drop_index) {
 
         for (auto block_id : *block_ids) {
             BlockMeta block_meta(block_id, segment_meta);
-            check_block(block_meta, begin_ts, commit_ts);
+            check_block(block_meta, kv_instance, begin_ts, commit_ts);
         }
     };
 
     auto check_table = [&](TableMeeta &table_meta, NewTxn *txn, const Vector<SegmentID> &segment_ids) {
-        auto [segment_ids_ptr, seg_status] = table_meta.GetSegmentIDs1();
+        auto [segment_ids_ptr, seg_status] = table_meta.GetSegmentIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
         EXPECT_TRUE(seg_status.ok());
         EXPECT_EQ(*segment_ids_ptr, segment_ids);
 
@@ -5209,7 +5296,7 @@ TEST_P(TestTxnImport, test_import_and_drop_index) {
 
         Vector<String> *index_id_strs_ptr = nullptr;
         Vector<String> *index_names_ptr = nullptr;
-        Status status = table_meta.GetIndexIDs(index_id_strs_ptr, &index_names_ptr);
+        Status status = table_meta.GetIndexIDs(txn->kv_instance(), txn->BeginTS(), index_id_strs_ptr, &index_names_ptr);
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(index_id_strs_ptr->size(), 0);
         EXPECT_EQ(index_names_ptr->size(), 0);
@@ -6188,7 +6275,7 @@ TEST_P(TestTxnImport, test_import_and_optimize_index) {
         EXPECT_TRUE(status.ok());
 
         Vector<SegmentID> *segment_ids_ptr = nullptr;
-        std::tie(segment_ids_ptr, status) = table_meta->GetSegmentIDs1();
+        std::tie(segment_ids_ptr, status) = table_meta->GetSegmentIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
         EXPECT_TRUE(status.ok());
 
         Vector<SegmentID> expected_segments{0, 1};

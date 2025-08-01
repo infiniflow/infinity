@@ -123,7 +123,7 @@ TEST_P(TestTxnReplayImport, test_import0) {
         Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
 
-        auto [segment_ids, seg_status] = table_meta->GetSegmentIDs1();
+        auto [segment_ids, seg_status] = table_meta->GetSegmentIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
         EXPECT_TRUE(seg_status.ok());
         EXPECT_EQ(*segment_ids, Vector<SegmentID>({0, 1}));
 
@@ -148,7 +148,13 @@ TEST_P(TestTxnReplayImport, test_import0) {
                 ColumnMeta column_meta(column_idx, block_meta);
                 ColumnVector col;
 
-                Status status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorMode::kReadOnly, col);
+                Status status = NewCatalog::GetColumnVector(column_meta,
+                                                            txn->kv_instance(),
+                                                            txn->BeginTS(),
+                                                            txn->CommitTS(),
+                                                            row_count,
+                                                            ColumnVectorMode::kReadOnly,
+                                                            col);
                 EXPECT_TRUE(status.ok());
 
                 EXPECT_EQ(col.GetValueByIndex(0), Value::MakeInt(1));
@@ -161,7 +167,13 @@ TEST_P(TestTxnReplayImport, test_import0) {
                 ColumnMeta column_meta(column_idx, block_meta);
                 ColumnVector col;
 
-                Status status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorMode::kReadOnly, col);
+                Status status = NewCatalog::GetColumnVector(column_meta,
+                                                            txn->kv_instance(),
+                                                            txn->BeginTS(),
+                                                            txn->CommitTS(),
+                                                            row_count,
+                                                            ColumnVectorMode::kReadOnly,
+                                                            col);
                 EXPECT_TRUE(status.ok());
 
                 EXPECT_EQ(col.GetValueByIndex(0), Value::MakeVarchar("abc"));
@@ -256,7 +268,7 @@ TEST_P(TestTxnReplayImport, test_import_with_index) {
 
     RestartTxnMgr();
 
-    auto check_chunk_index = [&](NewTxn* txn, ChunkIndexMeta &chunk_index_meta) {
+    auto check_chunk_index = [&](NewTxn *txn, ChunkIndexMeta &chunk_index_meta) {
         SegmentID segment_id = chunk_index_meta.segment_index_meta().segment_id();
 
         ChunkIndexMetaInfo *chunk_info_ptr = nullptr;
@@ -266,7 +278,7 @@ TEST_P(TestTxnReplayImport, test_import_with_index) {
         EXPECT_EQ(chunk_info_ptr->row_cnt_, block_row_cnt * 2);
     };
 
-    auto check_segment_index = [&](NewTxn* txn, SegmentIndexMeta &segment_index_meta) {
+    auto check_segment_index = [&](NewTxn *txn, SegmentIndexMeta &segment_index_meta) {
         auto [chunk_ids_ptr, status] = segment_index_meta.GetChunkIDs1(txn->kv_instance());
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(*chunk_ids_ptr, Vector<ChunkID>({0}));

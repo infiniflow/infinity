@@ -436,19 +436,19 @@ SharedPtr<BaseTableRef> QueryBinder::BuildBaseTable(QueryContext *query_context,
     SharedPtr<TableInfo> table_info;
     Status status;
     NewTxn *new_txn = query_context->GetNewTxn();
+    KVInstance *kv_instance = new_txn->kv_instance();
+    TxnTimeStamp begin_ts = new_txn->BeginTS();
+    TxnTimeStamp commit_ts = new_txn->CommitTS();
+
     SharedPtr<DBMeeta> db_meta;
     Optional<TableMeeta> tmp_table_meta;
     status = new_txn->GetTableMeta(db_name, table_name, db_meta, tmp_table_meta);
     if (!status.ok()) {
         RecoverableError(status);
     }
-    auto table_meta = MakeUnique<TableMeeta>(tmp_table_meta->db_id_str(),
-                                             tmp_table_meta->table_id_str(),
-                                             tmp_table_meta->kv_instance(),
-                                             tmp_table_meta->begin_ts(),
-                                             tmp_table_meta->commit_ts());
+    auto table_meta = MakeUnique<TableMeeta>(tmp_table_meta->db_id_str(), tmp_table_meta->table_id_str(), kv_instance, begin_ts, commit_ts);
     table_info = MakeShared<TableInfo>();
-    status = table_meta->GetTableInfo(*table_info);
+    status = table_meta->GetTableInfo(kv_instance, begin_ts, commit_ts, *table_info);
     if (!status.ok()) {
         RecoverableError(status);
     }
@@ -478,10 +478,6 @@ SharedPtr<BaseTableRef> QueryBinder::BuildBaseTable(QueryContext *query_context,
             columns.emplace_back(column_def->id_);
         }
     }
-
-    TxnTimeStamp begin_ts = new_txn->BeginTS();
-    TxnTimeStamp commit_ts = new_txn->CommitTS();
-    KVInstance *kv_instance = new_txn->kv_instance();
 
     SharedPtr<BlockIndex> block_index;
     block_index = MakeShared<BlockIndex>();

@@ -189,11 +189,13 @@ void PhysicalMatchTensorScan::PlanWithIndex(QueryContext *query_context) {
     Set<SegmentID> index_entry_map;
     NewTxn *new_txn = query_context->GetNewTxn();
     KVInstance *kv_instance = new_txn->kv_instance();
+    TxnTimeStamp begin_ts = new_txn->BeginTS();
+    //    TxnTimeStamp commit_ts = new_txn->CommitTS();
 
     if (!src_match_tensor_expr_->ignore_index_) {
         Vector<String> *index_id_strs_ptr = nullptr;
         Vector<String> *index_names_ptr = nullptr;
-        status = table_meta->GetIndexIDs(index_id_strs_ptr, &index_names_ptr);
+        status = table_meta->GetIndexIDs(kv_instance, begin_ts, index_id_strs_ptr, &index_names_ptr);
         if (!status.ok()) {
             RecoverableError(status);
         }
@@ -394,7 +396,8 @@ void PhysicalMatchTensorScan::ExecuteInner(QueryContext *query_context, MatchTen
                                             function_data.result_handler_->AddResult(0, score_ptr[i], RowID(segment_id, row_id_ptr[i]));
                                         }
                                     },
-                                    [this, begin_ts, commit_ts, segment_id, &function_data, &segment_meta](const Pair<u32, u32> &in_mem_result) {
+                                    [this, begin_ts, commit_ts, segment_id, &function_data, &segment_meta, &kv_instance](
+                                        const Pair<u32, u32> &in_mem_result) {
                                         const auto &[start_offset, total_row_count] = in_mem_result;
                                         BlockID block_id = start_offset / DEFAULT_BLOCK_CAPACITY;
                                         BlockOffset block_offset = start_offset % DEFAULT_BLOCK_CAPACITY;
@@ -410,8 +413,13 @@ void PhysicalMatchTensorScan::ExecuteInner(QueryContext *query_context, MatchTen
                                                 }
                                                 ColumnMeta column_meta(this->search_column_id_, block_meta);
                                                 ColumnVector column_vector;
-                                                status =
-                                                    NewCatalog::GetColumnVector(column_meta, row_to_read, ColumnVectorMode::kReadOnly, column_vector);
+                                                status = NewCatalog::GetColumnVector(column_meta,
+                                                                                     kv_instance,
+                                                                                     begin_ts,
+                                                                                     commit_ts,
+                                                                                     row_to_read,
+                                                                                     ColumnVectorMode::kReadOnly,
+                                                                                     column_vector);
                                                 if (!status.ok()) {
                                                     UnrecoverableError(status.message());
                                                 }
@@ -476,7 +484,8 @@ void PhysicalMatchTensorScan::ExecuteInner(QueryContext *query_context, MatchTen
             }
             ColumnMeta column_meta(this->search_column_id_, *block_meta);
             ColumnVector column_vector;
-            status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorMode::kReadOnly, column_vector);
+            status =
+                NewCatalog::GetColumnVector(column_meta, kv_instance, begin_ts, commit_ts, row_count, ColumnVectorMode::kReadOnly, column_vector);
             if (!status.ok()) {
                 UnrecoverableError(status.message());
             }
@@ -997,7 +1006,7 @@ void GetRerankerScore(Vector<MatchTensorRerankDoc> &rerank_docs,
         if (!status.ok()) {
             UnrecoverableError("GetRowCnt1 failed!");
         }
-        status = NewCatalog::GetColumnVector(column_meta, block_row_cnt, ColumnVectorMode::kReadOnly, column_vec);
+        status = NewCatalog::GetColumnVector(column_meta, kv_instance, begin_ts, commit_ts, block_row_cnt, ColumnVectorMode::kReadOnly, column_vec);
         if (!status.ok()) {
             UnrecoverableError("GetRowCnt1 failed!");
         }

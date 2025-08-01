@@ -72,7 +72,9 @@ export struct IndexFilterEvaluatorSecondary : IndexFilterEvaluator {
     static UniquePtr<IndexFilterEvaluatorSecondary> Make(const BaseExpression *src_filter_secondary_index_expressions,
                                                          ColumnID column_id,
                                                          SharedPtr<TableIndexMeeta> new_secondary_index,
-                                                         KVInstance* kv_instance,
+                                                         KVInstance *kv_instance,
+                                                         TxnTimeStamp begin_ts,
+                                                         TxnTimeStamp commit_ts,
                                                          FilterCompareType compare_type,
                                                          const Value &val);
 

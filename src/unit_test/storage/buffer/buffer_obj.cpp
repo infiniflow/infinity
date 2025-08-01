@@ -636,7 +636,7 @@ TEST_F(BufferObjTest, test_hnsw_index_buffer_obj_shutdown) {
             EXPECT_TRUE(status.ok());
 
             {
-                auto [segment_ids, status] = table_meta->GetSegmentIDs1();
+                auto [segment_ids, status] = table_meta->GetSegmentIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
                 EXPECT_TRUE(status.ok());
                 EXPECT_EQ(*segment_ids, Vector<SegmentID>({0}));
             }
@@ -730,7 +730,7 @@ TEST_F(BufferObjTest, test_big_with_gc_and_cleanup) {
         Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
 
-        auto [segment_ids, seg_status] = table_meta->GetSegmentIDs1();
+        auto [segment_ids, seg_status] = table_meta->GetSegmentIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
         EXPECT_TRUE(seg_status.ok());
         EXPECT_EQ(segment_ids->size(), 1);
         SegmentID segment_id = segment_ids->at(0);
@@ -771,7 +771,13 @@ TEST_F(BufferObjTest, test_big_with_gc_and_cleanup) {
                 ColumnMeta column_meta(column_idx, block_meta);
                 ColumnVector col;
 
-                status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorMode::kReadOnly, col);
+                status = NewCatalog::GetColumnVector(column_meta,
+                                                     txn->kv_instance(),
+                                                     txn->BeginTS(),
+                                                     txn->CommitTS(),
+                                                     row_count,
+                                                     ColumnVectorMode::kReadOnly,
+                                                     col);
                 EXPECT_TRUE(status.ok());
 
                 for (SizeT row_id = 0; row_id < kImportSize; ++row_id) {
@@ -862,7 +868,7 @@ TEST_F(BufferObjTest, test_multiple_threads_read) {
             Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
             EXPECT_TRUE(status.ok());
 
-            auto [segment_ids, seg_status] = table_meta->GetSegmentIDs1();
+            auto [segment_ids, seg_status] = table_meta->GetSegmentIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
             EXPECT_TRUE(seg_status.ok());
             EXPECT_EQ(segment_ids->size(), 1);
             SegmentID segment_id = segment_ids->at(0);
@@ -903,7 +909,7 @@ TEST_F(BufferObjTest, test_multiple_threads_read) {
                     ColumnMeta column_meta(column_idx, block_meta);
                     ColumnVector col;
 
-                    status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorMode::kReadOnly, col);
+                    status = NewCatalog::GetColumnVector(column_meta, txn->kv_instance(), txn->BeginTS(), txn->CommitTS(), row_count, ColumnVectorMode::kReadOnly, col);
                     EXPECT_TRUE(status.ok());
 
                     for (SizeT row_id = 0; row_id < kImportSize; ++row_id) {
