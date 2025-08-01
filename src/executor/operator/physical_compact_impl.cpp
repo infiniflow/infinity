@@ -60,6 +60,7 @@ bool PhysicalCompact::Execute(QueryContext *query_context, OperatorState *operat
     compact_task->Wait();
 
     compact_operator_state->status_ = compact_task->result_status_;
+    compact_operator_state->result_msg_ = std::move(compact_operator_state->status_.msg_);
     compact_operator_state->SetComplete();
     return true;
 }

@@ -31,6 +31,7 @@ import :table_def;
 import :txn_state;
 import :segment_meta;
 import :table_meeta;
+import :block_meta;
 #else
 #include "gtest/gtest.h"
 import infinity_core;
@@ -77,6 +78,39 @@ TEST_P(TestTxnTableMeeta, table_meeta) {
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());
 
+        SizeT block_row_cnt = 8192;
+        auto make_input_block = [&](const Value &v1, const Value &v2) {
+            auto input_block = MakeShared<DataBlock>();
+            auto make_column = [&](const Value &v) {
+                auto col = ColumnVector::Make(MakeShared<DataType>(v.type()));
+                col->Initialize();
+                for (SizeT i = 0; i < block_row_cnt; ++i) {
+                    col->AppendValue(v);
+                }
+                return col;
+            };
+            {
+                auto col1 = make_column(v1);
+                input_block->InsertVector(col1, 0);
+            }
+            {
+                auto col2 = make_column(v2);
+                input_block->InsertVector(col2, 1);
+            }
+            input_block->Finalize();
+            return input_block;
+        };
+
+        auto append = [&] {
+            auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+            Status status = txn->Append(*db_name, *table_name, make_input_block(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz")));
+            EXPECT_TRUE(status.ok());
+            status = new_txn_mgr->CommitTxn(txn);
+            EXPECT_TRUE(status.ok());
+        };
+
+        append();
+
         new_txn_mgr->PrintAllKeyValue();
     }
     // ---------------------------
@@ -90,18 +124,13 @@ TEST_P(TestTxnTableMeeta, table_meeta) {
     TableMeeta table_meta(table_info->db_id_, table_info->table_id_, kv_instance.get(), txn2->BeginTS(), txn2->CommitTS());
 
     {
-        // SegmentID segment_id = 0;
-        // auto segment_status = table_meta.GetNextSegmentID(segment_id);
-        // EXPECT_TRUE(segment_status.ok());
-        // EXPECT_EQ(segment_id, 0);
         {
             SegmentMeta segment_meta(0, table_meta);
             segment_meta.Init();
-            // segment_meta.SetRowCnt(1048);
             {
                 auto [blocks, block_status] = segment_meta.GetBlockIDs1();
                 EXPECT_TRUE(block_status.ok());
-                EXPECT_EQ(blocks->size(), 0);
+                EXPECT_EQ(blocks->size(), 1);
             }
             {
                 TxnTimeStamp commit_ts = 1;
@@ -109,58 +138,58 @@ TEST_P(TestTxnTableMeeta, table_meeta) {
                 BlockID block_id = 0;
                 std::tie(block_id, status) = segment_meta.AddBlockID1(commit_ts);
                 EXPECT_TRUE(status.ok());
-                EXPECT_EQ(block_id, 0);
+                EXPECT_EQ(block_id, 1);
 
                 std::tie(block_id, status) = segment_meta.AddBlockID1(commit_ts);
                 EXPECT_TRUE(status.ok());
-                EXPECT_EQ(block_id, 1);
+                EXPECT_EQ(block_id, 2);
             }
 
             {
+                BlockMeta block_meta1(1, segment_meta);
+                block_meta1.InitSet();
+
+                BlockMeta block_meta2(2, segment_meta);
+                block_meta2.InitSet();
+
                 auto [blocks, block_status] = segment_meta.GetBlockIDs1();
                 EXPECT_TRUE(block_status.ok());
-                EXPECT_EQ(*blocks, std::vector<BlockID>({0, 1}));
+                EXPECT_EQ(*blocks, std::vector<BlockID>({0, 1, 2}));
             }
 
-            // {
-            //     auto [row_count, block_status] = segment_meta.GetRowCnt();
-            //     EXPECT_EQ(row_count, 1048);
-            // }
+            {
+                auto [row_count, block_status] = segment_meta.GetRowCnt1();
+                EXPECT_EQ(row_count, 8192);
+            }
         }
     }
 
-    // {
-    //     Status status = table_meta.SetNextSegmentID(1);
-    //     EXPECT_TRUE(status.ok());
+    {
+        TxnTimeStamp commit_ts = 1;
 
-    //     status = table_meta.AddSegmentID(1);
-    //     EXPECT_TRUE(status.ok());
+        SegmentID segment_id = 0;
+        std::tie(segment_id, status) = table_meta.AddSegmentID1(commit_ts);
+        EXPECT_TRUE(status.ok());
+        EXPECT_EQ(segment_id, 1);
 
-    //     status = table_meta.SetNextSegmentID(2);
-    //     EXPECT_TRUE(status.ok());
+        std::tie(segment_id, status) = table_meta.AddSegmentID1(commit_ts);
+        EXPECT_TRUE(status.ok());
+        EXPECT_EQ(segment_id, 2);
+    }
 
-    //     status = table_meta.AddSegmentID(2);
-    //     EXPECT_TRUE(status.ok());
+    {
+        auto dir_ptr = table_meta.GetTableDir();
+        EXPECT_STREQ(dir_ptr->c_str(), "0");
+    }
 
-    //     SegmentID segment_id = 0;
-    //     auto segment_status = table_meta.GetNextSegmentID(segment_id);
-    //     EXPECT_TRUE(segment_status.ok());
-    //     EXPECT_EQ(segment_id, 2);
-    // }
-
-    // {
-    //     auto dir_ptr = table_meta.GetTableDir();
-    //     EXPECT_STREQ(dir_ptr->c_str(), "1");
-    // }
-
-    // {
-    //     auto [segments_ptr, segments_status] = table_meta.GetSegmentIDs1();
-    //     EXPECT_TRUE(segments_status.ok());
-    //     EXPECT_EQ(segments_ptr->size(), 3);
-    //     EXPECT_EQ(segments_ptr->at(0), 0);
-    //     EXPECT_EQ(segments_ptr->at(1), 1);
-    //     EXPECT_EQ(segments_ptr->at(2), 2);
-    // }
+    {
+        auto [segments_ptr, segments_status] = table_meta.GetSegmentIDs1();
+        EXPECT_TRUE(segments_status.ok());
+        EXPECT_EQ(segments_ptr->size(), 3);
+        EXPECT_EQ(segments_ptr->at(0), 0);
+        EXPECT_EQ(segments_ptr->at(1), 1);
+        EXPECT_EQ(segments_ptr->at(2), 2);
+    }
 
     {
         auto [def_vectors, def_status] = table_meta.GetColumnDefs();

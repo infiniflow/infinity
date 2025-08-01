@@ -57,12 +57,6 @@ Status BlockMeta::GetBlockLock(SharedPtr<BlockLock> &block_lock) {
 }
 
 Status BlockMeta::InitSet() {
-    // {
-    //     Status status = SetRowCnt(0);
-    //     if (!status.ok()) {
-    //         return status;
-    //     }
-    // }
     NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
     {
         String block_lock_key = GetBlockTag("lock");

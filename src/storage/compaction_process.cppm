@@ -25,6 +25,7 @@ namespace infinity {
 
 class NewTxn;
 class BGTask;
+class TableMeeta;
 
 class TestCommander {
 public:
@@ -72,6 +73,8 @@ private:
     void NewScanAndOptimize();
 
     void Process();
+
+    Vector<SegmentID> GetCompactableSegments(TableMeeta &table_meta, const Vector<SegmentID> &segment_ids);
 
 private:
     BlockingQueue<SharedPtr<BGTask>> task_queue_{"CompactionProcessor"};
