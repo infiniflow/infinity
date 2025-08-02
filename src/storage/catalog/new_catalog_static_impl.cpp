@@ -917,13 +917,6 @@ Status NewCatalog::LoadFlushedBlock1(SegmentMeta &segment_meta, const WalBlockIn
             return status;
         }
     }
-    /*
-    status = block_meta.SetRowCnt(block_info.row_count_);
-    if (!status.ok()) {
-        return status;
-    }
-    */
-
     return Status::OK();
 }
 
