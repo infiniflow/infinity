@@ -304,8 +304,13 @@ public:
     inline void SetNull() { ptr = nullptr; }
 
     [[nodiscard]] inline std::string ToString() const {
-        ParserError("ToString() isn't implemented");
-        return std::string();
+        // This is a simplified implementation that cannot determine the exact type and dimension
+        // without additional context. In practice, you would need to pass the EmbeddingDataType
+        // and dimension as parameters or store them as member variables.
+        if (ptr == nullptr) {
+            return "NULL";
+        }
+        return "[EMBEDDING_DATA]";
     }
 
     bool Eq(const EmbeddingType &other, EmbeddingDataType type, size_t dimension) const {
