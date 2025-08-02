@@ -224,6 +224,7 @@ using std::cout;
 using std::endl;
 using std::format;
 
+using std::hex;
 using std::setfill;
 using std::setw;
 
