@@ -46,6 +46,7 @@
 *.tab.hh
 *.tar
 *.tgz
+*.whl
 *.zip
 *.tar.bz2
 *.xz
@@ -129,6 +130,12 @@ callgrind.out.*
 
 # ignore vscode clangd cache file
 .cache/
+
+# ignore augment dir
+.augment/
+
+# ignore marscode dir
+.marscode/
 
 # ignore all benchmark datasets
 python/benchmark/datasets/

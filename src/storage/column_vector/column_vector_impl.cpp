@@ -142,6 +142,7 @@ void ColumnVector::AppendValue(const Value &value) {
         UnrecoverableError(error_message);
     }
     SetValueByIndex(tail_index, value);
+    LOG_TRACE(fmt::format("ColumnVector::AppendValue: data_ptr_ {:p}, tail_index {}, value {}", data_ptr_, tail_index, value.ToString()));
 }
 
 void ColumnVector::SetVectorType(ColumnVectorType vector_type) {
@@ -2315,6 +2316,7 @@ void ColumnVector::AppendWith(const ColumnVector &other, SizeT from, SizeT count
         }
     }
     tail_index_.fetch_add(count);
+    LOG_TRACE(fmt::format("ColumnVector::AppendWith: data_ptr_ {:p}, tail_index {}, from {}, count {}", data_ptr_, tail_index, from, count));
 }
 
 SizeT ColumnVector::AppendWith(RowID from, SizeT row_count) {
