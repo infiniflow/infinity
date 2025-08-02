@@ -15,6 +15,7 @@
 module;
 
 #include <filesystem>
+#include <print>
 #include <string>
 
 module infinity_core:new_catalog.impl;

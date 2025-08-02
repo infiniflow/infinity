@@ -82,7 +82,7 @@ git clone https://github.com/infiniflow/infinity.git
 ```shell
 cd infinity && mkdir cmake-build-debug
 TZ=$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')
-docker run -d --name infinity_build -e TZ=$TZ -v $PWD:/infinity -v /boot:/boot infiniflow/infinity_builder:centos7_clang20
+docker run -d --name infinity_build -e TZ=$TZ -v $PWD:/infinity -v /boot:/boot infiniflow/infinity_builder:ubuntu20_clang20
 docker exec infinity_build bash -c "cd /infinity/cmake-build-debug && cmake -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_VERBOSE_MAKEFILE=ON .. && cmake --build . -t  infinity"
 ```
 
@@ -111,15 +111,29 @@ This section provides instructions for building Infinity from source on Ubuntu.
 
 ```shell
 sudo apt update && sudo apt install git wget unzip software-properties-common
-wget https://github.com/Kitware/CMake/releases/download/v3.29.0/cmake-3.29.0-linux-x86_64.tar.gz
-tar zxvf cmake-3.29.0-linux-x86_64.tar.gz
-sudo cp -rf cmake-3.29.0-linux-x86_64/bin/* /usr/local/bin && sudo cp -rf cmake-3.29.0-linux-x86_64/share/* /usr/local/share && rm -rf cmake-3.29.0-linux-x86_64
-wget https://github.com/ninja-build/ninja/releases/download/v1.12.1/ninja-linux.zip
-unzip ninja-linux.zip && sudo cp ninja /usr/local/bin && rm ninja
+wget https://github.com/Kitware/CMake/releases/download/v4.0.3/cmake-4.0.3-linux-x86_64.tar.gz
+tar zxvf cmake-4.0.3-linux-x86_64.tar.gz
+sudo cp -rf cmake-4.0.3-linux-x86_64/bin/* /usr/local/bin && sudo cp -rf cmake-4.0.3-linux-x86_64/share/* /usr/local/share && rm -rf cmake-4.0.3-linux-x86_64
+wget https://github.com/ninja-build/ninja/archive/refs/tags/v1.13.1.zip
+unzip v1.13.1.zip && cd ninja-1.13.1 && cmake -Bbuild-cmake -DBUILD_TESTING=OFF && cmake --build build-cmake --parallel $(nproc) && cd build-cmake && sudo cp ninja /usr/local/bin
+cd ../.. && rm -rf v1.13.1.zip ninja-1.13.1
+wget https://github.com/rui314/mold/archive/refs/tags/v2.40.3.zip
+./install-build-deps.sh
+cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=g++-15 -B build
+cmake --build build -j$(nproc)
+sudo cmake --build build --target install
+# compile gcc-15 and install it
+cd ~/Downloads # Of course, you can specify a different path.
+git clone https://github.com/microsoft/vcpkg.git
+cd vcpkg && ./bootstrap-vcpkg.sh -disableMetrics
+sudo sh -c 'cat <<EOF >> ~/.bashrc
+export VCPKG_ROOT='~/Downloads/vcpkg'
+export PATH=$VCPKG_ROOT:$PATH
+EOF'
+source ~/.bashrc
 wget https://apt.llvm.org/llvm.sh && chmod +x llvm.sh && sudo ./llvm.sh 20 && rm llvm.sh
 sudo add-apt-repository -P ppa:ubuntu-toolchain-r/test
-sudo add-apt-repository -P ppa:mhier/libboost-latest
-sudo apt update && sudo apt install libc++-20-dev clang-tools-20 flex libboost1.81-dev liblz4-dev zlib1g-dev libevent-dev python3-dev autoconf libssl-dev
+sudo apt update && sudo apt install clang-tools-20 flex zlib1g-dev python3-dev autoconf
 wget https://github.com/jemalloc/jemalloc/archive/refs/tags/5.3.0.tar.gz
 tar zxvf 5.3.0.tar.gz && cd jemalloc-5.3.0 && ./autogen.sh && CFLAGS="-fPIC" CXXFLAGS="-fPIC" ./configure --enable-static --disable-libdl --enable-prof --enable-prof-libunwind --disable-initial-exec-tls && sudo make -j install && cd ..
 sudo ldconfig && sudo rm -rf jemalloc-5.3.0 5.3.0.tar.gz
@@ -127,7 +141,7 @@ sudo ln -s /usr/lib/llvm-20/bin/clang-scan-deps /usr/bin/clang-scan-deps
 sudo ln -s /usr/bin/clang-format-20 /usr/bin/clang-format
 sudo ln -s /usr/bin/clang-tidy-20 /usr/bin/clang-tidy
 sudo ln -s /usr/bin/llvm-symbolizer-20 /usr/bin/llvm-symbolizer
-sudo ln -s /usr/lib/llvm-20/include/x86_64-pc-linux-gnu/c++/v1/__config_site /usr/lib/llvm-20/include/c++/v1/__config_site
+sudo ln -s /usr/lib/llvm-18/include/x86_64-pc-linux-gnu/c++/v1/__config_site /usr/lib/llvm-18/include/c++/v1/__config_site
 ```
 
   </TabItem>
@@ -135,14 +149,35 @@ sudo ln -s /usr/lib/llvm-20/include/x86_64-pc-linux-gnu/c++/v1/__config_site /us
 
 ```shell
 sudo apt update && sudo apt install -y git wget lsb-release software-properties-common
-wget https://github.com/Kitware/CMake/releases/download/v3.29.0/cmake-3.29.0-linux-x86_64.tar.gz
-tar zxvf cmake-3.29.0-linux-x86_64.tar.gz
-sudo cp -rf cmake-3.29.0-linux-x86_64/bin/* /usr/local/bin && sudo cp -rf cmake-3.29.0-linux-x86_64/share/* /usr/local/share && rm -rf cmake-3.29.0-linux-x86_64
+wget https://github.com/Kitware/CMake/releases/download/v4.0.3/cmake-4.0.3-linux-x86_64.tar.gz
+tar zxvf cmake-4.0.3-linux-x86_64.tar.gz
+sudo cp -rf cmake-4.0.3-linux-x86_64/bin/* /usr/local/bin && sudo cp -rf cmake-4.0.3-linux-x86_64/share/* /usr/local/share && rm -rf cmake-4.0.3-linux-x86_64
+wget https://github.com/ninja-build/ninja/archive/refs/tags/v1.13.1.zip
+unzip v1.13.1.zip && cd ninja-1.13.1 && cmake -Bbuild-cmake -DBUILD_TESTING=OFF && cmake --build build-cmake --parallel $(nproc) && cd build-cmake && sudo cp ninja /usr/local/bin
+cd ../.. && rm -rf v1.13.1.zip ninja-1.13.1
+wget https://github.com/rui314/mold/archive/refs/tags/v2.40.3.zip
+./install-build-deps.sh
+cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=g++-15 -B build
+cmake --build build -j$(nproc)
+sudo cmake --build build --target install
+sudo add-apt-repository ppa:puni070/gcc-noble
+sudo apt update
+sudo apt install gcc-15 g++-15
+# Ensure that no other gcc&g++ versions have a priority set, or that if they do, their priority is below 100.
+sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-15  100
+sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-15  100
+cd ~/Downloads # Of course, you can specify a different path.
+git clone https://github.com/microsoft/vcpkg.git
+cd vcpkg && ./bootstrap-vcpkg.sh -disableMetrics
+sudo sh -c 'cat <<EOF >> ~/.bashrc
+export VCPKG_ROOT='~/Downloads/vcpkg'
+export PATH=$VCPKG_ROOT:$PATH
+EOF'
+source ~/.bashrc
 wget https://apt.llvm.org/llvm.sh && chmod +x llvm.sh && sudo ./llvm.sh 20 && rm llvm.sh
-sudo apt install -y ninja-build clang-tools-20 flex libc++-20-dev libboost1.83-dev liblz4-dev zlib1g-dev libevent-dev python3-dev autoconf libssl-dev
-wget https://github.com/jemalloc/jemalloc/archive/refs/tags/5.3.0.tar.gz
-tar zxvf 5.3.0.tar.gz && cd jemalloc-5.3.0 && ./autogen.sh && CFLAGS="-fPIC" CXXFLAGS="-fPIC" ./configure --enable-static --disable-libdl --enable-prof --enable-prof-libunwind --disable-initial-exec-tls && sudo make -j install && cd ..
-sudo ldconfig && sudo rm -rf jemalloc-5.3.0 5.3.0.tar.gz
+sudo apt install -y ninja-build clang-tools-20 flex zlib1g-dev python3-dev autoconf libjemalloc-dev
+# Ensure that no other Clang versions have a priority set, or that if they do, their priority is below 100.
+sudo update-alternatives --install /usr/bin/clang clang /usr/bin/clang-20 100
 sudo ln -s /usr/lib/llvm-20/bin/clang-scan-deps /usr/bin/clang-scan-deps
 sudo ln -s /usr/bin/clang-format-20 /usr/bin/clang-format
 sudo ln -s /usr/bin/clang-tidy-20 /usr/bin/clang-tidy

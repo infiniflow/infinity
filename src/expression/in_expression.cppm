@@ -41,7 +41,7 @@ class ValueSet {
 public:
     void TryPut(Value &&val) {
         if (val.type().type() != data_type_.type()) {
-            UnrecoverableError(std::format("Mismatched type in ValueSet : {}, {}", val.type().ToString(), data_type_.ToString()));
+            UnrecoverableError(fmt::format("Mismatched type in ValueSet : {}, {}", val.type().ToString(), data_type_.ToString()));
             return;
         }
         set_.emplace(std::move(val));
@@ -74,7 +74,7 @@ public:
             case LogicalType::kVarchar:
                 break;
             default:
-                UnrecoverableError(std::format("Not supported type in ValueSet for InExpression: {}", LogicalType2Str(logical_type)));
+                UnrecoverableError(fmt::format("Not supported type in ValueSet for InExpression: {}", LogicalType2Str(logical_type)));
                 return;
         }
     }
@@ -108,7 +108,7 @@ private:
                 case LogicalType::kVarchar:
                     return std::hash<String>{}(val.GetVarchar());
                 default:
-                    String error_message = std::format("Not supported type : {}", val.type().ToString());
+                    String error_message = fmt::format("Not supported type : {}", val.type().ToString());
                     UnrecoverableError(error_message);
                     break;
             }

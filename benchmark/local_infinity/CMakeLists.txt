@@ -4,8 +4,7 @@ add_executable(infinity_benchmark
 )
 
 target_include_directories(infinity_benchmark PUBLIC "${CMAKE_SOURCE_DIR}/src")
-target_link_libraries(
-        infinity_benchmark
+target_link_libraries(infinity_benchmark
         benchmark_profiler
         infinity_core
         sql_parser
@@ -13,42 +12,36 @@ target_link_libraries(
         zsv_parser
         newpfor
         fastpfor
-        #        profiler
         jma
         opencc
         dl
-        parquet.a
-        arrow.a
-        thrift.a
-        thriftnb.a
-        lz4.a
-        event.a
-        snappy.a
+        thrift::thrift
+        # thriftnb::thriftnb
+        libevent::core
+        oatpp::oatpp
+        Parquet::parquet_static
+        Arrow::arrow_static
         ${JEMALLOC_STATIC_LIB}
         miniocpp.a
-        re2.a
-        pcre2-8-static
-        pugixml-static
+        pugixml::static
         curlpp_static
-        inih.a
+        unofficial::inih::libinih
+        unofficial::inih::inireader
         libcurl_static
-        ssl.a
-        crypto.a
-        rocksdb.a
+        OpenSSL::SSL
+        OpenSSL::Crypto
+        re2::re2
+        absl::any absl::log absl::base absl::bits
+        PCRE2::8BIT
+        RocksDB::rocksdb
         ${STDCXX15EXP_STATIC}
 )
 
 target_link_directories(infinity_benchmark PUBLIC "${CMAKE_BINARY_DIR}/lib")
-target_link_directories(infinity_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/arrow/")
-target_link_directories(infinity_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/snappy/")
 target_link_directories(infinity_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/minio-cpp/")
-target_link_directories(infinity_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/pugixml/")
 target_link_directories(infinity_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/curlpp/")
 target_link_directories(infinity_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/curl/")
-target_link_directories(infinity_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/re2/")
-target_link_directories(infinity_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/pcre2/")
 target_link_directories(infinity_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/")
-target_link_directories(infinity_benchmark PUBLIC "/usr/local/openssl30/lib64")
 
 # ########################################
 # knn
@@ -56,11 +49,10 @@ target_link_directories(infinity_benchmark PUBLIC "/usr/local/openssl30/lib64")
 add_executable(knn_import_benchmark
         ./knn/knn_import_benchmark.cpp
 )
-add_dependencies(knn_import_benchmark miniocpp inih)
+add_dependencies(knn_import_benchmark miniocpp)
 
 target_include_directories(knn_import_benchmark PUBLIC "${CMAKE_SOURCE_DIR}/src")
-target_link_libraries(
-        knn_import_benchmark
+target_link_libraries(knn_import_benchmark
         infinity_core
         benchmark_profiler
         sql_parser
@@ -71,50 +63,47 @@ target_link_libraries(
         jma
         opencc
         dl
-        lz4.a
-        event.a
-        #        profiler
-        parquet.a
-        arrow.a
-        thrift.a
-        thriftnb.a
-        snappy.a
+        thrift::thrift
+        # thriftnb::thriftnb
+        libevent::core
+        oatpp::oatpp
+        Parquet::parquet_static
+        Arrow::arrow_static
         ${JEMALLOC_STATIC_LIB}
         miniocpp.a
-        re2.a
-        pcre2-8-static
-        pugixml-static
+        pugixml::static
         curlpp_static
-        inih.a
+        unofficial::inih::libinih
+        unofficial::inih::inireader
         libcurl_static
-        ssl.a
-        crypto.a
-        rocksdb.a
+        OpenSSL::SSL
+        OpenSSL::Crypto
+        re2::re2
+        absl::any absl::log absl::base absl::bits
+        PCRE2::8BIT
+        RocksDB::rocksdb
+        simdjson::simdjson
+        nlohmann_json::nlohmann_json
+        CLI11::CLI11
+        magic_enum::magic_enum
+        roaring::roaring
         ${STDCXX15EXP_STATIC}
 )
 
 target_link_directories(knn_import_benchmark PUBLIC "${CMAKE_BINARY_DIR}/lib")
-target_link_directories(knn_import_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/arrow/")
-target_link_directories(knn_import_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/snappy/")
 target_link_directories(knn_import_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/minio-cpp/")
-target_link_directories(knn_import_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/pugixml/")
 target_link_directories(knn_import_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/curlpp/")
 target_link_directories(knn_import_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/curl/")
-target_link_directories(knn_import_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/re2/")
-target_link_directories(knn_import_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/pcre2/")
 target_link_directories(knn_import_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/")
-target_link_directories(knn_import_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/rocksdb/")
-target_link_directories(knn_import_benchmark PUBLIC "/usr/local/openssl30/lib64")
 
 # query benchmark
 add_executable(knn_query_benchmark
         ./knn/knn_query_benchmark.cpp
 )
-add_dependencies(knn_query_benchmark miniocpp inih)
+add_dependencies(knn_query_benchmark miniocpp)
 
 target_include_directories(knn_query_benchmark PUBLIC "${CMAKE_SOURCE_DIR}/src")
-target_link_libraries(
-        knn_query_benchmark
+target_link_libraries(knn_query_benchmark
         infinity_core
         benchmark_profiler
         sql_parser
@@ -125,38 +114,37 @@ target_link_libraries(
         jma
         opencc
         dl
-        lz4.a
-        parquet.a
-        arrow.a
-        thrift.a
-        thriftnb.a
-        snappy.a
+        Parquet::parquet_static
+        Arrow::arrow_static
+        thrift::thrift
+        # thriftnb::thriftnb
+        libevent::core
+        oatpp::oatpp
         ${JEMALLOC_STATIC_LIB}
-        miniocpp.a
-        re2.a
-        pcre2-8-static
-        pugixml-static
+        pugixml::static
         curlpp_static
-        inih.a
+        unofficial::inih::libinih
+        unofficial::inih::inireader
         libcurl_static
-        ssl.a
-        crypto.a
-        rocksdb.a
+        OpenSSL::SSL
+        OpenSSL::Crypto
+        re2::re2
+        absl::any absl::log absl::base absl::bits
+        PCRE2::8BIT
+        RocksDB::rocksdb
+        simdjson::simdjson
+        nlohmann_json::nlohmann_json
+        CLI11::CLI11
+        magic_enum::magic_enum
+        roaring::roaring
         ${STDCXX15EXP_STATIC}
 )
 
 target_link_directories(knn_query_benchmark PUBLIC "${CMAKE_BINARY_DIR}/lib")
-target_link_directories(knn_query_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/arrow/")
-target_link_directories(knn_query_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/snappy/")
 target_link_directories(knn_query_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/minio-cpp/")
-target_link_directories(knn_query_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/pugixml/")
 target_link_directories(knn_query_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/curlpp/")
 target_link_directories(knn_query_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/curl/")
-target_link_directories(knn_query_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/re2/")
-target_link_directories(knn_query_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/pcre2/")
 target_link_directories(knn_query_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/")
-target_link_directories(knn_query_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/rocksdb/")
-target_link_directories(knn_query_benchmark PUBLIC "/usr/local/openssl30/lib64")
 
 # ########################################
 # fulltext
@@ -166,8 +154,7 @@ add_executable(fulltext_benchmark
 )
 
 target_include_directories(fulltext_benchmark PUBLIC "${CMAKE_SOURCE_DIR}/src")
-target_link_libraries(
-        fulltext_benchmark
+target_link_libraries(fulltext_benchmark
         infinity_core
         benchmark_profiler
         sql_parser
@@ -178,38 +165,38 @@ target_link_libraries(
         jma
         opencc
         dl
-        lz4.a
-        parquet.a
-        arrow.a
-        thrift.a
-        thriftnb.a
-        snappy.a
+        thrift::thrift
+        # thriftnb::thriftnb
+        libevent::core
+        oatpp::oatpp
+        Parquet::parquet_static
+        Arrow::arrow_static
         ${JEMALLOC_STATIC_LIB}
         miniocpp.a
-        re2.a
-        pcre2-8-static
-        pugixml-static
+        pugixml::static
         curlpp_static
-        inih.a
+        unofficial::inih::libinih
+        unofficial::inih::inireader
         libcurl_static
-        ssl.a
-        crypto.a
-        rocksdb.a
+        OpenSSL::SSL
+        OpenSSL::Crypto
+        re2::re2
+        absl::any absl::log absl::base absl::bits
+        PCRE2::8BIT
+        RocksDB::rocksdb
+        simdjson::simdjson
+        nlohmann_json::nlohmann_json
+        CLI11::CLI11
+        magic_enum::magic_enum
+        roaring::roaring
         ${STDCXX15EXP_STATIC}
 )
 
 target_link_directories(fulltext_benchmark PUBLIC "${CMAKE_BINARY_DIR}/lib")
-target_link_directories(fulltext_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/arrow/")
-target_link_directories(fulltext_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/snappy/")
 target_link_directories(fulltext_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/minio-cpp/")
-target_link_directories(fulltext_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/pugixml/")
 target_link_directories(fulltext_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/curlpp/")
 target_link_directories(fulltext_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/curl/")
-target_link_directories(fulltext_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/re2/")
-target_link_directories(fulltext_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/pcre2/")
 target_link_directories(fulltext_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/")
-target_link_directories(fulltext_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/rocksdb/")
-target_link_directories(fulltext_benchmark PUBLIC "/usr/local/openssl30/lib64")
 
 # ########################################
 add_executable(sparse_benchmark
@@ -217,8 +204,7 @@ add_executable(sparse_benchmark
 )
 
 target_include_directories(sparse_benchmark PUBLIC "${CMAKE_SOURCE_DIR}/src")
-target_link_libraries(
-        sparse_benchmark
+target_link_libraries(sparse_benchmark
         infinity_core
         benchmark_profiler
         sql_parser
@@ -229,46 +215,41 @@ target_link_libraries(
         jma
         opencc
         dl
-        lz4.a
-        parquet.a
-        arrow.a
-        thrift.a
-        thriftnb.a
-        snappy.a
+        Parquet::parquet_static
+        Arrow::arrow_static
         ${JEMALLOC_STATIC_LIB}
         miniocpp.a
-        re2.a
-        pcre2-8-static
-        pugixml-static
+        pugixml::static
         curlpp_static
-        inih.a
+        unofficial::inih::libinih
+        unofficial::inih::inireader
         libcurl_static
-        ssl.a
-        crypto.a
-        rocksdb.a
+        OpenSSL::SSL
+        OpenSSL::Crypto
+        re2::re2
+        absl::any absl::log absl::base absl::bits
+        PCRE2::8BIT
+        RocksDB::rocksdb
+        simdjson::simdjson
+        nlohmann_json::nlohmann_json
+        CLI11::CLI11
+        magic_enum::magic_enum
+        roaring::roaring
         ${STDCXX15EXP_STATIC}
 )
 
 target_link_directories(sparse_benchmark PUBLIC "${CMAKE_BINARY_DIR}/lib")
-target_link_directories(sparse_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/arrow/")
-target_link_directories(sparse_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/snappy/")
 target_link_directories(sparse_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/minio-cpp/")
-target_link_directories(sparse_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/pugixml/")
 target_link_directories(sparse_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/curlpp/")
 target_link_directories(sparse_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/curl/")
-target_link_directories(sparse_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/re2/")
-target_link_directories(sparse_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/pcre2/")
 target_link_directories(sparse_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/")
-target_link_directories(sparse_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/rocksdb/")
-target_link_directories(sparse_benchmark PUBLIC "/usr/local/openssl30/lib64")
 
 add_executable(bmp_benchmark
         ./sparse/bmp_benchmark.cpp
 )
 
 target_include_directories(bmp_benchmark PUBLIC "${CMAKE_SOURCE_DIR}/src")
-target_link_libraries(
-        bmp_benchmark
+target_link_libraries(bmp_benchmark
         infinity_core
         benchmark_profiler
         sql_parser
@@ -279,46 +260,45 @@ target_link_libraries(
         jma
         opencc
         dl
-        lz4.a
-        parquet.a
-        arrow.a
-        thrift.a
-        thriftnb.a
-        snappy.a
+        thrift::thrift
+        # thriftnb::thriftnb
+        libevent::core
+        oatpp::oatpp
+        Parquet::parquet_static
+        Arrow::arrow_static
         ${JEMALLOC_STATIC_LIB}
         miniocpp.a
-        re2.a
-        pcre2-8-static
-        pugixml-static
+        pugixml::static
         curlpp_static
-        inih.a
+        unofficial::inih::libinih
+        unofficial::inih::inireader
         libcurl_static
-        ssl.a
-        crypto.a
-        rocksdb.a
+        OpenSSL::SSL
+        OpenSSL::Crypto
+        re2::re2
+        absl::any absl::log absl::base absl::bits
+        PCRE2::8BIT
+        RocksDB::rocksdb
+        simdjson::simdjson
+        nlohmann_json::nlohmann_json
+        CLI11::CLI11
+        magic_enum::magic_enum
+        roaring::roaring
         ${STDCXX15EXP_STATIC}
 )
 
 target_link_directories(bmp_benchmark PUBLIC "${CMAKE_BINARY_DIR}/lib")
-target_link_directories(bmp_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/arrow/")
-target_link_directories(bmp_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/snappy/")
 target_link_directories(bmp_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/minio-cpp/")
-target_link_directories(bmp_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/pugixml/")
 target_link_directories(bmp_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/curlpp/")
 target_link_directories(bmp_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/curl/")
-target_link_directories(bmp_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/re2/")
-target_link_directories(bmp_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/pcre2/")
 target_link_directories(bmp_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/")
-target_link_directories(bmp_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/rocksdb/")
-target_link_directories(bmp_benchmark PUBLIC "/usr/local/openssl30/lib64")
 
 add_executable(hnsw_benchmark
         ./knn/hnsw_benchmark.cpp
 )
 
 target_include_directories(hnsw_benchmark PUBLIC "${CMAKE_SOURCE_DIR}/src")
-target_link_libraries(
-        hnsw_benchmark
+target_link_libraries(hnsw_benchmark
         infinity_core
         benchmark_profiler
         sql_parser
@@ -329,38 +309,38 @@ target_link_libraries(
         jma
         opencc
         dl
-        lz4.a
-        parquet.a
-        arrow.a
-        thrift.a
-        thriftnb.a
-        snappy.a
+        Parquet::parquet_static
+        Arrow::arrow_static
+        thrift::thrift
+        # thriftnb::thriftnb
+        libevent::core
+        oatpp::oatpp
         ${JEMALLOC_STATIC_LIB}
         miniocpp.a
-        re2.a
-        pcre2-8-static
-        pugixml-static
+        pugixml::static
         curlpp_static
-        inih.a
+        unofficial::inih::libinih
+        unofficial::inih::inireader
         libcurl_static
-        ssl.a
-        crypto.a
-        rocksdb.a
+        OpenSSL::SSL
+        OpenSSL::Crypto
+        re2::re2
+        absl::any absl::log absl::base absl::bits
+        PCRE2::8BIT
+        RocksDB::rocksdb
+        simdjson::simdjson
+        nlohmann_json::nlohmann_json
+        CLI11::CLI11
+        magic_enum::magic_enum
+        roaring::roaring
         ${STDCXX15EXP_STATIC}
 )
 
 target_link_directories(hnsw_benchmark PUBLIC "${CMAKE_BINARY_DIR}/lib")
-target_link_directories(hnsw_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/arrow/")
-target_link_directories(hnsw_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/snappy/")
 target_link_directories(hnsw_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/minio-cpp/")
-target_link_directories(hnsw_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/pugixml/")
 target_link_directories(hnsw_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/curlpp/")
 target_link_directories(hnsw_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/curl/")
-target_link_directories(hnsw_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/re2/")
-target_link_directories(hnsw_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/pcre2/")
 target_link_directories(hnsw_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/")
-target_link_directories(hnsw_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/rocksdb/")
-target_link_directories(hnsw_benchmark PUBLIC "/usr/local/openssl30/lib64")
 
 # add_definitions(-march=native)
 # add_definitions(-msse4.2 -mfma)

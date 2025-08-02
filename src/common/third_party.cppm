@@ -21,7 +21,7 @@ module;
 #pragma clang diagnostic ignored "-W#pragma-messages"
 #pragma clang diagnostic ignored "-Wpessimizing-move"
 
-#include "CLI11.hpp"
+#include "CLI/CLI.hpp"
 
 #include "spdlog/details/registry.h"
 #include "spdlog/fmt/fmt.h"
@@ -30,12 +30,12 @@ module;
 #include "spdlog/sinks/stdout_color_sinks.h"
 #include "spdlog/spdlog.h"
 
-#include "json.hpp"
+#include "nlohmann/json.hpp"
 #include "simdjson.h"
 
 #include "toml.hpp"
 
-#include "magic_enum.hpp"
+#include "magic_enum/magic_enum.hpp"
 
 #include "parallel_hashmap/phmap.h"
 #include "pgm/pgm_index.hpp"
@@ -71,7 +71,7 @@ module;
 #include "rocksdb/options.h"
 #include "rocksdb/slice.h"
 #include "rocksdb/utilities/backup_engine.h"
-#include "rocksdb/utilities/merge_operators.h"
+// #include "rocksdb/utilities/merge_operators.h"
 #include "rocksdb/utilities/transaction.h"
 #include "rocksdb/utilities/transaction_db.h"
 
@@ -250,13 +250,6 @@ export using ParquetReaderProperties = parquet::ReaderProperties;
 export using ParquetArrowReaderProperties = parquet::ArrowReaderProperties;
 } // namespace arrow
 
-namespace parquet {
-export ::arrow::Status
-OpenFile(std::shared_ptr<::arrow::RandomAccessFile> file, ::arrow::MemoryPool *pool, std::unique_ptr<parquet::arrow::FileReader> *reader) {
-    return parquet::arrow::OpenFile(file, pool, reader);
-}
-} // namespace parquet
-
 namespace infinity {
 
 // spdlog
@@ -374,7 +367,7 @@ using IOStatus = ::ROCKSDB_NAMESPACE::IOStatus;
 using Slice = ::ROCKSDB_NAMESPACE::Slice;
 using AssociativeMergeOperator = ::ROCKSDB_NAMESPACE::AssociativeMergeOperator;
 using MergeOperator = ::ROCKSDB_NAMESPACE::MergeOperator;
-using MergeOperators = ::ROCKSDB_NAMESPACE::MergeOperators;
+// using MergeOperators = ::ROCKSDB_NAMESPACE::MergeOperators;
 using Logger = ::ROCKSDB_NAMESPACE::Logger;
 } // namespace rocksdb
 

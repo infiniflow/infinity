@@ -14,7 +14,7 @@
 
 module;
 
-#include <boost/bind.hpp>
+#include <boost/bind/bind.hpp>
 #include <thread>
 
 module infinity_core:pg_server.impl;

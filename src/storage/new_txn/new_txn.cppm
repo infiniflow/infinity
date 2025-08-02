@@ -30,6 +30,8 @@ import :column_vector;
 
 namespace infinity {
 
+
+
 class KVInstance;
 class NewCatalog;
 class NewTxnManager;
