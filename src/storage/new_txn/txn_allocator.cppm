@@ -14,10 +14,10 @@
 
 module;
 
-export module txn_allocator;
+export module infinity_core:txn_allocator;
 
-import stl;
-import blocking_queue;
+import :stl;
+import :blocking_queue;
 
 namespace infinity {
 

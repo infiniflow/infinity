@@ -14,19 +14,19 @@
 
 module;
 
-export module bool_cast;
+export module infinity_core:bool_cast;
 
-import stl;
-import bound_cast_func;
-import column_vector_cast;
-import infinity_exception;
-import third_party;
-import column_vector;
+import :stl;
+import :bound_cast_func;
+import :column_vector_cast;
+import :infinity_exception;
+import :third_party;
+import :column_vector;
 import logical_type;
 import internal_types;
 import data_type;
-import logger;
-import status;
+import :logger;
+import :status;
 
 namespace infinity {
 

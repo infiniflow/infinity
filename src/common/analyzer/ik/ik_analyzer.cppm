@@ -2,17 +2,17 @@ module;
 
 #include <fstream>
 
-export module ik_analyzer;
+export module infinity_core:ik_analyzer;
 
-import stl;
-import analyze_context;
-import lexeme;
-import arbitrator;
-import segmenter;
-import analyzer;
-import term;
-import ik_dict;
-import status;
+import :stl;
+import :analyze_context;
+import :lexeme;
+import :arbitrator;
+import :segmenter;
+import :analyzer;
+import :term;
+import :ik_dict;
+import :status;
 
 namespace infinity {
 

@@ -14,13 +14,13 @@
 
 module;
 
-export module aggregate_binder;
+export module infinity_core:aggregate_binder;
 
-import stl;
+import :stl;
 
-import base_expression;
-import bind_context;
-import expression_binder;
+import :base_expression;
+import :bind_context;
+import :expression_binder;
 import parsed_expr;
 import knn_expr;
 

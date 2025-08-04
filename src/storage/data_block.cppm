@@ -14,17 +14,17 @@
 
 module;
 
-export module data_block;
+export module infinity_core:data_block;
 
-import stl;
-import default_values;
-import selection;
+import :stl;
+import :default_values;
+import :selection;
 import data_type;
-import column_vector;
-import value;
+import :column_vector;
+import :value;
 import internal_types;
-import infinity_exception;
-import logger;
+import :infinity_exception;
+import :logger;
 
 namespace infinity {
 
@@ -56,7 +56,7 @@ public:
 
     void UnInit();
 
-    [[nodiscard]] inline bool Initialized() const { return initialized; }
+    [[nodiscard]] bool Initialized() const { return initialized; }
 
     // Reset to just initialized state.
     void Reset();
@@ -93,20 +93,19 @@ public:
     void InsertVector(const SharedPtr<ColumnVector> &vector, SizeT index);
 
 public:
-    [[nodiscard]] inline SizeT column_count() const { return column_count_; }
+    [[nodiscard]] SizeT column_count() const { return column_count_; }
 
-    [[nodiscard]] inline u16 row_count() const {
+    [[nodiscard]] u16 row_count() const {
         if (!finalized) {
             if (row_count_ == 0) {
                 return 0;
             }
-            String error_message = "Not finalized data block";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Not finalized data block");
         }
         return row_count_;
     }
 
-    [[nodiscard]] inline Vector<SharedPtr<DataType>> types() const {
+    [[nodiscard]] Vector<SharedPtr<DataType>> types() const {
         Vector<SharedPtr<DataType>> types;
 
         types.reserve(column_count());
@@ -116,8 +115,8 @@ public:
         return types;
     }
 
-    [[nodiscard]] inline SizeT capacity() const { return capacity_; }
-    [[nodiscard]] inline SizeT available_capacity() const { return capacity_ - row_count_; }
+    [[nodiscard]] SizeT capacity() const { return capacity_; }
+    [[nodiscard]] SizeT available_capacity() const { return capacity_ - row_count_; }
 
     bool operator==(const DataBlock &other) const;
     bool operator!=(const DataBlock &other) const { return !(*this == other); }

@@ -14,11 +14,11 @@
 
 module;
 
-export module block_version;
+export module infinity_core:block_version;
 
-import stl;
-import local_file_handle;
-import status;
+import :stl;
+import :local_file_handle;
+import :status;
 
 namespace infinity {
 

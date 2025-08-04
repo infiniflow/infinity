@@ -14,18 +14,18 @@
 
 module;
 
-export module project_binder;
+export module infinity_core:project_binder;
 
-import stl;
+import :stl;
 
-import base_expression;
-import bind_context;
-import expression_binder;
-import query_context;
+import :base_expression;
+import :bind_context;
+import :expression_binder;
+// import :query_context;
 import parsed_expr;
 import function_expr;
 import column_expr;
-import bound_select_statement;
+import :bound_select_statement;
 
 namespace infinity {
 

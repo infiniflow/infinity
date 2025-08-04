@@ -2,11 +2,11 @@ module;
 
 #include <string>
 
-export module letter_segmenter;
+export module infinity_core:letter_segmenter;
 
-import stl;
-import segmenter;
-import analyze_context;
+import :stl;
+import :segmenter;
+import :analyze_context;
 
 namespace infinity {
 

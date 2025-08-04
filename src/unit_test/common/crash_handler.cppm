@@ -14,32 +14,33 @@
 
 module;
 
-#include <csignal>
-#include <cstdio>
-#include <cstdlib>
-#include <string>
-
+#ifdef CI
 export module crash_handler;
+
+import infinity_core;
+#else
+export module infinity_core:ut.crash_handler;
+#endif
 
 export namespace infinity {
 
 class CrashHandler {
 public:
     // Install crash handlers for the current test
-    static void InstallForTest(const char* test_name);
-    
+    static void InstallForTest(const char *test_name);
+
     // Remove crash handlers
     static void Uninstall();
-    
+
     // Enable/disable crash detection
     static void SetEnabled(bool enabled) { enabled_ = enabled; }
-    
+
 private:
     static void SignalHandler(int signal);
-    static void PrintCrashInfo(int signal, const char* test_name);
-    
+    static void PrintCrashInfo(int signal, const char *test_name);
+
     static bool enabled_;
-    static const char* current_test_name_;
+    static const char *current_test_name_;
     static void (*old_sigsegv_)(int);
     static void (*old_sigabrt_)(int);
     static void (*old_sigfpe_)(int);
@@ -47,20 +48,15 @@ private:
     static void (*old_sigbus_)(int);
 };
 
-// RAII wrapper for crash handler
 class CrashHandlerGuard {
 public:
-    explicit CrashHandlerGuard(const char* test_name=nullptr) {
-        CrashHandler::InstallForTest(test_name);
-    }
-    
-    ~CrashHandlerGuard() {
-        CrashHandler::Uninstall();
-    }
-    
+    explicit CrashHandlerGuard(const char *test_name = nullptr) { CrashHandler::InstallForTest(test_name); }
+
+    ~CrashHandlerGuard() { CrashHandler::Uninstall(); }
+
     // Non-copyable
-    CrashHandlerGuard(const CrashHandlerGuard&) = delete;
-    CrashHandlerGuard& operator=(const CrashHandlerGuard&) = delete;
+    CrashHandlerGuard(const CrashHandlerGuard &) = delete;
+    CrashHandlerGuard &operator=(const CrashHandlerGuard &) = delete;
 };
 
 } // namespace infinity

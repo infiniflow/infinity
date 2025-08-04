@@ -7,6 +7,9 @@ CREATE TABLE cached_knn_scan(c1 INT, c2 EMBEDDING(FLOAT, 4));
 statement ok
 COPY cached_knn_scan FROM '/var/infinity/test_data/embedding_float_dim4.csv' WITH (DELIMITER ',', FORMAT CSV);
 
+statement ok
+SET CONFIG result_cache "on";
+
 query I
 EXPLAIN SELECT c1, Distance() FROM cached_knn_scan SEARCH MATCH VECTOR (c2, [0.3, 0.3, 0.2, 0.2], 'float', 'l2', 3);
 ----

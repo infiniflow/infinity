@@ -8,10 +8,10 @@ module;
 #include <sys/stat.h>
 #include <unistd.h>
 
-export module mmap;
+export module infinity_core:mmap;
 
-import stl;
-import infinity_exception;
+import :stl;
+import :infinity_exception;
 
 using namespace infinity;
 namespace fs = std::filesystem;

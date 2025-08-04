@@ -109,8 +109,36 @@ public:
     void Reset(bool in_constructor = false);
 
     [[nodiscard]] inline std::string ToString() const {
-        ParserError("ToString() isn't implemented");
-        return std::string();
+        // This is a simplified implementation for MixedType
+        // A full implementation would need to handle all the different value types
+        switch (type) {
+            case MixedValueType::kInteger: {
+                const auto *int_type = reinterpret_cast<const IntegerMixedType *>(this);
+                return std::to_string(int_type->value);
+            }
+            case MixedValueType::kFloat: {
+                const auto *float_type = reinterpret_cast<const FloatMixedType *>(this);
+                return std::to_string(float_type->value);
+            }
+            case MixedValueType::kShortStr: {
+                const auto *str_type = reinterpret_cast<const ShortStrMixedType *>(this);
+                return std::string(str_type->ptr, str_type->length);
+            }
+            case MixedValueType::kLongStr: {
+                const auto *str_type = reinterpret_cast<const LongStrMixedType *>(this);
+                return std::string(str_type->ptr, str_type->length);
+            }
+            case MixedValueType::kNull:
+                return "NULL";
+            case MixedValueType::kMissing:
+                return "MISSING";
+            case MixedValueType::kArray:
+                return "[ARRAY]";
+            case MixedValueType::kTuple:
+                return "(TUPLE)";
+            default:
+                return "UNKNOWN";
+        }
     }
 
 private:

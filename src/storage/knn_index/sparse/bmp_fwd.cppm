@@ -17,16 +17,16 @@ module;
 #include "common/simd/simd_common_intrin_include.h"
 #include <vector>
 
-export module bmp_fwd;
+export module infinity_core:bmp_fwd;
 
-import stl;
-import sparse_util;
-import local_file_handle;
-import bmp_util;
-import knn_result_handler;
+import :stl;
+import :sparse_util;
+import :local_file_handle;
+import :bmp_util;
+import :knn_result_handler;
 import serialize;
-import infinity_exception;
-import third_party;
+import :infinity_exception;
+import :third_party;
 
 namespace infinity {
 

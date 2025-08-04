@@ -16,22 +16,22 @@ module;
 
 #include <compare>
 
-export module physical_top;
+export module infinity_core:physical_top;
 
-import stl;
+import :stl;
 
-import query_context;
-import operator_state;
-import physical_operator;
-import physical_operator_type;
-import base_expression;
-import expression_state;
-import data_table;
-import data_block;
-import column_vector;
-import load_meta;
-import infinity_exception;
-import physical_limit;
+import :query_context;
+import :operator_state;
+import :physical_operator;
+import :physical_operator_type;
+import :base_expression;
+import :expression_state;
+import :data_table;
+import :data_block;
+import :column_vector;
+import :load_meta;
+import :infinity_exception;
+import :physical_limit;
 import internal_types;
 import select_statement;
 import data_type;

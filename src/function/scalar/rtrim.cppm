@@ -1,8 +1,8 @@
 module;
 
-export module rtrim;
+export module infinity_core:rtrim;
 
-import stl;
+import :stl;
 
 namespace infinity {
 

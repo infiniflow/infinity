@@ -14,14 +14,14 @@
 
 module;
 
-export module buffer_handle;
+export module infinity_core:buffer_handle;
 
-import stl;
-import third_party;
+import :stl;
+import :third_party;
 
 namespace infinity {
 
-class BufferObj;
+export class BufferObj;
 class FileWorker;
 
 export class BufferHandle {

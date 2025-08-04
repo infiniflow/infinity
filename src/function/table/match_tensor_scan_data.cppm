@@ -14,17 +14,17 @@
 
 module;
 
-export module match_tensor_scan_function_data;
+export module infinity_core:match_tensor_scan_function_data;
 
-import stl;
-import function_data;
-import table_function;
-import global_block_id;
+import :stl;
+import :function_data;
+import :table_function;
+import :global_block_id;
 import internal_types;
-import knn_result_handler;
-import infinity_exception;
-import logger;
-import merge_knn;
+import :knn_result_handler;
+import :infinity_exception;
+import :logger;
+import :merge_knn;
 
 namespace infinity {
 

@@ -14,13 +14,13 @@
 
 module;
 
-export module snapshot_info;
+export module infinity_core:snapshot_info;
 
-import stl;
-import status;
+import :stl;
+import :status;
 import command_statement;
-import index_base;
-import third_party;
+import :index_base;
+import :third_party;
 import column_def;
 import chunk_index_meta;
 

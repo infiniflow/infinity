@@ -1,8 +1,8 @@
 module;
 
-import stl;
+export module infinity_core:byte_slice;
 
-export module byte_slice;
+import :stl;
 
 namespace infinity {
 

@@ -16,16 +16,19 @@ module;
 
 #include "gtest/gtest.h"
 
+#ifdef CI
 export module request_test;
 
+import infinity_core;
 import base_test;
-import stl;
-import infinity_context;
-import session;
-import session_manager;
-import query_context;
-import query_result;
-import data_table;
+#else
+export module infinity_core:ut.request_test;
+
+import :ut.base_test;
+import :query_context;
+import :data_table;
+import :session_manager;
+#endif
 
 using namespace infinity;
 

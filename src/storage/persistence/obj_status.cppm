@@ -14,11 +14,11 @@
 
 module;
 
-export module obj_status;
+export module infinity_core:obj_status;
 
-import stl;
-import third_party;
-import status;
+import :stl;
+import :third_party;
+import :status;
 
 namespace infinity {
 

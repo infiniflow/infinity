@@ -14,11 +14,10 @@
 
 module;
 
-export module file_worker_type;
+export module infinity_core:file_worker_type;
 
-import stl;
-import infinity_exception;
-import logger;
+import :stl;
+import :infinity_exception;
 
 namespace infinity {
 

@@ -14,9 +14,9 @@
 
 module;
 
-export module greater;
+export module infinity_core:greater;
 
-import stl;
+import :stl;
 
 namespace infinity {
 

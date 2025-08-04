@@ -13,21 +13,21 @@
 // limitations under the License.
 module;
 
-export module new_txn;
+export module infinity_core:new_txn;
 
-import stl;
+import :stl;
 import statement_common;
-import txn_state;
-import new_txn_store;
-import database_detail;
-import status;
+import :txn_state;
+import :new_txn_store;
+import :database_detail;
+import :status;
 import extra_ddl_info;
 import internal_types;
-import value;
-import snapshot_info;
+import :value;
+import :snapshot_info;
 import column_def;
-import column_vector;
-import fast_rough_filter;
+import :column_vector;
+import :fast_rough_filter;
 
 
 namespace infinity {
