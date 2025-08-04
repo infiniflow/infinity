@@ -1,5 +1,7 @@
 # NOTICE: This Dockerfile depends on BuildKit
-# NOTICE: You can use the download_deps_infinity_builder_ubuntu18.sh script to download dependencies.
+# NOTICE: You must run download_deps_infinity_builder_ubuntu20.sh script BEFORE building this image
+# NOTICE: The script downloads all dependencies including vcpkg packages to avoid network issues during build
+# NOTICE: Use build_infinity_builder_ubuntu20.sh for automated build process
 
 FROM ubuntu:20.04
 
@@ -195,16 +197,13 @@ RUN --mount=type=cache,id=inf_apt,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,id=inf_lib,target=/var/lib/apt,sharing=locked \
     apt-get install -y zip rpm
 
-RUN git clone https://github.com/microsoft/vcpkg.git /root/vcpkg \
-    && cd /root/vcpkg \
-    && ./bootstrap-vcpkg.sh --disableMetrics
+# Copy pre-downloaded vcpkg and dependencies
+COPY vcpkg /root/vcpkg
 
 ENV VCPKG_ROOT=/root/vcpkg \
     PATH=/root/vcpkg:${PATH}
 
-RUN --mount=type=bind,source=vcpkg.json,target=/root/vcpkg.json \
-    cd /root && vcpkg install --only-downloads
-
+# Install vcpkg dependencies from pre-downloaded cache
 RUN --mount=type=bind,source=vcpkg.json,target=/root/vcpkg.json \
     cd /root && vcpkg install --clean-buildtrees-after-build --clean-packages-after-build
 
