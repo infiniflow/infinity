@@ -26,10 +26,10 @@
 #define ARROW_FULL_SO_VERSION "1800.0.0"
 
 #define ARROW_CXX_COMPILER_ID "Clang"
-#define ARROW_CXX_COMPILER_VERSION "18.1.8"
-#define ARROW_CXX_COMPILER_FLAGS "  -O0 -g -fno-stack-protector -fno-var-tracking  -Wall -Werror -Wno-asm-operand-widths -Wno-unused-command-line-argument -Wno-deprecated-declarations -Wextra -Wno-unused-parameter -Wno-unused-private-field -pthread -fcolor-diagnostics -fPIC -Qunused-arguments -fcolor-diagnostics  -Wall -Wextra -Wdocumentation -DARROW_WARN_DOCUMENTATION -Wshorten-64-to-32 -Wno-missing-braces -Wno-unused-parameter -Wno-constant-logical-operand -Wno-return-stack-address -Wdate-time -Wno-unknown-warning-option -Wno-pass-failed -msse4.2  -Wall -Wextra -Wno-unused-parameter -Wno-unused-private-field"
+#define ARROW_CXX_COMPILER_VERSION "18.1.6"
+#define ARROW_CXX_COMPILER_FLAGS "  -Qunused-arguments -fcolor-diagnostics  -Wall -Wno-unknown-warning-option -Wno-pass-failed -msse4.2  -Wall -Wextra -Wno-unused-parameter -Wno-unused-private-field"
 
-#define ARROW_BUILD_TYPE "DEBUG"
+#define ARROW_BUILD_TYPE "RELEASE"
 
 #define ARROW_PACKAGE_KIND ""
 
@@ -41,7 +41,7 @@
 /* #undef ARROW_FLIGHT */
 /* #undef ARROW_FLIGHT_SQL */
 #define ARROW_IPC
-/* #undef ARROW_JEMALLOC */
+#define ARROW_JEMALLOC
 /* #undef ARROW_JEMALLOC_VENDORED */
 /* #undef ARROW_JSON */
 /* #undef ARROW_MIMALLOC */
@@ -62,7 +62,7 @@
 /* #undef ARROW_WITH_MUSL */
 /* #undef ARROW_WITH_OPENTELEMETRY */
 #define ARROW_WITH_RE2
-#define ARROW_WITH_SNAPPY
+/* #undef ARROW_WITH_SNAPPY */
 /* #undef ARROW_WITH_UCX */
 #define ARROW_WITH_UTF8PROC
 /* #undef ARROW_WITH_ZLIB */
