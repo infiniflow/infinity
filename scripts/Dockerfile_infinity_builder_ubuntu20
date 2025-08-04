@@ -191,14 +191,15 @@ RUN --mount=type=bind,source=ragel-master.zip,target=/root/ragel-master.zip  \
     && make -j 12 install \
     && rm -rf ../ragel-master
 
+RUN --mount=type=cache,id=inf_apt,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,id=inf_lib,target=/var/lib/apt,sharing=locked \
+    apt-get install -y zip rpm
+
 RUN git clone https://github.com/microsoft/vcpkg.git /root/vcpkg \
- && cd /root/vcpkg \
- && ./bootstrap-vcpkg.sh        \
-      --disableMetrics         \
-      --clean-after-build      \
-      --jobs=12                \
- && rm -rf /root/vcpkg/.git     \
- && mv /root/vcpkg /opt/vcpkg
+    && cd /root/vcpkg \
+    && ./bootstrap-vcpkg.sh --disableMetrics \
+    && rm -rf /root/vcpkg/.git     \
+    && mv /root/vcpkg /opt/vcpkg
 
 ENV VCPKG_ROOT=/opt/vcpkg \
     PATH=${VCPKG_ROOT}:${PATH}
