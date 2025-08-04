@@ -429,8 +429,8 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(MessageSinkState *message_
             break;
         }
         case PhysicalOperatorType::kCompact: {
-            // auto *compact_output_state = static_cast<CompactOperatorState *>(task_operator_state);
-            message_sink_state->message_ = MakeUnique<String>("Tmp for test");
+            auto *compact_output_state = static_cast<CompactOperatorState *>(task_operator_state);
+            message_sink_state->message_ = std::move(compact_output_state->result_msg_);
             break;
         }
         default: {

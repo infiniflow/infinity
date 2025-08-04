@@ -421,7 +421,8 @@ void Connection::SendQueryResponse(const QueryResult &query_result) {
             break;
         }
         case LogicalNodeType::kImport:
-        case LogicalNodeType::kExport: {
+        case LogicalNodeType::kExport:
+        case LogicalNodeType::kCompact: {
             message = *query_result.result_table_->result_msg();
             break;
         }
