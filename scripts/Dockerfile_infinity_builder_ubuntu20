@@ -206,7 +206,7 @@ RUN --mount=type=bind,source=vcpkg.json,target=/root/vcpkg.json \
     cd /root && vcpkg install --only-downloads
 
 RUN --mount=type=bind,source=vcpkg.json,target=/root/vcpkg.json \
-    cd /root && vcpkg install
+    cd /root && vcpkg install --clean-buildtrees-after-build --clean-packages-after-build
 
 ENV CC=clang \
     CXX=clang++ \
