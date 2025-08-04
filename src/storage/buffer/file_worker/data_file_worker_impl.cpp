@@ -14,6 +14,8 @@
 
 module;
 
+#include <iomanip>
+#include <sstream>
 #include <tuple>
 
 module infinity_core:data_file_worker.impl;
@@ -91,6 +93,21 @@ bool DataFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_success, const
     if (!status.ok()) {
         RecoverableError(status);
     }
+
+    // Record data_[:min(512,data_size)] to log
+    std::ostringstream hex_stream;
+    hex_stream << std::hex << std::setfill('0');
+    SizeT log_size = std::min(data_size, static_cast<SizeT>(512));
+    for (SizeT i = 0; i < log_size; ++i) {
+        hex_stream << std::setw(2) << static_cast<unsigned int>(static_cast<const u8 *>(data_)[i]);
+        if ((i + 1) % 8 == 0 && i + 1 < log_size) { // insert a space every 8 bytes
+            hex_stream << " ";
+        }
+    }
+    if (data_size > log_size) {
+        hex_stream << "... (truncated)";
+    }
+    LOG_TRACE(fmt::format("DataFileWorker::WriteToFileImpl data: data_={:p}, size={}, hex={}", data_, data_size, hex_stream.str()));
 
     SizeT unused_size = buffer_size_ - data_size;
     if (unused_size > 0) {

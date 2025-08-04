@@ -39,10 +39,9 @@ std::string IntervalType::ToString() const {
             return fmt::format("{} SECOND", value);
         }
         default: {
+            return fmt::format("{} INVALID", value);
         }
     }
-    ParserError("ToString() isn't implemented");
-    return std::string();
 }
 
 } // namespace infinity

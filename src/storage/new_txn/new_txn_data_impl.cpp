@@ -957,7 +957,7 @@ Status NewTxn::AppendInBlock(BlockMeta &block_meta, SizeT block_offset, SizeT ap
     {
         std::unique_lock<std::shared_mutex> lock(block_lock->mtx_);
 
-        block_lock->min_ts_ = std::max(block_lock->min_ts_, commit_ts);
+        block_lock->min_ts_ = std::min(block_lock->min_ts_, commit_ts);
         block_lock->max_ts_ = std::max(block_lock->max_ts_, commit_ts);
 
         // append in column file
@@ -1261,6 +1261,7 @@ Status NewTxn::AddColumnsDataInBlock(BlockMeta &block_meta, const Vector<SharedP
         }
         old_column_cnt = all_column_defs->size() - column_defs.size();
     }
+    LOG_TRACE("NewTxn::AddColumnsDataInBlock begin");
     for (SizeT i = 0; i < column_defs.size(); ++i) {
         SizeT column_idx = old_column_cnt + i;
         // const SharedPtr<ColumnDef> &column_def = column_defs[column_idx];
@@ -1281,6 +1282,37 @@ Status NewTxn::AddColumnsDataInBlock(BlockMeta &block_meta, const Vector<SharedP
         for (SizeT j = 0; j < block_row_count; ++j) {
             column_vector.AppendValue(default_value);
         }
+
+        BufferObj *buffer_obj = nullptr;
+        BufferObj *outline_buffer_obj = nullptr;
+        Status status = column_meta->GetColumnBuffer(buffer_obj, outline_buffer_obj);
+        if (!status.ok()) {
+            return status;
+        }
+
+        auto [data_size, status2] = column_meta->GetColumnSize(column_vector.Size());
+        if (!status2.ok()) {
+            return status;
+        }
+        buffer_obj->SetDataSize(data_size);
+
+        if (VarBufferManager *var_buffer_mgr = column_vector.buffer_->var_buffer_mgr(); var_buffer_mgr != nullptr) {
+            //     Ensure buffer obj is loaded.
+            SizeT _ = var_buffer_mgr->TotalSize();
+            //     Status status = column_meta.SetChunkOffset(chunk_size);
+            //     if (!status.ok()) {
+            //         return status;
+            //     }
+        }
+        LOG_TRACE(
+            fmt::format("NewTxn::AddColumnsDataInBlock: column name {}, column id {}, column_idx {}, default value {}, segment {}, block {}, rows {}",
+                        column_defs[i]->name(),
+                        column_defs[i]->id(),
+                        column_idx,
+                        default_value.ToString(),
+                        block_meta.segment_meta().segment_id(),
+                        block_meta.block_id(),
+                        block_row_count));
     }
 
     SharedPtr<BlockLock> block_lock;
@@ -1420,7 +1452,6 @@ Status NewTxn::CheckpointTable(TableMeeta &table_meta, const CheckpointOption &o
                     LOG_INFO(fmt::format("Block {} to mmap, checkpoint ts: {}", block_meta.block_id(), option.checkpoint_ts_));
                 }
             }
-
             LOG_TRACE(fmt::format("NewTxn::CheckpointTable segment_id {}, block_id {}, flush_column {}, flush_version {}, option.checkpoint_ts_ {}, "
                                   "block min_ts {}, block "
                                   "max_ts {}, block checkpoint_ts {}",
@@ -1542,6 +1573,7 @@ Status NewTxn::CommitBottomAppend(WalCmdAppendV2 *append_cmd) {
         }
     }
 
+    LOG_DEBUG("NewTxn::CommitBottomAppend begin");
     for (const Pair<RowID, u64> &range : append_ranges) {
         SegmentID segment_id = range.first.segment_id_;
         BlockID block_id = range.first.segment_offset_ >> BLOCK_OFFSET_SHIFT;
@@ -1899,6 +1931,7 @@ Status NewTxn::FlushColumnFiles(BlockMeta &block_meta, TxnTimeStamp save_ts) {
     if (!status.ok()) {
         return status;
     }
+    LOG_TRACE("NewTxn::FlushColumnFiles begin");
     for (SizeT column_idx = 0; column_idx < column_defs->size(); ++column_idx) {
         ColumnMeta column_meta(column_idx, block_meta);
         BufferObj *buffer_obj = nullptr;
@@ -1913,6 +1946,7 @@ Status NewTxn::FlushColumnFiles(BlockMeta &block_meta, TxnTimeStamp save_ts) {
             outline_buffer_obj->Save();
         }
     }
+    LOG_TRACE("NewTxn::FlushColumnFiles end");
     return Status::OK();
 }
 

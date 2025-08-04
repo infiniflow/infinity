@@ -32,8 +32,9 @@ struct TimestampTZType {
     }
 
     [[nodiscard]] inline std::string ToString() const {
-        ParserError("ToString() isn't implemented");
-        return std::string();
+        // Convert timestamp with timezone to readable format
+        // This is a simplified implementation
+        return std::to_string(date) + " " + std::to_string(time) + " TZ";
     }
 
     int32_t date{};
