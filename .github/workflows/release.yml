@@ -78,7 +78,7 @@ jobs:
 
     - name: Build release version
       run: |
-        sudo docker exec ${BUILDER_CONTAINER} bash -c "git config --global safe.directory \"*\" && cd /infinity && rm -fr cmake-build-reldeb && mkdir -p cmake-build-reldeb && cmake -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCPACK_PACKAGE_VERSION=${{ env.RELEASE_TAG }} -DCPACK_DEBIAN_PACKAGE_ARCHITECTURE=amd64 -DCMAKE_JOB_POOLS:STRING='link=1' -DCMAKE_TOOLCHAIN_FILE=${VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake -DCI=ON -S /infinity -B /infinity/cmake-build-reldeb && cmake --build /infinity/cmake-build-reldeb --target infinity"
+        sudo docker exec ${BUILDER_CONTAINER} bash -c "git config --global safe.directory \"*\" && cd /infinity && rm -fr cmake-build-reldeb && mkdir -p cmake-build-reldeb && cmake -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCPACK_PACKAGE_VERSION=${{ env.RELEASE_TAG }} -DCPACK_DEBIAN_PACKAGE_ARCHITECTURE=amd64 -DCMAKE_JOB_POOLS:STRING='link=1' -DCI=ON -S /infinity -B /infinity/cmake-build-reldeb && cmake --build /infinity/cmake-build-reldeb --target infinity"
 
     - name: Build RPM and DEB
       run: sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/cmake-build-reldeb && cpack"

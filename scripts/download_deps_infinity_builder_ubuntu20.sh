@@ -1,5 +1,15 @@
 #!/usr/bin/env bash
 
+# This script should be run from the infinity project root directory
+# Usage: ./scripts/download_deps_infinity_builder_ubuntu20.sh
+
+# Check if we're in the correct directory
+if [ ! -d ".git" ] || [ ! -d "scripts" ]; then
+    echo "Error: This script must be run from the infinity project root directory"
+    echo "Usage: ./scripts/download_deps_infinity_builder_ubuntu20.sh"
+    exit 1
+fi
+
 download()
 {
     echo "download $@"
@@ -55,34 +65,6 @@ for ((i=0; i<${#names[@]}; i+=1)); do
     fi
 done
 
-# Download vcpkg dependencies
-echo "Setting up vcpkg and downloading dependencies..."
-
-# Clone vcpkg if not exists
-if [ ! -d "vcpkg" ]; then
-    git clone https://github.com/microsoft/vcpkg.git vcpkg
-fi
-
-cd vcpkg
-
-# Bootstrap vcpkg if not already done
-if [ ! -f "vcpkg" ]; then
-    ./bootstrap-vcpkg.sh --disableMetrics
-fi
-
-# Copy vcpkg.json to current directory for dependency resolution
-if [ -f "../vcpkg.json" ]; then
-    cp ../vcpkg.json .
-elif [ -f "../../vcpkg.json" ]; then
-    cp ../../vcpkg.json .
-else
-    echo "Error: vcpkg.json not found. Please ensure vcpkg.json is in the project root."
-    exit 1
-fi
-
-# Download all vcpkg dependencies without building
-echo "Downloading vcpkg dependencies..."
-./vcpkg install --only-downloads
-
-echo "vcpkg dependencies downloaded successfully."
-cd ..
+# Note: vcpkg dependencies are now handled directly in the Dockerfile
+# using binary cache mechanism for better performance and caching
+echo "vcpkg dependencies will be handled during Docker build with binary cache"

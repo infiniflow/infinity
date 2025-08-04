@@ -1,7 +1,5 @@
 # NOTICE: This Dockerfile depends on BuildKit
 # NOTICE: You must run download_deps_infinity_builder_ubuntu20.sh script BEFORE building this image
-# NOTICE: The script downloads all dependencies including vcpkg packages to avoid network issues during build
-# NOTICE: Use build_infinity_builder_ubuntu20.sh for automated build process
 
 FROM ubuntu:20.04
 
@@ -174,6 +172,20 @@ RUN --mount=type=bind,source=gperftools-2.15.tar.gz,target=/root/gperftools-2.15
 RUN --mount=type=bind,source=sqllogictest-bin-v0.28.2-x86_64-unknown-linux-musl.tar.gz,target=/root/sqllogictest-bin-v0.28.2-x86_64-unknown-linux-musl.tar.gz \
     cd /tmp && tar xzf /root/sqllogictest-bin-v0.28.2-x86_64-unknown-linux-musl.tar.gz && cp -rf sqllogictest /usr/local/bin && rm -fr /tmp/*
 
+# Install thrift 0.22.0
+RUN --mount=type=bind,source=thrift-0.22.0.tar.gz,target=/root/thrift-0.22.0.tar.gz  \
+    cd /root && tar xzf thrift-0.22.0.tar.gz \
+    && cd thrift-0.22.0/build && cmake -G Ninja .. && ninja thrift-compiler \
+    && cp compiler/cpp/bin/thrift /usr/local/bin/thrift \
+    && cd /root && rm -rf thrift-0.22.0
+
+# Install OpenSSL
+RUN --mount=type=bind,source=openssl-3.0.15.tar.gz,target=/root/openssl-3.0.15.tar.gz  \
+    cd /root && tar xzf openssl-3.0.15.tar.gz \
+    && cd openssl-3.0.15 && ./config --prefix=/usr/local/openssl30 --openssldir=/usr/local/openssl30 shared zlib \
+    && make -j && make install \
+    && ldconfig && cd /root && rm -rf openssl-3.0.15
+
 # Install colm
 RUN --mount=type=bind,source=colm-bd19b1ab7c0bcdba2772061bc38f6bca5cbba977.zip,target=/root/colm-bd19b1ab7c0bcdba2772061bc38f6bca5cbba977.zip  \
     cd /root && unzip colm-bd19b1ab7c0bcdba2772061bc38f6bca5cbba977.zip \
@@ -197,16 +209,22 @@ RUN --mount=type=cache,id=inf_apt,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,id=inf_lib,target=/var/lib/apt,sharing=locked \
     apt-get install -y zip rpm
 
-# Copy pre-downloaded vcpkg and dependencies
-COPY vcpkg /root/vcpkg
+# Setup vcpkg for manifest mode (no global VCPKG_ROOT)
+RUN git clone https://github.com/microsoft/vcpkg.git /opt/vcpkg \
+    && cd /opt/vcpkg \
+    && ./bootstrap-vcpkg.sh --disableMetrics
 
-ENV VCPKG_ROOT=/root/vcpkg \
-    PATH=/root/vcpkg:${PATH}
+# Pre-build vcpkg dependencies using manifest mode
+# This populates the binary cache for later use by infinity builds
+# Note: downloads will be re-downloaded at runtime if needed, but binary cache avoids recompilation
+RUN --mount=type=bind,source=vcpkg.json,target=/opt/vcpkg/vcpkg.json \
+    cd /opt/vcpkg && \
+    /opt/vcpkg/vcpkg install
 
-# Install vcpkg dependencies from pre-downloaded cache
-RUN --mount=type=bind,source=vcpkg.json,target=/root/vcpkg.json \
-    cd /root && vcpkg install --clean-buildtrees-after-build --clean-packages-after-build
+# Set vcpkg toolchain path for CMake
+ENV CMAKE_TOOLCHAIN_FILE=/opt/vcpkg/scripts/buildsystems/vcpkg.cmake
 
+# Set environment variables for infinity build
 ENV CC=clang \
     CXX=clang++ \
     LZ4_ROOT=/usr/local \
