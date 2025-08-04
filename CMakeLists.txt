@@ -2,6 +2,13 @@ cmake_minimum_required(VERSION 3.28.1)
 
 cmake_policy(SET CMP0167 OLD)
 
+# Auto-detect and set vcpkg toolchain if not already set
+if(NOT CMAKE_TOOLCHAIN_FILE AND DEFINED ENV{VCPKG_ROOT})
+    set(CMAKE_TOOLCHAIN_FILE "$ENV{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake"
+        CACHE STRING "Vcpkg toolchain file")
+    message(STATUS "Using vcpkg toolchain: ${CMAKE_TOOLCHAIN_FILE}")
+endif()
+
 project(infinity VERSION 0.6.0)
 
 if (NOT CMAKE_GENERATOR STREQUAL "Ninja")
@@ -133,7 +140,13 @@ find_package(Thrift CONFIG REQUIRED)
 find_package(unofficial-inih CONFIG REQUIRED)
 find_path(VIT_VIT_CTPL_INCLUDE_DIRS "ctpl_stl.h")
 
-set(VCPKG_ROOT "${CMAKE_SOURCE_DIR}/vcpkg_installed")
+# Use environment variable VCPKG_ROOT if available, otherwise fallback to local vcpkg_installed
+if(DEFINED ENV{VCPKG_ROOT})
+    set(VCPKG_ROOT "$ENV{VCPKG_ROOT}/packages")
+else()
+    set(VCPKG_ROOT "${CMAKE_SOURCE_DIR}/vcpkg_installed")
+endif()
+
 file(GLOB VCPKG_INCLUDE_DIRS
         "${VCPKG_ROOT}/*/include"
 )

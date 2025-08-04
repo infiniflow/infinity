@@ -26,6 +26,7 @@
     "simdjson",
     "sse2neon",
     "thrift",
+    "tomlplusplus",
     {
       "name": "vcpkg-cmake",
       "host": true
