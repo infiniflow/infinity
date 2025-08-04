@@ -20,11 +20,13 @@ import :stl;
 import :bg_task_type;
 import :blocking_queue;
 import :status;
+import :kv_store;
 
 namespace infinity {
 
 class NewTxn;
 class BGTask;
+class TableMeeta;
 
 class TestCommander {
 public:
@@ -72,6 +74,12 @@ private:
     void NewScanAndOptimize();
 
     void Process();
+
+    Vector<SegmentID> GetCompactableSegments(TableMeeta &table_meta,
+                                             KVInstance *kv_instance,
+                                             TxnTimeStamp begin_ts,
+                                             TxnTimeStamp commit_ts,
+                                             const Vector<SegmentID> &segment_ids);
 
 private:
     BlockingQueue<SharedPtr<BGTask>> task_queue_{"CompactionProcessor"};

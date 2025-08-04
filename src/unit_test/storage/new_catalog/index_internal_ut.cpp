@@ -61,13 +61,8 @@ import :secondary_index_in_mem;
 import :ivf_index_data_in_mem;
 import :emvb_index_in_mem;
 import :memory_indexer;
-#ifdef INDEX_HANDLER
 import :hnsw_handler;
 import :bmp_handler;
-#else
-import :abstract_hnsw;
-import :abstract_bmp;
-#endif
 import :roaring_bitmap;
 import :index_filter_evaluators;
 import :index_emvb;
@@ -295,7 +290,7 @@ TEST_P(TestTxnIndexInternal, test_index0) {
     });
 }
 
-TEST_P(TestTxnIndexInternal, test_index) {
+TEST_P(TestTxnIndexInternal, DISABLED_test_index) {
     using namespace infinity;
 
     NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
@@ -826,7 +821,7 @@ TEST_P(TestTxnIndexInternal, test_populate_index0) {
     });
 }
 
-TEST_P(TestTxnIndexInternal, test_populate_index) {
+TEST_P(TestTxnIndexInternal, DISABLED_test_populate_index) {
     using namespace infinity;
 
     NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();

@@ -22,11 +22,7 @@ module infinity_core:hnsw_lsg_builder.impl;
 import :hnsw_lsg_builder;
 
 import :stl;
-#ifdef INDEX_HANDLER
 import :hnsw_handler;
-#else
-import :abstract_hnsw;
-#endif
 import column_def;
 import :index_hnsw;
 import :index_ivf;

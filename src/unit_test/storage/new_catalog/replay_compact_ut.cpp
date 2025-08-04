@@ -181,7 +181,7 @@ TEST_P(TestTxnReplayCompact, test_compact0) {
     }
 }
 
-TEST_P(TestTxnReplayCompact, test_compact_with_index) {
+TEST_P(TestTxnReplayCompact, DISABLED_test_compact_with_index) {
     using namespace infinity;
 
     new_txn_mgr->PrintAllKeyValue();

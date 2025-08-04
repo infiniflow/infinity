@@ -106,11 +106,6 @@ struct NewTxnCompactState {
         Status status;
 
         if (block_meta_) {
-            // status = block_meta_->SetRowCnt(cur_block_row_cnt_);
-            // if (!status.ok()) {
-            //     return status;
-            // }
-            // segment_row_cnt_ += cur_block_row_cnt_;
             block_row_cnts_.push_back(cur_block_row_cnt_);
             segment_row_cnt_ += cur_block_row_cnt_;
             block_meta_.reset();
@@ -138,10 +133,6 @@ struct NewTxnCompactState {
 
     Status FinalizeBlock() {
         if (block_meta_) {
-            // Status status = block_meta_->SetRowCnt(cur_block_row_cnt_);
-            // if (!status.ok()) {
-            //     return status;
-            // }
             block_row_cnts_.push_back(cur_block_row_cnt_);
             segment_row_cnt_ += cur_block_row_cnt_;
             for (ColumnID i = 0; i < column_cnt_; ++i) {
@@ -176,7 +167,6 @@ struct NewTxnCompactState {
         if (!status.ok()) {
             return status;
         }
-        // status = new_segment_meta_->SetRowCnt(segment_row_cnt_);
         return status;
     }
 
@@ -325,17 +315,9 @@ Status NewTxn::Import(const String &db_name, const String &table_name, const Vec
             }
         }
 
-        // status = block_meta->SetRowCnt(row_cnt);
-        // if (!status.ok()) {
-        //     return status;
-        // }
         block_row_cnts[segment_idx].push_back(row_cnt);
         segment_row_cnts[segment_idx] += row_cnt;
     }
-    // status = segment_meta->SetRowCnt(segment_row_cnt);
-    // if (!status.ok()) {
-    //     return status;
-    // }
     Vector<WalSegmentInfo> segment_infos;
     segment_infos.reserve(segment_count);
     for (SizeT segment_idx = 0; segment_idx < segment_count; ++segment_idx) {

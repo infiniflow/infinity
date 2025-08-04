@@ -59,7 +59,7 @@ public:
         segment_layers_[layer].emplace_back(segment_id, segment_row_cnt);
     }
 
-    Vector<SegmentID> GetCompactiableSegments() override {
+    Vector<SegmentID> GetCompactableSegments() override {
         int cur_layer_n = segment_layers_.size();
         for (int layer = 0; layer < cur_layer_n; ++layer) {
             auto &segment_layer = segment_layers_[layer];

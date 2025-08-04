@@ -63,14 +63,14 @@ public:
 
     SizeT segment_capacity() const { return DEFAULT_SEGMENT_CAPACITY; }
 
-    Status SetFirstDeleteTS(KVInstance *kv_instance, TxnTimeStamp first_delete_ts);
-
     Status InitSet(KVInstance *kv_instance);
 
     Status UninitSet(UsageFlag usage_flag, KVInstance *kv_instance, TxnTimeStamp begin_ts);
 
     Pair<BlockID, Status> AddBlockID1(KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts);
     Status AddBlockWithID(KVInstance *kv_instance, TxnTimeStamp commit_ts, BlockID block_id);
+
+    Status SetFirstDeleteTS(KVInstance *kv_instance, TxnTimeStamp first_delete_ts);
 
     Status CommitBlock(KVInstance *kv_instance, BlockID block_id, TxnTimeStamp commit_ts);
 

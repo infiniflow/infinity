@@ -82,6 +82,7 @@ public:
     GetColumnIDByColumnName(KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts, const String &column_name);
     Tuple<String, Status>
     GetColumnKeyByColumnName(KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts, const String &column_name) const;
+
     SharedPtr<String> GetTableDir();
 
     Tuple<Vector<SegmentID> *, Status> GetSegmentIDs1(KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts);

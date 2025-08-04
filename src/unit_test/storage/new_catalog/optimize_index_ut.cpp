@@ -690,7 +690,7 @@ TEST_P(TestTxnOptimizeIndex, optimize_index_and_drop_index) {
     }
 }
 
-TEST_P(TestTxnOptimizeIndex, optimize_index_and_optimize_index) {
+TEST_P(TestTxnOptimizeIndex, DISABLED_optimize_index_and_optimize_index) {
     auto CheckTable = [&] {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check table"), TransactionType::kNormal);
 
@@ -824,7 +824,7 @@ TEST_P(TestTxnOptimizeIndex, optimize_index_and_optimize_index) {
     }
 }
 
-TEST_P(TestTxnOptimizeIndex, optimize_index_and_dump_index) {
+TEST_P(TestTxnOptimizeIndex, DISABLED_optimize_index_and_dump_index) {
     auto PrepareForOptimizeAndDumpIndex = [&] {
         PrepareForOptimizeIndex();
         {

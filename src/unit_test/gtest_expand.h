@@ -10,4 +10,6 @@
     SetPrintTransactionHistory(true);                                                                                                                \
     SetPrintStacktrace(true);
 
+#define SLOW a
+
 #endif // GTEST_EXPAND_H
