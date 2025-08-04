@@ -14,19 +14,17 @@
 
 module;
 
-export module cluster_manager;
+export module infinity_core:cluster_manager;
 
-import stl;
-import third_party;
-import status;
-import peer_thrift_client;
-import peer_server_thrift_types;
-import peer_task;
-import storage;
+import :stl;
+import :status;
+import :node_info;
 import admin_statement;
-import node_info;
+import :peer_server_thrift_service;
+import :peer_server_thrift_types;
 
 namespace infinity {
+class PeerClient;
 
 export enum class UpdateNodeOp { kRemove, kLostConnection };
 

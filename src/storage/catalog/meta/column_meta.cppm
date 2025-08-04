@@ -14,13 +14,13 @@
 
 module;
 
-export module column_meta;
+export module infinity_core:column_meta;
 
-import stl;
-import status;
-import new_catalog;
+import :stl;
+import :status;
+import :new_catalog;
 import column_def;
-import base_meta;
+import :base_meta;
 
 namespace infinity {
 

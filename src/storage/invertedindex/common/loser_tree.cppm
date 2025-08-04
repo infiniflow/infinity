@@ -4,10 +4,11 @@ module;
 
 #include <cassert>
 #include <vector>
-export module loser_tree;
 
-import stl;
-import third_party;
+export module infinity_core:loser_tree;
+
+import :stl;
+import :third_party;
 
 namespace infinity {
 

@@ -1,8 +1,8 @@
 module;
 
-export module md5;
+export module infinity_core:md5;
 
-import stl;
+import :stl;
 
 namespace infinity {
 

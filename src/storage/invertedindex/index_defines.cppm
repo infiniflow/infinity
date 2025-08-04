@@ -1,10 +1,10 @@
 module;
 
-export module index_defines;
+export module infinity_core:index_defines;
 
-import stl;
+import :stl;
 
-import default_values;
+import :default_values;
 import internal_types;
 
 namespace infinity {

@@ -14,10 +14,11 @@
 
 module;
 
-export module whitespace_analyzer;
-import stl;
-import term;
-import analyzer;
+export module infinity_core:whitespace_analyzer;
+
+import :stl;
+import :term;
+import :analyzer;
 
 namespace infinity {
 

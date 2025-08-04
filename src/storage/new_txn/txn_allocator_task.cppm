@@ -14,11 +14,11 @@
 
 module;
 
-export module txn_allocator_task;
+export module infinity_core:txn_allocator_task;
 
-import stl;
-import status;
-import new_txn;
+import :stl;
+import :status;
+import :new_txn;
 
 namespace infinity {
 

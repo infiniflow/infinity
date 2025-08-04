@@ -14,17 +14,17 @@
 
 module;
 
-export module deprecated_knn_flat_l2_reservoir;
+export module infinity_core:deprecated_knn_flat_l2_reservoir;
 
-import stl;
-import knn_result_handler;
-import deprecated_knn_distance;
-import roaring_bitmap;
-import logger;
+import :stl;
+import :knn_result_handler;
+import :deprecated_knn_distance;
+import :roaring_bitmap;
+import :logger;
 
-import infinity_exception;
-import default_values;
-import vector_distance;
+import :infinity_exception;
+import :default_values;
+import :vector_distance;
 import knn_expr;
 import internal_types;
 

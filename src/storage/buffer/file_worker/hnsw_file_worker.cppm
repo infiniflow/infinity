@@ -14,19 +14,19 @@
 
 module;
 
-export module hnsw_file_worker;
+export module infinity_core:hnsw_file_worker;
 
-import stl;
-import index_file_worker;
-import hnsw_alg;
-import index_hnsw;
-import index_base;
+import :stl;
+import :index_file_worker;
+import :hnsw_alg;
+import :index_hnsw;
+import :index_base;
 import knn_expr;
 import column_def;
 import internal_types;
-import file_worker_type;
-import file_worker;
-import persistence_manager;
+import :file_worker_type;
+import :file_worker;
+import :persistence_manager;
 
 namespace infinity {
 

@@ -14,25 +14,25 @@
 
 module;
 
-export module ivf_index_data_in_mem;
+export module infinity_core:ivf_index_data_in_mem;
 
-import stl;
+import :stl;
 import internal_types;
-import index_ivf;
-import ivf_index_storage;
+import :index_ivf;
+import :ivf_index_storage;
 import column_def;
 import logical_type;
-import buffer_handle;
-import base_memindex;
-import memindex_tracer;
-import chunk_index_meta;
+import :buffer_handle;
+import :base_memindex;
+import :memindex_tracer;
+import :chunk_index_meta;
 
 namespace infinity {
 
 class BufferManager;
 class IndexBase;
 class KnnDistanceBase1;
-class ColumnVector;
+export struct ColumnVector;
 class BufferObj;
 
 export class IVFIndexInMem : public BaseMemIndex {

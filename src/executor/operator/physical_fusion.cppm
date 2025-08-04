@@ -14,24 +14,19 @@
 
 module;
 
-export module physical_fusion;
+export module infinity_core:physical_fusion;
 
-import stl;
-import base_table_ref;
-import query_context;
-import operator_state;
-import physical_operator;
-import physical_operator_type;
-import base_expression;
-import fusion_expression;
-import load_meta;
-import infinity_exception;
-import internal_types;
-import data_type;
-import logger;
+import :stl;
+import :physical_operator;
+import :base_table_ref;
+import :fusion_expression;
+import :operator_state;
+import row_id;
 
 namespace infinity {
-struct DataBlock;
+// struct FusionOperatorState;
+// class FusionExpression;
+// struct DataBlock;
 
 export enum class FusionMethod { kRRF, kWeightedSum, kMatchTensor };
 

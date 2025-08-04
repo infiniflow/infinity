@@ -16,10 +16,10 @@ module;
 
 #include <string>
 
-export module null_value;
+export module infinity_core:null_value;
 
-import stl;
-import infinity_exception;
+import :stl;
+import :infinity_exception;
 import internal_types;
 import data_type;
 

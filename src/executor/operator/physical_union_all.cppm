@@ -14,21 +14,20 @@
 
 module;
 
-export module physical_union_all;
+export module infinity_core:physical_union_all;
 
-import stl;
-
-import query_context;
-import operator_state;
-import physical_operator;
-import physical_operator_type;
-import base_expression;
-import data_table;
-import load_meta;
-import infinity_exception;
+import :stl;
+import :query_context;
+import :operator_state;
+import :physical_operator;
+import :physical_operator_type;
+import :base_expression;
+import :data_table;
+import :load_meta;
+import :infinity_exception;
 import internal_types;
 import data_type;
-import logger;
+import :logger;
 
 namespace infinity {
 

@@ -14,11 +14,11 @@
 
 module;
 
-export module ivf_index_util_func;
+export module infinity_core:ivf_index_util_func;
 
-import stl;
+import :stl;
 import internal_types;
-import column_vector;
+import :column_vector;
 
 namespace infinity {
 

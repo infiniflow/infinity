@@ -14,20 +14,19 @@
 
 module;
 
-export module physical_project;
+export module infinity_core:physical_project;
 
-import stl;
-
-import query_context;
-import operator_state;
-import physical_operator;
-import physical_operator_type;
-import base_expression;
-import load_meta;
-import infinity_exception;
+import :stl;
+import :query_context;
+import :operator_state;
+import :physical_operator;
+import :physical_operator_type;
+import :base_expression;
+import :load_meta;
+import :infinity_exception;
 import internal_types;
 import data_type;
-import highlighter;
+import :highlighter;
 
 namespace infinity {
 

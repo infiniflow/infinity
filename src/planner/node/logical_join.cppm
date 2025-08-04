@@ -14,14 +14,14 @@
 
 module;
 
-export module logical_join;
+export module infinity_core:logical_join;
 
-import stl;
-import logical_node_type;
-import column_binding;
-import logical_node;
+import :stl;
+import :logical_node_type;
+import :column_binding;
+import :logical_node;
 import data_type;
-import base_expression;
+import :base_expression;
 import internal_types;
 import join_reference;
 

@@ -44,7 +44,7 @@ export using infinity::IntervalT;
 
 // Nest types
 export using infinity::ArrayT;
-export using infinity::TupleT;
+// export using infinity::TupleT;
 
 // Geography
 export using infinity::PointT;

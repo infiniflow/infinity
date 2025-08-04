@@ -14,16 +14,16 @@
 
 module;
 
-export module user_defined_analyzer;
+export module infinity_core:user_defined_analyzer;
 #if 0
 #include "Python.h"
-import stl;
-import term;
-import stemmer;
-import analyzer;
-import tokenizer;
-import third_party;
-import status;
+import :stl;
+import :term;
+import :stemmer;
+import :analyzer;
+import :tokenizer;
+import :third_party;
+import :status;
 
 namespace infinity {
 export class UserDefinedAnalyzer : public Analyzer {

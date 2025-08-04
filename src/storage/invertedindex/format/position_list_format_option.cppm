@@ -1,10 +1,10 @@
 module;
 
-export module position_list_format_option;
+export module infinity_core:position_list_format_option;
 
-import stl;
-import posting_field;
-import index_defines;
+import :stl;
+import :posting_field;
+import :index_defines;
 
 namespace infinity {
 

@@ -60,7 +60,7 @@ module;
 #include <variant>
 #include <vector>
 
-export module stl;
+export module infinity_core:stl;
 
 export namespace std {
 
@@ -347,6 +347,11 @@ using std::put_time;
 
 using std::views::keys;
 using std::views::values;
+
+using std::greater;
+using std::less;
+
+using std::make_move_iterator;
 } // namespace std
 
 namespace infinity {

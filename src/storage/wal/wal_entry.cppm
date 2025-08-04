@@ -17,16 +17,16 @@ module;
 #include <cassert>
 #include <typeinfo>
 
-export module wal_entry;
+export module infinity_core:wal_entry;
 
-import table_def;
-import index_base;
-import data_block;
-import stl;
+import :table_def;
+import :index_base;
+import :data_block;
+import :stl;
 import statement_common;
-import infinity_exception;
+import :infinity_exception;
 import internal_types;
-import persistence_manager;
+import :persistence_manager;
 import column_def;
 import global_resource_usage;
 
@@ -37,6 +37,7 @@ class ChunkIndexMeta;
 class BlockMeta;
 class SegmentMeta;
 class KVInstance;
+
 
 export enum class WalCommandType : i8 {
     INVALID = 0,

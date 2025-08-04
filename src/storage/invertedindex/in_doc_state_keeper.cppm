@@ -1,16 +1,17 @@
 module;
 
-import stl;
+export module infinity_core:in_doc_state_keeper;
 
-import byte_slice;
-import in_doc_pos_state;
-import position_list_decoder;
-import posting_decoder;
-import inmem_posting_decoder;
-import inmem_position_list_decoder;
-import posting_list_format;
-import index_defines;
-export module in_doc_state_keeper;
+import :stl;
+
+import :byte_slice;
+import :in_doc_pos_state;
+import :position_list_decoder;
+import :posting_decoder;
+import :inmem_posting_decoder;
+import :inmem_position_list_decoder;
+import :posting_list_format;
+import :index_defines;
 
 namespace infinity {
 export class InDocStateKeeper {

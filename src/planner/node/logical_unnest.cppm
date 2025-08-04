@@ -14,13 +14,13 @@
 
 module;
 
-export module logical_unnest;
+export module infinity_core:logical_unnest;
 
-import stl;
-import logical_node_type;
-import column_binding;
-import logical_node;
-import base_expression;
+import :stl;
+import :logical_node_type;
+import :column_binding;
+import :logical_node;
+import :base_expression;
 import data_type;
 import internal_types;
 

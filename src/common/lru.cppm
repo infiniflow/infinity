@@ -16,9 +16,9 @@ module;
 
 #include <cassert>
 
-export module lru;
+export module infinity_core:lru;
 
-import stl;
+import :stl;
 
 namespace infinity {
 

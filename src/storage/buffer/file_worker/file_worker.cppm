@@ -14,13 +14,13 @@
 
 module;
 
-export module file_worker;
+export module infinity_core:file_worker;
 
-import stl;
-import third_party;
-import file_worker_type;
-import persistence_manager;
-import defer_op;
+import :stl;
+import :third_party;
+import :file_worker_type;
+import :persistence_manager;
+import :defer_op;
 
 namespace infinity {
 

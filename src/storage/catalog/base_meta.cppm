@@ -14,19 +14,11 @@
 
 module;
 
-export module base_meta;
+export module infinity_core:base_meta;
 
-import stl;
-import infinity_exception;
-import meta_type;
-//  import lru;
-//  import status;
-//  import meta_info;
-//  import extra_ddl_info;
-//  import default_values;
-//  import internal_types;
-//  import third_party;
-//  import status;
+import :stl;
+import :infinity_exception;
+import :meta_type;
 
 namespace infinity {
 

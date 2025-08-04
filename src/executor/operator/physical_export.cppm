@@ -14,29 +14,29 @@
 
 module;
 
-export module physical_export;
+export module infinity_core:physical_export;
 
-import stl;
+import :stl;
 
-import query_context;
-import operator_state;
-import physical_operator;
-import physical_operator_type;
-import load_meta;
-import infinity_exception;
+// import :query_context;
+import :operator_state;
+import :physical_operator;
+import :physical_operator_type;
+import :load_meta;
+import :infinity_exception;
 import internal_types;
 import statement_common;
 import data_type;
-import meta_info;
-import logger;
-import third_party;
+import :meta_info;
+import :logger;
+import :third_party;
 import column_def;
-import column_vector;
-import knn_filter;
+import :column_vector;
+import :knn_filter;
 
 namespace infinity {
 
-class BlockIndex;
+struct BlockIndex;
 
 export class PhysicalExport : public PhysicalOperator {
 public:

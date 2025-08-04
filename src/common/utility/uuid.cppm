@@ -3,9 +3,9 @@
 
 module;
 
-export module uuid;
+export module infinity_core:uuid;
 
-import stl;
+import :stl;
 
 export namespace infinity {
 

@@ -14,17 +14,17 @@
 
 module;
 
-export module db_meeta;
+export module infinity_core:db_meeta;
 
-import stl;
-import status;
-import new_catalog;
-import base_meta;
+import :stl;
+import :status;
+import :new_catalog;
+import :base_meta;
 
 namespace infinity {
 
 class KVInstance;
-class DatabaseInfo;
+struct DatabaseInfo;
 class NewTxn;
 
 export class DBMeeta : public BaseMeta {

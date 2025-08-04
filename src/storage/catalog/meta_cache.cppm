@@ -14,22 +14,15 @@
 
 module;
 
-export module meta_cache;
+export module infinity_core:meta_cache;
 
-import stl;
-import lru;
-import base_meta;
-// import status;
-// import meta_info;
-// import extra_ddl_info;
-// import default_values;
-// import internal_types;
-// import third_party;
-// import status;
+import :stl;
+import :lru;
+import :base_meta;
 
 namespace infinity {
 
-class MetaCache {
+export class MetaCache {
 public:
     explicit MetaCache(SizeT capacity);
 

@@ -14,24 +14,24 @@
 
 module;
 
-export module logical_match;
+export module infinity_core:logical_match;
 
-import stl;
-import logical_node_type;
-import column_binding;
-import logical_node;
+import :stl;
+import :logical_node_type;
+import :column_binding;
+import :logical_node;
 
-import base_expression;
-import match_expression;
-import base_table_ref;
-import meta_info;
+import :base_expression;
+import :match_expression;
+import :base_table_ref;
+import :meta_info;
 import internal_types;
 import data_type;
-import common_query_filter;
-import column_index_reader;
-import doc_iterator;
-import query_node;
-import parse_fulltext_options;
+import :common_query_filter;
+import :column_index_reader;
+import :doc_iterator;
+import :query_node;
+import :parse_fulltext_options;
 
 namespace infinity {
 

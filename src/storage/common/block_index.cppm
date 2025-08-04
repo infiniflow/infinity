@@ -14,11 +14,11 @@
 
 module;
 
-export module block_index;
+export module infinity_core:block_index;
 
-import stl;
-import global_block_id;
-import default_values;
+import :stl;
+import :global_block_id;
+import :default_values;
 
 namespace infinity {
 
