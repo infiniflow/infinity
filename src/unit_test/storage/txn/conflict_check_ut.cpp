@@ -36,6 +36,8 @@ import :value;
 import :infinity_exception;
 import :status;
 import :txn_state;
+import :db_meeta;
+import :table_meeta;
 #endif
 
 import compilation_config;
@@ -114,12 +116,17 @@ protected:
 
     void CheckRowCnt(const String &db_name, const String &table_name, SizeT expected_row_cnt) {
         auto *txn = txn_mgr_->BeginTxn(MakeUnique<String>("Check row count"), TransactionType::kNormal);
-        //        auto [table_entry, status] = txn->GetTableByName(db_name, table_name);
-        //        EXPECT_TRUE(status.ok());
-        //
-        //        EXPECT_EQ(table_entry->row_count(), expected_row_cnt);
+
+        Optional<DBMeeta> db_meta;
+        Optional<TableMeeta> table_meta;
+        Status status = txn->GetTableMeta(db_name, table_name, db_meta, table_meta);
+        EXPECT_TRUE(status.ok());
+        auto[row_cnt, status2] = table_meta->GetTableRowCount();
+        EXPECT_TRUE(status2.ok());
 
         txn_mgr_->CommitTxn(txn);
+
+        EXPECT_EQ(row_cnt, expected_row_cnt);
     }
 
 protected:

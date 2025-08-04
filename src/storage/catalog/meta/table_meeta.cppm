@@ -113,6 +113,8 @@ public:
 
     Status SetNextIndexID(const String &index_id_str);
 
+    Tuple<SizeT,Status> GetTableRowCount();
+
 private:
     Status LoadComment();
 
