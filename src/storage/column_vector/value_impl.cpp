@@ -1505,15 +1505,33 @@ String Value::ToString() const {
             oss << '}';
             return std::move(oss).str();
         }
-        case LogicalType::kDecimal:
+        case LogicalType::kDecimal: {
+            return value_.decimal.ToString();
+        }
+        case LogicalType::kPoint: {
+            return value_.point.ToString();
+        }
+        case LogicalType::kLine: {
+            return value_.line.ToString();
+        }
+        case LogicalType::kLineSeg: {
+            return value_.line_segment.ToString();
+        }
+        case LogicalType::kBox: {
+            return value_.box.ToString();
+        }
+        case LogicalType::kCircle: {
+            return value_.circle.ToString();
+        }
+        case LogicalType::kUuid: {
+            return value_.uuid.ToString();
+        }
+        case LogicalType::kMixed: {
+            String error_message = fmt::format("Value::ToString() not implemented for type {}", type_.ToString());
+            UnrecoverableError(error_message);
+            return {};
+        }
         case LogicalType::kTuple:
-        case LogicalType::kPoint:
-        case LogicalType::kLine:
-        case LogicalType::kLineSeg:
-        case LogicalType::kBox:
-        case LogicalType::kCircle:
-        case LogicalType::kUuid:
-        case LogicalType::kMixed:
         case LogicalType::kNull:
         case LogicalType::kMissing:
         case LogicalType::kInvalid: {

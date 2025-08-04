@@ -183,6 +183,7 @@ bool BufferObj::Free() {
 bool BufferObj::Save(const FileWorkerSaveCtx &ctx) {
     bool write = false;
     std::unique_lock<std::mutex> locker(w_locker_);
+    LOG_TRACE(fmt::format("BufferObj::Save begin, type_: {}, status_: {}, file: {}", int(type_), int(status_), GetFilename()));
     if (type_ == BufferType::kEphemeral) {
         switch (status_) {
             case BufferStatus::kNew: {
@@ -216,6 +217,7 @@ bool BufferObj::Save(const FileWorkerSaveCtx &ctx) {
         file_worker_->MoveFile();
         type_ = BufferType::kPersistent;
     }
+    LOG_TRACE(fmt::format("BufferObj::Save end, type_: {}, status_: {}, file: {}, write: {}", int(type_), int(status_), GetFilename(), write));
     return write;
 }
 

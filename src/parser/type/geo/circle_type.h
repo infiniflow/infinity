@@ -40,10 +40,7 @@ struct CircleType {
         radius = 0;
     }
 
-    [[nodiscard]] inline std::string ToString() const {
-        ParserError("ToString() isn't implemented");
-        return std::string();
-    }
+    [[nodiscard]] inline std::string ToString() const { return "<" + center.ToString() + "," + std::to_string(radius) + ">"; }
 };
 
 } // namespace infinity

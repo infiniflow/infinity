@@ -67,8 +67,44 @@ public:
 };
 
 std::string HugeInt::ToString() const {
-    ParserError("ToString() isn't implemented");
-    return std::string();
+    // Handle special case of zero
+    if (upper == 0 && lower == 0) {
+        return "0";
+    }
+
+    // Since HugeInt is assumed to be non-negative, we can work directly with the values
+    uint64_t work_upper = static_cast<uint64_t>(upper);
+    uint64_t work_lower = static_cast<uint64_t>(lower);
+
+    // Convert to string using base 10
+    std::string result;
+
+    // Handle the case where we have a 128-bit number
+    while (work_upper != 0 || work_lower != 0) {
+        // Divide the 128-bit number by 10
+        uint64_t remainder = 0;
+
+        // Divide upper part
+        if (work_upper != 0) {
+            remainder = work_upper % 10;
+            work_upper /= 10;
+        }
+
+        // Combine remainder with lower part and divide
+        // This handles the carry from upper to lower
+        uint64_t temp = (remainder << 32) | (work_lower >> 32);
+        uint64_t high_remainder = temp % 10;
+        work_lower = ((temp / 10) << 32) | (work_lower & 0xFFFFFFFF);
+
+        temp = (high_remainder << 32) | (work_lower & 0xFFFFFFFF);
+        remainder = temp % 10;
+        work_lower = (work_lower & 0xFFFFFFFF00000000ULL) | (temp / 10);
+
+        // Add digit to result
+        result = char('0' + remainder) + result;
+    }
+
+    return result;
 }
 
 } // namespace infinity
