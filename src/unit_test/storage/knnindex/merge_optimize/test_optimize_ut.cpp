@@ -53,11 +53,7 @@ import :catalog_meta;
 import :mem_index;
 import :status;
 import :new_txn;
-#ifdef INDEX_HANDLER
 import :hnsw_handler;
-#else
-import :abstract_hnsw;
-#endif
 import :buffer_obj;
 #endif
 

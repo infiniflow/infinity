@@ -61,13 +61,8 @@ import :secondary_index_in_mem;
 import :ivf_index_data_in_mem;
 import :emvb_index_in_mem;
 import :memory_indexer;
-#ifdef INDEX_HANDLER
 import :hnsw_handler;
 import :bmp_handler;
-#else
-import :abstract_hnsw;
-import :abstract_bmp;
-#endif
 import :roaring_bitmap;
 import :index_filter_evaluators;
 import :index_emvb;
