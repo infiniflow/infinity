@@ -40,10 +40,10 @@ import :utility;
 import :block_version;
 import data_type;
 import parsed_expr;
-import fst;
+import :fst.fst;
 
 
-import :column_def;
+import column_def;
 
 namespace infinity {
 
@@ -199,7 +199,10 @@ SharedPtr<SegmentSnapshotInfo> SegmentSnapshotInfo::Deserialize(const nlohmann::
 nlohmann::json ChunkIndexSnapshotInfo::Serialize() {
     nlohmann::json json_res;
     json_res["chunk_id"] = chunk_id_;
-    json_res["chunk_info"] = chunk_info_->Serialize();
+    json_res["base_name"] = base_name_;
+    json_res["base_row_id"] = base_row_id_.ToString();
+    json_res["row_cnt"] = row_cnt_;
+    json_res["index_size"] = index_size_;
     json_res["index_filename"] = index_filename_;
     for (const auto &file : full_text_files_) {
         json_res["full_text_files"].emplace_back(file);
@@ -210,7 +213,10 @@ nlohmann::json ChunkIndexSnapshotInfo::Serialize() {
 SharedPtr<ChunkIndexSnapshotInfo> ChunkIndexSnapshotInfo::Deserialize(const nlohmann::json &chunk_index_json) {
     auto chunk_index_snapshot = MakeShared<ChunkIndexSnapshotInfo>();
     chunk_index_snapshot->chunk_id_ = chunk_index_json["chunk_id"];
-    chunk_index_snapshot->chunk_info_ = ChunkIndexMetaInfo::Deserialize(chunk_index_json["chunk_info"]);
+    chunk_index_snapshot->base_name_ = chunk_index_json["base_name"];
+    chunk_index_snapshot->base_row_id_ = RowID::FromUint64(std::stoull(chunk_index_json["base_row_id"].get<String>()));
+    chunk_index_snapshot->row_cnt_ = chunk_index_json["row_cnt"];
+    chunk_index_snapshot->index_size_ = chunk_index_json["index_size"];
     chunk_index_snapshot->index_filename_ = chunk_index_json["index_filename"];
     if (chunk_index_json.contains("full_text_files")) {
         for (const auto &file : chunk_index_json["full_text_files"]) {

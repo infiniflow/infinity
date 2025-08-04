@@ -23,10 +23,10 @@ import data_type;
 import create_index_info;
 import :third_party;
 
+
 namespace infinity {
 
-struct WalChunkIndexInfo;
-
+export struct WalChunkIndexInfo;
 export enum class SegmentStatus : u8;
 
 export struct DatabaseInfo {

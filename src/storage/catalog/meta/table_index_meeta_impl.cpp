@@ -34,7 +34,9 @@ import :txn_state;
 import :infinity_exception;
 import :utility;
 import :kv_utility;
-import :column_def;
+import :snapshot_info;
+import :segment_index_meta;
+import column_def;
 
 namespace infinity {
 

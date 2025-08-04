@@ -20,7 +20,7 @@ import :stl;
 import :status;
 import :new_catalog;
 import column_def;
-import snapshot_info;
+import :snapshot_info;
 
 namespace infinity {
 

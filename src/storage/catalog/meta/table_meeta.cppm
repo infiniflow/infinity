@@ -21,8 +21,8 @@ import :status;
 import column_def;
 import :new_catalog;
 import :snapshot_info;
+import row_id;
 import :wal_entry;
-import :row_id;
 
 namespace infinity {
 

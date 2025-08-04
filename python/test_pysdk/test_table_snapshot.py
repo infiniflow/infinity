@@ -448,10 +448,10 @@ class TestSnapshot:
         print(f"Snapshot creation time: {snapshot_time:.2f} seconds")
 
         # Drop table
-        # db_obj.drop_table(table_name, ConflictType.Error)
+        db_obj.drop_table(table_name, ConflictType.Error)
         # use new db
-        self.infinity_obj.create_database("test_large_dataset_db", ConflictType.Ignore)
-        db_obj = self.infinity_obj.get_database("test_large_dataset_db")
+        # self.infinity_obj.create_database("test_large_dataset_db", ConflictType.Ignore)
+        # db_obj = self.infinity_obj.get_database("test_large_dataset_db")
         
         # Test restore performance
         start_time = time.time()

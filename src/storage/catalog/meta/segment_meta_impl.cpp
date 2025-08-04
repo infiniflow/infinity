@@ -31,7 +31,7 @@ import :block_meta;
 import :meta_info;
 import :new_catalog;
 import :fast_rough_filter;
-import :column_def;
+import column_def;
 import :kv_utility;
 import :snapshot_info;
 

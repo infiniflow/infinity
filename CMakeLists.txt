@@ -25,6 +25,7 @@ option(CI "Build in CI mode" OFF)
 if (CI)
     add_definitions(-DCI=1)
 endif ()
+add_definitions(-D_POSIX_C_SOURCE=200809L -D_POSIX_SEM_VALUE_MAX=_SC_SEM_VALUE_MAX -DARROW_USE_NATIVE_INT128)
 
 message(STATUS "CXX: ${CMAKE_CXX_COMPILER}")
 execute_process(COMMAND ${CMAKE_CXX_COMPILER} --version OUTPUT_VARIABLE clang_full_version_string)

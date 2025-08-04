@@ -688,13 +688,11 @@ Tuple<SharedPtr<ChunkIndexSnapshotInfo>, Status> ChunkIndexMeta::MapMetaToSnapSh
     if (!status.ok()) {
         return {nullptr, status};
     }
-    auto chunk_info = MakeShared<ChunkIndexMetaInfo>();
-    chunk_info->base_name_ = chunk_info_->base_name_;
-    chunk_info->base_row_id_ = chunk_info_->base_row_id_;
-    chunk_info->row_cnt_ = chunk_info_->row_cnt_;
-    chunk_info->index_size_ = chunk_info_->index_size_;
 
-    chunk_index_snapshot_info->chunk_info_ = chunk_info;
+    chunk_index_snapshot_info->base_name_ = chunk_info_->base_name_;
+    chunk_index_snapshot_info->base_row_id_ = chunk_info_->base_row_id_;
+    chunk_index_snapshot_info->row_cnt_ = chunk_info_->row_cnt_;
+    chunk_index_snapshot_info->index_size_ = chunk_info_->index_size_;
 
     chunk_index_snapshot_info->index_filename_ = IndexFileName(chunk_id);
     TableIndexMeeta &table_index_meta = segment_index_meta_.table_index_meta();

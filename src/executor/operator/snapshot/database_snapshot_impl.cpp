@@ -12,23 +12,23 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
+module infinity_core:database_snapshot.impl;
 
-module snapshot;
+import :snapshot;
 
-import stl;
-import new_txn;
-import new_txn_manager;
-import query_context;
-import status;
-import third_party;
-import config;
-import infinity_exception;
-import snapshot_info;
-import db_meeta;
-import table_meeta;
-import txn_state;
-import logger;
+import :stl;
+import :new_txn;
+import :new_txn_manager;
+import :query_context;
+import :status;
+import :third_party;
+import :config;
+import :infinity_exception;
+import :snapshot_info;
+import :db_meeta;
+import :table_meeta;
+import :txn_state;
+import :logger;
 
 namespace infinity {
 

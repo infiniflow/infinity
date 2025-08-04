@@ -5933,10 +5933,10 @@ Status NewTxn::ProcessSnapshotRestorationData(const String &db_name,
             for (const auto &chunk_index : segment_index->chunk_index_snapshots_) {
                 WalChunkIndexInfo wal_chunk_index_info{};
                 wal_chunk_index_info.chunk_id_ = chunk_index->chunk_id_;
-                wal_chunk_index_info.base_name_ = chunk_index->chunk_info_->base_name_;
-                wal_chunk_index_info.base_rowid_ = chunk_index->chunk_info_->base_row_id_;
-                wal_chunk_index_info.row_count_ = chunk_index->chunk_info_->row_cnt_;
-                wal_chunk_index_info.index_size_ = chunk_index->chunk_info_->index_size_;
+                wal_chunk_index_info.base_name_ = chunk_index->base_name_;
+                wal_chunk_index_info.base_rowid_ = chunk_index->base_row_id_;
+                wal_chunk_index_info.row_count_ = chunk_index->row_cnt_;
+                wal_chunk_index_info.index_size_ = chunk_index->index_size_;
                 wal_segment_index_info.chunk_infos_.push_back(wal_chunk_index_info);
             }
             wal_index_cmd.segment_index_infos_.push_back(wal_segment_index_info);
