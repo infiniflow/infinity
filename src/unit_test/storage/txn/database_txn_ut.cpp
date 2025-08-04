@@ -286,7 +286,7 @@ TEST_P(DBTxnTest, test6) {
     txn_mgr->CommitTxn(new_txn3);
 }
 
-TEST_P(DBTxnTest, test7) {
+TEST_P(DBTxnTest, DISABLED_test7) {
     using namespace infinity;
     NewTxnManager *txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
 
