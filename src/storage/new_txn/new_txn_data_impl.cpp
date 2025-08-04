@@ -1317,12 +1317,12 @@ Status NewTxn::AddColumnsDataInBlock(BlockMeta &block_meta, const Vector<SharedP
 
         BufferObj *buffer_obj = nullptr;
         BufferObj *outline_buffer_obj = nullptr;
-        Status status = column_meta->GetColumnBuffer(buffer_obj, outline_buffer_obj);
+        status = column_meta->GetColumnBuffer(kv_instance, begin_ts, commit_ts, buffer_obj, outline_buffer_obj);
         if (!status.ok()) {
             return status;
         }
 
-        auto [data_size, status2] = column_meta->GetColumnSize(column_vector.Size());
+        auto [data_size, status2] = column_meta->GetColumnSize(kv_instance, begin_ts, commit_ts, column_vector.Size());
         if (!status2.ok()) {
             return status;
         }
