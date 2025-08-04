@@ -170,6 +170,7 @@ export {
     constexpr SizeT HNSW_EF_CONSTRUCTION = 200;
     constexpr SizeT HNSW_BLOCK_SIZE = 8192;
     constexpr SizeT DEFAULT_PREFETCH_SIZE = 4;
+    constexpr SizeT DEFAULT_ITER_BATCH_SIZE = 1024;
 
     constexpr SizeT BMP_BLOCK_SIZE = 16;
 

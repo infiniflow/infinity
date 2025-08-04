@@ -15,7 +15,6 @@
 module;
 
 #include <future>
-#include <vector>
 
 export module infinity_core:hnsw_lsg_builder;
 
@@ -318,7 +317,6 @@ private:
 
             ivf_avg_[offset] = GetDistMean(d_ptr.get(), result_n);
         }
-
     }
 
     template <typename Iter, template <typename, typename> typename Compare>
@@ -350,7 +348,7 @@ private:
         if constexpr (SplitIter<Iter>) {
             Iter iter_copy = iter;
             auto iters = std::move(iter_copy).split();
-            auto &thread_pool = InfinityContext::instance().GetHnswBuildThreadPool();
+            auto &thread_pool = InfinityContext::instance().GetLsgBuildThreadPool();
             Vector<std::future<void>> futs;
             for (auto &splited_iter : iters) {
                 futs.emplace_back(thread_pool.push([&](int id) {

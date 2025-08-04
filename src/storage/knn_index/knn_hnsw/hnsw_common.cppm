@@ -22,6 +22,7 @@ export module infinity_core:hnsw_common;
 import :stl;
 import :infinity_exception;
 import :sparse_util;
+import :default_values;
 
 namespace infinity {
 
@@ -52,18 +53,37 @@ class DenseVectorIter {
     LabelType label_;
 
 public:
+    using This = DenseVectorIter<DataType, LabelType>;
+    using Split = Vector<This>;
     using ValueType = const DataType *;
 
-    DenseVectorIter(const DataType *ptr, SizeT dim, SizeT vec_num, LabelType offset = 0)
+    DenseVectorIter(ValueType ptr, SizeT dim, SizeT vec_num, LabelType offset = 0)
         : ptr_(ptr), dim_(dim), ptr_end_(ptr_ + dim * vec_num), label_(offset) {}
 
-    Optional<Pair<const DataType *, LabelType>> Next() {
+    Optional<Pair<ValueType, LabelType>> Next() {
         auto ret = ptr_;
         if (ret == ptr_end_) {
             return None;
         }
         ptr_ += dim_;
         return std::make_pair(ret, label_++);
+    }
+
+    Split split() && {
+        Split res;
+        LabelType vec_num = 0;
+        ValueType head = ptr_;
+        while (ptr_ != ptr_end_) {
+            if (vec_num == DEFAULT_ITER_BATCH_SIZE) {
+                res.emplace_back(head, dim_, DEFAULT_ITER_BATCH_SIZE, label_ + res.size() * DEFAULT_ITER_BATCH_SIZE);
+                vec_num = 0;
+                head = ptr_;
+            }
+            ptr_ += dim_;
+            ++vec_num;
+        }
+        res.emplace_back(head, dim_, vec_num, label_ + res.size() * DEFAULT_ITER_BATCH_SIZE);
+        return res;
     }
 };
 
