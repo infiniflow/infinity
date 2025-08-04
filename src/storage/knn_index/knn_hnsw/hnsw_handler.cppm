@@ -29,7 +29,6 @@ import :memindex_tracer;
 import :buffer_handle;
 import :third_party;
 import :config;
-import :abstract_hnsw;
 import :chunk_index_meta;
 
 namespace infinity {

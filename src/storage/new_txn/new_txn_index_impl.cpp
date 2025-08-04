@@ -52,13 +52,8 @@ import :memory_indexer;
 import :index_full_text;
 import :column_index_reader;
 import :column_index_merger;
-#ifdef INDEX_HANDLER
 import :hnsw_handler;
 import :bmp_handler;
-#else
-import :abstract_hnsw;
-import :abstract_bmp;
-#endif
 import :index_hnsw;
 import :index_bmp;
 import :emvb_index_in_mem;
@@ -1585,26 +1580,6 @@ Status NewTxn::OptimizeSegmentIndexByParams(SegmentIndexMeta &segment_index_meta
             }
             const auto &options = ret.value();
 
-#ifdef INDEX_HANDLER
-#else
-            auto optimize_index = [&](const AbstractBMP &index) {
-                std::visit(
-                    [&](auto &&index) {
-                        using T = std::decay_t<decltype(index)>;
-                        if constexpr (std::is_same_v<T, std::nullptr_t>) {
-                            UnrecoverableError("Invalid index type.");
-                        } else {
-                            using IndexT = typename std::remove_pointer_t<T>;
-                            if constexpr (IndexT::kOwnMem) {
-                                index->Optimize(options);
-                            } else {
-                                UnrecoverableError("Invalid index type.");
-                            }
-                        }
-                    },
-                    index);
-            };
-#endif
             for (ChunkID chunk_id : *chunk_ids_ptr) {
                 ChunkIndexMeta chunk_index_meta(chunk_id, segment_index_meta);
                 BufferObj *index_buffer = nullptr;
@@ -1613,22 +1588,13 @@ Status NewTxn::OptimizeSegmentIndexByParams(SegmentIndexMeta &segment_index_meta
                     return status;
                 }
                 BufferHandle buffer_handle = index_buffer->Load();
-#ifdef INDEX_HANDLER
                 BMPHandlerPtr bmp_handler = *static_cast<BMPHandlerPtr *>(buffer_handle.GetDataMut());
                 bmp_handler->Optimize(options);
-#else
-                auto *abstract_bmp = static_cast<AbstractBMP *>(buffer_handle.GetDataMut());
-                optimize_index(*abstract_bmp);
-#endif
             }
             SharedPtr<BMPIndexInMem> bmp_index = mem_index->GetBMPIndex();
             if (bmp_index) {
-#ifdef INDEX_HANDLER
                 BMPHandlerPtr bmp_handler = bmp_index->get();
                 bmp_handler->Optimize(options);
-#else
-                optimize_index(mem_index->GetBMPIndex()->get());
-#endif
             }
 
             break;
@@ -1638,38 +1604,6 @@ Status NewTxn::OptimizeSegmentIndexByParams(SegmentIndexMeta &segment_index_meta
             if (!params) {
                 break;
             }
-#ifdef INDEX_HANDLER
-#else
-            auto optimize_index = [&](AbstractHnsw *abstract_hnsw) {
-                std::visit(
-                    [&](auto &&index) {
-                        using T = std::decay_t<decltype(index)>;
-                        if constexpr (std::is_same_v<T, std::nullptr_t>) {
-                            UnrecoverableError("Invalid index type.");
-                        } else {
-                            using IndexT = typename std::remove_pointer_t<T>;
-                            if constexpr (IndexT::kOwnMem) {
-                                using HnswIndexDataType = typename std::remove_pointer_t<T>::DataType;
-                                if (params->compress_to_lvq) {
-                                    if constexpr (IsAnyOf<HnswIndexDataType, i8, u8>) {
-                                        UnrecoverableError("Invalid index type.");
-                                    } else {
-                                        auto *p = std::move(*index).CompressToLVQ().release();
-                                        delete index;
-                                        *abstract_hnsw = p;
-                                    }
-                                }
-                                if (params->lvq_avg) {
-                                    index->Optimize();
-                                }
-                            } else {
-                                UnrecoverableError("Invalid index type.");
-                            }
-                        }
-                    },
-                    *abstract_hnsw);
-            };
-#endif
             for (ChunkID chunk_id : *chunk_ids_ptr) {
                 ChunkIndexMeta chunk_index_meta(chunk_id, segment_index_meta);
                 BufferObj *index_buffer = nullptr;
@@ -1678,7 +1612,6 @@ Status NewTxn::OptimizeSegmentIndexByParams(SegmentIndexMeta &segment_index_meta
                     return status;
                 }
                 BufferHandle buffer_handle = index_buffer->Load();
-#ifdef INDEX_HANDLER
                 HnswHandlerPtr hnsw_handler = *static_cast<HnswHandlerPtr *>(buffer_handle.GetDataMut());
                 if (params->compress_to_lvq) {
                     hnsw_handler->CompressToLVQ();
@@ -1686,15 +1619,10 @@ Status NewTxn::OptimizeSegmentIndexByParams(SegmentIndexMeta &segment_index_meta
                 if (params->lvq_avg) {
                     hnsw_handler->Optimize();
                 }
-#else
-                auto *abstract_hnsw = static_cast<AbstractHnsw *>(buffer_handle.GetDataMut());
-                optimize_index(abstract_hnsw);
-#endif
             }
             if (mem_index) {
                 SharedPtr<HnswIndexInMem> memory_hnsw_index = mem_index->GetHnswIndex();
                 if (memory_hnsw_index) {
-#ifdef INDEX_HANDLER
                     HnswHandlerPtr hnsw_handler = memory_hnsw_index->get();
                     if (params->compress_to_lvq) {
                         hnsw_handler->CompressToLVQ();
@@ -1702,9 +1630,6 @@ Status NewTxn::OptimizeSegmentIndexByParams(SegmentIndexMeta &segment_index_meta
                     if (params->lvq_avg) {
                         hnsw_handler->Optimize();
                     }
-#else
-                    optimize_index(memory_hnsw_index->get_ptr());
-#endif
                 }
             }
             break;

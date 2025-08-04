@@ -26,7 +26,7 @@ jobs:
   slow_tests:
     name: run slow test
     if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'slow-test') }}
-    runs-on: ["self-hosted", "slow-test" ]
+    runs-on: [ "self-hosted", "slow-test" ]
     timeout-minutes: 720    # 12 hours
     steps:
 
@@ -67,14 +67,22 @@ jobs:
         if: ${{ !cancelled() && !failure() }}
         run: sudo docker exec ${BUILDER_CONTAINER} bash -c "git config --global safe.directory \"*\" && cd /infinity && rm -fr cmake-build-release && mkdir -p cmake-build-release && cmake -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_JOB_POOLS:STRING=link=8 -DCI=ON -S /infinity -B /infinity/cmake-build-release && cmake --build /infinity/cmake-build-release --target infinity"
 
-      - name: Install pysdk for Python 3.10
+      - name: Build release unit test
         if: ${{ !cancelled() && !failure() }}
-        run: |
-          sudo docker exec ${BUILDER_CONTAINER} bash -c "rm -rf /root/.config/pip/pip.conf && cd /infinity/ && pip3 uninstall -y infinity-sdk && pip3 install python/infinity_sdk -v -i https://pypi.tuna.tsinghua.edu.cn/simple --trusted-host tuna.tsinghua.edu.cn"
+        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "git config --global safe.directory \"*\" && cd /infinity && cmake --build /infinity/cmake-build-release --target test_main knn_import_benchmark knn_query_benchmark"
 
       - name: Build debug version with thread sanitizer
         if: ${{ !cancelled() && !failure() && steps.choose_test_type.outputs.RUN_TSAN_TEST == 'true' }}
         run: sudo docker exec ${BUILDER_CONTAINER} bash -c "git config --global safe.directory \"*\" && cd /infinity && rm -fr cmake-build-debug && mkdir -p cmake-build-debug && cmake -G Ninja -DENABLE_SANITIZER_THREAD=ON -DCMAKE_BUILD_TYPE=Debug -DCMAKE_JOB_POOLS:STRING=link=8 -DCI=ON -S /infinity -B /infinity/cmake-build-debug && cmake --build /infinity/cmake-build-debug --target infinity"
+
+      - name: Build debug unit test
+        if: ${{ !cancelled() && !failure() }}
+        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "git config --global safe.directory \"*\" && cd /infinity && cmake --build /infinity/cmake-build-debug --target test_main"
+
+      - name: Install pysdk for Python 3.10
+        if: ${{ !cancelled() && !failure() }}
+        run: |
+          sudo docker exec ${BUILDER_CONTAINER} bash -c "rm -rf /root/.config/pip/pip.conf && cd /infinity/ && pip3 uninstall -y infinity-sdk && pip3 install python/infinity_sdk -v -i https://pypi.tuna.tsinghua.edu.cn/simple --trusted-host tuna.tsinghua.edu.cn"
 
       - name: Prepare restart test data
         if: ${{ !cancelled() && !failure() && steps.choose_test_type.outputs.RUN_RESTART_TEST == 'true' }}
@@ -86,7 +94,7 @@ jobs:
       - name: Run restart test with thread sanitizer
         if: ${{ !cancelled() && !failure() && steps.choose_test_type.outputs.RUN_TSAN_TEST == 'true' }}
         id: run_restart_test_sanitizer
-        run : |
+        run: |
           sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && pip3 install -r python/restart_test/requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple --trusted-host tuna.tsinghua.edu.cn"
           # Fix sanitizer: https://github.com/ClickHouse/ClickHouse/issues/64086
           old_value=$(sudo sysctl -n vm.mmap_rnd_bits)
@@ -96,7 +104,7 @@ jobs:
 
       - name: Collect restart test output with thread sanitizer
         if: ${{ !cancelled() && steps.choose_test_type.outputs.RUN_TSAN_TEST == 'true' }} # always run this step even if previous steps failed
-          # remove symbolic link
+        # remove symbolic link
         # find all log file like [debug.log.*] in directory, and cat to stdout
         run: |
           failure="${{ steps.run_restart_test_sanitizer.outcome == 'failure'}}"
@@ -168,7 +176,7 @@ jobs:
       - name: Run restart test
         if: ${{ !cancelled() && !failure() && steps.choose_test_type.outputs.RUN_RESTART_TEST == 'true' }}
         id: run_restart_test
-        run : |
+        run: |
           sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && pip3 install -r python/restart_test/requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple --trusted-host tuna.tsinghua.edu.cn"
           sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && python3 tools/run_restart_test_continuously.py --infinity_path=cmake-build-release/src/infinity"
         #   sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && pytest python/restart_test/test_insert.py -k "test_data[infinity_runner0-columns5-gen-1000000-test/data/config/restart_test/test_insert/1.toml]" -s --infinity_path=cmake-build-release/src/infinity"
@@ -176,7 +184,7 @@ jobs:
 
       - name: Collect restart test output
         if: ${{ !cancelled() && steps.choose_test_type.outputs.RUN_RESTART_TEST == 'true' }} # always run this step even if previous steps failed
-          # remove symbolic link
+        # remove symbolic link
         # find all log file like [debug.log.*] in directory, and cat to stdout
         run: |
           sudo python3 scripts/prepare_restart_test_data.py --op=remove
@@ -216,9 +224,35 @@ jobs:
           sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /var/infinity/log && tar -cvf /infinity/infinity.log.tar * && cd -"
           sudo python3 scripts/collect_log.py --log_path=infinity.log.tar --stdout_path=release.log --stderror_path=release_error.log --executable_path=cmake-build-release/src/infinity --output_dir=${RUNNER_WORKSPACE_PREFIX}/log --failure=${failure}
 
+      - name: Run sqllogictest debug version
+        if: ${{ !cancelled() && !failure() }}
+        id: run_tests_debug
+        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && LD_PRELOAD=/usr/local/lib/clang/20/lib/x86_64-unknown-linux-gnu/libclang_rt.asan.so ASAN_OPTIONS=detect_leaks=0 python3 tools/sqllogictest.py" && sleep 1s
+
+      - name: Unit test debug version
+        if: ${{ !cancelled() && !failure() }}
+        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "mkdir -p /var/infinity && cd /infinity/ && ASAN_OPTIONS=detect_leaks=0 cmake-build-debug/src/test_main --gtest_also_run_disabled_tests > unittest_debug.log 2>&1"
+
+      - name: Collect infinity unit test debug output
+        if: ${{ !cancelled() && failure() }}
+        run: unittest_debug.log 2>/dev/null || true
+
+      - name: Run sqllogictest release version
+        if: ${{ !cancelled() && !failure() }}
+        id: run_tests_release
+        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && python3 tools/sqllogictest.py" && sleep 1s
+
+      - name: Unit test release version
+        if: ${{ !cancelled() && !failure() }}
+        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "mkdir -p /var/infinity && cd /infinity/ && cmake-build-release/src/test_main > unittest_release.log 2>&1"
+
+      - name: Collect infinity unit test release output
+        if: ${{ !cancelled() }}
+        run: unittest_release.log 2>/dev/null || true
+
       - name: Destroy builder container
         if: always()  # always run this step even if previous steps failed
         run: |
-            if [ -n "${BUILDER_CONTAINER}" ]; then
-              sudo docker rm -f -v ${BUILDER_CONTAINER}
-            fi
+          if [ -n "${BUILDER_CONTAINER}" ]; then
+            sudo docker rm -f -v ${BUILDER_CONTAINER}
+          fi

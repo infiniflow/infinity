@@ -208,26 +208,6 @@ Status TableMeeta::RemoveSegmentIDs1(const Vector<SegmentID> &segment_ids) {
     return Status::OK();
 }
 
-// Status TableMeeta::AddSegmentID(SegmentID segment_id) {
-//     if (!segment_ids_) {
-//         Status status = LoadSegmentIDs();
-//         //        if (!status.ok() && status.code() != ErrorCode::kNotFound) {
-//         //            return status;
-//         //        }
-//         //        segment_ids_ = Vector<SegmentID>();
-//         if (!status.ok()) {
-//             return status;
-//         }
-//     }
-
-//     segment_ids_->emplace_back(segment_id);
-//     Status status = SetSegmentIDs(*segment_ids_);
-//     if (!status.ok()) {
-//         return status;
-//     }
-//     return Status::OK();
-// }
-
 Pair<SegmentID, Status> TableMeeta::AddSegmentID1(TxnTimeStamp commit_ts) {
     Status status;
 
@@ -647,18 +627,6 @@ Status TableMeeta::LoadColumnDefs() {
     return Status::OK();
 }
 
-// Status TableMeeta::LoadSegmentIDs() {
-//     String segment_ids_key = GetTableTag("segment_ids");
-//     String segment_ids_str;
-//     Status status = kv_instance_.Get(segment_ids_key, segment_ids_str);
-//     if (!status.ok()) {
-//         LOG_ERROR(fmt::format("Fail to get segment ids from kv store, key: {}, cause: {}", segment_ids_key, status.message()));
-//         return status;
-//     }
-//     segment_ids_ = nlohmann::json::parse(segment_ids_str).get<Vector<SegmentID>>();
-//     return Status::OK();
-// }
-
 Status TableMeeta::LoadSegmentIDs1() {
     segment_ids1_ = infinity::GetTableSegments(kv_instance_, db_id_str_, table_id_str_, begin_ts_, commit_ts_);
     return Status::OK();
@@ -840,20 +808,6 @@ Tuple<String, Status> TableMeeta::GetColumnKeyByColumnName(const String &column_
 }
 
 SharedPtr<String> TableMeeta::GetTableDir() { return {MakeShared<String>(table_id_str_)}; }
-
-// Tuple<SharedPtr<Vector<SegmentID>>, Status> TableMeeta::GetSegmentIndexIDs1() {
-//     if (!segment_ids_) {
-//         auto status = LoadSegmentIDs();
-//         if (!status.ok()) {
-//             //            if (status.code() == ErrorCode::kNotFound) {
-//             //                return {MakeShared<Vector<SegmentID>>(), Status::OK()};
-//             //            } else {
-//             return {nullptr, status};
-//             //            }
-//         }
-//     }
-//     return {MakeShared<Vector<SegmentID>>(segment_ids_.value()), Status::OK()};
-// }
 
 Tuple<Vector<SegmentID> *, Status> TableMeeta::GetSegmentIDs1() {
     std::lock_guard<std::mutex> lock(mtx_);

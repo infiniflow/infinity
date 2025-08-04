@@ -201,39 +201,40 @@ TEST_P(TestTxnCheckpointTest, checkpoint_and_create_db) {
         }
     }
 
-    // UninitTxnMgr();
-    // CleanupDbDirs();
-    // InitTxnMgr();
+    UninitTxnMgr();
+    CleanupDbDirs();
+    InitTxnMgr();
 
-    // {
-    //     {
-    //         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
-    //         status = txn->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
-    //         EXPECT_TRUE(status.ok());
+    {
+        {
+            auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
+            status = txn->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
+            EXPECT_TRUE(status.ok());
 
-    //         auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("checkpoint"), TransactionType::kNewCheckpoint);
+            auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("checkpoint"), TransactionType::kNewCheckpoint);
 
-    //         status = new_txn_mgr->CommitTxn(txn);
-    //         EXPECT_TRUE(status.ok());
+            status = new_txn_mgr->CommitTxn(txn);
+            EXPECT_TRUE(status.ok());
 
-    //         Status status = txn2->Checkpoint(wal_manager_->LastCheckpointTS());
-    //         EXPECT_TRUE(status.ok());
-    //         status = new_txn_mgr->CommitTxn(txn2);
-    //         EXPECT_TRUE(status.ok());
-    //     }
-    //     RestartTxnMgr();
-    //     {
-    //         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check"), TransactionType::kNormal);
+            Status status = txn2->Checkpoint(wal_manager_->LastCheckpointTS());
+            EXPECT_TRUE(status.ok());
+            status = new_txn_mgr->CommitTxn(txn2);
+            EXPECT_TRUE(status.ok());
+        }
+        RestartTxnMgr();
+        {
+            auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check"), TransactionType::kNormal);
 
-    //         Vector<String> db_names;
-    //         Status status = txn->ListDatabase(db_names);
-    //         EXPECT_TRUE(status.ok());
-    //         EXPECT_EQ(db_names, Vector<String>({"default_db"}));
+            Vector<String> db_names;
+            Status status = txn->ListDatabase(db_names);
+            EXPECT_TRUE(status.ok());
+            // Checkpoint occurs after create db is committed, kv of the db is flushed during checkpoint.
+            EXPECT_EQ(db_names, Vector<String>({*db_name, "default_db"}));
 
-    //         status = new_txn_mgr->CommitTxn(txn);
-    //         EXPECT_TRUE(status.ok());
-    //     }
-    // }
+            status = new_txn_mgr->CommitTxn(txn);
+            EXPECT_TRUE(status.ok());
+        }
+    }
 }
 
 TEST_P(TestTxnCheckpointTest, checkpoint_and_create_table) {
@@ -334,37 +335,41 @@ TEST_P(TestTxnCheckpointTest, checkpoint_and_create_table) {
         }
     }
 
-    // UninitTxnMgr();
-    // CleanupDbDirs();
-    // InitTxnMgr();
+    UninitTxnMgr();
+    CleanupDbDirs();
+    InitTxnMgr();
 
-    // {
-    //     {
-    //         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
-    //         status = txn->CreateTable(*db_name, table_def, ConflictType::kIgnore);
-    //         EXPECT_TRUE(status.ok());
+    {
+        {
+            auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+            status = txn->CreateTable(*db_name, table_def, ConflictType::kIgnore);
+            EXPECT_TRUE(status.ok());
 
-    //         auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("checkpoint"), TransactionType::kNewCheckpoint);
+            auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("checkpoint"), TransactionType::kNewCheckpoint);
 
-    //         status = new_txn_mgr->CommitTxn(txn);
-    //         EXPECT_TRUE(status.ok());
+            status = new_txn_mgr->CommitTxn(txn);
+            EXPECT_TRUE(status.ok());
 
-    //         Status status = txn2->Checkpoint(wal_manager_->LastCheckpointTS());
-    //         EXPECT_TRUE(status.ok());
-    //         status = new_txn_mgr->CommitTxn(txn2);
-    //         EXPECT_TRUE(status.ok());
-    //     }
-    //     RestartTxnMgr();
-    //     {
-    //         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check"), TransactionType::kNormal);
+            LOG_INFO("Abc");
+            new_txn_mgr->PrintAllKeyValue();
 
-    // Vector<String> table_names;
-    // status = txn->ListTable(*db_name, table_names);
-    // EXPECT_TRUE(status.ok());
-    // EXPECT_EQ(table_names, Vector<String>({"tb1"}));
+            Status status = txn2->Checkpoint(wal_manager_->LastCheckpointTS());
+            EXPECT_TRUE(status.ok());
+            status = new_txn_mgr->CommitTxn(txn2);
+            EXPECT_TRUE(status.ok());
+        }
+        RestartTxnMgr();
+        {
+            auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check"), TransactionType::kNormal);
 
-    //         status = new_txn_mgr->CommitTxn(txn);
-    //         EXPECT_TRUE(status.ok());
-    //     }
-    // }
+            Vector<String> table_names;
+            status = txn->ListTable(*db_name, table_names);
+            EXPECT_TRUE(status.ok());
+            // Checkpoint occurs after create table is committed, kv of the table is flushed during checkpoint.
+            EXPECT_EQ(table_names, Vector<String>({"tb1"}));
+
+            status = new_txn_mgr->CommitTxn(txn);
+            EXPECT_TRUE(status.ok());
+        }
+    }
 }

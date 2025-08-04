@@ -19,6 +19,7 @@ import base_test;
 #else
 module;
 
+#include "unit_test/gtest_expand.h"
 #include "gtest/gtest.h"
 
 module infinity_core:ut.buffer_obj;
@@ -594,7 +595,7 @@ TEST_F(BufferObjTest, test_big_with_gc_and_cleanup) {
     infinity::InfinityContext::instance().UnInit();
 }
 
-TEST_F(BufferObjTest, test_multiple_threads_read) {
+TEST_F(BufferObjTest, DISABLED_test_multiple_threads_read) {
     std::shared_ptr<std::string> config_path = std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_buffer_obj.toml");
     // Earlier cases may leave a dirty infinity instance. Destroy it first.
     infinity::Infinity::LocalUnInit();

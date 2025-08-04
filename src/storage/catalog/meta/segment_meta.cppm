@@ -75,8 +75,6 @@ public:
 
     Status SetNextBlockID(BlockID next_block_id);
 
-    // Status SetRowCnt(SizeT row_cnt);
-
     Status SetFirstDeleteTS(TxnTimeStamp first_delete_ts);
 
     Status InitSet();
