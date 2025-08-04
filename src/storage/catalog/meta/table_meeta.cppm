@@ -14,20 +14,19 @@
 
 module;
 
-#include "type/complex/row_id.h"
+export module infinity_core:table_meeta;
 
-export module table_meeta;
-
-import stl;
-import status;
+import :stl;
+import :status;
 import column_def;
-import new_catalog;
+import :new_catalog;
+import row_id;
 
 namespace infinity {
 
 class KVInstance;
 class TableDef;
-class TableInfo;
+struct TableInfo;
 class TableIndexReaderCache;
 class NewTxn;
 // struct SegmentUpdateTS;

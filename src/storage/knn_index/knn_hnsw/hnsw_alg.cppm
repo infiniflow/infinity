@@ -17,23 +17,24 @@ module;
 #include <ostream>
 #include <random>
 
-export module hnsw_alg;
+export module infinity_core:hnsw_alg;
 
-import stl;
-import local_file_handle;
-import infinity_exception;
-import knn_result_handler;
-import multivector_result_handler;
+import :stl;
+import :local_file_handle;
+import :infinity_exception;
+import :knn_result_handler;
+import :multivector_result_handler;
 import logical_type;
-import hnsw_common;
-import data_store;
-import third_party;
+import :hnsw_common;
+import :data_store;
+import :third_party;
 import serialize;
-import dist_func_lsg_wrapper;
-import default_values;
-import hnsw_lsg_builder;
+import :dist_func_lsg_wrapper;
+import :plain_vec_store;
+import :default_values;
+import :hnsw_lsg_builder;
 import column_def;
-import index_hnsw;
+import :index_hnsw;
 
 // Fixme: some variable has implicit type conversion.
 // Fixme: some variable has confusing name.

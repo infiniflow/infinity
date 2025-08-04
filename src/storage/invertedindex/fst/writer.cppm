@@ -13,10 +13,12 @@
 // limitations under the License.
 
 module;
+
 #include <cassert>
-import stl;
-import crc;
-export module fst:writer;
+
+export module infinity_core:fst.writer;
+import :stl;
+import :crc;
 
 export namespace infinity {
 
@@ -27,12 +29,12 @@ public:
     virtual void Flush() = 0;
 };
 
-class BufferWriter : public Writer {
+class FstBufferWriter : public Writer {
 public:
     Vector<u8> &buffer_;
 
 public:
-    BufferWriter(Vector<u8> &buffer) : buffer_(buffer) {}
+    FstBufferWriter(Vector<u8> &buffer) : buffer_(buffer) {}
 
     void Write(const u8 *data_ptr, SizeT data_size) override { buffer_.insert(buffer_.end(), data_ptr, data_ptr + data_size); }
 

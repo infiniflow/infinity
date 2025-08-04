@@ -14,16 +14,16 @@
 
 module;
 
-export module bitmap_cast;
+export module infinity_core:bitmap_cast;
 
-import stl;
+import :stl;
 
-import column_vector_cast;
+import :column_vector_cast;
 
-import infinity_exception;
-import bound_cast_func;
-import column_vector;
-import third_party;
+import :infinity_exception;
+import :bound_cast_func;
+import :column_vector;
+import :third_party;
 
 #if 0
 namespace infinity {

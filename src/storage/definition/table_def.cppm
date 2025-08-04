@@ -13,11 +13,11 @@
 // limitations under the License.
 module;
 
-export module table_def;
+export module infinity_core:table_def;
 
-import stl;
+import :stl;
 
-import index_base;
+import :index_base;
 import column_def;
 import global_resource_usage;
 

@@ -23,13 +23,13 @@ module;
 #include <simde/x86/sse.h>
 #endif
 
-export module lvq_vec_store;
+export module infinity_core:lvq_vec_store;
 
-import stl;
-import local_file_handle;
-import hnsw_common;
+import :stl;
+import :local_file_handle;
+import :hnsw_common;
 import serialize;
-import data_store_util;
+import :data_store_util;
 
 namespace infinity {
 
@@ -245,7 +245,7 @@ public:
         std::memcpy(meta.mean_.get(), ptr, sizeof(MeanType) * dim);
         ptr += sizeof(MeanType) * dim;
         if constexpr (!std::is_same_v<GlobalCacheType, Tuple<>>) {
-            std::memcpy(&meta.global_cache_, ptr, sizeof(GlobalCacheType));
+            std::memcpy(static_cast<void*>(&meta.global_cache_), ptr, sizeof(GlobalCacheType));
             ptr += sizeof(GlobalCacheType);
         }
         return meta;

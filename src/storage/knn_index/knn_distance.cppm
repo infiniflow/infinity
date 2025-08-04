@@ -14,12 +14,12 @@
 
 module;
 
-export module deprecated_knn_distance;
+export module infinity_core:deprecated_knn_distance;
 
-import stl;
+import :stl;
 import knn_expr;
 import internal_types;
-import roaring_bitmap;
+import :roaring_bitmap;
 
 namespace infinity {
 

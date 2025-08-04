@@ -4,9 +4,9 @@ module;
 #include <cstdio>
 #include <iterator>
 
-export module rcu_multimap;
+export module infinity_core:rcu_multimap;
 
-import stl;
+import :stl;
 
 namespace infinity {
 

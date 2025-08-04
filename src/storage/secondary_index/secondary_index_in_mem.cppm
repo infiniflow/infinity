@@ -14,20 +14,20 @@
 
 module;
 
-export module secondary_index_in_mem;
+export module infinity_core:secondary_index_in_mem;
 
-import stl;
-import roaring_bitmap;
+import :stl;
+import :roaring_bitmap;
 import internal_types;
 import column_def;
-import base_memindex;
-import memindex_tracer;
-import chunk_index_meta;
+import :base_memindex;
+import :memindex_tracer;
+import :chunk_index_meta;
 
 namespace infinity {
 
 class BufferManager;
-class ColumnVector;
+struct ColumnVector;
 class BufferObj;
 
 export class SecondaryIndexInMem : public BaseMemIndex {

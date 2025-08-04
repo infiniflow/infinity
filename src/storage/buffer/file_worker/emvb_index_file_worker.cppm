@@ -14,16 +14,16 @@
 
 module;
 
-export module emvb_index_file_worker;
+export module infinity_core:emvb_index_file_worker;
 
-import stl;
-import index_file_worker;
-import file_worker;
-import index_base;
+import :stl;
+import :index_file_worker;
+import :file_worker;
+import :index_base;
 import embedding_info;
 import column_def;
-import file_worker_type;
-import persistence_manager;
+import :file_worker_type;
+import :persistence_manager;
 
 namespace infinity {
 

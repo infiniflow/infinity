@@ -118,8 +118,20 @@ public:
     }
 
     [[nodiscard]] inline std::string ToString() const {
-        ParserError("ToString() isn't implemented");
-        return std::string();
+        if (point_count == 0 || ptr == nullptr) {
+            return "()";
+        }
+
+        std::string result = "(";
+        PointType *points = reinterpret_cast<PointType *>(ptr);
+        for (uint64_t i = 0; i < point_count; ++i) {
+            if (i > 0) {
+                result += ",";
+            }
+            result += points[i].ToString();
+        }
+        result += ")";
+        return result;
     }
 };
 

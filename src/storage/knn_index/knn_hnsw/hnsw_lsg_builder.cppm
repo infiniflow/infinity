@@ -17,32 +17,32 @@ module;
 #include <future>
 #include <vector>
 
-export module hnsw_lsg_builder;
+export module infinity_core:hnsw_lsg_builder;
 
-import stl;
+import :stl;
 import column_def;
-import index_hnsw;
-import index_ivf;
+import :index_hnsw;
+import :index_ivf;
 import statement_common;
-import defer_op;
-import infinity_exception;
-import index_base;
-import ivf_index_data;
-import third_party;
+import :defer_op;
+import :infinity_exception;
+import :index_base;
+import :ivf_index_data;
+import :third_party;
 import internal_types;
-import knn_scan_data;
+import :knn_scan_data;
 import knn_expr;
-import ivf_index_search;
+import :ivf_index_search;
 import data_type;
-import roaring_bitmap;
-import knn_result_handler;
+import :roaring_bitmap;
+import :knn_result_handler;
 import logical_type;
 import embedding_info;
-import hnsw_common;
-import status;
-import merge_knn;
-import infinity_context;
-import logger;
+import :hnsw_common;
+import :status;
+import :merge_knn;
+import :infinity_context;
+import :logger;
 
 namespace infinity {
 

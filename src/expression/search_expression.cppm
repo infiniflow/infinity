@@ -14,15 +14,15 @@
 
 module;
 
-export module search_expression;
+export module infinity_core:search_expression;
 
-import stl;
-import base_expression;
-import fusion_expression;
-import match_expression;
-import knn_expression;
-import match_tensor_expression;
-import match_sparse_expression;
+import :stl;
+import :base_expression;
+import :fusion_expression;
+import :match_expression;
+import :knn_expression;
+import :match_tensor_expression;
+import :match_sparse_expression;
 import logical_type;
 import internal_types;
 import data_type;

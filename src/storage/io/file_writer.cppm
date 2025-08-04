@@ -14,10 +14,10 @@
 
 module;
 
-export module file_writer;
+export module infinity_core:file_writer;
 
-import stl;
-import local_file_handle;
+import :stl;
+import :local_file_handle;
 
 namespace infinity {
 

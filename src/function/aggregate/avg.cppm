@@ -14,9 +14,9 @@
 
 module;
 
-export module avg;
+export module infinity_core:avg;
 
-import stl;
+import :stl;
 
 namespace infinity {
 

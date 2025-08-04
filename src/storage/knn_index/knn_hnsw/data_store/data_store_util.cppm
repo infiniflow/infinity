@@ -14,9 +14,9 @@
 
 module;
 
-export module data_store_util;
+export module infinity_core:data_store_util;
 
-import stl;
+import :stl;
 
 namespace infinity {
 

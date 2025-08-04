@@ -14,25 +14,27 @@
 
 module;
 
-export module query_binder;
+export module infinity_core:query_binder;
 
-import logical_node;
-import stl;
+import :logical_node;
+import :stl;
 
-import query_context;
-import bound_select_statement;
-import bind_context;
-import table_ref;
-import base_table_ref;
-import binding;
-import bind_alias_proxy;
-import bound_delete_statement;
-import bound_update_statement;
-import bound_compact_statement;
+import :query_context;
+import :bound_select_statement;
+import :bind_context;
+import :table_ref;
+import :base_table_ref;
+import :binding;
+import :bind_alias_proxy;
+import :bound_insert_statement;
+import :bound_delete_statement;
+import :bound_update_statement;
+import :bound_compact_statement;
 import select_statement;
 import delete_statement;
 import update_statement;
 import compact_statement;
+import insert_statement;
 import parsed_expr;
 import knn_expr;
 import table_reference;
@@ -49,6 +51,8 @@ public:
         : query_context_ptr_(std::move(query_context)), bind_context_ptr_(std::move(bind_context_ptr)) {}
 
     UniquePtr<BoundSelectStatement> BindSelect(const SelectStatement &statement);
+
+    UniquePtr<BoundInsertStatement> BindInsert(const InsertStatement &statement);
 
     UniquePtr<BoundDeleteStatement> BindDelete(const DeleteStatement &statement);
 

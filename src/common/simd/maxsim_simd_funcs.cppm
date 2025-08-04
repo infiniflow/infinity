@@ -18,9 +18,10 @@ module;
 #include <bit>
 #include <cassert>
 
-export module maxsim_simd_funcs;
-import stl;
-import simd_common_tools;
+export module infinity_core:maxsim_simd_funcs;
+
+import :stl;
+import :simd_common_tools;
 
 namespace infinity {
 

@@ -12,15 +12,30 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#if 0
+#ifdef CI
 #include "gtest/gtest.h"
+import infinity_core;
 import base_test;
+#else
+module;
 
-import stl;
-import user_defined_term_weight;
+#include "gtest/gtest.h"
+
+module infinity_core:ut.user_defined_term_weight;
+
+import :ut.base_test;
+import :stl;
+import :status;
+import :user_defined_term_weight;
+import :python_instance;
+#endif
+
 import compilation_config;
-import status;
-import python_instance;
+
+#if 0
+
+
+
 
 using namespace infinity;
 

@@ -14,20 +14,20 @@
 
 module;
 
-export module physical_command;
+export module infinity_core:physical_command;
 
-import stl;
+import :stl;
 import internal_types;
-import physical_operator;
-import physical_operator_type;
-import query_context;
+import :physical_operator;
+import :physical_operator_type;
+// import :query_context;
 
-import operator_state;
-import load_meta;
-import infinity_exception;
+import :operator_state;
+import :load_meta;
+import :infinity_exception;
 import command_statement;
 import data_type;
-import logger;
+import :logger;
 
 namespace infinity {
 

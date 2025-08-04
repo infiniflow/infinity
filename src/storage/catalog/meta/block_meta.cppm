@@ -14,13 +14,13 @@
 
 module;
 
-export module block_meta;
+export module infinity_core:block_meta;
 
-import stl;
-import status;
-import default_values;
-import meta_info;
-import new_catalog;
+import :stl;
+import :status;
+import :default_values;
+import :meta_info;
+import :new_catalog;
 
 namespace infinity {
 

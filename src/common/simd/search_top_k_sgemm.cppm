@@ -15,12 +15,12 @@
 module;
 
 #include "simd_common_intrin_include.h"
-export module search_top_k_sgemm;
-import stl;
-import knn_result_handler;
-import mlas_matrix_multiply;
-import vector_distance;
-import heap_twin_operation;
+export module infinity_core:search_top_k_sgemm;
+import :stl;
+import :knn_result_handler;
+import :mlas_matrix_multiply;
+import :vector_distance;
+import :heap_twin_operation;
 
 namespace infinity {
 

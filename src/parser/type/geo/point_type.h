@@ -38,10 +38,7 @@ struct PointType {
         y = 0;
     }
 
-    [[nodiscard]] inline std::string ToString() const {
-        ParserError("ToString() isn't implemented");
-        return std::string();
-    }
+    [[nodiscard]] inline std::string ToString() const { return "(" + std::to_string(x) + "," + std::to_string(y) + ")"; }
 
     double x{};
     double y{};

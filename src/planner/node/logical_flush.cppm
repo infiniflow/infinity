@@ -14,12 +14,12 @@
 
 module;
 
-export module logical_flush;
+export module infinity_core:logical_flush;
 
-import stl;
-import logical_node_type;
-import column_binding;
-import logical_node;
+import :stl;
+import :logical_node_type;
+import :column_binding;
+import :logical_node;
 import data_type;
 import internal_types;
 import flush_statement;

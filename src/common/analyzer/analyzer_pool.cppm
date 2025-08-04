@@ -14,13 +14,13 @@
 
 module;
 
-export module analyzer_pool;
+export module infinity_core:analyzer_pool;
 
-import stl;
-import singleton;
-import third_party;
-import analyzer;
-import status;
+import :stl;
+import :singleton;
+import :third_party;
+import :analyzer;
+import :status;
 
 namespace infinity {
 

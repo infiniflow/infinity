@@ -14,9 +14,9 @@
 
 module;
 
-export module substring;
+export module infinity_core:substring;
 
-import stl;
+import :stl;
 
 namespace infinity {
 

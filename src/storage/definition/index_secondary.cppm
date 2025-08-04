@@ -14,12 +14,12 @@
 
 module;
 
-export module index_secondary;
+export module infinity_core:index_secondary;
 
-import stl;
+import :stl;
 
-import index_base;
-import base_table_ref;
+import :index_base;
+import :base_table_ref;
 import create_index_info;
 
 namespace infinity {
