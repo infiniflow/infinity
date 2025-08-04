@@ -18,7 +18,7 @@ import time
 
 import infinity
 from infinity import index
-from infinity.common import LOCAL_HOST, LOCAL_INFINITY_PATH
+from infinity.common import LOCAL_HOST, LOCAL_INFINITY_PATH, ConflictType
 from infinity.errors import ErrorCode
 from infinity.remote_thrift.client import ThriftInfinityClient
 from infinity.remote_thrift.table import RemoteTable
@@ -103,6 +103,10 @@ def import_gist_1m(path, m: int, ef_construction: int, build_type: str, encode_t
 
 
 def create_index(table_obj, m: int, ef_construction: int, build_type: str, encode_type: str):
+    res = table_obj.drop_index("hnsw_index", ConflictType.Ignore)
+
+    assert res.error_code == ErrorCode.OK
+
     res = table_obj.create_index(
         "hnsw_index",
         index.IndexInfo(
@@ -139,8 +143,8 @@ if __name__ == "__main__":
 
     parser.add_argument("-d", "--data", type=str, default="sift_1m", dest="data_set")
     parser.add_argument("--m", type=int, default=16, dest="m")
-    parser.add_argument("--ef_construction", type=int, default=200, dest="ef_construction")
-    parser.add_argument("-b", "--build", type=str, default="plain", dest="build_type") # plain
+    parser.add_argument("--efc", type=int, default=200, dest="ef_construction")
+    parser.add_argument("-b", "--build", type=str, default="plain", dest="build_type") # plain, lsg
     parser.add_argument("-e", "--encode", type=str, default="lvq", dest="encode_type") # plain, lvq
     parser.add_argument("-R", "--remote", type=str2bool, default=True, dest="remote")
 

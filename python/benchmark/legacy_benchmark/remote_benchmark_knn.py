@@ -171,8 +171,7 @@ def process_pool(threads, rounds, query_path, ef: int, remote: bool, table_name)
 
     dur_sum /= rounds
     results.append(f"Round result [1, {rounds}]:")
-    results.append(f"Avg total dur: {dur_sum:.2f} s")
-    results.append(f"Avg QPS: {(total_queries_count / dur_sum):.2f}")
+    results.append(f"ef: {ef}, Avg total dur: {dur_sum:.2f} s, Avg QPS: {(total_queries_count / dur_sum):.2f}")
 
     for result in results:
         print(result)
@@ -200,14 +199,12 @@ def one_thread(rounds, query_path, ground_truth_path, ef: int, remote: bool, tab
 
     dur_sum = 0
     for i in range(rounds):
-
         query_results = [[] for _ in range(len(queries))]
 
         dur = 0.0
         for idx, query_vec in enumerate(queries):
 
             start = time.time()
-
             query_builder = InfinityThriftQueryBuilder(table)
             query_builder.output(["_row_id"])
             query_builder.match_dense('col1', query_vec, 'float', 'l2', 100,
@@ -238,8 +235,8 @@ def one_thread(rounds, query_path, ground_truth_path, ef: int, remote: bool, tab
 
     dur_sum /= rounds
     results.append(f"Round result [1, {rounds}]:")
-    results.append(f"Avg total dur: {dur_sum:.2f} s")
-    results.append(f"Avg QPS: {(len(queries) / dur_sum):.2f}")
+    results.append(f"ef: {ef}, Avg total dur: {dur_sum:.2f} s, Avg QPS: {(len(queries) / dur_sum):.2f}")
+    results.append(f"Recall@1: {recall_1}, Recall@10: {recall_10}, Recall@100: {recall_100}")
 
     infinity_obj.disconnect()
 
@@ -269,12 +266,12 @@ def benchmark(threads, rounds, data_set, ef: int, build_type: str, encode_type: 
         if threads > 1:
             print(f"Multi-threads: {threads}")
             print(f"Rounds: {rounds}")
-            process_pool(threads, rounds, query_path, ef, "gist_benchmark")
+            process_pool(threads, rounds, query_path, ef, remote, f"gist_{build_type}_{encode_type}_benchmark")
 
         else:
             print(f"Single-thread")
             print(f"Rounds: {rounds}")
-            one_thread(rounds, query_path, ground_truth_path, ef, remote, "gist_benchmark")
+            one_thread(rounds, query_path, ground_truth_path, ef, remote, f"gist_{build_type}_{encode_type}_benchmark")
 
 
 def str2bool(value):
@@ -297,7 +294,7 @@ if __name__ == '__main__':
     parser.add_argument("-r", "--rounds", type=int, default=5, dest="rounds")
     parser.add_argument("-d", "--data", type=str, default='sift_1m', dest="data_set")
     parser.add_argument("--ef", type=int, default=200, dest="ef")
-    parser.add_argument("-b", "--build", type=str, default="plain", dest="build_type")  # plain
+    parser.add_argument("-b", "--build", type=str, default="plain", dest="build_type")  # plain, lsg
     parser.add_argument("-e", "--encode", type=str, default="lvq", dest="encode_type")  # plain, lvq
     parser.add_argument("-R", "--remote", type=str2bool, default=True, dest="remote")
 
