@@ -583,6 +583,13 @@ class table_http:
             res[col["name"]] = col["type"]
         return res
 
+    def compact(self):
+        url = f"databases/{self.database_name}/tables/{self.table_name}/compact"
+        h = self.net.set_up_header(["accept", "content-type"])
+        r = self.net.request(url, "put", h)
+        self.net.raise_exception(r)
+        return database_result()
+
     # index
     def create_index(
             self,

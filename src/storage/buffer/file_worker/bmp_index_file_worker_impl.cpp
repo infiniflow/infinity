@@ -26,11 +26,7 @@ import :third_party;
 import internal_types;
 import :bmp_util;
 import :bmp_alg;
-#ifdef INDEX_HANDLER
 import :bmp_handler;
-#else
-import :abstract_bmp;
-#endif
 import :virtual_store;
 import :persistence_manager;
 import :local_file_handle;
@@ -80,11 +76,7 @@ void BMPIndexFileWorker::AllocateInMemory() {
         const auto error_message = "Data is already allocated.";
         UnrecoverableError(error_message);
     }
-#ifdef INDEX_HANDLER
     data_ = static_cast<void *>(new BMPHandlerPtr());
-#else
-    data_ = static_cast<void *>(new AbstractBMP());
-#endif
 }
 
 void BMPIndexFileWorker::FreeInMemory() {
@@ -92,24 +84,9 @@ void BMPIndexFileWorker::FreeInMemory() {
         const auto error_message = "Data is not allocated.";
         UnrecoverableError(error_message);
     }
-#ifdef INDEX_HANDLER
     auto *bmp_handler = reinterpret_cast<BMPHandlerPtr *>(data_);
     delete *bmp_handler;
     delete bmp_handler;
-#else
-    auto *p = reinterpret_cast<AbstractBMP *>(data_);
-    std::visit(
-        [](auto &&arg) {
-            using T = std::decay_t<decltype(arg)>;
-            if constexpr (!std::is_same_v<T, std::nullptr_t>) {
-                if (arg != nullptr) {
-                    delete arg;
-                }
-            }
-        },
-        *p);
-    delete p;
-#endif
     data_ = nullptr;
 }
 
@@ -117,35 +94,12 @@ bool BMPIndexFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_success, c
     if (!data_) {
         UnrecoverableError("Data is not allocated.");
     }
-#ifdef INDEX_HANDLER
     auto *bmp_handler = reinterpret_cast<BMPHandlerPtr *>(data_);
     if (to_spill) {
         (*bmp_handler)->Save(*file_handle_);
     } else {
         (*bmp_handler)->SaveToPtr(*file_handle_);
     }
-#else
-    auto *bmp_index = reinterpret_cast<AbstractBMP *>(data_);
-    std::visit(
-        [&](auto &&index) {
-            using T = std::decay_t<decltype(index)>;
-            if constexpr (std::is_same_v<T, std::nullptr_t>) {
-                UnrecoverableError("Invalid index type.");
-            } else {
-                using IndexT = std::decay_t<decltype(*index)>;
-                if constexpr (IndexT::kOwnMem) {
-                    if (to_spill) {
-                        index->Save(*file_handle_);
-                    } else {
-                        index->SaveToPtr(*file_handle_);
-                    }
-                } else {
-                    UnrecoverableError("BMPIndexFileWorker::WriteToFileImpl: index does not own memory");
-                }
-            }
-        },
-        *bmp_index);
-#endif
     prepare_success = true;
     return true;
 }
@@ -154,7 +108,6 @@ void BMPIndexFileWorker::ReadFromFileImpl(SizeT file_size, bool from_spill) {
     if (data_ != nullptr) {
         UnrecoverableError("Data is already allocated.");
     }
-#ifdef INDEX_HANDLER
     data_ = static_cast<void *>(new BMPHandlerPtr(BMPHandler::Make(index_base_.get(), column_def_.get()).release()));
     auto *bmp_handler = reinterpret_cast<BMPHandlerPtr *>(data_);
     if (from_spill) {
@@ -162,63 +115,15 @@ void BMPIndexFileWorker::ReadFromFileImpl(SizeT file_size, bool from_spill) {
     } else {
         (*bmp_handler)->LoadFromPtr(*file_handle_, file_size);
     }
-#else
-    data_ = static_cast<void *>(new AbstractBMP(BMPIndexInMem::InitAbstractIndex(index_base_.get(), column_def_.get())));
-    auto *bmp_index = reinterpret_cast<AbstractBMP *>(data_);
-    std::visit(
-        [&](auto &&index) {
-            using T = std::decay_t<decltype(index)>;
-            if constexpr (std::is_same_v<T, std::nullptr_t>) {
-                UnrecoverableError("Invalid index type.");
-            } else {
-                using IndexT = std::decay_t<decltype(*index)>;
-                if constexpr (IndexT::kOwnMem) {
-                    if (from_spill) {
-                        index = IndexT::Load(*file_handle_).release();
-                    } else {
-                        index = IndexT::LoadFromPtr(*file_handle_, file_size).release();
-                    }
-                } else {
-                    UnrecoverableError("BMPIndexFileWorker::ReadFromFileImpl: index does not own memory");
-                }
-            }
-        },
-        *bmp_index);
-#endif
 }
 
 bool BMPIndexFileWorker::ReadFromMmapImpl(const void *ptr, SizeT size) {
     if (mmap_data_ != nullptr) {
         UnrecoverableError("Data is already allocated.");
     }
-    
-    // DEBUG: Validate the file size and metadata
-    LOG_INFO(fmt::format("BMP ReadFromMmapImpl: file_size={}, expected_index_size={}", size, index_size_));
-    
-#ifdef INDEX_HANDLER
     mmap_data_ = reinterpret_cast<u8 *>(new BMPHandlerPtr(BMPHandler::Make(index_base_.get(), column_def_.get(), false).release()));
     auto *bmp_handler = reinterpret_cast<BMPHandlerPtr *>(mmap_data_);
     (*bmp_handler)->LoadFromPtr(static_cast<const char *>(ptr), size);
-#else
-    mmap_data_ = reinterpret_cast<u8 *>(new AbstractBMP(BMPIndexInMem::InitAbstractIndex(index_base_.get(), column_def_.get(), false)));
-    auto *bmp_index = reinterpret_cast<AbstractBMP *>(mmap_data_);
-    std::visit(
-        [&](auto &&index) {
-            using T = std::decay_t<decltype(index)>;
-            if constexpr (std::is_same_v<T, std::nullptr_t>) {
-                UnrecoverableError("Invalid index type.");
-            } else {
-                using IndexT = std::decay_t<decltype(*index)>;
-                if constexpr (!IndexT::kOwnMem) {
-                    const auto *p = static_cast<const char *>(ptr);
-                    index = IndexT::LoadFromPtr(p, size).release();
-                } else {
-                    UnrecoverableError("BMPIndexFileWorker::ReadFromMmapImpl: index own memory");
-                }
-            }
-        },
-        *bmp_index);
-#endif
     return true;
 }
 
@@ -226,27 +131,9 @@ void BMPIndexFileWorker::FreeFromMmapImpl() {
     if (mmap_data_ == nullptr) {
         return;
     }
-#ifdef INDEX_HANDLER
     auto *bmp_handler = reinterpret_cast<BMPHandlerPtr *>(mmap_data_);
     delete *bmp_handler;
     delete bmp_handler;
-#else
-    auto *bmp_index = reinterpret_cast<AbstractBMP *>(mmap_data_);
-    std::visit(
-        [&](auto &&index) {
-            using T = std::decay_t<decltype(index)>;
-            if constexpr (!std::is_same_v<T, std::nullptr_t>) {
-                using IndexT = std::decay_t<decltype(*index)>;
-                if constexpr (!IndexT::kOwnMem) {
-                    delete index;
-                } else {
-                    UnrecoverableError("Invalid index type.");
-                }
-            }
-        },
-        *bmp_index);
-    delete bmp_index;
-#endif
     mmap_data_ = nullptr;
 }
 

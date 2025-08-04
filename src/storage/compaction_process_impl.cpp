@@ -197,19 +197,7 @@ void CompactionProcessor::NewDoCompact() {
             return;
         }
 
-        auto compaction_alg = NewCompactionAlg::GetInstance();
-
-        for (SegmentID segment_id : segment_ids) {
-            SegmentMeta segment_meta(segment_id, *table_meta);
-            auto [segment_row_cnt, segment_status] = segment_meta.GetRowCnt1();
-            if (!segment_status.ok()) {
-                UnrecoverableError(segment_status.message());
-            }
-
-            compaction_alg->AddSegment(segment_id, segment_row_cnt);
-        }
-        Vector<SegmentID> compactible_segment_ids = compaction_alg->GetCompactiableSegments();
-
+        Vector<SegmentID> compactible_segment_ids = GetCompactableSegments(*table_meta, segment_ids);
         if (!compactible_segment_ids.empty()) {
             status = new_txn_shared->Compact(db_name, table_name, compactible_segment_ids);
         }
@@ -229,6 +217,7 @@ void CompactionProcessor::NewDoCompact() {
 }
 
 Status CompactionProcessor::NewManualCompact(const String &db_name, const String &table_name) {
+    UniquePtr<String> result_msg;
     //    LOG_TRACE(fmt::format("Compact command triggered compaction: {}.{}", db_name, table_name));
     auto *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
     auto *new_txn = new_txn_mgr->BeginTxn(MakeUnique<String>(fmt::format("compact table {}.{}", db_name, table_name)), TransactionType::kNormal);
@@ -257,12 +246,22 @@ Status CompactionProcessor::NewManualCompact(const String &db_name, const String
             segment_ids.erase(std::remove(segment_ids.begin(), segment_ids.end(), unsealed_id), segment_ids.end());
         }
     }
-    status = new_txn->Compact(db_name, table_name, segment_ids);
-    if (!status.ok()) {
-        return status;
+
+    Vector<SegmentID> compactible_segment_ids = GetCompactableSegments(*table_meta, segment_ids);
+    if (!compactible_segment_ids.empty()) {
+        status = new_txn->Compact(db_name, table_name, compactible_segment_ids);
+        if (!status.ok()) {
+            return status;
+        }
+        status = new_txn_mgr->CommitTxn(new_txn);
+        if (!status.ok()) {
+            return status;
+        }
+        result_msg = MakeUnique<String>(fmt::format("Compact segments {} into new segment", fmt::join(compactible_segment_ids, ",")));
+    } else {
+        result_msg = MakeUnique<String>("No segment to compact");
     }
-    status = new_txn_mgr->CommitTxn(new_txn);
-    return status;
+    return Status(ErrorCode::kOk, std::move(result_msg));
 }
 
 void CompactionProcessor::NewScanAndOptimize() {
@@ -391,6 +390,21 @@ void CompactionProcessor::Process() {
         task_count_ -= tasks.size();
         tasks.clear();
     }
+}
+
+Vector<SegmentID> CompactionProcessor::GetCompactableSegments(TableMeeta &table_meta, const Vector<SegmentID> &segment_ids) {
+    auto compaction_alg = NewCompactionAlg::GetInstance();
+
+    for (SegmentID segment_id : segment_ids) {
+        SegmentMeta segment_meta(segment_id, table_meta);
+        auto [segment_row_cnt, segment_status] = segment_meta.GetRowCnt1();
+        if (!segment_status.ok()) {
+            UnrecoverableError(segment_status.message());
+        }
+        compaction_alg->AddSegment(segment_id, segment_row_cnt);
+    }
+
+    return compaction_alg->GetCompactableSegments();
 }
 
 } // namespace infinity

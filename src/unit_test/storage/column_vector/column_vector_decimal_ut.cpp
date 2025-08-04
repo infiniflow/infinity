@@ -45,7 +45,6 @@ import decimal_info;
 import data_type;
 import compilation_config;
 
-#if 0
 using namespace infinity;
 
 class ColumnVectorDecimalTest : public BaseTest {
@@ -315,4 +314,3 @@ TEST_F(ColumnVectorDecimalTest, decimal_column_slice_init) {
         EXPECT_EQ(vx.value_.decimal.lower, static_cast<i64>(src_idx));
     }
 }
-#endif

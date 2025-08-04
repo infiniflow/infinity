@@ -3256,12 +3256,8 @@ public:
         auto infinity = Infinity::RemoteConnect();
         DeferFn defer_fn([&]() { infinity->RemoteDisconnect(); });
 
-        String data_body = request->readBodyToString();
-        simdjson::padded_string json_pad(data_body);
-        simdjson::parser parser;
-        simdjson::document doc = parser.iterate(json_pad);
-        String db_name = doc["db_name"].get<String>();
-        String table_name = doc["table_name"].get<String>();
+        String db_name = request->getPathVariable("database_name");
+        String table_name = request->getPathVariable("table_name");
 
         nlohmann::json json_response;
         HTTPStatus http_status;
@@ -4057,6 +4053,7 @@ Thread HTTPServer::Start(const String &ip_address, u16 port) {
     router->route("POST", "/databases/{database_name}/tables/{table_name}/docs", MakeShared<InsertHandler>());
     router->route("DELETE", "/databases/{database_name}/tables/{table_name}/docs", MakeShared<DeleteHandler>());
     router->route("PUT", "/databases/{database_name}/tables/{table_name}/docs", MakeShared<UpdateHandler>());
+    router->route("PUT", "/databases/{database_name}/tables/{table_name}/compact", MakeShared<CompactTableHandler>());
 
     // DQL
     router->route("GET", "/databases/{database_name}/tables/{table_name}/docs", MakeShared<SelectHandler>());
@@ -4125,7 +4122,6 @@ Thread HTTPServer::Start(const String &ip_address, u16 port) {
     router->route("GET", "/instance/memory/objects", MakeShared<ShowMemoryObjectsHandler>());
     router->route("GET", "/instance/memory/allocations", MakeShared<ShowMemoryAllocationsHandler>());
     router->route("POST", "/instance/flush", MakeShared<ForceGlobalCheckpointHandler>());
-    router->route("POST", "/instance/table/compact", MakeShared<CompactTableHandler>());
 
     // variable
     router->route("GET", "/variables/global", MakeShared<ShowGlobalVariablesHandler>());

@@ -75,12 +75,6 @@ TxnTimeStamp BlockMeta::GetCreateTimestampFromKV() const {
 
 
 Status BlockMeta::InitSet() {
-    // {
-    //     Status status = SetRowCnt(0);
-    //     if (!status.ok()) {
-    //         return status;
-    //     }
-    // }
     NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
     {
         String block_lock_key = GetBlockTag("lock");

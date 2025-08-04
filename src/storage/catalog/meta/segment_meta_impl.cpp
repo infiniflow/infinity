@@ -78,17 +78,6 @@ Status SegmentMeta::SetNextBlockID(BlockID next_block_id) {
     return Status::OK();
 }
 
-// Status SegmentMeta::SetRowCnt(SizeT row_cnt) {
-//     row_cnt_ = row_cnt;
-//     String row_cnt_key = GetSegmentTag("row_cnt");
-//     String row_cnt_str = fmt::format("{}", row_cnt);
-//     Status status = kv_instance_.Put(row_cnt_key, row_cnt_str);
-//     if (!status.ok()) {
-//         return status;
-//     }
-//     return Status::OK();
-// }
-
 Status SegmentMeta::SetFirstDeleteTS(TxnTimeStamp first_delete_ts) {
     String first_delete_ts_key = GetSegmentTag("first_delete_ts");
     String first_delete_ts_str = fmt::format("{}", first_delete_ts);
@@ -113,12 +102,6 @@ Status SegmentMeta::InitSet() {
             return status;
         }
     }
-    // {
-    //     Status status = SetRowCnt(0);
-    //     if (!status.ok()) {
-    //         return status;
-    //     }
-    // }
     {
         Status status = SetFirstDeleteTS(UNCOMMIT_TS);
         if (!status.ok()) {

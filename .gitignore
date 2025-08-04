@@ -95,6 +95,9 @@ test/data/csv/pysdk_test_import_with_different_size.csv
 test/data/bvecs/
 test/sql/dml/import/test_bvecs.slt
 
+test/data/csv/test_slt_import_more_than_one_segment.csv
+test/sql/dml/import/test_slt_import_more_than_one_segment.slt
+
 invalid/*
 
 benchmark/toml/toml_config.h

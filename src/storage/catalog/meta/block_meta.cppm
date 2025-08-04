@@ -47,8 +47,6 @@ public:
 
     Status GetBlockLock(SharedPtr<BlockLock> &block_lock);
 
-    // Status SetRowCnt(SizeT row_cnt);
-
     Status InitSet();
 
     Status LoadSet(TxnTimeStamp checkpoint_ts);
