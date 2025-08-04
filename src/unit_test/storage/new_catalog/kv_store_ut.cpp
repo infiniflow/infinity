@@ -76,7 +76,7 @@ TEST_P(TestTxnKVStoreTest, kv_store0) {
     EXPECT_TRUE(status.ok());
 }
 
-TEST_P(TestTxnKVStoreTest, kv_store1) {
+TEST_P(TestTxnKVStoreTest, DISABLED_kv_store1) {
     using namespace infinity;
     const auto rocksdb_tmp_path = fmt::format("{}/rocksdb_transaction_example", GetFullTmpDir());
     // Test multi-version

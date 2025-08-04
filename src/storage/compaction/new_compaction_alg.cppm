@@ -26,7 +26,7 @@ public:
 
     virtual void AddSegment(SegmentID segment_id, SizeT segment_row_cnt) = 0;
 
-    virtual Vector<SegmentID> GetCompactiableSegments() = 0;
+    virtual Vector<SegmentID> GetCompactableSegments() = 0;
 
     static UniquePtr<NewCompactionAlg> GetInstance();
 };
