@@ -117,11 +117,11 @@ protected:
     void CheckRowCnt(const String &db_name, const String &table_name, SizeT expected_row_cnt) {
         auto *txn = txn_mgr_->BeginTxn(MakeUnique<String>("Check row count"), TransactionType::kNormal);
 
-        Optional<DBMeeta> db_meta;
+        SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         Status status = txn->GetTableMeta(db_name, table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
-        auto[row_cnt, status2] = table_meta->GetTableRowCount();
+        auto[row_cnt, status2] = table_meta->GetTableRowCount(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
         EXPECT_TRUE(status2.ok());
 
         txn_mgr_->CommitTxn(txn);

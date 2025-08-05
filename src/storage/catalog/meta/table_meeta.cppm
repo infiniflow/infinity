@@ -123,7 +123,7 @@ public:
 
     Status SetNextIndexID(KVInstance *kv_instance, const String &index_id_str);
 
-    Tuple<SizeT,Status> GetTableRowCount();
+    Tuple<SizeT,Status> GetTableRowCount(KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts);
 
 private:
     Status LoadComment(KVInstance *kv_instance);

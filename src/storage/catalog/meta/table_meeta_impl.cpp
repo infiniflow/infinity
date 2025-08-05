@@ -46,8 +46,7 @@ import row_id;
 namespace infinity {
 
 TableMeeta::TableMeeta(const String &db_id_str, const String &table_id_str, KVInstance *kv_instance, TxnTimeStamp commit_ts)
-    : BaseMeta(MetaType::kTable), commit_ts_(commit_ts), kv_instance_(kv_instance), db_id_str_(db_id_str),
-      table_id_str_(table_id_str) {}
+    : BaseMeta(MetaType::kTable), commit_ts_(commit_ts), kv_instance_(kv_instance), db_id_str_(db_id_str), table_id_str_(table_id_str) {}
 
 TableMeeta::TableMeeta(const String &db_id_str, const String &table_id_str, NewTxn *txn)
     : BaseMeta(MetaType::kTable), txn_(txn), db_id_str_(db_id_str), table_id_str_(table_id_str) {
@@ -839,14 +838,14 @@ Status TableMeeta::SetNextIndexID(KVInstance *kv_instance, const String &index_i
     return Status::OK();
 }
 
-Tuple<SizeT, Status> TableMeeta::GetTableRowCount() {
+Tuple<SizeT, Status> TableMeeta::GetTableRowCount(KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts) {
     Status status{};
     SizeT row_count{};
-    auto [segment_ids, seg_status] = GetSegmentIDs1();
+    auto [segment_ids, seg_status] = GetSegmentIDs1(kv_instance, begin_ts, commit_ts);
     for (auto &segment_id : *segment_ids) {
         SegmentMeta segment_meta(segment_id, *this);
         Vector<BlockID> *block_ids_ptr = nullptr;
-        std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1();
+        std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1(kv_instance, begin_ts, commit_ts);
         if (!status.ok()) {
             return {row_count, status};
         }
@@ -854,7 +853,7 @@ Tuple<SizeT, Status> TableMeeta::GetTableRowCount() {
         for (auto &block_id : *block_ids_ptr) {
             BlockMeta block_meta(block_id, segment_meta);
             NewTxnGetVisibleRangeState state;
-            status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts_, commit_ts_, state);
+            status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, commit_ts_, state);
             if (!status.ok()) {
                 return {row_count, status};
             }
