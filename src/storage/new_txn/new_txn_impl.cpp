@@ -1645,13 +1645,6 @@ Status NewTxn::RestoreDatabaseSnapshot(const SharedPtr<DatabaseSnapshotInfo> &da
     return Status::OK();
 }
 
-Status NewTxn::RestoreSystemSnapshot(const SharedPtr<SystemSnapshotInfo> &system_snapshot_info) {
-    // Cleanup();
-    this->SetTxnType(TransactionType::kRestoreSystem);
-    const String &system_name = system_snapshot_info->system_name_;
-    this->CheckTxn(system_name);
-}
-
 TxnTimeStamp NewTxn::GetCurrentCkpTS() const {
     TransactionType txn_type = GetTxnType();
     if (txn_type != TransactionType::kNewCheckpoint) {
@@ -2953,7 +2946,7 @@ bool NewTxn::CheckConflictTxnStore(const CreateDBTxnStore &txn_store, NewTxn *pr
             }
             break;
         }
-        case TransactionType::kCreateTableSnapshot: {
+        case TransactionType::kCreateSnapshot: {
                 retry_query = true;
             conflict = true;
             break;
@@ -2989,7 +2982,7 @@ bool NewTxn::CheckConflictTxnStore(const RestoreDatabaseTxnStore &txn_store, New
             }
             break;
         }
-        case TransactionType::kCreateTableSnapshot: {
+        case TransactionType::kCreateSnapshot: {
                 retry_query = true;
             conflict = true;
             break;
@@ -3121,7 +3114,7 @@ bool NewTxn::CheckConflictTxnStore(const CreateTableTxnStore &txn_store, NewTxn 
             }
             break;
         }
-        case TransactionType::kCreateTableSnapshot: {
+        case TransactionType::kCreateSnapshot: {
                 retry_query = true;
                 conflict = true;
             break;
@@ -4378,18 +4371,18 @@ bool NewTxn::CheckConflictTxnStore(const OptimizeIndexTxnStore &txn_store, NewTx
             }
             break;
         }
-        case TransactionType::kImport: {
-            LOG_INFO("OptimizeIndexTxnStore vs. ImportTxnStore conflict");
-            ImportTxnStore *import_txn_store = static_cast<ImportTxnStore *>(previous_txn->base_txn_store_.get());
-            const String &prev_db_name = import_txn_store->db_name_;
-            const String &prev_table_name = import_txn_store->table_name_;
-            if (std::find(db_names.begin(), db_names.end(), prev_db_name) != db_names.end() &&
-                std::find(table_names_in_db.at(prev_db_name).begin(), table_names_in_db.at(prev_db_name).end(), prev_table_name) !=
-                    table_names_in_db.at(prev_db_name).end()) {
-                conflict = true;
-            }
-            break;
-        }
+        // case TransactionType::kImport: {
+        //     LOG_INFO("OptimizeIndexTxnStore vs. ImportTxnStore conflict");
+        //     ImportTxnStore *import_txn_store = static_cast<ImportTxnStore *>(previous_txn->base_txn_store_.get());
+        //     const String &prev_db_name = import_txn_store->db_name_;
+        //     const String &prev_table_name = import_txn_store->table_name_;
+        //     if (std::find(db_names.begin(), db_names.end(), prev_db_name) != db_names.end() &&
+        //         std::find(table_names_in_db.at(prev_db_name).begin(), table_names_in_db.at(prev_db_name).end(), prev_table_name) !=
+        //             table_names_in_db.at(prev_db_name).end()) {
+        //         conflict = true;
+        //     }
+        //     break;
+        // }
         case TransactionType::kCompact: {
             CompactTxnStore *compact_txn_store = static_cast<CompactTxnStore *>(previous_txn->base_txn_store_.get());
             const String &prev_db_name = compact_txn_store->db_name_;
@@ -4861,11 +4854,6 @@ void NewTxn::CommitBottom() {
                     Status status = CommitBottomCreateDatabaseSnapshot(create_snapshot_cmd->db_name_, create_snapshot_cmd->snapshot_name_);
                     if (!status.ok()) {
                         UnrecoverableError(fmt::format("CommitBottomCreateDatabaseSnapshot failed: {}", status.message()));
-                    }
-                } else if (create_snapshot_cmd->snapshot_type_ == SnapshotScope::kSystem) {
-                    Status status = CommitBottomCreateSystemSnapshot(create_snapshot_cmd->snapshot_name_);
-                    if (!status.ok()) {
-                        UnrecoverableError(fmt::format("CommitBottomCreateSystemSnapshot failed: {}", status.message()));
                     }
                 }
                 break;

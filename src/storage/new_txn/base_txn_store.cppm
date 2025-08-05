@@ -131,8 +131,8 @@ export struct CreateTableTxnStore final : public BaseTxnStore {
 };
 
 
-export struct CreateTableSnapshotTxnStore final : public BaseTxnStore {
-    CreateTableSnapshotTxnStore() : BaseTxnStore(TransactionType::kCreateSnapshot) {}
+export struct CreateSnapshotTxnStore : public BaseTxnStore {
+    CreateSnapshotTxnStore() : BaseTxnStore(TransactionType::kCreateSnapshot) {}
 
     String db_name_{};
     String table_name_{};
@@ -143,7 +143,6 @@ export struct CreateTableSnapshotTxnStore final : public BaseTxnStore {
     String ToString() const final;
     SharedPtr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;
 };
-
 
 export struct RestoreTableTxnStore final : public BaseTxnStore {
     RestoreTableTxnStore() : BaseTxnStore(TransactionType::kRestoreTable) {}
