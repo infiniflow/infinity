@@ -1983,8 +1983,10 @@ Status NewTxn::Commit() {
     if (status.ok()) {
         status = this->PrepareCommit();
     }
+    // LOG_INFO(fmt::format("Prepare commit status: {}", status.message()));
 
     if (!status.ok()) {
+        LOG_INFO("Prepare commit failed, rollback the transaction");
         // If prepare commit or conflict check failed, rollback the transaction
         this->SetTxnRollbacking(commit_ts);
         txn_mgr_->SendToWAL(this);
@@ -2177,6 +2179,7 @@ Status NewTxn::PrepareCommit() {
 
                 Status status = PrepareCommitDelete(delete_cmd);
                 if (!status.ok()) {
+                    LOG_INFO(fmt::format("Prepare commit delete failed: {}", status.message()));
                     return status;
                 }
                 break;
@@ -4674,8 +4677,7 @@ bool NewTxn::CheckConflictTxnStore(const UpdateTxnStore &txn_store, NewTxn *prev
     const String &db_name = txn_store.db_name_;
     const String &table_name = txn_store.table_name_;
     Set<SegmentID> segment_ids;
-    for (const auto &row_range : txn_store.row_ranges_) {
-        RowID row_id = row_range.first;
+    for (const auto &row_id : txn_store.row_ids_) {
         segment_ids.insert(row_id.segment_id_);
     }
     bool conflict = false;
@@ -4716,10 +4718,16 @@ bool NewTxn::CheckConflictTxnStore(const UpdateTxnStore &txn_store, NewTxn *prev
             break;
         }
         case TransactionType::kDumpMemIndex: {
+            LOG_INFO("UpdateTxnStore vs. DumpMemIndexTxnStore conflict");
+            LOG_INFO(fmt::format("segment_ids_size: {}", segment_ids.size()));
+            for (SegmentID segment_id : segment_ids) {
+                LOG_INFO(fmt::format("segment_id: {}", segment_id));
+            }
             DumpMemIndexTxnStore *dump_index_txn_store = static_cast<DumpMemIndexTxnStore *>(previous_txn->base_txn_store_.get());
             if (dump_index_txn_store->db_name_ == db_name && dump_index_txn_store->table_name_ == table_name) {
                 for (SegmentID segment_id : dump_index_txn_store->segment_ids_) {
                     if (segment_ids.contains(segment_id)) {
+                        LOG_INFO("same segment id");
                         conflict = true;
                         break;
                     }
