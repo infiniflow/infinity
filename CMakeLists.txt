@@ -25,6 +25,7 @@ option(CI "Build in CI mode" OFF)
 if (CI)
     add_definitions(-DCI=1)
 endif ()
+add_definitions(-D_POSIX_C_SOURCE=200809L -D_POSIX_SEM_VALUE_MAX=_SC_SEM_VALUE_MAX -DARROW_USE_NATIVE_INT128)
 
 message(STATUS "CXX: ${CMAKE_CXX_COMPILER}")
 execute_process(COMMAND ${CMAKE_CXX_COMPILER} --version OUTPUT_VARIABLE clang_full_version_string)
@@ -252,6 +253,13 @@ endif ()
 
 if (CMAKE_BUILD_TYPE STREQUAL "Debug")
     ADD_DEFINITIONS(-D INFINITY_DEBUG)
+endif ()
+
+if (NOT INDEX_BUILD_METHOD STREQUAL "Variant")
+    message(STATUS "Add Environment Variable INDEX_HANDLER")
+    ADD_DEFINITIONS(-D INDEX_HANDLER)
+else ()
+    message(STATUS "NOT USING INDEX_HANDLER")
 endif ()
 
 # find_package(Boost REQUIRED)
