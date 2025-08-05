@@ -183,8 +183,7 @@ Status SegmentIndexMeta::SetNoMemIndex() {
 }
 
 Status SegmentIndexMeta::InitSet() {
-    Status status = SetNextChunkID(0);
-    return status;
+    return SetNextChunkID(0);
 }
 
 Status SegmentIndexMeta::InitSet1() {
