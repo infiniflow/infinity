@@ -4352,6 +4352,7 @@ bool NewTxn::CheckConflictTxnStore(const OptimizeIndexTxnStore &txn_store, NewTx
             break;
         }
         case TransactionType::kImport: {
+            LOG_INFO("OptimizeIndexTxnStore vs. ImportTxnStore conflict");
             ImportTxnStore *import_txn_store = static_cast<ImportTxnStore *>(previous_txn->base_txn_store_.get());
             const String &prev_db_name = import_txn_store->db_name_;
             const String &prev_table_name = import_txn_store->table_name_;
