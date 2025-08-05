@@ -36,6 +36,7 @@ import :new_catalog;
 import :table_index_meeta;
 import create_index_info;
 import :segment_meta;
+import :block_meta;
 import :kv_utility;
 import :column_index_reader;
 import :new_txn;
@@ -836,6 +837,37 @@ Status TableMeeta::SetNextIndexID(KVInstance *kv_instance, const String &index_i
         return status;
     }
     return Status::OK();
+}
+
+Tuple<SizeT, Status> TableMeeta::GetTableRowCount() {
+    Status status{};
+    SizeT row_count{};
+    auto [segment_ids, seg_status] = GetSegmentIDs1();
+    for (auto &segment_id : *segment_ids) {
+        SegmentMeta segment_meta(segment_id, *this);
+        Vector<BlockID> *block_ids_ptr = nullptr;
+        std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1();
+        if (!status.ok()) {
+            return {row_count, status};
+        }
+
+        for (auto &block_id : *block_ids_ptr) {
+            BlockMeta block_meta(block_id, segment_meta);
+            NewTxnGetVisibleRangeState state;
+            status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts_, commit_ts_, state);
+            if (!status.ok()) {
+                return {row_count, status};
+            }
+
+            Pair<BlockOffset, BlockOffset> range;
+            BlockOffset offset = 0;
+            while (state.Next(offset, range)) {
+                row_count += (range.second - range.first);
+                offset = range.second;
+            }
+        }
+    }
+    return {row_count, Status::OK()};
 }
 
 } // namespace infinity

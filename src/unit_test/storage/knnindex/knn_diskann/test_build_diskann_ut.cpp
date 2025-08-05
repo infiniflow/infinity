@@ -38,6 +38,7 @@ import :knn_diskann;
 
 import internal_types;
 
+// TODO: diskann is not implemented
 #if 0
 
 using namespace infinity;

@@ -40,6 +40,7 @@ import global_resource_usage;
 import internal_types;
 import logical_type;
 
+// TODO: Mixed type is not implemented
 #if 0
 using namespace infinity;
 class ColumnVectorMixedTest : public BaseTest {};
