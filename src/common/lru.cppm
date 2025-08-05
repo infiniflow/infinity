@@ -104,6 +104,17 @@ public:
         return lru.size();
     }
 
+    std::vector<std::string> get_all_keys() const {
+        std::unique_lock<std::mutex> lk(lock_);
+        std::vector<std::string> keys;
+        for (const auto &item : lru) {
+            if (map_.contains(item.key)) {
+                keys.push_back(item.key);
+            }
+        }
+        return keys;
+    }
+
 private:
     std::optional<V> insert(const K &key, V value) {
         auto pair = map_.insert({key, lru.end()});
@@ -121,7 +132,7 @@ private:
     void touch(list_iterator list_it) const { lru.splice(lru.begin(), lru, list_it); }
 
     void maybe_trim() {
-        while (max_size_ && lru.size() > max_size_) {
+        while (max_size_ && lru.size() > *max_size_) {
             const auto &to_remove = lru.back();
             map_.erase(to_remove.key);
             lru.pop_back();

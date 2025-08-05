@@ -154,7 +154,7 @@ Vector<ColumnID> GetTableSegmentBlockColumns(KVInstance *kv_instance,
 }
 
 SharedPtr<IndexBase>
-GetTableIndexDef(KVInstance *kv_instance, const String &db_id_str, const String &table_id_str, const String &index_id_str, TxnTimeStamp begin_ts) {
+GetTableIndexDef(KVInstance *kv_instance, const String &db_id_str, const String &table_id_str, const String &index_id_str) {
     String index_def_key = KeyEncode::CatalogIndexTagKey(db_id_str, table_id_str, index_id_str, "index_base");
     String index_def_str;
     Status status = kv_instance->Get(index_def_key, index_def_str);

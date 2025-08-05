@@ -3727,7 +3727,7 @@ TEST_P(TestTxnAppend, test_append_and_create_index) {
         EXPECT_EQ(index_base->index_type_, IndexType::kSecondary);
 
         Vector<SegmentID> *index_segment_ids_ptr = nullptr;
-        std::tie(index_segment_ids_ptr, status) = table_index_meta.GetSegmentIndexIDs1(txn->kv_instance());
+        std::tie(index_segment_ids_ptr, status) = table_index_meta.GetSegmentIndexIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(index_segment_ids_ptr->size(), 1);
     };
@@ -4225,7 +4225,7 @@ TEST_P(TestTxnAppend, test_append_and_drop_index) {
         EXPECT_EQ(index_base->index_type_, IndexType::kSecondary);
 
         Vector<SegmentID> *index_segment_ids_ptr = nullptr;
-        std::tie(index_segment_ids_ptr, status) = table_index_meta.GetSegmentIndexIDs1(txn->kv_instance());
+        std::tie(index_segment_ids_ptr, status) = table_index_meta.GetSegmentIndexIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(*index_segment_ids_ptr, Vector<SegmentID>({0}));
     };
@@ -5071,13 +5071,13 @@ TEST_P(TestTxnAppend, test_append_and_optimize_index) {
         EXPECT_EQ(*index_base->index_name_, *index_name1);
 
         Vector<SegmentID> *index_segment_ids_ptr = nullptr;
-        std::tie(index_segment_ids_ptr, status) = table_index_meta->GetSegmentIndexIDs1(txn->kv_instance());
+        std::tie(index_segment_ids_ptr, status) = table_index_meta->GetSegmentIndexIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(*index_segment_ids_ptr, Vector<SegmentID>({0}));
 
         SegmentIndexMeta segment_index_meta((*index_segment_ids_ptr)[0], *table_index_meta);
         Vector<ChunkID> *chunk_ids_ptr = nullptr;
-        std::tie(chunk_ids_ptr, status) = segment_index_meta.GetChunkIDs1(txn->kv_instance());
+        std::tie(chunk_ids_ptr, status) = segment_index_meta.GetChunkIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(*chunk_ids_ptr, Vector<ChunkID>({2}));
         status = new_txn_mgr->CommitTxn(txn);

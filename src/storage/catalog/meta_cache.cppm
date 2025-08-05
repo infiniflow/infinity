@@ -26,6 +26,20 @@ export class MetaCache {
 public:
     explicit MetaCache(SizeT capacity);
 
+    void Put(const String &key, SharedPtr<BaseMeta> meta);
+
+    void Erase(const String &key);
+
+    SharedPtr<BaseMeta> Get(const String &key);
+
+    Vector<String> GetAllKeys() const;
+
+public:
+
+    static String DbKey(const String &db_name);
+    static String TableKey(const String &db_name, const String &table_name);
+    static String TableIndexKey(const String &db_name, const String &table_name, const String& index_name);
+
 private:
     lru_cache<String, SharedPtr<BaseMeta>> lru_cache_;
 };

@@ -56,9 +56,9 @@ public:
 
     Status GetTableIndexInfo(KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts, TableIndexInfo &table_index_info);
 
-    Tuple<Vector<SegmentID> *, Status> GetSegmentIndexIDs1(KVInstance *kv_instance);
+    Tuple<Vector<SegmentID> *, Status> GetSegmentIndexIDs1(KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts);
 
-    bool HasSegmentIndexID(KVInstance *kv_instance, SegmentID segment_id);
+    bool HasSegmentIndexID(KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts, SegmentID segment_id);
 
     Status AddSegmentIndexID1(KVInstance *kv_instance, SegmentID segment_id, NewTxn *new_txn);
 
@@ -70,7 +70,7 @@ private:
 public:
     Status InitSet1(KVInstance *kv_instance, const SharedPtr<IndexBase> &index_base, NewCatalog *new_catalog);
 
-    Status UninitSet1(KVInstance *kv_instance, UsageFlag usage_flag);
+    Status UninitSet1(KVInstance *kv_instance, TxnTimeStamp begin_ts, UsageFlag usage_flag);
 
 private:
     Status LoadSegmentIDs(KVInstance *kv_instance);

@@ -291,9 +291,12 @@ IndexFilterEvaluatorSecondary::IndexFilterEvaluatorSecondary(const BaseExpressio
                                                              const ColumnID column_id,
                                                              const LogicalType column_logical_type,
                                                              SharedPtr<TableIndexMeeta> new_secondary_index,
-                                                             KVInstance *kv_instance)
+                                                             KVInstance *kv_instance,
+                                                             TxnTimeStamp begin_ts,
+                                                             TxnTimeStamp commit_ts)
     : IndexFilterEvaluator(Type::kSecondaryIndex), src_filter_secondary_index_expressions_({src_expr}), column_id_(column_id),
-      column_logical_type_(column_logical_type), new_secondary_index_(std::move(new_secondary_index)), kv_instance_(kv_instance) {}
+      column_logical_type_(column_logical_type), new_secondary_index_(std::move(new_secondary_index)), kv_instance_(kv_instance), begin_ts_(begin_ts),
+      commit_ts_(commit_ts) {}
 
 // 1. secondary index
 // 2. filter_fulltext
@@ -386,17 +389,27 @@ struct IndexFilterEvaluatorSecondaryT final : IndexFilterEvaluatorSecondary {
                                    const ColumnID column_id,
                                    const LogicalType column_logical_type,
                                    SharedPtr<TableIndexMeeta> new_secondary_index,
-                                   KVInstance *kv_instance)
-        : IndexFilterEvaluatorSecondary(src_expr, column_id, column_logical_type, new_secondary_index, kv_instance) {}
+                                   KVInstance *kv_instance,
+                                   TxnTimeStamp begin_ts,
+                                   TxnTimeStamp commit_ts)
+        : IndexFilterEvaluatorSecondary(src_expr, column_id, column_logical_type, new_secondary_index, kv_instance, begin_ts, commit_ts) {}
 
     static UniquePtr<IndexFilterEvaluatorSecondaryT> Make(const BaseExpression *src_expr,
                                                           const ColumnID column_id,
                                                           SharedPtr<TableIndexMeeta> new_secondary_index,
                                                           KVInstance *kv_instance,
+                                                          TxnTimeStamp begin_ts,
+                                                          TxnTimeStamp commit_ts,
                                                           const FilterCompareType compare_type,
                                                           const Value &val) {
         constexpr auto expect_logical_type = GetLogicalType<ColumnValueT>;
-        auto result = MakeUnique<IndexFilterEvaluatorSecondaryT>(src_expr, column_id, expect_logical_type, new_secondary_index, kv_instance);
+        auto result = MakeUnique<IndexFilterEvaluatorSecondaryT>(src_expr,
+                                                                 column_id,
+                                                                 expect_logical_type,
+                                                                 new_secondary_index,
+                                                                 kv_instance,
+                                                                 begin_ts,
+                                                                 commit_ts);
         const SecondaryIndexOrderedT val_ordered = GetOrderedV<ColumnValueT>(val);
         switch (compare_type) {
             case FilterCompareType::kEqual: {
@@ -438,38 +451,115 @@ UniquePtr<IndexFilterEvaluatorSecondary> IndexFilterEvaluatorSecondary::Make(con
     }
     switch (column_def->type()->type()) {
         case LogicalType::kTinyInt: {
-            return IndexFilterEvaluatorSecondaryT<TinyIntT>::Make(src_expr, column_id, new_secondary_index, kv_instance, compare_type, val);
+            return IndexFilterEvaluatorSecondaryT<TinyIntT>::Make(src_expr,
+                                                                  column_id,
+                                                                  new_secondary_index,
+                                                                  kv_instance,
+                                                                  begin_ts,
+                                                                  commit_ts,
+                                                                  compare_type,
+                                                                  val);
         }
         case LogicalType::kSmallInt: {
-            return IndexFilterEvaluatorSecondaryT<SmallIntT>::Make(src_expr, column_id, new_secondary_index, kv_instance, compare_type, val);
+            return IndexFilterEvaluatorSecondaryT<SmallIntT>::Make(src_expr,
+                                                                   column_id,
+                                                                   new_secondary_index,
+                                                                   kv_instance,
+                                                                   begin_ts,
+                                                                   commit_ts,
+                                                                   compare_type,
+                                                                   val);
         }
         case LogicalType::kInteger: {
-            return IndexFilterEvaluatorSecondaryT<IntegerT>::Make(src_expr, column_id, new_secondary_index, kv_instance, compare_type, val);
+            return IndexFilterEvaluatorSecondaryT<IntegerT>::Make(src_expr,
+                                                                  column_id,
+                                                                  new_secondary_index,
+                                                                  kv_instance,
+                                                                  begin_ts,
+                                                                  commit_ts,
+                                                                  compare_type,
+                                                                  val);
         }
         case LogicalType::kBigInt: {
-            return IndexFilterEvaluatorSecondaryT<BigIntT>::Make(src_expr, column_id, new_secondary_index, kv_instance, compare_type, val);
+            return IndexFilterEvaluatorSecondaryT<BigIntT>::Make(src_expr,
+                                                                 column_id,
+                                                                 new_secondary_index,
+                                                                 kv_instance,
+                                                                 begin_ts,
+                                                                 commit_ts,
+                                                                 compare_type,
+                                                                 val);
         }
         case LogicalType::kFloat: {
-            return IndexFilterEvaluatorSecondaryT<FloatT>::Make(src_expr, column_id, new_secondary_index, kv_instance, compare_type, val);
+            return IndexFilterEvaluatorSecondaryT<FloatT>::Make(src_expr,
+                                                                column_id,
+                                                                new_secondary_index,
+                                                                kv_instance,
+                                                                begin_ts,
+                                                                commit_ts,
+                                                                compare_type,
+                                                                val);
         }
         case LogicalType::kDouble: {
-            return IndexFilterEvaluatorSecondaryT<DoubleT>::Make(src_expr, column_id, new_secondary_index, kv_instance, compare_type, val);
+            return IndexFilterEvaluatorSecondaryT<DoubleT>::Make(src_expr,
+                                                                 column_id,
+                                                                 new_secondary_index,
+                                                                 kv_instance,
+                                                                 begin_ts,
+                                                                 commit_ts,
+                                                                 compare_type,
+                                                                 val);
         }
         case LogicalType::kDate: {
-            return IndexFilterEvaluatorSecondaryT<DateT>::Make(src_expr, column_id, new_secondary_index, kv_instance, compare_type, val);
+            return IndexFilterEvaluatorSecondaryT<DateT>::Make(src_expr,
+                                                               column_id,
+                                                               new_secondary_index,
+                                                               kv_instance,
+                                                               begin_ts,
+                                                               commit_ts,
+                                                               compare_type,
+                                                               val);
         }
         case LogicalType::kTime: {
-            return IndexFilterEvaluatorSecondaryT<TimeT>::Make(src_expr, column_id, new_secondary_index, kv_instance, compare_type, val);
+            return IndexFilterEvaluatorSecondaryT<TimeT>::Make(src_expr,
+                                                               column_id,
+                                                               new_secondary_index,
+                                                               kv_instance,
+                                                               begin_ts,
+                                                               commit_ts,
+                                                               compare_type,
+                                                               val);
         }
         case LogicalType::kDateTime: {
-            return IndexFilterEvaluatorSecondaryT<DateTimeT>::Make(src_expr, column_id, new_secondary_index, kv_instance, compare_type, val);
+            return IndexFilterEvaluatorSecondaryT<DateTimeT>::Make(src_expr,
+                                                                   column_id,
+                                                                   new_secondary_index,
+                                                                   kv_instance,
+                                                                   begin_ts,
+                                                                   commit_ts,
+                                                                   compare_type,
+                                                                   val);
         }
         case LogicalType::kTimestamp: {
-            return IndexFilterEvaluatorSecondaryT<TimestampT>::Make(src_expr, column_id, new_secondary_index, kv_instance, compare_type, val);
+            return IndexFilterEvaluatorSecondaryT<TimestampT>::Make(src_expr,
+                                                                    column_id,
+                                                                    new_secondary_index,
+                                                                    kv_instance,
+                                                                    begin_ts,
+                                                                    commit_ts,
+                                                                    compare_type,
+                                                                    val);
         }
         case LogicalType::kVarchar: {
             if (compare_type == FilterCompareType::kEqual) {
-                return IndexFilterEvaluatorSecondaryT<VarcharT>::Make(src_expr, column_id, new_secondary_index, kv_instance, compare_type, val);
+                return IndexFilterEvaluatorSecondaryT<VarcharT>::Make(src_expr,
+                                                                      column_id,
+                                                                      new_secondary_index,
+                                                                      kv_instance,
+                                                                      begin_ts,
+                                                                      commit_ts,
+                                                                      compare_type,
+                                                                      val);
             }
             RecoverableError(Status::SyntaxError("VarcharT only support kEqual compare type in secondary index."));
             return {};
@@ -838,18 +928,20 @@ struct TrunkReaderM<ColumnValueType, HighCardinalityTag> final : TrunkReader<Col
 
 template <typename ColumnValueType>
 Bitmask ExecuteSingleRangeHighCardinalityT(KVInstance *kv_instance,
+                                           TxnTimeStamp begin_ts,
+                                           TxnTimeStamp commit_ts,
                                            const Pair<ConvertToOrderedType<ColumnValueType>, ConvertToOrderedType<ColumnValueType>> interval_range,
                                            SegmentIndexMeta *index_meta,
                                            const SegmentOffset segment_row_count) {
     Vector<UniquePtr<TrunkReader<ColumnValueType, HighCardinalityTag>>> trunk_readers;
-    auto [chunk_ids_ptr, status] = index_meta->GetChunkIDs1(kv_instance);
+    auto [chunk_ids_ptr, status] = index_meta->GetChunkIDs1(kv_instance, begin_ts, commit_ts);
     if (!status.ok()) {
         UnrecoverableError(status.message());
     }
     for (ChunkID chunk_id : *chunk_ids_ptr) {
         ChunkIndexMeta chunk_index_meta(chunk_id, *index_meta);
         BufferObj *index_buffer = nullptr;
-        Status status = chunk_index_meta.GetIndexBuffer(kv_instance, index_buffer);
+        status = chunk_index_meta.GetIndexBuffer(kv_instance, begin_ts, index_buffer);
         if (!status.ok()) {
             UnrecoverableError(status.message());
         }
@@ -878,18 +970,20 @@ Bitmask ExecuteSingleRangeHighCardinalityT(KVInstance *kv_instance,
 
 template <typename ColumnValueType>
 Bitmask ExecuteSingleRangeLowCardinalityT(KVInstance *kv_instance,
+                                          TxnTimeStamp begin_ts,
+                                          TxnTimeStamp commit_ts,
                                           const Pair<ConvertToOrderedType<ColumnValueType>, ConvertToOrderedType<ColumnValueType>> interval_range,
                                           SegmentIndexMeta *index_meta,
                                           const SegmentOffset segment_row_count) {
     Vector<UniquePtr<TrunkReader<ColumnValueType, LowCardinalityTag>>> trunk_readers;
-    auto [chunk_ids_ptr, status] = index_meta->GetChunkIDs1(kv_instance);
+    auto [chunk_ids_ptr, status] = index_meta->GetChunkIDs1(kv_instance, begin_ts, commit_ts);
     if (!status.ok()) {
         UnrecoverableError(status.message());
     }
     for (ChunkID chunk_id : *chunk_ids_ptr) {
         ChunkIndexMeta chunk_index_meta(chunk_id, *index_meta);
         BufferObj *index_buffer = nullptr;
-        Status status = chunk_index_meta.GetIndexBuffer(kv_instance, index_buffer);
+        Status status = chunk_index_meta.GetIndexBuffer(kv_instance, begin_ts, index_buffer);
         if (!status.ok()) {
             UnrecoverableError(status.message());
         }
@@ -934,9 +1028,9 @@ Bitmask IndexFilterEvaluatorSecondaryT<ColumnValueT>::Evaluate(const SegmentID s
     for (const auto rng : secondary_index_start_end_pairs_) {
         Bitmask part_result(segment_row_count);
         if (cardinality == SecondaryIndexCardinality::kHighCardinality) {
-            part_result = ExecuteSingleRangeHighCardinalityT<ColumnValueT>(kv_instance_, rng, &*index_meta, segment_row_count);
+            part_result = ExecuteSingleRangeHighCardinalityT<ColumnValueT>(kv_instance_, begin_ts_, commit_ts_, rng, &*index_meta, segment_row_count);
         } else {
-            part_result = ExecuteSingleRangeLowCardinalityT<ColumnValueT>(kv_instance_, rng, &*index_meta, segment_row_count);
+            part_result = ExecuteSingleRangeLowCardinalityT<ColumnValueT>(kv_instance_, begin_ts_, commit_ts_, rng, &*index_meta, segment_row_count);
         }
         result.MergeOr(part_result);
     }

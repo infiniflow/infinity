@@ -1139,7 +1139,7 @@ TEST_P(TestTxnReplayTest, test_replay_flush_gap_dump_index) {
         SegmentID segment_id = 0;
         SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta);
         {
-            auto [chunk_ids, status] = segment_index_meta.GetChunkIDs1(txn->kv_instance());
+            auto [chunk_ids, status] = segment_index_meta.GetChunkIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*chunk_ids, Vector<ChunkID>({0, 1}));
 
@@ -1152,7 +1152,7 @@ TEST_P(TestTxnReplayTest, test_replay_flush_gap_dump_index) {
                 EXPECT_EQ(chunk_info->base_row_id_, RowID(0, chunk_id * block_row_cnt));
 
                 BufferObj *buffer_obj = nullptr;
-                status = chunk_index_meta.GetIndexBuffer(txn->kv_instance(), buffer_obj);
+                status = chunk_index_meta.GetIndexBuffer(txn->kv_instance(), txn->BeginTS(), buffer_obj);
                 EXPECT_TRUE(status.ok());
             }
         }
@@ -1422,7 +1422,7 @@ TEST_P(TestTxnReplayTest, test_replay_flush_gap_optimize_index) {
         SegmentID segment_id = 0;
         SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta);
         {
-            auto [chunk_ids, status] = segment_index_meta.GetChunkIDs1(txn->kv_instance());
+            auto [chunk_ids, status] = segment_index_meta.GetChunkIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*chunk_ids, Vector<ChunkID>({2}));
 
@@ -1435,7 +1435,7 @@ TEST_P(TestTxnReplayTest, test_replay_flush_gap_optimize_index) {
             EXPECT_EQ(chunk_info->base_row_id_, RowID(0, 0));
 
             BufferObj *buffer_obj = nullptr;
-            status = chunk_index_meta.GetIndexBuffer(txn->kv_instance(), buffer_obj);
+            status = chunk_index_meta.GetIndexBuffer(txn->kv_instance(), txn->BeginTS(), buffer_obj);
             EXPECT_TRUE(status.ok());
         }
 

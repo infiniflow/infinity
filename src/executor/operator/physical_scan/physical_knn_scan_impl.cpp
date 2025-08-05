@@ -395,6 +395,7 @@ void PhysicalKnnScan::PlanWithIndex(QueryContext *query_context) { // TODO: retu
     NewTxn *new_txn = query_context->GetNewTxn();
     KVInstance *kv_instance = new_txn->kv_instance();
     TxnTimeStamp begin_ts = new_txn->BeginTS();
+    TxnTimeStamp commit_ts = new_txn->CommitTS();
     if (knn_expression_->ignore_index_) {
         LOG_TRACE("Not use index"); // No index need to check
     } else {
@@ -460,7 +461,7 @@ void PhysicalKnnScan::PlanWithIndex(QueryContext *query_context) { // TODO: retu
         // Fill the segment with index
         if (table_index_meta_) {
             Vector<SegmentID> *segment_ids_ptr = nullptr;
-            std::tie(segment_ids_ptr, status) = table_index_meta_->GetSegmentIndexIDs1(kv_instance);
+            std::tie(segment_ids_ptr, status) = table_index_meta_->GetSegmentIndexIDs1(kv_instance, begin_ts, commit_ts);
             if (!status.ok()) {
                 RecoverableError(status);
             }
@@ -613,8 +614,8 @@ void PhysicalKnnScan::ExecuteInternalByColumnDataTypeAndQueryDataType(QueryConte
             }
         }
 
-        auto get_chunks = [&segment_index_meta, kv_instance] {
-            auto [chunk_ids_ptr, status] = segment_index_meta->GetChunkIDs1(kv_instance);
+        auto get_chunks = [&segment_index_meta, kv_instance, begin_ts, commit_ts] {
+            auto [chunk_ids_ptr, status] = segment_index_meta->GetChunkIDs1(kv_instance, begin_ts, commit_ts);
             if (!status.ok()) {
                 UnrecoverableError(status.message());
             }
@@ -642,7 +643,7 @@ void PhysicalKnnScan::ExecuteInternalByColumnDataTypeAndQueryDataType(QueryConte
                     for (ChunkID chunk_id : *chunk_ids_ptr) {
                         ChunkIndexMeta chunk_index_meta(chunk_id, *segment_index_meta);
                         BufferObj *index_buffer = nullptr;
-                        status = chunk_index_meta.GetIndexBuffer(kv_instance, index_buffer);
+                        status = chunk_index_meta.GetIndexBuffer(kv_instance, begin_ts, index_buffer);
                         if (!status.ok()) {
                             UnrecoverableError(status.message());
                         }
@@ -815,7 +816,7 @@ void PhysicalKnnScan::ExecuteInternalByColumnDataTypeAndQueryDataType(QueryConte
                         for (ChunkID chunk_id : *chunk_ids_ptr) {
                             ChunkIndexMeta chunk_index_meta(chunk_id, *segment_index_meta);
                             BufferObj *index_buffer = nullptr;
-                            status = chunk_index_meta.GetIndexBuffer(kv_instance, index_buffer);
+                            status = chunk_index_meta.GetIndexBuffer(kv_instance, begin_ts, index_buffer);
                             if (!status.ok()) {
                                 UnrecoverableError(status.message());
                             }

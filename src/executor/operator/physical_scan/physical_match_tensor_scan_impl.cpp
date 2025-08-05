@@ -90,8 +90,7 @@ import data_type;
 
 namespace infinity {
 
-using AlignedMatchTensorExprHolderT =
-    std::pair<std::unique_ptr<void, decltype([](void *ptr) { std::free(ptr); })>, UniquePtr<MatchTensorExpression>>;
+using AlignedMatchTensorExprHolderT = std::pair<std::unique_ptr<void, decltype([](void *ptr) { std::free(ptr); })>, UniquePtr<MatchTensorExpression>>;
 
 AlignedMatchTensorExprHolderT GetMatchTensorExprForCalculation(MatchTensorExpression &src_match_tensor_expr, EmbeddingDataType column_embedding_type);
 
@@ -194,7 +193,7 @@ void PhysicalMatchTensorScan::PlanWithIndex(QueryContext *query_context) {
     NewTxn *new_txn = query_context->GetNewTxn();
     KVInstance *kv_instance = new_txn->kv_instance();
     TxnTimeStamp begin_ts = new_txn->BeginTS();
-    //    TxnTimeStamp commit_ts = new_txn->CommitTS();
+    TxnTimeStamp commit_ts = new_txn->CommitTS();
 
     if (!src_match_tensor_expr_->ignore_index_) {
         Vector<String> *index_id_strs_ptr = nullptr;
@@ -260,7 +259,7 @@ void PhysicalMatchTensorScan::PlanWithIndex(QueryContext *query_context) {
         // Fill the segment with index
         if (table_index_meta_) {
             Vector<SegmentID> *segment_ids_ptr = nullptr;
-            std::tie(segment_ids_ptr, status) = table_index_meta_->GetSegmentIndexIDs1(kv_instance);
+            std::tie(segment_ids_ptr, status) = table_index_meta_->GetSegmentIndexIDs1(kv_instance, begin_ts, commit_ts);
             if (!status.ok()) {
                 RecoverableError(status);
             }
@@ -374,7 +373,7 @@ void PhysicalMatchTensorScan::ExecuteInner(QueryContext *query_context, MatchTen
             LOG_TRACE(
                 fmt::format("MatchTensorScan: index {}/{} not skipped after common_query_filter", task_job_index, segment_index_metas_->size()));
             // TODO: now only have EMVB index
-            auto [chunk_ids_ptr, status] = segment_index_meta.GetChunkIDs1(kv_instance);
+            auto [chunk_ids_ptr, status] = segment_index_meta.GetChunkIDs1(kv_instance, begin_ts, commit_ts);
             if (!status.ok()) {
                 UnrecoverableError(status.message());
             }
@@ -450,7 +449,7 @@ void PhysicalMatchTensorScan::ExecuteInner(QueryContext *query_context, MatchTen
             for (ChunkID chunk_id : *chunk_ids_ptr) {
                 ChunkIndexMeta chunk_index_meta(chunk_id, segment_index_meta);
                 BufferObj *index_buffer = nullptr;
-                Status status = chunk_index_meta.GetIndexBuffer(kv_instance, index_buffer);
+                Status status = chunk_index_meta.GetIndexBuffer(kv_instance, begin_ts, index_buffer);
                 if (!status.ok()) {
                     UnrecoverableError(status.message());
                 }

@@ -925,7 +925,7 @@ Status NewTxn::ReplayCompact(WalCmdCompactV2 *compact_cmd, TxnTimeStamp commit_t
         if (!status.ok()) {
             return status;
         }
-        status = table_meta.RemoveSegmentIDs1(kv_instance, compact_cmd->deprecated_segment_ids_);
+        status = table_meta.RemoveSegmentIDs1(kv_instance, begin_ts, compact_cmd->deprecated_segment_ids_);
         if (!status.ok()) {
             return status;
         }
@@ -1763,9 +1763,9 @@ Status NewTxn::PrepareCommitCompact(WalCmdCompactV2 *compact_cmd) {
     Status status;
     const String &db_id_str = compact_cmd->db_id_;
     const String &table_id_str = compact_cmd->table_id_;
-    TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
-    TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
     KVInstance *kv_instance = kv_instance_.get();
+    TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
+    TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
 
     Vector<WalSegmentInfo> &segment_infos = compact_cmd->new_segment_infos_;
     if (segment_infos.empty()) {
@@ -1814,7 +1814,7 @@ Status NewTxn::PrepareCommitCompact(WalCmdCompactV2 *compact_cmd) {
         for (const String &index_id_str : *index_id_strs_ptr) {
             TableIndexMeeta table_index_meta(index_id_str, table_meta);
             Vector<SegmentID> *segment_ids_ptr = nullptr;
-            std::tie(segment_ids_ptr, status) = table_index_meta.GetSegmentIndexIDs1(kv_instance_.get());
+            std::tie(segment_ids_ptr, status) = table_index_meta.GetSegmentIndexIDs1(kv_instance, begin_ts, commit_ts);
             if (!status.ok()) {
                 return status;
             }

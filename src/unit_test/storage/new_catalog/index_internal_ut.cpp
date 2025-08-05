@@ -196,7 +196,7 @@ TEST_P(TestTxnIndexInternal, test_index0) {
         }
 
         {
-            auto [chunk_ids, status] = segment_index_meta.GetChunkIDs1(txn->kv_instance());
+            auto [chunk_ids, status] = segment_index_meta.GetChunkIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*chunk_ids, Vector<ChunkID>({0}));
         }
@@ -211,7 +211,7 @@ TEST_P(TestTxnIndexInternal, test_index0) {
         }
 
         BufferObj *buffer_obj = nullptr;
-        status = chunk_index_meta.GetIndexBuffer(txn->kv_instance(), buffer_obj);
+        status = chunk_index_meta.GetIndexBuffer(txn->kv_instance(), txn->BeginTS(), buffer_obj);
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn);
@@ -255,7 +255,7 @@ TEST_P(TestTxnIndexInternal, test_index0) {
         }
 
         {
-            auto [chunk_ids, status] = segment_index_meta.GetChunkIDs1(txn->kv_instance());
+            auto [chunk_ids, status] = segment_index_meta.GetChunkIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*chunk_ids, Vector<ChunkID>({2}));
         }
@@ -270,7 +270,7 @@ TEST_P(TestTxnIndexInternal, test_index0) {
         }
 
         BufferObj *buffer_obj = nullptr;
-        status = chunk_index_meta.GetIndexBuffer(txn->kv_instance(), buffer_obj);
+        status = chunk_index_meta.GetIndexBuffer(txn->kv_instance(), txn->BeginTS(), buffer_obj);
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn);
@@ -505,7 +505,7 @@ TEST_P(TestTxnIndexInternal, DISABLED_test_index) {
         // }
 
         {
-            auto [chunk_ids, status] = segment_index_meta.GetChunkIDs1(txn->kv_instance());
+            auto [chunk_ids, status] = segment_index_meta.GetChunkIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*chunk_ids, Vector<ChunkID>({0}));
         }
@@ -520,7 +520,7 @@ TEST_P(TestTxnIndexInternal, DISABLED_test_index) {
         }
 
         BufferObj *buffer_obj = nullptr;
-        status = chunk_index_meta.GetIndexBuffer(txn->kv_instance(), buffer_obj);
+        status = chunk_index_meta.GetIndexBuffer(txn->kv_instance(), txn->BeginTS(), buffer_obj);
         EXPECT_TRUE(status.ok());
 
         // {
@@ -602,7 +602,7 @@ TEST_P(TestTxnIndexInternal, DISABLED_test_index) {
         }
 
         {
-            auto [chunk_ids, status] = segment_index_meta.GetChunkIDs1(txn->kv_instance());
+            auto [chunk_ids, status] = segment_index_meta.GetChunkIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*chunk_ids, Vector<ChunkID>({2}));
         }
@@ -620,7 +620,7 @@ TEST_P(TestTxnIndexInternal, DISABLED_test_index) {
         // int32_t end_val = 3;
 
         BufferObj *buffer_obj = nullptr;
-        status = chunk_index_meta.GetIndexBuffer(txn->kv_instance(), buffer_obj);
+        status = chunk_index_meta.GetIndexBuffer(txn->kv_instance(), txn->BeginTS(), buffer_obj);
         EXPECT_TRUE(status.ok());
 
         // {
@@ -786,7 +786,7 @@ TEST_P(TestTxnIndexInternal, test_populate_index0) {
 
         ChunkID chunk_id = 0;
         {
-            auto [chunk_ids, status] = segment_index_meta.GetChunkIDs1(txn->kv_instance());
+            auto [chunk_ids, status] = segment_index_meta.GetChunkIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*chunk_ids, Vector<ChunkID>({0}));
             chunk_id = (*chunk_ids)[0];
@@ -801,7 +801,7 @@ TEST_P(TestTxnIndexInternal, test_populate_index0) {
         }
 
         BufferObj *buffer_obj = nullptr;
-        status = chunk_index_meta.GetIndexBuffer(txn->kv_instance(), buffer_obj);
+        status = chunk_index_meta.GetIndexBuffer(txn->kv_instance(), txn->BeginTS(), buffer_obj);
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn);
@@ -1016,7 +1016,7 @@ TEST_P(TestTxnIndexInternal, DISABLED_test_populate_index) {
 
         ChunkID chunk_id = 0;
         {
-            auto [chunk_ids, status] = segment_index_meta.GetChunkIDs1(txn->kv_instance());
+            auto [chunk_ids, status] = segment_index_meta.GetChunkIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(chunk_ids->size(), 1);
             chunk_id = chunk_ids->at(0);
@@ -1032,7 +1032,7 @@ TEST_P(TestTxnIndexInternal, DISABLED_test_populate_index) {
         }
 
         BufferObj *buffer_obj = nullptr;
-        status = chunk_index_meta.GetIndexBuffer(txn->kv_instance(), buffer_obj);
+        status = chunk_index_meta.GetIndexBuffer(txn->kv_instance(), txn->BeginTS(), buffer_obj);
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn);

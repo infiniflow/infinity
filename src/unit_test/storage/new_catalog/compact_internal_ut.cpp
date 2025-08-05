@@ -491,7 +491,7 @@ TEST_P(TestTxnCompactInternal, test_compact_with_index) {
         SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta);
 
         {
-            auto [chunk_ids, status] = segment_index_meta.GetChunkIDs1(txn->kv_instance());
+            auto [chunk_ids, status] = segment_index_meta.GetChunkIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*chunk_ids, Vector<ChunkID>({0}));
         }
@@ -506,7 +506,7 @@ TEST_P(TestTxnCompactInternal, test_compact_with_index) {
         }
 
         BufferObj *buffer_obj = nullptr;
-        status = chunk_index_meta.GetIndexBuffer(txn->kv_instance(), buffer_obj);
+        status = chunk_index_meta.GetIndexBuffer(txn->kv_instance(), txn->BeginTS(), buffer_obj);
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn);

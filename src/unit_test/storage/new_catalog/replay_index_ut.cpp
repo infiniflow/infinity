@@ -277,7 +277,7 @@ TEST_P(TestTxnReplayIndex, DISABLED_test_replay_append_with_index) {
 
         {
             Vector<ChunkID> *chunk_ids_ptr = nullptr;
-            std::tie(chunk_ids_ptr, status) = segment_index_meta.GetChunkIDs1(txn->kv_instance());
+            std::tie(chunk_ids_ptr, status) = segment_index_meta.GetChunkIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*chunk_ids_ptr, Vector<ChunkID>({}));
         }
@@ -389,7 +389,7 @@ TEST_P(TestTxnReplayIndex, DISABLED_test_replay_append_with_index) {
         }
 
         {
-            auto [chunk_ids, status] = segment_index_meta.GetChunkIDs1(txn->kv_instance());
+            auto [chunk_ids, status] = segment_index_meta.GetChunkIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*chunk_ids, Vector<ChunkID>({2}));
         }
@@ -407,7 +407,7 @@ TEST_P(TestTxnReplayIndex, DISABLED_test_replay_append_with_index) {
         // int32_t end_val = 3;
 
         BufferObj *buffer_obj = nullptr;
-        status = chunk_index_meta.GetIndexBuffer(txn->kv_instance(), buffer_obj);
+        status = chunk_index_meta.GetIndexBuffer(txn->kv_instance(), txn->BeginTS(), buffer_obj);
         EXPECT_TRUE(status.ok());
 
         // {
@@ -654,7 +654,7 @@ TEST_P(TestTxnReplayIndex, DISABLED_test_populate_index) {
 
         ChunkID chunk_id = 0;
         {
-            auto [chunk_ids, status] = segment_index_meta.GetChunkIDs1(txn->kv_instance());
+            auto [chunk_ids, status] = segment_index_meta.GetChunkIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(chunk_ids->size(), 1);
             chunk_id = chunk_ids->at(0);
@@ -670,7 +670,7 @@ TEST_P(TestTxnReplayIndex, DISABLED_test_populate_index) {
         }
 
         BufferObj *buffer_obj = nullptr;
-        status = chunk_index_meta.GetIndexBuffer(txn->kv_instance(), buffer_obj);
+        status = chunk_index_meta.GetIndexBuffer(txn->kv_instance(), txn->BeginTS(), buffer_obj);
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn);

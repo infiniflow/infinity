@@ -92,8 +92,10 @@ Status NewTxn::DumpMemIndex(const String &db_name, const String &table_name, con
         return status;
     }
     KVInstance *kv_instance = kv_instance_.get();
+    TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
+    TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
     Vector<SegmentID> *segment_ids_ptr = nullptr;
-    std::tie(segment_ids_ptr, status) = table_index_meta->GetSegmentIndexIDs1(kv_instance);
+    std::tie(segment_ids_ptr, status) = table_index_meta->GetSegmentIndexIDs1(kv_instance, begin_ts, commit_ts);
     if (!status.ok()) {
         return status;
     }
@@ -323,7 +325,8 @@ Status NewTxn::OptimizeTableIndexes(const String &db_name, const String &table_n
         return status;
     }
     KVInstance *kv_instance = kv_instance_.get();
-    TxnTimeStamp begin_ts = BeginTS();
+    TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
+    TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
     Vector<String> *index_id_strs_ptr = nullptr;
     Vector<String> *index_names_ptr = nullptr;
     status = table_meta->GetIndexIDs(kv_instance, begin_ts, index_id_strs_ptr, &index_names_ptr);
@@ -337,7 +340,7 @@ Status NewTxn::OptimizeTableIndexes(const String &db_name, const String &table_n
         TableIndexMeeta table_index_meta(index_id_str, *table_meta);
 
         Vector<SegmentID> *segment_ids_ptr = nullptr;
-        std::tie(segment_ids_ptr, status) = table_index_meta.GetSegmentIndexIDs1(kv_instance);
+        std::tie(segment_ids_ptr, status) = table_index_meta.GetSegmentIndexIDs1(kv_instance, begin_ts, commit_ts);
         if (!status.ok()) {
             return status;
         }
@@ -386,7 +389,7 @@ Status NewTxn::OptimizeIndexInner(SegmentIndexMeta &segment_index_meta,
     TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
     TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
 
-    auto [old_chunk_ids_ptr, status] = segment_index_meta.GetChunkIDs1(kv_instance);
+    auto [old_chunk_ids_ptr, status] = segment_index_meta.GetChunkIDs1(kv_instance, begin_ts, commit_ts);
     if (!status.ok()) {
         return status;
     }
@@ -448,7 +451,7 @@ Status NewTxn::OptimizeIndexInner(SegmentIndexMeta &segment_index_meta,
         if (!status.ok()) {
             return status;
         }
-        status = chunk_index_meta->GetIndexBuffer(kv_instance_.get(), buffer_obj);
+        status = chunk_index_meta->GetIndexBuffer(kv_instance_.get(), begin_ts, buffer_obj);
         if (!status.ok()) {
             return status;
         }
@@ -464,7 +467,7 @@ Status NewTxn::OptimizeIndexInner(SegmentIndexMeta &segment_index_meta,
                 BufferObj *buffer_obj = nullptr;
                 {
                     // Status status = NewCatalog::GetChunkIndex(old_chunk_meta, buffer_obj);
-                    status = old_chunk_meta.GetIndexBuffer(kv_instance_.get(), buffer_obj);
+                    status = old_chunk_meta.GetIndexBuffer(kv_instance_.get(), begin_ts, buffer_obj);
                     if (!status.ok()) {
                         return status;
                     }
@@ -601,6 +604,8 @@ Status NewTxn::OptimizeIndexByParams(const String &db_name,
         return status;
     }
     KVInstance *kv_instance = kv_instance_.get();
+    TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
+    TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
     TableIndexMeeta &table_index_meta = *table_index_meta_opt;
 
     auto [index_base, index_status] = table_index_meta.GetIndexBase(kv_instance);
@@ -644,7 +649,7 @@ Status NewTxn::OptimizeIndexByParams(const String &db_name,
         return Status::OK();
     }
     Vector<SegmentID> *segment_ids_ptr = nullptr;
-    std::tie(segment_ids_ptr, status) = table_index_meta.GetSegmentIndexIDs1(kv_instance);
+    std::tie(segment_ids_ptr, status) = table_index_meta.GetSegmentIndexIDs1(kv_instance, begin_ts, commit_ts);
     if (!status.ok()) {
         return status;
     }
@@ -757,7 +762,7 @@ Status NewTxn::AppendIndex(TableIndexMeeta &table_index_meta, const Pair<RowID, 
     cur_row_cnt = append_range.second;
     if (!segment_meta || segment_meta->segment_id() != segment_id) {
         segment_meta.emplace(segment_id, table_index_meta.table_meta());
-        if (!table_index_meta.HasSegmentIndexID(kv_instance, segment_id) && append_range.first.segment_offset_ == 0) {
+        if (!table_index_meta.HasSegmentIndexID(kv_instance, begin_ts, commit_ts, segment_id) && append_range.first.segment_offset_ == 0) {
             Status status = NewCatalog::AddNewSegmentIndex1(table_index_meta, this, segment_id, segment_index_meta);
             if (!status.ok()) {
                 return status;
@@ -985,7 +990,7 @@ Status NewTxn::PopulateIndex(const String &db_name,
 
     Vector<ChunkID> old_chunk_ids;
     {
-        auto [old_chunk_ids_ptr, status] = segment_index_meta->GetChunkIDs1(kv_instance);
+        auto [old_chunk_ids_ptr, status] = segment_index_meta->GetChunkIDs1(kv_instance, begin_ts, commit_ts);
         if (!status.ok()) {
             return status;
         }
@@ -1098,18 +1103,20 @@ Status NewTxn::ReplayDumpIndex(WalCmdDumpIndexV2 *dump_index_cmd) {
     }
 
     KVInstance *kv_instance = kv_instance_.get();
+    TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
+    TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
     SegmentID segment_id = dump_index_cmd->segment_id_;
     Optional<SegmentIndexMeta> segment_index_meta_opt;
     {
-        auto [segment_ids_ptr, status] = table_index_meta->GetSegmentIndexIDs1(kv_instance);
-        if (!status.ok()) {
-            return status;
+        auto [segment_ids_ptr, index_status] = table_index_meta->GetSegmentIndexIDs1(kv_instance, begin_ts, commit_ts);
+        if (!index_status.ok()) {
+            return index_status;
         }
         auto iter = std::find(segment_ids_ptr->begin(), segment_ids_ptr->end(), segment_id);
         if (iter == segment_ids_ptr->end()) {
-            status = NewCatalog::AddNewSegmentIndex1(*table_index_meta, this, segment_id, segment_index_meta_opt);
-            if (!status.ok()) {
-                return status;
+            index_status = NewCatalog::AddNewSegmentIndex1(*table_index_meta, this, segment_id, segment_index_meta_opt);
+            if (!index_status.ok()) {
+                return index_status;
             }
         } else {
             segment_index_meta_opt.emplace(segment_id, *table_index_meta);
@@ -1121,7 +1128,7 @@ Status NewTxn::ReplayDumpIndex(WalCmdDumpIndexV2 *dump_index_cmd) {
     Vector<ChunkID> *chunk_ids_ptr = nullptr;
     {
         HashSet<ChunkID> deprecate_chunk_ids(dump_index_cmd->deprecate_ids_.begin(), dump_index_cmd->deprecate_ids_.end());
-        std::tie(chunk_ids_ptr, status) = segment_index_meta.GetChunkIDs1(kv_instance);
+        std::tie(chunk_ids_ptr, status) = segment_index_meta.GetChunkIDs1(kv_instance, begin_ts, commit_ts);
         if (!status.ok()) {
             return status;
         }
@@ -1355,6 +1362,7 @@ Status NewTxn::PopulateIvfIndexInner(SharedPtr<IndexBase> index_base,
     }
 
     KVInstance *kv_instance = kv_instance_.get();
+    TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
 
     ChunkID chunk_id = 0;
     {
@@ -1382,7 +1390,7 @@ Status NewTxn::PopulateIvfIndexInner(SharedPtr<IndexBase> index_base,
         if (!status.ok()) {
             return status;
         }
-        status = chunk_index_meta->GetIndexBuffer(kv_instance_.get(), buffer_obj);
+        status = chunk_index_meta->GetIndexBuffer(kv_instance_.get(), begin_ts, buffer_obj);
         if (!status.ok()) {
             return status;
         }
@@ -1439,7 +1447,7 @@ Status NewTxn::PopulateEmvbIndexInner(SharedPtr<IndexBase> index_base,
                                                       "" /*base_name*/,
                                                       0 /*index_size*/,
                                                       chunk_index_meta);
-        status = chunk_index_meta->GetIndexBuffer(kv_instance_.get(), buffer_obj);
+        status = chunk_index_meta->GetIndexBuffer(kv_instance_.get(), begin_ts, buffer_obj);
         if (!status.ok()) {
             return status;
         }
@@ -1460,9 +1468,11 @@ Status NewTxn::OptimizeFtIndex(SharedPtr<IndexBase> index_base,
                                String &base_name_out) {
     const auto *index_fulltext = static_cast<const IndexFullText *>(index_base.get());
     KVInstance *kv_instance = kv_instance_.get();
+    TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
+    TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
     Vector<ChunkID> chunk_ids;
     {
-        auto [chunk_ids_ptr, status] = segment_index_meta.GetChunkIDs1(kv_instance);
+        auto [chunk_ids_ptr, status] = segment_index_meta.GetChunkIDs1(kv_instance, begin_ts, commit_ts);
         if (!status.ok()) {
             return status;
         }
@@ -1613,6 +1623,8 @@ Status NewTxn::OptimizeSegmentIndexByParams(SegmentIndexMeta &segment_index_meta
     SharedPtr<IndexBase> index_base;
 
     KVInstance *kv_instance = kv_instance_.get();
+    TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
+    TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
 
     std::tie(index_base, status) = segment_index_meta.table_index_meta().GetIndexBase(kv_instance);
     if (!status.ok()) {
@@ -1620,7 +1632,7 @@ Status NewTxn::OptimizeSegmentIndexByParams(SegmentIndexMeta &segment_index_meta
     }
 
     Vector<ChunkID> *chunk_ids_ptr = nullptr;
-    std::tie(chunk_ids_ptr, status) = segment_index_meta.GetChunkIDs1(kv_instance);
+    std::tie(chunk_ids_ptr, status) = segment_index_meta.GetChunkIDs1(kv_instance, begin_ts, commit_ts);
     if (!status.ok()) {
         return status;
     }
@@ -1637,7 +1649,7 @@ Status NewTxn::OptimizeSegmentIndexByParams(SegmentIndexMeta &segment_index_meta
             for (ChunkID chunk_id : *chunk_ids_ptr) {
                 ChunkIndexMeta chunk_index_meta(chunk_id, segment_index_meta);
                 BufferObj *index_buffer = nullptr;
-                status = chunk_index_meta.GetIndexBuffer(kv_instance_.get(), index_buffer);
+                status = chunk_index_meta.GetIndexBuffer(kv_instance_.get(), begin_ts, index_buffer);
                 if (!status.ok()) {
                     return status;
                 }
@@ -1661,7 +1673,7 @@ Status NewTxn::OptimizeSegmentIndexByParams(SegmentIndexMeta &segment_index_meta
             for (ChunkID chunk_id : *chunk_ids_ptr) {
                 ChunkIndexMeta chunk_index_meta(chunk_id, segment_index_meta);
                 BufferObj *index_buffer = nullptr;
-                status = chunk_index_meta.GetIndexBuffer(kv_instance_.get(), index_buffer);
+                status = chunk_index_meta.GetIndexBuffer(kv_instance_.get(), begin_ts, index_buffer);
                 if (!status.ok()) {
                     return status;
                 }
@@ -1709,6 +1721,7 @@ Status NewTxn::DumpSegmentMemIndex(SegmentIndexMeta &segment_index_meta, const C
     }
 
     KVInstance *kv_instance = kv_instance_.get();
+    TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
 
     TableIndexMeeta &table_index_meta = segment_index_meta.table_index_meta();
     auto [index_base, index_status] = table_index_meta.GetIndexBase(kv_instance);
@@ -1805,7 +1818,7 @@ Status NewTxn::DumpSegmentMemIndex(SegmentIndexMeta &segment_index_meta, const C
                                                        segment_index_meta.segment_id(),
                                                        new_chunk_id});
 
-        status = chunk_index_meta->GetIndexBuffer(kv_instance_.get(), buffer_obj);
+        status = chunk_index_meta->GetIndexBuffer(kv_instance_.get(), begin_ts, buffer_obj);
         if (!status.ok()) {
             return status;
         }
@@ -1871,8 +1884,10 @@ Status NewTxn::DumpSegmentMemIndex(SegmentIndexMeta &segment_index_meta, const C
 Status NewTxn::CountMemIndexGapInSegment(SegmentIndexMeta &segment_index_meta, SegmentMeta &segment_meta, Vector<Pair<RowID, u64>> &append_ranges) {
     Status status;
     KVInstance *kv_instance = kv_instance_.get();
+    TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
+    TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
     Vector<ChunkID> *chunk_ids_ptr = nullptr;
-    std::tie(chunk_ids_ptr, status) = segment_index_meta.GetChunkIDs1(kv_instance);
+    std::tie(chunk_ids_ptr, status) = segment_index_meta.GetChunkIDs1(kv_instance, begin_ts, commit_ts);
     if (!status.ok()) {
         return status;
     }
@@ -1946,7 +1961,7 @@ Status NewTxn::RecoverMemIndex(TableIndexMeeta &table_index_meta) {
         return status;
     }
     Vector<SegmentID> *index_segment_ids_ptr = nullptr;
-    std::tie(index_segment_ids_ptr, status) = table_index_meta.GetSegmentIndexIDs1(kv_instance);
+    std::tie(index_segment_ids_ptr, status) = table_index_meta.GetSegmentIndexIDs1(kv_instance, begin_ts, commit_ts);
     if (!status.ok()) {
         return status;
     }
@@ -1988,6 +2003,8 @@ Status NewTxn::CommitMemIndex(TableIndexMeeta &table_index_meta) {
     Status status;
 
     KVInstance *kv_instance = kv_instance_.get();
+    TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
+    TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
 
     SharedPtr<IndexBase> index_base;
     std::tie(index_base, status) = table_index_meta.GetIndexBase(kv_instance);
@@ -2000,7 +2017,7 @@ Status NewTxn::CommitMemIndex(TableIndexMeeta &table_index_meta) {
     }
 
     Vector<SegmentID> *index_segment_ids_ptr = nullptr;
-    std::tie(index_segment_ids_ptr, status) = table_index_meta.GetSegmentIndexIDs1(kv_instance);
+    std::tie(index_segment_ids_ptr, status) = table_index_meta.GetSegmentIndexIDs1(kv_instance, begin_ts, commit_ts);
     if (!status.ok()) {
         return status;
     }

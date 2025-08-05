@@ -14,8 +14,8 @@
 
 module;
 
-#include <vector>
 #include <string>
+#include <vector>
 
 module infinity_core:physical_match_sparse_scan.impl;
 
@@ -143,7 +143,7 @@ void PhysicalMatchSparseScan::PlanWithIndex(QueryContext *query_context) {
     NewTxn *new_txn = query_context->GetNewTxn();
     KVInstance *kv_instance = new_txn->kv_instance();
     TxnTimeStamp begin_ts = new_txn->BeginTS();
-    //    TxnTimeStamp commit_ts = new_txn->CommitTS();
+    TxnTimeStamp commit_ts = new_txn->CommitTS();
 
     Vector<String> *index_id_strs_ptr = nullptr;
     Vector<String> *index_names_ptr = nullptr;
@@ -174,7 +174,7 @@ void PhysicalMatchSparseScan::PlanWithIndex(QueryContext *query_context) {
                 base_table_ref_->index_index_ = MakeShared<IndexIndex>();
             }
             IndexIndex *index_index = base_table_ref_->index_index_.get();
-            auto index_snapshot = index_index->Insert(kv_instance, index_name, table_index_meta);
+            auto index_snapshot = index_index->Insert(kv_instance, begin_ts, commit_ts, index_name, table_index_meta);
             break;
         }
     } else {
@@ -208,7 +208,7 @@ void PhysicalMatchSparseScan::PlanWithIndex(QueryContext *query_context) {
             base_table_ref_->index_index_ = MakeShared<IndexIndex>();
         }
         IndexIndex *index_index = base_table_ref_->index_index_.get();
-        auto index_snapshot = index_index->Insert(kv_instance, index_name, table_index_meta);
+        auto index_snapshot = index_index->Insert(kv_instance, begin_ts, commit_ts, index_name, table_index_meta);
     }
     return;
 }
@@ -535,14 +535,14 @@ void PhysicalMatchSparseScan::ExecuteInnerT(DistFunc *dist_func,
             bmp_handler->template SearchIndex<ResultType, DistFunc>(query, topn, options, filter, query_id, segment_id, merge_heap);
         };
         auto bmp_scan = [&](const auto &filter) {
-            auto [chunk_ids_ptr, status] = segment_index_meta->GetChunkIDs1(kv_instance);
+            auto [chunk_ids_ptr, status] = segment_index_meta->GetChunkIDs1(kv_instance, begin_ts, commit_ts);
             if (!status.ok()) {
                 UnrecoverableError(status.message());
             }
             for (ChunkID chunk_id : *chunk_ids_ptr) {
                 ChunkIndexMeta chunk_index_meta(chunk_id, *segment_index_meta);
                 BufferObj *index_buffer = nullptr;
-                status = chunk_index_meta.GetIndexBuffer(kv_instance, index_buffer);
+                status = chunk_index_meta.GetIndexBuffer(kv_instance, begin_ts, index_buffer);
                 if (!status.ok()) {
                     UnrecoverableError(status.message());
                 }

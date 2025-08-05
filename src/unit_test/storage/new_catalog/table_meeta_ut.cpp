@@ -121,7 +121,7 @@ TEST_P(TestTxnTableMeeta, table_meeta) {
     EXPECT_TRUE(get_status.ok());
 
     UniquePtr<KVInstance> kv_instance = infinity::InfinityContext::instance().storage()->KVInstance();
-    TableMeeta table_meta(table_info->db_id_, table_info->table_id_, kv_instance.get(), txn2->BeginTS(), txn2->CommitTS());
+    TableMeeta table_meta(table_info->db_id_, table_info->table_id_, kv_instance.get(), txn2->CommitTS());
 
     {
         {

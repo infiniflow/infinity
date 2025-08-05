@@ -173,12 +173,12 @@ Status NewCatalog::InitCatalog(KVInstance *kv_instance, TxnTimeStamp checkpoint_
     };
     auto InitSegmentIndex = [&](SegmentID segment_id, TableIndexMeeta &table_index_meta) {
         SegmentIndexMeta segment_index_meta(segment_id, table_index_meta);
-        status = segment_index_meta.LoadSet(kv_instance);
+        status = segment_index_meta.LoadSet(kv_instance, checkpoint_ts);
         if (!status.ok()) {
             return status;
         }
 
-        auto [chunk_ids_ptr, chunk_status] = segment_index_meta.GetChunkIDs1(kv_instance);
+        auto [chunk_ids_ptr, chunk_status] = segment_index_meta.GetChunkIDs1(kv_instance, checkpoint_ts, UNCOMMIT_TS);
         if (!chunk_status.ok()) {
             return status;
         }
@@ -194,7 +194,7 @@ Status NewCatalog::InitCatalog(KVInstance *kv_instance, TxnTimeStamp checkpoint_
         TableIndexMeeta table_index_meta(index_id_str, table_meta);
 
         Vector<SegmentID> *segment_ids_ptr = nullptr;
-        std::tie(segment_ids_ptr, status) = table_index_meta.GetSegmentIndexIDs1(kv_instance);
+        std::tie(segment_ids_ptr, status) = table_index_meta.GetSegmentIndexIDs1(kv_instance, checkpoint_ts, UNCOMMIT_TS);
         if (!status.ok()) {
             return status;
         }
@@ -207,7 +207,7 @@ Status NewCatalog::InitCatalog(KVInstance *kv_instance, TxnTimeStamp checkpoint_
         return Status::OK();
     };
     auto InitTable = [&](const String &table_id_str, DBMeeta &db_meta) {
-        TableMeeta table_meta(db_meta.db_id_str(), table_id_str, kv_instance, checkpoint_ts, UNCOMMIT_TS);
+        TableMeeta table_meta(db_meta.db_id_str(), table_id_str, kv_instance, UNCOMMIT_TS);
 
         Vector<SegmentID> *segment_ids_ptr = nullptr;
         std::tie(segment_ids_ptr, status) = table_meta.GetSegmentIDs1(kv_instance, checkpoint_ts, UNCOMMIT_TS);
@@ -371,8 +371,9 @@ Status NewCatalog::MemIndexCommit(NewTxn *new_txn) {
 Status NewCatalog::GetAllMemIndexes(NewTxn *txn, Vector<SharedPtr<MemIndex>> &mem_indexes, Vector<MemIndexID> &mem_index_ids) {
     KVInstance *kv_instance = txn->kv_instance();
     TxnTimeStamp begin_ts = txn->BeginTS();
+    TxnTimeStamp commit_ts = txn->CommitTS();
     auto TraverseTableIndex = [&](TableIndexMeeta &table_index_meta, const String &db_name, const String &table_name, const String &index_name) {
-        auto [index_segment_ids_ptr, status] = table_index_meta.GetSegmentIndexIDs1(kv_instance);
+        auto [index_segment_ids_ptr, status] = table_index_meta.GetSegmentIndexIDs1(kv_instance, begin_ts, commit_ts);
         if (!status.ok()) {
             return status;
         }
@@ -479,7 +480,7 @@ Status NewCatalog::CleanDB(KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTi
 
     for (SizeT i = 0; i < table_id_strs_ptr->size(); ++i) {
         const String &table_id_str = (*table_id_strs_ptr)[i];
-        TableMeeta table_meta(db_meta.db_id_str(), table_id_str, kv_instance, begin_ts, MAX_TIMESTAMP);
+        TableMeeta table_meta(db_meta.db_id_str(), table_id_str, kv_instance, MAX_TIMESTAMP);
         status = NewCatalog::CleanTable(kv_instance, begin_ts, commit_ts, table_meta, usage_flag);
         if (!status.ok()) {
             return status;
@@ -508,7 +509,7 @@ Status NewCatalog::AddNewTable(DBMeeta &db_meta,
         return status;
     }
 
-    table_meta.emplace(db_meta.db_id_str(), table_id_str, kv_instance, begin_ts, commit_ts);
+    table_meta.emplace(db_meta.db_id_str(), table_id_str, kv_instance, commit_ts);
     status = table_meta->InitSet(kv_instance, commit_ts, table_def);
     if (!status.ok()) {
         return status;
@@ -589,7 +590,7 @@ Status NewCatalog::CleanTableIndex(TableIndexMeeta &table_index_meta,
                           table_index_meta.table_meta().table_id_str(),
                           table_index_meta.index_id_str()));
 
-    auto [segment_ids_ptr, status] = table_index_meta.GetSegmentIndexIDs1(kv_instance);
+    auto [segment_ids_ptr, status] = table_index_meta.GetSegmentIndexIDs1(kv_instance, begin_ts, commit_ts);
     if (!status.ok()) {
         return status;
     }
@@ -601,7 +602,7 @@ Status NewCatalog::CleanTableIndex(TableIndexMeeta &table_index_meta,
         }
     }
 
-    status = table_index_meta.UninitSet1(kv_instance, usage_flag);
+    status = table_index_meta.UninitSet1(kv_instance, begin_ts, usage_flag);
     if (!status.ok()) {
         return status;
     }
@@ -792,12 +793,12 @@ Status NewCatalog::LoadImportedOrCompactedSegment(TableMeeta &table_meta,
     for (const String &index_id_str : *index_id_strs_ptr) {
         TableIndexMeeta table_index_meta(index_id_str, table_meta);
         SegmentIndexMeta segment_index_meta(segment_info.segment_id_, table_index_meta);
-        status = segment_index_meta.LoadSet(kv_instance);
+        status = segment_index_meta.LoadSet(kv_instance, begin_ts);
         if (!status.ok()) {
             return status;
         }
 
-        auto [chunk_ids_ptr, chunk_status] = segment_index_meta.GetChunkIDs1(kv_instance);
+        auto [chunk_ids_ptr, chunk_status] = segment_index_meta.GetChunkIDs1(kv_instance, begin_ts, commit_ts);
         if (!chunk_status.ok()) {
             return status;
         }
@@ -1006,7 +1007,7 @@ Status NewCatalog::CleanSegmentIndex(SegmentIndexMeta &segment_index_meta,
         }
     }
 
-    auto [chunk_ids_ptr, status] = segment_index_meta.GetChunkIDs1(kv_instance);
+    auto [chunk_ids_ptr, status] = segment_index_meta.GetChunkIDs1(kv_instance, begin_ts, commit_ts);
     if (!status.ok()) {
         return status;
     }
@@ -1066,7 +1067,7 @@ Status NewCatalog::LoadFlushedChunkIndex1(SegmentIndexMeta &segment_index_meta, 
 
     Status status;
     Vector<ChunkID> *chunk_ids_ptr = nullptr;
-    std::tie(chunk_ids_ptr, status) = segment_index_meta.GetChunkIDs1(kv_instance);
+    std::tie(chunk_ids_ptr, status) = segment_index_meta.GetChunkIDs1(kv_instance, begin_ts, commit_ts);
     if (!status.ok()) {
         return status;
     }
@@ -1115,7 +1116,7 @@ Status NewCatalog::CleanChunkIndex(ChunkIndexMeta &chunk_index_meta,
     chunk_index_meta.RestoreSet(kv_instance, begin_ts, commit_ts);
     Status status;
 
-    status = chunk_index_meta.UninitSet(kv_instance, usage_flag);
+    status = chunk_index_meta.UninitSet(kv_instance, begin_ts, usage_flag);
     if (!status.ok()) {
         return status;
     }
@@ -1234,7 +1235,7 @@ NewCatalog::GetDBFilePaths(KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTi
         return status;
     }
     for (const String &table_id_str : *table_id_strs_ptr) {
-        TableMeeta table_meta(db_meta.db_id_str(), table_id_str, kv_instance, begin_ts, commit_ts);
+        TableMeeta table_meta(db_meta.db_id_str(), table_id_str, kv_instance, commit_ts);
         status = GetTableFilePaths(kv_instance, begin_ts, commit_ts, table_meta, file_paths);
         if (!status.ok()) {
             return status;
@@ -1269,7 +1270,7 @@ Status NewCatalog::GetTableFilePaths(KVInstance *kv_instance,
     }
     for (const String &index_id_str : *index_id_strs_ptr) {
         TableIndexMeeta table_index_meta(index_id_str, table_meta);
-        status = GetTableIndexFilePaths(table_index_meta, kv_instance, file_paths);
+        status = GetTableIndexFilePaths(table_index_meta, kv_instance, begin_ts, commit_ts, file_paths);
         if (!status.ok()) {
             return status;
         }
@@ -1355,15 +1356,19 @@ Status NewCatalog::GetColumnFilePaths(KVInstance *kv_instance,
     return NewCatalog::GetTableFilePaths(kv_instance, begin_ts, commit_ts, table_meta, file_paths, column_def);
 }
 
-Status NewCatalog::GetTableIndexFilePaths(TableIndexMeeta &table_index_meta, KVInstance *kv_instance, Vector<String> &file_paths) {
+Status NewCatalog::GetTableIndexFilePaths(TableIndexMeeta &table_index_meta,
+                                          KVInstance *kv_instance,
+                                          TxnTimeStamp begin_ts,
+                                          TxnTimeStamp commit_ts,
+                                          Vector<String> &file_paths) {
 
-    auto [segment_ids_ptr, status] = table_index_meta.GetSegmentIndexIDs1(kv_instance);
+    auto [segment_ids_ptr, status] = table_index_meta.GetSegmentIndexIDs1(kv_instance, begin_ts, commit_ts);
     if (!status.ok()) {
         return status;
     }
     for (SegmentID segment_id : *segment_ids_ptr) {
         SegmentIndexMeta segment_index_meta(segment_id, table_index_meta);
-        status = GetSegmentIndexFilepaths(segment_index_meta, kv_instance, file_paths);
+        status = GetSegmentIndexFilepaths(segment_index_meta, kv_instance, begin_ts, commit_ts, file_paths);
         if (!status.ok()) {
             return status;
         }
@@ -1371,14 +1376,18 @@ Status NewCatalog::GetTableIndexFilePaths(TableIndexMeeta &table_index_meta, KVI
     return Status::OK();
 }
 
-Status NewCatalog::GetSegmentIndexFilepaths(SegmentIndexMeta &segment_index_meta, KVInstance *kv_instance, Vector<String> &file_paths) {
-    auto [chunk_ids_ptr, status] = segment_index_meta.GetChunkIDs1(kv_instance);
+Status NewCatalog::GetSegmentIndexFilepaths(SegmentIndexMeta &segment_index_meta,
+                                            KVInstance *kv_instance,
+                                            TxnTimeStamp begin_ts,
+                                            TxnTimeStamp commit_ts,
+                                            Vector<String> &file_paths) {
+    auto [chunk_ids_ptr, status] = segment_index_meta.GetChunkIDs1(kv_instance, begin_ts, commit_ts);
     if (!status.ok()) {
         return status;
     }
     for (ChunkID chunk_id : *chunk_ids_ptr) {
         ChunkIndexMeta chunk_index_meta(chunk_id, segment_index_meta);
-        status = GetChunkIndexFilePaths(chunk_index_meta, kv_instance, file_paths);
+        status = GetChunkIndexFilePaths(chunk_index_meta, kv_instance, begin_ts, file_paths);
         if (!status.ok()) {
             return status;
         }
@@ -1386,9 +1395,10 @@ Status NewCatalog::GetSegmentIndexFilepaths(SegmentIndexMeta &segment_index_meta
     return Status::OK();
 }
 
-Status NewCatalog::GetChunkIndexFilePaths(ChunkIndexMeta &chunk_index_meta, KVInstance *kv_instance, Vector<String> &file_paths) {
+Status
+NewCatalog::GetChunkIndexFilePaths(ChunkIndexMeta &chunk_index_meta, KVInstance *kv_instance, TxnTimeStamp begin_ts, Vector<String> &file_paths) {
     Vector<String> paths;
-    Status status = chunk_index_meta.FilePaths(kv_instance, paths);
+    Status status = chunk_index_meta.FilePaths(kv_instance, begin_ts, paths);
     if (!status.ok()) {
         return status;
     }

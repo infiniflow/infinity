@@ -44,8 +44,8 @@ import row_id;
 
 namespace infinity {
 
-TableMeeta::TableMeeta(const String &db_id_str, const String &table_id_str, KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts)
-    : BaseMeta(MetaType::kTable), begin_ts_(begin_ts), commit_ts_(commit_ts), kv_instance_(kv_instance), db_id_str_(db_id_str),
+TableMeeta::TableMeeta(const String &db_id_str, const String &table_id_str, KVInstance *kv_instance, TxnTimeStamp commit_ts)
+    : BaseMeta(MetaType::kTable), commit_ts_(commit_ts), kv_instance_(kv_instance), db_id_str_(db_id_str),
       table_id_str_(table_id_str) {}
 
 TableMeeta::TableMeeta(const String &db_id_str, const String &table_id_str, NewTxn *txn)
@@ -53,7 +53,6 @@ TableMeeta::TableMeeta(const String &db_id_str, const String &table_id_str, NewT
     if (txn == nullptr) {
         UnrecoverableError("Null txn pointer");
     }
-    begin_ts_ = txn->BeginTS();
     commit_ts_ = txn->CommitTS();
     kv_instance_ = txn->kv_instance();
 }
@@ -108,7 +107,7 @@ Status TableMeeta::GetIndexID(KVInstance *kv_instance,
     TxnTimeStamp max_commit_ts = 0;
     for (SizeT i = 0; i < index_kvs.size(); ++i) {
         TxnTimeStamp commit_ts = infinity::GetTimestampFromKey(index_kvs[i].first);
-        if ((commit_ts <= begin_ts_ || (txn_ != nullptr && txn_->IsReplay() && commit_ts == commit_ts_)) && commit_ts > max_commit_ts) {
+        if ((commit_ts <= begin_ts || (txn_ != nullptr && txn_->IsReplay() && commit_ts == commit_ts_)) && commit_ts > max_commit_ts) {
             max_commit_ts = commit_ts;
             max_visible_index_index = i;
         }
@@ -124,7 +123,7 @@ Status TableMeeta::GetIndexID(KVInstance *kv_instance,
     String drop_index_ts{};
     kv_instance_->Get(KeyEncode::DropTableIndexKey(db_id_str_, table_id_str_, index_name, max_commit_ts, index_id_str), drop_index_ts);
 
-    if (!drop_index_ts.empty() && std::stoull(drop_index_ts) <= begin_ts_) {
+    if (!drop_index_ts.empty() && std::stoull(drop_index_ts) <= begin_ts) {
         return Status::IndexNotExist(index_name);
     }
 
@@ -168,7 +167,7 @@ TableMeeta::GetColumnDefByColumnID(KVInstance *kv_instance, TxnTimeStamp begin_t
     return {(*column_defs_)[column_idx], Status::OK()};
 }
 
-Status TableMeeta::RemoveSegmentIDs1(KVInstance *kv_instance, const Vector<SegmentID> &segment_ids) {
+Status TableMeeta::RemoveSegmentIDs1(KVInstance *kv_instance, TxnTimeStamp begin_ts, const Vector<SegmentID> &segment_ids) {
     HashSet<SegmentID> segment_ids_set(segment_ids.begin(), segment_ids.end());
 
     String segment_id_prefix = KeyEncode::CatalogTableSegmentKeyPrefix(db_id_str_, table_id_str_);
@@ -179,7 +178,7 @@ Status TableMeeta::RemoveSegmentIDs1(KVInstance *kv_instance, const Vector<Segme
         TxnTimeStamp commit_ts = std::stoull(iter->Value().ToString());
         SegmentID segment_id = std::stoull(iter->Key().ToString().substr(segment_id_prefix.size()));
         if (segment_ids_set.contains(segment_id)) {
-            if (commit_ts > begin_ts_ and commit_ts != std::numeric_limits<TxnTimeStamp>::max()) {
+            if (commit_ts > begin_ts and commit_ts != std::numeric_limits<TxnTimeStamp>::max()) {
                 UnrecoverableError(fmt::format("Segment id: {} is not allowed to be removed. commit_ts: {}", segment_id, commit_ts));
             }
             // the key is committed before the txn or the key isn't committed
@@ -354,7 +353,7 @@ Status TableMeeta::UninitSet(KVInstance *kv_instance, TxnTimeStamp begin_ts, Txn
         if (!status.ok()) {
             return status;
         }
-        status = RemoveSegmentIDs1(kv_instance, *segment_ids_ptr);
+        status = RemoveSegmentIDs1(kv_instance, begin_ts, *segment_ids_ptr);
         if (!status.ok()) {
             return status;
         }
@@ -591,7 +590,7 @@ Status TableMeeta::LoadColumnDefs(KVInstance *kv_instance, TxnTimeStamp begin_ts
         for (SizeT i = 0; i < column_kv.size(); ++i) {
             String commit_ts_str = GetLastPartOfKey(column_kv[i].first, '|');
             TxnTimeStamp commit_ts = std::stoull(commit_ts_str);
-            if ((commit_ts <= begin_ts_ || commit_ts == commit_ts_) && commit_ts > max_commit_ts) {
+            if ((commit_ts <= begin_ts || commit_ts == commit_ts_) && commit_ts > max_commit_ts) {
                 {
                     max_commit_ts = commit_ts;
                     max_visible_column_index = i;
@@ -604,7 +603,7 @@ Status TableMeeta::LoadColumnDefs(KVInstance *kv_instance, TxnTimeStamp begin_ts
             const String &column_value = column_kv[max_visible_column_index].second;
             kv_instance_->Get(KeyEncode::DropTableColumnKey(db_id_str_, table_id_str_, column_name, max_commit_ts), drop_column_ts);
 
-            if (drop_column_ts.empty() || std::stoull(drop_column_ts) > begin_ts_) {
+            if (drop_column_ts.empty() || std::stoull(drop_column_ts) > begin_ts) {
                 auto column_def = ColumnDef::FromJson(column_value);
                 column_defs.push_back(column_def);
             }
@@ -639,7 +638,7 @@ Status TableMeeta::LoadIndexIDs(KVInstance *kv_instance, TxnTimeStamp begin_ts) 
         for (SizeT i = 0; i < index_kv.size(); ++i) {
             String commit_ts_str = GetLastPartOfKey(index_kv[i].first, '|');
             TxnTimeStamp commit_ts = std::stoull(commit_ts_str);
-            if (commit_ts <= begin_ts_ && commit_ts > max_commit_ts) {
+            if (commit_ts <= begin_ts && commit_ts > max_commit_ts) {
                 max_commit_ts = commit_ts;
                 max_visible_index_index = i;
             }
@@ -650,7 +649,7 @@ Status TableMeeta::LoadIndexIDs(KVInstance *kv_instance, TxnTimeStamp begin_ts) 
             const String &index_id = index_kv[max_visible_index_index].second;
             kv_instance_->Get(KeyEncode::DropTableIndexKey(db_id_str_, table_id_str_, index_name, max_commit_ts, index_id), drop_index_ts);
 
-            if (drop_index_ts.empty() || std::stoull(drop_index_ts) > begin_ts_) {
+            if (drop_index_ts.empty() || std::stoull(drop_index_ts) > begin_ts) {
                 index_id_strs.push_back(index_id);
                 index_names.push_back(index_name);
             }
@@ -749,9 +748,9 @@ TableMeeta::GetColumnKeyByColumnName(KVInstance *kv_instance, TxnTimeStamp begin
     SizeT max_visible_column_index = std::numeric_limits<SizeT>::max();
     TxnTimeStamp max_commit_ts = 0;
     for (SizeT i = 0; i < column_kvs.size(); ++i) {
-        TxnTimeStamp commit_ts = infinity::GetTimestampFromKey(column_kvs[i].first);
-        if ((commit_ts <= begin_ts_ || commit_ts == commit_ts_) && commit_ts > max_commit_ts) {
-            max_commit_ts = commit_ts;
+        TxnTimeStamp column_commit_ts = infinity::GetTimestampFromKey(column_kvs[i].first);
+        if ((column_commit_ts <= begin_ts || column_commit_ts == commit_ts_) && column_commit_ts > max_commit_ts) {
+            max_commit_ts = column_commit_ts;
             max_visible_column_index = i;
         }
     }
@@ -762,7 +761,7 @@ TableMeeta::GetColumnKeyByColumnName(KVInstance *kv_instance, TxnTimeStamp begin
 
     String drop_column_ts{};
     kv_instance_->Get(KeyEncode::DropTableColumnKey(db_id_str_, table_id_str_, column_name, max_commit_ts), drop_column_ts);
-    if (!drop_column_ts.empty() && std::stoull(drop_column_ts) <= begin_ts_) {
+    if (!drop_column_ts.empty() && std::stoull(drop_column_ts) <= begin_ts) {
         return {"", Status::ColumnNotExist(column_name)};
     }
 
@@ -774,7 +773,7 @@ SharedPtr<String> TableMeeta::GetTableDir() { return {MakeShared<String>(table_i
 Tuple<Vector<SegmentID> *, Status> TableMeeta::GetSegmentIDs1(KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts) {
     std::lock_guard<std::mutex> lock(mtx_);
     if (!segment_ids1_) {
-        segment_ids1_ = infinity::GetTableSegments(kv_instance_, db_id_str_, table_id_str_, begin_ts_, commit_ts_);
+        segment_ids1_ = infinity::GetTableSegments(kv_instance_, db_id_str_, table_id_str_, begin_ts, commit_ts_);
     }
     return {&*segment_ids1_, Status::OK()};
 }
@@ -790,7 +789,7 @@ Status TableMeeta::CheckSegments(KVInstance *kv_instance, TxnTimeStamp begin_ts,
 
         String drop_segment_ts{};
         kv_instance_->Get(KeyEncode::DropSegmentKey(db_id_str_, table_id_str_, segment_id), drop_segment_ts);
-        if (!drop_segment_ts.empty() && std::stoull(drop_segment_ts) <= begin_ts_) {
+        if (!drop_segment_ts.empty() && std::stoull(drop_segment_ts) <= begin_ts) {
             return Status::SegmentNotExist(segment_id);
         }
     }

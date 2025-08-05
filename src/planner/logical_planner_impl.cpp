@@ -1106,7 +1106,6 @@ Status LogicalPlanner::BuildExport(const CopyStatement *statement, SharedPtr<Bin
     auto table_meta = MakeUnique<TableMeeta>(tmp_table_meta->db_id_str(),
                                              tmp_table_meta->table_id_str(),
                                              tmp_table_meta->kv_instance(),
-                                             tmp_table_meta->begin_ts(),
                                              tmp_table_meta->commit_ts());
     table_info = MakeShared<TableInfo>();
     status = table_meta->GetTableInfo(kv_instance, begin_ts, commit_ts, *table_info);

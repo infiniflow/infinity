@@ -214,7 +214,7 @@ TEST_P(OptimizeKnnTest, test_hnsw_optimize) {
         EXPECT_EQ(mem_index->GetHnswIndex(), nullptr);
         txn_mgr->PrintAllKeyValue();
         {
-            auto [chunk_ids, status] = segment_index_meta.GetChunkIDs1(txn->kv_instance());
+            auto [chunk_ids, status] = segment_index_meta.GetChunkIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*chunk_ids, Vector<ChunkID>({3}));
         }
@@ -229,7 +229,7 @@ TEST_P(OptimizeKnnTest, test_hnsw_optimize) {
         }
 
         BufferObj *buffer_obj = nullptr;
-        status = chunk_index_meta.GetIndexBuffer(txn->kv_instance(), buffer_obj);
+        status = chunk_index_meta.GetIndexBuffer(txn->kv_instance(), txn->BeginTS(), buffer_obj);
         EXPECT_TRUE(status.ok());
 
         status = txn_mgr->CommitTxn(txn);
@@ -333,7 +333,7 @@ TEST_P(OptimizeKnnTest, test_secondary_index_optimize) {
         EXPECT_EQ(mem_index->GetSecondaryIndex(), nullptr);
         txn_mgr->PrintAllKeyValue();
         {
-            auto [chunk_ids, status] = segment_index_meta.GetChunkIDs1(txn->kv_instance());
+            auto [chunk_ids, status] = segment_index_meta.GetChunkIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*chunk_ids, Vector<ChunkID>({3}));
         }
@@ -348,7 +348,7 @@ TEST_P(OptimizeKnnTest, test_secondary_index_optimize) {
         }
 
         BufferObj *buffer_obj = nullptr;
-        status = chunk_index_meta.GetIndexBuffer(txn->kv_instance(), buffer_obj);
+        status = chunk_index_meta.GetIndexBuffer(txn->kv_instance(), txn->BeginTS(), buffer_obj);
         EXPECT_TRUE(status.ok());
 
         status = txn_mgr->CommitTxn(txn);

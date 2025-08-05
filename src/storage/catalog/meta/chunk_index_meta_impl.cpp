@@ -88,9 +88,9 @@ Status ChunkIndexMeta::GetChunkInfo(KVInstance *kv_instance, ChunkIndexMetaInfo 
     return Status::OK();
 }
 
-Status ChunkIndexMeta::GetIndexBuffer(KVInstance *kv_instance, BufferObj *&index_buffer) {
+Status ChunkIndexMeta::GetIndexBuffer(KVInstance *kv_instance, TxnTimeStamp begin_ts, BufferObj *&index_buffer) {
     if (!index_buffer_) {
-        Status status = LoadIndexBuffer(kv_instance);
+        Status status = LoadIndexBuffer(kv_instance, begin_ts);
         if (!status.ok()) {
             return status;
         }
@@ -448,9 +448,9 @@ Status ChunkIndexMeta::RestoreSet(KVInstance *kv_instance, TxnTimeStamp begin_ts
     return Status::OK();
 }
 
-Status ChunkIndexMeta::UninitSet(KVInstance *kv_instance, UsageFlag usage_flag) {
+Status ChunkIndexMeta::UninitSet(KVInstance *kv_instance, TxnTimeStamp begin_ts, UsageFlag usage_flag) {
     auto *kv_store = InfinityContext::instance().storage()->kv_store();
-    Status status = this->GetIndexBuffer(kv_instance, index_buffer_);
+    Status status = this->GetIndexBuffer(kv_instance, begin_ts, index_buffer_);
     if (!status.ok()) {
         return status;
     }
@@ -526,7 +526,7 @@ Status ChunkIndexMeta::SetChunkInfoNoPutKV(const ChunkIndexMetaInfo &chunk_info)
     return Status::OK();
 }
 
-Status ChunkIndexMeta::FilePaths(KVInstance *kv_instance, Vector<String> &paths) {
+Status ChunkIndexMeta::FilePaths(KVInstance *kv_instance, TxnTimeStamp begin_ts, Vector<String> &paths) {
     Status status;
     TableIndexMeeta &table_index_meta = segment_index_meta_.table_index_meta();
     auto [index_def, index_status] = table_index_meta.GetIndexBase(kv_instance);
@@ -576,7 +576,7 @@ Status ChunkIndexMeta::LoadChunkInfo(KVInstance *kv_instance) {
     return Status::OK();
 }
 
-Status ChunkIndexMeta::LoadIndexBuffer(KVInstance *kv_instance) {
+Status ChunkIndexMeta::LoadIndexBuffer(KVInstance *kv_instance, TxnTimeStamp begin_ts) {
     TableIndexMeeta &table_index_meta = segment_index_meta_.table_index_meta();
 
     String index_dir = fmt::format("{}/{}", InfinityContext::instance().config()->DataDir(), segment_index_meta_.GetSegmentIndexDir()->c_str());

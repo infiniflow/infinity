@@ -55,7 +55,7 @@ public:
 
     Status GetChunkInfo(KVInstance *kv_instance, ChunkIndexMetaInfo *&chunk_info);
 
-    Status GetIndexBuffer(KVInstance *kv_instance, BufferObj *&index_buffer);
+    Status GetIndexBuffer(KVInstance *kv_instance, TxnTimeStamp begin_ts, BufferObj *&index_buffer);
 
     Status InitSet(KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts, const ChunkIndexMetaInfo &chunk_info);
 
@@ -63,18 +63,18 @@ public:
 
     Status RestoreSet(KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts);
 
-    Status UninitSet(KVInstance *kv_instance, UsageFlag usage_flag);
+    Status UninitSet(KVInstance *kv_instance, TxnTimeStamp begin_ts, UsageFlag usage_flag);
 
     Status SetChunkInfo(KVInstance *kv_instance, const ChunkIndexMetaInfo &chunk_info);
 
     Status SetChunkInfoNoPutKV(const ChunkIndexMetaInfo &chunk_info);
 
-    Status FilePaths(KVInstance *kv_instance, Vector<String> &paths);
+    Status FilePaths(KVInstance *kv_instance, TxnTimeStamp begin_ts, Vector<String> &paths);
 
 private:
     Status LoadChunkInfo(KVInstance *kv_instance);
 
-    Status LoadIndexBuffer(KVInstance *kv_instance);
+    Status LoadIndexBuffer(KVInstance *kv_instance, TxnTimeStamp begin_ts);
 
     String GetChunkIndexTag(const String &tag) const;
 

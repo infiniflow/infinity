@@ -1329,8 +1329,10 @@ NewTxn::GetSegmentIndexInfo(const String &db_name, const String &table_name, con
         return {nullptr, status};
     }
     KVInstance *kv_instance = kv_instance_.get();
+    TxnTimeStamp begin_ts = BeginTS();
+    TxnTimeStamp commit_ts = CommitTS();
     SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta);
-    SharedPtr<SegmentIndexInfo> segment_index_info = segment_index_meta.GetSegmentIndexInfo(kv_instance);
+    SharedPtr<SegmentIndexInfo> segment_index_info = segment_index_meta.GetSegmentIndexInfo(kv_instance, begin_ts, commit_ts);
     return {std::move(segment_index_info), Status::OK()};
 }
 
@@ -4418,11 +4420,7 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
         }
         case TransactionType::kCreateIndex: {
             CreateIndexTxnStore *create_index_txn_store = static_cast<CreateIndexTxnStore *>(base_txn_store_.get());
-            TableMeeta table_meta(create_index_txn_store->db_id_str_,
-                                  create_index_txn_store->table_id_str_,
-                                  kv_instance_.get(),
-                                  abort_ts,
-                                  MAX_TIMESTAMP);
+            TableMeeta table_meta(create_index_txn_store->db_id_str_, create_index_txn_store->table_id_str_, kv_instance_.get(), MAX_TIMESTAMP);
             Vector<String> *index_id_strs_ptr = nullptr;
             Status status = table_meta.GetIndexIDs(kv_instance, begin_ts, index_id_strs_ptr);
             if (!status.ok()) {
@@ -4634,7 +4632,7 @@ Status NewTxn::CleanupInner(const Vector<UniquePtr<MetaKey>> &metas) {
                 if (!status.ok()) {
                     return status;
                 }
-                TableMeeta table_meta(table_meta_key->db_id_str_, table_meta_key->table_id_str_, kv_instance, begin_ts, MAX_TIMESTAMP);
+                TableMeeta table_meta(table_meta_key->db_id_str_, table_meta_key->table_id_str_, kv_instance, MAX_TIMESTAMP);
                 status = NewCatalog::CleanTable(kv_instance, begin_ts, commit_ts, table_meta, UsageFlag::kOther);
                 if (!status.ok()) {
                     return status;
@@ -4652,8 +4650,8 @@ Status NewTxn::CleanupInner(const Vector<UniquePtr<MetaKey>> &metas) {
             }
             case MetaType::kSegment: {
                 auto *segment_meta_key = static_cast<SegmentMetaKey *>(meta.get());
-                TableMeeta table_meta(segment_meta_key->db_id_str_, segment_meta_key->table_id_str_, kv_instance, begin_ts, MAX_TIMESTAMP);
-                Status status = table_meta.RemoveSegmentIDs1(kv_instance, {segment_meta_key->segment_id_});
+                TableMeeta table_meta(segment_meta_key->db_id_str_, segment_meta_key->table_id_str_, kv_instance, MAX_TIMESTAMP);
+                Status status = table_meta.RemoveSegmentIDs1(kv_instance, begin_ts, {segment_meta_key->segment_id_});
                 if (!status.ok()) {
                     return status;
                 }
@@ -4667,7 +4665,7 @@ Status NewTxn::CleanupInner(const Vector<UniquePtr<MetaKey>> &metas) {
             }
             case MetaType::kBlock: {
                 auto *block_meta_key = static_cast<BlockMetaKey *>(meta.get());
-                TableMeeta table_meta(block_meta_key->db_id_str_, block_meta_key->table_id_str_, kv_instance, begin_ts, MAX_TIMESTAMP);
+                TableMeeta table_meta(block_meta_key->db_id_str_, block_meta_key->table_id_str_, kv_instance, MAX_TIMESTAMP);
                 SegmentMeta segment_meta(block_meta_key->segment_id_, table_meta);
                 BlockMeta block_meta(block_meta_key->block_id_, segment_meta);
                 Status status = NewCatalog::CleanBlock(kv_instance, begin_ts, MAX_TIMESTAMP, block_meta, UsageFlag::kOther);
@@ -4690,11 +4688,16 @@ Status NewTxn::CleanupInner(const Vector<UniquePtr<MetaKey>> &metas) {
             }
             case MetaType::kBlockColumn: {
                 auto *column_meta_key = static_cast<ColumnMetaKey *>(meta.get());
-                TableMeeta table_meta(column_meta_key->db_id_str_, column_meta_key->table_id_str_, kv_instance, begin_ts, MAX_TIMESTAMP);
+                TableMeeta table_meta(column_meta_key->db_id_str_, column_meta_key->table_id_str_, kv_instance, MAX_TIMESTAMP);
                 SegmentMeta segment_meta(column_meta_key->segment_id_, table_meta);
                 BlockMeta block_meta(column_meta_key->block_id_, segment_meta);
                 ColumnMeta column_meta(column_meta_key->column_def_->id(), block_meta);
-                Status status = NewCatalog::CleanBlockColumn(kv_instance, begin_ts, MAX_TIMESTAMP, column_meta, column_meta_key->column_def_.get(), UsageFlag::kOther);
+                Status status = NewCatalog::CleanBlockColumn(kv_instance,
+                                                             begin_ts,
+                                                             MAX_TIMESTAMP,
+                                                             column_meta,
+                                                             column_meta_key->column_def_.get(),
+                                                             UsageFlag::kOther);
                 if (!status.ok()) {
                     return status;
                 }
@@ -4711,7 +4714,7 @@ Status NewTxn::CleanupInner(const Vector<UniquePtr<MetaKey>> &metas) {
                     return status;
                 }
 
-                TableMeeta table_meta(table_index_meta_key->db_id_str_, table_index_meta_key->table_id_str_, kv_instance, begin_ts, MAX_TIMESTAMP);
+                TableMeeta table_meta(table_index_meta_key->db_id_str_, table_index_meta_key->table_id_str_, kv_instance, MAX_TIMESTAMP);
                 TableIndexMeeta table_index_meta(table_index_meta_key->index_id_str_, table_meta);
                 status = NewCatalog::CleanTableIndex(table_index_meta, kv_instance, begin_ts, MAX_TIMESTAMP, UsageFlag::kOther);
                 if (!status.ok()) {
@@ -4721,11 +4724,7 @@ Status NewTxn::CleanupInner(const Vector<UniquePtr<MetaKey>> &metas) {
             }
             case MetaType::kSegmentIndex: {
                 auto *segment_index_meta_key = static_cast<SegmentIndexMetaKey *>(meta.get());
-                TableMeeta table_meta(segment_index_meta_key->db_id_str_,
-                                      segment_index_meta_key->table_id_str_,
-                                      kv_instance,
-                                      begin_ts,
-                                      MAX_TIMESTAMP);
+                TableMeeta table_meta(segment_index_meta_key->db_id_str_, segment_index_meta_key->table_id_str_, kv_instance, MAX_TIMESTAMP);
                 TableIndexMeeta table_index_meta(segment_index_meta_key->index_id_str_, table_meta);
                 SegmentIndexMeta segment_index_meta(segment_index_meta_key->segment_id_, table_index_meta);
                 Status status = NewCatalog::CleanSegmentIndex(segment_index_meta, kv_instance, begin_ts, commit_ts, UsageFlag::kOther);
@@ -4736,7 +4735,7 @@ Status NewTxn::CleanupInner(const Vector<UniquePtr<MetaKey>> &metas) {
             }
             case MetaType::kChunkIndex: {
                 auto *chunk_index_meta_key = static_cast<ChunkIndexMetaKey *>(meta.get());
-                TableMeeta table_meta(chunk_index_meta_key->db_id_str_, chunk_index_meta_key->table_id_str_, kv_instance, begin_ts, MAX_TIMESTAMP);
+                TableMeeta table_meta(chunk_index_meta_key->db_id_str_, chunk_index_meta_key->table_id_str_, kv_instance, MAX_TIMESTAMP);
                 TableIndexMeeta table_index_meta(chunk_index_meta_key->index_id_str_, table_meta);
                 SegmentIndexMeta segment_index_meta(chunk_index_meta_key->segment_id_, table_index_meta);
                 ChunkIndexMeta chunk_index_meta(chunk_index_meta_key->chunk_id_, segment_index_meta);
@@ -5040,7 +5039,7 @@ Status NewTxn::GetTableIndexFilePaths(const String &db_name, const String &table
     if (!status.ok()) {
         return status;
     }
-    return NewCatalog::GetTableIndexFilePaths(*table_index_meta, kv_instance_.get(), file_paths);
+    return NewCatalog::GetTableIndexFilePaths(*table_index_meta, kv_instance_.get(), BeginTS(), CommitTS(), file_paths);
 }
 
 Status NewTxn::GetSegmentIndexFilepaths(const String &db_name,
@@ -5057,8 +5056,11 @@ Status NewTxn::GetSegmentIndexFilepaths(const String &db_name,
     if (!status.ok()) {
         return status;
     }
+    KVInstance *kv_instance = kv_instance_.get();
+    TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
+    TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
     SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta);
-    return NewCatalog::GetSegmentIndexFilepaths(segment_index_meta, kv_instance_.get(), file_paths);
+    return NewCatalog::GetSegmentIndexFilepaths(segment_index_meta, kv_instance, begin_ts, commit_ts, file_paths);
 }
 
 Status NewTxn::GetChunkIndexFilePaths(const String &db_name,
@@ -5078,7 +5080,7 @@ Status NewTxn::GetChunkIndexFilePaths(const String &db_name,
     }
     SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta);
     ChunkIndexMeta chunk_index_meta(chunk_id, segment_index_meta);
-    return NewCatalog::GetChunkIndexFilePaths(chunk_index_meta, kv_instance_.get(), file_paths);
+    return NewCatalog::GetChunkIndexFilePaths(chunk_index_meta, kv_instance_.get(), BeginTS(), file_paths);
 }
 
 Status NewTxn::Dummy() {

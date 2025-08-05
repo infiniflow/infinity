@@ -41,25 +41,25 @@ public:
 
     TableIndexMeeta &table_index_meta() const { return table_index_meta_; }
 
-    Status GetNextChunkID(KVInstance* kv_instance, ChunkID &chunk_id);
+    Status GetNextChunkID(KVInstance *kv_instance, ChunkID &chunk_id);
 
-    Tuple<Vector<ChunkID> *, Status> GetChunkIDs1(KVInstance* kv_instance);
+    Tuple<Vector<ChunkID> *, Status> GetChunkIDs1(KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts);
 
-    Status GetFtInfo(KVInstance* kv_instance, SharedPtr<SegmentIndexFtInfo> &ft_info);
+    Status GetFtInfo(KVInstance *kv_instance, SharedPtr<SegmentIndexFtInfo> &ft_info);
 
-    Status RemoveChunkIDs(KVInstance* kv_instance, const Vector<ChunkID> &chunk_ids);
+    Status RemoveChunkIDs(KVInstance *kv_instance, const Vector<ChunkID> &chunk_ids);
 
-    Status AddChunkIndexID1(KVInstance* kv_instance, ChunkID chunk_id, NewTxn *new_txn);
+    Status AddChunkIndexID1(KVInstance *kv_instance, ChunkID chunk_id, NewTxn *new_txn);
 
-    Status SetNextChunkID(KVInstance* kv_instance, ChunkID chunk_id);
+    Status SetNextChunkID(KVInstance *kv_instance, ChunkID chunk_id);
 
-    Status UpdateFtInfo(KVInstance* kv_instance, u64 column_len_sum, u32 column_len_cnt);
+    Status UpdateFtInfo(KVInstance *kv_instance, u64 column_len_sum, u32 column_len_cnt);
 
-    Status InitSet1(KVInstance* kv_instance);
+    Status InitSet1(KVInstance *kv_instance);
 
-    Status LoadSet(KVInstance *kv_instance);
+    Status LoadSet(KVInstance *kv_instance, TxnTimeStamp begin_ts);
 
-    Status UninitSet1(KVInstance* kv_instance, UsageFlag usage_flag);
+    Status UninitSet1(KVInstance *kv_instance, UsageFlag usage_flag);
 
     SharedPtr<MemIndex> GetMemIndex();
     SharedPtr<MemIndex> PopMemIndex();
@@ -67,14 +67,14 @@ public:
 
     SharedPtr<String> GetSegmentIndexDir() const;
 
-    SharedPtr<SegmentIndexInfo> GetSegmentIndexInfo(KVInstance* kv_instance);
+    SharedPtr<SegmentIndexInfo> GetSegmentIndexInfo(KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts);
 
 private:
-    Status LoadChunkIDs1(KVInstance* kv_instance);
+    Status LoadChunkIDs1(KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts);
 
-    Status LoadNextChunkID(KVInstance* kv_instance);
+    Status LoadNextChunkID(KVInstance *kv_instance);
 
-    Status LoadFtInfo(KVInstance* kv_instance);
+    Status LoadFtInfo(KVInstance *kv_instance);
 
     String GetSegmentIndexTag(const String &tag);
 

@@ -50,7 +50,7 @@ export class ColumnIndexReader {
 public:
     ~ColumnIndexReader();
 
-    Status Open(optionflag_t flag, TableIndexMeeta &table_index_meta, KVInstance* kv_instance);
+    Status Open(optionflag_t flag, TableIndexMeeta &table_index_meta, KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts);
 
     UniquePtr<PostingIterator> Lookup(const String &term, bool fetch_position = true);
 

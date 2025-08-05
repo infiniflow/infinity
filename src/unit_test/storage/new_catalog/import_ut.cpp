@@ -306,7 +306,7 @@ TEST_P(TestTxnImport, test_import_with_index) {
 
             {
                 Vector<ChunkID> *chunk_ids = nullptr;
-                std::tie(chunk_ids, status) = segment_index_meta.GetChunkIDs1(txn->kv_instance());
+                std::tie(chunk_ids, status) = segment_index_meta.GetChunkIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
                 EXPECT_TRUE(status.ok());
                 EXPECT_EQ(*chunk_ids, Vector<ChunkID>({0}));
             }
@@ -321,7 +321,7 @@ TEST_P(TestTxnImport, test_import_with_index) {
             }
 
             BufferObj *buffer_obj = nullptr;
-            status = chunk_index_meta.GetIndexBuffer(txn->kv_instance(), buffer_obj);
+            status = chunk_index_meta.GetIndexBuffer(txn->kv_instance(), txn->BeginTS(), buffer_obj);
             EXPECT_TRUE(status.ok());
         };
         {
@@ -4687,7 +4687,7 @@ TEST_P(TestTxnImport, test_import_and_create_index) {
         EXPECT_EQ(index_base->index_type_, IndexType::kSecondary);
 
         Vector<SegmentID> *index_segment_ids_ptr = nullptr;
-        std::tie(index_segment_ids_ptr, status) = table_index_meta.GetSegmentIndexIDs1(txn->kv_instance());
+        std::tie(index_segment_ids_ptr, status) = table_index_meta.GetSegmentIndexIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(index_segment_ids_ptr->size(), 1);
     };
@@ -5932,7 +5932,7 @@ TEST_P(TestTxnImport, test_import_and_compact) {
         EXPECT_EQ(*index_base->index_name_, *index_name1);
 
         Vector<SegmentID> *index_segment_ids_ptr = nullptr;
-        std::tie(index_segment_ids_ptr, status) = table_index_meta->GetSegmentIndexIDs1(txn->kv_instance());
+        std::tie(index_segment_ids_ptr, status) = table_index_meta->GetSegmentIndexIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(*index_segment_ids_ptr, segment_ids);
     };
@@ -6302,14 +6302,14 @@ TEST_P(TestTxnImport, test_import_and_optimize_index) {
         EXPECT_EQ(*index_base->index_name_, *index_name1);
 
         Vector<SegmentID> *index_segment_ids_ptr = nullptr;
-        std::tie(index_segment_ids_ptr, status) = table_index_meta->GetSegmentIndexIDs1(txn->kv_instance());
+        std::tie(index_segment_ids_ptr, status) = table_index_meta->GetSegmentIndexIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(*index_segment_ids_ptr, Vector<SegmentID>({0, 1}));
 
         {
             SegmentIndexMeta segment_index_meta((*index_segment_ids_ptr)[0], *table_index_meta);
             Vector<ChunkID> *chunk_ids_ptr = nullptr;
-            std::tie(chunk_ids_ptr, status) = segment_index_meta.GetChunkIDs1(txn->kv_instance());
+            std::tie(chunk_ids_ptr, status) = segment_index_meta.GetChunkIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*chunk_ids_ptr, Vector<ChunkID>({2}));
         }
@@ -6317,7 +6317,7 @@ TEST_P(TestTxnImport, test_import_and_optimize_index) {
         {
             SegmentIndexMeta segment_index_meta((*index_segment_ids_ptr)[1], *table_index_meta);
             Vector<ChunkID> *chunk_ids_ptr = nullptr;
-            std::tie(chunk_ids_ptr, status) = segment_index_meta.GetChunkIDs1(txn->kv_instance());
+            std::tie(chunk_ids_ptr, status) = segment_index_meta.GetChunkIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*chunk_ids_ptr, Vector<ChunkID>({0}));
         }

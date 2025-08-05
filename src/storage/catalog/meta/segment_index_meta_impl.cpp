@@ -60,9 +60,9 @@ Status SegmentIndexMeta::GetNextChunkID(KVInstance *kv_instance, ChunkID &chunk_
     return Status::OK();
 }
 
-Tuple<Vector<ChunkID> *, Status> SegmentIndexMeta::GetChunkIDs1(KVInstance *kv_instance) {
+Tuple<Vector<ChunkID> *, Status> SegmentIndexMeta::GetChunkIDs1(KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts) {
     if (!chunk_ids_) {
-        auto status = LoadChunkIDs1(kv_instance);
+        auto status = LoadChunkIDs1(kv_instance, begin_ts, commit_ts);
         if (!status.ok()) {
             return {nullptr, status};
         }
@@ -172,7 +172,7 @@ Status SegmentIndexMeta::InitSet1(KVInstance *kv_instance) {
     return Status::OK();
 }
 
-Status SegmentIndexMeta::LoadSet(KVInstance *kv_instance) {
+Status SegmentIndexMeta::LoadSet(KVInstance *kv_instance, TxnTimeStamp begin_ts) {
     {
         auto [index_base, status] = table_index_meta_.GetIndexBase(kv_instance);
         if (!status.ok()) {
@@ -250,11 +250,9 @@ bool SegmentIndexMeta::HasMemIndex() {
     return new_catalog->HasMemIndex(mem_index_key);
 }
 
-Status SegmentIndexMeta::LoadChunkIDs1(KVInstance *kv_instance) {
+Status SegmentIndexMeta::LoadChunkIDs1(KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts) {
     chunk_ids_ = Vector<ChunkID>();
     Vector<ChunkID> &chunk_ids = *chunk_ids_;
-    TxnTimeStamp begin_ts = table_index_meta_.table_meta().begin_ts();
-    TxnTimeStamp commit_ts = table_index_meta_.table_meta().commit_ts();
 
     TableMeeta &table_meta = table_index_meta_.table_meta();
     String chunk_id_prefix =
@@ -326,7 +324,7 @@ SharedPtr<String> SegmentIndexMeta::GetSegmentIndexDir() const {
     return MakeShared<String>(fmt::format("{}/seg_{}", *table_index_dir, segment_id_));
 }
 
-SharedPtr<SegmentIndexInfo> SegmentIndexMeta::GetSegmentIndexInfo(KVInstance *kv_instance) {
+SharedPtr<SegmentIndexInfo> SegmentIndexMeta::GetSegmentIndexInfo(KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts) {
     SharedPtr<IndexBase> index_def;
     Status status;
     std::tie(index_def, status) = table_index_meta_.GetIndexBase(kv_instance);
@@ -334,7 +332,7 @@ SharedPtr<SegmentIndexInfo> SegmentIndexMeta::GetSegmentIndexInfo(KVInstance *kv
         return nullptr;
     }
     if (!chunk_ids_) {
-        Status status = LoadChunkIDs1(kv_instance);
+        Status status = LoadChunkIDs1(kv_instance, begin_ts, commit_ts);
         if (!status.ok()) {
             return nullptr;
         }
@@ -343,7 +341,7 @@ SharedPtr<SegmentIndexInfo> SegmentIndexMeta::GetSegmentIndexInfo(KVInstance *kv
     for (auto &chunk_id : *chunk_ids_) {
         ChunkIndexMeta chunk_index_meta(chunk_id, *this);
         Vector<String> chunk_index_files;
-        status = chunk_index_meta.FilePaths(kv_instance, chunk_index_files);
+        status = chunk_index_meta.FilePaths(kv_instance, begin_ts, chunk_index_files);
         if (!status.ok()) {
             return nullptr;
         }

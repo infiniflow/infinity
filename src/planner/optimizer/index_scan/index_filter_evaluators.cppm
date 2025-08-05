@@ -65,6 +65,8 @@ export struct IndexFilterEvaluatorSecondary : IndexFilterEvaluator {
     LogicalType column_logical_type_ = LogicalType::kInvalid;
     SharedPtr<TableIndexMeeta> new_secondary_index_ = nullptr;
     KVInstance *kv_instance_{};
+    TxnTimeStamp begin_ts_{};
+    TxnTimeStamp commit_ts_{};
 
     ColumnID column_id() const { return column_id_; }
     virtual bool IsValid() const = 0;
@@ -83,7 +85,9 @@ protected:
                                   const ColumnID column_id,
                                   const LogicalType column_logical_type,
                                   SharedPtr<TableIndexMeeta> new_secondary_index,
-                                  KVInstance *kv_instance);
+                                  KVInstance *kv_instance,
+                                  TxnTimeStamp begin_ts,
+                                  TxnTimeStamp commit_ts);
 };
 
 // maybe combined from multiple filter_fulltext exprs

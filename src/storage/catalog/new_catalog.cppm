@@ -408,11 +408,20 @@ public:
                                      SharedPtr<ColumnDef> column_def,
                                      Vector<String> &file_paths);
 
-    static Status GetTableIndexFilePaths(TableIndexMeeta &table_index_meta, KVInstance *kv_instance, Vector<String> &file_paths);
+    static Status GetTableIndexFilePaths(TableIndexMeeta &table_index_meta,
+                                         KVInstance *kv_instance,
+                                         TxnTimeStamp begin_ts,
+                                         TxnTimeStamp commit_ts,
+                                         Vector<String> &file_paths);
 
-    static Status GetSegmentIndexFilepaths(SegmentIndexMeta &segment_index_meta, KVInstance *kv_instance, Vector<String> &file_paths);
+    static Status GetSegmentIndexFilepaths(SegmentIndexMeta &segment_index_meta,
+                                           KVInstance *kv_instance,
+                                           TxnTimeStamp begin_ts,
+                                           TxnTimeStamp commit_ts,
+                                           Vector<String> &file_paths);
 
-    static Status GetChunkIndexFilePaths(ChunkIndexMeta &chunk_index_meta, KVInstance *kv_instance, Vector<String> &file_paths);
+    static Status
+    GetChunkIndexFilePaths(ChunkIndexMeta &chunk_index_meta, KVInstance *kv_instance, TxnTimeStamp begin_ts, Vector<String> &file_paths);
 
     static Status CheckColumnIfIndexed(TableMeeta &table_meta,
                                        KVInstance *kv_instance,

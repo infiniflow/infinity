@@ -160,7 +160,7 @@ public:
         Status status = txn->GetTableIndexMeta("db1", "tb1", "idx1", db_meta_, table_meta_, index_meta_, &table_key, &index_key);
         EXPECT_TRUE(status.ok());
         ColumnIndexReader reader;
-        reader.Open(flag_, *index_meta_, txn->kv_instance());
+        reader.Open(flag_, *index_meta_, txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
         // Pair<u64, float> res = reader.GetTotalDfAndAvgColumnLength();
         // ASSERT_GT(res.first, 0);     // row count
         // ASSERT_GT(res.second, 0.0f); // avg column length

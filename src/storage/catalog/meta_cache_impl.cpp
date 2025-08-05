@@ -18,9 +18,26 @@ module infinity_core:meta_cache.impl;
 
 import :stl;
 import :meta_cache;
+import :lru;
 
 namespace infinity {
 
 MetaCache::MetaCache(SizeT capacity) : lru_cache_(capacity) {}
+
+void MetaCache::Put(const String &key, SharedPtr<BaseMeta> meta) { lru_cache_.set(key, std::move(meta)); }
+
+void MetaCache::Erase(const String &key) { lru_cache_.unset(key); }
+
+SharedPtr<BaseMeta> MetaCache::Get(const String &key) { return lru_cache_.maybe_get(key).value_or(nullptr); }
+
+Vector<String> MetaCache::GetAllKeys() const { return lru_cache_.get_all_keys(); }
+
+String MetaCache::DbKey(const String &db_name) { return fmt::format("db|{}", db_name); }
+
+String MetaCache::TableKey(const String &db_name, const String &table_name) { return fmt::format("table|{}|{}", db_name, table_name); }
+
+String MetaCache::TableIndexKey(const String &db_name, const String &table_name, const String &index_name) {
+    return fmt::format("table_index|{}|{}|{}", db_name, table_name, index_name);
+}
 
 } // namespace infinity

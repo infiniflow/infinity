@@ -80,7 +80,8 @@ export struct NewIndexSnapshot {
 
 export struct IndexIndex {
 public:
-    SharedPtr<NewIndexSnapshot> Insert(KVInstance *kv_instance, const String &index_name, SharedPtr<TableIndexMeeta> table_index_meta);
+    SharedPtr<NewIndexSnapshot>
+    Insert(KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts, const String &index_name, SharedPtr<TableIndexMeeta> table_index_meta);
 
     void Insert(String index_name, SharedPtr<NewIndexSnapshot> new_index_snapshot);
 

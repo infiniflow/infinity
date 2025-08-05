@@ -219,14 +219,14 @@ TEST_P(TestTxnOptimizeIndex, optimize_index_rollback) {
             SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta);
 
             {
-                auto [chunk_ids, status] = segment_index_meta.GetChunkIDs1(txn->kv_instance());
+                auto [chunk_ids, status] = segment_index_meta.GetChunkIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
                 EXPECT_TRUE(status.ok());
                 EXPECT_EQ(*chunk_ids, my_chunk_ids);
             }
             for (const auto chunk_id : my_chunk_ids) {
                 ChunkIndexMeta chunk_index_meta(chunk_id, segment_index_meta);
                 BufferObj *buffer_obj = nullptr;
-                status = chunk_index_meta.GetIndexBuffer(txn->kv_instance(), buffer_obj);
+                status = chunk_index_meta.GetIndexBuffer(txn->kv_instance(), txn->BeginTS(), buffer_obj);
                 EXPECT_TRUE(status.ok());
             }
             status = new_txn_mgr->CommitTxn(txn);
@@ -709,13 +709,13 @@ TEST_P(TestTxnOptimizeIndex, DISABLED_optimize_index_and_optimize_index) {
         EXPECT_EQ(*index_base->index_name_, *index_name1);
 
         Vector<SegmentID> *index_segment_ids_ptr = nullptr;
-        std::tie(index_segment_ids_ptr, status) = table_index_meta->GetSegmentIndexIDs1(txn->kv_instance());
+        std::tie(index_segment_ids_ptr, status) = table_index_meta->GetSegmentIndexIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(*index_segment_ids_ptr, Vector<SegmentID>({0}));
 
         SegmentIndexMeta segment_index_meta((*index_segment_ids_ptr)[0], *table_index_meta);
         Vector<ChunkID> *chunk_ids_ptr = nullptr;
-        std::tie(chunk_ids_ptr, status) = segment_index_meta.GetChunkIDs1(txn->kv_instance());
+        std::tie(chunk_ids_ptr, status) = segment_index_meta.GetChunkIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(*chunk_ids_ptr, Vector<ChunkID>({2}));
     };

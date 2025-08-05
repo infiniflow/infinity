@@ -127,11 +127,15 @@ void IndexIndex::Insert(String index_name, SharedPtr<NewIndexSnapshot> new_index
     new_index_snapshots_.emplace(std::move(index_name), new_index_snapshot);
 }
 
-SharedPtr<NewIndexSnapshot> IndexIndex::Insert(KVInstance *kv_instance, const String &index_name, SharedPtr<TableIndexMeeta> table_index_meta) {
+SharedPtr<NewIndexSnapshot> IndexIndex::Insert(KVInstance *kv_instance,
+                                               TxnTimeStamp begin_ts,
+                                               TxnTimeStamp commit_ts,
+                                               const String &index_name,
+                                               SharedPtr<TableIndexMeeta> table_index_meta) {
     auto index_snapshot = MakeShared<NewIndexSnapshot>();
     index_snapshot->table_index_meta_ = table_index_meta;
 
-    auto [segment_ids_ptr, status] = table_index_meta->GetSegmentIndexIDs1(kv_instance);
+    auto [segment_ids_ptr, status] = table_index_meta->GetSegmentIndexIDs1(kv_instance, begin_ts, commit_ts);
     if (!status.ok()) {
         RecoverableError(status);
     }

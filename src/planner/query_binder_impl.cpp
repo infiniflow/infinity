@@ -449,7 +449,7 @@ SharedPtr<BaseTableRef> QueryBinder::BuildBaseTable(QueryContext *query_context,
     if (!status.ok()) {
         RecoverableError(status);
     }
-    auto table_meta = MakeUnique<TableMeeta>(tmp_table_meta->db_id_str(), tmp_table_meta->table_id_str(), kv_instance, begin_ts, commit_ts);
+    auto table_meta = MakeUnique<TableMeeta>(tmp_table_meta->db_id_str(), tmp_table_meta->table_id_str(), kv_instance, commit_ts);
     table_info = MakeShared<TableInfo>();
     status = table_meta->GetTableInfo(kv_instance, begin_ts, commit_ts, *table_info);
     if (!status.ok()) {

@@ -47,8 +47,7 @@ TableIndexMeeta::~TableIndexMeeta() = default;
 Tuple<SharedPtr<IndexBase>, Status> TableIndexMeeta::GetIndexBase(KVInstance *kv_instance) {
     std::lock_guard<std::mutex> lock(mtx_);
     if (!index_def_) {
-        index_def_ =
-            infinity::GetTableIndexDef(kv_instance, table_meta_.db_id_str(), table_meta_.table_id_str(), index_id_str_, table_meta_.begin_ts());
+        index_def_ = infinity::GetTableIndexDef(kv_instance, table_meta_.db_id_str(), table_meta_.table_id_str(), index_id_str_);
     }
     return {index_def_, Status::OK()};
 }
@@ -75,21 +74,21 @@ Tuple<SharedPtr<ColumnDef>, Status> TableIndexMeeta::GetColumnDef(KVInstance *kv
     return table_meta_.GetColumnDefByColumnName(kv_instance, begin_ts, commit_ts, index_base->column_name());
 }
 
-Tuple<Vector<SegmentID> *, Status> TableIndexMeeta::GetSegmentIndexIDs1(KVInstance *kv_instance) {
+Tuple<Vector<SegmentID> *, Status> TableIndexMeeta::GetSegmentIndexIDs1(KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts) {
     std::lock_guard<std::mutex> lock(mtx_);
     if (!segment_ids_) {
         segment_ids_ = infinity::GetTableIndexSegments(kv_instance,
                                                        table_meta_.db_id_str(),
                                                        table_meta_.table_id_str(),
                                                        index_id_str_,
-                                                       table_meta_.begin_ts(),
+                                                       begin_ts,
                                                        table_meta_.commit_ts());
     }
     return {&*segment_ids_, Status::OK()};
 }
 
-bool TableIndexMeeta::HasSegmentIndexID(KVInstance *kv_instance, SegmentID segment_id) {
-    auto [segment_ids_ptr, status] = GetSegmentIndexIDs1(kv_instance);
+bool TableIndexMeeta::HasSegmentIndexID(KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts, SegmentID segment_id) {
+    auto [segment_ids_ptr, status] = GetSegmentIndexIDs1(kv_instance, begin_ts, commit_ts);
     if (!status.ok()) {
         return false;
     }
@@ -171,7 +170,7 @@ Status TableIndexMeeta::InitSet1(KVInstance *kv_instance, const SharedPtr<IndexB
     return Status::OK();
 }
 
-Status TableIndexMeeta::UninitSet1(KVInstance *kv_instance, UsageFlag usage_flag) {
+Status TableIndexMeeta::UninitSet1(KVInstance *kv_instance, TxnTimeStamp begin_ts, UsageFlag usage_flag) {
     Status status;
 
     SharedPtr<IndexBase> index_base;
@@ -237,12 +236,11 @@ Status TableIndexMeeta::GetTableIndexInfo(KVInstance *kv_instance, TxnTimeStamp 
                                                        table_meta_.db_id_str(),
                                                        table_meta_.table_id_str(),
                                                        index_id_str_,
-                                                       table_meta_.begin_ts(),
+                                                       begin_ts,
                                                        table_meta_.commit_ts());
     }
     if (!index_def_) {
-        index_def_ =
-            infinity::GetTableIndexDef(kv_instance, table_meta_.db_id_str(), table_meta_.table_id_str(), index_id_str_, table_meta_.begin_ts());
+        index_def_ = infinity::GetTableIndexDef(kv_instance, table_meta_.db_id_str(), table_meta_.table_id_str(), index_id_str_);
     }
 
     SharedPtr<ColumnDef> column_def = nullptr;
