@@ -3,19 +3,19 @@ cmake_minimum_required(VERSION 3.28.1)
 cmake_policy(SET CMP0167 OLD)
 
 # Auto-detect and set vcpkg toolchain if not already set
-if(NOT CMAKE_TOOLCHAIN_FILE)
+if (NOT CMAKE_TOOLCHAIN_FILE)
     # First try environment variable CMAKE_TOOLCHAIN_FILE (for container builds)
-    if(DEFINED ENV{CMAKE_TOOLCHAIN_FILE})
+    if (DEFINED ENV{CMAKE_TOOLCHAIN_FILE})
         set(CMAKE_TOOLCHAIN_FILE "$ENV{CMAKE_TOOLCHAIN_FILE}"
-            CACHE STRING "Vcpkg toolchain file")
+                CACHE STRING "Vcpkg toolchain file")
         message(STATUS "Using vcpkg toolchain from environment: ${CMAKE_TOOLCHAIN_FILE}")
-    # Fallback to VCPKG_ROOT for backward compatibility
-    elseif(DEFINED ENV{VCPKG_ROOT})
+        # Fallback to VCPKG_ROOT for backward compatibility
+    elseif (DEFINED ENV{VCPKG_ROOT})
         set(CMAKE_TOOLCHAIN_FILE "$ENV{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake"
-            CACHE STRING "Vcpkg toolchain file")
+                CACHE STRING "Vcpkg toolchain file")
         message(STATUS "Using vcpkg toolchain from VCPKG_ROOT: ${CMAKE_TOOLCHAIN_FILE}")
-    endif()
-endif()
+    endif ()
+endif ()
 
 project(infinity VERSION 0.6.0)
 
@@ -148,32 +148,21 @@ find_package(Thrift CONFIG REQUIRED)
 find_package(unofficial-inih CONFIG REQUIRED)
 find_path(VIT_VIT_CTPL_INCLUDE_DIRS "ctpl_stl.h")
 
-# Manual vcpkg path handling (only when not using vcpkg toolchain)
-if(NOT CMAKE_TOOLCHAIN_FILE OR NOT CMAKE_TOOLCHAIN_FILE MATCHES "vcpkg.cmake")
-    message(STATUS "Using manual vcpkg path detection (legacy mode)")
+set(VCPKG_PROJECT_ROOT "${CMAKE_CURRENT_BINARY_DIR}/vcpkg_installed")
+file(GLOB VCPKG_INCLUDE_DIRS
+        "${VCPKG_PROJECT_ROOT}/*/include"
+)
+message(STATUS "Found vcpkg include directories: ${VCPKG_INCLUDE_DIRS}")
+include_directories(${VCPKG_INCLUDE_DIRS})
 
-    # Use environment variable VCPKG_ROOT if available, otherwise fallback to local vcpkg_installed
-    if(DEFINED ENV{VCPKG_ROOT})
-        set(VCPKG_ROOT "$ENV{VCPKG_ROOT}/installed")
-    else()
-        set(VCPKG_ROOT "${CMAKE_SOURCE_DIR}/vcpkg_installed")
-    endif()
+# vcpkg oatpp bug
+file(GLOB OATPP_INCLUDE_DIRS
+        "${VCPKG_PROJECT_ROOT}/*/include/oatpp-1.3.0/oatpp"
+)
+message(STATUS "Found oatpp include directories: ${OATPP_INCLUDE_DIRS}")
+include_directories(${OATPP_INCLUDE_DIRS})
+message(STATUS "Using vcpkg toolchain - automatic package discovery enabled")
 
-    file(GLOB VCPKG_INCLUDE_DIRS
-            "${VCPKG_ROOT}/*/include"
-    )
-    message(STATUS "Found vcpkg include directories: ${VCPKG_INCLUDE_DIRS}")
-    include_directories(${VCPKG_INCLUDE_DIRS})
-
-    # vcpkg oatpp bug
-    file(GLOB OATPP_INCLUDE_DIRS
-            "${VCPKG_ROOT}/*/include/oatpp-1.3.0/oatpp"
-    )
-    message(STATUS "Found oatpp include directories: ${OATPP_INCLUDE_DIRS}")
-    include_directories(${OATPP_INCLUDE_DIRS})
-else()
-    message(STATUS "Using vcpkg toolchain - automatic package discovery enabled")
-endif()
 
 # Get current system time and print the build time
 execute_process(COMMAND "date" +"%Y-%m-%d %H:%M.%S" OUTPUT_VARIABLE CURRENT_SYS_TIME)
