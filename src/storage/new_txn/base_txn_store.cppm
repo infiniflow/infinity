@@ -132,7 +132,7 @@ export struct CreateTableTxnStore final : public BaseTxnStore {
 
 
 export struct CreateTableSnapshotTxnStore final : public BaseTxnStore {
-    CreateTableSnapshotTxnStore() : BaseTxnStore(TransactionType::kCreateTableSnapshot) {}
+    CreateTableSnapshotTxnStore() : BaseTxnStore(TransactionType::kCreateSnapshot) {}
 
     String db_name_{};
     String table_name_{};
