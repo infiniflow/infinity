@@ -1326,6 +1326,18 @@ NewTxn::GetChunkIndexInfo(const String &db_name, const String &table_name, const
     }
 
     SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta);
+
+    String chunk_id_key = KeyEncode::CatalogIdxChunkKey(table_meta->db_id_str(),
+                                                        table_meta->table_id_str(),
+                                                        table_index_meta->index_id_str(),
+                                                        segment_index_meta.segment_id(),
+                                                        chunk_id);
+    String commit_ts_str;
+    status = kv_instance_->Get(chunk_id_key, commit_ts_str);
+    if (!status.ok()) {
+        return {nullptr, status};
+    }
+
     ChunkIndexMeta chunk_index_meta(chunk_id, segment_index_meta);
     ChunkIndexMetaInfo *chunk_index_info_ptr;
     status = chunk_index_meta.GetChunkInfo(chunk_index_info_ptr);
