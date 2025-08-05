@@ -125,6 +125,7 @@ Status TableMeeta::GetIndexID(const String &index_name, String &index_key, Strin
     return Status::OK();
 }
 
+
 Tuple<SharedPtr<ColumnDef>, Status> TableMeeta::GetColumnDefByColumnName(const String &column_name, SizeT *column_idx_ptr) {
     if (!column_defs_) {
         Status status = LoadColumnDefs();
@@ -308,6 +309,7 @@ Status TableMeeta::LoadSet() {
     if (!status.ok()) {
         return status;
     }
+    LOG_DEBUG(fmt::format("LoadSet for table: {} with number of indexes: {}", table_id_str_, index_id_strs_ptr->size()));
     for (const String &index_id_str : *index_id_strs_ptr) {
         TableIndexMeeta table_index_meta(index_id_str, *this);
         auto [index_def, status] = table_index_meta.GetIndexBase();
@@ -319,6 +321,7 @@ Status TableMeeta::LoadSet() {
             String ft_index_cache_key = GetTableTag("ft_index_cache");
             auto ft_index_cache = MakeShared<TableIndexReaderCache>(db_id_str_, table_id_str_);
             status = new_catalog->AddFtIndexCache(std::move(ft_index_cache_key), std::move(ft_index_cache));
+            LOG_DEBUG(fmt::format("Add ft index cache for table: {}, commit ts: {}", table_id_str_, commit_ts_));
             if (!status.ok()) {
                 return status;
             }
@@ -901,6 +904,124 @@ Status TableMeeta::SetNextIndexID(const String &index_id_str) {
     return Status::OK();
 }
 
+Tuple<SharedPtr<TableSnapshotInfo>, Status> TableMeeta::MapMetaToSnapShotInfo(const String &db_name, const String &table_name){
+    // TxnTimeStamp txn_id_{};
+
+    // TxnTimeStamp max_commit_ts_{};
+    // String table_entry_dir_{};
+    // ColumnID next_column_id_{};
+    // SegmentID unsealed_id_{};
+    // SegmentID next_segment_id_{};
+    // SizeT row_count_{};
+    // Vector<SharedPtr<ColumnDef>> columns_{};
+    // Map<SegmentID, SharedPtr<SegmentSnapshotInfo>> segment_snapshots_{};
+    // Map<String, SharedPtr<TableIndexSnapshotInfo>> table_index_snapshots_{};
+    SharedPtr<TableSnapshotInfo> table_snapshot_info = MakeShared<TableSnapshotInfo>();
+    // Get comment
+        // TableInfo table_info;
+        // Status status = GetComm(table_info);
+    // if (!status.ok()) {
+    //     return {nullptr, status};
+    // }
+    table_snapshot_info->table_name_ = table_name;
+    table_snapshot_info->db_name_ = db_name;
+    table_snapshot_info->db_id_str_ = db_id_str_;
+    table_snapshot_info->table_id_str_ = table_id_str_;
+    // table_snapshot_info->table_comment_ = table_info.comment_;
+
+    // TODO: remove these two fields and figure out why they are here in the first place
+    // table_snapshot_info->begin_ts_ = begin_ts_;
+    // table_snapshot_info->commit_ts_ = commit_ts_;
+
+    // table_snapshot_info->create_ts_ = table_info.create_ts_;
+    
+
+    // Get unsealed segment id
+    SegmentID unsealed_segment_id = 0;
+    Status status = GetUnsealedSegmentID(unsealed_segment_id);
+    // if (!status.ok()) {
+    //     return {nullptr, status};
+    // }
+    table_snapshot_info->unsealed_id_ = unsealed_segment_id;
+
+    // Get next column id
+    ColumnID next_column_id = 0;
+    status = GetNextColumnID(next_column_id);
+    // if (!status.ok()) {
+    //     return {nullptr, status};
+    // }
+    table_snapshot_info->next_column_id_ = next_column_id;
+
+
+    // Get column defs
+    SharedPtr<Vector<SharedPtr<ColumnDef>>> column_defs;
+    std::tie(column_defs, status) = this->GetColumnDefs();
+    if (!status.ok()) {
+        return {nullptr, status};
+    }
+    table_snapshot_info->columns_ = *column_defs;
+    std::sort(table_snapshot_info->columns_.begin(), table_snapshot_info->columns_.end(), [](const SharedPtr<ColumnDef> &a, const SharedPtr<ColumnDef> &b) {
+        return a->id_ < b->id_;
+    });
+
+    // Get segment ids
+    Vector<SegmentID> *segment_ids_ptr = nullptr;
+    std::tie(segment_ids_ptr, status) = GetSegmentIDs1();
+    // if (!status.ok()) {
+    //     return {nullptr, status};
+    // }
+    for (SegmentID segment_id : *segment_ids_ptr) {
+        SegmentMeta segment_meta(segment_id, *this);
+        auto [segment_snapshot, segment_status] = segment_meta.MapMetaToSnapShotInfo();
+        if (!segment_status.ok()) {
+            return {nullptr, segment_status};
+        }
+        table_snapshot_info->segment_snapshots_.emplace(segment_id, segment_snapshot);
+    }
+
+    // Get index ids
+    if (!index_id_strs_) {
+        status = LoadIndexIDs();
+        if (!status.ok()) {
+            return {nullptr, status};
+        }
+    }
+    for (const String &index_id : *index_id_strs_) {
+        TableIndexMeeta table_index_meta(index_id, *this);
+        auto [table_index_snapshot, table_index_status] = table_index_meta.MapMetaToSnapShotInfo();
+        if (!table_index_status.ok()) {
+            return {nullptr, table_index_status};
+        }
+        table_snapshot_info->table_index_snapshots_.emplace(index_id, table_index_snapshot);
+    }
+
+    return {table_snapshot_info, Status::OK()};
+}
+
+Status TableMeeta::RestoreFromSnapshot(WalCmdRestoreTableSnapshot *restore_table_snapshot_cmd,bool is_link_files) {
+    for (const WalSegmentInfoV2 &segment_info : restore_table_snapshot_cmd->segment_infos_) {
+        if (!is_link_files) {
+            Status status = AddSegmentWithID(commit_ts(), segment_info.segment_id_);
+            if (!status.ok()) {
+                return status;
+            }
+        }
+        SegmentMeta segment_meta(segment_info.segment_id_, *this);
+        Status status = segment_meta.RestoreFromSnapshot(segment_info, is_link_files);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    return Status::OK();
+}
+
+Status TableMeeta::SetBeginTS(TxnTimeStamp begin_ts) {
+    begin_ts_ = begin_ts;
+    return Status::OK();
+}
+
+
+
 Tuple<SizeT, Status> TableMeeta::GetTableRowCount() {
     Status status{};
     SizeT row_count{};
@@ -931,5 +1052,6 @@ Tuple<SizeT, Status> TableMeeta::GetTableRowCount() {
     }
     return {row_count, Status::OK()};
 }
+
 
 } // namespace infinity

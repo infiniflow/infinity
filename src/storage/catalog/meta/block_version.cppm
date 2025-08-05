@@ -72,6 +72,8 @@ export struct BlockVersion {
 
     void RollbackDelete(i32 offset);
 
+    void RestoreFromSnapshot(TxnTimeStamp commit_ts); // restore from snapshot, only used by block meta
+
     bool CheckDelete(i32 offset, TxnTimeStamp check_ts) const;
 
     Status Print(TxnTimeStamp commit_ts, i32 offset, bool ignore_invisible);
