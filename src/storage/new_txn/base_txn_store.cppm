@@ -24,6 +24,7 @@ import internal_types;
 import :txn_state;
 import column_def;
 import :wal_entry;
+import command_statement;
 
 namespace infinity {
 
@@ -137,6 +138,7 @@ export struct CreateTableSnapshotTxnStore final : public BaseTxnStore {
     String table_name_{};
     String snapshot_name_{};
     TxnTimeStamp max_commit_ts_{};
+    SnapshotScope snapshot_type_{};
 
     String ToString() const final;
     SharedPtr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;

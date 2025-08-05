@@ -24,6 +24,7 @@ import logger;
 import query_result;
 import query_context;
 import request_test;
+import command_statement;
 
 #include <thread>
 #include <mutex>
@@ -90,6 +91,7 @@ public:
         EXPECT_TRUE(status.ok());
         txn_mgr->CommitTxn(insert_txn);
 
+        // Create snapshot using the correct method
         // Create snapshot using the correct method
         NewTxn *snapshot_txn = txn_mgr->BeginTxn(MakeUnique<String>("create snapshot"), TransactionType::kNormal);
         status = snapshot_txn->CreateTableSnapshot("default_db", "test_table", "test_snapshot");
@@ -425,6 +427,5 @@ TEST_P(TableSnapshotTest, test_restore_table_same_snapshot_multithreaded) {
         }
     }
 }
-
 
 

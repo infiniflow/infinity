@@ -634,9 +634,9 @@ Tuple<TransactionID, TxnTimeStamp, TxnTimeStamp> WalManager::GetReplayEntries(St
                 if (cmd->GetType() == WalCommandType::CHECKPOINT_V2) {
                     auto checkpoint_cmd = static_cast<WalCmdCheckpointV2 *>(cmd);
                     max_checkpoint_ts = checkpoint_cmd->max_commit_ts_;                    
-                } else if (cmd->GetType() == WalCommandType::CREATE_TABLE_SNAPSHOT) {
-                    auto create_table_snapshot_cmd = static_cast<WalCmdCreateTableSnapshot *>(cmd);
-                    max_checkpoint_ts = create_table_snapshot_cmd->max_commit_ts_;
+                } else if (cmd->GetType() == WalCommandType::CREATE_SNAPSHOT) {
+                    auto create_snapshot_cmd = static_cast<WalCmdCreateSnapshot *>(cmd);
+                    max_checkpoint_ts = create_snapshot_cmd->max_commit_ts_;
                 }
                 last_commit_ts = wal_entry->commit_ts_;
                 max_transaction_id = wal_entry->txn_id_;
@@ -789,9 +789,9 @@ Vector<SharedPtr<WalEntry>> WalManager::CollectWalEntries() const {
                 if (cmd->GetType() == WalCommandType::CHECKPOINT_V2) {
                     auto checkpoint_cmd = static_cast<WalCmdCheckpointV2 *>(cmd);
                     max_checkpoint_ts = checkpoint_cmd->max_commit_ts_;
-                } else if (cmd->GetType() == WalCommandType::CREATE_TABLE_SNAPSHOT) {
-                    auto create_table_snapshot_cmd = static_cast<WalCmdCreateTableSnapshot *>(cmd);
-                    max_checkpoint_ts = create_table_snapshot_cmd->max_commit_ts_;
+                    } else if (cmd->GetType() == WalCommandType::CREATE_SNAPSHOT) {
+                    auto create_snapshot_cmd = static_cast<WalCmdCreateSnapshot *>(cmd);
+                    max_checkpoint_ts = create_snapshot_cmd->max_commit_ts_;
                 }
                 system_start_ts = wal_entry->commit_ts_;
                 break;
