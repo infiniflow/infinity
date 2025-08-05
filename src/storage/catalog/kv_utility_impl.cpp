@@ -173,6 +173,9 @@ SizeT GetBlockRowCount(KVInstance *kv_instance,
                        BlockID block_id,
                        TxnTimeStamp begin_ts,
                        TxnTimeStamp commit_ts) {
+    LOG_INFO(fmt::format("GetBlockRowCount called: db={}, table={}, segment={}, block={}, begin_ts={}, commit_ts={}", 
+                        db_id_str, table_id_str, segment_id, block_id, begin_ts, commit_ts));
+    
     NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
     String block_lock_key = KeyEncode::CatalogTableSegmentBlockTagKey(db_id_str, table_id_str, segment_id, block_id, "lock");
 
@@ -205,6 +208,10 @@ SizeT GetBlockRowCount(KVInstance *kv_instance,
         auto [offset, commit_cnt] = block_version->GetCommitRowCount(commit_ts);
         row_cnt += commit_cnt;
     }
+    
+    LOG_INFO(fmt::format("GetBlockRowCount result: db={}, table={}, segment={}, block={}, row_count={}", 
+                        db_id_str, table_id_str, segment_id, block_id, row_cnt));
+    
     return row_cnt;
 }
 
@@ -214,12 +221,22 @@ SizeT GetSegmentRowCount(KVInstance *kv_instance,
                          SegmentID segment_id,
                          TxnTimeStamp begin_ts,
                          TxnTimeStamp commit_ts) {
+    LOG_INFO(fmt::format("GetSegmentRowCount called: db={}, table={}, segment={}, begin_ts={}, commit_ts={}", 
+                        db_id_str, table_id_str, segment_id, begin_ts, commit_ts));
+    
     Vector<BlockID> blocks = GetTableSegmentBlocks(kv_instance, db_id_str, table_id_str, segment_id, begin_ts, commit_ts);
+    LOG_INFO(fmt::format("GetSegmentRowCount: db={}, table={}, segment={}, block_count={}", 
+                        db_id_str, table_id_str, segment_id, blocks.size()));
+    
     SizeT segment_row_count = 0;
     for (BlockID block_id : blocks) {
         SizeT block_row_cnt = GetBlockRowCount(kv_instance, db_id_str, table_id_str, segment_id, block_id, begin_ts, commit_ts);
         segment_row_count += block_row_cnt;
     }
+    
+    LOG_INFO(fmt::format("GetSegmentRowCount result: db={}, table={}, segment={}, total_row_count={}", 
+                        db_id_str, table_id_str, segment_id, segment_row_count));
+    
     return segment_row_count;
 }
 

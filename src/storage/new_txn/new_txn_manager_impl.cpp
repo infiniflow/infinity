@@ -480,6 +480,38 @@ void NewTxnManager::UpdateCatalogCache(NewTxn *txn) {
             }
             break;
         }
+        case TransactionType::kRestoreTable: {
+            BaseTxnStore *base_txn_store = txn->GetTxnStore();
+            if (base_txn_store != nullptr) {
+                RestoreTableTxnStore *txn_store = static_cast<RestoreTableTxnStore *>(base_txn_store);
+                system_cache_->AddNewTableCache(txn_store->db_id_, txn_store->table_id_, txn_store->table_name_);
+                if (!txn_store->segment_infos_.empty()) {
+                    system_cache_->ApplySegmentIDs(txn_store->db_id_, txn_store->table_id_, txn_store->segment_infos_.back().segment_id_+1);
+                }
+                for (const auto &index_cmd : txn_store->index_cmds_) {
+                    system_cache_->AddNewIndexCache(txn_store->db_id_, txn_store->table_id_, index_cmd.index_id_);
+                }
+            }
+            break;
+        }
+        case TransactionType::kRestoreDatabase: {
+            BaseTxnStore *base_txn_store = txn->GetTxnStore();
+            if (base_txn_store != nullptr) {
+                RestoreDatabaseTxnStore *txn_store = static_cast<RestoreDatabaseTxnStore *>(base_txn_store);
+                u64 db_id = std::stoull(txn_store->db_id_str_);
+                system_cache_->AddNewDbCache(txn_store->db_name_, db_id);
+                for (const auto &restore_table_txn_store : txn_store->restore_table_txn_stores_) {
+                    system_cache_->AddNewTableCache(db_id,restore_table_txn_store->table_id_, restore_table_txn_store->table_name_);
+                    if (!restore_table_txn_store->segment_infos_.empty()) {
+                        system_cache_->ApplySegmentIDs(db_id, restore_table_txn_store->table_id_, restore_table_txn_store->segment_infos_[-1].segment_id_+1);
+                    }
+                    for (const auto &index_cmd : restore_table_txn_store->index_cmds_) {
+                        system_cache_->AddNewIndexCache(db_id, restore_table_txn_store->table_id_, index_cmd.index_id_);
+                    }
+                }
+            }
+            break;
+        }
         case TransactionType::kDropTable: {
             BaseTxnStore *base_txn_store = txn->GetTxnStore();
             // base_txn_store means the drop with ignore
@@ -598,6 +630,37 @@ void NewTxnManager::PrintAllKeyValue() const {
     std::println("{}", kv_store_->ToString());
     // std::cout << String(" -------------- ") << std::endl;
     std::println(" -------------- ");
+}
+
+void NewTxnManager::PrintPMKeyValue() const {
+    std::cout << String("Persistence Manager keys and values: ") << std::endl;
+    
+    // Get all key-value pairs from the KV store
+    Vector<Pair<String, String>> all_key_values = kv_store_->GetAllKeyValue();
+    
+    for (const auto& [key, value] : all_key_values) {
+        // Check if the key is a PM key by looking for "pm|" prefix
+        if (key.find("pm|") == 0) {
+            std::cout << "PM Key: " << key << " -> Value: " << value << std::endl;
+        }
+    }
+    std::cout << String(" -------------- ") << std::endl;
+}
+
+void NewTxnManager::PrintAllDroppedKeys() const {
+    std::cout << String("All dropped keys: ") << std::endl;
+    
+    // Get all key-value pairs from the KV store
+    Vector<Pair<String, String>> all_key_values = kv_store_->GetAllKeyValue();
+    
+    
+    for (const auto& [key, value] : all_key_values) {
+        // Check if the key is a dropped key by looking for "drop|" prefix
+        if (key.find("drop|") == 0) {
+            std::cout << "Dropped Key: " << key << " -> Value: " << value << std::endl;
+            std::cout << " -------------- " << std::endl;
+        }
+    }
 }
 
 SizeT NewTxnManager::KeyValueNum() const { return kv_store_->KeyValueNum(); }

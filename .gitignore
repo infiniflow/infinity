@@ -155,5 +155,4 @@ minio/
 # not ignore Dockerfile
 !Dockerfile*
 
-my_env/
 vcpkg_installed/

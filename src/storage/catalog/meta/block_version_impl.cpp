@@ -148,6 +148,7 @@ bool BlockVersion::SaveToFile(TxnTimeStamp checkpoint_ts, LocalFileHandle &file_
    
     return !is_modified;
 }
+ 
 
 void BlockVersion::SpillToFile(LocalFileHandle *file_handle) const {
     std::unique_lock<std::shared_mutex> lock(rw_mutex_);
@@ -284,6 +285,19 @@ Status BlockVersion::Print(TxnTimeStamp begin_ts, i32 offset, bool ignore_invisi
         row_count += created_range.row_count_;
     }
     return Status::UnexpectedError(fmt::format("Offset {} out of range", offset));
+}
+
+void BlockVersion::RestoreFromSnapshot(TxnTimeStamp commit_ts) {
+    // set all the create timestamp to commit_ts
+    auto row_count = created_.back().row_count_;
+    created_.clear();
+    created_.emplace_back(commit_ts,row_count);
+    for(auto &ts:deleted_){
+        if(ts!=0){
+            ts = commit_ts;
+        }
+    }
+    latest_change_ts_ = commit_ts;
 }
 
 } // namespace infinity

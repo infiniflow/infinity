@@ -693,4 +693,8 @@ Status Status::RocksDBError(rocksdb::IOStatus rocksdb_s, const String &msg) {
     return Status(ErrorCode::kRocksDBError, MakeUnique<String>(fmt::format("{}, {}", msg, rocksdb_s.ToString())));
 }
 
+Status Status::SnapshotAlreadyExists(const String &snapshot_name) {
+    return Status(ErrorCode::kSnapshotAlreadyExists, MakeUnique<String>(fmt::format("Snapshot: {} already exists", snapshot_name)));
+}
+
 } // namespace infinity
