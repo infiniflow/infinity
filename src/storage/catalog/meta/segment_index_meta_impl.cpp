@@ -90,17 +90,6 @@ Status SegmentIndexMeta::GetFtInfo(SharedPtr<SegmentIndexFtInfo> &ft_info) {
     return Status::OK();
 }
 
-Status SegmentIndexMeta::SetChunkIDs(const Vector<ChunkID> &chunk_ids) {
-    chunk_ids_ = chunk_ids;
-    String chunk_ids_key = GetSegmentIndexTag("chunk_ids");
-    String chunk_ids_str = nlohmann::json(chunk_ids).dump();
-    Status status = kv_instance_.Put(chunk_ids_key, chunk_ids_str);
-    if (!status.ok()) {
-        return status;
-    }
-    return Status::OK();
-}
-
 Status SegmentIndexMeta::RemoveChunkIDs(const Vector<ChunkID> &chunk_ids) {
     TableMeeta &table_meta = table_index_meta_.table_meta();
     for (ChunkID chunk_id : chunk_ids) {
@@ -194,19 +183,8 @@ Status SegmentIndexMeta::SetNoMemIndex() {
 }
 
 Status SegmentIndexMeta::InitSet() {
-    {
-        Status status = SetChunkIDs(Vector<ChunkID>());
-        if (!status.ok()) {
-            return status;
-        }
-    }
-    {
-        Status status = SetNextChunkID(0);
-        if (!status.ok()) {
-            return status;
-        }
-    }
-    return Status::OK();
+    Status status = SetNextChunkID(0);
+    return status;
 }
 
 Status SegmentIndexMeta::InitSet1() {
@@ -254,14 +232,6 @@ Status SegmentIndexMeta::LoadSet() {
 }
 
 Status SegmentIndexMeta::UninitSet(UsageFlag usage_flag) {
-    {
-        String chunk_ids_key = GetSegmentIndexTag("chunk_ids");
-        Status status = kv_instance_.Delete(chunk_ids_key);
-        if (!status.ok()) {
-            return status;
-        }
-        chunk_ids_.reset();
-    }
     {
         String next_chunk_id_key = GetSegmentIndexTag("next_chunk_id");
         Status status = kv_instance_.Delete(next_chunk_id_key);
