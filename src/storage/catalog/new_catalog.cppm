@@ -264,7 +264,7 @@ public:
     static Status CleanTable(KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts, TableMeeta &table_meta, UsageFlag usage_flag);
 
     Status AddNewTableIndex(TableMeeta &table_meta,
-                            String &index_id_str,
+                            const String &index_id_str,
                             TxnTimeStamp commit_ts,
                             const SharedPtr<IndexBase> &index_base,
                             Optional<TableIndexMeeta> &table_index_meta);
@@ -334,6 +334,12 @@ public:
                                    const ColumnDef *column_def,
                                    UsageFlag usage_flag);
 
+    static Status RestoreNewSegmentIndex1(TableIndexMeeta &table_index_meta,
+                                          NewTxn *new_txn,
+                                          SegmentID segment_id,
+                                          Optional<SegmentIndexMeta> &segment_index_meta,
+                                          ChunkID next_chunk_id);
+
     static Status
     AddNewSegmentIndex1(TableIndexMeeta &table_index_meta, NewTxn *new_txn, SegmentID segment_id, Optional<SegmentIndexMeta> &segment_index_meta);
 
@@ -351,6 +357,16 @@ public:
                                     const String &base_name,
                                     SizeT index_size,
                                     Optional<ChunkIndexMeta> &chunk_index_meta);
+
+    static Status RestoreNewChunkIndex1(SegmentIndexMeta &segment_index_meta,
+                                        NewTxn *new_txn,
+                                        ChunkID chunk_id,
+                                        RowID base_row_id,
+                                        SizeT row_count,
+                                        const String &base_name,
+                                        SizeT index_size,
+                                        Optional<ChunkIndexMeta> &chunk_index_meta,
+                                        bool is_link_files = false);
 
     static Status LoadFlushedChunkIndex1(SegmentIndexMeta &segment_index_meta, const WalChunkIndexInfo &chunk_info, NewTxn *new_txn);
 

@@ -42,27 +42,6 @@ namespace infinity {
 ColumnMeta::ColumnMeta(SizeT column_idx, BlockMeta &block_meta)
     : BaseMeta(MetaType::kBlockColumn), block_meta_(block_meta), column_idx_(column_idx) {}
 
-Status ColumnMeta::GetChunkOffset(SizeT &chunk_offset, KVInstance *kv_instance) {
-    if (!chunk_offset_) {
-        Status status = LoadChunkOffset(kv_instance);
-        if (!status.ok()) {
-            return status;
-        }
-    }
-    chunk_offset = *chunk_offset_;
-    return Status::OK();
-}
-
-Status ColumnMeta::SetChunkOffset(SizeT chunk_offset, KVInstance *kv_instance) {
-    chunk_offset_ = chunk_offset;
-    String chunk_offset_key = GetColumnTag("last_chunk_offset");
-    Status status = kv_instance->Put(chunk_offset_key, fmt::format("{}", *chunk_offset_));
-    if (!status.ok()) {
-        return status;
-    }
-    return Status::OK();
-}
-
 Status ColumnMeta::InitSet(KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts) {
     Status status;
     SharedPtr<ColumnDef> col_def;
@@ -155,10 +134,6 @@ Status ColumnMeta::LoadSet(KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTi
         auto filename = MakeShared<String>(fmt::format("col_{}_out", col_def->id()));
 
         SizeT chunk_offset = 0;
-        // status = this->GetChunkOffset(chunk_offset);
-        // if (!status.ok()) {
-        //     return status;
-        // }
 
         auto outline_file_worker = MakeUnique<VarFileWorker>(MakeShared<String>(InfinityContext::instance().config()->DataDir()),
                                                              MakeShared<String>(InfinityContext::instance().config()->TempDir()),
@@ -175,7 +150,7 @@ Status ColumnMeta::LoadSet(KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTi
     return Status::OK();
 }
 
-Status ColumnMeta::RestoreSet(const ColumnDef *column_def, KVInstance *kv_instance) {
+Status ColumnMeta::RestoreSet(KVInstance *kv_instance, const ColumnDef *column_def) {
     Status status;
 
     auto *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
@@ -207,17 +182,13 @@ Status ColumnMeta::RestoreSet(const ColumnDef *column_def, KVInstance *kv_instan
     if (buffer_type == VectorBufferType::kVarBuffer) {
         auto filename = MakeShared<String>(fmt::format("col_{}_out", column_def->id()));
 
-        SizeT chunk_offset = 0;
-        status = this->GetChunkOffset(chunk_offset, kv_instance);
-        if (!status.ok()) {
-            return status;
-        }
-
+        // check if 0 is the right buffer size
+        // follow loadset
         auto outline_file_worker = MakeUnique<VarFileWorker>(MakeShared<String>(InfinityContext::instance().config()->DataDir()),
                                                              MakeShared<String>(InfinityContext::instance().config()->TempDir()),
                                                              block_dir_ptr,
                                                              filename,
-                                                             chunk_offset,
+                                                             0, /*buffer_size*/
                                                              buffer_mgr->persistence_manager());
         auto *buffer_obj = buffer_mgr->GetBufferObject(outline_file_worker->GetFilePath());
         if (buffer_obj == nullptr) {
@@ -302,7 +273,7 @@ Tuple<SizeT, Status> ColumnMeta::GetColumnSize(KVInstance *kv_instance, TxnTimeS
 }
 
 Status
-ColumnMeta::UninitSet(const ColumnDef *column_def, KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts, UsageFlag usage_flag) {
+ColumnMeta::UninitSet(KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts, const ColumnDef *column_def, UsageFlag usage_flag) {
     Status status;
 
     if (usage_flag == UsageFlag::kOther) {
@@ -377,6 +348,46 @@ String ColumnMeta::GetColumnTag(const String &tag) const {
                                                            block_meta_.block_id(),
                                                            column_idx_,
                                                            tag);
+}
+
+Tuple<SharedPtr<BlockColumnSnapshotInfo>, Status>
+ColumnMeta::MapMetaToSnapShotInfo(KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts) {
+    SharedPtr<BlockColumnSnapshotInfo> block_column_snapshot_info = MakeShared<BlockColumnSnapshotInfo>();
+    block_column_snapshot_info->column_id_ = column_idx_;
+    Vector<String> column_file_paths;
+    auto status = FilePaths(kv_instance, begin_ts, commit_ts, column_file_paths);
+    if (!status.ok()) {
+        return {nullptr, status};
+    }
+    block_column_snapshot_info->filepath_ = column_file_paths[0];
+
+    Vector<SharedPtr<OutlineSnapshotInfo>> outline_snapshots;
+    // start at the second column file path
+    for (SizeT i = 1; i < column_file_paths.size(); ++i) {
+        const String &outline_filename = column_file_paths[i];
+        SharedPtr<OutlineSnapshotInfo> outline_snapshot_info = MakeShared<OutlineSnapshotInfo>();
+        outline_snapshot_info->filepath_ = outline_filename;
+        outline_snapshots.push_back(outline_snapshot_info);
+    }
+    block_column_snapshot_info->outline_snapshots_ = outline_snapshots;
+    return {block_column_snapshot_info, Status::OK()};
+}
+
+Status ColumnMeta::RestoreFromSnapshot(KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts, ColumnID column_id) {
+    // TODO: figure out whether we are still using chunkoffset
+    Status status;
+    SharedPtr<Vector<SharedPtr<ColumnDef>>> column_defs;
+    std::tie(column_defs, status) = block_meta_.segment_meta().table_meta().GetColumnDefs(kv_instance, begin_ts, commit_ts);
+    if (!status.ok()) {
+        return status;
+    }
+    const ColumnDef *col_def = (*column_defs)[column_id].get();
+    status = RestoreSet(kv_instance, col_def);
+    if (!status.ok()) {
+        return status;
+    }
+
+    return Status::OK();
 }
 
 } // namespace infinity

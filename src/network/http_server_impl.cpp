@@ -3275,6 +3275,380 @@ public:
     }
 };
 
+class CreateTableSnapshotHandler final : public HttpRequestHandler {
+public:
+    SharedPtr<OutgoingResponse> handle(const SharedPtr<IncomingRequest> &request) final {
+        auto infinity = Infinity::RemoteConnect();
+        DeferFn defer_fn([&]() { infinity->RemoteDisconnect(); });
+
+        String data_body = request->readBodyToString();
+        simdjson::padded_string json_pad(data_body);
+        simdjson::parser parser;
+        simdjson::document doc = parser.iterate(json_pad);
+        String db_name = doc["db_name"].get<String>();
+        String table_name = doc["table_name"].get<String>();
+        String snapshot_name = doc["snapshot_name"].get<String>();
+
+        nlohmann::json json_response;
+        HTTPStatus http_status;
+        QueryResult result = infinity->CreateTableSnapshot(db_name, table_name, snapshot_name);
+
+        if (result.IsOk()) {
+            json_response["error_code"] = 0;
+            http_status = HTTPStatus::CODE_200;
+        } else {
+            json_response["error_code"] = result.ErrorCode();
+            json_response["error_message"] = result.ErrorMsg();
+            http_status = HTTPStatus::CODE_500;
+        }
+        return ResponseFactory::createResponse(http_status, json_response.dump());
+    }
+};
+
+class RestoreTableSnapshotHandler final : public HttpRequestHandler {
+
+    SharedPtr<OutgoingResponse> handle(const SharedPtr<IncomingRequest> &request) final {
+        auto infinity = Infinity::RemoteConnect();
+        DeferFn defer_fn([&]() { infinity->RemoteDisconnect(); });
+
+        String data_body = request->readBodyToString();
+        simdjson::padded_string json_pad(data_body);
+        simdjson::parser parser;
+        simdjson::document doc = parser.iterate(json_pad);
+        String snapshot_name = doc["snapshot_name"].get<String>();
+
+        nlohmann::json json_response;
+        HTTPStatus http_status;
+        QueryResult result = infinity->RestoreTableSnapshot(snapshot_name);
+
+        if (result.IsOk()) {
+            json_response["error_code"] = 0;
+            http_status = HTTPStatus::CODE_200;
+        } else {
+            json_response["error_code"] = result.ErrorCode();
+            json_response["error_message"] = result.ErrorMsg();
+            http_status = HTTPStatus::CODE_500;
+        }
+        return ResponseFactory::createResponse(http_status, json_response.dump());
+    }
+};
+
+class DropSnapshotHandler final : public HttpRequestHandler {
+public:
+    SharedPtr<OutgoingResponse> handle(const SharedPtr<IncomingRequest> &request) final {
+        auto infinity = Infinity::RemoteConnect();
+        DeferFn defer_fn([&]() { infinity->RemoteDisconnect(); });
+
+        // Get snapshot name from URL path parameter
+        String snapshot_name = request->getPathVariable("snapshot_name");
+
+        nlohmann::json json_response;
+        HTTPStatus http_status;
+        QueryResult result = infinity->DropSnapshot(snapshot_name);
+
+        if (result.IsOk()) {
+            json_response["error_code"] = 0;
+            http_status = HTTPStatus::CODE_200;
+        } else {
+            json_response["error_code"] = result.ErrorCode();
+            json_response["error_message"] = result.ErrorMsg();
+            http_status = HTTPStatus::CODE_500;
+        }
+        return ResponseFactory::createResponse(http_status, json_response.dump());
+    }
+};
+
+class ListSnapshotsHandler final : public HttpRequestHandler {
+public:
+    SharedPtr<OutgoingResponse> handle(const SharedPtr<IncomingRequest> &request) final {
+        auto infinity = Infinity::RemoteConnect();
+        DeferFn defer_fn([&]() { infinity->RemoteDisconnect(); });
+
+        nlohmann::json json_response;
+        HTTPStatus http_status;
+        
+        // Call Infinity API to list snapshots
+        QueryResult result = infinity->ListSnapshots();
+
+        if (result.IsOk()) {
+            json_response["error_code"] = 0;
+            json_response["error_message"] = "";
+            
+            // Convert QueryResult to JSON format
+            nlohmann::json snapshots_array = nlohmann::json::array();
+            
+            // Get the result table from QueryResult
+            auto result_table = result.result_table_;
+            if (result_table != nullptr) {
+                SizeT blocks_count = result_table->DataBlockCount();
+                
+                for (SizeT block_idx = 0; block_idx < blocks_count; ++block_idx) {
+                    auto data_block = result_table->GetDataBlockById(block_idx);
+                    SizeT row_count = data_block->row_count();
+                    
+                    for (SizeT row_idx = 0; row_idx < row_count; ++row_idx) {
+                        nlohmann::json snapshot_obj;
+                        
+                        // Extract snapshot name (column 0)
+                        auto &name_column = data_block->column_vectors[0];
+                        if (name_column->data_type()->type() == LogicalType::kVarchar) {
+                            auto varchar_value = name_column->GetValueByIndex(row_idx);
+                            snapshot_obj["name"] = varchar_value.GetVarchar();
+                        }
+                        
+                        // Extract scope (column 1)
+                        auto &scope_column = data_block->column_vectors[1];
+                        if (scope_column->data_type()->type() == LogicalType::kVarchar) {
+                            auto scope_value = scope_column->GetValueByIndex(row_idx);
+                            snapshot_obj["scope"] = scope_value.GetVarchar();
+                        }
+                        
+                        // Extract create time (column 2)
+                        auto &time_column = data_block->column_vectors[2];
+                        if (time_column->data_type()->type() == LogicalType::kVarchar) {
+                            auto time_value = time_column->GetValueByIndex(row_idx);
+                            snapshot_obj["time"] = time_value.GetVarchar();
+                        }
+                        
+                        // Extract commit timestamp (column 3)
+                        auto &commit_column = data_block->column_vectors[3];
+                        if (commit_column->data_type()->type() == LogicalType::kBigInt) {
+                            auto commit_value = commit_column->GetValueByIndex(row_idx);
+                            snapshot_obj["commit"] = commit_value.GetValue<BigIntT>();
+                        }
+                        
+                        // Extract size (column 4)
+                        auto &size_column = data_block->column_vectors[4];
+                        if (size_column->data_type()->type() == LogicalType::kVarchar) {
+                            auto size_value = size_column->GetValueByIndex(row_idx);
+                            snapshot_obj["size"] = size_value.GetVarchar();
+                        }
+                        
+                        snapshots_array.push_back(snapshot_obj);
+                    }
+                }
+            }
+            
+            json_response["snapshots"] = snapshots_array;
+            http_status = HTTPStatus::CODE_200;
+        } else {
+            json_response["error_code"] = result.ErrorCode();
+            json_response["error_message"] = result.ErrorMsg();
+            http_status = HTTPStatus::CODE_500;
+        }
+                
+        return ResponseFactory::createResponse(http_status, json_response.dump());
+    }
+};
+
+class ShowSnapshotHandler final : public HttpRequestHandler {
+public:
+    SharedPtr<OutgoingResponse> handle(const SharedPtr<IncomingRequest> &request) final {
+        auto infinity = Infinity::RemoteConnect();
+        DeferFn defer_fn([&]() { infinity->RemoteDisconnect(); });
+
+        nlohmann::json json_response;
+        HTTPStatus http_status;
+        
+        // Get snapshot name from path
+        String snapshot_name = request->getPathVariable("snapshot_name");
+        
+        // Validate snapshot name
+        if (snapshot_name.empty()) {
+            json_response["error_code"] = 3001;
+            json_response["error_message"] = "Snapshot name is required";
+            http_status = HTTPStatus::CODE_400;
+            return ResponseFactory::createResponse(http_status, json_response.dump());
+        }
+        
+        // Call Infinity API to show snapshot details
+        QueryResult result = infinity->ShowSnapshot(snapshot_name);
+
+        if (result.IsOk()) {
+            json_response["error_code"] = 0;
+            json_response["error_message"] = "";
+            
+            // Convert QueryResult to JSON format
+            nlohmann::json snapshot_obj;
+            
+            // Get the result table from QueryResult
+            auto result_table = result.result_table_;
+            if (result_table != nullptr) {
+                SizeT blocks_count = result_table->DataBlockCount();
+                
+                // The ShowSnapshot result has key-value pairs in alternating rows
+                // We need to extract the values for each field
+                String snapshot_name_value, scope, create_time, size;
+                i64 commit_ts = 0;
+                
+                for (SizeT block_idx = 0; block_idx < blocks_count; ++block_idx) {
+                    auto data_block = result_table->GetDataBlockById(block_idx);
+                    SizeT row_count = data_block->row_count();
+                    
+                    for (SizeT row_idx = 0; row_idx < row_count; row_idx += 2) {
+                        // Each pair consists of a key row and a value row
+                        if (row_idx + 1 < row_count) {
+                            auto &key_column = data_block->column_vectors[0];
+                            auto &value_column = data_block->column_vectors[1];
+                            
+                            if (key_column->data_type()->type() == LogicalType::kVarchar &&
+                                value_column->data_type()->type() == LogicalType::kVarchar) {
+                                
+                                auto key_value = key_column->GetValueByIndex(row_idx);
+                                auto value_value = value_column->GetValueByIndex(row_idx + 1);
+                                
+                                String key = key_value.GetVarchar();
+                                String value = value_value.GetVarchar();
+                                
+                                if (key == "snapshot_name") {
+                                    snapshot_name_value = value;
+                                } else if (key == "snapshot_scope") {
+                                    scope = value;
+                                } else if (key == "create_time") {
+                                    create_time = value;
+                                } else if (key == "commit_timestamp") {
+                                    commit_ts = std::stoll(value);
+                                } else if (key == "snapshot_size") {
+                                    size = value;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Fill the JSON object
+                snapshot_obj["name"] = snapshot_name_value;
+                snapshot_obj["scope"] = scope;
+                snapshot_obj["time"] = create_time;
+                snapshot_obj["commit"] = commit_ts;
+                snapshot_obj["size"] = size;
+            }
+
+            json_response["snapshot"] = snapshot_obj;
+            http_status = HTTPStatus::CODE_200;
+        } else {
+            json_response["error_code"] = result.ErrorCode();
+            json_response["error_message"] = result.ErrorMsg();
+            http_status = HTTPStatus::CODE_500;
+        }
+
+    return ResponseFactory::createResponse(http_status, json_response.dump());
+    }
+};
+        
+
+class CreateSystemSnapshotHandler final : public HttpRequestHandler {
+public:
+    SharedPtr<OutgoingResponse> handle(const SharedPtr<IncomingRequest> &request) final {
+        auto infinity = Infinity::RemoteConnect();
+        DeferFn defer_fn([&]() { infinity->RemoteDisconnect(); });
+
+        String data_body = request->readBodyToString();
+        simdjson::padded_string json_pad(data_body);
+        simdjson::parser parser;
+        simdjson::document doc = parser.iterate(json_pad);
+        String snapshot_name = doc["snapshot_name"].get<String>();
+
+        nlohmann::json json_response;
+        HTTPStatus http_status;
+        QueryResult result = infinity->CreateSystemSnapshot(snapshot_name);
+
+        if (result.IsOk()) {
+            json_response["error_code"] = 0;
+            http_status = HTTPStatus::CODE_200;
+        } else {
+            json_response["error_code"] = result.ErrorCode();
+            json_response["error_message"] = result.ErrorMsg();
+            http_status = HTTPStatus::CODE_500;
+        }
+        return ResponseFactory::createResponse(http_status, json_response.dump());
+    }
+};
+
+class RestoreSystemSnapshotHandler final : public HttpRequestHandler {
+public:
+    SharedPtr<OutgoingResponse> handle(const SharedPtr<IncomingRequest> &request) final {
+        auto infinity = Infinity::RemoteConnect();
+        DeferFn defer_fn([&]() { infinity->RemoteDisconnect(); });
+
+        String data_body = request->readBodyToString();
+        simdjson::padded_string json_pad(data_body);
+        simdjson::parser parser;
+        simdjson::document doc = parser.iterate(json_pad);
+        String snapshot_name = doc["snapshot_name"].get<String>();
+
+        nlohmann::json json_response;
+        HTTPStatus http_status;
+        QueryResult result = infinity->RestoreSystemSnapshot(snapshot_name);
+
+        if (result.IsOk()) {
+            json_response["error_code"] = 0;
+            http_status = HTTPStatus::CODE_200;
+        } else {
+            json_response["error_code"] = result.ErrorCode();
+            json_response["error_message"] = result.ErrorMsg();
+            http_status = HTTPStatus::CODE_500;
+        }
+        return ResponseFactory::createResponse(http_status, json_response.dump());
+    }
+};
+
+class CreateDatabaseSnapshotHandler final : public HttpRequestHandler {
+public:
+    SharedPtr<OutgoingResponse> handle(const SharedPtr<IncomingRequest> &request) final {
+        auto infinity = Infinity::RemoteConnect();
+        DeferFn defer_fn([&]() { infinity->RemoteDisconnect(); });
+
+        String data_body = request->readBodyToString();
+        simdjson::padded_string json_pad(data_body);
+        simdjson::parser parser;
+        simdjson::document doc = parser.iterate(json_pad);
+        String snapshot_name = doc["snapshot_name"].get<String>();
+        String db_name = doc["db_name"].get<String>();
+        nlohmann::json json_response;
+        HTTPStatus http_status;
+        QueryResult result = infinity->CreateDatabaseSnapshot(snapshot_name, db_name);
+
+        if (result.IsOk()) {
+            json_response["error_code"] = 0;
+            http_status = HTTPStatus::CODE_200;
+        } else {
+            json_response["error_code"] = result.ErrorCode();
+            json_response["error_message"] = result.ErrorMsg();
+            http_status = HTTPStatus::CODE_500;
+        }
+        return ResponseFactory::createResponse(http_status, json_response.dump());
+    }
+};
+
+class RestoreDatabaseSnapshotHandler final : public HttpRequestHandler {
+public:
+    SharedPtr<OutgoingResponse> handle(const SharedPtr<IncomingRequest> &request) final {
+        auto infinity = Infinity::RemoteConnect();
+        DeferFn defer_fn([&]() { infinity->RemoteDisconnect(); });
+
+        String data_body = request->readBodyToString();
+        simdjson::padded_string json_pad(data_body);
+        simdjson::parser parser;
+        simdjson::document doc = parser.iterate(json_pad);
+        String snapshot_name = doc["snapshot_name"].get<String>();
+
+        nlohmann::json json_response;
+        HTTPStatus http_status;
+        QueryResult result = infinity->RestoreDatabaseSnapshot(snapshot_name);
+
+        if (result.IsOk()) {
+            json_response["error_code"] = 0;
+            http_status = HTTPStatus::CODE_200;
+        } else {
+            json_response["error_code"] = result.ErrorCode();
+            json_response["error_message"] = result.ErrorMsg();
+            http_status = HTTPStatus::CODE_500;
+        }
+        return ResponseFactory::createResponse(http_status, json_response.dump());
+    }
+};
+
 class AdminShowCurrentNodeHandler final : public HttpRequestHandler {
 public:
     SharedPtr<OutgoingResponse> handle(const SharedPtr<IncomingRequest> &request) final {
@@ -3701,6 +4075,17 @@ Thread HTTPServer::Start(const String &ip_address, u16 port) {
     // alter
     router->route("POST", "/databases/{database_name}/tables/{table_name}/columns", MakeShared<AddColumnsHandler>());
     router->route("DELETE", "/databases/{database_name}/tables/{table_name}/columns", MakeShared<DropColumnsHandler>());
+
+    // snapshot
+    router->route("POST", "/snapshots", MakeShared<CreateTableSnapshotHandler>());
+    router->route("POST", "/snapshots/restore", MakeShared<RestoreTableSnapshotHandler>());
+    router->route("DELETE", "/snapshots/{snapshot_name}", MakeShared<DropSnapshotHandler>());
+    router->route("GET", "/snapshots", MakeShared<ListSnapshotsHandler>());
+    router->route("GET", "/snapshots/{snapshot_name}", MakeShared<ShowSnapshotHandler>());
+    router->route("POST", "/snapshots/system", MakeShared<CreateSystemSnapshotHandler>());
+    router->route("POST", "/snapshots/system/restore", MakeShared<RestoreSystemSnapshotHandler>());
+    router->route("POST", "/snapshots/database", MakeShared<CreateDatabaseSnapshotHandler>());
+    router->route("POST", "/snapshots/database/restore", MakeShared<RestoreDatabaseSnapshotHandler>());
 
     // segment
     router->route("GET", "/databases/{database_name}/tables/{table_name}/segments/{segment_id}", MakeShared<ShowSegmentDetailHandler>());

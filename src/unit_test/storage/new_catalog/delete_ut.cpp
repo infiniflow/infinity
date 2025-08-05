@@ -148,7 +148,7 @@ TEST_P(TestTxnDelete, test_delete) {
 
         {
             TxnTimeStamp first_delete_ts = 0;
-            Status status = segment_meta.GetFirstDeleteTS(txn->kv_instance(), first_delete_ts, begin_ts);
+            Status status = segment_meta.GetFirstDeleteTS(txn->kv_instance(), begin_ts, first_delete_ts);
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(first_delete_ts, first_delete_ts);
         }
@@ -199,7 +199,7 @@ TEST_P(TestTxnDelete, test_delete) {
 
         {
             TxnTimeStamp first_delete_ts = 0;
-            Status status = segment_meta.GetFirstDeleteTS(txn->kv_instance(), first_delete_ts, txn->BeginTS());
+            Status status = segment_meta.GetFirstDeleteTS(txn->kv_instance(), txn->BeginTS(), first_delete_ts);
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(first_delete_ts, first_delete_ts);
         }

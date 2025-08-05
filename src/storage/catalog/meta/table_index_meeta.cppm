@@ -22,6 +22,7 @@ import column_def;
 import :meta_info;
 import :new_catalog;
 import :base_meta;
+import :snapshot_info;
 
 namespace infinity {
 
@@ -64,11 +65,14 @@ public:
 
     Status RemoveSegmentIndexIDs(KVInstance *kv_instance, const Vector<SegmentID> &segment_ids);
 
+    Tuple<SharedPtr<TableIndexSnapshotInfo>, Status> MapMetaToSnapShotInfo(KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts);
+
 private:
     Status GetSegmentUpdateTS(SharedPtr<SegmentUpdateTS> &segment_update_ts);
 
 public:
     Status InitSet1(KVInstance *kv_instance, const SharedPtr<IndexBase> &index_base, NewCatalog *new_catalog);
+
 
     Status UninitSet1(KVInstance *kv_instance, TxnTimeStamp begin_ts, UsageFlag usage_flag);
 

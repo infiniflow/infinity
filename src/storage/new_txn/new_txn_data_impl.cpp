@@ -295,13 +295,6 @@ Status NewTxn::Import(const String &db_name, const String &table_name, const Vec
                 return status;
             }
             col->SetToCatalog(buffer_obj, outline_buffer_obj, ColumnVectorMode::kReadWrite);
-            // if (VarBufferManager *var_buffer_mgr = col->buffer_->var_buffer_mgr(); var_buffer_mgr != nullptr) {
-            //     SizeT chunk_size = var_buffer_mgr->TotalSize();
-            //     Status status = column_meta.SetChunkOffset(chunk_size);
-            //     if (!status.ok()) {
-            //         return status;
-            //     }
-            // }
 
             auto [data_size, status2] = column_meta.GetColumnSize(kv_instance, begin_ts, commit_ts, row_cnt);
             if (!status2.ok()) {
@@ -1004,10 +997,6 @@ Status NewTxn::AppendInColumn(ColumnMeta &column_meta, SizeT dest_offset, SizeT 
     if (VarBufferManager *var_buffer_mgr = dest_vec.buffer_->var_buffer_mgr(); var_buffer_mgr != nullptr) {
         //     Ensure buffer obj is loaded.
         SizeT _ = var_buffer_mgr->TotalSize();
-        //     Status status = column_meta.SetChunkOffset(chunk_size);
-        //     if (!status.ok()) {
-        //         return status;
-        //     }
     }
     return Status::OK();
 }
@@ -1313,10 +1302,6 @@ Status NewTxn::AddColumnsDataInBlock(BlockMeta &block_meta, const Vector<SharedP
         if (VarBufferManager *var_buffer_mgr = column_vector.buffer_->var_buffer_mgr(); var_buffer_mgr != nullptr) {
             //     Ensure buffer obj is loaded.
             SizeT _ = var_buffer_mgr->TotalSize();
-            //     Status status = column_meta.SetChunkOffset(chunk_size);
-            //     if (!status.ok()) {
-            //         return status;
-            //     }
         }
         LOG_TRACE(
             fmt::format("NewTxn::AddColumnsDataInBlock: column name {}, column id {}, column_idx {}, default value {}, segment {}, block {}, rows {}",
@@ -1711,7 +1696,7 @@ Status NewTxn::PrepareCommitDelete(const WalCmdDeleteV2 *delete_cmd) {
 
         {
             TxnTimeStamp first_delete_ts = 0;
-            Status status = segment_meta->GetFirstDeleteTS(kv_instance_.get(), first_delete_ts, txn_context_ptr_->begin_ts_);
+            Status status = segment_meta->GetFirstDeleteTS(kv_instance_.get(), txn_context_ptr_->begin_ts_, first_delete_ts);
             if (!status.ok()) {
                 return status;
             }

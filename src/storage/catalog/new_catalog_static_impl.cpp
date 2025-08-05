@@ -514,7 +514,6 @@ Status NewCatalog::AddNewTable(DBMeeta &db_meta,
     if (!status.ok()) {
         return status;
     }
-
     return status;
 }
 
@@ -560,7 +559,7 @@ Status NewCatalog::CleanTable(KVInstance *kv_instance, TxnTimeStamp begin_ts, Tx
 }
 
 Status NewCatalog::AddNewTableIndex(TableMeeta &table_meta,
-                                    String &index_id_str,
+                                    const String &index_id_str,
                                     TxnTimeStamp commit_ts,
                                     const SharedPtr<IndexBase> &index_base,
                                     Optional<TableIndexMeeta> &table_index_meta) {
@@ -893,10 +892,6 @@ Status NewCatalog::LoadFlushedBlock1(SegmentMeta &segment_meta,
     for (const auto &column_def : *column_defs_ptr) {
         //    const auto &[chunk_idx, chunk_offset] = block_info.outline_infos_[column_def->id()];
         ColumnMeta column_meta(column_def->id(), block_meta);
-        //    status = column_meta.SetChunkOffset(chunk_offset);
-        //    if (!status.ok()) {
-        //        return status;
-        //    }
 
         status = column_meta.LoadSet(kv_instance, begin_ts, commit_ts);
         if (!status.ok()) {
@@ -960,10 +955,10 @@ Status NewCatalog::CleanBlockColumn(KVInstance *kv_instance,
                           column_meta.block_meta().segment_meta().segment_id(),
                           column_meta.block_meta().block_id(),
                           column_def->id()));
-    column_meta.RestoreSet(column_def, kv_instance);
+    column_meta.RestoreSet(kv_instance, column_def);
     Status status;
 
-    status = column_meta.UninitSet(column_def, kv_instance, begin_ts, commit_ts, usage_flag);
+    status = column_meta.UninitSet(kv_instance, begin_ts, commit_ts, column_def, usage_flag);
     if (!status.ok()) {
         return status;
     }
@@ -983,6 +978,25 @@ Status NewCatalog::AddNewSegmentIndex1(TableIndexMeeta &table_index_meta,
 
     segment_index_meta.emplace(segment_id, table_index_meta);
     status = segment_index_meta->InitSet1(kv_instance);
+    if (!status.ok()) {
+        return status;
+    }
+    return Status::OK();
+}
+
+// TODO: add next_chunk_id to this logic
+Status NewCatalog::RestoreNewSegmentIndex1(TableIndexMeeta &table_index_meta,
+                                           NewTxn *new_txn,
+                                           SegmentID segment_id,
+                                           Optional<SegmentIndexMeta> &segment_index_meta,
+                                           ChunkID next_chunk_id) {
+    Status status = table_index_meta.AddSegmentIndexID1(new_txn->kv_instance(), segment_id, new_txn);
+    if (!status.ok()) {
+        return status;
+    }
+
+    segment_index_meta.emplace(segment_id, table_index_meta);
+    status = segment_index_meta->RestoreSet(new_txn->kv_instance(), next_chunk_id);
     if (!status.ok()) {
         return status;
     }
@@ -1052,6 +1066,36 @@ Status NewCatalog::AddNewChunkIndex1(SegmentIndexMeta &segment_index_meta,
     }
     {
         Status status = segment_index_meta.AddChunkIndexID1(kv_instance, chunk_id, new_txn);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    return Status::OK();
+}
+
+Status NewCatalog::RestoreNewChunkIndex1(SegmentIndexMeta &segment_index_meta,
+                                         NewTxn *new_txn,
+                                         ChunkID chunk_id,
+                                         RowID base_row_id,
+                                         SizeT row_count,
+                                         const String &base_name,
+                                         SizeT index_size,
+                                         Optional<ChunkIndexMeta> &chunk_index_meta,
+                                         bool is_link_files) {
+    ChunkIndexMetaInfo chunk_info;
+    chunk_info.base_name_ = base_name;
+    chunk_info.base_row_id_ = base_row_id;
+    chunk_info.row_cnt_ = row_count;
+    chunk_info.index_size_ = index_size;
+    {
+        chunk_index_meta.emplace(chunk_id, segment_index_meta);
+        Status status = chunk_index_meta->RestoreSetFromSnapshot(new_txn->kv_instance(), new_txn->BeginTS(), new_txn->CommitTS(), chunk_info);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    if (!is_link_files) {
+        Status status = segment_index_meta.AddChunkIndexID1(new_txn->kv_instance(), chunk_id, new_txn);
         if (!status.ok()) {
             return status;
         }
@@ -1449,7 +1493,7 @@ NewCatalog::CheckTableIfDelete(TableMeeta &table_meta, KVInstance *kv_instance, 
     for (SegmentID segment_id : *segment_ids_ptr) {
         SegmentMeta segment_meta(segment_id, table_meta);
         TxnTimeStamp first_delete_ts = 0;
-        status = segment_meta.GetFirstDeleteTS(kv_instance, first_delete_ts, begin_ts);
+        status = segment_meta.GetFirstDeleteTS(kv_instance, begin_ts, first_delete_ts);
         if (!status.ok()) {
             return status;
         }
@@ -1494,7 +1538,7 @@ Status NewCatalog::CheckSegmentRowsVisible(SegmentMeta &segment_meta,
                                            TxnTimeStamp commit_ts,
                                            Bitmask &bitmask) {
     TxnTimeStamp first_delete_ts = 0;
-    Status status = segment_meta.GetFirstDeleteTS(kv_instance, first_delete_ts, begin_ts);
+    Status status = segment_meta.GetFirstDeleteTS(kv_instance, begin_ts, first_delete_ts);
     if (!status.ok()) {
         return status;
     }

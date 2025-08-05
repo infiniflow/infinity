@@ -392,6 +392,19 @@ class ThriftInfinityClient:
                                                       index_name=index_name))
 
     @retry_wrapper
+    def restore_table_snapshot(self, db_name: str, snapshot_name: str):
+        return self.client.RestoreTableSnapshot(RestoreTableSnapshotRequest(session_id=self.session_id,
+                                                                             db_name=db_name,
+                                                                             snapshot_name=snapshot_name))
+
+    @retry_wrapper
+    def create_table_snapshot(self, db_name: str, table_name: str, snapshot_name: str):
+        return self.client.CreateTableSnapshot(CreateTableSnapshotRequest(session_id=self.session_id,
+                                                                             db_name=db_name,
+                                                                             table_name=table_name,
+                                                                             snapshot_name=snapshot_name))
+
+    @retry_wrapper
     def command(self, command: ttypes.CommandRequest):
         command.session_id = self.session_id
         return self.client.Command(command)

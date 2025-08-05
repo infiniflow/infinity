@@ -182,6 +182,16 @@ Status SegmentIndexMeta::LoadSet(KVInstance *kv_instance, TxnTimeStamp begin_ts)
     return Status::OK();
 }
 
+Status SegmentIndexMeta::RestoreSet(KVInstance *kv_instance, const ChunkID &next_chunk_id) {
+    {
+        Status status = SetNextChunkID(kv_instance, next_chunk_id);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    return Status::OK();
+}
+
 Status SegmentIndexMeta::UninitSet1(KVInstance *kv_instance, UsageFlag usage_flag) {
     {
         // Remove all chunk ids
@@ -355,6 +365,25 @@ SharedPtr<SegmentIndexInfo> SegmentIndexMeta::GetSegmentIndexInfo(KVInstance *kv
     segment_index_info->chunk_count_ = chunk_ids_.value().size();
     segment_index_info->files_ = std::move(segment_index_files);
     return segment_index_info;
+}
+
+Tuple<SharedPtr<SegmentIndexSnapshotInfo>, Status>
+SegmentIndexMeta::MapMetaToSnapShotInfo(KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts) {
+    SharedPtr<SegmentIndexSnapshotInfo> segment_index_snapshot_info = MakeShared<SegmentIndexSnapshotInfo>();
+    segment_index_snapshot_info->segment_id_ = segment_id_;
+    auto [chunk_ids, status] = GetChunkIDs1(kv_instance, begin_ts, commit_ts);
+    if (!status.ok()) {
+        return {nullptr, status};
+    }
+    for (auto &chunk_id : *chunk_ids) {
+        ChunkIndexMeta chunk_index_meta(chunk_id, *this);
+        auto [chunk_index_snapshot, chunk_index_status] = chunk_index_meta.MapMetaToSnapShotInfo(kv_instance, chunk_id);
+        if (!chunk_index_status.ok()) {
+            return {nullptr, chunk_index_status};
+        }
+        segment_index_snapshot_info->chunk_index_snapshots_.push_back(chunk_index_snapshot);
+    }
+    return {segment_index_snapshot_info, Status::OK()};
 }
 
 } // namespace infinity

@@ -2186,4 +2186,182 @@ Status NewTxn::PrepareCommitDumpIndex(const WalCmdDumpIndexV2 *dump_index_cmd, K
     return Status::OK();
 }
 
+Status NewTxn::RestoreTableIndexesFromSnapshot(TableMeeta &table_meta, const Vector<WalCmdCreateIndexV2> &index_cmds, bool is_link_files) {
+    // NewTxnManager *new_txn_manager = InfinityContext::instance().storage()->new_txn_manager();
+    // new_txn_manager->PrintAllKeyValue();
+    u64 max_index_id = 0;
+    Status status;
+    for (const auto &index_cmd : index_cmds) {
+        u64 index_id = std::stoull(index_cmd.index_id_);
+        if (index_id > max_index_id) {
+            max_index_id = index_id;
+        }
+        Optional<TableIndexMeeta> table_index_meta;
+        if (!is_link_files) {
+            status = new_catalog_->AddNewTableIndex(table_meta,
+                                                    index_cmd.index_id_,
+                                                    txn_context_ptr_->commit_ts_,
+                                                    index_cmd.index_base_,
+                                                    table_index_meta);
+            if (!status.ok()) {
+                return status;
+            }
+        } else {
+            table_index_meta.emplace(index_cmd.index_id_, table_meta);
+        }
+
+        for (const auto &segment_index : index_cmd.segment_index_infos_) {
+            Optional<SegmentIndexMeta> segment_index_meta;
+
+            // Calculate next_chunk_id from existing chunk infos
+            ChunkID next_chunk_id = 0;
+            if (!segment_index.chunk_infos_.empty()) {
+                next_chunk_id = std::max_element(segment_index.chunk_infos_.begin(),
+                                                 segment_index.chunk_infos_.end(),
+                                                 [](const WalChunkIndexInfo &a, const WalChunkIndexInfo &b) { return a.chunk_id_ < b.chunk_id_; })
+                                    ->chunk_id_ +
+                                1;
+            }
+            if (!is_link_files) {
+                status = new_catalog_->RestoreNewSegmentIndex1(*table_index_meta, this, segment_index.segment_id_, segment_index_meta, next_chunk_id);
+                if (!status.ok()) {
+                    return status;
+                }
+            } else {
+                segment_index_meta.emplace(segment_index.segment_id_, *table_index_meta);
+            }
+
+            for (const auto &chunk_index : segment_index.chunk_infos_) {
+                Optional<ChunkIndexMeta> chunk_index_meta;
+                status = new_catalog_->RestoreNewChunkIndex1(*segment_index_meta,
+                                                             this,
+                                                             chunk_index.chunk_id_,
+                                                             chunk_index.base_rowid_,
+                                                             chunk_index.row_count_,
+                                                             chunk_index.base_name_,
+                                                             chunk_index.index_size_,
+                                                             chunk_index_meta,
+                                                             is_link_files);
+                if (!status.ok()) {
+                    return status;
+                }
+            }
+        }
+    }
+
+    if (!is_link_files) {
+        KVInstance *kv_instance = kv_instance_.get();
+        status = table_meta.SetNextIndexID(kv_instance, std::to_string(max_index_id + 1));
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    return Status::OK();
+}
+
+Status NewTxn::ManualDumpIndex(const String &db_name, const String &table_name) {
+
+    Status status;
+
+    // 1. Get table and index metadata
+    SharedPtr<DBMeeta> db_meta;
+    Optional<TableMeeta> table_meta;
+    Optional<TableIndexMeeta> table_index_meta;
+    String table_key;
+    String index_key;
+    status = GetTableMeta(db_name, table_name, db_meta, table_meta);
+    if (!status.ok()) {
+        return status;
+    }
+
+    KVInstance *kv_instance = kv_instance_.get();
+    TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
+    TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
+
+    // get all index ids
+    Vector<String> *index_ids_ptr = nullptr;
+    Vector<String> *index_names_ptr = nullptr;
+    status = table_meta->GetIndexIDs(kv_instance, begin_ts, index_ids_ptr, &index_names_ptr);
+    if (!status.ok()) {
+        return status;
+    }
+    for (const auto &index_id : *index_ids_ptr) {
+        TableIndexMeeta table_index_meta(index_id, *table_meta);
+
+        // 2. Get all segment IDs for this index
+        Vector<SegmentID> *segment_ids_ptr = nullptr;
+        std::tie(segment_ids_ptr, status) = table_index_meta.GetSegmentIndexIDs1(kv_instance, begin_ts, commit_ts);
+        if (!status.ok()) {
+            return status;
+        }
+
+        // 3. Loop through all segments and dump each one
+        for (SegmentID segment_id : *segment_ids_ptr) {
+            SegmentIndexMeta segment_index_meta(segment_id, table_index_meta);
+
+            // 4. Get memory index for this segment
+            SharedPtr<MemIndex> mem_index = segment_index_meta.GetMemIndex();
+            if (mem_index == nullptr || (mem_index->GetBaseMemIndex() == nullptr && mem_index->GetEMVBIndex() == nullptr)) {
+                LOG_INFO(fmt::format("Skipping segment {} - no memory index to dump", segment_id));
+                continue;
+            }
+
+            // 4.5. Additional check for EMVB index - ensure it's built before dumping
+
+            // 5. Allocate new chunk ID for this dump
+            ChunkID chunk_id = 0;
+            status = segment_index_meta.GetNextChunkID(kv_instance, chunk_id);
+            if (!status.ok()) {
+                return status;
+            }
+            status = segment_index_meta.SetNextChunkID(kv_instance, chunk_id + 1);
+            if (!status.ok()) {
+                return status;
+            }
+
+            // 6. Get old chunk IDs for cleanup (if any exist)
+            Vector<ChunkID> old_chunk_ids;
+            auto [existing_chunk_ids_ptr, chunk_status] = segment_index_meta.GetChunkIDs1(kv_instance, begin_ts, commit_ts);
+            if (chunk_status.ok()) {
+                old_chunk_ids = *existing_chunk_ids_ptr;
+            }
+
+            // 7. Actually dump the memory index to disk
+            status = this->DumpSegmentMemIndex(segment_index_meta, chunk_id);
+            if (!status.ok()) {
+                return status;
+            }
+
+            // 8. Clean up old chunk references
+            TxnTimeStamp commit_ts = this->txn_context_ptr_->commit_ts_;
+            for (ChunkID deprecate_id : old_chunk_ids) {
+                auto ts_str = std::to_string(commit_ts);
+                status = this->kv_instance_->Put(KeyEncode::DropChunkIndexKey(table_index_meta.table_meta().db_id_str(),
+                                                                              table_index_meta.table_meta().table_id_str(),
+                                                                              table_index_meta.index_id_str(),
+                                                                              segment_id,
+                                                                              deprecate_id),
+                                                 ts_str);
+                if (!status.ok()) {
+                    return status;
+                }
+            }
+
+            LOG_INFO(fmt::format("Successfully dumped segment {} to chunk {}", segment_id, chunk_id));
+        }
+
+        // 9. Update fulltext segment timestamp if needed
+        // auto [index_base, index_status] = table_index_meta.GetIndexBase();
+        // if (index_status.ok() && index_base->index_type_ == IndexType::kFullText) {
+        //     TxnTimeStamp commit_ts = this->txn_context_ptr_->commit_ts_;
+        //     status = table_index_meta.UpdateFulltextSegmentTS(commit_ts);
+        //     if (!status.ok()) {
+        //         return status;
+        //     }
+        // }
+    }
+
+    return Status::OK();
+}
+
 } // namespace infinity

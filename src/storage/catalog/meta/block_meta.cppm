@@ -22,6 +22,7 @@ import :default_values;
 import :meta_info;
 import :new_catalog;
 import :base_meta;
+import :snapshot_info;
 
 namespace infinity {
 
@@ -51,9 +52,12 @@ public:
 
     Status RestoreSet();
 
+    Status RestoreSetFromSnapshot(TxnTimeStamp commit_ts);
+
     Status UninitSet(KVInstance *kv_instance, UsageFlag usage_flag);
 
     // Tuple<SizeT, Status> GetRowCnt();
+    TxnTimeStamp GetCreateTimestampFromKV(KVInstance *kv_instance) const;
 
     Tuple<SizeT, Status> GetRowCnt1(KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts);
 
@@ -72,6 +76,10 @@ public:
 
     Status SetFastRoughFilter(KVInstance *kv_instance, SharedPtr<FastRoughFilter> fast_rough_filter);
 
+    Status RestoreFromSnapshot(KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts);
+
+    Tuple<SharedPtr<BlockSnapshotInfo>, Status> MapMetaToSnapShotInfo(KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts);
+
 private:
     mutable std::mutex mtx_;
 
@@ -80,10 +88,10 @@ private:
     //    KVInstance &kv_instance_;
     SegmentMeta &segment_meta_;
     BlockID block_id_;
-    Optional<Vector<ColumnID>> column_ids1_;
+    Optional<Vector<ColumnID>> column_ids1_; // stored in columndefs in kv
 
     SharedPtr<String> block_dir_;
-    Optional<SizeT> row_cnt_;
+    Optional<SizeT> row_cnt_; // stored in the block version file
 
     BufferObj *version_buffer_ = nullptr;
     SharedPtr<FastRoughFilter> fast_rough_filter_;

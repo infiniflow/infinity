@@ -73,6 +73,17 @@ void CompactionProcessor::Stop() {
     this->Submit(stop_task);
     stop_task->Wait();
     processor_thread_.join();
+    // Ensure all pending tasks are processed before shutdown
+    while (!task_queue_.Empty()) {
+        Deque<SharedPtr<BGTask>> tasks;
+        task_queue_.DequeueBulk(tasks);
+        for (const auto &bg_task : tasks) {
+            if (bg_task->type_ != BGTaskType::kStopProcessor) {
+                // Skip processing any remaining tasks during shutdown
+                continue;
+            }
+        }
+    }
     LOG_INFO("Compaction processor is stopped.");
 }
 

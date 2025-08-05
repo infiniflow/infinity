@@ -21,6 +21,8 @@ import :status;
 import :default_values;
 import :new_catalog;
 import :base_meta;
+import :snapshot_info;
+import :wal_entry;
 
 namespace infinity {
 
@@ -57,6 +59,8 @@ export class SegmentMeta : public BaseMeta {
 public:
     SegmentMeta(SegmentID segment_id, TableMeeta &table_meta);
 
+    TxnTimeStamp GetCreateTimestampFromKV(KVInstance *kv_instance) const;
+
     TableMeeta &table_meta() { return table_meta_; }
 
     SegmentID segment_id() const { return segment_id_; }
@@ -80,13 +84,19 @@ public:
 
     Tuple<SizeT, Status> GetRowCnt1(KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts);
 
-    Status GetFirstDeleteTS(KVInstance *kv_instance, TxnTimeStamp &first_delete_ts, TxnTimeStamp begin_ts);
+    Status GetFirstDeleteTS(KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp &first_delete_ts);
 
     Tuple<SharedPtr<SegmentInfo>, Status> GetSegmentInfo(KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts);
 
     Status GetFastRoughFilter(KVInstance *kv_instance, SharedPtr<FastRoughFilter> &fast_rough_filter);
 
     Status SetFastRoughFilter(KVInstance *kv_instance, SharedPtr<FastRoughFilter> fast_rough_filter);
+
+    Tuple<SharedPtr<SegmentSnapshotInfo>, Status> MapMetaToSnapShotInfo(KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts);
+
+    Status RestoreSet(KVInstance *kv_instance);
+
+    Status RestoreFromSnapshot(KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts, const WalSegmentInfoV2 &segment_info, bool is_link_files = false);
 
 private:
     Status LoadFirstDeleteTS(KVInstance *kv_instance);
@@ -96,7 +106,7 @@ private:
 private:
     TableMeeta &table_meta_;
     SegmentID segment_id_;
-    Optional<String> segment_dir_;
+    Optional<String> segment_dir_; // TODO: check if it is no longer in use
 
     Optional<BlockID> next_block_id_;
 

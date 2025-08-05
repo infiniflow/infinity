@@ -24,7 +24,7 @@ import :new_catalog;
 import :base_meta;
 
 namespace infinity {
-
+export struct ChunkIndexSnapshotInfo;
 class KVInstance;
 class SegmentIndexMeta;
 class BufferObj;
@@ -41,6 +41,10 @@ export struct ChunkIndexMetaInfo {
     void ToJson(nlohmann::json &json) const;
 
     void FromJson(std::string_view json_str);
+
+    nlohmann::json Serialize();
+
+    static SharedPtr<ChunkIndexMetaInfo> Deserialize(const nlohmann::json &chunk_index_json);
 
     static String IndexFileName(ChunkID chunk_id) { return fmt::format("chunk_{}.idx", chunk_id); }
 };
@@ -65,11 +69,15 @@ public:
 
     Status UninitSet(KVInstance *kv_instance, TxnTimeStamp begin_ts, UsageFlag usage_flag);
 
+    Status RestoreSetFromSnapshot(KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts, const ChunkIndexMetaInfo &chunk_info);
+
     Status SetChunkInfo(KVInstance *kv_instance, const ChunkIndexMetaInfo &chunk_info);
 
     Status SetChunkInfoNoPutKV(const ChunkIndexMetaInfo &chunk_info);
 
     Status FilePaths(KVInstance *kv_instance, TxnTimeStamp begin_ts, Vector<String> &paths);
+
+    Tuple<SharedPtr<ChunkIndexSnapshotInfo>, Status> MapMetaToSnapShotInfo(KVInstance* kv_instance, ChunkID chunk_id);
 
 private:
     Status LoadChunkInfo(KVInstance *kv_instance);

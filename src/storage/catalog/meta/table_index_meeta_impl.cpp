@@ -35,6 +35,8 @@ import :infinity_exception;
 import :utility;
 import :kv_utility;
 import :meta_type;
+import :snapshot_info;
+import :segment_index_meta;
 import column_def;
 
 namespace infinity {
@@ -259,6 +261,31 @@ Status TableIndexMeeta::GetTableIndexInfo(KVInstance *kv_instance, TxnTimeStamp 
     table_index_info.index_column_ids_ = MakeShared<String>(std::to_string(column_def->id_));
 
     return Status::OK();
+}
+
+Tuple<SharedPtr<TableIndexSnapshotInfo>, Status>
+TableIndexMeeta::MapMetaToSnapShotInfo(KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts) {
+    SharedPtr<TableIndexSnapshotInfo> table_index_snapshot_info = MakeShared<TableIndexSnapshotInfo>();
+    table_index_snapshot_info->index_dir_ = GetTableIndexDir();
+    table_index_snapshot_info->index_id_str_ = MakeShared<String>(index_id_str_);
+    auto [index_base, status] = GetIndexBase(kv_instance);
+    if (!status.ok()) {
+        return {nullptr, status};
+    }
+    table_index_snapshot_info->index_base_ = index_base;
+    if (!segment_ids_) {
+        segment_ids_ =
+            infinity::GetTableIndexSegments(kv_instance, table_meta_.db_id_str(), table_meta_.table_id_str(), index_id_str_, begin_ts, commit_ts);
+    }
+    for (const auto &segment_id : *segment_ids_) {
+        SegmentIndexMeta segment_index_meta(segment_id, *this);
+        auto [segment_index_snapshot, segment_index_status] = segment_index_meta.MapMetaToSnapShotInfo(kv_instance, begin_ts, commit_ts);
+        if (!segment_index_status.ok()) {
+            return {nullptr, segment_index_status};
+        }
+        table_index_snapshot_info->segment_index_snapshots_.emplace_back(segment_index_snapshot);
+    }
+    return {table_index_snapshot_info, Status::OK()};
 }
 
 Tuple<SecondaryIndexCardinality, Status> TableIndexMeeta::GetSecondaryIndexCardinality(KVInstance *kv_instance) {

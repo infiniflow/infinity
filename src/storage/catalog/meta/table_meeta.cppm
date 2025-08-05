@@ -21,7 +21,9 @@ import :status;
 import column_def;
 import :new_catalog;
 import :base_meta;
+import :snapshot_info;
 import row_id;
+import :wal_entry;
 
 namespace infinity {
 
@@ -123,7 +125,16 @@ public:
 
     Status SetNextIndexID(KVInstance *kv_instance, const String &index_id_str);
 
-    Tuple<SizeT,Status> GetTableRowCount(KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts);
+    Tuple<SharedPtr<TableSnapshotInfo>, Status>
+    MapMetaToSnapShotInfo(const String &db_name, const String &table_name, KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts);
+
+    Status RestoreFromSnapshot(KVInstance *kv_instance,
+                               TxnTimeStamp begin_ts,
+                               TxnTimeStamp commit_ts,
+                               WalCmdRestoreTableSnapshot *restore_table_snapshot_cmd,
+                               bool is_link_files = false);
+
+    Tuple<SizeT, Status> GetTableRowCount(KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts);
 
 private:
     Status LoadComment(KVInstance *kv_instance);

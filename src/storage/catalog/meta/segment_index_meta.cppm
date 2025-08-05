@@ -22,6 +22,7 @@ import :third_party;
 import :meta_info;
 import :new_catalog;
 import :base_meta;
+import :snapshot_info;
 
 namespace infinity {
 
@@ -59,6 +60,8 @@ public:
 
     Status LoadSet(KVInstance *kv_instance, TxnTimeStamp begin_ts);
 
+    Status RestoreSet(KVInstance *kv_instance, const ChunkID &next_chunk_id);
+
     Status UninitSet1(KVInstance *kv_instance, UsageFlag usage_flag);
 
     SharedPtr<MemIndex> GetMemIndex();
@@ -68,6 +71,8 @@ public:
     SharedPtr<String> GetSegmentIndexDir() const;
 
     SharedPtr<SegmentIndexInfo> GetSegmentIndexInfo(KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts);
+
+    Tuple<SharedPtr<SegmentIndexSnapshotInfo>, Status> MapMetaToSnapShotInfo(KVInstance *, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts);
 
 private:
     Status LoadChunkIDs1(KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts);

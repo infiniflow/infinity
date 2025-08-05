@@ -56,6 +56,18 @@ String IndexFileName(ChunkID chunk_id) { return fmt::format("chunk_{}.idx", chun
 
 } // namespace
 
+nlohmann::json ChunkIndexMetaInfo::Serialize() {
+    nlohmann::json json_res;
+    ToJson(json_res);
+    return json_res;
+}
+
+SharedPtr<ChunkIndexMetaInfo> ChunkIndexMetaInfo::Deserialize(const nlohmann::json &chunk_index_json) {
+    auto chunk_index_meta_info = MakeShared<ChunkIndexMetaInfo>();
+    chunk_index_meta_info->FromJson(chunk_index_json.dump());
+    return chunk_index_meta_info;
+}
+
 void ChunkIndexMetaInfo::ToJson(nlohmann::json &json) const {
     json["base_name"] = base_name_;
     json["base_row_id"] = base_row_id_.ToUint64();
@@ -448,6 +460,42 @@ Status ChunkIndexMeta::RestoreSet(KVInstance *kv_instance, TxnTimeStamp begin_ts
     return Status::OK();
 }
 
+Status ChunkIndexMeta::RestoreSetFromSnapshot(KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts, const ChunkIndexMetaInfo &chunk_info) {
+    chunk_info_ = chunk_info;
+    {
+        String chunk_info_key = GetChunkIndexTag("chunk_info");
+        nlohmann::json chunk_info_json;
+        chunk_info_->ToJson(chunk_info_json);
+        Status status = kv_instance->Put(chunk_info_key, chunk_info_json.dump());
+        if (!status.ok()) {
+            return status;
+        }
+    }
+
+    TableIndexMeeta &table_index_meta = segment_index_meta_.table_index_meta();
+
+    auto [index_base, index_status] = table_index_meta.GetIndexBase(kv_instance);
+    if (!index_status.ok()) {
+        return index_status;
+    }
+
+    SharedPtr<ColumnDef> column_def;
+    {
+        auto [col_def, status] = table_index_meta.GetColumnDef(kv_instance, begin_ts, commit_ts);
+        if (!status.ok()) {
+            return status;
+        }
+        column_def = std::move(col_def);
+    }
+
+    Status status = RestoreSet(kv_instance, begin_ts, commit_ts);
+    if (!status.ok()) {
+        return status;
+    }
+
+    return Status::OK();
+}
+
 Status ChunkIndexMeta::UninitSet(KVInstance *kv_instance, TxnTimeStamp begin_ts, UsageFlag usage_flag) {
     auto *kv_store = InfinityContext::instance().storage()->kv_store();
     Status status = this->GetIndexBuffer(kv_instance, begin_ts, index_buffer_);
@@ -632,6 +680,40 @@ String ChunkIndexMeta::GetChunkIndexTag(const String &tag) const {
                                             segment_index_meta_.segment_id(),
                                             chunk_id_,
                                             tag);
+}
+
+Tuple<SharedPtr<ChunkIndexSnapshotInfo>, Status> ChunkIndexMeta::MapMetaToSnapShotInfo(KVInstance* kv_instance, ChunkID chunk_id) {
+    SharedPtr<ChunkIndexSnapshotInfo> chunk_index_snapshot_info = MakeShared<ChunkIndexSnapshotInfo>();
+    chunk_index_snapshot_info->chunk_id_ = chunk_id_;
+    Status status = LoadChunkInfo(kv_instance);
+    if (!status.ok()) {
+        return {nullptr, status};
+    }
+
+    chunk_index_snapshot_info->base_name_ = chunk_info_->base_name_;
+    chunk_index_snapshot_info->base_row_id_ = chunk_info_->base_row_id_;
+    chunk_index_snapshot_info->row_cnt_ = chunk_info_->row_cnt_;
+    chunk_index_snapshot_info->index_size_ = chunk_info_->index_size_;
+
+    chunk_index_snapshot_info->index_filename_ = IndexFileName(chunk_id);
+    TableIndexMeeta &table_index_meta = segment_index_meta_.table_index_meta();
+    auto [index_base, index_status] = table_index_meta.GetIndexBase(kv_instance);
+    if (!index_status.ok()) {
+        return {nullptr, index_status};
+    }
+    const auto &index_dir = table_index_meta.GetTableIndexDir();
+    if (index_base->index_type_ == IndexType::kFullText) {
+        String index_prefix = VirtualStore::ConcatenatePath(*index_dir, "seg_" + std::to_string(segment_index_meta_.segment_id()));
+        index_prefix = VirtualStore::ConcatenatePath(index_prefix, chunk_info_->base_name_);
+        String posting_file = index_prefix + POSTING_SUFFIX;
+        String dict_file = index_prefix + DICT_SUFFIX;
+        String len_file = index_prefix + LENGTH_SUFFIX;
+        chunk_index_snapshot_info->full_text_files_.push_back(posting_file);
+        chunk_index_snapshot_info->full_text_files_.push_back(dict_file);
+        chunk_index_snapshot_info->full_text_files_.push_back(len_file);
+    }
+
+    return {chunk_index_snapshot_info, Status::OK()};
 }
 
 } // namespace infinity

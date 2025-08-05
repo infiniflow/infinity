@@ -21,6 +21,7 @@ import :status;
 import :new_catalog;
 import column_def;
 import :base_meta;
+import :snapshot_info;
 
 namespace infinity {
 
@@ -37,17 +38,13 @@ public:
 
     SizeT column_idx() const { return column_idx_; }
 
-    Status GetChunkOffset(SizeT &chunk_offset, KVInstance *kv_instance);
-
-    Status SetChunkOffset(SizeT chunk_offset, KVInstance *kv_instance);
-
     Status InitSet(KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts);
 
     Status LoadSet(KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts);
 
-    Status RestoreSet(const ColumnDef *column_def, KVInstance *kv_instance);
+    Status RestoreSet(KVInstance *kv_instance, const ColumnDef *column_def);
 
-    Status UninitSet(const ColumnDef *column_def, KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts, UsageFlag usage_flag);
+    Status UninitSet(KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts, const ColumnDef *column_def, UsageFlag usage_flag);
 
     Status
     GetColumnBuffer(KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts, BufferObj *&column_buffer, BufferObj *&outline_buffer);
@@ -57,6 +54,10 @@ public:
     Tuple<SizeT, Status> GetColumnSize(KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts, SizeT row_cnt) const;
 
     Status FilePaths(KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts, Vector<String> &paths);
+
+    Tuple<SharedPtr<BlockColumnSnapshotInfo>, Status> MapMetaToSnapShotInfo(KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts);
+
+    Status RestoreFromSnapshot(KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts, ColumnID column_id);
 
 private:
     Status GetColumnBuffer(KVInstance *kv_instance,
