@@ -32,6 +32,8 @@ def import_data(path, dataset: str, m: int, ef_construction: int, build_type: st
         import_sift_1m(path + "/sift_base.fvecs", m, ef_construction, build_type, encode_type, remote)
     elif dataset == "gist_1m":
         import_gist_1m(path + "/gist_base.fvecs", m, ef_construction, build_type, encode_type, remote)
+    elif dataset == "msmarco_1m":
+        import_msmarco_1m(path + "/msmarco_base.fvecs", m, ef_construction, build_type, encode_type, remote)
     else:
         raise Exception("Invalid data set")
 
@@ -102,6 +104,39 @@ def import_gist_1m(path, m: int, ef_construction: int, build_type: str, encode_t
     print(f"Create index on gist_1m cost time: {dur} s")
 
 
+def import_msmarco_1m(path, m: int, ef_construction: int, build_type: str, encode_type: str, remote: bool):
+    infinity_obj = None
+    if remote:
+        infinity_obj = infinity.connect(LOCAL_HOST)
+    else:
+        infinity_obj = infinity.connect(LOCAL_INFINITY_PATH)
+    assert infinity_obj
+
+    db_obj = infinity_obj.get_database("default_db")
+    assert db_obj
+    table_name = f"msmarco_{build_type}_{encode_type}_benchmark"
+    db_obj.drop_table(table_name)
+    db_obj.create_table(table_name, {"col1": {"type": "vector,1024,float"}})
+    table_obj = db_obj.get_table(table_name)
+    assert table_obj
+
+    assert os.path.exists(path)
+
+    start = time.time()
+    res = table_obj.import_data(path, {"file_type": "fvecs"})
+    end = time.time()
+    dur = end - start
+    print(f"Import msmarco_1m cost time: {dur} s")
+
+    assert res.error_code == ErrorCode.OK
+
+    start = time.time()
+    create_index(table_obj, m, ef_construction, build_type, encode_type)
+    end = time.time()
+    dur = end - start
+    print(f"Create index on msmarco_1m cost time: {dur} s")
+
+
 def create_index(table_obj, m: int, ef_construction: int, build_type: str, encode_type: str):
     res = table_obj.drop_index("hnsw_index", ConflictType.Ignore)
 
@@ -144,8 +179,8 @@ if __name__ == "__main__":
     parser.add_argument("-d", "--data", type=str, default="sift_1m", dest="data_set")
     parser.add_argument("--m", type=int, default=16, dest="m")
     parser.add_argument("--efc", type=int, default=200, dest="ef_construction")
-    parser.add_argument("-b", "--build", type=str, default="plain", dest="build_type") # plain, lsg
-    parser.add_argument("-e", "--encode", type=str, default="lvq", dest="encode_type") # plain, lvq
+    parser.add_argument("-b", "--build", type=str, default="plain", dest="build_type")  # plain, lsg
+    parser.add_argument("-e", "--encode", type=str, default="lvq", dest="encode_type")  # plain, lvq
     parser.add_argument("-R", "--remote", type=str2bool, default=True, dest="remote")
 
     args = parser.parse_args()

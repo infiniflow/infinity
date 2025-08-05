@@ -145,8 +145,6 @@ def process_pool(threads, rounds, query_path, ef: int, remote: bool, table_name)
         print(f"File: {query_path} doesn't exist")
         raise Exception(f"File: {query_path} doesn't exist")
 
-    results = []
-
     total_queries = fvecs_read_all(query_path)
     queries = [[] for i in range(threads)]
     total_queries_count = len(total_queries)
@@ -164,17 +162,14 @@ def process_pool(threads, rounds, query_path, ef: int, remote: bool, table_name)
         p.join()
         end = time.time()
         dur = end - start
-        results.append(f"Round {i + 1}:")
-        results.append(f"Query Count: {total_queries_count}")
-        results.append(f"Total Dur: {dur:.2f} s, QPS: {(total_queries_count / dur):.2f}")
+        print(f"Round {i + 1}:")
+        print(f"Query Count: {total_queries_count}")
+        print(f"Total Dur: {dur:.2f} s, QPS: {(total_queries_count / dur):.2f}")
         dur_sum += dur
 
     dur_sum /= rounds
-    results.append(f"Round result [1, {rounds}]:")
-    results.append(f"ef: {ef}, Avg total dur: {dur_sum:.2f} s, Avg QPS: {(total_queries_count / dur_sum):.2f}")
-
-    for result in results:
-        print(result)
+    print(f"Round result [1, {rounds}]:")
+    print(f"ef: {ef}, Avg total dur: {dur_sum:.2f} s, Avg QPS: {(total_queries_count / dur_sum):.2f}")
 
 
 def one_thread(rounds, query_path, ground_truth_path, ef: int, remote: bool, table_name):
@@ -182,7 +177,6 @@ def one_thread(rounds, query_path, ground_truth_path, ef: int, remote: bool, tab
         print(f"File: {query_path} doesn't exist")
         raise Exception(f"File: {query_path} doesn't exist")
 
-    results = []
     queries = fvecs_read_all(query_path)
 
     infinity_obj = None
@@ -225,23 +219,20 @@ def one_thread(rounds, query_path, ground_truth_path, ef: int, remote: bool, tab
 
         recall_1, recall_10, recall_100 = calculate_recall_all(ground_truth_sets_1, ground_truth_sets_10,
                                                                ground_truth_sets_100, query_results)
-        results.append(f"Round {i + 1}:")
-        results.append(f"Query Count: {len(queries)}")
-        results.append(f"Recall@1: {recall_1}")
-        results.append(f"Recall@10: {recall_10}")
-        results.append(f"Recall@100: {recall_100}")
-        results.append(f"Total Dur: {dur:.2f} s, QPS: {(len(queries) / dur):.2f}")
+        print(f"Round {i + 1}:")
+        print(f"Query Count: {len(queries)}")
+        print(f"Recall@1: {recall_1}")
+        print(f"Recall@10: {recall_10}")
+        print(f"Recall@100: {recall_100}")
+        print(f"Total Dur: {dur:.2f} s, QPS: {(len(queries) / dur):.2f}")
         dur_sum += dur
 
     dur_sum /= rounds
-    results.append(f"Round result [1, {rounds}]:")
-    results.append(f"ef: {ef}, Avg total dur: {dur_sum:.2f} s, Avg QPS: {(len(queries) / dur_sum):.2f}")
-    results.append(f"Recall@1: {recall_1}, Recall@10: {recall_10}, Recall@100: {recall_100}")
+    print(f"Round result [1, {rounds}]:")
+    print(f"ef: {ef}, Avg total dur: {dur_sum:.2f} s, Avg QPS: {(len(queries) / dur_sum):.2f}")
+    print(f"Recall@1: {recall_1}, Recall@10: {recall_10}, Recall@100: {recall_100}")
 
     infinity_obj.disconnect()
-
-    for result in results:
-        print(result)
 
 
 def benchmark(threads, rounds, data_set, ef: int, build_type: str, encode_type: str, remote: bool, path):
@@ -272,6 +263,18 @@ def benchmark(threads, rounds, data_set, ef: int, build_type: str, encode_type: 
             print(f"Single-thread")
             print(f"Rounds: {rounds}")
             one_thread(rounds, query_path, ground_truth_path, ef, remote, f"gist_{build_type}_{encode_type}_benchmark")
+    elif data_set == "msmarco_1m":
+        query_path = path + "/msmarco_query.fvecs"
+        ground_truth_path = path + "/msmarco_groundtruth.ivecs"
+        if threads > 1:
+            print(f"Multi-threads: {threads}")
+            print(f"Rounds: {rounds}")
+            process_pool(threads, rounds, query_path, ef, remote, f"msmarco_{build_type}_{encode_type}_benchmark")
+
+        else:
+            print(f"Single-thread")
+            print(f"Rounds: {rounds}")
+            one_thread(rounds, query_path, ground_truth_path, ef, remote, f"msmarco_{build_type}_{encode_type}_benchmark")
 
 
 def str2bool(value):
@@ -292,7 +295,7 @@ if __name__ == '__main__':
 
     parser.add_argument("-t", "--threads", type=int, default=1, dest="threads")
     parser.add_argument("-r", "--rounds", type=int, default=5, dest="rounds")
-    parser.add_argument("-d", "--data", type=str, default='sift_1m', dest="data_set")
+    parser.add_argument("-d", "--data", type=str, default='sift_1m', dest="data_set")  # sift_1m, gist_1m, msmarco_1m
     parser.add_argument("--ef", type=int, default=200, dest="ef")
     parser.add_argument("-b", "--build", type=str, default="plain", dest="build_type")  # plain, lsg
     parser.add_argument("-e", "--encode", type=str, default="lvq", dest="encode_type")  # plain, lvq
