@@ -30,32 +30,65 @@ import :logger;
 
 namespace infinity {
 
+// Status Snapshot::DropSnapshot(QueryContext *query_context, const String &snapshot_name) {
+
+//     String snapshot_dir = query_context->global_config()->SnapshotDir();
+//     bool found = false;
+//     for (const auto &entry : std::filesystem::directory_iterator(snapshot_dir)) {
+//         if (entry.is_directory()) {
+//             // Don't search the directory recursively
+//         } else {
+//             // Just the file base name
+//             if (entry.path().stem() == snapshot_name) {
+//                 String extension = entry.path().extension();
+//                 if (extension == ".json" or extension == ".lz4") {
+//                     LOG_INFO(fmt::format("Delete file: {}", entry.path().string()));
+//                     VirtualStore::DeleteFile(entry.path().string());
+//                     found = true;
+//                 }
+//             } else {
+//                 String filename = entry.path().filename();
+//                 LOG_WARN(fmt::format("Invalid snapshot file name: {}", filename));
+//             }
+//         }
+//     }
+
+//     if (!found) {
+//         return Status::NotFound(fmt::format("Snapshot: {} not found", snapshot_name));
+//     }
+
+//     return Status::OK();
+// }
+
 Status Snapshot::DropSnapshot(QueryContext *query_context, const String &snapshot_name) {
-
     String snapshot_dir = query_context->global_config()->SnapshotDir();
-    bool found = false;
-    for (const auto &entry : std::filesystem::directory_iterator(snapshot_dir)) {
-        if (entry.is_directory()) {
-            // Don't search the directory recursively
-        } else {
-            // Just the file base name
-            if (entry.path().stem() == snapshot_name) {
-                String extension = entry.path().extension();
-                if (extension == ".json" or extension == ".lz4") {
-                    LOG_INFO(fmt::format("Delete file: {}", entry.path().string()));
-                    VirtualStore::DeleteFile(entry.path().string());
-                    found = true;
-                }
-            } else {
-                String filename = entry.path().filename();
-                LOG_WARN(fmt::format("Invalid snapshot file name: {}", filename));
-            }
-        }
-    }
-
-    if (!found) {
+    String snapshot_path = fmt::format("{}/{}", snapshot_dir, snapshot_name);
+    
+    // Check if snapshot directory exists
+    if (!VirtualStore::Exists(snapshot_path)) {
         return Status::NotFound(fmt::format("Snapshot: {} not found", snapshot_name));
     }
+
+    
+    // ATOMIC RENAME - Move entire directory to deleted location
+    String deleted_path = fmt::format("{}/deleted_{}", snapshot_dir, snapshot_name);
+    if (VirtualStore::Exists(deleted_path)) {
+        LOG_WARN(fmt::format("Snapshot: {} already deleted", snapshot_name));
+        VirtualStore::RemoveDirectory(deleted_path);
+    }
+    Status rename_status = VirtualStore::Rename(snapshot_path, deleted_path);
+    
+    if (!rename_status.ok()) {
+        return Status::IOError(fmt::format("Failed to delete snapshot: {}", rename_status.message()));
+    }
+    
+    LOG_INFO(fmt::format("Atomically moved snapshot directory: {} -> {}", snapshot_path, deleted_path));
+
+    // Remove the entire deleted snapshot directory and all its contents
+    LOG_INFO(fmt::format("Removing snapshot directory: {}", deleted_path));
+    VirtualStore::RemoveDirectory(deleted_path);
+    
+
 
     return Status::OK();
 }

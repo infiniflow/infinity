@@ -254,6 +254,13 @@ if (CMAKE_BUILD_TYPE STREQUAL "Debug")
     ADD_DEFINITIONS(-D INFINITY_DEBUG)
 endif ()
 
+if (NOT INDEX_BUILD_METHOD STREQUAL "Variant")
+    message(STATUS "Add Environment Variable INDEX_HANDLER")
+    ADD_DEFINITIONS(-D INDEX_HANDLER)
+else ()
+    message(STATUS "NOT USING INDEX_HANDLER")
+endif ()
+
 # find_package(Boost REQUIRED)
 find_package(Lz4 REQUIRED)
 

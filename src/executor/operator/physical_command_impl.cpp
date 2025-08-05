@@ -53,7 +53,6 @@ import :bg_task_type;
 import :new_catalog;
 import command_statement;
 import :session_manager;
-
 namespace infinity {
 
 void PhysicalCommand::Init(QueryContext *query_context) {}
@@ -446,31 +445,38 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
             SnapshotScope snapshot_scope = snapshot_cmd->scope();
             const String &snapshot_name = snapshot_cmd->name();
 
-            {
-                // checkpoint
-                auto *wal_manager = query_context->storage()->wal_manager();
-                if (wal_manager->IsCheckpointing()) {
-                    LOG_ERROR("There is a running checkpoint task, skip this checkpoint triggered by snapshot");
-                    Status status = Status::Checkpointing();
-                    RecoverableError(status);
-                }
+            // auto new_txn_mgr = InfinityContext::instance().storage()-> new_txn_manager();
 
-                TxnTimeStamp max_commit_ts{};
-                i64 wal_size{};
-                std::tie(max_commit_ts, wal_size) = wal_manager->GetCommitState();
-                LOG_TRACE(fmt::format("Construct checkpoint task with WAL size: {}, max_commit_ts: {}", wal_size, max_commit_ts));
-                auto checkpoint_task = MakeShared<NewCheckpointTask>(wal_size);
-                NewTxn *new_txn = query_context->GetNewTxn();
-                checkpoint_task->new_txn_ = new_txn;
-
-                auto *bg_processor = InfinityContext::instance().storage()->bg_processor();
-                bg_processor->Submit(checkpoint_task);
-                checkpoint_task->Wait();
-            }
+            // new_txn_mgr->PrintAllKeyValue();
 
             switch (snapshot_operation) {
                 case SnapshotOp::kCreate: {
                     LOG_INFO(fmt::format("Execute snapshot create"));
+
+                    // TODO: do we need a new checkpoint in case the last one just create the table
+                    // Get WAL manager and check if checkpoint is already in progress
+                    // auto *wal_manager = query_context->storage()->wal_manager();
+                    // if (wal_manager->IsCheckpointing()) {
+                    //     LOG_ERROR("There is a running checkpoint task, skip this checkpoint triggered by snapshot");
+                    //     Status status = Status::Checkpointing();
+                    //     RecoverableError(status);
+                    // } else {
+                    //     // Get current commit state
+                    //     TxnTimeStamp max_commit_ts{};
+                    //     i64 wal_size{};
+                    //     std::tie(max_commit_ts, wal_size) = wal_manager->GetCommitState();
+                    //     LOG_TRACE(fmt::format("Construct checkpoint task with WAL size: {}, max_commit_ts: {}", wal_size, max_commit_ts));
+
+                    //     // Create and configure checkpoint task
+                    //     auto checkpoint_task = MakeShared<NewCheckpointTask>(wal_size);
+                    //     checkpoint_task->ExecuteWithNewTxn();
+                    // }
+
+
+                    // // wait for checkpoint to complete
+                    // while (wal_manager->LastCheckpointTS() + 2 < begin_ts) {
+                    //     std::this_thread::sleep_for(std::chrono::milliseconds(10));
+                    // }
 
                     switch (snapshot_scope) {
                         case SnapshotScope::kSystem: {
@@ -479,11 +485,20 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
                         }
                         case SnapshotScope::kDatabase: {
                             LOG_INFO(fmt::format("Execute snapshot database"));
+                            const String &db_name = snapshot_cmd->object_name();
+                            Status snapshot_status = Snapshot::CreateDatabaseSnapshot(query_context, snapshot_name, db_name);
+                            if (!snapshot_status.ok()) {
+                                RecoverableError(snapshot_status);
+                            }
+
                             break;
                         }
                         case SnapshotScope::kTable: {
                             const String &table_name = snapshot_cmd->object_name();
-                            Status snapshot_status = Snapshot::CreateTableSnapshot(query_context, snapshot_name, table_name);
+                            const String &db_name = query_context->schema_name();
+                            // Status snapshot_status = Snapshot::CreateTableSnapshot(query_context, snapshot_name, table_name);
+                            NewTxn *new_txn = query_context->GetNewTxn();
+                            Status snapshot_status = new_txn->CreateTableSnapshot(db_name, table_name, snapshot_name);
                             if (!snapshot_status.ok()) {
                                 RecoverableError(snapshot_status);
                             }
@@ -519,6 +534,10 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
                         }
                         case SnapshotScope::kDatabase: {
                             LOG_INFO(fmt::format("Execute snapshot database restore"));
+                            Status snapshot_status = Snapshot::RestoreDatabaseSnapshot(query_context, snapshot_name);
+                            if (!snapshot_status.ok()) {
+                                RecoverableError(snapshot_status);
+                            }
                             break;
                         }
                         case SnapshotScope::kTable: {

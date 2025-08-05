@@ -21,6 +21,7 @@ import :status;
 import :third_party;
 import :meta_info;
 import :new_catalog;
+import :snapshot_info;
 
 namespace infinity {
 
@@ -66,6 +67,8 @@ public:
 
     Status InitSet1();
 
+    Status RestoreSet(const ChunkID &next_chunk_id);
+
     Status LoadSet();
 
     Status UninitSet(UsageFlag usage_flag);
@@ -79,6 +82,8 @@ public:
     SharedPtr<String> GetSegmentIndexDir() const;
 
     SharedPtr<SegmentIndexInfo> GetSegmentIndexInfo();
+
+    Tuple<SharedPtr<SegmentIndexSnapshotInfo>, Status> MapMetaToSnapShotInfo();
 
 private:
     Status LoadChunkIDs1();

@@ -20,6 +20,7 @@ import :stl;
 import :status;
 import :new_catalog;
 import column_def;
+import :snapshot_info;
 
 namespace infinity {
 
@@ -57,6 +58,10 @@ public:
     Tuple<SizeT, Status> GetColumnSize(SizeT row_cnt) const;
 
     Status FilePaths(Vector<String> &paths);
+
+    Tuple<SharedPtr<BlockColumnSnapshotInfo>, Status> MapMetaToSnapShotInfo();
+
+    Status RestoreFromSnapshot(ColumnID column_id);
 
 private:
     Status GetColumnBuffer(BufferObj *&column_buffer, BufferObj *&outline_buffer, const ColumnDef *column_def);

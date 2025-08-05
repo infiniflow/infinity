@@ -129,6 +129,53 @@ export struct CreateTableTxnStore final : public BaseTxnStore {
     SharedPtr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;
 };
 
+
+export struct CreateTableSnapshotTxnStore final : public BaseTxnStore {
+    CreateTableSnapshotTxnStore() : BaseTxnStore(TransactionType::kCreateTableSnapshot) {}
+
+    String db_name_{};
+    String table_name_{};
+    String snapshot_name_{};
+    TxnTimeStamp max_commit_ts_{};
+
+    String ToString() const final;
+    SharedPtr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;
+};
+
+
+export struct RestoreTableTxnStore final : public BaseTxnStore {
+    RestoreTableTxnStore() : BaseTxnStore(TransactionType::kRestoreTable) {}
+
+    String db_name_{};
+    String snapshot_name_{};
+    String db_id_str_{};
+    u64 db_id_{};
+    String table_name_{};
+    String table_id_str_{};
+    u64 table_id_{};
+    SharedPtr<TableDef> table_def_{};
+    Vector<WalSegmentInfoV2> segment_infos_{};
+    Vector<WalCmdCreateIndexV2> index_cmds_{};
+    Vector<String> files_{};
+
+    String ToString() const final;
+    SharedPtr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;
+
+};
+
+export struct RestoreDatabaseTxnStore final : public BaseTxnStore {
+    RestoreDatabaseTxnStore() : BaseTxnStore(TransactionType::kRestoreDatabase) {}
+
+    String db_name_{};
+    String db_id_str_{};
+    String db_comment_{};
+    Vector<SharedPtr<RestoreTableTxnStore>> restore_table_txn_stores_{};
+
+    String ToString() const final;
+    SharedPtr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;
+};
+
+
 export struct DropTableTxnStore final : public BaseTxnStore {
     DropTableTxnStore() : BaseTxnStore(TransactionType::kDropTable) {}
     ~DropTableTxnStore() override = default;
