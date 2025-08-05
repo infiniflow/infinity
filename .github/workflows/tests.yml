@@ -70,10 +70,6 @@ jobs:
               exit 1
           fi
 
-      - name: Vcpkg install
-        if: ${{ !cancelled() && !failure() }}
-        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && /opt/vcpkg/vcpkg install"
-
       - name: Build debug version
         if: ${{ !cancelled() && !failure() }}
         run: sudo docker exec ${BUILDER_CONTAINER} bash -c "git config --global safe.directory \"*\" && cd /infinity && rm -fr cmake-build-debug && mkdir -p cmake-build-debug && cmake -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_JOB_POOLS:STRING=link=8 -DCI=ON -S /infinity -B /infinity/cmake-build-debug && cmake --build /infinity/cmake-build-debug --target infinity"
@@ -142,9 +138,6 @@ jobs:
 #              exit 1
 #          fi
 #
-#      - name: Vcpkg install
-#        if: ${{ !cancelled() && !failure() }}
-#        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && vcpkg install"
 #
 #      - name: Build release version
 #        if: ${{ !cancelled() && !failure() }}
