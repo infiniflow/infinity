@@ -130,6 +130,9 @@ public:
 
     Status SetBeginTS(TxnTimeStamp begin_ts);
 
+    Tuple<SizeT,Status> GetTableRowCount();
+
+
 private:
     Status LoadComment();
 
