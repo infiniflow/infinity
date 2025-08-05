@@ -121,6 +121,7 @@ target_link_libraries(knn_query_benchmark
         libevent::core
         oatpp::oatpp
         ${JEMALLOC_STATIC_LIB}
+        miniocpp.a
         pugixml::static
         curlpp_static
         unofficial::inih::libinih
