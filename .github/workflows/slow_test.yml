@@ -36,6 +36,7 @@ jobs:
           echo "RUN_TSAN_TEST=true" >> $GITHUB_OUTPUT
           echo "RUN_RESTART_TEST=true" >> $GITHUB_OUTPUT
           echo "RUN_PYTEST_PARALLEL=true" >> $GITHUB_OUTPUT
+          echo "RUN_CI_SLOW_TEST=true" >> $GITHUB_OUTPUT
 
       - name: Show PR labels
         if: ${{ !cancelled() && !failure() }}
@@ -61,23 +62,17 @@ jobs:
           echo "BUILDER_CONTAINER=${BUILDER_CONTAINER}" >> $GITHUB_ENV
           echo "CPUS=${CPUS}" >> $GITHUB_ENV
           TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
+          RUNNER_WORKSPACE_PREFIX=${RUNNER_WORKSPACE_PREFIX:-$HOME}
+          echo "RUNNER_WORKSPACE_PREFIX=${RUNNER_WORKSPACE_PREFIX}" >> $GITHUB_ENV
           sudo docker rm -f -v ${BUILDER_CONTAINER} && sudo docker run --privileged --cap-add=NET_ADMIN -d --name ${BUILDER_CONTAINER} -e TZ=$TZ -e CMAKE_BUILD_PARALLEL_LEVEL=${CPUS} -v $PWD:/infinity -v /boot:/boot -v /var/run/docker.sock:/var/run/docker.sock --cpus ${CPUS} infiniflow/infinity_builder:ubuntu20_clang20
 
       - name: Build release version
         if: ${{ !cancelled() && !failure() }}
         run: sudo docker exec ${BUILDER_CONTAINER} bash -c "git config --global safe.directory \"*\" && cd /infinity && rm -fr cmake-build-release && mkdir -p cmake-build-release && cmake -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_JOB_POOLS:STRING=link=8 -DCI=ON -S /infinity -B /infinity/cmake-build-release && cmake --build /infinity/cmake-build-release --target infinity"
 
-      - name: Build release unit test
-        if: ${{ !cancelled() && !failure() }}
-        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "git config --global safe.directory \"*\" && cd /infinity && cmake --build /infinity/cmake-build-release --target test_main knn_import_benchmark knn_query_benchmark"
-
       - name: Build debug version with thread sanitizer
         if: ${{ !cancelled() && !failure() && steps.choose_test_type.outputs.RUN_TSAN_TEST == 'true' }}
         run: sudo docker exec ${BUILDER_CONTAINER} bash -c "git config --global safe.directory \"*\" && cd /infinity && rm -fr cmake-build-debug && mkdir -p cmake-build-debug && cmake -G Ninja -DENABLE_SANITIZER_THREAD=ON -DCMAKE_BUILD_TYPE=Debug -DCMAKE_JOB_POOLS:STRING=link=8 -DCI=ON -S /infinity -B /infinity/cmake-build-debug && cmake --build /infinity/cmake-build-debug --target infinity"
-
-      - name: Build debug unit test
-        if: ${{ !cancelled() && !failure() }}
-        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "git config --global safe.directory \"*\" && cd /infinity && cmake --build /infinity/cmake-build-debug --target test_main"
 
       - name: Install pysdk for Python 3.10
         if: ${{ !cancelled() && !failure() }}
@@ -87,8 +82,6 @@ jobs:
       - name: Prepare restart test data
         if: ${{ !cancelled() && !failure() && steps.choose_test_type.outputs.RUN_RESTART_TEST == 'true' }}
         run: |
-          RUNNER_WORKSPACE_PREFIX=${RUNNER_WORKSPACE_PREFIX:-$HOME}
-          echo "RUNNER_WORKSPACE_PREFIX=${RUNNER_WORKSPACE_PREFIX}" >> $GITHUB_ENV
           sudo python3 scripts/prepare_restart_test_data.py --from_dir=${RUNNER_WORKSPACE_PREFIX} --op=add
 
       - name: Run restart test with thread sanitizer
@@ -224,30 +217,37 @@ jobs:
           sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /var/infinity/log && tar -cvf /infinity/infinity.log.tar * && cd -"
           sudo python3 scripts/collect_log.py --log_path=infinity.log.tar --stdout_path=release.log --stderror_path=release_error.log --executable_path=cmake-build-release/src/infinity --output_dir=${RUNNER_WORKSPACE_PREFIX}/log --failure=${failure}
 
+      - name: Build release unit test
+        if: ${{ !cancelled() && !failure() && steps.choose_test_type.outputs.RUN_CI_SLOW_TEST == 'true' }}
+        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "git config --global safe.directory \"*\" && cd /infinity && mkdir -p cmake-build-release && cmake --build /infinity/cmake-build-release --target test_main"
+
+      - name: Build debug unit test
+        if: ${{ !cancelled() && !failure() && steps.choose_test_type.outputs.RUN_CI_SLOW_TEST == 'true' }}
+        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "git config --global safe.directory \"*\" && cd /infinity && mkdir -p cmake-build-debug && cmake --build /infinity/cmake-build-debug --target test_main"
+
       - name: Run sqllogictest debug version
-        if: ${{ !cancelled() && !failure() }}
-        id: run_tests_debug
+        if: ${{ !cancelled() && !failure() && steps.choose_test_type.outputs.RUN_CI_SLOW_TEST == 'true' }}
         run: sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && LD_PRELOAD=/usr/local/lib/clang/20/lib/x86_64-unknown-linux-gnu/libclang_rt.asan.so ASAN_OPTIONS=detect_leaks=0 python3 tools/sqllogictest.py" && sleep 1s
 
       - name: Unit test debug version
-        if: ${{ !cancelled() && !failure() }}
+        if: ${{ !cancelled() && !failure() && steps.choose_test_type.outputs.RUN_CI_SLOW_TEST == 'true' }}
         run: sudo docker exec ${BUILDER_CONTAINER} bash -c "mkdir -p /var/infinity && cd /infinity/ && ASAN_OPTIONS=detect_leaks=0 cmake-build-debug/src/test_main --gtest_also_run_disabled_tests > unittest_debug.log 2>&1"
 
       - name: Collect infinity unit test debug output
-        if: ${{ !cancelled() && failure() }}
+        if: ${{ !cancelled() && failure() && steps.choose_test_type.outputs.RUN_CI_SLOW_TEST == 'true' }}
         run: unittest_debug.log 2>/dev/null || true
 
       - name: Run sqllogictest release version
-        if: ${{ !cancelled() && !failure() }}
+        if: ${{ !cancelled() && !failure() && steps.choose_test_type.outputs.RUN_CI_SLOW_TEST == 'true' }}
         id: run_tests_release
         run: sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && python3 tools/sqllogictest.py" && sleep 1s
 
       - name: Unit test release version
-        if: ${{ !cancelled() && !failure() }}
+        if: ${{ !cancelled() && !failure() && steps.choose_test_type.outputs.RUN_CI_SLOW_TEST == 'true' }}
         run: sudo docker exec ${BUILDER_CONTAINER} bash -c "mkdir -p /var/infinity && cd /infinity/ && cmake-build-release/src/test_main > unittest_release.log 2>&1"
 
       - name: Collect infinity unit test release output
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && steps.choose_test_type.outputs.RUN_CI_SLOW_TEST == 'true' }}
         run: unittest_release.log 2>/dev/null || true
 
       - name: Destroy builder container
