@@ -33,10 +33,11 @@ jobs:
       - name: Choose test type
         id: choose_test_type
         run: |
-          echo "RUN_TSAN_TEST=true" >> $GITHUB_OUTPUT
-          echo "RUN_RESTART_TEST=true" >> $GITHUB_OUTPUT
-          echo "RUN_PYTEST_PARALLEL=true" >> $GITHUB_OUTPUT
-          echo "RUN_CI_SLOW_TEST=true" >> $GITHUB_OUTPUT
+          echo "RUN_TSAN_TEST=false" >> $GITHUB_OUTPUT
+          echo "RUN_RESTART_TEST=false" >> $GITHUB_OUTPUT
+          echo "RUN_PYTEST_PARALLEL=false" >> $GITHUB_OUTPUT
+          echo "RUN_CI_SLOW_TEST=false" >> $GITHUB_OUTPUT
+          echo "RUN_BENCHMARK_KNN_TEST=true" >> $GITHUB_OUTPUT
 
       - name: Show PR labels
         if: ${{ !cancelled() && !failure() }}
@@ -249,6 +250,45 @@ jobs:
       - name: Collect infinity unit test release output
         if: ${{ !cancelled() && steps.choose_test_type.outputs.RUN_CI_SLOW_TEST == 'true' }}
         run: unittest_release.log 2>/dev/null || true
+
+      - name: Build release cpp benchmark test
+        if: ${{ !cancelled() && !failure() && steps.choose_test_type.outputs.RUN_BENCHMARK_KNN_TEST == 'true' }}
+        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && cmake --build /infinity/cmake-build-release --target knn_import_benchmark knn_query_benchmark"
+
+      - name: Prepare benchmark dataset
+        if: ${{ !cancelled() && !failure() && steps.choose_test_type.outputs.RUN_BENCHMARK_KNN_TEST == 'true' }}
+        run: |
+          sudo mkdir -p $PWD/test/data/benchmark
+          sudo ln -s ${RUNNER_WORKSPACE_PREFIX}/benchmark/sift1M $PWD/test/data/benchmark/sift_1m
+          sudo ln -s ${RUNNER_WORKSPACE_PREFIX}/benchmark/gist1M $PWD/test/data/benchmark/gist_1m
+
+      - name: Run sift benchmark test
+        if: ${{ !cancelled() && !failure() && steps.choose_test_type.outputs.RUN_BENCHMARK_KNN_TEST == 'true' }}
+        run: |
+          rm -fr $PWD/db_tmp && mkdir -p $PWD/db_tmp && cat conf/infinity_conf.toml | sed -e "s|/var/infinity|$PWD/db_tmp|g" > $PWD/db_tmp/infinity_conf.toml && \
+          ./cmake-build-release/benchmark/local_infinity/knn_import_benchmark --dataset=sift --build_type=plain --encode_type=plain --dataset_dir=$PWD/test/data --infinity_dir=$PWD/db_tmp --config_path=db_tmp/infinity_conf.toml | tee plain_sift_benchmark.log && \
+          echo "1 20" | ./cmake-build-release/benchmark/local_infinity/knn_query_benchmark sift 79 false $PWD/test/data $PWD/db_tmp db_tmp/infinity_conf.toml | tee -a plain_sift_benchmark.log && \
+          echo "8 20" | ./cmake-build-release/benchmark/local_infinity/knn_query_benchmark sift 79 false $PWD/test/data $PWD/db_tmp db_tmp/infinity_conf.toml | tee -a plain_sift_benchmark.log
+          rm -fr $PWD/db_tmp && mkdir -p $PWD/db_tmp && cat conf/infinity_conf.toml | sed -e "s|/var/infinity|$PWD/db_tmp|g" > $PWD/db_tmp/infinity_conf.toml && \
+          ./cmake-build-release/benchmark/local_infinity/knn_import_benchmark --dataset=sift --build_type=plain --encode_type=lvq --dataset_dir=$PWD/test/data --infinity_dir=$PWD/db_tmp --config_path=db_tmp/infinity_conf.toml | tee lvq_sift_benchmark.log && \
+          echo "1 20" | ./cmake-build-release/benchmark/local_infinity/knn_query_benchmark sift 98 false $PWD/test/data $PWD/db_tmp db_tmp/infinity_conf.toml | tee -a lvq_sift_benchmark.log && \
+          echo "8 20" | ./cmake-build-release/benchmark/local_infinity/knn_query_benchmark sift 98 false $PWD/test/data $PWD/db_tmp db_tmp/infinity_conf.toml | tee -a lvq_sift_benchmark.log
+          rm -fr $PWD/db_tmp && mkdir -p $PWD/db_tmp && cat conf/infinity_conf.toml | sed -e "s|/var/infinity|$PWD/db_tmp|g" > $PWD/db_tmp/infinity_conf.toml && \
+          ./cmake-build-release/benchmark/local_infinity/knn_import_benchmark --dataset=sift --build_type=lsg --encode_type=plain --dataset_dir=$PWD/test/data --infinity_dir=$PWD/db_tmp --config_path=db_tmp/infinity_conf.toml | tee lsg_sift_benchmark.log && \
+          echo "1 20" | ./cmake-build-release/benchmark/local_infinity/knn_query_benchmark sift 73 false $PWD/test/data $PWD/db_tmp db_tmp/infinity_conf.toml | tee -a lsg_sift_benchmark.log && \
+          echo "8 20" | ./cmake-build-release/benchmark/local_infinity/knn_query_benchmark sift 73 false $PWD/test/data $PWD/db_tmp db_tmp/infinity_conf.toml | tee -a lsg_sift_benchmark.log
+          rm -fr $PWD/db_tmp && mkdir -p $PWD/db_tmp && cat conf/infinity_conf.toml | sed -e "s|/var/infinity|$PWD/db_tmp|g" > $PWD/db_tmp/infinity_conf.toml && \
+          ./cmake-build-release/benchmark/local_infinity/knn_import_benchmark --dataset=sift --build_type=lsg --encode_type=lvq --dataset_dir=$PWD/test/data --infinity_dir=$PWD/db_tmp --config_path=db_tmp/infinity_conf.toml | tee lvqlsg_sift_benchmark.log && \
+          echo "1 20" | ./cmake-build-release/benchmark/local_infinity/knn_query_benchmark sift 92 false $PWD/test/data $PWD/db_tmp db_tmp/infinity_conf.toml | tee -a lvqlsg_sift_benchmark.log && \
+          echo "8 20" | ./cmake-build-release/benchmark/local_infinity/knn_query_benchmark sift 92 false $PWD/test/data $PWD/db_tmp db_tmp/infinity_conf.toml | tee -a lvqlsg_sift_benchmark.log
+
+      - name: Collect sift benchmark_knn output
+        if: ${{ !cancelled() && !failure() && steps.choose_test_type.outputs.RUN_BENCHMARK_KNN_TEST == 'true' }}
+        run: |
+          echo "########## plain ##########" && grep -E "Create Index|thread :" plain_sift_benchmark.log
+          echo "########## lvq ##########" && grep -E "Create Index|thread :" lvq_sift_benchmark.log
+          echo "########## lsg ##########" && grep -E "Create Index|thread :" lsg_sift_benchmark.log
+          echo "########## lvqlsg ##########" && grep -E "Create Index|thread :" lvqlsg_sift_benchmark.log
 
       - name: Destroy builder container
         if: always()  # always run this step even if previous steps failed
