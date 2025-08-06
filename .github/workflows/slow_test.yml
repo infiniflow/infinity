@@ -285,11 +285,7 @@ jobs:
 
       - name: Collect sift benchmark_knn output
         if: ${{ !cancelled() && !failure() && steps.choose_test_type.outputs.RUN_BENCHMARK_KNN_TEST == 'true' }}
-        run: |
-          echo "########## plain ##########" && grep -E "Create Index|thread :" plain_sift_benchmark.log
-          echo "########## lvq ##########" && grep -E "Create Index|thread :" lvq_sift_benchmark.log
-          echo "########## lsg ##########" && grep -E "Create Index|thread :" lsg_sift_benchmark.log
-          echo "########## lvqlsg ##########" && grep -E "Create Index|thread :" lvqlsg_sift_benchmark.log
+        run: python3 tools/ci_tools/collect_multiple_benchmark_result.py plain_sift_benchmark.log lvq_sift_benchmark.log lsg_sift_benchmark.log lvqlsg_sift_benchmark.log
 
       - name: Run gist benchmark test
         if: ${{ !cancelled() && !failure() && steps.choose_test_type.outputs.RUN_BENCHMARK_KNN_TEST == 'true' }}
@@ -313,11 +309,7 @@ jobs:
 
       - name: Collect gist benchmark_knn output
         if: ${{ !cancelled() && !failure() && steps.choose_test_type.outputs.RUN_BENCHMARK_KNN_TEST == 'true' }}
-        run: |
-          echo "########## plain ##########" && grep -E "Create Index|thread :" plain_gist_benchmark.log
-          echo "########## lvq ##########" && grep -E "Create Index|thread :" lvq_gist_benchmark.log
-          echo "########## lsg ##########" && grep -E "Create Index|thread :" lsg_gist_benchmark.log
-          echo "########## lvqlsg ##########" && grep -E "Create Index|thread :" lvqlsg_gist_benchmark.log
+        run: python3 tools/ci_tools/collect_multiple_benchmark_result.py plain_gist_benchmark.log lvq_gist_benchmark.log lsg_gist_benchmark.log lvqlsg_gist_benchmark.log
 
       - name: Run msmarco benchmark test
         if: ${{ !cancelled() && !failure() && steps.choose_test_type.outputs.RUN_BENCHMARK_KNN_TEST == 'true' }}
@@ -341,11 +333,7 @@ jobs:
 
       - name: Collect msmarco benchmark_knn output
         if: ${{ !cancelled() && !failure() && steps.choose_test_type.outputs.RUN_BENCHMARK_KNN_TEST == 'true' }}
-        run: |
-          echo "########## plain ##########" && grep -E "Create Index|thread :" plain_msmarco_benchmark.log
-          echo "########## lvq ##########" && grep -E "Create Index|thread :" lvq_msmarco_benchmark.log
-          echo "########## lsg ##########" && grep -E "Create Index|thread :" lsg_msmarco_benchmark.log
-          echo "########## lvqlsg ##########" && grep -E "Create Index|thread :" lvqlsg_msmarco_benchmark.log
+        run: python3 tools/ci_tools/collect_multiple_benchmark_result.py plain_msmarco_benchmark.log lvq_msmarco_benchmark.log lsg_msmarco_benchmark.log lvqlsg_msmarco_benchmark.log
 
       - name: Destroy builder container
         if: always()  # always run this step even if previous steps failed
