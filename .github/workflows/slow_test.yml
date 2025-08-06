@@ -382,16 +382,16 @@ jobs:
           echo "8 20" | ${RUNNER_WORKSPACE_PREFIX}/benchmark/knn_query_benchmark msmarco 250 false $PWD/test/data $PWD/tmp_db tmp_db/infinity_conf.toml | sudo tee -a ${RUNNER_WORKSPACE_PREFIX}/benchmark/golden_plain_msmarco_benchmark.log
           rm -fr $PWD/tmp_db && mkdir -p $PWD/tmp_db && cat conf/infinity_conf.toml | sed -e "s|/var/infinity|$PWD/tmp_db|g" > $PWD/tmp_db/infinity_conf.toml && \
           ${RUNNER_WORKSPACE_PREFIX}/benchmark/knn_import_benchmark --dataset=msmarco --build_type=plain --encode_type=lvq --dataset_dir=$PWD/test/data --infinity_dir=$PWD/tmp_db --config_path=tmp_db/infinity_conf.toml | sudo tee ${RUNNER_WORKSPACE_PREFIX}/benchmark/golden_lvq_msmarco_benchmark.log && \
-          echo "1 20" | ${RUNNER_WORKSPACE_PREFIX}/benchmark/knn_query_benchmark msmarco 300 false $PWD/test/data $PWD/tmp_db tmp_db/infinity_conf.toml | sudo tee -a ${RUNNER_WORKSPACE_PREFIX}/benchmark/golden_lvq_msmarco_benchmark.log && \
-          echo "8 20" | ${RUNNER_WORKSPACE_PREFIX}/benchmark/knn_query_benchmark msmarco 300 false $PWD/test/data $PWD/tmp_db tmp_db/infinity_conf.toml | sudo tee -a ${RUNNER_WORKSPACE_PREFIX}/benchmark/golden_lvq_msmarco_benchmark.log
+          echo "1 20" | ${RUNNER_WORKSPACE_PREFIX}/benchmark/knn_query_benchmark msmarco 360 false $PWD/test/data $PWD/tmp_db tmp_db/infinity_conf.toml | sudo tee -a ${RUNNER_WORKSPACE_PREFIX}/benchmark/golden_lvq_msmarco_benchmark.log && \
+          echo "8 20" | ${RUNNER_WORKSPACE_PREFIX}/benchmark/knn_query_benchmark msmarco 360 false $PWD/test/data $PWD/tmp_db tmp_db/infinity_conf.toml | sudo tee -a ${RUNNER_WORKSPACE_PREFIX}/benchmark/golden_lvq_msmarco_benchmark.log
           rm -fr $PWD/tmp_db && mkdir -p $PWD/tmp_db && cat conf/infinity_conf.toml | sed -e "s|/var/infinity|$PWD/tmp_db|g" > $PWD/tmp_db/infinity_conf.toml && \
           ${RUNNER_WORKSPACE_PREFIX}/benchmark/knn_import_benchmark --dataset=msmarco --build_type=lsg --encode_type=plain --dataset_dir=$PWD/test/data --infinity_dir=$PWD/tmp_db --config_path=tmp_db/infinity_conf.toml | sudo tee ${RUNNER_WORKSPACE_PREFIX}/benchmark/golden_lsg_msmarco_benchmark.log && \
-          echo "1 20" | ${RUNNER_WORKSPACE_PREFIX}/benchmark/knn_query_benchmark msmarco 200 false $PWD/test/data $PWD/tmp_db tmp_db/infinity_conf.toml | sudo tee -a ${RUNNER_WORKSPACE_PREFIX}/benchmark/golden_lsg_msmarco_benchmark.log && \
-          echo "8 20" | ${RUNNER_WORKSPACE_PREFIX}/benchmark/knn_query_benchmark msmarco 200 false $PWD/test/data $PWD/tmp_db tmp_db/infinity_conf.toml | sudo tee -a ${RUNNER_WORKSPACE_PREFIX}/benchmark/golden_lsg_msmarco_benchmark.log
+          echo "1 20" | ${RUNNER_WORKSPACE_PREFIX}/benchmark/knn_query_benchmark msmarco 230 false $PWD/test/data $PWD/tmp_db tmp_db/infinity_conf.toml | sudo tee -a ${RUNNER_WORKSPACE_PREFIX}/benchmark/golden_lsg_msmarco_benchmark.log && \
+          echo "8 20" | ${RUNNER_WORKSPACE_PREFIX}/benchmark/knn_query_benchmark msmarco 230 false $PWD/test/data $PWD/tmp_db tmp_db/infinity_conf.toml | sudo tee -a ${RUNNER_WORKSPACE_PREFIX}/benchmark/golden_lsg_msmarco_benchmark.log
           rm -fr $PWD/tmp_db && mkdir -p $PWD/tmp_db && cat conf/infinity_conf.toml | sed -e "s|/var/infinity|$PWD/tmp_db|g" > $PWD/tmp_db/infinity_conf.toml && \
           ${RUNNER_WORKSPACE_PREFIX}/benchmark/knn_import_benchmark --dataset=msmarco --build_type=lsg --encode_type=lvq --dataset_dir=$PWD/test/data --infinity_dir=$PWD/tmp_db --config_path=tmp_db/infinity_conf.toml | sudo tee ${RUNNER_WORKSPACE_PREFIX}/benchmark/golden_lvqlsg_msmarco_benchmark.log && \
-          echo "1 20" | ${RUNNER_WORKSPACE_PREFIX}/benchmark/knn_query_benchmark msmarco 250 false $PWD/test/data $PWD/tmp_db tmp_db/infinity_conf.toml | sudo tee -a ${RUNNER_WORKSPACE_PREFIX}/benchmark/golden_lvqlsg_msmarco_benchmark.log && \
-          echo "8 20" | ${RUNNER_WORKSPACE_PREFIX}/benchmark/knn_query_benchmark msmarco 250 false $PWD/test/data $PWD/tmp_db tmp_db/infinity_conf.toml | sudo tee -a ${RUNNER_WORKSPACE_PREFIX}/benchmark/golden_lvqlsg_msmarco_benchmark.log
+          echo "1 20" | ${RUNNER_WORKSPACE_PREFIX}/benchmark/knn_query_benchmark msmarco 290 false $PWD/test/data $PWD/tmp_db tmp_db/infinity_conf.toml | sudo tee -a ${RUNNER_WORKSPACE_PREFIX}/benchmark/golden_lvqlsg_msmarco_benchmark.log && \
+          echo "8 20" | ${RUNNER_WORKSPACE_PREFIX}/benchmark/knn_query_benchmark msmarco 290 false $PWD/test/data $PWD/tmp_db tmp_db/infinity_conf.toml | sudo tee -a ${RUNNER_WORKSPACE_PREFIX}/benchmark/golden_lvqlsg_msmarco_benchmark.log
 
       - name: Run msmarco benchmark test
         if: ${{ !cancelled() && !failure() && steps.choose_test_type.outputs.RUN_BENCHMARK_KNN_TEST == 'true' }}
@@ -402,16 +402,16 @@ jobs:
           echo "8 20" | ./cmake-build-release/benchmark/local_infinity/knn_query_benchmark msmarco 250 false $PWD/test/data $PWD/tmp_db tmp_db/infinity_conf.toml | tee -a plain_msmarco_benchmark.log
           rm -fr $PWD/tmp_db && mkdir -p $PWD/tmp_db && cat conf/infinity_conf.toml | sed -e "s|/var/infinity|$PWD/tmp_db|g" > $PWD/tmp_db/infinity_conf.toml && \
           ./cmake-build-release/benchmark/local_infinity/knn_import_benchmark --dataset=msmarco --build_type=plain --encode_type=lvq --dataset_dir=$PWD/test/data --infinity_dir=$PWD/tmp_db --config_path=tmp_db/infinity_conf.toml | tee lvq_msmarco_benchmark.log && \
-          echo "1 20" | ./cmake-build-release/benchmark/local_infinity/knn_query_benchmark msmarco 300 false $PWD/test/data $PWD/tmp_db tmp_db/infinity_conf.toml | tee -a lvq_msmarco_benchmark.log && \
-          echo "8 20" | ./cmake-build-release/benchmark/local_infinity/knn_query_benchmark msmarco 300 false $PWD/test/data $PWD/tmp_db tmp_db/infinity_conf.toml | tee -a lvq_msmarco_benchmark.log
+          echo "1 20" | ./cmake-build-release/benchmark/local_infinity/knn_query_benchmark msmarco 360 false $PWD/test/data $PWD/tmp_db tmp_db/infinity_conf.toml | tee -a lvq_msmarco_benchmark.log && \
+          echo "8 20" | ./cmake-build-release/benchmark/local_infinity/knn_query_benchmark msmarco 360 false $PWD/test/data $PWD/tmp_db tmp_db/infinity_conf.toml | tee -a lvq_msmarco_benchmark.log
           rm -fr $PWD/tmp_db && mkdir -p $PWD/tmp_db && cat conf/infinity_conf.toml | sed -e "s|/var/infinity|$PWD/tmp_db|g" > $PWD/tmp_db/infinity_conf.toml && \
           ./cmake-build-release/benchmark/local_infinity/knn_import_benchmark --dataset=msmarco --build_type=lsg --encode_type=plain --dataset_dir=$PWD/test/data --infinity_dir=$PWD/tmp_db --config_path=tmp_db/infinity_conf.toml | tee lsg_msmarco_benchmark.log && \
-          echo "1 20" | ./cmake-build-release/benchmark/local_infinity/knn_query_benchmark msmarco 200 false $PWD/test/data $PWD/tmp_db tmp_db/infinity_conf.toml | tee -a lsg_msmarco_benchmark.log && \
-          echo "8 20" | ./cmake-build-release/benchmark/local_infinity/knn_query_benchmark msmarco 200 false $PWD/test/data $PWD/tmp_db tmp_db/infinity_conf.toml | tee -a lsg_msmarco_benchmark.log
+          echo "1 20" | ./cmake-build-release/benchmark/local_infinity/knn_query_benchmark msmarco 230 false $PWD/test/data $PWD/tmp_db tmp_db/infinity_conf.toml | tee -a lsg_msmarco_benchmark.log && \
+          echo "8 20" | ./cmake-build-release/benchmark/local_infinity/knn_query_benchmark msmarco 230 false $PWD/test/data $PWD/tmp_db tmp_db/infinity_conf.toml | tee -a lsg_msmarco_benchmark.log
           rm -fr $PWD/tmp_db && mkdir -p $PWD/tmp_db && cat conf/infinity_conf.toml | sed -e "s|/var/infinity|$PWD/tmp_db|g" > $PWD/tmp_db/infinity_conf.toml && \
           ./cmake-build-release/benchmark/local_infinity/knn_import_benchmark --dataset=msmarco --build_type=lsg --encode_type=lvq --dataset_dir=$PWD/test/data --infinity_dir=$PWD/tmp_db --config_path=tmp_db/infinity_conf.toml | tee lvqlsg_msmarco_benchmark.log && \
-          echo "1 20" | ./cmake-build-release/benchmark/local_infinity/knn_query_benchmark msmarco 250 false $PWD/test/data $PWD/tmp_db tmp_db/infinity_conf.toml | tee -a lvqlsg_msmarco_benchmark.log && \
-          echo "8 20" | ./cmake-build-release/benchmark/local_infinity/knn_query_benchmark msmarco 250 false $PWD/test/data $PWD/tmp_db tmp_db/infinity_conf.toml | tee -a lvqlsg_msmarco_benchmark.log
+          echo "1 20" | ./cmake-build-release/benchmark/local_infinity/knn_query_benchmark msmarco 290 false $PWD/test/data $PWD/tmp_db tmp_db/infinity_conf.toml | tee -a lvqlsg_msmarco_benchmark.log && \
+          echo "8 20" | ./cmake-build-release/benchmark/local_infinity/knn_query_benchmark msmarco 290 false $PWD/test/data $PWD/tmp_db tmp_db/infinity_conf.toml | tee -a lvqlsg_msmarco_benchmark.log
 
       - name: Collect msmarco benchmark_knn output
         if: ${{ !cancelled() && !failure() && steps.choose_test_type.outputs.RUN_BENCHMARK_KNN_TEST == 'true' }}
