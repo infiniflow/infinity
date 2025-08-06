@@ -9,10 +9,13 @@
     "abseil",
     "arrow",
     "boost-asio",
+    "bzip2",
+    "brotli",
     "cli11",
     "gtest",
     "inih",
     "libevent",
+    "lz4",
     "magic-enum",
     "nlohmann-json",
     "oatpp",
@@ -27,6 +30,8 @@
     "sse2neon",
     "thrift",
     "tomlplusplus",
+    "zlib",
+    "zstd",
     {
       "name": "vcpkg-cmake",
       "host": true
