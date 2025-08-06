@@ -263,6 +263,30 @@ jobs:
           sudo ln -s ${RUNNER_WORKSPACE_PREFIX}/benchmark/gist1M $PWD/test/data/benchmark/gist_1m
           sudo ln -s ${RUNNER_WORKSPACE_PREFIX}/benchmark/msmarco1M $PWD/test/data/benchmark/msmarco_1m
 
+      - name: Golden benchmark sift
+        if: ${{ !cancelled() && !failure() }}
+        run: |
+          if [[ -f "${RUNNER_WORKSPACE_PREFIX}/benchmark/golden_plain_sift_benchmark.log" ]]; then
+              echo "golden benchmark result already exists!"
+              exit 0
+          fi
+          rm -fr $PWD/tmp_db && mkdir -p $PWD/tmp_db && cat conf/infinity_conf.toml | sed -e "s|/var/infinity|$PWD/tmp_db|g" > $PWD/tmp_db/infinity_conf.toml && \
+          ${RUNNER_WORKSPACE_PREFIX}/benchmark/knn_import_benchmark --dataset=sift --build_type=plain --encode_type=plain --dataset_dir=$PWD/test/data --infinity_dir=$PWD/tmp_db --config_path=tmp_db/infinity_conf.toml | sudo tee ${RUNNER_WORKSPACE_PREFIX}/benchmark/golden_plain_sift_benchmark.log && \
+          echo "1 20" | ${RUNNER_WORKSPACE_PREFIX}/benchmark/knn_query_benchmark sift 79 false $PWD/test/data $PWD/tmp_db tmp_db/infinity_conf.toml | sudo tee -a ${RUNNER_WORKSPACE_PREFIX}/benchmark/golden_plain_sift_benchmark.log && \
+          echo "8 20" | ${RUNNER_WORKSPACE_PREFIX}/benchmark/knn_query_benchmark sift 79 false $PWD/test/data $PWD/tmp_db tmp_db/infinity_conf.toml | sudo tee -a ${RUNNER_WORKSPACE_PREFIX}/benchmark/golden_plain_sift_benchmark.log
+          rm -fr $PWD/tmp_db && mkdir -p $PWD/tmp_db && cat conf/infinity_conf.toml | sed -e "s|/var/infinity|$PWD/tmp_db|g" > $PWD/tmp_db/infinity_conf.toml && \
+          ${RUNNER_WORKSPACE_PREFIX}/benchmark/knn_import_benchmark --dataset=sift --build_type=plain --encode_type=lvq --dataset_dir=$PWD/test/data --infinity_dir=$PWD/tmp_db --config_path=tmp_db/infinity_conf.toml | sudo tee ${RUNNER_WORKSPACE_PREFIX}/benchmark/golden_lvq_sift_benchmark.log && \
+          echo "1 20" | ${RUNNER_WORKSPACE_PREFIX}/benchmark/knn_query_benchmark sift 98 false $PWD/test/data $PWD/tmp_db tmp_db/infinity_conf.toml | sudo tee -a ${RUNNER_WORKSPACE_PREFIX}/benchmark/golden_lvq_sift_benchmark.log && \
+          echo "8 20" | ${RUNNER_WORKSPACE_PREFIX}/benchmark/knn_query_benchmark sift 98 false $PWD/test/data $PWD/tmp_db tmp_db/infinity_conf.toml | sudo tee -a ${RUNNER_WORKSPACE_PREFIX}/benchmark/golden_lvq_sift_benchmark.log
+          rm -fr $PWD/tmp_db && mkdir -p $PWD/tmp_db && cat conf/infinity_conf.toml | sed -e "s|/var/infinity|$PWD/tmp_db|g" > $PWD/tmp_db/infinity_conf.toml && \
+          ${RUNNER_WORKSPACE_PREFIX}/benchmark/knn_import_benchmark --dataset=sift --build_type=lsg --encode_type=plain --dataset_dir=$PWD/test/data --infinity_dir=$PWD/tmp_db --config_path=tmp_db/infinity_conf.toml | sudo tee ${RUNNER_WORKSPACE_PREFIX}/benchmark/golden_lsg_sift_benchmark.log && \
+          echo "1 20" | ${RUNNER_WORKSPACE_PREFIX}/benchmark/knn_query_benchmark sift 73 false $PWD/test/data $PWD/tmp_db tmp_db/infinity_conf.toml | sudo tee -a ${RUNNER_WORKSPACE_PREFIX}/benchmark/golden_lsg_sift_benchmark.log && \
+          echo "8 20" | ${RUNNER_WORKSPACE_PREFIX}/benchmark/knn_query_benchmark sift 73 false $PWD/test/data $PWD/tmp_db tmp_db/infinity_conf.toml | sudo tee -a ${RUNNER_WORKSPACE_PREFIX}/benchmark/golden_lsg_sift_benchmark.log
+          rm -fr $PWD/tmp_db && mkdir -p $PWD/tmp_db && cat conf/infinity_conf.toml | sed -e "s|/var/infinity|$PWD/tmp_db|g" > $PWD/tmp_db/infinity_conf.toml && \
+          ${RUNNER_WORKSPACE_PREFIX}/benchmark/knn_import_benchmark --dataset=sift --build_type=lsg --encode_type=lvq --dataset_dir=$PWD/test/data --infinity_dir=$PWD/tmp_db --config_path=tmp_db/infinity_conf.toml | sudo tee ${RUNNER_WORKSPACE_PREFIX}/benchmark/golden_lvqlsg_sift_benchmark.log && \
+          echo "1 20" | ${RUNNER_WORKSPACE_PREFIX}/benchmark/knn_query_benchmark sift 92 false $PWD/test/data $PWD/tmp_db tmp_db/infinity_conf.toml | sudo tee -a ${RUNNER_WORKSPACE_PREFIX}/benchmark/golden_lvqlsg_sift_benchmark.log && \
+          echo "8 20" | ${RUNNER_WORKSPACE_PREFIX}/benchmark/knn_query_benchmark sift 92 false $PWD/test/data $PWD/tmp_db tmp_db/infinity_conf.toml | sudo tee -a ${RUNNER_WORKSPACE_PREFIX}/benchmark/golden_lvqlsg_sift_benchmark.log
+
       - name: Run sift benchmark test
         if: ${{ !cancelled() && !failure() && steps.choose_test_type.outputs.RUN_BENCHMARK_KNN_TEST == 'true' }}
         run: |
@@ -285,7 +309,36 @@ jobs:
 
       - name: Collect sift benchmark_knn output
         if: ${{ !cancelled() && !failure() && steps.choose_test_type.outputs.RUN_BENCHMARK_KNN_TEST == 'true' }}
-        run: python3 tools/ci_tools/collect_multiple_benchmark_result.py plain_sift_benchmark.log lvq_sift_benchmark.log lsg_sift_benchmark.log lvqlsg_sift_benchmark.log
+        run: |
+          python3 tools/ci_tools/collect_multiple_benchmark_result.py plain_sift_benchmark.log lvq_sift_benchmark.log lsg_sift_benchmark.log lvqlsg_sift_benchmark.log
+          python3 tools/ci_tools/check_multiple_benchmark_result.py golden_plain_sift_benchmark.log plain_sift_benchmark.log
+          python3 tools/ci_tools/check_multiple_benchmark_result.py golden_lvq_sift_benchmark.log lvq_sift_benchmark.log
+          python3 tools/ci_tools/check_multiple_benchmark_result.py golden_lsg_sift_benchmark.log lsg_sift_benchmark.log
+          python3 tools/ci_tools/check_multiple_benchmark_result.py golden_lvqlsg_sift_benchmark.log lvqlsg_sift_benchmark.log
+
+      - name: Golden benchmark gist
+        if: ${{ !cancelled() && !failure() }}
+        run: |
+          if [[ -f "${RUNNER_WORKSPACE_PREFIX}/benchmark/golden_plain_gist_benchmark.log" ]]; then
+              echo "golden benchmark result already exists!"
+              exit 0
+          fi
+          rm -fr $PWD/tmp_db && mkdir -p $PWD/tmp_db && cat conf/infinity_conf.toml | sed -e "s|/var/infinity|$PWD/tmp_db|g" > $PWD/tmp_db/infinity_conf.toml && \
+          ${RUNNER_WORKSPACE_PREFIX}/benchmark/knn_import_benchmark --dataset=gist --build_type=plain --encode_type=plain --dataset_dir=$PWD/test/data --infinity_dir=$PWD/tmp_db --config_path=tmp_db/infinity_conf.toml | sudo tee ${RUNNER_WORKSPACE_PREFIX}/benchmark/golden_plain_gist_benchmark.log && \
+          echo "1 20" | ${RUNNER_WORKSPACE_PREFIX}/benchmark/knn_query_benchmark gist 440 false $PWD/test/data $PWD/tmp_db tmp_db/infinity_conf.toml | sudo tee -a ${RUNNER_WORKSPACE_PREFIX}/benchmark/golden_plain_gist_benchmark.log && \
+          echo "8 20" | ${RUNNER_WORKSPACE_PREFIX}/benchmark/knn_query_benchmark gist 440 false $PWD/test/data $PWD/tmp_db tmp_db/infinity_conf.toml | sudo tee -a ${RUNNER_WORKSPACE_PREFIX}/benchmark/golden_plain_gist_benchmark.log
+          rm -fr $PWD/tmp_db && mkdir -p $PWD/tmp_db && cat conf/infinity_conf.toml | sed -e "s|/var/infinity|$PWD/tmp_db|g" > $PWD/tmp_db/infinity_conf.toml && \
+          ${RUNNER_WORKSPACE_PREFIX}/benchmark/knn_import_benchmark --dataset=gist --build_type=plain --encode_type=lvq --dataset_dir=$PWD/test/data --infinity_dir=$PWD/tmp_db --config_path=tmp_db/infinity_conf.toml | sudo tee ${RUNNER_WORKSPACE_PREFIX}/benchmark/golden_lvq_gist_benchmark.log && \
+          echo "1 20" | ${RUNNER_WORKSPACE_PREFIX}/benchmark/knn_query_benchmark gist 540 false $PWD/test/data $PWD/tmp_db tmp_db/infinity_conf.toml | sudo tee -a ${RUNNER_WORKSPACE_PREFIX}/benchmark/golden_lvq_gist_benchmark.log && \
+          echo "8 20" | ${RUNNER_WORKSPACE_PREFIX}/benchmark/knn_query_benchmark gist 540 false $PWD/test/data $PWD/tmp_db tmp_db/infinity_conf.toml | sudo tee -a ${RUNNER_WORKSPACE_PREFIX}/benchmark/golden_lvq_gist_benchmark.log
+          rm -fr $PWD/tmp_db && mkdir -p $PWD/tmp_db && cat conf/infinity_conf.toml | sed -e "s|/var/infinity|$PWD/tmp_db|g" > $PWD/tmp_db/infinity_conf.toml && \
+          ${RUNNER_WORKSPACE_PREFIX}/benchmark/knn_import_benchmark --dataset=gist --build_type=lsg --encode_type=plain --dataset_dir=$PWD/test/data --infinity_dir=$PWD/tmp_db --config_path=tmp_db/infinity_conf.toml | sudo tee ${RUNNER_WORKSPACE_PREFIX}/benchmark/golden_lsg_gist_benchmark.log && \
+          echo "1 20" | ${RUNNER_WORKSPACE_PREFIX}/benchmark/knn_query_benchmark gist 220 false $PWD/test/data $PWD/tmp_db tmp_db/infinity_conf.toml | sudo tee -a ${RUNNER_WORKSPACE_PREFIX}/benchmark/golden_lsg_gist_benchmark.log && \
+          echo "8 20" | ${RUNNER_WORKSPACE_PREFIX}/benchmark/knn_query_benchmark gist 220 false $PWD/test/data $PWD/tmp_db tmp_db/infinity_conf.toml | sudo tee -a ${RUNNER_WORKSPACE_PREFIX}/benchmark/golden_lsg_gist_benchmark.log
+          rm -fr $PWD/tmp_db && mkdir -p $PWD/tmp_db && cat conf/infinity_conf.toml | sed -e "s|/var/infinity|$PWD/tmp_db|g" > $PWD/tmp_db/infinity_conf.toml && \
+          ${RUNNER_WORKSPACE_PREFIX}/benchmark/knn_import_benchmark --dataset=gist --build_type=lsg --encode_type=lvq --dataset_dir=$PWD/test/data --infinity_dir=$PWD/tmp_db --config_path=tmp_db/infinity_conf.toml | sudo tee ${RUNNER_WORKSPACE_PREFIX}/benchmark/golden_lvqlsg_gist_benchmark.log && \
+          echo "1 20" | ${RUNNER_WORKSPACE_PREFIX}/benchmark/knn_query_benchmark gist 250 false $PWD/test/data $PWD/tmp_db tmp_db/infinity_conf.toml | sudo tee -a ${RUNNER_WORKSPACE_PREFIX}/benchmark/golden_lvqlsg_gist_benchmark.log && \
+          echo "8 20" | ${RUNNER_WORKSPACE_PREFIX}/benchmark/knn_query_benchmark gist 250 false $PWD/test/data $PWD/tmp_db tmp_db/infinity_conf.toml | sudo tee -a ${RUNNER_WORKSPACE_PREFIX}/benchmark/golden_lvqlsg_gist_benchmark.log
 
       - name: Run gist benchmark test
         if: ${{ !cancelled() && !failure() && steps.choose_test_type.outputs.RUN_BENCHMARK_KNN_TEST == 'true' }}
@@ -309,7 +362,36 @@ jobs:
 
       - name: Collect gist benchmark_knn output
         if: ${{ !cancelled() && !failure() && steps.choose_test_type.outputs.RUN_BENCHMARK_KNN_TEST == 'true' }}
-        run: python3 tools/ci_tools/collect_multiple_benchmark_result.py plain_gist_benchmark.log lvq_gist_benchmark.log lsg_gist_benchmark.log lvqlsg_gist_benchmark.log
+        run: |
+          python3 tools/ci_tools/collect_multiple_benchmark_result.py plain_gist_benchmark.log lvq_gist_benchmark.log lsg_gist_benchmark.log lvqlsg_gist_benchmark.log
+          python3 tools/ci_tools/check_multiple_benchmark_result.py golden_plain_gist_benchmark.log plain_gist_benchmark.log
+          python3 tools/ci_tools/check_multiple_benchmark_result.py golden_lvq_gist_benchmark.log lvq_gist_benchmark.log
+          python3 tools/ci_tools/check_multiple_benchmark_result.py golden_lsg_gist_benchmark.log lsg_gist_benchmark.log
+          python3 tools/ci_tools/check_multiple_benchmark_result.py golden_lvqlsg_gist_benchmark.log lvqlsg_gist_benchmark.log
+
+      - name: Golden benchmark msmarco
+        if: ${{ !cancelled() && !failure() }}
+        run: |
+          if [[ -f "${RUNNER_WORKSPACE_PREFIX}/benchmark/golden_plain_msmarco_benchmark.log" ]]; then
+              echo "golden benchmark result already exists!"
+              exit 0
+          fi
+          rm -fr $PWD/tmp_db && mkdir -p $PWD/tmp_db && cat conf/infinity_conf.toml | sed -e "s|/var/infinity|$PWD/tmp_db|g" > $PWD/tmp_db/infinity_conf.toml && \
+          ${RUNNER_WORKSPACE_PREFIX}/benchmark/knn_import_benchmark --dataset=msmarco --build_type=plain --encode_type=plain --dataset_dir=$PWD/test/data --infinity_dir=$PWD/tmp_db --config_path=tmp_db/infinity_conf.toml | sudo tee ${RUNNER_WORKSPACE_PREFIX}/benchmark/golden_plain_msmarco_benchmark.log && \
+          echo "1 20" | ${RUNNER_WORKSPACE_PREFIX}/benchmark/knn_query_benchmark msmarco 250 false $PWD/test/data $PWD/tmp_db tmp_db/infinity_conf.toml | sudo tee -a ${RUNNER_WORKSPACE_PREFIX}/benchmark/golden_plain_msmarco_benchmark.log && \
+          echo "8 20" | ${RUNNER_WORKSPACE_PREFIX}/benchmark/knn_query_benchmark msmarco 250 false $PWD/test/data $PWD/tmp_db tmp_db/infinity_conf.toml | sudo tee -a ${RUNNER_WORKSPACE_PREFIX}/benchmark/golden_plain_msmarco_benchmark.log
+          rm -fr $PWD/tmp_db && mkdir -p $PWD/tmp_db && cat conf/infinity_conf.toml | sed -e "s|/var/infinity|$PWD/tmp_db|g" > $PWD/tmp_db/infinity_conf.toml && \
+          ${RUNNER_WORKSPACE_PREFIX}/benchmark/knn_import_benchmark --dataset=msmarco --build_type=plain --encode_type=lvq --dataset_dir=$PWD/test/data --infinity_dir=$PWD/tmp_db --config_path=tmp_db/infinity_conf.toml | sudo tee ${RUNNER_WORKSPACE_PREFIX}/benchmark/golden_lvq_msmarco_benchmark.log && \
+          echo "1 20" | ${RUNNER_WORKSPACE_PREFIX}/benchmark/knn_query_benchmark msmarco 300 false $PWD/test/data $PWD/tmp_db tmp_db/infinity_conf.toml | sudo tee -a ${RUNNER_WORKSPACE_PREFIX}/benchmark/golden_lvq_msmarco_benchmark.log && \
+          echo "8 20" | ${RUNNER_WORKSPACE_PREFIX}/benchmark/knn_query_benchmark msmarco 300 false $PWD/test/data $PWD/tmp_db tmp_db/infinity_conf.toml | sudo tee -a ${RUNNER_WORKSPACE_PREFIX}/benchmark/golden_lvq_msmarco_benchmark.log
+          rm -fr $PWD/tmp_db && mkdir -p $PWD/tmp_db && cat conf/infinity_conf.toml | sed -e "s|/var/infinity|$PWD/tmp_db|g" > $PWD/tmp_db/infinity_conf.toml && \
+          ${RUNNER_WORKSPACE_PREFIX}/benchmark/knn_import_benchmark --dataset=msmarco --build_type=lsg --encode_type=plain --dataset_dir=$PWD/test/data --infinity_dir=$PWD/tmp_db --config_path=tmp_db/infinity_conf.toml | sudo tee ${RUNNER_WORKSPACE_PREFIX}/benchmark/golden_lsg_msmarco_benchmark.log && \
+          echo "1 20" | ${RUNNER_WORKSPACE_PREFIX}/benchmark/knn_query_benchmark msmarco 200 false $PWD/test/data $PWD/tmp_db tmp_db/infinity_conf.toml | sudo tee -a ${RUNNER_WORKSPACE_PREFIX}/benchmark/golden_lsg_msmarco_benchmark.log && \
+          echo "8 20" | ${RUNNER_WORKSPACE_PREFIX}/benchmark/knn_query_benchmark msmarco 200 false $PWD/test/data $PWD/tmp_db tmp_db/infinity_conf.toml | sudo tee -a ${RUNNER_WORKSPACE_PREFIX}/benchmark/golden_lsg_msmarco_benchmark.log
+          rm -fr $PWD/tmp_db && mkdir -p $PWD/tmp_db && cat conf/infinity_conf.toml | sed -e "s|/var/infinity|$PWD/tmp_db|g" > $PWD/tmp_db/infinity_conf.toml && \
+          ${RUNNER_WORKSPACE_PREFIX}/benchmark/knn_import_benchmark --dataset=msmarco --build_type=lsg --encode_type=lvq --dataset_dir=$PWD/test/data --infinity_dir=$PWD/tmp_db --config_path=tmp_db/infinity_conf.toml | sudo tee ${RUNNER_WORKSPACE_PREFIX}/benchmark/golden_lvqlsg_msmarco_benchmark.log && \
+          echo "1 20" | ${RUNNER_WORKSPACE_PREFIX}/benchmark/knn_query_benchmark msmarco 250 false $PWD/test/data $PWD/tmp_db tmp_db/infinity_conf.toml | sudo tee -a ${RUNNER_WORKSPACE_PREFIX}/benchmark/golden_lvqlsg_msmarco_benchmark.log && \
+          echo "8 20" | ${RUNNER_WORKSPACE_PREFIX}/benchmark/knn_query_benchmark msmarco 250 false $PWD/test/data $PWD/tmp_db tmp_db/infinity_conf.toml | sudo tee -a ${RUNNER_WORKSPACE_PREFIX}/benchmark/golden_lvqlsg_msmarco_benchmark.log
 
       - name: Run msmarco benchmark test
         if: ${{ !cancelled() && !failure() && steps.choose_test_type.outputs.RUN_BENCHMARK_KNN_TEST == 'true' }}
@@ -333,7 +415,12 @@ jobs:
 
       - name: Collect msmarco benchmark_knn output
         if: ${{ !cancelled() && !failure() && steps.choose_test_type.outputs.RUN_BENCHMARK_KNN_TEST == 'true' }}
-        run: python3 tools/ci_tools/collect_multiple_benchmark_result.py plain_msmarco_benchmark.log lvq_msmarco_benchmark.log lsg_msmarco_benchmark.log lvqlsg_msmarco_benchmark.log
+        run: |
+          python3 tools/ci_tools/collect_multiple_benchmark_result.py plain_msmarco_benchmark.log lvq_msmarco_benchmark.log lsg_msmarco_benchmark.log lvqlsg_msmarco_benchmark.log
+          python3 tools/ci_tools/check_multiple_benchmark_result.py golden_plain_msmarco_benchmark.log plain_msmarco_benchmark.log
+          python3 tools/ci_tools/check_multiple_benchmark_result.py golden_lvq_msmarco_benchmark.log lvq_msmarco_benchmark.log
+          python3 tools/ci_tools/check_multiple_benchmark_result.py golden_lsg_msmarco_benchmark.log lsg_msmarco_benchmark.log
+          python3 tools/ci_tools/check_multiple_benchmark_result.py golden_lvqlsg_msmarco_benchmark.log lvqlsg_msmarco_benchmark.log
 
       - name: Destroy builder container
         if: always()  # always run this step even if previous steps failed
