@@ -218,11 +218,10 @@ RUN git clone https://github.com/microsoft/vcpkg.git /opt/vcpkg \
     && ./bootstrap-vcpkg.sh --disableMetrics
 
 # Pre-build vcpkg dependencies using manifest mode
-# This populates the binary cache for later use by infinity builds
-# Note: downloads will be re-downloaded at runtime if needed, but binary cache avoids recompilation
+# This populates the binary cache at /root/.cache/vcpkg for later use by infinity builds
 RUN --mount=type=bind,source=vcpkg.json,target=/opt/vcpkg/vcpkg.json \
     cd /opt/vcpkg && \
-    /opt/vcpkg/vcpkg install
+    /opt/vcpkg/vcpkg install --clean-buildtrees-after-build --clean-packages-after-build
 
 # Set vcpkg toolchain path for CMake
 ENV CMAKE_TOOLCHAIN_FILE=/opt/vcpkg/scripts/buildsystems/vcpkg.cmake
