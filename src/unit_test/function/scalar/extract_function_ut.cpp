@@ -14,12 +14,14 @@
 
 #ifdef CI
 #include "gtest/gtest.h"
+#include <iomanip>
 import infinity_core;
 import base_test;
 #else
 module;
 
 #include "gtest/gtest.h"
+#include <iomanip>
 
 module infinity_core:ut.extract_function;
 

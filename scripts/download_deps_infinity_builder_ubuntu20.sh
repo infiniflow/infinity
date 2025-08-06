@@ -1,5 +1,15 @@
 #!/usr/bin/env bash
 
+# This script should be run from the infinity project root directory
+# Usage: ./scripts/download_deps_infinity_builder_ubuntu20.sh
+
+# Check if we're in the correct directory
+if [ ! -d ".git" ] || [ ! -d "scripts" ]; then
+    echo "Error: This script must be run from the infinity project root directory"
+    echo "Usage: ./scripts/download_deps_infinity_builder_ubuntu20.sh"
+    exit 1
+fi
+
 download()
 {
     echo "download $@"
@@ -54,3 +64,7 @@ for ((i=0; i<${#names[@]}; i+=1)); do
 	exit -1
     fi
 done
+
+# Note: vcpkg dependencies are now handled directly in the Dockerfile
+# using binary cache mechanism for better performance and caching
+echo "vcpkg dependencies will be handled during Docker build with binary cache"

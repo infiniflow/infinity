@@ -14,7 +14,7 @@
 
 #pragma once
 
-#include "json.hpp"
+#include "nlohmann/json.hpp"
 #include "parsed_expr.h"
 #include "type/datetime/interval_type.h"
 

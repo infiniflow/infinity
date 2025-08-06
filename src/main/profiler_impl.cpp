@@ -13,7 +13,7 @@
 // limitations under the License.
 module;
 
-#include "magic_enum.hpp"
+#include "magic_enum/magic_enum.hpp"
 #include <chrono>
 
 module infinity_core:profiler.impl;
