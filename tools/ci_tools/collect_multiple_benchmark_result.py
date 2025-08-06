@@ -17,12 +17,15 @@ def get_result(fname):
     for line in lines:
         k, v = re.search(r'(thread) : (\d+)', line).groups()
         key = f'{k}_{v}'
-        patterns = [
-            r'(Average cost) : ([\d.]+) s',
-            r'(QPS) : (\d+)',
-            r'(Recall@10) : ([\d.]+)',
-        ]
-        dic[key] = dict(re.search(p, line).groups() for p in patterns)
+        value = {}
+        k, v = re.search(r'(Average cost) : ([\d.]+) s', line).groups()
+        value[k] = float(v)
+        k, v = re.search(r'(QPS) : (\d+)', line).groups()
+        value[k] = int(v)
+        k, v = re.search(r'(Recall@10) : ([\d.]+)', line).groups()
+        value[k] = float(v)
+
+        dic[key] = value
 
     return dic
 
