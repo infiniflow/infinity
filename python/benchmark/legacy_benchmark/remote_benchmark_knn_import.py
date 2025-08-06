@@ -48,7 +48,7 @@ def import_sift_1m(path, m: int, ef_construction: int, build_type: str, encode_t
 
     db_obj = infinity_obj.get_database("default_db")
     assert db_obj
-    table_name = f"sift_{build_type}_{encode_type}_benchmark"
+    table_name = f"sift_benchmark"
     db_obj.drop_table(table_name)
     db_obj.create_table(table_name, {"col1": {"type": "vector,128,float"}})
     table_obj = db_obj.get_table(table_name)
@@ -81,7 +81,7 @@ def import_gist_1m(path, m: int, ef_construction: int, build_type: str, encode_t
 
     db_obj = infinity_obj.get_database("default_db")
     assert db_obj
-    table_name = f"gist_{build_type}_{encode_type}_benchmark"
+    table_name = f"gist_benchmark"
     db_obj.drop_table(table_name)
     db_obj.create_table(table_name, {"col1": {"type": "vector,960,float"}})
     table_obj = db_obj.get_table(table_name)
@@ -114,7 +114,7 @@ def import_msmarco_1m(path, m: int, ef_construction: int, build_type: str, encod
 
     db_obj = infinity_obj.get_database("default_db")
     assert db_obj
-    table_name = f"msmarco_{build_type}_{encode_type}_benchmark"
+    table_name = f"msmarco_benchmark"
     db_obj.drop_table(table_name)
     db_obj.create_table(table_name, {"col1": {"type": "vector,1024,float"}})
     table_obj = db_obj.get_table(table_name)

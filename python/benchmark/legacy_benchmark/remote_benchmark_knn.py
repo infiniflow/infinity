@@ -235,7 +235,7 @@ def one_thread(rounds, query_path, ground_truth_path, ef: int, remote: bool, tab
     infinity_obj.disconnect()
 
 
-def benchmark(threads, rounds, data_set, ef: int, build_type: str, encode_type: str, remote: bool, path):
+def benchmark(threads, rounds, data_set, ef: int, remote: bool, path):
     if not os.path.exists(path):
         print(f"Path: {path} doesn't exist")
         raise Exception(f"Path: {path} doesn't exist")
@@ -245,36 +245,36 @@ def benchmark(threads, rounds, data_set, ef: int, build_type: str, encode_type: 
         if threads > 1:
             print(f"Multi-threads: {threads}")
             print(f"Rounds: {rounds}")
-            process_pool(threads, rounds, query_path, ef, remote, f"sift_{build_type}_{encode_type}_benchmark")
+            process_pool(threads, rounds, query_path, ef, remote, f"sift_benchmark")
 
         else:
             print(f"Single-thread")
             print(f"Rounds: {rounds}")
-            one_thread(rounds, query_path, ground_truth_path, ef, remote, f"sift_{build_type}_{encode_type}_benchmark")
+            one_thread(rounds, query_path, ground_truth_path, ef, remote, f"sift_benchmark")
     elif data_set == "gist_1m":
         query_path = path + "/gist_query.fvecs"
         ground_truth_path = path + "/gist_groundtruth.ivecs"
         if threads > 1:
             print(f"Multi-threads: {threads}")
             print(f"Rounds: {rounds}")
-            process_pool(threads, rounds, query_path, ef, remote, f"gist_{build_type}_{encode_type}_benchmark")
+            process_pool(threads, rounds, query_path, ef, remote, f"gist_benchmark")
 
         else:
             print(f"Single-thread")
             print(f"Rounds: {rounds}")
-            one_thread(rounds, query_path, ground_truth_path, ef, remote, f"gist_{build_type}_{encode_type}_benchmark")
+            one_thread(rounds, query_path, ground_truth_path, ef, remote, f"gist_benchmark")
     elif data_set == "msmarco_1m":
         query_path = path + "/msmarco_query.fvecs"
         ground_truth_path = path + "/msmarco_groundtruth.ivecs"
         if threads > 1:
             print(f"Multi-threads: {threads}")
             print(f"Rounds: {rounds}")
-            process_pool(threads, rounds, query_path, ef, remote, f"msmarco_{build_type}_{encode_type}_benchmark")
+            process_pool(threads, rounds, query_path, ef, remote, f"msmarco_benchmark")
 
         else:
             print(f"Single-thread")
             print(f"Rounds: {rounds}")
-            one_thread(rounds, query_path, ground_truth_path, ef, remote, f"msmarco_{build_type}_{encode_type}_benchmark")
+            one_thread(rounds, query_path, ground_truth_path, ef, remote, f"msmarco_benchmark")
 
 
 def str2bool(value):
@@ -297,8 +297,6 @@ if __name__ == '__main__':
     parser.add_argument("-r", "--rounds", type=int, default=5, dest="rounds")
     parser.add_argument("-d", "--data", type=str, default='sift_1m', dest="data_set")  # sift_1m, gist_1m, msmarco_1m
     parser.add_argument("--ef", type=int, default=200, dest="ef")
-    parser.add_argument("-b", "--build", type=str, default="plain", dest="build_type")  # plain, lsg
-    parser.add_argument("-e", "--encode", type=str, default="lvq", dest="encode_type")  # plain, lvq
     parser.add_argument("-R", "--remote", type=str2bool, default=True, dest="remote")
 
     data_dir = current_path + "/test/data/benchmark/" + parser.parse_args().data_set
@@ -306,5 +304,4 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    benchmark(args.threads, args.rounds, args.data_set, args.ef, args.build_type, args.encode_type, args.remote,
-              path=data_dir)
+    benchmark(args.threads, args.rounds, args.data_set, args.ef, args.remote, path=data_dir)
