@@ -1,5 +1,5 @@
 # NOTICE: This Dockerfile depends on BuildKit
-# NOTICE: You can use the download_deps_infinity_builder_ubuntu18.sh script to download dependencies.
+# NOTICE: You must run download_deps_infinity_builder_ubuntu20.sh script BEFORE building this image
 
 FROM ubuntu:20.04
 
@@ -205,12 +205,35 @@ RUN --mount=type=bind,source=ragel-master.zip,target=/root/ragel-master.zip  \
     && make -j 12 install \
     && rm -rf ../ragel-master
 
-ENV CC=clang CXX=clang++ LZ4_ROOT=/usr/local PATH=/usr/local/bin:/usr/local/ragel/bin:$PATH
+RUN --mount=type=cache,id=inf_apt,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,id=inf_lib,target=/var/lib/apt,sharing=locked \
+    apt-get install -y zip rpm
+
+# Set environment variables for vcpkg and infinity build
+ENV CC=clang CXX=clang++
+
+# Setup vcpkg for manifest mode (no global VCPKG_ROOT)
+RUN git clone https://github.com/microsoft/vcpkg.git /opt/vcpkg \
+    && cd /opt/vcpkg \
+    && ./bootstrap-vcpkg.sh --disableMetrics
+
+# Pre-build vcpkg dependencies using manifest mode
+# This populates the binary cache at /root/.cache/vcpkg for later use by infinity builds
+RUN --mount=type=bind,source=vcpkg.json,target=/opt/vcpkg/vcpkg.json \
+    cd /opt/vcpkg && \
+    /opt/vcpkg/vcpkg install --clean-buildtrees-after-build --clean-packages-after-build
+
+# Set vcpkg toolchain path for CMake
+ENV CMAKE_TOOLCHAIN_FILE=/opt/vcpkg/scripts/buildsystems/vcpkg.cmake
+
+# Set environment variables for infinity build
+ENV LZ4_ROOT=/usr/local \
+    PATH=/usr/local/bin:/usr/local/ragel/bin:$PATH
 
 # Set Python paths for CMake to find the correct Python installation
-ENV Python3_EXECUTABLE=/usr/local/bin/python3.10
-ENV Python3_INCLUDE_DIR=/usr/local/include/python3.10
-ENV Python3_LIBRARY=/usr/local/lib/libpython3.10.so
+ENV Python3_EXECUTABLE=/usr/local/bin/python3.10 \
+    Python3_INCLUDE_DIR=/usr/local/include/python3.10 \
+    Python3_LIBRARY=/usr/local/lib/libpython3.10.so
 
 # Install vectorscan
 RUN --mount=type=bind,source=vectorscan-master.zip,target=/root/vectorscan-master.zip \

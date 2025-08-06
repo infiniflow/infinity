@@ -32,6 +32,8 @@ import :fast_rough_filter;
 
 namespace infinity {
 
+
+
 class KVInstance;
 class NewCatalog;
 class NewTxnManager;

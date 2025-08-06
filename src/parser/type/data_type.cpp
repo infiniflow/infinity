@@ -23,7 +23,7 @@
 #include "type/logical_type.h"
 #include "type/type_info.h"
 #include <arrow/type.h>
-#include "simdjson.h"
+#include <simdjson.h>
 #include <charconv>
 #include <ctype.h>
 #include <iostream>

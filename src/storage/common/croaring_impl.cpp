@@ -14,5 +14,4 @@
 
 module;
 
-#include "roaring.c"
 module infinity_core:croaring.impl;

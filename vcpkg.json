@@ -1,0 +1,40 @@
+{
+  "name": "infinity",
+  "version": "0.6.0",
+  "description": "The AI-native database built for LLM applications, providing incredibly fast hybrid search of dense vector, sparse vector, tensor (multi-vector), and full-text.",
+  "homepage": "https://github.com/infiniflow/infinity",
+  "license": "Apache-2.0",
+  "builtin-baseline": "333e0d58bc01544452394f483b5547ecb83af0e5",
+  "dependencies": [
+    "abseil",
+    "arrow",
+    "boost-asio",
+    "cli11",
+    "gtest",
+    "inih",
+    "libevent",
+    "magic-enum",
+    "nlohmann-json",
+    "oatpp",
+    "openssl",
+    "parallel-hashmap",
+    "pcre2",
+    "pugixml",
+    "re2",
+    "roaring",
+    "rocksdb",
+    "simdjson",
+    "sse2neon",
+    "thrift",
+    "tomlplusplus",
+    {
+      "name": "vcpkg-cmake",
+      "host": true
+    },
+    {
+      "name": "vcpkg-cmake-config",
+      "host": true
+    },
+    "vit-vit-ctpl"
+  ]
+}
