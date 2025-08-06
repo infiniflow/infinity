@@ -42,7 +42,7 @@ using namespace infinity;
 
 class VirtualStoreTest : public BaseTest {};
 
-TEST_F(VirtualStoreTest, file_write) {
+TEST_F(VirtualStoreTest, TestAppend) {
     using namespace infinity;
     String path = String(GetFullTmpDir()) + "/test_file2.abc";
 
@@ -62,7 +62,7 @@ TEST_F(VirtualStoreTest, file_write) {
     EXPECT_FALSE(VirtualStore::Exists(path));
 }
 
-TEST_F(VirtualStoreTest, dir_ops) {
+TEST_F(VirtualStoreTest, TestDir) {
     using namespace infinity;
     String dir = String(GetFullTmpDir()) + "/unit_test";
     String path = dir + "/test_file.test";
@@ -81,6 +81,9 @@ TEST_F(VirtualStoreTest, dir_ops) {
     }
     file_handle->Append(data_array.get(), len);
     file_handle->Sync();
+
+    EXPECT_TRUE(VirtualStore::Exists(path));
+    EXPECT_TRUE(VirtualStore::Exists(dir));
 
     VirtualStore::RemoveDirectory(dir);
     EXPECT_FALSE(VirtualStore::Exists(path));
@@ -139,7 +142,8 @@ TEST_F(VirtualStoreTest, TestRename) {
     file_handle->Append(data_array.get(), len);
     file_handle->Sync();
 
-    VirtualStore::Rename(old_path, new_path);
+    status = VirtualStore::Rename(old_path, new_path);
+    EXPECT_TRUE(status.ok());
 
     EXPECT_FALSE(VirtualStore::Exists(old_path));
     EXPECT_TRUE(VirtualStore::Exists(new_path));
@@ -185,7 +189,7 @@ TEST_F(VirtualStoreTest, TestTruncate) {
     EXPECT_FALSE(VirtualStore::Exists(path));
 }
 
-TEST_F(VirtualStoreTest, TestAppend) {
+TEST_F(VirtualStoreTest, TestMerge) {
     using namespace infinity;
     String dst_path = String(GetFullTmpDir()) + "/test_file_append_dst.abc";
     String src_path = String(GetFullTmpDir()) + "/test_file_append_src.abc";
@@ -278,6 +282,9 @@ TEST_F(VirtualStoreTest, TestCleanDir) {
     EXPECT_FALSE(VirtualStore::Exists(file_path1));
     EXPECT_FALSE(VirtualStore::Exists(file_path2));
     EXPECT_TRUE(VirtualStore::Exists(dir));
+
+    VirtualStore::RemoveDirectory(dir);
+    EXPECT_FALSE(VirtualStore::Exists(dir));
 }
 
 /*

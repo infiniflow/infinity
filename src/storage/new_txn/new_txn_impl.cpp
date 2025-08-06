@@ -1351,6 +1351,18 @@ NewTxn::GetChunkIndexInfo(const String &db_name, const String &table_name, const
     }
 
     SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta);
+
+    String chunk_id_key = KeyEncode::CatalogIdxChunkKey(table_meta->db_id_str(),
+                                                        table_meta->table_id_str(),
+                                                        table_index_meta->index_id_str(),
+                                                        segment_index_meta.segment_id(),
+                                                        chunk_id);
+    String commit_ts_str;
+    status = kv_instance_->Get(chunk_id_key, commit_ts_str);
+    if (!status.ok()) {
+        return {nullptr, status};
+    }
+
     ChunkIndexMeta chunk_index_meta(chunk_id, segment_index_meta);
     ChunkIndexMetaInfo *chunk_index_info_ptr;
     status = chunk_index_meta.GetChunkInfo(this->kv_instance(), chunk_index_info_ptr);
@@ -4433,18 +4445,19 @@ bool NewTxn::CheckConflictTxnStore(const OptimizeIndexTxnStore &txn_store, NewTx
             }
             break;
         }
-        case TransactionType::kImport: {
-            LOG_INFO("OptimizeIndexTxnStore vs. ImportTxnStore conflict");
-            ImportTxnStore *import_txn_store = static_cast<ImportTxnStore *>(previous_txn->base_txn_store_.get());
-            const String &prev_db_name = import_txn_store->db_name_;
-            const String &prev_table_name = import_txn_store->table_name_;
-            if (std::find(db_names.begin(), db_names.end(), prev_db_name) != db_names.end() &&
-                std::find(table_names_in_db.at(prev_db_name).begin(), table_names_in_db.at(prev_db_name).end(), prev_table_name) !=
-                    table_names_in_db.at(prev_db_name).end()) {
-                conflict = true;
-            }
-            break;
-        }
+        // There shold be no conflict between optimize index and import
+        // case TransactionType::kImport: {
+        //     LOG_INFO("OptimizeIndexTxnStore vs. ImportTxnStore conflict");
+        //     ImportTxnStore *import_txn_store = static_cast<ImportTxnStore *>(previous_txn->base_txn_store_.get());
+        //     const String &prev_db_name = import_txn_store->db_name_;
+        //     const String &prev_table_name = import_txn_store->table_name_;
+        //     if (std::find(db_names.begin(), db_names.end(), prev_db_name) != db_names.end() &&
+        //         std::find(table_names_in_db.at(prev_db_name).begin(), table_names_in_db.at(prev_db_name).end(), prev_table_name) !=
+        //             table_names_in_db.at(prev_db_name).end()) {
+        //         conflict = true;
+        //     }
+        //     break;
+        // }
         case TransactionType::kCompact: {
             CompactTxnStore *compact_txn_store = static_cast<CompactTxnStore *>(previous_txn->base_txn_store_.get());
             const String &prev_db_name = compact_txn_store->db_name_;
@@ -4739,8 +4752,7 @@ bool NewTxn::CheckConflictTxnStore(const UpdateTxnStore &txn_store, NewTxn *prev
     const String &db_name = txn_store.db_name_;
     const String &table_name = txn_store.table_name_;
     Set<SegmentID> segment_ids;
-    for (const auto &row_range : txn_store.row_ranges_) {
-        RowID row_id = row_range.first;
+    for (const auto &row_id : txn_store.row_ids_) {
         segment_ids.insert(row_id.segment_id_);
     }
     bool conflict = false;

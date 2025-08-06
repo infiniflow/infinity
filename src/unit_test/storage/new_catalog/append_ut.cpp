@@ -305,7 +305,7 @@ TEST_P(TestTxnAppend, test_append1) {
     // Check the appended data.
     {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
-        KVInstance* kv_instance = txn->kv_instance();
+        KVInstance *kv_instance = txn->kv_instance();
         TxnTimeStamp begin_ts = txn->BeginTS();
         TxnTimeStamp commit_ts = txn->CommitTS();
 
@@ -541,7 +541,13 @@ TEST_P(TestTxnAppend, test_append2) {
                 ColumnMeta column_meta(column_idx, block_meta);
                 ColumnVector col;
 
-                status = NewCatalog::GetColumnVector(column_meta, txn->kv_instance(), txn->BeginTS(), txn->CommitTS(), row_count, ColumnVectorMode::kReadOnly, col);
+                status = NewCatalog::GetColumnVector(column_meta,
+                                                     txn->kv_instance(),
+                                                     txn->BeginTS(),
+                                                     txn->CommitTS(),
+                                                     row_count,
+                                                     ColumnVectorMode::kReadOnly,
+                                                     col);
                 EXPECT_TRUE(status.ok());
 
                 if (idx % 2 == 0) {
@@ -561,7 +567,13 @@ TEST_P(TestTxnAppend, test_append2) {
                 SizeT column_idx = 1;
                 ColumnMeta column_meta(column_idx, block_meta);
                 ColumnVector col;
-                status = NewCatalog::GetColumnVector(column_meta, txn->kv_instance(), txn->BeginTS(), txn->CommitTS(), row_count, ColumnVectorMode::kReadOnly, col);
+                status = NewCatalog::GetColumnVector(column_meta,
+                                                     txn->kv_instance(),
+                                                     txn->BeginTS(),
+                                                     txn->CommitTS(),
+                                                     row_count,
+                                                     ColumnVectorMode::kReadOnly,
+                                                     col);
                 EXPECT_TRUE(status.ok());
 
                 if (idx % 2 == 0) {
@@ -3576,7 +3588,13 @@ TEST_P(TestTxnAppend, test_append_append_concurrent) {
                             ColumnMeta column_meta(column_idx, block_meta);
                             ColumnVector col;
 
-                            Status status = NewCatalog::GetColumnVector(column_meta, txn->kv_instance(), txn->BeginTS(), txn->CommitTS(), row_count, ColumnVectorMode::kReadOnly, col);
+                            Status status = NewCatalog::GetColumnVector(column_meta,
+                                                                        txn->kv_instance(),
+                                                                        txn->BeginTS(),
+                                                                        txn->CommitTS(),
+                                                                        row_count,
+                                                                        ColumnVectorMode::kReadOnly,
+                                                                        col);
                             EXPECT_TRUE(status.ok());
 
                             for (SizeT row_id = 0; row_id < 4096; ++row_id) {
@@ -3591,7 +3609,13 @@ TEST_P(TestTxnAppend, test_append_append_concurrent) {
                             ColumnMeta column_meta(column_idx, block_meta);
                             ColumnVector col;
 
-                            Status status = NewCatalog::GetColumnVector(column_meta, txn->kv_instance(), txn->BeginTS(), txn->CommitTS(), row_count, ColumnVectorMode::kReadOnly, col);
+                            Status status = NewCatalog::GetColumnVector(column_meta,
+                                                                        txn->kv_instance(),
+                                                                        txn->BeginTS(),
+                                                                        txn->CommitTS(),
+                                                                        row_count,
+                                                                        ColumnVectorMode::kReadOnly,
+                                                                        col);
                             EXPECT_TRUE(status.ok());
 
                             for (SizeT row_id = 0; row_id < 4096; ++row_id) {
@@ -5084,6 +5108,38 @@ TEST_P(TestTxnAppend, test_append_and_optimize_index) {
         EXPECT_TRUE(status.ok());
     };
 
+    auto CheckTableRollback = [&](const Vector<SegmentID> &segment_ids) {
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check table"), TransactionType::kNormal);
+
+        SharedPtr<DBMeeta> db_meta;
+        Optional<TableMeeta> table_meta;
+        Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
+        EXPECT_TRUE(status.ok());
+
+        Optional<TableIndexMeeta> table_index_meta;
+        status = txn->GetTableIndexMeta(*index_name1, *table_meta, table_index_meta);
+        EXPECT_TRUE(status.ok());
+
+        SharedPtr<IndexBase> index_base;
+        std::tie(index_base, status) = table_index_meta->GetIndexBase(txn->kv_instance());
+        EXPECT_TRUE(status.ok());
+        EXPECT_EQ(*index_base->index_name_, *index_name1);
+
+        Vector<SegmentID> *index_segment_ids_ptr = nullptr;
+        std::tie(index_segment_ids_ptr, status) = table_index_meta->GetSegmentIndexIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
+        EXPECT_TRUE(status.ok());
+        EXPECT_EQ(*index_segment_ids_ptr, Vector<SegmentID>({0}));
+
+        SegmentIndexMeta segment_index_meta((*index_segment_ids_ptr)[0], *table_index_meta);
+        Vector<ChunkID> *chunk_ids_ptr = nullptr;
+        std::tie(chunk_ids_ptr, status) = segment_index_meta.GetChunkIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
+        EXPECT_TRUE(status.ok());
+        EXPECT_EQ(*chunk_ids_ptr, Vector<ChunkID>({0, 1}));
+
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+    };
+
     auto DropDB = [&] {
         // drop database
         auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
@@ -5120,11 +5176,10 @@ TEST_P(TestTxnAppend, test_append_and_optimize_index) {
         DropDB();
     }
 
-    /* FIXME: PostRollback() for dump index is not implemented.
     //    t1      append      commit (success)
     //    |----------|---------|
     //                    |------------------|----------------|
-    //                    t2             optimize           commit
+    //                    t2             optimize           commit (fail)
     {
         PrepareForAppendAndOptimize();
 
@@ -5143,9 +5198,10 @@ TEST_P(TestTxnAppend, test_append_and_optimize_index) {
         status = txn2->OptimizeIndex(*db_name, *table_name, *index_name1, 0);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn2);
-        EXPECT_TRUE(status.ok());
+        // Rollback
+        EXPECT_FALSE(status.ok());
 
-        CheckTable({0});
+        CheckTableRollback({0});
 
         DropDB();
     }
@@ -5153,7 +5209,7 @@ TEST_P(TestTxnAppend, test_append_and_optimize_index) {
     //    t1      append                       commit (success)
     //    |----------|--------------------------------|
     //                    |-----------------------|-------------------------|
-    //                    t2                    optimize         commit (success)
+    //                    t2                    optimize         commit (fail)
     {
         PrepareForAppendAndOptimize();
 
@@ -5172,13 +5228,12 @@ TEST_P(TestTxnAppend, test_append_and_optimize_index) {
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn2);
-        EXPECT_TRUE(status.ok());
+        EXPECT_FALSE(status.ok());
 
-        CheckTable({0});
+        CheckTableRollback({0});
 
         DropDB();
     }
-    */
 
     //    t1      append                                   commit (success)
     //    |----------|-----------------------------------------------|

@@ -6362,7 +6362,7 @@ TEST_P(TestTxnImport, test_import_and_optimize_index) {
         DropDB();
     }
 
-    /* FIXME: PostRollback() for dump index is not implemented.
+
     //    t1      import      commit (success)
     //    |----------|---------|
     //                    |------------------|----------------|
@@ -6535,7 +6535,6 @@ TEST_P(TestTxnImport, test_import_and_optimize_index) {
 
         DropDB();
     }
-    */
 
     //                                                           t1                  import                             commit (success)
     //                                                          |--------------------|------------------------------------------|

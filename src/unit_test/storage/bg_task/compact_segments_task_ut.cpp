@@ -47,6 +47,8 @@ import :txn_state;
 import :data_block;
 import :new_txn_manager;
 import :new_txn;
+import :db_meeta;
+import :table_meeta;
 #endif
 
 import global_resource_usage;
@@ -97,68 +99,61 @@ protected:
 
 INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
                          CompactTaskTest,
-                         ::testing::Values((std::string(test_data_path()) + "/config/test_close_bgtask.toml").c_str(),
-                                           (std::string(test_data_path()) + "/config/test_close_bgtask_vfs_off.toml").c_str()));
+                         ::testing::Values((std::string(test_data_path()) + "/config/test_new_bg_on.toml").c_str(),
+                                           (std::string(test_data_path()) + "/config/test_new_vfs_off_bg_on.toml").c_str()));
 
-TEST_P(CompactTaskTest, compact_to_single_segment) {
+TEST_P(CompactTaskTest, bg_compact) {
+    String table_name = "tbl1";
+    Storage *storage = infinity::InfinityContext::instance().storage();
+    NewTxnManager *txn_mgr = storage->new_txn_manager();
+
+    Vector<SharedPtr<ColumnDef>> columns;
     {
-        String table_name = "tbl1";
-
-        Storage *storage = infinity::InfinityContext::instance().storage();
-        NewTxnManager *txn_mgr = storage->new_txn_manager();
-
-        Vector<SharedPtr<ColumnDef>> columns;
+        i64 column_id = 0;
         {
-            i64 column_id = 0;
-            {
-                std::set<ConstraintType> constraints;
-                auto column_def_ptr =
-                    MakeShared<ColumnDef>(column_id++, MakeShared<DataType>(DataType(LogicalType::kTinyInt)), "tiny_int_col", constraints);
-                columns.emplace_back(column_def_ptr);
-            }
+            std::set<ConstraintType> constraints;
+            auto column_def_ptr =
+                MakeShared<ColumnDef>(column_id++, MakeShared<DataType>(DataType(LogicalType::kTinyInt)), "tiny_int_col", constraints);
+            columns.emplace_back(column_def_ptr);
         }
-        {
-            // create table
-            auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>(table_name), MakeShared<String>(), columns);
-            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+    }
+    {
+        // create table
+        auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>(table_name), MakeShared<String>(), columns);
+        auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
 
-            Status status = txn->CreateTable("default_db", std::move(tbl1_def), ConflictType::kIgnore);
-            EXPECT_TRUE(status.ok());
+        Status status = txn->CreateTable("default_db", std::move(tbl1_def), ConflictType::kIgnore);
+        EXPECT_TRUE(status.ok());
 
-            txn_mgr->CommitTxn(txn);
-        }
-        Vector<SizeT> segment_sizes{1, 10, 100};
-        SizeT segment_count = std::accumulate(segment_sizes.begin(), segment_sizes.end(), 0);
-        this->AddSegments(txn_mgr, table_name, segment_sizes);
-        {
-            // add compact
-            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
-            Vector<SegmentID> segments;
+        txn_mgr->CommitTxn(txn);
+    }
+    Vector<SizeT> segment_sizes{1, 10, 100};
+    SizeT segment_count = std::accumulate(segment_sizes.begin(), segment_sizes.end(), 0);
+    this->AddSegments(txn_mgr, table_name, segment_sizes);
 
-            segments.reserve(segment_count);
-            for (SizeT i = 0; i < segment_count; ++i) {
-                segments.push_back(i);
-            }
-            Status status = txn->Compact("default_db", table_name, segments);
-            EXPECT_TRUE(status.ok());
-            status = txn_mgr->CommitTxn(txn);
-            EXPECT_TRUE(status.ok());
-        }
+    i64 compact_interval = InfinityContext::instance().storage()->config()->CleanupInterval();
 
-        {
-            auto txn5 = txn_mgr->BeginTxn(MakeUnique<String>("check table"), TransactionType::kNormal);
-            for (SizeT i = 0; i < segment_count; ++i) {
-                auto [segment_info, status] = txn5->GetSegmentInfo("default_db", table_name, i);
-                EXPECT_FALSE(status.ok());
-            }
-            auto [segment_info, status] = txn5->GetSegmentInfo("default_db", table_name, segment_count);
-            EXPECT_TRUE(status.ok());
+    SizeT last_seg_count = segment_count;
+    i64 loop = 0;
+    while (loop < 5) {
+        loop++;
+        // Wait for the compact task to run
+        sleep(compact_interval + 1);
 
-            EXPECT_TRUE(status.ok());
-            EXPECT_EQ(segment_info->row_count_, segment_count * 8192);
-            EXPECT_EQ(segment_info->block_count_, segment_count);
+        // Check if the segment count has been reduced
+        auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("check"), TransactionType::kNormal);
+        SharedPtr<DBMeeta> db_meta;
+        Optional<TableMeeta> table_meta;
+        Status status = txn->GetTableMeta("default_db", table_name, db_meta, table_meta);
+        EXPECT_TRUE(status.ok());
 
-            txn_mgr->CommitTxn(txn5);
-        }
+        Vector<SegmentID> *segment_ids_ptr = nullptr;
+        std::tie(segment_ids_ptr, status) = table_meta->GetSegmentIDs1(txn->kv_instance(), txn->BeginTS(), txn->CommitTS());
+        EXPECT_TRUE(status.ok());
+        EXPECT_LT(segment_ids_ptr->size(), last_seg_count);
+        last_seg_count = segment_ids_ptr->size();
+
+        status = txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
     }
 }
