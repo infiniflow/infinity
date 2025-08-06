@@ -290,6 +290,34 @@ jobs:
           echo "########## lsg ##########" && grep -E "Create Index|thread :" lsg_sift_benchmark.log
           echo "########## lvqlsg ##########" && grep -E "Create Index|thread :" lvqlsg_sift_benchmark.log
 
+      - name: Run gist benchmark test
+        if: ${{ !cancelled() && !failure() && steps.choose_test_type.outputs.RUN_BENCHMARK_KNN_TEST == 'true' }}
+        run: |
+          rm -fr $PWD/db_tmp && mkdir -p $PWD/db_tmp && cat conf/infinity_conf.toml | sed -e "s|/var/infinity|$PWD/db_tmp|g" > $PWD/db_tmp/infinity_conf.toml && \
+          ./cmake-build-release/benchmark/local_infinity/knn_import_benchmark --dataset=gist --build_type=plain --encode_type=plain --dataset_dir=$PWD/test/data --infinity_dir=$PWD/db_tmp --config_path=db_tmp/infinity_conf.toml | tee plain_gist_benchmark.log && \
+          echo "1 20" | ./cmake-build-release/benchmark/local_infinity/knn_query_benchmark gist 440 false $PWD/test/data $PWD/db_tmp db_tmp/infinity_conf.toml | tee -a plain_gist_benchmark.log && \
+          echo "8 20" | ./cmake-build-release/benchmark/local_infinity/knn_query_benchmark gist 440 false $PWD/test/data $PWD/db_tmp db_tmp/infinity_conf.toml | tee -a plain_gist_benchmark.log
+          rm -fr $PWD/db_tmp && mkdir -p $PWD/db_tmp && cat conf/infinity_conf.toml | sed -e "s|/var/infinity|$PWD/db_tmp|g" > $PWD/db_tmp/infinity_conf.toml && \
+          ./cmake-build-release/benchmark/local_infinity/knn_import_benchmark --dataset=gist --build_type=plain --encode_type=lvq --dataset_dir=$PWD/test/data --infinity_dir=$PWD/db_tmp --config_path=db_tmp/infinity_conf.toml | tee lvq_gist_benchmark.log && \
+          echo "1 20" | ./cmake-build-release/benchmark/local_infinity/knn_query_benchmark gist 540 false $PWD/test/data $PWD/db_tmp db_tmp/infinity_conf.toml | tee -a lvq_gist_benchmark.log && \
+          echo "8 20" | ./cmake-build-release/benchmark/local_infinity/knn_query_benchmark gist 540 false $PWD/test/data $PWD/db_tmp db_tmp/infinity_conf.toml | tee -a lvq_gist_benchmark.log
+          rm -fr $PWD/db_tmp && mkdir -p $PWD/db_tmp && cat conf/infinity_conf.toml | sed -e "s|/var/infinity|$PWD/db_tmp|g" > $PWD/db_tmp/infinity_conf.toml && \
+          ./cmake-build-release/benchmark/local_infinity/knn_import_benchmark --dataset=gist --build_type=lsg --encode_type=plain --dataset_dir=$PWD/test/data --infinity_dir=$PWD/db_tmp --config_path=db_tmp/infinity_conf.toml | tee lsg_gist_benchmark.log && \
+          echo "1 20" | ./cmake-build-release/benchmark/local_infinity/knn_query_benchmark gist 220 false $PWD/test/data $PWD/db_tmp db_tmp/infinity_conf.toml | tee -a lsg_gist_benchmark.log && \
+          echo "8 20" | ./cmake-build-release/benchmark/local_infinity/knn_query_benchmark gist 220 false $PWD/test/data $PWD/db_tmp db_tmp/infinity_conf.toml | tee -a lsg_gist_benchmark.log
+          rm -fr $PWD/db_tmp && mkdir -p $PWD/db_tmp && cat conf/infinity_conf.toml | sed -e "s|/var/infinity|$PWD/db_tmp|g" > $PWD/db_tmp/infinity_conf.toml && \
+          ./cmake-build-release/benchmark/local_infinity/knn_import_benchmark --dataset=gist --build_type=lsg --encode_type=lvq --dataset_dir=$PWD/test/data --infinity_dir=$PWD/db_tmp --config_path=db_tmp/infinity_conf.toml | tee lvqlsg_gist_benchmark.log && \
+          echo "1 20" | ./cmake-build-release/benchmark/local_infinity/knn_query_benchmark gist 250 false $PWD/test/data $PWD/db_tmp db_tmp/infinity_conf.toml | tee -a lvqlsg_gist_benchmark.log && \
+          echo "8 20" | ./cmake-build-release/benchmark/local_infinity/knn_query_benchmark gist 250 false $PWD/test/data $PWD/db_tmp db_tmp/infinity_conf.toml | tee -a lvqlsg_gist_benchmark.log
+
+      - name: Collect gist benchmark_knn output
+        if: ${{ !cancelled() && !failure() && steps.choose_test_type.outputs.RUN_BENCHMARK_KNN_TEST == 'true' }}
+        run: |
+          echo "########## plain ##########" && grep -E "Create Index|thread :" plain_gist_benchmark.log
+          echo "########## lvq ##########" && grep -E "Create Index|thread :" lvq_gist_benchmark.log
+          echo "########## lsg ##########" && grep -E "Create Index|thread :" lsg_gist_benchmark.log
+          echo "########## lvqlsg ##########" && grep -E "Create Index|thread :" lvqlsg_gist_benchmark.log
+
       - name: Destroy builder container
         if: always()  # always run this step even if previous steps failed
         run: |
