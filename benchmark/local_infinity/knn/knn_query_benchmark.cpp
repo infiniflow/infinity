@@ -73,11 +73,7 @@ int main(int argc, char *argv[]) {
                   << std::endl;
         return 1;
     }
-    bool sift = true;
-    if (strcmp(argv[1], "sift") && strcmp(argv[1], "gist")) {
-        return 1;
-    }
-    sift = strcmp(argv[1], "sift") == 0;
+    std::string dataset = std::string(argv[1]);
     size_t ef = std::stoull(argv[2]);
     bool rerank = false;
     if (argc >= 4) {
@@ -119,16 +115,24 @@ int main(int argc, char *argv[]) {
 
     std::string db_name = "default_db";
     std::string table_name;
-    if (sift) {
+    if (dataset == "sift") {
         dimension = 128;
         query_path += "/benchmark/sift_1m/sift_query.fvecs";
         groundtruth_path += "/benchmark/sift_1m/sift_groundtruth.ivecs";
         table_name = "sift_benchmark";
-    } else {
+    } else if (dataset == "gist") {
         dimension = 960;
         query_path += "/benchmark/gist_1m/gist_query.fvecs";
         groundtruth_path += "/benchmark/gist_1m/gist_groundtruth.ivecs";
         table_name = "gist_benchmark";
+    } else if (dataset == "msmarco") {
+        dimension = 1024;
+        query_path += "/benchmark/msmarco_1m/msmarco_query.fvecs";
+        groundtruth_path += "/benchmark/msmarco_1m/msmarco_groundtruth.ivecs";
+        table_name = "msmarco_benchmark";
+    } else {
+        std::cerr << "dataset: " << dataset << " doesn't support" << std::endl;
+        exit(-1);
     }
     std::cout << "query from: " << query_path << std::endl;
     std::cout << "groundtruth is: " << groundtruth_path << std::endl;

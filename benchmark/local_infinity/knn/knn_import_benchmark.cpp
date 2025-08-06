@@ -73,15 +73,17 @@ public:
             UnrecoverableError(e.what());
         }
 
-        if (dataset_ == "invalid") {
-            UnrecoverableError("Invalid dataset");
-        }
         if (dataset_ == "sift") {
             data_path_ = dataset_dir_ + "/benchmark/sift_1m/sift_base.fvecs";
             table_name_ = "sift_benchmark";
-        } else {
+        } else if (dataset_ == "gist") {
             data_path_ = dataset_dir_ + "/benchmark/gist_1m/gist_base.fvecs";
             table_name_ = "gist_benchmark";
+        } else if (dataset_ == "msmarco") {
+            data_path_ = dataset_dir_ + "/benchmark/msmarco_1m/msmarco_base.fvecs";
+            table_name_ = "msmarco_benchmark";
+        } else {
+            UnrecoverableError("Invalid dataset");
         }
     }
 
@@ -135,6 +137,8 @@ int main(int argc, char *argv[]) {
             col1_type = std::make_shared<DataType>(LogicalType::kEmbedding, std::make_shared<EmbeddingInfo>(EmbeddingDataType::kElemFloat, 128));
         } else if (args.dataset_ == "gist") {
             col1_type = std::make_shared<DataType>(LogicalType::kEmbedding, std::make_shared<EmbeddingInfo>(EmbeddingDataType::kElemFloat, 960));
+        } else if (args.dataset_ == "msmarco") {
+            col1_type = std::make_shared<DataType>(LogicalType::kEmbedding, std::make_shared<EmbeddingInfo>(EmbeddingDataType::kElemFloat, 1024));
         } else {
             UnrecoverableError("Invalid dataset");
         }
