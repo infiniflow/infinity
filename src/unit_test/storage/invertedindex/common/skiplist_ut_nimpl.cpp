@@ -32,9 +32,8 @@ import :skiplist;
 using namespace infinity;
 
 class SkiplistTest : public BaseTest {};
-#if 0
-typedef u32 Key;
-typedef u32 Value;
+typedef u32 KeyType;
+typedef u32 ValueType;
 
 static String available_chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
 
@@ -63,40 +62,40 @@ public:
 TEST_F(SkiplistTest, test1) {
 
     NumComparator cmp;
-    SkipList<Key, Value, NumComparator> list(cmp);
+    SkipList<KeyType, ValueType, NumComparator> list(cmp);
 
     constexpr int N = 50000;
     constexpr int R = 50000;
-    std::map<Key, Value> keys;
+    std::map<KeyType, ValueType> keys;
 
-    Key a = 512;
-    Value b = 111;
+    KeyType a = 512;
+    ValueType b = 111;
     list.Insert(a, b);
-    Value v;
+    ValueType v;
     list.Search(a, v);
     ASSERT_EQ(b, v);
 
     for (int i = 0; i < N; i++) {
-        Key key = random() % R;
-        Value value = random() % R;
+        KeyType key = random() % R;
+        ValueType value = random() % R;
         if (keys.emplace(key, value).second) {
             list.Insert(key, value);
 
-            Value v;
+            ValueType v;
             list.Search(key, v);
             ASSERT_EQ(value, v);
         }
     }
 
-    for (std::map<Key, Value>::iterator it = keys.begin(); it != keys.end(); ++it) {
-        Value v;
+    for (std::map<KeyType, ValueType>::iterator it = keys.begin(); it != keys.end(); ++it) {
+        ValueType v;
         if (list.Search(it->first, v)) {
             ASSERT_EQ(it->second, v);
         }
     }
 
-    for (std::map<Key, Value>::iterator it = keys.begin(); it != keys.end(); ++it) {
-        SkipList<Key, Value, NumComparator>::Iterator iter = list.Begin(it->first);
+    for (std::map<KeyType, ValueType>::iterator it = keys.begin(); it != keys.end(); ++it) {
+        SkipList<KeyType, ValueType, NumComparator>::Iterator iter = list.Begin(it->first);
         if (iter != list.End()) {
             ASSERT_EQ(it->second, iter.Value());
         }
@@ -185,4 +184,3 @@ TEST_F(SkiplistTest, test3) {
 
     // You can add additional assertions here to validate the correctness of the SkipList
 }
-#endif
