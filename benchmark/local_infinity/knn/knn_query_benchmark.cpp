@@ -261,9 +261,9 @@ int main(int argc, char *argv[]) {
             recall_1 = float(correct_1) / float(query_count * 1);
             recall_10 = float(correct_10) / float(query_count * 10);
             recall_100 = float(correct_100) / float(query_count * 100);
-            results.push_back(fmt::format("R@1:   {:.3f}", recall_1));
-            results.push_back(fmt::format("R@10:  {:.3f}", recall_10));
-            results.push_back(fmt::format("R@100: {:.3f}", recall_100));
+            results.push_back(fmt::format("R@1:   {:.4f}", recall_1));
+            results.push_back(fmt::format("R@10:  {:.4f}", recall_10));
+            results.push_back(fmt::format("R@100: {:.4f}", recall_100));
         }
     }
 
@@ -273,7 +273,8 @@ int main(int argc, char *argv[]) {
     }
     float elapsed_s_avg = elapsed_s_sum / total_times;
     size_t QPS = query_count / elapsed_s_avg;
-    std::cout << fmt::format("ef : {}, Average cost : {} s, QPS : {}, Recall@1 : {}, Recall@10 : {}, Recall@100 : {}",
+    std::cout << fmt::format("thread : {}, ef : {}, Average cost : {:.4f} s, QPS : {}, Recall@1 : {:.4f}, Recall@10 : {:.4f}, Recall@100 : {:.4f}",
+                             thread_num,
                              ef,
                              elapsed_s_avg,
                              QPS,
