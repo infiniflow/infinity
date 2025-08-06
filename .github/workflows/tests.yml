@@ -567,18 +567,18 @@ jobs:
               echo "golden benchmark result already exists!"
               exit 0
           fi
-          rm -fr $PWD/db_tmp && mkdir -p $PWD/db_tmp && cat ${RUNNER_WORKSPACE_PREFIX}/benchmark/infinity_conf.toml | sed -e "s|/var/infinity|$PWD/db_tmp|g" > $PWD/db_tmp/infinity_conf.toml && \
-          ${RUNNER_WORKSPACE_PREFIX}/benchmark/knn_import_benchmark --dataset=sift --dataset_dir=$PWD/test/data --infinity_dir=$PWD/db_tmp && \
-          echo "1 50" | ${RUNNER_WORKSPACE_PREFIX}/benchmark/knn_query_benchmark sift 200 false $PWD/test/data $PWD/db_tmp | sudo tee ${RUNNER_WORKSPACE_PREFIX}/benchmark/golden_benchmark_sift_1_thread.log && \
-          echo "8 50" | ${RUNNER_WORKSPACE_PREFIX}/benchmark/knn_query_benchmark sift 200 false $PWD/test/data $PWD/db_tmp | sudo tee ${RUNNER_WORKSPACE_PREFIX}/benchmark/golden_benchmark_sift_8_threads.log
+          rm -fr $PWD/tmp_db && mkdir -p $PWD/tmp_db && cat ${RUNNER_WORKSPACE_PREFIX}/benchmark/infinity_conf.toml | sed -e "s|/var/infinity|$PWD/tmp_db|g" > $PWD/tmp_db/infinity_conf.toml && \
+          ${RUNNER_WORKSPACE_PREFIX}/benchmark/knn_import_benchmark --dataset=sift --dataset_dir=$PWD/test/data --infinity_dir=$PWD/tmp_db && \
+          echo "1 50" | ${RUNNER_WORKSPACE_PREFIX}/benchmark/knn_query_benchmark sift 200 false $PWD/test/data $PWD/tmp_db | sudo tee ${RUNNER_WORKSPACE_PREFIX}/benchmark/golden_benchmark_sift_1_thread.log && \
+          echo "8 50" | ${RUNNER_WORKSPACE_PREFIX}/benchmark/knn_query_benchmark sift 200 false $PWD/test/data $PWD/tmp_db | sudo tee ${RUNNER_WORKSPACE_PREFIX}/benchmark/golden_benchmark_sift_8_threads.log
 
       - name: Latest benchmark sift
         if: ${{ !cancelled() && !failure() }}
         run: |
-          rm -fr $PWD/db_tmp && mkdir -p $PWD/db_tmp && cat conf/infinity_conf.toml | sed -e "s|/var/infinity|$PWD/db_tmp|g" > $PWD/db_tmp/infinity_conf.toml && \
-          ./cmake-build-release/benchmark/local_infinity/knn_import_benchmark --dataset=sift --dataset_dir=$PWD/test/data --infinity_dir=$PWD/db_tmp --config_path=db_tmp/infinity_conf.toml && \
-          echo "1 50" | ./cmake-build-release/benchmark/local_infinity/knn_query_benchmark sift 200 false $PWD/test/data $PWD/db_tmp db_tmp/infinity_conf.toml | tee benchmark_sift_1_thread.log && \
-          echo "8 50" | ./cmake-build-release/benchmark/local_infinity/knn_query_benchmark sift 200 false $PWD/test/data $PWD/db_tmp db_tmp/infinity_conf.toml | tee benchmark_sift_8_threads.log && \
+          rm -fr $PWD/tmp_db && mkdir -p $PWD/tmp_db && cat conf/infinity_conf.toml | sed -e "s|/var/infinity|$PWD/tmp_db|g" > $PWD/tmp_db/infinity_conf.toml && \
+          ./cmake-build-release/benchmark/local_infinity/knn_import_benchmark --dataset=sift --dataset_dir=$PWD/test/data --infinity_dir=$PWD/tmp_db --config_path=tmp_db/infinity_conf.toml && \
+          echo "1 50" | ./cmake-build-release/benchmark/local_infinity/knn_query_benchmark sift 200 false $PWD/test/data $PWD/tmp_db tmp_db/infinity_conf.toml | tee benchmark_sift_1_thread.log && \
+          echo "8 50" | ./cmake-build-release/benchmark/local_infinity/knn_query_benchmark sift 200 false $PWD/test/data $PWD/tmp_db tmp_db/infinity_conf.toml | tee benchmark_sift_8_threads.log && \
           ./tools/ci_tools/check_benchmark_result.py ${RUNNER_WORKSPACE_PREFIX}/benchmark/golden_benchmark_sift_1_thread.log benchmark_sift_1_thread.log && \
           ./tools/ci_tools/check_benchmark_result.py ${RUNNER_WORKSPACE_PREFIX}/benchmark/golden_benchmark_sift_8_threads.log benchmark_sift_8_threads.log
 
