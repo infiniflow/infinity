@@ -5080,6 +5080,35 @@ TEST_P(TestTxnAppend, test_append_and_optimize_index) {
         EXPECT_EQ(*chunk_ids_ptr, Vector<ChunkID>({2}));
     };
 
+    auto CheckTableRollback = [&](const Vector<SegmentID> &segment_ids) {
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check table"), TransactionType::kNormal);
+
+        Optional<DBMeeta> db_meta;
+        Optional<TableMeeta> table_meta;
+        Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
+        EXPECT_TRUE(status.ok());
+
+        Optional<TableIndexMeeta> table_index_meta;
+        status = txn->GetTableIndexMeta(*index_name1, *table_meta, table_index_meta);
+        EXPECT_TRUE(status.ok());
+
+        SharedPtr<IndexBase> index_base;
+        std::tie(index_base, status) = table_index_meta->GetIndexBase();
+        EXPECT_TRUE(status.ok());
+        EXPECT_EQ(*index_base->index_name_, *index_name1);
+
+        Vector<SegmentID> *index_segment_ids_ptr = nullptr;
+        std::tie(index_segment_ids_ptr, status) = table_index_meta->GetSegmentIndexIDs1();
+        EXPECT_TRUE(status.ok());
+        EXPECT_EQ(*index_segment_ids_ptr, Vector<SegmentID>({0}));
+
+        SegmentIndexMeta segment_index_meta((*index_segment_ids_ptr)[0], *table_index_meta);
+        Vector<ChunkID> *chunk_ids_ptr = nullptr;
+        std::tie(chunk_ids_ptr, status) = segment_index_meta.GetChunkIDs1();
+        EXPECT_TRUE(status.ok());
+        EXPECT_EQ(*chunk_ids_ptr, Vector<ChunkID>({0,1}));
+    };
+
     auto DropDB = [&] {
         // drop database
         auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
@@ -5116,11 +5145,11 @@ TEST_P(TestTxnAppend, test_append_and_optimize_index) {
         DropDB();
     }
 
-    /* FIXME: PostRollback() for dump index is not implemented.
+
     //    t1      append      commit (success)
     //    |----------|---------|
     //                    |------------------|----------------|
-    //                    t2             optimize           commit
+    //                    t2             optimize           commit (fail)
     {
         PrepareForAppendAndOptimize();
 
@@ -5139,17 +5168,18 @@ TEST_P(TestTxnAppend, test_append_and_optimize_index) {
         status = txn2->OptimizeIndex(*db_name, *table_name, *index_name1, 0);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn2);
-        EXPECT_TRUE(status.ok());
+        //Rollback
+        EXPECT_FALSE(status.ok());
 
-        CheckTable({0});
+        CheckTableRollback({0});
 
         DropDB();
     }
-
+    
     //    t1      append                       commit (success)
     //    |----------|--------------------------------|
     //                    |-----------------------|-------------------------|
-    //                    t2                    optimize         commit (success)
+    //                    t2                    optimize         commit (fail)
     {
         PrepareForAppendAndOptimize();
 
@@ -5168,13 +5198,13 @@ TEST_P(TestTxnAppend, test_append_and_optimize_index) {
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn2);
-        EXPECT_TRUE(status.ok());
+        EXPECT_FALSE(status.ok());
 
-        CheckTable({0});
+        CheckTableRollback({0});
 
         DropDB();
     }
-    */
+    
 
     //    t1      append                                   commit (success)
     //    |----------|-----------------------------------------------|

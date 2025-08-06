@@ -1,0 +1,32 @@
+# name: test/sql/ddl/index/test_index_comment.sql
+# description: Test create index with comment
+# group: [ddl, test_index_comment]
+
+statement ok
+DROP TABLE IF EXISTS sqllogic_test_index_comment;
+
+statement ok
+CREATE TABLE sqllogic_test_index_comment (col1 embedding(float,128));
+
+# import data from fvecs file
+statement ok
+COPY sqllogic_test_index_comment FROM '/var/infinity/test_data/test.fvecs' WITH ( DELIMITER ',', FORMAT fvecs);
+
+statement ok
+CREATE INDEX idx1 ON sqllogic_test_index_comment (col1) USING IVF WITH (metric = l2) COMMENT 'testcomment';
+
+# now sqllogic itself does not support partially match the output
+statement ok
+SHOW TABLE sqllogic_test_index_comment INDEXES;
+
+statement ok
+SHOW TABLE sqllogic_test_index_comment INDEX idx1;
+
+statement ok
+DROP INDEX idx1 ON sqllogic_test_index_comment;
+
+statement ok
+DROP INDEX IF EXISTS idx1 ON sqllogic_test_index_comment;
+
+statement ok
+DROP TABLE sqllogic_test_index_comment;

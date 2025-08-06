@@ -477,6 +477,14 @@ public:
         auto block_fwd = BlockFwd<DataType, IdxType, BMPOwnMem::kFalse>::LoadFromPtr(p);
         SizeT doc_num = ReadBufAdvAligned<SizeT>(p);
         const BMPDocID *doc_ids = ReadBufVecAdvAligned<BMPDocID>(p, doc_num);
+        
+        // DEBUG: Validate consistency between block structure and doc_ids
+        SizeT expected_doc_count = block_fwd.block_num() * block_fwd.block_size();
+        if (doc_num != expected_doc_count) {
+            LOG_ERROR(fmt::format("BMP INCONSISTENCY: doc_num {} != expected_doc_count {} (block_num: {}, block_size: {})", 
+                                 doc_num, expected_doc_count, block_fwd.block_num(), block_fwd.block_size()));
+        }
+        
         if (SizeT(p - start) != size) {
             UnrecoverableError(fmt::format("BMPAlg::LoadFromPtr: p - start != size: {} != {}", p - start, size));
         }

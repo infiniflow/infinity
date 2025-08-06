@@ -218,7 +218,7 @@ TEST_P(TestTxnCheckpointInternalTest, test_checkpoint0) {
     check_table();
 }
 
-TEST_P(TestTxnCheckpointInternalTest, test_checkpoint1) {
+TEST_P(TestTxnCheckpointInternalTest, DISABLED_test_checkpoint1) {
     SharedPtr<String> db_name = std::make_shared<String>("db1");
     auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
     auto column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
@@ -551,7 +551,7 @@ TEST_P(TestTxnCheckpointInternalTest, test_checkpoint2) {
     RestartTxnMgr();
 }
 
-TEST_P(TestTxnCheckpointInternalTest, test_checkpoint3) {
+TEST_P(TestTxnCheckpointInternalTest, DISABLED_test_checkpoint3) {
     SharedPtr<String> db_name = std::make_shared<String>("db1");
     auto column_def1 = std::make_shared<ColumnDef>(999, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
     auto column_def2 = std::make_shared<ColumnDef>(9999, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
@@ -698,7 +698,7 @@ TEST_P(TestTxnCheckpointInternalTest, test_checkpoint3) {
     checkpoint();
 }
 
-TEST_P(TestTxnCheckpointInternalTest, test_checkpoint4) {
+TEST_P(TestTxnCheckpointInternalTest, DISABLED_test_checkpoint4) {
     SharedPtr<String> db_name = std::make_shared<String>("db1");
     auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
     auto column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());

@@ -233,6 +233,7 @@ SharedPtr<IndexReader> TableIndexReaderCache::GetIndexReader(NewTxn *txn) {
     std::scoped_lock lock(mutex_);
     if (begin_ts >= cache_ts_) [[likely]] {
         // no need to build, use cache
+        LOG_INFO(fmt::format("DEBUG: Using cached index readers for table_id: '{}'", table_id_str_));
         index_reader->column_index_readers_ = cache_column_readers_;
         return index_reader;
     }

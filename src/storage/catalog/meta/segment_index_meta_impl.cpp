@@ -90,17 +90,6 @@ Status SegmentIndexMeta::GetFtInfo(SharedPtr<SegmentIndexFtInfo> &ft_info) {
     return Status::OK();
 }
 
-Status SegmentIndexMeta::SetChunkIDs(const Vector<ChunkID> &chunk_ids) {
-    chunk_ids_ = chunk_ids;
-    String chunk_ids_key = GetSegmentIndexTag("chunk_ids");
-    String chunk_ids_str = nlohmann::json(chunk_ids).dump();
-    Status status = kv_instance_.Put(chunk_ids_key, chunk_ids_str);
-    if (!status.ok()) {
-        return status;
-    }
-    return Status::OK();
-}
-
 Status SegmentIndexMeta::RemoveChunkIDs(const Vector<ChunkID> &chunk_ids) {
     TableMeeta &table_meta = table_index_meta_.table_meta();
     for (ChunkID chunk_id : chunk_ids) {
@@ -194,12 +183,10 @@ Status SegmentIndexMeta::SetNoMemIndex() {
 }
 
 Status SegmentIndexMeta::InitSet() {
-    {
-        Status status = SetChunkIDs(Vector<ChunkID>());
-        if (!status.ok()) {
-            return status;
-        }
-    }
+    return SetNextChunkID(0);
+}
+
+Status SegmentIndexMeta::InitSet1() {
     {
         Status status = SetNextChunkID(0);
         if (!status.ok()) {
@@ -209,9 +196,9 @@ Status SegmentIndexMeta::InitSet() {
     return Status::OK();
 }
 
-Status SegmentIndexMeta::InitSet1() {
-    {
-        Status status = SetNextChunkID(0);
+Status SegmentIndexMeta::RestoreSet(const ChunkID &next_chunk_id) {
+   {
+        Status status = SetNextChunkID(next_chunk_id);
         if (!status.ok()) {
             return status;
         }
@@ -244,14 +231,6 @@ Status SegmentIndexMeta::LoadSet() {
 }
 
 Status SegmentIndexMeta::UninitSet(UsageFlag usage_flag) {
-    {
-        String chunk_ids_key = GetSegmentIndexTag("chunk_ids");
-        Status status = kv_instance_.Delete(chunk_ids_key);
-        if (!status.ok()) {
-            return status;
-        }
-        chunk_ids_.reset();
-    }
     {
         String next_chunk_id_key = GetSegmentIndexTag("next_chunk_id");
         Status status = kv_instance_.Delete(next_chunk_id_key);
@@ -471,6 +450,24 @@ SharedPtr<SegmentIndexInfo> SegmentIndexMeta::GetSegmentIndexInfo() {
     segment_index_info->chunk_count_ = chunk_ids_.value().size();
     segment_index_info->files_ = std::move(segment_index_files);
     return segment_index_info;
+}
+
+Tuple<SharedPtr<SegmentIndexSnapshotInfo>, Status> SegmentIndexMeta::MapMetaToSnapShotInfo() {
+    SharedPtr<SegmentIndexSnapshotInfo> segment_index_snapshot_info = MakeShared<SegmentIndexSnapshotInfo>();
+    segment_index_snapshot_info->segment_id_ = segment_id_;
+    auto [chunk_ids, status] = GetChunkIDs1();
+    if (!status.ok()) {
+        return {nullptr, status};
+    }   
+    for (auto &chunk_id : *chunk_ids) {
+        ChunkIndexMeta chunk_index_meta(chunk_id, *this);
+        auto [chunk_index_snapshot, chunk_index_status] = chunk_index_meta.MapMetaToSnapShotInfo(chunk_id);
+        if (!chunk_index_status.ok()) {
+            return {nullptr, chunk_index_status};
+        }
+        segment_index_snapshot_info->chunk_index_snapshots_.push_back(chunk_index_snapshot);
+    }
+    return {segment_index_snapshot_info, Status::OK()};
 }
 
 } // namespace infinity

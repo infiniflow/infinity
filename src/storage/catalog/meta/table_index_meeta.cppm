@@ -21,6 +21,7 @@ import :status;
 import column_def;
 import :meta_info;
 import :new_catalog;
+import :snapshot_info;
 
 namespace infinity {
 
@@ -69,10 +70,13 @@ public:
 
     Status RemoveSegmentIndexIDs(const Vector<SegmentID> &segment_ids);
 
+    Tuple<SharedPtr<TableIndexSnapshotInfo>, Status> MapMetaToSnapShotInfo();
+
 private:
     Status GetSegmentUpdateTS(SharedPtr<SegmentUpdateTS> &segment_update_ts);
 
 public:
+
     Status InitSet1(const SharedPtr<IndexBase> &index_base, NewCatalog *new_catalog);
 
     Status UninitSet1(UsageFlag usage_flag);

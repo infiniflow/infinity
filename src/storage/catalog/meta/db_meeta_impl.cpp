@@ -271,5 +271,4 @@ Status DBMeeta::SetNextTableID(const String &table_id_str) {
     }
     return Status::OK();
 }
-
 } // namespace infinity
