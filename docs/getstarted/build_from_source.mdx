@@ -175,7 +175,7 @@ export PATH=$VCPKG_ROOT:$PATH
 EOF'
 source ~/.bashrc
 wget https://apt.llvm.org/llvm.sh && chmod +x llvm.sh && sudo ./llvm.sh 20 && rm llvm.sh
-sudo apt install -y ninja-build clang-tools-20 flex zlib1g-dev python3-dev autoconf libjemalloc-dev
+sudo apt install -y clang-tools-20 flex zlib1g-dev python3-dev autoconf libjemalloc-dev
 # Ensure that no other Clang versions have a priority set, or that if they do, their priority is below 100.
 sudo update-alternatives --install /usr/bin/clang clang /usr/bin/clang-20 100
 sudo ln -s /usr/lib/llvm-20/bin/clang-scan-deps /usr/bin/clang-scan-deps
