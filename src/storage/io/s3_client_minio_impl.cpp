@@ -11,7 +11,6 @@ import :infinity_exception;
 import :status;
 import :third_party;
 import :logger;
-import :s3_client_minio;
 
 namespace infinity {
 

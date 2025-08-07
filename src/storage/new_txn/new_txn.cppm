@@ -33,6 +33,8 @@ import command_statement;
 
 namespace infinity {
 
+
+
 class KVInstance;
 class NewCatalog;
 class NewTxnManager;
@@ -96,6 +98,8 @@ struct DumpMemIndexTxnStore;
 struct DeleteTxnStore;
 struct DropTableTxnStore;
 struct RenameTableTxnStore;
+struct RestoreTableTxnStore;
+struct RestoreDatabaseTxnStore;
 struct RestoreTableTxnStore;
 struct RestoreDatabaseTxnStore;
 struct UpdateTxnStore;
@@ -247,6 +251,10 @@ public:
 
     // Status ApplyTableSnapshot(const SharedPtr<TableSnapshotInfo> &table_snapshot_info);
 
+    // Tuple<SharedPtr<TableSnapshotInfo>, Status> GetTableSnapshot(const String &db_name, const String &table_name);
+
+    // Status ApplyTableSnapshot(const SharedPtr<TableSnapshotInfo> &table_snapshot_info);
+
     // Index OPs
 
     Status CreateIndex(const String &db_name, const String &table_name, const SharedPtr<IndexBase> &index_base, ConflictType conflict_type);
@@ -282,6 +290,7 @@ public:
     Status RestoreDatabaseSnapshot(const SharedPtr<DatabaseSnapshotInfo> &database_snapshot_info);
   
     friend class NewTxnManager;
+
 
 
 private:

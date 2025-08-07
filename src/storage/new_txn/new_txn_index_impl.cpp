@@ -527,13 +527,12 @@ Status NewTxn::OptimizeIndexInner(SegmentIndexMeta &segment_index_meta,
     {
         // To delete deprecated chunk ids
         status = segment_index_meta.RemoveChunkIDs(deprecate_ids);
-        //        Vector<ChunkID> chunk_ids = {chunk_id};
-        //        status = segment_index_meta.SetChunkIDs(chunk_ids);
         if (!status.ok()) {
             return status;
         }
     }
 
+    
     buffer_obj->Save();
     if (index_base->index_type_ == IndexType::kHnsw || index_base->index_type_ == IndexType::kBMP) {
         if (buffer_obj->type() != BufferType::kMmap) {

@@ -1052,16 +1052,16 @@ bool MetaTree::CheckData(const String &path) {
 
     if (RE2::FullMatch(path, regex_column, &sp1, &sp2, &sp3, &sp4, &sp5, &sp6)) {
         // db_{1}, tbl_{2}, seg_{3}, blk_{4}, {5}.col, col_{6}_out
-        db_id_str = sp1.as_string();
-        table_id_str = sp2.as_string();
-        segment_id = static_cast<SegmentID>(std::stoull(sp3.as_string()));
-        block_id = static_cast<BlockID>(std::stoull(sp4.as_string()));
+        db_id_str = sp1.data();
+        table_id_str = sp2.data();
+        segment_id = static_cast<SegmentID>(std::stoull(sp3.data()));
+        block_id = static_cast<BlockID>(std::stoull(sp4.data()));
 
         if (!sp5.empty()) {
-            suffix_id = sp5.as_string();
+            suffix_id = sp5.data();
             suffix = "col";
         } else if (!sp6.empty()) {
-            suffix_id = sp6.as_string();
+            suffix_id = sp6.data();
             suffix = "out";
         } else {
             suffix = "version";
@@ -1070,17 +1070,17 @@ bool MetaTree::CheckData(const String &path) {
         // db_{1}, tbl_{2}, idx_{3}, seg_{4},
         // chunk_{5}.idx,
         // ft_{6}.{7}   sp[7] == len | pos | dic
-        db_id_str = sp1.as_string();
-        table_id_str = sp2.as_string();
-        index_id_str = sp3.as_string();
-        segment_id = static_cast<SegmentID>(std::stoull(sp4.as_string()));
+        db_id_str = sp1.data();
+        table_id_str = sp2.data();
+        index_id_str = sp3.data();
+        segment_id = static_cast<SegmentID>(std::stoull(sp4.data()));
 
         if (!sp5.empty()) {
-            suffix_id = sp5.as_string();
+            suffix_id = sp5.data();
             suffix = "idx";
         } else {
-            suffix_id = sp6.as_string();
-            suffix = sp7.as_string(); // len | pos | dic
+            suffix_id = sp6.data();
+            suffix = sp7.data(); // len | pos | dic
         }
     } else {
         return true;

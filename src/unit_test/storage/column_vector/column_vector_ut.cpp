@@ -131,8 +131,8 @@ TEST_F(ColumnVectorTest, ReadWrite) {
         columns.push_back(column);
     }
 
+    // TODO: LogicalType::kBitmap, Value::MakeBitmap are not implemented
     /*
-    // TODO: Following case cause exception due to the value created by `Value::MakeBitmap` has null info_ptr.
          {
             SharedPtr<ColumnVector> column =
                 ColumnVector::Make(MakeShared<DataType>(LogicalType::kBitmap,

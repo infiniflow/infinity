@@ -1,5 +1,22 @@
 cmake_minimum_required(VERSION 3.28.1)
 
+cmake_policy(SET CMP0167 OLD)
+
+# Auto-detect and set vcpkg toolchain if not already set
+if (NOT CMAKE_TOOLCHAIN_FILE)
+    # First try environment variable CMAKE_TOOLCHAIN_FILE (for container builds)
+    if (DEFINED ENV{CMAKE_TOOLCHAIN_FILE})
+        set(CMAKE_TOOLCHAIN_FILE "$ENV{CMAKE_TOOLCHAIN_FILE}"
+                CACHE STRING "Vcpkg toolchain file")
+        message(STATUS "Using vcpkg toolchain from environment: ${CMAKE_TOOLCHAIN_FILE}")
+        # Fallback to VCPKG_ROOT for backward compatibility
+    elseif (DEFINED ENV{VCPKG_ROOT})
+        set(CMAKE_TOOLCHAIN_FILE "$ENV{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake"
+                CACHE STRING "Vcpkg toolchain file")
+        message(STATUS "Using vcpkg toolchain from VCPKG_ROOT: ${CMAKE_TOOLCHAIN_FILE}")
+    endif ()
+endif ()
+
 project(infinity VERSION 0.6.0)
 
 if (NOT CMAKE_GENERATOR STREQUAL "Ninja")
@@ -30,23 +47,30 @@ add_definitions(-D_POSIX_C_SOURCE=200809L -D_POSIX_SEM_VALUE_MAX=_SC_SEM_VALUE_M
 message(STATUS "CXX: ${CMAKE_CXX_COMPILER}")
 execute_process(COMMAND ${CMAKE_CXX_COMPILER} --version OUTPUT_VARIABLE clang_full_version_string)
 string(REGEX REPLACE ".*clang version ([0-9]+\\.[0-9]+).*" "\\1" CLANG_VERSION_STRING ${clang_full_version_string})
-if (CLANG_VERSION_STRING VERSION_GREATER 16)
+if (CLANG_VERSION_STRING VERSION_GREATER_EQUAL 20)
     # Print CMake version and project name
     message(STATUS "Building ${PROJECT_NAME} with CMake version: ${CMAKE_VERSION} On CLANG-${CLANG_VERSION_STRING}")
 
     # add_compile_options(-ftime-trace)
-
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Wno-unused-parameter -Wno-unused-private-field")
     add_link_options(-fuse-ld=mold)
-    # Add library search paths for mold linker
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Wno-unused-parameter -Wno-unused-private-field")
+
     add_link_options(-L/usr/local/lib)
     set(CMAKE_FIND_PACKAGE_SORT_ORDER NATURAL)
     set(CMAKE_FIND_PACKAGE_SORT_DIRECTION DEC)
 
 else ()
 
-    message(FATAL_ERROR "Please use clang version 17.0 and above, current version: ${CLANG_VERSION_STRING} ${CMAKE_CXX_COMPILER}")
+    message(FATAL_ERROR "Please use clang version 20.0 and above, current version: ${CLANG_VERSION_STRING} ${CMAKE_CXX_COMPILER}")
 
+endif ()
+
+if (CMAKE_SYSTEM_PROCESSOR MATCHES "^arm64.*")
+    set(ARM64 TRUE)
+elseif (CMAKE_SYSTEM_PROCESSOR MATCHES "^aarch64.*")
+    set(ARM64 TRUE)
+elseif (CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64)$")
+    set(X86_64 TRUE)
 endif ()
 
 set(GCC_SEARCH_ROOTS
@@ -83,6 +107,63 @@ find_library(STDCXX15EXP_STATIC
 get_filename_component(GCC15_LIB_DIR ${STDCXX15_STATIC} DIRECTORY)
 
 set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -L${GCC15_LIB_DIR} -static-libstdc++ -static-libgcc")
+
+find_package(absl CONFIG REQUIRED)
+find_package(Arrow CONFIG REQUIRED)
+find_package(Boost REQUIRED COMPONENTS asio)
+find_package(CLI11 CONFIG REQUIRED)
+#find_package(CURL REQUIRED) # wait for s3
+#darts-clone # wait for fix
+#eigen3 fuck this package
+#find_package(fmt REQUIRED) # wait for fmt:11.2.0
+find_package(GTest CONFIG REQUIRED)
+find_package(Libevent CONFIG REQUIRED)
+find_package(magic_enum CONFIG REQUIRED)
+#find_package(miniocpp CONFIG REQUIRED) # wait for s3
+#nanobind   don't need it
+find_package(nlohmann_json CONFIG REQUIRED)
+find_package(oatpp CONFIG REQUIRED)
+#if (X86_64)
+#    find_package(opencc CONFIG REQUIRED) # wait for fix
+#endif ()
+find_package(OpenSSL REQUIRED)
+find_package(pcre2 CONFIG REQUIRED)
+find_package(pugixml CONFIG REQUIRED)
+find_package(Parquet CONFIG REQUIRED)
+find_path(PARALLEL_HASHMAP_INCLUDE_DIRS "parallel_hashmap/btree.h")
+find_package(re2 CONFIG REQUIRED)
+find_package(roaring CONFIG REQUIRED)
+find_package(RocksDB CONFIG REQUIRED)
+find_package(simdjson CONFIG REQUIRED)
+#find_package(spdlog REQUIRED) # wait for fmt:11.2.0
+if (ARM64)
+    add_library(sse2neon INTERFACE)
+    # need this after highway and before simdcomp
+    find_path(SSE2NEON_INCLUDE_DIRS "sse2neon/sse2neon.h")
+    target_include_directories(sse2neon SYSTEM ${SSE2NEON_INCLUDE_DIRS})
+endif ()
+find_package(tomlplusplus CONFIG REQUIRED)
+#find_package(turbobase64 CONFIG REQUIRED)
+find_package(Thrift CONFIG REQUIRED)
+#find_package(unofficial-curlpp CONFIG REQUIRED) # for s3
+find_package(unofficial-inih CONFIG REQUIRED)
+find_path(VIT_VIT_CTPL_INCLUDE_DIRS "ctpl_stl.h")
+
+set(VCPKG_PROJECT_ROOT "${CMAKE_CURRENT_BINARY_DIR}/vcpkg_installed")
+file(GLOB VCPKG_INCLUDE_DIRS
+        "${VCPKG_PROJECT_ROOT}/*/include"
+)
+message(STATUS "Found vcpkg include directories: ${VCPKG_INCLUDE_DIRS}")
+include_directories(${VCPKG_INCLUDE_DIRS})
+
+# vcpkg oatpp bug
+file(GLOB OATPP_INCLUDE_DIRS
+        "${VCPKG_PROJECT_ROOT}/*/include/oatpp-1.3.0/oatpp"
+)
+message(STATUS "Found oatpp include directories: ${OATPP_INCLUDE_DIRS}")
+include_directories(${OATPP_INCLUDE_DIRS})
+message(STATUS "Using vcpkg toolchain - automatic package discovery enabled")
+
 
 # Get current system time and print the build time
 execute_process(COMMAND "date" +"%Y-%m-%d %H:%M.%S" OUTPUT_VARIABLE CURRENT_SYS_TIME)
@@ -224,14 +305,6 @@ endif ()
 
 MESSAGE(STATUS "C++ Compilation flags: " ${CMAKE_CXX_FLAGS})
 
-if (CMAKE_SYSTEM_PROCESSOR MATCHES "^arm64.*")
-    set(ARM64 TRUE)
-elseif (CMAKE_SYSTEM_PROCESSOR MATCHES "^aarch64.*")
-    set(ARM64 TRUE)
-elseif (CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64)$")
-    set(X86_64 TRUE)
-endif ()
-
 #add_definitions(-march=native)
 add_definitions(-DSIMDE_ENABLE_NATIVE_ALIASES)
 if (CMAKE_C_COMPILER_ID STREQUAL "Clang" AND CMAKE_C_COMPILER_VERSION VERSION_GREATER_EQUAL "18.0")
@@ -255,9 +328,12 @@ if (CMAKE_BUILD_TYPE STREQUAL "Debug")
     ADD_DEFINITIONS(-D INFINITY_DEBUG)
 endif ()
 
-# find_package(Boost REQUIRED)
-find_package(Lz4 REQUIRED)
-
+if (NOT INDEX_BUILD_METHOD STREQUAL "Variant")
+    message(STATUS "Add Environment Variable INDEX_HANDLER")
+    ADD_DEFINITIONS(-D INDEX_HANDLER)
+else ()
+    message(STATUS "NOT USING INDEX_HANDLER")
+endif ()
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC")
 find_package(Python COMPONENTS Interpreter Development REQUIRED)
@@ -270,7 +346,7 @@ if (NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
     set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS "Debug" "Release" "MinSizeRel" "RelWithDebInfo")
 endif ()
 
-add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/third_party/nanobind)
+#add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/third_party/nanobind)
 
 add_subdirectory(src)
 add_subdirectory(third_party EXCLUDE_FROM_ALL)

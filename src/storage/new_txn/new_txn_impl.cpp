@@ -477,6 +477,8 @@ Status NewTxn::ReplayCreateTable(WalCmdCreateTableV2 *create_table_cmd, TxnTimeS
     String table_id;
     // auto new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
     // new_txn_mgr->PrintAllKeyValue();
+    // auto new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
+    // new_txn_mgr->PrintAllKeyValue();
     Status status = kv_instance_->Get(table_key, table_id);
     if (status.ok()) {
         if (table_id == create_table_cmd->table_id_) {
@@ -1326,6 +1328,18 @@ NewTxn::GetChunkIndexInfo(const String &db_name, const String &table_name, const
     }
 
     SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta);
+
+    String chunk_id_key = KeyEncode::CatalogIdxChunkKey(table_meta->db_id_str(),
+                                                        table_meta->table_id_str(),
+                                                        table_index_meta->index_id_str(),
+                                                        segment_index_meta.segment_id(),
+                                                        chunk_id);
+    String commit_ts_str;
+    status = kv_instance_->Get(chunk_id_key, commit_ts_str);
+    if (!status.ok()) {
+        return {nullptr, status};
+    }
+
     ChunkIndexMeta chunk_index_meta(chunk_id, segment_index_meta);
     ChunkIndexMetaInfo *chunk_index_info_ptr;
     status = chunk_index_meta.GetChunkInfo(chunk_index_info_ptr);
@@ -2890,6 +2904,13 @@ bool NewTxn::CheckConflictCmd(const WalCmdCreateDatabaseV2 &cmd, NewTxn *previou
                 }
                 break;
             }
+            case WalCommandType::CREATE_TABLE_SNAPSHOT: {
+                auto *create_table_snapshot_cmd = static_cast<WalCmdCreateTableSnapshot *>(wal_cmd.get());
+                if (create_table_snapshot_cmd->db_name_ == db_name) {
+                    retry_query = true;
+                    conflict = true;
+                }
+            }
             default: {
                 //
             }
@@ -2916,6 +2937,13 @@ bool NewTxn::CheckConflictCmd(const WalCmdDropDatabaseV2 &cmd, NewTxn *previous_
                     conflict = true;
                 }
                 break;
+            }
+            case WalCommandType::CREATE_TABLE_SNAPSHOT: {
+                auto *create_table_snapshot_cmd = static_cast<WalCmdCreateTableSnapshot *>(wal_cmd.get());
+                if (create_table_snapshot_cmd->db_name_ == db_name) {
+                    retry_query = true;
+                    conflict = true;
+                }
             }
             default: {
                 //
@@ -4374,6 +4402,7 @@ bool NewTxn::CheckConflictTxnStore(const OptimizeIndexTxnStore &txn_store, NewTx
             }
             break;
         }
+        // There shold be no conflict between optimize index and import
         // case TransactionType::kImport: {
         //     LOG_INFO("OptimizeIndexTxnStore vs. ImportTxnStore conflict");
         //     ImportTxnStore *import_txn_store = static_cast<ImportTxnStore *>(previous_txn->base_txn_store_.get());

@@ -36,6 +36,7 @@ import :new_catalog;
 import :table_index_meeta;
 import create_index_info;
 import :segment_meta;
+import :block_meta;
 import :kv_utility;
 import :column_index_reader;
 import :new_txn;
@@ -123,6 +124,7 @@ Status TableMeeta::GetIndexID(const String &index_name, String &index_key, Strin
     create_index_ts = max_commit_ts;
     return Status::OK();
 }
+
 
 
 Tuple<SharedPtr<ColumnDef>, Status> TableMeeta::GetColumnDefByColumnName(const String &column_name, SizeT *column_idx_ptr) {
