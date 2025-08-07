@@ -12,7 +12,6 @@ add_library(benchmark_profiler
 )
 
 target_include_directories(benchmark_profiler PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
-target_include_directories(benchmark_profiler PUBLIC "${CMAKE_SOURCE_DIR}/third_party/magic_enum/include")
 
 # add_definitions(-march=native)
 # add_definitions(-msse4.2 -mfma)

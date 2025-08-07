@@ -20,28 +20,25 @@ module;
 module infinity_core:physical_check.impl;
 
 import :physical_check;
-
 import :stl;
 import :new_txn;
 import :query_context;
 import :third_party;
-
 import :profiler;
 import :operator_state;
 import :data_block;
-
 import :infinity_exception;
 import :value_expression;
-
 import :defer_op;
 import :new_catalog;
 import :status;
 import :value;
-import logical_type;
 import :meta_tree;
 import :db_meeta;
+
 import check_statement;
 import data_type;
+import logical_type;
 
 namespace infinity {
 
@@ -75,7 +72,7 @@ void PhysicalCheck::Init(QueryContext *query_context) {
 }
 
 bool PhysicalCheck::Execute(QueryContext *query_context, OperatorState *operator_state) {
-    CheckOperatorState *check_operator_state = (CheckOperatorState *)(operator_state);
+    auto *check_operator_state = static_cast<CheckOperatorState *>(operator_state);
     DeferFn defer_fn([&]() { check_operator_state->SetComplete(); });
 
     switch (check_type_) {
@@ -210,7 +207,7 @@ void PhysicalCheck::ExecuteCheckTable(QueryContext *query_context, CheckOperator
 
     // Prepare the output data block
     UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
-    Vector<SharedPtr<DataType>> column_types{varchar_type, varchar_type};
+    Vector<SharedPtr<DataType>> column_types{varchar_type};
 
     output_block_ptr->Init(column_types);
 

@@ -1,5 +1,5 @@
 # NOTICE: This Dockerfile depends on BuildKit
-# NOTICE: You can use the download_deps_infinity_builder_ubuntu18.sh script to download dependencies.
+# NOTICE: You must run download_deps_infinity_builder_ubuntu20.sh script BEFORE building this image
 
 FROM ubuntu:20.04
 
@@ -106,54 +106,6 @@ RUN --mount=type=bind,source=ninja-linux.zip,target=/root/ninja-linux.zip \
     cd /root && unzip ninja-linux.zip \
     && cp ninja /usr/local/bin && rm ninja
 
-
-# Install boost-1.86.0
-RUN --mount=type=bind,source=boost-1.86.0-cmake.tar.xz,target=/root/boost-1.86.0-cmake.tar.xz \
-    cd /root && tar xf boost-1.86.0-cmake.tar.xz \
-    && cd boost-1.86.0 && mkdir build && cd build \
-    && cmake .. -DCMAKE_INSTALL_PREFIX=/usr/local -DBUILD_SHARED_LIBS=OFF -DBOOST_ENABLE_PYTHON=OFF \
-    && make -j && make install \
-    && ldconfig && cd /root && rm -rf boost-1.86.0
-
-# Install libevent-2.1.12
-RUN --mount=type=bind,source=libevent-2.1.12-stable.tar.gz,target=/root/libevent-2.1.12-stable.tar.gz  \
-    cd /root && tar xf libevent-2.1.12-stable.tar.gz \
-    && cd libevent-2.1.12-stable && mkdir build && cd build \
-    && cmake -G Ninja -DCMAKE_BUILD_TYPE=Release \
-        -DCMAKE_C_FLAGS="-fPIC" .. \
-    && ninja install \
-    && ldconfig && cd /root && rm -rf libevent-2.1.12-stable
-
-# Install lz4-1.10.0
-RUN --mount=type=bind,source=lz4-1.10.0.tar.gz,target=/root/lz4-1.10.0.tar.gz  \
-    cd /root && tar xf lz4-1.10.0.tar.gz \
-    && cd lz4-1.10.0 && CFLAGS="-fPIC" make -j install \
-    && ldconfig && cd /root && rm -rf lz4-1.10.0
-
-# Install zlib-1.3.1
-RUN --mount=type=bind,source=zlib-1.3.1.tar.gz,target=/root/zlib-1.3.1.tar.gz  \
-    cd /root && tar xf zlib-1.3.1.tar.gz \
-    && cd zlib-1.3.1 && ./configure && CFLAGS="-fPIC" make -j install \
-    && ldconfig && cd /root && rm -rf zlib-1.3.1
-
-# Install zstd-1.5.7
-RUN --mount=type=bind,source=zstd-1.5.7.tar.gz,target=/root/zstd-1.5.7.tar.gz  \
-    cd /root && tar xf zstd-1.5.7.tar.gz \
-    && cd zstd-1.5.7 && CFLAGS="-fPIC" CXXFLAGS="-fPIC" make -j lib-mt && make install \
-    && ldconfig && cd /root && rm -rf zstd-1.5.7
-
-# Install bzip2-1.0.8
-RUN --mount=type=bind,source=bzip2-1.0.8.tar.gz,target=/root/bzip2-1.0.8.tar.gz  \
-    cd /root && tar xf bzip2-1.0.8.tar.gz \
-    && cd bzip2-1.0.8 && make install \
-    && ldconfig && cd /root && rm -rf bzip2-1.0.8
-
-# Install brotli-1.1.0
-RUN --mount=type=bind,source=v1.1.0.tar.gz,target=/root/v1.1.0.tar.gz  \
-    cd /root && tar xf v1.1.0.tar.gz \
-    && cd brotli-1.1.0 && mkdir out && cd out && cmake -DCMAKE_BUILD_TYPE=Release .. && cmake --build . --config Release --target install \
-    && ldconfig && cd /root && rm -rf brotli-1.1.0
-
 # Install jemalloc-5.3.0
 # Known issue: Composition of `-fsanitize=address`, staticly linked jemalloc and `mallctl` cause crash at initialization.
 # Refers to https://github.com/jemalloc/jemalloc/issues/2454
@@ -172,55 +124,35 @@ RUN --mount=type=bind,source=gperftools-2.15.tar.gz,target=/root/gperftools-2.15
 RUN --mount=type=bind,source=sqllogictest-bin-v0.28.2-x86_64-unknown-linux-musl.tar.gz,target=/root/sqllogictest-bin-v0.28.2-x86_64-unknown-linux-musl.tar.gz \
     cd /tmp && tar xzf /root/sqllogictest-bin-v0.28.2-x86_64-unknown-linux-musl.tar.gz && cp -rf sqllogictest /usr/local/bin && rm -fr /tmp/*
 
-# Install thrift 0.22.0
-RUN --mount=type=bind,source=thrift-0.22.0.tar.gz,target=/root/thrift-0.22.0.tar.gz  \
-    cd /root && tar xzf thrift-0.22.0.tar.gz \
-    && cd thrift-0.22.0/build && cmake -G Ninja .. && ninja thrift-compiler \
-    && cp compiler/cpp/bin/thrift /usr/local/bin/thrift \
-    && cd /root && rm -rf thrift-0.22.0
+RUN --mount=type=cache,id=inf_apt,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,id=inf_lib,target=/var/lib/apt,sharing=locked \
+    apt-get install -y zip rpm
 
-# Install OpenSSL
-RUN --mount=type=bind,source=openssl-3.0.15.tar.gz,target=/root/openssl-3.0.15.tar.gz  \
-    cd /root && tar xzf openssl-3.0.15.tar.gz \
-    && cd openssl-3.0.15 && ./config --prefix=/usr/local/openssl30 --openssldir=/usr/local/openssl30 shared zlib \
-    && make -j && make install \
-    && ldconfig && cd /root && rm -rf openssl-3.0.15
+# Set environment variables for vcpkg and infinity build
+ENV CC=clang CXX=clang++
 
-# Install colm
-RUN --mount=type=bind,source=colm-bd19b1ab7c0bcdba2772061bc38f6bca5cbba977.zip,target=/root/colm-bd19b1ab7c0bcdba2772061bc38f6bca5cbba977.zip  \
-    cd /root && unzip colm-bd19b1ab7c0bcdba2772061bc38f6bca5cbba977.zip \
-    && cd colm-bd19b1ab7c0bcdba2772061bc38f6bca5cbba977 \
-    && ./autogen.sh \
-    && ./configure --prefix=/usr/local/colm \
-    && make -j 8 \
-    && make install \
-    && rm -rf ../colm-bd19b1ab7c0bcdba2772061bc38f6bca5cbba977
+# Setup vcpkg for manifest mode (no global VCPKG_ROOT)
+RUN git clone https://github.com/microsoft/vcpkg.git /opt/vcpkg \
+    && cd /opt/vcpkg \
+    && ./bootstrap-vcpkg.sh --disableMetrics
 
-# Install ragel
-RUN --mount=type=bind,source=ragel-master.zip,target=/root/ragel-master.zip  \
-    cd /root && unzip ragel-master.zip \
-    && cd ragel-master \
-    && ./autogen.sh \
-    && ./configure --prefix=/usr/local/ragel --with-colm=/usr/local/colm \
-    && make -j 12 install \
-    && rm -rf ../ragel-master
+# Pre-build vcpkg dependencies using manifest mode
+# This populates the binary cache at /root/.cache/vcpkg for later use by infinity builds
+RUN --mount=type=bind,source=vcpkg.json,target=/opt/vcpkg/vcpkg.json \
+    cd /opt/vcpkg && \
+    /opt/vcpkg/vcpkg install --clean-after-build
 
-ENV CC=clang CXX=clang++ LZ4_ROOT=/usr/local PATH=/usr/local/bin:/usr/local/ragel/bin:$PATH
+# Set vcpkg toolchain path for CMake
+ENV CMAKE_TOOLCHAIN_FILE=/opt/vcpkg/scripts/buildsystems/vcpkg.cmake
+
+# Set environment variables for infinity build
+ENV LZ4_ROOT=/usr/local \
+    PATH=/usr/local/bin:/usr/local/ragel/bin:$PATH
 
 # Set Python paths for CMake to find the correct Python installation
-ENV Python3_EXECUTABLE=/usr/local/bin/python3.10
-ENV Python3_INCLUDE_DIR=/usr/local/include/python3.10
-ENV Python3_LIBRARY=/usr/local/lib/libpython3.10.so
-
-# Install vectorscan
-RUN --mount=type=bind,source=vectorscan-master.zip,target=/root/vectorscan-master.zip \
-    cd /root && unzip vectorscan-master.zip \
-    && cd vectorscan-master\
-    && mkdir build \
-    && cd build \
-    && cmake -DCMAKE_BUILD_TYPE=Release -DFAT_RUNTIME=Off ..  \
-    && make -j 12 install \
-    && rm -rf ../../vectorscan-master
+ENV Python3_EXECUTABLE=/usr/local/bin/python3.10 \
+    Python3_INCLUDE_DIR=/usr/local/include/python3.10 \
+    Python3_LIBRARY=/usr/local/lib/libpython3.10.so
 
 # Install mold-2.40.3
 RUN --mount=type=bind,source=mold-2.40.3-x86_64-linux.tar.gz,target=/root/mold-2.40.3-x86_64-linux.tar.gz \

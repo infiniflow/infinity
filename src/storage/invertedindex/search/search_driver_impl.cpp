@@ -34,8 +34,9 @@ import :logger;
 import :third_party;
 import :analyzer;
 import :analyzer_pool;
-import search_scanner;
 import :query_node;
+
+import search_scanner;
 
 namespace infinity {
 

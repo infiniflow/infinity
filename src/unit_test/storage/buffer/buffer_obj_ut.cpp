@@ -318,7 +318,6 @@ TEST_F(BufferObjTest, test1) {
 }
 
 TEST_F(BufferObjTest, test_hnsw_index_buffer_obj_shutdown) {
-    // GTEST_SKIP(); // FIXME
     // Earlier cases may leave a dirty infinity instance. Destroy it first.
     infinity::Infinity::LocalUnInit();
     RemoveDbDirs();
