@@ -226,7 +226,6 @@ jobs:
 
       - name: Run sqllogictest debug version
         if: ${{ !cancelled() && !failure() }}
-        id: run_tests_debug
         run: sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && LD_PRELOAD=/usr/local/lib/clang/20/lib/x86_64-unknown-linux-gnu/libclang_rt.asan.so ASAN_OPTIONS=detect_leaks=0 python3 tools/sqllogictest.py" && sleep 1s
 
       - name: Unit test debug version
@@ -239,7 +238,6 @@ jobs:
 
       - name: Run sqllogictest release version
         if: ${{ !cancelled() && !failure() }}
-        id: run_tests_release
         run: sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && python3 tools/sqllogictest.py" && sleep 1s
 
       - name: Unit test release version
