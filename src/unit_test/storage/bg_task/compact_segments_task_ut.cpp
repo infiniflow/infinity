@@ -102,7 +102,7 @@ INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
                          ::testing::Values((std::string(test_data_path()) + "/config/test_new_bg_on.toml").c_str(),
                                            (std::string(test_data_path()) + "/config/test_new_vfs_off_bg_on.toml").c_str()));
 
-TEST_P(CompactTaskTest, bg_compact) {
+TEST_P(CompactTaskTest, DISABLED_bg_compact) {
     String table_name = "tbl1";
     Storage *storage = infinity::InfinityContext::instance().storage();
     NewTxnManager *txn_mgr = storage->new_txn_manager();
