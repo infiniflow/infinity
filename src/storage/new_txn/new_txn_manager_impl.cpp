@@ -503,7 +503,7 @@ void NewTxnManager::UpdateCatalogCache(NewTxn *txn) {
                 for (const auto &restore_table_txn_store : txn_store->restore_table_txn_stores_) {
                     system_cache_->AddNewTableCache(db_id,restore_table_txn_store->table_id_, restore_table_txn_store->table_name_);
                     if (!restore_table_txn_store->segment_infos_.empty()) {
-                        system_cache_->ApplySegmentIDs(db_id, restore_table_txn_store->table_id_, restore_table_txn_store->segment_infos_[-1].segment_id_+1);
+                        system_cache_->ApplySegmentIDs(db_id, restore_table_txn_store->table_id_, restore_table_txn_store->segment_infos_.back().segment_id_+1);
                     }
                     for (const auto &index_cmd : restore_table_txn_store->index_cmds_) {
                         system_cache_->AddNewIndexCache(db_id, restore_table_txn_store->table_id_, index_cmd.index_id_);

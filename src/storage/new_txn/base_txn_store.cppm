@@ -24,6 +24,7 @@ import internal_types;
 import :txn_state;
 import column_def;
 import :wal_entry;
+import command_statement;
 
 namespace infinity {
 
@@ -130,18 +131,18 @@ export struct CreateTableTxnStore final : public BaseTxnStore {
 };
 
 
-export struct CreateTableSnapshotTxnStore final : public BaseTxnStore {
-    CreateTableSnapshotTxnStore() : BaseTxnStore(TransactionType::kCreateTableSnapshot) {}
+export struct CreateSnapshotTxnStore : public BaseTxnStore {
+    CreateSnapshotTxnStore() : BaseTxnStore(TransactionType::kCreateSnapshot) {}
 
     String db_name_{};
     String table_name_{};
     String snapshot_name_{};
     TxnTimeStamp max_commit_ts_{};
+    SnapshotScope snapshot_type_{};
 
     String ToString() const final;
     SharedPtr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;
 };
-
 
 export struct RestoreTableTxnStore final : public BaseTxnStore {
     RestoreTableTxnStore() : BaseTxnStore(TransactionType::kRestoreTable) {}

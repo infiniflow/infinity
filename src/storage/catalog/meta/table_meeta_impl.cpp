@@ -126,6 +126,7 @@ Status TableMeeta::GetIndexID(const String &index_name, String &index_key, Strin
 }
 
 
+
 Tuple<SharedPtr<ColumnDef>, Status> TableMeeta::GetColumnDefByColumnName(const String &column_name, SizeT *column_idx_ptr) {
     if (!column_defs_) {
         Status status = LoadColumnDefs();
@@ -1020,8 +1021,6 @@ Status TableMeeta::SetBeginTS(TxnTimeStamp begin_ts) {
     return Status::OK();
 }
 
-
-
 Tuple<SizeT, Status> TableMeeta::GetTableRowCount() {
     Status status{};
     SizeT row_count{};
@@ -1052,6 +1051,5 @@ Tuple<SizeT, Status> TableMeeta::GetTableRowCount() {
     }
     return {row_count, Status::OK()};
 }
-
 
 } // namespace infinity
