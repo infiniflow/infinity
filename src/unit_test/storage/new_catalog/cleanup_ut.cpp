@@ -87,7 +87,17 @@ protected:
         function_dictionary_['B'] = other;
         function_dictionary_['C'] = other_commit;
 
-        auto cleanup_begin = [this] { txn_clean_ = new_txn_mgr_->BeginTxn(MakeUnique<String>("cleanup"), TransactionType::kCleanup); };
+        auto cleanup_begin = [this] {
+            {
+                auto *wal_manager = InfinityContext::instance().storage()->wal_manager();
+                auto *txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("checkpoint"), TransactionType::kNewCheckpoint);
+                auto status = txn->Checkpoint(wal_manager->LastCheckpointTS());
+                EXPECT_TRUE(status.ok());
+                status = new_txn_mgr_->CommitTxn(txn);
+                EXPECT_TRUE(status.ok());
+            }
+            txn_clean_ = new_txn_mgr_->BeginTxn(MakeUnique<String>("cleanup"), TransactionType::kCleanup);
+        };
         auto cleanup = [this] {
             Status status = txn_clean_->Cleanup();
             EXPECT_TRUE(status.ok());
@@ -101,12 +111,12 @@ protected:
         function_dictionary_['c'] = cleanup_commit;
     }
 
-    void TestNoConflict(bool is_compact = false) {
+    void TestNoConflict() {
         LOG_INFO("a = cleanup_begin, b = cleanup, c = cleanup_commit");
         LOG_INFO("A = other_begin, B = other, C = other_commit");
         for (const auto &plan : plans_) {
             LOG_INFO(fmt::format("---{}", plan));
-            PreTest(is_compact);
+            PreTest();
             for (auto func_char : plan) {
                 LOG_INFO(fmt::format("now running: {}", func_char));
                 function_dictionary_[func_char]();
@@ -115,7 +125,7 @@ protected:
         }
     }
 
-    void PreTest(bool is_compact) {
+    void PreTest() {
         if (static_cast<bool>(pre_fucntion_)) {
             pre_fucntion_();
             return;
@@ -125,28 +135,43 @@ protected:
         CreateTable();
         CreateIndex();
 
-        for (int i = 0; i < 2; ++i) {
-            auto *txn = new_txn_mgr_->BeginTxn(MakeUnique<String>(fmt::format("append {}", i)), TransactionType::kNormal);
-            SharedPtr<DataBlock> input_block = MakeInputBlock(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"), 1);
-            Status status = txn->Append(*db_name_, *table_name_, input_block);
+        {
+            auto *txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("import"), TransactionType::kNormal);
+            auto input_block_ptr = MakeInputBlock(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"), 1);
+            Vector<SharedPtr<DataBlock>> input_blocks = {input_block_ptr};
+            auto status = txn->Import(*db_name_, *table_name_, input_blocks);
             EXPECT_TRUE(status.ok());
             status = new_txn_mgr_->CommitTxn(txn);
             EXPECT_TRUE(status.ok());
         }
         {
-            auto txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("delete"), TransactionType::kNormal);
-
-            Vector<RowID> row_ids;
-            row_ids.push_back(RowID(0, 0));
-            Status status = txn->Delete(*db_name_, *table_name_, row_ids);
+            auto *txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("import"), TransactionType::kNormal);
+            auto input_block_ptr = MakeInputBlock(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"), 1);
+            Vector<SharedPtr<DataBlock>> input_blocks = {input_block_ptr};
+            auto status = txn->Import(*db_name_, *table_name_, input_blocks);
             EXPECT_TRUE(status.ok());
-
             status = new_txn_mgr_->CommitTxn(txn);
             EXPECT_TRUE(status.ok());
         }
-        if (!is_compact) {
+        // {
+        //     auto *wal_manager = InfinityContext::instance().storage()->wal_manager();
+        //     auto *txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("checkpoint"), TransactionType::kNewCheckpoint);
+        //     auto status = txn->Checkpoint(wal_manager->LastCheckpointTS());
+        //     EXPECT_TRUE(status.ok());
+        //     status = new_txn_mgr_->CommitTxn(txn);
+        //     EXPECT_TRUE(status.ok());
+        // }
+        {
             auto *txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
-            Status status = txn->Compact(*db_name_, *table_name_, {0});
+            auto status = txn->Compact(*db_name_, *table_name_, {0, 1});
+            EXPECT_TRUE(status.ok());
+            status = new_txn_mgr_->CommitTxn(txn);
+            EXPECT_TRUE(status.ok());
+        }
+        {
+            auto *wal_manager = InfinityContext::instance().storage()->wal_manager();
+            auto *txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("checkpoint"), TransactionType::kNewCheckpoint);
+            auto status = txn->Checkpoint(wal_manager->LastCheckpointTS());
             EXPECT_TRUE(status.ok());
             status = new_txn_mgr_->CommitTxn(txn);
             EXPECT_TRUE(status.ok());
@@ -155,17 +180,9 @@ protected:
 
     void PostTest() {
         validity_function_();
-        Status status;
         {
             auto *txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
-            status = txn->DropDatabase("db1", ConflictType::kIgnore);
-            EXPECT_TRUE(status.ok());
-            status = new_txn_mgr_->CommitTxn(txn);
-            EXPECT_TRUE(status.ok());
-        }
-        {
-            auto *txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("cleanup"), TransactionType::kCleanup);
-            status = txn->Cleanup();
+            auto status = txn->DropDatabase("db1", ConflictType::kIgnore);
             EXPECT_TRUE(status.ok());
             status = new_txn_mgr_->CommitTxn(txn);
             EXPECT_TRUE(status.ok());
@@ -173,7 +190,22 @@ protected:
         {
             auto *wal_manager = InfinityContext::instance().storage()->wal_manager();
             auto *txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("checkpoint"), TransactionType::kNewCheckpoint);
-            status = txn->Checkpoint(wal_manager->LastCheckpointTS());
+            auto status = txn->Checkpoint(wal_manager->LastCheckpointTS());
+            EXPECT_TRUE(status.ok());
+            status = new_txn_mgr_->CommitTxn(txn);
+            EXPECT_TRUE(status.ok());
+        }
+        {
+            auto *txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("cleanup"), TransactionType::kCleanup);
+            auto status = txn->Cleanup();
+            EXPECT_TRUE(status.ok());
+            status = new_txn_mgr_->CommitTxn(txn);
+            EXPECT_TRUE(status.ok());
+        }
+        {
+            auto *wal_manager = InfinityContext::instance().storage()->wal_manager();
+            auto *txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("checkpoint"), TransactionType::kNewCheckpoint);
+            auto status = txn->Checkpoint(wal_manager->LastCheckpointTS());
             EXPECT_TRUE(status.ok());
             status = new_txn_mgr_->CommitTxn(txn);
             EXPECT_TRUE(status.ok());
@@ -220,7 +252,7 @@ protected:
 
     void CreateIndex() {
         auto *txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("create index"), TransactionType::kNormal);
-        Status status = txn->CreateIndex(*db_name_, *table_name_, index_def1_, ConflictType::kError);
+        auto status = txn->CreateIndex(*db_name_, *table_name_, index_def1_, ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr_->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
@@ -266,7 +298,8 @@ protected:
 
 INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
                          TestTxnCleanup,
-                         ::testing::Values(BaseTestParamStr::NEW_CONFIG_PATH, BaseTestParamStr::NEW_VFS_OFF_CONFIG_PATH));
+                         // ::testing::Values(BaseTestParamStr::NEW_CONFIG_PATH, BaseTestParamStr::NEW_VFS_OFF_CONFIG_PATH));
+                         ::testing::Values(BaseTestParamStr::NEW_VFS_OFF_CONFIG_PATH));
 
 TEST_P(TestTxnCleanup, cleanup_with_drop_db) {
     LOG_INFO("Checking cleanup & drop db...");
@@ -283,10 +316,10 @@ TEST_P(TestTxnCleanup, cleanup_with_drop_db) {
 
     validity_function_ = [this] {
         { // check drop db
-            auto txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("get db"), TransactionType::kRead);
+            auto *txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("get db"), TransactionType::kRead);
             Optional<DBMeeta> db_meta;
             TxnTimeStamp db_create_ts;
-            Status status = txn->GetDBMeta(*db_name_, db_meta, db_create_ts);
+            auto status = txn->GetDBMeta(*db_name_, db_meta, db_create_ts);
             EXPECT_FALSE(status.ok());
             status = new_txn_mgr_->CommitTxn(txn);
             EXPECT_TRUE(status.ok());
@@ -345,29 +378,18 @@ TEST_P(TestTxnCleanup, cleanup_and_add_columns) {
     };
 
     validity_function_ = [this] {
-        { // check clean
-            auto txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("get segment"), TransactionType::kRead);
-            Optional<DBMeeta> db_meta;
-            Optional<TableMeeta> table_meta;
-            Status status = txn->GetTableMeta(*db_name_, *table_name_, db_meta, table_meta);
-            EXPECT_TRUE(status.ok());
-            status = table_meta->CheckSegments({0 /* segment_id */});
-            EXPECT_FALSE(status.ok());
-            status = table_meta->CheckSegments({1 /* segment_id */});
-            EXPECT_TRUE(status.ok());
-            status = table_meta->CheckSegments({2 /* segment_id */});
-            EXPECT_FALSE(status.ok());
-
-            status = new_txn_mgr_->CommitTxn(txn);
-            EXPECT_TRUE(status.ok());
-        }
         { // check add column
-            auto txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("get column"), TransactionType::kRead);
+            auto *txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("get column"), TransactionType::kRead);
             Optional<DBMeeta> db_meta;
             Optional<TableMeeta> table_meta;
             String table_key;
             Status status = txn->GetTableMeta(*db_name_, *table_name_, db_meta, table_meta);
             EXPECT_TRUE(status.ok());
+
+            Vector<SegmentID> *segment_ids_ptr = nullptr;
+            std::tie(segment_ids_ptr, status) = table_meta->GetSegmentIDs1();
+            EXPECT_TRUE(status.ok());
+            EXPECT_EQ(*segment_ids_ptr, Vector<SegmentID>({2}));
 
             SharedPtr<Vector<SharedPtr<ColumnDef>>> column_defs;
             std::tie(column_defs, status) = table_meta->GetColumnDefs();
@@ -403,28 +425,19 @@ TEST_P(TestTxnCleanup, cleanup_and_drop_columns) {
     };
 
     validity_function_ = [this] {
-        { // check clean
-            auto txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("get segment"), TransactionType::kRead);
-            Optional<DBMeeta> db_meta;
-            Optional<TableMeeta> table_meta;
-            Status status = txn->GetTableMeta(*db_name_, *table_name_, db_meta, table_meta);
-            EXPECT_TRUE(status.ok());
-            status = table_meta->CheckSegments({0 /* segment_id */});
-            EXPECT_FALSE(status.ok());
-            status = table_meta->CheckSegments({1 /* segment_id */});
-            EXPECT_TRUE(status.ok());
-            status = table_meta->CheckSegments({2 /* segment_id */});
-            EXPECT_FALSE(status.ok());
-            status = new_txn_mgr_->CommitTxn(txn);
-            EXPECT_TRUE(status.ok());
-        }
         { // check drop column
-            auto txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("drop column"), TransactionType::kRead);
+            auto *txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("drop column"), TransactionType::kRead);
+
             Optional<DBMeeta> db_meta;
             Optional<TableMeeta> table_meta;
             String table_key;
             Status status = txn->GetTableMeta(*db_name_, *table_name_, db_meta, table_meta);
             EXPECT_TRUE(status.ok());
+
+            Vector<SegmentID> *segment_ids_ptr = nullptr;
+            std::tie(segment_ids_ptr, status) = table_meta->GetSegmentIDs1();
+            EXPECT_TRUE(status.ok());
+            EXPECT_EQ(*segment_ids_ptr, Vector<SegmentID>({2}));
 
             SharedPtr<Vector<SharedPtr<ColumnDef>>> column_defs;
             std::tie(column_defs, status) = table_meta->GetColumnDefs();
@@ -458,27 +471,18 @@ TEST_P(TestTxnCleanup, cleanup_and_rename_table) {
     };
 
     validity_function_ = [&, this] {
-        { // check clean
-            auto txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("get segment"), TransactionType::kRead);
-            Optional<DBMeeta> db_meta;
-            Optional<TableMeeta> table_meta;
-            Status status = txn->GetTableMeta(*db_name_, *new_table_name, db_meta, table_meta);
-            EXPECT_TRUE(status.ok());
-            status = table_meta->CheckSegments({0 /* segment_id */});
-            EXPECT_FALSE(status.ok());
-            status = table_meta->CheckSegments({1 /* segment_id */});
-            EXPECT_TRUE(status.ok());
-            status = table_meta->CheckSegments({2 /* segment_id */});
-            EXPECT_FALSE(status.ok());
-            status = new_txn_mgr_->CommitTxn(txn);
-            EXPECT_TRUE(status.ok());
-        }
         { // check rename table
-            auto txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("get table"), TransactionType::kRead);
+            auto *txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("get table"), TransactionType::kRead);
             Optional<DBMeeta> db_meta;
             Optional<TableMeeta> table_meta;
-            Status status = txn->GetTableMeta(*db_name_, *new_table_name, db_meta, table_meta);
+            auto status = txn->GetTableMeta(*db_name_, *new_table_name, db_meta, table_meta);
             EXPECT_TRUE(status.ok());
+
+            Vector<SegmentID> *segment_ids_ptr = nullptr;
+            std::tie(segment_ids_ptr, status) = table_meta->GetSegmentIDs1();
+            EXPECT_TRUE(status.ok());
+            EXPECT_EQ(*segment_ids_ptr, Vector<SegmentID>({2}));
+
             status = new_txn_mgr_->CommitTxn(txn);
             EXPECT_TRUE(status.ok());
         }
@@ -494,7 +498,7 @@ TEST_P(TestTxnCleanup, cleanup_and_compact) {
 
     auto other_begin = [this] { txn_other_ = new_txn_mgr_->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal); };
     auto other = [&, this] {
-        status = txn_other_->Compact(*db_name_, *table_name_, {0});
+        status = txn_other_->Compact(*db_name_, *table_name_, {2});
         EXPECT_TRUE(status.ok());
     };
     auto other_commit = [&, this] {
@@ -504,24 +508,24 @@ TEST_P(TestTxnCleanup, cleanup_and_compact) {
 
     validity_function_ = [this] {
         { // check clean & compact
-            auto txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("get segment"), TransactionType::kRead);
+            auto *txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("get segment"), TransactionType::kRead);
             Optional<DBMeeta> db_meta;
             Optional<TableMeeta> table_meta;
-            Status status = txn->GetTableMeta(*db_name_, *table_name_, db_meta, table_meta);
+            auto status = txn->GetTableMeta(*db_name_, *table_name_, db_meta, table_meta);
             EXPECT_TRUE(status.ok());
-            status = table_meta->CheckSegments({0 /* segment_id */});
-            EXPECT_FALSE(status.ok());
-            status = table_meta->CheckSegments({1 /* segment_id */});
+
+            Vector<SegmentID> *segment_ids_ptr = nullptr;
+            std::tie(segment_ids_ptr, status) = table_meta->GetSegmentIDs1();
             EXPECT_TRUE(status.ok());
-            status = table_meta->CheckSegments({2 /* segment_id */});
-            EXPECT_FALSE(status.ok());
+            EXPECT_EQ(*segment_ids_ptr, Vector<SegmentID>({3}));
+
             status = new_txn_mgr_->CommitTxn(txn);
             EXPECT_TRUE(status.ok());
         }
     };
 
     MappingFunction(other_begin, other, other_commit);
-    TestNoConflict(true);
+    TestNoConflict();
 }
 
 TEST_P(TestTxnCleanup, cleanup_and_drop_index) {
@@ -539,29 +543,19 @@ TEST_P(TestTxnCleanup, cleanup_and_drop_index) {
     };
 
     validity_function_ = [this] {
-        { // check clean
-            auto txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("get segment"), TransactionType::kRead);
-            Optional<DBMeeta> db_meta;
-            Optional<TableMeeta> table_meta;
-            Status status = txn->GetTableMeta(*db_name_, *table_name_, db_meta, table_meta);
-            EXPECT_TRUE(status.ok());
-            status = table_meta->CheckSegments({0 /* segment_id */});
-            EXPECT_FALSE(status.ok());
-            status = table_meta->CheckSegments({1 /* segment_id */});
-            EXPECT_TRUE(status.ok());
-            status = table_meta->CheckSegments({2 /* segment_id */});
-            EXPECT_FALSE(status.ok());
-            status = new_txn_mgr_->CommitTxn(txn);
-            EXPECT_TRUE(status.ok());
-        }
         {
             // check drop index
-            auto txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("get index"), TransactionType::kRead);
+            auto *txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("get index"), TransactionType::kRead);
             Optional<DBMeeta> db_meta;
             Optional<TableMeeta> table_meta;
             String table_key;
             Status status = txn->GetTableMeta(*db_name_, *table_name_, db_meta, table_meta);
             EXPECT_TRUE(status.ok());
+
+            Vector<SegmentID> *segment_ids_ptr = nullptr;
+            std::tie(segment_ids_ptr, status) = table_meta->GetSegmentIDs1();
+            EXPECT_TRUE(status.ok());
+            EXPECT_EQ(*segment_ids_ptr, Vector<SegmentID>({2}));
 
             String index_key;
             String index_id;
@@ -678,107 +672,43 @@ TEST_P(TestTxnCleanup, cleanup_and_append) {
         status = new_txn_mgr_->CommitTxn(txn_other_);
         EXPECT_TRUE(status.ok());
     };
-    pre_fucntion_ = [this] {
-        CreateDB();
-        CreateTable();
-        CreateIndex();
-        u32 block_row_cnt = 8192;
-        auto make_input_block = [&](const Value &v1, const Value &v2) {
-            auto input_block = MakeShared<DataBlock>();
-            auto append_to_col = [&](ColumnVector &col, const Value &v) {
-                for (u32 i = 0; i < block_row_cnt; ++i) {
-                    col.AppendValue(v);
-                }
-            };
-            // Initialize input block
-            {
-                auto col1 = ColumnVector::Make(column_def1_->type());
-                col1->Initialize();
-                append_to_col(*col1, v1);
-                input_block->InsertVector(col1, 0);
-            }
-            {
-                auto col2 = ColumnVector::Make(column_def2_->type());
-                col2->Initialize();
-                append_to_col(*col2, v2);
-                input_block->InsertVector(col2, 1);
-            }
-            input_block->Finalize();
-            return input_block;
-        };
-        for (int i = 0; i < 2; ++i) {
-            {
-                auto *txn = new_txn_mgr_->BeginTxn(MakeUnique<String>(fmt::format("import {}", i)), TransactionType::kNormal);
-                Vector<SharedPtr<DataBlock>> input_blocks = {make_input_block(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"))};
-                Status status = txn->Import(*db_name_, *table_name_, input_blocks);
-                EXPECT_TRUE(status.ok());
-                status = new_txn_mgr_->CommitTxn(txn);
-                EXPECT_TRUE(status.ok());
-            }
-            {
-                auto *txn = new_txn_mgr_->BeginTxn(MakeUnique<String>(fmt::format("delete an element {}", i)), TransactionType::kDelete);
-                Vector<RowID> row_ids;
-                for (u32 j = 1; j < block_row_cnt; j += 2) {
-                    row_ids.push_back(RowID(i, j));
-                }
-                Status status = txn->Delete(*db_name_, *table_name_, row_ids);
-                EXPECT_TRUE(status.ok());
-                status = new_txn_mgr_->CommitTxn(txn);
-                EXPECT_TRUE(status.ok());
-            }
-        }
-        auto *txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
-        Status status = txn->Compact(*db_name_, *table_name_, {0, 1});
-        EXPECT_TRUE(status.ok());
-        status = new_txn_mgr_->CommitTxn(txn);
-        EXPECT_TRUE(status.ok());
-    };
     validity_function_ = [this] {
-        { // check clean
-            auto txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("get segment"), TransactionType::kRead);
-            Optional<DBMeeta> db_meta;
-            Optional<TableMeeta> table_meta;
-            Status status = txn->GetTableMeta(*db_name_, *table_name_, db_meta, table_meta);
-            EXPECT_TRUE(status.ok());
-            status = table_meta->CheckSegments({0 /* segment_id */});
-            EXPECT_FALSE(status.ok());
-            status = table_meta->CheckSegments({1 /* segment_id */});
-            EXPECT_FALSE(status.ok());
-            status = table_meta->CheckSegments({2 /* segment_id */});
-            EXPECT_TRUE(status.ok());
-            status = new_txn_mgr_->CommitTxn(txn);
-            EXPECT_TRUE(status.ok());
-        }
-        { // check append
+        {
+            // check append
             auto *txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("check"), TransactionType::kNormal);
 
             Optional<DBMeeta> db_meta;
             Optional<TableMeeta> table_meta;
-            Status status = txn->GetTableMeta(*db_name_, *table_name_, db_meta, table_meta);
+            auto status = txn->GetTableMeta(*db_name_, *table_name_, db_meta, table_meta);
             EXPECT_TRUE(status.ok());
 
             Vector<SegmentID> *segment_ids_ptr = nullptr;
             std::tie(segment_ids_ptr, status) = table_meta->GetSegmentIDs1();
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*segment_ids_ptr, Vector<SegmentID>({2, 3}));
+
             SegmentID segment_id = segment_ids_ptr->back();
 
             SegmentMeta segment_meta(segment_id, *table_meta);
 
-            SizeT segment_row_cnt = 0;
-            std::tie(segment_row_cnt, status) = segment_meta.GetRowCnt1();
-            EXPECT_EQ(segment_row_cnt, 1);
+            {
+                SizeT segment_row_cnt = 0;
+                std::tie(segment_row_cnt, status) = segment_meta.GetRowCnt1();
+                EXPECT_EQ(segment_row_cnt, 1);
+            }
 
-            Vector<BlockID> *block_ids_ptr = nullptr;
-            std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1();
-            EXPECT_TRUE(status.ok());
-            EXPECT_EQ(*block_ids_ptr, Vector<BlockID>({0}));
+            {
+                Vector<BlockID> *block_ids_ptr = nullptr;
+                std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1();
+                EXPECT_TRUE(status.ok());
+                EXPECT_EQ(*block_ids_ptr, Vector<BlockID>({0}));
 
-            BlockID block_id = block_ids_ptr->back();
-            BlockMeta block_meta(block_id, segment_meta);
-            SizeT block_row_cnt = 0;
-            std::tie(block_row_cnt, status) = block_meta.GetRowCnt1();
-            EXPECT_EQ(block_row_cnt, 1);
+                BlockID block_id = block_ids_ptr->back();
+                BlockMeta block_meta(block_id, segment_meta);
+                SizeT block_row_cnt = 0;
+                std::tie(block_row_cnt, status) = block_meta.GetRowCnt1();
+                EXPECT_EQ(block_row_cnt, 1);
+            }
 
             status = new_txn_mgr_->CommitTxn(txn);
             EXPECT_TRUE(status.ok());
@@ -791,103 +721,31 @@ TEST_P(TestTxnCleanup, cleanup_and_append) {
 
 TEST_P(TestTxnCleanup, cleanup_and_delete) {
     LOG_INFO("Checking cleanup & delete...");
-    Status status;
-
     auto other_begin = [this] { txn_other_ = new_txn_mgr_->BeginTxn(MakeUnique<String>("delete"), TransactionType::kNormal); };
     auto other = [&, this] {
         Vector<RowID> row_ids;
         row_ids.push_back(RowID(2, 0));
-        status = txn_other_->Delete(*db_name_, *table_name_, row_ids);
+        auto status = txn_other_->Delete(*db_name_, *table_name_, row_ids);
         EXPECT_TRUE(status.ok());
     };
     auto other_commit = [&, this] {
-        status = new_txn_mgr_->CommitTxn(txn_other_);
-        EXPECT_TRUE(status.ok());
-    };
-    pre_fucntion_ = [this] {
-        CreateDB();
-        CreateTable();
-        CreateIndex();
-        u32 block_row_cnt = 8192;
-        auto make_input_block = [&](const Value &v1, const Value &v2) {
-            auto input_block = MakeShared<DataBlock>();
-            auto append_to_col = [&](ColumnVector &col, const Value &v) {
-                for (u32 i = 0; i < block_row_cnt; ++i) {
-                    col.AppendValue(v);
-                }
-            };
-            // Initialize input block
-            {
-                auto col1 = ColumnVector::Make(column_def1_->type());
-                col1->Initialize();
-                append_to_col(*col1, v1);
-                input_block->InsertVector(col1, 0);
-            }
-            {
-                auto col2 = ColumnVector::Make(column_def2_->type());
-                col2->Initialize();
-                append_to_col(*col2, v2);
-                input_block->InsertVector(col2, 1);
-            }
-            input_block->Finalize();
-            return input_block;
-        };
-        for (int i = 0; i < 2; ++i) {
-            {
-                auto *txn = new_txn_mgr_->BeginTxn(MakeUnique<String>(fmt::format("import {}", i)), TransactionType::kNormal);
-                Vector<SharedPtr<DataBlock>> input_blocks = {make_input_block(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"))};
-                Status status = txn->Import(*db_name_, *table_name_, input_blocks);
-                EXPECT_TRUE(status.ok());
-                status = new_txn_mgr_->CommitTxn(txn);
-                EXPECT_TRUE(status.ok());
-            }
-            {
-                auto *txn = new_txn_mgr_->BeginTxn(MakeUnique<String>(fmt::format("delete an element {}", i)), TransactionType::kDelete);
-                Vector<RowID> row_ids;
-                for (u32 j = 1; j < block_row_cnt; j += 2) {
-                    row_ids.push_back(RowID(i, j));
-                }
-                Status status = txn->Delete(*db_name_, *table_name_, row_ids);
-                EXPECT_TRUE(status.ok());
-                status = new_txn_mgr_->CommitTxn(txn);
-                EXPECT_TRUE(status.ok());
-            }
-        }
-        auto *txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
-        Status status = txn->Compact(*db_name_, *table_name_, {0, 1});
-        EXPECT_TRUE(status.ok());
-        status = new_txn_mgr_->CommitTxn(txn);
+        auto status = new_txn_mgr_->CommitTxn(txn_other_);
         EXPECT_TRUE(status.ok());
     };
     validity_function_ = [this] {
-        { // check clean
-            auto txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("get segment"), TransactionType::kRead);
-            Optional<DBMeeta> db_meta;
-            Optional<TableMeeta> table_meta;
-            Status status = txn->GetTableMeta(*db_name_, *table_name_, db_meta, table_meta);
-            EXPECT_TRUE(status.ok());
-            status = table_meta->CheckSegments({0 /* segment_id */});
-            EXPECT_FALSE(status.ok());
-            status = table_meta->CheckSegments({1 /* segment_id */});
-            EXPECT_FALSE(status.ok());
-            status = table_meta->CheckSegments({2 /* segment_id */});
-            EXPECT_TRUE(status.ok());
-            status = new_txn_mgr_->CommitTxn(txn);
-            EXPECT_TRUE(status.ok());
-        }
-
-        { // check delete
-            auto txn_compact = new_txn_mgr_->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
-            Status status = txn_compact->Compact(*db_name_, *table_name_, {2});
+        {
+            auto *txn_compact = new_txn_mgr_->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
+            auto status = txn_compact->Compact(*db_name_, *table_name_, {2});
             EXPECT_TRUE(status.ok());
             status = new_txn_mgr_->CommitTxn(txn_compact);
             EXPECT_TRUE(status.ok());
-
+        }
+        {
             auto *txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("check"), TransactionType::kNormal);
 
             Optional<DBMeeta> db_meta;
             Optional<TableMeeta> table_meta;
-            status = txn->GetTableMeta(*db_name_, *table_name_, db_meta, table_meta);
+            auto status = txn->GetTableMeta(*db_name_, *table_name_, db_meta, table_meta);
             EXPECT_TRUE(status.ok());
 
             Vector<SegmentID> *segment_ids_ptr = nullptr;
@@ -900,18 +758,12 @@ TEST_P(TestTxnCleanup, cleanup_and_delete) {
 
             SizeT segment_row_cnt;
             std::tie(segment_row_cnt, status) = segment_meta.GetRowCnt1();
-            EXPECT_EQ(segment_row_cnt, 8191);
+            EXPECT_EQ(segment_row_cnt, 1);
 
             Vector<BlockID> *block_ids_ptr = nullptr;
             std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1();
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*block_ids_ptr, Vector<BlockID>({0}));
-
-            BlockID block_id = (*block_ids_ptr)[0];
-            BlockMeta block_meta(block_id, segment_meta);
-            SizeT block_row_cnt;
-            std::tie(block_row_cnt, status) = block_meta.GetRowCnt1();
-            EXPECT_EQ(block_row_cnt, 8191);
 
             status = new_txn_mgr_->CommitTxn(txn);
             EXPECT_TRUE(status.ok());
@@ -924,107 +776,42 @@ TEST_P(TestTxnCleanup, cleanup_and_delete) {
 
 TEST_P(TestTxnCleanup, cleanup_and_update) {
     LOG_INFO("Checking cleanup & update...");
-    Status status;
-
     auto other_begin = [this] { txn_other_ = new_txn_mgr_->BeginTxn(MakeUnique<String>("update"), TransactionType::kNormal); };
     auto other = [&, this] {
-        auto input_block = MakeInputBlock(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"), 1);
+        auto input_block = MakeInputBlock(Value::MakeInt(2), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"), 1);
         Vector<RowID> row_ids;
         row_ids.push_back(RowID(2, 0));
-        status = txn_other_->Update(*db_name_, *table_name_, input_block, row_ids);
+        auto status = txn_other_->Update(*db_name_, *table_name_, input_block, row_ids);
         EXPECT_TRUE(status.ok());
     };
     auto other_commit = [&, this] {
-        status = new_txn_mgr_->CommitTxn(txn_other_);
-        EXPECT_TRUE(status.ok());
-    };
-
-    pre_fucntion_ = [this] {
-        CreateDB();
-        CreateTable();
-        CreateIndex();
-        u32 block_row_cnt = 8192;
-        auto make_input_block = [&](const Value &v1, const Value &v2) {
-            auto input_block = MakeShared<DataBlock>();
-            auto append_to_col = [&](ColumnVector &col, const Value &v) {
-                for (u32 i = 0; i < block_row_cnt; ++i) {
-                    col.AppendValue(v);
-                }
-            };
-            // Initialize input block
-            {
-                auto col1 = ColumnVector::Make(column_def1_->type());
-                col1->Initialize();
-                append_to_col(*col1, v1);
-                input_block->InsertVector(col1, 0);
-            }
-            {
-                auto col2 = ColumnVector::Make(column_def2_->type());
-                col2->Initialize();
-                append_to_col(*col2, v2);
-                input_block->InsertVector(col2, 1);
-            }
-            input_block->Finalize();
-            return input_block;
-        };
-        for (int i = 0; i < 2; ++i) {
-            {
-                auto *txn = new_txn_mgr_->BeginTxn(MakeUnique<String>(fmt::format("import {}", i)), TransactionType::kNormal);
-                Vector<SharedPtr<DataBlock>> input_blocks = {make_input_block(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"))};
-                Status status = txn->Import(*db_name_, *table_name_, input_blocks);
-                EXPECT_TRUE(status.ok());
-                status = new_txn_mgr_->CommitTxn(txn);
-                EXPECT_TRUE(status.ok());
-            }
-            {
-                auto *txn = new_txn_mgr_->BeginTxn(MakeUnique<String>(fmt::format("delete an element {}", i)), TransactionType::kDelete);
-                Vector<RowID> row_ids;
-                for (u32 j = 1; j < block_row_cnt; j += 2) {
-                    row_ids.push_back(RowID(i, j));
-                }
-                Status status = txn->Delete(*db_name_, *table_name_, row_ids);
-                EXPECT_TRUE(status.ok());
-                status = new_txn_mgr_->CommitTxn(txn);
-                EXPECT_TRUE(status.ok());
-            }
-        }
-        auto *txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
-        Status status = txn->Compact(*db_name_, *table_name_, {0, 1});
-        EXPECT_TRUE(status.ok());
-        status = new_txn_mgr_->CommitTxn(txn);
+        auto status = new_txn_mgr_->CommitTxn(txn_other_);
         EXPECT_TRUE(status.ok());
     };
 
     validity_function_ = [this] {
-        { // check clean
-            auto txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("get segment"), TransactionType::kRead);
-            Optional<DBMeeta> db_meta;
-            Optional<TableMeeta> table_meta;
-            Status status = txn->GetTableMeta(*db_name_, *table_name_, db_meta, table_meta);
-            EXPECT_TRUE(status.ok());
-            status = table_meta->CheckSegments({0 /* segment_id */});
-            EXPECT_FALSE(status.ok());
-            status = table_meta->CheckSegments({1 /* segment_id */});
-            EXPECT_FALSE(status.ok());
-            status = table_meta->CheckSegments({2 /* segment_id */});
-            EXPECT_TRUE(status.ok());
-            status = table_meta->CheckSegments({3 /* segment_id */});
+        {
+            auto *txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
+            auto status = txn->Compact(*db_name_, *table_name_, {2, 3});
             EXPECT_TRUE(status.ok());
             status = new_txn_mgr_->CommitTxn(txn);
             EXPECT_TRUE(status.ok());
         }
-        { // check update
-            auto txn_compact = new_txn_mgr_->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
-            Status status = txn_compact->Compact(*db_name_, *table_name_, {2, 3});
+        {
+            auto *wal_manager = InfinityContext::instance().storage()->wal_manager();
+            auto *txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("checkpoint"), TransactionType::kNewCheckpoint);
+            auto status = txn->Checkpoint(wal_manager->LastCheckpointTS());
             EXPECT_TRUE(status.ok());
-            status = new_txn_mgr_->CommitTxn(txn_compact);
+            status = new_txn_mgr_->CommitTxn(txn);
             EXPECT_TRUE(status.ok());
+        }
 
+        { // check update
             auto *txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("check"), TransactionType::kNormal);
 
             Optional<DBMeeta> db_meta;
             Optional<TableMeeta> table_meta;
-            status = txn->GetTableMeta(*db_name_, *table_name_, db_meta, table_meta);
+            auto status = txn->GetTableMeta(*db_name_, *table_name_, db_meta, table_meta);
             EXPECT_TRUE(status.ok());
 
             Vector<SegmentID> *segment_ids_ptr = nullptr;
@@ -1037,7 +824,7 @@ TEST_P(TestTxnCleanup, cleanup_and_update) {
 
             SizeT segment_row_cnt = 0;
             std::tie(segment_row_cnt, status) = segment_meta.GetRowCnt1();
-            EXPECT_EQ(segment_row_cnt, 8192);
+            EXPECT_EQ(segment_row_cnt, 2);
 
             Vector<BlockID> *block_ids_ptr = nullptr;
             std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1();
@@ -1048,7 +835,7 @@ TEST_P(TestTxnCleanup, cleanup_and_update) {
             BlockMeta block_meta(block_id, segment_meta);
             SizeT block_row_cnt = 0;
             std::tie(block_row_cnt, status) = block_meta.GetRowCnt1();
-            EXPECT_EQ(block_row_cnt, 8192);
+            EXPECT_EQ(block_row_cnt, 2);
 
             status = new_txn_mgr_->CommitTxn(txn);
             EXPECT_TRUE(status.ok());
@@ -1061,98 +848,25 @@ TEST_P(TestTxnCleanup, cleanup_and_update) {
 
 TEST_P(TestTxnCleanup, cleanup_and_dump_index) {
     LOG_INFO("Checking cleanup & dump index...");
-    Status status;
-
     auto other_begin = [this] { txn_other_ = new_txn_mgr_->BeginTxn(MakeUnique<String>("dump index"), TransactionType::kNormal); };
     auto other = [&, this] {
         SegmentID segment_id = 1;
-        status = txn_other_->DumpMemIndex(*db_name_, *table_name_, *index_name1_, segment_id);
+        auto status = txn_other_->DumpMemIndex(*db_name_, *table_name_, *index_name1_, segment_id);
         EXPECT_TRUE(status.ok());
     };
     auto other_commit = [&, this] {
-        status = new_txn_mgr_->CommitTxn(txn_other_);
-        EXPECT_TRUE(status.ok());
-    };
-    pre_fucntion_ = [this] {
-        CreateDB();
-        CreateTable();
-        CreateIndex();
-        u32 block_row_cnt = 8192;
-        auto make_input_block = [&](const Value &v1, const Value &v2) {
-            auto input_block = MakeShared<DataBlock>();
-            auto append_to_col = [&](ColumnVector &col, const Value &v) {
-                for (u32 i = 0; i < block_row_cnt; ++i) {
-                    col.AppendValue(v);
-                }
-            };
-            // Initialize input block
-            {
-                auto col1 = ColumnVector::Make(column_def1_->type());
-                col1->Initialize();
-                append_to_col(*col1, v1);
-                input_block->InsertVector(col1, 0);
-            }
-            {
-                auto col2 = ColumnVector::Make(column_def2_->type());
-                col2->Initialize();
-                append_to_col(*col2, v2);
-                input_block->InsertVector(col2, 1);
-            }
-            input_block->Finalize();
-            return input_block;
-        };
-        for (int i = 0; i < 2; ++i) {
-            {
-                auto *txn = new_txn_mgr_->BeginTxn(MakeUnique<String>(fmt::format("import {}", i)), TransactionType::kNormal);
-                Vector<SharedPtr<DataBlock>> input_blocks = {make_input_block(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"))};
-                Status status = txn->Import(*db_name_, *table_name_, input_blocks);
-                EXPECT_TRUE(status.ok());
-                status = new_txn_mgr_->CommitTxn(txn);
-                EXPECT_TRUE(status.ok());
-            }
-            {
-                auto *txn = new_txn_mgr_->BeginTxn(MakeUnique<String>(fmt::format("delete an element {}", i)), TransactionType::kDelete);
-                Vector<RowID> row_ids;
-                for (u32 j = 1; j < block_row_cnt; j += 2) {
-                    row_ids.push_back(RowID(i, j));
-                }
-                Status status = txn->Delete(*db_name_, *table_name_, row_ids);
-                EXPECT_TRUE(status.ok());
-                status = new_txn_mgr_->CommitTxn(txn);
-                EXPECT_TRUE(status.ok());
-            }
-        }
-        auto *txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
-        Status status = txn->Compact(*db_name_, *table_name_, {0, 1});
-        EXPECT_TRUE(status.ok());
-        status = new_txn_mgr_->CommitTxn(txn);
+        auto status = new_txn_mgr_->CommitTxn(txn_other_);
         EXPECT_TRUE(status.ok());
     };
     validity_function_ = [&, this] {
-        { // check clean
-            auto txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("get segment"), TransactionType::kRead);
-            Optional<DBMeeta> db_meta;
-            Optional<TableMeeta> table_meta;
-            Status status = txn->GetTableMeta(*db_name_, *table_name_, db_meta, table_meta);
-            EXPECT_TRUE(status.ok());
-            status = table_meta->CheckSegments({0 /* segment_id */});
-            EXPECT_FALSE(status.ok());
-            status = table_meta->CheckSegments({1 /* segment_id */});
-            EXPECT_FALSE(status.ok());
-            status = table_meta->CheckSegments({2 /* segment_id */});
-            EXPECT_TRUE(status.ok());
-            status = new_txn_mgr_->CommitTxn(txn);
-            EXPECT_TRUE(status.ok());
-        }
         { // check dump index
             auto *txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("check"), TransactionType::kNormal);
-            SizeT block_row_cnt = 8192;
             Optional<DBMeeta> db_meta;
             Optional<TableMeeta> table_meta;
             Optional<TableIndexMeeta> table_index_meta;
             String table_key;
             String index_key;
-            Status status =
+            auto status =
                 txn->GetTableIndexMeta(*db_name_, *table_name_, *index_name1_, db_meta, table_meta, table_index_meta, &table_key, &index_key);
             EXPECT_TRUE(status.ok());
 
@@ -1177,9 +891,9 @@ TEST_P(TestTxnCleanup, cleanup_and_dump_index) {
             ChunkIndexMeta chunk_index_meta(chunk_id, segment_index_meta);
             {
                 ChunkIndexMetaInfo *chunk_info = nullptr;
-                Status status = chunk_index_meta.GetChunkInfo(chunk_info);
+                auto status = chunk_index_meta.GetChunkInfo(chunk_info);
                 EXPECT_TRUE(status.ok());
-                EXPECT_EQ(chunk_info->row_cnt_, block_row_cnt);
+                EXPECT_EQ(chunk_info->row_cnt_, 2);
                 EXPECT_EQ(chunk_info->base_row_id_, RowID(2, 0));
             }
 

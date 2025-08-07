@@ -22,11 +22,9 @@ import :txn_allocator_task;
 import :new_txn;
 import :logger;
 import :storage;
-import :third_party;
 import :base_txn_store;
 import :txn_state;
 import :infinity_exception;
-import :new_catalog;
 import :catalog_cache;
 import :status;
 
@@ -75,16 +73,15 @@ void TxnAllocator::Process() {
                     case TransactionType::kAppend: {
                         AppendTxnStore *txn_store = static_cast<AppendTxnStore *>(base_txn_store);
                         SizeT row_count = txn_store->input_block_->row_count();
-                        //                        LOG_TRACE(fmt::format("TxnAllocator: Append txn {}: db: {}, {}, table: {}, {}, data size: {}",
-                        //                                              txn->TxnID(),
-                        //                                              txn_store->db_name_,
-                        //                                              txn_store->db_id_,
-                        //                                              txn_store->table_name_,
-                        //                                              txn_store->table_id_,
-                        //                                              row_count));
-                        SharedPtr<AppendPrepareInfo> append_info =
-                            system_cache_->PrepareAppend(txn_store->db_id_, txn_store->table_id_, row_count, txn->TxnID());
-                        txn_store->row_ranges_ = append_info->ranges_;
+                        // LOG_TRACE(fmt::format("TxnAllocator: Append txn {}: db: {}, {}, table: {}, {}, data size: {}",
+                        //                       txn->TxnID(),
+                        //                       txn_store->db_name_,
+                        //                       txn_store->db_id_,
+                        //                       txn_store->table_name_,
+                        //                       txn_store->table_id_,
+                        //                       row_count));
+                        auto append_info_ptr = system_cache_->PrepareAppend(txn_store->db_id_, txn_store->table_id_, row_count, txn->TxnID());
+                        txn_store->row_ranges_ = append_info_ptr->ranges_;
                         break;
                     }
                     case TransactionType::kUpdate: {
