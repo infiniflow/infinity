@@ -236,7 +236,7 @@ Status CompactionProcessor::NewManualCompact(const String &db_name, const String
             return status;
         }
         segment_ids = *segment_ids_ptr;
-        SegmentID unsealed_id = std::numeric_limits<SegmentID>::max();
+        SegmentID unsealed_id = 0;
         status = table_meta->GetUnsealedSegmentID(unsealed_id);
         if (!status.ok()) {
             if (status.code() != ErrorCode::kNotFound) {
