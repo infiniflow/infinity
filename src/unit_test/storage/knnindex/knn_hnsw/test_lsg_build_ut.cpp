@@ -64,15 +64,15 @@ protected:
         lsg_config = LSGConfig();
     }
 
-    UniquePtr<IndexHnsw> MakeIndexHnsw() {
-        return MakeUnique<
+    SharedPtr<IndexHnsw> MakeIndexHnsw() {
+        return MakeShared<
             IndexHnsw>(index_name, nullptr, filename, column_names, metric_type, encode_type, build_type, M, ef_construction, block_size, lsg_config);
     }
 
-    UniquePtr<ColumnDef> MakeColumnDef() {
+    SharedPtr<ColumnDef> MakeColumnDef() {
         auto embeddingInfo = MakeShared<EmbeddingInfo>(EmbeddingDataType::kElemFloat, dim);
         auto data_type = MakeShared<DataType>(LogicalType::kEmbedding, embeddingInfo);
-        return MakeUnique<ColumnDef>(0, data_type, column_names[0], std::set<ConstraintType>());
+        return MakeShared<ColumnDef>(0, data_type, column_names[0], std::set<ConstraintType>());
     }
 
 protected:
@@ -110,9 +110,11 @@ TEST_F(LSGBuildTest, test_avg) {
     auto index_hnsw = MakeIndexHnsw();
     auto column_def = MakeColumnDef();
 
-    HnswLSGBuilder lsg_builder(index_hnsw.get(), std::move(column_def));
+    HnswLSGBuilder<f32, f32> lsg_builder(index_hnsw.get(), column_def);
 
-    auto avg = lsg_builder.GetLSAvg<decltype(iter), f32, f32>(std::move(iter), element_size, RowID(0, 0));
+    lsg_builder.InsertSampleVec(iter);
+    lsg_builder.InsertLSAvg<decltype(iter)>(std::move(iter), element_size);
+    auto avg = lsg_builder.avg();
 
     auto avg_gt = MakeUnique<float[]>(element_size);
     {
@@ -162,11 +164,14 @@ TEST_F(LSGBuildTest, test1) {
     auto index_hnsw = MakeIndexHnsw();
     auto column_def = MakeColumnDef();
 
-    HnswLSGBuilder lsg_builder(index_hnsw.get(), std::move(column_def));
 
     auto iter = DenseVectorIter<f32, LabelT>(data.get(), dim, element_size);
 
-    UniquePtr<HnswIndexInMem> hnsw_index = lsg_builder.MakeImplIter<decltype(iter), f32, f32>(std::move(iter), element_size, RowID(0, 0), false);
+    auto hnsw_index = HnswIndexInMem::Make(index_hnsw.get(), column_def);
+    hnsw_index->InsertSampleVecs(iter);
+    hnsw_index->InsertLSAvg(iter, element_size);
+    hnsw_index->SetLSGParam();
+    hnsw_index->InsertVecs(std::move(iter), kDefaultHnswInsertConfig, false);
 
     u32 correct_count = 0;
     i32 topk = 1;

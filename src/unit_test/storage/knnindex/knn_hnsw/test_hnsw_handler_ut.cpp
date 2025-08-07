@@ -84,13 +84,13 @@ public:
         }
     }
 
-    UniquePtr<IndexHnsw> MakeIndexHnsw(bool compress = false) {
+    SharedPtr<IndexHnsw> MakeIndexHnsw(bool compress = false) {
         HnswEncodeType tmp_encode_type = compress ? HnswEncodeType::kLVQ : encode_type;
         return MakeUnique<
             IndexHnsw>(index_name, nullptr, filename, column_names, metric_type, tmp_encode_type, build_type, M, ef_construction, chunk_size, None);
     }
 
-    UniquePtr<ColumnDef> MakeColumnDef() {
+    SharedPtr<ColumnDef> MakeColumnDef() {
         auto embeddingInfo = MakeShared<EmbeddingInfo>(EmbeddingDataType::kElemFloat, dim);
         auto data_type = MakeShared<DataType>(LogicalType::kEmbedding, embeddingInfo);
         return MakeUnique<ColumnDef>(0, data_type, column_names[0], std::set<ConstraintType>());
@@ -148,7 +148,7 @@ TEST_F(HnswHandlerTest, test_memory) {
 
     {
         /// get HnswHandler
-        auto hnsw_handler = HnswHandler::Make(index_hnsw.get(), column_def.get());
+        auto hnsw_handler = HnswHandler::Make(index_hnsw.get(), column_def);
         auto iter = DenseVectorIter<float, LabelT>(data.get(), dim, element_size);
         hnsw_handler->InsertVecs(std::move(iter));
 
@@ -168,7 +168,7 @@ TEST_F(HnswHandlerTest, test_memory) {
 
     /// test load
     {
-        auto hnsw_handler = HnswHandler::Make(index_hnsw.get(), column_def.get());
+        auto hnsw_handler = HnswHandler::Make(index_hnsw.get(), column_def);
         SizeT file_size = VirtualStore::GetFileSize(filepath);
         auto [file_handle, status] = VirtualStore::Open(filepath, FileAccessMode::kRead);
         if (!status.ok()) {
@@ -185,7 +185,7 @@ TEST_F(HnswHandlerTest, test_compress) {
     {
         auto index_hnsw = MakeIndexHnsw();
         auto column_def = MakeColumnDef();
-        auto hnsw_handler = HnswHandler::Make(index_hnsw.get(), column_def.get());
+        auto hnsw_handler = HnswHandler::Make(index_hnsw.get(), column_def);
         auto iter = DenseVectorIter<float, LabelT>(data.get(), dim, element_size);
         hnsw_handler->InsertVecs(std::move(iter));
 
@@ -204,7 +204,7 @@ TEST_F(HnswHandlerTest, test_compress) {
     {
         auto index_hnsw = MakeIndexHnsw(true);
         auto column_def = MakeColumnDef();
-        auto hnsw_handler = HnswHandler::Make(index_hnsw.get(), column_def.get());
+        auto hnsw_handler = HnswHandler::Make(index_hnsw.get(), column_def);
         SizeT file_size = VirtualStore::GetFileSize(filepath);
         auto [file_handle, status] = VirtualStore::Open(filepath, FileAccessMode::kRead);
         if (!status.ok()) {
@@ -222,7 +222,7 @@ TEST_F(HnswHandlerTest, test_load) {
     /// save index file
     {
         /// get HnswHandler
-        auto hnsw_handler = HnswHandler::Make(index_hnsw.get(), column_def.get());
+        auto hnsw_handler = HnswHandler::Make(index_hnsw.get(), column_def);
         auto iter = DenseVectorIter<float, LabelT>(data.get(), dim, element_size);
         hnsw_handler->InsertVecs(std::move(iter));
 
@@ -235,7 +235,7 @@ TEST_F(HnswHandlerTest, test_load) {
     }
     /// load by file_handle
     {
-        auto hnsw_handler = HnswHandler::Make(index_hnsw.get(), column_def.get());
+        auto hnsw_handler = HnswHandler::Make(index_hnsw.get(), column_def);
 
         SizeT file_size = VirtualStore::GetFileSize(filepath);
         auto [file_handle, status] = VirtualStore::Open(filepath, FileAccessMode::kRead);
@@ -248,7 +248,7 @@ TEST_F(HnswHandlerTest, test_load) {
     }
     /// load by mmap
     {
-        auto hnsw_handler = HnswHandler::Make(index_hnsw.get(), column_def.get(), false);
+        auto hnsw_handler = HnswHandler::Make(index_hnsw.get(), column_def, false);
         SizeT file_size = VirtualStore::GetFileSize(filepath);
 #define USE_MMAP
 #ifdef USE_MMAP
@@ -280,7 +280,7 @@ TEST_F(HnswHandlerTest, test_load) {
 TEST_F(HnswHandlerTest, test_parallel) {
     auto index_hnsw = MakeIndexHnsw();
     auto column_def = MakeColumnDef();
-    auto hnsw_handler = HnswHandler::Make(index_hnsw.get(), column_def.get());
+    auto hnsw_handler = HnswHandler::Make(index_hnsw.get(), column_def);
 
     std::atomic<int> total = 0;
     std::atomic<int> res = 0;

@@ -31,21 +31,40 @@ namespace infinity {
 export template <typename DataType>
 class MemIndexInserterIter1 {
 public:
+    using This = MemIndexInserterIter1<DataType>;
+    using Split = Vector<This>;
     using ValueType = const DataType *;
 
     MemIndexInserterIter1(SegmentOffset block_offset, const ColumnVector &col, BlockOffset offset, BlockOffset row_cnt)
         : block_offset_(block_offset), col_(col), ele_size_(col.data_type()->Size()), cur_(offset), end_(offset + row_cnt) {}
 
-    Optional<Pair<const DataType *, SegmentOffset>> Next() {
+    Optional<Pair<ValueType, SegmentOffset>> Next() {
         if (cur_ == end_) {
             return None;
         }
         const void *ret = col_.data() + cur_ * ele_size_;
-        const auto *v_ptr = reinterpret_cast<const DataType *>(ret);
+        const auto *v_ptr = reinterpret_cast<ValueType>(ret);
         return std::make_pair(v_ptr, block_offset_ + cur_++);
     }
 
     const ColumnVector *column_vector() const { return &col_; }
+
+    Split split() && {
+        Split res;
+        SizeT vec_num = 0;
+        BlockOffset head = cur_;
+        while (cur_ != end_) {
+            if (vec_num == DEFAULT_ITER_BATCH_SIZE) {
+                res.emplace_back(block_offset_, col_, head, DEFAULT_ITER_BATCH_SIZE);
+                vec_num = 0;
+                head = cur_;
+            }
+            ++cur_;
+            ++vec_num;
+        }
+        res.emplace_back(block_offset_, col_, head, vec_num);
+        return res;
+    }
 
 private:
     SegmentOffset block_offset_;
