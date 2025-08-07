@@ -6126,7 +6126,7 @@ Status NewTxn::CheckpointforSnapshot(TxnTimeStamp last_ckp_ts, CheckpointTxnStor
 
     auto *wal_manager = InfinityContext::instance().storage()->wal_manager();
     if (!wal_manager->SetCheckpointing()) {
-        return Status::RecoverableError("WAL manager is checkpointing, please retry later");    
+        return Status::Checkpointing();    
     }
     DeferFn defer([&] { wal_manager->UnsetCheckpoint(); });
 
