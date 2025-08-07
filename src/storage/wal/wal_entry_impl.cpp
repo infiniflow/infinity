@@ -190,18 +190,6 @@ void WalSegmentInfoV2::WriteBufferAdv(char *&buf) const {
     }
 }
 
-WalSegmentInfoV2::WalSegmentInfoV2(SegmentID segment_id, const Vector<BlockID> &block_ids) : segment_id_(segment_id) {
-    block_ids_ = block_ids;
-}
-
-void WalSegmentInfoV2::WriteBufferAdv(char *&buf) const {
-    WriteBufAdv(buf, segment_id_);
-    WriteBufAdv(buf, static_cast<i32>(block_ids_.size()));
-    for (const auto &block_id : block_ids_) {
-        WriteBufAdv(buf, block_id);
-    }
-}
-
 WalSegmentInfo::WalSegmentInfo(SegmentMeta &segment_meta, TxnTimeStamp begin_ts) : segment_id_(segment_meta.segment_id()) {
     Status status;
 

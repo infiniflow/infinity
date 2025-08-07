@@ -42,7 +42,8 @@ option(CI "Build in CI mode" OFF)
 if (CI)
     add_definitions(-DCI=1)
 endif ()
-add_definitions(-D_POSIX_C_SOURCE=200809L -D_POSIX_SEM_VALUE_MAX=_SC_SEM_VALUE_MAX -DARROW_USE_NATIVE_INT128)
+# add_definitions(-D_POSIX_C_SOURCE=200809L -D_POSIX_SEM_VALUE_MAX=_SC_SEM_VALUE_MAX -DARROW_USE_NATIVE_INT128)
+
 
 message(STATUS "CXX: ${CMAKE_CXX_COMPILER}")
 execute_process(COMMAND ${CMAKE_CXX_COMPILER} --version OUTPUT_VARIABLE clang_full_version_string)
@@ -108,6 +109,8 @@ get_filename_component(GCC15_LIB_DIR ${STDCXX15_STATIC} DIRECTORY)
 
 set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -L${GCC15_LIB_DIR} -static-libstdc++ -static-libgcc")
 
+find_package(Python3 COMPONENTS Interpreter Development REQUIRED)
+
 find_package(absl CONFIG REQUIRED)
 find_package(Arrow CONFIG REQUIRED)
 find_package(Boost REQUIRED COMPONENTS asio)
@@ -144,7 +147,7 @@ if (ARM64)
 endif ()
 find_package(tomlplusplus CONFIG REQUIRED)
 #find_package(turbobase64 CONFIG REQUIRED)
-find_package(Thrift CONFIG REQUIRED)
+#find_package(Thrift CONFIG REQUIRED)
 #find_package(unofficial-curlpp CONFIG REQUIRED) # for s3
 find_package(unofficial-inih CONFIG REQUIRED)
 find_path(VIT_VIT_CTPL_INCLUDE_DIRS "ctpl_stl.h")

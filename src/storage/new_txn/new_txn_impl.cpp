@@ -2904,13 +2904,6 @@ bool NewTxn::CheckConflictCmd(const WalCmdCreateDatabaseV2 &cmd, NewTxn *previou
                 }
                 break;
             }
-            case WalCommandType::CREATE_TABLE_SNAPSHOT: {
-                auto *create_table_snapshot_cmd = static_cast<WalCmdCreateTableSnapshot *>(wal_cmd.get());
-                if (create_table_snapshot_cmd->db_name_ == db_name) {
-                    retry_query = true;
-                    conflict = true;
-                }
-            }
             default: {
                 //
             }
@@ -2937,13 +2930,6 @@ bool NewTxn::CheckConflictCmd(const WalCmdDropDatabaseV2 &cmd, NewTxn *previous_
                     conflict = true;
                 }
                 break;
-            }
-            case WalCommandType::CREATE_TABLE_SNAPSHOT: {
-                auto *create_table_snapshot_cmd = static_cast<WalCmdCreateTableSnapshot *>(wal_cmd.get());
-                if (create_table_snapshot_cmd->db_name_ == db_name) {
-                    retry_query = true;
-                    conflict = true;
-                }
             }
             default: {
                 //

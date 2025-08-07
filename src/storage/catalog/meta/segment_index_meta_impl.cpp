@@ -206,16 +206,6 @@ Status SegmentIndexMeta::RestoreSet(const ChunkID &next_chunk_id) {
     return Status::OK();
 }
 
-Status SegmentIndexMeta::RestoreSet(const ChunkID &next_chunk_id) {
-   {
-        Status status = SetNextChunkID(next_chunk_id);
-        if (!status.ok()) {
-            return status;
-        }
-    }
-    return Status::OK();
-}
-
 Status SegmentIndexMeta::LoadSet() {
     // {
     //     String mem_index_key = GetSegmentIndexTag("mem_index");
