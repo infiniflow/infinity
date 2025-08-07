@@ -153,14 +153,6 @@ protected:
             status = new_txn_mgr_->CommitTxn(txn);
             EXPECT_TRUE(status.ok());
         }
-        // {
-        //     auto *wal_manager = InfinityContext::instance().storage()->wal_manager();
-        //     auto *txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("checkpoint"), TransactionType::kNewCheckpoint);
-        //     auto status = txn->Checkpoint(wal_manager->LastCheckpointTS());
-        //     EXPECT_TRUE(status.ok());
-        //     status = new_txn_mgr_->CommitTxn(txn);
-        //     EXPECT_TRUE(status.ok());
-        // }
         {
             auto *txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
             auto status = txn->Compact(*db_name_, *table_name_, {0, 1});
@@ -298,8 +290,7 @@ protected:
 
 INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
                          TestTxnCleanup,
-                         // ::testing::Values(BaseTestParamStr::NEW_CONFIG_PATH, BaseTestParamStr::NEW_VFS_OFF_CONFIG_PATH));
-                         ::testing::Values(BaseTestParamStr::NEW_VFS_OFF_CONFIG_PATH));
+                         ::testing::Values(BaseTestParamStr::NEW_CONFIG_PATH, BaseTestParamStr::NEW_VFS_OFF_CONFIG_PATH));
 
 TEST_P(TestTxnCleanup, cleanup_with_drop_db) {
     LOG_INFO("Checking cleanup & drop db...");
