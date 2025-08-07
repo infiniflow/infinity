@@ -240,7 +240,6 @@ jobs:
 
       - name: Run sqllogictest release version
         if: ${{ !cancelled() && !failure() && steps.choose_test_type.outputs.RUN_CI_SLOW_TEST == 'true' }}
-        id: run_tests_release
         run: sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && python3 tools/sqllogictest.py" && sleep 1s
 
       - name: Unit test release version
