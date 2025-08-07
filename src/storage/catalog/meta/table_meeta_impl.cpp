@@ -882,7 +882,6 @@ Tuple<String, Status> TableMeeta::GetNextIndexID() {
         LOG_ERROR(fmt::format("Fail to get next index id from kv store, key: {}, cause: {}", next_index_id_key, status.message()));
         return {"", status};
     }
-    String now_index_id = fmt::format("{}", std::stoull(next_index_id_str));
     String next_index_id = fmt::format("{}", std::stoull(next_index_id_str) + 1);
     status = kv_instance_->Put(next_index_id_key, next_index_id);
     if (!status.ok()) {
@@ -890,7 +889,7 @@ Tuple<String, Status> TableMeeta::GetNextIndexID() {
             fmt::format("Fail to set next index id to kv store, key: {}, value: {}, cause: {}", next_index_id_key, next_index_id, status.message()));
         return {"", status};
     }
-    return {now_index_id, Status::OK()};
+    return {next_index_id, Status::OK()};
 }
 
 Status TableMeeta::SetNextIndexID(const String &index_id_str) {
