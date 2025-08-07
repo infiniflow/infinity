@@ -1682,7 +1682,6 @@ Status NewTxn::Checkpoint(TxnTimeStamp last_ckp_ts) {
     if (last_ckp_ts % 2 == 0 and last_ckp_ts > 0) {
         UnrecoverableError(fmt::format("last checkpoint ts isn't correct: {}", last_ckp_ts));
     }
-    std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
     Status status;
     TxnTimeStamp checkpoint_ts = txn_context_ptr_->begin_ts_;
