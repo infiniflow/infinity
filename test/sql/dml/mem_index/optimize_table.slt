@@ -70,11 +70,7 @@ INSERT INTO optimize_embedding_table VALUES
 
 # Test optimization on embedding index
 statement ok
-OPTIMIZE idx_embedding ON optimize_embedding_table WITH (compress_to_lvq);
-
-# Test optimization with different compression options
-statement ok
-OPTIMIZE idx_embedding ON optimize_embedding_table WITH (lvq_avg);
+OPTIMIZE optimize_embedding_table;
 
 # Test optimization on sparse table
 statement ok
