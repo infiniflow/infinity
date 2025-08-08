@@ -64,30 +64,11 @@ using namespace infinity;
 class CompactTaskTest : public BaseTestParamStr {
 protected:
     void AddSegments(NewTxnManager *txn_mgr, const String &table_name, const Vector<SizeT> &segment_sizes) {
-
-        u32 block_row_cnt = 8192;
-        auto make_input_block = [&] {
-            auto input_block = MakeShared<DataBlock>();
-            auto append_to_col = [&](ColumnVector &col, Value v1) {
-                for (u32 i = 0; i < block_row_cnt; ++i) {
-                    col.AppendValue(v1);
-                }
-            };
-            // Initialize input block
-            {
-                auto col1 = ColumnVector::Make(MakeShared<DataType>(DataType(LogicalType::kTinyInt)));
-                col1->Initialize();
-                append_to_col(*col1, Value::MakeTinyInt(2));
-                input_block->InsertVector(col1, 0);
-            }
-            input_block->Finalize();
-            return input_block;
-        };
-
         for (SizeT segment_size : segment_sizes) {
             for (SizeT i = 0; i < segment_size; ++i) {
                 auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("import"), TransactionType::kNormal);
-                Vector<SharedPtr<DataBlock>> input_blocks = {make_input_block()};
+                auto input_block = MakeInputBlock(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"), 8192);
+                Vector<SharedPtr<DataBlock>> input_blocks = {input_block};
                 Status status = txn->Import("default_db", table_name, input_blocks);
                 EXPECT_TRUE(status.ok());
                 status = txn_mgr->CommitTxn(txn);
@@ -103,48 +84,43 @@ INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
                                            (std::string(test_data_path()) + "/config/test_new_vfs_off_bg_on.toml").c_str()));
 
 TEST_P(CompactTaskTest, DISABLED_bg_compact) {
-    String table_name = "tbl1";
     Storage *storage = infinity::InfinityContext::instance().storage();
     NewTxnManager *txn_mgr = storage->new_txn_manager();
 
-    Vector<SharedPtr<ColumnDef>> columns;
-    {
-        i64 column_id = 0;
-        {
-            std::set<ConstraintType> constraints;
-            auto column_def_ptr =
-                MakeShared<ColumnDef>(column_id++, MakeShared<DataType>(DataType(LogicalType::kTinyInt)), "tiny_int_col", constraints);
-            columns.emplace_back(column_def_ptr);
-        }
-    }
+    SharedPtr<String> db_name = std::make_shared<String>("default_db");
+    auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
+    auto column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
+    auto table_name = std::make_shared<std::string>("tb1");
+    auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def2});
+
     {
         // create table
-        auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>(table_name), MakeShared<String>(), columns);
         auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
-
-        Status status = txn->CreateTable("default_db", std::move(tbl1_def), ConflictType::kIgnore);
+        Status status = txn->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
 
-        txn_mgr->CommitTxn(txn);
+        status = txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
     }
     Vector<SizeT> segment_sizes{1, 10, 100};
     SizeT segment_count = std::accumulate(segment_sizes.begin(), segment_sizes.end(), 0);
-    this->AddSegments(txn_mgr, table_name, segment_sizes);
+    this->AddSegments(txn_mgr, *table_name, segment_sizes);
 
-    i64 compact_interval = InfinityContext::instance().storage()->config()->CleanupInterval();
-
+    i64 compact_interval = InfinityContext::instance().storage()->config()->CompactInterval();
+    LOG_INFO(fmt::format("compact_interval: {} seconds", compact_interval));
     SizeT last_seg_count = segment_count;
     i64 loop = 0;
     while (loop < 5) {
         loop++;
         // Wait for the compact task to run
+        LOG_INFO("Wait for compact task to run");
         sleep(compact_interval + 1);
 
         // Check if the segment count has been reduced
         auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("check"), TransactionType::kNormal);
         Optional<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
-        Status status = txn->GetTableMeta("default_db", table_name, db_meta, table_meta);
+        Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
 
         Vector<SegmentID> *segment_ids_ptr = nullptr;

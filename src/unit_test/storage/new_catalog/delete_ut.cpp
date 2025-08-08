@@ -5650,25 +5650,6 @@ TEST_P(TestTxnDelete, test_delete_and_delete) {
                     row_id += 2;
                 }
             }
-            //            {
-            //                BlockMeta block_meta(1, segment_meta);
-            //
-            //                status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, commit_ts, state);
-            //                EXPECT_TRUE(status.ok());
-            //                Pair<BlockOffset, BlockOffset> range;
-            //                BlockOffset offset = 0;
-            //                SizeT row_id = 0;
-            //                while (true) {
-            //                    bool has_next = state.Next(offset, range);
-            //                    if (!has_next) {
-            //                        break;
-            //                    }
-            //                    EXPECT_EQ(range.first, row_id);
-            //                    EXPECT_EQ(range.second, 8192);
-            //                    offset = range.second;
-            //                    row_id += 2;
-            //                }
-            //            }
         }
     };
 
@@ -6056,7 +6037,7 @@ TEST_P(TestTxnDelete, test_delete_and_delete) {
     //    t1                                                   delete                                   commit (success)
     //    |------------------------------------------------------|------------------------------------------|
     //                    |----------------------|------------|
-    //                    t2                  append  commit (success)
+    //                    t2                  delete  commit (success)
     {
         SharedPtr<String> db_name = std::make_shared<String>("db1");
         auto table_name = std::make_shared<std::string>("tb1");
