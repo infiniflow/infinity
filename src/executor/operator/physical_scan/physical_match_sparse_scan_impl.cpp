@@ -14,8 +14,8 @@
 
 module;
 
-#include <vector>
 #include <string>
+#include <vector>
 
 module infinity_core:physical_match_sparse_scan.impl;
 
@@ -30,27 +30,19 @@ import :match_sparse_expression;
 import :base_table_ref;
 import :block_index;
 import :column_expression;
-import create_index_info;
-import data_type;
 import :common_query_filter;
 import :default_values;
-import logical_type;
 import :match_sparse_scan_function_data;
 import :logger;
 import :infinity_exception;
-import :third_party;
-import :buffer_manager;
 import :expression_evaluator;
 import :expression_state;
 import :base_expression;
 import :column_vector;
 import :data_block;
-import sparse_info;
-import internal_types;
 import :knn_result_handler;
 import :match_sparse_scan_function_data;
 import :global_block_id;
-import :roaring_bitmap;
 import :bmp_index_file_worker;
 import :buffer_handle;
 import :sparse_util;
@@ -59,7 +51,6 @@ import :knn_filter;
 import :bmp_handler;
 import :status;
 import :buffer_obj;
-
 import :table_meeta;
 import :table_index_meeta;
 import :segment_index_meta;
@@ -69,10 +60,15 @@ import :block_meta;
 import :table_meeta;
 import :new_txn;
 import :new_catalog;
-import :index_base;
 import :column_meta;
 import :mem_index;
+
 import match_sparse_expr;
+import sparse_info;
+import internal_types;
+import logical_type;
+import create_index_info;
+// import data_type;
 
 namespace infinity {
 
@@ -212,7 +208,7 @@ PhysicalMatchSparseScan::PlanWithIndex(Vector<SharedPtr<Vector<GlobalBlockID>>> 
     for (i64 i = 0; i < parallel_count; ++i) {
         segment_groups[i] = MakeShared<Vector<SegmentID>>();
     }
-    if ((i64)block_groups.size() != parallel_count) {
+    if (static_cast<i64>(block_groups.size()) != parallel_count) {
         UnrecoverableError("block_groups.size() != parallel_count");
     }
     IndexIndex *index_index = base_table_ref_->index_index_.get();
@@ -252,8 +248,7 @@ bool PhysicalMatchSparseScan::Execute(QueryContext *query_context, OperatorState
     }
 
     const auto &column_type = match_sparse_expr_->column_expr_->Type();
-    const auto *sparse_info = static_cast<const SparseInfo *>(column_type.type_info().get());
-    switch (sparse_info->DataType()) {
+    switch (const auto *sparse_info = static_cast<const SparseInfo *>(column_type.type_info().get()); sparse_info->DataType()) {
         case EmbeddingDataType::kElemBit: {
             ExecuteInner<bool>(query_context, match_sparse_scan_state, sparse_info, match_sparse_expr_->metric_type_);
             break;
@@ -339,8 +334,7 @@ void PhysicalMatchSparseScan::ExecuteInner(QueryContext *query_context,
 
 template <typename DataT, typename IdxType, template <typename, typename> typename C>
 void PhysicalMatchSparseScan::ExecuteInner(QueryContext *query_context, MatchSparseScanOperatorState *match_sparse_scan_state) {
-    DataType result_type = match_sparse_expr_->Type();
-    switch (result_type.type()) {
+    switch (auto result_type = match_sparse_expr_->Type(); result_type.type()) {
         case LogicalType::kTinyInt: {
             ExecuteInner<DataT, IdxType, i8, C>(query_context, match_sparse_scan_state);
             break;
@@ -396,7 +390,7 @@ void PhysicalMatchSparseScan::ExecuteInnerT(DistFunc *dist_func,
                                             QueryContext *query_context,
                                             MatchSparseScanOperatorState *match_sparse_scan_state) {
     Status status;
-    NewTxn *new_txn = query_context->GetNewTxn();
+    auto *new_txn = query_context->GetNewTxn();
     TxnTimeStamp begin_ts = new_txn->BeginTS();
     TxnTimeStamp commit_ts = new_txn->CommitTS();
     if (!common_query_filter_->TryFinishBuild()) {
