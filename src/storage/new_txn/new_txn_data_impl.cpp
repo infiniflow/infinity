@@ -460,7 +460,7 @@ Status NewTxn::Append(const String &db_name, const String &table_name, const Sha
     Optional<DBMeeta> db_meta;
     Optional<TableMeeta> table_meta;
     String table_key;
-    Status status = GetTableMeta(db_name, table_name, db_meta, table_meta, &table_key);
+    auto status = GetTableMeta(db_name, table_name, db_meta, table_meta, &table_key);
     if (!status.ok()) {
         return status;
     }
@@ -470,7 +470,7 @@ Status NewTxn::Append(const String &db_name, const String &table_name, const Sha
         return Status::UnexpectedError("txn store is not null");
     }
     base_txn_store_ = MakeShared<AppendTxnStore>();
-    AppendTxnStore *append_txn_store = static_cast<AppendTxnStore *>(base_txn_store_.get());
+    auto *append_txn_store = static_cast<AppendTxnStore *>(base_txn_store_.get());
     append_txn_store->db_name_ = db_name;
     append_txn_store->db_id_str_ = table_meta->db_id_str();
     append_txn_store->db_id_ = std::stoull(table_meta->db_id_str());
@@ -520,9 +520,7 @@ Status NewTxn::AppendInner(const String &db_name,
     for (SizeT col_id = 0; col_id < column_count; ++col_id) {
         column_types.emplace_back((*column_defs)[col_id]->type());
         if (*column_types.back() != *input_block->column_vectors[col_id]->data_type()) {
-            String err_msg = fmt::format("Attempt to insert different type data into transaction table store");
-            LOG_ERROR(err_msg);
-
+            LOG_ERROR(fmt::format("Attempt to insert different type data into transaction table store"));
             return Status::DataTypeMismatch(column_types.back()->ToString(), input_block->column_vectors[col_id]->data_type()->ToString());
         }
     }
@@ -536,7 +534,7 @@ Status NewTxn::Delete(const String &db_name, const String &table_name, const Vec
     Optional<DBMeeta> db_meta;
     Optional<TableMeeta> table_meta_opt;
     String table_key;
-    Status status = GetTableMeta(db_name, table_name, db_meta, table_meta_opt, &table_key);
+    auto status = GetTableMeta(db_name, table_name, db_meta, table_meta_opt, &table_key);
     if (!status.ok()) {
         return status;
     }
@@ -1091,12 +1089,10 @@ Status NewTxn::PrintVersionInBlock(BlockMeta &block_meta, const Vector<BlockOffs
 }
 
 Status NewTxn::CompactBlock(BlockMeta &block_meta, NewTxnCompactState &compact_state) {
-    Status status;
-
     NewTxnGetVisibleRangeState range_state;
     TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
     TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
-    status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, commit_ts, range_state);
+    auto status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, commit_ts, range_state);
     if (!status.ok()) {
         return status;
     }
@@ -1130,7 +1126,7 @@ Status NewTxn::CompactBlock(BlockMeta &block_meta, NewTxnCompactState &compact_s
                     return status;
                 }
             }
-            append_size = std::min(SizeT(range.second - range.first), compact_state.block_meta_->block_capacity() - compact_state.cur_block_row_cnt_);
+            append_size = std::min(static_cast<SizeT>(range.second - range.first), compact_state.block_meta_->block_capacity() - compact_state.cur_block_row_cnt_);
             if (append_size == 0) {
                 status = compact_state.FinalizeBlock();
                 if (!status.ok()) {

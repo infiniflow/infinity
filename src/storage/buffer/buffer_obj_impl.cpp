@@ -28,9 +28,10 @@ import :logger;
 import :third_party;
 import :file_worker_type;
 import :var_file_worker;
-import global_resource_usage;
 import :kv_store;
 import :status;
+
+import global_resource_usage;
 
 namespace infinity {
 
@@ -84,8 +85,7 @@ BufferHandle BufferObj::Load() {
                 break;
             }
             default: {
-                String error_message = fmt::format("Invalid status: {}", BufferStatusToString(status_));
-                UnrecoverableError(error_message);
+                UnrecoverableError(fmt::format("Invalid status: {}", BufferStatusToString(status_)));
             }
         }
         status_ = BufferStatus::kLoaded;
@@ -99,8 +99,7 @@ BufferHandle BufferObj::Load() {
         }
         case BufferStatus::kUnloaded: {
             if (!buffer_mgr_->RemoveFromGCQueue(this)) {
-                String error_message = fmt::format("attempt to buffer: {} status is UNLOADED, but not in GC queue", GetFilename());
-                UnrecoverableError(error_message);
+                UnrecoverableError(fmt::format("attempt to buffer: {} status is UNLOADED, but not in GC queue", GetFilename()));
             }
             break;
         }
@@ -108,8 +107,7 @@ BufferHandle BufferObj::Load() {
             buffer_mgr_->AddCacheMissCount();
 
             if (type_ == BufferType::kEphemeral) {
-                String error_message = "Invalid status";
-                UnrecoverableError(error_message);
+                UnrecoverableError("Invalid status");
             }
 
             bool from_spill = type_ != BufferType::kPersistent;
@@ -117,8 +115,7 @@ BufferHandle BufferObj::Load() {
 
             bool free_success = buffer_mgr_->RequestSpace(GetBufferSize());
             if (!free_success) {
-                String error_message = "Out of memory.";
-                UnrecoverableError(error_message);
+                UnrecoverableError("Out of memory.");
             }
             break;
         }
@@ -127,16 +124,14 @@ BufferHandle BufferObj::Load() {
             LOG_TRACE(fmt::format("Request memory {}", GetBufferSize()));
             bool free_success = buffer_mgr_->RequestSpace(GetBufferSize());
             if (!free_success) {
-                String error_message = "Out of memory.";
-                UnrecoverableError(error_message);
+                UnrecoverableError("Out of memory.");
             }
             file_worker_->AllocateInMemory();
             LOG_TRACE(fmt::format("Allocated memory {}", GetBufferSize()));
             break;
         }
         default: {
-            String error_message = fmt::format("Invalid status: {}", BufferStatusToString(status_));
-            UnrecoverableError(error_message);
+            UnrecoverableError(fmt::format("Invalid status: {}", BufferStatusToString(status_)));
         }
     }
     status_ = BufferStatus::kLoaded;
@@ -151,8 +146,7 @@ bool BufferObj::Free() {
         return false; // when other thread is loading or cleaning, return false
     }
     if (status_ != BufferStatus::kUnloaded) {
-        String error_message = fmt::format("attempt to free {} buffer object", BufferStatusToString(status_));
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("attempt to free {} buffer object", BufferStatusToString(status_)));
     }
     switch (type_) {
         case BufferType::kTemp:
@@ -164,15 +158,13 @@ bool BufferObj::Free() {
             type_ = BufferType::kTemp;
             bool all_save = file_worker_->WriteToFile(true);
             if (!all_save) {
-                String error_message = fmt::format("Spill to file failed: {}", GetFilename());
-                UnrecoverableError(error_message);
+                UnrecoverableError(fmt::format("Spill to file failed: {}", GetFilename()));
             }
             buffer_mgr_->AddTemp(this);
             break;
         }
         default: {
-            String error_message = fmt::format("Invalid buffer type: {}", BufferTypeToString(type_));
-            UnrecoverableError(error_message);
+            UnrecoverableError(fmt::format("Invalid buffer type: {}", BufferTypeToString(type_)));
         }
     }
     file_worker_->FreeInMemory();
