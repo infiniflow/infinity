@@ -1947,14 +1947,11 @@ Status NewTxn::Commit() {
     bool retry_query = true;
     bool conflict = txn_mgr_->CheckConflict1(this, conflict_reason, retry_query);
     if (conflict) {
-        // TODO: We are not retrying the query if its transaction is conflicted with other transaction right now. We will add retry logic later.
-        status = Status::TxnConflictNoRetry(txn_context_ptr_->txn_id_, fmt::format("NewTxn conflict reason: {}.", conflict_reason));
-
-        // if (retry_query) {
-        //     status = Status::TxnConflict(txn_context_ptr_->txn_id_, fmt::format("NewTxn conflict reason: {}.", conflict_reason));
-        // } else {
-        //     status = Status::TxnConflictNoRetry(txn_context_ptr_->txn_id_, fmt::format("NewTxn conflict reason: {}.", conflict_reason));
-        // }
+        if (retry_query) {
+            status = Status::TxnConflict(txn_context_ptr_->txn_id_, fmt::format("NewTxn conflict reason: {}.", conflict_reason));
+        } else {
+            status = Status::TxnConflictNoRetry(txn_context_ptr_->txn_id_, fmt::format("NewTxn conflict reason: {}.", conflict_reason));
+        }
 
         this->SetTxnRollbacking(commit_ts);
     }
