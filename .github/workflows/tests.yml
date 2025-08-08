@@ -417,12 +417,12 @@ jobs:
       #          failure="${{ steps.run_tests_release_minio.outcome == 'failure' || steps.stop_tests_release_minio.outcome == 'failure' }}"
       #          sudo python3 scripts/collect_log.py --log_path=/var/infinity/log/infinity.log --stderror_path=vfs_release_error.log --stdout_path=vfs_release.log --executable_path=cmake-build-release/src/infinity --output_dir=${RUNNER_WORKSPACE_PREFIX}/log --failure=${failure}
 
-      - name: Start infinity release version
-        if: ${{ !cancelled() && !failure() }}
-        run: |
-          # Run a command in the background
-          sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && rm -fr /var/infinity && cmake-build-release/src/infinity --config=conf/pytest_parallel_infinity_conf.toml > sqllogictest_release.log 2> sqllogictest_release_error.log" &
-
+#      - name: Start infinity release version
+#        if: ${{ !cancelled() && !failure() }}
+#        run: |
+#          # Run a command in the background
+#          sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && rm -fr /var/infinity && cmake-build-release/src/infinity --config=conf/pytest_parallel_infinity_conf.toml > sqllogictest_release.log 2> sqllogictest_release_error.log" &
+#
 #      - name: Run sqllogictest release version
 #        if: ${{ !cancelled() && !failure() }}
 #        id: run_tests_release
