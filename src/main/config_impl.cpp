@@ -21,12 +21,14 @@ module;
 module infinity_core:config.impl;
 
 import :config;
-import compilation_config;
-import global_resource_usage;
+
 import :logger;
 import :infinity_exception;
 import :boost;
 import :utility;
+
+import compilation_config;
+import global_resource_usage;
 
 namespace infinity {
 using namespace std::chrono;
@@ -67,8 +69,7 @@ Status Config::ParseByteSize(const String &byte_size_str, i64 &byte_size) {
     if (res.ec == std::errc()) {
         String unit = res.ptr;
         ToLower(unit);
-        auto it = byte_unit.find(unit);
-        if (it != byte_unit.end()) {
+        if (auto it = byte_unit.find(unit); it != byte_unit.end()) {
             byte_size = factor * it->second;
             return Status::OK();
         } else {

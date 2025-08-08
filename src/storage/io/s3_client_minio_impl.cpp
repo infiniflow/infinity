@@ -8,7 +8,6 @@ import :s3_client_minio;
 
 import :stl;
 import :infinity_exception;
-import :status;
 import :third_party;
 import :logger;
 
@@ -32,10 +31,7 @@ Status S3ClientMinio::DownloadObject(const String &bucket_name, const String &ob
 
     // Call download object.
     LOG_INFO(fmt::format("Downloading object {} from {} to {}", object_name, bucket_name, file_path));
-    minio::s3::DownloadObjectResponse resp = client_->DownloadObject(args);
-
-    // Handle response.
-    if (resp) {
+    if (auto resp = client_->DownloadObject(args)) {
         LOG_INFO(fmt::format("{}/{} downloaded to {} successfully", bucket_name, object_name, file_path));
     } else {
         UnrecoverableError(fmt::format("Unable to download object: {}/{}, reason: {}", bucket_name, object_name, resp.Error().String()));
@@ -52,10 +48,7 @@ Status S3ClientMinio::UploadObject(const String &bucket_name, const String &obje
 
     // Call upload object.
     LOG_INFO(fmt::format("Uploading object {} to {} from {}", object_name, bucket_name, file_path));
-    minio::s3::UploadObjectResponse resp = client_->UploadObject(args);
-
-    // Handle response.
-    if (resp) {
+    if (auto resp = client_->UploadObject(args)) {
         LOG_INFO(fmt::format("{} uploaded to {}/{} successfully", file_path, bucket_name, object_name));
     } else {
         UnrecoverableError(fmt::format("Unable to upload object: {}/{}, code: {}, reason: {}", bucket_name, object_name, resp.code, resp.Error().String()));
@@ -71,10 +64,7 @@ Status S3ClientMinio::RemoveObject(const String &bucket_name, const String &obje
 
     // Call remove object.
     LOG_INFO(fmt::format("Removing object {} from {}", object_name, bucket_name));
-    minio::s3::RemoveObjectResponse resp = client_->RemoveObject(args);
-
-    // Handle response.
-    if (resp) {
+    if (auto resp = client_->RemoveObject(args)) {
         LOG_INFO(fmt::format("{} is removed from {} successfully", object_name, bucket_name));
     } else {
         UnrecoverableError(fmt::format("Unable to remove object: {}/{}, reason: {}", bucket_name, object_name, resp.Error().String()));
@@ -97,10 +87,7 @@ Status S3ClientMinio::CopyObject(const String &src_bucket_name,
     args.source = source;
 
     // Call copy object.
-    minio::s3::CopyObjectResponse resp = client_->CopyObject(args);
-
-    // Handle response.
-    if (resp) {
+    if (auto resp = client_->CopyObject(args)) {
         LOG_TRACE(fmt::format("{} is copied to {} successfully", src_object_name, dst_object_name));
     } else {
         UnrecoverableError(fmt::format("Unable to do copy object: {}", resp.Error().String()));
@@ -114,9 +101,7 @@ Status S3ClientMinio::BucketExists(const String &bucket_name) {
     args.bucket = bucket_name;
 
     // Call bucket exists.
-    minio::s3::BucketExistsResponse resp = client_->BucketExists(args);
-    // Handle response.
-    if (resp) {
+    if (auto resp = client_->BucketExists(args)) {
         if (resp.exist) {
             return Status::OK();
         } else {
@@ -142,10 +127,7 @@ Status S3ClientMinio::MakeBucket(const String &bucket_name) {
     args.bucket = bucket_name;
 
     // Call make bucket.
-    minio::s3::MakeBucketResponse resp = client_->MakeBucket(args);
-
-    // Handle response.
-    if (resp) {
+    if (auto resp = client_->MakeBucket(args)) {
         LOG_TRACE(fmt::format("{} is created successfully", bucket_name));
     } else {
         UnrecoverableError(fmt::format("Unable to create bucket: {}", resp.Error().String()));
