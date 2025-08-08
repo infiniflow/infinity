@@ -600,6 +600,7 @@ if (CI)
             ut_mod
             CONFIGURE_DEPENDS
             unit_test/*.cppm
+            unit_test/base_test_impl.cpp
     )
     add_executable(unit_test
             ${test_main_cpp}

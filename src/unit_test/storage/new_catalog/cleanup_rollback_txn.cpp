@@ -120,48 +120,6 @@ public:
         EXPECT_TRUE(status.ok());
     }
 
-    void CheckFilePaths() {
-        auto *pm = infinity::InfinityContext::instance().persistence_manager();
-        if (pm == nullptr) {
-            Path data_dir = this->GetFullDataDir();
-            for (auto &file_path : delete_file_paths_) {
-                file_path = data_dir / file_path;
-            }
-            for (auto &file_path : exist_file_paths_) {
-                file_path = data_dir / file_path;
-            }
-            for (const auto &file_path : delete_file_paths_) {
-                if (!std::filesystem::path(file_path).is_absolute()) {
-                    ADD_FAILURE() << "File path is not absolute: " << file_path;
-                }
-                EXPECT_FALSE(std::filesystem::exists(file_path));
-
-                auto path = static_cast<Path>(file_path).parent_path();
-                EXPECT_TRUE(!std::filesystem::exists(path) || std::filesystem::is_directory(path) && !std::filesystem::is_empty(path) ||
-                            std::filesystem::is_directory(path) && std::filesystem::is_empty(path) && path == data_dir);
-            }
-            for (const auto &file_path : exist_file_paths_) {
-                if (!std::filesystem::path(file_path).is_absolute()) {
-                    ADD_FAILURE() << "File path is not absolute: " << file_path;
-                }
-                EXPECT_TRUE(std::filesystem::exists(file_path));
-            }
-        } else {
-            auto local_path_map = pm->GetAllFiles();
-            for (const auto &file_path : delete_file_paths_) {
-                auto persist_read_result = local_path_map.find(file_path);
-                EXPECT_TRUE(persist_read_result == local_path_map.end());
-            }
-            for (const auto &file_path : exist_file_paths_) {
-                auto persist_read_result = local_path_map.find(file_path);
-                EXPECT_FALSE(persist_read_result == local_path_map.end());
-            }
-        }
-
-        delete_file_paths_.clear();
-        exist_file_paths_.clear();
-    }
-
 protected:
     NewTxnManager *new_txn_mgr_;
     WalManager *wal_manager_;
@@ -254,5 +212,5 @@ TEST_P(TestTxnCleanupRollbackTxn, test_import_with_index_rollback_cleanup) {
     Checkpoint();
     Cleanup();
 
-    this->CheckFilePaths();
+    CheckFilePaths(delete_file_paths_, exist_file_paths_);
 }
