@@ -1,0 +1,207 @@
+// Copyright(C) 2025 InfiniFlow, Inc. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+module;
+
+#include <iterator>
+
+module infinity_core:meta_cache.impl;
+
+import :meta_cache;
+import :stl;
+import :infinity_exception;
+import :kv_code;
+import :logger;
+
+namespace infinity {
+
+void MetaCache::PutDb(const String &db_name, const SharedPtr<MetaDbCache> &db_cache) {
+    TxnTimeStamp commit_ts = db_cache->commit_ts_;
+    std::unique_lock lock(cache_mtx_);
+    auto iter = dbs_.find(db_name);
+    if (iter != dbs_.end()) {
+        Map<u64, List<CacheItem>::iterator> &db_map_ref = iter->second;
+        auto cache_iter = db_map_ref.find(commit_ts);
+        if (cache_iter != db_map_ref.end()) {
+            TouchNolock(cache_iter->second);
+            cache_iter->second->meta_cache_ = db_cache;
+            return;
+        }
+    }
+
+    // db is not in map
+    lru_.push_front({db_name, db_cache});
+    dbs_[db_name][commit_ts] = lru_.begin();
+    TrimCacheNolock();
+}
+
+SharedPtr<MetaDbCache> MetaCache::GetDb(const String &db_name, TxnTimeStamp begin_ts) {
+    std::unique_lock lock(cache_mtx_);
+    auto iter = dbs_.find(db_name);
+    if (iter != dbs_.end()) {
+        Map<u64, List<CacheItem>::iterator> &db_map_ref = iter->second;
+        for (auto r_cache_iter = db_map_ref.rbegin(); r_cache_iter != db_map_ref.rend(); ++r_cache_iter) {
+            TxnTimeStamp commit_ts = r_cache_iter->first;
+            if (begin_ts > commit_ts) {
+                TouchNolock(r_cache_iter->second);
+                return std::static_pointer_cast<MetaDbCache>(r_cache_iter->second->meta_cache_);
+            }
+        }
+    }
+    return nullptr;
+}
+
+void MetaCache::PutTable(const String &table_name, const SharedPtr<MetaTableCache> &table_cache) {
+    u64 db_id = table_cache->db_id_;
+    String name = KeyEncode::CatalogTablePrefix(std::to_string(db_id), table_name);
+    TxnTimeStamp commit_ts = table_cache->commit_ts_;
+    std::unique_lock lock(cache_mtx_);
+    auto iter = tables_.find(name);
+    if (iter != tables_.end()) {
+        Map<u64, List<CacheItem>::iterator> &db_map_ref = iter->second;
+        auto cache_iter = db_map_ref.find(commit_ts);
+        if (cache_iter != db_map_ref.end()) {
+            TouchNolock(cache_iter->second);
+            cache_iter->second->meta_cache_ = table_cache;
+            return;
+        }
+    }
+
+    // table is not in map
+    lru_.push_front({name, table_cache});
+    tables_[name][commit_ts] = lru_.begin();
+    TrimCacheNolock();
+}
+
+SharedPtr<MetaTableCache> MetaCache::GetTable(u64 db_id, const String &table_name, TxnTimeStamp begin_ts) {
+    String name = KeyEncode::CatalogTablePrefix(std::to_string(db_id), table_name);
+
+    std::unique_lock lock(cache_mtx_);
+    auto iter = tables_.find(name);
+    if (iter != tables_.end()) {
+        Map<u64, List<CacheItem>::iterator> &table_map_ref = iter->second;
+        for (auto r_cache_iter = table_map_ref.rbegin(); r_cache_iter != table_map_ref.rend(); ++r_cache_iter) {
+            TxnTimeStamp commit_ts = r_cache_iter->first;
+            if (begin_ts > commit_ts) {
+                TouchNolock(r_cache_iter->second);
+                return std::static_pointer_cast<MetaTableCache>(r_cache_iter->second->meta_cache_);
+            }
+        }
+    }
+    return nullptr;
+}
+
+void MetaCache::PutIndex(const String &index_name, const SharedPtr<MetaIndexCache> &index_cache) {
+    u64 db_id = index_cache->db_id_;
+    u64 table_id = index_cache->table_id_;
+    String name = KeyEncode::CatalogIndexPrefix(std::to_string(db_id), std::to_string(table_id), index_name);
+    TxnTimeStamp commit_ts = index_cache->commit_ts_;
+    std::unique_lock lock(cache_mtx_);
+    auto iter = indexes_.find(name);
+    if (iter != indexes_.end()) {
+        Map<u64, List<CacheItem>::iterator> &db_map_ref = iter->second;
+        auto cache_iter = db_map_ref.find(commit_ts);
+        if (cache_iter != db_map_ref.end()) {
+            TouchNolock(cache_iter->second);
+            cache_iter->second->meta_cache_ = index_cache;
+            return;
+        }
+    }
+
+    // table is not in map
+    lru_.push_front({name, index_cache});
+    indexes_[name][commit_ts] = lru_.begin();
+    TrimCacheNolock();
+}
+
+SharedPtr<MetaIndexCache> MetaCache::GetIndex(u64 db_id, u64 table_id, const String &index_name, TxnTimeStamp begin_ts) {
+    String name = KeyEncode::CatalogIndexPrefix(std::to_string(db_id), std::to_string(table_id), index_name);
+
+    std::unique_lock lock(cache_mtx_);
+    auto iter = indexes_.find(name);
+    if (iter != indexes_.end()) {
+        Map<u64, List<CacheItem>::iterator> &index_map_ref = iter->second;
+        for (auto r_cache_iter = index_map_ref.rbegin(); r_cache_iter != index_map_ref.rend(); ++r_cache_iter) {
+            TxnTimeStamp commit_ts = r_cache_iter->first;
+            if (begin_ts > commit_ts) {
+                TouchNolock(r_cache_iter->second);
+                return std::static_pointer_cast<MetaIndexCache>(r_cache_iter->second->meta_cache_);
+            }
+        }
+    }
+    return nullptr;
+}
+
+void MetaCache::PrintLRU() const {
+    for (const auto &item : lru_) {
+        TxnTimeStamp commit_ts = 0;
+        switch (item.meta_cache_->type_) {
+            case MetaType::kDB: {
+                MetaDbCache *db_cache = static_cast<MetaDbCache *>(item.meta_cache_.get());
+                commit_ts = db_cache->commit_ts_;
+                break;
+            }
+            case MetaType::kTable: {
+                MetaTableCache *table_cache = static_cast<MetaTableCache *>(item.meta_cache_.get());
+                commit_ts = table_cache->commit_ts_;
+                break;
+            }
+            case MetaType::kTableIndex: {
+                MetaIndexCache *index_cache = static_cast<MetaIndexCache *>(item.meta_cache_.get());
+                commit_ts = index_cache->commit_ts_;
+                break;
+            }
+            default: {
+                UnrecoverableError("Invalid meta type");
+            }
+        }
+        LOG_INFO(fmt::format("name: {}, commit: {}", item.name_, commit_ts));
+    }
+}
+
+void MetaCache::TrimCacheNolock() {
+    while (lru_.size() > capacity_) {
+        CacheItem &item = lru_.back();
+        switch (item.meta_cache_->type_) {
+            case MetaType::kDB: {
+                MetaDbCache *db_cache = static_cast<MetaDbCache *>(item.meta_cache_.get());
+                dbs_[item.name_].erase(db_cache->commit_ts_);
+                break;
+            }
+            case MetaType::kTable: {
+                MetaTableCache *table_cache = static_cast<MetaTableCache *>(item.meta_cache_.get());
+                tables_[item.name_].erase(table_cache->commit_ts_);
+                break;
+            }
+            case MetaType::kTableIndex: {
+                MetaIndexCache *index_cache = static_cast<MetaIndexCache *>(item.meta_cache_.get());
+                indexes_[item.name_].erase(index_cache->commit_ts_);
+                break;
+            }
+            default: {
+                UnrecoverableError("Invalid meta type");
+            }
+        }
+        lru_.pop_back();
+    }
+}
+
+SizeT MetaCache::Size() const {
+    std::unique_lock lock(cache_mtx_);
+    return lru_.size();
+}
+
+void MetaCache::TouchNolock(List<CacheItem>::iterator iter) { lru_.splice(lru_.begin(), lru_, iter); }
+
+} // namespace infinity
