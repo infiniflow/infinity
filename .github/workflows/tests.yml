@@ -21,274 +21,274 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  debug_tests:
-    name: debug_tests
-    # https://docs.github.com/en/actions/using-jobs/using-conditions-to-control-job-execution
-    # https://github.com/orgs/community/discussions/26261
-    if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ci') }}
-    runs-on: [ "self-hosted", "debug" ]
-    steps:
-      # https://github.com/hmarr/debug-action
-      #- uses: hmarr/debug-action@v3
-
-      - name: Show PR labels
-        if: ${{ !cancelled() && !failure() }}
-        run: |
-          echo "Workflow triggered by ${{ github.event_name }}"
-          if [[ ${{ github.event_name }} == 'pull_request' ]]; then
-            echo "PR labels: ${{ join(github.event.pull_request.labels.*.name, ', ') }}"
-          fi
-
-      - name: Ensure workspace ownership
-        if: ${{ !cancelled() && !failure() }}
-        run: echo "chown -R $USER $GITHUB_WORKSPACE" && sudo chown -R $USER $GITHUB_WORKSPACE
-
-      - name: Check out code
-        if: ${{ !cancelled() && !failure() }}
-        uses: actions/checkout@v4
-
-      - name: Start builder container
-        if: ${{ !cancelled() && !failure() }}
-        run: |
-          BUILDER_CONTAINER=infinity_build_$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')
-          CPUS=${CPUS:-$(nproc)}
-          echo "BUILDER_CONTAINER=${BUILDER_CONTAINER}" >> $GITHUB_ENV
-          echo "CPUS=${CPUS}" >> $GITHUB_ENV
-          TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
-          sudo docker rm -f -v ${BUILDER_CONTAINER} && sudo docker run --privileged --cap-add=NET_ADMIN -d --name ${BUILDER_CONTAINER} -e TZ=$TZ -e CMAKE_BUILD_PARALLEL_LEVEL=${CPUS} -v $PWD:/infinity -v /boot:/boot -v /var/run/docker.sock:/var/run/docker.sock --cpus ${CPUS} infiniflow/infinity_builder:ubuntu20_clang20
-
-      - name: Start minio container
-        if: ${{ !cancelled() && !failure() }}
-        run: |
-          MINIO_CONTAINER=minio_$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')
-          MINIO_DIR=~/minio_data_$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')
-          echo "MINIO_CONTAINER=${MINIO_CONTAINER}" >> $GITHUB_ENV
-          echo "MINIO_DIR=${MINIO_DIR}" >> $GITHUB_ENV
-          sudo docker rm -f -v ${MINIO_CONTAINER} && sudo rm -fr ${MINIO_DIR} && sudo mkdir ${MINIO_DIR} && sudo docker run -d --net=container:${BUILDER_CONTAINER} --name ${MINIO_CONTAINER} -e "MINIO_ROOT_PASSWORD=minioadmin" -e "MINIO_ROOT_USER=minioadmin"  -v ${MINIO_DIR}:/data    quay.io/minio/minio server /data --console-address ":9006" --address ":9005" && sleep 5s
-          if ! sudo docker ps --filter "name=${MINIO_CONTAINER}" --filter "status=running" | grep -q ${MINIO_CONTAINER}; then
-              echo "Minio container is not running"
-              exit 1
-          fi
-
-      - name: Build debug version
-        if: ${{ !cancelled() && !failure() }}
-        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "git config --global safe.directory \"*\" && cd /infinity && rm -fr cmake-build-debug && mkdir -p cmake-build-debug && cmake -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_JOB_POOLS:STRING=link=8 -DCI=ON -S /infinity -B /infinity/cmake-build-debug && cmake --build /infinity/cmake-build-debug --target infinity"
-
-      - name: Install pysdk
-        if: ${{ !cancelled() && !failure() }}
-        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "rm -rf /root/.config/pip/pip.conf && cd /infinity/ && pip3 uninstall -y infinity-sdk && pip3 install python/infinity_sdk -i https://pypi.tuna.tsinghua.edu.cn/simple --trusted-host tuna.tsinghua.edu.cn"
-      #      - name: Run cluster test
-      #        if: ${{ !cancelled() && !failure() }}
-      #        id: run_cluster_test
-      #        run: |
-      #          sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && rm -fr /var/infinity && python3 tools/run_cluster_test.py --infinity_path=cmake-build-debug/src/infinity"
-      #
-      #      - name: Collect cluster test output
-      #        if: ${{ !cancelled() }}
-      #        run: |
-      #          failure="${{ steps.run_cluster_test.outcome == 'failure'}}"
-      #          sudo python3 scripts/collect_cluster_log.py --executable_path=cmake-build-debug/src/infinity --log_dir=/var/infinity/ --output_dir=${RUNNER_WORKSPACE_PREFIX}/log --failure=${failure}
-      #
-      - name: Prepare restart test data
-        if: ${{ !cancelled() && !failure() }}
-        run: |
-          RUNNER_WORKSPACE_PREFIX=${RUNNER_WORKSPACE_PREFIX:-$HOME}
-          echo "RUNNER_WORKSPACE_PREFIX=${RUNNER_WORKSPACE_PREFIX}" >> $GITHUB_ENV
-
-      - name: Run restart test
-        if: ${{ !cancelled() && !failure() }}
-        id: run_restart_test
-        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && python3 tools/run_restart_test.py --infinity_path=cmake-build-debug/src/infinity"
-
-      - name: Collect restart test output
-        if: ${{ !cancelled() }} # always run this step even if previous steps failed
-        run: |
-          failure="${{ steps.run_restart_test.outcome == 'failure'}}"
-          sudo python3 scripts/collect_restart_log.py --executable_path=cmake-build-debug/src/infinity --output_dir=${RUNNER_WORKSPACE_PREFIX}/log --failure=${failure}
-      #
-      #      - name: Start infinity debug version with minio
-      #        if: ${{ !cancelled() && !failure() }}
-      #        run: |
-      #          # Run a command in the background
-      #          sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && rm -fr /var/infinity && cmake-build-debug/src/infinity --config=conf/pytest_parallel_infinity_minio.toml > vfs_debug.log 2> vfs_debug_error.log" &
-      #
-      #      - name: Run pysdk remote infinity & parallel & http_api & sqllogic test debug version
-      #        if: ${{ !cancelled() && !failure() }}
-      #        id: run_tests_debug_minio
-      #        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && LD_PRELOAD=/usr/local/lib/clang/20/lib/x86_64-unknown-linux-gnu/libclang_rt.asan.so ASAN_OPTIONS=detect_leaks=0 python3 tools/run_pytest_parallel.py" && sleep 1s
-      #
-      #      - name: Stop infinity pysdk & http_api & sqllogictest debug
-      #        if: ${{ !cancelled() }}
-      #        id: stop_tests_debug_minio
-      #        run: |
-      #          sudo chmod +x scripts/timeout_kill.sh
-      #          pids=$(sudo docker exec ${BUILDER_CONTAINER} pgrep -f cmake-build-debug/src/infinity | xargs echo)
-      #          sudo docker exec ${BUILDER_CONTAINER} bash -c "/infinity/scripts/timeout_kill.sh 15 ${pids}"
-      #          if [ $? -ne 0 ]; then
-      #            echo "Failed to kill infinity debug version"
-      #            exit 1
-      #          fi
-      #
-      #      - name: Collect infinity debug output
-      #        if: ${{ !cancelled() }}
-      #        # GitHub Actions interprets output lines starting with "Error" as error messages, and it automatically sets the step status to failed when such lines are detected.
-      #        run: |
-      #          failure="${{ steps.run_tests_debug_minio.outcome == 'failure' || steps.stop_tests_debug_minio.outcome == 'failure' }}"
-      #          sudo python3 scripts/collect_log.py --log_path=/var/infinity/log/infinity.log --stdout_path=vfs_debug.log --stderror_path=vfs_debug_error.log --executable_path=cmake-build-debug/src/infinity --output_dir=${RUNNER_WORKSPACE_PREFIX}/log --failure=${failure}
-      #
-      - name: Start infinity debug version
-        if: ${{ !cancelled() && !failure() }}
-        run: |
-          # Run a command in the background
-          sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && rm -fr /var/infinity && cmake-build-debug/src/infinity --config=conf/pytest_parallel_infinity_conf.toml > sqllogictest_debug.log 2> sqllogictest_debug_error.log" &
-
-      - name: Run sqllogictest debug version
-        if: ${{ !cancelled() && !failure() }}
-        id: run_tests_debug
-        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && LD_PRELOAD=/usr/local/lib/clang/20/lib/x86_64-unknown-linux-gnu/libclang_rt.asan.so ASAN_OPTIONS=detect_leaks=0 python3 tools/sqllogictest.py" && sleep 1s
-
-      - name: Stop sqllogictest debug
-        if: ${{ !cancelled() }}
-        id: stop_tests_debug
-        run: |
-          sudo chmod +x scripts/timeout_kill.sh
-          pids=$(sudo docker exec ${BUILDER_CONTAINER} pgrep -f cmake-build-debug/src/infinity | xargs echo)
-          sudo docker exec ${BUILDER_CONTAINER} bash -c "/infinity/scripts/timeout_kill.sh 15 ${pids}"
-          if [ $? -ne 0 ]; then
-            echo "Failed to kill infinity debug version"
-            exit 1
-          fi
-
-      - name: Collect infinity debug output
-        if: ${{ !cancelled() }}
-        # GitHub Actions interprets output lines starting with "Error" as error messages, and it automatically sets the step status to failed when such lines are detected.
-        run: |
-          failure="${{ steps.run_tests_debug.outcome == 'failure' || steps.stop_tests_debug.outcome == 'failure' }}"
-          sudo docker exec ${BUILDER_CONTAINER} bash -c "cp /var/infinity/log/infinity.log /infinity/infinity.log"
-          sudo python3 scripts/collect_log.py --log_path=infinity.log --stdout_path=sqllogictest_debug.log --stderror_path=sqllogictest_debug_error.log --executable_path=cmake-build-debug/src/infinity --output_dir=${RUNNER_WORKSPACE_PREFIX}/log --failure=${failure}
-
-      - name: Build unit test
-        if: ${{ !cancelled() && !failure() }}
-        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "git config --global safe.directory \"*\" && cd /infinity && cmake --build /infinity/cmake-build-debug --target test_main"
-
-      - name: Unit test debug version
-        if: ${{ !cancelled() && !failure() }}
-        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "mkdir -p /var/infinity && cd /infinity/ && ASAN_OPTIONS=detect_leaks=0 cmake-build-debug/src/test_main > unittest_debug.log 2>&1"
-
-      - name: Collect infinity unit test debug output
-        if: ${{ !cancelled() && failure() }}
-        run: tail -n 1000 unittest_debug.log 2>/dev/null || true
-
-      - name: Start infinity debug version
-        if: ${{ !cancelled() && !failure() }}
-        run: |
-          # Run a command in the background
-          sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && rm -fr /var/infinity && cmake-build-debug/src/infinity --config=conf/pytest_parallel_infinity_conf.toml > pysdk_remote_debug.log 2> pysdk_remote_debug_error.log" &
-
-      - name: Run pysdk remote infinity test debug version
-        if: ${{ !cancelled() && !failure() }}
-        id: run_pysdk_remote_debug
-        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && LD_PRELOAD=/usr/local/lib/clang/20/lib/x86_64-unknown-linux-gnu/libclang_rt.asan.so ASAN_OPTIONS=detect_leaks=0 python3 tools/run_pysdk_remote_infinity_test.py" && sleep 1s
-
-      - name: Stop infinity pysdk_remote test
-        if: ${{ !cancelled() }}
-        id: stop_pysdk_remote_debug
-        run: |
-          sudo chmod +x scripts/timeout_kill.sh
-          pids=$(sudo docker exec ${BUILDER_CONTAINER} pgrep -f cmake-build-debug/src/infinity | xargs echo)
-          sudo docker exec ${BUILDER_CONTAINER} bash -c "/infinity/scripts/timeout_kill.sh 15 ${pids}"
-          if [ $? -ne 0 ]; then
-            echo "Failed to kill infinity debug version"
-            exit 1
-          fi
-
-      - name: Collect infinity debug output
-        if: ${{ !cancelled() }}
-        # GitHub Actions interprets output lines starting with "Error" as error messages, and it automatically sets the step status to failed when such lines are detected.
-        run: |
-          failure="${{ steps.run_pysdk_remote_debug.outcome == 'failure' || steps.stop_pysdk_remote_debug.outcome == 'failure' }}"
-          sudo docker exec ${BUILDER_CONTAINER} bash -c "cp /var/infinity/log/infinity.log /infinity/infinity.log"
-          sudo python3 scripts/collect_log.py --log_path=infinity.log --stdout_path=pysdk_remote_debug.log --stderror_path=pysdk_remote_debug_error.log --executable_path=cmake-build-debug/src/infinity --output_dir=${RUNNER_WORKSPACE_PREFIX}/log --failure=${failure}
-
-      - name: Start infinity debug version
-        if: ${{ !cancelled() && !failure() }}
-        run: |
-          # Run a command in the background
-          sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && rm -fr /var/infinity && cmake-build-debug/src/infinity --config=conf/pytest_parallel_infinity_conf.toml > http_remote_debug.log 2> http_remote_debug_error.log" &
-
-      - name: Run HTTP infinity test debug version
-        if: ${{ !cancelled() && !failure() }}
-        id: run_http_remote_debug
-        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && LD_PRELOAD=/usr/local/lib/clang/20/lib/x86_64-unknown-linux-gnu/libclang_rt.asan.so ASAN_OPTIONS=detect_leaks=0 python3 tools/run_http_api.py" && sleep 1s
-
-      - name: Stop infinity HTTP test
-        if: ${{ !cancelled() }}
-        id: stop_http_remote_debug
-        run: |
-          sudo chmod +x scripts/timeout_kill.sh
-          pids=$(sudo docker exec ${BUILDER_CONTAINER} pgrep -f cmake-build-debug/src/infinity | xargs echo)
-          sudo docker exec ${BUILDER_CONTAINER} bash -c "/infinity/scripts/timeout_kill.sh 15 ${pids}"
-          if [ $? -ne 0 ]; then
-            echo "Failed to kill infinity debug version"
-            exit 1
-          fi
-
-      - name: Collect infinity debug output
-        if: ${{ !cancelled() }}
-        # GitHub Actions interprets output lines starting with "Error" as error messages, and it automatically sets the step status to failed when such lines are detected.
-        run: |
-          failure="${{ steps.run_http_remote_debug.outcome == 'failure' || steps.stop_http_remote_debug.outcome == 'failure' }}"
-          sudo docker exec ${BUILDER_CONTAINER} bash -c "cp /var/infinity/log/infinity.log /infinity/infinity.log"
-          sudo python3 scripts/collect_log.py --log_path=infinity.log --stdout_path=http_remote_debug.log --stderror_path=http_remote_debug_error.log --executable_path=cmake-build-debug/src/infinity --output_dir=${RUNNER_WORKSPACE_PREFIX}/log --failure=${failure}
-
-      - name: Start infinity debug version
-        if: ${{ !cancelled() && !failure() }}
-        run: |
-          # Run a command in the background
-          sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && rm -fr /var/infinity && cmake-build-debug/src/infinity --config=conf/pytest_parallel_infinity_conf.toml > parallel_test_debug.log 2> parallel_test_debug_error.log" &
-
-      - name: Run pysdk parallel test debug version
-        if: ${{ !cancelled() && !failure() }}
-        id: run_parallel_test_debug
-        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && LD_PRELOAD=/usr/local/lib/clang/20/lib/x86_64-unknown-linux-gnu/libclang_rt.asan.so ASAN_OPTIONS=detect_leaks=0 python3 tools/run_parallel_test.py" && sleep 1s
-
-      - name: Stop infinity pysdk parallel test
-        if: ${{ !cancelled() }}
-        id: stop_parallel_test_debug
-        run: |
-          sudo chmod +x scripts/timeout_kill.sh
-          pids=$(sudo docker exec ${BUILDER_CONTAINER} pgrep -f cmake-build-debug/src/infinity | xargs echo)
-          sudo docker exec ${BUILDER_CONTAINER} bash -c "/infinity/scripts/timeout_kill.sh 15 ${pids}"
-          if [ $? -ne 0 ]; then
-            echo "Failed to kill infinity debug version"
-            exit 1
-          fi
-
-      - name: Collect infinity debug output
-        if: ${{ !cancelled() }}
-        # GitHub Actions interprets output lines starting with "Error" as error messages, and it automatically sets the step status to failed when such lines are detected.
-        run: |
-          failure="${{ steps.run_parallel_test_debug.outcome == 'failure' || steps.stop_parallel_test_debug.outcome == 'failure' }}"
-          sudo docker exec ${BUILDER_CONTAINER} bash -c "cp /var/infinity/log/infinity.log /infinity/infinity.log"
-          sudo python3 scripts/collect_log.py --log_path=infinity.log --stdout_path=parallel_test_debug.log --stderror_path=parallel_test_debug_error.log --executable_path=cmake-build-debug/src/infinity --output_dir=${RUNNER_WORKSPACE_PREFIX}/log --failure=${failure}
-
-      - name: Destroy builder container
-        if: always()  # always run this step even if previous steps failed
-        run: |
-          if [ -n "${BUILDER_CONTAINER}" ]; then
-            sudo docker rm -f -v ${BUILDER_CONTAINER}
-          fi
-
-      - name: Destroy minio container
-        if: always()  # always run this step even if previous steps failed
-        run: |
-          if [ -n "${MINIO_CONTAINER}" ]; then
-            sudo docker rm -f -v ${MINIO_CONTAINER}
-          fi
-
-      - name: Clear minio working dir
-        if: always()  # always run this step even if previous steps failed
-        run: sudo rm -fr ${MINIO_DIR}
+#  debug_tests:
+#    name: debug_tests
+#    # https://docs.github.com/en/actions/using-jobs/using-conditions-to-control-job-execution
+#    # https://github.com/orgs/community/discussions/26261
+#    if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ci') }}
+#    runs-on: [ "self-hosted", "debug" ]
+#    steps:
+#      # https://github.com/hmarr/debug-action
+#      #- uses: hmarr/debug-action@v3
+#
+#      - name: Show PR labels
+#        if: ${{ !cancelled() && !failure() }}
+#        run: |
+#          echo "Workflow triggered by ${{ github.event_name }}"
+#          if [[ ${{ github.event_name }} == 'pull_request' ]]; then
+#            echo "PR labels: ${{ join(github.event.pull_request.labels.*.name, ', ') }}"
+#          fi
+#
+#      - name: Ensure workspace ownership
+#        if: ${{ !cancelled() && !failure() }}
+#        run: echo "chown -R $USER $GITHUB_WORKSPACE" && sudo chown -R $USER $GITHUB_WORKSPACE
+#
+#      - name: Check out code
+#        if: ${{ !cancelled() && !failure() }}
+#        uses: actions/checkout@v4
+#
+#      - name: Start builder container
+#        if: ${{ !cancelled() && !failure() }}
+#        run: |
+#          BUILDER_CONTAINER=infinity_build_$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')
+#          CPUS=${CPUS:-$(nproc)}
+#          echo "BUILDER_CONTAINER=${BUILDER_CONTAINER}" >> $GITHUB_ENV
+#          echo "CPUS=${CPUS}" >> $GITHUB_ENV
+#          TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
+#          sudo docker rm -f -v ${BUILDER_CONTAINER} && sudo docker run --privileged --cap-add=NET_ADMIN -d --name ${BUILDER_CONTAINER} -e TZ=$TZ -e CMAKE_BUILD_PARALLEL_LEVEL=${CPUS} -v $PWD:/infinity -v /boot:/boot -v /var/run/docker.sock:/var/run/docker.sock --cpus ${CPUS} infiniflow/infinity_builder:ubuntu20_clang20
+#
+#      - name: Start minio container
+#        if: ${{ !cancelled() && !failure() }}
+#        run: |
+#          MINIO_CONTAINER=minio_$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')
+#          MINIO_DIR=~/minio_data_$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')
+#          echo "MINIO_CONTAINER=${MINIO_CONTAINER}" >> $GITHUB_ENV
+#          echo "MINIO_DIR=${MINIO_DIR}" >> $GITHUB_ENV
+#          sudo docker rm -f -v ${MINIO_CONTAINER} && sudo rm -fr ${MINIO_DIR} && sudo mkdir ${MINIO_DIR} && sudo docker run -d --net=container:${BUILDER_CONTAINER} --name ${MINIO_CONTAINER} -e "MINIO_ROOT_PASSWORD=minioadmin" -e "MINIO_ROOT_USER=minioadmin"  -v ${MINIO_DIR}:/data    quay.io/minio/minio server /data --console-address ":9006" --address ":9005" && sleep 5s
+#          if ! sudo docker ps --filter "name=${MINIO_CONTAINER}" --filter "status=running" | grep -q ${MINIO_CONTAINER}; then
+#              echo "Minio container is not running"
+#              exit 1
+#          fi
+#
+#      - name: Build debug version
+#        if: ${{ !cancelled() && !failure() }}
+#        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "git config --global safe.directory \"*\" && cd /infinity && rm -fr cmake-build-debug && mkdir -p cmake-build-debug && cmake -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_JOB_POOLS:STRING=link=8 -DCI=ON -S /infinity -B /infinity/cmake-build-debug && cmake --build /infinity/cmake-build-debug --target infinity"
+#
+#      - name: Install pysdk
+#        if: ${{ !cancelled() && !failure() }}
+#        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "rm -rf /root/.config/pip/pip.conf && cd /infinity/ && pip3 uninstall -y infinity-sdk && pip3 install python/infinity_sdk -i https://pypi.tuna.tsinghua.edu.cn/simple --trusted-host tuna.tsinghua.edu.cn"
+#      #      - name: Run cluster test
+#      #        if: ${{ !cancelled() && !failure() }}
+#      #        id: run_cluster_test
+#      #        run: |
+#      #          sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && rm -fr /var/infinity && python3 tools/run_cluster_test.py --infinity_path=cmake-build-debug/src/infinity"
+#      #
+#      #      - name: Collect cluster test output
+#      #        if: ${{ !cancelled() }}
+#      #        run: |
+#      #          failure="${{ steps.run_cluster_test.outcome == 'failure'}}"
+#      #          sudo python3 scripts/collect_cluster_log.py --executable_path=cmake-build-debug/src/infinity --log_dir=/var/infinity/ --output_dir=${RUNNER_WORKSPACE_PREFIX}/log --failure=${failure}
+#      #
+#      - name: Prepare restart test data
+#        if: ${{ !cancelled() && !failure() }}
+#        run: |
+#          RUNNER_WORKSPACE_PREFIX=${RUNNER_WORKSPACE_PREFIX:-$HOME}
+#          echo "RUNNER_WORKSPACE_PREFIX=${RUNNER_WORKSPACE_PREFIX}" >> $GITHUB_ENV
+#
+#      - name: Run restart test
+#        if: ${{ !cancelled() && !failure() }}
+#        id: run_restart_test
+#        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && python3 tools/run_restart_test.py --infinity_path=cmake-build-debug/src/infinity"
+#
+#      - name: Collect restart test output
+#        if: ${{ !cancelled() }} # always run this step even if previous steps failed
+#        run: |
+#          failure="${{ steps.run_restart_test.outcome == 'failure'}}"
+#          sudo python3 scripts/collect_restart_log.py --executable_path=cmake-build-debug/src/infinity --output_dir=${RUNNER_WORKSPACE_PREFIX}/log --failure=${failure}
+#      #
+#      #      - name: Start infinity debug version with minio
+#      #        if: ${{ !cancelled() && !failure() }}
+#      #        run: |
+#      #          # Run a command in the background
+#      #          sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && rm -fr /var/infinity && cmake-build-debug/src/infinity --config=conf/pytest_parallel_infinity_minio.toml > vfs_debug.log 2> vfs_debug_error.log" &
+#      #
+#      #      - name: Run pysdk remote infinity & parallel & http_api & sqllogic test debug version
+#      #        if: ${{ !cancelled() && !failure() }}
+#      #        id: run_tests_debug_minio
+#      #        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && LD_PRELOAD=/usr/local/lib/clang/20/lib/x86_64-unknown-linux-gnu/libclang_rt.asan.so ASAN_OPTIONS=detect_leaks=0 python3 tools/run_pytest_parallel.py" && sleep 1s
+#      #
+#      #      - name: Stop infinity pysdk & http_api & sqllogictest debug
+#      #        if: ${{ !cancelled() }}
+#      #        id: stop_tests_debug_minio
+#      #        run: |
+#      #          sudo chmod +x scripts/timeout_kill.sh
+#      #          pids=$(sudo docker exec ${BUILDER_CONTAINER} pgrep -f cmake-build-debug/src/infinity | xargs echo)
+#      #          sudo docker exec ${BUILDER_CONTAINER} bash -c "/infinity/scripts/timeout_kill.sh 15 ${pids}"
+#      #          if [ $? -ne 0 ]; then
+#      #            echo "Failed to kill infinity debug version"
+#      #            exit 1
+#      #          fi
+#      #
+#      #      - name: Collect infinity debug output
+#      #        if: ${{ !cancelled() }}
+#      #        # GitHub Actions interprets output lines starting with "Error" as error messages, and it automatically sets the step status to failed when such lines are detected.
+#      #        run: |
+#      #          failure="${{ steps.run_tests_debug_minio.outcome == 'failure' || steps.stop_tests_debug_minio.outcome == 'failure' }}"
+#      #          sudo python3 scripts/collect_log.py --log_path=/var/infinity/log/infinity.log --stdout_path=vfs_debug.log --stderror_path=vfs_debug_error.log --executable_path=cmake-build-debug/src/infinity --output_dir=${RUNNER_WORKSPACE_PREFIX}/log --failure=${failure}
+#      #
+#      - name: Start infinity debug version
+#        if: ${{ !cancelled() && !failure() }}
+#        run: |
+#          # Run a command in the background
+#          sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && rm -fr /var/infinity && cmake-build-debug/src/infinity --config=conf/pytest_parallel_infinity_conf.toml > sqllogictest_debug.log 2> sqllogictest_debug_error.log" &
+#
+#      - name: Run sqllogictest debug version
+#        if: ${{ !cancelled() && !failure() }}
+#        id: run_tests_debug
+#        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && LD_PRELOAD=/usr/local/lib/clang/20/lib/x86_64-unknown-linux-gnu/libclang_rt.asan.so ASAN_OPTIONS=detect_leaks=0 python3 tools/sqllogictest.py" && sleep 1s
+#
+#      - name: Stop sqllogictest debug
+#        if: ${{ !cancelled() }}
+#        id: stop_tests_debug
+#        run: |
+#          sudo chmod +x scripts/timeout_kill.sh
+#          pids=$(sudo docker exec ${BUILDER_CONTAINER} pgrep -f cmake-build-debug/src/infinity | xargs echo)
+#          sudo docker exec ${BUILDER_CONTAINER} bash -c "/infinity/scripts/timeout_kill.sh 15 ${pids}"
+#          if [ $? -ne 0 ]; then
+#            echo "Failed to kill infinity debug version"
+#            exit 1
+#          fi
+#
+#      - name: Collect infinity debug output
+#        if: ${{ !cancelled() }}
+#        # GitHub Actions interprets output lines starting with "Error" as error messages, and it automatically sets the step status to failed when such lines are detected.
+#        run: |
+#          failure="${{ steps.run_tests_debug.outcome == 'failure' || steps.stop_tests_debug.outcome == 'failure' }}"
+#          sudo docker exec ${BUILDER_CONTAINER} bash -c "cp /var/infinity/log/infinity.log /infinity/infinity.log"
+#          sudo python3 scripts/collect_log.py --log_path=infinity.log --stdout_path=sqllogictest_debug.log --stderror_path=sqllogictest_debug_error.log --executable_path=cmake-build-debug/src/infinity --output_dir=${RUNNER_WORKSPACE_PREFIX}/log --failure=${failure}
+#
+#      - name: Build unit test
+#        if: ${{ !cancelled() && !failure() }}
+#        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "git config --global safe.directory \"*\" && cd /infinity && cmake --build /infinity/cmake-build-debug --target test_main"
+#
+#      - name: Unit test debug version
+#        if: ${{ !cancelled() && !failure() }}
+#        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "mkdir -p /var/infinity && cd /infinity/ && ASAN_OPTIONS=detect_leaks=0 cmake-build-debug/src/test_main > unittest_debug.log 2>&1"
+#
+#      - name: Collect infinity unit test debug output
+#        if: ${{ !cancelled() && failure() }}
+#        run: tail -n 1000 unittest_debug.log 2>/dev/null || true
+#
+#      - name: Start infinity debug version
+#        if: ${{ !cancelled() && !failure() }}
+#        run: |
+#          # Run a command in the background
+#          sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && rm -fr /var/infinity && cmake-build-debug/src/infinity --config=conf/pytest_parallel_infinity_conf.toml > pysdk_remote_debug.log 2> pysdk_remote_debug_error.log" &
+#
+#      - name: Run pysdk remote infinity test debug version
+#        if: ${{ !cancelled() && !failure() }}
+#        id: run_pysdk_remote_debug
+#        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && LD_PRELOAD=/usr/local/lib/clang/20/lib/x86_64-unknown-linux-gnu/libclang_rt.asan.so ASAN_OPTIONS=detect_leaks=0 python3 tools/run_pysdk_remote_infinity_test.py" && sleep 1s
+#
+#      - name: Stop infinity pysdk_remote test
+#        if: ${{ !cancelled() }}
+#        id: stop_pysdk_remote_debug
+#        run: |
+#          sudo chmod +x scripts/timeout_kill.sh
+#          pids=$(sudo docker exec ${BUILDER_CONTAINER} pgrep -f cmake-build-debug/src/infinity | xargs echo)
+#          sudo docker exec ${BUILDER_CONTAINER} bash -c "/infinity/scripts/timeout_kill.sh 15 ${pids}"
+#          if [ $? -ne 0 ]; then
+#            echo "Failed to kill infinity debug version"
+#            exit 1
+#          fi
+#
+#      - name: Collect infinity debug output
+#        if: ${{ !cancelled() }}
+#        # GitHub Actions interprets output lines starting with "Error" as error messages, and it automatically sets the step status to failed when such lines are detected.
+#        run: |
+#          failure="${{ steps.run_pysdk_remote_debug.outcome == 'failure' || steps.stop_pysdk_remote_debug.outcome == 'failure' }}"
+#          sudo docker exec ${BUILDER_CONTAINER} bash -c "cp /var/infinity/log/infinity.log /infinity/infinity.log"
+#          sudo python3 scripts/collect_log.py --log_path=infinity.log --stdout_path=pysdk_remote_debug.log --stderror_path=pysdk_remote_debug_error.log --executable_path=cmake-build-debug/src/infinity --output_dir=${RUNNER_WORKSPACE_PREFIX}/log --failure=${failure}
+#
+#      - name: Start infinity debug version
+#        if: ${{ !cancelled() && !failure() }}
+#        run: |
+#          # Run a command in the background
+#          sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && rm -fr /var/infinity && cmake-build-debug/src/infinity --config=conf/pytest_parallel_infinity_conf.toml > http_remote_debug.log 2> http_remote_debug_error.log" &
+#
+#      - name: Run HTTP infinity test debug version
+#        if: ${{ !cancelled() && !failure() }}
+#        id: run_http_remote_debug
+#        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && LD_PRELOAD=/usr/local/lib/clang/20/lib/x86_64-unknown-linux-gnu/libclang_rt.asan.so ASAN_OPTIONS=detect_leaks=0 python3 tools/run_http_api.py" && sleep 1s
+#
+#      - name: Stop infinity HTTP test
+#        if: ${{ !cancelled() }}
+#        id: stop_http_remote_debug
+#        run: |
+#          sudo chmod +x scripts/timeout_kill.sh
+#          pids=$(sudo docker exec ${BUILDER_CONTAINER} pgrep -f cmake-build-debug/src/infinity | xargs echo)
+#          sudo docker exec ${BUILDER_CONTAINER} bash -c "/infinity/scripts/timeout_kill.sh 15 ${pids}"
+#          if [ $? -ne 0 ]; then
+#            echo "Failed to kill infinity debug version"
+#            exit 1
+#          fi
+#
+#      - name: Collect infinity debug output
+#        if: ${{ !cancelled() }}
+#        # GitHub Actions interprets output lines starting with "Error" as error messages, and it automatically sets the step status to failed when such lines are detected.
+#        run: |
+#          failure="${{ steps.run_http_remote_debug.outcome == 'failure' || steps.stop_http_remote_debug.outcome == 'failure' }}"
+#          sudo docker exec ${BUILDER_CONTAINER} bash -c "cp /var/infinity/log/infinity.log /infinity/infinity.log"
+#          sudo python3 scripts/collect_log.py --log_path=infinity.log --stdout_path=http_remote_debug.log --stderror_path=http_remote_debug_error.log --executable_path=cmake-build-debug/src/infinity --output_dir=${RUNNER_WORKSPACE_PREFIX}/log --failure=${failure}
+#
+#      - name: Start infinity debug version
+#        if: ${{ !cancelled() && !failure() }}
+#        run: |
+#          # Run a command in the background
+#          sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && rm -fr /var/infinity && cmake-build-debug/src/infinity --config=conf/pytest_parallel_infinity_conf.toml > parallel_test_debug.log 2> parallel_test_debug_error.log" &
+#
+#      - name: Run pysdk parallel test debug version
+#        if: ${{ !cancelled() && !failure() }}
+#        id: run_parallel_test_debug
+#        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && LD_PRELOAD=/usr/local/lib/clang/20/lib/x86_64-unknown-linux-gnu/libclang_rt.asan.so ASAN_OPTIONS=detect_leaks=0 python3 tools/run_parallel_test.py" && sleep 1s
+#
+#      - name: Stop infinity pysdk parallel test
+#        if: ${{ !cancelled() }}
+#        id: stop_parallel_test_debug
+#        run: |
+#          sudo chmod +x scripts/timeout_kill.sh
+#          pids=$(sudo docker exec ${BUILDER_CONTAINER} pgrep -f cmake-build-debug/src/infinity | xargs echo)
+#          sudo docker exec ${BUILDER_CONTAINER} bash -c "/infinity/scripts/timeout_kill.sh 15 ${pids}"
+#          if [ $? -ne 0 ]; then
+#            echo "Failed to kill infinity debug version"
+#            exit 1
+#          fi
+#
+#      - name: Collect infinity debug output
+#        if: ${{ !cancelled() }}
+#        # GitHub Actions interprets output lines starting with "Error" as error messages, and it automatically sets the step status to failed when such lines are detected.
+#        run: |
+#          failure="${{ steps.run_parallel_test_debug.outcome == 'failure' || steps.stop_parallel_test_debug.outcome == 'failure' }}"
+#          sudo docker exec ${BUILDER_CONTAINER} bash -c "cp /var/infinity/log/infinity.log /infinity/infinity.log"
+#          sudo python3 scripts/collect_log.py --log_path=infinity.log --stdout_path=parallel_test_debug.log --stderror_path=parallel_test_debug_error.log --executable_path=cmake-build-debug/src/infinity --output_dir=${RUNNER_WORKSPACE_PREFIX}/log --failure=${failure}
+#
+#      - name: Destroy builder container
+#        if: always()  # always run this step even if previous steps failed
+#        run: |
+#          if [ -n "${BUILDER_CONTAINER}" ]; then
+#            sudo docker rm -f -v ${BUILDER_CONTAINER}
+#          fi
+#
+#      - name: Destroy minio container
+#        if: always()  # always run this step even if previous steps failed
+#        run: |
+#          if [ -n "${MINIO_CONTAINER}" ]; then
+#            sudo docker rm -f -v ${MINIO_CONTAINER}
+#          fi
+#
+#      - name: Clear minio working dir
+#        if: always()  # always run this step even if previous steps failed
+#        run: sudo rm -fr ${MINIO_DIR}
 
   release_tests:
     name: release_tests and benchmark
@@ -423,135 +423,135 @@ jobs:
           # Run a command in the background
           sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && rm -fr /var/infinity && cmake-build-release/src/infinity --config=conf/pytest_parallel_infinity_conf.toml > sqllogictest_release.log 2> sqllogictest_release_error.log" &
 
-      - name: Run sqllogictest release version
-        if: ${{ !cancelled() && !failure() }}
-        id: run_tests_release
-        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && python3 tools/sqllogictest.py" && sleep 1s
-
-      - name: Stop sqllogictest release
-        if: ${{ !cancelled() }}
-        id: stop_tests_release
-        run: |
-          sudo chmod +x scripts/timeout_kill.sh
-          pids=$(sudo docker exec ${BUILDER_CONTAINER} pgrep -f cmake-build-release/src/infinity | xargs echo)
-          sudo docker exec ${BUILDER_CONTAINER} bash -c "/infinity/scripts/timeout_kill.sh 15 ${pids}"
-          if [ $? -ne 0 ]; then
-            echo "Failed to kill infinity debug version"
-            exit 1
-          fi
-
-      - name: Collect infinity release output
-        if: ${{ !cancelled() }} # always run this step even if previous steps failed
-        # GitHub Actions interprets output lines starting with "Error" as error messages, and it automatically sets the step status to failed when such lines are detected.
-        run: |
-          failure="${{ steps.run_tests_release.outcome == 'failure' || steps.stop_tests_release.outcome == 'failure' }}"
-          sudo docker exec ${BUILDER_CONTAINER} bash -c "cp /var/infinity/log/infinity.log /infinity/infinity.log"
-          sudo python3 scripts/collect_log.py --log_path=infinity.log --stdout_path=sqllogictest_release.log --stderror_path=sqllogictest_release_error.log --executable_path=cmake-build-release/src/infinity --output_dir=${RUNNER_WORKSPACE_PREFIX}/log --failure=${failure}
-
-      - name: Build unit test
-        if: ${{ !cancelled() && !failure() }}
-        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "git config --global safe.directory \"*\" && cd /infinity && cmake --build /infinity/cmake-build-release --target test_main knn_import_benchmark knn_query_benchmark"
-
-      - name: Unit test release version
-        if: ${{ !cancelled() && !failure() }}
-        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "mkdir -p /var/infinity && cd /infinity/ && cmake-build-release/src/test_main > unittest_release.log 2>&1"
-
-      - name: Collect infinity unit test release output
-        if: ${{ !cancelled() }}
-        run: tail -n 1000 unittest_release.log 2>/dev/null || true
-
-      - name: Start infinity release version
-        if: ${{ !cancelled() && !failure() }}
-        run: |
-          # Run a command in the background
-          sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && rm -fr /var/infinity && cmake-build-release/src/infinity --config=conf/pytest_parallel_infinity_conf.toml > pysdk_remote_release.log 2> pysdk_remote_release_error.log" &
-
-      - name: Run pysdk remote test
-        if: ${{ !cancelled() && !failure() }}
-        id: run_pysdk_remote_release
-        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && python3 tools/run_pysdk_remote_infinity_test.py" && sleep 1s
-
-      - name: Stop infinity release
-        if: ${{ !cancelled() }}
-        id: stop_pysdk_remote_release
-        run: |
-          sudo chmod +x scripts/timeout_kill.sh
-          pids=$(sudo docker exec ${BUILDER_CONTAINER} pgrep -f cmake-build-release/src/infinity | xargs echo)
-          sudo docker exec ${BUILDER_CONTAINER} bash -c "/infinity/scripts/timeout_kill.sh 15 ${pids}"
-          if [ $? -ne 0 ]; then
-            echo "Failed to kill infinity debug version"
-            exit 1
-          fi
-
-      - name: Collect infinity release output
-        if: ${{ !cancelled() }} # always run this step even if previous steps failed
-        # GitHub Actions interprets output lines starting with "Error" as error messages, and it automatically sets the step status to failed when such lines are detected.
-        run: |
-          failure="${{ steps.run_pysdk_remote_release.outcome == 'failure' || steps.stop_pysdk_remote_release.outcome == 'failure' }}"
-          sudo docker exec ${BUILDER_CONTAINER} bash -c "cp /var/infinity/log/infinity.log /infinity/infinity.log"
-          sudo python3 scripts/collect_log.py --log_path=infinity.log --stdout_path=pysdk_remote_release.log --stderror_path=pysdk_remote_release_error.log --executable_path=cmake-build-release/src/infinity --output_dir=${RUNNER_WORKSPACE_PREFIX}/log --failure=${failure}
-
-      - name: Start infinity release version
-        if: ${{ !cancelled() && !failure() }}
-        run: |
-          # Run a command in the background
-          sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && rm -fr /var/infinity && cmake-build-release/src/infinity --config=conf/pytest_parallel_infinity_conf.toml > http_remote_release.log 2> http_remote_release_error.log" &
-
-      - name: Run HTTP test
-        if: ${{ !cancelled() && !failure() }}
-        id: run_http_remote_release
-        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && python3 tools/run_http_api.py" && sleep 1s
-
-      - name: Stop infinity release
-        if: ${{ !cancelled() }}
-        id: stop_http_remote_release
-        run: |
-          sudo chmod +x scripts/timeout_kill.sh
-          pids=$(sudo docker exec ${BUILDER_CONTAINER} pgrep -f cmake-build-release/src/infinity | xargs echo)
-          sudo docker exec ${BUILDER_CONTAINER} bash -c "/infinity/scripts/timeout_kill.sh 15 ${pids}"
-          if [ $? -ne 0 ]; then
-            echo "Failed to kill infinity debug version"
-            exit 1
-          fi
-
-      - name: Collect infinity release output
-        if: ${{ !cancelled() }} # always run this step even if previous steps failed
-        # GitHub Actions interprets output lines starting with "Error" as error messages, and it automatically sets the step status to failed when such lines are detected.
-        run: |
-          failure="${{ steps.run_http_remote_release.outcome == 'failure' || steps.stop_http_remote_release.outcome == 'failure' }}"
-          sudo docker exec ${BUILDER_CONTAINER} bash -c "cp /var/infinity/log/infinity.log /infinity/infinity.log"
-          sudo python3 scripts/collect_log.py --log_path=infinity.log --stdout_path=http_remote_release.log --stderror_path=http_remote_release_error.log --executable_path=cmake-build-release/src/infinity --output_dir=${RUNNER_WORKSPACE_PREFIX}/log --failure=${failure}
-
-      - name: Start infinity release version
-        if: ${{ !cancelled() && !failure() }}
-        run: |
-          # Run a command in the background
-          sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && rm -fr /var/infinity && cmake-build-release/src/infinity --config=conf/pytest_parallel_infinity_conf.toml > parallel_test_release.log 2> parallel_test_release_error.log" &
-
-      - name: Run parallel test
-        if: ${{ !cancelled() && !failure() }}
-        id: run_parallel_test_release
-        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && python3 tools/run_parallel_test.py" && sleep 1s
-
-      - name: Stop infinity release
-        if: ${{ !cancelled() }}
-        id: stop_parallel_test_release
-        run: |
-          sudo chmod +x scripts/timeout_kill.sh
-          pids=$(sudo docker exec ${BUILDER_CONTAINER} pgrep -f cmake-build-release/src/infinity | xargs echo)
-          sudo docker exec ${BUILDER_CONTAINER} bash -c "/infinity/scripts/timeout_kill.sh 15 ${pids}"
-          if [ $? -ne 0 ]; then
-            echo "Failed to kill infinity debug version"
-            exit 1
-          fi
-
-      - name: Collect infinity release output
-        if: ${{ !cancelled() }} # always run this step even if previous steps failed
-        # GitHub Actions interprets output lines starting with "Error" as error messages, and it automatically sets the step status to failed when such lines are detected.
-        run: |
-          failure="${{ steps.run_parallel_test_release.outcome == 'failure' || steps.stop_parallel_test_release.outcome == 'failure' }}"
-          sudo docker exec ${BUILDER_CONTAINER} bash -c "cp /var/infinity/log/infinity.log /infinity/infinity.log"
-          sudo python3 scripts/collect_log.py --log_path=infinity.log --stdout_path=parallel_test_release.log --stderror_path=parallel_test_release_error.log --executable_path=cmake-build-release/src/infinity --output_dir=${RUNNER_WORKSPACE_PREFIX}/log --failure=${failure}
+#      - name: Run sqllogictest release version
+#        if: ${{ !cancelled() && !failure() }}
+#        id: run_tests_release
+#        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && python3 tools/sqllogictest.py" && sleep 1s
+#
+#      - name: Stop sqllogictest release
+#        if: ${{ !cancelled() }}
+#        id: stop_tests_release
+#        run: |
+#          sudo chmod +x scripts/timeout_kill.sh
+#          pids=$(sudo docker exec ${BUILDER_CONTAINER} pgrep -f cmake-build-release/src/infinity | xargs echo)
+#          sudo docker exec ${BUILDER_CONTAINER} bash -c "/infinity/scripts/timeout_kill.sh 15 ${pids}"
+#          if [ $? -ne 0 ]; then
+#            echo "Failed to kill infinity debug version"
+#            exit 1
+#          fi
+#
+#      - name: Collect infinity release output
+#        if: ${{ !cancelled() }} # always run this step even if previous steps failed
+#        # GitHub Actions interprets output lines starting with "Error" as error messages, and it automatically sets the step status to failed when such lines are detected.
+#        run: |
+#          failure="${{ steps.run_tests_release.outcome == 'failure' || steps.stop_tests_release.outcome == 'failure' }}"
+#          sudo docker exec ${BUILDER_CONTAINER} bash -c "cp /var/infinity/log/infinity.log /infinity/infinity.log"
+#          sudo python3 scripts/collect_log.py --log_path=infinity.log --stdout_path=sqllogictest_release.log --stderror_path=sqllogictest_release_error.log --executable_path=cmake-build-release/src/infinity --output_dir=${RUNNER_WORKSPACE_PREFIX}/log --failure=${failure}
+#
+#      - name: Build unit test
+#        if: ${{ !cancelled() && !failure() }}
+#        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "git config --global safe.directory \"*\" && cd /infinity && cmake --build /infinity/cmake-build-release --target test_main knn_import_benchmark knn_query_benchmark"
+#
+#      - name: Unit test release version
+#        if: ${{ !cancelled() && !failure() }}
+#        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "mkdir -p /var/infinity && cd /infinity/ && cmake-build-release/src/test_main > unittest_release.log 2>&1"
+#
+#      - name: Collect infinity unit test release output
+#        if: ${{ !cancelled() }}
+#        run: tail -n 1000 unittest_release.log 2>/dev/null || true
+#
+#      - name: Start infinity release version
+#        if: ${{ !cancelled() && !failure() }}
+#        run: |
+#          # Run a command in the background
+#          sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && rm -fr /var/infinity && cmake-build-release/src/infinity --config=conf/pytest_parallel_infinity_conf.toml > pysdk_remote_release.log 2> pysdk_remote_release_error.log" &
+#
+#      - name: Run pysdk remote test
+#        if: ${{ !cancelled() && !failure() }}
+#        id: run_pysdk_remote_release
+#        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && python3 tools/run_pysdk_remote_infinity_test.py" && sleep 1s
+#
+#      - name: Stop infinity release
+#        if: ${{ !cancelled() }}
+#        id: stop_pysdk_remote_release
+#        run: |
+#          sudo chmod +x scripts/timeout_kill.sh
+#          pids=$(sudo docker exec ${BUILDER_CONTAINER} pgrep -f cmake-build-release/src/infinity | xargs echo)
+#          sudo docker exec ${BUILDER_CONTAINER} bash -c "/infinity/scripts/timeout_kill.sh 15 ${pids}"
+#          if [ $? -ne 0 ]; then
+#            echo "Failed to kill infinity debug version"
+#            exit 1
+#          fi
+#
+#      - name: Collect infinity release output
+#        if: ${{ !cancelled() }} # always run this step even if previous steps failed
+#        # GitHub Actions interprets output lines starting with "Error" as error messages, and it automatically sets the step status to failed when such lines are detected.
+#        run: |
+#          failure="${{ steps.run_pysdk_remote_release.outcome == 'failure' || steps.stop_pysdk_remote_release.outcome == 'failure' }}"
+#          sudo docker exec ${BUILDER_CONTAINER} bash -c "cp /var/infinity/log/infinity.log /infinity/infinity.log"
+#          sudo python3 scripts/collect_log.py --log_path=infinity.log --stdout_path=pysdk_remote_release.log --stderror_path=pysdk_remote_release_error.log --executable_path=cmake-build-release/src/infinity --output_dir=${RUNNER_WORKSPACE_PREFIX}/log --failure=${failure}
+#
+#      - name: Start infinity release version
+#        if: ${{ !cancelled() && !failure() }}
+#        run: |
+#          # Run a command in the background
+#          sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && rm -fr /var/infinity && cmake-build-release/src/infinity --config=conf/pytest_parallel_infinity_conf.toml > http_remote_release.log 2> http_remote_release_error.log" &
+#
+#      - name: Run HTTP test
+#        if: ${{ !cancelled() && !failure() }}
+#        id: run_http_remote_release
+#        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && python3 tools/run_http_api.py" && sleep 1s
+#
+#      - name: Stop infinity release
+#        if: ${{ !cancelled() }}
+#        id: stop_http_remote_release
+#        run: |
+#          sudo chmod +x scripts/timeout_kill.sh
+#          pids=$(sudo docker exec ${BUILDER_CONTAINER} pgrep -f cmake-build-release/src/infinity | xargs echo)
+#          sudo docker exec ${BUILDER_CONTAINER} bash -c "/infinity/scripts/timeout_kill.sh 15 ${pids}"
+#          if [ $? -ne 0 ]; then
+#            echo "Failed to kill infinity debug version"
+#            exit 1
+#          fi
+#
+#      - name: Collect infinity release output
+#        if: ${{ !cancelled() }} # always run this step even if previous steps failed
+#        # GitHub Actions interprets output lines starting with "Error" as error messages, and it automatically sets the step status to failed when such lines are detected.
+#        run: |
+#          failure="${{ steps.run_http_remote_release.outcome == 'failure' || steps.stop_http_remote_release.outcome == 'failure' }}"
+#          sudo docker exec ${BUILDER_CONTAINER} bash -c "cp /var/infinity/log/infinity.log /infinity/infinity.log"
+#          sudo python3 scripts/collect_log.py --log_path=infinity.log --stdout_path=http_remote_release.log --stderror_path=http_remote_release_error.log --executable_path=cmake-build-release/src/infinity --output_dir=${RUNNER_WORKSPACE_PREFIX}/log --failure=${failure}
+#
+#      - name: Start infinity release version
+#        if: ${{ !cancelled() && !failure() }}
+#        run: |
+#          # Run a command in the background
+#          sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && rm -fr /var/infinity && cmake-build-release/src/infinity --config=conf/pytest_parallel_infinity_conf.toml > parallel_test_release.log 2> parallel_test_release_error.log" &
+#
+#      - name: Run parallel test
+#        if: ${{ !cancelled() && !failure() }}
+#        id: run_parallel_test_release
+#        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && python3 tools/run_parallel_test.py" && sleep 1s
+#
+#      - name: Stop infinity release
+#        if: ${{ !cancelled() }}
+#        id: stop_parallel_test_release
+#        run: |
+#          sudo chmod +x scripts/timeout_kill.sh
+#          pids=$(sudo docker exec ${BUILDER_CONTAINER} pgrep -f cmake-build-release/src/infinity | xargs echo)
+#          sudo docker exec ${BUILDER_CONTAINER} bash -c "/infinity/scripts/timeout_kill.sh 15 ${pids}"
+#          if [ $? -ne 0 ]; then
+#            echo "Failed to kill infinity debug version"
+#            exit 1
+#          fi
+#
+#      - name: Collect infinity release output
+#        if: ${{ !cancelled() }} # always run this step even if previous steps failed
+#        # GitHub Actions interprets output lines starting with "Error" as error messages, and it automatically sets the step status to failed when such lines are detected.
+#        run: |
+#          failure="${{ steps.run_parallel_test_release.outcome == 'failure' || steps.stop_parallel_test_release.outcome == 'failure' }}"
+#          sudo docker exec ${BUILDER_CONTAINER} bash -c "cp /var/infinity/log/infinity.log /infinity/infinity.log"
+#          sudo python3 scripts/collect_log.py --log_path=infinity.log --stdout_path=parallel_test_release.log --stderror_path=parallel_test_release_error.log --executable_path=cmake-build-release/src/infinity --output_dir=${RUNNER_WORKSPACE_PREFIX}/log --failure=${failure}
 
       - name: Start infinity release version
         if: ${{ !cancelled() && !failure() }}
@@ -559,7 +559,7 @@ jobs:
           # Run a command in the background
           sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && rm -fr /var/infinity && cmake-build-release/src/infinity --config=conf/infinity_minio_conf.toml > minio_pysdk_remote_release.log 2> minio_pysdk_remote_release_error.log" &
 
-      - name: Run pysdk remote test
+      - name: Run minio pysdk remote test
         if: ${{ !cancelled() && !failure() }}
         id: run_minio_pysdk_remote_release
         run: sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && python3 tools/run_pysdk_remote_infinity_test.py" && sleep 1s
@@ -591,7 +591,7 @@ jobs:
           # Run a command in the background
           sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && rm -fr /var/infinity && cmake-build-release/src/infinity --config=conf/infinity_minio_conf.toml > minio_parallel_test_release.log 2> minio_parallel_test_release_error.log" &
 
-      - name: Run parallel test
+      - name: Run minio parallel test
         if: ${{ !cancelled() && !failure() }}
         id: run_minio_parallel_test_release
         run: sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && python3 tools/run_parallel_test.py" && sleep 1s
@@ -616,34 +616,34 @@ jobs:
           sudo docker exec ${BUILDER_CONTAINER} bash -c "cp /var/infinity/log/infinity.log /infinity/infinity.log"
           sudo python3 scripts/collect_log.py --log_path=infinity.log --stdout_path=minio_parallel_test_release.log --stderror_path=minio_parallel_test_release_error.log --executable_path=cmake-build-release/src/infinity --output_dir=${RUNNER_WORKSPACE_PREFIX}/log --failure=${failure}
 
-      - name: Prepare sift dataset
-        if: ${{ !cancelled() && !failure() }}
-        run: |
-          RUNNER_WORKSPACE_PREFIX=${RUNNER_WORKSPACE_PREFIX:-$HOME}
-          echo "RUNNER_WORKSPACE_PREFIX=${RUNNER_WORKSPACE_PREFIX}" >> $GITHUB_ENV
-          sudo chmod +x ./tools/ci_tools/check_benchmark_result.py && sudo mkdir -p test/data/benchmark && sudo ln -s ${RUNNER_WORKSPACE_PREFIX}/benchmark/sift1M test/data/benchmark/sift_1m
-
-      - name: Golden benchmark sift
-        if: ${{ !cancelled() && !failure() }}
-        run: |
-          if [[ -f "${RUNNER_WORKSPACE_PREFIX}/benchmark/golden_benchmark_sift_1_thread.log" ]]; then
-              echo "golden benchmark result already exists!"
-              exit 0
-          fi
-          rm -fr $PWD/db_tmp && mkdir -p $PWD/db_tmp && cat ${RUNNER_WORKSPACE_PREFIX}/benchmark/infinity_conf.toml | sed -e "s|/var/infinity|$PWD/db_tmp|g" > $PWD/db_tmp/infinity_conf.toml && \
-          ${RUNNER_WORKSPACE_PREFIX}/benchmark/knn_import_benchmark --dataset=sift --dataset_dir=$PWD/test/data --infinity_dir=$PWD/db_tmp && \
-          echo "1 50" | ${RUNNER_WORKSPACE_PREFIX}/benchmark/knn_query_benchmark sift 200 false $PWD/test/data $PWD/db_tmp | sudo tee ${RUNNER_WORKSPACE_PREFIX}/benchmark/golden_benchmark_sift_1_thread.log && \
-          echo "8 50" | ${RUNNER_WORKSPACE_PREFIX}/benchmark/knn_query_benchmark sift 200 false $PWD/test/data $PWD/db_tmp | sudo tee ${RUNNER_WORKSPACE_PREFIX}/benchmark/golden_benchmark_sift_8_threads.log
-
-      - name: Latest benchmark sift
-        if: ${{ !cancelled() && !failure() }}
-        run: |
-          rm -fr $PWD/db_tmp && mkdir -p $PWD/db_tmp && cat conf/infinity_conf.toml | sed -e "s|/var/infinity|$PWD/db_tmp|g" > $PWD/db_tmp/infinity_conf.toml && \
-          ./cmake-build-release/benchmark/local_infinity/knn_import_benchmark --dataset=sift --dataset_dir=$PWD/test/data --infinity_dir=$PWD/db_tmp --config_path=db_tmp/infinity_conf.toml && \
-          echo "1 50" | ./cmake-build-release/benchmark/local_infinity/knn_query_benchmark sift 200 false $PWD/test/data $PWD/db_tmp db_tmp/infinity_conf.toml | tee benchmark_sift_1_thread.log && \
-          echo "8 50" | ./cmake-build-release/benchmark/local_infinity/knn_query_benchmark sift 200 false $PWD/test/data $PWD/db_tmp db_tmp/infinity_conf.toml | tee benchmark_sift_8_threads.log && \
-          ./tools/ci_tools/check_benchmark_result.py ${RUNNER_WORKSPACE_PREFIX}/benchmark/golden_benchmark_sift_1_thread.log benchmark_sift_1_thread.log && \
-          ./tools/ci_tools/check_benchmark_result.py ${RUNNER_WORKSPACE_PREFIX}/benchmark/golden_benchmark_sift_8_threads.log benchmark_sift_8_threads.log
+#      - name: Prepare sift dataset
+#        if: ${{ !cancelled() && !failure() }}
+#        run: |
+#          RUNNER_WORKSPACE_PREFIX=${RUNNER_WORKSPACE_PREFIX:-$HOME}
+#          echo "RUNNER_WORKSPACE_PREFIX=${RUNNER_WORKSPACE_PREFIX}" >> $GITHUB_ENV
+#          sudo chmod +x ./tools/ci_tools/check_benchmark_result.py && sudo mkdir -p test/data/benchmark && sudo ln -s ${RUNNER_WORKSPACE_PREFIX}/benchmark/sift1M test/data/benchmark/sift_1m
+#
+#      - name: Golden benchmark sift
+#        if: ${{ !cancelled() && !failure() }}
+#        run: |
+#          if [[ -f "${RUNNER_WORKSPACE_PREFIX}/benchmark/golden_benchmark_sift_1_thread.log" ]]; then
+#              echo "golden benchmark result already exists!"
+#              exit 0
+#          fi
+#          rm -fr $PWD/db_tmp && mkdir -p $PWD/db_tmp && cat ${RUNNER_WORKSPACE_PREFIX}/benchmark/infinity_conf.toml | sed -e "s|/var/infinity|$PWD/db_tmp|g" > $PWD/db_tmp/infinity_conf.toml && \
+#          ${RUNNER_WORKSPACE_PREFIX}/benchmark/knn_import_benchmark --dataset=sift --dataset_dir=$PWD/test/data --infinity_dir=$PWD/db_tmp && \
+#          echo "1 50" | ${RUNNER_WORKSPACE_PREFIX}/benchmark/knn_query_benchmark sift 200 false $PWD/test/data $PWD/db_tmp | sudo tee ${RUNNER_WORKSPACE_PREFIX}/benchmark/golden_benchmark_sift_1_thread.log && \
+#          echo "8 50" | ${RUNNER_WORKSPACE_PREFIX}/benchmark/knn_query_benchmark sift 200 false $PWD/test/data $PWD/db_tmp | sudo tee ${RUNNER_WORKSPACE_PREFIX}/benchmark/golden_benchmark_sift_8_threads.log
+#
+#      - name: Latest benchmark sift
+#        if: ${{ !cancelled() && !failure() }}
+#        run: |
+#          rm -fr $PWD/db_tmp && mkdir -p $PWD/db_tmp && cat conf/infinity_conf.toml | sed -e "s|/var/infinity|$PWD/db_tmp|g" > $PWD/db_tmp/infinity_conf.toml && \
+#          ./cmake-build-release/benchmark/local_infinity/knn_import_benchmark --dataset=sift --dataset_dir=$PWD/test/data --infinity_dir=$PWD/db_tmp --config_path=db_tmp/infinity_conf.toml && \
+#          echo "1 50" | ./cmake-build-release/benchmark/local_infinity/knn_query_benchmark sift 200 false $PWD/test/data $PWD/db_tmp db_tmp/infinity_conf.toml | tee benchmark_sift_1_thread.log && \
+#          echo "8 50" | ./cmake-build-release/benchmark/local_infinity/knn_query_benchmark sift 200 false $PWD/test/data $PWD/db_tmp db_tmp/infinity_conf.toml | tee benchmark_sift_8_threads.log && \
+#          ./tools/ci_tools/check_benchmark_result.py ${RUNNER_WORKSPACE_PREFIX}/benchmark/golden_benchmark_sift_1_thread.log benchmark_sift_1_thread.log && \
+#          ./tools/ci_tools/check_benchmark_result.py ${RUNNER_WORKSPACE_PREFIX}/benchmark/golden_benchmark_sift_8_threads.log benchmark_sift_8_threads.log
 
       - name: Destroy builder container
         if: always()  # always run this step even if previous steps failed
