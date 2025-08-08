@@ -2395,7 +2395,7 @@ Status NewTxn::PrepareCommitCreateTableSnapshot(const WalCmdCreateTableSnapshot 
     // After calling Checkpoint()
     TxnTimeStamp last_checkpoint_ts = InfinityContext::instance().storage()->wal_manager()->LastCheckpointTS();
     SharedPtr<CheckpointTxnStore> ckp_txn_store = MakeShared<CheckpointTxnStore>();
-    this->CheckpointInner(last_checkpoint_ts, ckp_txn_store.get());
+    this->CheckpointforSnapshot(last_checkpoint_ts, ckp_txn_store.get());
 
     // Check if checkpoint actually happened
     if (ckp_txn_store != nullptr) {
@@ -6100,7 +6100,7 @@ Status NewTxn::CommitBottomCreateTableSnapshot(WalCmdCreateTableSnapshot *create
     return Status::OK();
 }
 
-Status NewTxn::CheckpointInner(TxnTimeStamp last_ckp_ts, CheckpointTxnStore *txn_store) {
+Status NewTxn::CheckpointforSnapshot(TxnTimeStamp last_ckp_ts, CheckpointTxnStore *txn_store) {
     TransactionType txn_type = GetTxnType();
     if (txn_type != TransactionType::kNewCheckpoint && txn_type != TransactionType::kCreateTableSnapshot) {
         UnrecoverableError(fmt::format("Expected transaction type is checkpoint or create table snapshot."));
@@ -6125,13 +6125,8 @@ Status NewTxn::CheckpointInner(TxnTimeStamp last_ckp_ts, CheckpointTxnStore *txn
     }
 
     auto *wal_manager = InfinityContext::instance().storage()->wal_manager();
-    while (!wal_manager->SetCheckpointing()) {
-        // Checkpointing
-        last_ckp_ts = wal_manager->LastCheckpointTS();
-        if(last_ckp_ts + 2 >= checkpoint_ts) {
-            return Status::OK();
-        }
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    if (!wal_manager->SetCheckpointing()) {
+        return Status::Checkpointing();    
     }
     DeferFn defer([&] { wal_manager->UnsetCheckpoint(); });
 
