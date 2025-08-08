@@ -21,23 +21,6 @@ module infinity_core:physical_compact.impl;
 import :physical_compact;
 
 import :stl;
-import internal_types;
-import :operator_state;
-import :base_table_ref;
-import :block_index;
-import :column_vector;
-import :compact_state_data;
-import :default_values;
-import :infinity_exception;
-import :third_party;
-import :status;
-import :wal_entry;
-import :wal_manager;
-
-import :new_txn;
-import :db_meeta;
-import :table_meeta;
-import :segment_meta;
 import :bg_task;
 import :compaction_process;
 import :infinity_context;
@@ -52,7 +35,7 @@ bool PhysicalCompact::Execute(QueryContext *query_context, OperatorState *operat
 
     const String &db_name = *base_table_ref_->table_info_->db_name_;
     const String &table_name = *base_table_ref_->table_info_->table_name_;
-    NewTxn *new_txn = query_context->GetNewTxn();
+    auto *new_txn = query_context->GetNewTxn();
 
     auto compact_task = MakeShared<NewCompactTask>(new_txn, db_name, table_name);
     auto *compaction_processor = InfinityContext::instance().storage()->compaction_processor();

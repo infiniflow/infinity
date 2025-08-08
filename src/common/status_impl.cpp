@@ -109,6 +109,8 @@ Status Status::InvalidLogLevel(const String &log_level) {
 
 Status Status::InvalidConfig(const String &detailed_info) { return Status(ErrorCode::kInvalidConfig, MakeUnique<String>(detailed_info)); }
 
+Status Status::InvalidMemIndex(const String &invalid_info) { return Status(ErrorCode::kInvalidMemIndex, MakeUnique<String>(invalid_info)); }
+
 // 2. Auth error
 Status Status::WrongPasswd(const String &user_name) {
     return Status(ErrorCode::kWrongPasswd, MakeUnique<String>(fmt::format("Invalid password to login user: {}", user_name)));
