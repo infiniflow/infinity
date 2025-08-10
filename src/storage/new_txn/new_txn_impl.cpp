@@ -912,7 +912,7 @@ Status NewTxn::DropColumns(const String &db_name, const String &table_name, cons
     }
 
     base_txn_store_ = MakeShared<DropColumnsTxnStore>();
-    DropColumnsTxnStore *txn_store = static_cast<DropColumnsTxnStore *>(base_txn_store_.get());
+    auto *txn_store = static_cast<DropColumnsTxnStore *>(base_txn_store_.get());
     txn_store->db_name_ = db_name;
     txn_store->db_id_str_ = db_meta->db_id_str();
     txn_store->db_id_ = std::stoull(db_meta->db_id_str());
@@ -1670,7 +1670,6 @@ Status NewTxn::Checkpoint(TxnTimeStamp last_ckp_ts) {
     if (last_ckp_ts % 2 == 0 and last_ckp_ts > 0) {
         UnrecoverableError(fmt::format("last checkpoint ts isn't correct: {}", last_ckp_ts));
     }
-    std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
     Status status;
     TxnTimeStamp checkpoint_ts = txn_context_ptr_->begin_ts_;
@@ -2076,7 +2075,7 @@ Status NewTxn::PrepareCommit() {
                     break;
                 }
                 auto *create_table_cmd = static_cast<WalCmdCreateTableV2 *>(command.get());
-                Status status = PrepareCommitCreateTable(create_table_cmd);
+                auto status = PrepareCommitCreateTable(create_table_cmd);
                 if (!status.ok()) {
                     return status;
                 }
@@ -4816,7 +4815,7 @@ void NewTxn::CommitBottom() {
         switch (command_type) {
             case WalCommandType::APPEND_V2: {
                 auto *append_cmd = static_cast<WalCmdAppendV2 *>(command.get());
-                Status status = CommitBottomAppend(append_cmd);
+                auto status = CommitBottomAppend(append_cmd);
                 if (!status.ok()) {
                     UnrecoverableError(fmt::format("CommitBottomAppend failed: {}", status.message()));
                 }
@@ -4825,7 +4824,7 @@ void NewTxn::CommitBottom() {
             case WalCommandType::DUMP_INDEX_V2: {
                 auto *dump_index_cmd = static_cast<WalCmdDumpIndexV2 *>(command.get());
                 if (dump_index_cmd->dump_cause_ == DumpIndexCause::kDumpMemIndex && !IsReplay()) {
-                    Status status = CommitBottomDumpMemIndex(dump_index_cmd);
+                    auto status = CommitBottomDumpMemIndex(dump_index_cmd);
                     if (!status.ok()) {
                         UnrecoverableError(fmt::format("CommitBottomDumpMemIndex failed: {}", status.message()));
                     }
@@ -4837,7 +4836,7 @@ void NewTxn::CommitBottom() {
                     break;
                 }
                 auto *create_table_snapshot_cmd = static_cast<WalCmdCreateTableSnapshot *>(command.get());                
-                Status status = CommitBottomCreateTableSnapshot(create_table_snapshot_cmd);
+                auto status = CommitBottomCreateTableSnapshot(create_table_snapshot_cmd);
                     if (!status.ok()) {
                         UnrecoverableError(fmt::format("CommitBottomCreateTableSnapshot failed: {}", status.message()));
                 }

@@ -149,8 +149,7 @@ private:
         if (!fs::exists(dir)) {
             std::filesystem::create_directories(p, error_code);
             if (error_code.value() != 0) {
-                std::cerr << "Failed to create directory " << dir << std::endl;
-                abort();
+                UnrecoverableError(fmt::format("Failed to create directory {}", dir));
             }
         }
         try {
@@ -158,8 +157,7 @@ private:
                 std::filesystem::remove_all(dir_entry.path());
             };
         } catch (const std::filesystem::filesystem_error &e) {
-            std::cerr << "Failed to cleanup " << dir << ", exception: " << e.what() << std::endl;
-            abort();
+            UnrecoverableError(fmt::format("Failed to cleanup {}, exception: {}", dir, e.what()));
         }
     }
 
@@ -169,8 +167,7 @@ private:
         try {
             std::filesystem::remove_all(p, error_code);
         } catch (const std::filesystem::filesystem_error &e) {
-            std::cerr << "Failed to remove " << dir << ", exception: " << e.what() << std::endl;
-            abort();
+            UnrecoverableError(fmt::format("Failed to remove {}, exception: {}", dir, e.what()));
         }
     }
 };
@@ -189,7 +186,6 @@ public:
         auto config_path = std::make_shared<std::string>(BaseTestNoParam::NULL_CONFIG_PATH);
         infinity::InfinityContext::instance().InitPhase1(config_path);
         infinity::InfinityContext::instance().InitPhase2();
-        // SetPrintStacktrace(false);
     }
 
     void TearDown() override {
@@ -215,7 +211,6 @@ public:
         auto config_path = std::make_shared<std::string>(BaseTestNoParam::NEW_CONFIG_PATH);
         infinity::InfinityContext::instance().InitPhase1(config_path);
         infinity::InfinityContext::instance().InitPhase2();
-        // SetPrintStacktrace(false);
     }
 
     void TearDown() override {
@@ -245,7 +240,6 @@ public:
         }
         infinity::InfinityContext::instance().InitPhase1(config_path);
         infinity::InfinityContext::instance().InitPhase2();
-        // SetPrintStacktrace(false);
     }
 
     void TearDown() override {

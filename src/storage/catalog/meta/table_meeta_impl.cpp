@@ -125,7 +125,6 @@ Status TableMeeta::GetIndexID(const String &index_name, String &index_key, Strin
     return Status::OK();
 }
 
-
 Tuple<SharedPtr<ColumnDef>, Status> TableMeeta::GetColumnDefByColumnName(const String &column_name, SizeT *column_idx_ptr) {
     if (!column_defs_) {
         Status status = LoadColumnDefs();
@@ -904,7 +903,7 @@ Status TableMeeta::SetNextIndexID(const String &index_id_str) {
     return Status::OK();
 }
 
-Tuple<SharedPtr<TableSnapshotInfo>, Status> TableMeeta::MapMetaToSnapShotInfo(const String &db_name, const String &table_name){
+Tuple<SharedPtr<TableSnapshotInfo>, Status> TableMeeta::MapMetaToSnapShotInfo(const String &db_name, const String &table_name) {
     // TxnTimeStamp txn_id_{};
 
     // TxnTimeStamp max_commit_ts_{};
@@ -918,8 +917,8 @@ Tuple<SharedPtr<TableSnapshotInfo>, Status> TableMeeta::MapMetaToSnapShotInfo(co
     // Map<String, SharedPtr<TableIndexSnapshotInfo>> table_index_snapshots_{};
     SharedPtr<TableSnapshotInfo> table_snapshot_info = MakeShared<TableSnapshotInfo>();
     // Get comment
-        // TableInfo table_info;
-        // Status status = GetComm(table_info);
+    // TableInfo table_info;
+    // Status status = GetComm(table_info);
     // if (!status.ok()) {
     //     return {nullptr, status};
     // }
@@ -934,7 +933,6 @@ Tuple<SharedPtr<TableSnapshotInfo>, Status> TableMeeta::MapMetaToSnapShotInfo(co
     // table_snapshot_info->commit_ts_ = commit_ts_;
 
     // table_snapshot_info->create_ts_ = table_info.create_ts_;
-    
 
     // Get unsealed segment id
     SegmentID unsealed_segment_id = 0;
@@ -952,7 +950,6 @@ Tuple<SharedPtr<TableSnapshotInfo>, Status> TableMeeta::MapMetaToSnapShotInfo(co
     // }
     table_snapshot_info->next_column_id_ = next_column_id;
 
-
     // Get column defs
     SharedPtr<Vector<SharedPtr<ColumnDef>>> column_defs;
     std::tie(column_defs, status) = this->GetColumnDefs();
@@ -960,9 +957,9 @@ Tuple<SharedPtr<TableSnapshotInfo>, Status> TableMeeta::MapMetaToSnapShotInfo(co
         return {nullptr, status};
     }
     table_snapshot_info->columns_ = *column_defs;
-    std::sort(table_snapshot_info->columns_.begin(), table_snapshot_info->columns_.end(), [](const SharedPtr<ColumnDef> &a, const SharedPtr<ColumnDef> &b) {
-        return a->id_ < b->id_;
-    });
+    std::sort(table_snapshot_info->columns_.begin(),
+              table_snapshot_info->columns_.end(),
+              [](const SharedPtr<ColumnDef> &a, const SharedPtr<ColumnDef> &b) { return a->id_ < b->id_; });
 
     // Get segment ids
     Vector<SegmentID> *segment_ids_ptr = nullptr;
@@ -998,7 +995,7 @@ Tuple<SharedPtr<TableSnapshotInfo>, Status> TableMeeta::MapMetaToSnapShotInfo(co
     return {table_snapshot_info, Status::OK()};
 }
 
-Status TableMeeta::RestoreFromSnapshot(WalCmdRestoreTableSnapshot *restore_table_snapshot_cmd,bool is_link_files) {
+Status TableMeeta::RestoreFromSnapshot(WalCmdRestoreTableSnapshot *restore_table_snapshot_cmd, bool is_link_files) {
     for (const WalSegmentInfoV2 &segment_info : restore_table_snapshot_cmd->segment_infos_) {
         if (!is_link_files) {
             Status status = AddSegmentWithID(commit_ts(), segment_info.segment_id_);
@@ -1019,8 +1016,6 @@ Status TableMeeta::SetBeginTS(TxnTimeStamp begin_ts) {
     begin_ts_ = begin_ts;
     return Status::OK();
 }
-
-
 
 Tuple<SizeT, Status> TableMeeta::GetTableRowCount() {
     Status status{};
@@ -1052,6 +1047,5 @@ Tuple<SizeT, Status> TableMeeta::GetTableRowCount() {
     }
     return {row_count, Status::OK()};
 }
-
 
 } // namespace infinity

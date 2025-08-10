@@ -35,7 +35,6 @@ import :default_values;
 import :new_txn;
 import :data_access_state;
 import :roaring_bitmap;
-
 import :catalog_meta;
 import :db_meeta;
 import :table_meeta;
@@ -52,7 +51,6 @@ import :meta_cache;
 
 import logical_type;
 import data_type;
-
 import column_def;
 import row_id;
 
@@ -1099,13 +1097,13 @@ Status NewCatalog::AddNewChunkIndex1(SegmentIndexMeta &segment_index_meta,
     chunk_info.index_size_ = index_size;
     {
         chunk_index_meta.emplace(chunk_id, segment_index_meta);
-        Status status = chunk_index_meta->InitSet(chunk_info);
+        auto status = chunk_index_meta->InitSet(chunk_info);
         if (!status.ok()) {
             return status;
         }
     }
     {
-        Status status = segment_index_meta.AddChunkIndexID1(chunk_id, new_txn);
+        auto status = segment_index_meta.AddChunkIndexID1(chunk_id, new_txn);
         if (!status.ok()) {
             return status;
         }
