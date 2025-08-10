@@ -60,6 +60,7 @@ class DbCache;
 class SystemCache;
 class FunctionSet;
 class SpecialFunction;
+class MetaCache;
 
 enum class ColumnVectorMode;
 
@@ -236,7 +237,7 @@ private:
     Atomic<TxnTimeStamp> last_cleanup_ts_{0};
 
 public:
-    static Status InitCatalog(KVInstance *kv_instance, TxnTimeStamp checkpoint_ts);
+    static Status InitCatalog(MetaCache *meta_cache, KVInstance *kv_instance, TxnTimeStamp checkpoint_ts);
 
     static Status MemIndexRecover(NewTxn *txn);
 
@@ -275,8 +276,6 @@ public:
     static Status AddNewSegment1(TableMeeta &table_meta, TxnTimeStamp commit_ts, Optional<SegmentMeta> &segment_meta);
 
     static Status AddNewSegmentWithID(TableMeeta &table_meta, TxnTimeStamp commit_ts, Optional<SegmentMeta> &segment_meta, SegmentID segment_id);
-
-
 
     static Status LoadFlushedSegment1(TableMeeta &table_meta, const WalSegmentInfo &segment_info, TxnTimeStamp checkpoint_ts);
 
@@ -375,8 +374,6 @@ public:
     static Status SetBlockDeleteBitmask(BlockMeta &block_meta, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts, Bitmask &bitmask);
 
     static Status CheckSegmentRowsVisible(SegmentMeta &segment_meta, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts, Bitmask &bitmask);
-
-    
 
 public:
     // Function related methods

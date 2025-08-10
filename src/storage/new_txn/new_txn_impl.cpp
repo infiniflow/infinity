@@ -5357,7 +5357,7 @@ Status NewTxn::CleanupInner(const Vector<UniquePtr<MetaKey>> &metas) {
                     return status;
                 }
 
-                DBMeeta db_meta(db_meta_key->db_id_str_, kv_instance);
+                DBMeeta db_meta(db_meta_key->db_id_str_, this);
                 status = NewCatalog::CleanDB(db_meta, begin_ts, UsageFlag::kOther);
                 if (!status.ok()) {
                     return status;

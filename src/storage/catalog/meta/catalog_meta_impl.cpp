@@ -26,6 +26,8 @@ import :third_party;
 import :kv_utility;
 import :default_values;
 import :new_txn;
+import :new_txn_manager;
+import :storage;
 
 namespace infinity {
 
@@ -35,9 +37,11 @@ CatalogMeta::CatalogMeta(NewTxn *txn) : txn_(txn) {
     }
     read_ts_ = txn->BeginTS();
     kv_instance_ = txn_->kv_instance();
+    meta_cache_ = txn_->txn_mgr()->storage()->meta_cache();
 }
 
-CatalogMeta::CatalogMeta(KVInstance *kv_instance) : read_ts_{MAX_TIMESTAMP}, kv_instance_{kv_instance} {}
+CatalogMeta::CatalogMeta(KVInstance *kv_instance, MetaCache *meta_cache)
+    : read_ts_{MAX_TIMESTAMP}, kv_instance_{kv_instance}, meta_cache_(meta_cache) {}
 
 Status CatalogMeta::GetDBID(const String &db_name, String &db_key, String &db_id, TxnTimeStamp &create_ts) {
     String db_key_prefix = KeyEncode::CatalogDbPrefix(db_name);

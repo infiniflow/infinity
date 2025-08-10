@@ -29,6 +29,7 @@ import :default_values;
 import :new_txn;
 import :utility;
 import :kv_utility;
+import :new_txn_manager;
 
 namespace infinity {
 
@@ -38,10 +39,11 @@ DBMeeta::DBMeeta(String db_id_str, NewTxn *txn) : db_id_str_(std::move(db_id_str
     }
     txn_begin_ts_ = txn->BeginTS();
     kv_instance_ = txn_->kv_instance();
+    meta_cache_ = txn_->txn_mgr()->storage()->meta_cache();
 }
 
-DBMeeta::DBMeeta(String db_id_str, KVInstance *kv_instance)
-    : db_id_str_(std::move(db_id_str)), txn_begin_ts_{MAX_TIMESTAMP}, kv_instance_{kv_instance} {}
+DBMeeta::DBMeeta(String db_id_str, KVInstance *kv_instance, MetaCache *meta_cache)
+    : db_id_str_(std::move(db_id_str)), txn_begin_ts_{MAX_TIMESTAMP}, kv_instance_{kv_instance}, meta_cache_(meta_cache) {}
 
 const String &DBMeeta::db_id_str() const { return db_id_str_; }
 
