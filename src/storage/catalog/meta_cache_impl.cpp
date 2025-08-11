@@ -23,13 +23,17 @@ import :stl;
 import :infinity_exception;
 import :kv_code;
 import :logger;
+import :kv_store;
 
 namespace infinity {
 
-void MetaCache::Put(const Vector<SharedPtr<MetaBaseCache>> &cache_items) {
+void MetaCache::Put(const Vector<SharedPtr<MetaBaseCache>> &cache_items, KVInstance *kv_instance) {
     std::unique_lock lock(cache_mtx_);
     for (const auto &cache_item : cache_items) {
         PutNolock(cache_item);
+    }
+    if (kv_instance != nullptr) {
+        kv_instance->Commit();
     }
 }
 

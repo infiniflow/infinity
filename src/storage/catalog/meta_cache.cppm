@@ -25,6 +25,8 @@ import :meta_type;
 
 namespace infinity {
 
+class KVInstance;
+
 struct MetaBaseCache {
     MetaBaseCache(MetaType type) : type_(type) {}
     MetaType type_{MetaType::kInvalid};
@@ -85,7 +87,7 @@ export class MetaCache {
 public:
     explicit MetaCache(SizeT capacity) : capacity_(capacity) {};
 
-    void Put(const Vector<SharedPtr<MetaBaseCache>> &cache_items);
+    void Put(const Vector<SharedPtr<MetaBaseCache>> &cache_items, KVInstance *kv_instance);
 
     SharedPtr<MetaDbCache> GetDb(const String &db_name, TxnTimeStamp begin_ts);
 

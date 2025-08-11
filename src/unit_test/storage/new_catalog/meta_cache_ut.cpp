@@ -41,7 +41,7 @@ TEST_F(MetaCacheTest, test_db) {
     MetaCache cache(2);
     {
         SharedPtr<MetaDbCache> db_cache = MakeShared<MetaDbCache>("db1", 0, 4, false);
-        cache.Put({db_cache});
+        cache.Put({db_cache}, nullptr);
         db_cache = cache.GetDb("db1", 3);
         EXPECT_EQ(db_cache.get(), nullptr);
         db_cache = cache.GetDb("db1", 5);
@@ -52,7 +52,7 @@ TEST_F(MetaCacheTest, test_db) {
     }
     {
         SharedPtr<MetaDbCache> db_cache = MakeShared<MetaDbCache>("db1", 0, 6, true);
-        cache.Put({db_cache});
+        cache.Put({db_cache}, nullptr);
         db_cache = cache.GetDb("db1", 3);
         EXPECT_EQ(db_cache.get(), nullptr);
         db_cache = cache.GetDb("db1", 5);
@@ -66,7 +66,7 @@ TEST_F(MetaCacheTest, test_db) {
     }
     {
         SharedPtr<MetaDbCache> db_cache = MakeShared<MetaDbCache>("db1", 0, 8, false);
-        cache.Put({db_cache});
+        cache.Put({db_cache}, nullptr);
         db_cache = cache.GetDb("db1", 3);
         EXPECT_EQ(db_cache.get(), nullptr);
         db_cache = cache.GetDb("db1", 5);
@@ -91,7 +91,7 @@ TEST_F(MetaCacheTest, test_db) {
         // cache.PrintLRU();
 
         db_cache = MakeShared<MetaDbCache>("db2", 1, 10, false);
-        cache.Put({db_cache});
+        cache.Put({db_cache}, nullptr);
 
         // cache.PrintLRU();
 
@@ -112,7 +112,7 @@ TEST_F(MetaCacheTest, test_table) {
     MetaCache cache(2);
     {
         SharedPtr<MetaTableCache> table_cache = MakeShared<MetaTableCache>(0, "tbl1", 0, 4, false);
-        cache.Put({table_cache});
+        cache.Put({table_cache}, nullptr);
         table_cache = cache.GetTable(0, "tbl1", 3);
         EXPECT_EQ(table_cache.get(), nullptr);
         table_cache = cache.GetTable(0, "tbl1", 5);
@@ -123,7 +123,7 @@ TEST_F(MetaCacheTest, test_table) {
     }
     {
         SharedPtr<MetaTableCache> table_cache = MakeShared<MetaTableCache>(0, "tbl1", 0, 6, true);
-        cache.Put({table_cache});
+        cache.Put({table_cache}, nullptr);
         table_cache = cache.GetTable(0, "tbl1", 3);
         EXPECT_EQ(table_cache.get(), nullptr);
         table_cache = cache.GetTable(0, "tbl1", 5);
@@ -137,7 +137,7 @@ TEST_F(MetaCacheTest, test_table) {
     }
     {
         SharedPtr<MetaTableCache> table_cache = MakeShared<MetaTableCache>(0, "tbl1", 0, 8, false);
-        cache.Put({table_cache});
+        cache.Put({table_cache}, nullptr);
         table_cache = cache.GetTable(0, "tbl1", 3);
         EXPECT_EQ(table_cache.get(), nullptr);
         table_cache = cache.GetTable(0, "tbl1", 5);
@@ -162,7 +162,7 @@ TEST_F(MetaCacheTest, test_table) {
         // cache.PrintLRU();
 
         table_cache = MakeShared<MetaTableCache>(0, "tbl2", 1, 10, false);
-        cache.Put({table_cache});
+        cache.Put({table_cache}, nullptr);
 
         // cache.PrintLRU();
 
@@ -183,7 +183,7 @@ TEST_F(MetaCacheTest, test_index) {
     MetaCache cache(2);
     {
         SharedPtr<MetaIndexCache> index_cache = MakeShared<MetaIndexCache>(0, 0, "idx1", 0, 4, false);
-        cache.Put({index_cache});
+        cache.Put({index_cache}, nullptr);
         index_cache = cache.GetIndex(0, 0, "idx1", 3);
         EXPECT_EQ(index_cache.get(), nullptr);
         index_cache = cache.GetIndex(0, 0, "idx1", 5);
@@ -193,7 +193,7 @@ TEST_F(MetaCacheTest, test_index) {
     }
     {
         SharedPtr<MetaIndexCache> index_cache = MakeShared<MetaIndexCache>(0, 0, "idx1", 0, 6, true);
-        cache.Put({index_cache});
+        cache.Put({index_cache}, nullptr);
         index_cache = cache.GetIndex(0, 0, "idx1", 3);
         EXPECT_EQ(index_cache.get(), nullptr);
         index_cache = cache.GetIndex(0, 0, "idx1", 5);
@@ -207,7 +207,7 @@ TEST_F(MetaCacheTest, test_index) {
     }
     {
         SharedPtr<MetaIndexCache> index_cache = MakeShared<MetaIndexCache>(0, 0, "idx1", 0, 8, false);
-        cache.Put({index_cache});
+        cache.Put({index_cache}, nullptr);
         index_cache = cache.GetIndex(0, 0, "idx1", 3);
         EXPECT_EQ(index_cache.get(), nullptr);
         index_cache = cache.GetIndex(0, 0, "idx1", 5);
@@ -232,7 +232,7 @@ TEST_F(MetaCacheTest, test_index) {
         // cache.PrintLRU();
 
         index_cache = MakeShared<MetaIndexCache>(0, 0, "idx2", 1, 10, false);
-        cache.Put({index_cache});
+        cache.Put({index_cache}, nullptr);
 
         // cache.PrintLRU();
 
@@ -253,7 +253,7 @@ TEST_F(MetaCacheTest, test_mix) {
     MetaCache cache(2);
     {
         SharedPtr<MetaDbCache> db_cache = MakeShared<MetaDbCache>("db1", 0, 4, false);
-        cache.Put({db_cache});
+        cache.Put({db_cache}, nullptr);
         db_cache = cache.GetDb("db1", 3);
         EXPECT_EQ(db_cache.get(), nullptr);
         db_cache = cache.GetDb("db1", 5);
@@ -264,7 +264,7 @@ TEST_F(MetaCacheTest, test_mix) {
     }
     {
         SharedPtr<MetaTableCache> table_cache = MakeShared<MetaTableCache>(0, "tbl1", 0, 6, true);
-        cache.Put({table_cache});
+        cache.Put({table_cache}, nullptr);
         SharedPtr<MetaDbCache> db_cache = cache.GetDb("db1", 3);
         EXPECT_EQ(db_cache.get(), nullptr);
         db_cache = cache.GetDb("db1", 5);
@@ -278,7 +278,7 @@ TEST_F(MetaCacheTest, test_mix) {
     }
     {
         SharedPtr<MetaIndexCache> index_cache = MakeShared<MetaIndexCache>(0, 0, "idx1", 0, 8, false);
-        cache.Put({index_cache});
+        cache.Put({index_cache}, nullptr);
         SharedPtr<MetaDbCache> db_cache = cache.GetDb("db1", 3);
         EXPECT_EQ(db_cache.get(), nullptr);
         db_cache = cache.GetDb("db1", 5);
