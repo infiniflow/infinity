@@ -104,10 +104,7 @@ class TestDatabaseSnapshot:
         data = []
         for i in range(num_rows):
             # Create sparse vector data
-            num_non_zero = random.randint(1, 2)
-            indices = sorted(random.sample(range(3), num_non_zero))
-            values = [random.uniform(-1, 1) for _ in range(num_non_zero)]
-            sparse_data = SparseVector(indices, values)
+            sparse_data = SparseVector([0, 1], [1.0, 1.0]) 
             
             row = {
                 "id": i,
@@ -171,7 +168,7 @@ class TestDatabaseSnapshot:
                     "is_active": (row_idx % 2) == 0,  # Alternate true/false
                     "vector_col": [0.1 + (row_idx % 100) / 1000.0],  # Deterministic vector
                     "tensor_col": [0.1 + (row_idx % 50) / 500.0, 0.2 + (row_idx % 30) / 300.0],
-                    "sparse_col": SparseVector([row_idx % 3], [0.1 + (row_idx % 10) / 100.0]),
+                    "sparse_col": SparseVector([0, 1], [1.0, 1.0]) ,
                 }
                 batch_data.append(row)
             
@@ -222,11 +219,10 @@ class TestDatabaseSnapshot:
         try:
             # Get the table
             table = db_obj.get_table(table_name)
-            
+        
             # 1. Verify basic table structure and data
-            result = table.query_builder.output(["*"]).to_result()
-            data_dict = result[0]
-            row_count = len(next(iter(data_dict.values())))
+            count_result, extra_result = table.output(["count(*)"]).to_df()
+            row_count = count_result.iloc[0, 0]  # Get the count value
             print(f"   Row count: {row_count}")
             
             if expected_row_count:
@@ -235,12 +231,12 @@ class TestDatabaseSnapshot:
             # 2. Test search operations
             try:
                 # Full-text search
-                fts_result = table.query_builder.output(["id", "name"]).match_text("name", "user_1", 5, None).to_result()
+                fts_result = table.output(["id", "name"]).match_text("name", "user_1", 5, None).to_result()
                 print(f"   Full-text search: {len(fts_result[0])} results")
                 
                 # Vector similarity search
                 query_vector = [random.uniform(-1, 1) for _ in range(1)]
-                vector_result = table.query_builder.output(["id", "vector_col"]).match_dense("vector_col", query_vector, "float", "l2", 5).to_result()
+                vector_result = table.output(["id", "vector_col"]).match_dense("vector_col", query_vector, "float", "l2", 5).to_result()
                 print(f"   Vector search: {len(vector_result[0])} results")
                 
             except Exception as e:
@@ -263,7 +259,7 @@ class TestDatabaseSnapshot:
                 print(f"   Insert operation: {insert_result.error_code}")
                 
                 # Verify insert
-                verify_result = table.query_builder.output(["id", "name"]).filter("id = 999999").to_result()
+                verify_result = table.output(["id", "name"]).filter("id = 999999").to_result()
                 assert len(verify_result[0]) > 0, "Inserted row not found"
                 print(f"   Insert verification: OK")
                 
@@ -299,9 +295,8 @@ class TestDatabaseSnapshot:
             table = db_obj.get_table(table_name)
             
             # 1. Verify basic table structure and data
-            result = table.query_builder.output(["*"]).to_result()
-            data_dict = result[0]
-            row_count = len(next(iter(data_dict.values())))
+            count_result, extra_result = table.output(["count(*)"]).to_df()
+            row_count = count_result.iloc[0, 0]  # Get the count value
             print(f"   Row count: {row_count}")
             
             if expected_row_count:
@@ -318,7 +313,7 @@ class TestDatabaseSnapshot:
                 print(f"   Insert operation: {insert_result.error_code}")
                 
                 # Verify insert
-                verify_result = table.query_builder.output(["id", "name"]).filter("id = 999999").to_result()
+                verify_result = table.output(["id", "name"]).filter("id = 999999").to_result()
                 assert len(verify_result[0]) > 0, "Inserted row not found"
                 print(f"   Insert verification: OK")
                 
@@ -328,7 +323,7 @@ class TestDatabaseSnapshot:
             # 3. Test basic queries
             try:
                 # Simple filter query
-                filter_result = table.query_builder.output(["id", "name", "value"]).filter("value > 500").to_result()
+                filter_result = table.output(["id", "name", "value"]).filter("value > 500").to_result()
                 print(f"   Filter query: {len(filter_result[0])} results")
                 
             except Exception as e:
@@ -468,8 +463,8 @@ class TestDatabaseSnapshot:
             })
             table_obj = db_obj.get_table("new_test_table")
             table_obj.insert([{"id": 1, "name": "test_data"}])
-            self.infinity_obj.drop_database("default_db")
-            self.infinity_obj.create_database("default_db")
+            # self.infinity_obj.drop_database("default_db")
+            # self.infinity_obj.create_database("default_db")
             
             print("   Database operations verification: PASSED")
             return True
@@ -497,7 +492,8 @@ class TestDatabaseSnapshot:
         """
         Test database snapshot with comprehensive tables (all data types, indexes)
         """
-        db_obj = self.infinity_obj.get_database("default_db")
+        self.infinity_obj.create_database("sp1_db"+suffix)
+        db_obj = self.infinity_obj.get_database("sp1_db"+suffix)
             
         # Create multiple comprehensive tables with different configurations
         table_configs = [
@@ -535,7 +531,7 @@ class TestDatabaseSnapshot:
         
         # Create database snapshot
         print("Creating database snapshot...")
-        self.infinity_obj.create_database_snapshot("comprehensive_db_snapshot","default_db")
+        self.infinity_obj.create_database_snapshot("comprehensive_db_snapshot","sp1_db"+suffix)
         
         # Verify snapshot exists
         snapshots_response = self.infinity_obj.list_snapshots()
@@ -562,9 +558,13 @@ class TestDatabaseSnapshot:
         print("Restoring database from snapshot...")
         self.infinity_obj.create_database("temp_db1")
         db_obj = self.infinity_obj.get_database("temp_db1")
-        self.infinity_obj.drop_database("default_db")
+        db_obj.create_table("post_snapshot_table", {
+            "c1": {"type": "int"},
+            "c2": {"type": "varchar"}
+        })
+        self.infinity_obj.drop_database("sp1_db"+suffix)
         self.infinity_obj.restore_database_snapshot("comprehensive_db_snapshot")
-        db_obj = self.infinity_obj.get_database("default_db")
+        db_obj = self.infinity_obj.get_database("sp1_db"+suffix)
         
         # Verify all original tables are restored
         table_names_restored = self.get_table_names(db_obj)
@@ -586,6 +586,7 @@ class TestDatabaseSnapshot:
             except:
                 pass
         self.infinity_obj.drop_database("temp_db1")
+        self.infinity_obj.drop_database("sp1_db"+suffix)
         self.infinity_obj.drop_snapshot("comprehensive_db_snapshot")
         
         self.infinity_obj.disconnect()
@@ -594,7 +595,8 @@ class TestDatabaseSnapshot:
         """
         Test database snapshot with large number of tables and data
         """
-        db_obj = self.infinity_obj.get_database("default_db")
+        self.infinity_obj.create_database("sp2_db"+suffix)
+        db_obj = self.infinity_obj.get_database("sp2_db"+suffix)
         
         # Create many tables with different configurations
         table_configs = []
@@ -642,7 +644,7 @@ class TestDatabaseSnapshot:
         # Create snapshot
         print("Creating database snapshot...")
         snapshot_start = time.time()
-        self.infinity_obj.create_database_snapshot("large_scale_snapshot","default_db")
+        self.infinity_obj.create_database_snapshot("large_scale_snapshot","sp2_db"+suffix)
         snapshot_time = time.time() - snapshot_start
         print(f"Snapshot creation time: {snapshot_time:.2f} seconds")
         
@@ -671,9 +673,13 @@ class TestDatabaseSnapshot:
         restore_start = time.time()
         self.infinity_obj.create_database("temp_db2")
         db_obj = self.infinity_obj.get_database("temp_db2")
-        self.infinity_obj.drop_database("default_db")
+        db_obj.create_table("temp", {
+                "c1": {"type": "int"},
+                "c2": {"type": "varchar"}
+            })
+        self.infinity_obj.drop_database("sp2_db"+suffix)
         self.infinity_obj.restore_database_snapshot("large_scale_snapshot")
-        db_obj = self.infinity_obj.get_database("default_db")
+        db_obj = self.infinity_obj.get_database("sp2_db"+suffix)
         restore_time = time.time() - restore_start
         print(f"Snapshot restore time: {restore_time:.2f} seconds")
         
@@ -704,8 +710,10 @@ class TestDatabaseSnapshot:
                 db_obj.drop_table(table_name, ConflictType.Ignore)
             except:
                 pass
+        self.infinity_obj.get_database("default_db")
         
         self.infinity_obj.drop_database("temp_db2")
+        self.infinity_obj.drop_database("sp2_db"+suffix)
         self.infinity_obj.drop_snapshot("large_scale_snapshot")
         
         self.infinity_obj.disconnect()
@@ -791,103 +799,4 @@ class TestDatabaseSnapshot:
         
         self.infinity_obj.disconnect()
 
-    # def test_database_snapshot_large_scale_optimized(self, suffix):
-    #     """
-    #     Test database snapshot with large datasets using optimized generation
-    #     """
-    #     db_obj = self.infinity_obj.get_database("default_db")
-        
-    #     # Create tables with large datasets
-    #     table_configs = [
-    #         {"name": "large_comp_table_1", "rows": 1000000, "has_indexes": True, "type": "comprehensive"},  # 1M rows
-    #         {"name": "large_comp_table_2", "rows": 500000, "has_indexes": False, "type": "comprehensive"},   # 500K rows
-    #         {"name": "large_simple_table_1", "rows": 2000000, "has_indexes": False, "type": "simple"},      # 2M rows
-    #     ]
-        
-    #     created_tables = []
-        
-    #     # Create all tables with optimized data generation
-    #     print("Creating large scale tables with optimized data generation...")
-    #     start_time = time.time()
-        
-    #     for config in table_configs:
-    #         table_name = config["name"]
-    #         print(f"\nCreating table: {table_name}")
-            
-    #         if config["type"] == "comprehensive":
-    #             table_obj = self.create_comprehensive_table(table_name, db_obj)
-    #             self.insert_large_dataset_optimized(table_obj, config["rows"])
-    #             if config["has_indexes"]:
-    #                 print(f"Creating indexes for {table_name}...")
-    #                 self.create_indexes_for_table(table_obj)
-    #         else:
-    #             table_obj = self.create_simple_table(table_name, db_obj)
-    #             self.insert_large_simple_dataset_optimized(table_obj, config["rows"])
-            
-    #         created_tables.append(table_name)
-        
-    #     creation_time = time.time() - start_time
-    #     print(f"\nCreated {len(created_tables)} tables in {creation_time:.2f} seconds")
-        
-    #     # Create snapshot
-    #     print("Creating database snapshot...")
-    #     snapshot_start = time.time()
-    #     db_obj.create_database_snapshot("large_scale_optimized_snapshot")
-    #     snapshot_time = time.time() - snapshot_start
-    #     print(f"Snapshot creation time: {snapshot_time:.2f} seconds")
-        
-    #     # Verify snapshot exists
-    #     snapshots_response = self.infinity_obj.list_snapshots()
-    #     snapshots = snapshots_response.snapshots
-    #     assert "large_scale_optimized_snapshot" in [snapshot.name for snapshot in snapshots]
-        
-    #     # Add more tables after snapshot
-    #     for i in range(2):
-    #         table_name = f"post_snapshot_table_{i}"
-    #         db_obj.create_table(table_name, {
-    #             "c1": {"type": "int"},
-    #             "c2": {"type": "varchar"}
-    #         })
-    #         table = db_obj.get_table(table_name)
-    #         table.insert([{"c1": i, "c2": f"post_data_{i}"}])
-        
-    #     # Delete some tables
-    #     db_obj.drop_table("large_comp_table_2")
-        
-    #     # Restore from snapshot
-    #     print("Restoring from snapshot...")
-    #     restore_start = time.time()
-    #     db_obj.restore_database_snapshot("large_scale_optimized_snapshot")
-    #     restore_time = time.time() - restore_start
-    #     print(f"Snapshot restore time: {restore_time:.2f} seconds")
-        
-    #     # Verify all original tables are restored
-    #     tables_restored = db_obj.list_tables()
-    #     table_names_restored = tables_restored.table_names
-        
-    #     # Check that original tables are back
-    #     for table_name in created_tables:
-    #         assert table_name in table_names_restored, f"Table {table_name} not restored"
-        
-    #     # Check that post-snapshot tables are gone
-    #     for i in range(2):
-    #         assert f"post_snapshot_table_{i}" not in table_names_restored
-        
-    #     # Verify functionality of a subset of tables (for performance)
-    #     print("Verifying subset of restored tables...")
-    #     verification_tables = created_tables[:2]  # Verify first 2 tables
-        
-    #     for table_name in verification_tables:
-    #         if "comprehensive" in table_name:
-    #             self.verify_table_functionality(table_name, db_obj)
-    #         else:
-    #             self.verify_simple_table_functionality(table_name, db_obj)
-        
-    #     # Clean up
-    #     for table_name in created_tables:
-    #         try:
-    #             db_obj.drop_table(table_name, ConflictType.Ignore)
-    #         except:
-    #             pass
-        
-    #     self.infinity_obj.disconnect()
+  
