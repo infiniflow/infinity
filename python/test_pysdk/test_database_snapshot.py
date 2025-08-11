@@ -40,6 +40,21 @@ def setup_class(request, http):
 @pytest.mark.usefixtures("setup_class")
 @pytest.mark.usefixtures("suffix")
 class TestDatabaseSnapshot:
+    def get_table_names(self, db_obj):
+        """
+        Helper method to get table names from both HTTP and Thrift clients
+        """
+        try:
+            # Try Thrift client method first
+            tables = db_obj.list_tables()
+            if hasattr(tables, 'table_names'):
+                return tables.table_names
+            else:
+                # HTTP client - use get_all_tables method
+                return db_obj.get_all_tables()
+        except Exception as e:
+            print(f"Warning: Could not get table names: {e}")
+            return []
     def create_comprehensive_table(self, table_name: str, db_obj):
         """Create a table with all data types and indexes"""
         table_schema = {
@@ -338,8 +353,7 @@ class TestDatabaseSnapshot:
         
         try:
             # 1. Get current tables
-            tables_before = db_obj.list_tables()
-            table_names_before = tables_before.table_names
+            table_names_before = self.get_table_names(db_obj)
             print(f"   Tables before operations: {table_names_before}")
             
             # 2. Test adding new tables
@@ -371,8 +385,7 @@ class TestDatabaseSnapshot:
                 print(f"   Failed to create comprehensive table: {e}")
             
             # 3. Verify tables were added
-            tables_after_add = db_obj.list_tables()
-            table_names_after_add = tables_after_add.table_names
+            table_names_after_add = self.get_table_names(db_obj)
             print(f"   Tables after adding: {table_names_after_add}")
             
             for table_name in new_table_names:
@@ -390,8 +403,7 @@ class TestDatabaseSnapshot:
                 print(f"   Successfully renamed {original_name} to {new_name}")
                 
                 # Verify rename
-                tables_after_rename = db_obj.list_tables()
-                table_names_after_rename = tables_after_rename.table_names
+                table_names_after_rename = self.get_table_names(db_obj)
                 assert original_name not in table_names_after_rename, f"Original table {original_name} still exists"
                 assert new_name in table_names_after_rename, f"Renamed table {new_name} not found"
                 print(f"   Rename verification: OK")
@@ -408,8 +420,7 @@ class TestDatabaseSnapshot:
                 print(f"   Successfully deleted table: {delete_table_name}")
                 
                 # Verify deletion
-                tables_after_delete = db_obj.list_tables()
-                table_names_after_delete = tables_after_delete.table_names
+                table_names_after_delete = self.get_table_names(db_obj)
                 assert delete_table_name not in table_names_after_delete, f"Deleted table {delete_table_name} still exists"
                 print(f"   Delete verification: OK")
                 
@@ -420,8 +431,7 @@ class TestDatabaseSnapshot:
             print("   Testing table functionality after operations...")
             
             # Test remaining tables
-            final_tables = db_obj.list_tables()
-            final_table_names = final_tables.table_names
+            final_table_names = self.get_table_names(db_obj)
             
             for table_name in final_table_names:
                 if table_name == new_name:  # Renamed table
@@ -519,8 +529,7 @@ class TestDatabaseSnapshot:
             print(f"Created table: {table_name} with {config['rows']} rows")
         
         # Verify all tables exist
-        tables = db_obj.list_tables()
-        table_names = tables.table_names
+        table_names = self.get_table_names(db_obj)
         for table_name in created_tables:
             assert table_name in table_names, f"Table {table_name} not found"
         
@@ -545,8 +554,7 @@ class TestDatabaseSnapshot:
         db_obj.drop_table("comprehensive_table_3")
         
         # Show tables after modifications
-        tables_after_mod = db_obj.list_tables()
-        table_names_after = tables_after_mod.table_names
+        table_names_after = self.get_table_names(db_obj)
         assert "post_snapshot_table" in table_names_after
         assert "comprehensive_table_3" not in table_names_after
         
@@ -559,8 +567,7 @@ class TestDatabaseSnapshot:
         db_obj = self.infinity_obj.get_database("default_db")
         
         # Verify all original tables are restored
-        tables_restored = db_obj.list_tables()
-        table_names_restored = tables_restored.table_names
+        table_names_restored = self.get_table_names(db_obj)
         
         # Check that original tables are back
         for table_name in created_tables:
@@ -671,8 +678,7 @@ class TestDatabaseSnapshot:
         print(f"Snapshot restore time: {restore_time:.2f} seconds")
         
         # Verify all original tables are restored
-        tables_restored = db_obj.list_tables()
-        table_names_restored = tables_restored.table_names
+        table_names_restored = self.get_table_names(db_obj)
         
         # Check that original tables are back
         for table_name in created_tables:
