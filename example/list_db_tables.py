@@ -54,6 +54,7 @@ try:
         "vec": {"type": "vector, 4, float"},
     }, infinity.common.ConflictType.Ignore)
 
+    # For Thrift client, use res.table_names
     res = db_instance.list_tables()
     print(res.table_names)
 
