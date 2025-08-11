@@ -18,10 +18,13 @@ module;
 
 export module infinity_core:meta_tree;
 
+// import std;
+
 import :stl;
 import :meta_type;
 import :meta_key;
 import :third_party;
+
 import internal_types;
 import check_statement;
 

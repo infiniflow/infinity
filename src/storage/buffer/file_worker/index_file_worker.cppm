@@ -19,9 +19,10 @@ export module infinity_core:index_file_worker;
 import :index_base;
 import :file_worker;
 import :stl;
-import column_def;
 import :file_worker_type;
 import :persistence_manager;
+
+import column_def;
 
 namespace infinity {
 

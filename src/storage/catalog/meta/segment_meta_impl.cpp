@@ -14,9 +14,11 @@
 
 module;
 
-#include <string>
+// #include <string>
 
 module infinity_core:segment_meta.impl;
+
+import std;
 
 import :segment_meta;
 import :kv_store;
@@ -26,14 +28,14 @@ import :default_values;
 import :table_meeta;
 import :logger;
 import :infinity_exception;
-
 import :block_meta;
 import :meta_info;
 import :new_catalog;
 import :fast_rough_filter;
-import column_def;
 import :kv_utility;
 import :snapshot_info;
+
+import column_def;
 
 namespace infinity {
 

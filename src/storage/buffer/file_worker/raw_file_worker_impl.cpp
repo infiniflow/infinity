@@ -15,9 +15,12 @@
 module;
 
 #include <cassert>
-#include <tuple>
+// #include <tuple>
 
 module infinity_core:raw_file_worker.impl;
+
+import std;
+// import std.compat;
 
 import :raw_file_worker;
 import :stl;

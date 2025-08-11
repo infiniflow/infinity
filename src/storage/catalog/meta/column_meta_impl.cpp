@@ -14,9 +14,11 @@
 
 module;
 
-#include <string>
+// #include <string>
 
 module infinity_core:column_meta.impl;
+
+import std;
 
 import :column_meta;
 import :kv_store;
@@ -25,7 +27,6 @@ import :block_meta;
 import :segment_meta;
 import :table_meeta;
 import :third_party;
-
 import :infinity_context;
 import :buffer_manager;
 import :data_file_worker;

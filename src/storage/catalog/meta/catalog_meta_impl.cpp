@@ -14,9 +14,12 @@
 
 module;
 
-#include <vector>
+// #include <vector>
 
 module infinity_core:catalog_meta.impl;
+
+import std;
+import std.compat;
 
 import :catalog_meta;
 import :kv_code;

@@ -14,10 +14,12 @@
 
 module;
 
-#include <memory>
-#include <string>
+// #include <memory>
+// #include <string>
 
 module infinity_core:segment_index_meta.impl;
+
+import std;
 
 import :segment_index_meta;
 import :kv_code;

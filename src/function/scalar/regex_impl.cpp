@@ -1,6 +1,6 @@
 module;
 
-#include <re2/re2.h>
+// #include <re2/re2.h>
 
 module infinity_core:regex.impl;
 

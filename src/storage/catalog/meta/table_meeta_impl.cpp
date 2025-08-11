@@ -14,16 +14,18 @@
 
 module;
 
-#include <memory>
-#include <string>
+// #include <memory>
+// #include <string>
 
 module infinity_core:table_meeta.impl;
+
+import std;
+import std.compat;
 
 import :table_meeta;
 import :status;
 import :kv_code;
 import :kv_store;
-import column_def;
 import :third_party;
 import :default_values;
 import :logger;
@@ -34,13 +36,15 @@ import :infinity_context;
 import :storage;
 import :new_catalog;
 import :table_index_meeta;
-import create_index_info;
 import :segment_meta;
 import :block_meta;
 import :kv_utility;
 import :column_index_reader;
 import :new_txn;
+
 import row_id;
+import column_def;
+import create_index_info;
 
 namespace infinity {
 

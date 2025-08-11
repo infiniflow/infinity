@@ -14,10 +14,12 @@
 
 module;
 
-#include <memory>
-#include <string>
+// #include <memory>
+// #include <string>
 
 module infinity_core:block_meta.impl;
+
+import std;
 
 import :block_meta;
 import :kv_code;
@@ -27,20 +29,19 @@ import :segment_meta;
 import :table_meeta;
 import :new_catalog;
 import :infinity_context;
-
 import :buffer_manager;
 import :block_version;
 import :version_file_worker;
-
 import :buffer_handle;
 import :meta_info;
-import column_def;
 import :column_meta;
 import :fast_rough_filter;
 import :kv_utility;
 import :logger;
 import :snapshot_info;
 import :new_txn_manager;
+
+import column_def;
 
 namespace infinity {
 

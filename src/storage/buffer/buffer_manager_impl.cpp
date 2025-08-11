@@ -14,9 +14,12 @@
 
 module;
 
-#include <vector>
+// #include <vector>
 
 module infinity_core:buffer_manager.impl;
+
+import std;
+import std.compat;
 
 import :buffer_manager;
 import :stl;
@@ -29,9 +32,10 @@ import :file_worker_type;
 import :var_file_worker;
 import :persistence_manager;
 import :virtual_store;
-import global_resource_usage;
 import :kv_store;
 import :status;
+
+import global_resource_usage;
 
 namespace infinity {
 

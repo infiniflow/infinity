@@ -21,12 +21,13 @@ import :index_file_worker;
 import :hnsw_alg;
 import :index_hnsw;
 import :index_base;
-import knn_expr;
-import column_def;
-import internal_types;
 import :file_worker_type;
 import :file_worker;
 import :persistence_manager;
+
+import knn_expr;
+import column_def;
+import internal_types;
 
 namespace infinity {
 

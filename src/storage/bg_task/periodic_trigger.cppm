@@ -20,6 +20,7 @@ import :stl;
 import :background_process;
 import :compaction_process;
 import :wal_manager;
+
 import global_resource_usage;
 
 namespace infinity {

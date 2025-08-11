@@ -14,9 +14,11 @@
 
 module;
 
-#include <set>
+// #include <set>
 
 module infinity_core:hnsw_file_worker.impl;
+
+import std;
 
 import :hnsw_file_worker;
 import :infinity_exception;
@@ -25,19 +27,19 @@ import :index_file_worker;
 import :hnsw_alg;
 import :hnsw_common;
 import :index_hnsw;
-
 import :index_base;
 import :third_party;
 import :logger;
-import logical_type;
-import embedding_info;
-import create_index_info;
-import internal_types;
 import :hnsw_handler;
 import :virtual_store;
 import :persistence_manager;
 import :local_file_handle;
+
 import column_def;
+import logical_type;
+import embedding_info;
+import create_index_info;
+import internal_types;
 
 namespace infinity {
 

@@ -14,20 +14,23 @@
 
 module;
 
-#include <memory>
-#include <vector>
+// #include <memory>
+// #include <vector>
 
 module infinity_core:catalog_cache.impl;
 
+import std;
+
 import :catalog_cache;
 import :stl;
-import internal_types;
 import :default_values;
 import :infinity_exception;
 import :third_party;
 import :logger;
 import :index_base;
 import :catalog_cache;
+
+import internal_types;
 
 namespace infinity {
 

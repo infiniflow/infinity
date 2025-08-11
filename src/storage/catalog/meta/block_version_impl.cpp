@@ -14,9 +14,11 @@
 
 module;
 
-#include <fstream>
+// #include <fstream>
 
 module infinity_core:block_version.impl;
+
+import std;
 
 import :block_version;
 import :stl;
@@ -25,9 +27,10 @@ import :logger;
 import :third_party;
 import :default_values;
 import :column_vector;
-import serialize;
 import :local_file_handle;
 import :status;
+
+import serialize;
 
 namespace infinity {
 

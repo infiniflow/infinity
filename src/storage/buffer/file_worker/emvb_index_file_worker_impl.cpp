@@ -24,17 +24,18 @@ import :index_base;
 import :emvb_index;
 import :index_emvb;
 import :infinity_exception;
+import :logger;
+import :file_worker_type;
+import :third_party;
+import :emvb_product_quantization;
+import :status;
+
 import logical_type;
 import embedding_info;
 import create_index_info;
 import knn_expr;
 import column_def;
-import :logger;
 import internal_types;
-import :file_worker_type;
-import :third_party;
-import :emvb_product_quantization;
-import :status;
 
 namespace infinity {
 

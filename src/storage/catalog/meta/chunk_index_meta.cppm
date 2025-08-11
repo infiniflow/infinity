@@ -22,7 +22,6 @@ import internal_types;
 import :third_party;
 import :new_catalog;
 
-
 namespace infinity {
 export struct ChunkIndexSnapshotInfo;
 class KVInstance;

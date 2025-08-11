@@ -37,16 +37,16 @@ module;
 
 #include <magic_enum/magic_enum.hpp>
 
-#include <parallel_hashmap/phmap.h>
 #include "pgm/pgm_index.hpp"
+#include <parallel_hashmap/phmap.h>
 
 #include <oatpp/network/Server.hpp>
 #include <oatpp/network/tcp/server/ConnectionProvider.hpp>
 #include <oatpp/web/server/HttpConnectionHandler.hpp>
 
 #include "Python.h"
-#include <arrow/api.h>
 #include "miniocpp/client.h"
+#include <arrow/api.h>
 #include <parquet/arrow/reader.h>
 #include <parquet/arrow/writer.h>
 
@@ -59,6 +59,8 @@ module;
 #include <rocksdb/utilities/backup_engine.h>
 #include <rocksdb/utilities/transaction.h>
 #include <rocksdb/utilities/transaction_db.h>
+
+#include <re2/re2.h>
 
 #pragma clang diagnostic pop
 
@@ -162,7 +164,7 @@ export using ondemand::value;
 export using ondemand::number;
 export using ondemand::json_type;
 export using ondemand::number_type;
-}
+} // namespace simdjson
 
 namespace magic_enum {
 export using magic_enum::underlying_type_t;
@@ -355,5 +357,10 @@ using MergeOperator = ::ROCKSDB_NAMESPACE::MergeOperator;
 // using MergeOperators = ::ROCKSDB_NAMESPACE::MergeOperators;
 using Logger = ::ROCKSDB_NAMESPACE::Logger;
 } // namespace rocksdb
+
+export namespace re2 {
+using RE2 = ::re2::RE2;
+};
+
 
 } // namespace infinity

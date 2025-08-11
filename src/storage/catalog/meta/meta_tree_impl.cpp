@@ -14,20 +14,21 @@
 
 module;
 
-#include <re2/re2.h>
+// #include <re2/re2.h>
 
-#include <filesystem>
+// #include <filesystem>
 #include <ranges>
-#include <regex>
+// #include <regex>
 
 module infinity_core:meta_tree.impl;
+
+import std;
 
 import :meta_tree;
 import :stl;
 import :third_party;
 import :infinity_context;
 import :infinity_exception;
-import internal_types;
 import :default_values;
 import :logger;
 import :buffer_obj;
@@ -40,11 +41,13 @@ import :new_catalog;
 import :status;
 import :kv_code;
 import :catalog_cache;
-import check_statement;
 import :kv_utility;
 import :kv_store;
 import :new_txn_manager;
 import :utility;
+
+import check_statement;
+import internal_types;
 
 namespace infinity {
 
@@ -1041,16 +1044,16 @@ bool MetaTree::ChunkIndexExistInMetas(const String &db_id_str,
 
 bool MetaTree::CheckData(const String &path) {
     Prepare();
-    static const RE2 regex_column(R"(^(?:db_(\d+)/tbl_(\d+)/seg_(\d+)/blk_(\d+)/(?:version|(\d+)\.col|col_(\d+)_out))$)");
+    static const re2::RE2 regex_column(R"(^(?:db_(\d+)/tbl_(\d+)/seg_(\d+)/blk_(\d+)/(?:version|(\d+)\.col|col_(\d+)_out))$)");
 
-    static const RE2 regex_index(R"(^(?:db_(\d+)/tbl_(\d+)/idx_(\d+)/seg_(\d+)/(?:chunk_(\d+)\.idx|ft_(\d+)\.(\w+)))$)");
+    static const re2::RE2 regex_index(R"(^(?:db_(\d+)/tbl_(\d+)/idx_(\d+)/seg_(\d+)/(?:chunk_(\d+)\.idx|ft_(\d+)\.(\w+)))$)");
 
-    re2::StringPiece sp1, sp2, sp3, sp4, sp5, sp6, sp7;
+    std::string_view sp1, sp2, sp3, sp4, sp5, sp6, sp7;
     String db_id_str, table_id_str, index_id_str, suffix_id, suffix;
     SegmentID segment_id = INVALID_SEGMENT_ID;
     BlockID block_id = INVALID_BLOCK_ID;
 
-    if (RE2::FullMatch(path, regex_column, &sp1, &sp2, &sp3, &sp4, &sp5, &sp6)) {
+    if (re2::RE2::FullMatch(path, regex_column, &sp1, &sp2, &sp3, &sp4, &sp5, &sp6)) {
         // db_{1}, tbl_{2}, seg_{3}, blk_{4}, {5}.col, col_{6}_out
         db_id_str = sp1.data();
         table_id_str = sp2.data();
@@ -1066,7 +1069,7 @@ bool MetaTree::CheckData(const String &path) {
         } else {
             suffix = "version";
         }
-    } else if (RE2::FullMatch(path, regex_index, &sp1, &sp2, &sp3, &sp4, &sp5, &sp6, &sp7)) {
+    } else if (re2::RE2::FullMatch(path, regex_index, &sp1, &sp2, &sp3, &sp4, &sp5, &sp6, &sp7)) {
         // db_{1}, tbl_{2}, idx_{3}, seg_{4},
         // chunk_{5}.idx,
         // ft_{6}.{7}   sp[7] == len | pos | dic

@@ -14,9 +14,11 @@
 
 module;
 
-#include <tuple>
+// #include <tuple>
 
 module infinity_core:var_file_worker.impl;
+
+import std;
 
 import :var_file_worker;
 import :stl;

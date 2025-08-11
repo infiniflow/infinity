@@ -18,11 +18,12 @@ export module infinity_core:table_meeta;
 
 import :stl;
 import :status;
-import column_def;
 import :new_catalog;
 import :snapshot_info;
-import row_id;
 import :wal_entry;
+
+import row_id;
+import column_def;
 
 namespace infinity {
 

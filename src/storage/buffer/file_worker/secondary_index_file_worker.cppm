@@ -19,13 +19,13 @@ export module infinity_core:secondary_index_file_worker;
 import :stl;
 import :index_file_worker;
 import :file_worker;
-
 import :index_base;
 import :infinity_exception;
 import :default_values;
-import column_def;
 import :file_worker_type;
 import :persistence_manager;
+
+import column_def;
 
 namespace infinity {
 

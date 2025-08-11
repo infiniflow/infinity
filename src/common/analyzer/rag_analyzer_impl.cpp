@@ -24,7 +24,7 @@ module;
 #include <iostream>
 #include <openccxx.h>
 #include <pcre2.h>
-#include <re2/re2.h>
+// #include <re2/re2.h>
 #include <sstream>
 #include "spdlog/fmt/fmt.h"
 
@@ -86,11 +86,11 @@ static inline i32 DecodeFreq(i32 value) {
 
 void Split(const String &input, const String &split_pattern, Vector<String> &result, bool keep_delim = false) {
     re2::RE2 pattern(split_pattern);
-    re2::StringPiece leftover(input.data());
-    re2::StringPiece last_end = leftover;
-    re2::StringPiece extracted_delim_token;
+    std::string_view leftover(input.data());
+    std::string_view last_end = leftover;
+    std::string_view extracted_delim_token;
 
-    while (RE2::FindAndConsume(&leftover, pattern, &extracted_delim_token)) {
+    while (re2::RE2::FindAndConsume(&leftover, pattern, &extracted_delim_token)) {
         std::string_view token(last_end.data(), extracted_delim_token.data() - last_end.data());
         if (!token.empty()) {
             result.push_back(String(token.data(), token.size()));
@@ -105,12 +105,12 @@ void Split(const String &input, const String &split_pattern, Vector<String> &res
     }
 }
 
-void Split(const String &input, const RE2 &pattern, Vector<String> &result, bool keep_delim = false) {
-    re2::StringPiece leftover(input.data());
-    re2::StringPiece last_end = leftover;
-    re2::StringPiece extracted_delim_token;
+void Split(const String &input, const re2::RE2 &pattern, Vector<String> &result, bool keep_delim = false) {
+    std::string_view leftover(input.data());
+    std::string_view last_end = leftover;
+    std::string_view extracted_delim_token;
 
-    while (RE2::FindAndConsume(&leftover, pattern, &extracted_delim_token)) {
+    while (re2::RE2::FindAndConsume(&leftover, pattern, &extracted_delim_token)) {
         std::string_view token(last_end.data(), extracted_delim_token.data() - last_end.data());
         if (!token.empty()) {
             result.push_back(String(token.data(), token.size()));
@@ -125,9 +125,9 @@ void Split(const String &input, const RE2 &pattern, Vector<String> &result, bool
     }
 }
 
-String Replace(const RE2 &re, const String &replacement, const String &input) {
+String Replace(const re2::RE2 &re, const String &replacement, const String &input) {
     String output = input;
-    RE2::GlobalReplace(&output, re, replacement);
+    re2::RE2::GlobalReplace(&output, re, replacement);
     return output;
 }
 
@@ -551,7 +551,7 @@ Status RAGAnalyzer::Load() {
         try {
             std::ifstream from(dict_path.string());
             String line;
-            RE2 re_pattern(R"([\r\n]+)");
+            re2::RE2 re_pattern(R"([\r\n]+)");
             String split_pattern("([ \t])");
 
             while (getline(from, line)) {
@@ -1083,7 +1083,7 @@ String RAGAnalyzer::Merge(const String &tks_str) const {
         std::size_t E = s + 1;
         for (std::size_t e = s + 2; e < std::min(tokens.size() + 1, s + 6); ++e) {
             String tk = Join(tokens, s, e, "");
-            if (RE2::PartialMatch(tk, regex_split_pattern_)) {
+            if (re2::RE2::PartialMatch(tk, regex_split_pattern_)) {
                 if (Freq(tk) > 0) {
                     E = e;
                 }
@@ -1098,7 +1098,7 @@ String RAGAnalyzer::Merge(const String &tks_str) const {
 
 void RAGAnalyzer::EnglishNormalize(const Vector<String> &tokens, Vector<String> &res) {
     for (auto &t : tokens) {
-        if (RE2::PartialMatch(t, pattern1_)) { //"[a-zA-Z_-]+$"
+        if (re2::RE2::PartialMatch(t, pattern1_)) { //"[a-zA-Z_-]+$"
             String lemma_term = lemma_->Lemmatize(t);
             char *lowercase_term = lowercase_string_buffer_.data();
             ToLower(lemma_term.c_str(), lemma_term.size(), lowercase_term, term_string_buffer_limit_);
@@ -1320,7 +1320,7 @@ String RAGAnalyzer::Tokenize(const String &line) {
     Split(strline, regex_split_pattern_, arr, true);
     for (const auto &L : arr) {
         auto length = UTF8Length(L);
-        if (length < 2 || RE2::PartialMatch(L, pattern2_) || RE2::PartialMatch(L, pattern3_)) { //[a-z\\.-]+$  [0-9\\.-]+$
+        if (length < 2 || re2::RE2::PartialMatch(L, pattern2_) || re2::RE2::PartialMatch(L, pattern3_)) { //[a-z\\.-]+$  [0-9\\.-]+$
             res.push_back(L);
             continue;
         }
@@ -1370,7 +1370,7 @@ void RAGAnalyzer::FineGrainedTokenize(const String &tokens, Vector<String> &resu
 
     for (auto &token : tks) {
         const auto token_len = UTF8Length(token);
-        if (token_len < 3 || RE2::PartialMatch(token, pattern4_)) { //[0-9,\\.-]+$
+        if (token_len < 3 || re2::RE2::PartialMatch(token, pattern4_)) { //[0-9,\\.-]+$
             res.push_back(token);
             continue;
         }
@@ -1406,7 +1406,7 @@ void RAGAnalyzer::FineGrainedTokenize(const String &tokens, Vector<String> &resu
         const auto &stk = sorted_tokens[1].first;
         if (stk.size() == token_len) {
             res.push_back(token);
-        } else if (RE2::PartialMatch(token, pattern5_)) { // [a-z\\.-]+
+        } else if (re2::RE2::PartialMatch(token, pattern5_)) { // [a-z\\.-]+
             bool need_append_stk = true;
             for (auto &t : stk) {
                 if (UTF8Length(t) < 3) {

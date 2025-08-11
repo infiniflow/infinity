@@ -14,9 +14,11 @@
 
 module;
 
-#include <string>
+// #include <string>
 
 module infinity_core:table_index_meeta.impl;
+
+import std;
 
 import :table_index_meeta;
 import :kv_store;
@@ -26,7 +28,6 @@ import :third_party;
 import :logger;
 import :index_base;
 import :meta_info;
-import create_index_info;
 import :new_catalog;
 import :infinity_context;
 import :new_txn;
@@ -36,7 +37,9 @@ import :utility;
 import :kv_utility;
 import :snapshot_info;
 import :segment_index_meta;
+
 import column_def;
+import create_index_info;
 
 namespace infinity {
 

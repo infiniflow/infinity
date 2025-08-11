@@ -20,7 +20,6 @@ import :secondary_index_file_worker;
 import :stl;
 import :index_file_worker;
 import :file_worker;
-
 import :logger;
 import :index_base;
 import :index_secondary;

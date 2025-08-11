@@ -14,10 +14,12 @@
 
 module;
 
-#include <string>
-#include <vector>
+// #include <string>
+// #include <vector>
 
 module infinity_core:chunk_index_meta.impl;
+
+import std;
 
 import :chunk_index_meta;
 import :kv_code;
@@ -25,11 +27,8 @@ import :kv_store;
 import :table_meeta;
 import :table_index_meeta;
 import :segment_index_meta;
-
 import :index_base;
-import column_def;
 import :index_defines;
-import create_index_info;
 import :infinity_context;
 import :buffer_manager;
 import :secondary_index_file_worker;
@@ -39,13 +38,15 @@ import :hnsw_file_worker;
 import :bmp_index_file_worker;
 import :emvb_index_file_worker;
 import :infinity_exception;
-
 import :persistence_manager;
 import :persist_result_handler;
 import :virtual_store;
 import :logger;
 import :file_worker;
+
 import row_id;
+import column_def;
+import create_index_info;
 
 namespace infinity {
 

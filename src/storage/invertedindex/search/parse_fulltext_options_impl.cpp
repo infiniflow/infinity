@@ -145,11 +145,11 @@ String Trim(const String &str) {
 }
 
 void Split(const std::string_view &input, const RE2 &pattern, Vector<String> &result, bool keep_delim = false) {
-    re2::StringPiece leftover(input.data());
-    re2::StringPiece last_end = leftover;
-    re2::StringPiece extracted_delim_token;
+    std::string_view leftover(input.data());
+    std::string_view last_end = leftover;
+    std::string_view extracted_delim_token;
 
-    while (RE2::FindAndConsume(&leftover, pattern, &extracted_delim_token)) {
+    while (re2::RE2::FindAndConsume(&leftover, pattern, &extracted_delim_token)) {
         std::string_view token(last_end.data(), extracted_delim_token.data() - last_end.data());
         if (!token.empty()) {
             result.push_back(Trim(String(token.data(), token.size())));
