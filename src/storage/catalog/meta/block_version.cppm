@@ -78,7 +78,7 @@ export struct BlockVersion {
 
     Status Print(TxnTimeStamp commit_ts, i32 offset, bool ignore_invisible);
 
-    TxnTimeStamp latest_change_ts() const {
+    [[nodiscard]] TxnTimeStamp latest_change_ts() const {
         std::shared_lock<std::shared_mutex> lock(rw_mutex_);
         return latest_change_ts_;
     }

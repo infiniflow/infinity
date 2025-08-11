@@ -126,9 +126,9 @@ sudo cmake --build build --target install
 cd ~/Downloads # Of course, you can specify a different path.
 git clone https://github.com/microsoft/vcpkg.git
 cd vcpkg && ./bootstrap-vcpkg.sh -disableMetrics
-sudo sh -c 'cat <<EOF >> ~/.bashrc
-export VCPKG_ROOT='~/Downloads/vcpkg'
-export PATH=$VCPKG_ROOT:$PATH
+sh -c 'cat <<EOF >> ~/.bashrc
+export VCPKG_ROOT=${PWD}
+export PATH=${VCPKG_ROOT}:${PATH}
 EOF'
 source ~/.bashrc
 wget https://apt.llvm.org/llvm.sh && chmod +x llvm.sh && sudo ./llvm.sh 20 && rm llvm.sh
@@ -169,9 +169,9 @@ sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-15  100
 cd ~/Downloads # Of course, you can specify a different path.
 git clone https://github.com/microsoft/vcpkg.git
 cd vcpkg && ./bootstrap-vcpkg.sh -disableMetrics
-sudo sh -c 'cat <<EOF >> ~/.bashrc
-export VCPKG_ROOT='~/Downloads/vcpkg'
-export PATH=$VCPKG_ROOT:$PATH
+sh -c 'cat <<EOF >> ~/.bashrc
+export VCPKG_ROOT=${PWD}
+export PATH=${VCPKG_ROOT}:${PATH}
 EOF'
 source ~/.bashrc
 wget https://apt.llvm.org/llvm.sh && chmod +x llvm.sh && sudo ./llvm.sh 20 && rm llvm.sh

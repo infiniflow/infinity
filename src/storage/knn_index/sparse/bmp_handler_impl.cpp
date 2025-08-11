@@ -23,16 +23,15 @@ import :buffer_manager;
 import :buffer_handle;
 import :block_column_iter;
 import :sparse_util;
-import :third_party;
 import :logger;
 import :buffer_obj;
 import :local_file_handle;
 import :chunk_index_meta;
+import :bmp_alg;
+
 import sparse_info;
 import embedding_type;
 import column_def;
-import :bmp_alg;
-// import data_type;
 
 namespace infinity {
 

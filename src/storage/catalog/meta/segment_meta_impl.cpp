@@ -130,7 +130,6 @@ Status SegmentMeta::RestoreSet() {
         }
     }
 
-
     return Status::OK();
 }
 
@@ -426,21 +425,13 @@ Tuple<Vector<BlockID> *, Status> SegmentMeta::GetBlockIDs1(TxnTimeStamp commit_t
 Tuple<SizeT, Status> SegmentMeta::GetRowCnt1() {
     std::lock_guard<std::mutex> lock(mtx_);
     if (row_cnt_) {
-        LOG_TRACE(fmt::format("SegmentMeta::GetRowCnt1 cached result: segment={}, row_count={}", 
-                             segment_id_, *row_cnt_));
         return {*row_cnt_, Status::OK()};
     }
-    
-    LOG_INFO(fmt::format("SegmentMeta::GetRowCnt1 called: segment={}, begin_ts={}, commit_ts={}", 
-                        segment_id_, begin_ts_, commit_ts_));
-    
+
     Status status;
 #if 1
     row_cnt_ = infinity::GetSegmentRowCount(&kv_instance_, table_meta_.db_id_str(), table_meta_.table_id_str(), segment_id_, begin_ts_, commit_ts_);
-    
-    LOG_INFO(fmt::format("SegmentMeta::GetRowCnt1 result: segment={}, row_count={}", 
-                        segment_id_, *row_cnt_));
-    
+
     return {*row_cnt_, Status::OK()};
 #else
     SizeT row_cnt = 0;
@@ -569,7 +560,7 @@ Status SegmentMeta::SetFastRoughFilter(SharedPtr<FastRoughFilter> fast_rough_fil
     return Status::OK();
 }
 
-Tuple<SharedPtr<SegmentSnapshotInfo>, Status> SegmentMeta::MapMetaToSnapShotInfo(){
+Tuple<SharedPtr<SegmentSnapshotInfo>, Status> SegmentMeta::MapMetaToSnapShotInfo() {
 
     SharedPtr<SegmentSnapshotInfo> segment_snapshot_info = MakeShared<SegmentSnapshotInfo>();
     Status status;
@@ -609,7 +600,7 @@ Tuple<SharedPtr<SegmentSnapshotInfo>, Status> SegmentMeta::MapMetaToSnapShotInfo
     return {std::move(segment_snapshot_info), Status::OK()};
 }
 
-Status SegmentMeta::RestoreFromSnapshot(const WalSegmentInfoV2 &segment_info, bool is_link_files){
+Status SegmentMeta::RestoreFromSnapshot(const WalSegmentInfoV2 &segment_info, bool is_link_files) {
     if (!is_link_files) {
         Status status = RestoreSet();
         if (!status.ok()) {
@@ -632,8 +623,5 @@ Status SegmentMeta::RestoreFromSnapshot(const WalSegmentInfoV2 &segment_info, bo
 
     return Status::OK();
 }
-
-
-
 
 } // namespace infinity
