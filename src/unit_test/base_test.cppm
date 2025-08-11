@@ -118,10 +118,6 @@ protected:
     // Create a data block with two columns, each with the specified row count (data is specified in the function).
     SharedPtr<DataBlock> MakeInputBlock2(SizeT row_cnt);
 
-    // Check if the table segments are as expected.
-    void CheckSegments(const String &db_name, const String &table_name, const Vector<SegmentID> &segment_ids);
-    // Check if the index segments are as expected.
-    void CheckIndexSegments(const String &db_name, const String &table_name, const String &index_name, const Vector<SegmentID> &segment_ids);
     // Check if the file paths exist or not.
     void CheckFilePaths(Vector<String> &delete_file_paths, Vector<String> &exist_file_paths);
 

@@ -20,19 +20,21 @@ module;
 #include <type_traits>
 #include <unistd.h>
 
+#ifdef CI
+module base_test;
+import infinity_core;
+#else
 module infinity_core:ut.base_test.impl;
 
 import :ut.base_test;
 import :stl;
 import :infinity_context;
 import :infinity_exception;
-import :db_meeta;
-import :table_meeta;
-import :table_index_meeta;
-import :txn_state;
-import :new_txn;
-import :new_txn_manager;
-import infinity_core;
+#endif
+
+import column_def;
+import data_type;
+import logical_type;
 
 namespace infinity {
 
@@ -111,49 +113,6 @@ SharedPtr<DataBlock> BaseTestWithParam<T>::MakeInputBlock2(SizeT row_cnt) {
     input_block->Finalize();
     return input_block;
 };
-
-template <typename T>
-void BaseTestWithParam<T>::CheckSegments(const String &db_name, const String &table_name, const Vector<SegmentID> &segment_ids) {
-    NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
-    auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check table segments"), TransactionType::kNormal);
-
-    Optional<DBMeeta> db_meta;
-    Optional<TableMeeta> table_meta;
-    Status status = txn->GetTableMeta(db_name, table_name, db_meta, table_meta);
-    EXPECT_TRUE(status.ok());
-
-    auto [segment_ids_ptr, status2] = table_meta->GetSegmentIDs1();
-    EXPECT_TRUE(status.ok());
-    EXPECT_EQ(*segment_ids_ptr, segment_ids);
-
-    status = new_txn_mgr->CommitTxn(txn);
-    EXPECT_TRUE(status.ok());
-}
-
-template <typename T>
-void BaseTestWithParam<T>::CheckIndexSegments(const String &db_name,
-                                              const String &table_name,
-                                              const String &index_name,
-                                              const Vector<SegmentID> &segment_ids) {
-    NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
-    auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check index segments"), TransactionType::kNormal);
-
-    Optional<DBMeeta> db_meta;
-    Optional<TableMeeta> table_meta;
-    Optional<TableIndexMeeta> table_index_meta;
-    String table_key;
-    String index_key;
-    Status status = txn->GetTableIndexMeta(db_name, table_name, index_name, db_meta, table_meta, table_index_meta, &table_key, &index_key);
-    EXPECT_TRUE(status.ok());
-
-    {
-        auto [segment_ids_ptr, status] = table_index_meta->GetSegmentIndexIDs1();
-        EXPECT_TRUE(status.ok());
-        EXPECT_EQ(*segment_ids_ptr, segment_ids);
-    }
-    status = new_txn_mgr->CommitTxn(txn);
-    EXPECT_TRUE(status.ok());
-}
 
 template <typename T>
 void BaseTestWithParam<T>::CheckFilePaths(Vector<String> &delete_file_paths, Vector<String> &exist_file_paths) {
