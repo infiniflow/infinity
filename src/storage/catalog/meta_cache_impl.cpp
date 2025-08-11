@@ -27,31 +27,46 @@ import :kv_store;
 
 namespace infinity {
 
-void MetaCache::Put(const Vector<SharedPtr<MetaBaseCache>> &cache_items, KVInstance *kv_instance) {
+void MetaCache::PutOrErase(const Vector<SharedPtr<MetaBaseCache>> &cache_items, KVInstance *kv_instance) {
     std::unique_lock lock(cache_mtx_);
     for (const auto &cache_item : cache_items) {
-        PutNolock(cache_item);
+        PutOrEraseNolock(cache_item);
     }
     if (kv_instance != nullptr) {
         kv_instance->Commit();
     }
 }
 
-void MetaCache::PutNolock(const SharedPtr<MetaBaseCache> &meta_base_cache) {
+void MetaCache::PutOrEraseNolock(const SharedPtr<MetaBaseCache> &meta_base_cache) {
     switch (meta_base_cache->type_) {
-        case MetaType::kDB: {
+        case MetaCacheType::kCreateDB: {
             SharedPtr<MetaDbCache> db_cache = std::static_pointer_cast<MetaDbCache>(meta_base_cache);
             PutDbNolock(db_cache);
             break;
         }
-        case MetaType::kTable: {
+        case MetaCacheType::kCreateTable: {
             SharedPtr<MetaTableCache> table_cache = std::static_pointer_cast<MetaTableCache>(meta_base_cache);
             PutTableNolock(table_cache);
             break;
         }
-        case MetaType::kTableIndex: {
+        case MetaCacheType::kCreateIndex: {
             SharedPtr<MetaIndexCache> index_cache = std::static_pointer_cast<MetaIndexCache>(meta_base_cache);
             PutIndexNolock(index_cache);
+            break;
+        }
+        case MetaCacheType::kDropDB: {
+            SharedPtr<MetaDropCache> drop_cache = std::static_pointer_cast<MetaDropCache>(meta_base_cache);
+            EraseDbNolock(drop_cache->name_);
+            break;
+        }
+        case MetaCacheType::kDropTable: {
+            SharedPtr<MetaDropCache> drop_cache = std::static_pointer_cast<MetaDropCache>(meta_base_cache);
+            EraseTableNolock(drop_cache->name_);
+            break;
+        }
+        case MetaCacheType::kDropIndex: {
+            SharedPtr<MetaDropCache> drop_cache = std::static_pointer_cast<MetaDropCache>(meta_base_cache);
+            EraseIndexNolock(drop_cache->name_);
             break;
         }
         default: {
@@ -97,6 +112,8 @@ SharedPtr<MetaDbCache> MetaCache::GetDb(const String &db_name, TxnTimeStamp begi
     return nullptr;
 }
 
+void MetaCache::EraseDbNolock(const String &db_name) { dbs_.erase(db_name); }
+
 void MetaCache::PutTableNolock(const SharedPtr<MetaTableCache> &table_cache) {
     const String &table_name = table_cache->table_name_;
     u64 db_id = table_cache->db_id_;
@@ -138,6 +155,8 @@ SharedPtr<MetaTableCache> MetaCache::GetTable(u64 db_id, const String &table_nam
     return nullptr;
 }
 
+void MetaCache::EraseTableNolock(const String &table_name) { tables_.erase(table_name); }
+
 void MetaCache::PutIndexNolock(const SharedPtr<MetaIndexCache> &index_cache) {
     const String &index_name = index_cache->index_name_;
     u64 db_id = index_cache->db_id_;
@@ -162,6 +181,8 @@ void MetaCache::PutIndexNolock(const SharedPtr<MetaIndexCache> &index_cache) {
     TrimCacheNolock();
 }
 
+void MetaCache::EraseIndexNolock(const String &index_name) { indexes_.erase(index_name); }
+
 SharedPtr<MetaIndexCache> MetaCache::GetIndex(u64 db_id, u64 table_id, const String &index_name, TxnTimeStamp begin_ts) {
     String name = KeyEncode::CatalogIndexPrefix(std::to_string(db_id), std::to_string(table_id), index_name);
 
@@ -185,17 +206,17 @@ void MetaCache::PrintLRU() const {
     for (const auto &item : lru_) {
         TxnTimeStamp commit_ts = 0;
         switch (item.meta_cache_->type_) {
-            case MetaType::kDB: {
+            case MetaCacheType::kCreateDB: {
                 MetaDbCache *db_cache = static_cast<MetaDbCache *>(item.meta_cache_.get());
                 commit_ts = db_cache->commit_ts_;
                 break;
             }
-            case MetaType::kTable: {
+            case MetaCacheType::kCreateTable: {
                 MetaTableCache *table_cache = static_cast<MetaTableCache *>(item.meta_cache_.get());
                 commit_ts = table_cache->commit_ts_;
                 break;
             }
-            case MetaType::kTableIndex: {
+            case MetaCacheType::kCreateIndex: {
                 MetaIndexCache *index_cache = static_cast<MetaIndexCache *>(item.meta_cache_.get());
                 commit_ts = index_cache->commit_ts_;
                 break;
@@ -212,19 +233,28 @@ void MetaCache::TrimCacheNolock() {
     while (lru_.size() > capacity_) {
         CacheItem &item = lru_.back();
         switch (item.meta_cache_->type_) {
-            case MetaType::kDB: {
+            case MetaCacheType::kCreateDB: {
                 MetaDbCache *db_cache = static_cast<MetaDbCache *>(item.meta_cache_.get());
-                dbs_[item.name_].erase(db_cache->commit_ts_);
+                auto iter = dbs_.find(item.name_);
+                if (iter != dbs_.end()) {
+                    iter->second.erase(db_cache->commit_ts_);
+                }
                 break;
             }
-            case MetaType::kTable: {
+            case MetaCacheType::kCreateTable: {
                 MetaTableCache *table_cache = static_cast<MetaTableCache *>(item.meta_cache_.get());
-                tables_[item.name_].erase(table_cache->commit_ts_);
+                auto iter = tables_.find(item.name_);
+                if (iter != tables_.end()) {
+                    iter->second.erase(table_cache->commit_ts_);
+                }
                 break;
             }
-            case MetaType::kTableIndex: {
+            case MetaCacheType::kCreateIndex: {
                 MetaIndexCache *index_cache = static_cast<MetaIndexCache *>(item.meta_cache_.get());
-                indexes_[item.name_].erase(index_cache->commit_ts_);
+                auto iter = indexes_.find(item.name_);
+                if (iter != indexes_.end()) {
+                    iter->second.erase(index_cache->commit_ts_);
+                }
                 break;
             }
             default: {

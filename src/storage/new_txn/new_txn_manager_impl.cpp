@@ -434,6 +434,9 @@ void NewTxnManager::CommitBottom(NewTxn *txn) {
 }
 
 void NewTxnManager::CommitKVInstance(NewTxn *txn) {
+    // Generate meta cache items
+    txn->GetTxnStore();
+    // Put meta cache items with kv_instance
     Status status = txn->kv_instance_->Commit();
     if (!status.ok()) {
         UnrecoverableError(fmt::format("Commit kv_instance: {}", status.message()));

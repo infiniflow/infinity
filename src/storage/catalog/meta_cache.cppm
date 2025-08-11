@@ -21,20 +21,29 @@ import :default_values;
 import internal_types;
 import :third_party;
 import :status;
-import :meta_type;
 
 namespace infinity {
 
 class KVInstance;
 
+export enum class MetaCacheType {
+    kInvalid,
+    kCreateDB,
+    kDropDB,
+    kCreateTable,
+    kDropTable,
+    kCreateIndex,
+    kDropIndex,
+};
+
 struct MetaBaseCache {
-    MetaBaseCache(MetaType type) : type_(type) {}
-    MetaType type_{MetaType::kInvalid};
+    MetaBaseCache(MetaCacheType type) : type_(type) {}
+    MetaCacheType type_{MetaCacheType::kInvalid};
 };
 
 export struct MetaDbCache : public MetaBaseCache {
     MetaDbCache(const String &db_name, u64 db_id, u64 commit_ts, bool is_dropped)
-        : MetaBaseCache(MetaType::kDB), db_name_(db_name), db_id_(db_id), commit_ts_(commit_ts), is_dropped_(is_dropped) {}
+        : MetaBaseCache(MetaCacheType::kCreateDB), db_name_(db_name), db_id_(db_id), commit_ts_(commit_ts), is_dropped_(is_dropped) {}
     String db_name_{};
     u64 db_id_{};
     u64 commit_ts_{};
@@ -43,7 +52,7 @@ export struct MetaDbCache : public MetaBaseCache {
 
 export struct MetaTableCache : public MetaBaseCache {
     MetaTableCache(u64 db_id, const String &table_name, u64 table_id, u64 commit_ts, bool is_dropped)
-        : MetaBaseCache(MetaType::kTable), db_id_(db_id), table_name_(table_name), table_id_(table_id), commit_ts_(commit_ts),
+        : MetaBaseCache(MetaCacheType::kCreateTable), db_id_(db_id), table_name_(table_name), table_id_(table_id), commit_ts_(commit_ts),
           is_dropped_(is_dropped) {}
     u64 db_id_{};
     String table_name_{};
@@ -54,7 +63,7 @@ export struct MetaTableCache : public MetaBaseCache {
 
 export struct MetaIndexCache : public MetaBaseCache {
     MetaIndexCache(u64 db_id, u64 table_id, const String &index_name, u64 index_id, u64 commit_ts, bool is_dropped)
-        : MetaBaseCache(MetaType::kTableIndex), db_id_(db_id), table_id_(table_id), index_name_(index_name), index_id_(index_id),
+        : MetaBaseCache(MetaCacheType::kCreateIndex), db_id_(db_id), table_id_(table_id), index_name_(index_name), index_id_(index_id),
           commit_ts_(commit_ts), is_dropped_(is_dropped) {};
     u64 db_id_{};
     u64 table_id_{};
@@ -62,6 +71,11 @@ export struct MetaIndexCache : public MetaBaseCache {
     u64 index_id_{};
     u64 commit_ts_{};
     bool is_dropped_{false};
+};
+
+export struct MetaDropCache : public MetaBaseCache {
+    explicit MetaDropCache(MetaCacheType drop_cache_type, const String &name) : MetaBaseCache(drop_cache_type), name_(name) {}
+    String name_{};
 };
 
 struct CacheItem {
@@ -72,7 +86,7 @@ struct CacheItem {
 struct TableNameID {
     String name_{};
     TxnTimeStamp commit_ts_{};
-    MetaType meta_type_{MetaType::kInvalid};
+    MetaCacheType meta_type_{MetaCacheType::kInvalid};
 };
 
 export class MetaCache {
@@ -87,7 +101,7 @@ export class MetaCache {
 public:
     explicit MetaCache(SizeT capacity) : capacity_(capacity) {};
 
-    void Put(const Vector<SharedPtr<MetaBaseCache>> &cache_items, KVInstance *kv_instance);
+    void PutOrErase(const Vector<SharedPtr<MetaBaseCache>> &cache_items, KVInstance *kv_instance);
 
     SharedPtr<MetaDbCache> GetDb(const String &db_name, TxnTimeStamp begin_ts);
 
@@ -100,10 +114,13 @@ public:
     SizeT Size() const;
 
 private:
-    void PutNolock(const SharedPtr<MetaBaseCache> &meta_base_cache);
+    void PutOrEraseNolock(const SharedPtr<MetaBaseCache> &meta_base_cache);
     void PutDbNolock(const SharedPtr<MetaDbCache> &db_cache);
+    void EraseDbNolock(const String &db_name);
     void PutTableNolock(const SharedPtr<MetaTableCache> &table_cache);
+    void EraseTableNolock(const String &table_name);
     void PutIndexNolock(const SharedPtr<MetaIndexCache> &index_cache);
+    void EraseIndexNolock(const String &index_name);
     void TrimCacheNolock();
     void TouchNolock(List<CacheItem>::iterator iter);
 };

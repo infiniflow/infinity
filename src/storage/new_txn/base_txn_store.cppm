@@ -30,6 +30,7 @@ namespace infinity {
 struct DataBlock;
 class IndexBase;
 class TableDef;
+struct MetaBaseCache;
 
 export struct MemIndexRange {
     String index_id_{};
@@ -74,6 +75,7 @@ export struct BaseTxnStore {
 
     virtual String ToString() const = 0;
     virtual SharedPtr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const = 0;
+    virtual Vector<SharedPtr<MetaBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const;
     virtual ~BaseTxnStore() = default;
     virtual void ClearData();
 };
@@ -98,6 +100,7 @@ export struct CreateDBTxnStore final : public BaseTxnStore {
 
     String ToString() const final;
     SharedPtr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;
+    Vector<SharedPtr<MetaBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
 };
 
 export struct DropDBTxnStore final : public BaseTxnStore {
@@ -111,6 +114,7 @@ export struct DropDBTxnStore final : public BaseTxnStore {
 
     String ToString() const final;
     SharedPtr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;
+    Vector<SharedPtr<MetaBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
 };
 
 export struct CreateTableTxnStore final : public BaseTxnStore {
@@ -127,6 +131,7 @@ export struct CreateTableTxnStore final : public BaseTxnStore {
 
     String ToString() const final;
     SharedPtr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;
+    Vector<SharedPtr<MetaBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
 };
 
 
@@ -189,8 +194,9 @@ export struct DropTableTxnStore final : public BaseTxnStore {
     TxnTimeStamp create_ts_{};
     String table_key_{};
 
-    String ToString() const final;\
+    String ToString() const final;
     SharedPtr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;
+    Vector<SharedPtr<MetaBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
 };
 
 export struct RenameTableTxnStore final : public BaseTxnStore {
@@ -206,6 +212,7 @@ export struct RenameTableTxnStore final : public BaseTxnStore {
 
     String ToString() const final;
     SharedPtr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;
+    Vector<SharedPtr<MetaBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
 };
 
 export struct CreateIndexTxnStore final : public BaseTxnStore {
@@ -224,6 +231,7 @@ export struct CreateIndexTxnStore final : public BaseTxnStore {
 
     String ToString() const final;
     SharedPtr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;
+    Vector<SharedPtr<MetaBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
 };
 
 export struct DropIndexTxnStore final : public BaseTxnStore {
@@ -244,6 +252,7 @@ export struct DropIndexTxnStore final : public BaseTxnStore {
 
     String ToString() const final;
     SharedPtr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;
+    Vector<SharedPtr<MetaBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
 };
 
 export struct OptimizeIndexStoreEntry {
