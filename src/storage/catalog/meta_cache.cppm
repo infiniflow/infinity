@@ -31,28 +31,32 @@ struct MetaBaseCache {
 };
 
 export struct MetaDbCache : public MetaBaseCache {
-    MetaDbCache(u64 db_id, u64 commit_ts, bool is_dropped)
-        : MetaBaseCache(MetaType::kDB), db_id_(db_id), commit_ts_(commit_ts), is_dropped_(is_dropped) {}
+    MetaDbCache(const String &db_name, u64 db_id, u64 commit_ts, bool is_dropped)
+        : MetaBaseCache(MetaType::kDB), db_name_(db_name), db_id_(db_id), commit_ts_(commit_ts), is_dropped_(is_dropped) {}
+    String db_name_{};
     u64 db_id_{};
     u64 commit_ts_{};
     bool is_dropped_{false};
 };
 
 export struct MetaTableCache : public MetaBaseCache {
-    MetaTableCache(u64 db_id, u64 table_id, u64 commit_ts, bool is_dropped)
-        : MetaBaseCache(MetaType::kTable), db_id_(db_id), table_id_(table_id), commit_ts_(commit_ts), is_dropped_(is_dropped) {}
+    MetaTableCache(u64 db_id, const String &table_name, u64 table_id, u64 commit_ts, bool is_dropped)
+        : MetaBaseCache(MetaType::kTable), db_id_(db_id), table_name_(table_name), table_id_(table_id), commit_ts_(commit_ts),
+          is_dropped_(is_dropped) {}
     u64 db_id_{};
+    String table_name_{};
     u64 table_id_{};
     u64 commit_ts_{};
     bool is_dropped_{false};
 };
 
 export struct MetaIndexCache : public MetaBaseCache {
-    MetaIndexCache(u64 db_id, u64 table_id, u64 index_id, u64 commit_ts, bool is_dropped)
-        : MetaBaseCache(MetaType::kTableIndex), db_id_(db_id), table_id_(table_id), index_id_(index_id), commit_ts_(commit_ts),
-          is_dropped_(is_dropped) {};
+    MetaIndexCache(u64 db_id, u64 table_id, const String &index_name, u64 index_id, u64 commit_ts, bool is_dropped)
+        : MetaBaseCache(MetaType::kTableIndex), db_id_(db_id), table_id_(table_id), index_name_(index_name), index_id_(index_id),
+          commit_ts_(commit_ts), is_dropped_(is_dropped) {};
     u64 db_id_{};
     u64 table_id_{};
+    String index_name_{};
     u64 index_id_{};
     u64 commit_ts_{};
     bool is_dropped_{false};
@@ -81,15 +85,11 @@ export class MetaCache {
 public:
     explicit MetaCache(SizeT capacity) : capacity_(capacity) {};
 
-    void PutDb(const String &db_name, const SharedPtr<MetaDbCache> &db_cache);
+    void Put(const Vector<SharedPtr<MetaBaseCache>> &cache_items);
 
     SharedPtr<MetaDbCache> GetDb(const String &db_name, TxnTimeStamp begin_ts);
 
-    void PutTable(const String &table_name, const SharedPtr<MetaTableCache> &table_cache);
-
     SharedPtr<MetaTableCache> GetTable(u64 db_id, const String &table_name, TxnTimeStamp begin_ts);
-
-    void PutIndex(const String &index_name, const SharedPtr<MetaIndexCache> &index_cache);
 
     SharedPtr<MetaIndexCache> GetIndex(u64 db_id, u64 table_id, const String &index_name, TxnTimeStamp begin_ts);
 
@@ -98,6 +98,10 @@ public:
     SizeT Size() const;
 
 private:
+    void PutNolock(const SharedPtr<MetaBaseCache> &meta_base_cache);
+    void PutDbNolock(const SharedPtr<MetaDbCache> &db_cache);
+    void PutTableNolock(const SharedPtr<MetaTableCache> &table_cache);
+    void PutIndexNolock(const SharedPtr<MetaIndexCache> &index_cache);
     void TrimCacheNolock();
     void TouchNolock(List<CacheItem>::iterator iter);
 };

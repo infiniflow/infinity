@@ -26,9 +26,40 @@ import :logger;
 
 namespace infinity {
 
-void MetaCache::PutDb(const String &db_name, const SharedPtr<MetaDbCache> &db_cache) {
-    TxnTimeStamp commit_ts = db_cache->commit_ts_;
+void MetaCache::Put(const Vector<SharedPtr<MetaBaseCache>> &cache_items) {
     std::unique_lock lock(cache_mtx_);
+    for (const auto &cache_item : cache_items) {
+        PutNolock(cache_item);
+    }
+}
+
+void MetaCache::PutNolock(const SharedPtr<MetaBaseCache> &meta_base_cache) {
+    switch (meta_base_cache->type_) {
+        case MetaType::kDB: {
+            SharedPtr<MetaDbCache> db_cache = std::static_pointer_cast<MetaDbCache>(meta_base_cache);
+            PutDbNolock(db_cache);
+            break;
+        }
+        case MetaType::kTable: {
+            SharedPtr<MetaTableCache> table_cache = std::static_pointer_cast<MetaTableCache>(meta_base_cache);
+            PutTableNolock(table_cache);
+            break;
+        }
+        case MetaType::kTableIndex: {
+            SharedPtr<MetaIndexCache> index_cache = std::static_pointer_cast<MetaIndexCache>(meta_base_cache);
+            PutIndexNolock(index_cache);
+            break;
+        }
+        default: {
+            UnrecoverableError("Invalid meta type");
+        }
+    }
+}
+
+void MetaCache::PutDbNolock(const SharedPtr<MetaDbCache> &db_cache) {
+    const String &db_name = db_cache->db_name_;
+    TxnTimeStamp commit_ts = db_cache->commit_ts_;
+
     auto iter = dbs_.find(db_name);
     if (iter != dbs_.end()) {
         Map<u64, List<CacheItem>::iterator> &db_map_ref = iter->second;
@@ -62,11 +93,12 @@ SharedPtr<MetaDbCache> MetaCache::GetDb(const String &db_name, TxnTimeStamp begi
     return nullptr;
 }
 
-void MetaCache::PutTable(const String &table_name, const SharedPtr<MetaTableCache> &table_cache) {
+void MetaCache::PutTableNolock(const SharedPtr<MetaTableCache> &table_cache) {
+    const String &table_name = table_cache->table_name_;
     u64 db_id = table_cache->db_id_;
     String name = KeyEncode::CatalogTablePrefix(std::to_string(db_id), table_name);
     TxnTimeStamp commit_ts = table_cache->commit_ts_;
-    std::unique_lock lock(cache_mtx_);
+
     auto iter = tables_.find(name);
     if (iter != tables_.end()) {
         Map<u64, List<CacheItem>::iterator> &db_map_ref = iter->second;
@@ -102,12 +134,13 @@ SharedPtr<MetaTableCache> MetaCache::GetTable(u64 db_id, const String &table_nam
     return nullptr;
 }
 
-void MetaCache::PutIndex(const String &index_name, const SharedPtr<MetaIndexCache> &index_cache) {
+void MetaCache::PutIndexNolock(const SharedPtr<MetaIndexCache> &index_cache) {
+    const String &index_name = index_cache->index_name_;
     u64 db_id = index_cache->db_id_;
     u64 table_id = index_cache->table_id_;
     String name = KeyEncode::CatalogIndexPrefix(std::to_string(db_id), std::to_string(table_id), index_name);
     TxnTimeStamp commit_ts = index_cache->commit_ts_;
-    std::unique_lock lock(cache_mtx_);
+
     auto iter = indexes_.find(name);
     if (iter != indexes_.end()) {
         Map<u64, List<CacheItem>::iterator> &db_map_ref = iter->second;
@@ -144,6 +177,7 @@ SharedPtr<MetaIndexCache> MetaCache::GetIndex(u64 db_id, u64 table_id, const Str
 }
 
 void MetaCache::PrintLRU() const {
+    std::unique_lock lock(cache_mtx_);
     for (const auto &item : lru_) {
         TxnTimeStamp commit_ts = 0;
         switch (item.meta_cache_->type_) {
