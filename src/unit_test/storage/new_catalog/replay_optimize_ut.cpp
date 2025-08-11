@@ -86,34 +86,32 @@ protected:
         
         // Create different types of indexes
         index_name1 = std::make_shared<std::string>("idx_secondary");
-        index_def1 = IndexSecondary::Make(index_name1, MakeShared<String>(), "file_name", {column_def1->name()});
+        index_def1 = IndexSecondary::Make(index_name1, MakeShared<String>(), "idx_file1.idx", {column_def1->name()});
         
         index_name2 = std::make_shared<String>("idx_fulltext");
-        index_def2 = IndexFullText::Make(index_name2, MakeShared<String>(), "file_name", {column_def2->name()}, {});
+        index_def2 = IndexFullText::Make(index_name2, MakeShared<String>(), "idx_file2.idx", {column_def2->name()}, {});
         
         index_name3 = std::make_shared<String>("idx_hnsw");
         
-        // Create HNSW index with required metric parameter
-        // First, ensure the embedding column has proper type info
-        auto embedding_type_info = EmbeddingInfo::Make(EmbeddingDataType::kElemFloat, 4);
-        column_def3 = std::make_shared<ColumnDef>(2, std::make_shared<DataType>(LogicalType::kEmbedding, embedding_type_info), "embedding_col", std::set<ConstraintType>());
+        // Create HNSW index with proper parameters following the pattern from other tests
+        Vector<UniquePtr<InitParameter>> index_param_list;
+        Vector<InitParameter *> index_param_list_ptr;
         
-        // Update table_def with the corrected column definition
-        table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def2, column_def3, column_def4});
+        // Add required parameters for HNSW index
+        index_param_list.push_back(std::make_unique<InitParameter>(InitParameter{"metric", "l2"}));
+        index_param_list.push_back(std::make_unique<InitParameter>(InitParameter{"encode", "plain"}));
         
-        // Create HNSW index with minimal required parameters
-        hnsw_params_.clear();
-        auto metric_param = new InitParameter();
-        metric_param->param_name_ = "metric";
-        metric_param->param_value_ = "l2";  // Use L2 distance as default
-        hnsw_params_.push_back(metric_param);
+        // Convert to raw pointers for the API call
+        for (auto &param : index_param_list) {
+            index_param_list_ptr.push_back(param.get());
+        }
         
-        LOG_INFO("Created InitParameter: name=" + metric_param->param_name_ + ", value=" + metric_param->param_value_);
-        LOG_INFO("HNSW params size: " + std::to_string(hnsw_params_.size()));
+        LOG_INFO("Creating HNSW index with parameters: metric=l2, encode=plain");
+        LOG_INFO("HNSW params size: " + std::to_string(index_param_list_ptr.size()));
         
         try {
             LOG_INFO("Attempting to create HNSW index with column: " + column_def3->name());
-            index_def3 = IndexHnsw::Make(index_name3, MakeShared<String>(), "file_name", {column_def3->name()}, hnsw_params_);
+            index_def3 = IndexHnsw::Make(index_name3, MakeShared<String>(), "idx_file3.idx", {column_def3->name()}, index_param_list_ptr);
             EXPECT_TRUE(index_def3 != nullptr);
             LOG_INFO("Successfully created HNSW index: " + *index_name3);
         } catch (const std::exception& e) {
@@ -121,17 +119,13 @@ protected:
         }
         
         index_name4 = std::make_shared<String>("idx_secondary2");
-        index_def4 = IndexSecondary::Make(index_name4, MakeShared<String>(), "file_name", {column_def4->name()});
+        index_def4 = IndexSecondary::Make(index_name4, MakeShared<String>(), "idx_file4.idx", {column_def4->name()});
         
         block_row_cnt = 8192;
     }
     
     ~TestTxnReplayOptimize() override {
-        // Clean up InitParameter objects
-        for (auto* param : hnsw_params_) {
-            delete param;
-        }
-        hnsw_params_.clear();
+        // No manual cleanup needed - using RAII with unique_ptr
     }
 
     SharedPtr<DataBlock> make_input_block() {
@@ -277,7 +271,7 @@ protected:
             status = chunk_index_meta.GetChunkInfo(chunk_info_ptr);
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(chunk_info_ptr->base_row_id_, RowID(segment_id, 0));
-            EXPECT_EQ(chunk_info_ptr->row_cnt_, block_row_cnt); // One block per segment
+            EXPECT_EQ(chunk_info_ptr->row_cnt_, block_row_cnt*4); // Four blocks per segment
         }
 
         status = new_txn_mgr->CommitTxn(txn);
@@ -322,6 +316,74 @@ protected:
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
     }
+    
+    // Helper function to prepare table with indexes, data, and dumped indexes
+    void PrepareTableWithIndexesAndData() {
+        // Create all indexes one by one
+        {
+            auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create secondary index"), TransactionType::kNormal);
+            Status status = txn->CreateIndex(*db_name, *table_name, index_def1, ConflictType::kIgnore);
+            EXPECT_TRUE(status.ok());
+            status = new_txn_mgr->CommitTxn(txn);
+            EXPECT_TRUE(status.ok());
+        }
+        
+        {
+            auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create fulltext index"), TransactionType::kNormal);
+            Status status = txn->CreateIndex(*db_name, *table_name, index_def2, ConflictType::kIgnore);
+            EXPECT_TRUE(status.ok());
+            status = new_txn_mgr->CommitTxn(txn);
+            EXPECT_TRUE(status.ok());
+        }
+        
+        {
+            auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create HNSW index"), TransactionType::kNormal);
+            Status status = txn->CreateIndex(*db_name, *table_name, index_def3, ConflictType::kIgnore);
+            EXPECT_TRUE(status.ok());
+            status = new_txn_mgr->CommitTxn(txn);
+            EXPECT_TRUE(status.ok());
+        }
+        
+        {
+            auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create secondary index 2"), TransactionType::kNormal);
+            Status status = txn->CreateIndex(*db_name, *table_name, index_def4, ConflictType::kIgnore);
+            EXPECT_TRUE(status.ok());
+            status = new_txn_mgr->CommitTxn(txn);
+            EXPECT_TRUE(status.ok());
+        }
+        
+        // Insert data into 1 segment with 4 blocks, dump indexes after each append
+        for (int block_id = 0; block_id < 4; ++block_id) {
+            auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+            SharedPtr<DataBlock> input_block = make_input_block();
+            Status status = txn->Append(*db_name, *table_name, input_block);
+            EXPECT_TRUE(status.ok());
+            status = new_txn_mgr->CommitTxn(txn);
+            EXPECT_TRUE(status.ok());
+            
+            // Dump all indexes for segment 0 after each append (each block)
+            auto *dump_txn = new_txn_mgr->BeginTxn(MakeUnique<String>(fmt::format("dump mem indexes block {}", block_id)), TransactionType::kNormal);
+            
+            Status dump_status = dump_txn->DumpMemIndex(*db_name, *table_name, *index_name1, 0);
+            EXPECT_TRUE(dump_status.ok());
+            new_txn_mgr->CommitTxn(dump_txn);
+
+            dump_txn = new_txn_mgr->BeginTxn(MakeUnique<String>(fmt::format("dump mem indexes block {}", block_id)), TransactionType::kNormal);
+            dump_status = dump_txn->DumpMemIndex(*db_name, *table_name, *index_name2, 0);
+            EXPECT_TRUE(dump_status.ok());
+            new_txn_mgr->CommitTxn(dump_txn);
+
+            dump_txn = new_txn_mgr->BeginTxn(MakeUnique<String>(fmt::format("dump mem indexes block {}", block_id)), TransactionType::kNormal);
+            dump_status = dump_txn->DumpMemIndex(*db_name, *table_name, *index_name3, 0);
+            EXPECT_TRUE(dump_status.ok());
+            new_txn_mgr->CommitTxn(dump_txn);
+
+            dump_txn = new_txn_mgr->BeginTxn(MakeUnique<String>(fmt::format("dump mem indexes block {}", block_id)), TransactionType::kNormal);
+            dump_status = dump_txn->DumpMemIndex(*db_name, *table_name, *index_name4, 0);
+            EXPECT_TRUE(dump_status.ok());
+            new_txn_mgr->CommitTxn(dump_txn);
+        }
+    }
 
 protected:
     SharedPtr<String> db_name{};
@@ -343,9 +405,6 @@ protected:
     
     // Store original chunk IDs for verification
     Map<String, Map<SegmentID, Vector<ChunkID>>> original_chunk_ids_{};
-    
-    // Store InitParameter objects for HNSW index
-    Vector<InitParameter*> hnsw_params_;
 };
 
 INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
@@ -361,30 +420,13 @@ TEST_P(TestTxnReplayOptimize, test_optimize_commit) {
         EXPECT_TRUE(status.ok());
     }
 
-    // Create all indexes
-    {
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create indexes"), TransactionType::kNormal);
-        Status status = txn->CreateIndex(*db_name, *table_name, index_def1, ConflictType::kError);
-        EXPECT_TRUE(status.ok());
-        status = txn->CreateIndex(*db_name, *table_name, index_def2, ConflictType::kError);
-        EXPECT_TRUE(status.ok());
-        status = txn->CreateIndex(*db_name, *table_name, index_def3, ConflictType::kError);
-        EXPECT_TRUE(status.ok());
-        status = txn->CreateIndex(*db_name, *table_name, index_def4, ConflictType::kError);
-        EXPECT_TRUE(status.ok());
-        status = new_txn_mgr->CommitTxn(txn);
-        EXPECT_TRUE(status.ok());
-    }
+    // Prepare table with indexes, data, and dumped indexes
+    PrepareTableWithIndexesAndData();
 
-    // Insert data into 4 segments with multiple chunks per segment using Append
-    for (int i = 0; i < 4; ++i) {
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
-        SharedPtr<DataBlock> input_block = make_input_block();
-        Status status = txn->Append(*db_name, *table_name, input_block);
-        EXPECT_TRUE(status.ok());
-        status = new_txn_mgr->CommitTxn(txn);
-        EXPECT_TRUE(status.ok());
-    }
+    CheckIndexBeforeOptimize(*index_name1);
+    CheckIndexBeforeOptimize(*index_name2);
+    CheckIndexBeforeOptimize(*index_name3);
+    CheckIndexBeforeOptimize(*index_name4);
 
     // Optimize table
     {
@@ -420,36 +462,20 @@ TEST_P(TestTxnReplayOptimize, test_optimize_rollback) {
         EXPECT_TRUE(status.ok());
     }
 
-    // Create all indexes
-    {
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create indexes"), TransactionType::kNormal);
-        Status status = txn->CreateIndex(*db_name, *table_name, index_def1, ConflictType::kError);
-        EXPECT_TRUE(status.ok());
-        status = txn->CreateIndex(*db_name, *table_name, index_def2, ConflictType::kError);
-        EXPECT_TRUE(status.ok());
-        status = txn->CreateIndex(*db_name, *table_name, index_def3, ConflictType::kError);
-        EXPECT_TRUE(status.ok());
-        status = txn->CreateIndex(*db_name, *table_name, index_def4, ConflictType::kError);
-        EXPECT_TRUE(status.ok());
-        status = new_txn_mgr->CommitTxn(txn);
-        EXPECT_TRUE(status.ok());
-    }
+    // Prepare table with indexes, data, and dumped indexes
+    PrepareTableWithIndexesAndData();
 
-    // Insert data into 4 segments with multiple chunks per segment using Append
-    for (int i = 0; i < 4; ++i) {
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
-        SharedPtr<DataBlock> input_block = make_input_block();
-        Status status = txn->Append(*db_name, *table_name, input_block);
-        EXPECT_TRUE(status.ok());
-        status = new_txn_mgr->CommitTxn(txn);
-        EXPECT_TRUE(status.ok());
-    }
+    CheckIndexBeforeOptimize(*index_name1);
+    CheckIndexBeforeOptimize(*index_name2);
+    CheckIndexBeforeOptimize(*index_name3);
+    CheckIndexBeforeOptimize(*index_name4);
 
 
     // Try to optimize but it will be rolled back due to conflict
     {
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop column"), TransactionType::kNormal);
-        Status status = txn2->DropColumns(*db_name, *table_name, Vector<String>({column_def1->name()}));
+        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+        SharedPtr<DataBlock> input_block = make_input_block();
+        Status status = txn2->Append(*db_name, *table_name, input_block);
         EXPECT_TRUE(status.ok());
 
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("optimize"), TransactionType::kNormal);
@@ -460,8 +486,13 @@ TEST_P(TestTxnReplayOptimize, test_optimize_rollback) {
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn);
-        EXPECT_FALSE(status.ok()); // Should fail due to column drop conflict
+        EXPECT_FALSE(status.ok());
     }
+
+    CheckIndexAfterFailedOptimize(*index_name1);
+    CheckIndexAfterFailedOptimize(*index_name2);
+    CheckIndexAfterFailedOptimize(*index_name3);
+    CheckIndexAfterFailedOptimize(*index_name4);
 
     RestartTxnMgr();
 
@@ -488,30 +519,8 @@ TEST_P(TestTxnReplayOptimize, test_optimize_interrupt) {
         EXPECT_TRUE(status.ok());
     }
 
-    // Create all indexes
-    {
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create indexes"), TransactionType::kNormal);
-        Status status = txn->CreateIndex(*db_name, *table_name, index_def1, ConflictType::kError);
-        EXPECT_TRUE(status.ok());
-        status = txn->CreateIndex(*db_name, *table_name, index_def2, ConflictType::kError);
-        EXPECT_TRUE(status.ok());
-        status = txn->CreateIndex(*db_name, *table_name, index_def3, ConflictType::kError);
-        EXPECT_TRUE(status.ok());
-        status = txn->CreateIndex(*db_name, *table_name, index_def4, ConflictType::kError);
-        EXPECT_TRUE(status.ok());
-        status = new_txn_mgr->CommitTxn(txn);
-        EXPECT_TRUE(status.ok());
-    }
-
-    // Insert data into 4 segments with multiple chunks per segment using Append
-    for (int i = 0; i < 4; ++i) {
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
-        SharedPtr<DataBlock> input_block = make_input_block();
-        Status status = txn->Append(*db_name, *table_name, input_block);
-        EXPECT_TRUE(status.ok());
-        status = new_txn_mgr->CommitTxn(txn);
-        EXPECT_TRUE(status.ok());
-    }
+    // Prepare table with indexes, data, and dumped indexes
+    PrepareTableWithIndexesAndData();
 
     // Start optimize but interrupt before commit
     {
