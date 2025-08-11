@@ -14,10 +14,12 @@
 
 module;
 
-#include <vector>
-#include <memory>
+// #include <vector>
+// #include <memory>
 
 module infinity_core:bg_task.impl;
+
+import std;
 
 import :bg_task;
 import :base_memindex;

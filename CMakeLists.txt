@@ -2,6 +2,12 @@ cmake_minimum_required(VERSION 3.28.1)
 
 cmake_policy(SET CMP0167 OLD)
 
+set(CMAKE_EXPERIMENTAL_CXX_IMPORT_STD "d0edc3af-4c50-42ea-a356-e2862fe7a444")
+set(CMAKE_CXX_STANDARD 23)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+set(CMAKE_CXX_MODULE_STD ON)
+
 # Auto-detect and set vcpkg toolchain if not already set
 if (NOT CMAKE_TOOLCHAIN_FILE)
     # First try environment variable CMAKE_TOOLCHAIN_FILE (for container builds)
@@ -32,10 +38,6 @@ endif ()
 # else()
 #     message("Can not find ccache")
 # endif()
-
-set(CMAKE_CXX_STANDARD 23)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_EXTENSIONS OFF)
 
 option(CI "Build in CI mode" OFF)
 
