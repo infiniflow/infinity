@@ -30,15 +30,8 @@ module infinity_core:virtual_store.impl;
 import :virtual_store;
 
 import :stl;
-import :third_party;
-import :logger;
-import :infinity_exception;
-import :default_values;
-import :stream_reader;
 import :s3_client_minio;
 import :infinity_context;
-import :object_storage_task;
-import admin_statement;
 import :utility;
 
 namespace fs = std::filesystem;
@@ -146,15 +139,14 @@ Tuple<UniquePtr<LocalFileHandle>, Status> VirtualStore::Open(const String &path,
         }
     }
     if (fd == -1) {
-        String error_message = fmt::format("File: {} open failed: {}", path, strerror(errno));
-        return {nullptr, Status::IOError(error_message)};
+        return {nullptr, Status::IOError(fmt::format("File: {} open failed: {}", path, strerror(errno)))};
     }
     return {MakeUnique<LocalFileHandle>(fd, path, access_mode), Status::OK()};
 }
 
 UniquePtr<StreamReader> VirtualStore::OpenStreamReader(const String &path) {
     auto res = MakeUnique<StreamReader>();
-    Status status = res->Init(path);
+    auto status = res->Init(path);
     if (!status.ok()) {
         RecoverableError(status);
     }
@@ -169,16 +161,14 @@ bool VirtualStore::Exists(const String &path) {
     if (error_code.value() == 0) {
         return is_exists;
     } else {
-        String error_message = fmt::format("{} exists exception: {}", path, strerror(errno));
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("{} exists exception: {}", path, strerror(errno)));
     }
     return false;
 }
 
 Status VirtualStore::DeleteFile(const String &file_name) {
     if (!std::filesystem::path(file_name).is_absolute()) {
-        String error_message = fmt::format("{} isn't absolute path.", file_name);
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("{} isn't absolute path.", file_name));
     }
     std::error_code error_code;
     Path p{file_name};
@@ -188,8 +178,7 @@ Status VirtualStore::DeleteFile(const String &file_name) {
     }
     bool is_deleted = std::filesystem::remove(p, error_code);
     if (error_code.value() != 0) {
-        String error_message = fmt::format("Delete file {} exception: {}", file_name, strerror(errno));
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("Delete file {} exception: {}", file_name, strerror(errno)));
     }
     if (!is_deleted) {
         String error_message = fmt::format("Failed to delete file: {}: {}", file_name, strerror(errno));
@@ -226,8 +215,7 @@ Status VirtualStore::MakeDirectory(const String &path) {
         } else {
             String error_message = fmt::format("Exists file: {}", path);
             LOG_ERROR(error_message);
-            Status status = Status::IOError(error_message);
-            return status;
+            return Status::IOError(error_message);
         }
     }
 
@@ -243,31 +231,27 @@ Status VirtualStore::MakeDirectory(const String &path) {
 
 Status VirtualStore::RemoveDirectory(const String &path) {
     if (!std::filesystem::path(path).is_absolute()) {
-        String error_message = fmt::format("{} isn't absolute path.", path);
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("{} isn't absolute path.", path));
     }
     std::error_code error_code;
     Path p{path};
     std::filesystem::remove_all(p, error_code);
     if (error_code.value() != 0) {
-        String error_message = fmt::format("Delete directory {} exception: {}", path, error_code.message());
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("Delete directory {} exception: {}", path, error_code.message()));
     }
     return Status::OK();
 }
 
 Status VirtualStore::CleanupDirectory(const String &path) {
     if (!std::filesystem::path(path).is_absolute()) {
-        String error_message = fmt::format("{} isn't absolute path.", path);
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("{} isn't absolute path.", path));
     }
     std::error_code error_code;
     Path p{path};
     if (!std::filesystem::exists(p)) {
         std::filesystem::create_directories(p, error_code);
         if (error_code.value() != 0) {
-            String error_message = fmt::format("CleanupDirectory create {} exception: {}", path, error_code.message());
-            UnrecoverableError(error_message);
+            UnrecoverableError(fmt::format("CleanupDirectory create {} exception: {}", path, error_code.message()));
         }
         return Status::OK();
     }
@@ -299,24 +283,20 @@ void VirtualStore::RecursiveCleanupAllEmptyDir(const String &path) {
 
 Status VirtualStore::Rename(const String &old_path, const String &new_path) {
     if (!std::filesystem::path(old_path).is_absolute()) {
-        String error_message = fmt::format("{} isn't absolute path.", old_path);
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("{} isn't absolute path.", old_path));
     }
     if (!std::filesystem::path(new_path).is_absolute()) {
-        String error_message = fmt::format("{} isn't absolute path.", new_path);
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("{} isn't absolute path.", new_path));
     }
     if (rename(old_path.c_str(), new_path.c_str()) != 0) {
-        String error_message = fmt::format("Can't rename file: {}, {}", old_path, strerror(errno));
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("Can't rename file: {}, {}", old_path, strerror(errno)));
     }
     return Status::OK();
 }
 
 Status VirtualStore::Truncate(const String &file_name, SizeT new_length) {
     if (!std::filesystem::path(file_name).is_absolute()) {
-        String error_message = fmt::format("{} isn't absolute path.", file_name);
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("{} isn't absolute path.", file_name));
     }
     std::error_code error_code;
     if (!std::filesystem::exists(file_name)) {
@@ -324,33 +304,28 @@ Status VirtualStore::Truncate(const String &file_name, SizeT new_length) {
     }
     std::filesystem::resize_file(file_name, new_length, error_code);
     if (error_code.value() != 0) {
-        String error_message = fmt::format("Failed to truncate {} to size {}", file_name, strerror(errno));
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("Failed to truncate {} to size {}", file_name, strerror(errno)));
     }
     return Status::OK();
 }
 
 Status VirtualStore::Merge(const String &dst_path, const String &src_path) {
     if (!std::filesystem::path(dst_path).is_absolute()) {
-        String error_message = fmt::format("{} isn't absolute path.", dst_path);
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("{} isn't absolute path.", dst_path));
     }
     if (!std::filesystem::path(src_path).is_absolute()) {
-        String error_message = fmt::format("{} isn't absolute path.", src_path);
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("{} isn't absolute path.", src_path));
     }
     Path dst{dst_path};
     Path src{src_path};
     std::ifstream srcFile(src, std::ios::binary);
     if (!srcFile.is_open()) {
-        String error_message = fmt::format("Failed to open source file {}", src_path);
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("Failed to open source file {}", src_path));
         return Status::OK();
     }
     std::ofstream dstFile(dst, std::ios::binary | std::ios::app);
     if (!dstFile.is_open()) {
-        String error_message = fmt::format("Failed to open destination file {}", dst_path);
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("Failed to open destination file {}", dst_path));
         return Status::OK();
     }
     char buffer[DEFAULT_READ_BUFFER_SIZE];
@@ -365,12 +340,10 @@ Status VirtualStore::Merge(const String &dst_path, const String &src_path) {
 
 Status VirtualStore::Copy(const String &dst_path, const String &src_path) {
     if (!std::filesystem::path(dst_path).is_absolute()) {
-        String error_message = fmt::format("{} isn't absolute path.", dst_path);
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("{} isn't absolute path.", dst_path));
     }
     if (!std::filesystem::path(src_path).is_absolute()) {
-        String error_message = fmt::format("{} isn't absolute path.", src_path);
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("{} isn't absolute path.", src_path));
     }
 
     String dst_dir = GetParentPath(dst_path);
@@ -388,13 +361,11 @@ Status VirtualStore::Copy(const String &dst_path, const String &src_path) {
 
 Tuple<Vector<SharedPtr<DirEntry>>, Status> VirtualStore::ListDirectory(const String &path) {
     if (!std::filesystem::path(path).is_absolute()) {
-        String error_message = fmt::format("{} isn't absolute path.", path);
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("{} isn't absolute path.", path));
     }
     Path dir_path(path);
     if (!is_directory(dir_path)) {
-        String error_message = fmt::format("{} isn't a directory", path);
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("{} isn't a directory", path));
     }
 
     Vector<SharedPtr<DirEntry>> file_array;
@@ -405,8 +376,7 @@ Tuple<Vector<SharedPtr<DirEntry>>, Status> VirtualStore::ListDirectory(const Str
 
 SizeT VirtualStore::GetFileSize(const String &path) {
     if (!std::filesystem::path(path).is_absolute()) {
-        String error_message = fmt::format("{} isn't absolute path.", path);
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("{} isn't absolute path.", path));
     }
     return std::filesystem::file_size(path);
 }
@@ -415,8 +385,7 @@ String VirtualStore::GetParentPath(const String &path) { return Path(path).paren
 
 SizeT VirtualStore::GetDirectorySize(const String &path) {
     if (!std::filesystem::path(path).is_absolute()) {
-        String error_message = fmt::format("{} isn't absolute path.", path);
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("{} isn't absolute path.", path));
     }
     u64 totalSize = 0;
 
@@ -439,8 +408,7 @@ HashMap<String, MmapInfo> VirtualStore::mapped_files_;
 
 i32 VirtualStore::MmapFile(const String &file_path, u8 *&data_ptr, SizeT &data_len) {
     if (!std::filesystem::path(file_path).is_absolute()) {
-        String error_message = fmt::format("{} isn't absolute path.", file_path);
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("{} isn't absolute path.", file_path));
     }
     data_ptr = nullptr;
     data_len = 0;
@@ -529,8 +497,7 @@ void VirtualStore::EndCompress(std::ofstream &ofstream) { ofstream.close(); }
 
 i32 VirtualStore::MunmapFile(const String &file_path) {
     if (!std::filesystem::path(file_path).is_absolute()) {
-        String error_message = fmt::format("{} isn't absolute path.", file_path);
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("{} isn't absolute path.", file_path));
     }
     std::lock_guard<std::mutex> lock(mtx_);
     auto it = mapped_files_.find(file_path);
@@ -608,12 +575,12 @@ Status VirtualStore::InitRemoteStore(StorageType storage_type,
 }
 
 Status VirtualStore::CreateBucket() {
-    Status bucket_check = s3_client_->BucketExists(bucket_);
-    if (!bucket_check.ok()) {
-        if (bucket_check.code() == ErrorCode::kMinioBucketNotExists) {
+    auto bucket_check_status = s3_client_->BucketExists(bucket_);
+    if (!bucket_check_status.ok()) {
+        if (bucket_check_status.code() == ErrorCode::kMinioBucketNotExists) {
             return s3_client_->MakeBucket(bucket_);
         } else {
-            return bucket_check;
+            return bucket_check_status;
         }
     }
     return Status::OK();

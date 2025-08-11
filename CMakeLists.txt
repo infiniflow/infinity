@@ -163,7 +163,6 @@ message(STATUS "Found oatpp include directories: ${OATPP_INCLUDE_DIRS}")
 include_directories(${OATPP_INCLUDE_DIRS})
 message(STATUS "Using vcpkg toolchain - automatic package discovery enabled")
 
-
 # Get current system time and print the build time
 execute_process(COMMAND "date" +"%Y-%m-%d %H:%M.%S" OUTPUT_VARIABLE CURRENT_SYS_TIME)
 string(REGEX REPLACE "\n" "" CURRENT_SYS_TIME ${CURRENT_SYS_TIME})

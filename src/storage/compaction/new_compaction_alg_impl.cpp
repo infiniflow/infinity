@@ -53,7 +53,7 @@ public:
 
     void AddSegment(SegmentID segment_id, SizeT segment_row_cnt) override {
         int layer = config_.CalculateLayer(segment_row_cnt);
-        if (layer >= (int)segment_layers_.size()) {
+        if (layer >= static_cast<int>(segment_layers_.size())) {
             segment_layers_.resize(layer + 1);
         }
         segment_layers_[layer].emplace_back(segment_id, segment_row_cnt);

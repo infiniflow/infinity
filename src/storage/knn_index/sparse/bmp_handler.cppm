@@ -24,18 +24,19 @@ import :stl;
 import :bmp_alg;
 import :bmp_util;
 import :index_base;
-import column_def;
-import internal_types;
 import :index_bmp;
-import sparse_info;
-import internal_types;
 import :buffer_handle;
 import :base_memindex;
 import :memindex_tracer;
 import :sparse_util;
 import :infinity_exception;
 import :column_vector;
+
 import data_type;
+import column_def;
+import internal_types;
+import sparse_info;
+import internal_types;
 
 namespace infinity {
 
@@ -45,7 +46,7 @@ class BufferManager;
 class BufferObj;
 class LocalFileHandle;
 
-export using AbstractBMP = std::variant<UniquePtr<BMPAlg<f32, i32, BMPCompressType::kCompressed>>,
+using AbstractBMP = std::variant<UniquePtr<BMPAlg<f32, i32, BMPCompressType::kCompressed>>,
                                  UniquePtr<BMPAlg<f32, i32, BMPCompressType::kRaw>>,
                                  UniquePtr<BMPAlg<f32, i16, BMPCompressType::kCompressed>>,
                                  UniquePtr<BMPAlg<f32, i16, BMPCompressType::kRaw>>,
