@@ -1,0 +1,207 @@
+# name: test/sql/optimize_table.slt
+# description: Test table optimization statements and operations
+# group: [optimization]
+
+# Test basic table creation and optimization
+statement ok
+DROP TABLE IF EXISTS optimize_test_table;
+
+statement ok
+CREATE TABLE optimize_test_table (id INTEGER PRIMARY KEY, name VARCHAR, value FLOAT, created_at TIMESTAMP);
+
+# Insert initial data
+statement ok
+INSERT INTO optimize_test_table VALUES 
+    (1, 'test1', 10.5, '2023-01-01 10:00:00'),
+    (2, 'test2', 20.3, '2023-01-02 11:00:00'),
+    (3, 'test3', 15.7, '2023-01-03 12:00:00');
+
+# Create indexes on the table
+statement ok
+CREATE INDEX idx_name ON optimize_test_table (name);
+
+statement ok
+CREATE INDEX idx_value ON optimize_test_table (value);
+
+# Insert more data to make optimization meaningful
+statement ok
+INSERT INTO optimize_test_table VALUES 
+    (4, 'test4', 25.1, '2023-01-04 13:00:00'),
+    (5, 'test5', 30.8, '2023-01-05 14:00:00'),
+    (6, 'test6', 18.9, '2023-01-06 15:00:00');
+
+# Now optimize the table (this will optimize all indexes)
+statement ok
+OPTIMIZE optimize_test_table;
+
+# Verify data integrity after optimization
+query I
+SELECT COUNT(*) FROM optimize_test_table;
+----
+6
+
+statement ok
+SELECT id, name, value FROM optimize_test_table ORDER BY id;
+
+# Test optimization on table with embedding column
+statement ok
+DROP TABLE IF EXISTS optimize_embedding_table;
+
+statement ok
+CREATE TABLE optimize_embedding_table (id INTEGER PRIMARY KEY, embedding_col EMBEDDING(FLOAT, 4));
+
+# Insert initial embedding data
+statement ok
+INSERT INTO optimize_embedding_table VALUES 
+    (1, [0.1, 0.2, 0.3, 0.4]),
+    (2, [0.5, 0.6, 0.7, 0.8]),
+    (3, [0.9, 1.0, 1.1, 1.2]);
+
+# Create embedding index
+statement ok
+CREATE INDEX idx_embedding ON optimize_embedding_table (embedding_col) USING Hnsw WITH (M = 16, ef_construction = 200, metric = l2);
+
+# Insert more embedding data
+statement ok
+INSERT INTO optimize_embedding_table VALUES 
+    (4, [1.3, 1.4, 1.5, 1.6]),
+    (5, [1.7, 1.8, 1.9, 2.0]),
+    (6, [2.1, 2.2, 2.3, 2.4]);
+
+# Test optimization on embedding index
+statement ok
+OPTIMIZE optimize_embedding_table;
+
+# Test optimization on sparse table
+statement ok
+DROP TABLE IF EXISTS optimize_sparse_table;
+
+statement ok
+CREATE TABLE optimize_sparse_table (id INTEGER PRIMARY KEY, sparse_col SPARSE(FLOAT,100));
+
+# Insert initial sparse data
+statement ok
+INSERT INTO optimize_sparse_table VALUES 
+    (1, [0:1.0, 10:2.0, 50:3.0]),
+    (2, [5:1.5, 15:2.5, 55:3.5]),
+    (3, [10:2.0, 20:3.0, 60:4.0]);
+
+# Create sparse index
+statement ok
+CREATE INDEX idx_sparse ON optimize_sparse_table (sparse_col) USING Bmp WITH (block_size = 8, compress_type = compress);
+
+# Insert more sparse data
+statement ok
+INSERT INTO optimize_sparse_table VALUES 
+    (4, [15:2.5, 25:3.5, 65:4.5]),
+    (5, [20:3.0, 30:4.0, 70:5.0]),
+    (6, [25:3.5, 35:4.5, 75:5.5]);
+
+# Test optimization on sparse index
+statement ok
+OPTIMIZE idx_sparse ON optimize_sparse_table WITH (topk = 3);
+
+statement ok
+OPTIMIZE idx_sparse ON optimize_sparse_table WITH (bp_reorder, topk = 3);
+
+# Test optimization on large table
+statement ok
+DROP TABLE IF EXISTS optimize_large_table;
+
+statement ok
+CREATE TABLE optimize_large_table (id INTEGER PRIMARY KEY, words VARCHAR, ts TIMESTAMP);
+
+# Insert initial data
+statement ok
+INSERT INTO optimize_large_table VALUES 
+    (1, 'data_1', '2023-01-01 00:00:00'),
+    (2, 'data_2', '2023-01-01 01:00:00'),
+    (3, 'data_3', '2023-01-01 02:00:00');
+
+# Create indexes
+statement ok
+CREATE INDEX idx_large_data ON optimize_large_table (words);
+
+statement ok
+CREATE INDEX idx_large_timestamp ON optimize_large_table (ts);
+
+# Insert more data
+statement ok
+INSERT INTO optimize_large_table VALUES 
+    (4, 'data_4', '2023-01-01 03:00:00'),
+    (5, 'data_5', '2023-01-01 04:00:00'),
+    (6, 'data_6', '2023-01-01 05:00:00'),
+    (7, 'data_7', '2023-01-01 06:00:00'),
+    (8, 'data_8', '2023-01-01 07:00:00');
+
+# Test optimization on large table (will optimize all indexes)
+statement ok
+OPTIMIZE optimize_large_table;
+
+# Verify large table data integrity
+query I
+SELECT COUNT(*) FROM optimize_large_table;
+----
+8
+
+query I
+SELECT MIN(id), MAX(id) FROM optimize_large_table;
+----
+1 8
+
+# Test optimization with invalid table (should error)
+statement error
+OPTIMIZE non_existent_table;
+
+# Test optimization on table with constraints
+statement ok
+DROP TABLE IF EXISTS optimize_constraint_table;
+
+statement ok
+CREATE TABLE optimize_constraint_table (id INTEGER PRIMARY KEY, name VARCHAR NOT NULL, value FLOAT, unique_col INTEGER UNIQUE);
+
+# Insert initial data
+statement ok
+INSERT INTO optimize_constraint_table VALUES 
+    (1, 'constraint1', 10.5, 100),
+    (2, 'constraint2', 20.3, 200),
+    (3, 'constraint3', 15.7, 300);
+
+# Create indexes
+statement ok
+CREATE INDEX idx_constraint_name ON optimize_constraint_table (name);
+
+statement ok
+CREATE INDEX idx_constraint_value ON optimize_constraint_table (value);
+
+# Insert more data
+statement ok
+INSERT INTO optimize_constraint_table VALUES 
+    (4, 'constraint4', 25.1, 400),
+    (5, 'constraint5', 30.8, 500);
+
+# Test optimization on table with constraints (will optimize all indexes)
+statement ok
+OPTIMIZE optimize_constraint_table;
+
+# Verify constraint table data integrity
+query I
+SELECT COUNT(*) FROM optimize_constraint_table;
+----
+5
+
+# Clean up all test tables
+statement ok
+DROP TABLE IF EXISTS optimize_test_table;
+
+statement ok
+DROP TABLE IF EXISTS optimize_embedding_table;
+
+statement ok
+DROP TABLE IF EXISTS optimize_sparse_table;
+
+statement ok
+DROP TABLE IF EXISTS optimize_large_table;
+
+statement ok
+DROP TABLE IF EXISTS optimize_constraint_table;

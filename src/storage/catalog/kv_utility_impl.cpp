@@ -174,14 +174,13 @@ SizeT GetBlockRowCount(KVInstance *kv_instance,
                        TxnTimeStamp begin_ts,
                        TxnTimeStamp commit_ts) {
     
+    
     NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
     String block_lock_key = KeyEncode::CatalogTableSegmentBlockTagKey(db_id_str, table_id_str, segment_id, block_id, "lock");
 
     SharedPtr<BlockLock> block_lock;
     Status status = new_catalog->GetBlockLock(block_lock_key, block_lock);
     if (!status.ok()) {
-        // NewTxnManager *new_txn_manager = InfinityContext::instance().storage()->new_txn_manager();
-        // new_txn_manager->PrintAllKeyValue();
         UnrecoverableError("Failed to get block lock");
     }
 
@@ -207,8 +206,7 @@ SizeT GetBlockRowCount(KVInstance *kv_instance,
         row_cnt = block_version->GetRowCount(begin_ts);
         auto [offset, commit_cnt] = block_version->GetCommitRowCount(commit_ts);
         row_cnt += commit_cnt;
-    }
-    
+    }   
     return row_cnt;
 }
 

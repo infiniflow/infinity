@@ -29,9 +29,6 @@ import internal_types;
 import :persistence_manager;
 import column_def;
 import global_resource_usage;
-import snapshot_info;
-import persistence_manager;
-import infinity_context;
 import command_statement;
 
 namespace infinity {

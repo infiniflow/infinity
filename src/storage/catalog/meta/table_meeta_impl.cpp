@@ -125,7 +125,6 @@ Status TableMeeta::GetIndexID(const String &index_name, String &index_key, Strin
     return Status::OK();
 }
 
-
 Tuple<SharedPtr<ColumnDef>, Status> TableMeeta::GetColumnDefByColumnName(const String &column_name, SizeT *column_idx_ptr) {
     if (!column_defs_) {
         Status status = LoadColumnDefs();

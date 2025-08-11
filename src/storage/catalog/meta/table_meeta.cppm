@@ -117,7 +117,6 @@ public:
 
     Status SetNextColumnID(ColumnID next_column_id);
     
-
     Status GetNextRowID(RowID &next_row_id);
 
     Tuple<String, Status> GetNextIndexID();

@@ -1018,6 +1018,13 @@ WalCmdCreateIndexV2 WalCmdCreateIndexV2::ReadBufferAdv(const char *&ptr, i32 max
     return cmd;
 }
 
+WalCmdRestoreTableSnapshot::WalCmdRestoreTableSnapshot(const String &db_name, const String &db_id, const String &table_name, const String &table_id, const String &snapshot_name, SharedPtr<TableDef> table_def_, const Vector<WalSegmentInfoV2> &segment_infos, const Vector<WalCmdCreateIndexV2> &index_cmds, const Vector<String> &files)
+        : WalCmd(WalCommandType::RESTORE_TABLE_SNAPSHOT), db_name_(db_name), db_id_(db_id), table_name_(table_name), table_id_(table_id), snapshot_name_(snapshot_name), table_def_(table_def_),
+          files_(files), segment_infos_(segment_infos), index_cmds_(index_cmds) {
+    PersistenceManager* persistence_manager = InfinityContext::instance().persistence_manager();
+    addr_serializer_.Initialize(persistence_manager, files);
+}
+
 WalCmdRestoreTableSnapshot WalCmdRestoreTableSnapshot::ReadBufferAdv(const char *&ptr, i32 max_bytes) {
     const char *const ptr_end = ptr + max_bytes;
     String db_name = ReadBufAdv<String>(ptr);

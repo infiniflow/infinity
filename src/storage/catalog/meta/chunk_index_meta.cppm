@@ -23,13 +23,11 @@ import :third_party;
 import :new_catalog;
 
 
-
 namespace infinity {
 export struct ChunkIndexSnapshotInfo;
 class KVInstance;
 class SegmentIndexMeta;
 class BufferObj;
-struct ChunkIndexSnapshotInfo; 
 
 export struct ChunkIndexMetaInfo {
     ChunkIndexMetaInfo() = default;

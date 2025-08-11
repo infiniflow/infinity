@@ -28,6 +28,7 @@ import :snapshot_info;
 import column_def;
 import :column_vector;
 import :fast_rough_filter;
+import command_statement;
 
 
 namespace infinity {
@@ -245,6 +246,10 @@ public:
 
     Tuple<SharedPtr<BlockColumnInfo>, Status>
     GetBlockColumnInfo(const String &db_name, const String &table_name, SegmentID segment_id, BlockID block_id, ColumnID column_id);
+
+    // Tuple<SharedPtr<TableSnapshotInfo>, Status> GetTableSnapshot(const String &db_name, const String &table_name);
+
+    // Status ApplyTableSnapshot(const SharedPtr<TableSnapshotInfo> &table_snapshot_info);
 
     // Tuple<SharedPtr<TableSnapshotInfo>, Status> GetTableSnapshot(const String &db_name, const String &table_name);
 
