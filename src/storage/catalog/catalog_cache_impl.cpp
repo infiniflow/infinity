@@ -492,11 +492,11 @@ Status SystemCache::AddDbCacheNolock(const SharedPtr<DbCache> &db_cache) {
     if (!insert_success) {
         UnrecoverableError(fmt::format("Db cache with id: {} already exists", db_cache->db_id()));
     }
-    //    LOG_TRACE(fmt::format("Adding db cache with id: {} and name: {}, name_map_size: {}, cache_map_size: {}",
-    //                         db_cache->db_id(),
-    //                         db_cache->db_name(),
-    //                         db_name_map_.size(),
-    //                         db_cache_map_.size()));
+    // LOG_TRACE(fmt::format("Adding db cache with id: {} and name: {}, name_map_size: {}, cache_map_size: {}",
+    //                      db_cache->db_id(),
+    //                      db_cache->db_name(),
+    //                      db_name_map_.size(),
+    //                      db_cache_map_.size()));
     return Status::OK();
 }
 

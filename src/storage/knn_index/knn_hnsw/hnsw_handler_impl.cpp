@@ -13,18 +13,19 @@ import :buffer_handle;
 import :block_column_iter;
 import :memindex_tracer;
 import :default_values;
-import logical_type;
 import :multivector_util;
 import :infinity_exception;
 import :third_party;
 import :column_vector;
 import :local_file_handle;
 import :chunk_index_meta;
+import :plain_vec_store;
+
 import embedding_info;
 import embedding_type;
 import column_def;
 import row_id;
-import :plain_vec_store;
+import logical_type;
 
 namespace infinity {
 
