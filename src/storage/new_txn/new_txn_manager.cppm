@@ -14,13 +14,13 @@
 
 module;
 
-export module new_txn_manager;
+export module infinity_core:new_txn_manager;
 
-import stl;
-import buffer_manager;
-import txn_state;
-import default_values;
-import status;
+import :stl;
+import :buffer_manager;
+import :txn_state;
+import :default_values;
+import :status;
 
 namespace infinity {
 
@@ -143,6 +143,8 @@ public:
 
     void PrintAllKeyValue() const;
 
+    void PrintPMKeyValue() const;
+
     void PrintAllDroppedKeys() const;
 
     SizeT KeyValueNum() const;
@@ -152,8 +154,6 @@ public:
     Vector<SharedPtr<NewTxn>> GetCheckCandidateTxns(NewTxn *this_txn);
 
     void SubmitForAllocation(SharedPtr<TxnAllocatorTask> txn_allocator_task);
-
-    void RemoveFromAllocation(TxnTimeStamp commit_ts);
 
     void SetSystemCache(UniquePtr<SystemCache> system_cache);
 

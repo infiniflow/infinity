@@ -14,10 +14,10 @@
 
 module;
 
-export module catalog_meta;
+export module infinity_core:catalog_meta;
 
-import stl;
-import status;
+import :stl;
+import :status;
 
 namespace infinity {
 

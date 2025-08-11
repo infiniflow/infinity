@@ -24,7 +24,6 @@ import logger;
 import query_result;
 import query_context;
 import request_test;
-import command_statement;
 
 #include <thread>
 #include <mutex>
@@ -92,9 +91,8 @@ public:
         txn_mgr->CommitTxn(insert_txn);
 
         // Create snapshot using the correct method
-        // Create snapshot using the correct method
         NewTxn *snapshot_txn = txn_mgr->BeginTxn(MakeUnique<String>("create snapshot"), TransactionType::kNormal);
-        status = snapshot_txn->CreateSnapshot("default_db", "test_table", "test_snapshot", SnapshotScope::kTable);
+        status = snapshot_txn->CreateTableSnapshot("default_db", "test_table", "test_snapshot");
         EXPECT_TRUE(status.ok());
         txn_mgr->CommitTxn(snapshot_txn);
 
@@ -108,7 +106,7 @@ public:
 
 INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
                          TableSnapshotTest,
-                         ::testing::Values(BaseTestParamStr::NEW_CONFIG_PATH));
+                         ::testing::Values(BaseTestParamStr::NEW_CONFIG_PATH));    
 
 TEST_P(TableSnapshotTest, test_restore_table_rollback_basic) {
     using namespace infinity;
@@ -124,15 +122,7 @@ TEST_P(TableSnapshotTest, test_restore_table_rollback_basic) {
     std::tie(table_snapshot, status) = TableSnapshotInfo::Deserialize(snapshot_dir, "test_snapshot");
     EXPECT_TRUE(status.ok());
     
-    // Deserialize the snapshot info
-    String snapshot_dir = InfinityContext::instance().config()->SnapshotDir();
-    SharedPtr<TableSnapshotInfo> table_snapshot;
-    Status status;
-    std::tie(table_snapshot, status) = TableSnapshotInfo::Deserialize(snapshot_dir, "test_snapshot");
-    EXPECT_TRUE(status.ok());
-    
     // Attempt to restore table
-    status = restore_txn->RestoreTableSnapshot("default_db", table_snapshot);
     status = restore_txn->RestoreTableSnapshot("default_db", table_snapshot);
     EXPECT_TRUE(status.ok());
     txn_mgr->CommitTxn(restore_txn);
@@ -155,12 +145,7 @@ TEST_P(TableSnapshotTest, test_restore_table_rollback_basic) {
     std::tie(table_snapshot, status) = TableSnapshotInfo::Deserialize(snapshot_dir, "test_snapshot");
     EXPECT_TRUE(status.ok());
     
-    // Deserialize the snapshot info again
-    std::tie(table_snapshot, status) = TableSnapshotInfo::Deserialize(snapshot_dir, "test_snapshot");
-    EXPECT_TRUE(status.ok());
-    
     // Attempt to restore table
-    status = restore_txn1->RestoreTableSnapshot("default_db", table_snapshot);
     status = restore_txn1->RestoreTableSnapshot("default_db", table_snapshot);
     EXPECT_TRUE(status.ok());
     
@@ -440,5 +425,6 @@ TEST_P(TableSnapshotTest, test_restore_table_same_snapshot_multithreaded) {
         }
     }
 }
+
 
 

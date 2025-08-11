@@ -14,12 +14,12 @@
 
 module;
 
-export module logical_create_view;
+export module infinity_core:logical_create_view;
 
-import stl;
-import logical_node_type;
-import column_binding;
-import logical_node;
+import :stl;
+import :logical_node_type;
+import :column_binding;
+import :logical_node;
 import data_type;
 import internal_types;
 import create_view_info;

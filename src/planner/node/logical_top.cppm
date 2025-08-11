@@ -14,15 +14,15 @@
 
 module;
 
-export module logical_top;
+export module infinity_core:logical_top;
 
-import stl;
-import logical_node_type;
-import column_binding;
-import logical_node;
+import :stl;
+import :logical_node_type;
+import :column_binding;
+import :logical_node;
 
-import base_expression;
-import base_table_ref;
+import :base_expression;
+import :base_table_ref;
 import internal_types;
 import select_statement;
 import data_type;

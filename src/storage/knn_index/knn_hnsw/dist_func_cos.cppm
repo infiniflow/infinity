@@ -16,15 +16,14 @@ module;
 
 #include <ostream>
 
-import stl;
-import logger;
-import third_party;
-import hnsw_common;
-import plain_vec_store;
-import lvq_vec_store;
-import simd_functions;
+export module infinity_core:dist_func_cos;
 
-export module dist_func_cos;
+import :stl;
+import :third_party;
+import :hnsw_common;
+import :plain_vec_store;
+import :lvq_vec_store;
+import :simd_functions;
 
 namespace infinity {
 
@@ -34,6 +33,7 @@ class LVQCosDist;
 export template <typename DataType>
 class PlainCosDist {
 public:
+    using This = PlainCosDist<DataType>;
     using VecStoreMeta = PlainVecStoreMeta<DataType>;
     using StoreType = typename VecStoreMeta::StoreType;
     using DistanceType = typename VecStoreMeta::DistanceType;
@@ -124,6 +124,7 @@ export template <typename DataType, typename CompressType>
 class LVQCosDist {
 public:
     using This = LVQCosDist<DataType, CompressType>;
+    using LVQDist = This;
     using VecStoreMetaType = LVQVecStoreMetaType<DataType, CompressType, LVQCosCache<DataType, CompressType>>;
     using StoreType = typename VecStoreMetaType::StoreType;
     using DistanceType = typename VecStoreMetaType::DistanceType;

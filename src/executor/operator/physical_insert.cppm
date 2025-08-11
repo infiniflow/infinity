@@ -14,21 +14,21 @@
 
 module;
 
-export module physical_insert;
+export module infinity_core:physical_insert;
 
-import stl;
+import :stl;
 
-import query_context;
-import operator_state;
-import physical_operator;
-import physical_operator_type;
-import base_expression;
-import load_meta;
-import infinity_exception;
-import meta_info;
+import :query_context;
+import :operator_state;
+import :physical_operator;
+import :physical_operator_type;
+import :base_expression;
+import :load_meta;
+import :infinity_exception;
+import :meta_info;
 import internal_types;
 import data_type;
-import logger;
+import :logger;
 
 namespace infinity {
 
@@ -38,9 +38,10 @@ public:
                             SharedPtr<TableInfo> table_info,
                             u64 table_index,
                             Vector<Vector<SharedPtr<BaseExpression>>> value_list,
+                            UniquePtr<PhysicalOperator> left,
                             SharedPtr<Vector<LoadMeta>> load_metas)
-        : PhysicalOperator(PhysicalOperatorType::kInsert, nullptr, nullptr, id, load_metas), table_info_(table_info), table_index_(table_index),
-          value_list_(std::move(value_list)) {}
+        : PhysicalOperator(PhysicalOperatorType::kInsert, std::move(left), nullptr, id, load_metas), table_info_(table_info),
+          table_index_(table_index), value_list_(std::move(value_list)) {}
 
     ~PhysicalInsert() override = default;
 

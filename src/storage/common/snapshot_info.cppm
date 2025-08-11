@@ -14,19 +14,21 @@
 
 module;
 
-export module snapshot_info;
+export module infinity_core:snapshot_info;
 
-import stl;
-import status;
+import :stl;
+import :status;
 import command_statement;
-import index_base;
-import third_party;
+import :index_base;
+import :third_party;
 import column_def;
-import chunk_index_meta;
+import :meta_info;
+import row_id;
+
+
 
 namespace infinity {
 
-enum class SegmentStatus;
 export struct SnapshotInfo {
     // structure to represent the snapshot
     String snapshot_name_;
@@ -81,7 +83,10 @@ export struct ChunkIndexSnapshotInfo {
     ChunkID chunk_id_;
     String index_filename_;
     Vector<String> full_text_files_; // full text files of the chunk
-    SharedPtr<ChunkIndexMetaInfo> chunk_info_;
+    String base_name_{};
+    RowID base_row_id_{};
+    SizeT row_cnt_{};
+    SizeT index_size_{};
     nlohmann::json Serialize();
     static SharedPtr<ChunkIndexSnapshotInfo> Deserialize(const nlohmann::json &chunk_index_json);
 };

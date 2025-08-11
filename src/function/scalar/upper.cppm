@@ -1,8 +1,8 @@
 module;
 
-export module upper;
+export module infinity_core:upper;
 
-import stl;
+import :stl;
 
 namespace infinity {
 

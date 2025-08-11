@@ -41,10 +41,7 @@ struct BoxType {
         lower_right.Reset();
     }
 
-    [[nodiscard]] inline std::string ToString() const {
-        ParserError("ToString() isn't implemented");
-        return std::string();
-    }
+    [[nodiscard]] inline std::string ToString() const { return "(" + upper_left.ToString() + "," + lower_right.ToString() + ")"; }
 };
 
 } // namespace infinity

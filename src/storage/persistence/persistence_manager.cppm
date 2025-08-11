@@ -14,13 +14,13 @@
 
 module;
 
-export module persistence_manager;
+export module infinity_core:persistence_manager;
 
-import stl;
+import :stl;
 import serialize;
-import third_party;
-import obj_status;
-import status;
+import :third_party;
+import :obj_status;
+import :status;
 
 // A view means a logical plan
 namespace infinity {

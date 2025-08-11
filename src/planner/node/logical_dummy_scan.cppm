@@ -14,14 +14,14 @@
 
 module;
 
-import stl;
-import logical_node_type;
-import column_binding;
-import logical_node;
+export module infinity_core:logical_dummy_scan;
+
+import :stl;
+import :logical_node_type;
+import :column_binding;
+import :logical_node;
 import data_type;
 import internal_types;
-
-export module logical_dummy_scan;
 
 namespace infinity {
 

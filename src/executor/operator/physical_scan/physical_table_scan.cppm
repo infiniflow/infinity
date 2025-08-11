@@ -14,27 +14,27 @@
 
 module;
 
-export module physical_table_scan;
+export module infinity_core:physical_table_scan;
 
-import stl;
+import :stl;
 
-import query_context;
-import operator_state;
-import physical_operator;
-import physical_operator_type;
-import global_block_id;
-import table_function;
-import base_table_ref;
-import meta_info;
-import load_meta;
+import :query_context;
+import :operator_state;
+import :physical_operator;
+import :physical_operator_type;
+import :global_block_id;
+import :table_function;
+import :base_table_ref;
+import :meta_info;
+import :load_meta;
 import internal_types;
 import data_type;
-import fast_rough_filter;
-import physical_scan_base;
+import :fast_rough_filter;
+import :physical_scan_base;
 
 namespace infinity {
 
-class BlockIndex;
+struct BlockIndex;
 
 export class PhysicalTableScan : public PhysicalScanBase {
 public:

@@ -14,14 +14,16 @@
 
 module;
 
-export module base_txn_store;
+#include <vector>
+#include <ranges>
 
-import stl;
+export module infinity_core:base_txn_store;
+
+import :stl;
 import internal_types;
-import txn_state;
+import :txn_state;
 import column_def;
-import wal_entry;
-import command_statement;
+import :wal_entry;
 
 namespace infinity {
 
@@ -268,7 +270,7 @@ export struct OptimizeIndexStoreEntry {
     String index_id_str_{};
     u64 index_id_{};
     SegmentID segment_id_{};
-    Vector<WalChunkIndexInfo> new_chunk_infos_;
+    std::vector<WalChunkIndexInfo> new_chunk_infos_;
     Vector<ChunkID> deprecate_chunks_;
 };
 

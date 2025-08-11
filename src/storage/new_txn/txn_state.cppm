@@ -14,11 +14,10 @@
 
 module;
 
-export module txn_state;
+export module infinity_core:txn_state;
 
-import stl;
-import logger;
-import infinity_exception;
+import :stl;
+import :infinity_exception;
 
 namespace infinity {
 

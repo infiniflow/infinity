@@ -1,20 +1,19 @@
 module;
 
-export module column_index_merger;
+export module infinity_core:column_index_merger;
 
-import stl;
-
-import file_writer;
-import posting_decoder;
-import posting_merger;
-import posting_list_format;
-import index_defines;
-import term_meta;
-import index_full_text;
-import column_index_iterator;
-import segment_term_posting;
+import :stl;
+import :file_writer;
+import :posting_decoder;
+import :posting_merger;
+import :posting_list_format;
+import :index_defines;
+import :term_meta;
+import :index_full_text;
+import :column_index_iterator;
+import :segment_term_posting;
 import internal_types;
-import vector_with_lock;
+import :vector_with_lock;
 
 namespace infinity {
 export class ColumnIndexMerger {

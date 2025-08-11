@@ -45,8 +45,8 @@ struct LineType {
     }
 
     [[nodiscard]] inline std::string ToString() const {
-        ParserError("ToString() isn't implemented");
-        return std::string();
+        // Line equation: ax + by + c = 0
+        return "{" + std::to_string(a) + "," + std::to_string(b) + "," + std::to_string(c) + "}";
     }
 };
 

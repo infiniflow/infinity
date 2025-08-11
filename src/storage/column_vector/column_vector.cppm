@@ -18,33 +18,29 @@ module;
 #include <concepts>
 #include <vector>
 
-namespace infinity {
-class ConstantExpr;
-}
+export module infinity_core:column_vector;
 
-export module column_vector;
-
-import stl;
+import :stl;
 import global_resource_usage;
-import vector_buffer;
-import roaring_bitmap;
-import selection;
-import default_values;
-import value;
-import status;
-import third_party;
-import infinity_exception;
+import :vector_buffer;
+import :roaring_bitmap;
+import :selection;
+import :default_values;
+import :value;
+import :status;
+import :third_party;
+import :infinity_exception;
 import internal_types;
 import data_type;
 import embedding_info;
 import sparse_info;
 import array_info;
-// import constant_expr;
-// import logger;
+import constant_expr;
+// import :logger;
 // import column_def;
 import logical_type;
-import var_buffer;
-import sparse_util;
+import :var_buffer;
+import :sparse_util;
 
 namespace infinity {
 
@@ -100,7 +96,7 @@ private:
 
     SizeT capacity_{0};
 
-    SizeT tail_index_{0};
+    Atomic<SizeT> tail_index_{0};
 
 public:
     ColumnVector();
@@ -265,7 +261,7 @@ public:
 
     template <typename DataT, typename IdxT>
     void AppendSparse(SizeT nnz, const DataT *data, const IdxT *index) {
-        SizeT dst_off = tail_index_++;
+        SizeT dst_off = tail_index_.fetch_add(1);
         AppendSparseInner(nnz, data, index, dst_off);
     }
 
@@ -311,14 +307,14 @@ public:
 
     [[nodiscard]] inline SizeT capacity() const { return capacity_; }
 
-    [[nodiscard]] inline SizeT Size() const { return tail_index_; }
+    [[nodiscard]] inline SizeT Size() const { return tail_index_.load(); }
 };
 
 template <typename T>
 void ColumnVector::CopyValue(ColumnVector &dst, const ColumnVector &src, SizeT from, SizeT count) {
     auto *src_ptr = (T *)(src.data_ptr_);
-    T *dst_ptr = &((T *)(dst.data_ptr_))[dst.tail_index_];
-    if (src.vector_type() == ColumnVectorType::kConstant && src.tail_index_ == 1) {
+    T *dst_ptr = &((T *)(dst.data_ptr_))[dst.tail_index_.load()];
+    if (src.vector_type() == ColumnVectorType::kConstant && src.tail_index_.load() == 1) {
         for (SizeT idx = 0; idx < count; ++idx) {
             dst_ptr[idx] = src_ptr[from];
         }
@@ -557,7 +553,7 @@ void CopyArray(ArrayT &dst_array,
 
 template <>
 void ColumnVector::CopyValue<BooleanT>(ColumnVector &dst, const ColumnVector &src, SizeT from, SizeT count) {
-    auto dst_tail = dst.tail_index_;
+    auto dst_tail = dst.tail_index_.load();
     const VectorBuffer *src_buffer = src.buffer_.get();
     auto dst_buffer = dst.buffer_.get();
     if (dst_tail % 8 == 0 && from % 8 == 0) {

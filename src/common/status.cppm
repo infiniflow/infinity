@@ -14,10 +14,10 @@
 
 module;
 
-export module status;
+export module infinity_core:status;
 
-import stl;
-import third_party;
+import :stl;
+import :third_party;
 
 // If new error codes are added, it also needs to be added to python/infinity/errors.py.
 namespace infinity {
@@ -36,6 +36,7 @@ export enum class ErrorCode : long {
     kInvalidIPAddr = 1006,
     kInvalidLogLevel = 1007,
     kInvalidConfig = 1008,
+    kInvalidMemIndex = 1009,
 
     // 2. Auth error
     kWrongPasswd = 2001,
@@ -233,6 +234,7 @@ public:
     static Status InvalidIPAddr(const String &ip_addr);
     static Status InvalidLogLevel(const String &log_level);
     static Status InvalidConfig(const String &detailed_info);
+    static Status InvalidMemIndex(const String &invalid_info);
 
     // 2. Auth error
     static Status WrongPasswd(const String &user_name);

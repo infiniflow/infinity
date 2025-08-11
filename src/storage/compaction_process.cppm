@@ -14,17 +14,18 @@
 
 module;
 
-export module compaction_process;
+export module infinity_core:compaction_process;
 
-import stl;
-import bg_task_type;
-import blocking_queue;
-import status;
+import :stl;
+import :bg_task_type;
+import :blocking_queue;
+import :status;
 
 namespace infinity {
 
 class NewTxn;
 class BGTask;
+class TableMeeta;
 
 class TestCommander {
 public:
@@ -72,6 +73,8 @@ private:
     void NewScanAndOptimize();
 
     void Process();
+
+    Vector<SegmentID> GetCompactableSegments(TableMeeta &table_meta, const Vector<SegmentID> &segment_ids);
 
 private:
     BlockingQueue<SharedPtr<BGTask>> task_queue_{"CompactionProcessor"};

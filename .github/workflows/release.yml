@@ -71,11 +71,11 @@ jobs:
         BUILDER_CONTAINER=infinity_build_$(od -An -N4 -t u8 < /dev/urandom | tr -d ' ')
         echo "BUILDER_CONTAINER=${BUILDER_CONTAINER}" >> $GITHUB_ENV
         TZ=$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')
-        sudo docker rm -f ${BUILDER_CONTAINER} && sudo docker run -d --name ${BUILDER_CONTAINER} -e TZ=$TZ -v $PWD:/infinity infiniflow/infinity_builder:centos7_clang18
+        sudo docker rm -f ${BUILDER_CONTAINER} && sudo docker run -d --name ${BUILDER_CONTAINER} -e TZ=$TZ -v $PWD:/infinity infiniflow/infinity_builder:ubuntu20_clang20
 
     - name: Build release version
       run: |
-        sudo docker exec ${BUILDER_CONTAINER} bash -c "git config --global safe.directory \"*\" && cd /infinity && rm -fr cmake-build-reldeb && mkdir -p cmake-build-reldeb && cmake -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCPACK_PACKAGE_VERSION=${{ env.RELEASE_TAG }} -DCPACK_DEBIAN_PACKAGE_ARCHITECTURE=amd64 -DCMAKE_JOB_POOLS:STRING='link=1' -S /infinity -B /infinity/cmake-build-reldeb && cmake --build /infinity/cmake-build-reldeb --target infinity"
+        sudo docker exec ${BUILDER_CONTAINER} bash -c "git config --global safe.directory \"*\" && cd /infinity && rm -fr cmake-build-reldeb && mkdir -p cmake-build-reldeb && cmake -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCPACK_PACKAGE_VERSION=${{ env.RELEASE_TAG }} -DCPACK_DEBIAN_PACKAGE_ARCHITECTURE=amd64 -DCMAKE_JOB_POOLS:STRING='link=1' -DCI=ON -S /infinity -B /infinity/cmake-build-reldeb && cmake --build /infinity/cmake-build-reldeb --target infinity"
 
     - name: Build RPM and DEB
       run: sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/cmake-build-reldeb && cpack"
@@ -120,7 +120,7 @@ jobs:
       if: startsWith(github.ref, 'refs/tags/v')
       run: |
         sudo rm -fr cmake-build-reldeb
-        sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && rm -rf dist && /usr/local/bin/pip3.10 wheel . -v -w dist --config-settings=wheel.py-api=cp310 --config-settings=build-dir='cmake-build-release' && /usr/local/bin/pip3.11 wheel . -v -w dist --config-settings=wheel.py-api=cp311 --config-settings=build-dir='cmake-build-release' && /usr/local/bin/pip3.12 wheel . -v -w dist --config-settings=wheel.py-api=cp312 --config-settings=build-dir='cmake-build-release' && auditwheel repair --plat manylinux_2_17_x86_64 dist/infinity*linux_x86_64.whl && /usr/local/bin/pip3.10 wheel ./python/infinity_sdk -v -w wheelhouse --no-deps"
+        sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && rm -rf wheelhouse && pip3 wheel ./python/infinity_sdk -v -w wheelhouse --no-deps"
 
     - name: Publish package distributions to PyPI
       if: startsWith(github.ref, 'refs/tags/v')

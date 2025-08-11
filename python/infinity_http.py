@@ -538,26 +538,8 @@ class database_http:
             "table_name": table_name,
             "snapshot_name": snapshot_name,
         }
-        
-        # Add retry logic for transaction conflicts
-        max_retries = 3
-        retry_delay = 0.1  # Start with 100ms delay
-        
-        for attempt in range(max_retries):
-            try:
-                r = self.net.request(url, "post", h, d)
-                self.net.raise_exception(r)
-                return database_result()
-            except InfinityException as e:
-                # Check if it's a transaction conflict (error code 4005)
-                if e.error_code == 4005 and attempt < max_retries - 1:
-                    import time
-                    time.sleep(retry_delay)
-                    retry_delay *= 2  # Exponential backoff
-                    continue
-                else:
-                    raise e
-        
+        r = self.net.request(url, "post", h, d)
+        self.net.raise_exception(r)
         return database_result()
 
     def restore_table_snapshot(self, snapshot_name):
@@ -600,6 +582,13 @@ class table_http:
         for col in r.json()["columns"]:
             res[col["name"]] = col["type"]
         return res
+
+    def compact(self):
+        url = f"databases/{self.database_name}/tables/{self.table_name}/compact"
+        h = self.net.set_up_header(["accept", "content-type"])
+        r = self.net.request(url, "put", h)
+        self.net.raise_exception(r)
+        return database_result()
 
     # index
     def create_index(

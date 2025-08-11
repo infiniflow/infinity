@@ -14,9 +14,9 @@
 
 module;
 
-export module new_compaction_alg;
+export module infinity_core:new_compaction_alg;
 
-import stl;
+import :stl;
 
 namespace infinity {
 
@@ -26,7 +26,7 @@ public:
 
     virtual void AddSegment(SegmentID segment_id, SizeT segment_row_cnt) = 0;
 
-    virtual Vector<SegmentID> GetCompactiableSegments() = 0;
+    virtual Vector<SegmentID> GetCompactableSegments() = 0;
 
     static UniquePtr<NewCompactionAlg> GetInstance();
 };

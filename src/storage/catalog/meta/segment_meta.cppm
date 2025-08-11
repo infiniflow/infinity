@@ -14,21 +14,21 @@
 
 module;
 
-export module segment_meta;
+export module infinity_core:segment_meta;
 
-import stl;
-import status;
-import default_values;
-import new_catalog;
-import snapshot_info;
-import wal_entry;
+import :stl;
+import :status;
+import :default_values;
+import :new_catalog;
+import :snapshot_info;
+import :wal_entry;
 
 namespace infinity {
 
 class KVInstance;
 // class ColumnDef;
 class TableMeeta;
-class SegmentInfo;
+export struct SegmentInfo;
 class FastRoughFilter;
 
 export enum class SegmentStatus : u8 {
@@ -74,8 +74,6 @@ public:
     // Status SetBlockIDs(const Vector<BlockID> &block_ids);
 
     Status SetNextBlockID(BlockID next_block_id);
-
-    // Status SetRowCnt(SizeT row_cnt);
 
     Status SetFirstDeleteTS(TxnTimeStamp first_delete_ts);
 

@@ -1,20 +1,20 @@
 [project]
 name = "infinity-sdk"
-version = "0.6.0.dev4"
+version = "0.6.0.dev5"
 requires-python = ">=3.10"
 dependencies = [
-    "sqlglot~=11.7.0",
-    "pydantic~=2.9.0",
-    "thrift~=0.20.0",
-    "setuptools~=75.2.0",
-    "pytest~=8.3.0",
-    "pandas~=2.2.0",
-    "numpy~=1.26.0",
-    "pyarrow~=17.0.0",
-    "polars-lts-cpu~=1.9.0",
-    "openpyxl~=3.1.0",
-    "requests~=2.32.0",
-    "readerwriterlock~=1.0.9"
+    "sqlglot>=11.7.0,<12.0.0",
+    "pydantic>=2.9.0,<3.0.0",
+    "thrift>=0.20.0,<1.0.0",
+    "setuptools>=75.2.0,<76.0.0",
+    "pytest>=8.3.0,<9.0.0",
+    "pandas>=2.2.0,<3.0.0",
+    "numpy>=1.26.0,<2.0.0",
+    "pyarrow>=17.0.0,<18.0.0",
+    "polars-lts-cpu>=1.9.0,<2.0.0",
+    "openpyxl>=3.1.0,<4.0.0",
+    "requests>=2.32.0,<3.0.0",
+    "readerwriterlock>=1.0.0,<2.0.0"
 ]
 description = "infinity"
 readme = "README.md"

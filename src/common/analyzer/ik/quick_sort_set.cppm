@@ -2,10 +2,10 @@ module;
 
 #include <stdexcept>
 
-export module quick_sort_set;
+export module infinity_core:quick_sort_set;
 
-import stl;
-import lexeme;
+import :stl;
+import :lexeme;
 
 namespace infinity {
 

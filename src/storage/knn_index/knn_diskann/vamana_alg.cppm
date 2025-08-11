@@ -19,21 +19,21 @@ module;
 #include <ostream>
 #include <random>
 
-export module vamana_alg;
+export module infinity_core:vamana_alg;
 
-import stl;
-import logger;
-import index_base;
-import local_file_handle;
-import infinity_exception;
-import knn_result_handler;
+import :stl;
+import :logger;
+import :index_base;
+import :local_file_handle;
+import :infinity_exception;
+import :knn_result_handler;
 import logical_type;
-import third_party;
-import diskann_mem_data_store;
-import diskann_mem_graph_store;
-import diskann_dist_func;
-import diskann_utils;
-import default_values;
+import :third_party;
+import :diskann_mem_data_store;
+import :diskann_mem_graph_store;
+import :diskann_dist_func;
+import :diskann_utils;
+import :default_values;
 
 namespace infinity {
 

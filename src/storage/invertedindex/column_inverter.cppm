@@ -16,19 +16,18 @@ module;
 
 #include <cstdio>
 
-export module column_inverter;
+export module infinity_core:column_inverter;
 
-import stl;
-import analyzer;
-
-import column_vector;
-import term;
-import string_ref;
+import :stl;
+import :analyzer;
+import :column_vector;
+import :term;
+import :string_ref;
 import internal_types;
-import posting_writer;
-import vector_with_lock;
-import buf_writer;
-import mem_usage_change;
+import :posting_writer;
+import :vector_with_lock;
+import :buf_writer;
+import :mem_usage_change;
 
 namespace infinity {
 

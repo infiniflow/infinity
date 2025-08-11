@@ -39,10 +39,7 @@ struct LineSegmentType {
         point2.Reset();
     }
 
-    [[nodiscard]] inline std::string ToString() const {
-        ParserError("ToString() isn't implemented");
-        return std::string();
-    }
+    [[nodiscard]] inline std::string ToString() const { return "[" + point1.ToString() + "," + point2.ToString() + "]"; }
 };
 
 } // namespace infinity

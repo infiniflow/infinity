@@ -14,16 +14,15 @@
 
 module;
 
-export module bound_statement;
+export module infinity_core:bound_statement;
 
-import stl;
-import logical_node;
-import query_context;
-
+import :stl;
+import :logical_node;
 import internal_types;
 import data_type;
 
 namespace infinity {
+class QueryContext;
 
 export struct BoundStatement {
 public:

@@ -17,16 +17,16 @@ module;
 #include <cassert>
 #include <typeinfo>
 
-export module wal_entry;
+export module infinity_core:wal_entry;
 
-import table_def;
-import index_base;
-import data_block;
-import stl;
+import :table_def;
+import :index_base;
+import :data_block;
+import :stl;
 import statement_common;
-import infinity_exception;
+import :infinity_exception;
 import internal_types;
-import persistence_manager;
+import :persistence_manager;
 import column_def;
 import global_resource_usage;
 import snapshot_info;
@@ -36,10 +36,11 @@ import command_statement;
 
 namespace infinity {
 
-enum class SegmentStatus;
+enum class SegmentStatus : u8;
 class ChunkIndexMeta;
 class BlockMeta;
 class SegmentMeta;
+
 
 export enum class WalCommandType : i8 {
     INVALID = 0,
@@ -1155,12 +1156,8 @@ export struct WalCmdCreateSnapshot : public WalCmd {
 
 
 export struct WalCmdRestoreTableSnapshot : public WalCmd {
-    WalCmdRestoreTableSnapshot(const String &db_name, const String &db_id, const String &table_name, const String &table_id, const String &snapshot_name, SharedPtr<TableDef> table_def_, const Vector<WalSegmentInfoV2> &segment_infos, const Vector<WalCmdCreateIndexV2> &index_cmds, const Vector<String> &files)
-        : WalCmd(WalCommandType::RESTORE_TABLE_SNAPSHOT), db_name_(db_name), db_id_(db_id), table_name_(table_name), table_id_(table_id),snapshot_name_(snapshot_name),table_def_(table_def_),
-          files_(files), segment_infos_(segment_infos), index_cmds_(index_cmds) {
-            PersistenceManager* persistence_manager = InfinityContext::instance().persistence_manager();
-            addr_serializer_.Initialize(persistence_manager, files);
-          }
+    explicit WalCmdRestoreTableSnapshot(const String &db_name, const String &db_id, const String &table_name, const String &table_id, const String &snapshot_name, SharedPtr<TableDef> table_def_, const Vector<WalSegmentInfoV2> &segment_infos, const Vector<WalCmdCreateIndexV2> &index_cmds, const Vector<String> &files);
+
     WalCmdRestoreTableSnapshot(const String &db_name, const String &db_id, const String &table_name, const String &table_id, const String &snapshot_name, SharedPtr<TableDef> table_def_, const Vector<WalSegmentInfoV2> &segment_infos, const Vector<WalCmdCreateIndexV2> &index_cmds, const Vector<String> &files, AddrSerializer addr_serializer)
         : WalCmd(WalCommandType::RESTORE_TABLE_SNAPSHOT), db_name_(db_name), db_id_(db_id), table_name_(table_name), table_id_(table_id),snapshot_name_(snapshot_name),table_def_(table_def_),
             files_(files), segment_infos_(segment_infos), index_cmds_(index_cmds), addr_serializer_(addr_serializer) {}

@@ -19,12 +19,12 @@ module;
 #include <string>
 #include <vector>
 
-export module query_node;
+export module infinity_core:query_node;
 
-import stl;
-import meta_info;
-import doc_iterator;
-import parse_fulltext_options;
+import :stl;
+import :meta_info;
+import :doc_iterator;
+import :parse_fulltext_options;
 
 namespace infinity {
 

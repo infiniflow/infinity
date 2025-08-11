@@ -257,7 +257,7 @@ struct yy_buffer_state
 /* %endif */
 
 /* %if-c++-only */
-	std::streambuf* yy_input_file;
+	std::streambuf* yy_input_file_;
 /* %endif */
 
 	char *yy_ch_buf;		/* input buffer */
@@ -992,7 +992,7 @@ case YY_STATE_EOF(INITIAL):
 /* %if-c-only */
 /* %endif */
 /* %if-c++-only */
-			YY_CURRENT_BUFFER_LVALUE->yy_input_file = yyin.rdbuf();
+			YY_CURRENT_BUFFER_LVALUE->yy_input_file_ = yyin.rdbuf();
 /* %endif */
 			YY_CURRENT_BUFFER_LVALUE->yy_buffer_status = YY_BUFFER_NORMAL;
 			}
@@ -1655,7 +1655,7 @@ void yyFlexLexer::yyrestart( std::istream* input_file )
 /* %if-c-only */
 /* %endif */
 /* %if-c++-only */
-	yyin.rdbuf(YY_CURRENT_BUFFER_LVALUE->yy_input_file);
+	yyin.rdbuf(YY_CURRENT_BUFFER_LVALUE->yy_input_file_);
 /* %endif */
 	(yy_hold_char) = *(yy_c_buf_p);
 }
@@ -1748,7 +1748,7 @@ void yyFlexLexer::yyrestart( std::istream* input_file )
 /* %if-c-only */
 /* %endif */
 /* %if-c++-only */
-	b->yy_input_file = file.rdbuf();
+	b->yy_input_file_ = file.rdbuf();
 /* %endif */
 	b->yy_fill_buffer = 1;
 

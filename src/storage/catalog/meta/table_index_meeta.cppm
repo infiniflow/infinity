@@ -14,14 +14,14 @@
 
 module;
 
-export module table_index_meeta;
+export module infinity_core:table_index_meeta;
 
-import stl;
-import status;
+import :stl;
+import :status;
 import column_def;
-import meta_info;
-import new_catalog;
-import snapshot_info;
+import :meta_info;
+import :new_catalog;
+import :snapshot_info;
 
 namespace infinity {
 
@@ -76,7 +76,6 @@ private:
     Status GetSegmentUpdateTS(SharedPtr<SegmentUpdateTS> &segment_update_ts);
 
 public:
-    Status UpdateFulltextSegmentTS(TxnTimeStamp ts);
 
     Status InitSet1(const SharedPtr<IndexBase> &index_base, NewCatalog *new_catalog);
 

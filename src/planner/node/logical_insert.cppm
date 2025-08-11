@@ -14,15 +14,15 @@
 
 module;
 
-export module logical_insert;
+export module infinity_core:logical_insert;
 
-import stl;
-import logical_node_type;
-import column_binding;
-import logical_node;
+import :stl;
+import :logical_node_type;
+import :column_binding;
+import :logical_node;
 
-import base_expression;
-import meta_info;
+import :base_expression;
+import :meta_info;
 import internal_types;
 import data_type;
 
@@ -54,6 +54,9 @@ public:
     [[nodiscard]] inline const Vector<Vector<SharedPtr<BaseExpression>>> &value_list() const { return value_list_; }
 
     [[nodiscard]] inline u64 table_index() const { return table_index_; }
+
+    // Check if this insert uses a SELECT source (has child node) or direct values
+    [[nodiscard]] inline bool has_select_source() const { return left_node_.get() != nullptr; }
 
 public:
     static bool NeedCastInInsert(const DataType &from, const DataType &to) {

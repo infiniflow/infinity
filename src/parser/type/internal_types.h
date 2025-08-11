@@ -42,7 +42,7 @@
 
 namespace infinity {
 
-struct Value;
+// struct Value;
 
 // Bool
 using BooleanT = bool;
@@ -73,7 +73,7 @@ using IntervalT = IntervalType;
 
 // Nest types
 using ArrayT = ArrayType;
-using TupleT = std::vector<Value>;
+// using TupleT = std::vector<Value>;
 // using ArrayT = ArrayType;
 // using TupleT = TupleType;
 

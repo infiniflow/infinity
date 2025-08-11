@@ -22,6 +22,7 @@
 #include "type/info/embedding_info.h"
 #include "type/info/sparse_info.h"
 #include "type/serialize.h"
+#include "simdjson.h"
 
 namespace infinity {
 

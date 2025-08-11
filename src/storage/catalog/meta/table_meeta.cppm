@@ -14,22 +14,21 @@
 
 module;
 
-#include "type/complex/row_id.h"
+export module infinity_core:table_meeta;
 
-export module table_meeta;
-
-import stl;
-import status;
+import :stl;
+import :status;
 import column_def;
-import new_catalog;
-import snapshot_info;
-import wal_entry;
+import :new_catalog;
+import :snapshot_info;
+import row_id;
+import :wal_entry;
 
 namespace infinity {
 
 class KVInstance;
 class TableDef;
-class TableInfo;
+struct TableInfo;
 class TableIndexReaderCache;
 class NewTxn;
 // struct SegmentUpdateTS;
@@ -70,39 +69,13 @@ public:
 
     Status UninitSet(UsageFlag usage_flag);
 
-    // Status GetNextSegmentID(SegmentID &next_segment_id) {
-    //     if (!next_segment_id_) {
-    //         Status status = LoadNextSegmentID();
-    //         if (!status.ok()) {
-    //             return status;
-    //         }
-    //     }
-    //     next_segment_id = *next_segment_id_;
-    //     return Status::OK();
-    // }
-
-    // Status SetNextSegmentID(SegmentID next_segment_id);
-
-    Status GetUnsealedSegmentID(SegmentID &unsealed_segment_id) {
-        if (!unsealed_segment_id_) {
-            Status status = LoadUnsealedSegmentID();
-            if (!status.ok()) {
-                return status;
-            }
-        }
-        unsealed_segment_id = *unsealed_segment_id_;
-        return Status::OK();
-    }
+    Status GetUnsealedSegmentID(SegmentID &unsealed_segment_id);
 
     Status SetUnsealedSegmentID(SegmentID unsealed_segment_id);
 
     Status DelUnsealedSegmentID();
 
-    // Status SetSegmentIDs(const Vector<SegmentID> &segment_ids);
-
     Status RemoveSegmentIDs1(const Vector<SegmentID> &segment_ids);
-
-    // Status AddSegmentID(SegmentID segment_id);
 
     Pair<SegmentID, Status> AddSegmentID1(TxnTimeStamp commit_ts);
     Status AddSegmentWithID(TxnTimeStamp commit_ts, SegmentID segment_id);
@@ -112,7 +85,6 @@ public:
     Tuple<ColumnID, Status> GetColumnIDByColumnName(const String &column_name);
     Tuple<String, Status> GetColumnKeyByColumnName(const String &column_name) const;
     SharedPtr<String> GetTableDir();
-    // Tuple<SharedPtr<Vector<SegmentID>>, Status> GetSegmentIndexIDs1();
 
     Tuple<Vector<SegmentID> *, Status> GetSegmentIDs1();
     Status CheckSegments(const Vector<SegmentID> &segment_ids);
@@ -139,13 +111,12 @@ public:
 
     Status RemoveFtIndexCache();
 
-    Status InvalidateFtIndexCache(SegmentID segment_id);
+    Status InvalidateFtIndexCache();
 
     Status GetNextColumnID(ColumnID &next_column_id);
 
     Status SetNextColumnID(ColumnID next_column_id);
     
-    Status UpdateFulltextSegmentTS(TxnTimeStamp ts, SegmentUpdateTS &segment_update_ts);
 
     Status GetNextRowID(RowID &next_row_id);
 
@@ -160,18 +131,17 @@ public:
 
     Status SetBeginTS(TxnTimeStamp begin_ts);
 
+    Tuple<SizeT,Status> GetTableRowCount();
+
+
 private:
     Status LoadComment();
 
     Status LoadColumnDefs();
 
-    // Status LoadSegmentIDs();
-
     Status LoadSegmentIDs1();
 
     Status LoadIndexIDs();
-
-    // Status LoadNextSegmentID();
 
     Status LoadUnsealedSegmentID();
 

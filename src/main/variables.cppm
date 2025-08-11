@@ -14,10 +14,9 @@
 
 module;
 
-export module variables;
+export module infinity_core:variables;
 
-import stl;
-import command_statement;
+import :stl;
 
 namespace infinity {
 

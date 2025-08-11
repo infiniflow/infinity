@@ -14,11 +14,11 @@
 
 module;
 
-export module block_version;
+export module infinity_core:block_version;
 
-import stl;
-import local_file_handle;
-import status;
+import :stl;
+import :local_file_handle;
+import :status;
 
 namespace infinity {
 
@@ -55,7 +55,7 @@ export struct BlockVersion {
 
     Tuple<i32, Status> GetRowCountForUpdate(TxnTimeStamp begin_ts) const;
 
-    void SaveToFile(TxnTimeStamp checkpoint_ts, LocalFileHandle &file_handler) const;
+    bool SaveToFile(TxnTimeStamp checkpoint_ts, LocalFileHandle &file_handler) const;
 
     void SpillToFile(LocalFileHandle *file_handle) const;
     static UniquePtr<BlockVersion> LoadFromFile(LocalFileHandle *file_handle);
@@ -78,7 +78,7 @@ export struct BlockVersion {
 
     Status Print(TxnTimeStamp commit_ts, i32 offset, bool ignore_invisible);
 
-    TxnTimeStamp latest_change_ts() const {
+    [[nodiscard]] TxnTimeStamp latest_change_ts() const {
         std::shared_lock<std::shared_mutex> lock(rw_mutex_);
         return latest_change_ts_;
     }

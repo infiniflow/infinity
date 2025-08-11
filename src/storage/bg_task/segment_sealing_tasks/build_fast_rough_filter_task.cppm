@@ -14,13 +14,13 @@
 
 module;
 
-export module build_fast_rough_filter_task;
+export module infinity_core:build_fast_rough_filter_task;
 
-import stl;
-import buffer_manager;
-import infinity_exception;
-import filter_value_type_classification;
-import logger;
+import :stl;
+import :buffer_manager;
+import :infinity_exception;
+import :filter_value_type_classification;
+import :logger;
 
 namespace infinity {
 

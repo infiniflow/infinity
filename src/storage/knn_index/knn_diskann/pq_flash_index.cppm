@@ -24,21 +24,21 @@ module;
 #include <simde/x86/sse.h>
 #endif
 
-export module pq_flash_index;
+export module infinity_core:pq_flash_index;
 
-import stl;
-import logger;
-import index_base;
-import local_file_handle;
-import status;
-import infinity_exception;
+import :stl;
+import :logger;
+import :index_base;
+import :local_file_handle;
+import :status;
+import :infinity_exception;
 import logical_type;
-import third_party;
-import diskann_dist_func;
-import diskann_utils;
-import default_values;
-import diskann_partition_and_pq;
-import virtual_store;
+import :third_party;
+import :diskann_dist_func;
+import :diskann_utils;
+import :default_values;
+import :diskann_partition_and_pq;
+import :virtual_store;
 
 namespace infinity {
 
@@ -56,7 +56,7 @@ public:
     }
 
     PqFlashIndex(This &&other)
-        : data_dim_(other.data_dim_), num_points_(other.num_points_), n_chunks_(other.n_chunks_), metric_(other.metric_), reader_(other.reader_) {
+        : data_dim_(other.data_dim_), num_points_(other.num_points_), n_chunks_(other.n_chunks_), metric_(other.metric_), reader_(std::move(other.reader_)) {
         this->aligned_dim_ = other.aligned_dim_;
         this->dist_cmp_ = std::move(other.dist_cmp_);
         this->dist_cmp_float_ = std::move(other.dist_cmp_float_);

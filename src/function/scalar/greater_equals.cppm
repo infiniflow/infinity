@@ -14,9 +14,9 @@
 
 module;
 
-export module greater_equals;
+export module infinity_core:greater_equals;
 
-import stl;
+import :stl;
 
 namespace infinity {
 

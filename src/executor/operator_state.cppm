@@ -14,26 +14,26 @@
 
 module;
 
-export module operator_state;
+export module infinity_core:operator_state;
 
-import stl;
-import global_block_id;
-import physical_operator_type;
-import fragment_data;
-import data_block;
-import match_tensor_scan_function_data;
-import match_sparse_scan_function_data;
-import table_def;
+import :stl;
+import :global_block_id;
+import :physical_operator_type;
+import :fragment_data;
+import :data_block;
+import :match_tensor_scan_function_data;
+import :match_sparse_scan_function_data;
+import :table_def;
 
-import merge_knn_data;
-import create_index_data;
-import blocking_queue;
-import expression_state;
-import status;
+import :merge_knn_data;
+import :create_index_data;
+import :blocking_queue;
+import :expression_state;
+import :status;
 import internal_types;
 import column_def;
 import data_type;
-import hash_table;
+import :hash_table;
 
 namespace infinity {
 
@@ -404,6 +404,7 @@ export struct CompactOperatorState : public OperatorState {
 
     SizeT compact_idx_{};
     SharedPtr<CompactStateData> compact_state_data_{};
+    UniquePtr<String> result_msg_{};
 };
 
 // Unnest
