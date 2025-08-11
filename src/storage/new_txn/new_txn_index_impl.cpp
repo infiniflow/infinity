@@ -906,7 +906,7 @@ NewTxn::AppendMemIndex(SegmentIndexMeta &segment_index_meta, BlockID block_id, c
 
     // Trigger dump if necessary
     SizeT row_count = mem_index->GetRowCount();
-    SizeT row_quota = InfinityContext::instance().config()->MemIndexMemoryQuota();
+    SizeT row_quota = InfinityContext::instance().config()->MemIndexCapacity();
     if (row_count >= row_quota) {
         TableMeeta &table_meta = segment_index_meta.table_index_meta().table_meta();
         auto [db_name, table_name] = table_meta.GetDBTableName();
