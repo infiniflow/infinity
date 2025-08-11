@@ -40,7 +40,7 @@ import :match_expression;
 import :default_values;
 import :infinity_exception;
 import :value;
-import :third_party;
+import third_party;
 import :base_table_ref;
 import :block_index;
 import :load_meta;

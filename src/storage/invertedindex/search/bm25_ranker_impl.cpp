@@ -22,7 +22,7 @@ import :bm25_ranker;
 
 import :stl;
 import :index_defines;
-import :third_party;
+import third_party;
 
 namespace infinity {
 

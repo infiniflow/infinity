@@ -12,7 +12,7 @@ module infinity_core:ut.query_match;
 
 import :ut.base_test;
 import :stl;
-import :third_party;
+import third_party;
 import :infinity_context;
 import :storage;
 import :table_def;

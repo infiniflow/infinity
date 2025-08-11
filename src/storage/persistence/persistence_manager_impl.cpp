@@ -24,7 +24,7 @@ import :persistence_manager;
 import :stl;
 import :uuid;
 import serialize;
-import :third_party;
+import third_party;
 import :infinity_exception;
 import :virtual_store;
 import :logger;

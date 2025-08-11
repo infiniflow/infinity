@@ -28,7 +28,7 @@ import :match_tensor_expression;
 import :default_values;
 import logical_type;
 import internal_types;
-import :third_party;
+import third_party;
 import :explain_logical_plan;
 import search_options;
 import :infinity_exception;

@@ -26,7 +26,7 @@ module infinity_core:ut.test_optimize;
 import :ut.base_test;
 import :stl;
 import :logger;
-import :third_party;
+import third_party;
 import :storage;
 import :infinity_context;
 import :table_def;

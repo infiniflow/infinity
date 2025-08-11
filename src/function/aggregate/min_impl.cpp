@@ -23,7 +23,7 @@ import :infinity_exception;
 import :aggregate_function;
 import :aggregate_function_set;
 
-import :third_party;
+import third_party;
 import :status;
 import internal_types;
 import data_type;

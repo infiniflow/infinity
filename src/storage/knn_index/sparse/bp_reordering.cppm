@@ -22,7 +22,7 @@ module;
 export module infinity_core:bp_reordering;
 
 import :stl;
-import :third_party;
+import third_party;
 
 namespace infinity {
 

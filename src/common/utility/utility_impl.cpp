@@ -23,7 +23,7 @@ module infinity_core:utility.impl;
 
 import :utility;
 import :stl;
-import :third_party;
+import third_party;
 import :default_values;
 
 namespace infinity::Utility {

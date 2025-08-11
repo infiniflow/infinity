@@ -32,7 +32,7 @@ import :conjunction_expression;
 import :expression_type;
 
 import :infinity_exception;
-import :third_party;
+import third_party;
 import :logger;
 
 namespace infinity {

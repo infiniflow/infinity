@@ -11,7 +11,7 @@ import :posting_field;
 import :flush_info;
 import :infinity_exception;
 import :logger;
-import :third_party;
+import third_party;
 
 namespace infinity {
 

@@ -28,7 +28,7 @@ module infinity_core:ut.test_bp_reordering;
 import :ut.base_test;
 import :stl;
 import :bp_reordering;
-import :third_party;
+import third_party;
 import :infinity_exception;
 import :virtual_store;
 import :sparse_util;

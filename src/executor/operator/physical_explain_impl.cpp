@@ -37,7 +37,7 @@ import logical_type;
 import :logger;
 import :plan_fragment;
 import :fragment_task;
-import :third_party;
+import third_party;
 import explain_statement;
 import data_type;
 

@@ -32,7 +32,7 @@ import :bmp_fwd;
 import :virtual_store;
 import :infinity_exception;
 import :local_file_handle;
-import :third_party;
+import third_party;
 #endif
 
 import compilation_config;

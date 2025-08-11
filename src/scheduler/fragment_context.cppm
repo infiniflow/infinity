@@ -28,7 +28,7 @@ import :data_block;
 import :knn_scan_data;
 import :create_index_data;
 // import :logger;
-import :third_party;
+import third_party;
 import :compact_state_data;
 // import :infinity_context;
 import :query_context;

@@ -26,7 +26,7 @@ module infinity_core:ut.sql_file_parsing_test;
 import :ut.base_test;
 import :infinity_context;
 import :infinity_exception;
-import :third_party;
+import third_party;
 import :logger;
 import :null_value;
 import :stl;

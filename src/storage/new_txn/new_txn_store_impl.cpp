@@ -22,7 +22,7 @@ module infinity_core:new_txn_store.impl;
 
 import :new_txn_store;
 import :stl;
-import :third_party;
+import third_party;
 
 import :status;
 import :infinity_exception;

@@ -17,7 +17,7 @@ module;
 export module infinity_core:secondary_index_pgm;
 
 import :stl;
-import :third_party;
+import third_party;
 import :local_file_handle;
 import :infinity_exception;
 

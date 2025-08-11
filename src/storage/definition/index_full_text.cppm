@@ -19,7 +19,7 @@ export module infinity_core:index_full_text;
 import :stl;
 import :index_base;
 
-import :third_party;
+import third_party;
 import :index_base;
 import create_index_info;
 import statement_common;

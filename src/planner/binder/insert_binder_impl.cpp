@@ -25,7 +25,7 @@ import :column_expression;
 import :function;
 import :status;
 import :infinity_exception;
-import :third_party;
+import third_party;
 import :function_set;
 import :bind_alias_proxy;
 import :logger;

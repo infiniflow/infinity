@@ -34,7 +34,7 @@ import :file_writer;
 import :table_def;
 import :data_table;
 import :options;
-import :third_party;
+import third_party;
 import :defer_op;
 import :config;
 import :status;

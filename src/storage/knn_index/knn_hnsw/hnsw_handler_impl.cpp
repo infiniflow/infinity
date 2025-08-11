@@ -15,7 +15,7 @@ import :memindex_tracer;
 import :default_values;
 import :multivector_util;
 import :infinity_exception;
-import :third_party;
+import third_party;
 import :column_vector;
 import :local_file_handle;
 import :chunk_index_meta;

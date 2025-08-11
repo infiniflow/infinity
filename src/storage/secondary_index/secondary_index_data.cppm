@@ -21,7 +21,7 @@ import :default_values;
 import :local_file_handle;
 import :infinity_exception;
 import :column_vector;
-import :third_party;
+import third_party;
 import :secondary_index_pgm;
 import logical_type;
 import internal_types;

@@ -20,7 +20,7 @@ import :stl;
 import logical_type;
 import :base_expression;
 import :infinity_exception;
-import :third_party;
+import third_party;
 
 namespace infinity {
 

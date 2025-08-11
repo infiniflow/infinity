@@ -26,7 +26,7 @@ import :raw_file_worker;
 import :stl;
 import :infinity_exception;
 import :local_file_handle;
-import :third_party;
+import third_party;
 import :status;
 import :logger;
 import :raw_file_worker;

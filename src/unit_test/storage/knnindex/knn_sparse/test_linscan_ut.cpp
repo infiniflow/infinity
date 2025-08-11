@@ -29,7 +29,7 @@ import :ut.base_test;
 import :stl;
 import :linscan_alg;
 import :sparse_util;
-import :third_party;
+import third_party;
 import :sparse_test_util;
 #endif
 

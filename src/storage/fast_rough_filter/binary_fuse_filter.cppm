@@ -18,7 +18,7 @@ export module infinity_core:binary_fuse_filter;
 import :stl;
 import :default_values;
 import :infinity_exception;
-import :third_party;
+import third_party;
 
 namespace infinity {
 

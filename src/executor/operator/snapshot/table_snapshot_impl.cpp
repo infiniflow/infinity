@@ -22,7 +22,7 @@ import :new_txn;
 import :new_txn_manager;
 import :query_context;
 import :status;
-import :third_party;
+import third_party;
 import :config;
 import :infinity_exception;
 import :snapshot_info;

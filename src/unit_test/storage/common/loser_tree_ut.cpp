@@ -13,7 +13,7 @@ module infinity_core:ut.loser_tree;
 import :ut.base_test;
 import :stl;
 import :random;
-import :third_party;
+import third_party;
 import :loser_tree;
 #endif
 

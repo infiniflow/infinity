@@ -18,7 +18,7 @@ module infinity_core:peer_task.impl;
 
 import :peer_task;
 import :stl;
-import :third_party;
+import third_party;
 import :peer_task;
 import admin_statement;
 

@@ -38,7 +38,7 @@ import :base_expression;
 import :fusion_expression;
 import :load_meta;
 import :default_values;
-import :third_party;
+import third_party;
 import :infinity_exception;
 import :value;
 import internal_types;

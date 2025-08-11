@@ -24,7 +24,7 @@ import :physical_operator_type;
 import :fragment_data;
 import :infinity_exception;
 import :logger;
-import :third_party;
+import third_party;
 import :table_scan_function_data;
 import :knn_scan_data;
 import :compact_state_data;

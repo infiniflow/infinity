@@ -32,7 +32,7 @@ import :buffer_obj;
 import :data_file_worker;
 import :var_file_worker;
 import :var_buffer;
-import :third_party;
+import third_party;
 import :buffer_handle;
 import :infinity_context;
 import :virtual_store;

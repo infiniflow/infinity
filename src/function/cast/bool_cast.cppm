@@ -20,7 +20,7 @@ import :stl;
 import :bound_cast_func;
 import :column_vector_cast;
 import :infinity_exception;
-import :third_party;
+import third_party;
 import :column_vector;
 import logical_type;
 import internal_types;

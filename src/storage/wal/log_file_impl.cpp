@@ -21,7 +21,7 @@ module infinity_core:log_file.impl;
 import :log_file;
 import :stl;
 import :virtual_store;
-import :third_party;
+import third_party;
 import :infinity_exception;
 import :logger;
 import :default_values;

@@ -26,7 +26,7 @@ module infinity_core:ut.knn_flat_ip_blas_reservoir;
 import :ut.base_test;
 import :infinity_exception;
 import :stl;
-import :third_party;
+import third_party;
 import :logger;
 import :deprecated_knn_flat_ip_blas_reservoir;
 import :infinity_context;

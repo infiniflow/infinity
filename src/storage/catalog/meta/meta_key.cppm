@@ -18,7 +18,7 @@ export module infinity_core:meta_key;
 
 import :stl;
 import :meta_type;
-import :third_party;
+import third_party;
 import :default_values;
 
 import column_def;

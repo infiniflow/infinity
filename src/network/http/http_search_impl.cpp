@@ -23,7 +23,7 @@ module infinity_core:http_search.impl;
 
 import :http_search;
 import :stl;
-import :third_party;
+import third_party;
 import parsed_expr;
 import knn_expr;
 import match_expr;

@@ -25,7 +25,7 @@ import :status;
 import column_def;
 import :infinity_exception;
 import :wal_entry;
-import :third_party;
+import third_party;
 import internal_types;
 
 namespace infinity {

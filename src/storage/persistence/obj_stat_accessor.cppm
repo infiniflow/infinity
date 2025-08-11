@@ -18,7 +18,7 @@ export module infinity_core:obj_stat_accessor;
 
 import :stl;
 import :obj_status;
-import :third_party;
+import third_party;
 
 namespace infinity {
 

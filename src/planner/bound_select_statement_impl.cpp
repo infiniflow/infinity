@@ -76,7 +76,7 @@ import :knn_expression;
 import :match_expression;
 import :match_tensor_expression;
 import :match_sparse_expression;
-import :third_party;
+import third_party;
 import table_reference;
 import :common_query_filter;
 import :logger;

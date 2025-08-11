@@ -32,7 +32,7 @@ import :query_node;
 import :base_table_ref;
 import :term_doc_iterator;
 import :logger;
-import :third_party;
+import third_party;
 import :parse_fulltext_options;
 import :query_node;
 

@@ -23,7 +23,7 @@ import :index_defines;
 import :doc_iterator;
 import internal_types;
 import :doc_iterator;
-import :third_party;
+import third_party;
 
 namespace infinity {
 

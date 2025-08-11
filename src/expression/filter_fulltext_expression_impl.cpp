@@ -23,7 +23,7 @@ import :expression_type;
 import data_type;
 import :stl;
 import logical_type;
-import :third_party;
+import third_party;
 import :infinity_exception;
 import :status;
 import parsed_expr;

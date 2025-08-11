@@ -20,7 +20,7 @@ module;
 module infinity_core:base_txn_store.impl;
 
 import :base_txn_store;
-import :third_party;
+import third_party;
 import :stl;
 import :wal_entry;
 import :data_block;

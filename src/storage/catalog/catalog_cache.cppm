@@ -22,7 +22,7 @@ import :stl;
 // import extra_ddl_info;
 import :default_values;
 import internal_types;
-import :third_party;
+import third_party;
 import :status;
 
 namespace infinity {

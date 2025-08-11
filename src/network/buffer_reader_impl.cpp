@@ -21,7 +21,7 @@ module infinity_core:buffer_reader.impl;
 
 import :buffer_reader;
 import :stl;
-import :third_party;
+import third_party;
 import :pg_message;
 import :ring_buffer_iterator;
 

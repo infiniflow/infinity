@@ -19,7 +19,7 @@ import :term_meta;
 import :column_index_iterator;
 import :segment_term_posting;
 import internal_types;
-import :third_party;
+import third_party;
 
 namespace infinity {
 

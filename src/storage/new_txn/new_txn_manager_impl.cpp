@@ -25,7 +25,7 @@ import :new_txn_manager;
 import :new_txn;
 import :txn_state;
 import :stl;
-import :third_party;
+import third_party;
 import :wal_entry;
 import :infinity_exception;
 import :logger;

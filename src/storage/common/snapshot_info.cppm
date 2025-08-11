@@ -20,7 +20,7 @@ import :stl;
 import :status;
 import command_statement;
 import :index_base;
-import :third_party;
+import third_party;
 import column_def;
 import :meta_info;
 import row_id;

@@ -29,7 +29,7 @@ import :logger;
 import :buffer_manager;
 import :column_vector;
 import :value;
-import :third_party;
+import third_party;
 import :block_column_iter;
 import :probabilistic_data_filter;
 import :min_max_data_filter;

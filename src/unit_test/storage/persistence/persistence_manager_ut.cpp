@@ -13,7 +13,7 @@ import :ut.base_test;
 import :stl;
 import :persistence_manager;
 import :virtual_store;
-import :third_party;
+import third_party;
 import :persist_result_handler;
 import :local_file_handle;
 import :kv_store;

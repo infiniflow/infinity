@@ -58,7 +58,7 @@ import :logical_unnest;
 import :logical_unnest_aggregate;
 import :logical_node_type;
 import :logical_check;
-import :third_party;
+import third_party;
 
 import :base_expression;
 import :expression_type;

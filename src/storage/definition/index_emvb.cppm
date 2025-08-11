@@ -21,7 +21,7 @@ import :stl;
 import :index_base;
 import :base_table_ref;
 import create_index_info;
-import :third_party;
+import third_party;
 import statement_common;
 
 namespace infinity {

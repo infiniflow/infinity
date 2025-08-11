@@ -27,7 +27,7 @@ import :multivector_result_handler;
 import logical_type;
 import :hnsw_common;
 import :data_store;
-import :third_party;
+import third_party;
 import serialize;
 import :dist_func_lsg_wrapper;
 import :plain_vec_store;

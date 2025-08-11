@@ -21,7 +21,7 @@ module infinity_core:ut.table_meeta;
 
 import :ut.base_test;
 import :stl;
-import :third_party;
+import third_party;
 import :kv_store;
 import :status;
 import :new_txn_manager;

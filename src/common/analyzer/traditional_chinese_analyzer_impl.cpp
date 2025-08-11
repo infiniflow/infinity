@@ -24,7 +24,7 @@ module infinity_core:traditional_chinese_analyzer.impl;
 import :traditional_chinese_analyzer;
 import :stl;
 import :logger;
-import :third_party;
+import third_party;
 import :chinese_analyzer;
 
 namespace fs = std::filesystem;

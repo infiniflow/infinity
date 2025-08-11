@@ -25,7 +25,7 @@ module;
 module infinity_core:lemmatizer.impl;
 
 import :stl;
-import :third_party;
+import third_party;
 import :lemmatizer;
 
 namespace fs = std::filesystem;

@@ -21,7 +21,7 @@ import :knn_scan_data;
 
 import :stl;
 import :infinity_exception;
-import :third_party;
+import third_party;
 import logical_type;
 import :merge_knn;
 import :knn_result_handler;

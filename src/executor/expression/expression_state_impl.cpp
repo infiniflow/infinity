@@ -22,7 +22,7 @@ import :expression_state;
 
 import :infinity_exception;
 import :stl;
-import :third_party;
+import third_party;
 import :column_vector;
 import :expression_type;
 import logical_type;

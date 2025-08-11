@@ -136,7 +136,7 @@ import :value_expression;
 import :match_tensor_expression;
 import :match_sparse_expression;
 import :explain_physical_plan;
-import :third_party;
+import third_party;
 import :status;
 import :infinity_exception;
 import create_index_info;

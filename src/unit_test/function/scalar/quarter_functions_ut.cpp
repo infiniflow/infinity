@@ -40,7 +40,7 @@ import :function;
 import :scalar_function;
 import :scalar_function_set;
 import :quarter;
-import :third_party;
+import third_party;
 import :config;
 import :status;
 import :kv_store;

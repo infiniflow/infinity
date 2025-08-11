@@ -20,7 +20,7 @@ module infinity_core:kv_code.impl;
 
 import :kv_code;
 import :stl;
-import :third_party;
+import third_party;
 import :infinity_exception;
 import column_def;
 

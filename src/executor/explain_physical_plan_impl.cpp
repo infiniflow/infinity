@@ -86,7 +86,7 @@ import :logical_show;
 import :infinity_exception;
 import :base_expression;
 import :knn_expression;
-import :third_party;
+import third_party;
 import select_statement;
 import knn_expr;
 import extra_ddl_info;

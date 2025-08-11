@@ -22,12 +22,12 @@ module infinity_core:new_catalog.impl;
 
 import :new_catalog;
 import :stl;
-import :third_party;
+import third_party;
 import :new_txn;
 import :status;
 import extra_ddl_info;
 import :kv_store;
-import :third_party;
+import third_party;
 import :logger;
 import :infinity_exception;
 import :default_values;

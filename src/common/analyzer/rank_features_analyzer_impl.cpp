@@ -23,7 +23,7 @@ import :stl;
 import :term;
 import :analyzer;
 import :smallfloat;
-import :third_party;
+import third_party;
 
 namespace infinity {
 

@@ -26,7 +26,7 @@ import :query_result;
 import :stl;
 import :status;
 import :log_file;
-import :third_party;
+import third_party;
 import :logger;
 import data_type;
 import logical_type;

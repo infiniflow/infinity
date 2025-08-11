@@ -30,7 +30,7 @@ module infinity_core:external_sort_merger.impl;
 import :external_sort_merger;
 
 import :stl;
-import :third_party;
+import third_party;
 import :file_writer;
 import :profiler;
 import :logger;

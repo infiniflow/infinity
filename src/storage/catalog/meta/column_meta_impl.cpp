@@ -26,7 +26,7 @@ import :kv_code;
 import :block_meta;
 import :segment_meta;
 import :table_meeta;
-import :third_party;
+import third_party;
 import :infinity_context;
 import :buffer_manager;
 import :data_file_worker;

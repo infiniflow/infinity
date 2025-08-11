@@ -21,7 +21,7 @@ module infinity_core:var_buffer.impl;
 import :var_buffer;
 import :stl;
 import :infinity_exception;
-import :third_party;
+import third_party;
 import :buffer_manager;
 import :var_file_worker;
 import :logger;

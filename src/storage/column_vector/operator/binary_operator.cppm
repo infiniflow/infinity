@@ -25,7 +25,7 @@ import :vector_buffer;
 
 import :infinity_exception;
 import :roaring_bitmap;
-import :third_party;
+import third_party;
 import internal_types;
 import :status;
 import :logger;

@@ -17,7 +17,7 @@ module;
 export module infinity_core:file_worker;
 
 import :stl;
-import :third_party;
+import third_party;
 import :file_worker_type;
 import :persistence_manager;
 import :defer_op;

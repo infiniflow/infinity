@@ -26,7 +26,7 @@ import :logger;
 import :status;
 import :infinity_exception;
 import :buffer_manager;
-import :third_party;
+import third_party;
 import :default_values;
 import :data_block;
 import :value;

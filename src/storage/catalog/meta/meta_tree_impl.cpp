@@ -26,7 +26,7 @@ import std;
 
 import :meta_tree;
 import :stl;
-import :third_party;
+import third_party;
 import :infinity_context;
 import :infinity_exception;
 import :default_values;

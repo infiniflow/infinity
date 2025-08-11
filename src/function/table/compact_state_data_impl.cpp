@@ -21,7 +21,7 @@ module infinity_core:compact_state_data.impl;
 
 import :compact_state_data;
 
-import :third_party;
+import third_party;
 import :logger;
 import :block_index;
 import row_id;

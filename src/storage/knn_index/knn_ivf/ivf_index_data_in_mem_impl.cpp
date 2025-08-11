@@ -42,7 +42,7 @@ import :ivf_index_util_func;
 import :base_memindex;
 import :memindex_tracer;
 import :infinity_context;
-import :third_party;
+import third_party;
 import :buffer_obj;
 
 namespace infinity {

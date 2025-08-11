@@ -22,7 +22,7 @@ import :status;
 import internal_types;
 import :index_base;
 import extra_ddl_info;
-import :third_party;
+import third_party;
 import :meta_key;
 import command_statement;
 

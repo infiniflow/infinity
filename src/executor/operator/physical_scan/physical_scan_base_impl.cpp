@@ -29,7 +29,7 @@ import :block_index;
 import :data_block;
 import :operator_state;
 import :default_values;
-import :third_party;
+import third_party;
 import :infinity_exception;
 import :logger;
 import :column_vector;

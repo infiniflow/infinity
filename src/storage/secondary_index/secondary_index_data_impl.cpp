@@ -28,7 +28,7 @@ import :default_values;
 import :index_base;
 import :local_file_handle;
 import :infinity_exception;
-import :third_party;
+import third_party;
 import :secondary_index_pgm;
 import :logger;
 import :buffer_handle;

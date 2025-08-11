@@ -34,7 +34,7 @@ import :peer_thrift_server;
 import :peer_server_thrift_service;
 import :peer_server_thrift_types;
 import :logger;
-import :third_party;
+import third_party;
 import :stl;
 import :infinity_exception;
 

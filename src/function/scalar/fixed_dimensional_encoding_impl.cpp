@@ -34,7 +34,7 @@ import :column_vector;
 import :data_block;
 import :value;
 import array_info;
-import :third_party;
+import third_party;
 import embedding_info;
 import :function_set;
 import :base_expression;

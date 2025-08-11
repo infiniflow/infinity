@@ -31,7 +31,7 @@ import :defer_op;
 import :infinity_exception;
 import :index_base;
 import :ivf_index_data;
-import :third_party;
+import third_party;
 import internal_types;
 import :knn_scan_data;
 import knn_expr;

@@ -29,7 +29,7 @@ import :pg_message;
 import :logger;
 // import :query_context;
 import :infinity_context;
-import :third_party;
+import third_party;
 import :data_table;
 
 import :logical_node_type;

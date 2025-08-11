@@ -26,7 +26,7 @@ import :bmp_ivt;
 import :bmp_fwd;
 import :bp_reordering;
 import serialize;
-import :third_party;
+import third_party;
 import :infinity_exception;
 import :sparse_vec_store;
 

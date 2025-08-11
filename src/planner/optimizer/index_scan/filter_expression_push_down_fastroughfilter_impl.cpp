@@ -29,7 +29,7 @@ import internal_types;
 import :function_expression;
 import :filter_expression_push_down_helper;
 import :infinity_exception;
-import :third_party;
+import third_party;
 import :column_expression;
 
 namespace infinity {

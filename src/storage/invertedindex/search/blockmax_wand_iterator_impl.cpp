@@ -20,7 +20,7 @@ module infinity_core:blockmax_wand_iterator.impl;
 
 import :blockmax_wand_iterator;
 import :stl;
-import :third_party;
+import third_party;
 import :index_defines;
 import :blockmax_leaf_iterator;
 import :multi_doc_iterator;

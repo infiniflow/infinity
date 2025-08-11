@@ -28,7 +28,7 @@ import :knn_result_handler;
 import :multivector_result_handler;
 import :infinity_exception;
 import :status;
-import :third_party;
+import third_party;
 import :roaring_bitmap;
 import :knn_filter;
 import :ivf_index_data;

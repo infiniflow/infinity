@@ -18,7 +18,7 @@ export module infinity_core:persistence_manager;
 
 import :stl;
 import serialize;
-import :third_party;
+import third_party;
 import :obj_status;
 import :status;
 

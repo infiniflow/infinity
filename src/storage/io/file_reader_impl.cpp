@@ -25,7 +25,7 @@ import :file_reader;
 import :stl;
 import :status;
 import :infinity_exception;
-import :third_party;
+import third_party;
 import :logger;
 import :virtual_store;
 

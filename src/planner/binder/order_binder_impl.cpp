@@ -22,7 +22,7 @@ import :base_expression;
 
 import :bind_context;
 import :column_expression;
-import :third_party;
+import third_party;
 import :status;
 import :infinity_exception;
 import parsed_expr;

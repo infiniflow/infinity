@@ -17,7 +17,7 @@ module;
 export module infinity_core:fst.fst;
 
 import :infinity_exception;
-import :third_party;
+import third_party;
 import :stl;
 import :crc;
 import :fst.bytes;

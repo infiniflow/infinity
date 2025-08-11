@@ -23,7 +23,7 @@ import std;
 import :segment_meta;
 import :kv_store;
 import :kv_code;
-import :third_party;
+import third_party;
 import :default_values;
 import :table_meeta;
 import :logger;

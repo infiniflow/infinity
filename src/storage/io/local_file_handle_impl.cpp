@@ -24,7 +24,7 @@ module infinity_core:local_file_handle.impl;
 
 import :local_file_handle;
 
-import :third_party;
+import third_party;
 import :status;
 import :virtual_store;
 import :infinity_exception;

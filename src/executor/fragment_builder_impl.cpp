@@ -35,7 +35,7 @@ import :infinity_exception;
 import :explain_fragment;
 import :fragment_context;
 import :logger;
-import :third_party;
+import third_party;
 import explain_statement;
 
 namespace infinity {

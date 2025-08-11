@@ -24,7 +24,7 @@ import :block_version;
 import :stl;
 import :infinity_exception;
 import :logger;
-import :third_party;
+import third_party;
 import :default_values;
 import :column_vector;
 import :local_file_handle;

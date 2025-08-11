@@ -35,7 +35,7 @@ import :column_meta;
 import :logger;
 import :infinity_context;
 import :buffer_manager;
-import :third_party;
+import third_party;
 import :infinity_exception;
 import column_def;
 import internal_types;

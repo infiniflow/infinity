@@ -24,7 +24,7 @@ import :match_tensor_expression;
 import :stl;
 import :expression_type;
 import internal_types;
-import :third_party;
+import third_party;
 import :base_expression;
 import :column_expression;
 import embedding_info;

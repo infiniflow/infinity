@@ -24,7 +24,7 @@ import :table_index_meeta;
 import :kv_store;
 import :table_meeta;
 import :kv_code;
-import :third_party;
+import third_party;
 import :logger;
 import :index_base;
 import :meta_info;

@@ -19,7 +19,7 @@
 import :stl;
 import :virtual_store;
 import :infinity_exception;
-import :third_party;
+import third_party;
 import :infinity_exception;
 import :sparse_util;
 import compilation_config;

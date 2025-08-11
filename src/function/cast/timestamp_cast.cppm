@@ -22,7 +22,7 @@ import logical_type;
 import :infinity_exception;
 import :bound_cast_func;
 import :column_vector;
-import :third_party;
+import third_party;
 import internal_types;
 import data_type;
 import :logger;

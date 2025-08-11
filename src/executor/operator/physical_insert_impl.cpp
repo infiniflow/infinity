@@ -29,7 +29,7 @@ import :physical_operator_type;
 import :operator_state;
 import :expression_state;
 import :data_block;
-import :third_party;
+import third_party;
 import :expression_evaluator;
 import :base_expression;
 import :default_values;

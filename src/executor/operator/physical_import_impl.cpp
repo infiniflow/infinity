@@ -42,7 +42,7 @@ import :operator_state;
 import :expression_state;
 import :data_block;
 import :logger;
-import :third_party;
+import third_party;
 import :defer_op;
 
 import :buffer_handle;

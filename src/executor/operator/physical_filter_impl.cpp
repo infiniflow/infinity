@@ -29,7 +29,7 @@ import :expression_state;
 import :expression_selector;
 import :data_block;
 import :logger;
-import :third_party;
+import third_party;
 
 import :infinity_exception;
 

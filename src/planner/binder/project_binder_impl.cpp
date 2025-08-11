@@ -27,7 +27,7 @@ import :function;
 import :function_set;
 import :column_expression;
 import :unnest_expression;
-import :third_party;
+import third_party;
 import function_expr;
 import parsed_expr;
 import column_expr;

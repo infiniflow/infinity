@@ -35,7 +35,7 @@ import :physical_operator_type;
 import :operator_state;
 import :data_block;
 import :infinity_exception;
-import :third_party;
+import third_party;
 import :status;
 import :physical_top;
 import :logger;

@@ -33,7 +33,7 @@ import :column_vector;
 import :function_expression;
 import :infinity_exception;
 import :value;
-import :third_party;
+import third_party;
 import internal_types;
 import data_type;
 import logical_type;

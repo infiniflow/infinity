@@ -40,7 +40,7 @@ import :thrift_server;
 import :infinity_thrift_service;
 import :infinity_thrift_types;
 import :logger;
-import :third_party;
+import third_party;
 import :stl;
 import :infinity_exception;
 

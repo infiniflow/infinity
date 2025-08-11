@@ -15,7 +15,7 @@ import :multi_posting_decoder;
 import :segment_posting;
 import :index_defines;
 import internal_types;
-import :third_party;
+import third_party;
 
 namespace infinity {
 export class PostingIterator {

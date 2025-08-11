@@ -16,7 +16,7 @@ import :hit;
 import :stl;
 import :status;
 import :character_util;
-import :third_party;
+import third_party;
 
 namespace fs = std::filesystem;
 

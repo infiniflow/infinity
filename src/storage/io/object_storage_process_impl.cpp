@@ -26,7 +26,7 @@ import :object_storage_task;
 import :logger;
 import :blocking_queue;
 import :infinity_exception;
-import :third_party;
+import third_party;
 import :virtual_store;
 
 namespace fs = std::filesystem;

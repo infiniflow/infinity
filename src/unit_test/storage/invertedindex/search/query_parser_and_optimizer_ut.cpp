@@ -31,7 +31,7 @@ import :search_driver;
 import :query_node;
 import :infinity_exception;
 import :infinity_context;
-import :third_party;
+import third_party;
 import :logger;
 #endif
 

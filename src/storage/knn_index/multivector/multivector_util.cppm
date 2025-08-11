@@ -17,7 +17,7 @@ module;
 export module infinity_core:multivector_util;
 
 import :stl;
-import :third_party;
+import third_party;
 
 namespace infinity {
 

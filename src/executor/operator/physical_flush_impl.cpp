@@ -28,7 +28,7 @@ import :physical_operator_type;
 import :operator_state;
 import :logger;
 import :bg_task;
-import :third_party;
+import third_party;
 import :status;
 import :infinity_context;
 import :background_process;

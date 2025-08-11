@@ -53,7 +53,7 @@ import :bound_cast_func;
 import :cast_table;
 
 import :new_catalog;
-import :third_party;
+import third_party;
 import subquery_expr;
 import :infinity_exception;
 import join_reference;

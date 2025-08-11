@@ -17,7 +17,7 @@ module;
 export module infinity_core:bg_task_type;
 
 import :stl;
-import :third_party;
+import third_party;
 import :status;
 
 import global_resource_usage;

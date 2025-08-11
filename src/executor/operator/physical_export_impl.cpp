@@ -29,7 +29,7 @@ import :query_context;
 import :operator_state;
 import :logger;
 import statement_common;
-import :third_party;
+import third_party;
 import column_def;
 import :column_vector;
 import :value;

@@ -38,7 +38,7 @@ import :meta_info;
 import :value;
 import :table_def;
 import :data_table;
-import :third_party;
+import third_party;
 import :index_base;
 import :index_hnsw;
 import :index_full_text;

@@ -21,7 +21,7 @@ module infinity_core:rocksdb_merge_operator.impl;
 
 import :rocksdb_merge_operator;
 import :stl;
-import :third_party;
+import third_party;
 import :logger;
 import :infinity_exception;
 

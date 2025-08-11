@@ -42,7 +42,7 @@ import :cast_expression;
 import :cast_function;
 import :bound_cast_func;
 import :base_expression;
-import :third_party;
+import third_party;
 import :table_def;
 import :logical_alter;
 import :logical_create_table;

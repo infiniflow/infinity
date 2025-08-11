@@ -14,7 +14,7 @@ import :inmem_posting_decoder;
 import :inmem_position_list_decoder;
 import :index_defines;
 import :posting_list_format;
-import :third_party;
+import third_party;
 
 namespace infinity {
 InDocStateKeeper::InDocStateKeeper(InDocPositionState *state) : state_(state) {}

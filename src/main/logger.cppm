@@ -17,7 +17,7 @@ export module infinity_core:logger;
 
 import :stl;
 import :status;
-import :third_party;
+import third_party;
 
 namespace infinity {
 

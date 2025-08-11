@@ -26,7 +26,7 @@ import :default_values;
 import type_info;
 import :infinity_exception;
 import :bind_context;
-import :third_party;
+import third_party;
 import :value;
 import logical_type;
 import internal_types;

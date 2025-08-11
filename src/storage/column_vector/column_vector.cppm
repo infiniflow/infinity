@@ -28,7 +28,7 @@ import :selection;
 import :default_values;
 import :value;
 import :status;
-import :third_party;
+import third_party;
 import :infinity_exception;
 import internal_types;
 import data_type;

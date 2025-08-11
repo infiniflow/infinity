@@ -17,7 +17,7 @@ module;
 module infinity_core:cast_function.impl;
 
 import :cast_function;
-import :third_party;
+import third_party;
 import :infinity_exception;
 import :bound_cast_func;
 import :bool_cast;
@@ -33,7 +33,7 @@ import :array_cast;
 import :logger;
 import :stl;
 import :sparse_cast;
-import :third_party;
+import third_party;
 import logical_type;
 import internal_types;
 import data_type;

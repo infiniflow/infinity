@@ -22,7 +22,7 @@ import :posting_field;
 import :posting_byte_slice_reader;
 import :skiplist_reader;
 import :posting_list_format;
-import :third_party;
+import third_party;
 import :byte_slice_reader;
 import :random;
 #endif

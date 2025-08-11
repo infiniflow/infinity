@@ -36,7 +36,7 @@ import :query_builder;
 import :query_node;
 import :search_driver;
 import :infinity_context;
-import :third_party;
+import third_party;
 import :logger;
 import :parse_fulltext_options;
 #endif

@@ -24,7 +24,7 @@ import :match_sparse_expression;
 import :stl;
 import logical_type;
 import internal_types;
-import :third_party;
+import third_party;
 import :column_expression;
 import :status;
 import :logger;

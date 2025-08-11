@@ -31,7 +31,7 @@ import :kmeans_partition;
 import :index_base;
 import :status;
 import :logger;
-import :third_party;
+import third_party;
 import :infinity_exception;
 import internal_types;
 import :column_vector;

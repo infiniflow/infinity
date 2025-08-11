@@ -25,7 +25,7 @@ import :column_vector_cast;
 import :float_cast;
 import :integer_cast;
 import :infinity_exception;
-import :third_party;
+import third_party;
 import :logger;
 import :status;
 import logical_type;

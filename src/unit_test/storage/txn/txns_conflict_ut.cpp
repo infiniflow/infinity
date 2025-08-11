@@ -40,7 +40,7 @@ import :query_context;
 import :data_table;
 import :value;
 import :logger;
-import :third_party;
+import third_party;
 import :segment_meta;
 import :block_meta;
 import :column_meta;

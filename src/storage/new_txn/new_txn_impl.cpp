@@ -29,7 +29,7 @@ import :infinity_exception;
 import :new_txn_manager;
 import :buffer_manager;
 import :wal_entry;
-import :third_party;
+import third_party;
 import :logger;
 import :data_block;
 import :txn_state;

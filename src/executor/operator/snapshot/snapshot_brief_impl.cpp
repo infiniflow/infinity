@@ -28,7 +28,7 @@ import :status;
 import :virtual_store;
 import :local_file_handle;
 import :infinity_exception;
-import :third_party;
+import third_party;
 import :logger;
 import command_statement;
 

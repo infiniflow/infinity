@@ -26,7 +26,7 @@ import :search_top_1;
 import :kmeans_partition;
 import :infinity_exception;
 import :logger;
-import :third_party;
+import third_party;
 import :status;
 import :default_values;
 import :diskann_partition_and_pq;

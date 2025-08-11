@@ -20,7 +20,7 @@ module infinity_core:persist_result_handler.impl;
 
 import :persist_result_handler;
 import :infinity_exception;
-import :third_party;
+import third_party;
 import :virtual_store;
 import :infinity_context;
 import :peer_task;

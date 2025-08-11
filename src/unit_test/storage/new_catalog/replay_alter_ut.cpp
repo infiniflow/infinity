@@ -22,7 +22,7 @@ module infinity_core:ut.replay_alter;
 import :ut.base_test;
 import :ut.replay_test;
 import :stl;
-import :third_party;
+import third_party;
 import :status;
 import :new_catalog;
 import :new_txn_manager;

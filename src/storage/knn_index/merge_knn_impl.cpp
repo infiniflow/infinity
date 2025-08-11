@@ -26,7 +26,7 @@ import statement_common;
 import :knn_scan_data;
 import :status;
 import knn_expr;
-import :third_party;
+import third_party;
 import embedding_type;
 
 namespace infinity {

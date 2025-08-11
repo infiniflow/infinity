@@ -27,7 +27,7 @@ import :expression_binder;
 import :status;
 import :infinity_exception;
 import :logger;
-import :third_party;
+import third_party;
 import :function_set;
 import :bind_alias_proxy;
 import parsed_expr;

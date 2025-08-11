@@ -19,7 +19,7 @@ export module infinity_core:blocking_queue;
 import :stl;
 import :default_values;
 import global_resource_usage;
-import :third_party;
+import third_party;
 
 namespace infinity {
 

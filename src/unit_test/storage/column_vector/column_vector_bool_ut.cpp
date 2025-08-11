@@ -31,7 +31,7 @@ import :logger;
 import :column_vector;
 import :value;
 import :default_values;
-import :third_party;
+import third_party;
 import :stl;
 import :selection;
 import :vector_buffer;

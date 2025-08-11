@@ -27,7 +27,7 @@ import :expression_type;
 import :scalar_function;
 import :logger;
 import :infinity_exception;
-import :third_party;
+import third_party;
 import statement_common;
 import :knn_expression;
 import knn_expr;

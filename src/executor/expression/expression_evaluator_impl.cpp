@@ -33,7 +33,7 @@ import :data_block;
 import :column_vector;
 import :expression_state;
 import :status;
-import :third_party;
+import third_party;
 import :infinity_exception;
 import :expression_type;
 import :bound_cast_func;

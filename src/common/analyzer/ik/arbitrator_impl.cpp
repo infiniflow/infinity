@@ -10,7 +10,7 @@ import :analyze_context;
 import :lexeme;
 import :lexeme_path;
 import :quick_sort_set;
-import :third_party;
+import third_party;
 
 namespace infinity {
 

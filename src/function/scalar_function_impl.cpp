@@ -27,7 +27,7 @@ import :infinity_exception;
 import :data_block;
 import :base_expression;
 import :column_vector;
-import :third_party;
+import third_party;
 import :logger;
 import data_type;
 

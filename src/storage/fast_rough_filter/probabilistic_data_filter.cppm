@@ -20,7 +20,7 @@ import internal_types;
 import :value;
 import :binary_fuse_filter;
 // import :logger;
-import :third_party;
+import third_party;
 import :infinity_exception;
 
 namespace infinity {

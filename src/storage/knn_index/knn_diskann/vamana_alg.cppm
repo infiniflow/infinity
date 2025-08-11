@@ -28,7 +28,7 @@ import :local_file_handle;
 import :infinity_exception;
 import :knn_result_handler;
 import logical_type;
-import :third_party;
+import third_party;
 import :diskann_mem_data_store;
 import :diskann_mem_graph_store;
 import :diskann_dist_func;

@@ -28,7 +28,7 @@ import :infinity_exception;
 import :cast_table;
 import :logger;
 import :status;
-import :third_party;
+import third_party;
 import logical_type;
 
 namespace infinity {

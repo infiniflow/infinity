@@ -12,7 +12,7 @@ import :phrase_doc_iterator;
 import :stl;
 import :doc_iterator;
 import internal_types;
-import :third_party;
+import third_party;
 import :posting_iterator;
 import :column_length_io;
 import :logger;

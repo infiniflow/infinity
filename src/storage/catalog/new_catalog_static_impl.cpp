@@ -21,7 +21,7 @@ module infinity_core:new_catalog_static.impl;
 
 import :new_catalog;
 import :stl;
-import :third_party;
+import third_party;
 import :block_version;
 import :infinity_exception;
 import :table_def;

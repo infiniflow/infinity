@@ -25,7 +25,7 @@ import :index_hnsw;
 import :stl;
 import :status;
 import :index_base;
-import :third_party;
+import third_party;
 import :infinity_exception;
 import serialize;
 import :default_values;

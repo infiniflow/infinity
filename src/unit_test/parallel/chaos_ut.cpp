@@ -35,7 +35,7 @@ import :txn_state;
 import :infinity;
 import :query_options;
 import :logger;
-import :third_party;
+import third_party;
 import :profiler;
 import :virtual_store;
 #endif

@@ -42,7 +42,7 @@ import :infinity_exception;
 import :column_vector;
 import internal_types;
 import :table_def;
-import :third_party;
+import third_party;
 import :logger;
 import :query_options;
 import search_options;

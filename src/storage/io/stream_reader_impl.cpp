@@ -24,7 +24,7 @@ import :stl;
 import :logger;
 import :status;
 import :infinity_exception;
-import :third_party;
+import third_party;
 import :stream_reader;
 
 namespace infinity {

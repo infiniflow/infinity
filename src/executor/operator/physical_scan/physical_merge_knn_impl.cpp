@@ -31,7 +31,7 @@ import :knn_result_handler;
 import :merge_knn;
 import :block_index;
 import :buffer_manager;
-import :third_party;
+import third_party;
 import :default_values;
 import :data_block;
 import :knn_expression;

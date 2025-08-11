@@ -8,7 +8,7 @@ import :ik_dict_segment;
 import :stl;
 import :hit;
 import :character_util;
-import :third_party;
+import third_party;
 
 namespace infinity {
 

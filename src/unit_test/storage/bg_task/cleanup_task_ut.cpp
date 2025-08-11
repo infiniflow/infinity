@@ -36,7 +36,7 @@ import :physical_import;
 import :status;
 import :bg_task;
 import :index_base;
-import :third_party;
+import third_party;
 import :base_table_ref;
 import :index_secondary;
 import :infinity_exception;

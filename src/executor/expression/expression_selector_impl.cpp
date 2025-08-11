@@ -28,7 +28,7 @@ import logical_type;
 import :column_vector;
 import :expression_evaluator;
 import internal_types;
-import :third_party;
+import third_party;
 import data_type;
 import :logger;
 

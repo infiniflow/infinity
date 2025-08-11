@@ -23,7 +23,7 @@ import :fst.fst;
 import internal_types;
 import :posting_byte_slice_reader;
 import :posting_merger;
-import :third_party;
+import third_party;
 import :virtual_store;
 import :local_file_handle;
 import :infinity_exception;

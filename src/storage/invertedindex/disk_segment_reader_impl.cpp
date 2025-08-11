@@ -32,7 +32,7 @@ import :term_meta;
 import :byte_slice;
 import :posting_list_format;
 import internal_types;
-import :third_party;
+import third_party;
 import :byte_slice_reader;
 import :infinity_exception;
 import :status;

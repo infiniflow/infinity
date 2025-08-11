@@ -50,7 +50,7 @@ import :global_block_id;
 import :knn_expression;
 import :value_expression;
 import :column_expression;
-import :third_party;
+import third_party;
 import :query_context;
 import :physical_source;
 import :physical_sink;

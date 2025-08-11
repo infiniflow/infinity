@@ -21,7 +21,7 @@ module infinity_core:peer_thrift_client.impl;
 
 import :peer_thrift_client;
 import :stl;
-import :third_party;
+import third_party;
 import :logger;
 import :peer_server_thrift_types;
 import :status;

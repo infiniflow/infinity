@@ -17,7 +17,7 @@ module;
 export module infinity_core:index_base;
 
 import :stl;
-import :third_party;
+import third_party;
 import create_index_info;
 import global_resource_usage;
 

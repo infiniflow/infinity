@@ -23,7 +23,7 @@ import :inmem_posting_decoder;
 import :inmem_position_list_decoder;
 import :skiplist_reader;
 import internal_types;
-import :third_party;
+import third_party;
 
 namespace infinity {
 

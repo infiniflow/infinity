@@ -24,7 +24,7 @@ module;
 module infinity_core:ut.polygon_cast;
 
 import :ut.base_test;
-import :third_party;
+import third_party;
 import :logger;
 import :stl;
 import :infinity_context;

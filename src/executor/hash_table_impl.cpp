@@ -25,7 +25,7 @@ import logical_type;
 import :column_vector;
 import :status;
 import :infinity_exception;
-import :third_party;
+import third_party;
 import internal_types;
 import data_type;
 

@@ -42,7 +42,7 @@ import match_tensor_expr;
 import :match_tensor_expression;
 import :default_values;
 import :infinity_exception;
-import :third_party;
+import third_party;
 import :base_table_ref;
 import :load_meta;
 import logical_type;

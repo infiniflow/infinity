@@ -23,7 +23,7 @@ import :snapshot;
 import :stl;
 import :query_context;
 import :status;
-import :third_party;
+import third_party;
 import :config;
 import :virtual_store;
 import :logger;

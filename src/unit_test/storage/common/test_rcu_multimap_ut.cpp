@@ -35,7 +35,7 @@ module infinity_core:ut.test_rcu_multimap;
 
 import :ut.base_test;
 import :stl;
-import :third_party;
+import third_party;
 import :rcu_multimap;
 import :map_with_lock;
 #endif

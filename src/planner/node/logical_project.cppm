@@ -21,7 +21,7 @@ import :logical_node_type;
 import :column_binding;
 import :logical_node;
 import data_type;
-import :third_party;
+import third_party;
 import :base_expression;
 import internal_types;
 import :highlighter;

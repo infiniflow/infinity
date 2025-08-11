@@ -23,7 +23,7 @@ import :fragment_task;
 import :profiler;
 import :plan_fragment;
 import :stl;
-import :third_party;
+import third_party;
 import :logger;
 import :physical_source;
 import :physical_sink;

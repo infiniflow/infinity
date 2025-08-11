@@ -23,7 +23,7 @@ import data_type;
 import :data_block;
 import :infinity_exception;
 import internal_types;
-import :third_party;
+import third_party;
 import column_def;
 import :logger;
 import :default_values;

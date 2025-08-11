@@ -45,7 +45,7 @@ import :expression_type;
 import :reference_expression;
 import :in_expression;
 import :infinity_exception;
-import :third_party;
+import third_party;
 import :logger;
 import :index_defines;
 import :logger;

@@ -8,7 +8,7 @@ import :s3_client_minio;
 
 import :stl;
 import :infinity_exception;
-import :third_party;
+import third_party;
 import :logger;
 
 namespace infinity {

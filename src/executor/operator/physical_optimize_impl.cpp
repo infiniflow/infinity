@@ -26,7 +26,7 @@ import :query_context;
 import :operator_state;
 import :infinity_exception;
 import :table_def;
-import :third_party;
+import third_party;
 import :status;
 import :logger;
 import :base_table_ref;

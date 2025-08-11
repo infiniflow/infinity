@@ -18,7 +18,7 @@ export module infinity_core:http_search;
 
 import :stl;
 import :status;
-import :third_party;
+import third_party;
 import parsed_expr;
 import knn_expr;
 import match_expr;

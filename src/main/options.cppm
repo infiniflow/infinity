@@ -20,7 +20,7 @@ import :stl;
 import :status;
 
 namespace infinity {
-enum class LogLevel;
+// enum class LogLevel;
 
 export enum class BaseOptionDataType {
     kInteger,

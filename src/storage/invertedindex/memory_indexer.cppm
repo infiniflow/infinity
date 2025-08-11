@@ -23,7 +23,7 @@ import :index_defines;
 import :posting_writer;
 import :column_vector;
 import :column_inverter;
-import :third_party;
+import third_party;
 import internal_types;
 import :ring;
 import :skiplist;

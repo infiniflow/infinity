@@ -47,7 +47,7 @@ import :system_info;
 import :stl;
 import :defer_op;
 import :status;
-import :third_party;
+import third_party;
 import :logger;
 import :infinity_exception;
 import :default_values;

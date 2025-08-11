@@ -33,7 +33,7 @@ import logical_type;
 import :data_block;
 import :column_vector;
 import internal_types;
-import :third_party;
+import third_party;
 import :wal_manager;
 import :infinity_context;
 import :status;

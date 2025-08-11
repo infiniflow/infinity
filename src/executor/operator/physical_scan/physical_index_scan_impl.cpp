@@ -27,7 +27,7 @@ import :default_values;
 import :buffer_handle;
 import :infinity_exception;
 import :logger;
-import :third_party;
+import third_party;
 import :data_block;
 import logical_type;
 import :secondary_index_in_mem;

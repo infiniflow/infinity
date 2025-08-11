@@ -21,7 +21,7 @@ module infinity_core:ut.kv_store;
 
 import :ut.base_test;
 import :stl;
-import :third_party;
+import third_party;
 import :status;
 import :kv_store;
 #else

@@ -28,7 +28,7 @@ import knn_expr;
 import :knn_scan_data;
 import :infinity_exception;
 import :status;
-import :third_party;
+import third_party;
 import :ivf_index_data;
 import :ivf_index_data_in_mem;
 import :ivf_index_storage;

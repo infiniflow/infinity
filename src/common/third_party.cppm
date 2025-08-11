@@ -64,7 +64,7 @@ module;
 
 #pragma clang diagnostic pop
 
-export module infinity_core:third_party;
+export module third_party;
 
 namespace minio {
 namespace s3 {

@@ -33,7 +33,7 @@ import :local_file_handle;
 import :status;
 import :infinity_exception;
 import logical_type;
-import :third_party;
+import third_party;
 import :diskann_dist_func;
 import :diskann_utils;
 import :default_values;

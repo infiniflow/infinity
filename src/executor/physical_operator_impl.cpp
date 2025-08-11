@@ -28,7 +28,7 @@ import :column_vector;
 import :query_context;
 
 import :base_table_ref;
-import :third_party;
+import third_party;
 import :infinity_exception;
 import logical_type;
 import internal_types;

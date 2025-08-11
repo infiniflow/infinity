@@ -23,7 +23,7 @@ module infinity_core:physical_merge_aggregate.impl;
 import :physical_merge_aggregate;
 
 import :stl;
-import :third_party;
+import third_party;
 import :query_context;
 import :operator_state;
 import :logger;

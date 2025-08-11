@@ -25,7 +25,7 @@ import :stl;
 import :status;
 import command_statement;
 // import :index_base;
-import :third_party;
+import third_party;
 import constant_expr;
 import :logger;
 import :virtual_store;

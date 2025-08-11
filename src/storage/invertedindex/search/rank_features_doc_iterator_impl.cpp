@@ -24,7 +24,7 @@ module infinity_core:rank_features_doc_iterator.impl;
 import :rank_features_doc_iterator;
 
 import :stl;
-import :third_party;
+import third_party;
 import :index_defines;
 import :rank_feature_doc_iterator;
 import :multi_doc_iterator;

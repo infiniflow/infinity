@@ -22,7 +22,7 @@ module infinity_core:bmp_util.impl;
 import :bmp_util;
 
 import :logger;
-import :third_party;
+import third_party;
 import :bmp_util;
 import :stl;
 import :infinity_thrift_types;

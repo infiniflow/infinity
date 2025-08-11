@@ -22,10 +22,10 @@ module;
 export module infinity_core:diskann_utils;
 
 import :stl;
-import :third_party;
+import third_party;
 import :default_values;
 import :status;
-import :third_party;
+import third_party;
 import :local_file_handle;
 import :virtual_store;
 import :diskann_dist_func;

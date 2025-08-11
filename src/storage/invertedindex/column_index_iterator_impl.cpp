@@ -13,7 +13,7 @@ import :posting_list_format;
 import :index_defines;
 import :term_meta;
 import :dict_reader;
-import :third_party;
+import third_party;
 import :infinity_context;
 import :persistence_manager;
 import :persist_result_handler;

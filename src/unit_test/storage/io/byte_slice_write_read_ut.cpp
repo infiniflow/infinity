@@ -12,7 +12,7 @@ module infinity_core:ut.byte_slice_write_read;
 
 import :ut.base_test;
 import :stl;
-import :third_party;
+import third_party;
 import :file_writer;
 import :file_reader;
 import :byte_slice;

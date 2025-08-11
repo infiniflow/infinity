@@ -32,7 +32,7 @@ import :ternary_operator;
 import :base_expression;
 import :null_value;
 import :logger;
-import :third_party;
+import third_party;
 
 namespace infinity {
 

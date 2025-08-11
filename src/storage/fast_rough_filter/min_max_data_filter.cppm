@@ -18,7 +18,7 @@ export module infinity_core:min_max_data_filter;
 import :stl;
 import :value;
 import :logger;
-import :third_party;
+import third_party;
 import :infinity_exception;
 import :filter_expression_push_down_helper;
 import internal_types;

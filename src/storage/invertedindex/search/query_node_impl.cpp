@@ -8,7 +8,7 @@ module infinity_core:query_node.impl;
 
 import :query_node;
 import :stl;
-import :third_party;
+import third_party;
 import :status;
 import :meta_info;
 import :column_index_reader;

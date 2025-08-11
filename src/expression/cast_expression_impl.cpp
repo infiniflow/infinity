@@ -23,7 +23,7 @@ import logical_type;
 import :infinity_exception;
 import :bound_cast_func;
 import :stl;
-import :third_party;
+import third_party;
 import :cast_function;
 import :status;
 import :logger;

@@ -27,7 +27,7 @@ import :update_segment_bloom_filter_task;
 import :logger;
 import :blocking_queue;
 import :infinity_exception;
-import :third_party;
+import third_party;
 import :infinity_context;
 import :status;
 import :new_txn;

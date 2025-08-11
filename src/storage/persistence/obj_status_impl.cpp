@@ -22,7 +22,7 @@ import :obj_status;
 import serialize;
 import :status;
 import :logger;
-import :third_party;
+import third_party;
 
 namespace infinity {
 

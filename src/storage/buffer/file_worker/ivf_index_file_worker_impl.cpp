@@ -24,7 +24,7 @@ import :logger;
 import :index_base;
 import :ivf_index_data;
 import :infinity_exception;
-import :third_party;
+import third_party;
 import :persistence_manager;
 
 namespace infinity {

@@ -24,7 +24,7 @@ import :data_block;
 import match_sparse_expr;
 import :match_sparse_expression;
 import :infinity_exception;
-import :third_party;
+import third_party;
 import :knn_result_handler;
 import :sparse_vector_distance;
 import :sparse_util;

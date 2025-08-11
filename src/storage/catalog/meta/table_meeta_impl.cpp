@@ -26,7 +26,7 @@ import :table_meeta;
 import :status;
 import :kv_code;
 import :kv_store;
-import :third_party;
+import third_party;
 import :default_values;
 import :logger;
 import :table_def;

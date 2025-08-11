@@ -5,7 +5,7 @@ export module infinity_core:phrase_doc_iterator;
 import :stl;
 import :doc_iterator;
 import internal_types;
-import :third_party;
+import third_party;
 import :posting_iterator;
 import :index_defines;
 import :column_length_io;

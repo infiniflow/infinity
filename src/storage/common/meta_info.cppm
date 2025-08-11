@@ -21,7 +21,7 @@ import column_def;
 import :default_values;
 import data_type;
 import create_index_info;
-import :third_party;
+import third_party;
 
 
 namespace infinity {

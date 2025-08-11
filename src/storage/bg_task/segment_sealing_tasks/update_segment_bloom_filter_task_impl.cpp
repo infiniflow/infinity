@@ -23,7 +23,7 @@ import :background_process;
 import :buffer_manager;
 import :infinity_exception;
 import :logger;
-import :third_party;
+import third_party;
 import :build_fast_rough_filter_task;
 import :infinity_context;
 

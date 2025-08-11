@@ -21,7 +21,7 @@ import :expression_type;
 import data_type;
 import internal_types;
 import :infinity_exception;
-import :third_party;
+import third_party;
 
 namespace infinity {
 

@@ -26,7 +26,7 @@ module infinity_core:ut.file_write_read;
 import :ut.base_test;
 import :infinity_exception;
 import :stl;
-import :third_party;
+import third_party;
 import :logger;
 import :file_writer;
 import :file_reader;

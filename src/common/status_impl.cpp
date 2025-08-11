@@ -19,7 +19,7 @@ module;
 module infinity_core:status.impl;
 
 import :stl;
-import :third_party;
+import third_party;
 import :default_values;
 import :status;
 

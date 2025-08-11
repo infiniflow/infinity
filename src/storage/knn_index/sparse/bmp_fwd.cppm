@@ -26,7 +26,7 @@ import :bmp_util;
 import :knn_result_handler;
 import serialize;
 import :infinity_exception;
-import :third_party;
+import third_party;
 
 namespace infinity {
 

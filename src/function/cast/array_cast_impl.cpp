@@ -22,7 +22,7 @@ import :column_vector;
 import :vector_buffer;
 import :bound_cast_func;
 import :column_vector_cast;
-import :third_party;
+import third_party;
 import :logger;
 import :status;
 import logical_type;

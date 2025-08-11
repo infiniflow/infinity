@@ -35,12 +35,12 @@ import :index_defines;
 import :posting_writer;
 import :vector_with_lock;
 import :infinity_exception;
-import :third_party;
+import third_party;
 import :status;
 import :logger;
 import :buf_writer;
 import :profiler;
-import :third_party;
+import third_party;
 
 namespace infinity {
 

@@ -23,7 +23,7 @@ import :physical_check;
 import :stl;
 import :new_txn;
 import :query_context;
-import :third_party;
+import third_party;
 import :profiler;
 import :operator_state;
 import :data_block;

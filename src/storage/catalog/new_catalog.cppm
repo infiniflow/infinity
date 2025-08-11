@@ -25,7 +25,7 @@ import internal_types;
 import :buffer_handle;
 import column_def;
 import :profiler;
-import :third_party;
+import third_party;
 import :storage;
 import :meta_tree;
 

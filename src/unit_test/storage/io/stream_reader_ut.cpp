@@ -13,7 +13,7 @@ module infinity_core:ut.stream_reader;
 import :ut.base_test;
 import :infinity_exception;
 import :stl;
-import :third_party;
+import third_party;
 import :logger;
 import :file_writer;
 import :file_reader;

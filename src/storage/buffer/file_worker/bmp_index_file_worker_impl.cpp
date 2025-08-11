@@ -24,7 +24,7 @@ import :bmp_index_file_worker;
 import :index_bmp;
 import :logger;
 import :infinity_exception;
-import :third_party;
+import third_party;
 import :bmp_util;
 import :bmp_alg;
 import :bmp_handler;

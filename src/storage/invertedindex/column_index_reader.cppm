@@ -17,7 +17,7 @@ module;
 export module infinity_core:column_index_reader;
 
 import :stl;
-import :third_party;
+import third_party;
 import :segment_posting;
 import :index_segment_reader;
 import :posting_iterator;

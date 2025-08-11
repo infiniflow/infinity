@@ -35,7 +35,7 @@ import :block_index;
 
 import :default_values;
 import :infinity_exception;
-import :third_party;
+import third_party;
 import :logger;
 import :column_vector;
 import logical_type;

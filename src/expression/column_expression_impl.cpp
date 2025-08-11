@@ -24,7 +24,7 @@ import :column_expression;
 import :stl;
 import :expression_type;
 import :special_function;
-import :third_party;
+import third_party;
 import :column_expression;
 import data_type;
 

@@ -20,7 +20,7 @@ module infinity_core:analyzer_pool.impl;
 
 import :analyzer_pool;
 import :stl;
-import :third_party;
+import third_party;
 import :config;
 import :infinity_context;
 import :analyzer;

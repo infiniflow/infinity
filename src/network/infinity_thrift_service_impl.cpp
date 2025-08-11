@@ -22,7 +22,7 @@ module;
 module infinity_core:infinity_thrift_service.impl;
 
 import :infinity_thrift_service;
-import :third_party;
+import third_party;
 import :logger;
 import :query_options;
 import :infinity_thrift_types;

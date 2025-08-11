@@ -28,7 +28,7 @@ import :stemmer;
 import :analyzer;
 import :tokenizer;
 import :status;
-import :third_party;
+import third_party;
 import :defer_op;
 
 namespace infinity {

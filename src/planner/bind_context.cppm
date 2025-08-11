@@ -19,7 +19,7 @@ export module infinity_core:bind_context;
 import :stl;
 
 import :column_binding;
-import :third_party;
+import third_party;
 
 import :infinity_exception;
 import :column_expression;

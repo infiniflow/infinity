@@ -31,7 +31,7 @@ import :term;
 import :infinity_exception;
 import :status;
 import :logger;
-import :third_party;
+import third_party;
 import :analyzer;
 import :analyzer_pool;
 import :query_node;

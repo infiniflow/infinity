@@ -34,7 +34,7 @@ import :data_table;
 import :data_block;
 import :column_vector;
 import :value;
-import :third_party;
+import third_party;
 #endif
 
 using namespace infinity;

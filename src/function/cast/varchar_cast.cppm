@@ -21,7 +21,7 @@ import :bound_cast_func;
 import :column_vector_cast;
 import logical_type;
 import :infinity_exception;
-import :third_party;
+import third_party;
 import :column_vector;
 import :vector_buffer;
 import internal_types;

@@ -27,7 +27,7 @@ import :new_txn_manager;
 import :new_txn;
 import :storage;
 import :virtual_store;
-import :third_party;
+import third_party;
 import :infinity_context;
 import :data_access_state;
 import :status;

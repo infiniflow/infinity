@@ -28,7 +28,7 @@ import :hnsw_alg;
 import :hnsw_common;
 import :index_hnsw;
 import :index_base;
-import :third_party;
+import third_party;
 import :logger;
 import :hnsw_handler;
 import :virtual_store;

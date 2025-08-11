@@ -29,7 +29,7 @@ import infinity_core;
 module infinity_core:ut.crash_handler.impl;
 
 import :ut.crash_handler;
-import :third_party;
+import third_party;
 #endif
 
 namespace infinity {

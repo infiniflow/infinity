@@ -25,7 +25,7 @@ module infinity_core:ut.null_value;
 
 import :ut.base_test;
 import :infinity_exception;
-import :third_party;
+import third_party;
 import :logger;
 import :null_value;
 import :stl;

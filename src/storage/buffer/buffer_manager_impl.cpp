@@ -24,7 +24,7 @@ import std.compat;
 import :buffer_manager;
 import :stl;
 import :file_worker;
-import :third_party;
+import third_party;
 import :logger;
 import :infinity_exception;
 import :buffer_obj;

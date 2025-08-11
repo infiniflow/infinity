@@ -18,7 +18,7 @@ module;
 export module infinity_core:profiler;
 
 import :stl;
-import :third_party;
+import third_party;
 
 namespace infinity {
 

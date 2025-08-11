@@ -27,7 +27,7 @@ import :byte_slice_reader;
 import :index_defines;
 import internal_types;
 import :file_reader;
-import :third_party;
+import third_party;
 
 namespace infinity {
 void SegmentPosting::Init(SharedPtr<ByteSliceList> slice_list, RowID base_row_id, u64 doc_count, TermMeta &term_meta) {

@@ -27,7 +27,7 @@ module infinity_core:ut.fragment;
 import :ut.base_test;
 import :ut.sql_runner;
 import :infinity_exception;
-import :third_party;
+import third_party;
 import :logger;
 import :stl;
 import :infinity_context;

@@ -27,7 +27,7 @@ import :infinity_exception;
 import :column_vector;
 
 import :value;
-import :third_party;
+import third_party;
 import :default_values;
 import serialize;
 import logical_type;

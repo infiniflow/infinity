@@ -9,7 +9,7 @@ module infinity_core:ut.cleanup_rollback_txn;
 
 import :ut.base_test;
 import :stl;
-import :third_party;
+import third_party;
 import :status;
 import :new_catalog;
 import :new_txn_manager;

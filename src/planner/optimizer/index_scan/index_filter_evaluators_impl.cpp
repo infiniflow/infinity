@@ -34,7 +34,7 @@ import :column_index_reader;
 import :infinity_exception;
 import :status;
 import internal_types;
-import :third_party;
+import third_party;
 import :doc_iterator;
 import :score_threshold_iterator;
 import column_def;

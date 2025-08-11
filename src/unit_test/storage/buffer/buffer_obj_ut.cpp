@@ -41,7 +41,7 @@ import :table_def;
 import :column_vector;
 import :value;
 import :status;
-import :third_party;
+import third_party;
 import :base_table_ref;
 import :index_hnsw;
 import :bg_task;

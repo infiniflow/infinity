@@ -21,7 +21,7 @@ module infinity_core:infinity_exception.impl;
 import :infinity_exception;
 import :stl;
 import :logger;
-import :third_party;
+import third_party;
 import :infinity_context;
 import :new_txn_manager;
 import :txn_context;

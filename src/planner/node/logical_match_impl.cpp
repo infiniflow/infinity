@@ -27,7 +27,7 @@ import :logical_node_type;
 import :match_expression;
 
 import :default_values;
-import :third_party;
+import third_party;
 import :meta_info;
 import logical_type;
 import internal_types;

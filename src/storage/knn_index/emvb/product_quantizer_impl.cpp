@@ -26,7 +26,7 @@ import :mlas_matrix_multiply;
 import :kmeans_partition;
 import :vector_distance;
 import :index_base;
-import :third_party;
+import third_party;
 import :logger;
 import :infinity_exception;
 import :local_file_handle;

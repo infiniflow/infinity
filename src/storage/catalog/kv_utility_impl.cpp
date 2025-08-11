@@ -25,7 +25,7 @@ import :kv_code;
 import :kv_store;
 // import :status;
 import :index_base;
-import :third_party;
+import third_party;
 import :utility;
 // import :rocksdb_merge_operator;
 import :logger;

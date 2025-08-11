@@ -25,7 +25,7 @@ import :doc_iterator;
 import internal_types;
 import :doc_iterator;
 import :column_length_io;
-import :third_party;
+import third_party;
 import :parse_fulltext_options;
 import :blockmax_leaf_iterator;
 

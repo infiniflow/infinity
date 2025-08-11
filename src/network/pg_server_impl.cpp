@@ -24,7 +24,7 @@ import :thrift_server;
 import :infinity_context;
 import :stl;
 import :boost;
-import :third_party;
+import third_party;
 import :infinity_exception;
 
 import :connection;

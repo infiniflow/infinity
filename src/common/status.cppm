@@ -17,7 +17,7 @@ module;
 export module infinity_core:status;
 
 import :stl;
-import :third_party;
+import third_party;
 
 // If new error codes are added, it also needs to be added to python/infinity/errors.py.
 namespace infinity {

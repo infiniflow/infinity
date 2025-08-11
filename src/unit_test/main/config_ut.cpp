@@ -27,7 +27,7 @@ import :ut.base_test;
 import :stl;
 import :config;
 import :infinity_exception;
-import :third_party;
+import third_party;
 import :status;
 import :virtual_store;
 import :default_values;

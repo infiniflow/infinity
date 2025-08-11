@@ -25,7 +25,7 @@ import :catalog_cache;
 import :stl;
 import :default_values;
 import :infinity_exception;
-import :third_party;
+import third_party;
 import :logger;
 import :index_base;
 import :catalog_cache;

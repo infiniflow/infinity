@@ -23,7 +23,7 @@ import :stl;
 import :sparse_vector_distance;
 import :knn_result_handler;
 import :infinity_exception;
-import :third_party;
+import third_party;
 import :local_file_handle;
 
 namespace infinity {

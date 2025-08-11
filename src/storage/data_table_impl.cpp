@@ -25,7 +25,7 @@ import :stl;
 import logical_type;
 import :infinity_exception;
 
-import :third_party;
+import third_party;
 import :data_block;
 import :table_def;
 import :value;

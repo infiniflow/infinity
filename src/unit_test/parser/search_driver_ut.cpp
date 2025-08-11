@@ -34,7 +34,7 @@ import :analyzer;
 import :infinity_exception;
 import :infinity_context;
 import :logger;
-import :third_party;
+import third_party;
 #endif
 
 import global_resource_usage;

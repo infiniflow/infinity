@@ -30,7 +30,7 @@ import :index_base;
 import :infinity_exception;
 import :stl;
 import :defer_op;
-import :third_party;
+import third_party;
 import internal_types;
 import :logger;
 import :block_version;

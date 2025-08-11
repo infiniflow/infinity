@@ -27,7 +27,7 @@ import :stl;
 import :status;
 import :base_table_ref;
 import :infinity_exception;
-import :third_party;
+import third_party;
 import :logger;
 import logical_type;
 import type_info;

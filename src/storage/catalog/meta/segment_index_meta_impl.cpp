@@ -26,7 +26,7 @@ import :kv_code;
 import :kv_store;
 import :table_index_meeta;
 import :table_meeta;
-import :third_party;
+import third_party;
 import :infinity_context;
 import :new_catalog;
 import :mem_index;

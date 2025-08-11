@@ -17,7 +17,7 @@ import :arbitrator;
 import :term;
 import :status;
 import :character_util;
-import :third_party;
+import third_party;
 
 namespace infinity {
 

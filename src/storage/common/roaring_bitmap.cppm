@@ -20,7 +20,7 @@ import :stl;
 import :croaring;
 import :infinity_exception;
 import serialize;
-import :third_party;
+import third_party;
 import :logger;
 
 namespace infinity {

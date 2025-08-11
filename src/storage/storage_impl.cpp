@@ -30,7 +30,7 @@ import :wal_manager;
 import :new_catalog;
 import :new_txn_manager;
 import :builtin_functions;
-import :third_party;
+import third_party;
 import :logger;
 import :kv_store;
 

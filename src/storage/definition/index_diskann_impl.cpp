@@ -26,7 +26,7 @@ import :index_diskann;
 import :stl;
 import :status;
 import :index_base;
-import :third_party;
+import third_party;
 import :infinity_exception;
 import serialize;
 import :default_values;

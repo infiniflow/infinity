@@ -26,7 +26,7 @@ export module infinity_core:external_sort_merger;
 import :stl;
 import :loser_tree;
 import :infinity_exception;
-import :third_party;
+import third_party;
 import :blocking_queue;
 
 namespace infinity {

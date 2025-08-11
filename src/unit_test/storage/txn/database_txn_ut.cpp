@@ -27,7 +27,7 @@ import :ut.base_test;
 import :infinity_context;
 import :infinity_exception;
 import :stl;
-import :third_party;
+import third_party;
 import :logger;
 import :table_def;
 import :value;

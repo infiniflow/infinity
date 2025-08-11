@@ -25,7 +25,7 @@ import :http_server;
 import :infinity;
 import :stl;
 import :status;
-import :third_party;
+import third_party;
 import :defer_op;
 import :data_block;
 import :data_table;

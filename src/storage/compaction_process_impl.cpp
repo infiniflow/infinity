@@ -25,7 +25,7 @@ import :stl;
 import :bg_task;
 import :logger;
 import :infinity_exception;
-import :third_party;
+import third_party;
 import :blocking_queue;
 import :infinity_context;
 import :base_memindex;

@@ -33,7 +33,7 @@ import :term;
 import :analyzer;
 import :common_analyzer;
 import :logger;
-import :third_party;
+import third_party;
 
 namespace fs = std::filesystem;
 

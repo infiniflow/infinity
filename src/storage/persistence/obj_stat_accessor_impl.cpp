@@ -22,7 +22,7 @@ module infinity_core:obj_stat_accessor.impl;
 import :obj_stat_accessor;
 import :infinity_exception;
 import :logger;
-import :third_party;
+import third_party;
 import :obj_status;
 
 import :kv_store;

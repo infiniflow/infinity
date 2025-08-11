@@ -22,7 +22,7 @@ import :unnest_expression;
 
 import logical_type;
 import internal_types;
-import :third_party;
+import third_party;
 import :infinity_exception;
 import array_info;
 import :column_expression;

@@ -37,7 +37,7 @@ import :base_table_ref;
 import :load_meta;
 import :special_function;
 import :infinity_exception;
-import :third_party;
+import third_party;
 
 namespace infinity {
 

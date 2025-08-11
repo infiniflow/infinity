@@ -23,7 +23,7 @@ import :column_vector_cast;
 import :infinity_exception;
 import :bound_cast_func;
 import :column_vector;
-import :third_party;
+import third_party;
 
 #if 0
 namespace infinity {

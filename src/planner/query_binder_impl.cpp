@@ -40,7 +40,7 @@ import :base_expression;
 import :conjunction_expression;
 import :column_expression;
 import :expression_transformer;
-import :third_party;
+import third_party;
 import :logger;
 import :expression_binder;
 import :where_binder;

@@ -26,7 +26,7 @@ import :new_txn_manager;
 import :infinity_context;
 import :new_txn;
 import :txn_state;
-import :third_party;
+import third_party;
 import :logger;
 import :table_def;
 import :data_block;

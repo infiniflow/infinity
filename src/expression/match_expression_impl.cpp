@@ -24,7 +24,7 @@ import :stl;
 import :logger;
 import :base_expression;
 import :expression_type;
-import :third_party;
+import third_party;
 
 namespace infinity {
 

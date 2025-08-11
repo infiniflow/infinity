@@ -22,7 +22,7 @@ import :query_context;
 import :operator_state;
 import :physical_operator;
 import :physical_operator_type;
-import :third_party;
+import third_party;
 import constant_expr;
 import :zsv;
 import :load_meta;

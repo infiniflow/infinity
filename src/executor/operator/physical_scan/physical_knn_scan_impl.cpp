@@ -35,7 +35,7 @@ import :logger;
 import :block_index;
 import :knn_scan_data;
 import :knn_filter;
-import :third_party;
+import third_party;
 import :infinity_exception;
 import :default_values;
 import :column_expression;

@@ -19,7 +19,7 @@ export module infinity_core:multivector_result_handler;
 import :stl;
 import :infinity_exception;
 import internal_types;
-import :third_party;
+import third_party;
 
 namespace infinity {
 

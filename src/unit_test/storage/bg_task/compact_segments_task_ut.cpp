@@ -42,7 +42,7 @@ import :infinity_exception;
 import :base_table_ref;
 import :compaction_process;
 import :logger;
-import :third_party;
+import third_party;
 import :txn_state;
 import :data_block;
 import :new_txn_manager;

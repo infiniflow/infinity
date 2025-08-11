@@ -24,7 +24,7 @@ import embedding_info;
 import sparse_info;
 import data_type;
 import knn_expr;
-import :third_party;
+import third_party;
 import :status;
 import global_resource_usage;
 

@@ -25,7 +25,7 @@ import std;
 import :data_file_worker;
 import :stl;
 import :infinity_exception;
-import :third_party;
+import third_party;
 import :status;
 import :logger;
 import :persistence_manager;

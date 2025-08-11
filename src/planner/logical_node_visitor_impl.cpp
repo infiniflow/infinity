@@ -25,7 +25,7 @@ import :base_expression;
 import :logical_node_type;
 import :infinity_exception;
 
-import :third_party;
+import third_party;
 import :expression_type;
 import :logical_node_type;
 import :logical_node;

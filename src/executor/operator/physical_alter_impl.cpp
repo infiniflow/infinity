@@ -22,7 +22,7 @@ import :physical_alter;
 
 import :query_context;
 import :operator_state;
-import :third_party;
+import third_party;
 import :status;
 import :infinity_exception;
 import :value;

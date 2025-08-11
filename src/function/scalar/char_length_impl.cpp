@@ -10,7 +10,7 @@ import :infinity_exception;
 import :scalar_function;
 import :scalar_function_set;
 
-import :third_party;
+import third_party;
 import logical_type;
 import internal_types;
 import data_type;

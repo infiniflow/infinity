@@ -37,7 +37,7 @@ import :infinity_exception;
 import create_index_info;
 import :index_base;
 import :index_full_text;
-import :third_party;
+import third_party;
 import :term_doc_iterator;
 import :default_values;
 import :logger;

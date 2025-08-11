@@ -12,7 +12,7 @@ module infinity_core:ut.fp16;
 
 import :ut.base_test;
 import :infinity_exception;
-import :third_party;
+import third_party;
 import :logger;
 import :stl;
 import :infinity_context;

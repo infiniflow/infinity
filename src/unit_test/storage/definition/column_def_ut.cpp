@@ -26,7 +26,7 @@ module infinity_core:ut.column_def;
 import :ut.base_test;
 import :infinity_exception;
 import :stl;
-import :third_party;
+import third_party;
 import :logger;
 import :infinity_context;
 #endif

@@ -30,7 +30,7 @@ import :stl;
 import :bmp_alg;
 import :bmp_util;
 import :sparse_util;
-import :third_party;
+import third_party;
 import :sparse_test_util;
 import :infinity_exception;
 import :virtual_store;

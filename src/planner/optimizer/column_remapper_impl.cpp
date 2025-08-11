@@ -26,7 +26,7 @@ import :column_expression;
 import :reference_expression;
 import :special_function;
 import :default_values;
-import :third_party;
+import third_party;
 import :logger;
 import :infinity_exception;
 

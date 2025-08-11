@@ -27,7 +27,7 @@ import :bg_task;
 import :infinity_context;
 import :infinity_exception;
 import :logger;
-import :third_party;
+import third_party;
 import :txn_state;
 import :dump_index_process;
 import :storage;

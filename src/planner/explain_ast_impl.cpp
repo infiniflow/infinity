@@ -21,7 +21,7 @@ module infinity_core:explain_ast.impl;
 import :explain_ast;
 
 import :stl;
-import :third_party;
+import third_party;
 import :status;
 import :infinity_exception;
 import base_statement;

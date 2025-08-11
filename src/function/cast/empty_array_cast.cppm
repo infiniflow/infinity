@@ -23,7 +23,7 @@ import :column_vector_cast;
 import :infinity_exception;
 import internal_types;
 import logical_type;
-import :third_party;
+import third_party;
 
 namespace infinity {
 

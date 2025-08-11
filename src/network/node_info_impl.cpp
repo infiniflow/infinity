@@ -21,7 +21,7 @@ module infinity_core:node_info.impl;
 
 import :node_info;
 import :stl;
-// import :third_party;
+// import third_party;
 import admin_statement;
 
 namespace infinity {

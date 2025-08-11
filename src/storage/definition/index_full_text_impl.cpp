@@ -24,7 +24,7 @@ import :index_full_text;
 
 import :stl;
 import :index_base;
-import :third_party;
+import third_party;
 import :status;
 import serialize;
 import :infinity_exception;

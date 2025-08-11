@@ -24,7 +24,7 @@ import :buffer_handle;
 import :infinity_exception;
 import :default_values;
 import :logger;
-import :third_party;
+import third_party;
 import serialize;
 import internal_types;
 import logical_type;

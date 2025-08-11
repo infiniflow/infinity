@@ -24,7 +24,7 @@ import :logger;
 import :base_memindex;
 import :memindex_tracer;
 import :buffer_handle;
-import :third_party;
+import third_party;
 import :config;
 import :chunk_index_meta;
 

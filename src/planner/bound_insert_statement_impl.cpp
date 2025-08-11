@@ -29,7 +29,7 @@ import :base_table_ref;
 import table_reference;
 import :infinity_exception;
 import :status;
-import :third_party;
+import third_party;
 
 namespace infinity {
 

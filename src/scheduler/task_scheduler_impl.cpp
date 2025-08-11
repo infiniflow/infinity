@@ -29,7 +29,7 @@ import :infinity_exception;
 import :threadutil;
 import :fragment_task;
 import :logger;
-import :third_party;
+import third_party;
 import :query_context;
 import :plan_fragment;
 import :fragment_context;

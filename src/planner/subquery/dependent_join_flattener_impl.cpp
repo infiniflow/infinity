@@ -22,7 +22,7 @@ import :stl;
 
 import :logical_node;
 import :logical_node_type;
-import :third_party;
+import third_party;
 
 import :infinity_exception;
 import :logical_aggregate;
