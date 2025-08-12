@@ -994,23 +994,6 @@ Status NewCatalog::CleanBlockColumn(ColumnMeta &column_meta, const ColumnDef *co
     return Status::OK();
 }
 
-Status NewCatalog::AddNewSegmentIndex(TableIndexMeeta &table_index_meta, SegmentID segment_id, Optional<SegmentIndexMeta> &segment_index_meta) {
-    {
-        Status status = table_index_meta.AddSegmentID(segment_id);
-        if (!status.ok()) {
-            return status;
-        }
-    }
-    {
-        segment_index_meta.emplace(segment_id, table_index_meta);
-        Status status = segment_index_meta->InitSet();
-        if (!status.ok()) {
-            return status;
-        }
-    }
-    return Status::OK();
-}
-
 Status NewCatalog::AddNewSegmentIndex1(TableIndexMeeta &table_index_meta,
                                        NewTxn *new_txn,
                                        SegmentID segment_id,

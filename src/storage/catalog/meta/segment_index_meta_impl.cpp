@@ -59,16 +59,6 @@ Status SegmentIndexMeta::GetNextChunkID(ChunkID &chunk_id) {
     return Status::OK();
 }
 
-Tuple<ChunkID, Status> SegmentIndexMeta::GetNextChunkID1() {
-    if (!next_chunk_id_) {
-        Status status = LoadNextChunkID();
-        if (!status.ok()) {
-            return {std::numeric_limits<ChunkID>::max(), status};
-        }
-    }
-    return {*next_chunk_id_, Status::OK()};
-}
-
 Tuple<Vector<ChunkID> *, Status> SegmentIndexMeta::GetChunkIDs1() {
     if (!chunk_ids_) {
         auto status = LoadChunkIDs1();
@@ -182,29 +172,12 @@ Status SegmentIndexMeta::SetNoMemIndex() {
     return Status::OK();
 }
 
-Status SegmentIndexMeta::InitSet() {
-    return SetNextChunkID(0);
-}
-
 Status SegmentIndexMeta::InitSet1() {
-    {
-        Status status = SetNextChunkID(0);
-        if (!status.ok()) {
-            return status;
-        }
-    }
+    // next_chunk_id is not set in InitSet1, it will be set when the first chunk is added.
     return Status::OK();
 }
 
-Status SegmentIndexMeta::RestoreSet(const ChunkID &next_chunk_id) {
-   {
-        Status status = SetNextChunkID(next_chunk_id);
-        if (!status.ok()) {
-            return status;
-        }
-    }
-    return Status::OK();
-}
+Status SegmentIndexMeta::RestoreSet(const ChunkID &next_chunk_id) { return SetNextChunkID(next_chunk_id); }
 
 Status SegmentIndexMeta::LoadSet() {
     // {
@@ -458,7 +431,7 @@ Tuple<SharedPtr<SegmentIndexSnapshotInfo>, Status> SegmentIndexMeta::MapMetaToSn
     auto [chunk_ids, status] = GetChunkIDs1();
     if (!status.ok()) {
         return {nullptr, status};
-    }   
+    }
     for (auto &chunk_id : *chunk_ids) {
         ChunkIndexMeta chunk_index_meta(chunk_id, *this);
         auto [chunk_index_snapshot, chunk_index_status] = chunk_index_meta.MapMetaToSnapShotInfo(chunk_id);

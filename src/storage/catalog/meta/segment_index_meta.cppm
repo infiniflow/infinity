@@ -45,8 +45,6 @@ public:
 
     Status GetNextChunkID(ChunkID &chunk_id);
 
-    Tuple<ChunkID, Status> GetNextChunkID1();
-
     Tuple<Vector<ChunkID> *, Status> GetChunkIDs1();
 
     Status GetFtInfo(SharedPtr<SegmentIndexFtInfo> &ft_info);
@@ -62,8 +60,6 @@ public:
     Status UpdateFtInfo(u64 column_len_sum, u32 column_len_cnt);
 
     Status SetNoMemIndex();
-
-    Status InitSet();
 
     Status InitSet1();
 
