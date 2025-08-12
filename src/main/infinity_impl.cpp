@@ -1427,6 +1427,17 @@ QueryResult Infinity::ListSnapshots() {
     return result;
 }
 
+QueryResult Infinity::ListCaches() {
+    UniquePtr<QueryContext> query_context_ptr;
+    GET_QUERY_CONTEXT(GetQueryContext(), query_context_ptr);
+
+    auto show_statement = MakeUnique<ShowStatement>();
+    show_statement->show_type_ = ShowStmtType::kListCaches;
+
+    QueryResult result = query_context_ptr->QueryStatement(show_statement.get());
+    return result;
+}
+
 QueryResult Infinity::AdminShowLogs() {
     UniquePtr<QueryContext> query_context_ptr;
     GET_QUERY_CONTEXT(GetQueryContext(true), query_context_ptr);

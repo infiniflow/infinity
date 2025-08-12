@@ -55,7 +55,9 @@ SharedPtr<WalEntry> CreateDBTxnStore::ToWalEntry(TxnTimeStamp commit_ts) const {
     return wal_entry;
 }
 
-Vector<SharedPtr<MetaBaseCache>> CreateDBTxnStore::ToCachedMeta(TxnTimeStamp commit_ts) const { return {}; }
+Vector<SharedPtr<MetaBaseCache>> CreateDBTxnStore::ToCachedMeta(TxnTimeStamp commit_ts) const {
+    return {MakeShared<MetaDbCache>(db_name_, db_id_, commit_ts, false)};
+}
 
 String DropDBTxnStore::ToString() const {
     return fmt::format("{}: database: {}, db_id: {}, create_ts: {}", TransactionType2Str(type_), db_name_, db_id_, create_ts_);
@@ -69,7 +71,9 @@ SharedPtr<WalEntry> DropDBTxnStore::ToWalEntry(TxnTimeStamp commit_ts) const {
     return wal_entry;
 }
 
-Vector<SharedPtr<MetaBaseCache>> DropDBTxnStore::ToCachedMeta(TxnTimeStamp commit_ts) const { return {}; }
+Vector<SharedPtr<MetaBaseCache>> DropDBTxnStore::ToCachedMeta(TxnTimeStamp commit_ts) const {
+    return {MakeShared<MetaDbCache>(db_name_, db_id_, commit_ts, true)};
+}
 
 String CreateTableTxnStore::ToString() const {
     return fmt::format("{}: database: {}, db_id: {}, table_id: {}", TransactionType2Str(type_), db_name_, db_id_, table_id_);
@@ -83,7 +87,9 @@ SharedPtr<WalEntry> CreateTableTxnStore::ToWalEntry(TxnTimeStamp commit_ts) cons
     return wal_entry;
 }
 
-Vector<SharedPtr<MetaBaseCache>> CreateTableTxnStore::ToCachedMeta(TxnTimeStamp commit_ts) const { return {}; }
+Vector<SharedPtr<MetaBaseCache>> CreateTableTxnStore::ToCachedMeta(TxnTimeStamp commit_ts) const {
+    return {MakeShared<MetaTableCache>(db_id_, table_name_, table_id_, commit_ts, false)};
+}
 
 String CreateTableSnapshotTxnStore::ToString() const {
     return fmt::format("{}: database: {}, table: {}, snapshot: {}, max_commit_ts: {}",
@@ -122,7 +128,9 @@ SharedPtr<WalEntry> DropTableTxnStore::ToWalEntry(TxnTimeStamp commit_ts) const 
     return wal_entry;
 }
 
-Vector<SharedPtr<MetaBaseCache>> DropTableTxnStore::ToCachedMeta(TxnTimeStamp commit_ts) const { return {}; }
+Vector<SharedPtr<MetaBaseCache>> DropTableTxnStore::ToCachedMeta(TxnTimeStamp commit_ts) const {
+    return {MakeShared<MetaTableCache>(db_id_, table_name_, table_id_, commit_ts, true)};
+}
 
 String RestoreTableTxnStore::ToString() const {
     return fmt::format("{}: database: {}, db_id: {}, table: {}, table_id: {}", TransactionType2Str(type_), db_name_, db_id_, table_name_, table_id_);
@@ -145,7 +153,9 @@ SharedPtr<WalEntry> RestoreTableTxnStore::ToWalEntry(TxnTimeStamp commit_ts) con
     return wal_entry;
 }
 
-Vector<SharedPtr<MetaBaseCache>> RestoreTableTxnStore::ToCachedMeta(TxnTimeStamp commit_ts) const { return {}; }
+Vector<SharedPtr<MetaBaseCache>> RestoreTableTxnStore::ToCachedMeta(TxnTimeStamp commit_ts) const {
+    return {MakeShared<MetaTableCache>(db_id_, table_name_, table_id_, commit_ts, false)};
+}
 
 String RestoreDatabaseTxnStore::ToString() const {
     return fmt::format("{}: database: {}, db_id: {}", TransactionType2Str(type_), db_name_, db_id_str_);
@@ -173,7 +183,9 @@ SharedPtr<WalEntry> RestoreDatabaseTxnStore::ToWalEntry(TxnTimeStamp commit_ts) 
     return wal_entry;
 }
 
-Vector<SharedPtr<MetaBaseCache>> RestoreDatabaseTxnStore::ToCachedMeta(TxnTimeStamp commit_ts) const { return {}; }
+Vector<SharedPtr<MetaBaseCache>> RestoreDatabaseTxnStore::ToCachedMeta(TxnTimeStamp commit_ts) const {
+    return {MakeShared<MetaDbCache>(db_name_, std::stoull(db_id_str_), commit_ts, false)};
+}
 
 String RenameTableTxnStore::ToString() const {
     return fmt::format("{}: database: {}, db_id: {}, old_table: {}, table_id: {}, new_table_name: {}",
@@ -194,7 +206,13 @@ SharedPtr<WalEntry> RenameTableTxnStore::ToWalEntry(TxnTimeStamp commit_ts) cons
     return wal_entry;
 }
 
-Vector<SharedPtr<MetaBaseCache>> RenameTableTxnStore::ToCachedMeta(TxnTimeStamp commit_ts) const { return {}; }
+Vector<SharedPtr<MetaBaseCache>> RenameTableTxnStore::ToCachedMeta(TxnTimeStamp commit_ts) const {
+    u64 table_id = std::stoull(table_id_str_);
+    Vector<SharedPtr<MetaBaseCache>> cache_items;
+    cache_items.push_back(MakeShared<MetaTableCache>(std::stoull(db_id_str_), old_table_name_, table_id, commit_ts, true));
+    cache_items.push_back(MakeShared<MetaTableCache>(std::stoull(db_id_str_), new_table_name_, table_id, commit_ts, false));
+    return cache_items;
+}
 
 String CreateIndexTxnStore::ToString() const {
     return fmt::format("{}: database: {}, db_id: {}, table: {}, table_id: {}, index_id: {}",

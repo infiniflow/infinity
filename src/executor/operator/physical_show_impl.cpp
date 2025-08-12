@@ -603,6 +603,19 @@ void PhysicalShow::Init(QueryContext *query_context) {
             output_types_->emplace_back(varchar_type);
             break;
         }
+        case ShowStmtType::kListCaches: {
+            output_names_->reserve(4);
+            output_types_->reserve(4);
+            output_names_->emplace_back("type");
+            output_names_->emplace_back("name");
+            output_names_->emplace_back("commit_ts");
+            output_names_->emplace_back("detail");
+            output_types_->emplace_back(varchar_type);
+            output_types_->emplace_back(varchar_type);
+            output_types_->emplace_back(varchar_type);
+            output_types_->emplace_back(varchar_type);
+            break;
+        }
         default: {
             Status status = Status::NotSupport("Not implemented show type");
             RecoverableError(status);
@@ -777,6 +790,10 @@ bool PhysicalShow::Execute(QueryContext *query_context, OperatorState *operator_
         }
         case ShowStmtType::kShowSnapshot: {
             ExecuteShowSnapshot(query_context, show_operator_state);
+            break;
+        }
+        case ShowStmtType::kListCaches: {
+            ExecuteListCaches(query_context, show_operator_state);
             break;
         }
         default: {
@@ -6479,6 +6496,21 @@ void PhysicalShow::ExecuteShowSnapshot(QueryContext *query_context, ShowOperator
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
         }
     }
+
+    output_block_ptr->Finalize();
+    operator_state->output_.emplace_back(std::move(output_block_ptr));
+    return;
+}
+
+void PhysicalShow::ExecuteListCaches(QueryContext *query_context, ShowOperatorState *operator_state) {
+    auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
+    UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
+    Vector<SharedPtr<DataType>> column_types{
+        varchar_type,
+        varchar_type,
+    };
+
+    output_block_ptr->Init(*output_types_);
 
     output_block_ptr->Finalize();
     operator_state->output_.emplace_back(std::move(output_block_ptr));

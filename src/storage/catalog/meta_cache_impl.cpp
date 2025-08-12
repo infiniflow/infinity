@@ -27,14 +27,15 @@ import :kv_store;
 
 namespace infinity {
 
-void MetaCache::PutOrErase(const Vector<SharedPtr<MetaBaseCache>> &cache_items, KVInstance *kv_instance) {
+Status MetaCache::PutOrErase(const Vector<SharedPtr<MetaBaseCache>> &cache_items, KVInstance *kv_instance) {
     std::unique_lock lock(cache_mtx_);
     for (const auto &cache_item : cache_items) {
         PutOrEraseNolock(cache_item);
     }
     if (kv_instance != nullptr) {
-        kv_instance->Commit();
+        return kv_instance->Commit();
     }
+    return Status::OK();
 }
 
 void MetaCache::PutOrEraseNolock(const SharedPtr<MetaBaseCache> &meta_base_cache) {

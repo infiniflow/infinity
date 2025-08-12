@@ -116,7 +116,7 @@ export class MetaCache {
 public:
     explicit MetaCache(SizeT capacity) : capacity_(capacity) {};
 
-    void PutOrErase(const Vector<SharedPtr<MetaBaseCache>> &cache_items, KVInstance *kv_instance);
+    Status PutOrErase(const Vector<SharedPtr<MetaBaseCache>> &cache_items, KVInstance *kv_instance);
 
     SharedPtr<MetaDbCache> GetDb(const String &db_name, TxnTimeStamp begin_ts);
 

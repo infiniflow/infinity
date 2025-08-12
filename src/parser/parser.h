@@ -323,16 +323,17 @@ struct SQL_LTYPE {
     SNAPSHOTS = 450,               /* SNAPSHOTS  */
     RECOVER = 451,                 /* RECOVER  */
     RESTORE = 452,                 /* RESTORE  */
-    PERSISTENCE = 453,             /* PERSISTENCE  */
-    OBJECT = 454,                  /* OBJECT  */
-    OBJECTS = 455,                 /* OBJECTS  */
-    FILES = 456,                   /* FILES  */
-    MEMORY = 457,                  /* MEMORY  */
-    ALLOCATION = 458,              /* ALLOCATION  */
-    HISTORY = 459,                 /* HISTORY  */
-    CHECK = 460,                   /* CHECK  */
-    CLEAN = 461,                   /* CLEAN  */
-    NUMBER = 462                   /* NUMBER  */
+    CACHES = 453,                  /* CACHES  */
+    PERSISTENCE = 454,             /* PERSISTENCE  */
+    OBJECT = 455,                  /* OBJECT  */
+    OBJECTS = 456,                 /* OBJECTS  */
+    FILES = 457,                   /* FILES  */
+    MEMORY = 458,                  /* MEMORY  */
+    ALLOCATION = 459,              /* ALLOCATION  */
+    HISTORY = 460,                 /* HISTORY  */
+    CHECK = 461,                   /* CHECK  */
+    CLEAN = 462,                   /* CLEAN  */
+    NUMBER = 463                   /* NUMBER  */
   };
   typedef enum sqltokentype sqltoken_kind_t;
 #endif
@@ -422,7 +423,7 @@ union SQLSTYPE
     std::pair<int64_t, int64_t>*    int_sparse_ele_t;
     std::pair<int64_t, double>*     float_sparse_ele_t;
 
-#line 426 "parser.h"
+#line 427 "parser.h"
 
 };
 typedef union SQLSTYPE SQLSTYPE;

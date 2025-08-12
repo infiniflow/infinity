@@ -116,6 +116,8 @@ String ToString(ShowStmtType type) {
             return "List snapshots";
         case ShowStmtType::kShowSnapshot:
             return "Show snapshot";
+        case ShowStmtType::kListCaches:
+            return "List caches";
         case ShowStmtType::kInvalid: {
             String error_message = "Invalid chunk scan type";
             UnrecoverableError(error_message);

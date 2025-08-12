@@ -178,6 +178,7 @@ public:
     QueryResult ShowMemoryObjects();
     QueryResult ShowMemoryAllocations();
     QueryResult ShowFunction(const String &function_name);
+    QueryResult ListCaches();
 
     QueryResult Insert(const String &db_name, const String &table_name, Vector<InsertRowExpr *> *&insert_rows);
 
