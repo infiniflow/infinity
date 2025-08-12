@@ -180,7 +180,6 @@ jobs:
         if: ${{ !cancelled() }}
         run: |
           failure="${{ steps.run_unit_test_debug.outcome == 'failure' }}"
-          sudo docker exec ${BUILDER_CONTAINER} bash -c "cp /var/infinity/log/infinity.log /infinity/infinity.log"
           sudo python3 scripts/collect_log.py --log_path=infinity.log --stdout_path=unittest_debug.log --stderror_path=unittest_debug_error.log --executable_path=cmake-build-debug/src/infinity --output_dir=${RUNNER_WORKSPACE_PREFIX}/log --failure=${failure}
 
       - name: Start infinity debug version
