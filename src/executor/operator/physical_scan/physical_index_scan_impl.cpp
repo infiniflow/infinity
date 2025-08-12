@@ -206,8 +206,7 @@ void PhysicalIndexScan::ExecuteInternal(QueryContext *query_context, IndexScanOp
     if (status.ok()) {
         if (fast_rough_filter_evaluator_ and !fast_rough_filter_evaluator_->Evaluate(begin_ts, *segment_filter)) {
             // skip this segment
-            LOG_TRACE(
-                fmt::format("IndexScan: job number: {}, segment_ids.size(): {}, skipped after FastRoughFilter", next_idx, segment_ids.size()));
+            LOG_TRACE(fmt::format("IndexScan: job number: {}, segment_ids.size(): {}, skipped after FastRoughFilter", next_idx, segment_ids.size()));
             Bitmask result_empty(segment_row_count);
             result_empty.SetAllFalse();
             OutputBitmaskResult(result_empty, segment_row_count);

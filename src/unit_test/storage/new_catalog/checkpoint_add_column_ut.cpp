@@ -102,8 +102,7 @@ protected:
 
 INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
                          TestTxnCheckpointAddColumnTest,
-                         ::testing::Values(
-                                           TestTxnCheckpointAddColumnTest::NEW_VFS_OFF_BG_OFF_PATH));
+                         ::testing::Values(TestTxnCheckpointAddColumnTest::NEW_VFS_OFF_BG_OFF_PATH));
 
 TEST_P(TestTxnCheckpointAddColumnTest, addcol_checkpoint_insert) {
     SharedPtr<String> db_name = std::make_shared<String>("default_db");
@@ -134,9 +133,8 @@ TEST_P(TestTxnCheckpointAddColumnTest, addcol_checkpoint_insert) {
     status = new_txn_mgr->CommitTxn(txn);
     EXPECT_TRUE(status.ok());
 
-    SharedPtr<DataBlock> input_block = make_input_block(Vector<SharedPtr<ColumnDef>>{column_def1, column_def2},
-                                                        Vector<Value>{Value::MakeInt(1), Value::MakeVarchar("abcde")},
-                                                        10);
+    SharedPtr<DataBlock> input_block =
+        make_input_block(Vector<SharedPtr<ColumnDef>>{column_def1, column_def2}, Vector<Value>{Value::MakeInt(1), Value::MakeVarchar("abcde")}, 10);
     txn = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
     status = txn->Append(*db_name, *table_name, input_block);
     EXPECT_TRUE(status.ok());

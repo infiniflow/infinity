@@ -42,7 +42,7 @@ import row_id;
 
 namespace infinity {
 
-void PhysicalMergeKnn::Init(QueryContext* query_context) { left()->Init(query_context); }
+void PhysicalMergeKnn::Init(QueryContext *query_context) { left()->Init(query_context); }
 
 bool PhysicalMergeKnn::Execute(QueryContext *query_context, OperatorState *operator_state) {
     auto merge_knn_op_state = static_cast<MergeKnnOperatorState *>(operator_state);

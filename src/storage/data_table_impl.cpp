@@ -14,8 +14,8 @@
 
 module;
 
-#include <sstream>
 #include <memory>
+#include <sstream>
 
 module infinity_core:data_table.impl;
 

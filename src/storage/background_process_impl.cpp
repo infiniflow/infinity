@@ -124,7 +124,7 @@ void BGTaskProcessor::Process() {
                         }
 
                         CleanupTxnStore *cleanup_txn_store = static_cast<CleanupTxnStore *>(new_txn_shared->GetTxnStore());
-                        if(cleanup_txn_store != nullptr) {
+                        if (cleanup_txn_store != nullptr) {
                             TxnTimeStamp clean_ts = cleanup_txn_store->timestamp_;
                             SharedPtr<BGTaskInfo> bg_task_info = MakeShared<BGTaskInfo>(BGTaskType::kNewCleanup);
                             String task_text = fmt::format("NewCleanup task, cleanup timestamp: {}", clean_ts);

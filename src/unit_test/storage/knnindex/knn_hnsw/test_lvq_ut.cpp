@@ -13,15 +13,15 @@
 // limitations under the License.
 
 #ifdef CI
-#include <random>
 #include "gtest/gtest.h"
+#include <random>
 import infinity_core;
 import base_test;
 #else
 module;
 
-#include <random>
 #include "gtest/gtest.h"
+#include <random>
 
 module infinity_core:ut.test_lvq;
 

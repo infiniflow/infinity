@@ -164,9 +164,7 @@ TEST_F(BufferObjTest, test1) {
         buf1->CheckState();
     }
 
-    {
-        auto handle2 = buf2->Load();
-    }
+    { auto handle2 = buf2->Load(); }
     // kUnloaded, kEphemeral -> kFreed, kEphemeral
     EXPECT_EQ(buf1->status(), BufferStatus::kFreed);
     buf1->CheckState();
@@ -178,9 +176,7 @@ TEST_F(BufferObjTest, test1) {
         EXPECT_EQ(buf1->status(), BufferStatus::kLoaded);
         buf1->CheckState();
     }
-    {
-        auto handle2 = buf2->Load();
-    }
+    { auto handle2 = buf2->Load(); }
 
     /// kTemp
     {
@@ -202,9 +198,7 @@ TEST_F(BufferObjTest, test1) {
         buf1->CheckState();
     }
 
-    {
-        auto handle2 = buf2->Load();
-    }
+    { auto handle2 = buf2->Load(); }
     // kUnloaded, kTemp -> kFreed, kTemp
     EXPECT_EQ(buf1->status(), BufferStatus::kFreed);
     buf1->CheckState();
@@ -232,9 +226,7 @@ TEST_F(BufferObjTest, test1) {
         buf1->CheckState();
     }
 
-    {
-        auto handle2 = buf2->Load();
-    }
+    { auto handle2 = buf2->Load(); }
     // kUnloaded, kPersistent -> kFreed, kPersistent
     EXPECT_EQ(buf1->status(), BufferStatus::kFreed);
     buf1->CheckState();
@@ -288,9 +280,7 @@ TEST_F(BufferObjTest, test1) {
         auto handle1 = buf1->Load();
         [[maybe_unused]] auto data1 = handle1.GetDataMut();
     }
-    {
-        auto handle2 = buf2->Load();
-    }
+    { auto handle2 = buf2->Load(); }
     {
         auto handle1 = buf1->Load();
         SaveBufferObj(buf1);
@@ -303,12 +293,8 @@ TEST_F(BufferObjTest, test1) {
         auto handle1 = buf1->Load();
         [[maybe_unused]] auto data1 = handle1.GetDataMut();
     }
-    {
-        auto handle2 = buf2->Load();
-    }
-    {
-        auto handle1 = buf1->Load();
-    }
+    { auto handle2 = buf2->Load(); }
+    { auto handle1 = buf1->Load(); }
     SaveBufferObj(buf1);
     // kUnloaded, kPersistent -> kUnloaded, kPersistent
     EXPECT_EQ(buf1->status(), BufferStatus::kUnloaded);

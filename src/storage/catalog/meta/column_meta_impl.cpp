@@ -376,7 +376,7 @@ String ColumnMeta::GetColumnTag(const String &tag) const {
                                                            tag);
 }
 
-Tuple<SharedPtr<BlockColumnSnapshotInfo>, Status> ColumnMeta::MapMetaToSnapShotInfo(){
+Tuple<SharedPtr<BlockColumnSnapshotInfo>, Status> ColumnMeta::MapMetaToSnapShotInfo() {
     SharedPtr<BlockColumnSnapshotInfo> block_column_snapshot_info = MakeShared<BlockColumnSnapshotInfo>();
     SharedPtr<Vector<SharedPtr<ColumnDef>>> column_defs;
     Status status;
@@ -407,7 +407,7 @@ Tuple<SharedPtr<BlockColumnSnapshotInfo>, Status> ColumnMeta::MapMetaToSnapShotI
     return {block_column_snapshot_info, Status::OK()};
 }
 
-Status ColumnMeta::RestoreFromSnapshot(SizeT column_idx){
+Status ColumnMeta::RestoreFromSnapshot(SizeT column_idx) {
     // TODO: figure out whether we are still using chunkoffset
     Status status;
     SharedPtr<Vector<SharedPtr<ColumnDef>>> column_defs;
@@ -423,9 +423,5 @@ Status ColumnMeta::RestoreFromSnapshot(SizeT column_idx){
 
     return Status::OK();
 }
-
-
-
-
 
 } // namespace infinity

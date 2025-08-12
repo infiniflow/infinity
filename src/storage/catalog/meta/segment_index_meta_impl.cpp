@@ -182,9 +182,7 @@ Status SegmentIndexMeta::SetNoMemIndex() {
     return Status::OK();
 }
 
-Status SegmentIndexMeta::InitSet() {
-    return SetNextChunkID(0);
-}
+Status SegmentIndexMeta::InitSet() { return SetNextChunkID(0); }
 
 Status SegmentIndexMeta::InitSet1() {
     {
@@ -197,7 +195,7 @@ Status SegmentIndexMeta::InitSet1() {
 }
 
 Status SegmentIndexMeta::RestoreSet(const ChunkID &next_chunk_id) {
-   {
+    {
         Status status = SetNextChunkID(next_chunk_id);
         if (!status.ok()) {
             return status;
@@ -458,7 +456,7 @@ Tuple<SharedPtr<SegmentIndexSnapshotInfo>, Status> SegmentIndexMeta::MapMetaToSn
     auto [chunk_ids, status] = GetChunkIDs1();
     if (!status.ok()) {
         return {nullptr, status};
-    }   
+    }
     for (auto &chunk_id : *chunk_ids) {
         ChunkIndexMeta chunk_index_meta(chunk_id, *this);
         auto [chunk_index_snapshot, chunk_index_status] = chunk_index_meta.MapMetaToSnapShotInfo(chunk_id);

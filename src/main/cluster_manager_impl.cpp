@@ -14,8 +14,8 @@
 
 module;
 
-#include <vector>
 #include <string>
+#include <vector>
 
 module infinity_core:cluster_manager.impl;
 

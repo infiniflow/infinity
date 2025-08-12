@@ -101,9 +101,7 @@ TEST_P(BlockVersionTest, SaveAndLoad2) {
             block_version->Delete(2, 30);
             block_version->Delete(5, 40);
         }
-        {
-            buffer_obj->Save(VersionFileWorkerSaveCtx(15));
-        }
+        { buffer_obj->Save(VersionFileWorkerSaveCtx(15)); }
     }
     {
         BufferManager buffer_mgr(1 << 20 /*memory limit*/, data_dir, temp_dir, nullptr);
@@ -130,9 +128,7 @@ TEST_P(BlockVersionTest, SaveAndLoad2) {
             block_version->Delete(2, 30);
             block_version->Delete(5, 40);
         }
-        {
-            buffer_obj->Save(VersionFileWorkerSaveCtx(35));
-        }
+        { buffer_obj->Save(VersionFileWorkerSaveCtx(35)); }
     }
     {
         BufferManager buffer_mgr(1 << 20 /*memory limit*/, data_dir, temp_dir, nullptr);

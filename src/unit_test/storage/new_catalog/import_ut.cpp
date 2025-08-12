@@ -6274,7 +6274,6 @@ TEST_P(TestTxnImport, test_import_and_optimize_index) {
         DropDB();
     }
 
-
     //    t1      import      commit (success)
     //    |----------|---------|
     //                    |------------------|----------------|

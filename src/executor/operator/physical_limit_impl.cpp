@@ -158,7 +158,7 @@ PhysicalLimit::PhysicalLimit(u64 id,
     counter_ = MakeUnique<AtomicCounter>(offset, limit);
 }
 
-void PhysicalLimit::Init(QueryContext* query_context) {}
+void PhysicalLimit::Init(QueryContext *query_context) {}
 
 //    offset     limit + offset
 //    left       right

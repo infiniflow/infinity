@@ -46,20 +46,16 @@ String LogicalFlush::ToString(i64 &space) const {
 
     switch (flush_type_) {
         case FlushType::kCatalog:
-            ss << String(space, ' ') << "-> "
-               << "Flush Catalog: ";
+            ss << String(space, ' ') << "-> " << "Flush Catalog: ";
             break;
         case FlushType::kData:
-            ss << String(space, ' ') << "-> "
-               << "Flush Data: ";
+            ss << String(space, ' ') << "-> " << "Flush Data: ";
             break;
         case FlushType::kLog:
-            ss << String(space, ' ') << "-> "
-               << "Flush Log: ";
+            ss << String(space, ' ') << "-> " << "Flush Log: ";
             break;
         case FlushType::kBuffer:
-            ss << String(space, ' ') << "-> "
-               << "Flush Buffer: ";
+            ss << String(space, ' ') << "-> " << "Flush Buffer: ";
             break;
     }
     space += arrow_str.size();

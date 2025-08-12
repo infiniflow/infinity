@@ -48,7 +48,7 @@ PhysicalCreateCollection::PhysicalCreateCollection(SharedPtr<String> schema_name
       collection_name_(std::move(collection_name)), conflict_type_(conflict_type), table_index_(table_index), output_names_(std::move(output_names)),
       output_types_(std::move(output_types)) {}
 
-void PhysicalCreateCollection::Init(QueryContext* query_context) {}
+void PhysicalCreateCollection::Init(QueryContext *query_context) {}
 
 bool PhysicalCreateCollection::Execute(QueryContext *, OperatorState *operator_state) {
     StorageMode storage_mode = InfinityContext::instance().storage()->GetStorageMode();

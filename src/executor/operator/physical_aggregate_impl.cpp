@@ -47,7 +47,7 @@ import data_type;
 
 namespace infinity {
 
-void PhysicalAggregate::Init(QueryContext* query_context) {}
+void PhysicalAggregate::Init(QueryContext *query_context) {}
 
 bool PhysicalAggregate::Execute(QueryContext *query_context, OperatorState *operator_state) {
     OperatorState *prev_op_state = operator_state->prev_op_state_;

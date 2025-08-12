@@ -31,7 +31,7 @@ import :status;
 
 namespace infinity {
 
-void PhysicalDropCollection::Init(QueryContext* query_context) {}
+void PhysicalDropCollection::Init(QueryContext *query_context) {}
 
 bool PhysicalDropCollection::Execute(QueryContext *, OperatorState *operator_state) {
     StorageMode storage_mode = InfinityContext::instance().storage()->GetStorageMode();

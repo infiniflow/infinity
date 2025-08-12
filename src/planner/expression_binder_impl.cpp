@@ -14,8 +14,8 @@
 
 module;
 
-#include <string>
 #include <memory>
+#include <string>
 
 module infinity_core:expression_binder.impl;
 

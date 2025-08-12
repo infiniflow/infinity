@@ -14,10 +14,10 @@
 
 module;
 
+#include <memory>
 #include <sstream>
 #include <string>
 #include <vector>
-#include <memory>
 
 module infinity_core:index_diskann.impl;
 

@@ -36,7 +36,6 @@ struct MinuteFunction {
         RecoverableError(status);
         return false;
     }
-
 };
 
 template <>
@@ -63,21 +62,21 @@ void RegisterMinuteFunction(NewCatalog *catalog_ptr) {
     SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
 
     ScalarFunction minute_datetime_function(func_name,
-                                  {DataType(LogicalType::kDateTime)},
-                                  {DataType(LogicalType::kBigInt)},
-                                  &ScalarFunction::UnaryFunctionWithFailure<DateTimeT, BigIntT, MinuteFunction>);
+                                            {DataType(LogicalType::kDateTime)},
+                                            {DataType(LogicalType::kBigInt)},
+                                            &ScalarFunction::UnaryFunctionWithFailure<DateTimeT, BigIntT, MinuteFunction>);
     function_set_ptr->AddFunction(minute_datetime_function);
 
     ScalarFunction minute_time_function(func_name,
-                                  {DataType(LogicalType::kTime)},
-                                  {DataType(LogicalType::kBigInt)},
-                                  &ScalarFunction::UnaryFunctionWithFailure<TimeT, BigIntT, MinuteFunction>);
+                                        {DataType(LogicalType::kTime)},
+                                        {DataType(LogicalType::kBigInt)},
+                                        &ScalarFunction::UnaryFunctionWithFailure<TimeT, BigIntT, MinuteFunction>);
     function_set_ptr->AddFunction(minute_time_function);
 
     ScalarFunction minute_timestamp_function(func_name,
-                                  {DataType(LogicalType::kTimestamp)},
-                                  {DataType(LogicalType::kBigInt)},
-                                  &ScalarFunction::UnaryFunctionWithFailure<TimestampT, BigIntT, MinuteFunction>);
+                                             {DataType(LogicalType::kTimestamp)},
+                                             {DataType(LogicalType::kBigInt)},
+                                             &ScalarFunction::UnaryFunctionWithFailure<TimestampT, BigIntT, MinuteFunction>);
     function_set_ptr->AddFunction(minute_timestamp_function);
 
     NewCatalog::AddFunctionSet(catalog_ptr, function_set_ptr);

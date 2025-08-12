@@ -68,10 +68,8 @@ protected:
     void SetUp() override {
         NewReplayTest::SetUp();
         db_name = std::make_shared<String>("default_db");
-        column_def1 =
-            std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
-        column_def2 =
-            std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
+        column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
+        column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
         table_name = std::make_shared<std::string>("tb1");
         table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def2});
         index_name1 = std::make_shared<std::string>("index1");

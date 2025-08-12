@@ -211,8 +211,8 @@ void ExpressionEvaluator::Execute(const SharedPtr<InExpression> &expr,
 
     // in expression evaluates to a constant
     if (left_state->OutputColumnVector()->vector_type() == ColumnVectorType::kConstant) {
-        bool in_result =
-            (expr->in_type() == InType::kIn) ? expr->Exists(left_state_output->GetValueByIndex(0)) : !expr->Exists(left_state_output->GetValueByIndex(0));
+        bool in_result = (expr->in_type() == InType::kIn) ? expr->Exists(left_state_output->GetValueByIndex(0))
+                                                          : !expr->Exists(left_state_output->GetValueByIndex(0));
         for (SizeT idx = 0; idx < input_data_block_->row_count(); idx++) {
             output_column_vector->buffer_->SetCompactBit(idx, in_result);
         }

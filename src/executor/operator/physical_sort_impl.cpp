@@ -151,7 +151,7 @@ void CopyWithIndexes(const Vector<UniquePtr<DataBlock>> &input_blocks,
     }
 }
 
-void PhysicalSort::Init(QueryContext* query_context) {
+void PhysicalSort::Init(QueryContext *query_context) {
     auto sort_expr_count = order_by_types_.size();
     if (sort_expr_count != expressions_.size()) {
         String error_message = "order_by_types_.size() != expressions_.size()";

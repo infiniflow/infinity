@@ -36,7 +36,6 @@ struct DayFunction {
         RecoverableError(status);
         return false;
     }
-
 };
 
 template <>
@@ -63,21 +62,21 @@ void RegisterDayFunction(NewCatalog *catalog_ptr) {
     SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
 
     ScalarFunction day_date_function(func_name,
-                                  {DataType(LogicalType::kDate)},
-                                  {DataType(LogicalType::kBigInt)},
-                                  &ScalarFunction::UnaryFunctionWithFailure<DateT, BigIntT, DayFunction>);
+                                     {DataType(LogicalType::kDate)},
+                                     {DataType(LogicalType::kBigInt)},
+                                     &ScalarFunction::UnaryFunctionWithFailure<DateT, BigIntT, DayFunction>);
     function_set_ptr->AddFunction(day_date_function);
 
     ScalarFunction day_datetime_function(func_name,
-                                  {DataType(LogicalType::kDateTime)},
-                                  {DataType(LogicalType::kBigInt)},
-                                  &ScalarFunction::UnaryFunctionWithFailure<DateTimeT, BigIntT, DayFunction>);
+                                         {DataType(LogicalType::kDateTime)},
+                                         {DataType(LogicalType::kBigInt)},
+                                         &ScalarFunction::UnaryFunctionWithFailure<DateTimeT, BigIntT, DayFunction>);
     function_set_ptr->AddFunction(day_datetime_function);
 
     ScalarFunction day_timestamp_function(func_name,
-                                  {DataType(LogicalType::kTimestamp)},
-                                  {DataType(LogicalType::kBigInt)},
-                                  &ScalarFunction::UnaryFunctionWithFailure<TimestampT, BigIntT, DayFunction>);
+                                          {DataType(LogicalType::kTimestamp)},
+                                          {DataType(LogicalType::kBigInt)},
+                                          &ScalarFunction::UnaryFunctionWithFailure<TimestampT, BigIntT, DayFunction>);
     function_set_ptr->AddFunction(day_timestamp_function);
 
     NewCatalog::AddFunctionSet(catalog_ptr, function_set_ptr);

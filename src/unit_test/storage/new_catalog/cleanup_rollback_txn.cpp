@@ -51,8 +51,8 @@ import :index_filter_evaluators;
 import :index_emvb;
 import :wal_manager;
 #else
-#include <filesystem>
 #include "gtest/gtest.h"
+#include <filesystem>
 import infinity_core;
 import base_test;
 #endif

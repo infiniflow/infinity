@@ -58,8 +58,7 @@ String LogicalCheck::ToString(i64 &space) const {
         space -= 4;
         arrow_str = "->  ";
     }
-    ss << String(space, ' ') << "-> "
-       << "Check: ";
+    ss << String(space, ' ') << "-> " << "Check: ";
     space += arrow_str.size();
 
     return ss.str();

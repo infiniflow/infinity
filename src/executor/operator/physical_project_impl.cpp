@@ -34,7 +34,8 @@ import :analyzer_pool;
 import :value;
 import :physical_project;
 import :highlighter;
-import data_type;;
+import data_type;
+;
 
 namespace infinity {
 

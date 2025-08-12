@@ -18,9 +18,9 @@ module;
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <iterator>
 #include <sstream>
 #include <unordered_map>
-#include <iterator>
 
 module infinity_core:lemmatizer.impl;
 

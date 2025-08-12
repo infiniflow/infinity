@@ -16,12 +16,12 @@
 #include "definition/column_def.h"
 #include "expr/parsed_expr.h"
 #include "parser_assert.h"
+#include "simdjson.h"
 #include "spdlog/fmt/fmt.h"
 #include "type/datetime/interval_type.h"
-#include "type/internal_types.h"
 #include "type/info/sparse_info.h"
+#include "type/internal_types.h"
 #include "type/serialize.h"
-#include "simdjson.h"
 #include <cstdint>
 #include <cstring>
 #include <sstream>

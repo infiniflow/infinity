@@ -1259,7 +1259,10 @@ void HandleTimeRelatedTypes(ColumnField &output_column_field, SizeT row_count, c
     output_column_field.column_vectors.emplace_back(dst.c_str(), dst.size());
 }
 
-extern template void InfinityThriftService::HandleArrayTypeRecursively<ArrayT>(String &output_str, const DataType &data_type, const ArrayT &data_value, const SharedPtr<ColumnVector> &column_vector);
+extern template void InfinityThriftService::HandleArrayTypeRecursively<ArrayT>(String &output_str,
+                                                                               const DataType &data_type,
+                                                                               const ArrayT &data_value,
+                                                                               const SharedPtr<ColumnVector> &column_vector);
 
 void HandleArrayType(ColumnField &output_column_field, SizeT row_count, const SharedPtr<ColumnVector> &column_vector) {
     const auto &column_data_type = *column_vector->data_type();

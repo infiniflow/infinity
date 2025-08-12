@@ -1,9 +1,9 @@
 module;
 
 #include <cassert>
+#include <cmath>
 #include <iostream>
 #include <vector>
-#include <cmath>
 
 module infinity_core:phrase_doc_iterator.impl;
 

@@ -915,12 +915,13 @@ TEST_P(TestTxnCleanup, cleanup_after_drop_and_add_columns) {
         EXPECT_TRUE(status.ok());
         EXPECT_TRUE(new_txn_mgr_->CommitTxn(txn_other_).ok());
     }
-    
+
     // Transaction 2: Add column2
     {
         std::shared_ptr<ConstantExpr> default_varchar = std::make_shared<ConstantExpr>(LiteralType::kString);
         default_varchar->str_value_ = strdup("default_varchar");
-        auto column_def3 = std::make_shared<ColumnDef>(2, std::make_shared<DataType>(LogicalType::kVarchar), "col3", std::set<ConstraintType>(), default_varchar);
+        auto column_def3 =
+            std::make_shared<ColumnDef>(2, std::make_shared<DataType>(LogicalType::kVarchar), "col3", std::set<ConstraintType>(), default_varchar);
         auto *txn_other_ = new_txn_mgr_->BeginTxn(MakeUnique<String>("add columns"), TransactionType::kNormal);
         auto status = txn_other_->AddColumns(*db_name_, *table_name_, Vector<SharedPtr<ColumnDef>>{column_def3});
         // Debug: Print the actual error
@@ -943,7 +944,7 @@ TEST_P(TestTxnCleanup, cleanup_after_drop_and_add_columns) {
         EXPECT_TRUE(status.ok());
         EXPECT_TRUE(new_txn_mgr_->CommitTxn(txn_other_).ok());
     }
-    
+
     // Transaction 4: Cleanup
     {
         auto *txn_other_ = new_txn_mgr_->BeginTxn(MakeUnique<String>("cleanup"), TransactionType::kNormal);

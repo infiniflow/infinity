@@ -16,6 +16,7 @@ module;
 
 #define PCRE2_CODE_UNIT_WIDTH 8
 
+#include "spdlog/fmt/fmt.h"
 #include <cassert>
 #include <chrono>
 #include <cmath>
@@ -26,7 +27,6 @@ module;
 #include <pcre2.h>
 #include <re2/re2.h>
 #include <sstream>
-#include "spdlog/fmt/fmt.h"
 
 #include "string_utils.h"
 

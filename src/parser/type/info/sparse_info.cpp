@@ -13,8 +13,8 @@
 // limitations under the License.
 
 #include "sparse_info.h"
-#include <arrow/type.h>
 #include "simdjson.h"
+#include <arrow/type.h>
 #include <limits>
 
 namespace infinity {

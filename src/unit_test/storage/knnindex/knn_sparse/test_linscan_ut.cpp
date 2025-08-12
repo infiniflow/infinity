@@ -13,15 +13,15 @@
 // limitations under the License.
 
 #ifdef CI
-#include <cassert>
 #include "gtest/gtest.h"
+#include <cassert>
 import infinity_core;
 import base_test;
 #else
 module;
 
-#include <cassert>
 #include "gtest/gtest.h"
+#include <cassert>
 
 module infinity_core:ut.test_linscan;
 

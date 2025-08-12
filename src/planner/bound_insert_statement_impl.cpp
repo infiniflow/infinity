@@ -35,9 +35,9 @@ namespace infinity {
 
 SharedPtr<LogicalNode> BoundInsertStatement::BuildPlan(QueryContext *query_context) {
     const SharedPtr<BindContext> &bind_context = this->bind_context_;
-    
+
     auto base_table_ref = std::static_pointer_cast<BaseTableRef>(table_ref_ptr_);
-    
+
     if (select_plan_) {
         // INSERT SELECT case
         auto logical_insert = MakeShared<LogicalInsert>(bind_context->GetNewLogicalNodeId(),

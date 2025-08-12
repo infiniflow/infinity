@@ -43,13 +43,9 @@ import :function;
 namespace infinity {
 
 // RandomGenerator implementation
-float RandomGenerator::GenerateGaussian() {
-    return gaussian_dist_(engine_);
-}
+float RandomGenerator::GenerateGaussian() { return gaussian_dist_(engine_); }
 
-bool RandomGenerator::GenerateBernoulli() {
-    return bernoulli_dist_(engine_);
-}
+bool RandomGenerator::GenerateBernoulli() { return bernoulli_dist_(engine_); }
 
 u32 RandomGenerator::GenerateUniform(u32 max_val) {
     std::uniform_int_distribution<u32> dist(0, max_val - 1);
@@ -57,8 +53,7 @@ u32 RandomGenerator::GenerateUniform(u32 max_val) {
 }
 
 // HashPartitioner implementation
-HashPartitioner::HashPartitioner(i32 dimension, i32 num_bits, RandomGenerator& rng)
-    : num_bits_(num_bits) {
+HashPartitioner::HashPartitioner(i32 dimension, i32 num_bits, RandomGenerator &rng) : num_bits_(num_bits) {
     projection_vectors_.resize(num_bits);
     for (i32 i = 0; i < num_bits; ++i) {
         projection_vectors_[i].resize(dimension);
@@ -68,7 +63,7 @@ HashPartitioner::HashPartitioner(i32 dimension, i32 num_bits, RandomGenerator& r
     }
 }
 
-u32 HashPartitioner::ComputePartition(const Vector<float>& point) const {
+u32 HashPartitioner::ComputePartition(const Vector<float> &point) const {
     u32 hash_code = 0;
     for (i32 bit = 0; bit < num_bits_; ++bit) {
         float dot_product = 0.0f;
@@ -88,16 +83,13 @@ u32 HashPartitioner::ComputePartition(const Vector<float>& point) const {
     return hash_code;
 }
 
-u32 HashPartitioner::ComputeDistance(const Vector<float>& point, u32 target_partition) const {
+u32 HashPartitioner::ComputeDistance(const Vector<float> &point, u32 target_partition) const {
     u32 actual_partition = ComputePartition(point);
     return __builtin_popcount(actual_partition ^ target_partition);
 }
 
-
-
 // SparseProjector implementation
-SparseProjector::SparseProjector(i32 input_dim, i32 output_dim, RandomGenerator& rng)
-    : input_dim_(input_dim), output_dim_(output_dim) {
+SparseProjector::SparseProjector(i32 input_dim, i32 output_dim, RandomGenerator &rng) : input_dim_(input_dim), output_dim_(output_dim) {
     for (i32 i = 0; i < input_dim; ++i) {
         u32 target_idx = rng.GenerateUniform(output_dim);
         float sign = rng.GenerateBernoulli() ? 1.0f : -1.0f;
@@ -105,27 +97,26 @@ SparseProjector::SparseProjector(i32 input_dim, i32 output_dim, RandomGenerator&
     }
 }
 
-Vector<float> SparseProjector::Project(const Vector<float>& input) const {
+Vector<float> SparseProjector::Project(const Vector<float> &input) const {
     Vector<float> output(output_dim_, 0.0f);
     for (i32 i = 0; i < static_cast<i32>(input.size()); ++i) {
-        const auto& [target_idx, sign] = projection_map_[i];
+        const auto &[target_idx, sign] = projection_map_[i];
         output[target_idx] += input[i] * sign;
     }
     return output;
 }
 
 // EncodingAccumulator implementation
-EncodingAccumulator::EncodingAccumulator(i32 size, bool use_averaging)
-    : accumulator_(size, 0.0f), counts_(size, 0), use_averaging_(use_averaging) {}
+EncodingAccumulator::EncodingAccumulator(i32 size, bool use_averaging) : accumulator_(size, 0.0f), counts_(size, 0), use_averaging_(use_averaging) {}
 
-void EncodingAccumulator::AddToPartition(i32 partition_start, const Vector<float>& values) {
+void EncodingAccumulator::AddToPartition(i32 partition_start, const Vector<float> &values) {
     for (i32 i = 0; i < static_cast<i32>(values.size()); ++i) {
         accumulator_[partition_start + i] += values[i];
         counts_[partition_start + i]++;
     }
 }
 
-void EncodingAccumulator::FillEmptyPartition(i32 partition_start, const Vector<float>& values) {
+void EncodingAccumulator::FillEmptyPartition(i32 partition_start, const Vector<float> &values) {
     for (i32 i = 0; i < static_cast<i32>(values.size()); ++i) {
         if (counts_[partition_start + i] == 0) {
             accumulator_[partition_start + i] = values[i];
@@ -147,13 +138,15 @@ Vector<float> EncodingAccumulator::Finalize() const {
 }
 
 // EncodingPipeline implementation
-bool EncodingPipeline::ValidateInput(const Tensor& tensor) const {
-    if (tensor.GetTotalSize() % config_.dimension != 0) return false;
-    if (config_.num_simhash_projections >= 31 || config_.num_simhash_projections < 0) return false;
+bool EncodingPipeline::ValidateInput(const Tensor &tensor) const {
+    if (tensor.GetTotalSize() % config_.dimension != 0)
+        return false;
+    if (config_.num_simhash_projections >= 31 || config_.num_simhash_projections < 0)
+        return false;
     return true;
 }
 
-Vector<float> EncodingPipeline::ProcessSingleRepetition(const Tensor& tensor, i32 rep_index) const {
+Vector<float> EncodingPipeline::ProcessSingleRepetition(const Tensor &tensor, i32 rep_index) const {
     RandomGenerator rng(config_.seed + rep_index);
 
     // Setup partitioning
@@ -161,12 +154,13 @@ Vector<float> EncodingPipeline::ProcessSingleRepetition(const Tensor& tensor, i3
     i32 num_partitions = 1 << config_.num_simhash_projections;
 
     // Setup projection
-    i32 proj_dim = (config_.projection_type == FixedDimensionalEncodingConfig::ProjectionType::DEFAULT_IDENTITY)
-                   ? config_.dimension : config_.projection_dimension;
+    i32 proj_dim = (config_.projection_type == FixedDimensionalEncodingConfig::ProjectionType::DEFAULT_IDENTITY) ? config_.dimension
+                                                                                                                 : config_.projection_dimension;
 
     Optional<SparseProjector> projector = None;
     if (config_.projection_type == FixedDimensionalEncodingConfig::ProjectionType::AMS_SKETCH) {
-        if (config_.projection_dimension <= 0) return {};
+        if (config_.projection_dimension <= 0)
+            return {};
         projector = SparseProjector(config_.dimension, proj_dim, rng);
     }
 
@@ -218,12 +212,12 @@ Vector<float> EncodingPipeline::ProcessSingleRepetition(const Tensor& tensor, i3
     return accumulator.Finalize();
 }
 
-Optional<Vector<float>> EncodingPipeline::Execute(const Tensor& tensor) const {
-    if (!ValidateInput(tensor)) return None;
+Optional<Vector<float>> EncodingPipeline::Execute(const Tensor &tensor) const {
+    if (!ValidateInput(tensor))
+        return None;
 
     // Special validation for query encoding
-    if (config_.encoding_type == FixedDimensionalEncodingConfig::EncodingType::DEFAULT_SUM &&
-        config_.fill_empty_partitions) {
+    if (config_.encoding_type == FixedDimensionalEncodingConfig::EncodingType::DEFAULT_SUM && config_.fill_empty_partitions) {
         return None;
     }
 
@@ -233,13 +227,14 @@ Optional<Vector<float>> EncodingPipeline::Execute(const Tensor& tensor) const {
     // Process each repetition
     for (i32 rep = 0; rep < config_.num_repetitions; ++rep) {
         Vector<float> rep_result = ProcessSingleRepetition(tensor, rep);
-        if (rep_result.empty()) return None;
+        if (rep_result.empty())
+            return None;
         repetition_results.push_back(std::move(rep_result));
     }
 
     // Concatenate all repetitions
     Vector<float> final_result;
-    for (const auto& rep_result : repetition_results) {
+    for (const auto &rep_result : repetition_results) {
         final_result.insert(final_result.end(), rep_result.begin(), rep_result.end());
     }
 
@@ -254,22 +249,19 @@ Optional<Vector<float>> EncodingPipeline::Execute(const Tensor& tensor) const {
 }
 
 // Public API functions
-Optional<Vector<float>> GenerateFixedDimensionalEncoding(
-    const Vector<float>& tensor_data, const FixedDimensionalEncodingConfig& config) {
+Optional<Vector<float>> GenerateFixedDimensionalEncoding(const Vector<float> &tensor_data, const FixedDimensionalEncodingConfig &config) {
     Tensor tensor(tensor_data, config.dimension);
     EncodingPipeline pipeline(config);
     return pipeline.Execute(tensor);
 }
 
-Optional<Vector<float>> GenerateQueryFixedDimensionalEncoding(
-    const Vector<float>& tensor_data, const FixedDimensionalEncodingConfig& config) {
+Optional<Vector<float>> GenerateQueryFixedDimensionalEncoding(const Vector<float> &tensor_data, const FixedDimensionalEncodingConfig &config) {
     auto modified_config = config;
     modified_config.encoding_type = FixedDimensionalEncodingConfig::EncodingType::DEFAULT_SUM;
     return GenerateFixedDimensionalEncoding(tensor_data, modified_config);
 }
 
-Optional<Vector<float>> GenerateDocumentFixedDimensionalEncoding(
-    const Vector<float>& tensor_data, const FixedDimensionalEncodingConfig& config) {
+Optional<Vector<float>> GenerateDocumentFixedDimensionalEncoding(const Vector<float> &tensor_data, const FixedDimensionalEncodingConfig &config) {
     auto modified_config = config;
     modified_config.encoding_type = FixedDimensionalEncodingConfig::EncodingType::AVERAGE;
     return GenerateFixedDimensionalEncoding(tensor_data, modified_config);
@@ -277,25 +269,25 @@ Optional<Vector<float>> GenerateDocumentFixedDimensionalEncoding(
 
 // Legacy compatibility functions for testing
 namespace internal {
-    u32 SimHashPartitionIndex(const Vector<float>& input_vector) {
-        RandomGenerator rng(1);  // Use default seed
-        HashPartitioner partitioner(input_vector.size(), std::min(32, static_cast<i32>(input_vector.size())), rng);
-        return partitioner.ComputePartition(input_vector);
-    }
-
-    u32 DistanceToSimHashPartition(const Vector<float>& input_vector, u32 index) {
-        RandomGenerator rng(1);
-        HashPartitioner partitioner(input_vector.size(), std::min(32, static_cast<i32>(input_vector.size())), rng);
-        return partitioner.ComputeDistance(input_vector, index);
-    }
-
-    Vector<float> ApplyCountSketchToVector(Span<const float> input_vector, u32 final_dimension, u32 seed) {
-        RandomGenerator rng(seed);
-        Vector<float> input_vec(input_vector.begin(), input_vector.end());
-        SparseProjector projector(input_vec.size(), final_dimension, rng);
-        return projector.Project(input_vec);
-    }
+u32 SimHashPartitionIndex(const Vector<float> &input_vector) {
+    RandomGenerator rng(1); // Use default seed
+    HashPartitioner partitioner(input_vector.size(), std::min(32, static_cast<i32>(input_vector.size())), rng);
+    return partitioner.ComputePartition(input_vector);
 }
+
+u32 DistanceToSimHashPartition(const Vector<float> &input_vector, u32 index) {
+    RandomGenerator rng(1);
+    HashPartitioner partitioner(input_vector.size(), std::min(32, static_cast<i32>(input_vector.size())), rng);
+    return partitioner.ComputeDistance(input_vector, index);
+}
+
+Vector<float> ApplyCountSketchToVector(Span<const float> input_vector, u32 final_dimension, u32 seed) {
+    RandomGenerator rng(seed);
+    Vector<float> input_vec(input_vector.begin(), input_vector.end());
+    SparseProjector projector(input_vec.size(), final_dimension, rng);
+    return projector.Project(input_vec);
+}
+} // namespace internal
 
 // FDE Scalar Function Implementation
 void FDEFunction(const DataBlock &input, SharedPtr<ColumnVector> &output) {
@@ -445,7 +437,7 @@ void FDEFunction(const DataBlock &input, SharedPtr<ColumnVector> &output) {
         // Create FDE configuration for simple dimensionality reduction
         FixedDimensionalEncodingConfig config;
         config.dimension = static_cast<i32>(tensor_data.size()); // Use actual data size
-        config.seed = 42; // Default seed
+        config.seed = 42;                                        // Default seed
         config.num_repetitions = 1;
         config.num_simhash_projections = 0; // No partitioning - direct projection
         config.projection_type = FixedDimensionalEncodingConfig::ProjectionType::AMS_SKETCH;
@@ -509,4 +501,4 @@ void RegisterFDEFunction(NewCatalog *catalog_ptr) {
     NewCatalog::AddFunctionSet(catalog_ptr, function_set_ptr);
 }
 
-}  // namespace infinity
+} // namespace infinity

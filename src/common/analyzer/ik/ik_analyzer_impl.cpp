@@ -1,7 +1,7 @@
 module;
 
-#include <vector>
 #include <string>
+#include <vector>
 
 module infinity_core:ik_analyzer.impl;
 

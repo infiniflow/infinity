@@ -48,7 +48,7 @@ import data_type;
 
 namespace infinity {
 
-void PhysicalUpdate::Init(QueryContext* query_context) {}
+void PhysicalUpdate::Init(QueryContext *query_context) {}
 
 bool PhysicalUpdate::Execute(QueryContext *query_context, OperatorState *operator_state) {
     StorageMode storage_mode = InfinityContext::instance().storage()->GetStorageMode();

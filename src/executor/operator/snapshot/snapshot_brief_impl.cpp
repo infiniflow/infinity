@@ -15,8 +15,8 @@
 module;
 
 #include <chrono>
-#include <filesystem>
 #include <ctime>
+#include <filesystem>
 #include <sys/stat.h>
 
 module infinity_core:snapshot_brief.impl;
@@ -53,29 +53,29 @@ Vector<SnapshotBrief> SnapshotBrief::GetSnapshots(const String &dir) {
 
     // Debug: Check if directory exists and log the path
     LOG_INFO(fmt::format("Scanning snapshot directory: {}", dir));
-    
+
     if (!VirtualStore::Exists(dir)) {
         LOG_ERROR(fmt::format("Snapshot directory does not exist: {}", dir));
         return briefs;
     }
-    
+
     // Scan for snapshot directories instead of JSON files directly
     for (const auto &entry : std::filesystem::directory_iterator(dir)) {
         if (!entry.is_directory()) {
             continue; // Skip non-directory entries
         }
-        
+
         String dir_name = entry.path().filename().string();
-        
+
         // Skip deleted directories (directories starting with "deleted_")
         if (dir_name.starts_with("deleted_") || dir_name.starts_with("tmp_")) {
             continue; // Skip deleted snapshots
         }
-        
+
         // Look for JSON file inside the snapshot directory
         String snapshot_dir_path = entry.path().string();
         String expected_json_path = fmt::format("{}/{}.json", snapshot_dir_path, dir_name);
-        
+
         if (!VirtualStore::Exists(expected_json_path)) {
             LOG_WARN(fmt::format("Snapshot directory {} does not contain expected JSON file", dir_name));
             continue;
@@ -97,12 +97,11 @@ Vector<SnapshotBrief> SnapshotBrief::GetSnapshots(const String &dir) {
             snapshot_brief.snapshot_name_ = doc["snapshot_name"].get<String>();
             snapshot_brief.scope_ = (SnapshotScope)(u8)doc["snapshot_scope"].get<u8>();
 
-            //snapshot_brief.commit_ts_ = doc["commit_ts"].get<u64>();
+            // snapshot_brief.commit_ts_ = doc["commit_ts"].get<u64>();
 
-//            std::filesystem::path compressed_file(snapshot_path);
-//            compressed_file.replace_extension("lz4");
+            //            std::filesystem::path compressed_file(snapshot_path);
+            //            compressed_file.replace_extension("lz4");
             snapshot_brief.size_ = VirtualStore::GetDirectorySize(snapshot_dir_path);
-
 
             struct stat statbuf;
             stat(snapshot_dir_path.c_str(), &statbuf);

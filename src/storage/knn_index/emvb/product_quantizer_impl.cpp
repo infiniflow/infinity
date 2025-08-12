@@ -260,9 +260,7 @@ void OPQ<SUBSPACE_CENTROID_TAG, SUBSPACE_NUM>::Train(const f32 *embedding_data, 
 
 template <std::unsigned_integral SUBSPACE_CENTROID_TAG, u32 SUBSPACE_NUM>
 void OPQ<SUBSPACE_CENTROID_TAG, SUBSPACE_NUM>::AddEmbeddings(const f32 *embedding_data, const u32 embedding_num) {
-    {
-        std::shared_lock lock(this->rw_mutex_);
-    }
+    { std::shared_lock lock(this->rw_mutex_); }
     // step 1. rotate by R
     const auto input_buffer = MakeUniqueForOverwrite<f32[]>(embedding_num * this->dimension_);
     matrixA_multiply_matrixB_output_to_C(embedding_data, matrix_R_.get(), embedding_num, this->dimension_, this->dimension_, input_buffer.get());
@@ -281,9 +279,7 @@ void OPQ<SUBSPACE_CENTROID_TAG, SUBSPACE_NUM>::AddEmbeddings(const f32 *embeddin
 
 template <std::unsigned_integral SUBSPACE_CENTROID_TAG, u32 SUBSPACE_NUM>
 UniquePtr<f32[]> OPQ<SUBSPACE_CENTROID_TAG, SUBSPACE_NUM>::GetIPDistanceTable(const f32 *query_data, const u32 query_num) const {
-    {
-        std::shared_lock lock(this->rw_mutex_);
-    }
+    { std::shared_lock lock(this->rw_mutex_); }
     auto result = MakeUniqueForOverwrite<f32[]>(SUBSPACE_NUM * this->subspace_centroid_num_ * query_num);
     // step 1. rotate by R
     const auto q_buffer = MakeUniqueForOverwrite<f32[]>(this->dimension_ * query_num);

@@ -270,9 +270,7 @@ TEST_F(WalEntryTest, ReadWrite) {
         Vector<ChunkID> deprecate_ids{0, 1};
         entry->cmds_.push_back(MakeShared<WalCmdDumpIndex>("db1", "tbl1", "idx1", 0 /*segment_id*/, chunk_infos, deprecate_ids));
     }
-    {
-        entry->cmds_.push_back(MakeShared<WalCmdRenameTable>("db1", "tbl1", "tbl2"));
-    }
+    { entry->cmds_.push_back(MakeShared<WalCmdRenameTable>("db1", "tbl1", "tbl2")); }
     {
         Vector<SharedPtr<ColumnDef>> column_defs;
         std::set<ConstraintType> constraints;
@@ -370,9 +368,7 @@ TEST_F(WalEntryTest, ReadWriteV2) {
         entry->cmds_.push_back(
             MakeShared<WalCmdDumpIndexV2>("db1", "1", "tbl1", "2", "idx1", "3", 0 /*segment_id*/, chunk_infos, deprecate_ids, "table_key"));
     }
-    {
-        entry->cmds_.push_back(MakeShared<WalCmdRenameTableV2>("db1", "1", "tbl1", "2", "tbl2", "old_table_key"));
-    }
+    { entry->cmds_.push_back(MakeShared<WalCmdRenameTableV2>("db1", "1", "tbl1", "2", "tbl2", "old_table_key")); }
     {
         Vector<SharedPtr<ColumnDef>> column_defs;
         std::set<ConstraintType> constraints;

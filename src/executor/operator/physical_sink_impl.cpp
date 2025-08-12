@@ -55,7 +55,7 @@ String ToString(SinkType sink_type) {
     }
 }
 
-void PhysicalSink::Init(QueryContext* query_context) {}
+void PhysicalSink::Init(QueryContext *query_context) {}
 
 bool PhysicalSink::Execute(QueryContext *, OperatorState *) { return true; }
 

@@ -14,8 +14,8 @@
 
 module;
 
-#include <vector>
 #include <memory>
+#include <vector>
 
 module infinity_core:bg_task.impl;
 

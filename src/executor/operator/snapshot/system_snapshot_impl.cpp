@@ -56,4 +56,4 @@ Status Snapshot::RestoreSystemSnapshot(QueryContext *query_context, const String
     return Status::OK();
 }
 
-} // namespace infinity 
+} // namespace infinity

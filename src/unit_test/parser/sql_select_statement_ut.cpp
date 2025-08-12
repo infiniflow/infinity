@@ -1123,13 +1123,9 @@ TEST_F(SelectStatementParsingTest, good_test3) {
 
         {
             SelectStatement *select = (SelectStatement *)((*result->statements_ptr_)[1]);
-            {
-                EXPECT_EQ(select->limit_expr_->type_, ParsedExprType::kSubquery);
-            }
+            { EXPECT_EQ(select->limit_expr_->type_, ParsedExprType::kSubquery); }
 
-            {
-                EXPECT_EQ(select->offset_expr_->type_, ParsedExprType::kSubquery);
-            }
+            { EXPECT_EQ(select->offset_expr_->type_, ParsedExprType::kSubquery); }
         }
 
         result->Reset();

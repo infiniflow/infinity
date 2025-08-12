@@ -36,7 +36,6 @@ struct DayOfMonthFunction {
         RecoverableError(status);
         return false;
     }
-
 };
 
 template <>
@@ -81,21 +80,21 @@ void RegisterDayOfMonthFunction(NewCatalog *catalog_ptr) {
     SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
 
     ScalarFunction day_of_month_date_function(func_name,
-                                  {DataType(LogicalType::kDate)},
-                                  {DataType(LogicalType::kBigInt)},
-                                  &ScalarFunction::UnaryFunctionWithFailure<DateT, BigIntT, DayOfMonthFunction>);
+                                              {DataType(LogicalType::kDate)},
+                                              {DataType(LogicalType::kBigInt)},
+                                              &ScalarFunction::UnaryFunctionWithFailure<DateT, BigIntT, DayOfMonthFunction>);
     function_set_ptr->AddFunction(day_of_month_date_function);
 
     ScalarFunction day_of_month_datetime_function(func_name,
-                                  {DataType(LogicalType::kDateTime)},
-                                  {DataType(LogicalType::kBigInt)},
-                                  &ScalarFunction::UnaryFunctionWithFailure<DateTimeT, BigIntT, DayOfMonthFunction>);
+                                                  {DataType(LogicalType::kDateTime)},
+                                                  {DataType(LogicalType::kBigInt)},
+                                                  &ScalarFunction::UnaryFunctionWithFailure<DateTimeT, BigIntT, DayOfMonthFunction>);
     function_set_ptr->AddFunction(day_of_month_datetime_function);
 
     ScalarFunction day_of_month_timestamp_function(func_name,
-                                  {DataType(LogicalType::kTimestamp)},
-                                  {DataType(LogicalType::kBigInt)},
-                                  &ScalarFunction::UnaryFunctionWithFailure<TimestampT, BigIntT, DayOfMonthFunction>);
+                                                   {DataType(LogicalType::kTimestamp)},
+                                                   {DataType(LogicalType::kBigInt)},
+                                                   &ScalarFunction::UnaryFunctionWithFailure<TimestampT, BigIntT, DayOfMonthFunction>);
     function_set_ptr->AddFunction(day_of_month_timestamp_function);
 
     NewCatalog::AddFunctionSet(catalog_ptr, function_set_ptr);

@@ -20,10 +20,10 @@ module;
 #include <fcntl.h>
 #include <filesystem>
 #include <functional>
-#include <queue>
-#include <sys/mman.h>
-#include <sched.h>
 #include <pthread.h>
+#include <queue>
+#include <sched.h>
+#include <sys/mman.h>
 
 module infinity_core:external_sort_merger.impl;
 
@@ -477,9 +477,7 @@ void SortMergerTermTuple<KeyType, LenType>::MergeImpl() {
         } else if (idx != last_idx) {
             if (tuple_list->IsFull() || out_key.term_ != tuple_list->term_) {
                 // output
-                {
-                    this->term_tuple_list_queue_.Enqueue(std::move(tuple_list));
-                }
+                { this->term_tuple_list_queue_.Enqueue(std::move(tuple_list)); }
                 tuple_list = MakeShared<TermTupleList>(out_key.term_);
             }
             tuple_list->Add(out_key.doc_id_, out_key.term_pos_, out_key.doc_payload_);

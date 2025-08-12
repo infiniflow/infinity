@@ -15,6 +15,7 @@
 #include "column_def.h"
 #include "expr/constant_expr.h"
 #include "expr/parsed_expr.h"
+#include "simdjson.h"
 #include "statement/statement_common.h"
 #include "type/data_type.h"
 #include "type/info/array_info.h"
@@ -22,7 +23,6 @@
 #include "type/info/embedding_info.h"
 #include "type/info/sparse_info.h"
 #include "type/serialize.h"
-#include "simdjson.h"
 
 namespace infinity {
 

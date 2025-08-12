@@ -44,8 +44,8 @@ struct CurrentDateFunction {
 
 template <>
 inline void CurrentDateFunction::Run(DateT &result) {
-    InfinityContext& infinityContext = InfinityContext::instance();
-    Config* config = infinityContext.config();
+    InfinityContext &infinityContext = InfinityContext::instance();
+    Config *config = infinityContext.config();
     auto now = system_clock::now() + config->hour_offset_;
     auto sys_days = std::chrono::floor<std::chrono::days>(now);
     result.value = sys_days.time_since_epoch().count();

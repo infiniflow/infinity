@@ -15,12 +15,12 @@
 module;
 
 #include <cassert>
+#include <memory>
 #include <optional>
 #include <sstream>
 #include <string>
 #include <tuple>
 #include <vector>
-#include <memory>
 
 module infinity_core:logical_planner.impl;
 

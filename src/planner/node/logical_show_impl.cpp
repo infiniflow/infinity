@@ -137,8 +137,7 @@ String LogicalShow::ToString(i64 &space) const {
         space -= 4;
         arrow_str = "->  ";
     }
-    ss << String(space, ' ') << "-> "
-       << "Show: ";
+    ss << String(space, ' ') << "-> " << "Show: ";
     space += arrow_str.size();
 
     return ss.str();

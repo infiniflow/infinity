@@ -5106,7 +5106,7 @@ TEST_P(TestTxnAppend, test_append_and_optimize_index) {
         Vector<ChunkID> *chunk_ids_ptr = nullptr;
         std::tie(chunk_ids_ptr, status) = segment_index_meta.GetChunkIDs1();
         EXPECT_TRUE(status.ok());
-        EXPECT_EQ(*chunk_ids_ptr, Vector<ChunkID>({0,1}));
+        EXPECT_EQ(*chunk_ids_ptr, Vector<ChunkID>({0, 1}));
     };
 
     auto DropDB = [&] {
@@ -5145,7 +5145,6 @@ TEST_P(TestTxnAppend, test_append_and_optimize_index) {
         DropDB();
     }
 
-
     //    t1      append      commit (success)
     //    |----------|---------|
     //                    |------------------|----------------|
@@ -5168,14 +5167,14 @@ TEST_P(TestTxnAppend, test_append_and_optimize_index) {
         status = txn2->OptimizeIndex(*db_name, *table_name, *index_name1, 0);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn2);
-        //Rollback
+        // Rollback
         EXPECT_FALSE(status.ok());
 
         CheckTableRollback({0});
 
         DropDB();
     }
-    
+
     //    t1      append                       commit (success)
     //    |----------|--------------------------------|
     //                    |-----------------------|-------------------------|
@@ -5204,7 +5203,6 @@ TEST_P(TestTxnAppend, test_append_and_optimize_index) {
 
         DropDB();
     }
-    
 
     //    t1      append                                   commit (success)
     //    |----------|-----------------------------------------------|

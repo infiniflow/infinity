@@ -23,9 +23,9 @@ module;
 #include <cerrno>
 #include <cstdio>
 #include <cstring>
-#include <vector>
-#include <string>
 #include <memory>
+#include <string>
+#include <vector>
 
 module infinity_core:physical_import.impl;
 

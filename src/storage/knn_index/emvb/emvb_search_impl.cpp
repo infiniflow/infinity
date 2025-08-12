@@ -20,8 +20,8 @@ module;
 #include <cassert>
 #include <cstdlib>
 #include <map>
-#include <vector>
 #include <memory>
+#include <vector>
 
 module infinity_core:emvb_search.impl;
 
@@ -346,12 +346,12 @@ EMVBSearch<FIXED_QUERY_TOKEN_NUM>::EMVBSearch(const u32 embedding_dimension,
 // return docid: start from 0
 template <u32 FIXED_QUERY_TOKEN_NUM>
 std::tuple<u32, UniquePtr<f32[]>, UniquePtr<u32[]>> EMVBSearch<FIXED_QUERY_TOKEN_NUM>::GetQueryResult(const f32 *query_ptr,
-                                                                                                                  const u32 nprobe,
-                                                                                                                  const f32 thresh,
-                                                                                                                  const u32 n_doc_to_score,
-                                                                                                                  const u32 out_second_stage,
-                                                                                                                  const u32 k,
-                                                                                                                  const f32 thresh_query) const {
+                                                                                                      const u32 nprobe,
+                                                                                                      const f32 thresh,
+                                                                                                      const u32 n_doc_to_score,
+                                                                                                      const u32 out_second_stage,
+                                                                                                      const u32 k,
+                                                                                                      const f32 thresh_query) const {
     assert(n_centroids_ % 8 == 0);
     auto query_token_centroids_scores = Get256AlignedF32Array(FIXED_QUERY_TOKEN_NUM * n_centroids_);
     matrixA_multiply_transpose_matrixB_output_to_C(query_ptr,

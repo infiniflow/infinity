@@ -191,8 +191,7 @@ TEST_F(ExtractFunctionTest, extract_year_test) {
         for (i64 i = 0; i < row_count; ++i) {
             DateT date_value;
             std::stringstream ss;
-            ss << "1-1"
-               << "-" << i % 28 + 1;
+            ss << "1-1" << "-" << i % 28 + 1;
             date_value.FromString(ss.str());
             data_block.AppendValue(0, Value::MakeDate(date_value));
         }

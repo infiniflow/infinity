@@ -95,7 +95,6 @@ import :fixed_dimensional_encoding;
 
 namespace infinity {
 
-
 BuiltinFunctions::BuiltinFunctions(NewCatalog *catalog_ptr) : catalog_ptr_(catalog_ptr) {}
 
 void BuiltinFunctions::Init() {

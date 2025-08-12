@@ -13,17 +13,17 @@
 // limitations under the License.
 
 #ifdef CI
-#include <vector>
-#include "gtest/gtest.h"
 #include "unit_test/gtest_expand.h"
+#include "gtest/gtest.h"
+#include <vector>
 import infinity_core;
 import base_test;
 #else
 module;
 
-#include <vector>
-#include "gtest/gtest.h"
 #include "unit_test/gtest_expand.h"
+#include "gtest/gtest.h"
+#include <vector>
 
 module infinity_core:ut.index_ivf_def;
 
@@ -114,11 +114,11 @@ TEST_F(IndexIVFTest, testplain) {
     {
         args_map["unused_param"] = "xxx";
         EXPECT_THROW_WITHOUT_STACKTRACE(IndexIVF::Make(MakeShared<String>("tmp_index_name"),
-                                    MakeShared<String>("test comment"),
-                                    "tmp_file_name",
-                                    Vector<String>{"col_ivf"},
-                                    h.build_ipl(args_map)),
-                     RecoverableException);
+                                                       MakeShared<String>("test comment"),
+                                                       "tmp_file_name",
+                                                       Vector<String>{"col_ivf"},
+                                                       h.build_ipl(args_map)),
+                                        RecoverableException);
     }
 }
 
@@ -152,11 +152,11 @@ TEST_F(IndexIVFTest, testsq) {
         args_map["centroids_num_ratio"] = "0.33";
         args_map["Centroids_num_ratio"] = "0.33";
         EXPECT_THROW_WITHOUT_STACKTRACE(IndexIVF::Make(MakeShared<String>("tmp_index_name"),
-                                    MakeShared<String>("test comment"),
-                                    "tmp_file_name",
-                                    Vector<String>{"col_ivf"},
-                                    h.build_ipl(args_map)),
-                     RecoverableException);
+                                                       MakeShared<String>("test comment"),
+                                                       "tmp_file_name",
+                                                       Vector<String>{"col_ivf"},
+                                                       h.build_ipl(args_map)),
+                                        RecoverableException);
     }
 }
 
@@ -180,10 +180,10 @@ TEST_F(IndexIVFTest, testpq) {
     {
         args_map.erase("Metric");
         EXPECT_THROW_WITHOUT_STACKTRACE(IndexIVF::Make(MakeShared<String>("tmp_index_name"),
-                                    MakeShared<String>("test comment"),
-                                    "tmp_file_name",
-                                    Vector<String>{"col_ivf"},
-                                    h.build_ipl(args_map)),
-                     RecoverableException);
+                                                       MakeShared<String>("test comment"),
+                                                       "tmp_file_name",
+                                                       Vector<String>{"col_ivf"},
+                                                       h.build_ipl(args_map)),
+                                        RecoverableException);
     }
 }

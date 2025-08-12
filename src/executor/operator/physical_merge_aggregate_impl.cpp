@@ -14,9 +14,9 @@
 
 module;
 
+#include <memory>
 #include <string>
 #include <vector>
-#include <memory>
 
 module infinity_core:physical_merge_aggregate.impl;
 

@@ -14,8 +14,8 @@
 
 module;
 
-#include <vector>
 #include <string>
+#include <vector>
 
 module infinity_core:physical_operator.impl;
 

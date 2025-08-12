@@ -14,9 +14,9 @@
 
 module;
 
+#include <memory>
 #include <sstream>
 #include <vector>
-#include <memory>
 
 module infinity_core:admin_executor.impl;
 

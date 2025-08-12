@@ -2,9 +2,9 @@
 #include "column_expr.h"
 #include "search_options.h"
 #include "spdlog/fmt/fmt.h"
-#include <simdjson.h>
 #include "sstream"
 #include <cmath>
+#include <simdjson.h>
 #include <utility>
 
 namespace infinity {

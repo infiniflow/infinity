@@ -34,13 +34,12 @@ namespace infinity {
 struct DatePartFunction {
     static std::unordered_map<std::string, TimeUnit> time_unit_map;
     template <typename TA, typename TB, typename TC>
-    static inline bool Run(TA &left, TB right,TC &result) {
+    static inline bool Run(TA &left, TB right, TC &result) {
         Status status = Status::NotSupport("Not implemented");
         RecoverableError(status);
         return false;
     }
     static inline void InitDatePartFunction();
-
 };
 std::unordered_map<std::string, TimeUnit> DatePartFunction::time_unit_map;
 inline void DatePartFunction::InitDatePartFunction() {
@@ -51,18 +50,15 @@ inline void DatePartFunction::InitDatePartFunction() {
     time_unit_map["yr"] = TimeUnit::kYear;
     time_unit_map["yrs"] = TimeUnit::kYear;
 
-
     time_unit_map["month"] = TimeUnit::kMonth;
     time_unit_map["months"] = TimeUnit::kMonth;
     time_unit_map["mons"] = TimeUnit::kMonth;
     time_unit_map["mon"] = TimeUnit::kMonth;
 
-
     time_unit_map["day"] = TimeUnit::kDay;
     time_unit_map["days"] = TimeUnit::kDay;
     time_unit_map["d"] = TimeUnit::kDay;
     time_unit_map["dayofmonth"] = TimeUnit::kDay;
-
 
     time_unit_map["h"] = TimeUnit::kHour;
     time_unit_map["hr"] = TimeUnit::kHour;
@@ -70,13 +66,11 @@ inline void DatePartFunction::InitDatePartFunction() {
     time_unit_map["hour"] = TimeUnit::kHour;
     time_unit_map["hours"] = TimeUnit::kHour;
 
-
     time_unit_map["m"] = TimeUnit::kMinute;
     time_unit_map["min"] = TimeUnit::kMinute;
     time_unit_map["mins"] = TimeUnit::kMinute;
     time_unit_map["minute"] = TimeUnit::kMinute;
     time_unit_map["minutes"] = TimeUnit::kMinute;
-
 
     time_unit_map["s"] = TimeUnit::kSecond;
     time_unit_map["sec"] = TimeUnit::kSecond;
@@ -193,21 +187,21 @@ void RegisterDatePartFunction(NewCatalog *catalog_ptr) {
     SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
 
     ScalarFunction date_part_date_function(func_name,
-                                  {DataType(LogicalType::kVarchar), DataType(LogicalType::kDate)},
-                                  {DataType(LogicalType::kBigInt)},
-                                  &ScalarFunction::BinaryFunctionWithFailure<VarcharT, DateT, BigIntT, DatePartFunction>);
+                                           {DataType(LogicalType::kVarchar), DataType(LogicalType::kDate)},
+                                           {DataType(LogicalType::kBigInt)},
+                                           &ScalarFunction::BinaryFunctionWithFailure<VarcharT, DateT, BigIntT, DatePartFunction>);
     function_set_ptr->AddFunction(date_part_date_function);
 
     ScalarFunction date_part_datetime_function(func_name,
-                                  {DataType(LogicalType::kVarchar), DataType(LogicalType::kDateTime)},
-                                  {DataType(LogicalType::kBigInt)},
-                                  &ScalarFunction::BinaryFunctionWithFailure<VarcharT, DateTimeT, BigIntT, DatePartFunction>);
+                                               {DataType(LogicalType::kVarchar), DataType(LogicalType::kDateTime)},
+                                               {DataType(LogicalType::kBigInt)},
+                                               &ScalarFunction::BinaryFunctionWithFailure<VarcharT, DateTimeT, BigIntT, DatePartFunction>);
     function_set_ptr->AddFunction(date_part_datetime_function);
 
     ScalarFunction date_part_timestamp_function(func_name,
-                                  {DataType(LogicalType::kVarchar), DataType(LogicalType::kTimestamp)},
-                                  {DataType(LogicalType::kBigInt)},
-                                  &ScalarFunction::BinaryFunctionWithFailure<VarcharT, TimestampT, BigIntT, DatePartFunction>);
+                                                {DataType(LogicalType::kVarchar), DataType(LogicalType::kTimestamp)},
+                                                {DataType(LogicalType::kBigInt)},
+                                                &ScalarFunction::BinaryFunctionWithFailure<VarcharT, TimestampT, BigIntT, DatePartFunction>);
     function_set_ptr->AddFunction(date_part_timestamp_function);
 
     NewCatalog::AddFunctionSet(catalog_ptr, function_set_ptr);

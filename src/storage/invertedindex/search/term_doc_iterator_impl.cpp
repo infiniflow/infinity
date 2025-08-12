@@ -15,8 +15,8 @@
 module;
 
 #include <cassert>
-#include <iostream>
 #include <cmath>
+#include <iostream>
 
 module infinity_core:term_doc_iterator.impl;
 

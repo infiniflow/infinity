@@ -16,8 +16,8 @@ module;
 
 #include <bit>
 #include <cassert>
-#include <vector>
 #include <memory>
+#include <vector>
 
 module infinity_core:common_query_filter.impl;
 

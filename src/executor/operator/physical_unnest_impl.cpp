@@ -46,7 +46,7 @@ import data_type;
 
 namespace infinity {
 
-void PhysicalUnnest::Init(QueryContext* query_context) {}
+void PhysicalUnnest::Init(QueryContext *query_context) {}
 
 namespace {
 
@@ -79,7 +79,7 @@ Vector<UniquePtr<DataBlock>> MakeDataBlocks(const Vector<Vector<SharedPtr<Column
     }
     return data_blocks;
 }
-}
+} // namespace
 
 bool PhysicalUnnest::Execute(QueryContext *, OperatorState *operator_state) {
     OperatorState *prev_op_state = operator_state->prev_op_state_;

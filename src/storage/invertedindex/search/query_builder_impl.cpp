@@ -15,8 +15,8 @@
 module;
 
 #include <iostream>
-#include <vector>
 #include <memory>
+#include <vector>
 
 module infinity_core:query_builder.impl;
 

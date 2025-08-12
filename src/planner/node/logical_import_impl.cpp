@@ -43,8 +43,7 @@ String LogicalImport::ToString(i64 &space) const {
         arrow_str = "->  ";
     }
 
-    ss << String(space, ' ') << "-> "
-       << "Import from: " << file_path_;
+    ss << String(space, ' ') << "-> " << "Import from: " << file_path_;
 
     switch (file_type_) {
         case CopyFileType::kCSV: {

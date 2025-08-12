@@ -39,7 +39,6 @@ struct WeekdayFunction {
         RecoverableError(status);
         return false;
     }
-
 };
 
 template <>
@@ -72,21 +71,21 @@ void RegisterWeekdayFunction(NewCatalog *catalog_ptr) {
     SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
 
     ScalarFunction weekday_date_function(func_name,
-                                  {DataType(LogicalType::kDate)},
-                                  {DataType(LogicalType::kBigInt)},
-                                  &ScalarFunction::UnaryFunctionWithFailure<DateT, BigIntT, WeekdayFunction>);
+                                         {DataType(LogicalType::kDate)},
+                                         {DataType(LogicalType::kBigInt)},
+                                         &ScalarFunction::UnaryFunctionWithFailure<DateT, BigIntT, WeekdayFunction>);
     function_set_ptr->AddFunction(weekday_date_function);
 
     ScalarFunction weekday_datetime_function(func_name,
-                                  {DataType(LogicalType::kDateTime)},
-                                  {DataType(LogicalType::kBigInt)},
-                                  &ScalarFunction::UnaryFunctionWithFailure<DateTimeT, BigIntT, WeekdayFunction>);
+                                             {DataType(LogicalType::kDateTime)},
+                                             {DataType(LogicalType::kBigInt)},
+                                             &ScalarFunction::UnaryFunctionWithFailure<DateTimeT, BigIntT, WeekdayFunction>);
     function_set_ptr->AddFunction(weekday_datetime_function);
 
     ScalarFunction weekday_timestamp_function(func_name,
-                                  {DataType(LogicalType::kTimestamp)},
-                                  {DataType(LogicalType::kBigInt)},
-                                  &ScalarFunction::UnaryFunctionWithFailure<TimestampT, BigIntT, WeekdayFunction>);
+                                              {DataType(LogicalType::kTimestamp)},
+                                              {DataType(LogicalType::kBigInt)},
+                                              &ScalarFunction::UnaryFunctionWithFailure<TimestampT, BigIntT, WeekdayFunction>);
     function_set_ptr->AddFunction(weekday_timestamp_function);
 
     NewCatalog::AddFunctionSet(catalog_ptr, function_set_ptr);

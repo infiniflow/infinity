@@ -839,4 +839,3 @@ TEST_P(TestTxnsConflictTest, delete_append) {
 
 }
 */
-

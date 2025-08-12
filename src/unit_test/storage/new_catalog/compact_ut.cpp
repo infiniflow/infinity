@@ -1637,7 +1637,7 @@ TEST_P(TestTxnCompact, compact_and_drop_index) {
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_FALSE(status.ok());
 
-        CheckWithNoIndex({0,1});
+        CheckWithNoIndex({0, 1});
         DropDB();
     }
     {
@@ -1662,7 +1662,7 @@ TEST_P(TestTxnCompact, compact_and_drop_index) {
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_FALSE(status.ok());
 
-        CheckWithNoIndex({0,1});
+        CheckWithNoIndex({0, 1});
         DropDB();
     }
     {

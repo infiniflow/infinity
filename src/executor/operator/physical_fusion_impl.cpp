@@ -82,7 +82,7 @@ PhysicalFusion::PhysicalFusion(const u64 id,
 
 PhysicalFusion::~PhysicalFusion() {}
 
-void PhysicalFusion::Init(QueryContext* query_context) {
+void PhysicalFusion::Init(QueryContext *query_context) {
     {
         String &method = fusion_expr_->method_;
         String to_lower_method;

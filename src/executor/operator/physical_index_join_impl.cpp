@@ -24,7 +24,8 @@ import :stl;
 import :query_context;
 import :operator_state;
 import :physical_index_join;
-import data_type;;
+import data_type;
+;
 
 namespace infinity {
 

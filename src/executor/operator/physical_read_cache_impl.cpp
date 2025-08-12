@@ -25,7 +25,7 @@ import data_type;
 
 namespace infinity {
 
-void PhysicalReadCache::Init(QueryContext* query_context) {}
+void PhysicalReadCache::Init(QueryContext *query_context) {}
 
 PhysicalReadCache::PhysicalReadCache(u64 id,
                                      LogicalNodeType origin_type,

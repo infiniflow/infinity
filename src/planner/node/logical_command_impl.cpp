@@ -127,7 +127,7 @@ String LogicalCommand::ToString(i64 &space) const {
         case CommandType::kSnapshot: {
             auto *snapshot_info = static_cast<SnapshotCmd *>(command_info_.get());
             ss << String(space, ' ') << arrow_str << "Snapshot command: ";
-            switch(snapshot_info->operation()) {
+            switch (snapshot_info->operation()) {
                 case SnapshotOp::kCreate: {
                     ss << "CREATE ";
                     break;
@@ -146,7 +146,7 @@ String LogicalCommand::ToString(i64 &space) const {
                 }
             }
 
-            switch(snapshot_info->scope()) {
+            switch (snapshot_info->scope()) {
                 case SnapshotScope::kSystem: {
                     ss << "SYSTEM ";
                     break;

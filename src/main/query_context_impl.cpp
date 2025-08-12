@@ -16,8 +16,8 @@ module;
 
 #include <csignal>
 #include <cstdio>
-#include <sstream>
 #include <memory>
+#include <sstream>
 
 module infinity_core:query_context.impl;
 
