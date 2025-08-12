@@ -34,23 +34,22 @@ module;
 
 #endif
 
-#include <cstdio>
 #include <dirent.h>
-#include <stdlib.h>
-#include <string>
 #include <unistd.h>
 
 module infinity_core:system_info.impl;
 
 import :system_info;
-
 import :stl;
 import :defer_op;
 import :status;
-import third_party;
 import :logger;
 import :infinity_exception;
 import :default_values;
+
+import std;
+import std.compat;
+import third_party;
 
 namespace infinity {
 
