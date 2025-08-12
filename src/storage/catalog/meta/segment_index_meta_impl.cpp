@@ -59,6 +59,40 @@ Status SegmentIndexMeta::GetNextChunkID(ChunkID &chunk_id) {
     return Status::OK();
 }
 
+Status SegmentIndexMeta::SetNextChunkID(ChunkID chunk_id) {
+    next_chunk_id_ = chunk_id;
+    String next_chunk_id_key = GetSegmentIndexTag("next_chunk_id");
+    String next_chunk_id_str = std::to_string(chunk_id);
+    Status status = kv_instance_.Put(next_chunk_id_key, next_chunk_id_str);
+    if (!status.ok()) {
+        return status;
+    }
+    return Status::OK();
+}
+
+Tuple<ChunkID, Status> SegmentIndexMeta::GetAndSetNextChunkID() {
+    std::lock_guard<std::mutex> lock(mtx_);
+    ChunkID chunk_id = std::numeric_limits<ChunkID>::max();
+    if (!next_chunk_id_) {
+        Status status = LoadNextChunkID();
+        // If next_chunk_id is not found, it means the segment index is empty.
+        // We can use chunk id 0 and set the next_chunk_id to 1.
+        if (status.code_ == ErrorCode::kNotFound) {
+            next_chunk_id_ = 0;
+        } else if (!status.ok()) {
+            return {chunk_id, status};
+        }
+    }
+    chunk_id = *next_chunk_id_;
+
+    (*next_chunk_id_)++;
+    String next_chunk_id_key = GetSegmentIndexTag("next_chunk_id");
+    String next_chunk_id_str = std::to_string(*next_chunk_id_);
+    Status status = kv_instance_.Put(next_chunk_id_key, next_chunk_id_str);
+
+    return {chunk_id, status};
+}
+
 Tuple<Vector<ChunkID> *, Status> SegmentIndexMeta::GetChunkIDs1() {
     if (!chunk_ids_) {
         auto status = LoadChunkIDs1();
@@ -126,17 +160,6 @@ Status SegmentIndexMeta::AddChunkIndexID1(ChunkID chunk_id, NewTxn *new_txn) {
     }
     chunk_ids_->push_back(chunk_id);
     return kv_instance_.Put(chunk_id_key, commit_ts_str);
-}
-
-Status SegmentIndexMeta::SetNextChunkID(ChunkID chunk_id) {
-    next_chunk_id_ = chunk_id;
-    String next_chunk_id_key = GetSegmentIndexTag("next_chunk_id");
-    String next_chunk_id_str = std::to_string(chunk_id);
-    Status status = kv_instance_.Put(next_chunk_id_key, next_chunk_id_str);
-    if (!status.ok()) {
-        return status;
-    }
-    return Status::OK();
 }
 
 Status SegmentIndexMeta::UpdateFtInfo(u64 column_len_sum, u32 column_len_cnt) {
