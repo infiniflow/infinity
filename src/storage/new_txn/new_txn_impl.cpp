@@ -2767,7 +2767,7 @@ Status NewTxn::RestoreTableFromSnapshot(const WalCmdRestoreTableSnapshot *restor
     Status status;  
     Optional<TableMeeta> table_meta;
     if (!is_link_files) {
-        status = NewCatalog::AddNewTable(db_meta, restore_table_snapshot_cmd->table_id_, begin_ts, commit_ts, restore_table_snapshot_cmd->table_def_, table_meta);
+        status = NewCatalog::RestoreTable(db_meta, restore_table_snapshot_cmd->table_id_, begin_ts, commit_ts, restore_table_snapshot_cmd->table_def_, table_meta);
         // table with the same name already exists
         if (!status.ok()) {
             return status;
@@ -3112,50 +3112,6 @@ bool NewTxn::CheckConflictTxnStore(const RestoreDatabaseTxnStore &txn_store, New
                 retry_query = true;
                 conflict = true;
             }
-            break;
-        }
-        default: {
-        }
-    }
-
-    if (conflict) {
-        cause = fmt::format("{} vs. {}", previous_txn->base_txn_store_->ToString(), txn_store.ToString());
-        return true;
-    }
-    return false;
-}
-
-bool NewTxn::CheckConflictTxnStore(const RestoreDatabaseTxnStore &txn_store, NewTxn *previous_txn, String &cause, bool &retry_query) {
-    const String &db_name = txn_store.db_name_;
-    bool conflict = false;
-    switch (previous_txn->base_txn_store_->type_) {
-        case TransactionType::kCreateDB: {
-            CreateDBTxnStore *create_db_txn_store = static_cast<CreateDBTxnStore *>(previous_txn->base_txn_store_.get());
-            if (create_db_txn_store->db_name_ == db_name) {
-                retry_query = false;
-                conflict = true;
-            }
-            break;
-        }
-        case TransactionType::kRestoreDatabase: {
-            RestoreDatabaseTxnStore *restore_database_txn_store = static_cast<RestoreDatabaseTxnStore *>(previous_txn->base_txn_store_.get());
-            if (restore_database_txn_store->db_name_ == db_name) {
-                retry_query = false;
-                conflict = true;
-            }
-            break;
-        }
-        case TransactionType::kCreateSnapshot: {
-            CreateSnapshotTxnStore *create_snapshot_txn_store = static_cast<CreateSnapshotTxnStore *>(previous_txn->base_txn_store_.get());
-            if (create_snapshot_txn_store->db_name_ == db_name || create_snapshot_txn_store->snapshot_type_ == SnapshotScope::kSystem) {
-                retry_query = true;
-                conflict = true;
-            }
-            break;
-        }
-        case TransactionType::kRestoreSystem: {
-            retry_query = false;
-            conflict = true;
             break;
         }
         default: {
@@ -6661,7 +6617,7 @@ Status NewTxn::CommitBottomCreateSystemSnapshot(const String &snapshot_name) {
 
 Status NewTxn::CheckpointforSnapshot(TxnTimeStamp last_ckp_ts, CheckpointTxnStore *txn_store) {
     TransactionType txn_type = GetTxnType();
-    if (txn_type != TransactionType::kNewCheckpoint && txn_type != TransactionType::kCreateTableSnapshot) {
+    if (txn_type != TransactionType::kNewCheckpoint && txn_type != TransactionType::kCreateSnapshot) {
         UnrecoverableError(fmt::format("Expected transaction type is checkpoint or create table snapshot."));
     }
 

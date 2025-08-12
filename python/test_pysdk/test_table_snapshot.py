@@ -268,6 +268,14 @@ class TestSnapshot:
         # BMP index
         table_obj.create_index("idx_vector_bmp", index.IndexInfo("sparse_col", index.IndexType.BMP, {"block_size": "16", "compress_type": "compress"}), ConflictType.Ignore)
 
+        # HNSW index
+        table_obj.create_index("idx_vector_hnsw", index.IndexInfo("vector_col", index.IndexType.Hnsw, {"metric": "cosine", "m": "16", "ef_construction": "200"}), ConflictType.Ignore)
+
+        table_obj.drop_index("idx_vector_bmp")
+
+        table_obj.create_index("idx_vector_bmp", index.IndexInfo("sparse_col", index.IndexType.BMP, {"block_size": "16", "compress_type": "compress"}), ConflictType.Ignore)
+
+
         # # EMVB index (for tensors)
         # table_obj.create_index("idx_tensor_emvb", index.IndexInfo("tensor_col", index.IndexType.EMVB, {"pq_subspace_num": "32", "pq_subspace_bits": "8"}), ConflictType.Ignore)
 
@@ -319,6 +327,12 @@ class TestSnapshot:
         
         return actual_count if 'actual_count' in locals() else successful_insertions
 
+    def add_drop_column(self, table_obj):
+        """Add and drop column"""
+        table_obj.drop_columns(["salary"])
+        table_obj.add_columns({"salary": {"type": "float64", "default": 0}})
+        return table_obj
+    
     # def test_persistence_restore(self, suffix):
     #     """Test basic snapshot create, list, drop operations"""
     #     table_name = f"test_basic_snapshot{suffix}"
@@ -350,10 +364,13 @@ class TestSnapshot:
         db_obj.drop_table(table_name, ConflictType.Ignore)
         # Create table and insert data
         table_obj = self.create_comprehensive_table(table_name)
+        table_obj = self.add_drop_column(table_obj)
         # Create indexes
         self._create_indexes(table_obj)
         actual_inserted = self.insert_comprehensive_data(table_obj, 100)
         print(f"Successfully inserted {actual_inserted} out of 100 rows")
+
+
         
         
         # Create snapshot
@@ -424,6 +441,7 @@ class TestSnapshot:
         db_obj.drop_table(table_name, ConflictType.Ignore)
         # Create table and insert large amount of data
         table_obj = self.create_comprehensive_table(table_name)
+        table_obj = self.add_drop_column(table_obj)
         self._create_indexes(table_obj)
         actual_inserted = self.insert_comprehensive_data(table_obj, 100000)  # 30k rows - should be fine with small dimensions
         print(f"Successfully inserted {actual_inserted} out of 100000 rows")

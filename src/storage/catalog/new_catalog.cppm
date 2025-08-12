@@ -260,6 +260,13 @@ public:
                               const SharedPtr<TableDef> &table_def,
                               Optional<TableMeeta> &table_meta);
 
+    static Status RestoreTable(DBMeeta &db_meta,
+                              const String &table_id_str,
+                              TxnTimeStamp begin_ts,
+                              TxnTimeStamp commit_ts,
+                              const SharedPtr<TableDef> &table_def,
+                              Optional<TableMeeta> &table_meta);
+
     static Status CleanTable(TableMeeta &table_meta, TxnTimeStamp begin_ts, UsageFlag usage_flag);
 
     Status AddNewTableIndex(TableMeeta &table_meta,

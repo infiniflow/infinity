@@ -378,9 +378,15 @@ String ColumnMeta::GetColumnTag(const String &tag) const {
 
 Tuple<SharedPtr<BlockColumnSnapshotInfo>, Status> ColumnMeta::MapMetaToSnapShotInfo(){
     SharedPtr<BlockColumnSnapshotInfo> block_column_snapshot_info = MakeShared<BlockColumnSnapshotInfo>();
-    block_column_snapshot_info->column_id_ = column_idx_;
+    SharedPtr<Vector<SharedPtr<ColumnDef>>> column_defs;
+    Status status;
+    std::tie(column_defs, status) = block_meta_.segment_meta().table_meta().GetColumnDefs();
+    if (!status.ok()) {
+        return {nullptr, status};
+    }
+    block_column_snapshot_info->column_id_ = (*column_defs)[column_idx_]->id();
     Vector<String> column_file_paths;
-    auto status = FilePaths(column_file_paths);
+    status = FilePaths(column_file_paths);
     if (!status.ok()) {
         return {nullptr, status};
     }
@@ -401,7 +407,7 @@ Tuple<SharedPtr<BlockColumnSnapshotInfo>, Status> ColumnMeta::MapMetaToSnapShotI
     return {block_column_snapshot_info, Status::OK()};
 }
 
-Status ColumnMeta::RestoreFromSnapshot(ColumnID column_id){
+Status ColumnMeta::RestoreFromSnapshot(SizeT column_idx){
     // TODO: figure out whether we are still using chunkoffset
     Status status;
     SharedPtr<Vector<SharedPtr<ColumnDef>>> column_defs;
@@ -409,7 +415,7 @@ Status ColumnMeta::RestoreFromSnapshot(ColumnID column_id){
     if (!status.ok()) {
         return status;
     }
-    const ColumnDef *col_def = (*column_defs)[column_id].get();
+    const ColumnDef *col_def = (*column_defs)[column_idx].get();
     status = RestoreSet(col_def);
     if (!status.ok()) {
         return status;

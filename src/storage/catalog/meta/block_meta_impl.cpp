@@ -437,8 +437,9 @@ Tuple<SharedPtr<BlockSnapshotInfo>, Status> BlockMeta::MapMetaToSnapShotInfo(){
     if (!status.ok()) {
         return {nullptr, status};
     }
-    for (auto &column_def: *column_defs) {
-        ColumnMeta column_meta(column_def->id(), *this);
+    for (SizeT i=0; i<column_defs->size(); ++i) {
+        // i is column idx not id, we need to use idx when creating column_meta
+        ColumnMeta column_meta(i, *this);
         auto [column_snapshot_info, status] = column_meta.MapMetaToSnapShotInfo();
         if (!status.ok()) {
             return {nullptr, status};
@@ -459,9 +460,9 @@ Status BlockMeta::RestoreFromSnapshot(){
     if (!status.ok()) {
         return status;
     }
-    for (const auto &column_def : *column_defs) {
-        ColumnMeta column_meta(column_def->id(), *this);
-        status = column_meta.RestoreFromSnapshot(column_def->id());
+    for (SizeT i = 0; i < column_defs->size(); ++i) {
+        ColumnMeta column_meta(i, *this);
+        status = column_meta.RestoreFromSnapshot(i);
         if (!status.ok()) {
             return status;
         }

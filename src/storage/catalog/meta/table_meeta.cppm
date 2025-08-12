@@ -65,6 +65,8 @@ public:
 
     Status InitSet(SharedPtr<TableDef> table_def);
 
+    Status RestoreSet(SharedPtr<TableDef> table_def);
+
     Status LoadSet();
 
     Status UninitSet(UsageFlag usage_flag);

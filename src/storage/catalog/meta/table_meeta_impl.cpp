@@ -302,6 +302,37 @@ Status TableMeeta::InitSet(SharedPtr<TableDef> table_def) {
     return Status::OK();
 }
 
+Status TableMeeta::RestoreSet(SharedPtr<TableDef> table_def) {
+    Status status;
+
+    // Create table comment;
+    if (table_def->table_comment() != nullptr and !table_def->table_comment()->empty()) {
+        String &table_comment = *table_def->table_comment();
+        String table_comment_key = GetTableTag("comment");
+        status = kv_instance_->Put(table_comment_key, table_comment);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+
+    // Create table column id;
+    ColumnID next_column_id = table_def->columns().back()->id() + 1;
+    status = SetNextColumnID(next_column_id);
+    if (!status.ok()) {
+        return status;
+    }
+
+    for (const auto &column : table_def->columns()) {
+        String column_key = KeyEncode::TableColumnKey(db_id_str_, table_id_str_, column->name(), commit_ts_);
+        status = kv_instance_->Put(column_key, column->ToJson().dump());
+        if (!status.ok()) {
+            return status;
+        }
+    }
+
+    return Status::OK();
+}
+
 Status TableMeeta::LoadSet() {
     Vector<String> *index_id_strs_ptr = nullptr;
     Status status = GetIndexIDs(index_id_strs_ptr);

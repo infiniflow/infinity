@@ -900,3 +900,55 @@ TEST_P(TestTxnCleanup, cleanup_and_dump_index) {
     MappingFunction(other_begin, other, other_commit);
     TestNoConflict();
 }
+
+TEST_P(TestTxnCleanup, cleanup_after_drop_and_add_columns) {
+    CreateDB();
+    CreateTable();
+    // Transaction 1: Drop column1
+    {
+        auto *txn_other_ = new_txn_mgr_->BeginTxn(MakeUnique<String>("drop column1"), TransactionType::kNormal);
+        auto status = txn_other_->DropColumns(*db_name_, *table_name_, Vector<String>({column_def1_->name()}));
+        // Debug: Print the actual error
+        if (!status.ok()) {
+            std::cout << "DropColumns failed: " << status.message() << std::endl;
+        }
+        EXPECT_TRUE(status.ok());
+        EXPECT_TRUE(new_txn_mgr_->CommitTxn(txn_other_).ok());
+    }
+    
+    // Transaction 2: Add column2
+    {
+        std::shared_ptr<ConstantExpr> default_varchar = std::make_shared<ConstantExpr>(LiteralType::kString);
+        default_varchar->str_value_ = strdup("default_varchar");
+        auto column_def3 = std::make_shared<ColumnDef>(2, std::make_shared<DataType>(LogicalType::kVarchar), "col3", std::set<ConstraintType>(), default_varchar);
+        auto *txn_other_ = new_txn_mgr_->BeginTxn(MakeUnique<String>("add columns"), TransactionType::kNormal);
+        auto status = txn_other_->AddColumns(*db_name_, *table_name_, Vector<SharedPtr<ColumnDef>>{column_def3});
+        // Debug: Print the actual error
+        if (!status.ok()) {
+            std::cout << "AddColumns failed: " << status.message() << std::endl;
+        }
+        EXPECT_TRUE(status.ok());
+        EXPECT_TRUE(new_txn_mgr_->CommitTxn(txn_other_).ok());
+    }
+
+    // Transaction 3: checkpoint
+    {
+        auto *wal_manager = InfinityContext::instance().storage()->wal_manager();
+        auto *txn_other_ = new_txn_mgr_->BeginTxn(MakeUnique<String>("checkpoint"), TransactionType::kNewCheckpoint);
+        auto status = txn_other_->Checkpoint(wal_manager->LastCheckpointTS());
+        // Debug: Print the actual error
+        if (!status.ok()) {
+            std::cout << "Checkpoint failed: " << status.message() << std::endl;
+        }
+        EXPECT_TRUE(status.ok());
+        EXPECT_TRUE(new_txn_mgr_->CommitTxn(txn_other_).ok());
+    }
+    
+    // Transaction 4: Cleanup
+    {
+        auto *txn_other_ = new_txn_mgr_->BeginTxn(MakeUnique<String>("cleanup"), TransactionType::kNormal);
+        auto status = txn_other_->Cleanup();
+        EXPECT_TRUE(status.ok());
+        EXPECT_TRUE(new_txn_mgr_->CommitTxn(txn_other_).ok());
+    }
+}
