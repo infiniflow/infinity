@@ -13,11 +13,7 @@
 // limitations under the License.
 module;
 
-#include <arrow/type_fwd.h>
 #include <cstring>
-#include <iostream>
-#include <ranges>
-#include <vector>
 
 module infinity_core:http_server.impl;
 
@@ -25,11 +21,9 @@ import :http_server;
 import :infinity;
 import :stl;
 import :status;
-import third_party;
 import :defer_op;
 import :data_block;
 import :data_table;
-import data_type;
 import :value;
 import :infinity_exception;
 import :logger;
@@ -38,6 +32,25 @@ import :query_options;
 import :column_vector;
 import :infinity_context;
 import :query_context;
+import :http_search;
+import :status;
+import :physical_import;
+
+import std;
+import std.compat;
+import third_party;
+
+import constant_expr;
+import command_statement;
+import knn_expr;
+import function_expr;
+import column_expr;
+import type_info;
+import logical_type;
+import embedding_info;
+import sparse_info;
+import decimal_info;
+import array_info;
 import column_def;
 import internal_types;
 import parsed_expr;
@@ -49,20 +62,7 @@ import create_index_info;
 import statement_common;
 import extra_ddl_info;
 import update_statement;
-import :http_search;
-import knn_expr;
-import function_expr;
-import column_expr;
-import type_info;
-import logical_type;
-import embedding_info;
-import sparse_info;
-import decimal_info;
-import array_info;
-import :status;
-import constant_expr;
-import command_statement;
-import :physical_import;
+import data_type;
 
 namespace {
 

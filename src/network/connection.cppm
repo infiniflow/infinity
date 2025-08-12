@@ -18,9 +18,7 @@ export module infinity_core:connection;
 
 import :boost;
 import :stl;
-// import :session;
 import :pg_protocol_handler;
-// import :query_context;
 import :data_table;
 import :query_result;
 import :session;

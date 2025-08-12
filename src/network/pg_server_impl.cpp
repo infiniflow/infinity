@@ -15,7 +15,6 @@
 module;
 
 #include <boost/bind/bind.hpp>
-#include <thread>
 
 module infinity_core:pg_server.impl;
 
@@ -24,11 +23,12 @@ import :thrift_server;
 import :infinity_context;
 import :stl;
 import :boost;
-import third_party;
 import :infinity_exception;
-
 import :connection;
 import :logger;
+
+import std;
+import third_party;
 
 namespace infinity {
 

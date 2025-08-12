@@ -14,20 +14,19 @@
 
 module;
 
-#include <arpa/inet.h>
 #include <boost/asio/write.hpp>
 
 module infinity_core:buffer_writer.impl;
 
 import :buffer_writer;
 import :stl;
-import third_party;
 import :pg_message;
 import :ring_buffer_iterator;
-
 import :infinity_exception;
 import :default_values;
 import :logger;
+
+import third_party;
 
 namespace infinity {
 

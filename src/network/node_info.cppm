@@ -17,6 +17,7 @@ module;
 export module infinity_core:node_info;
 
 import :stl;
+
 import admin_statement;
 
 namespace infinity {

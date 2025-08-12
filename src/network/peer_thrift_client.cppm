@@ -22,6 +22,7 @@ import :thrift;
 import :status;
 import :blocking_queue;
 import :peer_task;
+
 import global_resource_usage;
 
 namespace infinity {

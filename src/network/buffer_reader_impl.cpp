@@ -14,21 +14,20 @@
 
 module;
 
-#include <arpa/inet.h>
 #include <boost/asio/read.hpp>
 
 module infinity_core:buffer_reader.impl;
 
 import :buffer_reader;
 import :stl;
-import third_party;
 import :pg_message;
 import :ring_buffer_iterator;
-
 import :infinity_exception;
 import :default_values;
 import :status;
 import :logger;
+
+import third_party;
 
 namespace infinity {
 

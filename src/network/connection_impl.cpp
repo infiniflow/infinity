@@ -22,27 +22,24 @@ import :connection;
 import :pg_protocol_handler;
 import :boost;
 import :stl;
-// import :session;
 import :infinity_exception;
-import internal_types;
 import :pg_message;
 import :logger;
-// import :query_context;
 import :infinity_context;
-import third_party;
 import :data_table;
-
 import :logical_node_type;
-// import :query_result;
-// import session_manager;
+import :session_manager;
+import :query_context;
+
+import third_party;
+
 import type_info;
 import logical_type;
 import embedding_info;
 import sparse_info;
 import data_type;
 import global_resource_usage;
-import :session_manager;
-import :query_context;
+import internal_types;
 
 namespace infinity {
 

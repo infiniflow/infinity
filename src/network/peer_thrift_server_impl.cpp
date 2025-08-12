@@ -19,13 +19,10 @@ module;
 #include <thrift/concurrency/ThreadFactory.h>
 #include <thrift/concurrency/ThreadManager.h>
 #include <thrift/protocol/TBinaryProtocol.h>
-#include <thrift/protocol/TCompactProtocol.h>
 #include <thrift/server/TNonblockingServer.h>
 #include <thrift/server/TThreadPoolServer.h>
 #include <thrift/server/TThreadedServer.h>
-#include <thrift/transport/TNonblockingServerSocket.h>
 #include <thrift/transport/TServerSocket.h>
-#include <thrift/transport/TSocket.h>
 #include <thrift/transport/TTransportUtils.h>
 
 module infinity_core:peer_thrift_server.impl;
@@ -34,9 +31,10 @@ import :peer_thrift_server;
 import :peer_server_thrift_service;
 import :peer_server_thrift_types;
 import :logger;
-import third_party;
 import :stl;
 import :infinity_exception;
+
+import third_party;
 
 using namespace apache::thrift;
 using namespace apache::thrift::concurrency;

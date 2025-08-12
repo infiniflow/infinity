@@ -17,9 +17,10 @@ module;
 export module infinity_core:peer_task;
 
 import :stl;
+import :node_info;
+
 import admin_statement;
 import global_resource_usage;
-import :node_info;
 
 namespace infinity {
 

@@ -17,10 +17,11 @@ module;
 module infinity_core:pg_protocol_handler.impl;
 
 import :pg_protocol_handler;
-import global_resource_usage;
 import :boost;
 import :stl;
 import :pg_message;
+
+import global_resource_usage;
 
 namespace infinity {
 

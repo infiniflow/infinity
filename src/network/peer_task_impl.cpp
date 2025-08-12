@@ -18,8 +18,10 @@ module infinity_core:peer_task.impl;
 
 import :peer_task;
 import :stl;
-import third_party;
 import :peer_task;
+
+import third_party;
+
 import admin_statement;
 
 namespace infinity {
