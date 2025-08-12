@@ -17,19 +17,16 @@ module;
 module infinity_core:divide.impl;
 
 import :divide;
-
+import :status;
 import :stl;
 import :new_catalog;
-import logical_type;
 import :infinity_exception;
 import :scalar_function;
 import :scalar_function_set;
 
-import third_party;
-import :status;
 import internal_types;
 import data_type;
-import :logger;
+import logical_type;
 
 namespace infinity {
 

@@ -18,6 +18,7 @@ export module infinity_core:special_function;
 
 import :stl;
 import :function;
+
 import data_type;
 import internal_types;
 

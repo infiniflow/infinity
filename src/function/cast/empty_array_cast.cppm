@@ -17,13 +17,13 @@ module;
 export module infinity_core:empty_array_cast;
 
 import :stl;
-import data_type;
 import :bound_cast_func;
 import :column_vector_cast;
 import :infinity_exception;
+
+import data_type;
 import internal_types;
 import logical_type;
-import third_party;
 
 namespace infinity {
 

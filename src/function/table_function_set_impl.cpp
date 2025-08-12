@@ -17,7 +17,6 @@ module;
 module infinity_core:table_function_set.impl;
 
 import :table_function_set;
-
 import :stl;
 import :table_function;
 

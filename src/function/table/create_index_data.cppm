@@ -17,9 +17,7 @@ module;
 export module infinity_core:create_index_data;
 
 import :stl;
-import third_party;
 import :infinity_exception;
-// import :logger;
 
 namespace infinity {
 

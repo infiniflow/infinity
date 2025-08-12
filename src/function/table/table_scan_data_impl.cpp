@@ -17,7 +17,6 @@ module;
 module infinity_core:table_scan_data.impl;
 
 import :table_scan_function_data;
-
 import :stl;
 import :global_block_id;
 import :block_index;

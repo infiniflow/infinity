@@ -17,18 +17,15 @@ module;
 module infinity_core:plus.impl;
 
 import :plus;
-
 import :stl;
 import :new_catalog;
-import logical_type;
 import :infinity_exception;
 import :scalar_function;
 import :scalar_function_set;
 
-import third_party;
 import internal_types;
+import logical_type;
 import data_type;
-import :logger;
 
 namespace infinity {
 

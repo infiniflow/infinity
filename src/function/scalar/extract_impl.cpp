@@ -17,7 +17,6 @@ module;
 module infinity_core:extract.impl;
 
 import :extract;
-
 import :stl;
 import :new_catalog;
 import :status;
@@ -25,11 +24,9 @@ import :infinity_exception;
 import :scalar_function;
 import :scalar_function_set;
 
-import third_party;
 import logical_type;
 import internal_types;
 import data_type;
-import :logger;
 
 namespace infinity {
 

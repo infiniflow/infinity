@@ -20,22 +20,20 @@ import :stl;
 import :column_vector;
 import :vector_buffer;
 import :bound_cast_func;
-
 import :column_vector_cast;
 import :float_cast;
 import :integer_cast;
 import :infinity_exception;
-import third_party;
-import :logger;
 import :status;
+import :default_values;
+import :sparse_util;
+
 import logical_type;
 import internal_types;
 import embedding_info;
 import sparse_info;
 import knn_expr;
 import data_type;
-import :default_values;
-import :sparse_util;
 
 namespace infinity {
 

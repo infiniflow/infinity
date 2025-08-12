@@ -14,22 +14,20 @@
 
 module;
 
-#include <sstream>
-
 module infinity_core:scalar_function_set.impl;
 
 import :scalar_function_set;
-
 import :stl;
 import :base_expression;
 import :scalar_function;
-import embedding_info;
 import :infinity_exception;
 import :cast_table;
-import :logger;
 import :status;
-import third_party;
+
+import std;
+
 import logical_type;
+import embedding_info;
 
 namespace infinity {
 

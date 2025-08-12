@@ -1,24 +1,21 @@
 module;
 
-#include <cctype>
-
 module infinity_core:rtrim.impl;
 
 import :rtrim;
-
 import :stl;
 import :new_catalog;
 import :status;
 import :infinity_exception;
 import :scalar_function;
 import :scalar_function_set;
+import :column_vector;
 
-import third_party;
+import std.compat;
+
 import logical_type;
 import internal_types;
 import data_type;
-import :logger;
-import :column_vector;
 
 namespace infinity {
 

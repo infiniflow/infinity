@@ -17,7 +17,6 @@ module;
 module infinity_core:builtin_functions.impl;
 
 import :builtin_functions;
-
 import :stl;
 import :new_catalog;
 import :avg;
@@ -26,7 +25,6 @@ import :first;
 import :max;
 import :min;
 import :sum;
-
 import :add;
 import :abs;
 import :sqrt;
@@ -87,11 +85,12 @@ import :trim;
 import :position;
 import :default_values;
 import :special_function;
+import :trunc;
+import :fixed_dimensional_encoding;
+
+import logical_type;
 import internal_types;
 import data_type;
-import :trunc;
-import logical_type;
-import :fixed_dimensional_encoding;
 
 namespace infinity {
 

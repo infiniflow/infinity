@@ -19,15 +19,14 @@ export module infinity_core:varchar_cast;
 import :stl;
 import :bound_cast_func;
 import :column_vector_cast;
-import logical_type;
 import :infinity_exception;
-import third_party;
 import :column_vector;
 import :vector_buffer;
-import internal_types;
-import data_type;
 import :status;
-import :logger;
+
+import data_type;
+import internal_types;
+import logical_type;
 
 namespace infinity {
 

@@ -24,6 +24,7 @@ import :merge_knn;
 import :knn_result_handler;
 import :status;
 import :logger;
+
 import internal_types;
 import knn_expr;
 import statement_common;

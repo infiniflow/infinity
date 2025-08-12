@@ -16,8 +16,6 @@ module;
 
 export module infinity_core:pow;
 
-import :stl;
-
 namespace infinity {
 
 class NewCatalog;

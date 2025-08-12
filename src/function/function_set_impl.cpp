@@ -14,15 +14,15 @@
 
 module;
 
-#include <sstream>
-
 module infinity_core:function_set.impl;
 
 import :function_set;
-
 import :stl;
 import :new_catalog;
 import :base_expression;
+
+import std;
+
 import function_expr;
 
 namespace infinity {

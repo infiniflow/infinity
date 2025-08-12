@@ -20,11 +20,12 @@ import :stl;
 import :function_data;
 import :table_function;
 import :global_block_id;
-import internal_types;
 import :knn_result_handler;
 import :infinity_exception;
 import :logger;
 import :merge_knn;
+
+import internal_types;
 
 namespace infinity {
 

@@ -14,15 +14,15 @@
 
 module;
 
-#include <sstream>
-
 module infinity_core:table_function.impl;
 
 import :table_function;
-
 import :stl;
 import :function;
 import :query_context;
+
+import std;
+
 import logical_type;
 
 namespace infinity {

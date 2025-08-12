@@ -19,6 +19,7 @@ module infinity_core:cast_table.impl;
 import :cast_table;
 import :stl;
 import :cast_table;
+
 import logical_type;
 import embedding_type;
 

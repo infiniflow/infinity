@@ -18,12 +18,12 @@ export module infinity_core:column_vector_cast;
 
 import :column_vector;
 import :stl;
-
 import :roaring_bitmap;
 import :bound_cast_func;
 import :unary_operator;
 import :embedding_unary_operator;
 import :null_value;
+
 import logical_type;
 import internal_types;
 import data_type;

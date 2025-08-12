@@ -20,13 +20,12 @@ import :stl;
 import :column_vector;
 import :vector_buffer;
 import :bound_cast_func;
-import data_type;
-import :column_vector_cast;
-import logical_type;
 import :infinity_exception;
-import third_party;
+import :column_vector_cast;
+
+import data_type;
+import logical_type;
 import internal_types;
-import :logger;
 
 namespace infinity {
 

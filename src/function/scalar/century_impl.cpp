@@ -14,22 +14,22 @@
 
 module;
 
-#include <cmath>
-
 module infinity_core:century.impl;
 
 import :century;
 import :stl;
 import :new_catalog;
 import :status;
-import logical_type;
 import :infinity_exception;
 import :scalar_function;
 import :scalar_function_set;
-import third_party;
+import :column_vector;
+
+import std.compat;
+
 import internal_types;
 import data_type;
-import :column_vector;
+import logical_type;
 
 namespace infinity {
 

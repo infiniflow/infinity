@@ -14,16 +14,13 @@
 
 module;
 
-#include <cassert>
-#include <vector>
-
 module infinity_core:compact_state_data.impl;
 
 import :compact_state_data;
-
-import third_party;
-import :logger;
 import :block_index;
+
+import std;
+
 import row_id;
 
 namespace infinity {
@@ -38,8 +35,7 @@ void RowIDRemap::AddMap(SegmentID segment_id, BlockID block_id, BlockOffset bloc
     //                      new_row_id.segment_id_,
     //                      new_row_id.segment_offset_ / block_capacity_,
     //                      new_row_id.segment_offset_ % block_capacity_));
-    bool insert_ok = block_vec.emplace(block_offset, new_row_id).second;
-    if (!insert_ok) {
+    if (auto insert_ok = block_vec.emplace(block_offset, new_row_id).second; !insert_ok) {
         UnrecoverableError(fmt::format("RowID already exists, segment_id: {}, block_id: {}, block_offset: {}", segment_id, block_id, block_offset));
     }
 }

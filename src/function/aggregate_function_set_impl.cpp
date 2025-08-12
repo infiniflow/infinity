@@ -14,19 +14,17 @@
 
 module;
 
-#include <sstream>
-
 module infinity_core:aggregate_function_set.impl;
 
 import :aggregate_function_set;
-
 import :stl;
 import :base_expression;
 import :aggregate_function;
 import :cast_table;
-import :logger;
 import :status;
 import :infinity_exception;
+
+import std;
 
 namespace infinity {
 

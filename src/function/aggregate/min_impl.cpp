@@ -18,16 +18,14 @@ module infinity_core:min.impl;
 
 import :stl;
 import :new_catalog;
-import logical_type;
 import :infinity_exception;
 import :aggregate_function;
 import :aggregate_function_set;
-
-import third_party;
 import :status;
+
 import internal_types;
 import data_type;
-import :logger;
+import logical_type;
 
 namespace infinity {
 

@@ -14,31 +14,30 @@
 
 module;
 
-#include <cmath>
-#include <limits>
-#include <random>
-
 module infinity_core:fixed_dimensional_encoding.impl;
 
 import :fixed_dimensional_encoding;
 
 import :stl;
 import :new_catalog;
-import logical_type;
 import :infinity_exception;
 import :scalar_function;
 import :scalar_function_set;
-import internal_types;
-import data_type;
-import :column_vector;
-import :data_block;
-import :value;
-import array_info;
-import third_party;
-import embedding_info;
 import :function_set;
 import :base_expression;
 import :function;
+import :column_vector;
+import :data_block;
+import :value;
+
+import std;
+import std.compat;
+
+import embedding_info;
+import array_info;
+import logical_type;
+import internal_types;
+import data_type;
 
 namespace infinity {
 

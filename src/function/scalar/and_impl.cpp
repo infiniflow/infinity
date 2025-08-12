@@ -14,8 +14,6 @@
 
 module;
 
-#include <type_traits>
-
 module infinity_core:and_func.impl;
 
 import :and_func;
@@ -26,11 +24,11 @@ import :infinity_exception;
 import :scalar_function;
 import :scalar_function_set;
 
-import third_party;
+import std;
+
 import logical_type;
 import internal_types;
 import data_type;
-import :logger;
 
 namespace infinity {
 

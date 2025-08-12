@@ -11,24 +11,22 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-module;
 
-#include <sstream>
+module;
 
 module infinity_core:scalar_function.impl;
 
 import :scalar_function;
-
 import :stl;
 import :function;
-
 import :status;
 import :infinity_exception;
 import :data_block;
 import :base_expression;
 import :column_vector;
-import third_party;
-import :logger;
+
+import std;
+
 import data_type;
 
 namespace infinity {

@@ -13,20 +13,21 @@
 // limitations under the License.
 
 module;
+
 module infinity_core:reverse.impl;
 
 import :reverse;
 import :stl;
 import :new_catalog;
 import :status;
-import logical_type;
 import :infinity_exception;
 import :scalar_function;
 import :scalar_function_set;
-import third_party;
+import :column_vector;
+
 import internal_types;
 import data_type;
-import :column_vector;
+import logical_type;
 
 namespace infinity {
 

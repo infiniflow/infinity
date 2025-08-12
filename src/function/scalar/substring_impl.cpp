@@ -17,19 +17,16 @@ module;
 module infinity_core:substring.impl;
 
 import :substring;
-
 import :stl;
 import :new_catalog;
-import logical_type;
 import :infinity_exception;
 import :scalar_function;
 import :scalar_function_set;
-
-import third_party;
 import :column_vector;
+
 import internal_types;
 import data_type;
-import :logger;
+import logical_type;
 
 namespace infinity {
 

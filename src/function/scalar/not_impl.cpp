@@ -14,23 +14,20 @@
 
 module;
 
-#include <type_traits>
-
 module infinity_core:not_func.impl;
 
 import :not_func;
-
 import :stl;
 import :new_catalog;
-import logical_type;
 import :infinity_exception;
 import :scalar_function;
 import :scalar_function_set;
 
-import third_party;
+import std;
+
 import internal_types;
 import data_type;
-import :logger;
+import logical_type;
 
 namespace infinity {
 

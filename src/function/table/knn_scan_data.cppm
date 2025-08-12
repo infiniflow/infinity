@@ -18,7 +18,6 @@ export module infinity_core:knn_scan_data;
 
 import :stl;
 import :table_function;
-
 import :global_block_id;
 import :merge_knn;
 import :roaring_bitmap;
@@ -26,9 +25,10 @@ import :data_block;
 import :column_vector;
 import :base_expression;
 import :expression_state;
+import :base_table_ref;
+
 import knn_expr;
 import statement_common;
-import :base_table_ref;
 import internal_types;
 
 namespace infinity {

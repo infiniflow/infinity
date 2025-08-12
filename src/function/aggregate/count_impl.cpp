@@ -19,14 +19,13 @@ module infinity_core:count.impl;
 import :count;
 import :stl;
 import :new_catalog;
-import logical_type;
 import :infinity_exception;
 import :aggregate_function;
 import :aggregate_function_set;
 
-import third_party;
 import internal_types;
 import data_type;
+import logical_type;
 
 namespace infinity {
 

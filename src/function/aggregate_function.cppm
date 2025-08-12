@@ -14,8 +14,6 @@
 
 module;
 
-#include <type_traits>
-
 export module infinity_core:aggregate_function;
 
 import :stl;
@@ -25,10 +23,12 @@ import :column_vector;
 import :vector_buffer;
 import :infinity_exception;
 import :base_expression;
+
+import std;
+
 import data_type;
 import logical_type;
 import internal_types;
-import :logger;
 
 namespace infinity {
 

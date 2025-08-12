@@ -17,7 +17,6 @@ module;
 module infinity_core:create_index_data.impl;
 
 import :create_index_data;
-
 import :block_index;
 
 namespace infinity {

@@ -17,9 +17,9 @@ module;
 export module infinity_core:function_set;
 
 import :stl;
-
 import :function;
 import :base_expression;
+
 import function_expr;
 
 namespace infinity {

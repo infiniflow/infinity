@@ -18,21 +18,18 @@ export module infinity_core:sparse_cast;
 
 import :stl;
 import :bound_cast_func;
-import data_type;
-import logical_type;
 import :status;
 import :infinity_exception;
-import sparse_info;
 import :column_vector_cast;
-import internal_types;
 import :column_vector;
-import third_party;
 import :vector_buffer;
-
-import sparse_info;
 import :embedding_cast;
-import :logger;
 import :sparse_util;
+
+import data_type;
+import logical_type;
+import sparse_info;
+import internal_types;
 
 namespace infinity {
 

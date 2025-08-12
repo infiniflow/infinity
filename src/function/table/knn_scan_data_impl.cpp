@@ -14,15 +14,11 @@
 
 module;
 
-#include <string>
 module infinity_core:knn_scan_data.impl;
 
 import :knn_scan_data;
-
 import :stl;
 import :infinity_exception;
-import third_party;
-import logical_type;
 import :merge_knn;
 import :knn_result_handler;
 import :vector_distance;
@@ -30,15 +26,18 @@ import :data_block;
 import :column_vector;
 import :base_expression;
 import :expression_state;
-import internal_types;
-import data_type;
 import :status;
 import :logger;
 import :simd_functions;
-
 import :table_index_meeta;
 import :segment_index_meta;
 import :block_meta;
+
+import std;
+
+import logical_type;
+import internal_types;
+import data_type;
 import knn_expr;
 import statement_common;
 

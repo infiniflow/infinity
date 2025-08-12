@@ -24,17 +24,16 @@ import :column_vector_cast;
 import :float_cast;
 import :integer_cast;
 import :infinity_exception;
-import third_party;
-import :logger;
 import :status;
+import :default_values;
+import :embedding_cast;
+import :tensor_cast;
+
 import logical_type;
 import internal_types;
 import embedding_info;
 import knn_expr;
 import data_type;
-import :default_values;
-import :embedding_cast;
-import :tensor_cast;
 
 namespace infinity {
 

@@ -1,21 +1,19 @@
 module;
 
-#include <cmath>
-
 module infinity_core:floor.impl;
 
 import :floor;
-
 import :stl;
 import :new_catalog;
-import logical_type;
 import :infinity_exception;
 import :scalar_function;
 import :scalar_function_set;
 
-import third_party;
+import std.compat;
+
 import internal_types;
 import data_type;
+import logical_type;
 
 namespace infinity {
 

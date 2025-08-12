@@ -21,12 +21,11 @@ import :column_vector;
 import :vector_buffer;
 import :bound_cast_func;
 import :column_vector_cast;
-import logical_type;
 import :infinity_exception;
-import third_party;
+
 import internal_types;
 import data_type;
-import :logger;
+import logical_type;
 
 namespace infinity {
 

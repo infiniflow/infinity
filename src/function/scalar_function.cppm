@@ -20,9 +20,7 @@ import :stl;
 import :function;
 import :function_data;
 import :column_vector;
-import internal_types;
 import :infinity_exception;
-import data_type;
 import :data_block;
 import :roaring_bitmap;
 import :nullary_operation;
@@ -31,8 +29,9 @@ import :binary_operator;
 import :ternary_operator;
 import :base_expression;
 import :null_value;
-import :logger;
-import third_party;
+
+import data_type;
+import internal_types;
 
 namespace infinity {
 
