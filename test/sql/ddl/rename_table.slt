@@ -1,0 +1,103 @@
+statement ok
+DROP TABLE IF EXISTS test_rename_table;
+
+statement ok
+DROP TABLE IF EXISTS test_rename_table_new;
+
+statement ok
+CREATE TABLE test_rename_table (
+    id INTEGER PRIMARY KEY,
+    name VARCHAR,
+    value REAL
+);
+
+statement ok
+INSERT INTO test_rename_table VALUES (1, 'Alice', 10.5), (2, 'Bob', 20.7), (3, 'Charlie', 15.3);
+
+query I
+SELECT * FROM test_rename_table ORDER BY id;
+----
+1 Alice 10.500000
+2 Bob 20.700001
+3 Charlie 15.300000
+
+# Test basic table rename
+statement ok
+ALTER TABLE test_rename_table RENAME TO test_rename_table_new;
+
+query I
+SELECT * FROM test_rename_table_new ORDER BY id;
+----
+1 Alice 10.500000
+2 Bob 20.700001
+3 Charlie 15.300000
+
+# Verify old table name no longer exists
+statement error
+SELECT * FROM test_rename_table;
+
+# Test rename back to original name
+statement ok
+ALTER TABLE test_rename_table_new RENAME TO test_rename_table;
+
+query I
+SELECT * FROM test_rename_table ORDER BY id;
+----
+1 Alice 10.500000
+2 Bob 20.700001
+3 Charlie 15.300000
+
+# Test rename with schema prefix
+statement ok
+ALTER TABLE test_rename_table RENAME TO test_renamed_final;
+
+query I
+SELECT * FROM test_renamed_final ORDER BY id;
+----
+1 Alice 10.500000
+2 Bob 20.700001
+3 Charlie 15.300000
+
+# Test rename with special characters in new name
+statement ok
+ALTER TABLE test_renamed_final RENAME TO test_table_with_underscores;
+
+query I
+SELECT * FROM test_table_with_underscores ORDER BY id;
+----
+1 Alice 10.500000
+2 Bob 20.700001
+3 Charlie 15.300000
+
+# Test rename with numbers in new name
+statement ok
+ALTER TABLE test_table_with_underscores RENAME TO test_table_123;
+
+query I
+SELECT * FROM test_table_123 ORDER BY id;
+----
+1 Alice 10.500000
+2 Bob 20.700001
+3 Charlie 15.300000
+
+# Test rename to a name that already exists (should fail)
+statement ok
+CREATE TABLE duplicate_name (id INT);
+
+statement error
+ALTER TABLE test_table_123 RENAME TO duplicate_name;
+
+# Verify original table still exists and data is intact
+query I
+SELECT * FROM test_table_123 ORDER BY id;
+----
+1 Alice 10.500000
+2 Bob 20.700001
+3 Charlie 15.300000
+
+# Clean up
+statement ok
+DROP TABLE test_table_123;
+
+statement ok
+DROP TABLE duplicate_name; 

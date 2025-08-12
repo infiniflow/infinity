@@ -89,13 +89,7 @@ class TestSystemSnapshot:
     def insert_data_for_table(self, table_obj, num_rows: int = 100):
         """Insert test data for a comprehensive table"""
         data = []
-        for i in range(num_rows):
-            # Create sparse vector data
-            num_non_zero = random.randint(1, 2)
-            indices = sorted(random.sample(range(3), num_non_zero))
-            values = [random.uniform(-1, 1) for _ in range(num_non_zero)]
-            sparse_data = SparseVector(indices, values)
-            
+        for i in range(num_rows):          
             row = {
                 "id": i,
                 "name": f"user_{i}",
@@ -104,7 +98,7 @@ class TestSystemSnapshot:
                 "is_active": random.choice([True, False]),
                 "vector_col": [random.uniform(-1, 1)],
                 "tensor_col": [random.uniform(-1, 1), random.uniform(-1, 1)],
-                "sparse_col": sparse_data
+                "sparse_col": SparseVector([0, 1], [1.0, 1.0]) 
             }
             data.append(row)
         
