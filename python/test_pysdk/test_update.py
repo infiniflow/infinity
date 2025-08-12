@@ -142,7 +142,7 @@ class TestInfinity:
             print(e)
 
         try:
-            # FIXME tb_obj.update("c1 = 1", [{"c2": 90, "c3": 900}])
+            tb_obj.update("c1 = 1", [{"c2": 90, "c3": 900}])
             pass
         except Exception as e:
             print(e)
