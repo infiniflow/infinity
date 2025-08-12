@@ -624,12 +624,12 @@ void NewTxnManager::CleanupTxnBottomNolock(TransactionID txn_id, TxnTimeStamp be
 }
 
 void NewTxnManager::PrintAllKeyValue() const {
-    // // std::cout << String("All store key and value: ") << std::endl;
-    // std::println("All store key and value: ");
-    // // std::cout << kv_store_->ToString() << std::endl;
-    // std::println("{}", kv_store_->ToString());
-    // // std::cout << String(" -------------- ") << std::endl;
-    // std::println(" -------------- ");
+    // std::cout << String("All store key and value: ") << std::endl;
+    std::println("All store key and value: ");
+    // std::cout << kv_store_->ToString() << std::endl;
+    std::println("{}", kv_store_->ToString());
+    // std::cout << String(" -------------- ") << std::endl;
+    std::println(" -------------- ");
 }
 
 void NewTxnManager::PrintPMKeyValue() const {
