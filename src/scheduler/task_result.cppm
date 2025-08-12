@@ -17,9 +17,10 @@ module;
 export module infinity_core:task_result;
 
 import :stl;
-import data_type;
 import :data_block;
+
 import internal_types;
+import data_type;
 
 namespace infinity {
 

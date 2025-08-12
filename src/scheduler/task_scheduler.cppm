@@ -16,10 +16,10 @@ module;
 
 export module infinity_core:task_scheduler;
 
-// import :config;
 import :stl;
 import :fragment_task;
 import :blocking_queue;
+
 import base_statement;
 
 namespace infinity {

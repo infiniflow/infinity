@@ -14,14 +14,9 @@
 
 module;
 
-#include <list>
-#include <sched.h>
-#include <vector>
-
 module infinity_core:task_scheduler.impl;
 
 import :task_scheduler;
-
 import :stl;
 import :config;
 import :status;
@@ -29,7 +24,6 @@ import :infinity_exception;
 import :threadutil;
 import :fragment_task;
 import :logger;
-import third_party;
 import :query_context;
 import :plan_fragment;
 import :fragment_context;
@@ -37,6 +31,10 @@ import :default_values;
 import :physical_operator_type;
 import :physical_operator;
 import :physical_sink;
+
+import std;
+import third_party;
+
 import base_statement;
 import extra_ddl_info;
 import create_statement;

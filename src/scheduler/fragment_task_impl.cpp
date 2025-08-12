@@ -14,16 +14,12 @@
 
 module;
 
-#include <sstream>
-
 module infinity_core:fragment_task.impl;
 
 import :fragment_task;
-
 import :profiler;
 import :plan_fragment;
 import :stl;
-import third_party;
 import :logger;
 import :physical_source;
 import :physical_sink;
@@ -36,8 +32,12 @@ import :base_table_ref;
 import :defer_op;
 import :fragment_context;
 import :status;
-import parser_assert;
 import :infinity_context;
+
+import std;
+import third_party;
+
+import parser_assert;
 
 namespace infinity {
 

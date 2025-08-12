@@ -18,7 +18,6 @@ export module infinity_core:fragment_context;
 
 import :stl;
 import :fragment_task;
-// import :query_context;
 import :profiler;
 import :physical_operator;
 import :physical_source;
@@ -27,11 +26,10 @@ import :data_table;
 import :data_block;
 import :knn_scan_data;
 import :create_index_data;
-// import :logger;
-import third_party;
 import :compact_state_data;
-// import :infinity_context;
 import :query_context;
+
+import third_party;
 
 namespace infinity {
 

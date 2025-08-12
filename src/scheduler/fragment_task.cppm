@@ -19,6 +19,7 @@ export module infinity_core:fragment_task;
 import :stl;
 import :profiler;
 import :operator_state;
+
 import global_resource_usage;
 
 namespace infinity {
