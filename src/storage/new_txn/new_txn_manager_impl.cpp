@@ -440,11 +440,19 @@ void NewTxnManager::CommitKVInstance(NewTxn *txn) {
 
     TxnTimeStamp commit_ts = txn->CommitTS();
     // Put meta cache items with kv_instance
-    Vector<SharedPtr<MetaBaseCache>> cache_items = txn->GetTxnStore()->ToCachedMeta(commit_ts);
-    MetaCache *meta_cache_ptr = this->storage_->meta_cache();
-    Status status = meta_cache_ptr->PutOrErase(cache_items, txn->kv_instance_.get());
-    if (!status.ok()) {
-        UnrecoverableError(fmt::format("Commit kv_instance: {}", status.message()));
+    BaseTxnStore *base_txn_store = txn->GetTxnStore();
+    if (base_txn_store != nullptr) {
+        Vector<SharedPtr<MetaBaseCache>> cache_items = txn->GetTxnStore()->ToCachedMeta(commit_ts);
+        MetaCache *meta_cache_ptr = this->storage_->meta_cache();
+        Status status = meta_cache_ptr->PutOrErase(cache_items, txn->kv_instance_.get());
+        if (!status.ok()) {
+            UnrecoverableError(fmt::format("Put cache: {}", status.message()));
+        }
+    } else {
+        Status status = txn->kv_instance_->Commit();
+        if (!status.ok()) {
+            UnrecoverableError(fmt::format("Commit kv_instance: {}", status.message()));
+        }
     }
 
     TxnTimeStamp kv_commit_ts;
