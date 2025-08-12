@@ -14,19 +14,19 @@
 
 module;
 
-#include <sstream>
-
 module infinity_core:logical_show.impl;
 
 import :logical_show;
-
 import :stl;
-import internal_types;
 import :infinity_exception;
 import :column_binding;
 import :logger;
+
+import std;
+
 import show_statement;
 import data_type;
+import internal_types;
 
 namespace infinity {
 

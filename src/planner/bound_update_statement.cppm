@@ -21,7 +21,6 @@ import :table_ref;
 import :base_expression;
 import :bind_context;
 import :logical_node;
-// import :query_context;
 import :stl;
 
 namespace infinity {

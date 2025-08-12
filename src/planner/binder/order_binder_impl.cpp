@@ -19,17 +19,18 @@ module infinity_core:order_binder.impl;
 import :order_binder;
 import :stl;
 import :base_expression;
-
 import :bind_context;
 import :column_expression;
-import third_party;
 import :status;
 import :infinity_exception;
+import :logger;
+
+import third_party;
+
 import parsed_expr;
 import constant_expr;
 import knn_expr;
 import function_expr;
-import :logger;
 
 namespace infinity {
 

@@ -18,12 +18,11 @@ export module infinity_core:where_binder;
 
 import :stl;
 import :base_expression;
-
 import :function;
 import :bind_context;
 import :expression_binder;
-// import :query_context;
 import :bind_alias_proxy;
+
 import parsed_expr;
 import column_expr;
 

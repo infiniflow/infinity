@@ -14,26 +14,26 @@
 
 module;
 
-#include <sstream>
-
 module infinity_core:logical_match_tensor_scan.impl;
 
 import :logical_match_tensor_scan;
-
 import :stl;
 import :base_table_ref;
 import :column_binding;
 import :logical_node_type;
 import :match_tensor_expression;
 import :default_values;
-import logical_type;
-import internal_types;
-import third_party;
 import :explain_logical_plan;
-import search_options;
 import :infinity_exception;
 import :status;
 import :logger;
+
+import std;
+import third_party;
+
+import search_options;
+import logical_type;
+import internal_types;
 
 namespace infinity {
 

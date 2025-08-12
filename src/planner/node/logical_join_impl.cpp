@@ -14,18 +14,16 @@
 
 module;
 
-#include <sstream>
-#include <vector>
-
 module infinity_core:logical_join.impl;
 
 import :logical_join;
-
 import :stl;
 import :column_binding;
-
 import :logical_node_type;
 import :base_expression;
+
+import std;
+
 import internal_types;
 import join_reference;
 import data_type;

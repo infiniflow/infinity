@@ -14,11 +14,9 @@
 
 module;
 
-#include <vector>
 module infinity_core:apply_fast_rough_filter.impl;
 
 import :apply_fast_rough_filter;
-
 import :stl;
 import :logical_node;
 import :logical_node_type;
@@ -33,10 +31,12 @@ import :query_context;
 import :logical_node_visitor;
 import :infinity_exception;
 import :logger;
-import third_party;
 import :filter_expression_push_down;
 import :fast_rough_filter;
 import :logical_match_scan_base;
+
+import std;
+import third_party;
 
 namespace infinity {
 

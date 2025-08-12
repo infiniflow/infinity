@@ -14,12 +14,9 @@
 
 module;
 
-#include <vector>
-
 module infinity_core:bound_update_statement.impl;
 
 import :bound_update_statement;
-
 import :bound_statement;
 import :table_ref;
 import :base_expression;
@@ -41,6 +38,9 @@ import :logical_update;
 import :subquery_unnest;
 import :logger;
 import :conjunction_expression;
+
+import std;
+
 import table_reference;
 
 namespace infinity {

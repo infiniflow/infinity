@@ -24,9 +24,10 @@ import :base_table_ref;
 import :base_expression;
 import :default_values;
 import :filter_expression_push_down;
-import data_type;
 import :meta_info;
 import :fast_rough_filter;
+
+import data_type;
 
 namespace infinity {
 

@@ -14,11 +14,9 @@
 
 module;
 
-#include <vector>
 module infinity_core:index_scan_builder.impl;
 
 import :index_scan_builder;
-
 import :stl;
 import :logical_node;
 import :logical_node_type;
@@ -35,10 +33,12 @@ import :query_context;
 import :logical_node_visitor;
 import :infinity_exception;
 import :logger;
-import third_party;
 import :filter_expression_push_down;
 import :base_table_ref;
 import :lazy_load;
+
+import std;
+import third_party;
 
 namespace infinity {
 

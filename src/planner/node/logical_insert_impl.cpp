@@ -14,16 +14,16 @@
 
 module;
 
-#include <sstream>
-
 module infinity_core:logical_insert.impl;
 
 import :logical_insert;
-
 import :stl;
 import :column_binding;
-import internal_types;
 import :logical_insert;
+
+import std;
+
+import internal_types;
 import data_type;
 
 namespace infinity {

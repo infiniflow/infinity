@@ -14,19 +14,18 @@
 
 module;
 
-#include <sstream>
-
 module infinity_core:logical_fusion.impl;
 
 import :logical_fusion;
-
 import :stl;
 import :base_table_ref;
 import :column_binding;
 import :logical_node_type;
 import :fusion_expression;
-
 import :default_values;
+
+import std;
+
 import internal_types;
 
 namespace infinity {

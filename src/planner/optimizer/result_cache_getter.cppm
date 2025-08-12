@@ -18,7 +18,6 @@ export module infinity_core:result_cache_getter;
 
 import :stl;
 import :logical_node;
-// import :query_context;
 import :optimizer_rule;
 
 namespace infinity {

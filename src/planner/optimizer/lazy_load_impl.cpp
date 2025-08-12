@@ -14,11 +14,9 @@
 
 module;
 
-#include <vector>
 module infinity_core:lazy_load.impl;
 
 import :lazy_load;
-
 import :stl;
 import :logical_node;
 import :column_binding;
@@ -37,6 +35,8 @@ import :base_table_ref;
 import :load_meta;
 import :special_function;
 import :infinity_exception;
+
+import std;
 import third_party;
 
 namespace infinity {

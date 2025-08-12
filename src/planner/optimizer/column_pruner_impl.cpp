@@ -17,7 +17,6 @@ module;
 module infinity_core:column_pruner.impl;
 
 import :column_pruner;
-
 import :logical_aggregate;
 import :logical_project;
 import :logical_table_scan;

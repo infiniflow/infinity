@@ -14,18 +14,17 @@
 
 module;
 
-#include <sstream>
-
 module infinity_core:logical_sort.impl;
 
 import :logical_sort;
-
 import :stl;
 import :logical_node_type;
 import :column_binding;
 import :logical_node;
-
 import :base_expression;
+
+import std;
+
 import internal_types;
 import select_statement;
 import data_type;

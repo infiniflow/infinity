@@ -17,6 +17,7 @@ module;
 export module infinity_core:table_ref;
 
 import :stl;
+
 import table_reference;
 
 namespace infinity {

@@ -14,18 +14,13 @@
 
 module;
 
-#include <vector>
-
 module infinity_core:logical_node_visitor.impl;
 
 import :logical_node_visitor;
-
 import :stl;
 import :base_expression;
 import :logical_node_type;
 import :infinity_exception;
-
-import third_party;
 import :expression_type;
 import :logical_node_type;
 import :logical_node;
@@ -58,6 +53,9 @@ import :subquery_expression;
 import :knn_expression;
 import :conjunction_expression;
 import :logger;
+
+import std;
+import third_party;
 
 namespace infinity {
 

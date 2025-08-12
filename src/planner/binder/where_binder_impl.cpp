@@ -19,17 +19,17 @@ module infinity_core:where_binder.impl;
 import :where_binder;
 import :stl;
 import :base_expression;
-
 import :function;
 import :bind_context;
-
 import :infinity_exception;
-import third_party;
 import :bind_alias_proxy;
-import parsed_expr;
-import column_expr;
 import :status;
 import :logger;
+
+import third_party;
+
+import parsed_expr;
+import column_expr;
 
 namespace infinity {
 

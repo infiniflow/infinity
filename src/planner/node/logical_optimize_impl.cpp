@@ -14,16 +14,15 @@
 
 module;
 
-#include <sstream>
-
 module infinity_core:logical_optimize.impl;
 
 import :logical_optimize;
-
 import :stl;
 import :column_binding;
+
+import std;
+
 import internal_types;
-import :logical_optimize;
 import data_type;
 
 namespace infinity {

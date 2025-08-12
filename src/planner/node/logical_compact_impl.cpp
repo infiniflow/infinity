@@ -14,16 +14,16 @@
 
 module;
 
-#include <sstream>
-
 module infinity_core:logical_compact.impl;
 
 import :logical_compact;
-
 import :stl;
 import :column_binding;
-import data_type;
 import :base_table_ref;
+
+import std;
+
+import data_type;
 import logical_type;
 
 namespace infinity {

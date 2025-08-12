@@ -14,12 +14,9 @@
 
 module;
 
-#include <vector>
-
 module infinity_core:bound_delete_statement.impl;
 
 import :bound_delete_statement;
-
 import :bound_statement;
 import :table_ref;
 import :base_expression;
@@ -39,10 +36,12 @@ import :logical_table_scan;
 import :logical_filter;
 import :logical_delete;
 import :subquery_unnest;
-
 import :conjunction_expression;
-import table_reference;
 import :logger;
+
+import std;
+
+import table_reference;
 
 namespace infinity {
 

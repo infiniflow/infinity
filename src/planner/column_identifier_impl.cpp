@@ -17,15 +17,15 @@ module;
 module infinity_core:column_identifier.impl;
 
 import :column_identifier;
-
 import :stl;
-
-import column_expr;
 import :infinity_exception;
 import :status;
-import third_party;
 import :query_context;
 import :logger;
+
+import third_party;
+
+import column_expr;
 
 namespace infinity {
 

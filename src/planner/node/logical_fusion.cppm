@@ -20,7 +20,6 @@ import :stl;
 import :logical_node_type;
 import :column_binding;
 import :logical_node;
-
 import :fusion_expression;
 import :match_expression;
 import :base_table_ref;

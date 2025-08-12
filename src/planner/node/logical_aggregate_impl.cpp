@@ -14,16 +14,15 @@
 
 module;
 
-#include <sstream>
-
 module infinity_core:logical_aggregate.impl;
 
 import :logical_aggregate;
-
 import :stl;
 import :column_binding;
-
 import :base_expression;
+
+import std;
+
 import internal_types;
 import data_type;
 

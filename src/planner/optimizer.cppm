@@ -19,6 +19,7 @@ export module infinity_core:optimizer;
 import :stl;
 import :optimizer_rule;
 import :logical_node;
+
 import base_statement;
 import global_resource_usage;
 

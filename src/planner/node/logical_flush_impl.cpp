@@ -14,17 +14,16 @@
 
 module;
 
-#include <sstream>
-
 module infinity_core:logical_flush.impl;
 
 import :logical_flush;
-
 import :stl;
-
 import :column_binding;
-import internal_types;
 import :logical_flush;
+
+import std;
+
+import internal_types;
 import flush_statement;
 import data_type;
 

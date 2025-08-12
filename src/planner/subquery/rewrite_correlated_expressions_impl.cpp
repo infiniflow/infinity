@@ -17,7 +17,6 @@ module;
 module infinity_core:rewrite_correlated_expressions.impl;
 
 import :rewrite_correlated_expression;
-
 import :stl;
 import :logical_node;
 import :base_expression;

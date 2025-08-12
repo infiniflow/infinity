@@ -20,13 +20,14 @@ import :base_table_ref;
 import :stl;
 import :table_ref;
 import :table_function;
-import internal_types;
 import :infinity_exception;
-import table_reference;
-import data_type;
 import :meta_info;
 import :status;
 import :block_index;
+
+import table_reference;
+import data_type;
+import internal_types;
 
 namespace infinity {
 

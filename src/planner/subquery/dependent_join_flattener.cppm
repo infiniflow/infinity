@@ -18,7 +18,6 @@ export module infinity_core:dependent_join_flattener;
 
 import :stl;
 import :bind_context;
-// import :query_context;
 import :logical_node;
 import :column_binding;
 

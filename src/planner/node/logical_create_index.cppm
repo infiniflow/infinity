@@ -20,9 +20,9 @@ import :stl;
 import :logical_node_type;
 import :column_binding;
 import :logical_node;
-
 import :base_table_ref;
 import :index_base;
+
 import internal_types;
 import extra_ddl_info;
 import data_type;

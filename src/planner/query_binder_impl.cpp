@@ -14,16 +14,11 @@
 
 module;
 
-#include <string>
-
 module infinity_core:query_binder.impl;
 
 import :query_binder;
-
 import :stl;
-import internal_types;
 import :infinity_exception;
-
 import :bind_context;
 import :join_table_ref;
 import :base_table_ref;
@@ -40,7 +35,6 @@ import :base_expression;
 import :conjunction_expression;
 import :column_expression;
 import :expression_transformer;
-import third_party;
 import :logger;
 import :expression_binder;
 import :where_binder;
@@ -52,12 +46,25 @@ import :project_binder;
 import :limit_binder;
 import :subquery_table_ref;
 import :cross_product_table_ref;
-
 import :block_index;
 import :cast_expression;
 import :search_expression;
 import :status;
 import :default_values;
+import :logger;
+import :defer_op;
+import :highlighter;
+import :meta_info;
+import :new_txn;
+import :db_meeta;
+import :table_meeta;
+import :new_catalog;
+import :kv_store;
+
+import std;
+import third_party;
+
+import internal_types;
 import base_statement;
 import select_statement;
 import delete_statement;
@@ -74,16 +81,6 @@ import join_reference;
 import cross_product_reference;
 import data_type;
 import logical_type;
-import :logger;
-import :defer_op;
-import :highlighter;
-
-import :meta_info;
-import :new_txn;
-import :db_meeta;
-import :table_meeta;
-import :new_catalog;
-import :kv_store;
 
 namespace infinity {
 

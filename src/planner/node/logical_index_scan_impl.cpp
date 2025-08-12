@@ -14,9 +14,6 @@
 
 module;
 
-#include <memory>
-#include <vector>
-
 module infinity_core:logical_index_scan.impl;
 
 import :logical_index_scan;
@@ -31,6 +28,9 @@ import :base_expression;
 import :function_expression;
 import :cast_expression;
 import :column_expression;
+
+import std;
+
 import logical_type;
 import data_type;
 

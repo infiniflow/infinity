@@ -14,25 +14,24 @@
 
 module;
 
-#include <sstream>
-
 module infinity_core:logical_table_scan.impl;
 
 import :logical_table_scan;
-
 import :stl;
 import :logical_node_type;
 import :column_binding;
 import :logical_node;
-
 import :match_expression;
 import :base_table_ref;
-import logical_type;
 import :base_expression;
 import :default_values;
+import :meta_info;
+
+import std;
+
+import logical_type;
 import internal_types;
 import data_type;
-import :meta_info;
 
 namespace infinity {
 

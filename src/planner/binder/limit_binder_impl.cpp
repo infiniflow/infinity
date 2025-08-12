@@ -19,7 +19,6 @@ module infinity_core:limit_binder.impl;
 import :limit_binder;
 import :stl;
 import :base_expression;
-
 import :bind_context;
 import :function_set;
 import :function;
@@ -27,11 +26,12 @@ import :status;
 import :infinity_exception;
 import :logger;
 import :new_catalog;
+import :query_context;
+
 import parsed_expr;
 import function_expr;
 import column_expr;
 import knn_expr;
-import :query_context;
 
 namespace infinity {
 

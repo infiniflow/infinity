@@ -19,9 +19,10 @@ export module infinity_core:logical_create_table;
 import :stl;
 import :logical_node;
 import :table_def;
-import data_type;
 import :logical_node_type;
 import :column_binding;
+
+import data_type;
 import internal_types;
 import extra_ddl_info;
 

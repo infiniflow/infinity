@@ -17,7 +17,7 @@ module;
 export module infinity_core:column_identifier;
 
 import :stl;
-// import query_context
+
 import column_expr;
 
 namespace infinity {

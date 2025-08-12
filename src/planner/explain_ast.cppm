@@ -17,6 +17,8 @@ module;
 export module infinity_core:explain_ast;
 
 import :stl;
+import :status;
+
 import base_statement;
 import create_statement;
 import insert_statement;
@@ -28,7 +30,6 @@ import flush_statement;
 import optimize_statement;
 import check_statement;
 import base_table_reference;
-import :status;
 
 namespace infinity {
 

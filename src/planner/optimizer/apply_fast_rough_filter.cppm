@@ -18,7 +18,6 @@ export module infinity_core:apply_fast_rough_filter;
 
 import :stl;
 import :logical_node;
-// import :query_context;
 import :optimizer_rule;
 
 namespace infinity {

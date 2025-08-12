@@ -14,20 +14,20 @@
 
 module;
 
-#include <sstream>
-
 module infinity_core:logical_check.impl;
 
 import :logical_check;
-
 import :stl;
-import internal_types;
 import :infinity_exception;
 import :column_binding;
 import :logger;
-import check_statement;
 import :logical_check;
+
+import std;
+
 import data_type;
+import check_statement;
+import internal_types;
 
 namespace infinity {
 

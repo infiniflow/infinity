@@ -14,22 +14,14 @@
 
 module;
 
-#include <string>
-#include <memory>
-
 module infinity_core:expression_binder.impl;
 
 import :expression_binder;
-
 import :stl;
 import :default_values;
-import type_info;
 import :infinity_exception;
 import :bind_context;
-import third_party;
 import :value;
-import logical_type;
-import internal_types;
 import :base_expression;
 import :aggregate_expression;
 import :column_expression;
@@ -50,13 +42,9 @@ import :unnest_expression;
 import :function;
 import :aggregate_function;
 import :aggregate_function_set;
-import embedding_info;
-
 import :column_identifier;
-
 import :query_binder;
 import :bound_select_statement;
-
 import :function_set;
 import :scalar_function_set;
 import :scalar_function;
@@ -64,9 +52,17 @@ import :special_function;
 import :cast_function;
 import :bound_cast_func;
 import :status;
-
 import :query_context;
 import :logger;
+import :expression_type;
+import :meta_info;
+import :column_vector;
+import :new_catalog;
+
+import std;
+import third_party;
+
+import type_info;
 import embedding_info;
 import sparse_info;
 import array_info;
@@ -86,10 +82,9 @@ import match_tensor_expr;
 import match_sparse_expr;
 import fusion_expr;
 import data_type;
-import :expression_type;
-import :meta_info;
-import :column_vector;
-import :new_catalog;
+import embedding_info;
+import logical_type;
+import internal_types;
 
 namespace infinity {
 

@@ -15,10 +15,12 @@
 module;
 
 export module infinity_core:logical_node;
+
 import :stl;
 import :logical_node_type;
 import :column_binding;
 import :load_meta;
+
 import data_type;
 import internal_types;
 

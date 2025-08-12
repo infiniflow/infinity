@@ -18,7 +18,6 @@ export module infinity_core:query_binder;
 
 import :logical_node;
 import :stl;
-
 import :query_context;
 import :bound_select_statement;
 import :bind_context;
@@ -30,6 +29,7 @@ import :bound_insert_statement;
 import :bound_delete_statement;
 import :bound_update_statement;
 import :bound_compact_statement;
+
 import select_statement;
 import delete_statement;
 import update_statement;

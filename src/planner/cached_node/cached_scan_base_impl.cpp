@@ -14,16 +14,14 @@
 
 module;
 
-#include <vector>
-#include <string>
-
 module infinity_core:cached_scan_base.impl;
 
 import :cached_scan_base;
-
 import :base_table_ref;
 import :physical_scan_base;
 import :logical_node_type;
+
+import std;
 
 namespace infinity {
 

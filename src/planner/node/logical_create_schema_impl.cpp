@@ -14,17 +14,17 @@
 
 module;
 
-#include <sstream>
-
 module infinity_core:logical_create_schema.impl;
 
 import :logical_create_schema;
-
 import :stl;
+import :logical_create_schema;
 import :column_binding;
+
+import std;
+
 import logical_type;
 import internal_types;
-import :logical_create_schema;
 import data_type;
 
 namespace infinity {

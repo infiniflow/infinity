@@ -26,10 +26,12 @@ import :bind_context;
 import :logical_table_scan;
 import :table_ref;
 import :base_table_ref;
-import table_reference;
 import :infinity_exception;
 import :status;
+
 import third_party;
+
+import table_reference;
 
 namespace infinity {
 
@@ -59,8 +61,7 @@ SharedPtr<LogicalNode> BoundInsertStatement::BuildPlan(QueryContext *query_conte
 SharedPtr<LogicalNode>
 BoundInsertStatement::BuildFrom(SharedPtr<TableRef> &table_ref, QueryContext *query_context, const SharedPtr<BindContext> &bind_context) {
     if (table_ref.get() == nullptr || table_ref->type_ != TableRefType::kTable) {
-        String error_message = "Unsupported table reference type in INSERT statement";
-        UnrecoverableError(error_message);
+        UnrecoverableError("Unsupported table reference type in INSERT statement");
     }
     return BuildBaseTable(table_ref, query_context, bind_context);
 }

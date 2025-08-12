@@ -14,17 +14,17 @@
 
 module;
 
-#include <sstream>
-
 module infinity_core:logical_dummy_scan.impl;
 
 import :logical_dummy_scan;
-
 import :stl;
 import :column_binding;
+import :logical_dummy_scan;
+
+import std;
+
 import data_type;
 import internal_types;
-import :logical_dummy_scan;
 
 namespace infinity {
 

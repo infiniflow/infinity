@@ -17,7 +17,6 @@ module;
 module infinity_core:correlated_expressions_detector.impl;
 
 import :corrlated_expr_detector;
-
 import :stl;
 import :logical_node;
 import :base_expression;

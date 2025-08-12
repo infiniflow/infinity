@@ -14,16 +14,16 @@
 
 module;
 
-#include <sstream>
-
 module infinity_core:logical_drop_collection.impl;
 
 import :logical_drop_collection;
-
 import :stl;
 import :column_binding;
 import :logical_node_type;
 import :logical_drop_collection;
+
+import std;
+
 import logical_type;
 import internal_types;
 import data_type;

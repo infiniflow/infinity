@@ -19,22 +19,23 @@ module infinity_core:having_binder.impl;
 import :having_binder;
 import :stl;
 import :base_expression;
-
 import :bind_context;
 import :column_expression;
 import :function;
 import :status;
 import :infinity_exception;
-import third_party;
 import :function_set;
 import :bind_alias_proxy;
 import :logger;
 import :new_catalog;
+import :query_context;
+
+import third_party;
+
 import parsed_expr;
 import column_expr;
 import function_expr;
 import knn_expr;
-import :query_context;
 
 namespace infinity {
 
@@ -77,8 +78,7 @@ SharedPtr<BaseExpression> HavingBinder::BuildExpression(const ParsedExpr &expr, 
             return result;
         } else {
             // in an aggregate function, which means aggregate function nested, which is error.
-            Status status = Status::SyntaxError("Aggregate function is called in another aggregate function.");
-            RecoverableError(status);
+            RecoverableError(Status::SyntaxError("Aggregate function is called in another aggregate function."));
         }
     }
 
@@ -144,8 +144,7 @@ SharedPtr<BaseExpression> HavingBinder::BuildFuncExpr(const FunctionExpr &expr, 
 }
 
 SharedPtr<BaseExpression> HavingBinder::BuildKnnExpr(const KnnExpr &, BindContext *, i64, bool) {
-    Status status = Status::SyntaxError("KNN expression isn't supported in having clause");
-    RecoverableError(status);
+    RecoverableError(Status::SyntaxError("KNN expression isn't supported in having clause"));
     return nullptr;
 }
 

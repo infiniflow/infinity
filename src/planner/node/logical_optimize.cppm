@@ -20,6 +20,7 @@ import :stl;
 import :logical_node_type;
 import :column_binding;
 import :logical_node;
+
 import data_type;
 import internal_types;
 import optimize_statement;

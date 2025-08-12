@@ -17,11 +17,10 @@ module;
 export module infinity_core:order_binder;
 
 import :stl;
-
 import :base_expression;
 import :bind_context;
 import :expression_binder;
-// import :query_context;
+
 import parsed_expr;
 
 namespace infinity {

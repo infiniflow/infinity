@@ -17,7 +17,6 @@ module;
 module infinity_core:subquery_unnest.impl;
 
 import :subquery_unnest;
-
 import :stl;
 import :column_binding;
 import :logical_node;
@@ -25,24 +24,20 @@ import :base_expression;
 import :subquery_expression;
 import :column_expression;
 import :status;
-
 import :query_context;
 import :bind_context;
 import :expression_type;
 import :value;
 import :dependent_join_flattener;
-import internal_types;
 import :value_expression;
 import :function_expression;
 import :aggregate_expression;
 import :cast_expression;
 import :in_expression;
-
 import :logical_join;
 import :logical_limit;
 import :logical_aggregate;
 import :logical_cross_product;
-
 import :function_set;
 import :scalar_function;
 import :scalar_function_set;
@@ -51,14 +46,16 @@ import :aggregate_function;
 import :cast_function;
 import :bound_cast_func;
 import :cast_table;
-
 import :new_catalog;
-import third_party;
-import subquery_expr;
 import :infinity_exception;
-import join_reference;
-import data_type;
 import :logger;
+
+import third_party;
+
+import internal_types;
+import data_type;
+import join_reference;
+import subquery_expr;
 
 namespace infinity {
 

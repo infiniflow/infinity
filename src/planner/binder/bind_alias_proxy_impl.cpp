@@ -19,15 +19,16 @@ module infinity_core:bind_alias_proxy.impl;
 import :bind_alias_proxy;
 import :stl;
 import :base_expression;
-
 import :bind_context;
 import :expression_binder;
 import :status;
 import :infinity_exception;
-import third_party;
-import parsed_expr;
 import :logger;
 import :bind_alias_proxy;
+
+import third_party;
+
+import parsed_expr;
 
 namespace infinity {
 

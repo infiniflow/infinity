@@ -19,6 +19,7 @@ export module infinity_core:filter_expression_push_down_helper;
 import :stl;
 import :base_expression;
 import :value;
+
 import internal_types;
 
 namespace infinity {

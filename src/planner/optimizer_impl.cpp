@@ -17,7 +17,6 @@ module;
 module infinity_core:optimizer.impl;
 
 import :optimizer;
-
 import :stl;
 import :logical_node_type;
 import :logical_explain;
@@ -31,10 +30,10 @@ import :optimizer_rule;
 import :bound_delete_statement;
 import :bound_update_statement;
 import :logical_node;
-import explain_statement;
-import :logical_node_type;
-import base_statement;
 import :result_cache_getter;
+
+import explain_statement;
+import base_statement;
 import global_resource_usage;
 
 namespace infinity {

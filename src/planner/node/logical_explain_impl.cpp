@@ -17,11 +17,10 @@ module;
 module infinity_core:logical_explain.impl;
 
 import :logical_explain;
-
 import :stl;
 import :column_binding;
-
 import :base_expression;
+
 import internal_types;
 import data_type;
 

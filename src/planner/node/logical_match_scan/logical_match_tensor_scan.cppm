@@ -24,11 +24,12 @@ import :logical_match_scan_base;
 import :base_expression;
 import :match_tensor_expression;
 import :base_table_ref;
-import internal_types;
-import data_type;
 import :fast_rough_filter;
 import :common_query_filter;
 import :default_values;
+
+import internal_types;
+import data_type;
 
 namespace infinity {
 

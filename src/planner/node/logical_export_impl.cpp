@@ -14,15 +14,15 @@
 
 module;
 
-#include <sstream>
-
 module infinity_core:logical_export.impl;
 
 import :logical_export;
-
 import :stl;
 import :column_binding;
 import :block_index;
+
+import std;
+
 import internal_types;
 import statement_common;
 import data_type;

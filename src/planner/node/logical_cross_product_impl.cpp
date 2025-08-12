@@ -14,17 +14,17 @@
 
 module;
 
-#include <sstream>
-
 module infinity_core:logical_cross_product.impl;
 
 import :logical_cross_product;
-
 import :stl;
 import :column_binding;
 import :logical_node_type;
 import :logical_node;
 import :logical_cross_product;
+
+import std;
+
 import internal_types;
 import data_type;
 

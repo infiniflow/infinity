@@ -19,14 +19,14 @@ module infinity_core:join_binder.impl;
 import :join_binder;
 import :stl;
 import :base_expression;
-
 import :bind_context;
 import :status;
 import :infinity_exception;
-import parsed_expr;
-import knn_expr;
 import :logger;
 import :join_binder;
+
+import parsed_expr;
+import knn_expr;
 
 namespace infinity {
 

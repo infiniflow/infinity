@@ -26,9 +26,10 @@ import :query_context;
 import :column_expression;
 import :optimizer_rule;
 import :load_meta;
+import :base_table_ref;
+
 import internal_types;
 import data_type;
-import :base_table_ref;
 
 namespace infinity {
 

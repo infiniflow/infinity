@@ -14,17 +14,16 @@
 
 module;
 
-#include <sstream>
-
 module infinity_core:logical_create_index.impl;
 
 import :logical_create_index;
-
 import :stl;
 import :column_binding;
-
 import :base_expression;
 import :index_base;
+
+import std;
+
 import logical_type;
 import internal_types;
 import data_type;

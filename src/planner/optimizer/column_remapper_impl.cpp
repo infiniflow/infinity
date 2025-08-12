@@ -17,7 +17,6 @@ module;
 module infinity_core:column_remapper.impl;
 
 import :column_remapper;
-
 import :logical_node;
 import :logical_node_type;
 import :stl;
@@ -26,9 +25,10 @@ import :column_expression;
 import :reference_expression;
 import :special_function;
 import :default_values;
-import third_party;
 import :logger;
 import :infinity_exception;
+
+import third_party;
 
 namespace infinity {
 

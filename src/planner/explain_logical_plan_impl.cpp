@@ -58,8 +58,6 @@ import :logical_unnest;
 import :logical_unnest_aggregate;
 import :logical_node_type;
 import :logical_check;
-import third_party;
-
 import :base_expression;
 import :expression_type;
 import :knn_expression;
@@ -73,6 +71,10 @@ import :in_expression;
 import :value_expression;
 import :reference_expression;
 import :infinity_exception;
+import :logger;
+
+import third_party;
+
 import internal_types;
 import knn_expr;
 import select_statement;
@@ -82,7 +84,6 @@ import join_reference;
 import statement_common;
 import flush_statement;
 import optimize_statement;
-import :logger;
 import show_statement;
 import check_statement;
 

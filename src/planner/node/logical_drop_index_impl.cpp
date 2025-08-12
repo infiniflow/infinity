@@ -14,19 +14,19 @@
 
 module;
 
-#include <sstream>
-
 module infinity_core:logical_drop_index.impl;
 
 import :logical_drop_index;
-
 import :stl;
 import :column_binding;
 import :logical_node_type;
+import :logical_drop_index;
+
+import std;
+
+import data_type;
 import logical_type;
 import internal_types;
-import :logical_drop_index;
-import data_type;
 
 namespace infinity {
 

@@ -19,17 +19,18 @@ module infinity_core:insert_binder.impl;
 import :insert_binder;
 import :stl;
 import :base_expression;
-
 import :bind_context;
 import :column_expression;
 import :function;
 import :status;
 import :infinity_exception;
-import third_party;
 import :function_set;
 import :bind_alias_proxy;
 import :logger;
 import :insert_binder;
+
+import third_party;
+
 import parsed_expr;
 import knn_expr;
 

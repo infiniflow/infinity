@@ -18,6 +18,7 @@ export module infinity_core:binding;
 
 import :stl;
 import :meta_info;
+
 import internal_types;
 import data_type;
 

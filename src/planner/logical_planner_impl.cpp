@@ -15,20 +15,12 @@
 module;
 
 #include <cassert>
-#include <optional>
-#include <sstream>
-#include <string>
-#include <tuple>
-#include <vector>
-#include <memory>
 
 module infinity_core:logical_planner.impl;
 
 import :logical_planner;
-
 import :stl;
 import :bind_context;
-
 import :infinity_exception;
 import :query_binder;
 import :bound_delete_statement;
@@ -42,7 +34,6 @@ import :cast_expression;
 import :cast_function;
 import :bound_cast_func;
 import :base_expression;
-import third_party;
 import :table_def;
 import :logical_alter;
 import :logical_create_table;
@@ -66,9 +57,7 @@ import :logical_command;
 import :logical_check;
 import :explain_logical_plan;
 import :explain_ast;
-
 import :virtual_store;
-
 import :status;
 import :default_values;
 import :index_base;
@@ -81,6 +70,23 @@ import :index_bmp;
 import :index_full_text;
 import :base_table_ref;
 import :table_ref;
+import :logger;
+import :special_function;
+import :utility;
+import :wal_manager;
+import :infinity_context;
+import :block_index;
+import :new_txn;
+import :meta_info;
+import :db_meeta;
+import :table_meeta;
+import :new_catalog;
+import :kv_store;
+import :query_context;
+
+import std;
+import third_party;
+
 import logical_type;
 import parsed_expr;
 import extra_ddl_info;
@@ -98,23 +104,10 @@ import drop_schema_info;
 import drop_table_info;
 import drop_view_info;
 import column_def;
-import :logger;
 import statement_common;
-import :block_index;
 import column_expr;
 import function_expr;
 import insert_row_expr;
-import :special_function;
-import :utility;
-import :wal_manager;
-import :infinity_context;
-
-import :new_txn;
-import :meta_info;
-import :db_meeta;
-import :table_meeta;
-import :new_catalog;
-import :kv_store;
 import base_statement;
 import select_statement;
 import insert_statement;
@@ -134,7 +127,6 @@ import compact_statement;
 import check_statement;
 import optimize_statement;
 import data_type;
-import :query_context;
 
 namespace infinity {
 

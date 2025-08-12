@@ -17,16 +17,16 @@ module;
 export module infinity_core:bind_context;
 
 import :stl;
-
 import :column_binding;
-import third_party;
-
 import :infinity_exception;
 import :column_expression;
 import :column_identifier;
 import :binding;
 import :base_expression;
 import :meta_info;
+
+import third_party;
+
 import internal_types;
 import select_statement;
 import parsed_expr;

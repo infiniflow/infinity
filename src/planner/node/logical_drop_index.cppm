@@ -17,10 +17,10 @@ module;
 export module infinity_core:logical_drop_index;
 
 import :stl;
-
 import :logical_node;
 import :logical_node_type;
 import :column_binding;
+
 import internal_types;
 import extra_ddl_info;
 import data_type;

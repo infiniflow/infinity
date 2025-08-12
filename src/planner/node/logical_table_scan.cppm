@@ -20,12 +20,12 @@ import :stl;
 import :logical_node_type;
 import :column_binding;
 import :logical_node;
-
 import :base_table_ref;
 import :meta_info;
+import :fast_rough_filter;
+
 import internal_types;
 import data_type;
-import :fast_rough_filter;
 
 namespace infinity {
 

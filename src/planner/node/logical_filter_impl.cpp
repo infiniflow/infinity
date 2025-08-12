@@ -14,15 +14,15 @@
 
 module;
 
-#include <sstream>
-
 module infinity_core:logical_filter.impl;
 
 import :logical_filter;
-
 import :stl;
 import :column_binding;
 import :logical_node;
+
+import std;
+
 import internal_types;
 import data_type;
 

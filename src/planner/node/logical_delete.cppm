@@ -17,14 +17,13 @@ module;
 export module infinity_core:logical_delete;
 
 import :stl;
-
 import :logical_node;
 import :logical_node_type;
 import :column_binding;
+import :meta_info;
 
 import internal_types;
 import data_type;
-import :meta_info;
 
 namespace infinity {
 

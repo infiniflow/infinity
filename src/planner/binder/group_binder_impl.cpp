@@ -20,24 +20,25 @@ import :group_binder;
 import :stl;
 import :base_expression;
 import :subquery_expression;
-
 import :bind_context;
 import :function;
 import :expression_binder;
 import :status;
 import :infinity_exception;
 import :logger;
-import third_party;
 import :function_set;
 import :bind_alias_proxy;
+import :new_catalog;
+import :query_context;
+
+import third_party;
+
 import parsed_expr;
 import constant_expr;
 import column_expr;
 import function_expr;
 import subquery_expr;
 import knn_expr;
-import :new_catalog;
-import :query_context;
 
 namespace infinity {
 

@@ -23,12 +23,11 @@ import :stl;
 import :bind_context;
 import :logical_node;
 import :table_ref;
-
-// import :query_context;
 import :search_expression;
 import :knn_expression;
-import select_statement;
 import :highlighter;
+
+import select_statement;
 
 namespace infinity {
 

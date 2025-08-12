@@ -17,7 +17,6 @@ module;
 export module infinity_core:filter_expression_push_down;
 
 import :stl;
-// import :query_context;
 import :base_expression;
 import :base_table_ref;
 import :index_base;

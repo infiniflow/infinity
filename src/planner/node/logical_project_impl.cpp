@@ -14,19 +14,18 @@
 
 module;
 
-#include <sstream>
-
 module infinity_core:logical_project.impl;
 
 import :logical_project;
-
 import :stl;
 import :logical_node_type;
 import :column_binding;
 import :logical_node;
-
-import third_party;
 import :base_expression;
+
+import std;
+import third_party;
+
 import internal_types;
 import data_type;
 

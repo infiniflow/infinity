@@ -17,13 +17,13 @@ module;
 module infinity_core:binding.impl;
 
 import :binding;
-
 import :stl;
 import :block_index;
 import :infinity_exception;
 import :logger;
-import data_type;
 import :meta_info;
+
+import data_type;
 
 namespace infinity {
 

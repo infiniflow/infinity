@@ -17,27 +17,26 @@ module;
 module infinity_core:bind_context.impl;
 
 import :bind_context;
-
 import :stl;
-
 import :binding;
-import third_party;
 import :status;
 import :infinity_exception;
 import :base_expression;
 import :column_expression;
 import :column_identifier;
-
 import :block_index;
-import column_expr;
 import :logger;
-import knn_expr;
-import match_sparse_expr;
-import global_resource_usage;
 import :meta_info;
+
+import third_party;
+
 import parsed_expr;
 import search_expr;
 import data_type;
+import knn_expr;
+import match_sparse_expr;
+import global_resource_usage;
+import column_expr;
 
 namespace infinity {
 

@@ -17,12 +17,12 @@ module;
 module infinity_core:logical_alter.impl;
 
 import :logical_alter;
-
-import logical_type;
 import :stl;
-import data_type;
 import :column_binding;
 import :logical_alter;
+
+import logical_type;
+import data_type;
 
 namespace infinity {
 

@@ -14,17 +14,16 @@
 
 module;
 
-#include <sstream>
-
 module infinity_core:logical_view_scan.impl;
 
 import :logical_view_scan;
-
 import :stl;
 import :column_binding;
-
 import :base_expression;
 import :view;
+
+import std;
+
 import internal_types;
 import data_type;
 

@@ -14,17 +14,17 @@
 
 module;
 
-#include <sstream>
-
 module infinity_core:logical_create_view.impl;
 
 import :logical_create_view;
-
 import :stl;
 import :column_binding;
+import :logical_create_view;
+
+import std;
+
 import logical_type;
 import internal_types;
-import :logical_create_view;
 import create_view_info;
 import data_type;
 

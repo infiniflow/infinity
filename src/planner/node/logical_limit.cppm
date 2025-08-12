@@ -20,10 +20,11 @@ import :stl;
 import :logical_node_type;
 import :column_binding;
 import :logical_node;
-import data_type;
 import :base_expression;
-import internal_types;
 import :base_table_ref;
+
+import data_type;
+import internal_types;
 
 namespace infinity {
 

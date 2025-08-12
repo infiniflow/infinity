@@ -26,11 +26,12 @@ import :base_expression;
 import :meta_info;
 import :query_node;
 import :column_index_reader;
-import logical_type;
 import :value;
 import :doc_iterator;
 import :parse_fulltext_options;
 import :table_index_meeta;
+
+import logical_type;
 
 namespace infinity {
 

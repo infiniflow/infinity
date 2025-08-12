@@ -14,12 +14,9 @@
 
 module;
 
-#include <vector>
-
 module infinity_core:result_cache_getter.impl;
 
 import :result_cache_getter;
-
 import :logical_match;
 import :result_cache_manager;
 import :logical_node_type;
@@ -32,12 +29,14 @@ import :logical_index_scan;
 import :cached_match;
 import :cached_match_scan;
 import :cached_index_scan;
-import third_party;
 import :logger;
 import :base_table_ref;
 import :knn_expression;
 import :new_txn;
 import :query_context;
+
+import std;
+import third_party;
 
 namespace infinity {
 

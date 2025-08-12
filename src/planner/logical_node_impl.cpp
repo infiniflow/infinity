@@ -14,14 +14,15 @@
 
 module;
 
-#include <vector>
 module infinity_core:logical_node.impl;
 
 import :logical_node;
-
 import :column_binding;
 import :stl;
 import :logical_node;
+
+import std;
+
 import data_type;
 
 namespace infinity {

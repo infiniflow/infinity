@@ -14,16 +14,25 @@
 
 module;
 
-#include <string>
-
 module infinity_core:explain_ast.impl;
 
 import :explain_ast;
-
 import :stl;
-import third_party;
 import :status;
 import :infinity_exception;
+import :logger;
+
+import std;
+import third_party;
+
+import drop_schema_info;
+import drop_table_info;
+import base_table_reference;
+import cross_product_reference;
+import join_reference;
+import subquery_reference;
+import table_reference;
+import statement_common;
 import base_statement;
 import select_statement;
 import copy_statement;
@@ -41,16 +50,7 @@ import create_table_info;
 import create_index_info;
 import create_collection_info;
 import drop_collection_info;
-// import drop_index_info;
-import drop_schema_info;
-import drop_table_info;
-import base_table_reference;
-import cross_product_reference;
-import join_reference;
-import subquery_reference;
-import table_reference;
-import statement_common;
-import :logger;
+
 
 namespace infinity {
 

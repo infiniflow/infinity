@@ -19,15 +19,15 @@ module infinity_core:aggregate_binder.impl;
 import :aggregate_binder;
 import :stl;
 import :base_expression;
-
 import :bind_context;
 import :expression_binder;
 import :status;
 import :infinity_exception;
-import parsed_expr;
-import knn_expr;
 import :logger;
 import :aggregate_binder;
+
+import parsed_expr;
+import knn_expr;
 
 namespace infinity {
 
@@ -37,8 +37,7 @@ SharedPtr<BaseExpression> AggregateBinder::BuildExpression(const ParsedExpr &exp
 }
 
 SharedPtr<BaseExpression> AggregateBinder::BuildKnnExpr(const KnnExpr &, BindContext *, i64, bool) {
-    Status status = Status::SyntaxError("KNN expression isn't supported in in aggregate function");
-    RecoverableError(status);
+    RecoverableError(Status::SyntaxError("KNN expression isn't supported in in aggregate function"));
     return nullptr;
 }
 

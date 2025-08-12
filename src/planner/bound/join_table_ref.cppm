@@ -17,9 +17,9 @@ module;
 export module infinity_core:join_table_ref;
 
 import :stl;
-
 import :table_ref;
 import :base_expression;
+
 import table_reference;
 import join_reference;
 

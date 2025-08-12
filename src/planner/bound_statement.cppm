@@ -18,6 +18,7 @@ export module infinity_core:bound_statement;
 
 import :stl;
 import :logical_node;
+
 import internal_types;
 import data_type;
 

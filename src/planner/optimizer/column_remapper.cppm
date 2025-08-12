@@ -20,8 +20,9 @@ import :stl;
 import :logical_node_visitor;
 import :logical_node;
 import :column_binding;
-import data_type;
 import :optimizer_rule;
+
+import data_type;
 
 namespace infinity {
 
