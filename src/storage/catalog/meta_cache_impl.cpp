@@ -27,6 +27,33 @@ import :kv_store;
 
 namespace infinity {
 
+String MetaDbCache::name() { return db_name_; }
+u64 MetaDbCache::commit_ts() { return commit_ts_; }
+String MetaDbCache::type() { return "Database"; }
+String MetaDbCache::detail() {
+    if (is_dropped_) {
+        return "dropped";
+    } else {
+        return "created";
+    }
+}
+
+String MetaTableCache::name() { return table_name_; }
+u64 MetaTableCache::commit_ts() { return commit_ts_; }
+String MetaTableCache::type() { return "Table"; }
+String MetaTableCache::detail() {
+    String extend = is_dropped_ ? "dropped" : "created";
+    return fmt::format("db_id: {}, table_name: {}, table_id: {}, {}", db_id_, table_name_, table_id_, extend);
+}
+
+String MetaIndexCache::name() { return index_name_; }
+u64 MetaIndexCache::commit_ts() { return commit_ts_; }
+String MetaIndexCache::type() { return "Index"; }
+String MetaIndexCache::detail() {
+    String extend = is_dropped_ ? "dropped" : "created";
+    return fmt::format("db_id: {}, table_id: {}, index_name: {}, index_id: {}, {}", db_id_, table_id_, table_id_, index_name_, index_id_, extend);
+}
+
 Status MetaCache::PutOrErase(const Vector<SharedPtr<MetaBaseCache>> &cache_items, KVInstance *kv_instance) {
     std::unique_lock lock(cache_mtx_);
     for (const auto &cache_item : cache_items) {
@@ -279,6 +306,50 @@ void MetaCache::TrimCacheNolock() {
 SizeT MetaCache::Size() const {
     std::unique_lock lock(cache_mtx_);
     return lru_.size();
+}
+
+Vector<SharedPtr<MetaBaseCache>> MetaCache::GetAllCacheItems() const {
+    Vector<SharedPtr<MetaBaseCache>> result;
+    std::unique_lock lock(cache_mtx_);
+    result.reserve(lru_.size());
+    for (const auto &item : lru_) {
+        switch (item.meta_cache_->type_) {
+            case MetaCacheType::kCreateDB: {
+                MetaDbCache *db_cache = static_cast<MetaDbCache *>(item.meta_cache_.get());
+                auto iter = dbs_.find(item.name_);
+                if (iter != dbs_.end()) {
+                    if (iter->second.contains(db_cache->commit_ts_)) {
+                        result.push_back(item.meta_cache_);
+                    }
+                }
+                break;
+            }
+            case MetaCacheType::kCreateTable: {
+                MetaTableCache *table_cache = static_cast<MetaTableCache *>(item.meta_cache_.get());
+                auto iter = tables_.find(item.name_);
+                if (iter != tables_.end()) {
+                    if (iter->second.contains(table_cache->commit_ts_)) {
+                        result.push_back(item.meta_cache_);
+                    }
+                }
+                break;
+            }
+            case MetaCacheType::kCreateIndex: {
+                MetaIndexCache *index_cache = static_cast<MetaIndexCache *>(item.meta_cache_.get());
+                auto iter = indexes_.find(item.name_);
+                if (iter != tables_.end()) {
+                    if (iter->second.contains(index_cache->commit_ts_)) {
+                        result.push_back(item.meta_cache_);
+                    }
+                }
+                break;
+            }
+            default: {
+                UnrecoverableError("Invalid meta type");
+            }
+        }
+    }
+    return result;
 }
 
 void MetaCache::TouchNolock(List<CacheItem>::iterator iter) { lru_.splice(lru_.begin(), lru_, iter); }

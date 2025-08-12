@@ -37,17 +37,28 @@ export enum class MetaCacheType {
 };
 
 struct MetaBaseCache {
-    MetaBaseCache(MetaCacheType type) : type_(type) {}
+    explicit MetaBaseCache(MetaCacheType type) : type_(type) {}
+    virtual ~MetaBaseCache() = default;
     MetaCacheType type_{MetaCacheType::kInvalid};
+
+    virtual String name() { return ""; };
+    virtual u64 commit_ts() { return 0; };
+    virtual String type() { return ""; };
+    virtual String detail() { return ""; };
 };
 
-export struct MetaDbCache : public MetaBaseCache {
+export struct MetaDbCache final : public MetaBaseCache {
     MetaDbCache(const String &db_name, u64 db_id, u64 commit_ts, bool is_dropped)
         : MetaBaseCache(MetaCacheType::kCreateDB), db_name_(db_name), db_id_(db_id), commit_ts_(commit_ts), is_dropped_(is_dropped) {}
     String db_name_{};
     u64 db_id_{};
     u64 commit_ts_{};
     bool is_dropped_{false};
+
+    String name() final;
+    u64 commit_ts() final;
+    String type() final;
+    String detail() final;
 };
 
 export struct MetaTableCache : public MetaBaseCache {
@@ -59,6 +70,11 @@ export struct MetaTableCache : public MetaBaseCache {
     u64 table_id_{};
     u64 commit_ts_{};
     bool is_dropped_{false};
+
+    String name() final;
+    u64 commit_ts() final;
+    String type() final;
+    String detail() final;
 };
 
 export struct MetaIndexCache : public MetaBaseCache {
@@ -71,6 +87,11 @@ export struct MetaIndexCache : public MetaBaseCache {
     u64 index_id_{};
     u64 commit_ts_{};
     bool is_dropped_{false};
+
+    String name() final;
+    u64 commit_ts() final;
+    String type() final;
+    String detail() final;
 };
 
 export struct MetaEraseDbCache : public MetaBaseCache {
@@ -127,6 +148,8 @@ public:
     void PrintLRU() const;
 
     SizeT Size() const;
+
+    Vector<SharedPtr<MetaBaseCache>> GetAllCacheItems() const;
 
 private:
     void PutOrEraseNolock(const SharedPtr<MetaBaseCache> &meta_base_cache);

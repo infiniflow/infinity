@@ -86,6 +86,7 @@ import :chunk_index_meta;
 import :new_txn_manager;
 import :kv_store;
 import :meta_tree;
+import :meta_cache;
 import show_statement;
 import column_def;
 import data_type;
@@ -612,7 +613,7 @@ void PhysicalShow::Init(QueryContext *query_context) {
             output_names_->emplace_back("detail");
             output_types_->emplace_back(varchar_type);
             output_types_->emplace_back(varchar_type);
-            output_types_->emplace_back(varchar_type);
+            output_types_->emplace_back(bigint_type);
             output_types_->emplace_back(varchar_type);
             break;
         }
@@ -6505,12 +6506,55 @@ void PhysicalShow::ExecuteShowSnapshot(QueryContext *query_context, ShowOperator
 void PhysicalShow::ExecuteListCaches(QueryContext *query_context, ShowOperatorState *operator_state) {
     auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
     UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
-    Vector<SharedPtr<DataType>> column_types{
-        varchar_type,
-        varchar_type,
-    };
+    Storage *storage = query_context->storage();
+    MetaCache *meta_cache = storage->meta_cache();
+    Vector<SharedPtr<MetaBaseCache>> cache_items = meta_cache->GetAllCacheItems();
 
     output_block_ptr->Init(*output_types_);
+
+    SizeT row_count = 0;
+    for (auto &cache_item : cache_items) {
+        if (output_block_ptr.get() == nullptr) {
+            output_block_ptr = DataBlock::MakeUniquePtr();
+            output_block_ptr->Init(*output_types_);
+        }
+
+        {
+            // name
+            Value value = Value::MakeVarchar(cache_item->name());
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+        }
+
+        {
+            // cache type
+            Value value = Value::MakeVarchar(cache_item->type());
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+        }
+
+        {
+            // commit ts
+            Value value = Value::MakeBigInt(cache_item->commit_ts());
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+        }
+
+        {
+            // detailed info
+            Value value = Value::MakeVarchar(cache_item->detail());
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[3]);
+        }
+
+        ++row_count;
+        if (row_count == output_block_ptr->capacity()) {
+            output_block_ptr->Finalize();
+            operator_state->output_.emplace_back(std::move(output_block_ptr));
+            output_block_ptr = nullptr;
+            row_count = 0;
+        }
+    }
 
     output_block_ptr->Finalize();
     operator_state->output_.emplace_back(std::move(output_block_ptr));
