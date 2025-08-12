@@ -29,11 +29,11 @@ class KVInstance;
 export enum class MetaCacheType {
     kInvalid,
     kCreateDB,
-    kDropDB,
+    kEraseDB,
     kCreateTable,
-    kDropTable,
+    kEraseTable,
     kCreateIndex,
-    kDropIndex,
+    kEraseIndex,
 };
 
 struct MetaBaseCache {
@@ -73,9 +73,24 @@ export struct MetaIndexCache : public MetaBaseCache {
     bool is_dropped_{false};
 };
 
-export struct MetaDropCache : public MetaBaseCache {
-    explicit MetaDropCache(MetaCacheType drop_cache_type, const String &name) : MetaBaseCache(drop_cache_type), name_(name) {}
-    String name_{};
+export struct MetaEraseDbCache : public MetaBaseCache {
+    explicit MetaEraseDbCache(const String &db_name) : MetaBaseCache(MetaCacheType::kEraseDB), db_name_(db_name) {}
+    String db_name_{};
+};
+
+export struct MetaEraseTableCache : public MetaBaseCache {
+    explicit MetaEraseTableCache(u64 db_id, const String &table_name)
+        : MetaBaseCache(MetaCacheType::kEraseTable), db_id_(db_id), table_name_(table_name) {}
+    u64 db_id_{};
+    String table_name_{};
+};
+
+export struct MetaEraseIndexCache : public MetaBaseCache {
+    explicit MetaEraseIndexCache(u64 db_id, u64 table_id, const String &index_name)
+        : MetaBaseCache(MetaCacheType::kEraseIndex), db_id_(db_id), table_id_(table_id), index_name_(index_name) {}
+    u64 db_id_{};
+    u64 table_id_{};
+    String index_name_{};
 };
 
 struct CacheItem {
@@ -118,9 +133,9 @@ private:
     void PutDbNolock(const SharedPtr<MetaDbCache> &db_cache);
     void EraseDbNolock(const String &db_name);
     void PutTableNolock(const SharedPtr<MetaTableCache> &table_cache);
-    void EraseTableNolock(const String &table_name);
+    void EraseTableNolock(u64 db_id, const String &table_name);
     void PutIndexNolock(const SharedPtr<MetaIndexCache> &index_cache);
-    void EraseIndexNolock(const String &index_name);
+    void EraseIndexNolock(u64 db_id, u64 table_id, const String &index_name);
     void TrimCacheNolock();
     void TouchNolock(List<CacheItem>::iterator iter);
 };

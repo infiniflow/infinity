@@ -326,7 +326,7 @@ TEST_F(MetaCacheTest, test_erase) {
         EXPECT_EQ(size, 3);
     }
     {
-        SharedPtr<MetaDropCache> drop_cache = MakeShared<MetaDropCache>(MetaCacheType::kDropDB, "db1");
+        SharedPtr<MetaEraseDbCache> drop_cache = MakeShared<MetaEraseDbCache>("db1");
         cache.PutOrErase({drop_cache}, nullptr);
         SharedPtr<MetaDbCache> db_cache = cache.GetDb("db1", 5);
         EXPECT_EQ(db_cache.get(), nullptr);
@@ -334,7 +334,7 @@ TEST_F(MetaCacheTest, test_erase) {
         EXPECT_EQ(size, 3);
     }
     {
-        SharedPtr<MetaDropCache> drop_cache = MakeShared<MetaDropCache>(MetaCacheType::kDropTable, "tbl1");
+        SharedPtr<MetaEraseTableCache> drop_cache = MakeShared<MetaEraseTableCache>(0, "tbl1");
         cache.PutOrErase({drop_cache}, nullptr);
         SharedPtr<MetaTableCache> table_cache = cache.GetTable(0, "tbl1", 5);
         EXPECT_EQ(table_cache.get(), nullptr);
@@ -342,7 +342,7 @@ TEST_F(MetaCacheTest, test_erase) {
         EXPECT_EQ(size, 3);
     }
     {
-        SharedPtr<MetaDropCache> drop_cache = MakeShared<MetaDropCache>(MetaCacheType::kDropIndex, "idx1");
+        SharedPtr<MetaEraseIndexCache> drop_cache = MakeShared<MetaEraseIndexCache>(0, 0, "idx1");
         cache.PutOrErase({drop_cache}, nullptr);
         SharedPtr<MetaIndexCache> index_cache = cache.GetIndex(0, 0, "idx1", 5);
         EXPECT_EQ(index_cache.get(), nullptr);

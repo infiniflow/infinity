@@ -54,19 +54,19 @@ void MetaCache::PutOrEraseNolock(const SharedPtr<MetaBaseCache> &meta_base_cache
             PutIndexNolock(index_cache);
             break;
         }
-        case MetaCacheType::kDropDB: {
-            SharedPtr<MetaDropCache> drop_cache = std::static_pointer_cast<MetaDropCache>(meta_base_cache);
-            EraseDbNolock(drop_cache->name_);
+        case MetaCacheType::kEraseDB: {
+            SharedPtr<MetaEraseDbCache> drop_cache = std::static_pointer_cast<MetaEraseDbCache>(meta_base_cache);
+            EraseDbNolock(drop_cache->db_name_);
             break;
         }
-        case MetaCacheType::kDropTable: {
-            SharedPtr<MetaDropCache> drop_cache = std::static_pointer_cast<MetaDropCache>(meta_base_cache);
-            EraseTableNolock(drop_cache->name_);
+        case MetaCacheType::kEraseTable: {
+            SharedPtr<MetaEraseTableCache> drop_cache = std::static_pointer_cast<MetaEraseTableCache>(meta_base_cache);
+            EraseTableNolock(drop_cache->db_id_, drop_cache->table_name_);
             break;
         }
-        case MetaCacheType::kDropIndex: {
-            SharedPtr<MetaDropCache> drop_cache = std::static_pointer_cast<MetaDropCache>(meta_base_cache);
-            EraseIndexNolock(drop_cache->name_);
+        case MetaCacheType::kEraseIndex: {
+            SharedPtr<MetaEraseIndexCache> drop_cache = std::static_pointer_cast<MetaEraseIndexCache>(meta_base_cache);
+            EraseIndexNolock(drop_cache->db_id_, drop_cache->table_id_, drop_cache->index_name_);
             break;
         }
         default: {
@@ -76,10 +76,10 @@ void MetaCache::PutOrEraseNolock(const SharedPtr<MetaBaseCache> &meta_base_cache
 }
 
 void MetaCache::PutDbNolock(const SharedPtr<MetaDbCache> &db_cache) {
-    const String &db_name = db_cache->db_name_;
+    String name = KeyEncode::CatalogDbPrefix(db_cache->db_name_);
     TxnTimeStamp commit_ts = db_cache->commit_ts_;
 
-    auto iter = dbs_.find(db_name);
+    auto iter = dbs_.find(name);
     if (iter != dbs_.end()) {
         Map<u64, List<CacheItem>::iterator> &db_map_ref = iter->second;
         auto cache_iter = db_map_ref.find(commit_ts);
@@ -91,14 +91,15 @@ void MetaCache::PutDbNolock(const SharedPtr<MetaDbCache> &db_cache) {
     }
 
     // db is not in map
-    lru_.push_front({db_name, db_cache});
-    dbs_[db_name][commit_ts] = lru_.begin();
+    lru_.push_front({name, db_cache});
+    dbs_[name][commit_ts] = lru_.begin();
     TrimCacheNolock();
 }
 
 SharedPtr<MetaDbCache> MetaCache::GetDb(const String &db_name, TxnTimeStamp begin_ts) {
+    String name = KeyEncode::CatalogDbPrefix(db_name);
     std::unique_lock lock(cache_mtx_);
-    auto iter = dbs_.find(db_name);
+    auto iter = dbs_.find(name);
     if (iter != dbs_.end()) {
         Map<u64, List<CacheItem>::iterator> &db_map_ref = iter->second;
         for (auto r_cache_iter = db_map_ref.rbegin(); r_cache_iter != db_map_ref.rend(); ++r_cache_iter) {
@@ -112,7 +113,10 @@ SharedPtr<MetaDbCache> MetaCache::GetDb(const String &db_name, TxnTimeStamp begi
     return nullptr;
 }
 
-void MetaCache::EraseDbNolock(const String &db_name) { dbs_.erase(db_name); }
+void MetaCache::EraseDbNolock(const String &db_name) {
+    String name = KeyEncode::CatalogDbPrefix(db_name);
+    dbs_.erase(name);
+}
 
 void MetaCache::PutTableNolock(const SharedPtr<MetaTableCache> &table_cache) {
     const String &table_name = table_cache->table_name_;
@@ -155,7 +159,10 @@ SharedPtr<MetaTableCache> MetaCache::GetTable(u64 db_id, const String &table_nam
     return nullptr;
 }
 
-void MetaCache::EraseTableNolock(const String &table_name) { tables_.erase(table_name); }
+void MetaCache::EraseTableNolock(u64 db_id, const String &table_name) {
+    String name = KeyEncode::CatalogTablePrefix(std::to_string(db_id), table_name);
+    tables_.erase(name);
+}
 
 void MetaCache::PutIndexNolock(const SharedPtr<MetaIndexCache> &index_cache) {
     const String &index_name = index_cache->index_name_;
@@ -181,7 +188,10 @@ void MetaCache::PutIndexNolock(const SharedPtr<MetaIndexCache> &index_cache) {
     TrimCacheNolock();
 }
 
-void MetaCache::EraseIndexNolock(const String &index_name) { indexes_.erase(index_name); }
+void MetaCache::EraseIndexNolock(u64 db_id, u64 table_id, const String &index_name) {
+    String name = KeyEncode::CatalogIndexPrefix(std::to_string(db_id), std::to_string(table_id), index_name);
+    indexes_.erase(name);
+}
 
 SharedPtr<MetaIndexCache> MetaCache::GetIndex(u64 db_id, u64 table_id, const String &index_name, TxnTimeStamp begin_ts) {
     String name = KeyEncode::CatalogIndexPrefix(std::to_string(db_id), std::to_string(table_id), index_name);
