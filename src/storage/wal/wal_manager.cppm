@@ -17,7 +17,6 @@ module;
 export module infinity_core:wal_manager;
 
 import :stl;
-// import :options;
 import :blocking_queue;
 import :log_file;
 import :options;

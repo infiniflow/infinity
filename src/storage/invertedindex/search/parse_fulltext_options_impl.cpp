@@ -15,15 +15,16 @@
 module;
 
 #include <re2/re2.h>
-#include <vector>
+
 module infinity_core:parse_fulltext_options.impl;
 
 import :parse_fulltext_options;
-
 import :stl;
 import :infinity_exception;
 import :status;
 import :filter_value_type_classification;
+
+import std;
 
 namespace infinity {
 

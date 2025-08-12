@@ -14,13 +14,12 @@
 
 module;
 
-#include <cassert>
-#include <ostream>
-
 export module infinity_core:diskann_mem_graph_store;
 
 import :stl;
 import :local_file_handle;
+
+import std;
 
 namespace infinity {
 export class DiskAnnMemGraphStore {

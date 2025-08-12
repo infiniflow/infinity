@@ -15,7 +15,6 @@
 module;
 
 #include <cassert>
-#include <ostream>
 
 #if defined(__GNUC__) && (defined(__x86_64__) || defined(__i386__))
 #include <xmmintrin.h>
@@ -28,8 +27,11 @@ export module infinity_core:lvq_vec_store;
 import :stl;
 import :local_file_handle;
 import :hnsw_common;
-import serialize;
 import :data_store_util;
+
+import std;
+
+import serialize;
 
 namespace infinity {
 

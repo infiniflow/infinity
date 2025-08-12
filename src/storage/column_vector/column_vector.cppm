@@ -21,26 +21,27 @@ module;
 export module infinity_core:column_vector;
 
 import :stl;
-import global_resource_usage;
 import :vector_buffer;
 import :roaring_bitmap;
 import :selection;
 import :default_values;
 import :value;
 import :status;
-import third_party;
 import :infinity_exception;
+import :var_buffer;
+import :sparse_util;
+
+// import std;
+import third_party;
+
 import internal_types;
 import data_type;
 import embedding_info;
 import sparse_info;
 import array_info;
 import constant_expr;
-// import :logger;
-// import column_def;
 import logical_type;
-import :var_buffer;
-import :sparse_util;
+import global_resource_usage;
 
 namespace infinity {
 

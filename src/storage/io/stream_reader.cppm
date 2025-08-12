@@ -21,6 +21,8 @@ export module infinity_core:stream_reader;
 import :stl;
 import :status;
 
+// import std;
+
 namespace infinity {
 
 export class StreamReader {

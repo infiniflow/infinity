@@ -14,29 +14,27 @@
 
 module;
 
-#include <sstream>
-#include <string>
-#include <vector>
-
 module infinity_core:index_hnsw.impl;
 
 import :index_hnsw;
-
 import :stl;
 import :status;
 import :index_base;
-import third_party;
 import :infinity_exception;
-import serialize;
 import :default_values;
 import :index_base;
-import logical_type;
-import statement_common;
 import :logger;
+import :hnsw_lsg_builder;
+
+import std;
+import third_party;
+
 import data_type;
 import embedding_info;
 import internal_types;
-import :hnsw_lsg_builder;
+import logical_type;
+import statement_common;
+import serialize;
 
 namespace infinity {
 

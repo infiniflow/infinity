@@ -1,11 +1,11 @@
 module;
 
 #include <cstdlib>
+
 module infinity_core:posting_buffer.impl;
 
 import :posting_buffer;
 import :stl;
-
 import :index_defines;
 import :posting_field;
 import :file_writer;

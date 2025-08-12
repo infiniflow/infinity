@@ -14,14 +14,15 @@
 
 module;
 
-#include <vector>
-
 export module infinity_core:hnsw_util;
 
 import :stl;
-import statement_common;
 import :infinity_exception;
 import :status;
+
+import std;
+
+import statement_common;
 
 namespace infinity {
 

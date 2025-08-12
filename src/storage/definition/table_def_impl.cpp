@@ -14,21 +14,21 @@
 
 module;
 
-#include <sstream>
-
 module infinity_core:table_def.impl;
 
 import :table_def;
-
 import :stl;
+import :infinity_exception;
+import :logger;
+
+import std;
+
+import column_def;
 import data_type;
 import serialize;
-import internal_types;
-import :infinity_exception;
 import parsed_expr;
 import constant_expr;
-import :logger;
-import column_def;
+import internal_types;
 
 namespace infinity {
 
@@ -96,7 +96,7 @@ void TableDef::WriteAdv(char *&ptr) const {
     WriteBufAdv(ptr, *schema_name_);
     WriteBufAdv(ptr, *table_name_);
     WriteBufAdv(ptr, *table_comment_);
-    WriteBufAdv(ptr, (i32)(columns_.size()));
+    WriteBufAdv(ptr, static_cast<i32>(columns_.size()));
     SizeT column_count = columns_.size();
     for (SizeT idx = 0; idx < column_count; ++idx) {
         const ColumnDef &cd = *columns_[idx];
@@ -108,8 +108,7 @@ void TableDef::WriteAdv(char *&ptr) const {
 SharedPtr<TableDef> TableDef::ReadAdv(const char *&ptr, i32 maxbytes) {
     const char *const ptr_end = ptr + maxbytes;
     if (maxbytes <= 0) {
-        String error_message = "ptr goes out of range when reading TableDef";
-        UnrecoverableError(error_message);
+        UnrecoverableError("ptr goes out of range when reading TableDef");
     }
     String schema_name = ReadBufAdv<String>(ptr);
     String table_name = ReadBufAdv<String>(ptr);
@@ -122,8 +121,7 @@ SharedPtr<TableDef> TableDef::ReadAdv(const char *&ptr, i32 maxbytes) {
     }
     maxbytes = ptr_end - ptr;
     if (maxbytes < 0) {
-        String error_message = "ptr goes out of range when reading TableDef";
-        UnrecoverableError(error_message);
+        UnrecoverableError("ptr goes out of range when reading TableDef");
     }
     return TableDef::Make(MakeShared<String>(schema_name), MakeShared<String>(table_name), MakeShared<String>(table_comment), columns);
 }

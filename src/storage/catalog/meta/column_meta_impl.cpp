@@ -14,8 +14,6 @@
 
 module;
 
-// #include <string>
-
 module infinity_core:column_meta.impl;
 
 import std;

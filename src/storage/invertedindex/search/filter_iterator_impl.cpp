@@ -15,16 +15,18 @@
 module;
 
 #include <cassert>
-#include <iostream>
+
 module infinity_core:filter_iterator.impl;
 
 import :filter_iterator;
 import :stl;
 import :doc_iterator;
 import :query_node;
-import internal_types;
 import :column_index_reader;
 import :explain_logical_plan;
+
+import std;
+import internal_types;
 
 namespace infinity {
 

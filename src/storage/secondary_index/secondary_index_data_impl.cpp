@@ -15,25 +15,24 @@
 module;
 
 #include <cassert>
-#include <concepts>
-#include <vector>
 
 module infinity_core:secondary_index_data.impl;
 
 import :secondary_index_data;
-
 import :stl;
-
 import :default_values;
 import :index_base;
 import :local_file_handle;
 import :infinity_exception;
-import third_party;
 import :secondary_index_pgm;
 import :logger;
 import :buffer_handle;
 import :buffer_obj;
 import :table_index_meeta;
+
+import std;
+import third_party;
+
 import logical_type;
 import internal_types;
 import data_type;

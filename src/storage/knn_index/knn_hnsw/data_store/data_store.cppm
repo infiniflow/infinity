@@ -15,8 +15,6 @@
 module;
 
 #include <cassert>
-#include <ostream>
-#include <type_traits>
 
 export module infinity_core:data_store;
 
@@ -26,9 +24,12 @@ import :local_file_handle;
 import :vec_store_type;
 import :graph_store;
 import :infinity_exception;
-import serialize;
 import :data_store_util;
 import :plain_vec_store;
+
+import std;
+
+import serialize;
 
 namespace infinity {
 

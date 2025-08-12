@@ -3,9 +3,7 @@ module;
 module infinity_core:in_doc_state_keeper.impl;
 
 import :in_doc_state_keeper;
-
 import :stl;
-
 import :byte_slice;
 import :in_doc_pos_state;
 import :position_list_decoder;
@@ -14,6 +12,7 @@ import :inmem_posting_decoder;
 import :inmem_position_list_decoder;
 import :index_defines;
 import :posting_list_format;
+
 import third_party;
 
 namespace infinity {

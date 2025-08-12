@@ -17,8 +17,9 @@ module;
 export module infinity_core:ivf_index_util_func;
 
 import :stl;
-import internal_types;
 import :column_vector;
+
+import internal_types;
 
 namespace infinity {
 

@@ -17,13 +17,14 @@ module;
 export module infinity_core:vector_buffer;
 
 import :stl;
-import global_resource_usage;
 import :buffer_handle;
 import :var_buffer;
-import data_type;
 import :sparse_util;
+
 import sparse_info;
 import internal_types;
+import data_type;
+import global_resource_usage;
 
 namespace infinity {
 

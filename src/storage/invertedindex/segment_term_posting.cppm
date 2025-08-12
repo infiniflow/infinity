@@ -9,6 +9,7 @@ import :index_defines;
 import :term_meta;
 import :column_index_iterator;
 import :index_defines;
+
 import internal_types;
 
 namespace infinity {

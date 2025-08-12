@@ -14,14 +14,13 @@
 
 module;
 
-#include <memory>
-#include <thread>
-
 module infinity_core:periodic_trigger_thread.impl;
 
 import :periodic_trigger_thread;
 import :stl;
 import :logger;
+
+import std;
 
 namespace infinity {
 

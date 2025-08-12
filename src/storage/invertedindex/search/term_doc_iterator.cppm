@@ -17,17 +17,18 @@ module;
 export module infinity_core:term_doc_iterator;
 
 import :stl;
-
 import :posting_iterator;
 import :index_defines;
 import :term_meta;
 import :doc_iterator;
-import internal_types;
 import :doc_iterator;
 import :column_length_io;
-import third_party;
 import :parse_fulltext_options;
 import :blockmax_leaf_iterator;
+
+import third_party;
+
+import internal_types;
 
 namespace infinity {
 

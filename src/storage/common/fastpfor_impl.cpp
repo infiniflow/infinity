@@ -13,14 +13,12 @@
 // limitations under the License.
 
 module;
-#include <iostream>
+
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wuninitialized"
 
-#include <codecfactory.h>
 #include <compositecodec.h>
 #include <deltautil.h>
-#include <fastpfor.h>
 #include <simdbinarypacking.h>
 #include <simdfastpfor.h>
 #include <simdnewpfor.h>

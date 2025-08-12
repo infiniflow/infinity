@@ -19,12 +19,13 @@ export module infinity_core:data_block;
 import :stl;
 import :default_values;
 import :selection;
-import data_type;
 import :column_vector;
 import :value;
-import internal_types;
 import :infinity_exception;
 import :logger;
+
+import internal_types;
+import data_type;
 
 namespace infinity {
 

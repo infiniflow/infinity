@@ -14,21 +14,14 @@
 
 module;
 
-#include <vector>
 module infinity_core:ivf_index_data_in_mem.impl;
 
 import :ivf_index_data_in_mem;
-
 import :stl;
 import :ivf_index_storage;
-import internal_types;
 import :buffer_manager;
-import column_def;
 import :index_base;
 import :index_ivf;
-import embedding_info;
-import logical_type;
-import data_type;
 import :infinity_exception;
 import :status;
 import :logger;
@@ -42,8 +35,16 @@ import :ivf_index_util_func;
 import :base_memindex;
 import :memindex_tracer;
 import :infinity_context;
-import third_party;
 import :buffer_obj;
+
+import std;
+import third_party;
+
+import embedding_info;
+import logical_type;
+import data_type;
+import column_def;
+import internal_types;
 
 namespace infinity {
 

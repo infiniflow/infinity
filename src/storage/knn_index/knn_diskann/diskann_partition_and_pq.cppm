@@ -27,7 +27,6 @@ module;
 export module infinity_core:diskann_partition_and_pq;
 
 import :stl;
-import third_party;
 import :infinity_exception;
 import :index_base;
 import :vector_distance;
@@ -37,6 +36,10 @@ import :diskann_dist_func;
 import :default_values;
 import :local_file_handle;
 import :virtual_store;
+
+// import std;
+// import std.compat;
+import third_party;
 
 namespace infinity {
 

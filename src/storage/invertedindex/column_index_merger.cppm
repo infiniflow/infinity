@@ -12,8 +12,9 @@ import :term_meta;
 import :index_full_text;
 import :column_index_iterator;
 import :segment_term_posting;
-import internal_types;
 import :vector_with_lock;
+
+import internal_types;
 
 namespace infinity {
 export class ColumnIndexMerger {

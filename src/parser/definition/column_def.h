@@ -14,7 +14,6 @@
 
 #pragma once
 
-// #include "type/data_type.h"
 #include "expr/constant_expr.h"
 #include "expr/parsed_expr.h"
 #include "type/logical_type.h"

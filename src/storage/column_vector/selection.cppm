@@ -11,14 +11,16 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+
 module;
 
 export module infinity_core:selection;
 
 import :stl;
 import :infinity_exception;
-import global_resource_usage;
 import :default_values;
+
+import global_resource_usage;
 
 namespace infinity {
 

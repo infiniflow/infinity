@@ -3,7 +3,6 @@ module;
 module infinity_core:skiplist_reader.impl;
 
 import :skiplist_reader;
-
 import :stl;
 import :byte_slice;
 import :status;
@@ -11,6 +10,7 @@ import :posting_field;
 import :flush_info;
 import :infinity_exception;
 import :logger;
+
 import third_party;
 
 namespace infinity {

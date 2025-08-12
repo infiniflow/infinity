@@ -14,8 +14,6 @@
 
 module;
 
-#include <utility>
-
 export module infinity_core:block_column_iter;
 
 import :stl;
@@ -24,8 +22,11 @@ import :buffer_manager;
 import :column_vector;
 import :sparse_util;
 import :multivector_util;
-import internal_types;
 import :column_vector;
+
+import std;
+
+import internal_types;
 
 namespace infinity {
 export template <typename DataType>

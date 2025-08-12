@@ -21,6 +21,7 @@ import :index_defines;
 import :doc_iterator;
 import :multi_doc_iterator;
 import :or_iterator;
+
 import internal_types;
 
 namespace infinity {

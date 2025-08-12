@@ -1,13 +1,10 @@
 module;
 
 #include <cassert>
-#include <fstream>
-#include <string>
 
 module infinity_core:column_index_merger.impl;
 
 import :column_index_merger;
-
 import :stl;
 import :byte_slice;
 import :byte_slice_reader;
@@ -20,10 +17,8 @@ import :index_full_text;
 import :column_index_iterator;
 import :segment_term_posting;
 import :fst.fst;
-import internal_types;
 import :posting_byte_slice_reader;
 import :posting_merger;
-import third_party;
 import :virtual_store;
 import :local_file_handle;
 import :infinity_exception;
@@ -35,6 +30,11 @@ import :defer_op;
 import :utility;
 import :persist_result_handler;
 import :fst.build;
+
+import std;
+import third_party;
+
+import internal_types;
 
 namespace infinity {
 ColumnIndexMerger::ColumnIndexMerger(const String &index_dir, optionflag_t flag) : index_dir_(index_dir), flag_(flag) {}

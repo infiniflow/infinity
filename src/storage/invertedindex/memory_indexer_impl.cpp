@@ -25,14 +25,10 @@ module;
 #pragma clang diagnostic pop
 
 #include <cassert>
-#include <filesystem>
-#include <iostream>
-#include <string.h>
 
 module infinity_core:memory_indexer.impl;
 
 import :memory_indexer;
-
 import :stl;
 import :status;
 import :index_defines;
@@ -43,7 +39,6 @@ import :analyzer_pool;
 import :term;
 import :column_inverter;
 import :invert_task;
-import third_party;
 import :ring;
 import :external_sort_merger;
 import :file_writer;
@@ -58,7 +53,6 @@ import :infinity_exception;
 import :mmap;
 import :buf_writer;
 import :profiler;
-import third_party;
 import :infinity_context;
 import :defer_op;
 import :blocking_queue;
@@ -69,9 +63,14 @@ import :virtual_store;
 import :local_file_handle;
 import :mem_usage_change;
 import :bg_task;
-import row_id;
 import :fst.build;
 import :default_values;
+
+import std;
+import std.compat;
+import third_party;
+
+import row_id;
 
 namespace infinity {
 bool MemoryIndexer::KeyComp::operator()(const String &lhs, const String &rhs) const {

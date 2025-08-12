@@ -24,6 +24,7 @@ import :infinity_exception;
 import :default_values;
 import :mlas_matrix_multiply;
 import :roaring_bitmap;
+
 import knn_expr;
 import internal_types;
 

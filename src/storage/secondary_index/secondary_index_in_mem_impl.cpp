@@ -14,18 +14,12 @@
 
 module;
 
-#include <bit>
 #include <cassert>
-#include <vector>
 
 module infinity_core:secondary_index_in_mem.impl;
 
 import :secondary_index_in_mem;
-
 import :stl;
-import logical_type;
-import internal_types;
-import column_def;
 import :default_values;
 import :buffer_manager;
 import :block_column_iter;
@@ -38,6 +32,12 @@ import :memindex_tracer;
 import :column_vector;
 import :buffer_obj;
 import :rcu_multimap;
+
+import std;
+
+import logical_type;
+import internal_types;
+import column_def;
 
 namespace infinity {
 

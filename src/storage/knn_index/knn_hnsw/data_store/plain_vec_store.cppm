@@ -15,7 +15,7 @@
 module;
 
 #include <cassert>
-#include <ostream>
+
 #if defined(__GNUC__) && (defined(__x86_64__) || defined(__i386__))
 #include <xmmintrin.h>
 #elif defined(__GNUC__) && defined(__aarch64__)
@@ -27,9 +27,12 @@ export module infinity_core:plain_vec_store;
 import :stl;
 import :local_file_handle;
 import :hnsw_common;
-import serialize;
 import :data_store_util;
+
+import std;
+
 import data_type;
+import serialize;
 
 namespace infinity {
 

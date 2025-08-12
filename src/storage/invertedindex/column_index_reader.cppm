@@ -17,16 +17,17 @@ module;
 export module infinity_core:column_index_reader;
 
 import :stl;
-import third_party;
 import :segment_posting;
 import :index_segment_reader;
 import :posting_iterator;
 import :index_defines;
-// import :memory_indexer;
-import internal_types;
 import :logger;
 import :status;
 import :default_values;
+
+import third_party;
+
+import internal_types;
 
 namespace infinity {
 export class TermDocIterator;

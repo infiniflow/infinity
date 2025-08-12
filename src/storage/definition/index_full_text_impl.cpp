@@ -21,20 +21,23 @@ module;
 module infinity_core:index_full_text.impl;
 
 import :index_full_text;
-
 import :stl;
 import :index_base;
-import third_party;
 import :status;
-import serialize;
 import :infinity_exception;
-import statement_common;
 import :base_table_ref;
-import logical_type;
 import :index_defines;
 import :analyzer_pool;
 import :analyzer;
 import :logger;
+
+// import std;
+// import std.compat;
+import third_party;
+
+import logical_type;
+import statement_common;
+import serialize;
 
 namespace infinity {
 

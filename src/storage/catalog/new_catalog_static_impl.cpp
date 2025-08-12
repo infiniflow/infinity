@@ -14,14 +14,12 @@
 
 module;
 
-#include <memory>
-#include <vector>
-
 module infinity_core:new_catalog_static.impl;
+
+import std;
 
 import :new_catalog;
 import :stl;
-import third_party;
 import :block_version;
 import :infinity_exception;
 import :table_def;
@@ -47,6 +45,8 @@ import :chunk_index_meta;
 import :mem_index;
 import :scalar_function_set;
 import :special_function;
+
+import third_party;
 
 import logical_type;
 import data_type;

@@ -17,9 +17,9 @@ module;
 export module infinity_core:index_secondary;
 
 import :stl;
-
 import :index_base;
 import :base_table_ref;
+
 import create_index_info;
 
 namespace infinity {

@@ -18,12 +18,13 @@ module infinity_core:bottom_executor.impl;
 
 import :bottom_executor;
 import :stl;
-import third_party;
 import :crc;
 import :blocking_queue;
 import :new_txn;
 import :txn_state;
 import :logger;
+
+import third_party;
 
 namespace infinity {
 

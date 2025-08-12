@@ -16,8 +16,8 @@ module;
 export module infinity_core:table_def;
 
 import :stl;
-
 import :index_base;
+
 import column_def;
 import global_resource_usage;
 

@@ -15,6 +15,7 @@
 module;
 
 export module infinity_core:emvb_shared_vec;
+
 import :stl;
 
 namespace infinity {

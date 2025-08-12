@@ -1,11 +1,11 @@
 module;
+
 #include <cassert>
 
 module infinity_core:doc_list_encoder.impl;
 
 import :doc_list_encoder;
 import :stl;
-
 import :file_writer;
 import :file_reader;
 import :posting_byte_slice;

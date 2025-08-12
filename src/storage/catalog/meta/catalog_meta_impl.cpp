@@ -14,8 +14,6 @@
 
 module;
 
-// #include <vector>
-
 module infinity_core:catalog_meta.impl;
 
 import std;

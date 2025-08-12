@@ -14,20 +14,15 @@
 
 module;
 
-#include <cstdio>
-
 export module infinity_core:memory_indexer;
-import :stl;
 
+import :stl;
 import :index_defines;
 import :posting_writer;
 import :column_vector;
 import :column_inverter;
-import third_party;
-import internal_types;
 import :ring;
 import :skiplist;
-import internal_types;
 import :map_with_lock;
 import :vector_with_lock;
 import :buf_writer;
@@ -39,6 +34,11 @@ import :memindex_tracer;
 import :mem_usage_change;
 import :chunk_index_meta;
 import :rcu_multimap;
+
+import std.compat;
+import third_party;
+
+import internal_types;
 
 namespace infinity {
 

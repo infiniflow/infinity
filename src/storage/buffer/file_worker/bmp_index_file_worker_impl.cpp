@@ -14,8 +14,6 @@
 
 module;
 
-// #include <set>
-
 module infinity_core:bmp_index_file_worker.impl;
 
 import std;

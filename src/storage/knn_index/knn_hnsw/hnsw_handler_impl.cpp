@@ -7,7 +7,6 @@ module;
 module infinity_core:hnsw_handler.impl;
 
 import :hnsw_handler;
-
 import :buffer_manager;
 import :buffer_handle;
 import :block_column_iter;
@@ -15,11 +14,12 @@ import :memindex_tracer;
 import :default_values;
 import :multivector_util;
 import :infinity_exception;
-import third_party;
 import :column_vector;
 import :local_file_handle;
 import :chunk_index_meta;
 import :plain_vec_store;
+
+import third_party;
 
 import embedding_info;
 import embedding_type;

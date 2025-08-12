@@ -14,8 +14,6 @@
 
 module;
 
-// #include "storage/invertedindex/search/query_node.h"
-
 export module infinity_core:physical_match;
 
 import :stl;

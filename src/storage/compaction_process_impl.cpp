@@ -14,10 +14,6 @@
 
 module;
 
-#include <ranges>
-#include <thread>
-#include <vector>
-
 module infinity_core:compaction_process.impl;
 
 import :compaction_process;
@@ -25,7 +21,6 @@ import :stl;
 import :bg_task;
 import :logger;
 import :infinity_exception;
-import third_party;
 import :blocking_queue;
 import :infinity_context;
 import :base_memindex;
@@ -40,6 +35,9 @@ import :db_meeta;
 import :segment_meta;
 import :bg_task;
 import :base_txn_store;
+
+import std;
+import third_party;
 
 import global_resource_usage;
 import compilation_config;

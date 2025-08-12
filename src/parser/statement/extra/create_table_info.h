@@ -14,8 +14,6 @@
 
 #pragma once
 
-// #include <utility>
-
 #include "definition/column_def.h"
 #include "extra_ddl_info.h"
 #include "statement/select_statement.h"
@@ -25,7 +23,6 @@
 #include "type/info/decimal_info.h"
 #include "type/info/embedding_info.h"
 #include "type/info/sparse_info.h"
-// #include <unordered_set>
 
 namespace infinity {
 

@@ -3,8 +3,8 @@ module;
 export module infinity_core:index_defines;
 
 import :stl;
-
 import :default_values;
+
 import internal_types;
 
 namespace infinity {

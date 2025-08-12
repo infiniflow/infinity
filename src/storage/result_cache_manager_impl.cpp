@@ -14,9 +14,6 @@
 
 module;
 
-#include <memory>
-#include <vector>
-
 module infinity_core:result_cache_manager.impl;
 
 import :result_cache_manager;
@@ -26,6 +23,8 @@ import :logical_match;
 import :physical_match;
 import :logical_node_type;
 import :logger;
+
+import std;
 
 namespace infinity {
 

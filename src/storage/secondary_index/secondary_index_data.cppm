@@ -21,13 +21,15 @@ import :default_values;
 import :local_file_handle;
 import :infinity_exception;
 import :column_vector;
-import third_party;
 import :secondary_index_pgm;
+import :buffer_handle;
+import :logger;
+
+import third_party;
+
 import logical_type;
 import internal_types;
 import data_type;
-import :buffer_handle;
-import :logger;
 
 namespace infinity {
 

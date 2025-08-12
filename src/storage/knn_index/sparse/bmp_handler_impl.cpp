@@ -17,7 +17,6 @@ module;
 module infinity_core:bmp_handler.impl;
 
 import :bmp_handler;
-
 import :stl;
 import :buffer_manager;
 import :buffer_handle;

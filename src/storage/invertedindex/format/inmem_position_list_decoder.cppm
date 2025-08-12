@@ -3,7 +3,6 @@ module;
 export module infinity_core:inmem_position_list_decoder;
 
 import :stl;
-
 import :position_list_decoder;
 import :posting_byte_slice_reader;
 import :in_doc_pos_state;

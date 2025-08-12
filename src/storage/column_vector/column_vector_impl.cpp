@@ -15,32 +15,20 @@
 module;
 
 #include <cassert>
-#include <cstring>
-#include <memory>
-#include <sstream>
 
 module infinity_core:column_vector.impl;
 
 import :column_vector;
 import :stl;
 import :selection;
-
-import type_info;
 import :infinity_exception;
 import :default_values;
 import :roaring_bitmap;
 import :vector_buffer;
-import serialize;
-import third_party;
 import :logger;
 import :value;
-import internal_types;
-import logical_type;
 import :buffer_manager;
 import :status;
-import logical_type;
-import embedding_info;
-import array_info;
 import :base_expression;
 import :value_expression;
 import :expression_binder;
@@ -49,10 +37,22 @@ import :bound_cast_func;
 import :cast_expression;
 import :expression_evaluator;
 import :expression_state;
+
+import std;
+import std.compat;
+import third_party;
+
 import sparse_info;
 import constant_expr;
 import data_type;
 import global_resource_usage;
+import logical_type;
+import embedding_info;
+import array_info;
+import internal_types;
+import logical_type;
+import serialize;
+import type_info;
 
 namespace infinity {
 

@@ -15,24 +15,24 @@
 module;
 
 #include <cassert>
-#include <cstdlib>
-#include <tuple>
-#include <vector>
 
 module infinity_core:batch_or_iterator.impl;
 
 import :batch_or_iterator;
-
 import :stl;
-import third_party;
 import :index_defines;
 import :term_doc_iterator;
 import :multi_doc_iterator;
-import internal_types;
 import :logger;
 import :infinity_exception;
 import :simd_functions;
 import :default_values;
+
+import std;
+import std.compat;
+import third_party;
+
+import internal_types;
 
 namespace infinity {
 

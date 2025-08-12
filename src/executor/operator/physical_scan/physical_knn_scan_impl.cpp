@@ -721,8 +721,7 @@ void PhysicalKnnScan::ExecuteInternalByColumnDataTypeAndQueryDataType(QueryConte
                                 if (result_n < 0) {
                                     result_n = result_n1;
                                 } else if (result_n != (i64)result_n1) {
-                                    String error_message = "KnnScan: result_n mismatch";
-                                    UnrecoverableError(error_message);
+                                    UnrecoverableError("KnnScan: result_n mismatch");
                                 }
 
                                 if (rerank) {
@@ -774,8 +773,7 @@ void PhysicalKnnScan::ExecuteInternalByColumnDataTypeAndQueryDataType(QueryConte
                                 } else {
                                     switch (knn_scan_shared_data->knn_distance_type_) {
                                         case KnnDistanceType::kInvalid: {
-                                            String error_message = "Invalid distance type";
-                                            UnrecoverableError(error_message);
+                                            UnrecoverableError("Invalid distance type");
                                         }
                                         case KnnDistanceType::kL2:
                                         case KnnDistanceType::kHamming: {

@@ -14,11 +14,7 @@
 
 module;
 
-// #include <re2/re2.h>
-
-// #include <filesystem>
 #include <ranges>
-// #include <regex>
 
 module infinity_core:meta_tree.impl;
 

@@ -14,8 +14,6 @@
 
 module;
 
-// #include <string>
-
 module infinity_core:table_index_meeta.impl;
 
 import std;

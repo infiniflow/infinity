@@ -1,21 +1,21 @@
 module;
 
 #include <cassert>
-#include <iostream>
-#include <vector>
-#include <cmath>
 
 module infinity_core:phrase_doc_iterator.impl;
 
 import :phrase_doc_iterator;
-
 import :stl;
 import :doc_iterator;
-import internal_types;
-import third_party;
 import :posting_iterator;
 import :column_length_io;
 import :logger;
+
+import std;
+import std.compat;
+import third_party;
+
+import internal_types;
 
 namespace infinity {
 

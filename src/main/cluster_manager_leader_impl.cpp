@@ -53,8 +53,7 @@ Status ClusterManager::InitAsLeader(const String &node_name) {
 void ClusterManager::CheckHeartBeat() {
     std::unique_lock<std::mutex> cluster_lock(cluster_mutex_);
     if (current_node_role_ != NodeRole::kLeader) {
-        String error_message = "Invalid node role.";
-        UnrecoverableError(error_message);
+        UnrecoverableError("Invalid node role.");
     }
     hb_running_ = true;
     this_node_->set_heartbeat_interval(1000);
@@ -63,8 +62,7 @@ void ClusterManager::CheckHeartBeat() {
 
 void ClusterManager::CheckHeartBeatThread() {
     if (current_node_role_ != NodeRole::kLeader) {
-        String error_message = "Invalid node role.";
-        UnrecoverableError(error_message);
+        UnrecoverableError("Invalid node role.");
     }
     // this_node_ is the leader;
     auto hb_interval = std::chrono::milliseconds(this_node_->heartbeat_interval());
@@ -104,8 +102,7 @@ Status ClusterManager::AddNodeInfo(const SharedPtr<NodeInfo> &other_node) {
     {
         std::unique_lock<std::mutex> cluster_lock(cluster_mutex_);
         if (current_node_role_ != NodeRole::kLeader) {
-            String error_message = "Non-leader role can't add other node.";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Non-leader role can't add other node.");
         }
 
         if (other_node_name == this_node_->node_name()) {
@@ -138,8 +135,7 @@ Status ClusterManager::AddNodeInfo(const SharedPtr<NodeInfo> &other_node) {
                     break;
                 }
                 default: {
-                    String error_message = "Non-follower / learner role should be here.";
-                    UnrecoverableError(error_message);
+                    UnrecoverableError("Non-follower / learner role should be here.");
                 }
             }
         }

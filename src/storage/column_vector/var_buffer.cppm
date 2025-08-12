@@ -19,7 +19,6 @@ export module infinity_core:var_buffer;
 import :stl;
 import :buffer_obj;
 import :buffer_handle;
-// import :logger;
 
 namespace infinity {
 

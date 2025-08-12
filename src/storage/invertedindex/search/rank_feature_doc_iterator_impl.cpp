@@ -15,14 +15,15 @@
 module;
 
 #include <cassert>
-#include <iostream>
+
 module infinity_core:rank_feature_doc_iterator.impl;
 
 import :rank_feature_doc_iterator;
-
 import :stl;
-// import :logger;
 import :smallfloat;
+
+import std;
+
 import row_id;
 
 namespace infinity {

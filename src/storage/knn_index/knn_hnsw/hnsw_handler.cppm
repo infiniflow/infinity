@@ -4,8 +4,6 @@
 
 module;
 
-#include <future>
-
 export module infinity_core:hnsw_handler;
 
 import :stl;
@@ -24,9 +22,11 @@ import :logger;
 import :base_memindex;
 import :memindex_tracer;
 import :buffer_handle;
-import third_party;
 import :config;
 import :chunk_index_meta;
+
+import std;
+import third_party;
 
 import internal_types;
 import embedding_info;

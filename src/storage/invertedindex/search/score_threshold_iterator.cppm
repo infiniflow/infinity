@@ -15,8 +15,10 @@
 module;
 
 export module infinity_core:score_threshold_iterator;
+
 import :stl;
 import :doc_iterator;
+
 import internal_types;
 
 namespace infinity {

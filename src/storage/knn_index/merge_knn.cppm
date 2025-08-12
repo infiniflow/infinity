@@ -17,12 +17,11 @@ module;
 export module infinity_core:merge_knn;
 
 import :stl;
-
 import :knn_result_handler;
-
 import :infinity_exception;
 import :roaring_bitmap;
 import :default_values;
+
 import internal_types;
 import statement_common;
 

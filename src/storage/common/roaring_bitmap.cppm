@@ -19,9 +19,11 @@ export module infinity_core:roaring_bitmap;
 import :stl;
 import :croaring;
 import :infinity_exception;
-import serialize;
-import third_party;
 import :logger;
+
+import third_party;
+
+import serialize;
 
 namespace infinity {
 

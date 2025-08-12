@@ -14,18 +14,18 @@
 
 module;
 
-#include <algorithm>
-#include <vector>
-
 export module infinity_core:linscan_alg;
 
 import :stl;
 import :sparse_util;
 import :local_file_handle;
 import :knn_result_handler;
-import serialize;
 import :infinity_exception;
+
+import std;
 import third_party;
+
+import serialize;
 
 namespace infinity {
 

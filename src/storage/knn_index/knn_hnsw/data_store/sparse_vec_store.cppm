@@ -14,7 +14,6 @@
 
 module;
 
-#include <fstream>
 #if defined(__GNUC__) && (defined(__x86_64__) || defined(__i386__))
 #include <xmmintrin.h>
 #elif defined(__GNUC__) && defined(__aarch64__)
@@ -27,6 +26,8 @@ import :stl;
 import :local_file_handle;
 import :hnsw_common;
 import :sparse_util;
+
+import std;
 
 namespace infinity {
 

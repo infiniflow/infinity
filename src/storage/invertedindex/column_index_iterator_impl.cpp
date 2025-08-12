@@ -3,7 +3,6 @@ module;
 module infinity_core:column_index_iterator.impl;
 
 import :column_index_iterator;
-
 import :stl;
 import :byte_slice;
 import :byte_slice_reader;
@@ -13,10 +12,12 @@ import :posting_list_format;
 import :index_defines;
 import :term_meta;
 import :dict_reader;
-import third_party;
+
 import :infinity_context;
 import :persistence_manager;
 import :persist_result_handler;
+
+import third_party;
 
 namespace infinity {
 

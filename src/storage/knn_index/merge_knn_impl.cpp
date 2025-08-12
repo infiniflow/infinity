@@ -14,20 +14,19 @@
 
 module;
 
-#include <string>
-#include <vector>
-
 module infinity_core:merge_knn.impl;
 
 import :merge_knn;
-
 import :stl;
-import statement_common;
 import :knn_scan_data;
 import :status;
+
+import std;
+
 import knn_expr;
 import third_party;
 import embedding_type;
+import statement_common;
 
 namespace infinity {
 
@@ -37,8 +36,7 @@ template <typename QueryDataType, typename DistDataType>
 UniquePtr<MergeKnnBase> InitMergeKnn(KnnScanSharedData *knn_scan_shared_data) {
     switch (knn_scan_shared_data->knn_distance_type_) {
         case KnnDistanceType::kInvalid: {
-            String error_message = "Invalid Knn distance type";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Invalid Knn distance type");
             return nullptr;
         }
         case KnnDistanceType::kL2:
@@ -75,9 +73,8 @@ UniquePtr<MergeKnnBase> MergeKnnBase::Make(KnnScanSharedData *knn_scan_shared_da
         case EmbeddingDataType::kElemBit:
             return InitMergeKnn<u8, f32>(knn_scan_shared_data);
         default: {
-            Status status = Status::NotSupport(fmt::format("Query EmbeddingDataType: {} is not support.",
-                                                           EmbeddingType::EmbeddingDataType2String(knn_scan_shared_data->query_elem_type_)));
-            RecoverableError(status);
+            RecoverableError(Status::NotSupport(fmt::format("Query EmbeddingDataType: {} is not support.",
+                                                           EmbeddingType::EmbeddingDataType2String(knn_scan_shared_data->query_elem_type_))));
             return nullptr;
         }
     }

@@ -15,9 +15,11 @@
 module;
 
 export module infinity_core:emvb_index;
+
 import :stl;
 import :emvb_shared_vec;
 import :roaring_bitmap;
+
 import column_def;
 import row_id;
 

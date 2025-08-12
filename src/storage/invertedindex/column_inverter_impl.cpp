@@ -17,14 +17,10 @@ module;
 #include <arpa/inet.h>
 #include <cassert>
 #include <cstdio>
-#include <cstring>
-#include <iostream>
-#include <vector>
 
 module infinity_core:column_inverter.impl;
 
 import :column_inverter;
-
 import :stl;
 import :analyzer;
 import :analyzer_pool;
@@ -35,11 +31,13 @@ import :index_defines;
 import :posting_writer;
 import :vector_with_lock;
 import :infinity_exception;
-import third_party;
 import :status;
 import :logger;
 import :buf_writer;
 import :profiler;
+
+import std;
+import std.compat;
 import third_party;
 
 namespace infinity {

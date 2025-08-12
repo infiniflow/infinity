@@ -14,18 +14,12 @@
 
 module;
 
-#include <functional>
-#include <memory>
-#include <print>
-
 module infinity_core:new_txn_manager.impl;
 
 import :new_txn_manager;
-
 import :new_txn;
 import :txn_state;
 import :stl;
-import third_party;
 import :wal_entry;
 import :infinity_exception;
 import :logger;
@@ -34,7 +28,6 @@ import :default_values;
 import :wal_manager;
 import :defer_op;
 import :infinity_context;
-import global_resource_usage;
 import :bg_task;
 import :kv_store;
 import :new_catalog;
@@ -43,6 +36,11 @@ import :txn_allocator_task;
 import :storage;
 import :catalog_cache;
 import :base_txn_store;
+
+import std;
+import third_party;
+
+import global_resource_usage;
 
 namespace infinity {
 
@@ -624,12 +622,9 @@ void NewTxnManager::CleanupTxnBottomNolock(TransactionID txn_id, TxnTimeStamp be
 }
 
 void NewTxnManager::PrintAllKeyValue() const {
-    // std::cout << String("All store key and value: ") << std::endl;
-    std::println("All store key and value: ");
-    // std::cout << kv_store_->ToString() << std::endl;
-    std::println("{}", kv_store_->ToString());
-    // std::cout << String(" -------------- ") << std::endl;
-    std::println(" -------------- ");
+    fmt::print("All store key and value:\n");
+    fmt::print("{}\n", kv_store_->ToString());
+    fmt::print(" --------------\n");
 }
 
 void NewTxnManager::PrintPMKeyValue() const {

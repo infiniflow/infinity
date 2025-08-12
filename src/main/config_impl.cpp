@@ -804,9 +804,7 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig *default
 
                 if (global_options_.GetOptionByIndex(GlobalOptionIndex::kVersion) == nullptr) {
                     // Version
-                    String error_message = "Missing version field";
-                    fmt::print("Fatal: {}", error_message);
-                    UnrecoverableError(error_message);
+                    UnrecoverableError("Fatal: Missing version field");
                 }
 
                 if (global_options_.GetOptionByIndex(GlobalOptionIndex::kServerMode) == nullptr) {
@@ -821,16 +819,12 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig *default
 
                 if (global_options_.GetOptionByIndex(GlobalOptionIndex::kTimeZone) == nullptr) {
                     // Time zone
-                    String error_message = "Missing time zone field";
-                    fmt::print("Fatal: {}", error_message);
-                    UnrecoverableError(error_message);
+                    UnrecoverableError("Fatal: Missing time zone field");
                 }
 
                 if (global_options_.GetOptionByIndex(GlobalOptionIndex::kTimeZoneBias) == nullptr) {
                     // Time zone bias
-                    String error_message = "Missing time zone field";
-                    fmt::print("Fatal: {}", error_message);
-                    UnrecoverableError(error_message);
+                    UnrecoverableError("Fatal: Missing time zone field");
                 }
 
                 if (global_options_.GetOptionByIndex(GlobalOptionIndex::kWorkerCPULimit) == nullptr) {
@@ -2518,10 +2512,9 @@ void Config::SetRecordRunningQuery(bool flag) {
     std::lock_guard<std::mutex> guard(mutex_);
     BaseOption *base_option = global_options_.GetOptionByIndex(GlobalOptionIndex::kRecordRunningQuery);
     if (base_option->data_type_ != BaseOptionDataType::kBoolean) {
-        String error_message = "Attempt to fetch bool value from record running query data type option";
-        UnrecoverableError(error_message);
+        UnrecoverableError("Attempt to fetch bool value from record running query data type option");
     }
-    BooleanOption *record_running_query_option = static_cast<BooleanOption *>(base_option);
+    auto *record_running_query_option = static_cast<BooleanOption *>(base_option);
     record_running_query_option->value_ = flag;
     record_running_query_ = flag;
 }
@@ -2613,8 +2606,7 @@ void Config::SetLogToStdout(bool log_to_stdout) {
     std::lock_guard<std::mutex> guard(mutex_);
     BaseOption *base_option = global_options_.GetOptionByIndex(GlobalOptionIndex::kLogToStdout);
     if (base_option->data_type_ != BaseOptionDataType::kBoolean) {
-        String error_message = "Attempt to set bool value to log to stdout data type option";
-        UnrecoverableError(error_message);
+        UnrecoverableError("Attempt to set bool value to log to stdout data type option");
     }
     BooleanOption *log_to_stdout_option = static_cast<BooleanOption *>(base_option);
     log_to_stdout_option->value_ = log_to_stdout;
@@ -2639,22 +2631,19 @@ void Config::SetLogLevel(LogLevel level) {
     std::lock_guard<std::mutex> guard(mutex_);
     BaseOption *base_option = global_options_.GetOptionByIndex(GlobalOptionIndex::kLogLevel);
     if (base_option->data_type_ != BaseOptionDataType::kLogLevel) {
-        String error_message = "Attempt to fetch log level value from log level data type option";
-        UnrecoverableError(error_message);
+        UnrecoverableError("Attempt to fetch log level value from log level data type option");
     }
-    LogLevelOption *log_level_option = static_cast<LogLevelOption *>(base_option);
+    auto *log_level_option = static_cast<LogLevelOption *>(base_option);
     log_level_option->value_ = level;
-    return;
 }
 
 LogLevel Config::GetLogLevel() {
     std::lock_guard<std::mutex> guard(mutex_);
     BaseOption *base_option = global_options_.GetOptionByIndex(GlobalOptionIndex::kLogLevel);
     if (base_option->data_type_ != BaseOptionDataType::kLogLevel) {
-        String error_message = "Attempt to fetch log level value from log level data type option";
-        UnrecoverableError(error_message);
+        UnrecoverableError("Attempt to fetch log level value from log level data type option");
     }
-    LogLevelOption *log_level_option = static_cast<LogLevelOption *>(base_option);
+    auto *log_level_option = static_cast<LogLevelOption *>(base_option);
     return log_level_option->value_;
 }
 
@@ -2683,12 +2672,10 @@ void Config::SetCleanupInterval(i64 interval) {
     std::lock_guard<std::mutex> guard(mutex_);
     BaseOption *base_option = global_options_.GetOptionByIndex(GlobalOptionIndex::kCleanupInterval);
     if (base_option->data_type_ != BaseOptionDataType::kInteger) {
-        String error_message = "Attempt to set non-integer value to cleanup interval";
-        UnrecoverableError(error_message);
+        UnrecoverableError("Attempt to set non-integer value to cleanup interval");
     }
-    IntegerOption *cleanup_interval_option = static_cast<IntegerOption *>(base_option);
+    auto *cleanup_interval_option = static_cast<IntegerOption *>(base_option);
     cleanup_interval_option->value_ = interval;
-    return;
 }
 
 i64 Config::CompactInterval() {
@@ -2700,12 +2687,10 @@ void Config::SetCompactInterval(i64 interval) {
     std::lock_guard<std::mutex> guard(mutex_);
     BaseOption *base_option = global_options_.GetOptionByIndex(GlobalOptionIndex::kCompactInterval);
     if (base_option->data_type_ != BaseOptionDataType::kInteger) {
-        String error_message = "Attempt to set non-integer value to compact segment interval";
-        UnrecoverableError(error_message);
+        UnrecoverableError("Attempt to set non-integer value to compact segment interval");
     }
-    IntegerOption *compact_interval_option = static_cast<IntegerOption *>(base_option);
+    auto *compact_interval_option = static_cast<IntegerOption *>(base_option);
     compact_interval_option->value_ = interval;
-    return;
 }
 
 i64 Config::OptimizeIndexInterval() {
@@ -2717,12 +2702,10 @@ void Config::SetOptimizeInterval(i64 interval) {
     std::lock_guard<std::mutex> guard(mutex_);
     BaseOption *base_option = global_options_.GetOptionByIndex(GlobalOptionIndex::kOptimizeIndexInterval);
     if (base_option->data_type_ != BaseOptionDataType::kInteger) {
-        String error_message = "Attempt to set non-integer value to optimize interval";
-        UnrecoverableError(error_message);
+        UnrecoverableError("Attempt to set non-integer value to optimize interval");
     }
-    IntegerOption *optimize_interval_option = static_cast<IntegerOption *>(base_option);
+    auto *optimize_interval_option = static_cast<IntegerOption *>(base_option);
     optimize_interval_option->value_ = interval;
-    return;
 }
 
 String Config::SnapshotDir() {
@@ -2838,10 +2821,9 @@ void Config::SetCacheResult(const String &mode) {
     std::lock_guard<std::mutex> guard(mutex_);
     BaseOption *base_option = global_options_.GetOptionByIndex(GlobalOptionIndex::kResultCache);
     if (base_option->data_type_ != BaseOptionDataType::kString) {
-        String error_message = "Attempt to set string value to result cache mode data type option";
-        UnrecoverableError(error_message);
+        UnrecoverableError("Attempt to set string value to result cache mode data type option");
     }
-    StringOption *result_cache_option = static_cast<StringOption *>(base_option);
+    auto *result_cache_option = static_cast<StringOption *>(base_option);
     result_cache_option->value_ = mode;
 }
 
@@ -2865,22 +2847,19 @@ void Config::SetFullCheckpointInterval(i64 interval) {
     std::lock_guard<std::mutex> guard(mutex_);
     BaseOption *base_option = global_options_.GetOptionByIndex(GlobalOptionIndex::kCheckpointInterval);
     if (base_option->data_type_ != BaseOptionDataType::kInteger) {
-        String error_message = "Attempt to set non-integer value to checkpoint interval";
-        UnrecoverableError(error_message);
+        UnrecoverableError("Attempt to set non-integer value to checkpoint interval");
     }
-    IntegerOption *checkpoint_interval_option = static_cast<IntegerOption *>(base_option);
+    auto *checkpoint_interval_option = static_cast<IntegerOption *>(base_option);
     checkpoint_interval_option->value_ = interval;
-    return;
 }
 
 FlushOptionType Config::FlushMethodAtCommit() {
     std::lock_guard<std::mutex> guard(mutex_);
     BaseOption *base_option = global_options_.GetOptionByIndex(GlobalOptionIndex::kFlushMethodAtCommit);
     if (base_option->data_type_ != BaseOptionDataType::kFlush) {
-        String error_message = "Attempt to fetch flush option value from flush option data type option";
-        UnrecoverableError(error_message);
+        UnrecoverableError("Attempt to fetch flush option value from flush option data type option");
     }
-    FlushOption *flush_option = static_cast<FlushOption *>(base_option);
+    auto *flush_option = static_cast<FlushOption *>(base_option);
     return flush_option->value_;
 }
 
@@ -2896,24 +2875,20 @@ void Config::SetTimeZone(const String &value) {
     std::lock_guard<std::mutex> guard(mutex_);
     BaseOption *base_option = global_options_.GetOptionByIndex(GlobalOptionIndex::kTimeZone);
     if (base_option->data_type_ != BaseOptionDataType::kString) {
-        String error_message = "Attempt to set a non-string value to the time zone";
-        UnrecoverableError(error_message);
+        UnrecoverableError("Attempt to set a non-string value to the time zone");
     }
-    StringOption *time_zone_option = static_cast<StringOption *>(base_option);
+    auto *time_zone_option = static_cast<StringOption *>(base_option);
     time_zone_option->value_ = value;
-    return;
 }
 
 void Config::SetTimeZoneBias(i64 bias) {
     std::lock_guard<std::mutex> guard(mutex_);
     BaseOption *base_option = global_options_.GetOptionByIndex(GlobalOptionIndex::kTimeZoneBias);
     if (base_option->data_type_ != BaseOptionDataType::kInteger) {
-        String error_message = "Attempt to set non-integer value to the time zone bias";
-        UnrecoverableError(error_message);
+        UnrecoverableError("Attempt to set non-integer value to the time zone bias");
     }
-    IntegerOption *time_zone_bias_option = static_cast<IntegerOption *>(base_option);
+    auto *time_zone_bias_option = static_cast<IntegerOption *>(base_option);
     time_zone_bias_option->value_ = bias;
-    return;
 }
 
 //// Profiler

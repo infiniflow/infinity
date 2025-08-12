@@ -4,8 +4,8 @@ export module infinity_core:s3_client_minio;
 
 import :stl;
 import :s3_client;
-import third_party;
 
+import third_party;
 import global_resource_usage;
 
 namespace infinity {

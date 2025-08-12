@@ -14,28 +14,20 @@
 
 module;
 
-#include <filesystem>
-#include <print>
-#include <string>
-
 module infinity_core:new_catalog.impl;
+
+import std;
 
 import :new_catalog;
 import :stl;
-import third_party;
 import :new_txn;
 import :status;
-import extra_ddl_info;
 import :kv_store;
-import third_party;
 import :logger;
 import :infinity_exception;
 import :default_values;
 import :mem_index;
 import :column_index_reader;
-import data_type;
-import parsed_expr;
-import constant_expr;
 import :meta_key;
 import :db_meeta;
 import :table_def;
@@ -52,8 +44,6 @@ import :index_bmp;
 import :index_emvb;
 import :kv_code;
 import :config;
-import create_index_info;
-import statement_common;
 import :virtual_store;
 import :logger;
 import :utility;
@@ -64,7 +54,17 @@ import :persistence_manager;
 import :meta_key;
 import :catalog_cache;
 import :meta_type;
+
+import third_party;
+
 import column_def;
+import create_index_info;
+import statement_common;
+import data_type;
+import parsed_expr;
+import constant_expr;
+import extra_ddl_info;
+import third_party;
 
 namespace infinity {
 

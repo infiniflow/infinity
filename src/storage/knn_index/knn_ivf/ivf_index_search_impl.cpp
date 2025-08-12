@@ -14,24 +14,25 @@
 
 module;
 
-#include <string>
 module infinity_core:ivf_index_search.impl;
 
 import :ivf_index_search;
-
 import :stl;
 import :index_ivf;
+import :knn_scan_data;
+import :infinity_exception;
+import :status;
+import :ivf_index_data;
+import :ivf_index_data_in_mem;
+import :ivf_index_storage;
+
+import std;
+import third_party;
+
 import internal_types;
 import logical_type;
 import data_type;
 import knn_expr;
-import :knn_scan_data;
-import :infinity_exception;
-import :status;
-import third_party;
-import :ivf_index_data;
-import :ivf_index_data_in_mem;
-import :ivf_index_storage;
 
 namespace infinity {
 

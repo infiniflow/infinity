@@ -23,11 +23,14 @@ import :analyzer;
 import :column_vector;
 import :term;
 import :string_ref;
-import internal_types;
 import :posting_writer;
 import :vector_with_lock;
 import :buf_writer;
 import :mem_usage_change;
+
+// import std.compat;
+
+import internal_types;
 
 namespace infinity {
 

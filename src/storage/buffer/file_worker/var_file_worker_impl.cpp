@@ -14,8 +14,6 @@
 
 module;
 
-// #include <tuple>
-
 module infinity_core:var_file_worker.impl;
 
 import std;

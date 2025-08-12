@@ -15,6 +15,7 @@
 module;
 
 export module infinity_core:emvb_search;
+
 import :stl;
 import :emvb_shared_vec;
 import :simd_init;

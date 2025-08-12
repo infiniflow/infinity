@@ -21,10 +21,10 @@ import :knn_result_handler;
 import :roaring_bitmap;
 import :deprecated_knn_distance;
 import :logger;
-
 import :infinity_exception;
 import :default_values;
 import :vector_distance;
+
 import knn_expr;
 import internal_types;
 

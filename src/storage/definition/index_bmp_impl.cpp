@@ -14,9 +14,6 @@
 
 module;
 
-#include <sstream>
-#include <vector>
-
 module infinity_core:index_bmp.impl;
 
 import :index_bmp;
@@ -24,12 +21,15 @@ import :status;
 import :logger;
 import :infinity_exception;
 import :default_values;
-import logical_type;
+import :index_bmp;
+
+import std;
+
+import statement_common;
 import serialize;
 import sparse_info;
 import internal_types;
-import :index_bmp;
-import statement_common;
+import logical_type;
 
 namespace infinity {
 

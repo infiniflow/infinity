@@ -1,15 +1,14 @@
 module;
 
-#include <string>
-
 module infinity_core:s3_client_minio.impl;
 
 import :s3_client_minio;
-
 import :stl;
 import :infinity_exception;
-import third_party;
 import :logger;
+
+import std;
+import third_party;
 
 namespace infinity {
 

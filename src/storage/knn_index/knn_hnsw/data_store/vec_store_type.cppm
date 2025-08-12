@@ -26,6 +26,7 @@ import :dist_func_ip;
 import :dist_func_sparse_ip;
 import :sparse_util;
 import :dist_func_lsg_wrapper;
+
 import data_type;
 
 namespace infinity {

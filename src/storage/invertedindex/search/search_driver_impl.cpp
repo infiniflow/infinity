@@ -15,9 +15,6 @@
 module;
 
 #include <cassert>
-#include <iostream>
-#include <sstream>
-#include <utility>
 
 #define SearchScannerSuffix InfinitySyntax
 #include "search_scanner_derived_helper.h"
@@ -31,10 +28,12 @@ import :term;
 import :infinity_exception;
 import :status;
 import :logger;
-import third_party;
 import :analyzer;
 import :analyzer_pool;
 import :query_node;
+
+import std;
+import third_party;
 
 import search_scanner;
 

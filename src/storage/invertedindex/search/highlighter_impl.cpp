@@ -14,20 +14,18 @@
 
 module;
 
-#include <cstddef>
-#include <iostream>
-#include <vector>
-
 #include "common/analyzer/string_utils.h"
 
 module infinity_core:highlighter.impl;
 
 import :highlighter;
-
 import :stl;
 import :aho_corasick;
 import :analyzer;
 import :term;
+
+import std;
+import std.compat;
 
 namespace infinity {
 

@@ -14,14 +14,13 @@
 
 module;
 
-#include <limits>
-#include <utility>
-
 export module infinity_core:hnsw_common;
 
 import :stl;
 import :infinity_exception;
 import :sparse_util;
+
+import std;
 
 namespace infinity {
 

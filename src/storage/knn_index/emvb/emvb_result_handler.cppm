@@ -15,6 +15,7 @@
 module;
 
 export module infinity_core:emvb_result_handler;
+
 import :stl;
 import :infinity_exception;
 

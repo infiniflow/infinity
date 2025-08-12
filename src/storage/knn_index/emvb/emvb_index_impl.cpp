@@ -14,11 +14,6 @@
 
 module;
 
-#include <algorithm>
-#include <chrono>
-#include <cmath>
-#include <iostream>
-#include <random>
 module infinity_core:emvb_index.impl;
 
 import :emvb_index;
@@ -31,20 +26,23 @@ import :kmeans_partition;
 import :index_base;
 import :status;
 import :logger;
-import third_party;
 import :infinity_exception;
-import internal_types;
 import :column_vector;
-import column_def;
 import :buffer_manager;
 import :default_values;
 import :block_index;
-
 import :new_catalog;
 import :segment_meta;
 import :block_meta;
 import :column_meta;
 import :kv_store;
+
+import std;
+import std.compat;
+import third_party;
+
+import column_def;
+import internal_types;
 
 namespace infinity {
 

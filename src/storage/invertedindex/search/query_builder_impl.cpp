@@ -14,27 +14,25 @@
 
 module;
 
-#include <iostream>
-#include <vector>
-#include <memory>
-
 module infinity_core:query_builder.impl;
 
 import :query_builder;
-
 import :stl;
 import :doc_iterator;
 import :column_index_reader;
-import internal_types;
 import :index_base;
 import :infinity_exception;
 import :query_node;
 import :base_table_ref;
 import :term_doc_iterator;
 import :logger;
-import third_party;
 import :parse_fulltext_options;
 import :query_node;
+
+import std;
+import third_party;
+
+import internal_types;
 
 namespace infinity {
 

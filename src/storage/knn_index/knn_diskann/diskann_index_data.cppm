@@ -15,8 +15,6 @@
 module;
 
 #include <cassert>
-#include <set>
-#include <string.h>
 
 export module infinity_core:diskann_index_data;
 
@@ -26,7 +24,6 @@ import :search_top_1;
 import :kmeans_partition;
 import :infinity_exception;
 import :logger;
-import third_party;
 import :status;
 import :default_values;
 import :diskann_partition_and_pq;
@@ -34,6 +31,10 @@ import :vamana_alg;
 import :diskann_dist_func;
 import :local_file_handle;
 import :virtual_store;
+
+import std;
+import std.compat;
+import third_party;
 
 namespace infinity {
 export template <typename VectorDataType, typename LabelType, MetricType metric>

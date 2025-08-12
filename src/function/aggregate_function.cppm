@@ -50,8 +50,7 @@ public:
         switch (input_column_vector->vector_type()) {
             case ColumnVectorType::kCompactBit: {
                 if constexpr (!std::is_same_v<InputType, BooleanT>) {
-                    String error_message = "kCompactBit column vector only support Boolean type";
-                    UnrecoverableError(error_message);
+                    UnrecoverableError("kCompactBit column vector only support Boolean type");
                 } else {
                     // only for count, min, max
                     SizeT row_count = input_column_vector->Size();
@@ -75,8 +74,7 @@ public:
             case ColumnVectorType::kConstant: {
                 if (input_column_vector->data_type()->type() == LogicalType::kBoolean) {
                     if constexpr (!std::is_same_v<InputType, BooleanT>) {
-                        String error_message = "types do not match";
-                        UnrecoverableError(error_message);
+                        UnrecoverableError("types do not match");
                     } else {
                         BooleanT value = input_column_vector->buffer_->GetCompactBit(0);
                         ((AggregateState *)state)->Update(&value, 0);
@@ -88,12 +86,10 @@ public:
                 break;
             }
             case ColumnVectorType::kHeterogeneous: {
-                String error_message = "Not implement: Heterogeneous type";
-                UnrecoverableError(error_message);
+                UnrecoverableError("Not implement: Heterogeneous type");
             }
             default: {
-                String error_message = "Not implement: Other type";
-                UnrecoverableError(error_message);
+                UnrecoverableError("Not implement: Other type");
             }
         }
     }

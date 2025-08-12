@@ -14,14 +14,7 @@
 
 module;
 
-#include <algorithm>
-#include <array>
-#include <bitset>
 #include <cassert>
-#include <cstdlib>
-#include <map>
-#include <vector>
-#include <memory>
 
 module infinity_core:emvb_search.impl;
 
@@ -37,6 +30,9 @@ import :infinity_exception;
 import :roaring_bitmap;
 import :block_index;
 import :knn_filter;
+
+import std;
+import std.compat;
 
 namespace infinity {
 

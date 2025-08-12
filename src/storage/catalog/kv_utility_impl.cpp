@@ -14,20 +14,17 @@
 
 module;
 
-#include <tuple>
-#include <vector>
-
 module infinity_core:kv_utility.impl;
+
+import std;
+import std.compat;
 
 import :kv_utility;
 import :stl;
 import :kv_code;
 import :kv_store;
-// import :status;
 import :index_base;
-import third_party;
 import :utility;
-// import :rocksdb_merge_operator;
 import :logger;
 import :new_catalog;
 import :infinity_context;
@@ -37,6 +34,8 @@ import :block_version;
 import :buffer_manager;
 import :infinity_exception;
 import :config;
+
+import third_party;
 
 namespace infinity {
 

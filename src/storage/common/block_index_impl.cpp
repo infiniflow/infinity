@@ -14,15 +14,12 @@
 
 module;
 
-#include <vector>
-
 module infinity_core:block_index.impl;
 
 import :block_index;
 import :stl;
 import :global_block_id;
 import :default_values;
-
 import :status;
 import :infinity_exception;
 import :new_txn;
@@ -31,9 +28,10 @@ import :table_meeta;
 import :segment_meta;
 import :block_meta;
 import :kv_store;
-
 import :table_index_meeta;
 import :segment_index_meta;
+
+import std;
 
 namespace infinity {
 

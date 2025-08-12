@@ -15,26 +15,24 @@
 module;
 
 #include <cassert>
-#include <cstdio>
-#include <cstring>
 #include <fcntl.h>
-#include <filesystem>
-#include <functional>
-#include <queue>
-#include <sys/mman.h>
-#include <sched.h>
 #include <pthread.h>
+#include <sched.h>
+#include <sys/mman.h>
 
 module infinity_core:external_sort_merger.impl;
 
 import :external_sort_merger;
 
 import :stl;
-import third_party;
 import :file_writer;
 import :profiler;
 import :logger;
 import :blocking_queue;
+
+import std;
+import std.compat;
+import third_party;
 
 namespace infinity {
 

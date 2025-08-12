@@ -14,8 +14,6 @@
 
 module;
 
-// #include <string>
-
 module infinity_core:segment_meta.impl;
 
 import std;

@@ -5,7 +5,6 @@ module;
 export module infinity_core:posting_iterator;
 
 import :stl;
-
 import :byte_slice_reader;
 import :posting_list_format;
 import :term_meta;
@@ -14,8 +13,10 @@ import :in_doc_pos_state;
 import :multi_posting_decoder;
 import :segment_posting;
 import :index_defines;
-import internal_types;
+
 import third_party;
+
+import internal_types;
 
 namespace infinity {
 export class PostingIterator {

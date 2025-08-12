@@ -18,8 +18,10 @@ export module infinity_core:index_ivf;
 
 import :stl;
 import :index_base;
-import third_party;
 import :base_table_ref;
+
+import third_party;
+
 import statement_common;
 import internal_types;
 

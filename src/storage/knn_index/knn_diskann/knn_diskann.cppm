@@ -24,11 +24,12 @@ import :kmeans_partition;
 import :search_top_1;
 import :search_top_k;
 import :knn_result_handler;
-import knn_expr;
-import internal_types;
 import :logger;
 import :diskann_index_data;
 import :diskann_dist_func;
+
+import knn_expr;
+import internal_types;
 
 namespace infinity {
 export template <typename Compare, MetricType metric, KnnDistanceAlgoType algo>

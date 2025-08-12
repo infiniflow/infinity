@@ -14,7 +14,6 @@
 
 module;
 
-#include <concepts>
 #include <type_traits>
 
 export module infinity_core:unary_operator;
@@ -24,6 +23,9 @@ import :column_vector;
 import :logger;
 import :infinity_exception;
 import :roaring_bitmap;
+
+// import std;
+
 import internal_types;
 
 namespace infinity {

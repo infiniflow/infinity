@@ -1,13 +1,13 @@
 module;
 
-#include <cstddef>
-#include <vector>
-
 module infinity_core:aho_corasick.impl;
 
 import :aho_corasick;
 import :stl;
 import :darts;
+
+import std;
+import std.compat;
 
 namespace infinity {
 

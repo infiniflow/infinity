@@ -14,16 +14,10 @@
 
 module;
 
-#include <ranges>
-#include <string>
-#include <vector>
-
 module infinity_core:new_txn_store.impl;
 
 import :new_txn_store;
 import :stl;
-import third_party;
-
 import :status;
 import :infinity_exception;
 import :data_block;
@@ -31,12 +25,16 @@ import :logger;
 import :data_access_state;
 import :new_txn;
 import :default_values;
-import internal_types;
-import data_type;
-import compact_statement;
 import :persistence_manager;
 import :infinity_context;
 import :kv_store;
+
+import std;
+import third_party;
+
+import internal_types;
+import data_type;
+import compact_statement;
 
 namespace infinity {
 
@@ -72,8 +70,7 @@ void NewTxnTableStore1::GetAccessState(const Vector<RowID> &row_ids, AccessState
         auto &block_vec = seg_map[block_id];
         block_vec.emplace_back(block_offset);
         if (block_vec.size() > DEFAULT_BLOCK_CAPACITY) {
-            String error_message = "Delete row exceed block capacity";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Delete row exceed block capacity");
         }
     }
 }

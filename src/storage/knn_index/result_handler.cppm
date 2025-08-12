@@ -19,9 +19,9 @@ module;
 export module infinity_core:knn_result_handler;
 
 import :stl;
-
 import :infinity_exception;
 import :roaring_bitmap;
+
 import internal_types;
 
 namespace infinity {

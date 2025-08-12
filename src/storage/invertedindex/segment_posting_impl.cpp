@@ -17,7 +17,6 @@ module;
 module infinity_core:segment_posting.impl;
 
 import :segment_posting;
-
 import :stl;
 import :byte_slice;
 import :posting_list_format;
@@ -25,9 +24,11 @@ import :posting_writer;
 import :term_meta;
 import :byte_slice_reader;
 import :index_defines;
-import internal_types;
 import :file_reader;
+
 import third_party;
+
+import internal_types;
 
 namespace infinity {
 void SegmentPosting::Init(SharedPtr<ByteSliceList> slice_list, RowID base_row_id, u64 doc_count, TermMeta &term_meta) {

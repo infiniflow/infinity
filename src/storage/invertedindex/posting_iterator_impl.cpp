@@ -2,13 +2,10 @@ module;
 
 #include "common/utility/builtin.h"
 #include <cassert>
-#include <cstdlib>
-#include <vector>
 
 module infinity_core:posting_iterator.impl;
 
 import :posting_iterator;
-
 import :stl;
 import :byte_slice_reader;
 import :posting_list_format;
@@ -18,6 +15,10 @@ import :multi_posting_decoder;
 import :segment_posting;
 import :in_doc_pos_state;
 import :index_defines;
+
+import std;
+import std.compat;
+
 import internal_types;
 
 namespace infinity {

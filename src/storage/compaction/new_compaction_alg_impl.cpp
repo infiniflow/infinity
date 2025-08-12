@@ -14,14 +14,14 @@
 
 module;
 
-#include <cmath>
-#include <vector>
-
 module infinity_core:new_compaction_alg.impl;
 
 import :new_compaction_alg;
 import :default_values;
 import :infinity_exception;
+
+import std;
+import std.compat;
 
 namespace infinity {
 

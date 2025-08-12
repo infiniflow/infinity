@@ -3,7 +3,6 @@ module;
 module infinity_core:in_doc_pos_state.impl;
 
 import :in_doc_pos_state;
-
 import :stl;
 import :position_list_format_option;
 import :index_defines;

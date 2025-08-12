@@ -24,7 +24,6 @@ module;
 #include <iostream>
 #include <openccxx.h>
 #include <pcre2.h>
-// #include <re2/re2.h>
 #include <sstream>
 #include "spdlog/fmt/fmt.h"
 

@@ -14,16 +14,16 @@
 
 module;
 
-#include <vector>
-#include <ranges>
-
 export module infinity_core:base_txn_store;
 
 import :stl;
-import internal_types;
 import :txn_state;
-import column_def;
 import :wal_entry;
+
+import std;
+
+import column_def;
+import internal_types;
 
 namespace infinity {
 

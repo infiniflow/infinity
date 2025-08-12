@@ -17,12 +17,13 @@ module;
 export module infinity_core:meta_info;
 
 import :stl;
-import column_def;
 import :default_values;
-import data_type;
-import create_index_info;
+
 import third_party;
 
+import data_type;
+import create_index_info;
+import column_def;
 
 namespace infinity {
 

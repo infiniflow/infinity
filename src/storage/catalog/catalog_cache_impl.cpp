@@ -14,9 +14,6 @@
 
 module;
 
-// #include <memory>
-// #include <vector>
-
 module infinity_core:catalog_cache.impl;
 
 import std;

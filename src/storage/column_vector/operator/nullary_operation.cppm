@@ -14,13 +14,11 @@
 
 module;
 
-#include <concepts>
-#include <type_traits>
-
 export module infinity_core:nullary_operation;
 
 import :stl;
 import :column_vector;
+
 import internal_types;
 
 namespace infinity {

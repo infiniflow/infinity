@@ -17,12 +17,11 @@ module;
 export module infinity_core:obj_status;
 
 import :stl;
-import third_party;
 import :status;
 
-namespace infinity {
+import third_party;
 
-// class Status;
+namespace infinity {
 
 export struct Range {
     SizeT start_{}; // inclusive

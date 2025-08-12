@@ -16,9 +16,9 @@ module;
 
 export module infinity_core:mem_index;
 
-import row_id;
-
 import :stl;
+
+import row_id;
 
 namespace infinity {
 

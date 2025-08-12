@@ -13,7 +13,9 @@
 // limitations under the License.
 
 module;
+
 #include "inc/mlas.h"
+
 module infinity_core:mlas_matrix_multiply.impl;
 
 import :mlas_matrix_multiply;

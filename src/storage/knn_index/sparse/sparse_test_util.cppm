@@ -15,8 +15,6 @@
 module;
 
 #include <cassert>
-#include <cstdlib>
-#include <iostream>
 
 export module infinity_core:sparse_test_util;
 
@@ -25,6 +23,9 @@ import :sparse_vector_distance;
 import :linscan_alg;
 import :sparse_util;
 import :infinity_exception;
+
+import std;
+import std.compat;
 
 namespace infinity {
 

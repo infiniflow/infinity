@@ -14,16 +14,10 @@
 
 module;
 
-#include <vector>
-
 module infinity_core:emvb_index_in_mem.impl;
 
 import :emvb_index_in_mem;
-
 import :stl;
-import logical_type;
-import internal_types;
-import column_def;
 import :roaring_bitmap;
 import :default_values;
 import :buffer_manager;
@@ -34,19 +28,24 @@ import :index_emvb;
 import :buffer_handle;
 import :index_base;
 import :logger;
-import logical_type;
-import type_info;
-import embedding_info;
 import :emvb_product_quantization;
 import :column_vector;
 import :block_index;
-
 import :table_meeta;
 import :segment_meta;
 import :new_txn;
 import :buffer_obj;
 import :kv_store;
 import :chunk_index_meta;
+
+import std;
+
+import logical_type;
+import internal_types;
+import column_def;
+import logical_type;
+import type_info;
+import embedding_info;
 
 namespace infinity {
 

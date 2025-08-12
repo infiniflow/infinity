@@ -8,7 +8,6 @@ import :memory_chunk;
 import :default_values;
 import :file_writer;
 import :file_reader;
-
 import :infinity_exception;
 
 namespace infinity {

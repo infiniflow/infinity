@@ -48,8 +48,7 @@ void PeerServerThriftService::Register(infinity_peer_server::RegisterResponse &r
                 break;
             }
             default: {
-                String error_message = fmt::format("Invalid node type: {}", infinity_peer_server::to_string(request.node_type));
-                UnrecoverableError(error_message);
+                UnrecoverableError(fmt::format("Invalid node type: {}", infinity_peer_server::to_string(request.node_type)));
             }
         }
         auto now = std::chrono::system_clock::now();
@@ -118,8 +117,7 @@ void PeerServerThriftService::HeartBeat(infinity_peer_server::HeartBeatResponse 
                 break;
             }
             default: {
-                String error_message = "Invalid node type";
-                UnrecoverableError(error_message);
+                UnrecoverableError("Invalid node type");
             }
         }
 

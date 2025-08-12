@@ -14,17 +14,16 @@
 
 module;
 
-#include <set>
-
 module infinity_core:file_writer.impl;
 
 import :file_writer;
-
 import :stl;
 import :virtual_store;
 import :local_file_handle;
 import :infinity_exception;
 import :logger;
+
+import std;
 
 namespace infinity {
 

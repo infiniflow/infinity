@@ -13,6 +13,7 @@
 // limitations under the License.
 
 export module infinity_core:database_detail;
+
 import :stl;
 
 namespace infinity {

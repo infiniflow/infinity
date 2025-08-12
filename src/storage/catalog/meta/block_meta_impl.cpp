@@ -14,9 +14,6 @@
 
 module;
 
-// #include <memory>
-// #include <string>
-
 module infinity_core:block_meta.impl;
 
 import std;

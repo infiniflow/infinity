@@ -28,12 +28,6 @@ module;
 #include <thrift/transport/TSocket.h>
 #include <thrift/transport/TTransportUtils.h>
 
-// #include "infinity_thrift/InfinityService.h"
-// #include "infinity_thrift/infinity_types.h"
-// #include "statement/explain_statement.h"
-// #include "statement/extra/extra_ddl_info.h"
-// #include "statement/statement_common.h"
-
 module infinity_core:thrift_server.impl;
 
 import :thrift_server;

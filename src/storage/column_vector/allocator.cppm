@@ -11,11 +11,13 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+
 module;
 
 export module infinity_core:allocator;
 
 import :stl;
+
 import global_resource_usage;
 
 namespace infinity {

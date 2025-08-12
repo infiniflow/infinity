@@ -17,6 +17,7 @@ module;
 export module infinity_core:view;
 
 import :stl;
+
 import select_statement;
 import create_view_info;
 import data_type;

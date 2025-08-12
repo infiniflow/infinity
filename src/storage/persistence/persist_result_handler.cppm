@@ -18,6 +18,7 @@ export module infinity_core:persist_result_handler;
 
 import :stl;
 import :persistence_manager;
+
 import global_resource_usage;
 
 namespace infinity {

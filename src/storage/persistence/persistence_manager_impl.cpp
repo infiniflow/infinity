@@ -14,25 +14,28 @@
 
 module;
 
-#include <string.h>
 #include <cassert>
-#include <filesystem>
+#include <cerrno>
 
 module infinity_core:persistence_manager.impl;
 
 import :persistence_manager;
 import :stl;
 import :uuid;
-import serialize;
-import third_party;
 import :infinity_exception;
 import :virtual_store;
 import :logger;
-import global_resource_usage;
 import :obj_stat_accessor;
 import :kv_store;
 import :kv_code;
 import :infinity_context;
+
+import std;
+import std.compat;
+import third_party;
+
+import serialize;
+import global_resource_usage;
 
 namespace fs = std::filesystem;
 
@@ -113,8 +116,7 @@ PersistWriteResult PersistenceManager::Persist(const String &file_path, const St
 
     String local_path = RemovePrefix(file_path);
     if (local_path.empty()) {
-        String error_message = fmt::format("Failed to find local path of {}", local_path);
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("Failed to find local path of {}", local_path));
     }
     String pm_fp_key = KeyEncode::PMObjectKey(local_path);
     String pm_fp_value;
@@ -140,8 +142,7 @@ PersistWriteResult PersistenceManager::Persist(const String &file_path, const St
         ObjAddr obj_addr(ObjAddr::KeyEmpty, 0, 0);
         fs::remove(tmp_file_path, ec); // This may cause the issue
         if (ec) {
-            String error_message = fmt::format("Failed to remove {}", tmp_file_path);
-            UnrecoverableError(error_message);
+            UnrecoverableError(fmt::format("Failed to remove {}", tmp_file_path));
         }
         status = kv_store_->Put(pm_fp_key, obj_addr.Serialize().dump());
         if (!status.ok()) {
@@ -188,8 +189,7 @@ PersistWriteResult PersistenceManager::Persist(const String &file_path, const St
     CurrentObjAppendNoLock(tmp_file_path, src_size);
     fs::remove(tmp_file_path, ec);
     if (ec) {
-        String error_message = fmt::format("Failed to remove {}", tmp_file_path);
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("Failed to remove {}", tmp_file_path));
     }
 
     status = kv_store_->Put(pm_fp_key, obj_addr.Serialize().dump());
@@ -239,8 +239,7 @@ void PersistenceManager::CheckValid() {
         }
         Optional<ObjStat> obj_stat = objects_->GetNoCount(obj_addr.obj_key_);
         if (!obj_stat.has_value()) {
-            String error_message = fmt::format("CheckValid Failed to find object for local path {}", local_path);
-            LOG_ERROR(error_message);
+            LOG_ERROR(fmt::format("CheckValid Failed to find object for local path {}", local_path));
         }
     }
     const auto part2_begin = std::chrono::high_resolution_clock::now();
@@ -268,8 +267,7 @@ void PersistenceManager::CurrentObjFinalizeNoLock(Vector<String> &persist_keys, 
             dst_fp.append(current_object_key_);
             std::ofstream outFile(dst_fp, std::ios::app);
             if (!outFile.is_open()) {
-                String error_message = fmt::format("Failed to open file {}.", dst_fp.string());
-                UnrecoverableError(error_message);
+                UnrecoverableError(fmt::format("Failed to open file {}.", dst_fp.string()));
             }
             const u32 compose_format = 1;
             outFile.write((char *)&compose_format, sizeof(u32));
@@ -292,16 +290,14 @@ PersistReadResult PersistenceManager::GetObjCache(const String &file_path) {
 
     String local_path = RemovePrefix(file_path);
     if (local_path.empty()) {
-        String error_message = fmt::format("Failed to find local path of {}", local_path);
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("Failed to find local path of {}", local_path));
     }
 
     String pm_fp_key = KeyEncode::PMObjectKey(local_path);
     String value;
     Status status = kv_store_->Get(pm_fp_key, value);
     if (!status.ok()) {
-        String error_message = fmt::format("GetObjCache Failed to find object for local path {}: {}", local_path, status.message());
-        LOG_WARN(error_message);
+        LOG_WARN(fmt::format("GetObjCache Failed to find object for local path {}: {}", local_path, status.message()));
         LOG_TRACE(fmt::format("All key-value pairs in kv_store: \n{}", kv_store_->ToString()));
         return result;
     }
@@ -313,8 +309,7 @@ PersistReadResult PersistenceManager::GetObjCache(const String &file_path) {
     if (obj_addr.part_size_ == 0) {
         LOG_TRACE(fmt::format("GetObjCache empty object {} for local path {}", obj_addr.obj_key_, local_path));
         if (obj_addr.obj_key_ != ObjAddr::KeyEmpty) {
-            String error_message = fmt::format("GetObjCache object {} is empty", obj_addr.obj_key_);
-            UnrecoverableError(error_message);
+            UnrecoverableError(fmt::format("GetObjCache object {} is empty", obj_addr.obj_key_));
         }
     } else if (Optional<ObjStat> obj_stat = objects_->Get(obj_addr.obj_key_); obj_stat) {
         LOG_TRACE(fmt::format("GetObjCache object {}, file_path: {}, ref count {}", obj_addr.obj_key_, file_path, obj_stat->ref_count_));
@@ -326,8 +321,7 @@ PersistReadResult PersistenceManager::GetObjCache(const String &file_path) {
         }
     } else {
         if (obj_addr.obj_key_ != current_object_key_) {
-            String error_message = fmt::format("GetObjCache object {} not found", obj_addr.obj_key_);
-            UnrecoverableError(error_message);
+            UnrecoverableError(fmt::format("GetObjCache object {} not found", obj_addr.obj_key_));
         }
         current_object_ref_count_++;
         LOG_TRACE(fmt::format("GetObjCache current object {} ref count {}", obj_addr.obj_key_, current_object_ref_count_));
@@ -357,16 +351,14 @@ Tuple<SizeT, Status> PersistenceManager::GetFileSize(const String &file_path) {
 
     String local_path = RemovePrefix(file_path);
     if (local_path.empty()) {
-        String error_message = fmt::format("Failed to find local path of {}", local_path);
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("Failed to find local path of {}", local_path));
     }
 
     String pm_fp_key = KeyEncode::PMObjectKey(local_path);
     String value;
     Status status = kv_store_->Get(pm_fp_key, value);
     if (!status.ok()) {
-        String error_message = fmt::format("GetFileSize Failed to find object for local path {}: {}", local_path, status.message());
-        LOG_WARN(error_message);
+        LOG_WARN(fmt::format("GetFileSize Failed to find object for local path {}: {}", local_path, status.message()));
         return {0, Status::NotFound(fmt::format("Can't find {}", local_path))};
     }
     ObjAddr obj_addr;
@@ -377,16 +369,14 @@ Tuple<SizeT, Status> PersistenceManager::GetFileSize(const String &file_path) {
 ObjAddr PersistenceManager::GetObjCacheWithoutCnt(const String &local_path) {
     String lock_path = RemovePrefix(local_path);
     if (lock_path.empty()) {
-        String error_message = fmt::format("Failed to find local path of {}", local_path);
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("Failed to find local path of {}", local_path));
     }
 
     String pm_fp_key = KeyEncode::PMObjectKey(local_path);
     String value;
     Status status = kv_store_->Get(pm_fp_key, value);
     if (!status.ok()) {
-        String error_message = fmt::format("GetFileSize Failed to find object for local path {}: {}", local_path, status.message());
-        LOG_WARN(error_message);
+        LOG_WARN(fmt::format("GetFileSize Failed to find object for local path {}: {}", local_path, status.message()));
         return ObjAddr();
     }
     ObjAddr obj_addr;
@@ -398,15 +388,13 @@ PersistWriteResult PersistenceManager::PutObjCache(const String &file_path) {
     PersistWriteResult result;
     String local_path = RemovePrefix(file_path);
     if (local_path.empty()) {
-        String error_message = fmt::format("Failed to find file path of {}", file_path);
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("Failed to find file path of {}", file_path));
     }
     String pm_fp_key = KeyEncode::PMObjectKey(local_path);
     String value;
     Status status = kv_store_->Get(pm_fp_key, value);
     if (!status.ok()) {
-        String error_message = fmt::format("Failed to find file_path: {} stored object", local_path);
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("Failed to find file_path: {} stored object", local_path));
     }
     ObjAddr obj_addr;
     obj_addr.Deserialize(value);
@@ -439,22 +427,20 @@ int PersistenceManager::CurrentObjRoomNoLock() { return int(object_size_limit_) 
 void PersistenceManager::CurrentObjAppendNoLock(const String &tmp_file_path, SizeT file_size) {
     fs::path src_fp = tmp_file_path;
     fs::path dst_fp = Path(workspace_) / current_object_key_;
-    
+
     // Debug: Check if this is a dictionary file
     bool is_dict_file = tmp_file_path.find(".dic") != String::npos;
     if (is_dict_file) {
         LOG_DEBUG(fmt::format("CurrentObjAppendNoLock: Processing dictionary file {} (size: {})", tmp_file_path, file_size));
     }
-    
+
     std::ifstream srcFile(src_fp, std::ios::binary);
     if (!srcFile.is_open()) {
-        String error_message = fmt::format("Failed to open source file {}", tmp_file_path);
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("Failed to open source file {}", tmp_file_path));
     }
     std::ofstream dstFile(dst_fp, std::ios::binary | std::ios::app);
     if (!dstFile.is_open()) {
-        String error_message = fmt::format("Failed to open destination file {} {}", strerror(errno), dst_fp.string());
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("Failed to open destination file {} {}", strerror(errno), dst_fp.string()));
     }
     {
         dstFile.seekp(0, std::ios::end);
@@ -470,7 +456,7 @@ void PersistenceManager::CurrentObjAppendNoLock(const String &tmp_file_path, Siz
     }
     // Write any remaining bytes from the last read
     if (srcFile.gcount() > 0) {
-    dstFile.write(buffer, srcFile.gcount());
+        dstFile.write(buffer, srcFile.gcount());
     }
     srcFile.close();
     current_object_size_ += file_size;
@@ -480,11 +466,14 @@ void PersistenceManager::CurrentObjAppendNoLock(const String &tmp_file_path, Siz
             fmt::format("CurrentObjAppendNoLock object {} size {} exceeds limit {}", current_object_key_, current_object_size_, object_size_limit_));
     }
     dstFile.close();
-    
+
     // Debug: Log completion for dictionary files
     if (is_dict_file) {
-        LOG_DEBUG(fmt::format("CurrentObjAppendNoLock: Completed processing dictionary file {} -> object {} (offset: {}, size: {})", 
-                              tmp_file_path, current_object_key_, current_object_size_ - file_size, file_size));
+        LOG_DEBUG(fmt::format("CurrentObjAppendNoLock: Completed processing dictionary file {} -> object {} (offset: {}, size: {})",
+                              tmp_file_path,
+                              current_object_key_,
+                              current_object_size_ - file_size,
+                              file_size));
     }
 }
 
@@ -503,8 +492,7 @@ void PersistenceManager::CleanupNoLock(const ObjAddr &object_addr,
             obj_stat = objects_->GetNoCount(object_addr.obj_key_);
             assert(obj_stat.has_value());
         } else {
-            String error_message = fmt::format("CleanupNoLock Failed to find object {}", object_addr.obj_key_);
-            UnrecoverableError(error_message);
+            UnrecoverableError(fmt::format("CleanupNoLock Failed to find object {}", object_addr.obj_key_));
             return;
         }
     }
@@ -518,18 +506,16 @@ void PersistenceManager::CleanupNoLock(const ObjAddr &object_addr,
         auto inst_it_prev = std::prev(inst_it);
         if (inst_it_prev->Cover(orig_range)) {
             // Check duplication. Cleanup could delete a local file multiple times.
-            String error_message = fmt::format("CleanupNoLock delete [{}, {}) more than once", range.start_, range.end_);
-            LOG_WARN(error_message);
+            LOG_WARN(fmt::format("CleanupNoLock delete [{}, {}) more than once", range.start_, range.end_));
             return;
         } else if (inst_it_prev->Intersect(orig_range)) {
             // Check intersection with prev range
-            String error_message = fmt::format("ObjAddr {} range to delete [{}, {}) intersects with prev one [{}, {})",
+            UnrecoverableError(fmt::format("ObjAddr {} range to delete [{}, {}) intersects with prev one [{}, {})",
                                                object_addr.obj_key_,
                                                orig_range.start_,
                                                orig_range.end_,
                                                inst_it_prev->start_,
-                                               inst_it_prev->end_);
-            UnrecoverableError(error_message);
+                                               inst_it_prev->end_));
         } else if (orig_range.start_ == inst_it_prev->end_) {
             // Try merge with prev range
             range.start_ = inst_it_prev->start_;
@@ -540,18 +526,16 @@ void PersistenceManager::CleanupNoLock(const ObjAddr &object_addr,
     if (inst_it != obj_stat->deleted_ranges_.end()) {
         if (inst_it->Cover(orig_range)) {
             // Check duplication. Cleanup could delete a local file multiple times.
-            String error_message = fmt::format("CleanupNoLock delete [{}, {}) more than once", orig_range.start_, orig_range.end_);
-            LOG_WARN(error_message);
+            LOG_WARN(fmt::format("CleanupNoLock delete [{}, {}) more than once", orig_range.start_, orig_range.end_));
             return;
         } else if (inst_it->Intersect(orig_range)) {
             // Check intersection with next range
-            String error_message = fmt::format("ObjAddr {} range to delete [{}, {}) intersects with next one [{}, {})",
+            UnrecoverableError(fmt::format("ObjAddr {} range to delete [{}, {}) intersects with next one [{}, {})",
                                                object_addr.obj_key_,
                                                orig_range.start_,
                                                orig_range.end_,
                                                inst_it->start_,
-                                               inst_it->end_);
-            UnrecoverableError(error_message);
+                                               inst_it->end_));
         } else if (orig_range.end_ == inst_it->start_) {
             // Try merge with next range
             range.end_ = inst_it->end_;
@@ -561,21 +545,18 @@ void PersistenceManager::CleanupNoLock(const ObjAddr &object_addr,
 
     auto [_, ok] = obj_stat->deleted_ranges_.insert(range);
     if (!ok) {
-        String error_message = fmt::format("Failed to delete ObjAddr {} range [{}, {})", object_addr.obj_key_, range.start_, range.end_);
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("Failed to delete ObjAddr {} range [{}, {})", object_addr.obj_key_, range.start_, range.end_));
     }
 
     LOG_TRACE(fmt::format("Deleted object {} range [{}, {})", object_addr.obj_key_, orig_range.start_, orig_range.end_));
     SizeT obj_size = (obj_stat->obj_size_ + ObjAlignment - 1) & ~(ObjAlignment - 1);
     if (range.start_ == 0 && range.end_ == obj_size && object_addr.obj_key_ != current_object_key_) {
         if (object_addr.obj_key_.empty()) {
-            String error_message = fmt::format("Failed to find object key");
-            UnrecoverableError(error_message);
+            UnrecoverableError(fmt::format("Failed to find object key"));
         }
         if (check_ref_count) {
             if (obj_stat->ref_count_ > 0) {
-                String error_message = fmt::format("CleanupNoLock object {} ref count is {}", object_addr.obj_key_, obj_stat->ref_count_);
-                UnrecoverableError(error_message);
+                UnrecoverableError(fmt::format("CleanupNoLock object {} ref count is {}", object_addr.obj_key_, obj_stat->ref_count_));
             }
         }
         drop_from_remote_keys.emplace_back(object_addr.obj_key_);
@@ -626,16 +607,14 @@ PersistWriteResult PersistenceManager::Cleanup(const String &file_path) {
 
     String local_path = RemovePrefix(file_path);
     if (local_path.empty()) {
-        String error_message = fmt::format("Failed to find local path of {}", local_path);
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("Failed to find local path of {}", local_path));
     }
 
     String pm_fp_key = KeyEncode::PMObjectKey(local_path);
     String value;
     Status status = kv_store_->Get(pm_fp_key, value);
     if (!status.ok()) {
-        String error_message = fmt::format("Failed to find object for local path {}", local_path);
-        LOG_WARN(error_message);
+        LOG_WARN(fmt::format("Failed to find object for local path {}", local_path));
         return result;
     }
     ObjAddr obj_addr;

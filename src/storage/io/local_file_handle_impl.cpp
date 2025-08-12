@@ -15,7 +15,6 @@
 module;
 
 #include <cerrno>
-#include <cstring>
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -23,12 +22,14 @@ module;
 module infinity_core:local_file_handle.impl;
 
 import :local_file_handle;
-
-import third_party;
 import :status;
 import :virtual_store;
 import :infinity_exception;
 import :logger;
+
+import std.compat;
+import third_party;
+
 import global_resource_usage;
 
 namespace infinity {

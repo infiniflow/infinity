@@ -17,19 +17,22 @@ module;
 #include <boost/dynamic_bitset.hpp>
 #include <cassert>
 #include <cstdlib>
+#include <cstring>
 #include <queue>
 
 export module infinity_core:diskann_utils;
 
 import :stl;
-import third_party;
 import :default_values;
 import :status;
-import third_party;
 import :local_file_handle;
 import :virtual_store;
 import :diskann_dist_func;
 import :infinity_exception;
+
+// import std;
+// import std.compat;
+import third_party;
 
 namespace infinity {
 export struct QueryStats {

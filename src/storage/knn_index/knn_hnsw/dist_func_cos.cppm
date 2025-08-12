@@ -14,16 +14,16 @@
 
 module;
 
-#include <ostream>
-
 export module infinity_core:dist_func_cos;
 
 import :stl;
-import third_party;
 import :hnsw_common;
 import :plain_vec_store;
 import :lvq_vec_store;
 import :simd_functions;
+
+import std;
+import third_party;
 
 namespace infinity {
 

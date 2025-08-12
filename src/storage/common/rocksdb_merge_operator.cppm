@@ -17,6 +17,7 @@ module;
 export module infinity_core:rocksdb_merge_operator;
 
 import :stl;
+
 import third_party;
 
 namespace infinity {

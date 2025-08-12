@@ -4,7 +4,10 @@ module;
 #include <cstring>
 
 export module infinity_core:buf_writer;
+
 import :stl;
+
+// import std.compat;
 
 namespace infinity {
 // A simple buffer writer that writes data to a file.

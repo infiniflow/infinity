@@ -17,7 +17,6 @@ module;
 module infinity_core:base_memindex.impl;
 
 import :base_memindex;
-
 import :stl;
 import :memindex_tracer;
 import :infinity_context;

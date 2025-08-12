@@ -5,11 +5,9 @@ module;
 module infinity_core:multi_posting_decoder.impl;
 
 import :multi_posting_decoder;
-
 import :stl;
 import :byte_slice;
 import :byte_slice_reader;
-
 import :index_decoder;
 import :in_doc_pos_iterator;
 import :in_doc_pos_state;
@@ -22,6 +20,7 @@ import :posting_list_format;
 import :inmem_posting_decoder;
 import :inmem_position_list_decoder;
 import :skiplist_reader;
+
 import internal_types;
 import third_party;
 

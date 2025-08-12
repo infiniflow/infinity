@@ -14,38 +14,38 @@
 
 module;
 
-#include <future>
-#include <vector>
-
 module infinity_core:hnsw_lsg_builder.impl;
 
 import :hnsw_lsg_builder;
-
 import :stl;
 import :hnsw_handler;
-import column_def;
 import :index_hnsw;
 import :index_ivf;
-import statement_common;
 import :defer_op;
 import :infinity_exception;
 import :index_base;
 import :ivf_index_data;
-import third_party;
-import internal_types;
 import :knn_scan_data;
-import knn_expr;
 import :ivf_index_search;
-import data_type;
 import :roaring_bitmap;
 import :knn_result_handler;
-import logical_type;
-import embedding_info;
 import :hnsw_common;
 import :status;
 import :merge_knn;
 import :infinity_context;
 import :logger;
+
+import std;
+import std.compat;
+import third_party;
+
+import embedding_info;
+import logical_type;
+import data_type;
+import knn_expr;
+import internal_types;
+import statement_common;
+import column_def;
 
 namespace infinity {
 

@@ -14,8 +14,6 @@
 
 module;
 
-// #include <fstream>
-
 module infinity_core:block_version.impl;
 
 import std;

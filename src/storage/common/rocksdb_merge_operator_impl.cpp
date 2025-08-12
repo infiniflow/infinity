@@ -15,14 +15,15 @@
 module;
 
 #include <cassert>
-#include <cstdlib>
 
 module infinity_core:rocksdb_merge_operator.impl;
 
 import :rocksdb_merge_operator;
 import :stl;
-import third_party;
 import :logger;
+
+import third_party;
+
 import :infinity_exception;
 
 namespace infinity {

@@ -18,6 +18,7 @@ export module infinity_core:local_file_handle;
 
 import :stl;
 import :status;
+
 import global_resource_usage;
 
 namespace infinity {

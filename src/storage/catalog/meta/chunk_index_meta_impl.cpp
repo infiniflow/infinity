@@ -14,9 +14,6 @@
 
 module;
 
-// #include <string>
-// #include <vector>
-
 module infinity_core:chunk_index_meta.impl;
 
 import std;

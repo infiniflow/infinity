@@ -15,12 +15,9 @@
 module;
 
 #include <cerrno>
-#include <cstring>
 #include <fcntl.h>
-#include <filesystem>
 #include <lz4.h>
 #include <openssl/md5.h>
-#include <string>
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -28,11 +25,13 @@ module;
 module infinity_core:virtual_store.impl;
 
 import :virtual_store;
-
 import :stl;
 import :s3_client_minio;
 import :infinity_context;
 import :utility;
+
+import std;
+import std.compat;
 
 namespace fs = std::filesystem;
 

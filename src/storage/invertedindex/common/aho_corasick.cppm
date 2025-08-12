@@ -7,6 +7,8 @@ export module infinity_core:aho_corasick;
 import :stl;
 import :darts;
 
+// import std.compat;
+
 namespace infinity {
 
 // Aho-corasick based on double array trie

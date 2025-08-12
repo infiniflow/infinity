@@ -20,11 +20,12 @@ export module infinity_core:column_length_io;
 
 import :stl;
 import :index_defines;
-import internal_types;
 import :memory_indexer;
 import :buffer_obj;
 import :buffer_handle;
 import :column_index_reader;
+
+import internal_types;
 
 namespace infinity {
 class FileSystem;

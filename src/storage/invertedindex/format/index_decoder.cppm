@@ -4,7 +4,6 @@ export module infinity_core:index_decoder;
 
 import :stl;
 import :byte_slice;
-
 import :byte_slice_reader;
 import :posting_decoder;
 import :index_defines;

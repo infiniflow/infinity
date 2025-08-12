@@ -17,13 +17,11 @@ module;
 export module infinity_core:catalog_cache;
 
 import :stl;
-// import :status;
-// import :meta_info;
-// import extra_ddl_info;
 import :default_values;
+import :status;
+
 import internal_types;
 import third_party;
-import :status;
 
 namespace infinity {
 

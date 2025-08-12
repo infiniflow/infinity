@@ -15,9 +15,11 @@
 module;
 
 export module infinity_core:minimum_should_match_iterator;
+
 import :stl;
 import :doc_iterator;
 import :multi_doc_iterator;
+
 import internal_types;
 
 namespace infinity {

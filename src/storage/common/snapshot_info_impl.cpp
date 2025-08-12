@@ -14,19 +14,11 @@
 
 module;
 
-#include <memory>
-#include <vector>
-#include <chrono>
-
 module infinity_core:snapshot_info.impl;
 
 import :snapshot_info;
 import :stl;
 import :status;
-import command_statement;
-// import :index_base;
-import third_party;
-import constant_expr;
 import :logger;
 import :virtual_store;
 import :local_file_handle;
@@ -38,16 +30,21 @@ import :persist_result_handler;
 import :defer_op;
 import :utility;
 import :block_version;
-import data_type;
-import parsed_expr;
 import :fst.fst;
 
+import std;
+import std.compat;
+import third_party;
 
 import column_def;
+import data_type;
+import parsed_expr;
+import command_statement;
+import constant_expr;
 
 namespace infinity {
 
-    // Simple FST validation function
+// Simple FST validation function
 bool ValidateFstFile(const String &file_path) {
     try {
         LOG_DEBUG("FST validation: Starting validation for " + file_path);

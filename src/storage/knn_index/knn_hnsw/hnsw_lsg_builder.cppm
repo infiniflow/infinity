@@ -14,14 +14,12 @@
 
 module;
 
-namespace infinity {
-class ColumnDef;
-struct RowID;
-} // namespace infinity
-
 export module infinity_core:hnsw_lsg_builder;
 
 import :stl;
+
+import column_def;
+import row_id;
 
 namespace infinity {
 

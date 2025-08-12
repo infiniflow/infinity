@@ -1,7 +1,6 @@
 module;
 
 #include <cassert>
-#include <cstdio>
 
 export module infinity_core:ring;
 

@@ -14,19 +14,20 @@
 
 module;
 
-#include <vector>
-
 module infinity_core:persist_result_handler.impl;
 
 import :persist_result_handler;
 import :infinity_exception;
-import third_party;
 import :virtual_store;
 import :infinity_context;
 import :peer_task;
 import :logger;
-import admin_statement;
 import :obj_status;
+
+import std;
+import third_party;
+
+import admin_statement;
 
 namespace infinity {
 

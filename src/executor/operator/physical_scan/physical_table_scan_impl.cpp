@@ -99,8 +99,7 @@ Vector<SizeT> &PhysicalTableScan::ColumnIDs() const {
 
 void PhysicalTableScan::ExecuteInternal(QueryContext *query_context, TableScanOperatorState *table_scan_operator_state) {
     if (!table_scan_operator_state->data_block_array_.empty()) {
-        String error_message = "Table scan output data block array should be empty";
-        UnrecoverableError(error_message);
+        UnrecoverableError("Table scan output data block array should be empty");
     }
 
     table_scan_operator_state->data_block_array_.emplace_back(DataBlock::MakeUniquePtr());

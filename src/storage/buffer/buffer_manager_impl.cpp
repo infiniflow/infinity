@@ -14,8 +14,6 @@
 
 module;
 
-// #include <vector>
-
 module infinity_core:buffer_manager.impl;
 
 import std;

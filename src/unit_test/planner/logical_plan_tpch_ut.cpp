@@ -13,39 +13,11 @@
 // limitations under the License.
 
 #ifdef CI
-// #include "bin/compilation_config.h"
-// #include "common/column_vector/column_vector.h"
-// #include "common/types/value.h"
-// #include "executor/physical_planner.h"
-// #include "legacy_sched/operator_pipeline.h"
-// #include "main/infinity.h"
-// #include "main/logger.h"
-// #include "main/profiler/show_logical_plan.h"
-// #include "main/session.h"
-// #include "parser/sql_parser.h"
-// #include "planner/logical_planner.h"
-// #include "planner/optimizer.h"
-// #include "test_helper/sql_runner.h"
 #include "gtest/gtest.h"
 import infinity_core;
 import base_test;
 #else
 module;
-
-// #include "bin/compilation_config.h"
-// #include "common/column_vector/column_vector.h"
-// #include "common/types/value.h"
-// #include "executor/physical_planner.h"
-// #include "legacy_sched/operator_pipeline.h"
-// #include "main/infinity.h"
-// #include "main/logger.h"
-// #include "main/profiler/show_logical_plan.h"
-// #include "main/session.h"
-// #include "parser/sql_parser.h"
-// #include "planner/logical_planner.h"
-// #include "planner/optimizer.h"
-// #include "test_helper/sql_runner.h"
-// #include "gtest/gtest.h"
 
 module infinity_core:ut.logical_plan_tpch;
 

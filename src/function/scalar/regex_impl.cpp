@@ -1,7 +1,5 @@
 module;
 
-// #include <re2/re2.h>
-
 module infinity_core:regex.impl;
 
 import :regex;

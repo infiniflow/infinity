@@ -3,9 +3,7 @@ module;
 module infinity_core:posting_merger.impl;
 
 import :posting_merger;
-
 import :stl;
-
 import :file_writer;
 import :doc_list_encoder;
 import :inmem_posting_decoder;
@@ -18,8 +16,10 @@ import :posting_decoder;
 import :term_meta;
 import :column_index_iterator;
 import :segment_term_posting;
-import internal_types;
+
 import third_party;
+
+import internal_types;
 
 namespace infinity {
 

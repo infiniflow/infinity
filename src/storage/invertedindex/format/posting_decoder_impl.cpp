@@ -3,7 +3,6 @@ module;
 module infinity_core:posting_decoder.impl;
 
 import :posting_decoder;
-
 import :stl;
 import :byte_slice_reader;
 import :posting_list_format;
@@ -12,10 +11,10 @@ import :index_defines;
 import :posting_field;
 import :position_list_format_option;
 import :doc_list_format_option;
-
 import :infinity_exception;
-import third_party;
 import :logger;
+
+import third_party;
 
 namespace infinity {
 

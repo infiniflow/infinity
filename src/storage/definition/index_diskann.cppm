@@ -18,10 +18,11 @@ export module infinity_core:index_diskann;
 
 import :stl;
 import :index_base;
-
-import third_party;
 import :index_base;
 import :base_table_ref;
+
+import third_party;
+
 import create_index_info;
 import statement_common;
 

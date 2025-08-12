@@ -15,20 +15,21 @@
 module;
 
 #include <concepts>
-#include <type_traits>
 
 export module infinity_core:binary_operator;
+
+// import std;
 
 import :stl;
 import :column_vector;
 import :vector_buffer;
-
 import :infinity_exception;
 import :roaring_bitmap;
-import third_party;
-import internal_types;
 import :status;
 import :logger;
+
+import third_party;
+import internal_types;
 
 namespace infinity {
 
@@ -330,7 +331,7 @@ private:
         const auto &left_null = left->nulls_ptr_;
         auto &result_null = result->nulls_ptr_;
         *result_null = *left_null;
-        const BooleanT right_boolean = right_u8 & (u8(1));
+        const BooleanT right_boolean = right_u8 & static_cast<u8>(1);
         result_null->RoaringBitmapApplyFunc([&](u32 row_index) -> bool {
             if (row_index >= count) {
                 return false;
@@ -357,7 +358,7 @@ private:
         const auto &right_null = right->nulls_ptr_;
         auto &result_null = result->nulls_ptr_;
         *result_null = *right_null;
-        const BooleanT left_boolean = left_u8 & (u8(1));
+        const BooleanT left_boolean = left_u8 & static_cast<u8>(1);
         result_null->RoaringBitmapApplyFunc([&](u32 row_index) -> bool {
             if (row_index >= count) {
                 return false;

@@ -129,8 +129,7 @@ Tuple<Status, SharedPtr<NodeInfo>> ClusterManager::GetNodeInfoByName(const Strin
     std::unique_lock<std::mutex> cluster_lock(cluster_mutex_);
 
     if (current_node_role_ == NodeRole::kAdmin or current_node_role_ == NodeRole::kStandalone or current_node_role_ == NodeRole::kUnInitialized) {
-        String error_message = "Error node role type";
-        UnrecoverableError(error_message);
+        UnrecoverableError("Error node role type");
     }
 
     if (current_node_role_ == NodeRole::kFollower or current_node_role_ == NodeRole::kLearner) {

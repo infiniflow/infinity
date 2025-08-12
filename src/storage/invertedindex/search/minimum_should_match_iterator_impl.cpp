@@ -15,17 +15,19 @@
 module;
 
 #include <cassert>
-#include <iostream>
-#include <vector>
+
 module infinity_core:minimum_should_match_iterator.impl;
 
 import :minimum_should_match_iterator;
 import :stl;
 import :index_defines;
 import :multi_doc_iterator;
-import internal_types;
 import :logger;
 import :infinity_exception;
+
+import std;
+
+import internal_types;
 
 namespace infinity {
 

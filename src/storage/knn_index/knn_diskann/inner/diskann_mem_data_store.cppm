@@ -15,10 +15,7 @@
 module;
 
 #include <cassert>
-#include <fstream>
-#include <ostream>
-#include <memory>
-#include <cstring>
+
 #if defined(__GNUC__) && (defined(__x86_64__) || defined(__i386__))
 #include <xmmintrin.h>
 #elif defined(__GNUC__) && defined(__aarch64__)
@@ -32,6 +29,9 @@ import :diskann_dist_func;
 import :diskann_utils;
 import :infinity_exception;
 import :local_file_handle;
+
+import std;
+import std.compat;
 
 namespace infinity {
 export template <typename DataType>

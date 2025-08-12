@@ -17,8 +17,10 @@ module;
 export module infinity_core:memindex_tracer;
 
 import :stl;
-import third_party;
 import :logger;
+
+import third_party;
+
 import row_id;
 
 namespace infinity {

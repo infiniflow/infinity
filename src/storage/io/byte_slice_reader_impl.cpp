@@ -5,7 +5,6 @@ module;
 module infinity_core:byte_slice_reader.impl;
 
 import :byte_slice_reader;
-
 import :stl;
 import :byte_slice;
 import :status;

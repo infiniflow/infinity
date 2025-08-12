@@ -15,8 +15,6 @@
 module;
 
 #include <cassert>
-#include <memory>
-#include <vector>
 
 module infinity_core:new_txn_index.impl;
 
@@ -35,11 +33,7 @@ import :column_meta;
 import :logger;
 import :infinity_context;
 import :buffer_manager;
-import third_party;
 import :infinity_exception;
-import column_def;
-import internal_types;
-import create_index_info;
 import :buffer_obj;
 import :mem_index;
 import :wal_entry;
@@ -70,10 +64,17 @@ import :bg_task;
 import :mem_index_appender;
 import :txn_context;
 import :kv_utility;
-import statement_common;
 import :dump_index_process;
 import :persistence_manager;
 import :persist_result_handler;
+
+import std;
+import third_party;
+
+import statement_common;
+import column_def;
+import internal_types;
+import create_index_info;
 
 namespace infinity {
 

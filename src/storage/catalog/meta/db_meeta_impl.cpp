@@ -14,8 +14,6 @@
 
 module;
 
-// #include <string>
-
 module infinity_core:db_meeta.impl;
 
 import std;

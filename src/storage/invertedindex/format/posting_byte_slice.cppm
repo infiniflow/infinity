@@ -3,7 +3,6 @@ module;
 export module infinity_core:posting_byte_slice;
 
 import :stl;
-
 import :byte_slice;
 import :byte_slice_writer;
 import :file_writer;

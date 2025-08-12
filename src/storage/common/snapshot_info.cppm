@@ -18,14 +18,14 @@ export module infinity_core:snapshot_info;
 
 import :stl;
 import :status;
-import command_statement;
 import :index_base;
-import third_party;
-import column_def;
 import :meta_info;
+
+import third_party;
+
 import row_id;
-
-
+import column_def;
+import command_statement;
 
 namespace infinity {
 

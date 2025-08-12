@@ -15,8 +15,6 @@
 module;
 
 #include "inc/mlas.h"
-#include <chrono>
-#include <iostream>
 
 module infinity_core:product_quantizer.impl;
 
@@ -26,11 +24,13 @@ import :mlas_matrix_multiply;
 import :kmeans_partition;
 import :vector_distance;
 import :index_base;
-import third_party;
 import :logger;
 import :infinity_exception;
 import :local_file_handle;
 import :eigen_svd;
+
+import std;
+import third_party;
 
 namespace infinity {
 

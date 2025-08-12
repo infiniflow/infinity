@@ -15,17 +15,18 @@
 module;
 
 #include <cassert>
-#include <iostream>
-#include <cmath>
 
 module infinity_core:term_doc_iterator.impl;
 
 import :term_doc_iterator;
-
 import :stl;
 import :column_length_io;
 import :logger;
 import :infinity_exception;
+
+import std;
+import std.compat;
+
 import row_id;
 
 namespace infinity {

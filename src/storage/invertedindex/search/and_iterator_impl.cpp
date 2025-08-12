@@ -15,16 +15,18 @@
 module;
 
 #include <cassert>
-#include <vector>
+
 module infinity_core:and_iterator.impl;
 
 import :and_iterator;
-
 import :stl;
 import :doc_iterator;
 import :multi_doc_iterator;
-import internal_types;
 import :infinity_exception;
+
+import std;
+
+import internal_types;
 
 namespace infinity {
 

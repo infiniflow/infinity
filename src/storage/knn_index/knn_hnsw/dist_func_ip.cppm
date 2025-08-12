@@ -14,8 +14,6 @@
 
 module;
 
-#include <ostream>
-
 export module infinity_core:dist_func_ip;
 
 import :stl;
@@ -23,6 +21,8 @@ import :hnsw_common;
 import :plain_vec_store;
 import :lvq_vec_store;
 import :simd_functions;
+
+import std;
 
 namespace infinity {
 

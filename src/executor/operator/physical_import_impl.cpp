@@ -14,11 +14,6 @@
 
 module;
 
-// extern "C" {
-// #include "zsv/api.h"
-// #include "zsv/common.h"
-// }
-
 #include <cassert>
 #include <cerrno>
 #include <cstdio>

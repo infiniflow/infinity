@@ -18,13 +18,14 @@ export module infinity_core:index_full_text;
 
 import :stl;
 import :index_base;
-
-import third_party;
 import :index_base;
-import create_index_info;
-import statement_common;
 import :base_table_ref;
 import :index_defines;
+
+import third_party;
+
+import create_index_info;
+import statement_common;
 
 namespace infinity {
 

@@ -17,7 +17,6 @@ module;
 module infinity_core:emvb_shared_vec.impl;
 
 import :emvb_shared_vec;
-
 import :stl;
 import :emvb_shared_vec;
 

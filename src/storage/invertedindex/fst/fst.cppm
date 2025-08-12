@@ -17,11 +17,12 @@ module;
 export module infinity_core:fst.fst;
 
 import :infinity_exception;
-import third_party;
 import :stl;
 import :crc;
 import :fst.bytes;
 import :fst.node;
+
+import third_party;
 
 /// An acyclic deterministic finite state transducer.
 ///

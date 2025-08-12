@@ -14,14 +14,12 @@
 
 module;
 
-#include <map>
-#include <memory>
-#include <string>
-
 export module infinity_core:search_driver;
 
 import :stl;
 import :query_node;
+
+import std;
 
 namespace infinity {
 

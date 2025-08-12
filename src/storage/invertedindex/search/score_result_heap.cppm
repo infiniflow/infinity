@@ -15,7 +15,9 @@
 module;
 
 export module infinity_core:fulltext_score_result_heap;
+
 import :stl;
+
 import internal_types;
 
 namespace infinity {

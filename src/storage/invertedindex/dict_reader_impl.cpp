@@ -19,7 +19,6 @@ module;
 module infinity_core:dict_reader.impl;
 
 import :dict_reader;
-
 import :stl;
 import :term_meta;
 import :posting_list_format;

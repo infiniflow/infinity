@@ -14,9 +14,8 @@
 
 module;
 
-#include <cassert>
-
 export module infinity_core:fst.writer;
+
 import :stl;
 import :crc;
 

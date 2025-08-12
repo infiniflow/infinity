@@ -14,10 +14,9 @@
 
 module;
 
-#include <chrono>
-#include <memory>
-
 module infinity_core:mem_index.impl;
+
+import std;
 
 import :mem_index;
 import :stl;
@@ -26,9 +25,10 @@ import :secondary_index_in_mem;
 import :ivf_index_data_in_mem;
 import :emvb_index_in_mem;
 import :memory_indexer;
-import row_id;
 import :hnsw_handler;
 import :bmp_handler;
+
+import row_id;
 
 namespace infinity {
 

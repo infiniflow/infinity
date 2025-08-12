@@ -14,14 +14,12 @@
 
 module;
 
-#include <cassert>
-#include <iostream>
-#include <vector>
-#include <atomic>
-
 export module infinity_core:bp_reordering;
 
 import :stl;
+
+import std;
+import std.compat;
 import third_party;
 
 namespace infinity {
@@ -42,8 +40,8 @@ public:
 
     Vector<std::atomic<float>> term_gains_toright_;
     Vector<std::atomic<float>> term_gains_toleft_;
-    Vector<std::atomic<uint8_t>> term_gains_toright_valid_;
-    Vector<std::atomic<uint8_t>> term_gains_toleft_valid_;
+    Vector<std::atomic_uint8_t> term_gains_toright_valid_;
+    Vector<std::atomic_uint8_t> term_gains_toleft_valid_;
 
     Vector<float> gains_;
     Vector<i32> gains_permu_;

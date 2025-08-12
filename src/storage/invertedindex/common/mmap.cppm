@@ -1,17 +1,16 @@
 module;
 
 #include <cassert>
-#include <cstring>
 #include <fcntl.h>
-#include <filesystem>
 #include <sys/mman.h>
-#include <sys/stat.h>
 #include <unistd.h>
 
 export module infinity_core:mmap;
 
 import :stl;
 import :infinity_exception;
+
+import std.compat;
 
 using namespace infinity;
 namespace fs = std::filesystem;

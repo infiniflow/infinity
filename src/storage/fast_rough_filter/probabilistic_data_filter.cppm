@@ -15,13 +15,15 @@
 module;
 
 export module infinity_core:probabilistic_data_filter;
+
 import :stl;
-import internal_types;
 import :value;
 import :binary_fuse_filter;
-// import :logger;
-import third_party;
 import :infinity_exception;
+
+import third_party;
+
+import internal_types;
 
 namespace infinity {
 

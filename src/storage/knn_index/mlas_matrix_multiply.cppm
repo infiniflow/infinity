@@ -13,7 +13,9 @@
 // limitations under the License.
 
 module;
+
 export module infinity_core:mlas_matrix_multiply;
+
 import :stl;
 
 namespace infinity {

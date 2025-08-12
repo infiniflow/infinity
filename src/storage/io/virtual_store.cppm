@@ -18,11 +18,12 @@ export module infinity_core:virtual_store;
 
 import :stl;
 import :status;
-import third_party;
 import :local_file_handle;
 import :stream_reader;
 import :s3_client;
 import :object_storage_process;
+
+import third_party;
 
 namespace infinity {
 

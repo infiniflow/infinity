@@ -14,14 +14,13 @@
 
 module;
 
-#include <cmath>
-
 module infinity_core:bm25_ranker.impl;
 
 import :bm25_ranker;
-
 import :stl;
 import :index_defines;
+
+import std.compat;
 import third_party;
 
 namespace infinity {

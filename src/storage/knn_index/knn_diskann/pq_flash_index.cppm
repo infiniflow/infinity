@@ -14,10 +14,8 @@
 
 module;
 
-#include <boost/dynamic_bitset.hpp>
 #include <cassert>
-#include <ostream>
-#include <random>
+
 #if defined(__GNUC__) && (defined(__x86_64__) || defined(__i386__))
 #include <xmmintrin.h>
 #elif defined(__GNUC__) && defined(__aarch64__)
@@ -32,13 +30,17 @@ import :index_base;
 import :local_file_handle;
 import :status;
 import :infinity_exception;
-import logical_type;
-import third_party;
 import :diskann_dist_func;
 import :diskann_utils;
 import :default_values;
 import :diskann_partition_and_pq;
 import :virtual_store;
+
+import std;
+import std.compat;
+import third_party;
+
+import logical_type;
 
 namespace infinity {
 
@@ -56,7 +58,8 @@ public:
     }
 
     PqFlashIndex(This &&other)
-        : data_dim_(other.data_dim_), num_points_(other.num_points_), n_chunks_(other.n_chunks_), metric_(other.metric_), reader_(std::move(other.reader_)) {
+        : data_dim_(other.data_dim_), num_points_(other.num_points_), n_chunks_(other.n_chunks_), metric_(other.metric_),
+          reader_(std::move(other.reader_)) {
         this->aligned_dim_ = other.aligned_dim_;
         this->dist_cmp_ = std::move(other.dist_cmp_);
         this->dist_cmp_float_ = std::move(other.dist_cmp_float_);

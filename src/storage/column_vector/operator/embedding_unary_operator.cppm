@@ -20,8 +20,9 @@ import :stl;
 import :roaring_bitmap;
 import :column_vector;
 import :infinity_exception;
-import embedding_info;
 import :logger;
+
+import embedding_info;
 
 namespace infinity {
 

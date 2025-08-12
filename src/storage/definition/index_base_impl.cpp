@@ -14,16 +14,10 @@
 
 module;
 
-#include <memory>
-#include <sstream>
-#include <string>
-#include <vector>
-
 module infinity_core:index_base.impl;
 
 import :index_base;
 import :stl;
-import serialize;
 import :index_ivf;
 import :index_hnsw;
 import :index_diskann;
@@ -32,13 +26,15 @@ import :index_secondary;
 import :index_emvb;
 import :index_bmp;
 import :bmp_util;
-// import third_party;
-// import :status;
-
 import :infinity_exception;
-import create_index_info;
 import :index_defines;
 import :logger;
+
+import std;
+import std.compat;
+
+import serialize;
+import create_index_info;
 
 namespace infinity {
 

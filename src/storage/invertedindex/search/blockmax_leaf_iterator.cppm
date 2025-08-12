@@ -17,9 +17,10 @@ module;
 export module infinity_core:blockmax_leaf_iterator;
 
 import :stl;
-import internal_types;
 import :doc_iterator;
 import :column_length_io;
+
+import internal_types;
 
 namespace infinity {
 

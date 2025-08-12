@@ -19,8 +19,9 @@ module;
 export module infinity_core:fst.bytes;
 
 import :stl;
-import third_party;
 import :fst.writer;
+
+import third_party;
 
 namespace infinity {
 

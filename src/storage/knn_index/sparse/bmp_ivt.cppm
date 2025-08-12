@@ -15,7 +15,6 @@
 module;
 
 #include "common/simd/simd_common_intrin_include.h"
-#include <algorithm>
 
 export module infinity_core:bmp_ivt;
 
@@ -24,6 +23,9 @@ import :sparse_util;
 import :local_file_handle;
 import :bmp_util;
 import :knn_result_handler;
+
+import std;
+
 import serialize;
 
 namespace infinity {

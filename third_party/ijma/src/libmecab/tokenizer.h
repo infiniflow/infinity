@@ -12,7 +12,6 @@
 #include "dictionary.h"
 #include "char_property.h"
 #include "scoped_ptr.h"
-// #include "token.h"
 
 namespace MeCab {
 

@@ -19,14 +19,14 @@ module;
 module infinity_core:fst.build.impl;
 
 import :fst.build;
-
 import :stl;
 import :infinity_exception;
-import third_party;
 import :fst.bytes;
 import :fst.node;
 import :fst.registry;
 import :fst.writer;
+
+import third_party;
 
 namespace infinity {
 

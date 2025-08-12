@@ -22,8 +22,9 @@ import :posting_list_format;
 import :posting_writer;
 import :term_meta;
 import :index_defines;
-import internal_types;
 import :file_reader;
+
+import internal_types;
 
 namespace infinity {
 

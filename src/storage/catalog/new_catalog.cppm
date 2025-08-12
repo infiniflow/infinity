@@ -19,15 +19,18 @@ export module infinity_core:new_catalog;
 import :stl;
 import :status;
 import :meta_info;
-import extra_ddl_info;
 import :default_values;
-import internal_types;
+
 import :buffer_handle;
-import column_def;
 import :profiler;
-import third_party;
 import :storage;
 import :meta_tree;
+
+import third_party;
+
+import column_def;
+import extra_ddl_info;
+import internal_types;
 
 namespace infinity {
 

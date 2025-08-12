@@ -13,6 +13,7 @@
 // limitations under the License.
 
 module;
+
 #include <type_traits>
 
 export module infinity_core:vector_distance;

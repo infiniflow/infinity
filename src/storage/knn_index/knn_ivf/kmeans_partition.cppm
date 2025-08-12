@@ -16,6 +16,7 @@ module;
 
 #include <cstring>
 #include <random>
+
 export module infinity_core:kmeans_partition;
 
 import :stl;

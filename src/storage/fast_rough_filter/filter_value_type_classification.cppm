@@ -15,9 +15,11 @@
 module;
 
 export module infinity_core:filter_value_type_classification;
+
 import :stl;
-import internal_types;
 import :column_vector;
+
+import internal_types;
 
 namespace infinity {
 

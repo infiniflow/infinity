@@ -14,12 +14,9 @@
 
 module;
 
-#include <vector>
-
 module infinity_core:memindex_tracer.impl;
 
 import :memindex_tracer;
-
 import :stl;
 import :base_memindex;
 import :emvb_index_in_mem;
@@ -27,11 +24,9 @@ import :bg_task;
 import :infinity_context;
 import :infinity_exception;
 import :logger;
-import third_party;
 import :txn_state;
 import :dump_index_process;
 import :storage;
-
 import :kv_store;
 import :new_catalog;
 import :new_txn_manager;
@@ -39,6 +34,10 @@ import :mem_index;
 import :new_txn;
 import :status;
 import :defer_op;
+
+import std;
+import third_party;
+
 import row_id;
 import global_resource_usage;
 

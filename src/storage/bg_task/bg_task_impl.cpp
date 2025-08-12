@@ -14,9 +14,6 @@
 
 module;
 
-// #include <vector>
-// #include <memory>
-
 module infinity_core:bg_task.impl;
 
 import std;
