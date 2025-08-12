@@ -15,21 +15,10 @@
 module;
 
 #include <csignal>
-#include <cstdio>
-#include <sstream>
-#include <memory>
 
 module infinity_core:query_context.impl;
 
 import :query_context;
-
-import base_statement;
-import parser_result;
-import sql_parser;
-import admin_statement;
-import show_statement;
-import parser_assert;
-import global_resource_usage;
 import :logical_planner;
 import :optimizer;
 import :physical_planner;
@@ -43,6 +32,17 @@ import :new_catalog;
 import :bg_query_state;
 import :new_txn_manager;
 import :admin_executor;
+
+import std;
+import std.compat;
+
+import base_statement;
+import parser_result;
+import sql_parser;
+import admin_statement;
+import show_statement;
+import parser_assert;
+import global_resource_usage;
 
 namespace infinity {
 

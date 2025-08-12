@@ -21,7 +21,6 @@ module;
 module infinity_core:config.impl;
 
 import :config;
-
 import :logger;
 import :infinity_exception;
 import :boost;

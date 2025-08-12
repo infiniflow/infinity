@@ -17,6 +17,7 @@ export module infinity_core:query_result;
 import :stl;
 import :status;
 import :logical_node_type;
+
 import global_resource_usage;
 
 namespace infinity {

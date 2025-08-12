@@ -14,15 +14,14 @@
 
 module;
 
-#include <sstream>
-
 module infinity_core:query_result.impl;
 
 import :query_result;
-
 import :logical_node_type;
 import :data_block;
 import :data_table;
+
+import std;
 
 namespace infinity {
 

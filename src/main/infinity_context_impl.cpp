@@ -14,20 +14,20 @@
 
 module;
 
-#include <cstdlib>
-#include <memory>
-#include <string>
-
 module infinity_core:infinity_context.impl;
 
 import :infinity_context;
 import :wal_manager;
 import :infinity_thrift_service;
-import admin_statement;
-import knn_expr;
 import :resource_manager;
 import :session_manager;
 import :variables;
+
+import std;
+import std.compat;
+
+import admin_statement;
+import knn_expr;
 
 namespace infinity {
 

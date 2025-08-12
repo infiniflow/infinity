@@ -17,7 +17,6 @@ module;
 module infinity_core:variables.impl;
 
 import :variables;
-
 import :default_values;
 
 namespace infinity {

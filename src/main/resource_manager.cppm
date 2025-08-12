@@ -18,6 +18,7 @@ export module infinity_core:resource_manager;
 
 import :stl;
 import :singleton;
+
 import global_resource_usage;
 
 namespace infinity {

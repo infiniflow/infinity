@@ -19,9 +19,10 @@ export module infinity_core:cluster_manager;
 import :stl;
 import :status;
 import :node_info;
-import admin_statement;
 import :peer_server_thrift_service;
 import :peer_server_thrift_types;
+
+import admin_statement;
 
 namespace infinity {
 class PeerClient;

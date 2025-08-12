@@ -15,6 +15,7 @@
 export module infinity_core:query_options;
 
 import :stl;
+
 import extra_ddl_info;
 import statement_common;
 

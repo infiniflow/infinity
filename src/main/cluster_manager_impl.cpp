@@ -14,17 +14,16 @@
 
 module;
 
-#include <vector>
-#include <string>
-
 module infinity_core:cluster_manager.impl;
 
 import :cluster_manager;
+import :peer_thrift_client;
+import :infinity_exception;
+
+import std;
 
 import admin_statement;
 import global_resource_usage;
-import :peer_thrift_client;
-import :infinity_exception;
 
 namespace infinity {
 

@@ -21,11 +21,12 @@ import :session;
 import :config;
 import :storage;
 import :query_result;
+import :profiler;
+import :optimizer;
+
 import base_statement;
 import admin_statement;
-import :profiler;
 import sql_parser;
-import :optimizer;
 
 namespace infinity {
 enum class QueryPhase : i8;

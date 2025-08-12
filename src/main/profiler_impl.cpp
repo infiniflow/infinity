@@ -14,7 +14,6 @@
 module;
 
 #include "magic_enum/magic_enum.hpp"
-#include <chrono>
 
 module infinity_core:profiler.impl;
 
@@ -22,6 +21,9 @@ import :profiler;
 import :infinity_exception;
 import :operator_state;
 import :physical_operator;
+
+import std;
+import std.compat;
 
 namespace infinity {
 
