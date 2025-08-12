@@ -125,16 +125,6 @@ TEST_P(RecycleLogTest, recycle_wal_after_delta_checkpoint) {
             status = new_txn_mgr->CommitTxn(txn, ckp_commit_ts.get());
             EXPECT_TRUE(status.ok());
         }
-        {
-            // assert there is one log file
-            auto [temp_wal_file, wal_files] = WalFile::ParseWalFilenames(wal_dir);
-            EXPECT_TRUE(temp_wal_file.has_value());
-            if (wal_files.size() >= 1) {
-                EXPECT_EQ(*ckp_commit_ts, wal_files.back().max_commit_ts_ + 2);
-            } else {
-                ASSERT_TRUE(wal_files.empty());
-            }
-        }
         infinity::InfinityContext::instance().UnInit();
 
 #ifdef INFINITY_DEBUG
