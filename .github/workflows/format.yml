@@ -5,32 +5,23 @@ on:
     types: [opened, synchronize, reopened]
     paths:
       - 'src/**/*.cpp'
-      - 'src/**/*.h'
-      - 'src/**/*.hpp'
+      - 'src/**/*.cppm'
       - 'test/**/*.cpp'
-      - 'test/**/*.h'
-      - 'test/**/*.hpp'
+      - 'test/**/*.cppm'
       - 'example/**/*.cpp'
-      - 'example/**/*.h'
-      - 'example/**/*.hpp'
+      - 'example/**/*.cppm'
       - 'client/**/*.cpp'
-      - 'client/**/*.h'
-      - 'client/**/*.hpp'
+      - 'client/**/*.cppm'
       - 'benchmark/**/*.cpp'
-      - 'benchmark/**/*.h'
-      - 'benchmark/**/*.hpp'
+      - 'benchmark/**/*.cppm'
       - 'gui/**/*.cpp'
-      - 'gui/**/*.h'
-      - 'gui/**/*.hpp'
+      - 'gui/**/*.cppm'
       - 'thrift/**/*.cpp'
-      - 'thrift/**/*.h'
-      - 'thrift/**/*.hpp'
+      - 'thrift/**/*.cppm'
       - 'tools/**/*.cpp'
-      - 'tools/**/*.h'
-      - 'tools/**/*.hpp'
+      - 'tools/**/*.cppm'
       - 'scripts/**/*.cpp'
-      - 'scripts/**/*.h'
-      - 'scripts/**/*.hpp'
+      - 'scripts/**/*.cppm'
       - 'cmake/**/*.cmake'
       - 'CMakeLists.txt'
       - '.clang-format'
@@ -65,7 +56,7 @@ jobs:
         id: changed-files
         run: |
           # Get list of changed C++ files
-          CHANGED_FILES=$(git diff --name-only ${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }} | grep -E '\.(cpp|h|hpp|cmake)$' | grep -v 'third_party/' | grep -v 'build/' | grep -v 'cmake-build/' || true)
+          CHANGED_FILES=$(git diff --name-only ${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }} | grep -E '\.(cpp|h|hpp|cppm|cmake)$' | grep -v 'third_party/' | grep -v 'build/' | grep -v 'cmake-build/' || true)
           
           if [ -n "$CHANGED_FILES" ]; then
             echo "Changed C++ files:"
