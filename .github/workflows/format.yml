@@ -5,39 +5,30 @@ on:
     types: [opened, synchronize, reopened]
     paths:
       - 'src/**/*.cpp'
-      - 'src/**/*.h'
-      - 'src/**/*.hpp'
+      - 'src/**/*.cppm'
       - 'test/**/*.cpp'
-      - 'test/**/*.h'
-      - 'test/**/*.hpp'
+      - 'test/**/*.cppm'
       - 'example/**/*.cpp'
-      - 'example/**/*.h'
-      - 'example/**/*.hpp'
+      - 'example/**/*.cppm'
       - 'client/**/*.cpp'
-      - 'client/**/*.h'
-      - 'client/**/*.hpp'
+      - 'client/**/*.cppm'
       - 'benchmark/**/*.cpp'
-      - 'benchmark/**/*.h'
-      - 'benchmark/**/*.hpp'
+      - 'benchmark/**/*.cppm'
       - 'gui/**/*.cpp'
-      - 'gui/**/*.h'
-      - 'gui/**/*.hpp'
+      - 'gui/**/*.cppm'
       - 'thrift/**/*.cpp'
-      - 'thrift/**/*.h'
-      - 'thrift/**/*.hpp'
+      - 'thrift/**/*.cppm'
       - 'tools/**/*.cpp'
-      - 'tools/**/*.h'
-      - 'tools/**/*.hpp'
+      - 'tools/**/*.cppm'
       - 'scripts/**/*.cpp'
-      - 'scripts/**/*.h'
-      - 'scripts/**/*.hpp'
+      - 'scripts/**/*.cppm'
       - 'cmake/**/*.cmake'
       - 'CMakeLists.txt'
       - '.clang-format'
 
 jobs:
   format:
-    name: Format C++ Code
+    name: Check C++ Code Formatting
     runs-on: ubuntu-latest
     
     steps:
@@ -49,14 +40,23 @@ jobs:
       - name: Install clang-format
         run: |
           sudo apt-get update
-          sudo apt-get install -y clang-format-20
-          sudo ln -sf /usr/bin/clang-format-20 /usr/bin/clang-format
+          sudo apt-get install -y clang-format
+          
+          # Verify installation
+          echo "Installed clang-format version:"
+          clang-format --version
+          
+      - name: Verify clang-format availability
+        run: |
+          echo "Checking clang-format availability..."
+          clang-format --version
+          echo "clang-format is available at: $(which clang-format)"
           
       - name: Get changed files
         id: changed-files
         run: |
           # Get list of changed C++ files
-          CHANGED_FILES=$(git diff --name-only ${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }} | grep -E '\.(cpp|h|hpp|cmake)$' | grep -v 'third_party/' | grep -v 'build/' | grep -v 'cmake-build/' || true)
+          CHANGED_FILES=$(git diff --name-only ${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }} | grep -E '\.(cpp|h|hpp|cppm|cmake)$' | grep -v 'third_party/' | grep -v 'build/' | grep -v 'cmake-build/' || true)
           
           if [ -n "$CHANGED_FILES" ]; then
             echo "Changed C++ files:"
@@ -69,51 +69,27 @@ jobs:
             echo "changed_files=" >> $GITHUB_OUTPUT
           fi
           
-      - name: Format changed files
+      - name: Check formatting of changed files
         if: steps.changed-files.outputs.changed_files != ''
         run: |
-          # Format each changed file
+          # Format files temporarily to check if they need formatting
           echo "${{ steps.changed-files.outputs.changed_files }}" | while read -r file; do
             if [ -f "$file" ]; then
-              echo "Formatting: $file"
-              clang-format -i "$file"
+              echo "Checking formatting: $file"
+              # Create a temporary formatted version
+              clang-format "$file" > "${file}.formatted"
+              # Compare original with formatted version
+              if ! diff "$file" "${file}.formatted" > /dev/null; then
+                echo "❌ $file needs formatting"
+                echo "Run: clang-format -i $file"
+                # Show the diff for debugging
+                echo "Formatting diff:"
+                diff "$file" "${file}.formatted" || true
+                rm "${file}.formatted"
+                exit 1
+              else
+                echo "✅ $file is properly formatted"
+                rm "${file}.formatted"
+              fi
             fi
           done
-          
-      - name: Check if formatting changed files
-        if: steps.changed-files.outputs.changed_files != ''
-        id: check-format
-        run: |
-          # Check if any files were modified by formatting
-          if git diff --quiet; then
-            echo "All files are properly formatted"
-            echo "formatted=false" >> $GITHUB_OUTPUT
-          else
-            echo "Some files were reformatted"
-            echo "formatted=true" >> $GITHUB_OUTPUT
-          fi
-          
-      - name: Commit formatting changes
-        if: steps.changed-files.outputs.changed_files != '' && steps.check-format.outputs.formatted == 'true'
-        run: |
-          git config --local user.email "action@github.com"
-          git config --local user.name "GitHub Action"
-          git add -A
-          git commit -m "Auto-format C++ code with clang-format"
-          
-      - name: Push formatting changes
-        if: steps.changed-files.outputs.changed_files != '' && steps.check-format.outputs.formatted == 'true'
-        run: |
-          git push origin HEAD:${{ github.head_ref }}
-          
-      - name: Comment on PR
-        if: steps.changed-files.outputs.changed_files != '' && steps.check-format.outputs.formatted == 'true'
-        uses: actions/github-script@v7
-        with:
-          script: |
-            github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: '🤖 I\'ve automatically formatted the C++ code in this PR using clang-format. The changes have been committed and pushed to your branch.'
-            }) 
