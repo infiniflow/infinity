@@ -56,8 +56,7 @@ Status NewTxnTableStore1::Delete(const Vector<RowID> &row_ids) {
         auto &block_vec = seg_map[block_id];
         block_vec.emplace_back(block_offset);
         if (block_vec.size() > DEFAULT_BLOCK_CAPACITY) {
-            String error_message = "Delete row exceed block capacity";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Delete row exceed block capacity");
         }
     }
 

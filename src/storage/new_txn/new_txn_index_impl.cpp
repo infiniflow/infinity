@@ -176,7 +176,7 @@ Status NewTxn::DumpMemIndex(const String &db_name, const String &table_name, con
     // Return when there is no mem index to dump.
     if (mem_index == nullptr || (mem_index->GetBaseMemIndex() == nullptr && mem_index->GetEMVBIndex() == nullptr) ||
         (begin_row_id != RowID() && mem_index->GetBaseMemIndex() != nullptr && begin_row_id != mem_index->GetBaseMemIndex()->GetBeginRowID())) {
-        LOG_INFO(fmt::format("NewTxn::DumpMemIndex skipped dumping MemIndex {}.{}.{}.{}.{} since it doesn't exist.",
+        LOG_WARN(fmt::format("NewTxn::DumpMemIndex skipped dumping MemIndex {}.{}.{}.{}.{} since it doesn't exist.",
                              db_name,
                              table_name,
                              index_name,
@@ -936,7 +936,7 @@ Status NewTxn::PopulateIndex(const String &db_name,
     // PopulateIndex is used in create index / import and compact
     Optional<SegmentIndexMeta> segment_index_meta;
     {
-        Status status = NewCatalog::AddNewSegmentIndex1(table_index_meta, this, segment_meta.segment_id(), segment_index_meta);
+        auto status = NewCatalog::AddNewSegmentIndex1(table_index_meta, this, segment_meta.segment_id(), segment_index_meta);
         if (!status.ok()) {
             return status;
         }

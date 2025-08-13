@@ -350,7 +350,6 @@ TEST_P(TestTxnCheckpointTest, checkpoint_and_create_table) {
             status = new_txn_mgr->CommitTxn(txn);
             EXPECT_TRUE(status.ok());
 
-            LOG_INFO("Abc");
             new_txn_mgr->PrintAllKeyValue();
 
             Status status = txn2->Checkpoint(wal_manager_->LastCheckpointTS());

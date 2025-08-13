@@ -15,13 +15,10 @@ import :vec_store_type;
 import :dist_func_l2;
 import :dist_func_ip;
 import :hnsw_common;
-import column_def;
 import :index_hnsw;
 import :infinity_exception;
 import :index_base;
 import :logger;
-import internal_types;
-import embedding_info;
 import :infinity_context;
 import :logger;
 import :base_memindex;
@@ -31,6 +28,10 @@ import :third_party;
 import :config;
 import :chunk_index_meta;
 
+import internal_types;
+import embedding_info;
+import column_def;
+
 namespace infinity {
 
 class BufferManager;
@@ -38,7 +39,7 @@ struct ColumnVector;
 class BufferObj;
 class LocalFileHandle;
 
-export using AbstractHnsw = std::variant<UniquePtr<KnnHnsw<PlainCosVecStoreType<float>, SegmentOffset>>,
+using AbstractHnsw = std::variant<UniquePtr<KnnHnsw<PlainCosVecStoreType<float>, SegmentOffset>>,
                                   UniquePtr<KnnHnsw<PlainIPVecStoreType<float>, SegmentOffset>>,
                                   UniquePtr<KnnHnsw<PlainL2VecStoreType<float>, SegmentOffset>>,
                                   UniquePtr<KnnHnsw<PlainCosVecStoreType<u8>, SegmentOffset>>,

@@ -253,7 +253,7 @@ void BlockVersion::RollbackDelete(i32 offset) {
 
 bool BlockVersion::CheckDelete(i32 offset, TxnTimeStamp check_ts) const {
     std::shared_lock<std::shared_mutex> lock(rw_mutex_);
-    if (SizeT(offset) >= deleted_.size()) {
+    if (static_cast<SizeT>(offset) >= deleted_.size()) {
         return false;
     }
     return deleted_[offset] != 0 && deleted_[offset] <= check_ts;

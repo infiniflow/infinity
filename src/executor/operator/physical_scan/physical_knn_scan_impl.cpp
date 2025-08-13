@@ -29,11 +29,8 @@ import :physical_operator_type;
 import :base_table_ref;
 import :load_meta;
 import :knn_expression;
-import data_type;
 import :common_query_filter;
 import :physical_filter_scan_base;
-import logical_type;
-import internal_types;
 import :logger;
 import :block_index;
 import :knn_scan_data;
@@ -42,7 +39,6 @@ import :third_party;
 import :infinity_exception;
 import :default_values;
 import :column_expression;
-import embedding_info;
 import :buffer_manager;
 import :merge_knn;
 import :knn_result_handler;
@@ -53,15 +49,12 @@ import :roaring_bitmap;
 import :column_vector;
 import :index_hnsw;
 import :status;
-import create_index_info;
-import knn_expr;
 import :hnsw_handler;
 import :physical_match_tensor_scan;
 import :hnsw_alg;
 import :ivf_index_data_in_mem;
 import :ivf_index_data;
 import :ivf_index_search;
-
 import :new_txn;
 import :table_index_meeta;
 import :segment_index_meta;
@@ -69,10 +62,14 @@ import :table_meeta;
 import :segment_meta;
 import :block_meta;
 import :column_meta;
-import :index_base;
-import :new_catalog;
 import :mem_index;
-import :chunk_index_meta;
+
+import create_index_info;
+import knn_expr;
+import embedding_info;
+import logical_type;
+import internal_types;
+import data_type;
 
 namespace infinity {
 
