@@ -469,8 +469,7 @@ private:
 
         switch (right->vector_type()) {
             case ColumnVectorType::kInvalid: {
-                String error_message = "Invalid column vector type.";
-                UnrecoverableError(error_message);
+                UnrecoverableError("Invalid column vector type.");
             }
             case ColumnVectorType::kFlat: {
                 return ExecuteFlatFlat<LeftType, RightType, ResultType, Operator>(left,
@@ -503,8 +502,7 @@ private:
                                                                                            nullable);
             }
             case ColumnVectorType::kCompactBit: {
-                String error_message = "CompactBit isn't implemented.";
-                UnrecoverableError(error_message);
+                UnrecoverableError("CompactBit isn't implemented.");
             }
         }
     }
@@ -521,8 +519,7 @@ private:
 
         switch (right->vector_type()) {
             case ColumnVectorType::kInvalid: {
-                String error_message = "Invalid column vector type.";
-                UnrecoverableError(error_message);
+                UnrecoverableError("Invalid column vector type.");
             }
             case ColumnVectorType::kFlat: {
                 return ExecuteConstantFlat<LeftType, RightType, ResultType, Operator>(left,
@@ -555,8 +552,7 @@ private:
                                                                                                nullable);
             }
             case ColumnVectorType::kCompactBit: {
-                String error_message = "CompactBit isn't implemented.";
-                UnrecoverableError(error_message);
+                UnrecoverableError("CompactBit isn't implemented.");
                 return;
             }
         }
@@ -574,8 +570,7 @@ private:
 
         switch (right->vector_type()) {
             case ColumnVectorType::kInvalid: {
-                String error_message = "Invalid column vector type.";
-                UnrecoverableError(error_message);
+                UnrecoverableError("Invalid column vector type.");
                 break;
             }
             case ColumnVectorType::kFlat: {
@@ -609,8 +604,7 @@ private:
                                                                                                     nullable);
             }
             case ColumnVectorType::kCompactBit: {
-                String error_message = "CompactBit isn't implemented.";
-                UnrecoverableError(error_message);
+                UnrecoverableError("CompactBit isn't implemented.");
                 break;
             }
         }

@@ -781,8 +781,7 @@ Status LogicalPlanner::BuildCreateView(const CreateStatement *statement, SharedP
     } else {
         // Specify the view column
         if (column_count != bound_statement_ptr->names_ptr_->size()) {
-            String error_message = "Create view column count isn't matched.";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Create view column count isn't matched.");
         }
         columns_ptr = MakeShared<Vector<String>>(*(create_view_info->view_columns_));
     }
@@ -909,8 +908,7 @@ Status LogicalPlanner::BuildDrop(DropStatement *statement, SharedPtr<BindContext
             return BuildDropView(statement, bind_context_ptr);
         }
         case DDLType::kInvalid: {
-            String error_message = "Invalid drop statement type.";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Invalid drop statement type.");
         }
     }
     return Status::OK();

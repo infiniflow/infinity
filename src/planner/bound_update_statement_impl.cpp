@@ -74,8 +74,7 @@ SharedPtr<LogicalNode> BoundUpdateStatement::BuildPlan(QueryContext *query_conte
 SharedPtr<LogicalNode>
 BoundUpdateStatement::BuildFrom(SharedPtr<TableRef> &table_ref, QueryContext *query_context, const SharedPtr<BindContext> &bind_context) {
     if (table_ref.get() == nullptr || table_ref->type_ != TableRefType::kTable) {
-        String error_message = "Unsupported";
-        UnrecoverableError(error_message);
+        UnrecoverableError("Unsupported");
     }
     return BuildBaseTable(table_ref, query_context, bind_context);
 }

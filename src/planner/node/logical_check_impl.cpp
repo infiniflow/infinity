@@ -38,8 +38,7 @@ String ToString(CheckStmtType type) {
         case CheckStmtType::kTable:
             return "Check table";
         case CheckStmtType::kInvalid: {
-            String error_message = "Invalid chunk scan type";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Invalid chunk scan type");
         }
     }
     return {};

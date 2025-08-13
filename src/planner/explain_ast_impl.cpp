@@ -90,8 +90,7 @@ Status ExplainAST::Explain(const BaseStatement *statement, SharedPtr<Vector<Shar
             break;
         }
         default: {
-            String error_message = "Unexpected statement type";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Unexpected statement type");
         }
     }
     return Status::OK();
@@ -101,8 +100,7 @@ Status ExplainAST::BuildCreate(const CreateStatement *create_statement, SharedPt
 
     switch (create_statement->ddl_type()) {
         case DDLType::kInvalid: {
-            String error_message = "Invalid DDL type.";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Invalid DDL type.");
         }
         case DDLType::kDatabase: {
             String create_schema = String(intent_size, ' ') + "CREATE SCHEMA: ";
@@ -130,8 +128,7 @@ Status ExplainAST::BuildCreate(const CreateStatement *create_statement, SharedPt
 
             SizeT column_count = table_info->column_defs_.size();
             if (column_count == 0) {
-                String error_message = "Table definition without any columns";
-                UnrecoverableError(error_message);
+                UnrecoverableError("Table definition without any columns");
             }
 
             for (SizeT idx = 0; idx < column_count - 1; ++idx) {
@@ -224,8 +221,7 @@ Status ExplainAST::BuildInsert(const InsertStatement *insert_statement, SharedPt
 Status ExplainAST::BuildDrop(const DropStatement *drop_statement, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
     switch (drop_statement->ddl_type()) {
         case DDLType::kInvalid: {
-            String error_message = "Invalid DDL type.";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Invalid DDL type.");
         }
         case DDLType::kDatabase: {
             String drop_schema = String(intent_size, ' ') + "DROP SCHEMA: ";
@@ -313,8 +309,7 @@ Status ExplainAST::BuildSelect(const SelectStatement *select_statement,
         String projection_str = String(intent_size, ' ') + "projection: ";
         SizeT select_count = select_statement->select_list_->size();
         if (select_count == 0) {
-            String error_message = "No select list";
-            UnrecoverableError(error_message);
+            UnrecoverableError("No select list");
         }
         for (SizeT idx = 0; idx < select_count - 1; ++idx) {
             ParsedExpr *expr = select_statement->select_list_->at(idx);
@@ -329,8 +324,7 @@ Status ExplainAST::BuildSelect(const SelectStatement *select_statement,
         String highlight_str = String(intent_size, ' ') + "highlight: ";
         SizeT highlight_count = select_statement->highlight_list_->size();
         if (highlight_count == 0) {
-            String error_message = "No highlight expression";
-            UnrecoverableError(error_message);
+            UnrecoverableError("No highlight expression");
         }
         for (SizeT idx = 0; idx < highlight_count - 1; ++idx) {
             ParsedExpr *expr = select_statement->highlight_list_->at(idx);
@@ -773,8 +767,7 @@ Status ExplainAST::BuildShow(const ShowStatement *show_statement, SharedPtr<Vect
             break;
         }
         case ShowStmtType::kInvalid: {
-            String error_message = "Invalid show statement type";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Invalid show statement type");
         }
     }
     return Status::OK();
@@ -900,8 +893,7 @@ Status ExplainAST::BuildCopy(const CopyStatement *copy_statement, SharedPtr<Vect
             break;
         }
         case CopyFileType::kInvalid: {
-            String error_message = "Invalid file type";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Invalid file type");
         }
     }
     return Status::OK();
@@ -918,8 +910,7 @@ Status ExplainAST::BuildCheck(const CheckStatement *check_statement, SharedPtr<V
             break;
         }
         case CheckStmtType::kInvalid: {
-            String error_message = "Invalid file type";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Invalid file type");
         }
     }
     return Status::OK();

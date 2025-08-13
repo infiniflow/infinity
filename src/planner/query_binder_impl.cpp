@@ -89,12 +89,10 @@ UniquePtr<BoundSelectStatement> QueryBinder::BindSelect(const SelectStatement &s
     UniquePtr<BoundSelectStatement> bound_select_statement = BoundSelectStatement::Make(bind_context_ptr_);
 
     if (statement.select_list_ == nullptr) {
-        String error_message = "SELECT list is needed";
-        UnrecoverableError(error_message);
+        UnrecoverableError("SELECT list is needed");
     }
     if (statement.select_list_->empty()) {
-        String error_message = "SELECT list can't be empty";
-        UnrecoverableError(error_message);
+        UnrecoverableError("SELECT list can't be empty");
     }
 
     // 1. WITH clause
@@ -252,8 +250,7 @@ UniquePtr<BoundSelectStatement> QueryBinder::BindSelect(const SelectStatement &s
 
     // Trying to check if order by import new invisible column in project
     if (select_column_count < bound_select_statement->projection_expressions_.size()) {
-        String error_message = "Projection expressions more than expected!";
-        UnrecoverableError(error_message);
+        UnrecoverableError("Projection expressions more than expected!");
         //        bind_context_ptr_->result_index_ = bind_context_ptr_->GenerateTableIndex();
         //        PruneOutput(query_context_ptr_, select_column_count, bound_select_statement);
     } else {
@@ -300,8 +297,7 @@ SharedPtr<TableRef> QueryBinder::BuildFromClause(QueryContext *query_context, co
         }
 
         case TableRefType::kDummy: {
-            String error_message = "Unexpected table reference type.";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Unexpected table reference type.");
         }
 
             // TODO: No case currently, since parser doesn't support it.
@@ -783,8 +779,7 @@ void QueryBinder::GenerateColumns(const SharedPtr<Binding> &binding, const Strin
     switch (binding->binding_type_) {
 
         case BindingType::kInvalid: {
-            String error_message = "Invalid binding type";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Invalid binding type");
             break;
         }
         case BindingType::kTable: {
@@ -990,8 +985,7 @@ void QueryBinder::CheckKnnAndOrderBy(KnnDistanceType distance_type, OrderType or
             break;
         }
         default: {
-            String error_message = "Invalid KNN distance type";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Invalid KNN distance type");
         }
     }
 }

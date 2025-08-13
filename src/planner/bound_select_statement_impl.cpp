@@ -503,13 +503,11 @@ SharedPtr<LogicalKnnScan> BoundSelectStatement::BuildInitialKnnScan(SharedPtr<Ta
             return knn_scan_node;
         }
         case TableRefType::kSubquery: {
-            String error_message = "KNN is not supported on a SUBQUERY, now.";
-            UnrecoverableError(error_message);
+            UnrecoverableError("KNN is not supported on a SUBQUERY, now.");
             break;
         }
         default: {
-            String error_message = "Unexpected table type";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Unexpected table type");
         }
     }
 
@@ -536,8 +534,7 @@ BoundSelectStatement::BuildFrom(SharedPtr<TableRef> &table_ref, QueryContext *qu
                 return BuildDummyTable(table_ref, query_context, bind_context);
             }
             default: {
-                String error_message = "Unknown table reference type.";
-                UnrecoverableError(error_message);
+                UnrecoverableError("Unknown table reference type.");
             }
         }
     } else {
@@ -649,8 +646,7 @@ void BoundSelectStatement::BuildSubquery(SharedPtr<LogicalNode> &root,
     if (condition->type() == ExpressionType::kSubQuery) {
         if (building_subquery_) {
             // nested subquery
-            String error_message = "Nested subquery detected";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Nested subquery detected");
         }
         condition = UnnestSubquery(root, condition, query_context, bind_context);
     }

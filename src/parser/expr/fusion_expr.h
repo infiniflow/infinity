@@ -15,8 +15,6 @@
 #include "search_options.h"
 #include <memory>
 #include <string>
-#include <utility>
-#include <vector>
 
 namespace infinity {
 

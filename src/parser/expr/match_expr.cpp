@@ -1,9 +1,5 @@
 #include "match_expr.h"
-#include "parser_assert.h"
-#include "search_options.h"
-#include "spdlog/fmt/fmt.h"
 
-#include <cmath>
 #include <sstream>
 #include <utility>
 

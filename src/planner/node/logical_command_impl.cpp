@@ -98,8 +98,7 @@ String LogicalCommand::ToString(i64 &space) const {
                     break;
                 }
                 case SetVarType::kInvalid: {
-                    String error_message = "Invalid variable type.";
-                    UnrecoverableError(error_message);
+                    UnrecoverableError("Invalid variable type.");
                 }
             }
             break;
@@ -141,8 +140,7 @@ String LogicalCommand::ToString(i64 &space) const {
                     break;
                 }
                 case SnapshotOp::kInvalid: {
-                    String error_message = "Invalid snapshot operation type.";
-                    UnrecoverableError(error_message);
+                    UnrecoverableError("Invalid snapshot operation type.");
                 }
             }
 
@@ -163,8 +161,7 @@ String LogicalCommand::ToString(i64 &space) const {
                     break;
                 }
                 case SnapshotScope::kInvalid: {
-                    String error_message = "Invalid snapshot scope.";
-                    UnrecoverableError(error_message);
+                    UnrecoverableError("Invalid snapshot scope.");
                 }
             }
 
@@ -172,8 +169,7 @@ String LogicalCommand::ToString(i64 &space) const {
             break;
         }
         case CommandType::kInvalid: {
-            String error_message = "Invalid command type.";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Invalid command type.");
         }
     }
 

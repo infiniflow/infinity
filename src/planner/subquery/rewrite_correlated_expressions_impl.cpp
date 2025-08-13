@@ -43,8 +43,7 @@ SharedPtr<BaseExpression> RewriteCorrelatedExpressions::VisitReplace(const Share
     auto entry = bind_context_ptr_->correlated_column_map_.find(expression->binding());
     if (entry == bind_context_ptr_->correlated_column_map_.end()) {
         // This column expression wasn't stored in correlated column map before
-        String error_message = "Correlated expression isn't found.";
-        UnrecoverableError(error_message);
+        UnrecoverableError("Correlated expression isn't found.");
     }
 
     expression->SetBinding(base_binding_.table_idx, base_binding_.column_idx + entry->second);

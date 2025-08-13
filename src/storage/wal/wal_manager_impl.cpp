@@ -92,8 +92,7 @@ void WalManager::Start() {
     // TODO: recovery from wal checkpoint
     ofs_ = std::ofstream(wal_path_, std::ios::app | std::ios::binary);
     if (!ofs_.is_open()) {
-        String error_message = fmt::format("Failed to open wal file: {}", wal_path_);
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("Failed to open wal file: {}", wal_path_));
     }
     LOG_INFO(fmt::format("Open wal file: {}", wal_path_));
 
@@ -195,8 +194,7 @@ Vector<SharedPtr<String>> WalManager::GetDiffWalEntryString(TxnTimeStamp start_t
         while (iterator.HasNext()) {
             auto wal_entry = iterator.Next();
             if (wal_entry.get() == nullptr) {
-                String error_message = "Found unexpected bad wal entry";
-                UnrecoverableError(error_message);
+                UnrecoverableError("Found unexpected bad wal entry");
             }
             LOG_INFO(wal_entry->ToString());
 
@@ -216,8 +214,7 @@ Vector<SharedPtr<String>> WalManager::GetDiffWalEntryString(TxnTimeStamp start_t
         while (iterator.HasNext()) {
             auto wal_entry = iterator.Next();
             if (wal_entry.get() == nullptr) {
-                String error_message = "Found unexpected bad wal entry";
-                UnrecoverableError(error_message);
+                UnrecoverableError("Found unexpected bad wal entry");
                 break;
             }
             // LOG_TRACE(wal_entry->ToString());
@@ -243,11 +240,10 @@ Vector<SharedPtr<String>> WalManager::GetDiffWalEntryString(TxnTimeStamp start_t
         log_entry->WriteAdv(ptr);
         i32 act_size = ptr - buf_ptr->data();
         if (exp_size != act_size) {
-            String error_message = fmt::format("WalManager::Flush WalEntry estimated size {} differ with the actual one {}, entry {}",
+            UnrecoverableError(fmt::format("WalManager::Flush WalEntry estimated size {} differ with the actual one {}, entry {}",
                                                exp_size,
                                                act_size,
-                                               log_entry->ToString());
-            UnrecoverableError(error_message);
+                                               log_entry->ToString()));
         }
 
         // LOG_TRACE(fmt::format("SYNC: {}", log_entry->ToString()));
@@ -287,8 +283,7 @@ void WalManager::NewFlush() {
                     break;
                 }
                 default: {
-                    String error_message = fmt::format("NewTxnManager::Flush: txn state is {}, not committing", TxnState2Str(txn_state));
-                    UnrecoverableError(error_message);
+                    UnrecoverableError(fmt::format("NewTxnManager::Flush: txn state is {}, not committing", TxnState2Str(txn_state)));
                 }
             }
 
@@ -317,11 +312,10 @@ void WalManager::NewFlush() {
             entry->WriteAdv(ptr);
             i32 act_size = ptr - buf->data();
             if (exp_size != act_size) {
-                String error_message = fmt::format("WalManager::Flush WalEntry estimated size {} differ with the actual one {}, entry {}",
+                UnrecoverableError(fmt::format("WalManager::Flush WalEntry estimated size {} differ with the actual one {}, entry {}",
                                                    exp_size,
                                                    act_size,
-                                                   entry->ToString());
-                UnrecoverableError(error_message);
+                                                   entry->ToString()));
             }
             ofs_.write(buf->data(), ptr - buf->data());
 
@@ -460,13 +454,16 @@ bool WalManager::IsCheckpointing() const { return checkpoint_in_progress_; }
 void WalManager::UpdateCommitState(TxnTimeStamp commit_ts, i64 wal_size) {
     std::scoped_lock lock(mutex2_);
     if (commit_ts <= max_commit_ts_ || wal_size < wal_size_ /*equal when replay because both are 0*/) {
-        String error_message = fmt::format("WalManager::UpdateCommitState commit_ts {} <= max_commit_ts_ {} or wal_size {} <= wal_size_ {}",
+        // UnrecoverableError(fmt::format("WalManager::UpdateCommitState commit_ts {} <= max_commit_ts_ {} or wal_size {} <= wal_size_ {}",
+        //                                    commit_ts,
+        //                                    max_commit_ts_,
+        //                                    wal_size,
+        //                                    wal_size_));
+        LOG_ERROR(fmt::format("WalManager::UpdateCommitState commit_ts {} <= max_commit_ts_ {} or wal_size {} <= wal_size_ {}",
                                            commit_ts,
                                            max_commit_ts_,
                                            wal_size,
-                                           wal_size_);
-        // UnrecoverableError(error_message);
-        LOG_ERROR(error_message);
+                                           wal_size_));
         return;
     }
     max_commit_ts_ = commit_ts;
@@ -531,8 +528,7 @@ void WalManager::SwapWalFile(const TxnTimeStamp max_commit_ts, bool error_if_dup
     // Create a new wal file with the original name.
     ofs_ = std::ofstream(wal_path_, std::ios::app | std::ios::binary);
     if (!ofs_.is_open()) {
-        String error_message = fmt::format("Failed to open wal file: {}", wal_path_);
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("Failed to open wal file: {}", wal_path_));
     }
 
     last_swap_wal_ts_ = max_commit_ts;
@@ -621,8 +617,7 @@ Tuple<TransactionID, TxnTimeStamp, TxnTimeStamp> WalManager::GetReplayEntries(St
         while (iterator.HasNext()) {
             auto wal_entry = iterator.Next();
             if (wal_entry.get() == nullptr) {
-                String error_message = "Found unexpected bad wal entry";
-                UnrecoverableError(error_message);
+                UnrecoverableError("Found unexpected bad wal entry");
             }
             LOG_TRACE(wal_entry->ToString());
 
@@ -650,8 +645,7 @@ Tuple<TransactionID, TxnTimeStamp, TxnTimeStamp> WalManager::GetReplayEntries(St
         while (iterator.HasNext()) {
             auto wal_entry = iterator.Next();
             if (wal_entry.get() == nullptr) {
-                String error_message = "Found unexpected bad wal entry";
-                UnrecoverableError(error_message);
+                UnrecoverableError("Found unexpected bad wal entry");
                 // TODO: clean the wal entries, disk break will reach this place.
                 // replay_entries.clear();
                 break;
@@ -671,16 +665,14 @@ Tuple<TransactionID, TxnTimeStamp, TxnTimeStamp> WalManager::GetReplayEntries(St
         switch (targe_storage_mode) {
             case StorageMode::kWritable: {
                 // once wal is not empty, a checkpoint should always be found in leader or standalone mode.
-                String error_message = "WAL replay: No checkpoint found in wal";
-                UnrecoverableError(error_message);
+                UnrecoverableError("WAL replay: No checkpoint found in wal");
                 break;
             }
             case StorageMode::kReadable: {
                 return {0, 0, 0};
             }
             default: {
-                String error_message = "Unreachable branch";
-                UnrecoverableError(error_message);
+                UnrecoverableError("Unreachable branch");
             }
         }
     }
@@ -701,10 +693,9 @@ Tuple<TransactionID, TxnTimeStamp> WalManager::ReplayWalEntries(const Vector<Sha
 
     for (SizeT replay_count = 0; replay_count < replay_entries.size(); ++replay_count) {
         // if (replay_entries[replay_count]->commit_ts_ < max_checkpoint_ts) {
-        //     String error_message = fmt::format("Wal Replay: Commit ts should be greater than max commit ts, commit_ts: {}, max_commit: {}",
+        //     UnrecoverableError(fmt::format("Wal Replay: Commit ts should be greater than max commit ts, commit_ts: {}, max_commit: {}",
         //                                        replay_entries[replay_count]->commit_ts_,
-        //                                        max_checkpoint_ts);
-        //     UnrecoverableError(error_message);
+        //                                        max_checkpoint_ts));
         // }
         last_commit_ts = replay_entries[replay_count]->commit_ts_;
         last_txn_id = replay_entries[replay_count]->txn_id_;
@@ -759,8 +750,7 @@ Vector<SharedPtr<WalEntry>> WalManager::CollectWalEntries() const {
     }
 
     if (wal_list.empty()) {
-        String error_message = "No WAL file found";
-        UnrecoverableError(error_message);
+        UnrecoverableError("No WAL file found");
     }
 
     TxnTimeStamp max_checkpoint_ts = 0;
@@ -774,8 +764,7 @@ Vector<SharedPtr<WalEntry>> WalManager::CollectWalEntries() const {
         while (iterator.HasNext()) {
             auto wal_entry = iterator.Next();
             if (wal_entry.get() == nullptr) {
-                String error_message = "Found unexpected bad wal entry";
-                UnrecoverableError(error_message);
+                UnrecoverableError("Found unexpected bad wal entry");
             }
 
             LOG_TRACE(wal_entry->ToString());
@@ -797,8 +786,7 @@ Vector<SharedPtr<WalEntry>> WalManager::CollectWalEntries() const {
 
         if (system_start_ts == 0) {
             // once wal is not empty, a checkpoint should always be found.
-            String error_message = "No checkpoint found in WAL";
-            UnrecoverableError(error_message);
+            UnrecoverableError("No checkpoint found in WAL");
         }
 
         LOG_TRACE(fmt::format("Find checkpoint max commit ts: {}", max_checkpoint_ts));
@@ -806,8 +794,7 @@ Vector<SharedPtr<WalEntry>> WalManager::CollectWalEntries() const {
         while (iterator.HasNext()) {
             auto wal_entry = iterator.Next();
             if (wal_entry.get() == nullptr) {
-                String error_message = "Found unexpected bad wal entry";
-                UnrecoverableError(error_message);
+                UnrecoverableError("Found unexpected bad wal entry");
             }
 
             LOG_TRACE(wal_entry->ToString());

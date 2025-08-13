@@ -9,7 +9,6 @@
  */
 #include "parsed_expr.h"
 #include <string>
-#include <utility>
 #include <vector>
 
 namespace infinity {

@@ -37,8 +37,7 @@ namespace infinity {
 static String TableTypeToString(TableType type) {
     switch (type) {
         case TableType::kInvalid: {
-            String error_message = "Unexpected table type: Invalid";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Unexpected table type: Invalid");
             break;
         }
         case TableType::kDataTable:
@@ -56,8 +55,7 @@ static String TableTypeToString(TableType type) {
         case TableType::kCrossProduct:
             return "CrossProduct";
     }
-    String error_message = "Unexpected error.";
-    UnrecoverableError(error_message);
+    UnrecoverableError("Unexpected error.");
 
     return "";
 }
@@ -88,13 +86,10 @@ SharedPtr<Vector<RowID>> DataTable::GetRowIDVector() const {
 
 void DataTable::UnionWith(const SharedPtr<DataTable> &other) {
     if (this->row_count_ != other->row_count_) {
-        String error_message = fmt::format("Can't union two table with different row count {}:{}.", this->row_count_, other->row_count_);
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("Can't union two table with different row count {}:{}.", this->row_count_, other->row_count_));
     }
     if (this->data_blocks_.size() != other->data_blocks_.size()) {
-        String error_message =
-            fmt::format("Can't union two table with different block count {}:{}.", this->data_blocks_.size(), other->data_blocks_.size());
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("Can't union two table with different block count {}:{}.", this->data_blocks_.size(), other->data_blocks_.size()));
     }
     SizeT block_count = this->data_blocks_.size();
     for (SizeT idx = 0; idx < block_count; ++idx) {

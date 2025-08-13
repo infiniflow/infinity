@@ -38,8 +38,7 @@ inline String ToString(BaseTableType type) {
             return "Collection";
         }
         default: {
-            String error_message = "Invalid base table type";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Invalid base table type");
         }
     }
 

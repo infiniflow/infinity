@@ -251,8 +251,7 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildValueExpr(const ConstantExpr &e
             // It will be bound into a ValueExpression here.
             IntervalT interval_value(expr.integer_value_);
             if (expr.interval_type_ == TimeUnit::kInvalidUnit) {
-                String error_message = "Invalid time unit";
-                UnrecoverableError(error_message);
+                UnrecoverableError("Invalid time unit");
             }
             interval_value.unit = expr.interval_type_;
             Value value = Value::MakeInterval(interval_value);
@@ -280,8 +279,7 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildValueExpr(const ConstantExpr &e
         }
         case LiteralType::kSubArrayArray: {
             if (expr.sub_array_array_.size() == 0) {
-                String error_message = "Empty subarray array";
-                UnrecoverableError(error_message);
+                UnrecoverableError("Empty subarray array");
             }
             switch (expr.sub_array_array_[0]->literal_type_) {
                 case LiteralType::kIntegerArray:
@@ -361,8 +359,7 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildValueExpr(const ConstantExpr &e
                     }
                 }
                 default: {
-                    String error_message = "Unexpected subarray type";
-                    UnrecoverableError(error_message);
+                    UnrecoverableError("Unexpected subarray type");
                     return nullptr;
                 }
             }
@@ -424,8 +421,7 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildValueExpr(const ConstantExpr &e
         }
     }
 
-    String error_message = "Unreachable";
-    UnrecoverableError(error_message);
+    UnrecoverableError("Unreachable");
 }
 
 SharedPtr<BaseExpression> ExpressionBinder::BuildColExpr(const ColumnExpr &expr, BindContext *bind_context_ptr, i64 depth, bool) {
@@ -542,12 +538,10 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildFuncExpr(const FunctionExpr &ex
             return aggregate_function_ptr;
         }
         case FunctionType::kTable: {
-            String error_message = "Table function shouldn't be bound here.";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Table function shouldn't be bound here.");
         }
         default: {
-            String error_message = fmt::format("Unknown function type: {}", function_set_ptr->name());
-            UnrecoverableError(error_message);
+            UnrecoverableError(fmt::format("Unknown function type: {}", function_set_ptr->name()));
         }
     }
     return nullptr;
@@ -560,12 +554,10 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildCastExpr(const CastExpr &expr, 
 
 SharedPtr<BaseExpression> ExpressionBinder::BuildCaseExpr(const CaseExpr &expr, BindContext *bind_context_ptr, i64 depth, bool) {
     if (!expr.case_check_array_) {
-        String error_message = "No when and then expression";
-        UnrecoverableError(error_message);
+        UnrecoverableError("No when and then expression");
     }
     if (expr.case_check_array_->empty()) {
-        String error_message = "No when and then expression";
-        UnrecoverableError(error_message);
+        UnrecoverableError("No when and then expression");
     }
 
     SharedPtr<CaseExpression> case_expression_ptr = MakeShared<CaseExpression>();
@@ -813,8 +805,7 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildKnnExpr(const KnnExpr &parsed_k
 
     // Bind query column
     if (parsed_knn_expr.column_expr_->type_ != ParsedExprType::kColumn) {
-        String error_message = "Knn expression expect a column expression";
-        UnrecoverableError(error_message);
+        UnrecoverableError("Knn expression expect a column expression");
     }
     if (parsed_knn_expr.topn_ <= 0) {
         String topn = std::to_string(parsed_knn_expr.topn_);
@@ -1386,8 +1377,7 @@ template <typename T>
 ptr_t GetConcatenatedTensorData(const ConstantExpr *tensor_expr_, const u32 tensor_column_basic_embedding_dim, u32 &query_total_dimension) {
     if constexpr (std::is_same_v<T, bool>) {
         if (tensor_column_basic_embedding_dim % 8 != 0) {
-            String error_message = "The tensor column basic embedding dimension should be multiple of 8";
-            UnrecoverableError(error_message);
+            UnrecoverableError("The tensor column basic embedding dimension should be multiple of 8");
         }
     }
     switch (tensor_expr_->literal_type_) {
@@ -1401,8 +1391,7 @@ ptr_t GetConcatenatedTensorData(const ConstantExpr *tensor_expr_, const u32 tens
             return GetConcatenatedTensorDataFromSubArray<T>(tensor_expr_->sub_array_array_, tensor_column_basic_embedding_dim, query_total_dimension);
         }
         default: {
-            String error_message = "Unexpected case!";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Unexpected case!");
             return nullptr;
         }
     }

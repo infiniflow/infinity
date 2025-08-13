@@ -246,8 +246,7 @@ Status ExplainLogicalPlan::Explain(const LogicalNode *statement, SharedPtr<Vecto
             break;
         }
         default: {
-            String error_message = "Unexpected logical node type";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Unexpected logical node type");
         }
     }
     if (statement->left_node().get() != nullptr) {
@@ -321,8 +320,7 @@ Status ExplainLogicalPlan::Explain(const LogicalCreateTable *create_node, Shared
     {
         SizeT column_count = create_node->table_definitions()->column_count();
         if (column_count == 0) {
-            String error_message = "No columns in the table";
-            UnrecoverableError(error_message);
+            UnrecoverableError("No columns in the table");
         }
         const Vector<SharedPtr<ColumnDef>> &columns = create_node->table_definitions()->columns();
 
@@ -457,8 +455,7 @@ Status ExplainLogicalPlan::Explain(const LogicalCreateView *create_node, SharedP
     {
         SizeT column_count = create_node->names_ptr()->size();
         if (column_count == 0) {
-            String error_message = "No columns in the table";
-            UnrecoverableError(error_message);
+            UnrecoverableError("No columns in the table");
         }
         String columns_str;
         columns_str.append(String(intent_size, ' ')).append(" - columns: [");
@@ -676,8 +673,7 @@ Status ExplainLogicalPlan::Explain(const LogicalInsert *insert_node, SharedPtr<V
         insert_str = " - values ";
         SizeT value_count = insert_node->value_list().size();
         if (value_count == 0) {
-            String error_message = "No value list in insert statement";
-            UnrecoverableError(error_message);
+            UnrecoverableError("No value list in insert statement");
         }
         for (SizeT idx = 0; idx < value_count; ++idx) {
             if (idx != 0)
@@ -738,8 +734,7 @@ Status ExplainLogicalPlan::Explain(const LogicalProject *project_node, SharedPtr
         expression_str.append(String(intent_size, ' ')).append(" - expressions: [");
         SizeT expr_count = project_node->expressions_.size();
         if (expr_count == 0) {
-            String error_message = "No expression list in projection node.";
-            UnrecoverableError(error_message);
+            UnrecoverableError("No expression list in projection node.");
         }
         for (SizeT idx = 0; idx < expr_count - 1; ++idx) {
             Explain(project_node->expressions_[idx].get(), expression_str);
@@ -941,8 +936,7 @@ Status ExplainLogicalPlan::Explain(const LogicalTableScan *table_scan_node, Shar
     output_columns += " - output columns: [";
     SizeT column_count = table_scan_node->GetOutputNames()->size();
     if (column_count == 0) {
-        String error_message = fmt::format("No column in table: {}.", table_scan_node->TableAlias());
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("No column in table: {}.", table_scan_node->TableAlias()));
     }
     for (SizeT idx = 0; idx < column_count - 1; ++idx) {
         output_columns += table_scan_node->GetOutputNames()->at(idx);

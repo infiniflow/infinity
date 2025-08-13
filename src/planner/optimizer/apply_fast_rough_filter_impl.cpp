@@ -51,8 +51,7 @@ public:
                 auto &filter = static_cast<LogicalFilter &>(*op);
                 auto &filter_expression = filter.expression();
                 if (op->right_node().get() != nullptr) {
-                    String error_message = "BuildSecondaryIndexScan: Logical filter node shouldn't have right child.";
-                    UnrecoverableError(error_message);
+                    UnrecoverableError("BuildSecondaryIndexScan: Logical filter node shouldn't have right child.");
                 } else if (op->left_node()->operator_type() == LogicalNodeType::kTableScan) {
                     auto &table_scan = static_cast<LogicalTableScan &>(*(op->left_node()));
                     table_scan.fast_rough_filter_evaluator_ = FilterExpressionPushDown::PushDownToFastRoughFilter(filter_expression);
@@ -81,8 +80,7 @@ public:
                 break;
             }
             case LogicalNodeType::kIndexScan: {
-                String error_message = "ApplyFastRoughFilterMethod: IndexScan optimizer should not happen before ApplyFastRoughFilter optimizer.";
-                UnrecoverableError(error_message);
+                UnrecoverableError("ApplyFastRoughFilterMethod: IndexScan optimizer should not happen before ApplyFastRoughFilter optimizer.");
                 break;
             }
             default: {

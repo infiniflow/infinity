@@ -39,7 +39,3 @@ target_link_libraries(sql_parser PRIVATE infinity_core)
 
 target_include_directories(sql_parser PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 target_include_directories(sql_parser PUBLIC "${CMAKE_SOURCE_DIR}/third_party/spdlog/include")
-target_include_directories(sql_parser PUBLIC "${CMAKE_SOURCE_DIR}/third_party/nlohmann")
-target_include_directories(sql_parser PUBLIC "${CMAKE_SOURCE_DIR}/third_party/simdjson")
-target_include_directories(sql_parser PUBLIC "${CMAKE_SOURCE_DIR}/third_party/parallel-hashmap")
-target_include_directories(sql_parser PUBLIC "${CMAKE_SOURCE_DIR}/third_party/arrow/src")
