@@ -184,7 +184,6 @@ class TestInfinity:
         res = db_obj.drop_table("test_create_same_name"+suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-    # todo fix: why return TABLE_NOT_EXIST error
     @pytest.mark.usefixtures("skip_if_http")
     @pytest.mark.usefixtures("skip_if_local_infinity")
     def test_drop_same_name_table(self, suffix):
@@ -254,7 +253,7 @@ class TestInfinity:
             db_obj.create_table("test_various_table_create_option"+suffix, {"c1": {"type": "int"}}, conflict_type)
 
         assert e.type == InfinityException
-        #assert e.value.args[0] == ErrorCode.INVALID_CONFLICT_TYPE
+        assert e.value.args[0] == ErrorCode.INVALID_CONFLICT_TYPE
 
     @pytest.mark.parametrize("conflict_type", [
         ConflictType.Error,
@@ -283,7 +282,7 @@ class TestInfinity:
             db_obj.drop_table("test_various_table_drop_option"+suffix, conflict_type)
 
         assert e.type == InfinityException
-        #assert e.value.args[0] == ErrorCode.INVALID_CONFLICT_TYPE
+        assert e.value.args[0] == ErrorCode.INVALID_CONFLICT_TYPE
 
         res = db_obj.drop_table("test_various_table_drop_option"+suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
@@ -451,7 +450,7 @@ class TestInfinity:
         expect: all operations successfully
         """
         db_obj = self.infinity_obj.get_database("default_db")
-        table_name = "test_table_my_table"+suffix
+        table_name = "my_table"+suffix
         db_obj.drop_table(table_name, ConflictType.Ignore)
 
         # infinity
@@ -479,7 +478,8 @@ class TestInfinity:
                 "", {"c1": {"type": "int", "constraints": ["primary key"]}, "c2": {"type": "float"}},
                 ConflictType.Error)
 
-        # FIXME: res = db_obj.show_table("my_table")
+        res = db_obj.show_table(table_name)
+        assert res.error_code == ErrorCode.OK
 
         res = db_obj.list_tables()
         assert res.error_code == ErrorCode.OK

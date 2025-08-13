@@ -14,6 +14,7 @@ parent_dir = os.path.dirname(current_dir)
 if parent_dir not in sys.path:
     sys.path.insert(0, parent_dir)
 from infinity_http import infinity_http
+from polars.testing import assert_frame_not_equal
 
 @pytest.fixture(scope="class")
 def http(request):
@@ -146,7 +147,6 @@ class TestInfinity:
         res = db_obj.drop_table("test_update_non_existent_table"+suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-    @trace_expected_exceptions
     def test_update_no_row_is_met_the_condition(self, suffix):
 
         # connect
@@ -174,16 +174,17 @@ class TestInfinity:
 
             try:
                 tb_obj.update("c1 = 2", {"c2": common_values.types_example_array[i]})
-                res, extra_result = tb_obj.output(["*"]).to_df()
-                print("update type: {} \n {}".format(common_values.types_array[i], res))
+                new_res, extra_result = tb_obj.output(["*"]).to_df()
+                print("update type: {} \n {}".format(common_values.types_array[i], new_res))
 
             except Exception as e:
                 print(e)
+            
+            pd.testing.assert_frame_equal(res, new_res)
 
         for i in range(len(common_values.types_array)):
             db_obj.drop_table("test_update_no_row_is_met_the_condition" + str(i)+suffix, ConflictType.Error)
 
-    @trace_expected_exceptions
     def test_update_all_row_is_met_the_condition(self, suffix):
 
         # connect
@@ -211,12 +212,14 @@ class TestInfinity:
 
             try:
                 tb_obj.update("c1 = " + str(common_values.types_example_array[i]),
-                              {"c2": common_values.types_example_array[i]})
-                res, extra_result = tb_obj.output(["*"]).to_df()
-                print("update type: {} \n {}".format(common_values.types_array[i], res))
+                              {"c2": common_values.types_example_array[i]-1})
+                new_res, extra_result = tb_obj.output(["*"]).to_df()
+                print("update type: {} \n {}".format(common_values.types_array[i], new_res))
 
             except Exception as e:
                 print(e)
+
+            pd.testing.assert_frame_equal(res.assign(c2=res['c2'] - 1), new_res)
 
         for i in range(len(common_values.types_array)):
             db_obj.drop_table("test_update_all_row_is_met_the_condition" + str(i)+suffix, ConflictType.Error)
@@ -240,6 +243,8 @@ class TestInfinity:
         table_obj.update("c1 = 1", {"c2": 20})
         delete_res, extra_result = table_obj.output(["*"]).to_df()
         print(delete_res)
+
+        pd.testing.assert_frame_equal(insert_res.assign(c2=20).astype({'c2': 'int32'}) , delete_res)
 
         res = db_obj.drop_table("test_update_table_with_one_block"+suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
@@ -268,9 +273,11 @@ class TestInfinity:
         delete_res, extra_result = table_obj.output(["*"]).to_df()
         print(delete_res)
 
+        pd.testing.assert_frame_equal(insert_res.assign(c2=20).astype({'c2': 'int32'}) , delete_res)
         res = db_obj.drop_table("test_update_table_with_two_blocks"+suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
+    @pytest.mark.slow
     def test_update_table_with_one_segment(self, suffix):
         # connect
         db_obj = self.infinity_obj.get_database("default_db")
@@ -280,16 +287,19 @@ class TestInfinity:
                                         ConflictType.Error)
 
         # insert
-        for i in range(1024):
-            values = [{"c1": 1, "c2": 2} for _ in range(8)]
+        for _ in range(1025):
+            values = [{"c1": 1, "c2": 2} for _ in range(8192)]
             table_obj.insert(values)
-        insert_res, extra_result = table_obj.output(["*"]).to_df()
-        print(insert_res)
+        # `insert_res, extra_result = table_obj.output(["*"]).to_df()
+        # print(insert_res)
 
         # update
-        table_obj.update("c1 = 1", {"c2": 20})
-        delete_res, extra_result = table_obj.output(["*"]).to_df()
-        print(delete_res)
+        res = table_obj.update("c1 = 1", {"c2": 20})
+        assert res.error_code == ErrorCode.OK
+        # delete_res, extra_result = table_obj.output(["*"]).to_df()
+        # print(delete_res)
+
+        # pd.testing.assert_frame_equal(insert_res.assign(c2=20).astype({'c2': 'int32'}) , delete_res)
 
         res = db_obj.drop_table("test_update_table_with_one_segment"+suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
@@ -317,29 +327,11 @@ class TestInfinity:
         update_res, extra_result = table_obj.output(["*"]).to_df()
         print(update_res)
 
+        pd.testing.assert_frame_equal(delete_res,update_res)
+
         res = db_obj.drop_table("test_update_before_delete"+suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-    def test_update_inserted_data(self, suffix):
-        # connect
-        db_obj = self.infinity_obj.get_database("default_db")
-        db_obj.drop_table("test_update_inserted_data"+suffix, ConflictType.Ignore)
-        table_obj = db_obj.create_table("test_update_inserted_data"+suffix, {"c1": {"type": "int"}, "c2": {"type": "int"}},
-                                        ConflictType.Error)
-
-        # insert
-        values = [{"c1": 1, "c2": 2} for _ in range(8)]
-        table_obj.insert(values)
-        insert_res, extra_result = table_obj.output(["*"]).to_df()
-        print(insert_res)
-
-        # update
-        table_obj.update("c1 = 1", {"c2": 21})
-        update_res, extra_result = table_obj.output(["*"]).to_df()
-        print(update_res)
-
-        res = db_obj.drop_table("test_update_inserted_data"+suffix, ConflictType.Error)
-        assert res.error_code == ErrorCode.OK
 
     @pytest.mark.slow
     def test_update_inserted_long_before(self, suffix):
@@ -362,6 +354,8 @@ class TestInfinity:
         table_obj.update("c1 = 1", {"c2": 21})
         update_res, extra_result = table_obj.output(["*"]).to_df()
         print(update_res)
+
+        pd.testing.assert_frame_equal(insert_res.assign(c2=21).astype({'c2': 'int32'}),update_res)
 
         res = db_obj.drop_table("test_update_inserted_long_before"+suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
@@ -448,10 +442,10 @@ class TestInfinity:
     @pytest.mark.parametrize("filter_list", [
         "c1 > 10",
         "c2 > 1",
-        "c1 > 0.1 and c2 < 3.0",
-        "c1 > 0.1 and c2 < 1.0",
-        "c1 < 0.1 and c2 < 1.0",
-        "c1 < 0.1 and c1 > 1.0",
+        "c1 > 0.1 or c2 < 3.0",
+        "c1 > 0.1 or c2 < 1.0",
+        "c1 < 0.1 or c2 < 1.0",
+        "c1 < 0.1 or c1 > 1.0",
         "c1 = 0",
     ])
     @pytest.mark.parametrize("types_example", [1, 1.333])
@@ -469,10 +463,12 @@ class TestInfinity:
         insert_res, extra_result = table_obj.output(["*"]).to_df()
         print(insert_res)
 
-        # delete
+        # update
         table_obj.update(filter_list, {"c2": types_example})
-        delete_res, extra_result = table_obj.output(["*"]).to_df()
-        print(delete_res)
+        update_res, extra_result = table_obj.output(["*"]).to_df()
+        print(update_res)
+
+        assert(len(insert_res) == len(update_res))
 
         res = db_obj.drop_table("test_filter_expression"+suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
@@ -502,12 +498,14 @@ class TestInfinity:
         insert_res, extra_result = table_obj.output(["*"]).to_df()
         print(insert_res)
 
-        # delete
+        # update
         with pytest.raises(Exception):
             table_obj.update(filter_list, {"c2": types_example})
 
-        delete_res, extra_result = table_obj.output(["*"]).to_df()
-        print(delete_res)
+        update_res, extra_result = table_obj.output(["*"]).to_df()
+        print(update_res)
+
+        pd.testing.assert_frame_equal(insert_res, update_res)
 
         res = db_obj.drop_table("test_invalid_filter_expression"+suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
@@ -536,12 +534,14 @@ class TestInfinity:
         ])
 
         res, extra_result = table_instance.output(["*"]).to_pl()
-        print(res)
+        # print(res)
 
         table_instance.update("id = 1", {"content_demo_sparse":SparseVector([1, 2, 3], [1.1, 1.1, 1.1])})
 
-        res, extra_result = table_instance.output(["*"]).to_pl()
-        print(res)
+        new_res, extra_result = table_instance.output(["*"]).to_pl()
+        # print(new_res)
+
+        assert_frame_not_equal(res, new_res)
 
         res = db_obj.drop_table("test_update_sparse_vector"+suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
