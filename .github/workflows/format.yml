@@ -1,0 +1,119 @@
+name: Format C++ Code
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - 'src/**/*.cpp'
+      - 'src/**/*.h'
+      - 'src/**/*.hpp'
+      - 'test/**/*.cpp'
+      - 'test/**/*.h'
+      - 'test/**/*.hpp'
+      - 'example/**/*.cpp'
+      - 'example/**/*.h'
+      - 'example/**/*.hpp'
+      - 'client/**/*.cpp'
+      - 'client/**/*.h'
+      - 'client/**/*.hpp'
+      - 'benchmark/**/*.cpp'
+      - 'benchmark/**/*.h'
+      - 'benchmark/**/*.hpp'
+      - 'gui/**/*.cpp'
+      - 'gui/**/*.h'
+      - 'gui/**/*.hpp'
+      - 'thrift/**/*.cpp'
+      - 'thrift/**/*.h'
+      - 'thrift/**/*.hpp'
+      - 'tools/**/*.cpp'
+      - 'tools/**/*.h'
+      - 'tools/**/*.hpp'
+      - 'scripts/**/*.cpp'
+      - 'scripts/**/*.h'
+      - 'scripts/**/*.hpp'
+      - 'cmake/**/*.cmake'
+      - 'CMakeLists.txt'
+      - '.clang-format'
+
+jobs:
+  format:
+    name: Format C++ Code
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Need full history to get changed files
+          
+      - name: Install clang-format
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang-format-20
+          sudo ln -sf /usr/bin/clang-format-20 /usr/bin/clang-format
+          
+      - name: Get changed files
+        id: changed-files
+        run: |
+          # Get list of changed C++ files
+          CHANGED_FILES=$(git diff --name-only ${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }} | grep -E '\.(cpp|h|hpp|cmake)$' | grep -v 'third_party/' | grep -v 'build/' | grep -v 'cmake-build/' || true)
+          
+          if [ -n "$CHANGED_FILES" ]; then
+            echo "Changed C++ files:"
+            echo "$CHANGED_FILES"
+            echo "changed_files<<EOF" >> $GITHUB_OUTPUT
+            echo "$CHANGED_FILES" >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+          else
+            echo "No C++ files changed"
+            echo "changed_files=" >> $GITHUB_OUTPUT
+          fi
+          
+      - name: Format changed files
+        if: steps.changed-files.outputs.changed_files != ''
+        run: |
+          # Format each changed file
+          echo "${{ steps.changed-files.outputs.changed_files }}" | while read -r file; do
+            if [ -f "$file" ]; then
+              echo "Formatting: $file"
+              clang-format -i "$file"
+            fi
+          done
+          
+      - name: Check if formatting changed files
+        if: steps.changed-files.outputs.changed_files != ''
+        id: check-format
+        run: |
+          # Check if any files were modified by formatting
+          if git diff --quiet; then
+            echo "All files are properly formatted"
+            echo "formatted=false" >> $GITHUB_OUTPUT
+          else
+            echo "Some files were reformatted"
+            echo "formatted=true" >> $GITHUB_OUTPUT
+          fi
+          
+      - name: Commit formatting changes
+        if: steps.changed-files.outputs.changed_files != '' && steps.check-format.outputs.formatted == 'true'
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add -A
+          git commit -m "Auto-format C++ code with clang-format"
+          
+      - name: Push formatting changes
+        if: steps.changed-files.outputs.changed_files != '' && steps.check-format.outputs.formatted == 'true'
+        run: |
+          git push origin HEAD:${{ github.head_ref }}
+          
+      - name: Comment on PR
+        if: steps.changed-files.outputs.changed_files != '' && steps.check-format.outputs.formatted == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: '🤖 I\'ve automatically formatted the C++ code in this PR using clang-format. The changes have been committed and pushed to your branch.'
+            }) 
