@@ -62,6 +62,8 @@ import logical_type;
 import constant_expr;
 import internal_types;
 import statement_common;
+import embedding_info;
+
 
 using namespace infinity;
 
