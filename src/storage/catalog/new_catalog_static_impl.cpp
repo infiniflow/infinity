@@ -206,7 +206,7 @@ Status NewCatalog::InitCatalog(KVInstance *kv_instance, TxnTimeStamp checkpoint_
     };
     auto InitTable = [&](const String &table_id_str, DBMeeta &db_meta) {
         TableMeeta table_meta(db_meta.db_id_str(), table_id_str, kv_instance, checkpoint_ts, MAX_TIMESTAMP);
-        
+
         Vector<SegmentID> *segment_ids_ptr = nullptr;
         std::tie(segment_ids_ptr, status) = table_meta.GetSegmentIDs1();
         if (!status.ok()) {
@@ -994,23 +994,6 @@ Status NewCatalog::CleanBlockColumn(ColumnMeta &column_meta, const ColumnDef *co
     return Status::OK();
 }
 
-Status NewCatalog::AddNewSegmentIndex(TableIndexMeeta &table_index_meta, SegmentID segment_id, Optional<SegmentIndexMeta> &segment_index_meta) {
-    {
-        Status status = table_index_meta.AddSegmentID(segment_id);
-        if (!status.ok()) {
-            return status;
-        }
-    }
-    {
-        segment_index_meta.emplace(segment_id, table_index_meta);
-        Status status = segment_index_meta->InitSet();
-        if (!status.ok()) {
-            return status;
-        }
-    }
-    return Status::OK();
-}
-
 Status NewCatalog::AddNewSegmentIndex1(TableIndexMeeta &table_index_meta,
                                        NewTxn *new_txn,
                                        SegmentID segment_id,
@@ -1030,10 +1013,10 @@ Status NewCatalog::AddNewSegmentIndex1(TableIndexMeeta &table_index_meta,
 
 // TODO: add next_chunk_id to this logic
 Status NewCatalog::RestoreNewSegmentIndex1(TableIndexMeeta &table_index_meta,
-                                       NewTxn *new_txn,
-                                       SegmentID segment_id,
-                                       Optional<SegmentIndexMeta> &segment_index_meta,
-                                       ChunkID next_chunk_id) {
+                                           NewTxn *new_txn,
+                                           SegmentID segment_id,
+                                           Optional<SegmentIndexMeta> &segment_index_meta,
+                                           ChunkID next_chunk_id) {
     Status status = table_index_meta.AddSegmentIndexID1(segment_id, new_txn);
     if (!status.ok()) {
         return status;
@@ -1111,14 +1094,14 @@ Status NewCatalog::AddNewChunkIndex1(SegmentIndexMeta &segment_index_meta,
 }
 
 Status NewCatalog::RestoreNewChunkIndex1(SegmentIndexMeta &segment_index_meta,
-                                     NewTxn *new_txn,
-                                     ChunkID chunk_id,
-                                     RowID base_row_id,
-                                     SizeT row_count,
-                                     const String &base_name,
-                                     SizeT index_size,
-                                     Optional<ChunkIndexMeta> &chunk_index_meta,
-                                     bool is_link_files) {
+                                         NewTxn *new_txn,
+                                         ChunkID chunk_id,
+                                         RowID base_row_id,
+                                         SizeT row_count,
+                                         const String &base_name,
+                                         SizeT index_size,
+                                         Optional<ChunkIndexMeta> &chunk_index_meta,
+                                         bool is_link_files) {
     ChunkIndexMetaInfo chunk_info;
     chunk_info.base_name_ = base_name;
     chunk_info.base_row_id_ = base_row_id;
@@ -1139,7 +1122,6 @@ Status NewCatalog::RestoreNewChunkIndex1(SegmentIndexMeta &segment_index_meta,
     }
     return Status::OK();
 }
-
 
 Status NewCatalog::LoadFlushedChunkIndex1(SegmentIndexMeta &segment_index_meta, const WalChunkIndexInfo &chunk_info, NewTxn *new_txn) {
     Status status;
