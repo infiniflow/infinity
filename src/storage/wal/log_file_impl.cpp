@@ -56,8 +56,7 @@ Pair<Optional<TempWalFileInfo>, Vector<WalFileInfo>> WalFile::ParseWalFilenames(
         const auto &filename = entry->path().filename().string();
         if (IsEqual(filename, WalFile::TempWalFilename())) {
             if (cur_wal_info.has_value()) {
-                String error_message = fmt::format("Multiple current wal files found in the wal directory: {}", wal_dir);
-                UnrecoverableError(error_message);
+                UnrecoverableError(fmt::format("Multiple current wal files found in the wal directory: {}", wal_dir));
             }
             cur_wal_info = TempWalFileInfo{entry->path().string()};
         } else {

@@ -51,8 +51,7 @@ void QueueSourceState::MarkCompletedTask(u64 fragment_id) {
             num_tasks_.erase(it);
         }
     } else {
-        String error_message = "Get unexpected data from child fragment";
-        UnrecoverableError(error_message);
+        UnrecoverableError("Get unexpected data from child fragment");
     }
 }
 
@@ -62,8 +61,7 @@ void QueueSourceState::MarkCompletedTask(u64 fragment_id) {
 bool QueueSourceState::GetData() {
     SharedPtr<FragmentDataBase> fragment_data_base = nullptr;
     if (!source_queue_.TryDequeue(fragment_data_base)) {
-        String error_message = "This task should not be scheduled if the source queue is empty";
-        UnrecoverableError(error_message);
+        UnrecoverableError("This task should not be scheduled if the source queue is empty");
     }
 
     switch (fragment_data_base->type_) {
@@ -92,8 +90,7 @@ bool QueueSourceState::GetData() {
             break;
         }
         default: {
-            String error_message = "Not support fragment data type";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Not support fragment data type");
             break;
         }
     }
@@ -204,8 +201,7 @@ bool QueueSourceState::GetData() {
             break;
         }
         default: {
-            String error_message = "Not support operator type";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Not support operator type");
             break;
         }
     }

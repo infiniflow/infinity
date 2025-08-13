@@ -1555,8 +1555,7 @@ void NewCatalog::AddFunctionSet(NewCatalog *catalog, const SharedPtr<FunctionSet
     String name = function_set->name();
     StringToLower(name);
     if (catalog->function_sets_.contains(name)) {
-        String error_message = fmt::format("Trying to add duplicated function {} into catalog", name);
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("Trying to add duplicated function {} into catalog", name));
     }
     catalog->function_sets_.emplace(name, function_set);
 }

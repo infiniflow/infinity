@@ -1,4 +1,5 @@
 // Copyright(C) 2023 InfiniFlow, Inc. All rights reserved.
+// Copyright(C) 2023 InfiniFlow, Inc. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -69,8 +70,7 @@ VectorBuffer::Make(BufferObj *buffer_obj, BufferObj *outline_buffer_obj, SizeT d
 
 void VectorBuffer::InitializeCompactBit(SizeT capacity) {
     if (initialized_) {
-        String error_message = "Vector buffer is already initialized.";
-        UnrecoverableError(error_message);
+        UnrecoverableError("Vector buffer is already initialized.");
     }
     SizeT data_size = (capacity + 7) / 8;
     if (data_size > 0) {
@@ -83,8 +83,7 @@ void VectorBuffer::InitializeCompactBit(SizeT capacity) {
 
 void VectorBuffer::Initialize(SizeT type_size, SizeT capacity) {
     if (initialized_) {
-        String error_message = "Vector buffer is already initialized.";
-        UnrecoverableError(error_message);
+        UnrecoverableError("Vector buffer is already initialized.");
     }
     SizeT data_size = type_size * capacity;
     if (data_size > 0) {
@@ -100,17 +99,14 @@ void VectorBuffer::Initialize(SizeT type_size, SizeT capacity) {
 
 void VectorBuffer::InitializeCompactBit(BufferObj *buffer_obj, SizeT capacity) {
     if (initialized_) {
-        String error_message = "Vector buffer is already initialized.";
-        UnrecoverableError(error_message);
+        UnrecoverableError("Vector buffer is already initialized.");
     }
     SizeT data_size = (capacity + 7) / 8;
     if (buffer_obj == nullptr) {
-        String error_message = "Buffer object is nullptr.";
-        UnrecoverableError(error_message);
+        UnrecoverableError("Buffer object is nullptr.");
     }
     if (buffer_obj->GetBufferSize() != data_size) {
-        String error_message = "Buffer object size is not equal to data size.";
-        UnrecoverableError(error_message);
+        UnrecoverableError("Buffer object size is not equal to data size.");
     }
     ptr_ = buffer_obj->Load();
     initialized_ = true;
@@ -120,17 +116,14 @@ void VectorBuffer::InitializeCompactBit(BufferObj *buffer_obj, SizeT capacity) {
 
 void VectorBuffer::Initialize(BufferObj *buffer_obj, BufferObj *outline_buffer_obj, SizeT type_size, SizeT capacity) {
     if (initialized_) {
-        String error_message = "Vector buffer is already initialized.";
-        UnrecoverableError(error_message);
+        UnrecoverableError("Vector buffer is already initialized.");
     }
     SizeT data_size = type_size * capacity;
     if (buffer_obj == nullptr) {
-        String error_message = "Buffer object is nullptr.";
-        UnrecoverableError(error_message);
+        UnrecoverableError("Buffer object is nullptr.");
     }
     if (buffer_obj->GetBufferSize() != data_size) {
-        String error_message = "Buffer object size is not equal to data size.";
-        UnrecoverableError(error_message);
+        UnrecoverableError("Buffer object size is not equal to data size.");
     }
     ptr_ = buffer_obj->Load();
     if (buffer_type_ == VectorBufferType::kVarBuffer) {
@@ -159,8 +152,7 @@ void VectorBuffer::SetToCatalog(BufferObj *buffer_obj, BufferObj *outline_buffer
 void VectorBuffer::ResetToInit(VectorBufferType type) {
     if (type == VectorBufferType::kVarBuffer) {
         if (var_buffer_mgr_.get() != nullptr) {
-            String error_message = "Vector heap should be null.";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Vector heap should be null.");
         }
     }
 
@@ -171,8 +163,7 @@ void VectorBuffer::ResetToInit(VectorBufferType type) {
 
 void VectorBuffer::Copy(ptr_t input, SizeT size) {
     if (data_size_ < size) {
-        String error_message = "Attempt to copy an amount of data that cannot currently be accommodated";
-        UnrecoverableError(error_message);
+        UnrecoverableError("Attempt to copy an amount of data that cannot currently be accommodated");
     }
     // std::memcpy(data_.get(), input, size);
     std::memcpy(GetDataMut(), input, size);
@@ -186,8 +177,7 @@ bool VectorBuffer::RawPointerGetCompactBit(const u8 *src_ptr_u8, SizeT idx) {
 
 bool VectorBuffer::GetCompactBit(SizeT idx) const {
     if (idx >= capacity_) {
-        String error_message = "Index out of range.";
-        UnrecoverableError(error_message);
+        UnrecoverableError("Index out of range.");
     }
     return VectorBuffer::RawPointerGetCompactBit(reinterpret_cast<const u8 *>(GetData()), idx);
 }
@@ -204,8 +194,7 @@ void VectorBuffer::RawPointerSetCompactBit(u8 *dst_ptr_u8, SizeT idx, bool val) 
 
 void VectorBuffer::SetCompactBit(SizeT idx, bool val) {
     if (idx >= capacity_) {
-        String error_message = "Index out of range.";
-        UnrecoverableError(error_message);
+        UnrecoverableError("Index out of range.");
     }
     VectorBuffer::RawPointerSetCompactBit(reinterpret_cast<u8 *>(GetDataMut()), idx, val);
 }

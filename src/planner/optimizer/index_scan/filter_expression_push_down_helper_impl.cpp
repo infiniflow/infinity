@@ -100,8 +100,7 @@ inline bool IntegralContinueUnwind(BigIntT right_val_bigint, FilterCompareType &
             }
         }
         default: {
-            String error_message = "IntegralContinueUnwind(): compare type error.";
-            UnrecoverableError(error_message);
+            UnrecoverableError("IntegralContinueUnwind(): compare type error.");
             compare_type = FilterCompareType::kInvalid;
             return false;
         }
@@ -151,8 +150,7 @@ inline bool IntegralContinueUnwind(DoubleT right_val_double, FilterCompareType &
             return false;
         }
         default: {
-            String error_message = "IntegralContinueUnwind(): compare type error.";
-            UnrecoverableError(error_message);
+            UnrecoverableError("IntegralContinueUnwind(): compare type error.");
             compare_type = FilterCompareType::kInvalid;
             return false;
         }
@@ -183,8 +181,7 @@ inline void RewriteCompareT(T &right_val, FilterCompareType &compare_type) {
             break;
         }
         default: {
-            String error_message = "RewriteCompareT(): compare type error.";
-            UnrecoverableError(error_message);
+            UnrecoverableError("RewriteCompareT(): compare type error.");
         }
     }
 }
@@ -215,8 +212,7 @@ inline void RewriteCompareT(TIME &right_val_time, FilterCompareType &compare_typ
             break;
         }
         default: {
-            String error_message = "RewriteCompareT(): compare type error.";
-            UnrecoverableError(error_message);
+            UnrecoverableError("RewriteCompareT(): compare type error.");
         }
     }
     // recover original TIME type
@@ -250,8 +246,7 @@ inline void RewriteCompareT(Varchar &right_val, FilterCompareType &compare_type)
             break;
         }
         default: {
-            String error_message = "RewriteCompareT(): compare type error.";
-            UnrecoverableError(error_message);
+            UnrecoverableError("RewriteCompareT(): compare type error.");
         }
     }
 }
@@ -325,8 +320,7 @@ inline void RewriteCompare(Value &right_val, FilterCompareType &compare_type) {
             break;
         }
         default: {
-            String error_message = fmt::format("FindPrev(): type error: {}.", right_val.type().ToString());
-            UnrecoverableError(error_message);
+            UnrecoverableError(fmt::format("FindPrev(): type error: {}.", right_val.type().ToString()));
         }
     }
 }
@@ -350,8 +344,7 @@ inline void SimplifyCompareTypeAndValue(Value &right_val, FilterCompareType &com
             break;
         }
         case FilterCompareType::kInvalid: {
-            String error_message = "SimplifyCompareTypeAndValue(): compare type error.";
-            UnrecoverableError(error_message);
+            UnrecoverableError("SimplifyCompareTypeAndValue(): compare type error.");
         }
     }
 }
@@ -374,8 +367,7 @@ FilterExpressionPushDownHelper::UnwindCast(const SharedPtr<BaseExpression> &cast
         auto target_type = cast_expr->Type();
         auto target_logical_type = target_type.type();
         if (target_logical_type != right_val.type().type()) {
-            String error_message = fmt::format("UnwindCast(): type mismatch: {} vs {}.", target_type.ToString(), right_val.type().ToString());
-            UnrecoverableError(error_message);
+            UnrecoverableError(fmt::format("UnwindCast(): type mismatch: {} vs {}.", target_type.ToString(), right_val.type().ToString()));
             return {0, Value::MakeNull(), FilterCompareType::kInvalid};
         }
         // case 0. keep the original type?
@@ -473,8 +465,7 @@ FilterExpressionPushDownHelper::UnwindCast(const SharedPtr<BaseExpression> &cast
         // UnrecoverableError(fmt::format("UnwindCast(): error in: {}.", cast_expr->Name()));
         return {0, Value::MakeNull(), FilterCompareType::kInvalid};
     } else {
-        String error_message = fmt::format("UnwindCast(): expression type error: {}.", cast_expr->Name());
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("UnwindCast(): expression type error: {}.", cast_expr->Name()));
         return {0, Value::MakeNull(), FilterCompareType::kInvalid};
     }
 }

@@ -81,16 +81,14 @@ HnswFileWorker::~HnswFileWorker() {
 
 void HnswFileWorker::AllocateInMemory() {
     if (data_) {
-        String error_message = "Data is already allocated.";
-        UnrecoverableError(error_message);
+        UnrecoverableError("Data is already allocated.");
     }
     data_ = static_cast<void *>(new HnswHandlerPtr());
 }
 
 void HnswFileWorker::FreeInMemory() {
     if (!data_) {
-        String error_message = "FreeInMemory: Data is not allocated.";
-        UnrecoverableError(error_message);
+        UnrecoverableError("FreeInMemory: Data is not allocated.");
     }
     auto *hnsw_handler = reinterpret_cast<HnswHandlerPtr *>(data_);
     delete *hnsw_handler;
@@ -100,8 +98,7 @@ void HnswFileWorker::FreeInMemory() {
 
 bool HnswFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_success, const FileWorkerSaveCtx &ctx) {
     if (!data_) {
-        String error_message = "WriteToFileImpl: Data is not allocated.";
-        UnrecoverableError(error_message);
+        UnrecoverableError("WriteToFileImpl: Data is not allocated.");
     }
     auto *hnsw_handler = reinterpret_cast<HnswHandlerPtr *>(data_);
     (*hnsw_handler)->SaveToPtr(*file_handle_);

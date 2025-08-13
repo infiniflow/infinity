@@ -14,13 +14,13 @@
 
 module;
 
-#include <type_traits>
-
 export module infinity_core:diskann_dist_func;
 
 import :stl;
 import :search_top_1;
 import :infinity_exception;
+
+import std;
 
 namespace infinity {
 export enum class DiskAnnMetricType { L2, Cosine, IP, Invalid };

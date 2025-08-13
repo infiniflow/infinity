@@ -14,12 +14,7 @@
 
 module;
 
-#include <concepts>
 #include <cstdio>
-#include <stdexcept>
-#include <type_traits>
-#include <unistd.h>
-#include <vector>
 
 export module infinity_core:external_sort_merger;
 
@@ -28,8 +23,8 @@ import :loser_tree;
 import :infinity_exception;
 import :blocking_queue;
 
-// import std;
-// import std.compat;
+import std;
+import std.compat;
 import third_party;
 
 namespace infinity {

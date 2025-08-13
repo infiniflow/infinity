@@ -14,14 +14,9 @@
 
 #include "hnsw_benchmark_util.h"
 #include <cassert>
-#include <cstring>
-#include <functional>
-#include <iomanip>
-#include <iostream>
-#include <memory>
-#include <thread>
-#include <unordered_set>
 
+import std;
+import std.compat;
 import infinity_core;
 import compilation_config;
 import knn_expr;

@@ -214,12 +214,10 @@ SharedPtr<BaseExpression> SubqueryUnnest::UnnestUncorrelated(SubqueryExpression 
             break;
         }
         default: {
-            String error_message = "Unknown subquery type.";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Unknown subquery type.");
         }
     }
-    String error_message = "Not implement to unnest uncorrelated subquery.";
-    UnrecoverableError(error_message);
+    UnrecoverableError("Not implement to unnest uncorrelated subquery.");
     return nullptr;
 }
 
@@ -403,8 +401,7 @@ SharedPtr<BaseExpression> SubqueryUnnest::UnnestCorrelated(SubqueryExpression *e
             RecoverableError(status);
         }
     }
-    String error_message = "Unreachable";
-    UnrecoverableError(error_message);
+    UnrecoverableError("Unreachable");
     return nullptr;
 }
 

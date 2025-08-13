@@ -265,11 +265,11 @@ file(GLOB_RECURSE
         parser/*.cppm
 )
 
-file(GLOB_RECURSE
-        third_party_cpp
-        CONFIGURE_DEPENDS
-        ${CMAKE_SOURCE_DIR}/third_party/simdjson/*.cpp
-)
+#file(GLOB_RECURSE
+#        parser_impl_cpp
+#        CONFIGURE_DEPENDS
+#        parser/*_impl.cpp
+#)
 
 file(GLOB_RECURSE
         admin_cpp
@@ -302,7 +302,6 @@ add_library(infinity_core
         ${common_cpp}
         ${admin_cpp}
         ${network_cpp}
-        ${third_party_cpp}
 )
 
 target_sources(infinity_core
@@ -334,6 +333,7 @@ target_sources(infinity_core
         ${common_impl_cpp}
         ${admin_impl_cpp}
         ${network_impl_cpp}
+#        ${parser_impl_cpp}
 )
 
 #if (ARCH_AARCH64)

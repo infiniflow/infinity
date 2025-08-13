@@ -1106,12 +1106,10 @@ Status LogicalPlanner::BuildExport(const CopyStatement *statement, SharedPtr<Bin
                 case ParsedExprType::kColumn: {
                     ColumnExpr *column_expr = static_cast<ColumnExpr *>(expr);
                     if (column_expr->star_) {
-                        Status status = Status::NotSupport("Not support to export STAR expression");
-                        RecoverableError(status);
+                        RecoverableError(Status::NotSupport("Not support to export STAR expression"));
                     }
                     if (column_expr->generated_) {
-                        String error_message = "Column expression shouldn't be generated here";
-                        UnrecoverableError(error_message);
+                        UnrecoverableError("Column expression shouldn't be generated here");
                     }
 
                     SizeT name_count = column_expr->names_.size();
@@ -1437,8 +1435,7 @@ Status LogicalPlanner::BuildCommand(const CommandStatement *command_statement, S
             break;
         }
         default: {
-            String error_message = "Invalid command type.";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Invalid command type.");
         }
     }
     return Status::OK();
@@ -1870,8 +1867,7 @@ Status LogicalPlanner::BuildShow(ShowStatement *statement, SharedPtr<BindContext
             break;
         }
         default: {
-            String error_message = "Unexpected show statement type.";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Unexpected show statement type.");
         }
     }
 
@@ -1977,8 +1973,7 @@ Status LogicalPlanner::BuildCheck(const CheckStatement *statement, SharedPtr<Bin
 
             Optional<String> table_name = statement->table_name_;
             if (!table_name.has_value()) {
-                String error_message = "Check statement missing table table_name.";
-                UnrecoverableError(error_message);
+                UnrecoverableError("Check statement missing table table_name.");
             }
 
             NewTxn *new_txn = query_context_ptr_->GetNewTxn();
@@ -2002,8 +1997,7 @@ Status LogicalPlanner::BuildCheck(const CheckStatement *statement, SharedPtr<Bin
             break;
         }
         default: {
-            String error_message = "Unexpected check statement type.";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Unexpected check statement type.");
         }
     }
 

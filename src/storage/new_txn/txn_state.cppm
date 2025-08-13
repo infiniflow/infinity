@@ -55,8 +55,7 @@ export inline String TxnState2Str(TxnState txn_state) {
             break;
         }
     }
-    String error_message = "Invalid transaction state.";
-    UnrecoverableError(error_message);
+    UnrecoverableError("Invalid transaction state.");
     return String();
 }
 

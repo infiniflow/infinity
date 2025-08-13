@@ -568,8 +568,7 @@ void BuildFastRoughFilterTask::ExecuteInner(SegmentMeta *segment_meta, BuildingS
                 break;
             }
             default: {
-                String error_message = "BuildFastRoughFilterTask: unsupported data type";
-                UnrecoverableError(error_message);
+                UnrecoverableError("BuildFastRoughFilterTask: unsupported data type");
             }
         }
     }

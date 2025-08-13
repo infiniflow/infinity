@@ -20,11 +20,10 @@ module;
 #pragma clang diagnostic ignored "-Wmissing-field-initializers"
 #pragma clang diagnostic ignored "-W#pragma-messages"
 
-#include <ctpl_stl.h>
-
 #pragma clang diagnostic pop
 
 #include <cassert>
+#include <cstdio>
 
 module infinity_core:memory_indexer.impl;
 
@@ -336,7 +335,7 @@ SizeT MemoryIndexer::CommitSync(SizeT wait_if_empty_ms) {
     }
 
     MemUsageChange mem_usage_change = {true, 0};
-    while (1) {
+    while (true) {
         this->ring_sorted_.GetBatch(inverters, wait_if_empty_ms);
         // num_merged = inverters.size();
         if (inverters.empty()) {

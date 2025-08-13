@@ -26,6 +26,9 @@ import :vector_distance;
 import :logger;
 import :simd_functions;
 
+// import std;
+// import std.compat;
+
 namespace infinity {
 
 inline Vector<u32> RandomPermutatePartially(const u32 vector_count, u32 random_num = 0) {

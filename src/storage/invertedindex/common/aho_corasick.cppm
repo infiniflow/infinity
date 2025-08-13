@@ -1,13 +1,11 @@
 module;
 
-#include <cstddef>
-
 export module infinity_core:aho_corasick;
 
 import :stl;
 import :darts;
 
-// import std.compat;
+import std.compat;
 
 namespace infinity {
 

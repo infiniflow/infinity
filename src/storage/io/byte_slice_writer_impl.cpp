@@ -86,8 +86,7 @@ void ByteSliceWriter::Write(ByteSliceList &src) { slice_list_->MergeWith(src); }
 
 void ByteSliceWriter::Write(const ByteSliceList &src, u32 start, u32 end) {
     if (start >= end || end > src.GetTotalSize()) {
-        String error_message = "Write past EOF";
-        UnrecoverableError(error_message);
+        UnrecoverableError("Write past EOF");
     }
 
     ByteSlice *curr_slice = nullptr;

@@ -295,8 +295,7 @@ void PhysicalImport::NewImportTypeVecs(QueryContext *query_context,
     SizeT embedding_width = EmbeddingType::embedding_type_width[static_cast<int>(embedding_data_type)];
     SizeT row_size = dimension * embedding_width + sizeof(dimension);
     if (file_size % row_size != 0) {
-        String error_message = "Weird file size.";
-        UnrecoverableError(error_message);
+        UnrecoverableError("Weird file size.");
     }
     SizeT vector_n = file_size / row_size;
 

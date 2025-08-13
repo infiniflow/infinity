@@ -62,6 +62,8 @@ module;
 
 #include <re2/re2.h>
 
+// #include "inc/mlas.h"
+
 #pragma clang diagnostic pop
 
 export module third_party;
@@ -358,9 +360,12 @@ using MergeOperator = ::ROCKSDB_NAMESPACE::MergeOperator;
 using Logger = ::ROCKSDB_NAMESPACE::Logger;
 } // namespace rocksdb
 
-export namespace re2 {
-using RE2 = ::re2::RE2;
+namespace re2 {
+export using ::re2::RE2;
 };
+
+// mlas
+// export using CBLAS_TRANSPOSE
 
 
 } // namespace infinity

@@ -48,20 +48,17 @@ RawFileWorker::~RawFileWorker() {
 
 void RawFileWorker::AllocateInMemory() {
     if (data_ != nullptr) {
-        String error_message = "Data is already allocated.";
-        UnrecoverableError(error_message);
+        UnrecoverableError("Data is already allocated.");
     }
     if (buffer_size_ == 0) {
-        String error_message = "Buffer size is 0.";
-        UnrecoverableError(error_message);
+        UnrecoverableError("Buffer size is 0.");
     }
     data_ = static_cast<void *>(new char[buffer_size_]);
 }
 
 void RawFileWorker::FreeInMemory() {
     if (data_ == nullptr) {
-        String error_message = "Data is already freed.";
-        UnrecoverableError(error_message);
+        UnrecoverableError("Data is already freed.");
     }
     delete[] static_cast<char *>(data_);
     data_ = nullptr;

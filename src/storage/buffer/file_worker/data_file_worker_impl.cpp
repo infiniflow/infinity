@@ -49,20 +49,17 @@ DataFileWorker::~DataFileWorker() {
 
 void DataFileWorker::AllocateInMemory() {
     if (data_ != nullptr) {
-        String error_message = "Data is already allocated.";
-        UnrecoverableError(error_message);
+        UnrecoverableError("Data is already allocated.");
     }
     if (buffer_size_ == 0) {
-        String error_message = "Buffer size is 0.";
-        UnrecoverableError(error_message);
+        UnrecoverableError("Buffer size is 0.");
     }
     data_ = static_cast<void *>(new char[buffer_size_]{});
 }
 
 void DataFileWorker::FreeInMemory() {
     if (data_ == nullptr) {
-        String error_message = "Data is already freed.";
-        UnrecoverableError(error_message);
+        UnrecoverableError("Data is already freed.");
     }
     delete[] static_cast<char *>(data_);
     data_ = nullptr;
@@ -196,8 +193,7 @@ void DataFileWorker::FreeFromMmapImpl() {}
 
 void DataFileWorker::SetDataSize(SizeT size) {
     if (data_ == nullptr) {
-        String error_message = "Data has not been set.";
-        UnrecoverableError(error_message);
+        UnrecoverableError("Data has not been set.");
     }
     data_size_.store(size);
 }

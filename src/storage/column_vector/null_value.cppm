@@ -14,14 +14,12 @@
 
 module;
 
-#include <string>
-
 export module infinity_core:null_value;
 
 import :stl;
 import :infinity_exception;
 
-// import std;
+import std;
 
 import internal_types;
 import data_type;

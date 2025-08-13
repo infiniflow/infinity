@@ -15,8 +15,6 @@
 module;
 
 #include <cassert>
-#include <ostream>
-#include <random>
 
 export module infinity_core:vamana_alg;
 
@@ -32,6 +30,7 @@ import :diskann_dist_func;
 import :diskann_utils;
 import :default_values;
 
+import std;
 import third_party;
 
 import logical_type;

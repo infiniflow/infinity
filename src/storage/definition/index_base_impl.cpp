@@ -106,8 +106,7 @@ void IndexBase::WriteAdv(char *&ptr) const {
 SharedPtr<IndexBase> IndexBase::ReadAdv(const char *&ptr, int32_t maxbytes) {
     const char *const ptr_end = ptr + maxbytes;
     if (maxbytes <= 0) {
-        String error_message = "ptr goes out of range when reading IndexBase";
-        UnrecoverableError(error_message);
+        UnrecoverableError("ptr goes out of range when reading IndexBase");
     }
     IndexType index_type = ReadBufAdv<IndexType>(ptr);
     Vector<String> column_names;
@@ -188,8 +187,7 @@ SharedPtr<IndexBase> IndexBase::ReadAdv(const char *&ptr, int32_t maxbytes) {
             break;
         }
         case IndexType::kInvalid: {
-            String error_message = "Error index method while reading";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Error index method while reading");
         }
         default: {
             Status status = Status::NotSupport("Not implemented");
@@ -197,8 +195,7 @@ SharedPtr<IndexBase> IndexBase::ReadAdv(const char *&ptr, int32_t maxbytes) {
         }
     }
     if (ptr_end < ptr) {
-        String error_message = "ptr goes out of range when reading IndexBase";
-        UnrecoverableError(error_message);
+        UnrecoverableError("ptr goes out of range when reading IndexBase");
     }
     return res;
 }
@@ -331,12 +328,10 @@ SharedPtr<IndexBase> IndexBase::Deserialize(std::string_view index_def_str) {
             break;
         }
         case IndexType::kInvalid: {
-            String error_message = "Error index method while deserializing";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Error index method while deserializing");
         }
         default: {
-            Status status = Status::NotSupport("Not implemented");
-            RecoverableError(status);
+            RecoverableError(Status::NotSupport("Not implemented"));
         }
     }
     return res;

@@ -49,8 +49,7 @@ FileWorker::FileWorker(SharedPtr<String> data_dir,
     : data_dir_(std::move(data_dir)), temp_dir_(std::move(temp_dir)), file_dir_(std::move(file_dir)), file_name_(std::move(file_name)),
       persistence_manager_(persistence_manager) {
     if (std::filesystem::path(*file_dir_).is_absolute()) {
-        String error_message = fmt::format("File directory {} is an absolute path.", *file_dir_);
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("File directory {} is an absolute path.", *file_dir_));
     }
 #ifdef INFINITY_DEBUG
     GlobalResourceUsage::IncrObjectCount("FileWorker");
@@ -65,8 +64,7 @@ FileWorker::~FileWorker() {
 
 bool FileWorker::WriteToFile(bool to_spill, const FileWorkerSaveCtx &ctx) {
     if (data_ == nullptr) {
-        String error_message = "No data will be written.";
-        UnrecoverableError(error_message);
+        UnrecoverableError("No data will be written.");
     }
 
     if (persistence_manager_ != nullptr && !to_spill) {
@@ -173,8 +171,7 @@ void FileWorker::MoveFile() {
 
 void FileWorker::SetData(void *data) {
     if (data_ != nullptr) {
-        String error_message = "Data has been set.";
-        UnrecoverableError(error_message);
+        UnrecoverableError("Data has been set.");
     }
     data_ = data;
 }
@@ -206,8 +203,7 @@ Pair<Optional<DeferFn<std::function<void()>>>, String> FileWorker::GetFilePathIn
         PersistResultHandler handler = PersistResultHandler(persistence_manager_);
         obj_addr_ = handler.HandleReadResult(result);
         if (!obj_addr_.Valid()) {
-            String error_message = fmt::format("Failed to find object for local path {}", read_path);
-            UnrecoverableError(error_message);
+            UnrecoverableError(fmt::format("Failed to find object for local path {}", read_path));
         }
         read_path = persistence_manager_->GetObjPath(obj_addr_.obj_key_);
     }
@@ -239,8 +235,7 @@ void FileWorker::CleanupTempFile() const {
         LOG_TRACE(fmt::format("Clean temp file: {}", path));
         VirtualStore::DeleteFile(path);
     } else {
-        String error_message = fmt::format("Cleanup: File {} not found for deletion", path);
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("Cleanup: File {} not found for deletion", path));
     }
 }
 

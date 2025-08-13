@@ -68,13 +68,11 @@ export String FileWorkerType2Str(FileWorkerType type) {
             return "BMP index";
         }
         case FileWorkerType::kInvalid: {
-            String error_message = "Invalid file worker type";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Invalid file worker type");
         }
     }
-    String error_message = "Unreachable";
-    UnrecoverableError(error_message);
-    return error_message;
+    UnrecoverableError("Unreachable");
+    return "";
 }
 
 } // namespace infinity

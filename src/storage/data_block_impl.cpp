@@ -314,12 +314,11 @@ void DataBlock::AppendWith(const DataBlock *other) {
             fmt::format("Attempt merge block with column count {} into block with column count {}", other->column_count(), this->column_count()));
     }
     if (this->row_count_ + other->row_count_ > this->capacity_) {
-        String error_message = fmt::format("Attempt append block with row count {} into block with row count {}, "
+        UnrecoverableError(fmt::format("Attempt append block with row count {} into block with row count {}, "
                                            "which exceeds the capacity {}",
                                            other->row_count(),
                                            this->row_count(),
-                                           this->capacity());
-        UnrecoverableError(error_message);
+                                           this->capacity()));
     }
 
     SizeT column_count = this->column_count();
@@ -335,12 +334,11 @@ void DataBlock::AppendWith(const DataBlock *other, SizeT from, SizeT count) {
             fmt::format("Attempt merge block with column count {} into block with column count {}", other->column_count(), this->column_count()));
     }
     if (this->row_count_ + count > this->capacity_) {
-        String error_message = fmt::format("Attempt append block with row count {} into block with row count{}, "
+        UnrecoverableError(fmt::format("Attempt append block with row count {} into block with row count{}, "
                                            "which exceeds the capacity {}",
                                            count,
                                            this->row_count(),
-                                           this->capacity());
-        UnrecoverableError(error_message);
+                                           this->capacity()));
     }
     SizeT column_count = this->column_count();
     for (SizeT idx = 0; idx < column_count; ++idx) {

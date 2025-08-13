@@ -14,15 +14,13 @@
 
 #include <cassert>
 #include <csignal>
-#include <cstring>
-#include <string>
-#include <tuple>
 #include <unistd.h>
-#include <vector>
 #ifdef ENABLE_JEMALLOC_PROF
 #include <jemalloc/jemalloc.h>
 #endif
 
+import std;
+import std.compat;
 import infinity_core;
 import compilation_config;
 import internal_types;

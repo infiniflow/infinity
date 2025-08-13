@@ -1,14 +1,11 @@
 module;
 
-#include <cstdio>
-#include <iterator>
-
 export module infinity_core:rcu_multimap;
 
 import :stl;
 
-// import std;
-// import std.compat;
+import std;
+import std.compat;
 
 namespace infinity {
 

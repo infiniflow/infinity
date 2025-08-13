@@ -74,16 +74,14 @@ BMPIndexFileWorker::~BMPIndexFileWorker() {
 
 void BMPIndexFileWorker::AllocateInMemory() {
     if (data_) {
-        const auto error_message = "Data is already allocated.";
-        UnrecoverableError(error_message);
+        UnrecoverableError("Data is already allocated.");
     }
     data_ = static_cast<void *>(new BMPHandlerPtr());
 }
 
 void BMPIndexFileWorker::FreeInMemory() {
     if (!data_) {
-        const auto error_message = "Data is not allocated.";
-        UnrecoverableError(error_message);
+        UnrecoverableError("Data is not allocated.");
     }
     auto *bmp_handler = reinterpret_cast<BMPHandlerPtr *>(data_);
     delete *bmp_handler;

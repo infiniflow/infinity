@@ -3,13 +3,12 @@
 module;
 
 #include <cassert>
-#include <vector>
 
 export module infinity_core:loser_tree;
 
 import :stl;
 
-// import std;
+import std;
 import third_party;
 
 namespace infinity {

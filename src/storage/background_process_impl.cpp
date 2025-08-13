@@ -123,7 +123,7 @@ void BGTaskProcessor::Process() {
                         }
 
                         CleanupTxnStore *cleanup_txn_store = static_cast<CleanupTxnStore *>(new_txn_shared->GetTxnStore());
-                        if(cleanup_txn_store != nullptr) {
+                        if (cleanup_txn_store != nullptr) {
                             TxnTimeStamp clean_ts = cleanup_txn_store->timestamp_;
                             SharedPtr<BGTaskInfo> bg_task_info = MakeShared<BGTaskInfo>(BGTaskType::kNewCleanup);
                             String task_text = fmt::format("NewCleanup task, cleanup timestamp: {}", clean_ts);
@@ -158,8 +158,7 @@ void BGTaskProcessor::Process() {
                     break;
                 }
                 default: {
-                    String error_message = fmt::format("Invalid background task: {}", (u8)bg_task->type_);
-                    UnrecoverableError(error_message);
+                    UnrecoverableError(fmt::format("Invalid background task: {}", static_cast<u8>(bg_task->type_)));
                     break;
                 }
             }

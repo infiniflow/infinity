@@ -81,8 +81,7 @@ private:
     void SetHaveStartedMinMaxFilterBuildTask(TxnTimeStamp begin_ts) {
         std::lock_guard lock(mutex_check_task_start_);
         if (build_time_ != UNCOMMIT_TS) {
-            String error_message = "FastRoughFilter::SetHaveStartedBuildTask(): Job already started.";
-            UnrecoverableError(error_message);
+            UnrecoverableError("FastRoughFilter::SetHaveStartedBuildTask(): Job already started.");
         }
         build_time_ = begin_ts;
     }

@@ -64,15 +64,13 @@ SharedPtr<MetaTree> MetaTree::MakeMetaTree(const Vector<SharedPtr<MetaKey>> &met
 
                 // Check if duplicated
                 if (db_names.contains(db_key->db_name_)) {
-                    String error_message = fmt::format("Duplicate db name: {}, idx: {}", db_key->ToString(), idx);
-                    UnrecoverableError(error_message);
+                    UnrecoverableError(fmt::format("Duplicate db name: {}, idx: {}", db_key->ToString(), idx));
                 } else {
                     db_names.emplace(db_key->db_name_);
                 }
 
                 if (db_ids.contains(db_key->db_id_str_)) {
-                    String error_message = fmt::format("Duplicate db id: {}, idx: {}", db_key->ToString(), idx);
-                    UnrecoverableError(error_message);
+                    UnrecoverableError(fmt::format("Duplicate db id: {}, idx: {}", db_key->ToString(), idx));
                 } else {
                     db_ids.emplace(db_key->db_id_str_);
                 }
@@ -106,8 +104,7 @@ SharedPtr<MetaTree> MetaTree::MakeMetaTree(const Vector<SharedPtr<MetaKey>> &met
 
                 auto &table_map = iter->second->table_map_;
                 if (table_map.contains(table_key->table_id_str_)) {
-                    String error_message = fmt::format("Duplicate table id: {}, idx: {}", table_key->ToString(), idx);
-                    UnrecoverableError(error_message);
+                    UnrecoverableError(fmt::format("Duplicate table id: {}, idx: {}", table_key->ToString(), idx));
                 }
 
                 table_map.emplace(table_key->table_id_str_, table_object);
@@ -125,8 +122,7 @@ SharedPtr<MetaTree> MetaTree::MakeMetaTree(const Vector<SharedPtr<MetaKey>> &met
                 auto &db_object = db_iter->second;
                 auto &tag_map = db_object->tag_map_;
                 if (tag_map.contains(db_tag_key->tag_name_)) {
-                    String error_message = fmt::format("Duplicate db tag: {}, idx: {}", db_tag_key->ToString(), idx);
-                    UnrecoverableError(error_message);
+                    UnrecoverableError(fmt::format("Duplicate db tag: {}, idx: {}", db_tag_key->ToString(), idx));
                 }
                 tag_map.emplace(db_tag_key->tag_name_, meta_key);
                 break;
@@ -162,8 +158,7 @@ SharedPtr<MetaTree> MetaTree::MakeMetaTree(const Vector<SharedPtr<MetaKey>> &met
                 MetaTableObject *table_object = static_cast<MetaTableObject *>(table_iter->second.get());
                 auto &segment_map = table_object->segment_map_;
                 if (segment_map.contains(segment_key->segment_id_)) {
-                    String error_message = fmt::format("Duplicate segment id: {}, idx: {}", segment_key->ToString(), idx);
-                    UnrecoverableError(error_message);
+                    UnrecoverableError(fmt::format("Duplicate segment id: {}, idx: {}", segment_key->ToString(), idx));
                 }
 
                 auto segment_object = MakeShared<MetaSegmentObject>(meta_key);
@@ -350,8 +345,7 @@ SharedPtr<MetaTree> MetaTree::MakeMetaTree(const Vector<SharedPtr<MetaKey>> &met
                 auto &segment_map = table_object->segment_map_;
                 auto segment_iter = segment_map.find(block_key->segment_id_);
                 if (segment_iter == segment_map.end()) {
-                    String error_message = fmt::format("Segment not found: {}, idx: {}", block_key->ToString(), idx);
-                    UnrecoverableError(error_message);
+                    UnrecoverableError(fmt::format("Segment not found: {}, idx: {}", block_key->ToString(), idx));
                 }
 
                 MetaSegmentObject *segment_object = static_cast<MetaSegmentObject *>(segment_iter->second.get());
@@ -393,8 +387,7 @@ SharedPtr<MetaTree> MetaTree::MakeMetaTree(const Vector<SharedPtr<MetaKey>> &met
                 auto &block_map = segment_object->block_map_;
                 auto block_iter = block_map.find(block_tag->block_id_);
                 if (block_iter == block_map.end()) {
-                    String error_message = fmt::format("Block not found: {}, idx: {}", block_tag->ToString(), idx);
-                    UnrecoverableError(error_message);
+                    UnrecoverableError(fmt::format("Block not found: {}, idx: {}", block_tag->ToString(), idx));
                 }
 
                 MetaBlockObject *block_object = static_cast<MetaBlockObject *>(block_iter->second.get());
@@ -544,8 +537,7 @@ SharedPtr<MetaTree> MetaTree::MakeMetaTree(const Vector<SharedPtr<MetaKey>> &met
                 auto pm_obj_key = static_cast<PmStatMetaKey *>(meta_key.get());
                 auto pm_obj_iter = meta_tree->pm_object_map_.find(pm_obj_key->object_key_);
                 if (pm_obj_iter != meta_tree->pm_object_map_.end()) {
-                    String error_message = fmt::format("Duplicate pm stat key: {}, idx: {}", pm_obj_key->ToString(), idx);
-                    UnrecoverableError(error_message);
+                    UnrecoverableError(fmt::format("Duplicate pm stat key: {}, idx: {}", pm_obj_key->ToString(), idx));
                 }
 
                 auto pm_object = MakeShared<MetaPmObject>(meta_key);
@@ -619,12 +611,10 @@ UniquePtr<SystemCache> MetaTree::RestoreSystemCache(Storage *storage_ptr) const 
         try {
             next_db_id = std::stoull(tag_iter->second);
         } catch (const std::exception &e) {
-            String error_message = fmt::format("Latest database id is invalid: {}, cause: {}", tag_iter->second, e.what());
-            UnrecoverableError(error_message);
+            UnrecoverableError(fmt::format("Latest database id is invalid: {}, cause: {}", tag_iter->second, e.what()));
         }
     } else {
-        String error_message = fmt::format("Can't find 'latest database id' in system tag");
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("Can't find 'latest database id' in system tag"));
     }
 
     UniquePtr<SystemCache> system_cache = MakeUnique<SystemCache>(next_db_id);
@@ -653,8 +643,7 @@ SharedPtr<DbCache> MetaDBObject::RestoreDbCache(Storage *storage_ptr) const {
     try {
         db_id = std::stoull(db_key->db_id_str_);
     } catch (const std::exception &e) {
-        String error_message = fmt::format("DB id is invalid: {}, cause: {}", db_key->db_id_str_, e.what());
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("DB id is invalid: {}, cause: {}", db_key->db_id_str_, e.what()));
     }
     SharedPtr<DbCache> db_cache = MakeShared<DbCache>(db_id, db_key->db_name_, 0);
     for (const auto &table_pair : table_map_) {
@@ -717,8 +706,7 @@ SegmentID MetaTableObject::GetUnsealedSegmentID() const {
     try {
         unsealed_segment_id = std::stoull(table_tag_meta_key->value_);
     } catch (const std::exception &e) {
-        String error_message = fmt::format("Unsealed segment id is invalid: {}, cause: {}", table_tag_meta_key->value_, e.what());
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("Unsealed segment id is invalid: {}, cause: {}", table_tag_meta_key->value_, e.what()));
     }
     return unsealed_segment_id;
 }
@@ -790,8 +778,7 @@ SharedPtr<TableCache> MetaTableObject::RestoreTableCache(Storage *storage_ptr) c
         unsealed_segment_offset = this->GetCurrentSegmentRowCount(storage_ptr);
         next_segment_id = this->GetNextSegmentID();
     } catch (const std::exception &e) {
-        String error_message = fmt::format("DB id or table id is invalid: {}, cause: {}", table_key->ToString(), e.what());
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("DB id or table id is invalid: {}, cause: {}", table_key->ToString(), e.what()));
     }
 
     SharedPtr<TableCache> table_cache = nullptr;
@@ -909,8 +896,7 @@ SharedPtr<TableIndexCache> MetaTableIndexObject::RestoreTableIndexCache(Storage 
         table_id = std::stoull(table_index_key->table_id_str_);
         index_id = std::stoull(table_index_key->index_id_str_);
     } catch (const std::exception &e) {
-        String error_message = fmt::format("DB id or table id is invalid: {}, cause: {}", table_index_key->ToString(), e.what());
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("DB id or table id is invalid: {}, cause: {}", table_index_key->ToString(), e.what()));
     }
     SharedPtr<TableIndexCache> table_index_cache = MakeShared<TableIndexCache>(db_id, table_id, index_id, table_index_key->index_name_);
     return table_index_cache;

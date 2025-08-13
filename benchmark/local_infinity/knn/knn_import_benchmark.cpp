@@ -13,13 +13,8 @@
 // limitations under the License.
 
 #include <cassert>
-#include <cstring>
-#include <functional>
-#include <iostream>
-#include <set>
-#include <thread>
-#include <memory>
 
+import std;
 import infinity_core;
 import compilation_config;
 import internal_types;

@@ -125,21 +125,18 @@ void ColumnVector::AppendWith(const ColumnVector &other) { return AppendWith(oth
 
 void ColumnVector::AppendValue(const Value &value) {
     if (!initialized) {
-        String error_message = "Column vector isn't initialized.";
-        UnrecoverableError(error_message);
+        UnrecoverableError("Column vector isn't initialized.");
     }
     if (vector_type_ == ColumnVectorType::kConstant) {
         if (tail_index_.load() >= 1) {
-            String error_message = "Constant column vector will only have 1 value.";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Constant column vector will only have 1 value.");
         }
     }
 
     SizeT tail_index = tail_index_.fetch_add(1);
     if (tail_index >= capacity_) {
         tail_index_.fetch_sub(1);
-        String error_message = fmt::format("Exceed the column vector capacity.({}/{})", tail_index, capacity_);
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("Exceed the column vector capacity.({}/{})", tail_index, capacity_));
     }
     SetValueByIndex(tail_index, value);
     LOG_TRACE(fmt::format("ColumnVector::AppendValue: data_ptr_ {:p}, tail_index {}, value {}", data_ptr_, tail_index, value.ToString()));
@@ -147,12 +144,10 @@ void ColumnVector::AppendValue(const Value &value) {
 
 void ColumnVector::SetVectorType(ColumnVectorType vector_type) {
     if (initialized) {
-        String error_message = "Column vector isn't initialized.";
-        UnrecoverableError(error_message);
+        UnrecoverableError("Column vector isn't initialized.");
     }
     if (vector_type == ColumnVectorType::kInvalid) {
-        String error_message = "Invalid column vector type.";
-        UnrecoverableError(error_message);
+        UnrecoverableError("Invalid column vector type.");
     }
     if (vector_type_ == vector_type) {
         return;
@@ -184,8 +179,7 @@ VectorBufferType ColumnVector::GetVectorBufferType(const DataType &data_type) {
         case LogicalType::kInvalid:
         case LogicalType::kNull:
         case LogicalType::kMissing: {
-            String error_message = "Unexpected data type for column vector.";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Unexpected data type for column vector.");
         }
         default: {
             vector_buffer_type = VectorBufferType::kStandard;
@@ -196,17 +190,14 @@ VectorBufferType ColumnVector::GetVectorBufferType(const DataType &data_type) {
 
 VectorBufferType ColumnVector::InitializeHelper(ColumnVectorType vector_type, SizeT capacity) {
     if (initialized) {
-        String error_message = "Column vector is already initialized.";
-        UnrecoverableError(error_message);
+        UnrecoverableError("Column vector is already initialized.");
     }
     initialized = true;
     if (data_type_->type() == LogicalType::kInvalid) {
-        String error_message = "Attempt to initialize column vector to invalid type.";
-        UnrecoverableError(error_message);
+        UnrecoverableError("Attempt to initialize column vector to invalid type.");
     }
     if (vector_type == ColumnVectorType::kInvalid) {
-        String error_message = "Attempt to initialize column vector to invalid type.";
-        UnrecoverableError(error_message);
+        UnrecoverableError("Attempt to initialize column vector to invalid type.");
     }
 
     // require BooleanT vector to be initialized with ColumnVectorType::kConstant or ColumnVectorType::kCompactBit
@@ -252,8 +243,7 @@ void ColumnVector::Initialize(BufferObj *buffer_obj,
     VectorBufferType vector_buffer_type = InitializeHelper(vector_type, capacity);
 
     if (buffer_.get() != nullptr) {
-        String error_message = "Column vector is already initialized.";
-        UnrecoverableError(error_message);
+        UnrecoverableError("Column vector is already initialized.");
     }
 
     if (vector_type_ == ColumnVectorType::kConstant) {
@@ -459,8 +449,7 @@ void ColumnVector::Initialize(const ColumnVector &other, const Selection &input_
                 RecoverableError(status);
             }
             case LogicalType::kInvalid: {
-                String error_message = "Invalid data type";
-                UnrecoverableError(error_message);
+                UnrecoverableError("Invalid data type");
             }
             default: {
                 UnrecoverableError("Tuple is not implement.");
@@ -471,8 +460,7 @@ void ColumnVector::Initialize(const ColumnVector &other, const Selection &input_
 
 void ColumnVector::Initialize(ColumnVectorType vector_type, const ColumnVector &other, SizeT start_idx, SizeT end_idx) {
     if (end_idx <= start_idx) {
-        String error_message = "End index should larger than start index.";
-        UnrecoverableError(error_message);
+        UnrecoverableError("End index should larger than start index.");
     }
     Initialize(vector_type, end_idx - start_idx);
 
@@ -635,8 +623,7 @@ void ColumnVector::Initialize(ColumnVectorType vector_type, const ColumnVector &
                 RecoverableError(status);
             }
             case LogicalType::kInvalid: {
-                String error_message = "Invalid data type";
-                UnrecoverableError(error_message);
+                UnrecoverableError("Invalid data type");
             }
             default: {
                 UnrecoverableError("Tuple is not implement.");
@@ -647,16 +634,13 @@ void ColumnVector::Initialize(ColumnVectorType vector_type, const ColumnVector &
 
 void ColumnVector::CopyRow(const ColumnVector &other, SizeT dst_idx, SizeT src_idx) {
     if (!initialized) {
-        String error_message = "Column vector isn't initialized.";
-        UnrecoverableError(error_message);
+        UnrecoverableError("Column vector isn't initialized.");
     }
     if (data_type_->type() == LogicalType::kInvalid) {
-        String error_message = "Data type isn't assigned.";
-        UnrecoverableError(error_message);
+        UnrecoverableError("Data type isn't assigned.");
     }
     if (*data_type_ != *other.data_type_) {
-        String error_message = "Data type isn't assigned.";
-        UnrecoverableError(error_message);
+        UnrecoverableError("Data type isn't assigned.");
     }
     if (vector_type_ == ColumnVectorType::kConstant) {
         if (dst_idx != 0) {

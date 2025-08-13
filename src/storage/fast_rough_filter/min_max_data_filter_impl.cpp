@@ -85,8 +85,7 @@ void MinMaxDataFilter::SerializeToStringStream(OStringStream &os, u32 total_bina
     // check position
     auto end_pos = os.tellp();
     if (end_pos - begin_pos != total_binary_bytes) {
-        String error_message = "MinMaxDataFilter::SerializeToStringStream(): save size error";
-        UnrecoverableError(error_message);
+        UnrecoverableError("MinMaxDataFilter::SerializeToStringStream(): save size error");
     }
 }
 

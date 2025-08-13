@@ -53,8 +53,7 @@ VarFileWorker::~VarFileWorker() {
 
 void VarFileWorker::AllocateInMemory() {
     if (data_ != nullptr) {
-        String error_message = "Data is already allocated.";
-        UnrecoverableError(error_message);
+        UnrecoverableError("Data is already allocated.");
     }
     auto *buffer = new VarBuffer(buffer_obj_);
     data_ = static_cast<void *>(buffer);
@@ -62,8 +61,7 @@ void VarFileWorker::AllocateInMemory() {
 
 void VarFileWorker::FreeInMemory() {
     if (data_ == nullptr) {
-        String error_message = "Data is already freed.";
-        UnrecoverableError(error_message);
+        UnrecoverableError("Data is already freed.");
     }
     auto *buffer = static_cast<VarBuffer *>(data_);
     buffer_size_ = buffer->TotalSize();
@@ -81,8 +79,7 @@ SizeT VarFileWorker::GetMemoryCost() const {
 
 bool VarFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_success, const FileWorkerSaveCtx &ctx) {
     if (data_ == nullptr) {
-        String error_message = "Data is not allocated.";
-        UnrecoverableError(error_message);
+        UnrecoverableError("Data is not allocated.");
     }
     const auto *buffer = static_cast<const VarBuffer *>(data_);
     SizeT data_size = buffer->TotalSize();
@@ -101,12 +98,10 @@ bool VarFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_success, const 
 
 void VarFileWorker::ReadFromFileImpl(SizeT file_size, bool from_spill) {
     if (data_ != nullptr) {
-        String error_message = "Data is not allocated.";
-        UnrecoverableError(error_message);
+        UnrecoverableError("Data is not allocated.");
     }
     if (file_size < buffer_size_) {
-        String error_message = fmt::format("File: {} size {} is smaller than buffer size {}.", GetFilePath(), file_size, buffer_size_);
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("File: {} size {} is smaller than buffer size {}.", GetFilePath(), file_size, buffer_size_));
     } else {
         buffer_size_ = file_size;
     }
@@ -117,8 +112,7 @@ void VarFileWorker::ReadFromFileImpl(SizeT file_size, bool from_spill) {
         UnrecoverableError(status.message());
     }
     if (nbytes != buffer_size_) {
-        String error_message = fmt::format("Read {} bytes from file failed, only {} bytes read.", buffer_size_, nbytes);
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("Read {} bytes from file failed, only {} bytes read.", buffer_size_, nbytes));
     }
     auto *var_buffer = new VarBuffer(buffer_obj_, std::move(buffer), buffer_size_);
     data_ = static_cast<void *>(var_buffer);
@@ -126,8 +120,7 @@ void VarFileWorker::ReadFromFileImpl(SizeT file_size, bool from_spill) {
 
 bool VarFileWorker::ReadFromMmapImpl(const void *ptr, SizeT file_size) {
     if (file_size < buffer_size_) {
-        String error_message = fmt::format("File size {} is smaller than buffer size {}.", file_size, buffer_size_);
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("File size {} is smaller than buffer size {}.", file_size, buffer_size_));
     } else {
         buffer_size_ = file_size;
     }
@@ -138,8 +131,7 @@ bool VarFileWorker::ReadFromMmapImpl(const void *ptr, SizeT file_size) {
 
 void VarFileWorker::FreeFromMmapImpl() {
     if (mmap_data_ == nullptr) {
-        String error_message = "Data is already freed.";
-        UnrecoverableError(error_message);
+        UnrecoverableError("Data is already freed.");
     }
     auto *var_buffer = reinterpret_cast<VarBuffer *>(mmap_data_);
     delete var_buffer;

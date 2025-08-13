@@ -699,8 +699,7 @@ void Value::AppendToTensorArray(const Vector<Pair<ptr_t, SizeT>> &ptr_bytes) {
 template <>
 BooleanT Value::GetValue() const {
     if (type_.type() != LogicalType::kBoolean) {
-        String error_message = fmt::format("Not matched type: {}", type_.ToString());
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("Not matched type: {}", type_.ToString()));
     }
     return value_.boolean;
 }
@@ -708,8 +707,7 @@ BooleanT Value::GetValue() const {
 template <>
 TinyIntT Value::GetValue() const {
     if (type_.type() != LogicalType::kTinyInt) {
-        String error_message = fmt::format("Not matched type: {}", type_.ToString());
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("Not matched type: {}", type_.ToString()));
     }
     return value_.tiny_int;
 }
@@ -717,8 +715,7 @@ TinyIntT Value::GetValue() const {
 template <>
 SmallIntT Value::GetValue() const {
     if (type_.type() != LogicalType::kSmallInt) {
-        String error_message = fmt::format("Not matched type: {}", type_.ToString());
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("Not matched type: {}", type_.ToString()));
     }
     return value_.small_int;
 }
@@ -726,8 +723,7 @@ SmallIntT Value::GetValue() const {
 template <>
 IntegerT Value::GetValue() const {
     if (type_.type() != LogicalType::kInteger) {
-        String error_message = fmt::format("Not matched type: {}", type_.ToString());
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("Not matched type: {}", type_.ToString()));
     }
     return value_.integer;
 }
