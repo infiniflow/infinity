@@ -16,8 +16,6 @@ module;
 export module infinity_core:admin_executor;
 
 import admin_statement;
-// import :query_context;
-// import :query_result;
 import :stl;
 import :status;
 

@@ -134,8 +134,7 @@ void TaskProfiler::StartOperator(const PhysicalOperator *op) {
         return;
     }
     if (active_operator_ != nullptr) {
-        String error_message = "Attempting to call StartOperator while another operator is active.";
-        UnrecoverableError(error_message);
+        UnrecoverableError("Attempting to call StartOperator while another operator is active.");
     }
     active_operator_ = op;
     profiler_.Begin();
@@ -145,8 +144,7 @@ void TaskProfiler::StopOperator(const OperatorState *operator_state) {
         return;
     }
     if (active_operator_ == nullptr) {
-        String error_message = "Attempting to call StartOperator while another operator is active.";
-        UnrecoverableError(error_message);
+        UnrecoverableError("Attempting to call StartOperator while another operator is active.");
     }
     profiler_.End();
 
@@ -207,8 +205,7 @@ String QueryProfiler::QueryPhaseToString(QueryPhase phase) {
             return "Rollback";
         }
         default: {
-            String error_message = "Invalid query phase in query profiler";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Invalid query phase in query profiler");
         }
     }
     return {};
@@ -224,8 +221,7 @@ void QueryProfiler::StartPhase(QueryPhase phase) {
     if (current_phase_ == QueryPhase::kInvalid) {
         current_phase_ = phase;
     } else {
-        String error_message = fmt::format("Can't start new query phase before current phase({}) is finished", QueryPhaseToString(current_phase_));
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("Can't start new query phase before current phase({}) is finished", QueryPhaseToString(current_phase_)));
     }
 
     BaseProfiler &phase_profiler = profilers_[phase_idx];
@@ -240,8 +236,7 @@ void QueryProfiler::StopPhase(QueryPhase phase) {
 
     // Validate current query phase.
     if (current_phase_ == QueryPhase::kInvalid) {
-        String error_message = "Query phase isn't started, yet";
-        UnrecoverableError(error_message);
+        UnrecoverableError("Query phase isn't started, yet");
     }
 
     current_phase_ = QueryPhase::kInvalid;

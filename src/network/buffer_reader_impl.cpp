@@ -14,7 +14,7 @@
 
 module;
 
-#include <boost/asio/read.hpp>
+#include <netinet/in.h>
 
 module infinity_core:buffer_reader.impl;
 

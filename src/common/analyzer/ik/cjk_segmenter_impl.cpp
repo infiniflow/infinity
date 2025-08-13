@@ -1,7 +1,5 @@
 module;
 
-#include <string>
-
 module infinity_core:cjk_segmenter.impl;
 
 import :cjk_segmenter;
@@ -12,6 +10,8 @@ import :analyze_context;
 import :lexeme;
 import :character_util;
 import :ik_dict;
+
+import std;
 import third_party;
 
 namespace infinity {

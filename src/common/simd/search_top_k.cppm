@@ -14,7 +14,6 @@
 
 module;
 
-#include "simd_common_intrin_include.h"
 export module infinity_core:search_top_k;
 
 import :stl;

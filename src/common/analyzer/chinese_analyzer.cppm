@@ -21,8 +21,9 @@ import :jieba;
 import :term;
 import :analyzer;
 import :common_analyzer;
-import third_party;
 import :status;
+
+import third_party;
 
 namespace infinity {
 

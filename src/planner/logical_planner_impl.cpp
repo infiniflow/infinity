@@ -290,8 +290,7 @@ Status LogicalPlanner::BuildInsertValue(const InsertStatement *statement, Shared
 
     // Get table name
     if (table_name.empty()) {
-        String error_message = "Insert statement missing table table_name.";
-        UnrecoverableError(error_message);
+        UnrecoverableError("Insert statement missing table table_name.");
     }
     // Check schema and table in the catalog
 
@@ -525,8 +524,7 @@ Status LogicalPlanner::BuildCreate(CreateStatement *statement, SharedPtr<BindCon
             return BuildCreateDatabase(statement, bind_context_ptr);
         }
         default: {
-            String error_message = "Not supported";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Not supported");
         }
     }
     return Status::OK();

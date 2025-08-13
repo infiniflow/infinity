@@ -14,22 +14,22 @@
 
 module;
 
-#include <stacktrace>
-
 module infinity_core:infinity_exception.impl;
 
 import :infinity_exception;
 import :stl;
 import :logger;
-import third_party;
 import :infinity_context;
 import :new_txn_manager;
 import :txn_context;
 
+import std;
+import third_party;
+
 namespace infinity {
 
 void PrintTransactionHistory() {
-    NewTxnManager *txn_manager = InfinityContext::instance().storage()->new_txn_manager();
+    auto *txn_manager = InfinityContext::instance().storage()->new_txn_manager();
     if (!txn_manager) {
         LOG_WARN("TxnManager is null");
         return;

@@ -14,17 +14,16 @@
 
 module;
 
-#include <iomanip>
 #include <openssl/md5.h>
-#include <regex>
-#include <sstream>
 
 module infinity_core:utility.impl;
 
 import :utility;
 import :stl;
-import third_party;
 import :default_values;
+
+import std;
+import third_party;
 
 namespace infinity::Utility {
 

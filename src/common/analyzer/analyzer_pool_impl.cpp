@@ -14,13 +14,10 @@
 
 module;
 
-#include <cstring>
-
 module infinity_core:analyzer_pool.impl;
 
 import :analyzer_pool;
 import :stl;
-import third_party;
 import :config;
 import :infinity_context;
 import :analyzer;
@@ -37,6 +34,9 @@ import :whitespace_analyzer;
 import :ik_analyzer;
 import :rank_features_analyzer;
 import :logger;
+
+import std.compat;
+import third_party;
 
 namespace infinity {
 

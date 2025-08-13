@@ -222,8 +222,7 @@ Status VirtualStore::MakeDirectory(const String &path) {
     Path p{path};
     std::filesystem::create_directories(p, error_code);
     if (error_code.value() != 0) {
-        String error_message = fmt::format("{} create exception: {}", path, strerror(errno));
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("{} create exception: {}", path, strerror(errno)));
     }
     return Status::OK();
 }
@@ -257,8 +256,7 @@ Status VirtualStore::CleanupDirectory(const String &path) {
     try {
         std::ranges::for_each(std::filesystem::directory_iterator{path}, [&](const auto &dir_entry) { std::filesystem::remove_all(dir_entry); });
     } catch (const std::filesystem::filesystem_error &e) {
-        String error_message = fmt::format("CleanupDirectory cleanup {} exception: {}", path, e.what());
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("CleanupDirectory cleanup {} exception: {}", path, e.what()));
     }
     return Status::OK();
 }

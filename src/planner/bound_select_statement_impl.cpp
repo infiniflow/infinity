@@ -129,8 +129,7 @@ SharedPtr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query_conte
 
         if (!order_by_expressions_.empty()) {
             if (order_by_expressions_.size() != order_by_types_.size()) {
-                String error_message = "Unknown error on order by expression";
-                UnrecoverableError(error_message);
+                UnrecoverableError("Unknown error on order by expression");
             }
 
             if (limit_expression_.get() == nullptr) {
@@ -166,8 +165,7 @@ SharedPtr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query_conte
         root = project;
 
         if (!pruned_expression_.empty()) {
-            String error_message = "Projection method changed!";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Projection method changed!");
             auto pruned_project = MakeShared<LogicalProject>(bind_context->GetNewLogicalNodeId(),
                                                              pruned_expression_,
                                                              result_index_,
@@ -181,12 +179,10 @@ SharedPtr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query_conte
         SharedPtr<LogicalNode> root = nullptr;
         const SizeT num_children = search_expr_->match_exprs_.size();
         if (num_children <= 0) {
-            String error_message = "SEARCH shall have at least one MATCH TEXT or MATCH VECTOR or MATCH TENSOR or MATCH SPARSE expression";
-            UnrecoverableError(error_message);
+            UnrecoverableError("SEARCH shall have at least one MATCH TEXT or MATCH VECTOR or MATCH TENSOR or MATCH SPARSE expression");
         }
         if (table_ref_ptr_->type() != TableRefType::kTable) {
-            String error_message = "Not base table reference";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Not base table reference");
         }
         auto base_table_ref = std::static_pointer_cast<BaseTableRef>(table_ref_ptr_);
         // FIXME: need check if there is subquery inside the where conditions
@@ -487,18 +483,15 @@ SharedPtr<LogicalKnnScan> BoundSelectStatement::BuildInitialKnnScan(SharedPtr<Ta
                                                                     QueryContext *query_context,
                                                                     const SharedPtr<BindContext> &bind_context) {
     if (table_ref.get() == nullptr) {
-        String error_message = "Attempt to do KNN scan without table";
-        UnrecoverableError(error_message);
+        UnrecoverableError("Attempt to do KNN scan without table");
     }
     switch (table_ref->type_) {
         case TableRefType::kCrossProduct: {
-            String error_message = "KNN is not supported on CROSS PRODUCT relation, now.";
-            UnrecoverableError(error_message);
+            UnrecoverableError("KNN is not supported on CROSS PRODUCT relation, now.");
             break;
         }
         case TableRefType::kJoin: {
-            String error_message = "KNN is not supported on JOIN relation, now.";
-            UnrecoverableError(error_message);
+            UnrecoverableError("KNN is not supported on JOIN relation, now.");
         }
         case TableRefType::kTable: {
             auto base_table_ref = std::static_pointer_cast<BaseTableRef>(table_ref);

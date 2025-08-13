@@ -72,8 +72,7 @@ public:
     template <class T>
     T &Get() {
         if (type_ != T::TYPE) {
-            String error_message = "ExtraValueInfo type mismatch";
-            UnrecoverableError(error_message);
+            UnrecoverableError("ExtraValueInfo type mismatch");
         }
         return (T &)*this;
     }
@@ -338,8 +337,7 @@ public:
     // Value getter template for all types in union
     template <class T>
     T GetValue() const {
-        String error_message = "Not implemented value getter.";
-        UnrecoverableError(error_message);
+        UnrecoverableError("Not implemented value getter.");
         return T();
     }
 

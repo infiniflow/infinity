@@ -602,8 +602,7 @@ Status ChunkIndexMeta::FilePaths(Vector<String> &paths) {
             break;
         }
         default: {
-            String error_message = "Unsupported index type when add wal.";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Unsupported index type when add wal.");
         }
     }
     return Status::OK();

@@ -20,7 +20,7 @@ import base_test;
 #else
 module;
 
-#include <random>
+// #include <random>
 #include "gtest/gtest.h"
 
 module infinity_core:ut.test_lvq;
@@ -34,6 +34,8 @@ import :infinity_exception;
 import :hnsw_common;
 import :virtual_store;
 import :local_file_handle;
+
+import std;
 #endif
 
 using namespace infinity;

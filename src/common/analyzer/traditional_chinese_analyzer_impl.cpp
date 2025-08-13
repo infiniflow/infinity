@@ -14,9 +14,6 @@
 
 module;
 
-#include <cstring>
-#include <filesystem>
-
 #include <openccxx.h>
 
 module infinity_core:traditional_chinese_analyzer.impl;
@@ -24,8 +21,10 @@ module infinity_core:traditional_chinese_analyzer.impl;
 import :traditional_chinese_analyzer;
 import :stl;
 import :logger;
-import third_party;
 import :chinese_analyzer;
+
+import std;
+import third_party;
 
 namespace fs = std::filesystem;
 

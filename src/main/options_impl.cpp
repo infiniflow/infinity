@@ -145,8 +145,7 @@ BaseOption *GlobalOptions::GetOptionByIndex(GlobalOptionIndex global_option_inde
 String GlobalOptions::GetStringValue(GlobalOptionIndex option_index) {
     BaseOption *base_option = GetOptionByIndex(option_index);
     if (base_option->data_type_ != BaseOptionDataType::kString) {
-        String error_message = "Attempt to fetch string value from non-string data type option";
-        UnrecoverableError(error_message);
+        UnrecoverableError("Attempt to fetch string value from non-string data type option");
     }
     StringOption *string_option = static_cast<StringOption *>(base_option);
     return string_option->value_;
@@ -155,8 +154,7 @@ String GlobalOptions::GetStringValue(GlobalOptionIndex option_index) {
 i64 GlobalOptions::GetIntegerValue(GlobalOptionIndex option_index) {
     BaseOption *base_option = GetOptionByIndex(option_index);
     if (base_option->data_type_ != BaseOptionDataType::kInteger) {
-        String error_message = "Attempt to fetch integer value from non-integer data type option";
-        UnrecoverableError(error_message);
+        UnrecoverableError("Attempt to fetch integer value from non-integer data type option");
     }
     IntegerOption *integer_option = static_cast<IntegerOption *>(base_option);
     return integer_option->value_;
@@ -165,8 +163,7 @@ i64 GlobalOptions::GetIntegerValue(GlobalOptionIndex option_index) {
 bool GlobalOptions::GetBoolValue(GlobalOptionIndex option_index) {
     BaseOption *base_option = GetOptionByIndex(option_index);
     if (base_option->data_type_ != BaseOptionDataType::kBoolean) {
-        String error_message = "Attempt to fetch bool value from non-bool data type option";
-        UnrecoverableError(error_message);
+        UnrecoverableError("Attempt to fetch bool value from non-bool data type option");
     }
     BooleanOption *boolean_option = static_cast<BooleanOption *>(base_option);
     return boolean_option->value_;

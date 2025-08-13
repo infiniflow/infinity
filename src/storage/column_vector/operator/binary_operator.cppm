@@ -51,8 +51,7 @@ public:
             return vector_type == ColumnVectorType::kFlat || vector_type == ColumnVectorType::kConstant;
         };
         if (!check_vector_type_valid(left_vector_type) || !check_vector_type_valid(right_vector_type)) {
-            String error_message = "Invalid input ColumnVectorType. Support only kFlat and kConstant.";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Invalid input ColumnVectorType. Support only kFlat and kConstant.");
         }
         const auto &left_null = left->nulls_ptr_;
         const auto &right_null = right->nulls_ptr_;
@@ -289,8 +288,7 @@ public:
             }
             result->Finalize(count);
         } else {
-            String error_message = "Wrong boolean operation.";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Wrong boolean operation.");
         }
     }
 
@@ -391,8 +389,7 @@ public:
                                void *state_ptr_right,
                                void *state_ptr,
                                bool nullable) {
-        String error_message = "MixedType needs to be specialized.";
-        UnrecoverableError(error_message);
+        UnrecoverableError("MixedType needs to be specialized.");
     }
 
     // case for BinaryOperator which returns BooleanT result
@@ -420,12 +417,10 @@ public:
                                bool nullable) {
         switch (left->vector_type()) {
             case ColumnVectorType::kInvalid: {
-                String error_message = "Invalid column vector type.";
-                UnrecoverableError(error_message);
+                UnrecoverableError("Invalid column vector type.");
             }
             case ColumnVectorType::kCompactBit: {
-                String error_message = "kCompactBit should not be in this branch.";
-                UnrecoverableError(error_message);
+                UnrecoverableError("kCompactBit should not be in this branch.");
             }
             case ColumnVectorType::kFlat: {
                 return ExecuteFlat<LeftType, RightType, ResultType, Operator>(left,

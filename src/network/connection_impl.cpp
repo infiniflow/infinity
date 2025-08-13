@@ -14,8 +14,6 @@
 
 module;
 
-#include <boost/asio/ip/tcp.hpp>
-
 module infinity_core:connection.impl;
 
 import :connection;
@@ -31,6 +29,7 @@ import :logical_node_type;
 import :session_manager;
 import :query_context;
 
+import std;
 import third_party;
 
 import type_info;
@@ -148,8 +147,7 @@ void Connection::HandleRequest() {
             break;
         }
         default: {
-            String error_message = "Unknown PG command type";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Unknown PG command type");
         }
     }
 }
@@ -272,8 +270,7 @@ void Connection::SendTableDescription(const SharedPtr<DataTable> &result_table) 
             case LogicalType::kMultiVector:
             case LogicalType::kEmbedding: {
                 if (column_type->type_info()->type() != TypeInfoType::kEmbedding) {
-                    String error_message = "Not embedding type";
-                    UnrecoverableError(error_message);
+                    UnrecoverableError("Not embedding type");
                 }
 
                 EmbeddingInfo *embedding_info = static_cast<EmbeddingInfo *>(column_type->type_info().get());
@@ -318,16 +315,14 @@ void Connection::SendTableDescription(const SharedPtr<DataTable> &result_table) 
                         break;
                     }
                     case EmbeddingDataType::kElemInvalid: {
-                        String error_message = "Invalid embedding data type";
-                        UnrecoverableError(error_message);
+                        UnrecoverableError("Invalid embedding data type");
                     }
                 }
                 break;
             }
             case LogicalType::kSparse: {
                 if (column_type->type_info()->type() != TypeInfoType::kSparse) {
-                    String error_message = "Not sparse type";
-                    UnrecoverableError(error_message);
+                    UnrecoverableError("Not sparse type");
                 }
                 const auto *sparse_info = static_cast<SparseInfo *>(column_type->type_info().get());
                 switch (sparse_info->DataType()) {
@@ -370,16 +365,14 @@ void Connection::SendTableDescription(const SharedPtr<DataTable> &result_table) 
                         break;
                     }
                     case EmbeddingDataType::kElemInvalid: {
-                        String error_message = "Should not reach here";
-                        UnrecoverableError(error_message);
+                        UnrecoverableError("Should not reach here");
                     }
                 }
                 break;
             }
             default: {
-                String error_message = "Unexpected type";
-                LOG_ERROR(error_message);
-                UnrecoverableError(error_message);
+                LOG_ERROR("Unexpected type");
+                UnrecoverableError("Unexpected type");
             }
         }
 

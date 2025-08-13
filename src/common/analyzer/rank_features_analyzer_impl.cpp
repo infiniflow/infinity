@@ -14,8 +14,6 @@
 
 module;
 
-#include <string>
-
 module infinity_core:rank_features_analyzer.impl;
 
 import :rank_features_analyzer;
@@ -23,6 +21,8 @@ import :stl;
 import :term;
 import :analyzer;
 import :smallfloat;
+
+import std;
 import third_party;
 
 namespace infinity {

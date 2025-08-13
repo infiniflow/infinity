@@ -1,12 +1,12 @@
 module;
 
-#include <string>
-
 export module infinity_core:letter_segmenter;
 
 import :stl;
 import :segmenter;
 import :analyze_context;
+
+import std;
 
 namespace infinity {
 

@@ -15,6 +15,7 @@
 module;
 
 export module infinity_core:user_defined_analyzer;
+
 #if 0
 #include "Python.h"
 import :stl;

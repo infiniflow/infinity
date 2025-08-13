@@ -1,7 +1,5 @@
 module;
 
-#include <stack>
-
 module infinity_core:arbitrator.impl;
 
 import :arbitrator;
@@ -10,6 +8,8 @@ import :analyze_context;
 import :lexeme;
 import :lexeme_path;
 import :quick_sort_set;
+
+import std;
 import third_party;
 
 namespace infinity {

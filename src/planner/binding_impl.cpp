@@ -41,8 +41,7 @@ SharedPtr<Binding> Binding::MakeBinding(BindingType binding_type,
 
     SizeT column_count = column_names->size();
     if (column_count != column_types->size()) {
-        String error_message = "Make binding error: column size isn't valid.";
-        UnrecoverableError(error_message);
+        UnrecoverableError("Make binding error: column size isn't valid.");
     }
     binding->column_types_ = std::move(column_types);
     binding->column_names_ = std::move(column_names);

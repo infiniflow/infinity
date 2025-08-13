@@ -102,8 +102,7 @@ void NewTxnManager::Stop() {
 SharedPtr<NewTxn> NewTxnManager::BeginTxnShared(UniquePtr<String> txn_text, TransactionType txn_type) {
     // Check if the is_running_ is true
     if (is_running_.load() == false) {
-        String error_message = "NewTxnManager is not running, cannot create txn";
-        UnrecoverableError(error_message);
+        UnrecoverableError("NewTxnManager is not running, cannot create txn");
     }
 
     std::lock_guard guard(locker_);
@@ -149,8 +148,7 @@ NewTxn *NewTxnManager::BeginTxn(UniquePtr<String> txn_text, TransactionType txn_
 UniquePtr<NewTxn> NewTxnManager::BeginReplayTxn(const SharedPtr<WalEntry> &wal_entry) {
     // Check if the is_running_ is true
     if (is_running_.load() == false) {
-        String error_message = "NewTxnManager is not running, cannot replay txn";
-        UnrecoverableError(error_message);
+        UnrecoverableError("NewTxnManager is not running, cannot replay txn");
     }
 
     TxnTimeStamp txn_id = wal_entry->txn_id_;
@@ -165,8 +163,7 @@ UniquePtr<NewTxn> NewTxnManager::BeginReplayTxn(const SharedPtr<WalEntry> &wal_e
 UniquePtr<NewTxn> NewTxnManager::BeginRecoveryTxn() {
     // Check if the is_running_ is true
     if (is_running_.load() == false) {
-        String error_message = "NewTxnManager is not running, cannot replay txn";
-        UnrecoverableError(error_message);
+        UnrecoverableError("NewTxnManager is not running, cannot replay txn");
     }
 
     std::lock_guard guard(locker_);
@@ -240,26 +237,22 @@ bool NewTxnManager::CheckConflict1(NewTxn *txn, String &conflict_reason, bool &r
 void NewTxnManager::SendToWAL(NewTxn *txn) {
     // Check if the is_running_ is true
     if (is_running_.load() == false) {
-        String error_message = "NewTxnManager is not running, cannot put wal entry";
-        UnrecoverableError(error_message);
+        UnrecoverableError("NewTxnManager is not running, cannot put wal entry");
     }
     if (wal_mgr_ == nullptr) {
-        String error_message = "NewTxnManager is null";
-        UnrecoverableError(error_message);
+        UnrecoverableError("NewTxnManager is null");
     }
 
     TxnTimeStamp commit_ts = txn->CommitTS();
 
     std::lock_guard guard(locker_);
     if (wait_conflict_ck_.empty()) {
-        String error_message = fmt::format("NewTxnManager::SendToWAL wait_conflict_ck_ is empty, txn->CommitTS() {}", txn->CommitTS());
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("NewTxnManager::SendToWAL wait_conflict_ck_ is empty, txn->CommitTS() {}", txn->CommitTS()));
     }
     if (wait_conflict_ck_.begin()->first > commit_ts) {
-        String error_message = fmt::format("NewTxnManager::SendToWAL wait_conflict_ck_.begin()->first {} > txn->CommitTS() {}",
+        UnrecoverableError(fmt::format("NewTxnManager::SendToWAL wait_conflict_ck_.begin()->first {} > txn->CommitTS() {}",
                                            wait_conflict_ck_.begin()->first,
-                                           txn->CommitTS());
-        UnrecoverableError(error_message);
+                                           txn->CommitTS()));
     }
 
     if (txn->GetTxnState() == TxnState::kRollbacking) {
@@ -394,16 +387,13 @@ void NewTxnManager::CommitBottom(NewTxn *txn) {
         std::lock_guard guard(locker_);
         auto iter = bottom_txns_.find(commit_ts);
         if (iter == bottom_txns_.end()) {
-            String error_message = fmt::format("NewTxn: {} not found in bottom txn", txn_id);
-            UnrecoverableError(error_message);
+            UnrecoverableError(fmt::format("NewTxn: {} not found in bottom txn", txn_id));
         }
         if (iter->second == nullptr) {
-            String error_message = fmt::format("NewTxn {} has already done bottom", txn_id);
-            UnrecoverableError(error_message);
+            UnrecoverableError(fmt::format("NewTxn {} has already done bottom", txn_id));
         }
         if (iter->second->TxnID() != txn_id) {
-            String error_message = fmt::format("NewTxn {} and {} have the same commit ts {}", iter->second->TxnID(), txn_id, commit_ts);
-            UnrecoverableError(error_message);
+            UnrecoverableError(fmt::format("NewTxn {} and {} have the same commit ts {}", iter->second->TxnID(), txn_id, commit_ts));
         }
         iter->second->SetTxnBottomDone();
 
@@ -561,8 +551,7 @@ void NewTxnManager::CleanupTxn(NewTxn *txn) {
                 break;
             }
             default: {
-                String error_message = fmt::format("Invalid transaction status: {}", TxnState2Str(txn_state));
-                UnrecoverableError(error_message);
+                UnrecoverableError(fmt::format("Invalid transaction status: {}", TxnState2Str(txn_state)));
             }
         }
         {
@@ -574,8 +563,7 @@ void NewTxnManager::CleanupTxn(NewTxn *txn) {
             txn_context_histories_.push_back(txn_ptr->txn_context());
             SizeT remove_n = txn_map_.erase(txn_id);
             if (remove_n == 0) {
-                String error_message = fmt::format("NewTxn: {} not found in txn map", txn_id);
-                UnrecoverableError(error_message);
+                UnrecoverableError(fmt::format("NewTxn: {} not found in txn map", txn_id));
             }
 
             CleanupTxnBottomNolock(txn_id, begin_ts);
@@ -598,8 +586,7 @@ void NewTxnManager::CleanupTxn(NewTxn *txn) {
 void NewTxnManager::CleanupTxnBottomNolock(TransactionID txn_id, TxnTimeStamp begin_ts) {
     auto begin_txn_iter = begin_txn_map_.find(begin_ts);
     if (begin_txn_iter == begin_txn_map_.end()) {
-        String error_message = fmt::format("NewTxn: {} with begin ts: {} not found in begin_txn_map_", txn_id, begin_ts);
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("NewTxn: {} with begin ts: {} not found in begin_txn_map_", txn_id, begin_ts));
     }
     --begin_txn_iter->second;
     if (begin_txn_iter->second == 0) {
@@ -753,26 +740,22 @@ Vector<SharedPtr<NewTxn>> NewTxnManager::GetCheckCandidateTxns(NewTxn *this_txn)
 void NewTxnManager::SubmitForAllocation(SharedPtr<TxnAllocatorTask> txn_allocator_task) {
     // Check if the is_running_ is true
     if (is_running_.load() == false) {
-        String error_message = "NewTxnManager is not running, cannot put wal entry";
-        UnrecoverableError(error_message);
+        UnrecoverableError("NewTxnManager is not running, cannot put wal entry");
     }
     if (wal_mgr_ == nullptr) {
-        String error_message = "NewTxnManager is null";
-        UnrecoverableError(error_message);
+        UnrecoverableError("NewTxnManager is null");
     }
     NewTxn *txn = txn_allocator_task->txn_ptr();
     TxnTimeStamp commit_ts = txn->CommitTS();
 
     std::lock_guard guard(locker_);
     if (allocator_map_.empty()) {
-        String error_message = fmt::format("NewTxnManager::SubmitForAllocation allocator_map_ is empty, txn->CommitTS() {}", txn->CommitTS());
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("NewTxnManager::SubmitForAllocation allocator_map_ is empty, txn->CommitTS() {}", txn->CommitTS()));
     }
     if (allocator_map_.begin()->first > commit_ts) {
-        String error_message = fmt::format("NewTxnManager::SubmitForAllocation allocator_map_.begin()->first {} > txn->CommitTS() {}",
+        UnrecoverableError(fmt::format("NewTxnManager::SubmitForAllocation allocator_map_.begin()->first {} > txn->CommitTS() {}",
                                            allocator_map_.begin()->first,
-                                           txn->CommitTS());
-        UnrecoverableError(error_message);
+                                           txn->CommitTS()));
     }
 
     allocator_map_.at(commit_ts) = txn_allocator_task;

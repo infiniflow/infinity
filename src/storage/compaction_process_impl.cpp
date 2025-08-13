@@ -375,8 +375,7 @@ void CompactionProcessor::Process() {
                     break;
                 }
                 default: {
-                    String error_message = fmt::format("Invalid background task: {}", (u8)bg_task->type_);
-                    UnrecoverableError(error_message);
+                    UnrecoverableError(fmt::format("Invalid background task: {}", (u8)bg_task->type_));
                     break;
                 }
             }

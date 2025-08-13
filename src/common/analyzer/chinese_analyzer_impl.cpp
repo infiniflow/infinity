@@ -14,16 +14,11 @@
 
 module;
 
-#include "string_utils.h"
-
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wunused-variable"
 #pragma clang diagnostic ignored "-Wunused-but-set-variable"
 #include <cppjieba/Jieba.hpp>
 #pragma clang diagnostic pop
-
-#include <cstring>
-#include <filesystem>
 
 module infinity_core:chinese_analyzer.impl;
 
@@ -33,6 +28,8 @@ import :term;
 import :analyzer;
 import :common_analyzer;
 import :logger;
+
+import std;
 import third_party;
 
 namespace fs = std::filesystem;

@@ -14,14 +14,14 @@
 
 module;
 
-#include <cctype>
-#include <cstring>
-
 module infinity_core:tokenizer.impl;
 
 import :stl;
 import :term;
 import :tokenizer;
+
+import std;
+import std.compat;
 
 namespace infinity {
 

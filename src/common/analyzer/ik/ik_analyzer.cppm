@@ -1,7 +1,5 @@
 module;
 
-#include <fstream>
-
 export module infinity_core:ik_analyzer;
 
 import :stl;
@@ -13,6 +11,8 @@ import :analyzer;
 import :term;
 import :ik_dict;
 import :status;
+
+import std;
 
 namespace infinity {
 

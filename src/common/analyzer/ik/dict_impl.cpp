@@ -1,13 +1,5 @@
 module;
 
-#include <fstream>
-#include <iostream>
-#include <regex>
-#include <sstream>
-#include <filesystem>
-#include <stdexcept>
-#include <unordered_set>
-
 module infinity_core:ik_dict.impl;
 
 import :ik_dict;
@@ -16,6 +8,8 @@ import :hit;
 import :stl;
 import :status;
 import :character_util;
+
+import std;
 import third_party;
 
 namespace fs = std::filesystem;

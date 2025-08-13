@@ -15,7 +15,6 @@
 module;
 
 #include "string_utils.h"
-#include <cstring>
 
 module infinity_core:common_analyzer.impl;
 
@@ -26,6 +25,8 @@ import :analyzer;
 import :tokenizer;
 import :common_analyzer;
 import :default_values;
+
+import std.compat;
 
 namespace infinity {
 

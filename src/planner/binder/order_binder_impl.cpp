@@ -131,8 +131,7 @@ SharedPtr<BaseExpression> OrderBinder::BuildExpression(const ParsedExpr &expr, B
         }
     } else {
         String expr_name = expr.GetName();
-        String error_message = fmt::format("Need to add support for {} in order_binder.", expr_name);
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("Need to add support for {} in order_binder.", expr_name));
 
         if (bind_context_ptr->binding_names_by_column_.contains(expr_name)) {
             auto table_name = bind_context_ptr->binding_names_by_column_[expr_name][0];
@@ -151,8 +150,7 @@ SharedPtr<BaseExpression> OrderBinder::BuildExpression(const ParsedExpr &expr, B
         }
 
         if (column_id == -1) {
-            String error_message = fmt::format("{} isn't found in project list.", expr_name);
-            UnrecoverableError(error_message);
+            UnrecoverableError(fmt::format("{} isn't found in project list.", expr_name));
         }
     }
 

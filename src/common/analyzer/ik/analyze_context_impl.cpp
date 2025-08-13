@@ -1,8 +1,5 @@
 module;
 
-#include <fstream>
-#include <sstream>
-
 module infinity_core:analyze_context.impl;
 
 import :analyze_context;
@@ -12,6 +9,8 @@ import :character_util;
 import :lexeme;
 import :lexeme_path;
 import :ik_dict;
+
+import std;
 
 namespace infinity {
 AnalyzeContext::AnalyzeContext(Dictionary *dict, bool ik_smart) : dict_(dict), ik_smart_(ik_smart) {

@@ -14,15 +14,14 @@
 
 module;
 
-#include <sstream>
-#include <string>
-
 module infinity_core:whitespace_analyzer.impl;
 
 import :stl;
 import :term;
 import :analyzer;
 import :whitespace_analyzer;
+
+import std;
 
 namespace infinity {
 

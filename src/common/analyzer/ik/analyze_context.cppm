@@ -1,7 +1,5 @@
 module;
 
-#include <string>
-
 export module infinity_core:analyze_context;
 
 import :stl;
@@ -10,6 +8,8 @@ import :character_util;
 import :lexeme;
 import :lexeme_path;
 import :ik_dict;
+
+import std;
 
 namespace infinity {
 

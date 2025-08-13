@@ -1,13 +1,12 @@
 module;
 
-#include <sstream>
-#include <stdexcept>
-
 export module infinity_core:lexeme_path;
 
 import :stl;
 import :quick_sort_set;
 import :lexeme;
+
+import std;
 
 namespace infinity {
 

@@ -177,8 +177,7 @@ void PeerClient::Process() {
                     break;
                 }
                 default: {
-                    String error_message = fmt::format("Invalid peer task type");
-                    UnrecoverableError(error_message);
+                    UnrecoverableError(fmt::format("Invalid peer task type"));
                     break;
                 }
             }
@@ -228,8 +227,7 @@ void PeerClient::Register(RegisterPeerTask *peer_task) {
             break;
         }
         default: {
-            String error_message = fmt::format("Only follower and learner can send register message to leader");
-            UnrecoverableError(error_message);
+            UnrecoverableError(fmt::format("Only follower and learner can send register message to leader"));
         }
     }
     request.node_ip = peer_task->node_ip_;
@@ -254,8 +252,7 @@ void PeerClient::Register(RegisterPeerTask *peer_task) {
                 return;
             }
             default: {
-                String error_message = "Register to the leader";
-                UnrecoverableError(error_message);
+                UnrecoverableError("Register to the leader");
             }
         }
     }
@@ -291,8 +288,7 @@ void PeerClient::Unregister(UnregisterPeerTask *peer_task) {
                 return;
             }
             default: {
-                String error_message = "Unregister from the leader";
-                UnrecoverableError(error_message);
+                UnrecoverableError("Unregister from the leader");
             }
         }
     }
@@ -318,8 +314,7 @@ void PeerClient::HeartBeat(HeartBeatPeerTask *peer_task) {
             break;
         }
         default: {
-            String error_message = fmt::format("Only follower and learner can send register message to leader");
-            UnrecoverableError(error_message);
+            UnrecoverableError(fmt::format("Only follower and learner can send register message to leader"));
         }
     }
     request.node_ip = peer_task->node_ip_;
@@ -346,8 +341,7 @@ void PeerClient::HeartBeat(HeartBeatPeerTask *peer_task) {
                 return;
             }
             default: {
-                String error_message = "Heartbeat: error happens when data transfer to leader";
-                UnrecoverableError(error_message);
+                UnrecoverableError("Heartbeat: error happens when data transfer to leader");
             }
         }
     }
@@ -379,8 +373,7 @@ void PeerClient::HeartBeat(HeartBeatPeerTask *peer_task) {
                 break;
             }
             default: {
-                String error_message = "Invalid sender status";
-                UnrecoverableError(error_message);
+                UnrecoverableError("Invalid sender status");
             }
         }
 
@@ -408,8 +401,7 @@ void PeerClient::HeartBeat(HeartBeatPeerTask *peer_task) {
                     break;
                 }
                 default: {
-                    String error_message = "Invalid role type";
-                    UnrecoverableError(error_message);
+                    UnrecoverableError("Invalid role type");
                 }
             }
 
@@ -424,8 +416,7 @@ void PeerClient::HeartBeat(HeartBeatPeerTask *peer_task) {
                     break;
                 }
                 default: {
-                    String error_message = "Invalid node status";
-                    UnrecoverableError(error_message);
+                    UnrecoverableError("Invalid node status");
                 }
             }
 

@@ -14,8 +14,6 @@
 
 module;
 
-#include "simd_common_intrin_include.h"
-
 module infinity_core:simd_init.impl;
 
 import :stl;

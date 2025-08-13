@@ -99,8 +99,7 @@ QueryResult QueryContext::Query(const String &query) {
     }
 
     if (parsed_result->statements_ptr_->size() != 1) {
-        String error_message = "Only support single statement.";
-        UnrecoverableError(error_message);
+        UnrecoverableError("Only support single statement.");
     }
     StopProfile(QueryPhase::kParser);
 

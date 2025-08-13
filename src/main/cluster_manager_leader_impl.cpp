@@ -170,8 +170,7 @@ Status ClusterManager::AddNodeInfo(const SharedPtr<NodeInfo> &other_node) {
     if (log_sending_status.ok()) {
         std::unique_lock<std::mutex> cluster_lock(cluster_mutex_);
         if (current_node_role_ != NodeRole::kLeader) {
-            String error_message = "Non-leader role can't add other node.";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Non-leader role can't add other node.");
         }
 
         // Add by register

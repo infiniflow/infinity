@@ -1,11 +1,10 @@
 module;
 
-#include <stdexcept>
-#include <string>
-
 export module infinity_core:character_util;
 
 import :stl;
+
+import std;
 
 namespace infinity {
 

@@ -49,17 +49,14 @@ public:
 
         switch (input->vector_type()) {
             case ColumnVectorType::kInvalid: {
-                String error_message = "Invalid column vector type.";
-                UnrecoverableError(error_message);
+                UnrecoverableError("Invalid column vector type.");
             }
             case ColumnVectorType::kCompactBit: {
                 if (result->vector_type() != ColumnVectorType::kCompactBit) {
-                    String error_message = "Target vector type isn't kCompactBit.";
-                    UnrecoverableError(error_message);
+                    UnrecoverableError("Target vector type isn't kCompactBit.");
                 }
                 if constexpr (!std::is_same_v<std::remove_cv_t<InputType>, BooleanT> || !std::is_same_v<std::remove_cv_t<ResultType>, BooleanT>) {
-                    String error_message = "kCompactBit should match with BooleanT.";
-                    UnrecoverableError(error_message);
+                    UnrecoverableError("kCompactBit should match with BooleanT.");
                 }
                 if (nullable && !(input_null->IsAllTrue())) {
                     ExecuteBooleanWithNull<Operator>(input, result, count, state_ptr_input, state_ptr);
@@ -72,8 +69,7 @@ public:
             }
             case ColumnVectorType::kFlat: {
                 // if (result->vector_type() != ColumnVectorType::kFlat) {
-                //     String error_message = "Target vector type isn't flat.";
-                //     UnrecoverableError(error_message);
+                //     UnrecoverableError("Target vector type isn't flat.");
                 // }
                 if constexpr (std::is_same_v<std::remove_cv_t<ResultType>, BooleanT>) {
                     if (nullable)
@@ -100,8 +96,7 @@ public:
             }
             case ColumnVectorType::kConstant: {
                 if (count != 1) {
-                    String error_message = "Attempting to execute more than one row of the constant column vector.";
-                    UnrecoverableError(error_message);
+                    UnrecoverableError("Attempting to execute more than one row of the constant column vector.");
                 }
                 if (nullable && !(input_null->IsAllTrue())) {
                     result_null->SetFalse(0);
@@ -140,8 +135,7 @@ public:
                 return ExecuteHeterogeneous<InputType, ResultType, Operator>(input_ptr, result_ptr, result_null, count, state_ptr_input, state_ptr);
             }
         }
-        String error_message = "Unexpected error.";
-        UnrecoverableError(error_message);
+        UnrecoverableError("Unexpected error.");
     }
 
 private:

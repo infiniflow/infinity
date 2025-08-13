@@ -13,15 +13,15 @@
 // limitations under the License.
 
 #include <csignal>
-#include <cstdio>
-#include <cstdlib>
-#include <exception>
+
 #ifdef ENABLE_JEMALLOC_PROF
 #include <jemalloc/jemalloc.h>
 #endif
 
 import compilation_config;
 import infinity_core;
+import std;
+import std.compat;
 
 namespace {
 

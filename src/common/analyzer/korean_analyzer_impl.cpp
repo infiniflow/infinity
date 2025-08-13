@@ -20,10 +20,6 @@ module;
 #include <mecab_wrapper.h>
 #pragma clang diagnostic pop
 
-#include <cstring>
-#include <filesystem>
-#include <iostream>
-
 module infinity_core:korean_analyzer.impl;
 
 import :stl;
@@ -34,6 +30,8 @@ import :logger;
 import :status;
 import :ijma;
 import :korean_analyzer;
+
+import std;
 
 namespace fs = std::filesystem;
 

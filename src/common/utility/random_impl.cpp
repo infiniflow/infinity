@@ -21,12 +21,13 @@ module infinity_core:random.impl;
 
 import :random;
 import :stl;
-import third_party;
 import :logger;
 import :virtual_store;
 import :default_values;
 import :infinity_context;
 import :status;
+
+import third_party;
 
 namespace infinity {
 

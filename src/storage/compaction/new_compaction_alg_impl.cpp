@@ -29,8 +29,7 @@ class DBTConfig {
 public:
     DBTConfig(SizeT m, SizeT c, SizeT s) : m_(m), c_(c), s_(s) {
         if (m <= 0 || c < m || s <= 0) {
-            String error_message = "Invalid compaction parameters";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Invalid compaction parameters");
         }
     }
 

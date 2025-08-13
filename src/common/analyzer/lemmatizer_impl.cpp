@@ -15,18 +15,14 @@
 module;
 
 #include <cassert>
-#include <filesystem>
-#include <fstream>
-#include <iostream>
-#include <sstream>
-#include <unordered_map>
-#include <iterator>
 
 module infinity_core:lemmatizer.impl;
 
 import :stl;
-import third_party;
 import :lemmatizer;
+
+import std;
+import third_party;
 
 namespace fs = std::filesystem;
 

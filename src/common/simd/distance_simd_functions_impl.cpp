@@ -15,7 +15,6 @@
 module;
 
 #include "simd_common_intrin_include.h"
-#include <cmath>
 
 /*
 #if defined(__x86_64__) && (defined(__clang_major__) && (__clang_major__ > 10))
@@ -45,6 +44,8 @@ module infinity_core:distance_simd_functions.impl;
 import :distance_simd_functions;
 import :stl;
 import :simd_common_tools;
+
+import std.compat;
 
 namespace infinity {
 

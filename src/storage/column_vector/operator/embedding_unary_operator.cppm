@@ -41,14 +41,12 @@ public:
 
         switch (input->vector_type()) {
             case ColumnVectorType::kInvalid: {
-                String error_message = "Invalid column vector type.";
-                UnrecoverableError(error_message);
+                UnrecoverableError("Invalid column vector type.");
                 break;
             }
             case ColumnVectorType::kFlat: {
                 if (result->vector_type() != ColumnVectorType::kFlat) {
-                    String error_message = "Target vector type isn't flat.";
-                    UnrecoverableError(error_message);
+                    UnrecoverableError("Target vector type isn't flat.");
                     break;
                 }
                 if (nullable) {
@@ -68,8 +66,7 @@ public:
             }
             case ColumnVectorType::kConstant: {
                 if (count != 1) {
-                    String error_message = "Attempting to execute more than one row of the constant column vector.";
-                    UnrecoverableError(error_message);
+                    UnrecoverableError("Attempting to execute more than one row of the constant column vector.");
                 }
                 if (nullable) {
                     result_null->SetAllTrue();
@@ -81,13 +78,11 @@ public:
                 return;
             }
             case ColumnVectorType::kHeterogeneous: {
-                String error_message = "Heterogeneous embedding is not implemented yet.";
-                UnrecoverableError(error_message);
+                UnrecoverableError("Heterogeneous embedding is not implemented yet.");
                 // return ExecuteHeterogeneous<InputElemType, OutputElemType, Operator>(input, result, count, state_ptr, nullable);
             }
             case ColumnVectorType::kCompactBit: {
-                String error_message = "Compact Bit embedding is not implemented yet.";
-                UnrecoverableError(error_message);
+                UnrecoverableError("Compact Bit embedding is not implemented yet.");
                 // return ExecuteHeterogeneous<InputElemType, OutputElemType, Operator>(input, result, count, state_ptr, nullable);
             }
         }

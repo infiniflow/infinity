@@ -89,15 +89,13 @@ public:
         // 2. Flat Flat Constant
         if (first->vector_type() == ColumnVectorType::kFlat && second->vector_type() == ColumnVectorType::kFlat &&
             third->vector_type() == ColumnVectorType::kConstant) {
-            String error_message = "Not support";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Not support");
         }
 
         // 3. Flat Constant Flat
         if (first->vector_type() == ColumnVectorType::kFlat && second->vector_type() == ColumnVectorType::kConstant &&
             third->vector_type() == ColumnVectorType::kFlat) {
-            String error_message = "Not support";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Not support");
         }
 
         // 4. Flat Constant Constant
@@ -131,22 +129,19 @@ public:
         // 5. Constant Flat Flat
         if (first->vector_type() == ColumnVectorType::kConstant && second->vector_type() == ColumnVectorType::kFlat &&
             third->vector_type() == ColumnVectorType::kFlat) {
-            String error_message = "Not support";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Not support");
         }
 
         // 6. Constant Flat Constant
         if (first->vector_type() == ColumnVectorType::kConstant && second->vector_type() == ColumnVectorType::kFlat &&
             third->vector_type() == ColumnVectorType::kConstant) {
-            String error_message = "Not support";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Not support");
         }
 
         // 7. Constant Constant Flat
         if (first->vector_type() == ColumnVectorType::kConstant && second->vector_type() == ColumnVectorType::kConstant &&
             third->vector_type() == ColumnVectorType::kFlat) {
-            String error_message = "Not support";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Not support");
         }
 
         // 8. Constant Constant Constant

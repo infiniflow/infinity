@@ -14,7 +14,7 @@
 
 module;
 
-#include <boost/asio/write.hpp>
+#include <netinet/in.h>
 
 module infinity_core:buffer_writer.impl;
 
@@ -108,8 +108,7 @@ void BufferWriter::send_value_u32(u32 host_value) {
 
 void BufferWriter::flush(SizeT bytes) {
     if (bytes > size()) {
-        String error_message = "Can't flush more bytes than available";
-        UnrecoverableError(error_message);
+        UnrecoverableError("Can't flush more bytes than available");
     }
     const auto bytes_to_send = bytes ? bytes : size();
     SizeT bytes_sent{0};
@@ -130,8 +129,7 @@ void BufferWriter::flush(SizeT bytes) {
     }
 
     if (boost_error == boost::asio::error::broken_pipe || boost_error == boost::asio::error::connection_reset || bytes_sent == 0) {
-        String error_message = fmt::format("Can't flush more bytes than available: {}", boost_error.message());
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("Can't flush more bytes than available: {}", boost_error.message()));
     }
 
     if (boost_error) {

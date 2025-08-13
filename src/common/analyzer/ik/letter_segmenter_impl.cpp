@@ -1,7 +1,5 @@
 module;
 
-#include <string>
-
 module infinity_core:letter_segmenter.impl;
 
 import :letter_segmenter;
@@ -10,6 +8,8 @@ import :segmenter;
 import :analyze_context;
 import :lexeme;
 import :character_util;
+
+import std;
 
 namespace infinity {
 const std::wstring LetterSegmenter::SEGMENTER_NAME = L"LETTER_SEGMENTER";

@@ -425,8 +425,7 @@ void ColumnVector::AppendSparse(const Vector<std::string_view> &ele_str_views, S
             break;
         }
         default: {
-            String error_message = "Unsupported sparse index type.";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Unsupported sparse index type.");
         }
     }
 }

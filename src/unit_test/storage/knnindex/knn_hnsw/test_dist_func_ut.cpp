@@ -22,8 +22,8 @@ import base_test;
 module;
 
 #include "gtest/gtest.h"
-#include <cstdint>
-#include <random>
+// #include <cstdint>
+// #include <random>
 
 module infinity_core:ut.test_dist_func;
 
@@ -34,6 +34,8 @@ import :vec_store_type;
 import :hnsw_simd_func;
 import :hnsw_common;
 import :stl;
+
+import std;
 #endif
 
 using namespace infinity;

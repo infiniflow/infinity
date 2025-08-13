@@ -14,7 +14,6 @@
 
 module;
 
-#include <boost/dynamic_bitset.hpp>
 #include <cassert>
 #include <ostream>
 #include <random>

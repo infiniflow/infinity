@@ -17,15 +17,8 @@ module;
 #define PCRE2_CODE_UNIT_WIDTH 8
 
 #include <cassert>
-#include <chrono>
-#include <cmath>
-#include <filesystem>
-#include <fstream>
-#include <iostream>
 #include <openccxx.h>
 #include <pcre2.h>
-#include <sstream>
-#include "spdlog/fmt/fmt.h"
 
 #include "string_utils.h"
 
@@ -40,6 +33,9 @@ import :darts_trie;
 import :lemmatizer;
 import :stemmer;
 import :term;
+
+import std;
+import std.compat;
 
 namespace fs = std::filesystem;
 
@@ -62,23 +58,23 @@ static constexpr std::size_t MAX_SENTENCE_LEN = 100;
 static inline i32 Encode(i32 freq, i32 idx) {
     u32 encoded_value = 0;
     if (freq < 0) {
-        encoded_value |= (u32)(-freq);
+        encoded_value |= static_cast<u32>(-freq);
         encoded_value |= (1U << 23);
     } else {
-        encoded_value = (u32)(freq & 0x7FFFFF);
+        encoded_value = static_cast<u32>(freq & 0x7FFFFF);
     }
 
-    encoded_value |= (u32)idx << 24;
-    return (i32)encoded_value;
+    encoded_value |= static_cast<u32>(idx) << 24;
+    return static_cast<i32>(encoded_value);
 }
 
 static inline i32 DecodeFreq(i32 value) {
-    u32 v1 = (u32)(value) & 0xFFFFFF;
+    u32 v1 = static_cast<u32>(value) & 0xFFFFFF;
     if (v1 & (1 << 23)) {
         v1 &= 0x7FFFFF;
-        return -(i32)v1;
+        return -static_cast<i32>(v1);
     } else {
-        v1 = (i32)v1;
+        v1 = static_cast<i32>(v1);
     }
     return v1;
 }

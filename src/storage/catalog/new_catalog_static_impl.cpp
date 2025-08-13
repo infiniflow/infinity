@@ -1565,18 +1565,15 @@ void NewCatalog::AppendToScalarFunctionSet(NewCatalog *catalog, const SharedPtr<
     String name = function_set->name();
     StringToLower(name);
     if (!catalog->function_sets_.contains(name)) {
-        String error_message = fmt::format("Trying to append to non-existent function {} in catalog", name);
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("Trying to append to non-existent function {} in catalog", name));
     }
     auto target_scalar_function_set = std::dynamic_pointer_cast<ScalarFunctionSet>(catalog->function_sets_[name]);
     if (!target_scalar_function_set) {
-        String error_message = fmt::format("Trying to append to non-scalar function {} in catalog", name);
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("Trying to append to non-scalar function {} in catalog", name));
     }
     auto source_function_set = std::dynamic_pointer_cast<ScalarFunctionSet>(function_set);
     if (!source_function_set) {
-        String error_message = fmt::format("Trying to append non-scalar function to scalar function {} in catalog", name);
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("Trying to append non-scalar function to scalar function {} in catalog", name));
     }
     for (const auto &function : source_function_set->GetAllScalarFunctions()) {
         target_scalar_function_set->AddFunction(function);
@@ -1587,8 +1584,7 @@ void NewCatalog::AddSpecialFunction(NewCatalog *catalog, const SharedPtr<Special
     String name = special_function->name();
     StringToLower(name);
     if (catalog->special_functions_.contains(name)) {
-        String error_message = fmt::format("Trying to add duplicated special function into catalog: {}", name);
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("Trying to add duplicated special function into catalog: {}", name));
     }
     catalog->special_functions_.emplace(name, special_function);
     switch (special_function->special_type()) {

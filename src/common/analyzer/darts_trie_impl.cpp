@@ -11,14 +11,8 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+
 module;
-
-#include <cstddef>
-#include <fstream>
-#include <map>
-#include <vector>
-
-#include "string_utils.h"
 
 module infinity_core:darts_trie.impl;
 
@@ -26,6 +20,9 @@ import :darts_trie;
 import :stl;
 import :darts;
 import :status;
+
+import std;
+import std.compat;
 
 namespace infinity {
 

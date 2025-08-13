@@ -120,15 +120,13 @@ SharedPtr<BaseExpression> GroupBinder::BindColumnReference(const ColumnExpr &exp
 
 SharedPtr<BaseExpression> GroupBinder::BindConstantExpression(const ConstantExpr &expr, BindContext *bind_context_ptr) {
     if (expr.literal_type_ != LiteralType::kInteger) {
-        String error_message = "Not an integer.";
-        UnrecoverableError(error_message);
+        UnrecoverableError("Not an integer.");
     }
     i64 select_idx = expr.integer_value_;
 
     Vector<ParsedExpr *> &expr_array = bind_context_ptr->select_expression_;
-    if (select_idx > (i64)expr_array.size() or select_idx < 1) {
-        Status status = Status::SyntaxError(fmt::format("GROUP BY clause out of range - should be from 1 to {}", expr_array.size()));
-        RecoverableError(status);
+    if (select_idx > static_cast<i64>(expr_array.size()) or select_idx < 1) {
+        RecoverableError(Status::SyntaxError(fmt::format("GROUP BY clause out of range - should be from 1 to {}", expr_array.size())));
     }
 
     select_idx -= 1;

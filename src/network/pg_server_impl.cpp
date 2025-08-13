@@ -14,8 +14,6 @@
 
 module;
 
-#include <boost/bind/bind.hpp>
-
 module infinity_core:pg_server.impl;
 
 import :pg_server;
@@ -46,8 +44,7 @@ Thread PGServer::Run() {
     boost::asio::ip::address address = boost::asio::ip::make_address(pg_listen_addr, error);
     if (error) {
         infinity::InfinityContext::instance().UnInit();
-        String err_msg = fmt::format("{} isn't a valid IPv4 address.\n", pg_listen_addr);
-        UnrecoverableError(err_msg);
+        UnrecoverableError(fmt::format("{} isn't a valid IPv4 address.\n", pg_listen_addr));
     }
 
     running_connection_count_ = 0;
@@ -67,8 +64,7 @@ Thread PGServer::Run() {
 
 void PGServer::Shutdown() {
     {
-        auto expected = PGServerStatus::kRunning;
-        if (!status_.compare_exchange_strong(expected, PGServerStatus::kStopping)) {
+        if (auto expected = PGServerStatus::kRunning; !status_.compare_exchange_strong(expected, PGServerStatus::kStopping)) {
             if (status_ == PGServerStatus::kStopped) {
                 return;
             } else {

@@ -1,7 +1,5 @@
 module;
 
-#include <string>
-
 module infinity_core:cn_quantifier_segmenter.impl;
 
 import :cn_quantifier_segmenter;
@@ -12,6 +10,8 @@ import :analyze_context;
 import :lexeme;
 import :character_util;
 import :ik_dict;
+
+import std;
 
 namespace infinity {
 

@@ -20,10 +20,6 @@ module;
 #include <ijma.h>
 #pragma clang diagnostic pop
 
-#include <cstring>
-#include <filesystem>
-#include <iostream>
-
 module infinity_core:japanese_analyzer.impl;
 
 import :japanese_analyzer;
@@ -33,6 +29,8 @@ import :analyzer;
 import :common_analyzer;
 import :logger;
 import :status;
+
+import std;
 
 namespace fs = std::filesystem;
 

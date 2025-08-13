@@ -152,8 +152,7 @@ Vector<SharedPtr<String>> NewTxn::GetOperations() const { return txn_context_ptr
 void NewTxn::CheckTxnStatus() {
     TxnState txn_state = this->GetTxnState();
     if (txn_state != TxnState::kStarted) {
-        String error_message = "Transaction isn't started.";
-        UnrecoverableError(error_message);
+        UnrecoverableError("Transaction isn't started.");
     }
 }
 
@@ -1857,8 +1856,7 @@ void NewTxn::SetTxnRollbacking(TxnTimeStamp rollback_ts) {
         return;
     }
     if (txn_state != TxnState::kCommitting && txn_state != TxnState::kStarted) {
-        String error_message = fmt::format("Transaction is in {} status, which can't rollback.", TxnState2Str(txn_state));
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("Transaction is in {} status, which can't rollback.", TxnState2Str(txn_state)));
     }
     txn_context_ptr_->state_ = TxnState::kRollbacking;
     txn_context_ptr_->commit_ts_ = rollback_ts; // update commit_ts ?

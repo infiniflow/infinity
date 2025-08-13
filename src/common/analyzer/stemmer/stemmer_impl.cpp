@@ -14,8 +14,6 @@
 
 module;
 
-#include <cstring>
-
 #include "api.h"
 #include "stem_UTF_8_danish.h"
 #include "stem_UTF_8_dutch.h"
