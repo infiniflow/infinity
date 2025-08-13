@@ -1578,6 +1578,8 @@ Status NewTxn::RestoreTableSnapshot(const String &db_name, const SharedPtr<Table
                                                        restored_file_paths,
                                                        false);
 
+    // restore table
+
     if (!status.ok()) {
         return status;
     }
@@ -2526,6 +2528,8 @@ Status NewTxn::PrepareCommitCreateSnapshot(const WalCmdCreateSnapshot *create_sn
     // for (const auto &mem_index_detail : table_mem_indexes) {
     //     auto dump_index_task = MakeShared<DumpMemIndexTask>(mem_index_detail->db_name_, mem_index_detail->table_name_,
     //     mem_index_detail->index_name_, mem_index_detail->segment_id_, mem_index_detail->begin_row_id_); dump_tasks.push_back(dump_index_task);
+    //     auto dump_index_task = MakeShared<DumpMemIndexTask>(mem_index_detail->db_name_, mem_index_detail->table_name_,
+    //     mem_index_detail->index_name_, mem_index_detail->segment_id_, mem_index_detail->begin_row_id_); dump_tasks.push_back(dump_index_task);
     //     dump_index_processor->Submit(std::move(dump_index_task));
     // }
 
@@ -2810,7 +2814,7 @@ Status NewTxn::RestoreTableFromSnapshot(const WalCmdRestoreTableSnapshot *restor
         table_meta.emplace(db_meta.db_id_str(), restore_table_snapshot_cmd->table_id_, this);
     }
 
-    // restore meta data of the table
+    // restore meta data of the table`
     status = table_meta->RestoreFromSnapshot(const_cast<WalCmdRestoreTableSnapshot *>(restore_table_snapshot_cmd), is_link_files);
     if (!status.ok()) {
         return status;
@@ -5474,7 +5478,6 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
 
             // Remove the table directory if it's empty
             String table_dir = fmt::format("{}/db_{}/tbl_{}", data_dir, restore_table_txn_store->db_id_str_, restore_table_txn_store->table_id_str_);
-
             if (VirtualStore::Exists(table_dir)) {
                 Status remove_status = VirtualStore::RemoveDirectory(table_dir);
                 if (!remove_status.ok()) {
@@ -5487,13 +5490,19 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
             // for (const auto &segment_info : restore_table_txn_store->segment_infos_) {
             //     metas.emplace_back(MakeUnique<SegmentMetaKey>(restore_table_txn_store->db_id_str_,
             //                                                   restore_table_txn_store->table_id_str_,
+            //     metas.emplace_back(MakeUnique<SegmentMetaKey>(restore_table_txn_store->db_id_str_,
+            //                                                   restore_table_txn_store->table_id_str_,
             //                                                   segment_info.segment_id_));
             //     for (const auto &block_id : segment_info.block_ids_) {
+            //     metas.emplace_back(MakeUnique<BlockMetaKey>(restore_table_txn_store->db_id_str_,
+            //                                                 restore_table_txn_store->table_id_str_,
             //     metas.emplace_back(MakeUnique<BlockMetaKey>(restore_table_txn_store->db_id_str_,
             //                                                 restore_table_txn_store->table_id_str_,
             //                                                 segment_info.segment_id_,
             //                                                 block_id));
             //         for (const auto &column_def : restore_table_txn_store->table_def_->columns()) {
+            //             metas.emplace_back(MakeUnique<ColumnMetaKey>(restore_table_txn_store->db_id_str_,
+            //                                                         restore_table_txn_store->table_id_str_,
             //             metas.emplace_back(MakeUnique<ColumnMetaKey>(restore_table_txn_store->db_id_str_,
             //                                                         restore_table_txn_store->table_id_str_,
             //                                                         segment_info.segment_id_,
@@ -5510,8 +5519,14 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
             //         metas.emplace_back(MakeUnique<SegmentIndexMetaKey>(restore_table_txn_store->db_id_str_,
             //                                                            restore_table_txn_store->table_id_str_,
             //                                                            index_cmd.index_id_,
+            //         metas.emplace_back(MakeUnique<SegmentIndexMetaKey>(restore_table_txn_store->db_id_str_,
+            //                                                            restore_table_txn_store->table_id_str_,
+            //                                                            index_cmd.index_id_,
             //                                                            segment_index_info.segment_id_));
             //         for (const auto &chunk_info : segment_index_info.chunk_infos_) {
+            //         metas.emplace_back(MakeUnique<ChunkIndexMetaKey>(restore_table_txn_store->db_id_str_,
+            //                                                             restore_table_txn_store->table_id_str_,
+            //                                                             index_cmd.index_id_,
             //         metas.emplace_back(MakeUnique<ChunkIndexMetaKey>(restore_table_txn_store->db_id_str_,
             //                                                             restore_table_txn_store->table_id_str_,
             //                                                             index_cmd.index_id_,
@@ -5534,7 +5549,6 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
             RestoreDatabaseTxnStore *restore_database_txn_store = static_cast<RestoreDatabaseTxnStore *>(base_txn_store_.get());
             // Remove the database directory
             String db_dir = fmt::format("{}/db_{}", data_dir, restore_database_txn_store->db_id_str_);
-
             if (VirtualStore::Exists(db_dir)) {
                 Status remove_status = VirtualStore::RemoveDirectory(db_dir);
                 if (!remove_status.ok()) {
@@ -6313,7 +6327,6 @@ Status NewTxn::ReplayRestoreTableSnapshot(WalCmdRestoreTableSnapshot *restore_ta
     bool is_link_files = false;
     if (status.ok()) {
         if (table_id == restore_table_cmd->table_id_) {
-
             LOG_WARN(fmt::format("Skipping replay restore table: Table {} with id {} already exists, commit ts: {}, txn: {}.",
                                  *restore_table_cmd->table_def_->table_name(),
                                  restore_table_cmd->table_id_,
@@ -6397,21 +6410,6 @@ Status NewTxn::ReplayRestoreTableSnapshot(WalCmdRestoreTableSnapshot *restore_ta
     if (!status.ok()) {
         return status;
     }
-
-    // String snapshot_dir = InfinityContext::instance().config()->SnapshotDir();
-    // String snapshot_name = restore_table_cmd->snapshot_name_;
-    // SharedPtr<TableSnapshotInfo> table_snapshot;
-    // std::tie(table_snapshot, status) = TableSnapshotInfo::Deserialize(snapshot_dir, snapshot_name);
-    // if (!status.ok()) {
-    //     return status;
-    // }
-
-    // Vector<String> files_to_restore = table_snapshot->GetFiles();
-    // status = table_snapshot->RestoreSnapshotFiles(snapshot_dir, snapshot_name, files_to_restore, restore_table_cmd->table_id_);
-    // if (!status.ok()) {
-    //     return status;
-    // }
-
     return Status::OK();
 }
 
@@ -6423,13 +6421,15 @@ Status NewTxn::ReplayRestoreDatabaseSnapshot(WalCmdRestoreDatabaseSnapshot *rest
     Status status = kv_instance_->Get(db_key, db_id);
     if (status.ok()) {
         if (db_id == restore_database_cmd->db_id_str_) {
-            LOG_WARN(fmt::format("Skipping replay restore database: Database {} with id {} already exists, commit ts: {}, txn: {}.",
+            LOG_WARN(fmt::format("Skipping replay restore database: Database {} with id {} already "
+                                 "exists, commit ts: {}, txn: {}.",
                                  restore_database_cmd->db_name_,
                                  restore_database_cmd->db_id_str_,
                                  commit_ts,
                                  txn_id));
         } else {
-            LOG_ERROR(fmt::format("Replay restore database: Database {} with id {} already exists with different id {}, commit ts: {}, txn: {}.",
+            LOG_ERROR(fmt::format("Replay restore database: Database {} with id {} already exists "
+                                  "with different id {}, commit ts: {}, txn: {}.",
                                   restore_database_cmd->db_name_,
                                   restore_database_cmd->db_id_str_,
                                   db_id,
@@ -6445,7 +6445,8 @@ Status NewTxn::ReplayRestoreDatabaseSnapshot(WalCmdRestoreDatabaseSnapshot *rest
         if (persistence_manager != nullptr) {
             restore_table_cmd.addr_serializer_.AddToPersistenceManager(persistence_manager);
             HashMap<String, ObjAddr> all_files = persistence_manager->GetAllFiles();
-            LOG_DEBUG(fmt::format("Persistence manager has {} registered files during restore replay, commit ts: {}, txn: {}",
+            LOG_DEBUG(fmt::format("Persistence manager has {} registered files during restore "
+                                  "replay, commit ts: {}, txn: {}",
                                   all_files.size(),
                                   commit_ts,
                                   txn_id));
@@ -6686,7 +6687,8 @@ Status NewTxn::CheckpointforSnapshot(TxnTimeStamp last_ckp_ts, CheckpointTxnStor
     LOG_INFO(fmt::format("checkpoint ts: {}", current_ckp_ts_));
 
     if (last_ckp_ts > 0 and last_ckp_ts + 2 >= checkpoint_ts) {
-        // last checkpoint ts: last checkpoint txn begin ts. checkpoint is the begin_ts of current txn
+        // last checkpoint ts: last checkpoint txn begin ts. checkpoint is the begin_ts of current
+        // txn
         txn_type_ = TxnType::kReadOnly;
         LOG_INFO(fmt::format("Last checkpoint ts {}, this checkpoint begin ts: {}, SKIP CHECKPOINT", last_ckp_ts, checkpoint_ts));
         return Status::OK();

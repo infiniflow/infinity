@@ -462,6 +462,7 @@ class TestSnapshot:
         
         # Create table and insert data
         table_obj = self.create_comprehensive_table(table_name)
+        self.add_drop_column(table_obj)
         self._create_indexes(table_obj)
         actual_inserted = self.insert_comprehensive_data(table_obj, 100)
         print(f"Successfully inserted {actual_inserted} out of 100 rows")
