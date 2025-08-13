@@ -1,0 +1,104 @@
+name: Format C++ Code
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - 'src/**/*.cpp'
+      - 'src/**/*.h'
+      - 'src/**/*.hpp'
+      - 'test/**/*.cpp'
+      - 'test/**/*.h'
+      - 'test/**/*.hpp'
+      - 'example/**/*.cpp'
+      - 'example/**/*.h'
+      - 'example/**/*.hpp'
+      - 'client/**/*.cpp'
+      - 'client/**/*.h'
+      - 'client/**/*.hpp'
+      - 'benchmark/**/*.cpp'
+      - 'benchmark/**/*.h'
+      - 'benchmark/**/*.hpp'
+      - 'gui/**/*.cpp'
+      - 'gui/**/*.h'
+      - 'gui/**/*.hpp'
+      - 'thrift/**/*.cpp'
+      - 'thrift/**/*.h'
+      - 'thrift/**/*.hpp'
+      - 'tools/**/*.cpp'
+      - 'tools/**/*.h'
+      - 'tools/**/*.hpp'
+      - 'scripts/**/*.cpp'
+      - 'scripts/**/*.h'
+      - 'scripts/**/*.hpp'
+      - 'cmake/**/*.cmake'
+      - 'CMakeLists.txt'
+      - '.clang-format'
+
+jobs:
+  format:
+    name: Check C++ Code Formatting
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Need full history to get changed files
+          
+      - name: Install clang-format
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang-format
+          
+          # Verify installation
+          echo "Installed clang-format version:"
+          clang-format --version
+          
+      - name: Verify clang-format availability
+        run: |
+          echo "Checking clang-format availability..."
+          clang-format --version
+          echo "clang-format is available at: $(which clang-format)"
+          
+      - name: Get changed files
+        id: changed-files
+        run: |
+          # Get list of changed C++ files
+          CHANGED_FILES=$(git diff --name-only ${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }} | grep -E '\.(cpp|h|hpp|cmake)$' | grep -v 'third_party/' | grep -v 'build/' | grep -v 'cmake-build/' || true)
+          
+          if [ -n "$CHANGED_FILES" ]; then
+            echo "Changed C++ files:"
+            echo "$CHANGED_FILES"
+            echo "changed_files<<EOF" >> $GITHUB_OUTPUT
+            echo "$CHANGED_FILES" >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+          else
+            echo "No C++ files changed"
+            echo "changed_files=" >> $GITHUB_OUTPUT
+          fi
+          
+      - name: Check formatting of changed files
+        if: steps.changed-files.outputs.changed_files != ''
+        run: |
+          # Format files temporarily to check if they need formatting
+          echo "${{ steps.changed-files.outputs.changed_files }}" | while read -r file; do
+            if [ -f "$file" ]; then
+              echo "Checking formatting: $file"
+              # Create a temporary formatted version
+              clang-format "$file" > "${file}.formatted"
+              # Compare original with formatted version
+              if ! diff "$file" "${file}.formatted" > /dev/null; then
+                echo "❌ $file needs formatting"
+                echo "Run: clang-format -i $file"
+                # Show the diff for debugging
+                echo "Formatting diff:"
+                diff "$file" "${file}.formatted" || true
+                rm "${file}.formatted"
+                exit 1
+              else
+                echo "✅ $file is properly formatted"
+                rm "${file}.formatted"
+              fi
+            fi
+          done
