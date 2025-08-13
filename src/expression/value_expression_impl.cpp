@@ -17,7 +17,6 @@ module;
 module infinity_core:value_expression.impl;
 
 import :value_expression;
-
 import :stl;
 import :expression_type;
 import :value_expression;

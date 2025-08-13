@@ -18,10 +18,11 @@ export module infinity_core:column_expression;
 
 import :column_binding;
 import :base_expression;
-import data_type;
 import :special_function;
 import :stl;
+
 import internal_types;
+import data_type;
 
 namespace infinity {
 

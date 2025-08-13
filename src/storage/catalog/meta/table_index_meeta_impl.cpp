@@ -16,13 +16,10 @@ module;
 
 module infinity_core:table_index_meeta.impl;
 
-import std;
-
 import :table_index_meeta;
 import :kv_store;
 import :table_meeta;
 import :kv_code;
-import third_party;
 import :logger;
 import :index_base;
 import :meta_info;
@@ -35,6 +32,9 @@ import :utility;
 import :kv_utility;
 import :snapshot_info;
 import :segment_index_meta;
+
+import std;
+import third_party;
 
 import column_def;
 import create_index_info;

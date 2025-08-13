@@ -14,23 +14,22 @@
 
 module;
 
-#include <vector>
-#include <string>
-
 module infinity_core:match_tensor_expression.impl;
 
 import :match_tensor_expression;
-
 import :stl;
 import :expression_type;
-import internal_types;
-import third_party;
 import :base_expression;
 import :column_expression;
-import embedding_info;
 import :infinity_exception;
 import :status;
 import :logger;
+
+import std;
+import third_party;
+
+import internal_types;
+import embedding_info;
 import logical_type;
 import match_tensor_expr;
 import data_type;

@@ -16,21 +16,21 @@ module;
 
 module infinity_core:column_meta.impl;
 
-import std;
-
 import :column_meta;
 import :kv_store;
 import :kv_code;
 import :block_meta;
 import :segment_meta;
 import :table_meeta;
-import third_party;
 import :infinity_context;
 import :buffer_manager;
 import :data_file_worker;
 import :var_file_worker;
 import :vector_buffer;
 import :column_vector;
+
+import std;
+import third_party;
 
 import logical_type;
 import column_def;

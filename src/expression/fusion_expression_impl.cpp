@@ -14,19 +14,17 @@
 
 module;
 
-#include <sstream>
-
 module infinity_core:fusion_expression.impl;
 
 import :fusion_expression;
-
 import :stl;
 import :expression_type;
-
 import :scalar_function;
-import search_options;
 import :infinity_exception;
+
 import third_party;
+
+import search_options;
 
 namespace infinity {
 

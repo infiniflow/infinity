@@ -18,6 +18,7 @@ export module infinity_core:conjunction_expression;
 
 import :stl;
 import :base_expression;
+
 import data_type;
 import logical_type;
 import internal_types;

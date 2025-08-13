@@ -14,17 +14,16 @@
 
 module;
 
-#include <sstream>
-
 module infinity_core:case_expression.impl;
 
 import :case_expression;
-
 import :stl;
 import :expression_type;
 import :infinity_exception;
-import :logger;
 import :case_expression;
+
+import std;
+
 import data_type;
 
 namespace infinity {
@@ -37,8 +36,7 @@ void CaseExpression::AddCaseCheck(const SharedPtr<BaseExpression> &when_expr, co
 
 void CaseExpression::AddElseExpr(const SharedPtr<BaseExpression> &else_expr) {
     if (else_expr_.get() != nullptr) {
-        String error_message = "else expression already been assigned before.";
-        UnrecoverableError(error_message);
+        UnrecoverableError("else expression already been assigned before.");
     }
     else_expr_ = else_expr;
 }

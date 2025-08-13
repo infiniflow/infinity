@@ -18,10 +18,10 @@ export module infinity_core:base_expression;
 
 import :stl;
 import :expression_type;
+import :infinity_exception;
+
 import data_type;
 import internal_types;
-import :infinity_exception;
-import third_party;
 
 namespace infinity {
 

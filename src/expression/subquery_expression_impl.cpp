@@ -14,17 +14,16 @@
 
 module;
 
-#include <sstream>
-
 module infinity_core:subquery_expression.impl;
 
 import :subquery_expression;
-
 import :stl;
 import :bound_select_statement;
 import :expression_type;
-import subquery_expr;
 
+import std;
+
+import subquery_expr;
 import logical_type;
 import data_type;
 

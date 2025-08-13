@@ -19,6 +19,7 @@ export module infinity_core:reference_expression;
 import :stl;
 import :expression_type;
 import :base_expression;
+
 import data_type;
 import internal_types;
 

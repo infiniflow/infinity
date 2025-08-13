@@ -17,17 +17,15 @@ module;
 module infinity_core:cast_expression.impl;
 
 import :cast_expression;
-
 import :base_expression;
-import logical_type;
 import :infinity_exception;
 import :bound_cast_func;
 import :stl;
-import third_party;
 import :cast_function;
 import :status;
-import :logger;
+
 import data_type;
+import logical_type;
 
 namespace infinity {
 
@@ -40,8 +38,7 @@ SharedPtr<BaseExpression> CastExpression::AddCastToType(const SharedPtr<BaseExpr
         BoundCastFunc cast = CastFunction::GetBoundFunc(source_expr_ptr->Type(), target_type);
         return MakeShared<CastExpression>(cast, source_expr_ptr, target_type);
     } else {
-        Status status = Status::NotSupportedTypeConversion(source_expr_ptr->Type().ToString(), target_type.ToString());
-        RecoverableError(status);
+        RecoverableError(Status::NotSupportedTypeConversion(source_expr_ptr->Type().ToString(), target_type.ToString()));
     }
     return nullptr;
 }
@@ -50,8 +47,7 @@ bool CastExpression::CanCast(const DataType &source, const DataType &target) {
     switch (target.type()) {
         case LogicalType::kNull:
         case LogicalType::kInvalid: {
-            String error_message = "Invalid data type";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Invalid data type");
         }
         default:;
     }
@@ -171,8 +167,7 @@ bool CastExpression::CanCast(const DataType &source, const DataType &target) {
             }
         }
         default: {
-            String error_message = fmt::format("Invalid cast from {} to {}", source.ToString(), target.ToString());
-            UnrecoverableError(error_message);
+            UnrecoverableError(fmt::format("Invalid cast from {} to {}", source.ToString(), target.ToString()));
         }
     }
     return false;

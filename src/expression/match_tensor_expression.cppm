@@ -17,13 +17,14 @@ module;
 export module infinity_core:match_tensor_expression;
 
 import :stl;
+import :base_expression;
+import :column_expression;
+
+import match_tensor_expr;
 import data_type;
 import logical_type;
 import knn_expr;
 import internal_types;
-import :base_expression;
-import :column_expression;
-import match_tensor_expr;
 
 namespace infinity {
 

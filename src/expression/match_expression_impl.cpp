@@ -14,16 +14,15 @@
 
 module;
 
-#include <string>
-
 module infinity_core:match_expression.impl;
 
 import :match_expression;
-
 import :stl;
 import :logger;
 import :base_expression;
 import :expression_type;
+
+import std;
 import third_party;
 
 namespace infinity {

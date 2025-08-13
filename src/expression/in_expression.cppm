@@ -19,6 +19,7 @@ import :stl;
 import :value;
 import :infinity_exception;
 import :base_expression;
+
 import data_type;
 import logical_type;
 import internal_types;
@@ -108,8 +109,7 @@ private:
                 case LogicalType::kVarchar:
                     return std::hash<String>{}(val.GetVarchar());
                 default:
-                    String error_message = fmt::format("Not supported type : {}", val.type().ToString());
-                    UnrecoverableError(error_message);
+                    UnrecoverableError(fmt::format("Not supported type : {}", val.type().ToString()));
                     break;
             }
             return 0;

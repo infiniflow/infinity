@@ -16,9 +16,6 @@ module;
 
 module infinity_core:kv_utility.impl;
 
-import std;
-import std.compat;
-
 import :kv_utility;
 import :stl;
 import :kv_code;
@@ -35,6 +32,8 @@ import :buffer_manager;
 import :infinity_exception;
 import :config;
 
+import std;
+import std.compat;
 import third_party;
 
 namespace infinity {

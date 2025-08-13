@@ -14,16 +14,14 @@
 
 module;
 
-#include <sstream>
-
 module infinity_core:in_expression.impl;
 
 import :in_expression;
-
 import :infinity_exception;
 import :stl;
 import :expression_type;
-import :logger;
+
+import std;
 
 namespace infinity {
 
@@ -47,8 +45,7 @@ String InExpression::ToString() const {
             break;
         }
         default: {
-            String error_message = "Unknown IN operator type.";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Unknown IN operator type.");
             break;
         }
     }

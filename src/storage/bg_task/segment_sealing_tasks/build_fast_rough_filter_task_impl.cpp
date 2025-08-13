@@ -16,8 +16,6 @@ module;
 
 module infinity_core:build_fast_rough_filter_task.impl;
 
-import std;
-
 import :build_fast_rough_filter_task;
 import :stl;
 import :infinity_exception;
@@ -25,7 +23,6 @@ import :logger;
 import :buffer_manager;
 import :column_vector;
 import :value;
-import third_party;
 import :block_column_iter;
 import :probabilistic_data_filter;
 import :min_max_data_filter;
@@ -38,6 +35,9 @@ import :column_meta;
 import :table_meeta;
 import :status;
 import :default_values;
+
+import std;
+import third_party;
 
 import internal_types;
 import logical_type;
@@ -137,8 +137,7 @@ void UpdateMax(InnerMinMaxDataFilterVarcharType &max, const String &input_str) {
 
 inline void Advance(TotalRowCount &total_row_count_handler) {
     if (++total_row_count_handler.total_row_count_read_ > total_row_count_handler.total_row_count_in_segment_) {
-        String error_message = "BuildFastRoughFilterArg: total_row_count overflow";
-        UnrecoverableError(error_message);
+        UnrecoverableError("BuildFastRoughFilterArg: total_row_count overflow");
     }
 }
 

@@ -14,22 +14,19 @@
 
 module;
 
-#include <sstream>
-#include <vector>
-
 module infinity_core:knn_expression.impl;
 
 import :knn_expression;
-
 import :stl;
 import :expression_type;
-
 import :scalar_function;
 import :logger;
 import :infinity_exception;
+
+import std;
 import third_party;
+
 import statement_common;
-import :knn_expression;
 import knn_expr;
 import internal_types;
 
@@ -38,8 +35,7 @@ namespace infinity {
 String KnnExpression::KnnDistanceType2Str(KnnDistanceType type) {
     switch (type) {
         case KnnDistanceType::kInvalid: {
-            String error_message = "Invalid KNN distance type";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Invalid KNN distance type");
         }
         case KnnDistanceType::kL2: {
             return "L2";

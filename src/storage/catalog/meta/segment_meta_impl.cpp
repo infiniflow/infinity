@@ -16,12 +16,9 @@ module;
 
 module infinity_core:segment_meta.impl;
 
-import std;
-
 import :segment_meta;
 import :kv_store;
 import :kv_code;
-import third_party;
 import :default_values;
 import :table_meeta;
 import :logger;
@@ -32,6 +29,9 @@ import :new_catalog;
 import :fast_rough_filter;
 import :kv_utility;
 import :snapshot_info;
+
+import std;
+import third_party;
 
 import column_def;
 

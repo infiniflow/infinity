@@ -16,11 +16,8 @@ module;
 
 module infinity_core:block_meta.impl;
 
-import std;
-
 import :block_meta;
 import :kv_code;
-import third_party;
 import :kv_store;
 import :segment_meta;
 import :table_meeta;
@@ -37,6 +34,9 @@ import :kv_utility;
 import :logger;
 import :snapshot_info;
 import :new_txn_manager;
+
+import std;
+import third_party;
 
 import column_def;
 

@@ -16,19 +16,19 @@ module;
 
 module infinity_core:bmp_index_file_worker.impl;
 
-import std;
-
 import :bmp_index_file_worker;
 import :index_bmp;
 import :logger;
 import :infinity_exception;
-import third_party;
 import :bmp_util;
 import :bmp_alg;
 import :bmp_handler;
 import :virtual_store;
 import :persistence_manager;
 import :local_file_handle;
+
+import std;
+import third_party;
 
 import column_def;
 import internal_types;

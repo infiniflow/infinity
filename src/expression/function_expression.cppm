@@ -18,9 +18,10 @@ export module infinity_core:function_expression;
 
 import :stl;
 import :base_expression;
-import data_type;
 import :scalar_function;
+
 import internal_types;
+import data_type;
 
 namespace infinity {
 

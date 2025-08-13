@@ -14,7 +14,6 @@
 
 module;
 
-#include <sstream>
 module infinity_core:search_expression.impl;
 
 import :search_expression;
@@ -25,6 +24,8 @@ import :match_expression;
 import :knn_expression;
 import :match_tensor_expression;
 import :fusion_expression;
+
+import std;
 
 namespace infinity {
 

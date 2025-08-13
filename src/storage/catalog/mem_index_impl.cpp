@@ -16,8 +16,6 @@ module;
 
 module infinity_core:mem_index.impl;
 
-import std;
-
 import :mem_index;
 import :stl;
 import :base_memindex;
@@ -27,6 +25,8 @@ import :emvb_index_in_mem;
 import :memory_indexer;
 import :hnsw_handler;
 import :bmp_handler;
+
+import std;
 
 import row_id;
 

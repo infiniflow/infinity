@@ -16,8 +16,6 @@ module;
 
 module infinity_core:bg_task.impl;
 
-import std;
-
 import :bg_task;
 import :base_memindex;
 import :emvb_index_in_mem;
@@ -30,6 +28,8 @@ import :txn_state;
 import :column_vector;
 import :mem_index;
 import :base_txn_store;
+
+import std;
 
 import row_id;
 

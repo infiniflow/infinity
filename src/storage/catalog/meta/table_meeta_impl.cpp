@@ -16,14 +16,10 @@ module;
 
 module infinity_core:table_meeta.impl;
 
-import std;
-import std.compat;
-
 import :table_meeta;
 import :status;
 import :kv_code;
 import :kv_store;
-import third_party;
 import :default_values;
 import :logger;
 import :table_def;
@@ -38,6 +34,10 @@ import :block_meta;
 import :kv_utility;
 import :column_index_reader;
 import :new_txn;
+
+import std;
+import std.compat;
+import third_party;
 
 import row_id;
 import column_def;

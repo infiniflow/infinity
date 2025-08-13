@@ -14,18 +14,15 @@
 
 module;
 
-#include <cctype>
-#include <string>
-
 module infinity_core:column_expression.impl;
 
 import :column_expression;
-
 import :stl;
 import :expression_type;
 import :special_function;
-import third_party;
-import :column_expression;
+
+import std;
+
 import data_type;
 
 namespace infinity {
@@ -45,8 +42,7 @@ String ColumnExpression::ToString() const {
         bool all_digits{true};
         SizeT column_count = column_name_.size();
         for (SizeT idx = 0; idx < column_count; ++idx) {
-            char a = column_name_[idx];
-            if (!std::isdigit(a)) {
+            if (char a = column_name_[idx]; !std::isdigit(a)) {
                 all_digits = false;
                 break;
             }
@@ -74,8 +70,7 @@ bool ColumnExpression::Eq(const BaseExpression &other) const {
         return false;
     }
     const auto &other_column = static_cast<const ColumnExpression &>(other);
-    bool eq = table_name_ == other_column.table_name_ && column_name_ == other_column.column_name_;
-    if (!eq) {
+    if (bool eq = table_name_ == other_column.table_name_ && column_name_ == other_column.column_name_; !eq) {
         return false;
     }
     return true;

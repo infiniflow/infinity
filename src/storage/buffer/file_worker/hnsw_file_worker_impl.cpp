@@ -16,8 +16,6 @@ module;
 
 module infinity_core:hnsw_file_worker.impl;
 
-import std;
-
 import :hnsw_file_worker;
 import :infinity_exception;
 import :stl;
@@ -26,12 +24,14 @@ import :hnsw_alg;
 import :hnsw_common;
 import :index_hnsw;
 import :index_base;
-import third_party;
 import :logger;
 import :hnsw_handler;
 import :virtual_store;
 import :persistence_manager;
 import :local_file_handle;
+
+import std;
+import third_party;
 
 import column_def;
 import logical_type;

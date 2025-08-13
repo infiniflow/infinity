@@ -17,10 +17,11 @@ module;
 export module infinity_core:match_expression;
 
 import :stl;
-import data_type;
 import :base_expression;
+
 import logical_type;
 import internal_types;
+import data_type;
 
 namespace infinity {
 

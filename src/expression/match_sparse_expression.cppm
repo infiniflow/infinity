@@ -18,15 +18,16 @@ export module infinity_core:match_sparse_expression;
 
 import :stl;
 import :base_expression;
-import data_type;
 import :expression_type;
+import :column_expression;
+import :base_expression;
+
+import constant_expr;
+import sparse_info;
 import internal_types;
 import statement_common;
 import match_sparse_expr;
-import sparse_info;
-import :column_expression;
-import constant_expr;
-import :base_expression;
+import data_type;
 
 namespace infinity {
 

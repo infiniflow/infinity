@@ -18,11 +18,8 @@ module;
 
 module infinity_core:meta_tree.impl;
 
-import std;
-
 import :meta_tree;
 import :stl;
-import third_party;
 import :infinity_context;
 import :infinity_exception;
 import :default_values;
@@ -41,6 +38,9 @@ import :kv_utility;
 import :kv_store;
 import :new_txn_manager;
 import :utility;
+
+import std;
+import third_party;
 
 import check_statement;
 import internal_types;

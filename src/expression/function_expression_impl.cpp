@@ -14,15 +14,14 @@
 
 module;
 
-#include <sstream>
-
 module infinity_core:function_expression.impl;
 
 import :function_expression;
-
 import :stl;
 import :expression_type;
 import :scalar_function;
+
+import std;
 
 namespace infinity {
 

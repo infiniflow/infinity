@@ -21,9 +21,10 @@ module infinity_core:kv_store.impl;
 import :kv_store;
 import :stl;
 import :status;
-import third_party;
 import :rocksdb_merge_operator;
 import :logger;
+
+import third_party;
 
 namespace infinity {
 

@@ -20,7 +20,6 @@ import :stl;
 import :buffer_manager;
 import :infinity_exception;
 import :filter_value_type_classification;
-import :logger;
 
 namespace infinity {
 
@@ -107,8 +106,7 @@ private:
     template <CanOnlyBuildMinMaxFilter ValueType>
     static void BuildFilter(NewBuildFastRoughFilterArg &arg, bool build_min_max_filter, bool build_bloom_filter) {
         if (build_bloom_filter) [[unlikely]] {
-            String error_message = "BuildFilter: build_bloom_filter is true, but ValueType can only build min-max filter";
-            UnrecoverableError(error_message);
+            UnrecoverableError("BuildFilter: build_bloom_filter is true, but ValueType can only build min-max filter");
         }
         if (build_min_max_filter) {
             // TODO: now only use this branch
@@ -119,8 +117,7 @@ private:
     template <CanOnlyBuildBloomFilter ValueType>
     static void BuildFilter(NewBuildFastRoughFilterArg &arg, bool build_min_max_filter, bool build_bloom_filter) {
         if (build_min_max_filter) [[unlikely]] {
-            String error_message = "BuildFilter: build_min_max_filter is true, but ValueType can only build bloom filter";
-            UnrecoverableError(error_message);
+            UnrecoverableError("BuildFilter: build_min_max_filter is true, but ValueType can only build bloom filter");
         }
         if (build_bloom_filter) {
             BuildOnlyBloomFilter<ValueType>(arg);

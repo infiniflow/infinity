@@ -17,6 +17,7 @@ module;
 export module infinity_core:buffer_handle;
 
 import :stl;
+
 import third_party;
 
 namespace infinity {

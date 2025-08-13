@@ -17,19 +17,20 @@ module;
 module infinity_core:filter_fulltext_expression.impl;
 
 import :filter_fulltext_expression;
-
 import :base_expression;
 import :expression_type;
-import data_type;
 import :stl;
-import logical_type;
-import third_party;
 import :infinity_exception;
 import :status;
+import :block_index;
+
+import third_party;
+
+import data_type;
 import parsed_expr;
 import function_expr;
 import constant_expr;
-import :block_index;
+import logical_type;
 
 namespace infinity {
 

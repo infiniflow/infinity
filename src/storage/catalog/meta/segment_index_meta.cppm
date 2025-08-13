@@ -18,10 +18,11 @@ export module infinity_core:segment_index_meta;
 
 import :stl;
 import :status;
-import third_party;
 import :meta_info;
 import :new_catalog;
 import :snapshot_info;
+
+import third_party;
 
 namespace infinity {
 

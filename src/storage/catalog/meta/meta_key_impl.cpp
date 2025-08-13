@@ -20,11 +20,12 @@ module infinity_core:meta_key.impl;
 
 import :meta_key;
 import :utility;
-import third_party;
 import :kv_code;
 import :infinity_exception;
 import :meta_type;
 import :default_values;
+
+import third_party;
 
 import column_def;
 

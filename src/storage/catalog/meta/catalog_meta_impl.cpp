@@ -16,17 +16,17 @@ module;
 
 module infinity_core:catalog_meta.impl;
 
-import std;
-import std.compat;
-
 import :catalog_meta;
 import :kv_code;
 import :kv_store;
 import :infinity_exception;
-import third_party;
 import :kv_utility;
 import :default_values;
 import :new_txn;
+
+import std;
+import std.compat;
+import third_party;
 
 namespace infinity {
 

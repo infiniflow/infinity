@@ -22,8 +22,9 @@ import :file_worker;
 import :block_version;
 import :infinity_exception;
 import :logger;
-import third_party;
 import :persistence_manager;
+
+import third_party;
 
 namespace infinity {
 

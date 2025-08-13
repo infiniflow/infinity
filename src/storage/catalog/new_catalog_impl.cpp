@@ -16,8 +16,6 @@ module;
 
 module infinity_core:new_catalog.impl;
 
-import std;
-
 import :new_catalog;
 import :stl;
 import :new_txn;
@@ -55,6 +53,7 @@ import :meta_key;
 import :catalog_cache;
 import :meta_type;
 
+import std;
 import third_party;
 
 import column_def;

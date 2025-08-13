@@ -16,16 +16,16 @@ module;
 
 module infinity_core:var_file_worker.impl;
 
-import std;
-
 import :var_file_worker;
 import :stl;
 import :infinity_exception;
 import :var_buffer;
-import third_party;
 import :local_file_handle;
 import :persistence_manager;
 import :status;
+
+import std;
+import third_party;
 
 namespace infinity {
 

@@ -18,9 +18,10 @@ export module infinity_core:between_expression;
 
 import :column_binding;
 import :base_expression;
-import data_type;
 import :stl;
+
 import internal_types;
+import data_type;
 
 namespace infinity {
 

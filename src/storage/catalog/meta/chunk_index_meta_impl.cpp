@@ -16,8 +16,6 @@ module;
 
 module infinity_core:chunk_index_meta.impl;
 
-import std;
-
 import :chunk_index_meta;
 import :kv_code;
 import :kv_store;
@@ -40,6 +38,8 @@ import :persist_result_handler;
 import :virtual_store;
 import :logger;
 import :file_worker;
+
+import std;
 
 import row_id;
 import column_def;
