@@ -774,8 +774,7 @@ bool PhysicalShow::Execute(QueryContext *query_context, OperatorState *operator_
             break;
         }
         default: {
-            String error_message = "Invalid chunk scan type";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Invalid chunk scan type");
         }
     }
     operator_state->SetComplete();

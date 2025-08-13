@@ -112,8 +112,7 @@ private:
                 return original_value <= max_;
             }
             default: {
-                String error_message = "InnerMinMaxDataFilterDerived::MayInRange(): Unexpected compare type!";
-                UnrecoverableError(error_message);
+                UnrecoverableError("InnerMinMaxDataFilterDerived::MayInRange(): Unexpected compare type!");
                 // cannot decide, return true
                 return true;
             }
@@ -133,8 +132,7 @@ private:
                 return compare_str <= max_.GetStringView();
             }
             default: {
-                String error_message = "InnerMinMaxDataFilterDerived::MayInRange(): Unexpected compare type!";
-                UnrecoverableError(error_message);
+                UnrecoverableError("InnerMinMaxDataFilterDerived::MayInRange(): Unexpected compare type!");
                 // cannot decide, return true
                 return true;
             }
@@ -175,8 +173,7 @@ public:
 
     [[nodiscard]] inline bool MayInRange(ColumnID column_id, const Value &value, FilterCompareType compare_type) const {
         return std::visit(Overload{[column_id](const std::monostate &empty) -> bool {
-                                       String error_message = fmt::format("No InnerMinMaxDataFilter for column_id: {}", column_id);
-                                       UnrecoverableError(error_message);
+                                       UnrecoverableError(fmt::format("No InnerMinMaxDataFilter for column_id: {}", column_id));
 
                                        // Should always have minmax filter for sealed segment
                                        return true;
@@ -194,8 +191,7 @@ public:
         if (std::holds_alternative<std::monostate>(filter)) {
             CreateInnerMinMaxDataFilter<OriginalValueType>(filter, std::forward<MinMaxInnerValT>(min), std::forward<MinMaxInnerValT>(max));
         } else {
-            String error_message = fmt::format("In MinMaxDataFilter::Build(), InnerMinMaxDataFilter already exist for column_id: {}", column_id);
-            UnrecoverableError(error_message);
+            UnrecoverableError(fmt::format("In MinMaxDataFilter::Build(), InnerMinMaxDataFilter already exist for column_id: {}", column_id));
         }
     }
 

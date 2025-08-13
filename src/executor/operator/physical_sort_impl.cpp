@@ -152,8 +152,7 @@ void CopyWithIndexes(const Vector<UniquePtr<DataBlock>> &input_blocks,
 void PhysicalSort::Init(QueryContext* query_context) {
     auto sort_expr_count = order_by_types_.size();
     if (sort_expr_count != expressions_.size()) {
-        String error_message = "order_by_types_.size() != expressions_.size()";
-        UnrecoverableError(error_message);
+        UnrecoverableError("order_by_types_.size() != expressions_.size()");
     }
     Vector<std::function<std::strong_ordering(const SharedPtr<ColumnVector> &, u32, const SharedPtr<ColumnVector> &, u32)>> sort_functions;
     sort_functions.reserve(sort_expr_count);

@@ -250,9 +250,7 @@ void PhysicalAggregate::GroupByInputTable(const Vector<UniquePtr<DataBlock>> &in
         }
 
         if (output_data_num != datablock_size * column_count) {
-            String error_message =
-                fmt::format("Expected block size: {}, but only copied data size: {}", datablock_size * column_count, output_data_num);
-            UnrecoverableError(error_message);
+            UnrecoverableError(fmt::format("Expected block size: {}, but only copied data size: {}", datablock_size * column_count, output_data_num));
             break;
         }
 
@@ -303,8 +301,7 @@ bool PhysicalAggregate::SimpleAggregateExecute(const Vector<UniquePtr<DataBlock>
                                                bool task_completed) {
     SizeT aggregates_count = aggregates_.size();
     if (aggregates_count <= 0) {
-        String error_message = "Simple Aggregate without aggregate expression.";
-        UnrecoverableError(error_message);
+        UnrecoverableError("Simple Aggregate without aggregate expression.");
     }
 
     SizeT input_block_count = input_blocks.size();

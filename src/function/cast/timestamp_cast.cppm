@@ -46,8 +46,7 @@ export inline BoundCastFunc BindTimestampCast(DataType &target) {
             return BoundCastFunc(&ColumnVectorCast::TryCastColumnVectorToVarlen<TimestampT, VarcharT, TimestampTryCastToVarlen>);
         }
         default: {
-            String error_message = fmt::format("Can't cast from Timestamp type to {}", target.ToString());
-            UnrecoverableError(error_message);
+            UnrecoverableError(fmt::format("Can't cast from Timestamp type to {}", target.ToString()));
         }
     }
     return BoundCastFunc(nullptr);
@@ -75,29 +74,25 @@ struct TimestampTryCastToVarlen {
 
 template <>
 inline bool TimestampTryCastToFixlen::Run(TimestampT, DateT &) {
-    String error_message = "Not implement: TimestampTryCastToFixlen::Run";
-    UnrecoverableError(error_message);
+    UnrecoverableError("Not implement: TimestampTryCastToFixlen::Run");
     return false;
 }
 
 template <>
 inline bool TimestampTryCastToFixlen::Run(TimestampT, TimeT &) {
-    String error_message = "Not implement: TimestampTryCastToFixlen::Run";
-    UnrecoverableError(error_message);
+    UnrecoverableError("Not implement: TimestampTryCastToFixlen::Run");
     return false;
 }
 
 template <>
 inline bool TimestampTryCastToFixlen::Run(TimestampT, DateTimeT &) {
-    String error_message = "Not implement: TimestampTryCastToFixlen::Run";
-    UnrecoverableError(error_message);
+    UnrecoverableError("Not implement: TimestampTryCastToFixlen::Run");
     return false;
 }
 
 template <>
 inline bool TimestampTryCastToVarlen::Run(TimestampT, VarcharT &, ColumnVector *) {
-    String error_message = "Not implement: TimestampTryCastToFixlen::Run";
-    UnrecoverableError(error_message);
+    UnrecoverableError("Not implement: TimestampTryCastToFixlen::Run");
     return false;
 }
 

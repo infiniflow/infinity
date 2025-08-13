@@ -180,8 +180,7 @@ private:
 std::function<std::strong_ordering(const SharedPtr<ColumnVector> &, u32, const SharedPtr<ColumnVector> &, u32)>
 InvalidPhysicalTopCompareType(const DataType &type_) {
     return [type_name = type_.ToString()](const SharedPtr<ColumnVector> &, u32, const SharedPtr<ColumnVector> &, u32) -> std::strong_ordering {
-        String error_message = fmt::format("OrderBy LogicalType {} not implemented.", type_name);
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("OrderBy LogicalType {} not implemented.", type_name));
         return std::strong_ordering::equal;
     };
 }

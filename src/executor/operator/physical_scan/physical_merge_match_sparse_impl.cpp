@@ -59,8 +59,7 @@ PhysicalMergeMatchSparse::PhysicalMergeMatchSparse(u64 id,
 void PhysicalMergeMatchSparse::Init(QueryContext* query_context) { left_->Init(query_context); }
 
 SizeT PhysicalMergeMatchSparse::TaskletCount() {
-    String error_message = "Not Expected: TaskletCount of PhysicalMergeMatchSparse?";
-    UnrecoverableError(error_message);
+    UnrecoverableError("Not Expected: TaskletCount of PhysicalMergeMatchSparse?");
     return 0;
 }
 

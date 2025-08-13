@@ -53,8 +53,7 @@ bool PhysicalMergeKnn::Execute(QueryContext *query_context, OperatorState *opera
     auto &merge_knn_data = *merge_knn_op_state->merge_knn_function_data_;
     switch (merge_knn_data.elem_type_) {
         case EmbeddingDataType::kElemInvalid: {
-            String error_message = "Invalid elem type";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Invalid elem type");
             break;
         }
         case EmbeddingDataType::kElemUInt8:
@@ -62,8 +61,7 @@ bool PhysicalMergeKnn::Execute(QueryContext *query_context, OperatorState *opera
         case EmbeddingDataType::kElemFloat: {
             switch (merge_knn_data.heap_type_) {
                 case MergeKnnHeapType::kInvalid: {
-                    String error_message = "Invalid heap type";
-                    UnrecoverableError(error_message);
+                    UnrecoverableError("Invalid heap type");
                     break;
                 }
                 case MergeKnnHeapType::kMaxHeap: {
@@ -91,19 +89,16 @@ void PhysicalMergeKnn::ExecuteInner(QueryContext *query_context, MergeKnnOperato
 
     auto &input_data = *merge_knn_state->input_data_block_;
     if (!input_data.Finalized()) {
-        String error_message = "Input data block is not finalized";
-        UnrecoverableError(error_message);
+        UnrecoverableError("Input data block is not finalized");
     }
 
     auto merge_knn = dynamic_cast<MergeKnn<DataType, C, DataType> *>(merge_knn_data.merge_knn_base_.get());
     if (merge_knn == nullptr) {
-        String error_message = "Invalid merge knn data type";
-        UnrecoverableError(error_message);
+        UnrecoverableError("Invalid merge knn data type");
     }
     int column_n = input_data.column_count() - 2;
     if (column_n < 0) {
-        String error_message = "Input data block is invalid";
-        UnrecoverableError(error_message);
+        UnrecoverableError("Input data block is invalid");
     }
 
     auto &dist_column = *input_data.column_vectors[column_n];

@@ -47,8 +47,7 @@ export inline BoundCastFunc BindDateTimeCast(DataType &target) {
             return BoundCastFunc(&ColumnVectorCast::TryCastColumnVectorToVarlen<DateTimeT, VarcharT, DateTimeTryCastToVarlen>);
         }
         default: {
-            String error_message = fmt::format("Can't cast from DateTime type to {}", target.ToString());
-            UnrecoverableError(error_message);
+            UnrecoverableError(fmt::format("Can't cast from DateTime type to {}", target.ToString()));
         }
     }
     return BoundCastFunc(nullptr);
@@ -77,29 +76,25 @@ struct DateTimeTryCastToVarlen {
 
 template <>
 inline bool DateTimeTryCastToFixlen::Run(DateTimeT, DateT &) {
-    String error_message = "Not implemented";
-    UnrecoverableError(error_message);
+    UnrecoverableError("Not implemented");
     return false;
 }
 
 template <>
 inline bool DateTimeTryCastToFixlen::Run(DateTimeT, TimeT &) {
-    String error_message = "Not implemented";
-    UnrecoverableError(error_message);
+    UnrecoverableError("Not implemented");
     return false;
 }
 
 template <>
 inline bool DateTimeTryCastToFixlen::Run(DateTimeT, TimestampT &) {
-    String error_message = "Not implemented";
-    UnrecoverableError(error_message);
+    UnrecoverableError("Not implemented");
     return false;
 }
 
 template <>
 inline bool DateTimeTryCastToVarlen::Run(DateTimeT, VarcharT &, ColumnVector *) {
-    String error_message = "Not implemented";
-    UnrecoverableError(error_message);
+    UnrecoverableError("Not implemented");
     return false;
 }
 

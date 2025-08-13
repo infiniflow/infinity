@@ -65,12 +65,10 @@ SharedPtr<ExpressionState> ExpressionState::CreateState(const SharedPtr<BaseExpr
             return CreateState(static_pointer_cast<FilterFulltextExpression>(expression));
         }
         case ExpressionType::kKnn: {
-            String error_message = "Unexpected expression type: KNN";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Unexpected expression type: KNN");
         }
         default: {
-            String error_message = fmt::format("Unknown expression type: {}", expression->Name());
-            UnrecoverableError(error_message);
+            UnrecoverableError(fmt::format("Unknown expression type: {}", expression->Name())e);
         }
     }
     return nullptr;

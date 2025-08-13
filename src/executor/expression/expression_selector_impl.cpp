@@ -65,12 +65,10 @@ void ExpressionSelector::Select(const SharedPtr<BaseExpression> &expr,
         return; // All data are false;
     }
     if (output_true_select.get() == nullptr && output_false_select.get() == nullptr) {
-        String error_message = "No output select column vector is given";
-        UnrecoverableError(error_message);
+        UnrecoverableError("No output select column vector is given");
     }
     if (expr->Type().type() != LogicalType::kBoolean) {
-        String error_message = "Attempting to select non-boolean expression";
-        UnrecoverableError(error_message);
+        UnrecoverableError("Attempting to select non-boolean expression");
     }
     Select(expr, state, count, output_true_select);
 }

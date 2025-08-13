@@ -50,8 +50,7 @@ struct SparseTryCastToSparse {
                     TargetT &target,
                     const DataType &target_type,
                     ColumnVector *target_vector_ptr) {
-        String error_message = "Unexpected case";
-        UnrecoverableError(error_message);
+        UnrecoverableError("Unexpected case");
         return false;
     }
 };
@@ -199,8 +198,7 @@ void SparseTryCastToSparseFunT3(const SparseInfo *source_info,
             break;
         }
         default: {
-            String error_message = "Invalid source index type";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Invalid source index type");
         }
     }
 }
@@ -214,8 +212,7 @@ void SparseTryCastToSparseFunT2(const SparseInfo *source_info,
                                 ColumnVector *target_vector_ptr) {
     switch (source_info->DataType()) {
         case EmbeddingDataType::kElemBit: {
-            String error_message = "Unimplemented";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Unimplemented");
         }
         case EmbeddingDataType::kElemUInt8: {
             SparseTryCastToSparseFunT3<TargetValueType, TargetIndiceType, u8>(source_info,
@@ -299,8 +296,7 @@ void SparseTryCastToSparseFunT2(const SparseInfo *source_info,
             break;
         }
         default: {
-            String error_message = "Unreachable code";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Unreachable code");
         }
     }
 }
@@ -330,8 +326,7 @@ void SparseTryCastToSparseFunT1(const SparseInfo *source_info,
             break;
         }
         default: {
-            String error_message = "Invalid target index type";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Invalid target index type");
         }
     }
 }
@@ -384,8 +379,7 @@ void SparseTryCastToSparseFun(const SparseInfo *source_info,
             break;
         }
         default: {
-            String error_message = "Unreachable code";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Unreachable code");
         }
     }
 }
@@ -405,8 +399,7 @@ bool SparseTryCastToSparse::Run(const SparseT &source,
         RecoverableError(Status::DataTypeMismatch(source_type.ToString(), target_type.ToString()));
     }
     if (target_vector_ptr->buffer_->buffer_type_ != VectorBufferType::kVarBuffer) {
-        String error_message = fmt::format("Sparse column vector should use kHeap VectorBuffer.");
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("Sparse column vector should use kHeap VectorBuffer."));
     }
     SparseTryCastToSparseFun(source_info, source, source_vector_ptr, target_info, target, target_vector_ptr);
     return true;

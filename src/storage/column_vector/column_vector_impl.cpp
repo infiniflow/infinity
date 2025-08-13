@@ -644,14 +644,12 @@ void ColumnVector::CopyRow(const ColumnVector &other, SizeT dst_idx, SizeT src_i
     }
     if (vector_type_ == ColumnVectorType::kConstant) {
         if (dst_idx != 0) {
-            String error_message = "Attempting to access non-zero position of constant vector";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Attempting to access non-zero position of constant vector");
         }
         tail_index_.store(1);
     } else {
         if (dst_idx >= tail_index_.load()) {
-            String error_message = "Attempting to access invalid position of target column vector";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Attempting to access invalid position of target column vector");
         }
     }
     if (other.vector_type_ == ColumnVectorType::kConstant) {
@@ -660,8 +658,7 @@ void ColumnVector::CopyRow(const ColumnVector &other, SizeT dst_idx, SizeT src_i
     }
 
     if (src_idx >= other.tail_index_.load()) {
-        String error_message = "Attempting to access invalid position of target column vector";
-        UnrecoverableError(error_message);
+        UnrecoverableError("Attempting to access invalid position of target column vector");
     }
     switch (data_type_->type()) {
         case LogicalType::kBoolean: {
@@ -821,8 +818,7 @@ void ColumnVector::CopyRow(const ColumnVector &other, SizeT dst_idx, SizeT src_i
 
 String ColumnVector::ToString(SizeT row_index) const {
     if (!initialized) {
-        String error_message = "Column vector isn't initialized.";
-        UnrecoverableError(error_message);
+        UnrecoverableError("Column vector isn't initialized.");
     }
 
     // Not valid, make a same data type with null indicator
@@ -987,8 +983,7 @@ String ColumnVector::ToString(SizeT row_index) const {
         case LogicalType::kMissing:
         case LogicalType::kEmptyArray:
         case LogicalType::kInvalid: {
-            String error_message = "Attempt to access an unaccepted type";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Attempt to access an unaccepted type");
             // Null/Missing/Invalid
         }
     }
@@ -997,8 +992,7 @@ String ColumnVector::ToString(SizeT row_index) const {
 
 Value ColumnVector::GetValueByIndex(SizeT index) const {
     if (!initialized) {
-        String error_message = "Column vector isn't initialized.";
-        UnrecoverableError(error_message);
+        UnrecoverableError("Column vector isn't initialized.");
     }
     SizeT tail_index = tail_index_.load();
     if (index >= tail_index) {
@@ -1155,8 +1149,7 @@ Value ColumnVector::GetArrayValueRecursively(const DataType &data_type, const ch
 
 void ColumnVector::SetValueByIndex(SizeT index, const Value &value) {
     if (!initialized) {
-        String error_message = "Column vector isn't initialized.";
-        UnrecoverableError(error_message);
+        UnrecoverableError("Column vector isn't initialized.");
     }
     SizeT tail_index = tail_index_.load();
     if (index > tail_index || index >= capacity_) {
@@ -1383,8 +1376,7 @@ void ColumnVector::SetArrayValueRecursively(const Value &value, char *dst_ptr) {
 
 void ColumnVector::Finalize(SizeT index) {
     if (index > capacity_) {
-        String error_message = fmt::format("Attempt to set column vector tail index to {}, capacity: {}", index, capacity_);
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("Attempt to set column vector tail index to {}, capacity: {}", index, capacity_));
     }
     tail_index_.store(index);
 }
@@ -1393,12 +1385,10 @@ ptr_t ColumnVector::GetRawPtr(SizeT index) { return data_ptr_ + index * data_typ
 
 void ColumnVector::SetByRawPtr(SizeT index, const_ptr_t raw_ptr) {
     if (!initialized) {
-        String error_message = "Column vector isn't initialized.";
-        UnrecoverableError(error_message);
+        UnrecoverableError("Column vector isn't initialized.");
     }
     if (index >= capacity_) {
-        String error_message = fmt::format("Attempt to set column vector tail index to {}, capacity: {}", index, capacity_);
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("Attempt to set column vector tail index to {}, capacity: {}", index, capacity_));
     }
     SizeT tail_index = tail_index_.load();
     if (index > tail_index) {
@@ -1458,8 +1448,7 @@ void ColumnVector::SetByRawPtr(SizeT index, const_ptr_t raw_ptr) {
             break;
         }
         case LogicalType::kVarchar: {
-            String error_message = "Cannot SetByRawPtr to Varchar.";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Cannot SetByRawPtr to Varchar.");
         }
         case LogicalType::kDate: {
             ((DateT *)data_ptr_)[index] = *(DateT *)(raw_ptr);
@@ -1486,8 +1475,7 @@ void ColumnVector::SetByRawPtr(SizeT index, const_ptr_t raw_ptr) {
             break;
         }
         case LogicalType::kTuple: {
-            String error_message = "Shouldn't store tuple directly, a tuple is flatten as many columns";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Shouldn't store tuple directly, a tuple is flatten as many columns");
         }
         case LogicalType::kPoint: {
             ((PointT *)data_ptr_)[index] = *(PointT *)(raw_ptr);
@@ -1522,20 +1510,16 @@ void ColumnVector::SetByRawPtr(SizeT index, const_ptr_t raw_ptr) {
             //        case kBlob: {
             //        }
         case LogicalType::kMultiVector: {
-            String error_message = "Cannot SetByRawPtr to MultiVector.";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Cannot SetByRawPtr to MultiVector.");
         }
         case LogicalType::kTensor: {
-            String error_message = "Cannot SetByRawPtr to Tensor.";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Cannot SetByRawPtr to Tensor.");
         }
         case LogicalType::kTensorArray: {
-            String error_message = "Cannot SetByRawPtr to TensorArray.";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Cannot SetByRawPtr to TensorArray.");
         }
         case LogicalType::kSparse: {
-            String error_message = "Cannot SetByRawPtr to sparse";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Cannot SetByRawPtr to sparse");
         }
         case LogicalType::kEmbedding: {
             //            auto *embedding_ptr = (EmbeddingT *)(value_ptr);
@@ -1555,8 +1539,7 @@ void ColumnVector::SetByRawPtr(SizeT index, const_ptr_t raw_ptr) {
         case LogicalType::kMissing:
         case LogicalType::kEmptyArray:
         case LogicalType::kInvalid: {
-            String error_message = "Attempt to access an unaccepted type";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Attempt to access an unaccepted type");
 
             // Null/Missing/Invalid
         }
@@ -1565,20 +1548,17 @@ void ColumnVector::SetByRawPtr(SizeT index, const_ptr_t raw_ptr) {
 
 void ColumnVector::AppendByPtr(const_ptr_t value_ptr) {
     if (!initialized) {
-        String error_message = "Column vector isn't initialized.";
-        UnrecoverableError(error_message);
+        UnrecoverableError("Column vector isn't initialized.");
     }
     if (vector_type_ == ColumnVectorType::kConstant) {
         if (tail_index_.load() >= 1) {
-            String error_message = "Constant column vector will only have 1 value.";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Constant column vector will only have 1 value.");
         }
     }
     SizeT tail_index = tail_index_.fetch_add(1);
     if (tail_index >= capacity_) {
         tail_index_.fetch_sub(1);
-        String error_message = fmt::format("Exceed the column vector capacity.({}/{})", tail_index, capacity_);
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("Exceed the column vector capacity.({}/{})", tail_index, capacity_));
     }
     SetByRawPtr(tail_index, value_ptr);
 }
@@ -1802,8 +1782,7 @@ void ColumnVector::AppendByStringView(std::string_view sv) {
                     break;
                 }
                 case EmbeddingDataType::kElemInvalid: {
-                    String error_message = "Invalid embedding type";
-                    UnrecoverableError(error_message);
+                    UnrecoverableError("Invalid embedding type");
                 }
             }
             break;
@@ -1915,8 +1894,7 @@ void ColumnVector::AppendByStringView(std::string_view sv) {
                     break;
                 }
                 case EmbeddingDataType::kElemInvalid: {
-                    String error_message = "Invalid embedding type";
-                    UnrecoverableError(error_message);
+                    UnrecoverableError("Invalid embedding type");
                 }
             }
             break;
@@ -1978,8 +1956,7 @@ void ColumnVector::AppendByStringView(std::string_view sv) {
                     break;
                 }
                 case EmbeddingDataType::kElemInvalid: {
-                    String error_message = "Invalid embedding type";
-                    UnrecoverableError(error_message);
+                    UnrecoverableError("Invalid embedding type");
                 }
             }
             break;
@@ -2033,8 +2010,7 @@ void ColumnVector::AppendByStringView(std::string_view sv) {
                     break;
                 }
                 case EmbeddingDataType::kElemInvalid: {
-                    String error_message = "Invalid sparse type";
-                    UnrecoverableError(error_message);
+                    UnrecoverableError("Invalid sparse type");
                 }
             }
             break;
@@ -2237,8 +2213,7 @@ void ColumnVector::AppendWith(const ColumnVector &other, SizeT from, SizeT count
             break;
         }
         case LogicalType::kTuple: {
-            String error_message = "Shouldn't store tuple directly, a tuple is flatten as many columns";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Shouldn't store tuple directly, a tuple is flatten as many columns");
             break;
         }
         case LogicalType::kPoint: {
@@ -2294,8 +2269,7 @@ void ColumnVector::AppendWith(const ColumnVector &other, SizeT from, SizeT count
         case LogicalType::kMissing:
         case LogicalType::kEmptyArray:
         case LogicalType::kInvalid: {
-            String error_message = "Attempt to access an unaccepted type";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Attempt to access an unaccepted type");
             // Null/Missing/Invalid
         }
     }
@@ -2305,8 +2279,7 @@ void ColumnVector::AppendWith(const ColumnVector &other, SizeT from, SizeT count
 
 SizeT ColumnVector::AppendWith(RowID from, SizeT row_count) {
     if (data_type_->type() != LogicalType::kRowID) {
-        String error_message = fmt::format("Only RowID column vector supports this method, current data type: {}", data_type_->ToString());
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("Only RowID column vector supports this method, current data type: {}", data_type_->ToString()));
     }
     if (row_count == 0) {
         return 0;
@@ -2415,12 +2388,10 @@ bool ColumnVector::operator==(const ColumnVector &other) const {
 
 i32 ColumnVector::GetSizeInBytes() const {
     if (!initialized) {
-        String error_message = "Column vector isn't initialized.";
-        UnrecoverableError(error_message);
+        UnrecoverableError("Column vector isn't initialized.");
     }
     if (vector_type_ != ColumnVectorType::kFlat && vector_type_ != ColumnVectorType::kConstant && vector_type_ != ColumnVectorType::kCompactBit) {
-        String error_message = fmt::format("Not supported vector_type {}", int(vector_type_));
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("Not supported vector_type {}", int(vector_type_)));
     }
     i32 size = this->data_type_->GetSizeInBytes() + sizeof(ColumnVectorType);
     size += sizeof(i32);
@@ -2436,17 +2407,14 @@ i32 ColumnVector::GetSizeInBytes() const {
 
 void ColumnVector::WriteAdv(char *&ptr) const {
     if (!initialized) {
-        String error_message = "Column vector isn't initialized.";
-        UnrecoverableError(error_message);
+        UnrecoverableError("Column vector isn't initialized.");
     }
     if (vector_type_ != ColumnVectorType::kFlat && vector_type_ != ColumnVectorType::kConstant && vector_type_ != ColumnVectorType::kCompactBit) {
-        String error_message = fmt::format("Not supported vector_type {}", int(vector_type_));
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("Not supported vector_type {}", int(vector_type_)));
     }
 
     if (data_type_->type() == LogicalType::kHugeInt) {
-        String error_message = "Attempt to serialize huge integer type";
-        UnrecoverableError(error_message);
+        UnrecoverableError("Attempt to serialize huge integer type");
     }
     this->data_type_->WriteAdv(ptr);
     WriteBufAdv<ColumnVectorType>(ptr, this->vector_type_);
@@ -2489,14 +2457,12 @@ SharedPtr<ColumnVector> ColumnVector::ReadAdv(const char *&ptr, i32 maxbytes) {
 
     maxbytes = ptr_end - ptr;
     if (maxbytes < 0) {
-        String error_message = "ptr goes out of range when reading ColumnVector";
-        UnrecoverableError(error_message);
+        UnrecoverableError("ptr goes out of range when reading ColumnVector");
     }
     column_vector->nulls_ptr_ = Bitmask::ReadAdv(ptr, maxbytes);
     maxbytes = ptr_end - ptr;
     if (maxbytes < 0) {
-        String error_message = "ptr goes out of range when reading ColumnVector";
-        UnrecoverableError(error_message);
+        UnrecoverableError("ptr goes out of range when reading ColumnVector");
     }
     return column_vector;
 }

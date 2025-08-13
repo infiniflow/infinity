@@ -91,16 +91,14 @@ public:
 
     [[nodiscard]] inline DistType *GetDistanceByIdx(u64 idx) const {
         if (idx >= this->query_count_) {
-            String error_message = "Query index exceeds the limit";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Query index exceeds the limit");
         }
         return distance_array_.get() + idx * this->top_k_;
     }
 
     [[nodiscard]] inline RowID *GetIDByIdx(u64 idx) const {
         if (idx >= this->query_count_) {
-            String error_message = "Query index exceeds the limit";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Query index exceeds the limit");
         }
         return id_array_.get() + idx * this->top_k_;
     }

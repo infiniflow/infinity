@@ -34,8 +34,7 @@ namespace infinity {
 void ProbabilisticDataFilter::Build(TxnTimeStamp begin_ts, ColumnID column_id, u64 *data, u32 count) {
     auto &binary_fuse_filter = binary_fuse_filters_[column_id];
     if (!binary_fuse_filter) {
-        String error_message = fmt::format("BUG: ProbabilisticDataFilter for column_id: {} is nullptr.", column_id);
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("BUG: ProbabilisticDataFilter for column_id: {} is nullptr.", column_id));
     }
     binary_fuse_filter->Build(begin_ts, data, count);
 }
@@ -76,8 +75,7 @@ void ProbabilisticDataFilter::SerializeToStringStream(OStringStream &os, u32 tot
     // check position
     auto end_pos = os.tellp();
     if (end_pos - begin_pos != total_binary_bytes) {
-        String error_message = "ProbabilisticDataFilter::SerializeToStringStream(): save size error";
-        UnrecoverableError(error_message);
+        UnrecoverableError("ProbabilisticDataFilter::SerializeToStringStream(): save size error");
     }
 }
 
@@ -95,8 +93,7 @@ void ProbabilisticDataFilter::DeserializeFromStringStream(IStringStream &is) {
     } else if (binary_fuse_filters_.size() == column_count) {
         LOG_TRACE("ProbabilisticDataFilter::DeserializeFromStringStream(): begin with existing filter array");
     } else {
-        String error_message = "ProbabilisticDataFilter::DeserializeFromStringStream(): column_count mismatch";
-        UnrecoverableError(error_message);
+        UnrecoverableError("ProbabilisticDataFilter::DeserializeFromStringStream(): column_count mismatch");
     }
     for (char binary_fuse_filter_exist; auto &filter : binary_fuse_filters_) {
         is.read(reinterpret_cast<char *>(&binary_fuse_filter_exist), sizeof(binary_fuse_filter_exist));
@@ -113,8 +110,7 @@ void ProbabilisticDataFilter::DeserializeFromStringStream(IStringStream &is) {
     // check position
     auto end_pos = is.tellg();
     if (end_pos - begin_pos != expected_total_binary_bytes) {
-        String error_message = "ProbabilisticDataFilter::DeserializeFromStringStream(): position error";
-        UnrecoverableError(error_message);
+        UnrecoverableError("ProbabilisticDataFilter::DeserializeFromStringStream(): position error");
     }
 }
 
@@ -129,8 +125,7 @@ void ProbabilisticDataFilter::SaveToJsonFile(nlohmann::json &entry_json) const {
     // step 3. encode to base64, and save to json
     auto result_view = os.view();
     if (result_view.size() != total_binary_bytes) {
-        String error_message = "BUG: ProbabilisticDataFilter::SaveToJsonFile(): save size error";
-        UnrecoverableError(error_message);
+        UnrecoverableError("BUG: ProbabilisticDataFilter::SaveToJsonFile(): save size error");
     }
     entry_json[JsonTag] = base64::to_base64(result_view);
 }
@@ -148,8 +143,7 @@ bool ProbabilisticDataFilter::LoadFromJsonFile(std::string_view json_sv) {
     IStringStream is(filter_binary);
     DeserializeFromStringStream(is);
     if (!is or u32(is.tellg()) != is.view().size()) {
-        String error_message = "ProbabilisticDataFilter::LoadFromJsonFile(): load size error";
-        UnrecoverableError(error_message);
+        UnrecoverableError("ProbabilisticDataFilter::LoadFromJsonFile(): load size error");
         return false;
     }
     return true;

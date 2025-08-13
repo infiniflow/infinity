@@ -140,8 +140,7 @@ SharedPtr<Vector<SharedPtr<DataType>>> PhysicalMatchTensorScan::GetOutputTypes()
 
 ColumnID PhysicalMatchTensorScan::SearchColumnID() const {
     if (search_column_id_ == std::numeric_limits<ColumnID>::max()) {
-        String error_message = "Search column id is not set. Init() error.";
-        UnrecoverableError(error_message);
+        UnrecoverableError("Search column id is not set. Init() error.");
     }
     return search_column_id_;
 }
@@ -151,13 +150,11 @@ void PhysicalMatchTensorScan::CheckColumn() {
     const ColumnDef *column_def = base_table_ref_->table_info_->GetColumnDefByIdx(search_column_id_);
     const auto &column_type_ptr = column_def->type();
     if (const auto l_type = column_type_ptr->type(); l_type != LogicalType::kTensor and l_type != LogicalType::kTensorArray) {
-        String error_message = fmt::format("Column {} is not a tensor or tensorarray column", column_def->name());
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("Column {} is not a tensor or tensorarray column", column_def->name()));
     }
     const auto &type_info = column_type_ptr->type_info();
     if (type_info->type() != TypeInfoType::kEmbedding) {
-        String error_message = fmt::format("Column {} is not a tensor column", column_def->name());
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("Column {} is not a tensor column", column_def->name()));
     }
     const auto *embedding_info = static_cast<const EmbeddingInfo *>(type_info.get());
     if (embedding_info->Dimension() != src_match_tensor_expr_->tensor_basic_embedding_dimension_) {
@@ -304,8 +301,7 @@ void CalculateScoreOnColumnVector(ColumnVector &column_vector,
 
 void PhysicalMatchTensorScan::ExecuteInner(QueryContext *query_context, MatchTensorScanOperatorState *operator_state) const {
     if (!operator_state->data_block_array_.empty()) {
-        String error_message = "TensorScan output data block array should be empty";
-        UnrecoverableError(error_message);
+        UnrecoverableError("TensorScan output data block array should be empty");
     }
 
     Status status;
@@ -318,8 +314,7 @@ void PhysicalMatchTensorScan::ExecuteInner(QueryContext *query_context, MatchTen
     }
     MatchTensorScanFunctionData &function_data = *(operator_state->match_tensor_scan_function_data_);
     if (function_data.finished_) [[unlikely]] {
-        String error_message = "MatchTensorScanFunctionData is finished";
-        UnrecoverableError(error_message);
+        UnrecoverableError("MatchTensorScanFunctionData is finished");
     }
     const BlockIndex *block_index = base_table_ref_->block_index_.get();
     if (const u32 task_job_index = task_executed_++; task_job_index < segment_index_metas_->size()) {
@@ -331,15 +326,13 @@ void PhysicalMatchTensorScan::ExecuteInner(QueryContext *query_context, MatchTen
         SegmentMeta *segment_meta = nullptr;
         const auto &segment_index_hashmap = base_table_ref_->block_index_->new_segment_block_index_;
         if (auto iter = segment_index_hashmap.find(segment_id); iter == segment_index_hashmap.end()) {
-            String error_message = fmt::format("Cannot find SegmentMeta for segment id: {}", segment_id);
-            UnrecoverableError(error_message);
+            UnrecoverableError(fmt::format("Cannot find SegmentMeta for segment id: {}", segment_id));
         } else {
             // segment_entry = iter->second.segment_entry_;
             segment_meta = iter->second.segment_meta_.get();
             std::tie(segment_row_count, status) = segment_meta->GetRowCnt1();
             if (!status.ok()) {
-                String error_message = fmt::format("GetRowCnt1 failed: {}", status.message());
-                UnrecoverableError(error_message);
+                UnrecoverableError(fmt::format("GetRowCnt1 failed: {}", status.message()));
             }
         }
 

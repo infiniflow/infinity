@@ -731,8 +731,7 @@ IntegerT Value::GetValue() const {
 template <>
 BigIntT Value::GetValue() const {
     if (type_.type() != LogicalType::kBigInt) {
-        String error_message = fmt::format("Not matched type: {}", type_.ToString());
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("Not matched type: {}", type_.ToString()));
     }
     return value_.big_int;
 }
@@ -740,8 +739,7 @@ BigIntT Value::GetValue() const {
 template <>
 HugeIntT Value::GetValue() const {
     if (type_.type() != LogicalType::kHugeInt) {
-        String error_message = fmt::format("Not matched type: {}", type_.ToString());
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("Not matched type: {}", type_.ToString()));
     }
     return value_.huge_int;
 }
@@ -749,8 +747,7 @@ HugeIntT Value::GetValue() const {
 template <>
 FloatT Value::GetValue() const {
     if (type_.type() != LogicalType::kFloat) {
-        String error_message = fmt::format("Not matched type: {}", type_.ToString());
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("Not matched type: {}", type_.ToString()));
     }
     return value_.float32;
 }
@@ -758,8 +755,7 @@ FloatT Value::GetValue() const {
 template <>
 DoubleT Value::GetValue() const {
     if (type_.type() != LogicalType::kDouble) {
-        String error_message = fmt::format("Not matched type: {}", type_.ToString());
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("Not matched type: {}", type_.ToString()));
     }
     return value_.float64;
 }
@@ -767,8 +763,7 @@ DoubleT Value::GetValue() const {
 template <>
 Float16T Value::GetValue() const {
     if (type_.type() != LogicalType::kFloat16) {
-        String error_message = fmt::format("Not matched type: {}", type_.ToString());
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("Not matched type: {}", type_.ToString()));
     }
     return value_.float16;
 }
@@ -776,8 +771,7 @@ Float16T Value::GetValue() const {
 template <>
 BFloat16T Value::GetValue() const {
     if (type_.type() != LogicalType::kBFloat16) {
-        String error_message = fmt::format("Not matched type: {}", type_.ToString());
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("Not matched type: {}", type_.ToString()));
     }
     return value_.bfloat16;
 }
@@ -785,8 +779,7 @@ BFloat16T Value::GetValue() const {
 template <>
 DecimalT Value::GetValue() const {
     if (type_.type() != LogicalType::kDecimal) {
-        String error_message = fmt::format("Not matched type: {}", type_.ToString());
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("Not matched type: {}", type_.ToString()));
     }
     return value_.decimal;
 }
@@ -794,8 +787,7 @@ DecimalT Value::GetValue() const {
 template <>
 DateT Value::GetValue() const {
     if (type_.type() != LogicalType::kDate) {
-        String error_message = fmt::format("Not matched type: {}", type_.ToString());
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("Not matched type: {}", type_.ToString()));
     }
     return value_.date;
 }
@@ -803,8 +795,7 @@ DateT Value::GetValue() const {
 template <>
 TimeT Value::GetValue() const {
     if (type_.type() != LogicalType::kTime) {
-        String error_message = fmt::format("Not matched type: {}", type_.ToString());
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("Not matched type: {}", type_.ToString()));
     }
     return value_.time;
 }
@@ -812,8 +803,7 @@ TimeT Value::GetValue() const {
 template <>
 DateTimeT Value::GetValue() const {
     if (type_.type() != LogicalType::kDateTime) {
-        String error_message = fmt::format("Not matched type: {}", type_.ToString());
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("Not matched type: {}", type_.ToString()));
     }
     return value_.datetime;
 }
@@ -821,8 +811,7 @@ DateTimeT Value::GetValue() const {
 template <>
 TimestampT Value::GetValue() const {
     if (type_.type() != LogicalType::kTimestamp) {
-        String error_message = fmt::format("Not matched type: {}", type_.ToString());
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("Not matched type: {}", type_.ToString()));
     }
     return value_.timestamp;
 }
@@ -830,8 +819,7 @@ TimestampT Value::GetValue() const {
 template <>
 IntervalT Value::GetValue() const {
     if (type_.type() != LogicalType::kInterval) {
-        String error_message = fmt::format("Not matched type: {}", type_.ToString());
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("Not matched type: {}", type_.ToString()));
     }
     return value_.interval;
 }
@@ -839,8 +827,7 @@ IntervalT Value::GetValue() const {
 template <>
 PointT Value::GetValue() const {
     if (type_.type() != LogicalType::kPoint) {
-        String error_message = fmt::format("Not matched type: {}", type_.ToString());
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("Not matched type: {}", type_.ToString()));
     }
     return value_.point;
 }
@@ -848,8 +835,7 @@ PointT Value::GetValue() const {
 template <>
 LineT Value::GetValue() const {
     if (type_.type() != LogicalType::kLine) {
-        String error_message = fmt::format("Not matched type: {}", type_.ToString());
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("Not matched type: {}", type_.ToString()));
     }
     return value_.line;
 }
@@ -857,8 +843,7 @@ LineT Value::GetValue() const {
 template <>
 LineSegT Value::GetValue() const {
     if (type_.type() != LogicalType::kLineSeg) {
-        String error_message = fmt::format("Not matched type: {}", type_.ToString());
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("Not matched type: {}", type_.ToString()));
     }
     return value_.line_segment;
 }
@@ -866,8 +851,7 @@ LineSegT Value::GetValue() const {
 template <>
 BoxT Value::GetValue() const {
     if (type_.type() != LogicalType::kBox) {
-        String error_message = fmt::format("Not matched type: {}", type_.ToString());
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("Not matched type: {}", type_.ToString()));
     }
     return value_.box;
 }
@@ -875,8 +859,7 @@ BoxT Value::GetValue() const {
 template <>
 CircleT Value::GetValue() const {
     if (type_.type() != LogicalType::kCircle) {
-        String error_message = fmt::format("Not matched type: {}", type_.ToString());
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("Not matched type: {}", type_.ToString()));
     }
     return value_.circle;
 }
@@ -884,8 +867,7 @@ CircleT Value::GetValue() const {
 template <>
 UuidT Value::GetValue() const {
     if (type_.type() != LogicalType::kUuid) {
-        String error_message = fmt::format("Not matched type: {}", type_.ToString());
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("Not matched type: {}", type_.ToString()));
     }
     return value_.uuid;
 }
@@ -893,8 +875,7 @@ UuidT Value::GetValue() const {
 template <>
 RowID Value::GetValue() const {
     if (type_.type() != LogicalType::kRowID) {
-        String error_message = fmt::format("Not matched type: {}", type_.ToString());
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("Not matched type: {}", type_.ToString()));
     }
     return value_.row;
 }
@@ -1057,8 +1038,7 @@ bool Value::operator==(const Value &other) const {
         case LogicalType::kMixed:
         case LogicalType::kMissing:
         case LogicalType::kInvalid: {
-            String error_message = "Unhandled cases.";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Unhandled cases.");
             return false;
         }
     }
@@ -1179,8 +1159,7 @@ void Value::CopyUnionValue(const Value &other) {
         case LogicalType::kMixed:
         case LogicalType::kMissing:
         case LogicalType::kInvalid: {
-            String error_message = "Unhandled cases.";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Unhandled cases.");
             break;
         }
     }
@@ -1300,8 +1279,7 @@ void Value::MoveUnionValue(Value &&other) noexcept {
         case LogicalType::kMixed:
         case LogicalType::kMissing:
         case LogicalType::kInvalid: {
-            String error_message = "Unhandled cases.";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Unhandled cases.");
             break;
         }
     }
@@ -1327,12 +1305,10 @@ i64 Value::ToInteger() const {
             return value_.big_int;
         }
         default: {
-            String error_message = fmt::format("Attempt to output {} as integer", type_.ToString());
-            UnrecoverableError(error_message);
+            UnrecoverableError(fmt::format("Attempt to output {} as integer", type_.ToString()));
         }
     }
-    String error_message = "Unreachable code.";
-    UnrecoverableError(error_message);
+    UnrecoverableError("Unreachable code.");
     return -1;
 }
 
@@ -1340,8 +1316,7 @@ f32 Value::ToFloat() const {
     if (type_.type() == LogicalType::kFloat) {
         return static_cast<f32>(value_.float32);
     }
-    String error_message = fmt::format("Attempt to output {} as float", type_.ToString());
-    UnrecoverableError(error_message);
+    UnrecoverableError(fmt::format("Attempt to output {} as float", type_.ToString()));
     return std::numeric_limits<f32>::quiet_NaN();
 }
 
@@ -1349,8 +1324,7 @@ f64 Value::ToDouble() const {
     if (type_.type() == LogicalType::kDouble) {
         return static_cast<f64>(value_.float64);
     }
-    String error_message = fmt::format("Attempt to output {} as double", type_.ToString());
-    UnrecoverableError(error_message);
+    UnrecoverableError(fmt::format("Attempt to output {} as double", type_.ToString()));
     return std::numeric_limits<f64>::quiet_NaN();
 }
 
@@ -1378,8 +1352,7 @@ String Value::ToString() const {
             char buffer[20];
             auto [ptr, ec] = std::to_chars(buffer, buffer + sizeof(buffer), value_.float32);
             if (ec != std::errc()) {
-                String error_message = "Float to string conversion failed.";
-                UnrecoverableError(error_message);
+                UnrecoverableError("Float to string conversion failed.");
             }
             String result(buffer, ptr);
             return result;
@@ -1388,8 +1361,7 @@ String Value::ToString() const {
             char buffer[30];
             auto [ptr, ec] = std::to_chars(buffer, buffer + sizeof(buffer), value_.float64);
             if (ec != std::errc()) {
-                String error_message = "Double to string conversion failed.";
-                UnrecoverableError(error_message);
+                UnrecoverableError("Double to string conversion failed.");
             }
             String result(buffer, ptr);
             return result;
@@ -1398,8 +1370,7 @@ String Value::ToString() const {
             char buffer[20];
             auto [ptr, ec] = std::to_chars(buffer, buffer + sizeof(buffer), static_cast<float>(value_.float16));
             if (ec != std::errc()) {
-                String error_message = "Float to string conversion failed.";
-                UnrecoverableError(error_message);
+                UnrecoverableError("Float to string conversion failed.");
             }
             String result(buffer, ptr);
             return result;
@@ -1408,8 +1379,7 @@ String Value::ToString() const {
             char buffer[20];
             auto [ptr, ec] = std::to_chars(buffer, buffer + sizeof(buffer), static_cast<float>(value_.bfloat16));
             if (ec != std::errc()) {
-                String error_message = "Float to string conversion failed.";
-                UnrecoverableError(error_message);
+                UnrecoverableError("Float to string conversion failed.");
             }
             String result(buffer, ptr);
             return result;
@@ -1439,8 +1409,7 @@ String Value::ToString() const {
             const auto *embedding_info = static_cast<const EmbeddingInfo *>(type_.type_info().get());
             Span<char> data_span = this->GetEmbedding();
             if (data_span.size() != embedding_info->Size()) {
-                String error_message = "Embedding data size mismatch.";
-                UnrecoverableError(error_message);
+                UnrecoverableError("Embedding data size mismatch.");
             }
             const EmbeddingT embedding(data_span.data(), false);
             return EmbeddingT::Embedding2String(embedding, embedding_info->Type(), embedding_info->Dimension());
@@ -1522,16 +1491,14 @@ String Value::ToString() const {
             return value_.uuid.ToString();
         }
         case LogicalType::kMixed: {
-            String error_message = fmt::format("Value::ToString() not implemented for type {}", type_.ToString());
-            UnrecoverableError(error_message);
+            UnrecoverableError(fmt::format("Value::ToString() not implemented for type {}", type_.ToString()));
             return {};
         }
         case LogicalType::kTuple:
         case LogicalType::kNull:
         case LogicalType::kMissing:
         case LogicalType::kInvalid: {
-            String error_message = fmt::format("Value::ToString() not implemented for type {}", type_.ToString());
-            UnrecoverableError(error_message);
+            UnrecoverableError(fmt::format("Value::ToString() not implemented for type {}", type_.ToString()));
             return {};
         }
     }
@@ -1667,8 +1634,7 @@ void Value::AppendToJson(const String &name, nlohmann::json &json) const {
         case LogicalType::kNull:
         case LogicalType::kMissing:
         case LogicalType::kInvalid: {
-            String error_message = fmt::format("Value::AppendToJson() not implemented for type {}", type_.ToString());
-            UnrecoverableError(error_message);
+            UnrecoverableError(fmt::format("Value::AppendToJson() not implemented for type {}", type_.ToString()));
         }
     }
 }
@@ -1749,8 +1715,7 @@ void Value::AppendToArrowArray(const DataType &data_type, arrow::ArrayBuilder *a
             auto embedding_info = static_cast<EmbeddingInfo *>(data_type.type_info().get());
             Span<char> data_span = this->GetEmbedding();
             if (data_span.size() != embedding_info->Size()) {
-                String error_message = "Embedding data size mismatch.";
-                UnrecoverableError(error_message);
+                UnrecoverableError("Embedding data size mismatch.");
             }
             const EmbeddingT embedding(const_cast<char *>(data_span.data()), false);
 
@@ -1833,8 +1798,7 @@ void Value::AppendToArrowArray(const DataType &data_type, arrow::ArrayBuilder *a
         case LogicalType::kMissing:
         case LogicalType::kEmptyArray:
         case LogicalType::kInvalid: {
-            String error_message = "Invalid data type";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Invalid data type");
         }
     }
 }

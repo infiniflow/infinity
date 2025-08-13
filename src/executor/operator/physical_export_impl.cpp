@@ -101,8 +101,7 @@ bool PhysicalExport::Execute(QueryContext *query_context, OperatorState *operato
             break;
         }
         default: {
-            String error_message = "Not supported file type";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Not supported file type");
         }
     }
 
@@ -367,16 +366,14 @@ new_label_return:
 SizeT PhysicalExport::ExportToFVECS(QueryContext *query_context, ExportOperatorState *export_op_state) {
 
     if (column_idx_array_.size() != 1) {
-        String error_message = "Only one column with embedding data type can be exported as FVECS file";
-        UnrecoverableError(error_message);
+        UnrecoverableError("Only one column with embedding data type can be exported as FVECS file");
     }
 
     u64 exported_column_idx = column_idx_array_[0];
     const Vector<SharedPtr<ColumnDef>> &column_defs = table_info_->column_defs_;
     DataType *data_type = column_defs[exported_column_idx]->type().get();
     if (data_type->type() != LogicalType::kEmbedding) {
-        String error_message = fmt::format("Only embedding column can be exported as FVECS file, but it is {}", data_type->ToString());
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("Only embedding column can be exported as FVECS file, but it is {}", data_type->ToString()));
     }
 
     EmbeddingInfo *embedding_type_info = static_cast<EmbeddingInfo *>(data_type->type_info().get());
@@ -842,8 +839,7 @@ SharedPtr<arrow::DataType> GetArrowType(const DataType &column_data_type) {
         case LogicalType::kMissing:
         case LogicalType::kEmptyArray:
         case LogicalType::kInvalid: {
-            String error_message = "Invalid data type";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Invalid data type");
         }
     }
     return nullptr;
@@ -1043,8 +1039,7 @@ SharedPtr<arrow::ArrayBuilder> GetArrowBuilder(const DataType &column_type) {
                     break;
                 }
                 case EmbeddingDataType::kElemInvalid: {
-                    String error_message = "Invalid embedding data type: EmbeddingDataType::kElemInvalid";
-                    UnrecoverableError(error_message);
+                    UnrecoverableError("Invalid embedding data type: EmbeddingDataType::kElemInvalid");
                     break;
                 }
             }
@@ -1090,8 +1085,7 @@ SharedPtr<arrow::ArrayBuilder> GetArrowBuilder(const DataType &column_type) {
         case LogicalType::kMissing:
         case LogicalType::kEmptyArray:
         case LogicalType::kInvalid: {
-            String error_message = "Invalid data type";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Invalid data type");
         }
     }
     return array_builder;

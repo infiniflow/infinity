@@ -36,8 +36,7 @@ export struct FloatTryCastToVarlen;
 export template <class SourceType>
 inline BoundCastFunc BindFloatCast(const DataType &source, const DataType &target) {
     if (source.type() == target.type()) {
-        String error_message = "Can't cast from the same type";
-        UnrecoverableError(error_message);
+        UnrecoverableError("Can't cast from the same type");
     }
     switch (target.type()) {
         case LogicalType::kTinyInt: {
@@ -68,8 +67,7 @@ inline BoundCastFunc BindFloatCast(const DataType &source, const DataType &targe
             return BoundCastFunc(&ColumnVectorCast::TryCastColumnVector<SourceType, BFloat16T, FloatTryCastToFixlen>);
         }
         case LogicalType::kDecimal: {
-            String error_message = fmt::format("Not implement cast from numeric to decimal128 type.", source.ToString(), target.ToString());
-            UnrecoverableError(error_message);
+            UnrecoverableError(fmt::format("Not implement cast from numeric to decimal128 type.", source.ToString(), target.ToString()));
         }
         case LogicalType::kVarchar: {
             return BoundCastFunc(&ColumnVectorCast::TryCastColumnVectorToVarlen<SourceType, VarcharT, FloatTryCastToVarlen>);
@@ -80,8 +78,7 @@ inline BoundCastFunc BindFloatCast(const DataType &source, const DataType &targe
             RecoverableError(status);
         }
         default: {
-            String error_message = fmt::format("Attempt to cast from {} to {}", source.ToString(), target.ToString());
-            UnrecoverableError(error_message);
+            UnrecoverableError(fmt::format("Attempt to cast from {} to {}", source.ToString(), target.ToString()));
         }
     }
     return BoundCastFunc(nullptr);
@@ -159,8 +156,7 @@ inline bool FloatTryCastToFixlen::Run(FloatT source, BigIntT &target) {
 // TODO: Cast from float to hugeint
 template <>
 inline bool FloatTryCastToFixlen::Run(FloatT, HugeIntT &) {
-    String error_message = "Not implement: FloatTryCastToFixlen::Run";
-    UnrecoverableError(error_message);
+    UnrecoverableError("Not implement: FloatTryCastToFixlen::Run");
     return false;
 }
 
@@ -185,8 +181,7 @@ inline bool FloatTryCastToFixlen::Run(FloatT source, BFloat16T &target) {
 // TODO
 template <>
 inline bool FloatTryCastToFixlen::Run(FloatT, DecimalT &) {
-    String error_message = "Not implement: FloatTryCastToFixlen::Run";
-    UnrecoverableError(error_message);
+    UnrecoverableError("Not implement: FloatTryCastToFixlen::Run");
     return false;
 }
 
@@ -250,8 +245,7 @@ inline bool FloatTryCastToFixlen::Run(DoubleT source, BigIntT &target) {
 // TODO: Cast from double to hugeint
 template <>
 inline bool FloatTryCastToFixlen::Run(DoubleT, HugeIntT &) {
-    String error_message = "Not implement: FloatTryCastToFixlen::Run";
-    UnrecoverableError(error_message);
+    UnrecoverableError("Not implement: FloatTryCastToFixlen::Run");
     return false;
 }
 
@@ -276,8 +270,7 @@ inline bool FloatTryCastToFixlen::Run(DoubleT source, BFloat16T &target) {
 // TODO
 template <>
 inline bool FloatTryCastToFixlen::Run(DoubleT, DecimalT &) {
-    String error_message = "Not implement: FloatTryCastToFixlen::Run";
-    UnrecoverableError(error_message);
+    UnrecoverableError("Not implement: FloatTryCastToFixlen::Run");
     return false;
 }
 

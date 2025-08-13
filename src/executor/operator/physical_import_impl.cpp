@@ -338,8 +338,7 @@ UniquePtr<char[]> ConvertCSRIndice(const i32 *tmp_indice_ptr, SizeT nnz) {
     auto *ptr = reinterpret_cast<IdxT *>(res.get());
     for (SizeT i = 0; i < nnz; ++i) {
         if (tmp_indice_ptr[i] < 0 || tmp_indice_ptr[i] > std::numeric_limits<IdxT>::max()) {
-            String error_message = fmt::format("In compactible idx {} in csr file.", tmp_indice_ptr[i]);
-            UnrecoverableError(error_message);
+            UnrecoverableError(fmt::format("In compactible idx {} in csr file.", tmp_indice_ptr[i]));
         }
         ptr[i] = tmp_indice_ptr[i];
     }
@@ -361,8 +360,7 @@ UniquePtr<char[]> ConvertCSRIndice(UniquePtr<char[]> tmp_indice_ptr, SparseInfo 
             return ConvertCSRIndice<BigIntT>(reinterpret_cast<i32 *>(tmp_indice_ptr.get()), nnz);
         }
         default: {
-            String error_message = fmt::format("Unsupported index type {}.", EmbeddingT::EmbeddingDataType2String(sparse_info->IndexType()));
-            UnrecoverableError(error_message);
+            UnrecoverableError(fmt::format("Unsupported index type {}.", EmbeddingT::EmbeddingDataType2String(sparse_info->IndexType())));
         }
     }
     return {};
@@ -399,14 +397,12 @@ void PhysicalImport::NewImportCSR(QueryContext *query_context, ImportOperatorSta
 
     i64 file_size = file_handle->FileSize();
     if ((SizeT)file_size != 3 * sizeof(i64) + (nrow + 1) * sizeof(i64) + nnz * sizeof(i32) + nnz * sizeof(FloatT)) {
-        String error_message = "Invalid CSR file format.";
-        UnrecoverableError(error_message);
+        UnrecoverableError("Invalid CSR file format.");
     }
     i64 prev_off = 0;
     file_handle->Read(&prev_off, sizeof(i64));
     if (prev_off != 0) {
-        String error_message = "Invalid CSR file format.";
-        UnrecoverableError(error_message);
+        UnrecoverableError("Invalid CSR file format.");
     }
     auto [idx_file_handle, idx_status] = VirtualStore::Open(file_path_, FileAccessMode::kRead);
     if (!idx_status.ok()) {
@@ -548,8 +544,7 @@ void PhysicalImport::NewImportJSON(QueryContext *query_context, ImportOperatorSt
         UnrecoverableError(status_read.message());
     }
     if ((i64)read_n != file_size) {
-        String error_message = fmt::format("Read file size {} doesn't match with file size {}.", read_n, file_size);
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("Read file size {} doesn't match with file size {}.", read_n, file_size));
     }
     if (read_n == 0) {
         auto result_msg = MakeUnique<String>(fmt::format("Empty JSON file, IMPORT 0 Rows"));
@@ -1127,8 +1122,7 @@ void PhysicalImport::JSONLRowHandler(std::string_view line_sv, Vector<SharedPtr<
                             break;
                         }
                         case EmbeddingDataType::kElemInvalid: {
-                            String error_message = "Not implement: Embedding type.";
-                            UnrecoverableError(error_message);
+                            UnrecoverableError("Not implement: Embedding type.");
                             break;
                         }
                     }
@@ -1172,8 +1166,7 @@ void PhysicalImport::JSONLRowHandler(std::string_view line_sv, Vector<SharedPtr<
                 case LogicalType::kMissing:
                 case LogicalType::kEmptyArray:
                 case LogicalType::kInvalid: {
-                    String error_message = "Not implement: Invalid data type.";
-                    UnrecoverableError(error_message);
+                    UnrecoverableError("Not implement: Invalid data type.");
                 }
             }
         } else if (column_def->has_default_value()) {
@@ -1781,8 +1774,7 @@ void PhysicalImport::ParquetValueHandler(const SharedPtr<arrow::Array> &array, C
         case LogicalType::kMissing:
         case LogicalType::kEmptyArray:
         case LogicalType::kInvalid: {
-            String error_message = "Not implement: Invalid data type.";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Not implement: Invalid data type.");
         }
     }
 }
@@ -2077,8 +2069,7 @@ Value GetValueFromParquetRecursively(const DataType &data_type, const SharedPtr<
         case LogicalType::kMissing:
         case LogicalType::kEmptyArray:
         case LogicalType::kInvalid: {
-            String error_message = "Not implement: Invalid data type.";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Not implement: Invalid data type.");
             return Value::MakeInvalid();
         }
     }

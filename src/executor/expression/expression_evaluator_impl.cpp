@@ -70,8 +70,7 @@ void ExpressionEvaluator::Execute(const SharedPtr<BaseExpression> &expr, SharedP
         case ExpressionType::kFilterFullText:
             return Execute(std::static_pointer_cast<FilterFulltextExpression>(expr), state, output_column);
         default: {
-            String error_message = fmt::format("Unknown expression type: {}", expr->Name());
-            UnrecoverableError(error_message);
+            UnrecoverableError(fmt::format("Unknown expression type: {}", expr->Name()));
         }
     }
 }
@@ -143,13 +142,11 @@ void ExpressionEvaluator::Execute(const SharedPtr<CastExpression> &expr,
 }
 
 void ExpressionEvaluator::Execute(const SharedPtr<CaseExpression> &, SharedPtr<ExpressionState> &, SharedPtr<ColumnVector> &) {
-    String error_message = "Case execution";
-    UnrecoverableError(error_message);
+    UnrecoverableError("Case execution");
 }
 
 void ExpressionEvaluator::Execute(const SharedPtr<ColumnExpression> &, SharedPtr<ExpressionState> &, SharedPtr<ColumnVector> &) {
-    String error_message = "Column expression";
-    UnrecoverableError(error_message);
+    UnrecoverableError("Column expression");
 }
 
 void ExpressionEvaluator::Execute(const SharedPtr<FunctionExpression> &expr,
@@ -191,12 +188,10 @@ void ExpressionEvaluator::Execute(const SharedPtr<ReferenceExpression> &expr,
     SizeT column_index = expr->column_index();
 
     if (input_data_block_ == nullptr) {
-        String error_message = "Input data block is NULL";
-        UnrecoverableError(error_message);
+        UnrecoverableError("Input data block is NULL");
     }
     if (column_index >= input_data_block_->column_count()) {
-        String error_message = "Invalid column index";
-        UnrecoverableError(error_message);
+        UnrecoverableError("Invalid column index");
     }
 
     output_column_vector = input_data_block_->column_vectors[column_index];
