@@ -30,6 +30,7 @@ import :new_txn;
 import :utility;
 import :kv_utility;
 import :new_txn_manager;
+import :meta_cache;
 
 namespace infinity {
 
@@ -103,6 +104,16 @@ Status DBMeeta::UninitSet(UsageFlag usage_flag) {
 Status DBMeeta::GetComment(String *&comment) {
     std::lock_guard<std::mutex> lock(mtx_);
     if (!comment_) {
+        SharedPtr<MetaDbCache> db_cache = meta_cache_->GetDb(db_name_, txn_begin_ts_);
+        if (db_cache.get() != nullptr) {
+            if (db_cache->get_comment_) {
+                LOG_TRACE(fmt::format("Get db comment from db: {}", db_name_));
+                comment_ = *db_cache->comment_;
+                comment = &*comment_;
+                return Status::OK();
+            }
+        }
+
         String comment_str;
         String db_comment_key = GetDBTag("comment");
         Status status = kv_instance_->Get(db_comment_key, comment_str);
@@ -111,6 +122,11 @@ Status DBMeeta::GetComment(String *&comment) {
             return status;
         }
         comment_ = std::move(comment_str);
+
+        if (db_cache.get() != nullptr) {
+            db_cache->get_comment_ = true;
+            db_cache->comment_ = MakeShared<String>(*comment_);
+        }
     }
     comment = &*comment_;
     return Status::OK();
@@ -132,6 +148,20 @@ Status DBMeeta::GetTableIDs(Vector<String> *&table_id_strs, Vector<String> **tab
 }
 
 Status DBMeeta::GetTableID(const String &table_name, String &table_key, String &table_id_str, TxnTimeStamp &create_table_ts) {
+
+    u64 db_id = std::stoull(db_id_str_);
+    SharedPtr<MetaTableCache> table_cache = meta_cache_->GetTable(db_id, table_name, txn_begin_ts_);
+    if (table_cache.get() != nullptr && !table_cache->is_dropped_) {
+        table_id_str = std::to_string(table_cache->table_id_);
+        table_key = table_cache->table_key_;
+        create_table_ts = table_cache->commit_ts_;
+        LOG_TRACE(fmt::format("Get db meta from cache, db_id: {}, table_name: {}, table_id: {}, commit_ts: {}",
+                              table_cache->db_id_,
+                              table_name,
+                              table_cache->table_id_,
+                              table_cache->commit_ts_));
+        return Status::OK();
+    }
 
     String table_key_prefix = KeyEncode::CatalogTablePrefix(db_id_str_, table_name);
     auto iter2 = kv_instance_->GetIterator();
@@ -172,8 +202,15 @@ Status DBMeeta::GetTableID(const String &table_name, String &table_key, String &
 
     if ((!drop_table_ts.empty() && std::stoull(drop_table_ts) <= txn_begin_ts_) ||
         (!rename_table_ts.empty() && std::stoull(rename_table_ts) <= txn_begin_ts_)) {
+
+        table_cache = MakeShared<MetaTableCache>(db_id, table_name, std::stoull(table_id_str), max_commit_ts, table_key, true);
+        meta_cache_->Put({table_cache});
+
         return Status::TableNotExist(table_name);
     }
+
+    table_cache = MakeShared<MetaTableCache>(db_id, table_name, std::stoull(table_id_str), max_commit_ts, table_key, false);
+    meta_cache_->Put({table_cache});
 
     create_table_ts = max_commit_ts;
     return Status::OK();

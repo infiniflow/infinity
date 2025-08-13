@@ -2280,6 +2280,7 @@ Status NewTxn::GetDBMeta(const String &db_name, Optional<DBMeeta> &db_meta, TxnT
     if (db_key_ptr) {
         *db_key_ptr = db_key;
     }
+    db_meta->SetDBName(db_name);
     return Status::OK();
 }
 
