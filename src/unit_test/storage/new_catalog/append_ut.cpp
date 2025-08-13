@@ -140,31 +140,9 @@ TEST_P(TestTxnAppend, test_append0) {
         EXPECT_TRUE(status.ok());
     }
 
-    auto make_input_block = [&](const Value &v1, const Value &v2, SizeT row_cnt) {
-        auto make_column = [&](SharedPtr<ColumnDef> &column_def, const Value &v) {
-            auto col = ColumnVector::Make(column_def->type());
-            col->Initialize();
-            for (SizeT i = 0; i < row_cnt; ++i) {
-                col->AppendValue(v);
-            }
-            return col;
-        };
-        auto input_block = MakeShared<DataBlock>();
-        {
-            auto col1 = make_column(column_def1, v1);
-            input_block->InsertVector(col1, 0);
-        }
-        {
-            auto col2 = make_column(column_def2, v2);
-            input_block->InsertVector(col2, 1);
-        }
-        input_block->Finalize();
-        return input_block;
-    };
-
     auto append = [&] {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
-        auto input_block = make_input_block(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"), 4);
+        auto input_block = MakeInputBlock(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"), 4);
         Status status = txn->Append(*db_name, *table_name, input_block);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
@@ -395,62 +373,15 @@ TEST_P(TestTxnAppend, test_append2) {
         EXPECT_TRUE(status.ok());
     }
 
-    auto input_block1 = MakeShared<DataBlock>();
     SizeT insert_row = 8192;
-    {
-        // Initialize input block
-        {
-            auto col1 = ColumnVector::Make(column_def1->type());
-            col1->Initialize();
-            for (SizeT i = 0; i < insert_row; ++i) {
-                col1->AppendValue(Value::MakeInt(i));
-            }
 
-            input_block1->InsertVector(col1, 0);
-        }
-        {
-            auto col2 = ColumnVector::Make(column_def2->type());
-            col2->Initialize();
-            for (SizeT i = 0; i < insert_row; ++i) {
-                col2->AppendValue(Value::MakeVarchar(fmt::format("abc_{}", i)));
-            }
-
-            //            col2->AppendValue(Value::MakeVarchar("abc"));
-            //            col2->AppendValue(Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
-            input_block1->InsertVector(col2, 1);
-        }
-        input_block1->Finalize();
-    }
-
-    auto input_block2 = MakeShared<DataBlock>();
-    {
-        // Initialize input block
-        {
-            auto col1 = ColumnVector::Make(column_def1->type());
-            col1->Initialize();
-            for (SizeT i = 0; i < insert_row; ++i) {
-                col1->AppendValue(Value::MakeInt(2 * i));
-            }
-
-            input_block2->InsertVector(col1, 0);
-        }
-        {
-            auto col2 = ColumnVector::Make(column_def2->type());
-            col2->Initialize();
-            for (SizeT i = 0; i < insert_row; ++i) {
-                col2->AppendValue(Value::MakeVarchar(fmt::format("abcdefghijklmnopqrstuvwxyz_{}", i)));
-            }
-            input_block2->InsertVector(col2, 1);
-        }
-        input_block2->Finalize();
-    }
     //    t1      append      commit (success)
     //    |----------|---------|
     //                            |----------------------|----------|
     //                           t2                  append      commit (success)
     {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
-
+        auto input_block1 = MakeInputBlock1(insert_row);
         Status status = txn->Append(*db_name, *table_name, input_block1);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
@@ -458,7 +389,7 @@ TEST_P(TestTxnAppend, test_append2) {
     }
     {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("append again"), TransactionType::kNormal);
-
+        auto input_block2 = MakeInputBlock2(insert_row);
         Status status = txn->Append(*db_name, *table_name, input_block2);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
@@ -472,7 +403,8 @@ TEST_P(TestTxnAppend, test_append2) {
     {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("concurrent append 1"), TransactionType::kNormal);
         auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("concurrent append 2"), TransactionType::kNormal);
-
+        auto input_block1 = MakeInputBlock1(8192);
+        auto input_block2 = MakeInputBlock2(8192);
         Status status1 = txn->Append(*db_name, *table_name, input_block1);
         EXPECT_TRUE(status1.ok());
         Status status2 = txn2->Append(*db_name, *table_name, input_block2);
@@ -583,32 +515,6 @@ TEST_P(TestTxnAppend, test_append_drop_db) {
 
     auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
     auto column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
-    auto input_block1 = MakeShared<DataBlock>();
-    SizeT insert_row = 8192;
-    {
-        // Initialize input block
-        {
-            auto col1 = ColumnVector::Make(column_def1->type());
-            col1->Initialize();
-            for (SizeT i = 0; i < insert_row; ++i) {
-                col1->AppendValue(Value::MakeInt(i));
-            }
-
-            input_block1->InsertVector(col1, 0);
-        }
-        {
-            auto col2 = ColumnVector::Make(column_def2->type());
-            col2->Initialize();
-            for (SizeT i = 0; i < insert_row; ++i) {
-                col2->AppendValue(Value::MakeVarchar(fmt::format("abc_{}", i)));
-            }
-
-            //            col2->AppendValue(Value::MakeVarchar("abc"));
-            //            col2->AppendValue(Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
-            input_block1->InsertVector(col2, 1);
-        }
-        input_block1->Finalize();
-    }
 
     NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
 
@@ -637,7 +543,7 @@ TEST_P(TestTxnAppend, test_append_drop_db) {
 
         {
             auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
-
+            auto input_block1 = MakeInputBlock1(8192);
             Status status = txn->Append(*db_name, *table_name, input_block1);
             EXPECT_TRUE(status.ok());
             status = new_txn_mgr->CommitTxn(txn);
@@ -684,6 +590,7 @@ TEST_P(TestTxnAppend, test_append_drop_db) {
         EXPECT_TRUE(status.ok());
 
         auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+        auto input_block1 = MakeInputBlock1(8192);
         status = txn3->Append(*db_name, *table_name, input_block1);
         EXPECT_TRUE(status.ok());
 
@@ -729,6 +636,7 @@ TEST_P(TestTxnAppend, test_append_drop_db) {
         EXPECT_TRUE(status.ok());
 
         auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+        auto input_block1 = MakeInputBlock1(8192);
         status = txn3->Append(*db_name, *table_name, input_block1);
         EXPECT_TRUE(status.ok());
 
@@ -774,6 +682,7 @@ TEST_P(TestTxnAppend, test_append_drop_db) {
         EXPECT_TRUE(status.ok());
 
         auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+        auto input_block1 = MakeInputBlock1(8192);
         status = txn3->Append(*db_name, *table_name, input_block1);
         EXPECT_TRUE(status.ok());
 
@@ -823,6 +732,7 @@ TEST_P(TestTxnAppend, test_append_drop_db) {
         status = txn4->DropDatabase("db1", ConflictType::kError);
         EXPECT_TRUE(status.ok());
 
+        auto input_block1 = MakeInputBlock1(8192);
         status = txn3->Append(*db_name, *table_name, input_block1);
         EXPECT_TRUE(status.ok());
 
@@ -871,6 +781,7 @@ TEST_P(TestTxnAppend, test_append_drop_db) {
         status = new_txn_mgr->CommitTxn(txn4);
         EXPECT_TRUE(status.ok());
 
+        auto input_block1 = MakeInputBlock1(8192);
         status = txn3->Append(*db_name, *table_name, input_block1);
         EXPECT_TRUE(status.ok());
 
@@ -918,6 +829,7 @@ TEST_P(TestTxnAppend, test_append_drop_db) {
         status = new_txn_mgr->CommitTxn(txn4);
         EXPECT_TRUE(status.ok());
 
+        auto input_block1 = MakeInputBlock1(8192);
         status = txn3->Append(*db_name, *table_name, input_block1);
         EXPECT_TRUE(status.ok());
 
@@ -962,6 +874,7 @@ TEST_P(TestTxnAppend, test_append_drop_db) {
         EXPECT_TRUE(status.ok());
 
         auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+        auto input_block1 = MakeInputBlock1(8192);
         status = txn3->Append(*db_name, *table_name, input_block1);
         EXPECT_FALSE(status.ok());
         status = new_txn_mgr->RollBackTxn(txn3);
@@ -983,32 +896,6 @@ TEST_P(TestTxnAppend, test_append_drop_table) {
 
     auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
     auto column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
-    auto input_block1 = MakeShared<DataBlock>();
-    SizeT insert_row = 8192;
-    {
-        // Initialize input block
-        {
-            auto col1 = ColumnVector::Make(column_def1->type());
-            col1->Initialize();
-            for (SizeT i = 0; i < insert_row; ++i) {
-                col1->AppendValue(Value::MakeInt(i));
-            }
-
-            input_block1->InsertVector(col1, 0);
-        }
-        {
-            auto col2 = ColumnVector::Make(column_def2->type());
-            col2->Initialize();
-            for (SizeT i = 0; i < insert_row; ++i) {
-                col2->AppendValue(Value::MakeVarchar(fmt::format("abc_{}", i)));
-            }
-
-            //            col2->AppendValue(Value::MakeVarchar("abc"));
-            //            col2->AppendValue(Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
-            input_block1->InsertVector(col2, 1);
-        }
-        input_block1->Finalize();
-    }
 
     NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
 
@@ -1037,7 +924,7 @@ TEST_P(TestTxnAppend, test_append_drop_table) {
 
         {
             auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
-
+            auto input_block1 = MakeInputBlock1(8192);
             Status status = txn->Append(*db_name, *table_name, input_block1);
             EXPECT_TRUE(status.ok());
             status = new_txn_mgr->CommitTxn(txn);
@@ -1094,6 +981,7 @@ TEST_P(TestTxnAppend, test_append_drop_table) {
         EXPECT_TRUE(status.ok());
 
         auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+        auto input_block1 = MakeInputBlock1(8192);
         status = txn3->Append(*db_name, *table_name, input_block1);
         EXPECT_TRUE(status.ok());
 
@@ -1145,6 +1033,7 @@ TEST_P(TestTxnAppend, test_append_drop_table) {
         EXPECT_TRUE(status.ok());
 
         auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+        auto input_block1 = MakeInputBlock1(8192);
         status = txn3->Append(*db_name, *table_name, input_block1);
         EXPECT_TRUE(status.ok());
 
@@ -1196,6 +1085,7 @@ TEST_P(TestTxnAppend, test_append_drop_table) {
         EXPECT_TRUE(status.ok());
 
         auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+        auto input_block1 = MakeInputBlock1(8192);
         status = txn3->Append(*db_name, *table_name, input_block1);
         EXPECT_TRUE(status.ok());
 
@@ -1251,6 +1141,7 @@ TEST_P(TestTxnAppend, test_append_drop_table) {
         status = txn6->DropTable("db1", "tb1", ConflictType::kError);
         EXPECT_TRUE(status.ok());
 
+        auto input_block1 = MakeInputBlock1(8192);
         status = txn3->Append(*db_name, *table_name, input_block1);
         EXPECT_TRUE(status.ok());
 
@@ -1306,6 +1197,7 @@ TEST_P(TestTxnAppend, test_append_drop_table) {
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
 
+        auto input_block1 = MakeInputBlock1(8192);
         status = txn3->Append(*db_name, *table_name, input_block1);
         EXPECT_TRUE(status.ok());
 
@@ -1358,6 +1250,7 @@ TEST_P(TestTxnAppend, test_append_drop_table) {
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
 
+        auto input_block1 = MakeInputBlock1(8192);
         status = txn3->Append(*db_name, *table_name, input_block1);
         EXPECT_TRUE(status.ok());
 
@@ -1408,6 +1301,7 @@ TEST_P(TestTxnAppend, test_append_drop_table) {
         EXPECT_TRUE(status.ok());
 
         auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+        auto input_block1 = MakeInputBlock1(8192);
         status = txn3->Append(*db_name, *table_name, input_block1);
         EXPECT_FALSE(status.ok());
         status = new_txn_mgr->RollBackTxn(txn3);
@@ -1440,33 +1334,6 @@ TEST_P(TestTxnAppend, test_append_add_column) {
 
     auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
     auto column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
-    auto input_block1 = MakeShared<DataBlock>();
-    SizeT insert_row = 8192;
-    {
-        // Initialize input block
-        {
-            auto col1 = ColumnVector::Make(column_def1->type());
-            col1->Initialize();
-            for (SizeT i = 0; i < insert_row; ++i) {
-                col1->AppendValue(Value::MakeInt(i));
-            }
-
-            input_block1->InsertVector(col1, 0);
-        }
-        {
-            auto col2 = ColumnVector::Make(column_def2->type());
-            col2->Initialize();
-            for (SizeT i = 0; i < insert_row; ++i) {
-                col2->AppendValue(Value::MakeVarchar(fmt::format("abc_{}", i)));
-            }
-
-            //            col2->AppendValue(Value::MakeVarchar("abc"));
-            //            col2->AppendValue(Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
-            input_block1->InsertVector(col2, 1);
-        }
-        input_block1->Finalize();
-    }
-
     NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
 
     //    t1      append      commit (success)
@@ -1489,6 +1356,7 @@ TEST_P(TestTxnAppend, test_append_add_column) {
         EXPECT_TRUE(status.ok());
 
         auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+        auto input_block1 = MakeInputBlock1(8192);
         status = txn3->Append(*db_name, *table_name, input_block1);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn3);
@@ -1544,6 +1412,7 @@ TEST_P(TestTxnAppend, test_append_add_column) {
         EXPECT_TRUE(status.ok());
 
         auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+        auto input_block1 = MakeInputBlock1(8192);
         status = txn3->Append(*db_name, *table_name, input_block1);
         EXPECT_TRUE(status.ok());
 
@@ -1601,6 +1470,7 @@ TEST_P(TestTxnAppend, test_append_add_column) {
         EXPECT_TRUE(status.ok());
 
         auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+        auto input_block1 = MakeInputBlock1(8192);
         status = txn3->Append(*db_name, *table_name, input_block1);
         EXPECT_TRUE(status.ok());
 
@@ -1658,6 +1528,7 @@ TEST_P(TestTxnAppend, test_append_add_column) {
         EXPECT_TRUE(status.ok());
 
         auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+        auto input_block1 = MakeInputBlock1(8192);
         status = txn3->Append(*db_name, *table_name, input_block1);
         EXPECT_TRUE(status.ok());
 
@@ -1727,6 +1598,7 @@ TEST_P(TestTxnAppend, test_append_add_column) {
         status = txn4->AddColumns(*db_name, *table_name, columns);
         EXPECT_TRUE(status.ok());
 
+        auto input_block1 = MakeInputBlock1(8192);
         status = txn3->Append(*db_name, *table_name, input_block1);
         EXPECT_TRUE(status.ok());
 
@@ -1787,6 +1659,7 @@ TEST_P(TestTxnAppend, test_append_add_column) {
         status = new_txn_mgr->CommitTxn(txn4);
         EXPECT_TRUE(status.ok());
 
+        auto input_block1 = MakeInputBlock1(8192);
         status = txn3->Append(*db_name, *table_name, input_block1);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn3);
@@ -1844,6 +1717,7 @@ TEST_P(TestTxnAppend, test_append_add_column) {
         status = new_txn_mgr->CommitTxn(txn4);
         EXPECT_TRUE(status.ok());
 
+        auto input_block1 = MakeInputBlock1(8192);
         status = txn3->Append(*db_name, *table_name, input_block1);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn3);
@@ -1899,6 +1773,7 @@ TEST_P(TestTxnAppend, test_append_add_column) {
         EXPECT_TRUE(status.ok());
 
         auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+        auto input_block1 = MakeInputBlock1(8192);
         status = txn3->Append(*db_name, *table_name, input_block1);
         EXPECT_FALSE(status.ok());
         status = new_txn_mgr->RollBackTxn(txn3);
@@ -1932,32 +1807,6 @@ TEST_P(TestTxnAppend, test_append_drop_column) {
 
     auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
     auto column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
-    auto input_block1 = MakeShared<DataBlock>();
-    SizeT insert_row = 8192;
-    {
-        // Initialize input block
-        {
-            auto col1 = ColumnVector::Make(column_def1->type());
-            col1->Initialize();
-            for (SizeT i = 0; i < insert_row; ++i) {
-                col1->AppendValue(Value::MakeInt(i));
-            }
-
-            input_block1->InsertVector(col1, 0);
-        }
-        {
-            auto col2 = ColumnVector::Make(column_def2->type());
-            col2->Initialize();
-            for (SizeT i = 0; i < insert_row; ++i) {
-                col2->AppendValue(Value::MakeVarchar(fmt::format("abc_{}", i)));
-            }
-
-            //            col2->AppendValue(Value::MakeVarchar("abc"));
-            //            col2->AppendValue(Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
-            input_block1->InsertVector(col2, 1);
-        }
-        input_block1->Finalize();
-    }
 
     NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
 
@@ -1981,6 +1830,7 @@ TEST_P(TestTxnAppend, test_append_drop_column) {
         EXPECT_TRUE(status.ok());
 
         auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+        auto input_block1 = MakeInputBlock1(8192);
         status = txn3->Append(*db_name, *table_name, input_block1);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn3);
@@ -2031,6 +1881,7 @@ TEST_P(TestTxnAppend, test_append_drop_column) {
         EXPECT_TRUE(status.ok());
 
         auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+        auto input_block1 = MakeInputBlock1(8192);
         status = txn3->Append(*db_name, *table_name, input_block1);
         EXPECT_TRUE(status.ok());
 
@@ -2083,6 +1934,7 @@ TEST_P(TestTxnAppend, test_append_drop_column) {
         EXPECT_TRUE(status.ok());
 
         auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+        auto input_block1 = MakeInputBlock1(8192);
         status = txn3->Append(*db_name, *table_name, input_block1);
         EXPECT_TRUE(status.ok());
 
@@ -2135,6 +1987,7 @@ TEST_P(TestTxnAppend, test_append_drop_column) {
         EXPECT_TRUE(status.ok());
 
         auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+        auto input_block1 = MakeInputBlock1(8192);
         status = txn3->Append(*db_name, *table_name, input_block1);
         EXPECT_TRUE(status.ok());
 
@@ -2198,6 +2051,7 @@ TEST_P(TestTxnAppend, test_append_drop_column) {
         status = txn4->DropColumns(*db_name, *table_name, column_names);
         EXPECT_TRUE(status.ok());
 
+        auto input_block1 = MakeInputBlock1(8192);
         status = txn3->Append(*db_name, *table_name, input_block1);
         EXPECT_TRUE(status.ok());
 
@@ -2253,6 +2107,7 @@ TEST_P(TestTxnAppend, test_append_drop_column) {
         status = new_txn_mgr->CommitTxn(txn4);
         EXPECT_TRUE(status.ok());
 
+        auto input_block1 = MakeInputBlock1(8192);
         status = txn3->Append(*db_name, *table_name, input_block1);
         EXPECT_TRUE(status.ok());
         SizeT row_count = 0;
@@ -2315,6 +2170,7 @@ TEST_P(TestTxnAppend, test_append_drop_column) {
         status = new_txn_mgr->CommitTxn(txn4);
         EXPECT_TRUE(status.ok());
 
+        auto input_block1 = MakeInputBlock1(8192);
         status = txn3->Append(*db_name, *table_name, input_block1);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn3);
@@ -2365,6 +2221,7 @@ TEST_P(TestTxnAppend, test_append_drop_column) {
         EXPECT_TRUE(status.ok());
 
         auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+        auto input_block1 = MakeInputBlock1(8192);
         status = txn3->Append(*db_name, *table_name, input_block1);
         EXPECT_FALSE(status.ok());
         status = new_txn_mgr->RollBackTxn(txn3);
@@ -2398,33 +2255,6 @@ TEST_P(TestTxnAppend, test_append_rename) {
 
     auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
     auto column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
-    auto input_block1 = MakeShared<DataBlock>();
-    SizeT insert_row = 8192;
-    {
-        // Initialize input block
-        {
-            auto col1 = ColumnVector::Make(column_def1->type());
-            col1->Initialize();
-            for (SizeT i = 0; i < insert_row; ++i) {
-                col1->AppendValue(Value::MakeInt(i));
-            }
-
-            input_block1->InsertVector(col1, 0);
-        }
-        {
-            auto col2 = ColumnVector::Make(column_def2->type());
-            col2->Initialize();
-            for (SizeT i = 0; i < insert_row; ++i) {
-                col2->AppendValue(Value::MakeVarchar(fmt::format("abc_{}", i)));
-            }
-
-            //            col2->AppendValue(Value::MakeVarchar("abc"));
-            //            col2->AppendValue(Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
-            input_block1->InsertVector(col2, 1);
-        }
-        input_block1->Finalize();
-    }
-
     NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
 
     //    t1      append      commit (success)
@@ -2447,6 +2277,7 @@ TEST_P(TestTxnAppend, test_append_rename) {
         EXPECT_TRUE(status.ok());
 
         auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+        auto input_block1 = MakeInputBlock1(8192);
         status = txn3->Append(*db_name, *table_name, input_block1);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn3);
@@ -2496,6 +2327,7 @@ TEST_P(TestTxnAppend, test_append_rename) {
         EXPECT_TRUE(status.ok());
 
         auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+        auto input_block1 = MakeInputBlock1(8192);
         status = txn3->Append(*db_name, *table_name, input_block1);
         EXPECT_TRUE(status.ok());
 
@@ -2547,6 +2379,7 @@ TEST_P(TestTxnAppend, test_append_rename) {
         EXPECT_TRUE(status.ok());
 
         auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+        auto input_block1 = MakeInputBlock1(8192);
         status = txn3->Append(*db_name, *table_name, input_block1);
         EXPECT_TRUE(status.ok());
 
@@ -2598,6 +2431,7 @@ TEST_P(TestTxnAppend, test_append_rename) {
         EXPECT_TRUE(status.ok());
 
         auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+        auto input_block1 = MakeInputBlock1(8192);
         status = txn3->Append(*db_name, *table_name, input_block1);
         EXPECT_TRUE(status.ok());
 
@@ -2655,6 +2489,7 @@ TEST_P(TestTxnAppend, test_append_rename) {
         status = txn4->RenameTable(*db_name, *table_name, "table2");
         EXPECT_TRUE(status.ok());
 
+        auto input_block1 = MakeInputBlock1(8192);
         status = txn3->Append(*db_name, *table_name, input_block1);
         EXPECT_TRUE(status.ok());
 
@@ -2709,6 +2544,7 @@ TEST_P(TestTxnAppend, test_append_rename) {
         status = new_txn_mgr->CommitTxn(txn4);
         EXPECT_TRUE(status.ok());
 
+        auto input_block1 = MakeInputBlock1(8192);
         status = txn3->Append(*db_name, *table_name, input_block1);
         EXPECT_TRUE(status.ok());
 
@@ -2761,6 +2597,7 @@ TEST_P(TestTxnAppend, test_append_rename) {
         status = new_txn_mgr->CommitTxn(txn4);
         EXPECT_TRUE(status.ok());
 
+        auto input_block1 = MakeInputBlock1(8192);
         status = txn3->Append(*db_name, *table_name, input_block1);
         EXPECT_TRUE(status.ok());
 
@@ -2813,6 +2650,7 @@ TEST_P(TestTxnAppend, test_append_rename) {
 
         auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
 
+        auto input_block1 = MakeInputBlock1(8192);
         status = txn3->Append(*db_name, *table_name, input_block1);
         EXPECT_FALSE(status.ok());
 
@@ -2847,33 +2685,6 @@ TEST_P(TestTxnAppend, test_append_append) {
 
     auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
     auto column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
-    auto input_block1 = MakeShared<DataBlock>();
-    SizeT insert_row = 4096;
-    {
-        // Initialize input block
-        {
-            auto col1 = ColumnVector::Make(column_def1->type());
-            col1->Initialize();
-            for (SizeT i = 0; i < insert_row; ++i) {
-                col1->AppendValue(Value::MakeInt(i));
-            }
-
-            input_block1->InsertVector(col1, 0);
-        }
-        {
-            auto col2 = ColumnVector::Make(column_def2->type());
-            col2->Initialize();
-            for (SizeT i = 0; i < insert_row; ++i) {
-                col2->AppendValue(Value::MakeVarchar(fmt::format("abc_{}", i)));
-            }
-
-            //            col2->AppendValue(Value::MakeVarchar("abc"));
-            //            col2->AppendValue(Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
-            input_block1->InsertVector(col2, 1);
-        }
-        input_block1->Finalize();
-    }
-
     NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
 
     //    t1      append      commit (success)
@@ -2896,6 +2707,7 @@ TEST_P(TestTxnAppend, test_append_append) {
         EXPECT_TRUE(status.ok());
 
         auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+        auto input_block1 = MakeInputBlock1(4096);
         status = txn3->Append(*db_name, *table_name, input_block1);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn3);
@@ -2985,6 +2797,7 @@ TEST_P(TestTxnAppend, test_append_append) {
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());
 
+        auto input_block1 = MakeInputBlock1(4096);
         auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
         status = txn3->Append(*db_name, *table_name, input_block1);
         EXPECT_TRUE(status.ok());
@@ -3040,6 +2853,7 @@ TEST_P(TestTxnAppend, test_append_append) {
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());
 
+        auto input_block1 = MakeInputBlock1(4096);
         auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
         status = txn3->Append(*db_name, *table_name, input_block1);
         EXPECT_TRUE(status.ok());
@@ -3132,6 +2946,8 @@ TEST_P(TestTxnAppend, test_append_append) {
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());
 
+        auto input_block1 = MakeInputBlock1(4096);
+
         auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
         status = txn3->Append(*db_name, *table_name, input_block1);
         EXPECT_TRUE(status.ok());
@@ -3185,6 +3001,8 @@ TEST_P(TestTxnAppend, test_append_append) {
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());
+
+        auto input_block1 = MakeInputBlock1(4096);
 
         auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
 
@@ -3279,6 +3097,8 @@ TEST_P(TestTxnAppend, test_append_append) {
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());
 
+        auto input_block1 = MakeInputBlock1(4096);
+
         auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
 
         auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
@@ -3370,6 +3190,8 @@ TEST_P(TestTxnAppend, test_append_append) {
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());
 
+        auto input_block1 = MakeInputBlock1(4096);
+
         auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
         status = txn4->Append(*db_name, *table_name, input_block1);
         EXPECT_TRUE(status.ok());
@@ -3454,33 +3276,6 @@ TEST_P(TestTxnAppend, test_append_append_concurrent) {
 
     auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
     auto column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
-    auto input_block1 = MakeShared<DataBlock>();
-    SizeT insert_row = 4096;
-    {
-        // Initialize input block
-        {
-            auto col1 = ColumnVector::Make(column_def1->type());
-            col1->Initialize();
-            for (SizeT i = 0; i < insert_row; ++i) {
-                col1->AppendValue(Value::MakeInt(i));
-            }
-
-            input_block1->InsertVector(col1, 0);
-        }
-        {
-            auto col2 = ColumnVector::Make(column_def2->type());
-            col2->Initialize();
-            for (SizeT i = 0; i < insert_row; ++i) {
-                col2->AppendValue(Value::MakeVarchar(fmt::format("abc_{}", i)));
-            }
-
-            //            col2->AppendValue(Value::MakeVarchar("abc"));
-            //            col2->AppendValue(Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
-            input_block1->InsertVector(col2, 1);
-        }
-        input_block1->Finalize();
-    }
-
     NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
 
     //               t1                  append    commit (success)
@@ -3501,6 +3296,8 @@ TEST_P(TestTxnAppend, test_append_append_concurrent) {
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());
+
+        auto input_block1 = MakeInputBlock1(4096);
 
         std::vector<std::thread> worker_threads;
         SizeT thread_count = 4;
@@ -3637,32 +3434,6 @@ TEST_P(TestTxnAppend, test_append_and_create_index) {
     auto table_name = std::make_shared<std::string>("tb1");
     auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
     auto column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
-    auto input_block1 = MakeShared<DataBlock>();
-    SizeT insert_row = 4096;
-    {
-        // Initialize input block
-        {
-            auto col1 = ColumnVector::Make(column_def1->type());
-            col1->Initialize();
-            for (SizeT i = 0; i < insert_row; ++i) {
-                col1->AppendValue(Value::MakeInt(i));
-            }
-
-            input_block1->InsertVector(col1, 0);
-        }
-        {
-            auto col2 = ColumnVector::Make(column_def2->type());
-            col2->Initialize();
-            for (SizeT i = 0; i < insert_row; ++i) {
-                col2->AppendValue(Value::MakeVarchar(fmt::format("abc_{}", i)));
-            }
-
-            //            col2->AppendValue(Value::MakeVarchar("abc"));
-            //            col2->AppendValue(Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
-            input_block1->InsertVector(col2, 1);
-        }
-        input_block1->Finalize();
-    }
 
     auto check_segment = [&](SegmentMeta &segment_meta, NewTxn *txn) {
         Status status;
@@ -3788,6 +3559,8 @@ TEST_P(TestTxnAppend, test_append_and_create_index) {
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());
 
+        auto input_block1 = MakeInputBlock1(4096);
+
         auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
         status = txn4->Append(*db_name, *table_name, input_block1);
         EXPECT_TRUE(status.ok());
@@ -3832,6 +3605,7 @@ TEST_P(TestTxnAppend, test_append_and_create_index) {
         EXPECT_TRUE(status.ok());
 
         auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+        auto input_block1 = MakeInputBlock1(4096);
         status = txn4->Append(*db_name, *table_name, input_block1);
         EXPECT_TRUE(status.ok());
 
@@ -3876,6 +3650,7 @@ TEST_P(TestTxnAppend, test_append_and_create_index) {
         EXPECT_TRUE(status.ok());
 
         auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+        auto input_block1 = MakeInputBlock1(4096);
         status = txn4->Append(*db_name, *table_name, input_block1);
         EXPECT_TRUE(status.ok());
 
@@ -3920,6 +3695,7 @@ TEST_P(TestTxnAppend, test_append_and_create_index) {
         EXPECT_TRUE(status.ok());
 
         auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+        auto input_block1 = MakeInputBlock1(4096);
         status = txn4->Append(*db_name, *table_name, input_block1);
         EXPECT_TRUE(status.ok());
 
@@ -3971,6 +3747,7 @@ TEST_P(TestTxnAppend, test_append_and_create_index) {
         status = txn7->CreateIndex(*db_name, *table_name, index_def1, ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
 
+        auto input_block1 = MakeInputBlock1(4096);
         status = txn4->Append(*db_name, *table_name, input_block1);
         EXPECT_TRUE(status.ok());
 
@@ -4018,6 +3795,7 @@ TEST_P(TestTxnAppend, test_append_and_create_index) {
         status = new_txn_mgr->CommitTxn(txn7);
         EXPECT_TRUE(status.ok());
 
+        auto input_block1 = MakeInputBlock1(4096);
         status = txn4->Append(*db_name, *table_name, input_block1);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn4);
@@ -4062,6 +3840,7 @@ TEST_P(TestTxnAppend, test_append_and_create_index) {
         status = new_txn_mgr->CommitTxn(txn7);
         EXPECT_TRUE(status.ok());
 
+        auto input_block1 = MakeInputBlock1(4096);
         status = txn4->Append(*db_name, *table_name, input_block1);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn4);
@@ -4104,6 +3883,7 @@ TEST_P(TestTxnAppend, test_append_and_create_index) {
         EXPECT_TRUE(status.ok());
 
         auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+        auto input_block1 = MakeInputBlock1(4096);
         status = txn4->Append(*db_name, *table_name, input_block1);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn4);
@@ -4134,32 +3914,6 @@ TEST_P(TestTxnAppend, test_append_and_drop_index) {
     auto table_name = std::make_shared<std::string>("tb1");
     auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
     auto column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
-    auto input_block1 = MakeShared<DataBlock>();
-    SizeT insert_row = 4096;
-    {
-        // Initialize input block
-        {
-            auto col1 = ColumnVector::Make(column_def1->type());
-            col1->Initialize();
-            for (SizeT i = 0; i < insert_row; ++i) {
-                col1->AppendValue(Value::MakeInt(i));
-            }
-
-            input_block1->InsertVector(col1, 0);
-        }
-        {
-            auto col2 = ColumnVector::Make(column_def2->type());
-            col2->Initialize();
-            for (SizeT i = 0; i < insert_row; ++i) {
-                col2->AppendValue(Value::MakeVarchar(fmt::format("abc_{}", i)));
-            }
-
-            //            col2->AppendValue(Value::MakeVarchar("abc"));
-            //            col2->AppendValue(Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
-            input_block1->InsertVector(col2, 1);
-        }
-        input_block1->Finalize();
-    }
 
     auto check_segment = [&](SegmentMeta &segment_meta, NewTxn *txn) {
         Status status;
@@ -4279,6 +4033,7 @@ TEST_P(TestTxnAppend, test_append_and_drop_index) {
         EXPECT_TRUE(status.ok());
 
         auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+        auto input_block1 = MakeInputBlock1(4096);
         status = txn4->Append(*db_name, *table_name, input_block1);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn4);
@@ -4330,6 +4085,7 @@ TEST_P(TestTxnAppend, test_append_and_drop_index) {
         EXPECT_TRUE(status.ok());
 
         auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+        auto input_block1 = MakeInputBlock1(4096);
         status = txn4->Append(*db_name, *table_name, input_block1);
         EXPECT_TRUE(status.ok());
 
@@ -4382,6 +4138,7 @@ TEST_P(TestTxnAppend, test_append_and_drop_index) {
         EXPECT_TRUE(status.ok());
 
         auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+        auto input_block1 = MakeInputBlock1(4096);
         status = txn4->Append(*db_name, *table_name, input_block1);
         EXPECT_TRUE(status.ok());
 
@@ -4434,6 +4191,7 @@ TEST_P(TestTxnAppend, test_append_and_drop_index) {
         EXPECT_TRUE(status.ok());
 
         auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+        auto input_block1 = MakeInputBlock1(4096);
         status = txn4->Append(*db_name, *table_name, input_block1);
         EXPECT_TRUE(status.ok());
 
@@ -4488,6 +4246,7 @@ TEST_P(TestTxnAppend, test_append_and_drop_index) {
         status = txn5->DropIndexByName(*db_name, *table_name, *index_name1, ConflictType::kError);
         EXPECT_TRUE(status.ok());
 
+        auto input_block1 = MakeInputBlock1(4096);
         status = txn4->Append(*db_name, *table_name, input_block1);
         EXPECT_TRUE(status.ok());
 
@@ -4540,6 +4299,7 @@ TEST_P(TestTxnAppend, test_append_and_drop_index) {
         status = new_txn_mgr->CommitTxn(txn5);
         EXPECT_TRUE(status.ok());
 
+        auto input_block1 = MakeInputBlock1(4096);
         status = txn4->Append(*db_name, *table_name, input_block1);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn4);
@@ -4589,6 +4349,7 @@ TEST_P(TestTxnAppend, test_append_and_drop_index) {
         status = new_txn_mgr->CommitTxn(txn5);
         EXPECT_TRUE(status.ok());
 
+        auto input_block1 = MakeInputBlock1(4096);
         status = txn4->Append(*db_name, *table_name, input_block1);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn4);
@@ -4636,6 +4397,7 @@ TEST_P(TestTxnAppend, test_append_and_drop_index) {
         EXPECT_TRUE(status.ok());
 
         auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+        auto input_block1 = MakeInputBlock1(4096);
         status = txn4->Append(*db_name, *table_name, input_block1);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn4);
@@ -4661,32 +4423,6 @@ TEST_P(TestTxnAppend, test_append_and_compact) {
     auto column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
     auto table_name = std::make_shared<std::string>("tb1");
     auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def2});
-
-    u32 block_row_cnt = 8192;
-    auto make_input_block = [&](const Value &v1, const Value &v2) {
-        auto input_block = MakeShared<DataBlock>();
-        auto append_to_col = [&](ColumnVector &col, const Value &v) {
-            for (u32 i = 0; i < block_row_cnt; ++i) {
-                col.AppendValue(v);
-            }
-        };
-        // Initialize input block
-        {
-            auto col1 = ColumnVector::Make(column_def1->type());
-            col1->Initialize();
-            append_to_col(*col1, v1);
-            input_block->InsertVector(col1, 0);
-        }
-        {
-            auto col2 = ColumnVector::Make(column_def2->type());
-            col2->Initialize();
-            append_to_col(*col2, v2);
-            input_block->InsertVector(col2, 1);
-        }
-        input_block->Finalize();
-        return input_block;
-    };
-
     auto PrepareForCompact = [&] {
         {
             auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
@@ -4706,7 +4442,7 @@ TEST_P(TestTxnAppend, test_append_and_compact) {
         // For compact
         for (int i = 0; i < 2; ++i) {
             auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>(fmt::format("import {}", i)), TransactionType::kNormal);
-            Vector<SharedPtr<DataBlock>> input_blocks = {make_input_block(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"))};
+            Vector<SharedPtr<DataBlock>> input_blocks = {MakeInputBlock(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"), 8192)};
             Status status = txn->Import(*db_name, *table_name, input_blocks);
             EXPECT_TRUE(status.ok());
             status = new_txn_mgr->CommitTxn(txn);
@@ -4744,7 +4480,7 @@ TEST_P(TestTxnAppend, test_append_and_compact) {
     {
         PrepareForCompact();
 
-        SharedPtr<DataBlock> input_block1 = make_input_block(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
+        SharedPtr<DataBlock> input_block1 = MakeInputBlock(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"), 8192);
 
         auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kAppend);
         Status status = txn4->Append(*db_name, *table_name, input_block1);
@@ -4770,7 +4506,7 @@ TEST_P(TestTxnAppend, test_append_and_compact) {
     {
         PrepareForCompact();
 
-        SharedPtr<DataBlock> input_block1 = make_input_block(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
+        SharedPtr<DataBlock> input_block1 = MakeInputBlock(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"), 8192);
 
         auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
         Status status = txn4->Append(*db_name, *table_name, input_block1);
@@ -4799,7 +4535,7 @@ TEST_P(TestTxnAppend, test_append_and_compact) {
     {
         PrepareForCompact();
 
-        SharedPtr<DataBlock> input_block1 = make_input_block(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
+        SharedPtr<DataBlock> input_block1 = MakeInputBlock(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"), 8192);
 
         auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
         Status status = txn4->Append(*db_name, *table_name, input_block1);
@@ -4828,7 +4564,7 @@ TEST_P(TestTxnAppend, test_append_and_compact) {
     {
         PrepareForCompact();
 
-        SharedPtr<DataBlock> input_block1 = make_input_block(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
+        SharedPtr<DataBlock> input_block1 = MakeInputBlock(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"), 8192);
 
         auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
         Status status = txn4->Append(*db_name, *table_name, input_block1);
@@ -4856,7 +4592,7 @@ TEST_P(TestTxnAppend, test_append_and_compact) {
     {
         PrepareForCompact();
 
-        SharedPtr<DataBlock> input_block1 = make_input_block(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
+        SharedPtr<DataBlock> input_block1 = MakeInputBlock(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"), 8192);
 
         auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
 
@@ -4893,7 +4629,7 @@ TEST_P(TestTxnAppend, test_append_and_compact) {
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());
 
-        SharedPtr<DataBlock> input_block1 = make_input_block(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
+        SharedPtr<DataBlock> input_block1 = MakeInputBlock(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"), 8192);
         status = txn3->Append(*db_name, *table_name, input_block1);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn3);
@@ -4921,7 +4657,7 @@ TEST_P(TestTxnAppend, test_append_and_compact) {
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());
 
-        SharedPtr<DataBlock> input_block1 = make_input_block(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
+        SharedPtr<DataBlock> input_block1 = MakeInputBlock(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"), 8192);
         status = txn3->Append(*db_name, *table_name, input_block1);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn3);
@@ -4947,7 +4683,7 @@ TEST_P(TestTxnAppend, test_append_and_compact) {
         EXPECT_TRUE(status.ok());
 
         auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
-        SharedPtr<DataBlock> input_block1 = make_input_block(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
+        SharedPtr<DataBlock> input_block1 = MakeInputBlock(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"), 8192);
         status = txn3->Append(*db_name, *table_name, input_block1);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn3);
@@ -4971,31 +4707,6 @@ TEST_P(TestTxnAppend, test_append_and_optimize_index) {
 
     auto index_name1 = std::make_shared<std::string>("index1");
     auto index_def1 = IndexSecondary::Make(index_name1, MakeShared<String>(), "file_name", {column_def1->name()});
-
-    u32 block_row_cnt = 8192;
-    auto make_input_block = [&](const Value &v1, const Value &v2) {
-        auto input_block = MakeShared<DataBlock>();
-        auto append_to_col = [&](ColumnVector &col, const Value &v) {
-            for (u32 i = 0; i < block_row_cnt; ++i) {
-                col.AppendValue(v);
-            }
-        };
-        // Initialize input block
-        {
-            auto col1 = ColumnVector::Make(column_def1->type());
-            col1->Initialize();
-            append_to_col(*col1, v1);
-            input_block->InsertVector(col1, 0);
-        }
-        {
-            auto col2 = ColumnVector::Make(column_def2->type());
-            col2->Initialize();
-            append_to_col(*col2, v2);
-            input_block->InsertVector(col2, 1);
-        }
-        input_block->Finalize();
-        return input_block;
-    };
 
     auto PrepareForAppendAndOptimize = [&] {
         {
@@ -5024,7 +4735,7 @@ TEST_P(TestTxnAppend, test_append_and_optimize_index) {
         for (int i = 0; i < 2; ++i) {
             {
                 auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>(fmt::format("append {}", i)), TransactionType::kNormal);
-                SharedPtr<DataBlock> input_block = make_input_block(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
+                SharedPtr<DataBlock> input_block = MakeInputBlock(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"), 8192);
                 Status status = txn->Append(*db_name, *table_name, input_block);
                 EXPECT_TRUE(status.ok());
                 status = new_txn_mgr->CommitTxn(txn);
@@ -5043,7 +4754,7 @@ TEST_P(TestTxnAppend, test_append_and_optimize_index) {
 
         {
             auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
-            SharedPtr<DataBlock> input_block = make_input_block(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
+            SharedPtr<DataBlock> input_block = MakeInputBlock(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"), 8192);
             Status status = txn->Append(*db_name, *table_name, input_block);
             EXPECT_TRUE(status.ok());
             status = new_txn_mgr->CommitTxn(txn);
@@ -5125,7 +4836,7 @@ TEST_P(TestTxnAppend, test_append_and_optimize_index) {
     {
         PrepareForAppendAndOptimize();
 
-        SharedPtr<DataBlock> input_block1 = make_input_block(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
+        SharedPtr<DataBlock> input_block1 = MakeInputBlock(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"), 8192);
 
         auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
         Status status = txn4->Append(*db_name, *table_name, input_block1);
@@ -5152,7 +4863,7 @@ TEST_P(TestTxnAppend, test_append_and_optimize_index) {
     {
         PrepareForAppendAndOptimize();
 
-        SharedPtr<DataBlock> input_block1 = make_input_block(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
+        SharedPtr<DataBlock> input_block1 = MakeInputBlock(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"), 8192);
 
         auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
         Status status = txn4->Append(*db_name, *table_name, input_block1);
@@ -5182,7 +4893,7 @@ TEST_P(TestTxnAppend, test_append_and_optimize_index) {
     {
         PrepareForAppendAndOptimize();
 
-        SharedPtr<DataBlock> input_block1 = make_input_block(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
+        SharedPtr<DataBlock> input_block1 = MakeInputBlock(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"), 8192);
 
         auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
         Status status = txn4->Append(*db_name, *table_name, input_block1);
@@ -5211,7 +4922,7 @@ TEST_P(TestTxnAppend, test_append_and_optimize_index) {
     {
         PrepareForAppendAndOptimize();
 
-        SharedPtr<DataBlock> input_block1 = make_input_block(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
+        SharedPtr<DataBlock> input_block1 = MakeInputBlock(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"), 8192);
 
         auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
         Status status = txn4->Append(*db_name, *table_name, input_block1);
@@ -5240,7 +4951,7 @@ TEST_P(TestTxnAppend, test_append_and_optimize_index) {
     {
         PrepareForAppendAndOptimize();
 
-        SharedPtr<DataBlock> input_block1 = make_input_block(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
+        SharedPtr<DataBlock> input_block1 = MakeInputBlock(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"), 8192);
 
         auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
 
@@ -5270,7 +4981,7 @@ TEST_P(TestTxnAppend, test_append_and_optimize_index) {
     {
         PrepareForAppendAndOptimize();
 
-        SharedPtr<DataBlock> input_block1 = make_input_block(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
+        SharedPtr<DataBlock> input_block1 = MakeInputBlock(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"), 8192);
 
         auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
 
@@ -5298,7 +5009,7 @@ TEST_P(TestTxnAppend, test_append_and_optimize_index) {
     {
         PrepareForAppendAndOptimize();
 
-        SharedPtr<DataBlock> input_block1 = make_input_block(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
+        SharedPtr<DataBlock> input_block1 = MakeInputBlock(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"), 8192);
 
         // optimize index
         auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("optimize index"), TransactionType::kNormal);
@@ -5327,7 +5038,7 @@ TEST_P(TestTxnAppend, test_append_and_optimize_index) {
     {
         PrepareForAppendAndOptimize();
 
-        SharedPtr<DataBlock> input_block1 = make_input_block(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
+        SharedPtr<DataBlock> input_block1 = MakeInputBlock(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"), 8192);
 
         // optimize index
         auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("optimize index"), TransactionType::kNormal);

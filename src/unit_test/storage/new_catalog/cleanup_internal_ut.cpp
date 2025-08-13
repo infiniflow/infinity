@@ -134,48 +134,6 @@ public:
         EXPECT_TRUE(status.ok());
     }
 
-    void CheckFilePaths() {
-        auto *pm = infinity::InfinityContext::instance().persistence_manager();
-        if (pm == nullptr) {
-            Path data_dir = this->GetFullDataDir();
-            for (auto &file_path : delete_file_paths_) {
-                file_path = data_dir / file_path;
-            }
-            for (auto &file_path : exist_file_paths_) {
-                file_path = data_dir / file_path;
-            }
-            for (const auto &file_path : delete_file_paths_) {
-                if (!std::filesystem::path(file_path).is_absolute()) {
-                    ADD_FAILURE() << "File path is not absolute: " << file_path;
-                }
-                EXPECT_FALSE(std::filesystem::exists(file_path));
-
-                auto path = static_cast<Path>(file_path).parent_path();
-                EXPECT_TRUE(!std::filesystem::exists(path) || std::filesystem::is_directory(path) && !std::filesystem::is_empty(path) ||
-                            std::filesystem::is_directory(path) && std::filesystem::is_empty(path) && path == data_dir);
-            }
-            for (const auto &file_path : exist_file_paths_) {
-                if (!std::filesystem::path(file_path).is_absolute()) {
-                    ADD_FAILURE() << "File path is not absolute: " << file_path;
-                }
-                EXPECT_TRUE(std::filesystem::exists(file_path));
-            }
-        } else {
-            auto local_path_map = pm->GetAllFiles();
-            for (const auto &file_path : delete_file_paths_) {
-                auto persist_read_result = local_path_map.find(file_path);
-                EXPECT_TRUE(persist_read_result == local_path_map.end());
-            }
-            for (const auto &file_path : exist_file_paths_) {
-                auto persist_read_result = local_path_map.find(file_path);
-                EXPECT_FALSE(persist_read_result == local_path_map.end());
-            }
-        }
-
-        delete_file_paths_.clear();
-        exist_file_paths_.clear();
-    }
-
 protected:
     NewTxnManager *new_txn_mgr_;
     WalManager *wal_manager_;
@@ -253,7 +211,7 @@ TEST_P(TestTxnCleanupInternal, test_cleanup_db) {
         Checkpoint();
         Cleanup();
 
-        this->CheckFilePaths();
+        CheckFilePaths(delete_file_paths_, exist_file_paths_);
     }
     {
         {
@@ -326,7 +284,7 @@ TEST_P(TestTxnCleanupInternal, test_cleanup_db) {
         Checkpoint();
         Cleanup();
 
-        this->CheckFilePaths();
+        CheckFilePaths(delete_file_paths_, exist_file_paths_);
 
         {
             auto *txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
@@ -398,7 +356,7 @@ TEST_P(TestTxnCleanupInternal, test_cleanup_table) {
         Checkpoint();
         Cleanup();
 
-        this->CheckFilePaths();
+        CheckFilePaths(delete_file_paths_, exist_file_paths_);
     }
     {
         {
@@ -454,7 +412,7 @@ TEST_P(TestTxnCleanupInternal, test_cleanup_table) {
         Checkpoint();
         Cleanup();
 
-        this->CheckFilePaths();
+        CheckFilePaths(delete_file_paths_, exist_file_paths_);
 
         {
             auto *txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("drop table"), TransactionType::kNormal);
@@ -541,7 +499,7 @@ TEST_P(TestTxnCleanupInternal, test_cleanup_index) {
         Checkpoint();
         Cleanup();
 
-        this->CheckFilePaths();
+        CheckFilePaths(delete_file_paths_, exist_file_paths_);
 
         {
             auto *txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("drop table"), TransactionType::kNormal);
@@ -558,7 +516,7 @@ TEST_P(TestTxnCleanupInternal, test_cleanup_index) {
         Checkpoint();
         Cleanup();
 
-        this->CheckFilePaths();
+        CheckFilePaths(delete_file_paths_, exist_file_paths_);
     }
     {
         {
@@ -607,7 +565,7 @@ TEST_P(TestTxnCleanupInternal, test_cleanup_index) {
         Checkpoint();
         Cleanup();
 
-        this->CheckFilePaths();
+        CheckFilePaths(delete_file_paths_, exist_file_paths_);
 
         {
             auto *txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("drop table"), TransactionType::kNormal);
@@ -707,7 +665,7 @@ TEST_P(TestTxnCleanupInternal, test_cleanup_compact) {
         EXPECT_TRUE(status.ok());
     }
     new_txn_mgr_->PrintAllKeyValue();
-    this->CheckFilePaths();
+    CheckFilePaths(delete_file_paths_, exist_file_paths_);
 
     {
         auto *txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("drop table"), TransactionType::kNormal);
@@ -729,7 +687,7 @@ TEST_P(TestTxnCleanupInternal, test_cleanup_compact) {
         status = new_txn_mgr_->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
     }
-    this->CheckFilePaths();
+    CheckFilePaths(delete_file_paths_, exist_file_paths_);
 }
 
 TEST_P(TestTxnCleanupInternal, test_cleanup_optimize) {
@@ -827,7 +785,7 @@ TEST_P(TestTxnCleanupInternal, test_cleanup_optimize) {
         status = new_txn_mgr_->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
     }
-    this->CheckFilePaths();
+    CheckFilePaths(delete_file_paths_, exist_file_paths_);
 
     {
         auto *txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("drop table"), TransactionType::kNormal);
@@ -849,7 +807,7 @@ TEST_P(TestTxnCleanupInternal, test_cleanup_optimize) {
         status = new_txn_mgr_->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
     }
-    this->CheckFilePaths();
+    CheckFilePaths(delete_file_paths_, exist_file_paths_);
 }
 
 TEST_P(TestTxnCleanupInternal, test_cleanup_drop_column) {
@@ -921,7 +879,7 @@ TEST_P(TestTxnCleanupInternal, test_cleanup_drop_column) {
         status = new_txn_mgr_->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
     }
-    this->CheckFilePaths();
+    CheckFilePaths(delete_file_paths_, exist_file_paths_);
 
     {
         auto *txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("drop table"), TransactionType::kNormal);
@@ -945,7 +903,7 @@ TEST_P(TestTxnCleanupInternal, test_cleanup_drop_column) {
         status = new_txn_mgr_->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
     }
-    this->CheckFilePaths();
+    CheckFilePaths(delete_file_paths_, exist_file_paths_);
 }
 
 TEST_P(TestTxnCleanupInternal, test_cleanup_drop_index_and_checkpoint_and_restart) {
@@ -1047,7 +1005,7 @@ TEST_P(TestTxnCleanupInternal, test_cleanup_drop_index_and_checkpoint_and_restar
     Checkpoint();
     Cleanup();
 
-    this->CheckFilePaths();
+    CheckFilePaths(delete_file_paths_, exist_file_paths_);
 
     {
         auto *txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("drop table"), TransactionType::kNormal);
@@ -1079,5 +1037,5 @@ TEST_P(TestTxnCleanupInternal, test_cleanup_drop_index_and_checkpoint_and_restar
     Checkpoint();
     Cleanup();
 
-    this->CheckFilePaths();
+    CheckFilePaths(delete_file_paths_, exist_file_paths_);
 }

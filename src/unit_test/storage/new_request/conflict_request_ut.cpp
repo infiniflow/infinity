@@ -53,7 +53,7 @@ import extra_ddl_info;
 
 using namespace infinity;
 
-class TestTxnsConflictTest : public NewRequestTest {
+class TestConflictRequestTest : public NewRequestTest {
 
 public:
     std::mutex mtx_{};
@@ -101,13 +101,12 @@ public:
 };
 
 INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
-                         TestTxnsConflictTest,
+                         TestConflictRequestTest,
                          ::testing::Values(BaseTestParamStr::NEW_CONFIG_PATH, BaseTestParamStr::NEW_VFS_OFF_CONFIG_PATH));
 
-TEST_P(TestTxnsConflictTest, create_index_append) {
+TEST_P(TestConflictRequestTest, create_index_append) {
     LOG_INFO("--create_index_append--");
 
-    /*
     auto thread_create_index = [this]() {
         {
             String create_table_sql = "create table t1(c1 int, c2 varchar)";
@@ -177,12 +176,9 @@ TEST_P(TestTxnsConflictTest, create_index_append) {
         EXPECT_TRUE(ok);
         LOG_INFO(query_result.ToString());
     }
-    */
 }
 
-/* FIXME: We are not retrying query if it is conflicted with others right now.
- * In this test, we expect query is retried and successful after conflicts.
-TEST_P(TestTxnsConflictTest, add_column_append) {
+TEST_P(TestConflictRequestTest, add_column_append) {
     LOG_INFO("--add_column_append--");
 
     auto thread_add_column = [this]() {
@@ -258,7 +254,7 @@ TEST_P(TestTxnsConflictTest, add_column_append) {
     }
 }
 
-TEST_P(TestTxnsConflictTest, add_column_import) {
+TEST_P(TestConflictRequestTest, add_column_import) {
     LOG_INFO("--add_column_import--");
 
     auto thread_add_column = [this]() {
@@ -331,7 +327,7 @@ TEST_P(TestTxnsConflictTest, add_column_import) {
     }
 }
 
-TEST_P(TestTxnsConflictTest, add_column_compact) {
+TEST_P(TestConflictRequestTest, add_column_compact) {
     LOG_INFO("--add_column_compact--");
 
     auto thread_add_column = [this]() {
@@ -404,7 +400,7 @@ TEST_P(TestTxnsConflictTest, add_column_compact) {
     }
 }
 
-TEST_P(TestTxnsConflictTest, add_column_add_column) {
+TEST_P(TestConflictRequestTest, add_column_add_column) {
     LOG_INFO("--add_column_add_column--");
 
     auto thread_add_column = [this]() {
@@ -475,7 +471,7 @@ TEST_P(TestTxnsConflictTest, add_column_add_column) {
     }
 }
 
-TEST_P(TestTxnsConflictTest, drop_column_append) {
+TEST_P(TestConflictRequestTest, drop_column_append) {
     LOG_INFO("--drop_column_append--");
 
     auto thread_drop_column = [this]() {
@@ -551,7 +547,7 @@ TEST_P(TestTxnsConflictTest, drop_column_append) {
     }
 }
 
-TEST_P(TestTxnsConflictTest, drop_column_import) {
+TEST_P(TestConflictRequestTest, drop_column_import) {
     LOG_INFO("--drop_column_import--");
 
     auto thread_drop_column = [this]() {
@@ -621,7 +617,7 @@ TEST_P(TestTxnsConflictTest, drop_column_import) {
     }
 }
 
-TEST_P(TestTxnsConflictTest, drop_column_compact) {
+TEST_P(TestConflictRequestTest, drop_column_compact) {
     LOG_INFO("--drop_column_compact--");
 
     auto thread_drop_column = [this]() {
@@ -694,7 +690,7 @@ TEST_P(TestTxnsConflictTest, drop_column_compact) {
     }
 }
 
-TEST_P(TestTxnsConflictTest, drop_column_create_index) {
+TEST_P(TestConflictRequestTest, drop_column_create_index) {
     LOG_INFO("--drop_column_create_index--");
 
     auto thread_drop_column = [this](bool &ok) {
@@ -767,7 +763,7 @@ TEST_P(TestTxnsConflictTest, drop_column_create_index) {
     }
 }
 
-TEST_P(TestTxnsConflictTest, delete_append) {
+TEST_P(TestConflictRequestTest, delete_append) {
     LOG_INFO("--delete_append--");
 
     auto thread_add_column = [this]() {
@@ -836,6 +832,4 @@ TEST_P(TestTxnsConflictTest, delete_append) {
         EXPECT_TRUE(ok);
         LOG_INFO(query_result.ToString());
     }
-
 }
-*/

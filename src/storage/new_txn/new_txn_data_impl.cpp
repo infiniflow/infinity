@@ -1510,6 +1510,7 @@ Status NewTxn::CommitBottomAppend(WalCmdAppendV2 *append_cmd) {
     const String &table_id_str = append_cmd->table_id_;
     TxnTimeStamp commit_ts = CommitTS();
     TableMeeta table_meta(db_id_str, table_id_str, this);
+    table_meta.SetDBTableName(db_name, table_name);
     Optional<SegmentMeta> segment_meta;
     Optional<BlockMeta> block_meta;
     SizeT copied_row_cnt = 0;

@@ -144,6 +144,7 @@ enum ClientErrorCode : int64_t {
     kDirNotFound = 7009,
     kDataIOError = 7010,
     kUnexpectedError = 7011,
+    kCheckpointing = 7029,
 
     // 8. meta error
     kInvalidEntry = 8001,
