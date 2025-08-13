@@ -532,7 +532,6 @@ Status NewTxn::OptimizeIndexInner(SegmentIndexMeta &segment_index_meta,
         }
     }
 
-    
     buffer_obj->Save();
     if (index_base->index_type_ == IndexType::kHnsw || index_base->index_type_ == IndexType::kBMP) {
         if (buffer_obj->type() != BufferType::kMmap) {
@@ -2124,48 +2123,50 @@ Status NewTxn::RestoreTableIndexesFromSnapshot(TableMeeta &table_meta, const Vec
         }
         Optional<TableIndexMeeta> table_index_meta;
         if (!is_link_files) {
-            status = new_catalog_->AddNewTableIndex(table_meta, 
-                                                        index_cmd.index_id_, 
-                                                        txn_context_ptr_->commit_ts_, 
-                                                        index_cmd.index_base_, 
-                                                        table_index_meta);
+            status = new_catalog_->AddNewTableIndex(table_meta,
+                                                    index_cmd.index_id_,
+                                                    txn_context_ptr_->commit_ts_,
+                                                    index_cmd.index_base_,
+                                                    table_index_meta);
             if (!status.ok()) {
                 return status;
             }
         } else {
             table_index_meta.emplace(index_cmd.index_id_, table_meta);
         }
-        
+
         for (const auto &segment_index : index_cmd.segment_index_infos_) {
             Optional<SegmentIndexMeta> segment_index_meta;
-            
+
             // Calculate next_chunk_id from existing chunk infos
             ChunkID next_chunk_id = 0;
             if (!segment_index.chunk_infos_.empty()) {
-                next_chunk_id = std::max_element(segment_index.chunk_infos_.begin(), 
-                                               segment_index.chunk_infos_.end(),
-                                               [](const WalChunkIndexInfo &a, const WalChunkIndexInfo &b) {
-                                                   return a.chunk_id_ < b.chunk_id_;
-                                               })->chunk_id_ + 1;
+                next_chunk_id = std::max_element(segment_index.chunk_infos_.begin(),
+                                                 segment_index.chunk_infos_.end(),
+                                                 [](const WalChunkIndexInfo &a, const WalChunkIndexInfo &b) { return a.chunk_id_ < b.chunk_id_; })
+                                    ->chunk_id_ +
+                                1;
             }
             if (!is_link_files) {
                 status = new_catalog_->RestoreNewSegmentIndex1(*table_index_meta, this, segment_index.segment_id_, segment_index_meta, next_chunk_id);
-                    if (!status.ok()) {
-                        return status;
-                    }
+                if (!status.ok()) {
+                    return status;
+                }
             } else {
                 segment_index_meta.emplace(segment_index.segment_id_, *table_index_meta);
             }
-            
+
             for (const auto &chunk_index : segment_index.chunk_infos_) {
                 Optional<ChunkIndexMeta> chunk_index_meta;
-                status = new_catalog_->RestoreNewChunkIndex1(*segment_index_meta, this, chunk_index.chunk_id_,
-                                                      chunk_index.base_rowid_,
-                                                      chunk_index.row_count_,
-                                                      chunk_index.base_name_,
-                                                      chunk_index.index_size_,
-                                                      chunk_index_meta,
-                                                      is_link_files);
+                status = new_catalog_->RestoreNewChunkIndex1(*segment_index_meta,
+                                                             this,
+                                                             chunk_index.chunk_id_,
+                                                             chunk_index.base_rowid_,
+                                                             chunk_index.row_count_,
+                                                             chunk_index.base_name_,
+                                                             chunk_index.index_size_,
+                                                             chunk_index_meta,
+                                                             is_link_files);
                 if (!status.ok()) {
                     return status;
                 }
@@ -2182,9 +2183,9 @@ Status NewTxn::RestoreTableIndexesFromSnapshot(TableMeeta &table_meta, const Vec
 }
 
 Status NewTxn::ManualDumpIndex(const String &db_name, const String &table_name) {
-    
+
     Status status;
-    
+
     // 1. Get table and index metadata
     Optional<DBMeeta> db_meta;
     Optional<TableMeeta> table_meta;
@@ -2195,7 +2196,7 @@ Status NewTxn::ManualDumpIndex(const String &db_name, const String &table_name) 
     if (!status.ok()) {
         return status;
     }
-    //get all index ids
+    // get all index ids
     Vector<String> *index_ids_ptr = nullptr;
     Vector<String> *index_names_ptr = nullptr;
     status = table_meta->GetIndexIDs(index_ids_ptr, &index_names_ptr);
@@ -2204,26 +2205,25 @@ Status NewTxn::ManualDumpIndex(const String &db_name, const String &table_name) 
     }
     for (const auto &index_id : *index_ids_ptr) {
         TableIndexMeeta table_index_meta(index_id, *table_meta);
-        
+
         // 2. Get all segment IDs for this index
-        Vector<SegmentID>* segment_ids_ptr = nullptr;
+        Vector<SegmentID> *segment_ids_ptr = nullptr;
         std::tie(segment_ids_ptr, status) = table_index_meta.GetSegmentIndexIDs1();
         if (!status.ok()) {
             return status;
         }
-        
+
         // 3. Loop through all segments and dump each one
         for (SegmentID segment_id : *segment_ids_ptr) {
             SegmentIndexMeta segment_index_meta(segment_id, table_index_meta);
-            
+
             // 4. Get memory index for this segment
             SharedPtr<MemIndex> mem_index = segment_index_meta.GetMemIndex();
-            if (mem_index == nullptr || 
-                (mem_index->GetBaseMemIndex() == nullptr && mem_index->GetEMVBIndex() == nullptr)) {
+            if (mem_index == nullptr || (mem_index->GetBaseMemIndex() == nullptr && mem_index->GetEMVBIndex() == nullptr)) {
                 LOG_INFO(fmt::format("Skipping segment {} - no memory index to dump", segment_id));
                 continue;
             }
-            
+
             // 4.5. Additional check for EMVB index - ensure it's built before dumping
 
             // 5. Allocate new chunk ID for this dump
@@ -2236,42 +2236,38 @@ Status NewTxn::ManualDumpIndex(const String &db_name, const String &table_name) 
             if (!status.ok()) {
                 return status;
             }
-            
+
             // 6. Get old chunk IDs for cleanup (if any exist)
             Vector<ChunkID> old_chunk_ids;
             auto [existing_chunk_ids_ptr, chunk_status] = segment_index_meta.GetChunkIDs1();
             if (chunk_status.ok()) {
                 old_chunk_ids = *existing_chunk_ids_ptr;
             }
-            
+
             // 7. Actually dump the memory index to disk
             status = this->DumpSegmentMemIndex(segment_index_meta, chunk_id);
             if (!status.ok()) {
                 return status;
             }
-            
+
             // 8. Clean up old chunk references
             TxnTimeStamp commit_ts = this->txn_context_ptr_->commit_ts_;
             for (ChunkID deprecate_id : old_chunk_ids) {
                 auto ts_str = std::to_string(commit_ts);
-                status = this->kv_instance_->Put(
-                    KeyEncode::DropChunkIndexKey(
-                        table_index_meta.table_meta().db_id_str(),
-                        table_index_meta.table_meta().table_id_str(),
-                        table_index_meta.index_id_str(),
-                        segment_id,
-                        deprecate_id
-                    ), 
-                    ts_str
-                );
+                status = this->kv_instance_->Put(KeyEncode::DropChunkIndexKey(table_index_meta.table_meta().db_id_str(),
+                                                                              table_index_meta.table_meta().table_id_str(),
+                                                                              table_index_meta.index_id_str(),
+                                                                              segment_id,
+                                                                              deprecate_id),
+                                                 ts_str);
                 if (!status.ok()) {
                     return status;
                 }
             }
-            
+
             LOG_INFO(fmt::format("Successfully dumped segment {} to chunk {}", segment_id, chunk_id));
         }
-        
+
         // 9. Update fulltext segment timestamp if needed
         // auto [index_base, index_status] = table_index_meta.GetIndexBase();
         // if (index_status.ok() && index_base->index_type_ == IndexType::kFullText) {
@@ -2282,7 +2278,7 @@ Status NewTxn::ManualDumpIndex(const String &db_name, const String &table_name) 
         //     }
         // }
     }
-    
+
     return Status::OK();
 }
 

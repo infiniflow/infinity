@@ -38,7 +38,6 @@ class ChunkIndexMeta;
 class BlockMeta;
 class SegmentMeta;
 
-
 export enum class WalCommandType : i8 {
     INVALID = 0,
     // -----------------------------
@@ -453,7 +452,6 @@ export struct WalCmdCreateIndexV2 final : public WalCmd {
           index_id_(index_id), index_base_(index_base), table_key_(table_key) {}
     ~WalCmdCreateIndexV2() override = default;
 
-
     bool operator==(const WalCmd &other) const final;
     [[nodiscard]] i32 GetSizeInBytes() const final;
     void WriteAdv(char *&buf) const final;
@@ -474,9 +472,7 @@ export struct WalCmdCreateIndexV2 final : public WalCmd {
 };
 
 export struct WalRestoreIndexV2 final {
-    WalRestoreIndexV2(const String &index_id,
-                        const SharedPtr<IndexBase> &index_base,
-                        const Vector<WalSegmentIndexInfo> &segment_index_infos)
+    WalRestoreIndexV2(const String &index_id, const SharedPtr<IndexBase> &index_base, const Vector<WalSegmentIndexInfo> &segment_index_infos)
         : index_id_(index_id), index_base_(index_base), segment_index_infos_(segment_index_infos) {}
     WalRestoreIndexV2() = default;
     bool operator==(const WalRestoreIndexV2 &other) const;
@@ -1121,7 +1117,7 @@ export struct WalCmdDropColumnsV2 : public WalCmd {
 };
 
 export struct WalCmdCleanup : public WalCmd {
-    WalCmdCleanup(i64 timestamp) : WalCmd(WalCommandType::CLEANUP), timestamp_(timestamp) {};
+    WalCmdCleanup(i64 timestamp) : WalCmd(WalCommandType::CLEANUP), timestamp_(timestamp){};
     ~WalCmdCleanup() override = default;
 
     bool operator==(const WalCmd &other) const final;
@@ -1134,8 +1130,13 @@ export struct WalCmdCleanup : public WalCmd {
 };
 
 export struct WalCmdCreateSnapshot : public WalCmd {
-    WalCmdCreateSnapshot(const String &db_name, const String &table_name, const String &snapshot_name, TxnTimeStamp max_commit_ts, SnapshotScope snapshot_type)
-        : WalCmd(WalCommandType::CREATE_SNAPSHOT), db_name_(db_name), table_name_(table_name), snapshot_name_(snapshot_name), max_commit_ts_(max_commit_ts), snapshot_type_(snapshot_type) {}
+    WalCmdCreateSnapshot(const String &db_name,
+                         const String &table_name,
+                         const String &snapshot_name,
+                         TxnTimeStamp max_commit_ts,
+                         SnapshotScope snapshot_type)
+        : WalCmd(WalCommandType::CREATE_SNAPSHOT), db_name_(db_name), table_name_(table_name), snapshot_name_(snapshot_name),
+          max_commit_ts_(max_commit_ts), snapshot_type_(snapshot_type) {}
 
     bool operator==(const WalCmd &other) const final;
     [[nodiscard]] i32 GetSizeInBytes() const final;
@@ -1150,14 +1151,30 @@ export struct WalCmdCreateSnapshot : public WalCmd {
     SnapshotScope snapshot_type_{};
 };
 
-
-
 export struct WalCmdRestoreTableSnapshot : public WalCmd {
-    explicit WalCmdRestoreTableSnapshot(const String &db_name, const String &db_id, const String &table_name, const String &table_id, const String &snapshot_name, SharedPtr<TableDef> table_def_, const Vector<WalSegmentInfoV2> &segment_infos, const Vector<WalCmdCreateIndexV2> &index_cmds, const Vector<String> &files);
+    explicit WalCmdRestoreTableSnapshot(const String &db_name,
+                                        const String &db_id,
+                                        const String &table_name,
+                                        const String &table_id,
+                                        const String &snapshot_name,
+                                        SharedPtr<TableDef> table_def_,
+                                        const Vector<WalSegmentInfoV2> &segment_infos,
+                                        const Vector<WalCmdCreateIndexV2> &index_cmds,
+                                        const Vector<String> &files);
 
-    WalCmdRestoreTableSnapshot(const String &db_name, const String &db_id, const String &table_name, const String &table_id, const String &snapshot_name, SharedPtr<TableDef> table_def_, const Vector<WalSegmentInfoV2> &segment_infos, const Vector<WalCmdCreateIndexV2> &index_cmds, const Vector<String> &files, AddrSerializer addr_serializer)
-        : WalCmd(WalCommandType::RESTORE_TABLE_SNAPSHOT), db_name_(db_name), db_id_(db_id), table_name_(table_name), table_id_(table_id),snapshot_name_(snapshot_name),table_def_(table_def_),
-            files_(files), segment_infos_(segment_infos), index_cmds_(index_cmds), addr_serializer_(addr_serializer) {}
+    WalCmdRestoreTableSnapshot(const String &db_name,
+                               const String &db_id,
+                               const String &table_name,
+                               const String &table_id,
+                               const String &snapshot_name,
+                               SharedPtr<TableDef> table_def_,
+                               const Vector<WalSegmentInfoV2> &segment_infos,
+                               const Vector<WalCmdCreateIndexV2> &index_cmds,
+                               const Vector<String> &files,
+                               AddrSerializer addr_serializer)
+        : WalCmd(WalCommandType::RESTORE_TABLE_SNAPSHOT), db_name_(db_name), db_id_(db_id), table_name_(table_name), table_id_(table_id),
+          snapshot_name_(snapshot_name), table_def_(table_def_), files_(files), segment_infos_(segment_infos), index_cmds_(index_cmds),
+          addr_serializer_(addr_serializer) {}
 
     bool operator==(const WalCmd &other) const final;
     [[nodiscard]] i32 GetSizeInBytes() const final;
@@ -1173,14 +1190,18 @@ export struct WalCmdRestoreTableSnapshot : public WalCmd {
     String snapshot_name_{};
     SharedPtr<TableDef> table_def_{};
     Vector<String> files_;
-    Vector<WalSegmentInfoV2> segment_infos_;// eache segment has a vector of block ids(assuming same column count)
-    Vector<WalCmdCreateIndexV2> index_cmds_;// index commands to restore indexes
+    Vector<WalSegmentInfoV2> segment_infos_; // eache segment has a vector of block ids(assuming same column count)
+    Vector<WalCmdCreateIndexV2> index_cmds_; // index commands to restore indexes
     AddrSerializer addr_serializer_{};
 };
 
 export struct WalCmdRestoreDatabaseSnapshot : public WalCmd {
-    WalCmdRestoreDatabaseSnapshot(const String &db_name, const String &db_id_str, const String &db_comment, const Vector<WalCmdRestoreTableSnapshot> &restore_table_wal_cmds)
-        : WalCmd(WalCommandType::RESTORE_DATABASE_SNAPSHOT), db_name_(db_name), db_id_str_(db_id_str), db_comment_(db_comment), restore_table_wal_cmds_(restore_table_wal_cmds) {}
+    WalCmdRestoreDatabaseSnapshot(const String &db_name,
+                                  const String &db_id_str,
+                                  const String &db_comment,
+                                  const Vector<WalCmdRestoreTableSnapshot> &restore_table_wal_cmds)
+        : WalCmd(WalCommandType::RESTORE_DATABASE_SNAPSHOT), db_name_(db_name), db_id_str_(db_id_str), db_comment_(db_comment),
+          restore_table_wal_cmds_(restore_table_wal_cmds) {}
 
     bool operator==(const WalCmd &other) const final;
     [[nodiscard]] i32 GetSizeInBytes() const final;
@@ -1192,20 +1213,23 @@ export struct WalCmdRestoreDatabaseSnapshot : public WalCmd {
     String db_name_{};
     String db_id_str_{};
     String db_comment_{};
-    
+
     Vector<WalCmdRestoreTableSnapshot> restore_table_wal_cmds_{};
 };
 
 export struct WalCmdRestoreSystemSnapshot : public WalCmd {
-    WalCmdRestoreSystemSnapshot(const String &snapshot_name, const Vector<WalCmdRestoreDatabaseSnapshot> &restore_database_wal_cmds, const Vector<WalCmdDropDatabaseV2> &drop_database_wal_cmds)
-        : WalCmd(WalCommandType::RESTORE_SYSTEM_SNAPSHOT), snapshot_name_(snapshot_name), restore_database_wal_cmds_(restore_database_wal_cmds), drop_database_wal_cmds_(drop_database_wal_cmds) {}
+    WalCmdRestoreSystemSnapshot(const String &snapshot_name,
+                                const Vector<WalCmdRestoreDatabaseSnapshot> &restore_database_wal_cmds,
+                                const Vector<WalCmdDropDatabaseV2> &drop_database_wal_cmds)
+        : WalCmd(WalCommandType::RESTORE_SYSTEM_SNAPSHOT), snapshot_name_(snapshot_name), restore_database_wal_cmds_(restore_database_wal_cmds),
+          drop_database_wal_cmds_(drop_database_wal_cmds) {}
 
     bool operator==(const WalCmd &other) const final;
     [[nodiscard]] i32 GetSizeInBytes() const final;
     void WriteAdv(char *&buf) const final;
     String ToString() const final;
     String CompactInfo() const final;
-    
+
     String snapshot_name_{};
     Vector<WalCmdRestoreDatabaseSnapshot> restore_database_wal_cmds_{};
     Vector<WalCmdDropDatabaseV2> drop_database_wal_cmds_{};

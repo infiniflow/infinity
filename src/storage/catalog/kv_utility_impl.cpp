@@ -173,8 +173,7 @@ SizeT GetBlockRowCount(KVInstance *kv_instance,
                        BlockID block_id,
                        TxnTimeStamp begin_ts,
                        TxnTimeStamp commit_ts) {
-    
-    
+
     NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
     String block_lock_key = KeyEncode::CatalogTableSegmentBlockTagKey(db_id_str, table_id_str, segment_id, block_id, "lock");
 
@@ -206,7 +205,7 @@ SizeT GetBlockRowCount(KVInstance *kv_instance,
         row_cnt = block_version->GetRowCount(begin_ts);
         auto [offset, commit_cnt] = block_version->GetCommitRowCount(commit_ts);
         row_cnt += commit_cnt;
-    }   
+    }
     return row_cnt;
 }
 
@@ -217,13 +216,13 @@ SizeT GetSegmentRowCount(KVInstance *kv_instance,
                          TxnTimeStamp begin_ts,
                          TxnTimeStamp commit_ts) {
     Vector<BlockID> blocks = GetTableSegmentBlocks(kv_instance, db_id_str, table_id_str, segment_id, begin_ts, commit_ts);
-    
+
     SizeT segment_row_count = 0;
     for (BlockID block_id : blocks) {
         SizeT block_row_cnt = GetBlockRowCount(kv_instance, db_id_str, table_id_str, segment_id, block_id, begin_ts, commit_ts);
         segment_row_count += block_row_cnt;
     }
-    
+
     return segment_row_count;
 }
 

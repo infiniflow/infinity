@@ -261,11 +261,11 @@ public:
                               Optional<TableMeeta> &table_meta);
 
     static Status RestoreTable(DBMeeta &db_meta,
-                              const String &table_id_str,
-                              TxnTimeStamp begin_ts,
-                              TxnTimeStamp commit_ts,
-                              const SharedPtr<TableDef> &table_def,
-                              Optional<TableMeeta> &table_meta);
+                               const String &table_id_str,
+                               TxnTimeStamp begin_ts,
+                               TxnTimeStamp commit_ts,
+                               const SharedPtr<TableDef> &table_def,
+                               Optional<TableMeeta> &table_meta);
 
     static Status CleanTable(TableMeeta &table_meta, TxnTimeStamp begin_ts, UsageFlag usage_flag);
 
@@ -282,8 +282,6 @@ public:
     static Status AddNewSegment1(TableMeeta &table_meta, TxnTimeStamp commit_ts, Optional<SegmentMeta> &segment_meta);
 
     static Status AddNewSegmentWithID(TableMeeta &table_meta, TxnTimeStamp commit_ts, Optional<SegmentMeta> &segment_meta, SegmentID segment_id);
-
-
 
     static Status LoadFlushedSegment1(TableMeeta &table_meta, const WalSegmentInfo &segment_info, TxnTimeStamp checkpoint_ts);
 
@@ -382,8 +380,6 @@ public:
     static Status SetBlockDeleteBitmask(BlockMeta &block_meta, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts, Bitmask &bitmask);
 
     static Status CheckSegmentRowsVisible(SegmentMeta &segment_meta, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts, Bitmask &bitmask);
-
-    
 
 public:
     // Function related methods

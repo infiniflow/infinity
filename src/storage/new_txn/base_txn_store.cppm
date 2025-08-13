@@ -14,8 +14,8 @@
 
 module;
 
-#include <vector>
 #include <ranges>
+#include <vector>
 
 export module infinity_core:base_txn_store;
 
@@ -69,7 +69,7 @@ export struct MemIndexRange {
 // kCompact,
 
 export struct BaseTxnStore {
-    explicit BaseTxnStore(TransactionType type) : type_(type) {};
+    explicit BaseTxnStore(TransactionType type) : type_(type){};
 
     TransactionType type_{TransactionType::kInvalid};
 
@@ -160,7 +160,6 @@ export struct RestoreTableTxnStore final : public BaseTxnStore {
 
     String ToString() const final;
     SharedPtr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;
-
 };
 
 export struct RestoreDatabaseTxnStore final : public BaseTxnStore {
@@ -182,11 +181,10 @@ export struct RestoreSystemTxnStore final : public BaseTxnStore {
     String snapshot_name_{};
     Vector<SharedPtr<DropDBTxnStore>> drop_db_txn_stores_{};
     Vector<SharedPtr<RestoreDatabaseTxnStore>> restore_db_txn_stores_{};
-    
+
     String ToString() const final;
     SharedPtr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;
 };
-
 
 export struct DropTableTxnStore final : public BaseTxnStore {
     DropTableTxnStore() : BaseTxnStore(TransactionType::kDropTable) {}
@@ -201,7 +199,7 @@ export struct DropTableTxnStore final : public BaseTxnStore {
     TxnTimeStamp create_ts_{};
     String table_key_{};
 
-    String ToString() const final;\
+    String ToString() const final;
     SharedPtr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;
 };
 
