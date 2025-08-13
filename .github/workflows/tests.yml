@@ -173,11 +173,14 @@ jobs:
 
       - name: Unit test debug version
         if: ${{ !cancelled() && !failure() }}
-        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "mkdir -p /var/infinity && cd /infinity/ && ASAN_OPTIONS=detect_leaks=0 cmake-build-debug/src/test_main > unittest_debug.log 2>&1"
+        id: run_unit_test_debug
+        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "mkdir -p /var/infinity && cd /infinity/ && ASAN_OPTIONS=detect_leaks=0 cmake-build-debug/src/test_main > unittest_debug.log 2> unittest_debug_error.log"
 
       - name: Collect infinity unit test debug output
-        if: ${{ !cancelled() && failure() }}
-        run: tail -n 1000 unittest_debug.log 2>/dev/null || true
+        if: ${{ !cancelled() }}
+        run: |
+          failure="${{ steps.run_unit_test_debug.outcome == 'failure' }}"
+          sudo python3 scripts/collect_log.py --log_path=infinity.log --stdout_path=unittest_debug.log --stderror_path=unittest_debug_error.log --executable_path=cmake-build-debug/src/infinity --output_dir=${RUNNER_WORKSPACE_PREFIX}/log --failure=${failure}
 
       - name: Start infinity debug version
         if: ${{ !cancelled() && !failure() }}

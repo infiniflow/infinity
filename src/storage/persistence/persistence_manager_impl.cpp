@@ -302,7 +302,7 @@ PersistReadResult PersistenceManager::GetObjCache(const String &file_path) {
     if (!status.ok()) {
         String error_message = fmt::format("GetObjCache Failed to find object for local path {}: {}", local_path, status.message());
         LOG_WARN(error_message);
-        LOG_TRACE(fmt::format("All key-value pairs in kv_store: \n{}", kv_store_->ToString()));
+        // LOG_TRACE(fmt::format("All key-value pairs in kv_store: \n{}", kv_store_->ToString()));
         return result;
     }
     ObjAddr obj_addr;

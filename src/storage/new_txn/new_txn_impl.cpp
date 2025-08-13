@@ -1959,14 +1959,11 @@ Status NewTxn::Commit() {
     bool retry_query = true;
     bool conflict = txn_mgr_->CheckConflict1(this, conflict_reason, retry_query);
     if (conflict) {
-        // TODO: We are not retrying the query if its transaction is conflicted with other transaction right now. We will add retry logic later.
-        status = Status::TxnConflictNoRetry(txn_context_ptr_->txn_id_, fmt::format("NewTxn conflict reason: {}.", conflict_reason));
-
-        // if (retry_query) {
-        //     status = Status::TxnConflict(txn_context_ptr_->txn_id_, fmt::format("NewTxn conflict reason: {}.", conflict_reason));
-        // } else {
-        //     status = Status::TxnConflictNoRetry(txn_context_ptr_->txn_id_, fmt::format("NewTxn conflict reason: {}.", conflict_reason));
-        // }
+        if (retry_query) {
+            status = Status::TxnConflict(txn_context_ptr_->txn_id_, fmt::format("NewTxn conflict reason: {}.", conflict_reason));
+        } else {
+            status = Status::TxnConflictNoRetry(txn_context_ptr_->txn_id_, fmt::format("NewTxn conflict reason: {}.", conflict_reason));
+        }
 
         this->SetTxnRollbacking(commit_ts);
     }
@@ -2415,7 +2412,10 @@ Status NewTxn::PrepareCommitCreateSnapshot(const WalCmdCreateSnapshot *create_sn
     // After calling Checkpoint()
     TxnTimeStamp last_checkpoint_ts = InfinityContext::instance().storage()->wal_manager()->LastCheckpointTS();
     SharedPtr<CheckpointTxnStore> ckp_txn_store = MakeShared<CheckpointTxnStore>();
-    this->CheckpointforSnapshot(last_checkpoint_ts, ckp_txn_store.get());
+    Status status = this->CheckpointforSnapshot(last_checkpoint_ts, ckp_txn_store.get());
+    if (!status.ok()) {
+        return status;
+    }
 
     // Check if checkpoint actually happened
     if (ckp_txn_store != nullptr) {
