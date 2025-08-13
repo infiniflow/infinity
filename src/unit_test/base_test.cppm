@@ -111,6 +111,16 @@ protected:
         }
     }
 
+    // Create a data block with two columns, each with the specified row count.
+    SharedPtr<DataBlock> MakeInputBlock(const Value &v1, const Value &v2, SizeT row_cnt);
+    // Create a data block with two columns, each with the specified row count (data is specified in the function).
+    SharedPtr<DataBlock> MakeInputBlock1(SizeT row_cnt);
+    // Create a data block with two columns, each with the specified row count (data is specified in the function).
+    SharedPtr<DataBlock> MakeInputBlock2(SizeT row_cnt);
+
+    // Check if the file paths exist or not.
+    void CheckFilePaths(Vector<String> &delete_file_paths, Vector<String> &exist_file_paths);
+
 private:
     // Validate if given path satisfy all of following:
     // - The path is a directory or symlink to a directory.
