@@ -184,7 +184,6 @@ class TestInfinity:
         res = db_obj.drop_table("test_create_same_name"+suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-    # todo fix: why return TABLE_NOT_EXIST error
     @pytest.mark.usefixtures("skip_if_http")
     @pytest.mark.usefixtures("skip_if_local_infinity")
     def test_drop_same_name_table(self, suffix):

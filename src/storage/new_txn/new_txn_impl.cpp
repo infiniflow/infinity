@@ -1535,6 +1535,7 @@ Status NewTxn::RestoreTableSnapshot(const String &db_name, const SharedPtr<Table
     const String &table_name = table_snapshot_info->table_name_;
     this->CheckTxn(db_name);
 
+
     Optional<DBMeeta> db_meta;
     TxnTimeStamp db_create_ts;
     Status status = GetDBMeta(db_name, db_meta, db_create_ts);
@@ -1565,11 +1566,22 @@ Status NewTxn::RestoreTableSnapshot(const String &db_name, const SharedPtr<Table
                                                    MakeShared<String>(table_name),
                                                    MakeShared<String>(table_snapshot_info->table_comment_),
                                                    table_snapshot_info->columns_);
+    SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>(db_name),
+                                                   MakeShared<String>(table_name),
+                                                   MakeShared<String>(table_snapshot_info->table_comment_),
+                                                   table_snapshot_info->columns_);
     // copy files from snapshot to data dir
     String snapshot_dir = InfinityContext::instance().config()->SnapshotDir();
     String snapshot_name = table_snapshot_info->snapshot_name_;
     Vector<String> restored_file_paths;
 
+    status = table_snapshot_info->RestoreSnapshotFiles(snapshot_dir,
+                                                       snapshot_name,
+                                                       table_snapshot_info->GetFiles(),
+                                                       table_id_str,
+                                                       db_meta->db_id_str(),
+                                                       restored_file_paths,
+                                                       false);
     status = table_snapshot_info->RestoreSnapshotFiles(snapshot_dir,
                                                        snapshot_name,
                                                        table_snapshot_info->GetFiles(),
@@ -1586,7 +1598,16 @@ Status NewTxn::RestoreTableSnapshot(const String &db_name, const SharedPtr<Table
     RestoreTableTxnStore *txn_store = static_cast<RestoreTableTxnStore *>(base_txn_store_.get());
     txn_store->files_ = restored_file_paths;
 
+
     // Use the helper function to process snapshot restoration data
+    status = ProcessSnapshotRestorationData(db_name,
+                                            db_meta->db_id_str(),
+                                            table_name,
+                                            table_id_str,
+                                            table_def,
+                                            table_snapshot_info,
+                                            snapshot_name,
+                                            txn_store);
     status = ProcessSnapshotRestorationData(db_name,
                                             db_meta->db_id_str(),
                                             table_name,
@@ -1598,6 +1619,7 @@ Status NewTxn::RestoreTableSnapshot(const String &db_name, const SharedPtr<Table
     if (!status.ok()) {
         return status;
     }
+
 
     LOG_TRACE("NewTxn::RestoreTable created table entry is inserted.");
     // figure out why this is needed
@@ -2437,6 +2459,7 @@ Status NewTxn::GetTableMeta(const String &db_name,
                             Optional<TableMeeta> &table_meta,
                             String *table_key_ptr) {
 
+
     Status status;
     TxnTimeStamp db_create_ts;
     status = this->GetDBMeta(db_name, db_meta, db_create_ts);
@@ -2519,15 +2542,20 @@ Status NewTxn::PrepareCommitCreateSnapshot(const WalCmdCreateSnapshot *create_sn
     // // dump indexes for snapshot
     // Vector<SharedPtr<MemIndexDetail>> table_mem_indexes = GetTableMemIndexes(db_name, table_name);
 
+
     // // Submit all dump tasks in parallel
     // Vector<SharedPtr<DumpMemIndexTask>> dump_tasks;
     // auto *dump_index_processor = InfinityContext::instance().storage()->dump_index_processor();
 
+
     // for (const auto &mem_index_detail : table_mem_indexes) {
+    //     auto dump_index_task = MakeShared<DumpMemIndexTask>(mem_index_detail->db_name_, mem_index_detail->table_name_,
+    //     mem_index_detail->index_name_, mem_index_detail->segment_id_, mem_index_detail->begin_row_id_); dump_tasks.push_back(dump_index_task);
     //     auto dump_index_task = MakeShared<DumpMemIndexTask>(mem_index_detail->db_name_, mem_index_detail->table_name_,
     //     mem_index_detail->index_name_, mem_index_detail->segment_id_, mem_index_detail->begin_row_id_); dump_tasks.push_back(dump_index_task);
     //     dump_index_processor->Submit(std::move(dump_index_task));
     // }
+
 
     // // Wait for all dumps to complete
     // Status status = Status::OK();
@@ -2550,8 +2578,10 @@ Status NewTxn::PrepareCommitCreateSnapshot(const WalCmdCreateSnapshot *create_sn
         if (!ckp_txn_store->entries_.empty()) {
             LOG_INFO(fmt::format("Checkpoint successful! {} blocks flushed", ckp_txn_store->entries_.size()));
 
+
             // Use the transaction store to generate WAL command
             SharedPtr<WalEntry> wal_entry = ckp_txn_store->ToWalEntry(txn_context_ptr_->commit_ts_);
+
 
             // There's only ONE command - the checkpoint command
             if (!wal_entry->cmds_.empty()) {
@@ -2794,6 +2824,7 @@ Status NewTxn::RestoreTableFromSnapshot(const WalCmdRestoreTableSnapshot *restor
     TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
     TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
     Status status;
+    Status status;
     Optional<TableMeeta> table_meta;
     if (!is_link_files) {
         status = NewCatalog::RestoreTable(db_meta,
@@ -2810,6 +2841,8 @@ Status NewTxn::RestoreTableFromSnapshot(const WalCmdRestoreTableSnapshot *restor
         table_meta.emplace(db_meta.db_id_str(), restore_table_snapshot_cmd->table_id_, this);
     }
 
+    // restore meta data of the table
+    status = table_meta->RestoreFromSnapshot(const_cast<WalCmdRestoreTableSnapshot *>(restore_table_snapshot_cmd), is_link_files);
     // restore meta data of the table
     status = table_meta->RestoreFromSnapshot(const_cast<WalCmdRestoreTableSnapshot *>(restore_table_snapshot_cmd), is_link_files);
     if (!status.ok()) {
@@ -2836,6 +2869,12 @@ Status NewTxn::PrepareCommitRestoreDatabaseSnapshot(const WalCmdRestoreDatabaseS
 
     Optional<DBMeeta> db_meta;
     const String *db_comment = restore_database_snapshot_cmd->db_comment_.empty() ? nullptr : &restore_database_snapshot_cmd->db_comment_;
+    Status status = NewCatalog::AddNewDB(this,
+                                         restore_database_snapshot_cmd->db_id_str_,
+                                         commit_ts,
+                                         restore_database_snapshot_cmd->db_name_,
+                                         db_comment,
+                                         db_meta);
     Status status = NewCatalog::AddNewDB(this,
                                          restore_database_snapshot_cmd->db_id_str_,
                                          commit_ts,
@@ -2962,6 +3001,7 @@ bool NewTxn::CheckConflictTxnStore(NewTxn *previous_txn, String &cause, bool &re
         case TransactionType::kRestoreSystem: {
             return CheckConflictTxnStore(static_cast<const RestoreSystemTxnStore &>(*base_txn_store_), previous_txn, cause, retry_query);
         }
+        case TransactionType::kNewCheckpoint:
         case TransactionType::kNewCheckpoint:
         default: {
             return false;
@@ -5435,13 +5475,21 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
         case TransactionType::kRestoreTable: {
             RestoreTableTxnStore *restore_table_txn_store = static_cast<RestoreTableTxnStore *>(base_txn_store_.get());
 
+
             // Clean up the copied files from snapshot
             Config *config = InfinityContext::instance().config();
             String data_dir = config->DataDir();
 
+
             // Remove all the files that were copied during restore
             for (const auto &segment_info : restore_table_txn_store->segment_infos_) {
                 // Remove segment files
+                String segment_dir = fmt::format("{}/db_{}/tbl_{}/seg_{}",
+                                                 data_dir,
+                                                 restore_table_txn_store->db_id_str_,
+                                                 restore_table_txn_store->table_id_str_,
+                                                 segment_info.segment_id_);
+
                 String segment_dir = fmt::format("{}/db_{}/tbl_{}/seg_{}",
                                                  data_dir,
                                                  restore_table_txn_store->db_id_str_,
@@ -5455,6 +5503,7 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
                     }
                 }
             }
+
 
             // Remove index files
             for (const auto &index_cmd : restore_table_txn_store->index_cmds_) {
@@ -5470,9 +5519,24 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
                         LOG_WARN(fmt::format("Failed to remove index directory during rollback: {}", index_dir));
                     }
                 }
+                String index_dir = fmt::format("{}/db_{}/tbl_{}/idx_{}",
+                                               data_dir,
+                                               restore_table_txn_store->db_id_str_,
+                                               restore_table_txn_store->table_id_str_,
+                                               index_cmd.index_id_);
+
+                if (VirtualStore::Exists(index_dir)) {
+                    Status remove_status = VirtualStore::RemoveDirectory(index_dir);
+                    if (!remove_status.ok()) {
+                        LOG_WARN(fmt::format("Failed to remove index directory during rollback: {}", index_dir));
+                    }
+                }
             }
 
+
             // Remove the table directory if it's empty
+            String table_dir = fmt::format("{}/db_{}/tbl_{}", data_dir, restore_table_txn_store->db_id_str_, restore_table_txn_store->table_id_str_);
+
             String table_dir = fmt::format("{}/db_{}/tbl_{}", data_dir, restore_table_txn_store->db_id_str_, restore_table_txn_store->table_id_str_);
 
             if (VirtualStore::Exists(table_dir)) {
@@ -5482,18 +5546,25 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
                 }
             }
 
+
             // // Clean up metadata entries that were created
             // Vector<UniquePtr<MetaKey>> metas;
             // for (const auto &segment_info : restore_table_txn_store->segment_infos_) {
+            //     metas.emplace_back(MakeUnique<SegmentMetaKey>(restore_table_txn_store->db_id_str_,
+            //                                                   restore_table_txn_store->table_id_str_,
             //     metas.emplace_back(MakeUnique<SegmentMetaKey>(restore_table_txn_store->db_id_str_,
             //                                                   restore_table_txn_store->table_id_str_,
             //                                                   segment_info.segment_id_));
             //     for (const auto &block_id : segment_info.block_ids_) {
             //     metas.emplace_back(MakeUnique<BlockMetaKey>(restore_table_txn_store->db_id_str_,
             //                                                 restore_table_txn_store->table_id_str_,
+            //     metas.emplace_back(MakeUnique<BlockMetaKey>(restore_table_txn_store->db_id_str_,
+            //                                                 restore_table_txn_store->table_id_str_,
             //                                                 segment_info.segment_id_,
             //                                                 block_id));
             //         for (const auto &column_def : restore_table_txn_store->table_def_->columns()) {
+            //             metas.emplace_back(MakeUnique<ColumnMetaKey>(restore_table_txn_store->db_id_str_,
+            //                                                         restore_table_txn_store->table_id_str_,
             //             metas.emplace_back(MakeUnique<ColumnMetaKey>(restore_table_txn_store->db_id_str_,
             //                                                         restore_table_txn_store->table_id_str_,
             //                                                         segment_info.segment_id_,
@@ -5502,16 +5573,25 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
             //             }
             //     }
 
+
             // }
 
+
             // for (const auto &index_cmd : restore_table_txn_store->index_cmds_) {
+
 
             //     for (const auto &segment_index_info : index_cmd.segment_index_infos_) {
             //         metas.emplace_back(MakeUnique<SegmentIndexMetaKey>(restore_table_txn_store->db_id_str_,
             //                                                            restore_table_txn_store->table_id_str_,
             //                                                            index_cmd.index_id_,
+            //         metas.emplace_back(MakeUnique<SegmentIndexMetaKey>(restore_table_txn_store->db_id_str_,
+            //                                                            restore_table_txn_store->table_id_str_,
+            //                                                            index_cmd.index_id_,
             //                                                            segment_index_info.segment_id_));
             //         for (const auto &chunk_info : segment_index_info.chunk_infos_) {
+            //         metas.emplace_back(MakeUnique<ChunkIndexMetaKey>(restore_table_txn_store->db_id_str_,
+            //                                                             restore_table_txn_store->table_id_str_,
+            //                                                             index_cmd.index_id_,
             //         metas.emplace_back(MakeUnique<ChunkIndexMetaKey>(restore_table_txn_store->db_id_str_,
             //                                                             restore_table_txn_store->table_id_str_,
             //                                                             index_cmd.index_id_,
@@ -5521,10 +5601,12 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
             //     }
             // }
 
+
             // Status cleanup_status = CleanupInner(std::move(metas));
             // if (!cleanup_status.ok()) {
             //     LOG_WARN(fmt::format("Failed to cleanup metadata during restore table rollback: {}", cleanup_status.message()));
             // }
+
 
             break;
         }
@@ -5533,6 +5615,8 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
             String data_dir = config->DataDir();
             RestoreDatabaseTxnStore *restore_database_txn_store = static_cast<RestoreDatabaseTxnStore *>(base_txn_store_.get());
             // Remove the database directory
+            String db_dir = fmt::format("{}/db_{}", data_dir, restore_database_txn_store->db_id_str_);
+
             String db_dir = fmt::format("{}/db_{}", data_dir, restore_database_txn_store->db_id_str_);
 
             if (VirtualStore::Exists(db_dir)) {
@@ -6254,6 +6338,13 @@ Status NewTxn::ProcessSnapshotRestorationData(const String &db_name,
                                               const SharedPtr<TableSnapshotInfo> &table_snapshot_info,
                                               const String &snapshot_name,
                                               RestoreTableTxnStore *txn_store) {
+                                              const String &db_id_str,
+                                              const String &table_name,
+                                              const String &table_id_str,
+                                              const SharedPtr<TableDef> &table_def,
+                                              const SharedPtr<TableSnapshotInfo> &table_snapshot_info,
+                                              const String &snapshot_name,
+                                              RestoreTableTxnStore *txn_store) {
     // Set basic transaction store fields
     txn_store->db_name_ = db_name;
     txn_store->db_id_str_ = db_id_str;
@@ -6263,6 +6354,7 @@ Status NewTxn::ProcessSnapshotRestorationData(const String &db_name,
     txn_store->table_id_ = std::stoull(table_id_str);
     txn_store->table_def_ = table_def;
     txn_store->snapshot_name_ = snapshot_name;
+
 
     // Process segment information
     for (const auto &segment_info : table_snapshot_info->segment_snapshots_) {
@@ -6274,9 +6366,17 @@ Status NewTxn::ProcessSnapshotRestorationData(const String &db_name,
         txn_store->segment_infos_.push_back(wal_segment_info);
     }
 
+
     // Process index information
     for (const auto &index_snapshot : table_snapshot_info->table_index_snapshots_) {
         String table_key = KeyEncode::CatalogTableKey(txn_store->db_id_str_, txn_store->table_name_, this->CommitTS());
+        WalCmdCreateIndexV2 wal_index_cmd{txn_store->db_name_,
+                                          txn_store->db_id_str_,
+                                          txn_store->table_name_,
+                                          txn_store->table_id_str_,
+                                          *index_snapshot.second->index_id_str_,
+                                          index_snapshot.second->index_base_,
+                                          table_key};
         WalCmdCreateIndexV2 wal_index_cmd{txn_store->db_name_,
                                           txn_store->db_id_str_,
                                           txn_store->table_name_,
@@ -6314,6 +6414,7 @@ Status NewTxn::ReplayRestoreTableSnapshot(WalCmdRestoreTableSnapshot *restore_ta
     if (status.ok()) {
         if (table_id == restore_table_cmd->table_id_) {
 
+
             LOG_WARN(fmt::format("Skipping replay restore table: Table {} with id {} already exists, commit ts: {}, txn: {}.",
                                  *restore_table_cmd->table_def_->table_name(),
                                  restore_table_cmd->table_id_,
@@ -6333,9 +6434,15 @@ Status NewTxn::ReplayRestoreTableSnapshot(WalCmdRestoreTableSnapshot *restore_ta
 
     // Check persistence manager state during restore replay
     PersistenceManager *persistence_manager = InfinityContext::instance().persistence_manager();
+    PersistenceManager *persistence_manager = InfinityContext::instance().persistence_manager();
     if (persistence_manager != nullptr) {
         restore_table_cmd->addr_serializer_.AddToPersistenceManager(persistence_manager);
         HashMap<String, ObjAddr> all_files = persistence_manager->GetAllFiles();
+        LOG_DEBUG(fmt::format("Persistence manager has {} registered files during restore replay, commit ts: {}, txn: {}",
+                              all_files.size(),
+                              commit_ts,
+                              txn_id));
+
         LOG_DEBUG(fmt::format("Persistence manager has {} registered files during restore replay, commit ts: {}, txn: {}",
                               all_files.size(),
                               commit_ts,
@@ -6345,8 +6452,14 @@ Status NewTxn::ReplayRestoreTableSnapshot(WalCmdRestoreTableSnapshot *restore_ta
         String table_prefix = "db_" + restore_table_cmd->db_id_ + "/tbl_" + restore_table_cmd->table_id_;
         SizeT table_file_count = 0;
         for (const auto &[file_path, obj_addr] : all_files) {
+        for (const auto &[file_path, obj_addr] : all_files) {
             if (file_path.find(table_prefix) != String::npos) {
                 table_file_count++;
+                LOG_DEBUG(fmt::format("Found registered table file: {} -> obj_addr: ({}, {}, {})",
+                                      file_path,
+                                      obj_addr.obj_key_,
+                                      obj_addr.part_offset_,
+                                      obj_addr.part_size_));
                 LOG_DEBUG(fmt::format("Found registered table file: {} -> obj_addr: ({}, {}, {})",
                                       file_path,
                                       obj_addr.obj_key_,
@@ -6356,14 +6469,20 @@ Status NewTxn::ReplayRestoreTableSnapshot(WalCmdRestoreTableSnapshot *restore_ta
         }
         LOG_DEBUG(fmt::format("Table {} has {} files registered in persistence manager", restore_table_cmd->table_id_, table_file_count));
     } else { // check if the data still exist in the system
+        LOG_DEBUG(fmt::format("Table {} has {} files registered in persistence manager", restore_table_cmd->table_id_, table_file_count));
+    } else { // check if the data still exist in the system
         String data_dir = InfinityContext::instance().config()->DataDir();
+        String table_data_dir = VirtualStore::ConcatenatePath(VirtualStore::ConcatenatePath(data_dir, "db_" + restore_table_cmd->db_id_),
+                                                              "tbl_" + restore_table_cmd->table_id_);
         String table_data_dir = VirtualStore::ConcatenatePath(VirtualStore::ConcatenatePath(data_dir, "db_" + restore_table_cmd->db_id_),
                                                               "tbl_" + restore_table_cmd->table_id_);
         if (!VirtualStore::Exists(table_data_dir)) {
             LOG_ERROR(fmt::format("Table data directory {} does not exist, commit ts: {}, txn: {}.", table_data_dir, commit_ts, txn_id));
             // return Status::OK();
+            // return Status::OK();
         }
     }
+
 
     // if exist proceed
     Optional<DBMeeta> db_meta;
@@ -6694,6 +6813,7 @@ Status NewTxn::CheckpointforSnapshot(TxnTimeStamp last_ckp_ts, CheckpointTxnStor
 
     auto *wal_manager = InfinityContext::instance().storage()->wal_manager();
     if (!wal_manager->SetCheckpointing()) {
+        return Status::Checkpointing();
         return Status::Checkpointing();
     }
     DeferFn defer([&] { wal_manager->UnsetCheckpoint(); });
