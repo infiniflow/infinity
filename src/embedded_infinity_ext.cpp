@@ -643,6 +643,7 @@ NB_MODULE(embedded_infinity_ext, m) {
         .value("kParserError", ErrorCode::kParserError)
         .value("kMmapFileError", ErrorCode::kMmapFileError)
         .value("kMunmapFileError", ErrorCode::kMunmapFileError)
+        .value("kCheckpointing", ErrorCode::kCheckpointing)
 
         .value("kInvalidEntry", ErrorCode::kInvalidEntry)
         .value("kDuplicateEntry", ErrorCode::kDuplicateEntry)
