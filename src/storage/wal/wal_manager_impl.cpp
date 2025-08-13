@@ -633,7 +633,7 @@ Tuple<TransactionID, TxnTimeStamp, TxnTimeStamp> WalManager::GetReplayEntries(St
             if (wal_entry->IsCheckPointOrSnapshot(cmd)) {
                 if (cmd->GetType() == WalCommandType::CHECKPOINT_V2) {
                     auto checkpoint_cmd = static_cast<WalCmdCheckpointV2 *>(cmd);
-                    max_checkpoint_ts = checkpoint_cmd->max_commit_ts_;                    
+                    max_checkpoint_ts = checkpoint_cmd->max_commit_ts_;
                 } else if (cmd->GetType() == WalCommandType::CREATE_SNAPSHOT) {
                     auto create_snapshot_cmd = static_cast<WalCmdCreateSnapshot *>(cmd);
                     max_checkpoint_ts = create_snapshot_cmd->max_commit_ts_;
@@ -642,7 +642,7 @@ Tuple<TransactionID, TxnTimeStamp, TxnTimeStamp> WalManager::GetReplayEntries(St
                 max_transaction_id = wal_entry->txn_id_;
                 break;
             }
-            
+
             replay_entries.push_back(wal_entry);
         }
         LOG_INFO(fmt::format("Find and set checkpoint max commit ts: {}", max_checkpoint_ts));

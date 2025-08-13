@@ -25,8 +25,6 @@ import column_def;
 import :meta_info;
 import row_id;
 
-
-
 namespace infinity {
 
 export struct SnapshotInfo {
@@ -34,7 +32,13 @@ export struct SnapshotInfo {
     String snapshot_name_;
     SnapshotScope scope_;
     SizeT version_{1}; // version 1, start from 0.6.0
-    Status RestoreSnapshotFiles(const String& snapshot_dir, const String& snapshot_name, const Vector<String>& files_to_restore, const String& new_table_id_str, const String& new_db_id_str, Vector<String>& restored_file_paths, bool ignore_table_id = false);
+    Status RestoreSnapshotFiles(const String &snapshot_dir,
+                                const String &snapshot_name,
+                                const Vector<String> &files_to_restore,
+                                const String &new_table_id_str,
+                                const String &new_db_id_str,
+                                Vector<String> &restored_file_paths,
+                                bool ignore_table_id = false);
 };
 
 export struct OutlineSnapshotInfo {

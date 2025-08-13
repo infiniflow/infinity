@@ -30,10 +30,7 @@ import :column_vector;
 import :fast_rough_filter;
 import command_statement;
 
-
 namespace infinity {
-
-
 
 class KVInstance;
 class NewCatalog;
@@ -272,14 +269,12 @@ public:
 
     Status OptimizeIndex(const String &db_name, const String &table_name, const String &index_name, SegmentID segment_id);
 
-
     // // Snapshot OPs
     Status CreateSnapshot(const String &db_name, const String &table_name, const String &snapshot_name, SnapshotScope scope);
 
     // Tuple<SharedPtr<TableSnapshotInfo>, Status> GetTableSnapshotInfo(const String &db_name, const String &table_name);
 
     Status RestoreTableSnapshot(const String &db_name, const SharedPtr<TableSnapshotInfo> &table_snapshot_info);
-
 
     Status RestoreTableIndexesFromSnapshot(TableMeeta &table_meta, const Vector<WalCmdCreateIndexV2> &index_cmds, bool is_link_files = false);
 
@@ -288,10 +283,8 @@ public:
     Tuple<SharedPtr<DatabaseSnapshotInfo>, Status> GetDatabaseSnapshotInfo(const String &db_name);
 
     Status RestoreDatabaseSnapshot(const SharedPtr<DatabaseSnapshotInfo> &database_snapshot_info);
-  
+
     friend class NewTxnManager;
-
-
 
 private:
     Status OptimizeIndexInner(SegmentIndexMeta &segment_index_meta,
@@ -552,7 +545,6 @@ public:
 
     Status GetFullTextIndexReader(const String &db_name, const String &table_name, SharedPtr<IndexReader> &index_reader);
 
-
 private:
     Status PrepareCommitCreateDB(const WalCmdCreateDatabaseV2 *create_db_cmd);
     Status PrepareCommitDropDB(const WalCmdDropDatabaseV2 *drop_db_cmd);
@@ -654,17 +646,15 @@ public:
                                   ChunkID chunk_id,
                                   Vector<String> &file_paths);
     Status ProcessSnapshotRestorationData(const String &db_name,
-                                             const String &db_id_str,
-                                             const String &table_name,
-                                             const String &table_id_str,
-                                             const SharedPtr<TableDef> &table_def,
-                                             const SharedPtr<TableSnapshotInfo> &table_snapshot_info,
-                                             const String &snapshot_name,
-                                             RestoreTableTxnStore *txn_store);
+                                          const String &db_id_str,
+                                          const String &table_name,
+                                          const String &table_id_str,
+                                          const SharedPtr<TableDef> &table_def,
+                                          const SharedPtr<TableSnapshotInfo> &table_snapshot_info,
+                                          const String &snapshot_name,
+                                          RestoreTableTxnStore *txn_store);
     Status RestoreTableFromSnapshot(const WalCmdRestoreTableSnapshot *restore_table_snapshot_cmd, DBMeeta &db_meta, bool is_link_files = false);
     Status ManualDumpIndex(const String &db_name, const String &table_name);
-
-
 
     Status Dummy();
     void SetWalSize(i64 wal_size);

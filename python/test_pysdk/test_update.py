@@ -108,12 +108,8 @@ class TestInfinity:
         db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table("test_update_empty_table"+suffix, ConflictType.Ignore)
 
-        try:
-            db_obj.create_table("test_update_empty_table"+suffix, {}, ConflictType.Error)
-        except Exception as e:
-            print(e)
-
-        tb_obj = db_obj.get_table("test_update_empty_table"+suffix)
+        tb_obj = db_obj.create_table("test_update_empty_table"+suffix, {"c1": {"type": "int", "constraints": ["primary key", "not null"]},
+                            "c2": {"type": "int"}, "c3": {"type": "int"}}, ConflictType.Error)
 
         try:
             tb_obj.update("c1 = 1", {"c2": 90, "c3": 900})
