@@ -6149,7 +6149,7 @@ Status NewTxn::CheckpointforSnapshot(TxnTimeStamp last_ckp_ts, CheckpointTxnStor
     if (pm != nullptr) {
         PersistResultHandler handler(pm);
         PersistWriteResult result = pm->CurrentObjFinalize(true);
-        handler.HandleWriteResult(result);
+            handler.HandleWriteResult(result);
     }
 
     status = txn_mgr_->kv_store()->Flush();
