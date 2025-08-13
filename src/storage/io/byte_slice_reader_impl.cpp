@@ -29,8 +29,7 @@ void ByteSliceReader::Open(ByteSliceList *slice_list) {
     current_slice_offset_ = 0;
 
     if (current_slice_ == nullptr) {
-        String error_message = "Read past EOF";
-        UnrecoverableError(error_message);
+        UnrecoverableError("Read past EOF");
     }
 }
 
@@ -41,8 +40,7 @@ void ByteSliceReader::Open(ByteSlice *slice) {
     current_slice_offset_ = 0;
 
     if (current_slice_ == nullptr) {
-        String error_message = "Read past EOF";
-        UnrecoverableError(error_message);
+        UnrecoverableError("Read past EOF");
     }
 }
 

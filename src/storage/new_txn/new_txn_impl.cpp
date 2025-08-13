@@ -1874,8 +1874,7 @@ void NewTxn::SetTxnWrite() { txn_context_ptr_->is_write_transaction_ = true; }
 void NewTxn::SetTxnCommitted() {
     std::unique_lock<std::shared_mutex> w_locker(rw_locker_);
     if (txn_context_ptr_->state_ != TxnState::kCommitting) {
-        String error_message = "Transaction isn't in COMMITTING status.";
-        UnrecoverableError(error_message);
+        UnrecoverableError("Transaction isn't in COMMITTING status.");
     }
     txn_context_ptr_->state_ = TxnState::kCommitted;
 }
@@ -1883,8 +1882,7 @@ void NewTxn::SetTxnCommitted() {
 void NewTxn::SetTxnCommitting(TxnTimeStamp commit_ts) {
     std::unique_lock<std::shared_mutex> w_locker(rw_locker_);
     if (txn_context_ptr_->state_ != TxnState::kStarted) {
-        String error_message = "Transaction isn't in STARTED status.";
-        UnrecoverableError(error_message);
+        UnrecoverableError("Transaction isn't in STARTED status.");
     }
     txn_context_ptr_->state_ = TxnState::kCommitting;
     txn_context_ptr_->commit_ts_ = commit_ts;
@@ -5265,8 +5263,7 @@ Status NewTxn::Rollback() {
     } else if (state == TxnState::kCommitting) {
         abort_ts = this->CommitTS();
     } else {
-        String error_message = fmt::format("Transaction {} state is {}.", txn_context_ptr_->txn_id_, TxnState2Str(state));
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("Transaction {} state is {}.", txn_context_ptr_->txn_id_, TxnState2Str(state)));
     }
     this->SetTxnRollbacking(abort_ts);
 

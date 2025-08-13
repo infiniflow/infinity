@@ -135,8 +135,7 @@ void WalBlockInfo::WriteBufferAdv(char *&buf) const {
         addr_serializer_.WriteBufAdv(buf);
         SizeT size = buf - start;
         if (size != pm_size_) {
-            String error_message = fmt::format("WriteBufferAdv size mismatch: expected {}, actual {}", pm_size_, size);
-            UnrecoverableError(error_message);
+            UnrecoverableError(fmt::format("WriteBufferAdv size mismatch: expected {}, actual {}", pm_size_, size));
         }
     }
 }
@@ -349,8 +348,7 @@ void WalChunkIndexInfo::WriteBufferAdv(char *&buf) const {
         addr_serializer_.WriteBufAdv(buf);
         SizeT size = buf - start;
         if (size != pm_size_) {
-            String error_message = fmt::format("WriteBufferAdv size mismatch: expected {}, actual {}", pm_size_, size);
-            UnrecoverableError(error_message);
+            UnrecoverableError(fmt::format("WriteBufferAdv size mismatch: expected {}, actual {}", pm_size_, size));
         }
     }
 }
@@ -967,14 +965,12 @@ SharedPtr<WalCmd> WalCmd::ReadAdv(const char *&ptr, i32 max_bytes) {
             break;
         }
         default: {
-            String error_message = fmt::format("UNIMPLEMENTED ReadAdv for WAL command {}", int(cmd_type));
-            UnrecoverableError(error_message);
+            UnrecoverableError(fmt::format("UNIMPLEMENTED ReadAdv for WAL command {}", int(cmd_type)));
         }
     }
     max_bytes = ptr_end - ptr;
     if (max_bytes < 0) {
-        String error_message = fmt::format("ptr goes out of range when reading WalCmd: {}", WalCmd::WalCommandTypeToString(cmd_type));
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("ptr goes out of range when reading WalCmd: {}", WalCmd::WalCommandTypeToString(cmd_type)));
     }
     return cmd;
 }
@@ -3314,8 +3310,7 @@ String WalCmd::WalCommandTypeToString(WalCommandType type) {
             command = "CREATE_TABLE_SNAPSHOT";
             break;
         default: {
-            String error_message = "Unknown command type";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Unknown command type");
         }
     }
     return command;
@@ -3324,8 +3319,7 @@ String WalCmd::WalCommandTypeToString(WalCommandType type) {
 UniquePtr<WalEntryIterator> WalEntryIterator::Make(const String &wal_path, bool is_backward) {
     std::ifstream ifs(wal_path.c_str(), std::ios::binary | std::ios::ate);
     if (!ifs.is_open()) {
-        String error_message = "WAL open failed";
-        UnrecoverableError(error_message);
+        UnrecoverableError("WAL open failed");
     }
     auto wal_size = ifs.tellg();
     Vector<char> buf(wal_size);
