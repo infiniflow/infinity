@@ -222,6 +222,10 @@ jobs:
           sudo docker exec ${BUILDER_CONTAINER} bash -c "cp /var/infinity/log/infinity.log /infinity/infinity.log"
           sudo python3 scripts/collect_log.py --log_path=infinity.log --stdout_path=release.log --stderror_path=release_error.log --executable_path=cmake-build-release/src/infinity --output_dir=${RUNNER_WORKSPACE_PREFIX}/log --failure=${failure}
 
+      - name: Rebuild debug version no thread sanitizer
+        if: ${{ !cancelled() && !failure() }}
+        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "git config --global safe.directory \"*\" && cd /infinity && cmake -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_JOB_POOLS:STRING=link=8 -DCI=ON -S /infinity -B /infinity/cmake-build-debug && cmake --build /infinity/cmake-build-debug --target infinity"
+
       - name: Build debug unit test
         if: ${{ !cancelled() && !failure() && steps.choose_test_type.outputs.RUN_CI_SLOW_TEST == 'true' }}
         run: sudo docker exec ${BUILDER_CONTAINER} bash -c "git config --global safe.directory \"*\" && cd /infinity && mkdir -p cmake-build-debug && cmake --build /infinity/cmake-build-debug --target test_main"
