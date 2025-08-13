@@ -2395,7 +2395,10 @@ Status NewTxn::PrepareCommitCreateTableSnapshot(const WalCmdCreateTableSnapshot 
     // After calling Checkpoint()
     TxnTimeStamp last_checkpoint_ts = InfinityContext::instance().storage()->wal_manager()->LastCheckpointTS();
     SharedPtr<CheckpointTxnStore> ckp_txn_store = MakeShared<CheckpointTxnStore>();
-    this->CheckpointforSnapshot(last_checkpoint_ts, ckp_txn_store.get());
+    Status status = this->CheckpointforSnapshot(last_checkpoint_ts, ckp_txn_store.get());
+    if (!status.ok()) {
+        return status;
+    }
 
     // Check if checkpoint actually happened
     if (ckp_txn_store != nullptr) {
