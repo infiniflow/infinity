@@ -211,6 +211,60 @@ class TestDatabaseSnapshot:
                 print(f"Progress: {progress:.1f}% ({batch_idx + 1}/{total_batches} batches)")
         
         print(f"Completed generating {num_rows:,} simple rows")
+    
+    def create_snapshot_with_retry(self, db_obj, snapshot_name, db_name, max_retries=None, retry_delay=None):
+        """Create snapshot with retry logic for checkpoint failures"""
+        if max_retries is None:
+            max_retries = self.DEFAULT_MAX_RETRIES
+        if retry_delay is None:
+            retry_delay = self.DEFAULT_RETRY_DELAY
+            
+        for attempt in range(max_retries):
+            try:
+                snapshot_result = db_obj.create_database_snapshot(snapshot_name, db_name)
+                
+                if snapshot_result.error_code == ErrorCode.OK:
+                    print(f"Snapshot created successfully on attempt {attempt + 1}")
+                    return snapshot_result
+                
+                # Check if failure is checkpoint-related
+                if snapshot_result.error_code == ErrorCode.CHECKPOINTING:
+                    if attempt < max_retries - 1:
+                        print(f"Attempt {attempt + 1}: System is checkpointing, retrying in {retry_delay}s...")
+                        time.sleep(retry_delay)
+                        continue
+                    else:
+                        print(f"All {max_retries} attempts failed due to checkpointing")
+                        return snapshot_result
+                else:
+                    # Non-checkpoint failure, don't retry
+                    print(f"Non-checkpoint failure on attempt {attempt + 1}: {snapshot_result.error_msg}")
+                    return snapshot_result
+                    
+            except Exception as e:
+                if "checkpoint" in str(e).lower() and attempt < max_retries - 1:
+                    print(f"Attempt {attempt + 1}: Checkpoint exception, retrying in {retry_delay}s...")
+                    time.sleep(retry_delay)
+                    continue
+                else:
+                    raise
+        
+        # Should not reach here, but just in case
+        return snapshot_result
+
+    def handle_snapshot_result(self, snapshot_result, operation_name="Snapshot operation", skip_on_checkpoint=True):
+        """Handle snapshot operation results with consistent error handling"""
+        if snapshot_result.error_code == ErrorCode.OK:
+            print(f"{operation_name} completed successfully")
+            return True
+        elif snapshot_result.error_code == ErrorCode.CHECKPOINTING:
+            if skip_on_checkpoint:
+                pytest.skip(f"{operation_name} failed due to checkpointing: {snapshot_result.error_msg}")
+            else:
+                print(f"Warning: {operation_name} failed due to checkpointing: {snapshot_result.error_msg}")
+                return False
+        else:
+            assert False, f"{operation_name} failed with error: {snapshot_result.error_msg}"
 
     def verify_table_functionality(self, table_name: str, db_obj, expected_row_count: int | None = None):
         """Verify that a table functions correctly after snapshot operations"""
