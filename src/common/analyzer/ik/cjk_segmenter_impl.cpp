@@ -12,7 +12,6 @@ import :character_util;
 import :ik_dict;
 
 import std;
-import third_party;
 
 namespace infinity {
 const std::wstring CJKSegmenter::SEGMENTER_NAME = L"CJK_SEGMENTER";

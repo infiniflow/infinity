@@ -10,7 +10,6 @@ import :status;
 import :character_util;
 
 import std;
-import third_party;
 
 namespace fs = std::filesystem;
 

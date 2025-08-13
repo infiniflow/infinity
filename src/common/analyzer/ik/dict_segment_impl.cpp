@@ -8,7 +8,6 @@ import :hit;
 import :character_util;
 
 import std;
-import third_party;
 
 namespace infinity {
 

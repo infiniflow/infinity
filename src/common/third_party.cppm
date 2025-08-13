@@ -47,8 +47,11 @@ module;
 #include "Python.h"
 #include "miniocpp/client.h"
 #include <arrow/api.h>
-#include <parquet/arrow/reader.h>
+#include <arrow/io/file.h>
 #include <parquet/arrow/writer.h>
+#include <parquet/properties.h>
+
+#include <parquet/arrow/reader.h>
 
 #include <rocksdb/db.h>
 #include <rocksdb/env.h>
@@ -237,7 +240,38 @@ export using ParquetFileReaderBuilder = parquet::arrow::FileReaderBuilder;
 export using ArrowWriterProperties = parquet::ArrowWriterProperties;
 export using ParquetReaderProperties = parquet::ReaderProperties;
 export using ParquetArrowReaderProperties = parquet::ArrowReaderProperties;
+export using ::arrow::field;
+export using ::arrow::schema;
+export using ::arrow::boolean;
+export using ::arrow::uint8;
+export using ::arrow::int8;
+export using ::arrow::int16;
+export using ::arrow::int32;
+export using ::arrow::int64;
+export using ::arrow::float16;
+export using ::arrow::float32;
+export using ::arrow::float64;
+export using ::arrow::date32;
+export using ::arrow::time32;
+export using ::arrow::timestamp;
+export using ::arrow::utf8;
+export using ::arrow::TimeUnit;
+export using ::arrow::list;
+export using ::arrow::fixed_size_list;
+export using ::arrow::struct_;
+namespace io {
+export using ::arrow::io::FileOutputStream;
+}
 } // namespace arrow
+
+
+namespace parquet {
+export using ::parquet::default_writer_properties;
+namespace arrow {
+export using ::parquet::arrow::FileWriter;
+}
+};
+
 
 namespace infinity {
 

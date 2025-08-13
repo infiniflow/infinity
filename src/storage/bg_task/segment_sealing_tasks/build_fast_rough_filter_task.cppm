@@ -16,10 +16,11 @@ module;
 
 export module infinity_core:build_fast_rough_filter_task;
 
-import :stl;
 import :buffer_manager;
 import :infinity_exception;
 import :filter_value_type_classification;
+
+import std;
 
 namespace infinity {
 
@@ -28,10 +29,10 @@ class FastRoughFilter;
 
 export struct BuildingSegmentFastFilters {
     SegmentMeta *segment_meta_ = nullptr;
-    SharedPtr<FastRoughFilter> segment_filter_;
-    HashMap<BlockID, SharedPtr<FastRoughFilter>> block_filters_;
+    std::shared_ptr<FastRoughFilter> segment_filter_;
+    std::unordered_map<BlockID, std::shared_ptr<FastRoughFilter>> block_filters_;
 
-    static UniquePtr<BuildingSegmentFastFilters> Make(SegmentMeta *segment_meta);
+    static std::unique_ptr<BuildingSegmentFastFilters> Make(SegmentMeta *segment_meta);
 
     ~BuildingSegmentFastFilters();
 
@@ -57,15 +58,15 @@ struct TotalRowCount {
 struct NewBuildFastRoughFilterArg {
     SegmentMeta *segment_meta_{};
     ColumnID column_id_{};
-    UniquePtr<u64[]> &distinct_keys_;
-    UniquePtr<u64[]> &distinct_keys_backup_;
+    std::unique_ptr<u64[]> &distinct_keys_;
+    std::unique_ptr<u64[]> &distinct_keys_backup_;
     u32 distinct_count_{};
     BuildingSegmentFastFilters *segment_filters_{};
 
     NewBuildFastRoughFilterArg(SegmentMeta *segment_meta,
                                ColumnID column_id,
-                               UniquePtr<u64[]> &distinct_keys,
-                               UniquePtr<u64[]> &distinct_keys_backup,
+                               std::unique_ptr<u64[]> &distinct_keys,
+                               std::unique_ptr<u64[]> &distinct_keys_backup,
                                BuildingSegmentFastFilters *segment_filters);
 
     ~NewBuildFastRoughFilterArg();

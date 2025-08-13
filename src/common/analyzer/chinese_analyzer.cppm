@@ -23,8 +23,6 @@ import :analyzer;
 import :common_analyzer;
 import :status;
 
-import third_party;
-
 namespace infinity {
 
 export class ChineseAnalyzer : public CommonLanguageAnalyzer {

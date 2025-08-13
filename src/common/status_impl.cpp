@@ -20,8 +20,6 @@ import :stl;
 import :default_values;
 import :status;
 
-import third_party;
-
 namespace infinity {
 
 Status::Status(ErrorCode code, const char *msg) : code_(code) { msg_ = MakeUnique<String>(msg); }

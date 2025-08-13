@@ -16,9 +16,10 @@ module;
 
 export module infinity_core:update_segment_bloom_filter_task;
 
-import :stl;
 import :bg_task;
 import :bg_task_type;
+
+import std;
 
 namespace infinity {
 
@@ -28,7 +29,7 @@ public:
 
     explicit UpdateSegmentBloomFilterTask() : BGTask(BGTaskType::kUpdateSegmentBloomFilterData, false) {}
 
-    String ToString() const override { return "UpdateSegmentBloomFilterTask"; }
+    std::string ToString() const override { return "UpdateSegmentBloomFilterTask"; }
 
     void Execute();
 

@@ -32,7 +32,6 @@ import :persist_result_handler;
 import :fst.build;
 
 import std;
-import third_party;
 
 import internal_types;
 
@@ -112,8 +111,7 @@ void ColumnIndexMerger::Merge(const Vector<String> &base_names, const Vector<Row
             }
 
             const u32 file_size = file_handle->FileSize();
-            u32 file_read_array_len = file_size / sizeof(u32);
-            if (unsafe_column_lengths.size() < id_offset + file_read_array_len) {
+            if (u32 file_read_array_len = file_size / sizeof(u32); unsafe_column_lengths.size() < id_offset + file_read_array_len) {
                 unsafe_column_lengths.resize(id_offset + file_read_array_len);
             }
             auto [read_count, read_status] = file_handle->Read(unsafe_column_lengths.data() + id_offset, file_size);
@@ -121,8 +119,7 @@ void ColumnIndexMerger::Merge(const Vector<String> &base_names, const Vector<Row
                 UnrecoverableError(read_status.message());
             }
             if (read_count != file_size) {
-                String error_message = "ColumnIndexMerger: when loading column length file, read_count != file_size";
-                UnrecoverableError(error_message);
+                UnrecoverableError("ColumnIndexMerger: when loading column length file, read_count != file_size");
             }
 
             if (use_object_cache) {

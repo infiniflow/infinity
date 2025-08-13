@@ -22,7 +22,6 @@ import :stl;
 import :lemmatizer;
 
 import std;
-import third_party;
 
 namespace fs = std::filesystem;
 

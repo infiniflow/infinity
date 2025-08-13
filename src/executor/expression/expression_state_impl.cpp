@@ -68,7 +68,7 @@ SharedPtr<ExpressionState> ExpressionState::CreateState(const SharedPtr<BaseExpr
             UnrecoverableError("Unexpected expression type: KNN");
         }
         default: {
-            UnrecoverableError(fmt::format("Unknown expression type: {}", expression->Name())e);
+            UnrecoverableError(fmt::format("Unknown expression type: {}", expression->Name()));
         }
     }
     return nullptr;

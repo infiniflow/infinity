@@ -24,7 +24,6 @@ import :logical_node;
 import :base_expression;
 
 import std;
-import third_party;
 
 import internal_types;
 import data_type;

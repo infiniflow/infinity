@@ -24,7 +24,6 @@ import :logger;
 import :chinese_analyzer;
 
 import std;
-import third_party;
 
 namespace fs = std::filesystem;
 

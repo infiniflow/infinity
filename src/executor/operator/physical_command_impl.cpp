@@ -510,8 +510,7 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
                             break;
                         }
                         default: {
-                            String error_message = "Invalid snapshot scope";
-                            UnrecoverableError(error_message);
+                            UnrecoverableError("Invalid snapshot scope");
                             break;
                         }
                     }
@@ -553,16 +552,14 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
                             break;
                         }
                         default: {
-                            String error_message = "Invalid snapshot scope";
-                            UnrecoverableError(error_message);
+                            UnrecoverableError("Invalid snapshot scope");
                             break;
                         }
                     }
                     break;
                 }
                 default: {
-                    String error_message = "Invalid snapshot operation type";
-                    UnrecoverableError(error_message);
+                    UnrecoverableError("Invalid snapshot operation type");
                     break;
                 }
             }
@@ -570,8 +567,7 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
             break;
         }
         default: {
-            String error_message = fmt::format("Invalid command type: {}", command_info_->ToString());
-            UnrecoverableError(error_message);
+            UnrecoverableError(fmt::format("Invalid command type: {}", command_info_->ToString()));
         }
     }
     return true;

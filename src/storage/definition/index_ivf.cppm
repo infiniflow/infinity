@@ -20,8 +20,6 @@ import :stl;
 import :index_base;
 import :base_table_ref;
 
-import third_party;
-
 import statement_common;
 import internal_types;
 

@@ -19,8 +19,6 @@ export module infinity_core:logger;
 import :stl;
 import :status;
 
-import third_party;
-
 namespace infinity {
 
 export extern SharedPtr<spdlog::logger> infinity_logger;

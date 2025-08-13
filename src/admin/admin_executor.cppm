@@ -13,11 +13,13 @@
 // limitations under the License.
 
 module;
+
 export module infinity_core:admin_executor;
 
-import admin_statement;
 import :stl;
 import :status;
+
+import admin_statement;
 
 namespace infinity {
 

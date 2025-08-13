@@ -55,7 +55,7 @@ Status NewCheckpointTask::ExecuteWithNewTxn() {
     if (status.ok()) {
         status = new_txn_mgr->CommitTxn(new_txn_shared.get());
 
-        CheckpointTxnStore *ckp_idx_store = static_cast<CheckpointTxnStore *>(new_txn_shared->GetTxnStore());
+        auto *ckp_idx_store = static_cast<CheckpointTxnStore *>(new_txn_shared->GetTxnStore());
         if (ckp_idx_store != nullptr) {
             SharedPtr<BGTaskInfo> bg_task_info = MakeShared<BGTaskInfo>(BGTaskType::kNewCheckpoint);
             for (const SharedPtr<FlushDataEntry> &flush_data_entry : ckp_idx_store->entries_) {

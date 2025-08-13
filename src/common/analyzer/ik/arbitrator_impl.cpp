@@ -10,7 +10,6 @@ import :lexeme_path;
 import :quick_sort_set;
 
 import std;
-import third_party;
 
 namespace infinity {
 

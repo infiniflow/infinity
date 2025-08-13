@@ -36,7 +36,6 @@ import :rank_features_analyzer;
 import :logger;
 
 import std.compat;
-import third_party;
 
 namespace infinity {
 
@@ -119,8 +118,7 @@ Tuple<UniquePtr<Analyzer>, Status> AnalyzerPool::GetAnalyzer(const std::string_v
                     path = config->ResourcePath();
                 }
                 UniquePtr<TraditionalChineseAnalyzer> analyzer = MakeUnique<TraditionalChineseAnalyzer>(std::move(path));
-                Status load_status = analyzer->Load();
-                if (!load_status.ok()) {
+                if (auto load_status = analyzer->Load(); !load_status.ok()) {
                     return {nullptr, load_status};
                 }
                 prototype = analyzer.get();
@@ -153,8 +151,7 @@ Tuple<UniquePtr<Analyzer>, Status> AnalyzerPool::GetAnalyzer(const std::string_v
                     path = config->ResourcePath();
                 }
                 UniquePtr<RAGAnalyzer> analyzer = MakeUnique<RAGAnalyzer>(std::move(path));
-                Status load_status = analyzer->Load();
-                if (!load_status.ok()) {
+                if (auto load_status = analyzer->Load(); !load_status.ok()) {
                     return {nullptr, load_status};
                 }
                 prototype = analyzer.get();
@@ -231,8 +228,7 @@ Tuple<UniquePtr<Analyzer>, Status> AnalyzerPool::GetAnalyzer(const std::string_v
             Analyzer *prototype = cache_[KOREAN].get();
             if (prototype == nullptr) {
                 String path;
-                Config *config = InfinityContext::instance().config();
-                if (config == nullptr) {
+                if (auto *config = InfinityContext::instance().config(); config == nullptr) {
                     // InfinityContext has not been initialized.
                     // For unit test only
                     path = "/var/infinity/resource";

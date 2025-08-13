@@ -30,7 +30,6 @@ import :common_analyzer;
 import :logger;
 
 import std;
-import third_party;
 
 namespace fs = std::filesystem;
 

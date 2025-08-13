@@ -24,7 +24,6 @@ import :new_txn_manager;
 import :txn_context;
 
 import std;
-import third_party;
 
 namespace infinity {
 

@@ -28,6 +28,7 @@ import :persistence_manager;
 import :local_file_handle;
 
 import std;
+import std.compat;
 import third_party;
 
 import column_def;
@@ -35,14 +36,14 @@ import internal_types;
 
 namespace infinity {
 
-BMPIndexFileWorker::BMPIndexFileWorker(SharedPtr<String> data_dir,
-                                       SharedPtr<String> temp_dir,
-                                       SharedPtr<String> file_dir,
-                                       SharedPtr<String> file_name,
-                                       SharedPtr<IndexBase> index_base,
-                                       SharedPtr<ColumnDef> column_def,
+BMPIndexFileWorker::BMPIndexFileWorker(std::shared_ptr<std::string> data_dir,
+                                       std::shared_ptr<std::string> temp_dir,
+                                       std::shared_ptr<std::string> file_dir,
+                                       std::shared_ptr<std::string> file_name,
+                                       std::shared_ptr<IndexBase> index_base,
+                                       std::shared_ptr<ColumnDef> column_def,
                                        PersistenceManager *persistence_manager,
-                                       SizeT index_size)
+                                       size_t index_size)
     : IndexFileWorker(std::move(data_dir),
                       std::move(temp_dir),
                       std::move(file_dir),
@@ -51,7 +52,7 @@ BMPIndexFileWorker::BMPIndexFileWorker(SharedPtr<String> data_dir,
                       std::move(column_def),
                       persistence_manager) {
     if (index_size == 0) {
-        String index_path = GetFilePath();
+        std::string index_path = GetFilePath();
         auto [file_handle, status] = VirtualStore::Open(index_path, FileAccessMode::kRead);
         if (status.ok()) {
             // When replay by checkpoint, the data is deleted, but catalog is recovered. Do not read file in recovery.
@@ -103,7 +104,7 @@ bool BMPIndexFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_success, c
     return true;
 }
 
-void BMPIndexFileWorker::ReadFromFileImpl(SizeT file_size, bool from_spill) {
+void BMPIndexFileWorker::ReadFromFileImpl(size_t file_size, bool from_spill) {
     if (data_ != nullptr) {
         UnrecoverableError("Data is already allocated.");
     }
@@ -116,7 +117,7 @@ void BMPIndexFileWorker::ReadFromFileImpl(SizeT file_size, bool from_spill) {
     }
 }
 
-bool BMPIndexFileWorker::ReadFromMmapImpl(const void *ptr, SizeT size) {
+bool BMPIndexFileWorker::ReadFromMmapImpl(const void *ptr, size_t size) {
     if (mmap_data_ != nullptr) {
         UnrecoverableError("Data is already allocated.");
     }

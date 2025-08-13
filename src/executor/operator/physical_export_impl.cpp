@@ -14,12 +14,6 @@
 
 module;
 
-#include "arrow/type_fwd.h"
-#include <arrow/io/caching.h>
-#include <arrow/io/file.h>
-#include <parquet/arrow/writer.h>
-#include <parquet/properties.h>
-
 module infinity_core:physical_export.impl;
 
 import :physical_export;
@@ -500,13 +494,13 @@ SizeT PhysicalExport::ExportToPARQUET(QueryContext *query_context, ExportOperato
     for (auto &column_id : select_columns) {
         ColumnDef *column_def = column_defs[column_id].get();
         auto arrow_type = GetArrowType(*(column_def->type()));
-        fields.emplace_back(::arrow::field(column_def->name(), std::move(arrow_type)));
+        fields.emplace_back(arrow::field(column_def->name(), std::move(arrow_type)));
     }
 
     arrow::MemoryPool *pool = arrow::DefaultMemoryPool();
-    SharedPtr<arrow::Schema> schema = ::arrow::schema(std::move(fields));
-    SharedPtr<::arrow::io::FileOutputStream> file_stream;
-    UniquePtr<::parquet::arrow::FileWriter> file_writer;
+    SharedPtr<arrow::Schema> schema = arrow::schema(std::move(fields));
+    SharedPtr<arrow::io::FileOutputStream> file_stream;
+    UniquePtr<parquet::arrow::FileWriter> file_writer;
 
     String parent_path = VirtualStore::GetParentPath(file_path_);
     if (!parent_path.empty()) {
@@ -519,12 +513,12 @@ SizeT PhysicalExport::ExportToPARQUET(QueryContext *query_context, ExportOperato
     auto init_file_stream_writer = [&pool, &schema, &file_stream, &file_writer](const String &output_file_path) {
         file_writer.reset();
         file_stream.reset();
-        auto file_stream_result = ::arrow::io::FileOutputStream::Open(output_file_path, pool);
+        auto file_stream_result = arrow::io::FileOutputStream::Open(output_file_path, pool);
         if (!file_stream_result.ok()) {
             RecoverableError(Status::IOError(file_stream_result.status().ToString()));
         }
         file_stream = std::move(file_stream_result).ValueOrDie();
-        auto file_writer_result = ::parquet::arrow::FileWriter::Open(*schema, pool, file_stream, ::parquet::default_writer_properties());
+        auto file_writer_result = parquet::arrow::FileWriter::Open(*schema, pool, file_stream, parquet::default_writer_properties());
         if (!file_writer_result.ok()) {
             RecoverableError(Status::IOError(file_writer_result.status().ToString()));
         }
@@ -680,19 +674,19 @@ SharedPtr<arrow::DataType> GetArrowType(const DataType &column_data_type) {
             Optional<SharedPtr<arrow::DataType>> value_type = None;
             switch (sparse_info->IndexType()) {
                 case EmbeddingDataType::kElemInt8: {
-                    index_type = ::arrow::list(::arrow::int8());
+                    index_type = arrow::list(arrow::int8());
                     break;
                 }
                 case EmbeddingDataType::kElemInt16: {
-                    index_type = ::arrow::list(::arrow::int16());
+                    index_type = arrow::list(arrow::int16());
                     break;
                 }
                 case EmbeddingDataType::kElemInt32: {
-                    index_type = ::arrow::list(::arrow::int32());
+                    index_type = arrow::list(arrow::int32());
                     break;
                 }
                 case EmbeddingDataType::kElemInt64: {
-                    index_type = ::arrow::list(::arrow::int64());
+                    index_type = arrow::list(arrow::int64());
                     break;
                 }
                 default: {
@@ -704,39 +698,39 @@ SharedPtr<arrow::DataType> GetArrowType(const DataType &column_data_type) {
                     break;
                 }
                 case EmbeddingDataType::kElemInt8: {
-                    value_type = ::arrow::list(::arrow::int8());
+                    value_type = arrow::list(arrow::int8());
                     break;
                 }
                 case EmbeddingDataType::kElemInt16: {
-                    value_type = ::arrow::list(::arrow::int16());
+                    value_type = arrow::list(arrow::int16());
                     break;
                 }
                 case EmbeddingDataType::kElemInt32: {
-                    value_type = ::arrow::list(::arrow::int32());
+                    value_type = arrow::list(arrow::int32());
                     break;
                 }
                 case EmbeddingDataType::kElemInt64: {
-                    value_type = ::arrow::list(::arrow::int64());
+                    value_type = arrow::list(arrow::int64());
                     break;
                 }
                 case EmbeddingDataType::kElemFloat: {
-                    value_type = ::arrow::list(::arrow::float32());
+                    value_type = arrow::list(arrow::float32());
                     break;
                 }
                 case EmbeddingDataType::kElemDouble: {
-                    value_type = ::arrow::list(::arrow::float64());
+                    value_type = arrow::list(arrow::float64());
                     break;
                 }
                 case EmbeddingDataType::kElemUInt8: {
-                    value_type = ::arrow::list(::arrow::uint8());
+                    value_type = arrow::list(arrow::uint8());
                     break;
                 }
                 case EmbeddingDataType::kElemFloat16: {
-                    value_type = ::arrow::list(::arrow::float16());
+                    value_type = arrow::list(arrow::float16());
                     break;
                 }
                 case EmbeddingDataType::kElemBFloat16: {
-                    value_type = ::arrow::list(::arrow::float32());
+                    value_type = arrow::list(arrow::float32());
                     break;
                 }
                 default: {
@@ -744,9 +738,9 @@ SharedPtr<arrow::DataType> GetArrowType(const DataType &column_data_type) {
                 }
             }
 
-            arrow::FieldVector fields{::arrow::field("index", std::move(index_type))};
+            arrow::FieldVector fields{arrow::field("index", std::move(index_type))};
             if (value_type.has_value()) {
-                fields.emplace_back(::arrow::field("value", value_type.value()));
+                fields.emplace_back(arrow::field("value", value_type.value()));
             }
             return arrow::struct_(std::move(fields));
         }
@@ -759,43 +753,43 @@ SharedPtr<arrow::DataType> GetArrowType(const DataType &column_data_type) {
             SharedPtr<arrow::DataType> arrow_embedding_elem_type;
             switch (embedding_info->Type()) {
                 case EmbeddingDataType::kElemBit: {
-                    arrow_embedding_elem_type = ::arrow::boolean();
+                    arrow_embedding_elem_type = arrow::boolean();
                     break;
                 }
                 case EmbeddingDataType::kElemInt8: {
-                    arrow_embedding_elem_type = ::arrow::int8();
+                    arrow_embedding_elem_type = arrow::int8();
                     break;
                 }
                 case EmbeddingDataType::kElemInt16: {
-                    arrow_embedding_elem_type = ::arrow::int16();
+                    arrow_embedding_elem_type = arrow::int16();
                     break;
                 }
                 case EmbeddingDataType::kElemInt32: {
-                    arrow_embedding_elem_type = ::arrow::int32();
+                    arrow_embedding_elem_type = arrow::int32();
                     break;
                 }
                 case EmbeddingDataType::kElemInt64: {
-                    arrow_embedding_elem_type = ::arrow::int64();
+                    arrow_embedding_elem_type = arrow::int64();
                     break;
                 }
                 case EmbeddingDataType::kElemFloat: {
-                    arrow_embedding_elem_type = ::arrow::float32();
+                    arrow_embedding_elem_type = arrow::float32();
                     break;
                 }
                 case EmbeddingDataType::kElemDouble: {
-                    arrow_embedding_elem_type = ::arrow::float64();
+                    arrow_embedding_elem_type = arrow::float64();
                     break;
                 }
                 case EmbeddingDataType::kElemUInt8: {
-                    arrow_embedding_elem_type = ::arrow::uint8();
+                    arrow_embedding_elem_type = arrow::uint8();
                     break;
                 }
                 case EmbeddingDataType::kElemFloat16: {
-                    arrow_embedding_elem_type = ::arrow::float16();
+                    arrow_embedding_elem_type = arrow::float16();
                     break;
                 }
                 case EmbeddingDataType::kElemBFloat16: {
-                    arrow_embedding_elem_type = ::arrow::float32();
+                    arrow_embedding_elem_type = arrow::float32();
                     break;
                 }
                 case EmbeddingDataType::kElemInvalid: {
@@ -803,15 +797,15 @@ SharedPtr<arrow::DataType> GetArrowType(const DataType &column_data_type) {
                     break;
                 }
             }
-            auto arrow_embedding_type = ::arrow::fixed_size_list(std::move(arrow_embedding_elem_type), dimension);
+            auto arrow_embedding_type = arrow::fixed_size_list(std::move(arrow_embedding_elem_type), dimension);
             if (column_logical_type == LogicalType::kEmbedding) {
                 return arrow_embedding_type;
             }
-            auto arrow_tensor_type = ::arrow::list(std::move(arrow_embedding_type));
+            auto arrow_tensor_type = arrow::list(std::move(arrow_embedding_type));
             if (column_logical_type == LogicalType::kTensor || column_logical_type == LogicalType::kMultiVector) {
                 return arrow_tensor_type;
             }
-            auto arrow_tensor_array_type = ::arrow::list(std::move(arrow_tensor_type));
+            auto arrow_tensor_array_type = arrow::list(std::move(arrow_tensor_type));
             if (column_logical_type == LogicalType::kTensorArray) {
                 return arrow_tensor_array_type;
             }
@@ -821,7 +815,7 @@ SharedPtr<arrow::DataType> GetArrowType(const DataType &column_data_type) {
         case LogicalType::kArray: {
             const auto *array_info = static_cast<const ArrayInfo *>(column_data_type.type_info().get());
             auto element_arrow_type = GetArrowType(array_info->ElemType());
-            return ::arrow::list(std::move(element_arrow_type));
+            return arrow::list(std::move(element_arrow_type));
         }
         case LogicalType::kRowID:
         case LogicalType::kInterval:
@@ -853,52 +847,52 @@ SharedPtr<arrow::ArrayBuilder> GetArrowBuilder(const DataType &column_type) {
             break;
         }
         case LogicalType::kTinyInt: {
-            array_builder = MakeShared<::arrow::Int8Builder>();
+            array_builder = MakeShared<arrow::Int8Builder>();
             break;
         }
         case LogicalType::kSmallInt: {
-            array_builder = MakeShared<::arrow::Int16Builder>();
+            array_builder = MakeShared<arrow::Int16Builder>();
             break;
         }
         case LogicalType::kInteger: {
-            array_builder = MakeShared<::arrow::Int32Builder>();
+            array_builder = MakeShared<arrow::Int32Builder>();
             break;
         }
         case LogicalType::kBigInt: {
-            array_builder = MakeShared<::arrow::Int64Builder>();
+            array_builder = MakeShared<arrow::Int64Builder>();
             break;
         }
         case LogicalType::kFloat: {
-            array_builder = MakeShared<::arrow::FloatBuilder>();
+            array_builder = MakeShared<arrow::FloatBuilder>();
             break;
         }
         case LogicalType::kDouble: {
-            array_builder = MakeShared<::arrow::DoubleBuilder>();
+            array_builder = MakeShared<arrow::DoubleBuilder>();
             break;
         }
         case LogicalType::kFloat16: {
-            array_builder = MakeShared<::arrow::HalfFloatBuilder>();
+            array_builder = MakeShared<arrow::HalfFloatBuilder>();
             break;
         }
         case LogicalType::kBFloat16: {
-            array_builder = MakeShared<::arrow::FloatBuilder>();
+            array_builder = MakeShared<arrow::FloatBuilder>();
             break;
         }
         case LogicalType::kDate: {
-            array_builder = MakeShared<::arrow::Date32Builder>();
+            array_builder = MakeShared<arrow::Date32Builder>();
             break;
         }
         case LogicalType::kTime: {
-            array_builder = MakeShared<::arrow::Time32Builder>(arrow::time32(arrow::TimeUnit::SECOND), arrow::DefaultMemoryPool());
+            array_builder = MakeShared<arrow::Time32Builder>(arrow::time32(arrow::TimeUnit::SECOND), arrow::DefaultMemoryPool());
             break;
         }
         case LogicalType::kDateTime:
         case LogicalType::kTimestamp: {
-            array_builder = MakeShared<::arrow::TimestampBuilder>(::arrow::timestamp(arrow::TimeUnit::SECOND), arrow::DefaultMemoryPool());
+            array_builder = MakeShared<arrow::TimestampBuilder>(arrow::timestamp(arrow::TimeUnit::SECOND), arrow::DefaultMemoryPool());
             break;
         }
         case LogicalType::kVarchar: {
-            array_builder = MakeShared<::arrow::StringBuilder>();
+            array_builder = MakeShared<arrow::StringBuilder>();
             break;
         }
         case LogicalType::kSparse: {
@@ -907,23 +901,23 @@ SharedPtr<arrow::ArrayBuilder> GetArrowBuilder(const DataType &column_type) {
             SharedPtr<arrow::ArrayBuilder> value_builder = nullptr;
             switch (sparse_info->IndexType()) {
                 case EmbeddingDataType::kElemInt8: {
-                    auto int8_builder = MakeShared<::arrow::Int8Builder>();
-                    index_builder = MakeShared<::arrow::ListBuilder>(arrow::DefaultMemoryPool(), int8_builder);
+                    auto int8_builder = MakeShared<arrow::Int8Builder>();
+                    index_builder = MakeShared<arrow::ListBuilder>(arrow::DefaultMemoryPool(), int8_builder);
                     break;
                 }
                 case EmbeddingDataType::kElemInt16: {
-                    auto int16_builder = MakeShared<::arrow::Int16Builder>();
-                    index_builder = MakeShared<::arrow::ListBuilder>(arrow::DefaultMemoryPool(), int16_builder);
+                    auto int16_builder = MakeShared<arrow::Int16Builder>();
+                    index_builder = MakeShared<arrow::ListBuilder>(arrow::DefaultMemoryPool(), int16_builder);
                     break;
                 }
                 case EmbeddingDataType::kElemInt32: {
-                    auto int32_builder = MakeShared<::arrow::Int32Builder>();
-                    index_builder = MakeShared<::arrow::ListBuilder>(arrow::DefaultMemoryPool(), int32_builder);
+                    auto int32_builder = MakeShared<arrow::Int32Builder>();
+                    index_builder = MakeShared<arrow::ListBuilder>(arrow::DefaultMemoryPool(), int32_builder);
                     break;
                 }
                 case EmbeddingDataType::kElemInt64: {
-                    auto int64_builder = MakeShared<::arrow::Int64Builder>();
-                    index_builder = MakeShared<::arrow::ListBuilder>(arrow::DefaultMemoryPool(), int64_builder);
+                    auto int64_builder = MakeShared<arrow::Int64Builder>();
+                    index_builder = MakeShared<arrow::ListBuilder>(arrow::DefaultMemoryPool(), int64_builder);
                     break;
                 }
                 default: {
@@ -935,48 +929,48 @@ SharedPtr<arrow::ArrayBuilder> GetArrowBuilder(const DataType &column_type) {
                     break;
                 }
                 case EmbeddingDataType::kElemInt8: {
-                    auto int8_builder = MakeShared<::arrow::Int8Builder>();
-                    value_builder = MakeShared<::arrow::ListBuilder>(arrow::DefaultMemoryPool(), int8_builder);
+                    auto int8_builder = MakeShared<arrow::Int8Builder>();
+                    value_builder = MakeShared<arrow::ListBuilder>(arrow::DefaultMemoryPool(), int8_builder);
                     break;
                 }
                 case EmbeddingDataType::kElemInt16: {
-                    auto int16_builder = MakeShared<::arrow::Int16Builder>();
-                    value_builder = MakeShared<::arrow::ListBuilder>(arrow::DefaultMemoryPool(), int16_builder);
+                    auto int16_builder = MakeShared<arrow::Int16Builder>();
+                    value_builder = MakeShared<arrow::ListBuilder>(arrow::DefaultMemoryPool(), int16_builder);
                     break;
                 }
                 case EmbeddingDataType::kElemInt32: {
-                    auto int32_builder = MakeShared<::arrow::Int32Builder>();
-                    value_builder = MakeShared<::arrow::ListBuilder>(arrow::DefaultMemoryPool(), int32_builder);
+                    auto int32_builder = MakeShared<arrow::Int32Builder>();
+                    value_builder = MakeShared<arrow::ListBuilder>(arrow::DefaultMemoryPool(), int32_builder);
                     break;
                 }
                 case EmbeddingDataType::kElemInt64: {
-                    auto int64_builder = MakeShared<::arrow::Int64Builder>();
-                    value_builder = MakeShared<::arrow::ListBuilder>(arrow::DefaultMemoryPool(), int64_builder);
+                    auto int64_builder = MakeShared<arrow::Int64Builder>();
+                    value_builder = MakeShared<arrow::ListBuilder>(arrow::DefaultMemoryPool(), int64_builder);
                     break;
                 }
                 case EmbeddingDataType::kElemFloat: {
-                    auto float_builder = MakeShared<::arrow::FloatBuilder>();
-                    value_builder = MakeShared<::arrow::ListBuilder>(arrow::DefaultMemoryPool(), float_builder);
+                    auto float_builder = MakeShared<arrow::FloatBuilder>();
+                    value_builder = MakeShared<arrow::ListBuilder>(arrow::DefaultMemoryPool(), float_builder);
                     break;
                 }
                 case EmbeddingDataType::kElemDouble: {
-                    auto double_builder = MakeShared<::arrow::DoubleBuilder>();
-                    value_builder = MakeShared<::arrow::ListBuilder>(arrow::DefaultMemoryPool(), double_builder);
+                    auto double_builder = MakeShared<arrow::DoubleBuilder>();
+                    value_builder = MakeShared<arrow::ListBuilder>(arrow::DefaultMemoryPool(), double_builder);
                     break;
                 }
                 case EmbeddingDataType::kElemUInt8: {
-                    auto uint8_builder = MakeShared<::arrow::UInt8Builder>();
-                    value_builder = MakeShared<::arrow::ListBuilder>(arrow::DefaultMemoryPool(), uint8_builder);
+                    auto uint8_builder = MakeShared<arrow::UInt8Builder>();
+                    value_builder = MakeShared<arrow::ListBuilder>(arrow::DefaultMemoryPool(), uint8_builder);
                     break;
                 }
                 case EmbeddingDataType::kElemFloat16: {
-                    auto float16_builder = MakeShared<::arrow::HalfFloatBuilder>();
-                    value_builder = MakeShared<::arrow::ListBuilder>(arrow::DefaultMemoryPool(), float16_builder);
+                    auto float16_builder = MakeShared<arrow::HalfFloatBuilder>();
+                    value_builder = MakeShared<arrow::ListBuilder>(arrow::DefaultMemoryPool(), float16_builder);
                     break;
                 }
                 case EmbeddingDataType::kElemBFloat16: {
-                    auto float_builder = MakeShared<::arrow::FloatBuilder>();
-                    value_builder = MakeShared<::arrow::ListBuilder>(arrow::DefaultMemoryPool(), float_builder);
+                    auto float_builder = MakeShared<arrow::FloatBuilder>();
+                    value_builder = MakeShared<arrow::ListBuilder>(arrow::DefaultMemoryPool(), float_builder);
                     break;
                 }
                 default: {
@@ -988,7 +982,7 @@ SharedPtr<arrow::ArrayBuilder> GetArrowBuilder(const DataType &column_type) {
             if (value_builder.get() != nullptr) {
                 field_builders.emplace_back(value_builder);
             }
-            array_builder = MakeShared<::arrow::StructBuilder>(struct_type, arrow::DefaultMemoryPool(), std::move(field_builders));
+            array_builder = MakeShared<arrow::StructBuilder>(struct_type, arrow::DefaultMemoryPool(), std::move(field_builders));
             break;
         }
         case LogicalType::kEmbedding:
@@ -996,46 +990,46 @@ SharedPtr<arrow::ArrayBuilder> GetArrowBuilder(const DataType &column_type) {
         case LogicalType::kTensor:
         case LogicalType::kTensorArray: {
             const auto *embedding_info = static_cast<const EmbeddingInfo *>(column_type.type_info().get());
-            SharedPtr<::arrow::ArrayBuilder> embedding_element_builder;
+            SharedPtr<arrow::ArrayBuilder> embedding_element_builder;
             switch (embedding_info->Type()) {
                 case EmbeddingDataType::kElemBit: {
-                    embedding_element_builder = MakeShared<::arrow::BooleanBuilder>();
+                    embedding_element_builder = MakeShared<arrow::BooleanBuilder>();
                     break;
                 }
                 case EmbeddingDataType::kElemInt8: {
-                    embedding_element_builder = MakeShared<::arrow::Int8Builder>();
+                    embedding_element_builder = MakeShared<arrow::Int8Builder>();
                     break;
                 }
                 case EmbeddingDataType::kElemInt16: {
-                    embedding_element_builder = MakeShared<::arrow::Int16Builder>();
+                    embedding_element_builder = MakeShared<arrow::Int16Builder>();
                     break;
                 }
                 case EmbeddingDataType::kElemInt32: {
-                    embedding_element_builder = MakeShared<::arrow::Int32Builder>();
+                    embedding_element_builder = MakeShared<arrow::Int32Builder>();
                     break;
                 }
                 case EmbeddingDataType::kElemInt64: {
-                    embedding_element_builder = MakeShared<::arrow::Int64Builder>();
+                    embedding_element_builder = MakeShared<arrow::Int64Builder>();
                     break;
                 }
                 case EmbeddingDataType::kElemFloat: {
-                    embedding_element_builder = MakeShared<::arrow::FloatBuilder>();
+                    embedding_element_builder = MakeShared<arrow::FloatBuilder>();
                     break;
                 }
                 case EmbeddingDataType::kElemDouble: {
-                    embedding_element_builder = MakeShared<::arrow::DoubleBuilder>();
+                    embedding_element_builder = MakeShared<arrow::DoubleBuilder>();
                     break;
                 }
                 case EmbeddingDataType::kElemUInt8: {
-                    embedding_element_builder = MakeShared<::arrow::UInt8Builder>();
+                    embedding_element_builder = MakeShared<arrow::UInt8Builder>();
                     break;
                 }
                 case EmbeddingDataType::kElemFloat16: {
-                    embedding_element_builder = MakeShared<::arrow::HalfFloatBuilder>();
+                    embedding_element_builder = MakeShared<arrow::HalfFloatBuilder>();
                     break;
                 }
                 case EmbeddingDataType::kElemBFloat16: {
-                    embedding_element_builder = MakeShared<::arrow::FloatBuilder>();
+                    embedding_element_builder = MakeShared<arrow::FloatBuilder>();
                     break;
                 }
                 case EmbeddingDataType::kElemInvalid: {
@@ -1045,17 +1039,17 @@ SharedPtr<arrow::ArrayBuilder> GetArrowBuilder(const DataType &column_type) {
             }
             const SizeT dimension = embedding_info->Dimension();
             auto embedding_arrow_array_builder =
-                MakeShared<::arrow::FixedSizeListBuilder>(arrow::DefaultMemoryPool(), embedding_element_builder, dimension);
+                MakeShared<arrow::FixedSizeListBuilder>(arrow::DefaultMemoryPool(), embedding_element_builder, dimension);
             if (column_logical_type == LogicalType::kEmbedding) {
                 array_builder = std::move(embedding_arrow_array_builder);
                 break;
             }
-            auto tensor_arrow_array_builder = MakeShared<::arrow::ListBuilder>(arrow::DefaultMemoryPool(), embedding_arrow_array_builder);
+            auto tensor_arrow_array_builder = MakeShared<arrow::ListBuilder>(arrow::DefaultMemoryPool(), embedding_arrow_array_builder);
             if (column_logical_type == LogicalType::kTensor || column_logical_type == LogicalType::kMultiVector) {
                 array_builder = std::move(tensor_arrow_array_builder);
                 break;
             }
-            auto tensor_array_arrow_array_builder = MakeShared<::arrow::ListBuilder>(arrow::DefaultMemoryPool(), tensor_arrow_array_builder);
+            auto tensor_array_arrow_array_builder = MakeShared<arrow::ListBuilder>(arrow::DefaultMemoryPool(), tensor_arrow_array_builder);
             if (column_logical_type == LogicalType::kTensorArray) {
                 array_builder = std::move(tensor_array_arrow_array_builder);
                 break;
@@ -1066,7 +1060,7 @@ SharedPtr<arrow::ArrayBuilder> GetArrowBuilder(const DataType &column_type) {
         case LogicalType::kArray: {
             const auto *array_info = static_cast<const ArrayInfo *>(column_type.type_info().get());
             auto element_arrow_builder = GetArrowBuilder(array_info->ElemType());
-            array_builder = MakeShared<::arrow::ListBuilder>(arrow::DefaultMemoryPool(), element_arrow_builder);
+            array_builder = MakeShared<arrow::ListBuilder>(arrow::DefaultMemoryPool(), element_arrow_builder);
             break;
         }
         case LogicalType::kRowID:

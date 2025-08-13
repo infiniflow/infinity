@@ -16,10 +16,11 @@ module;
 
 export module infinity_core:periodic_trigger;
 
-import :stl;
 import :background_process;
 import :compaction_process;
 import :wal_manager;
+
+import std;
 
 import global_resource_usage;
 
@@ -50,9 +51,9 @@ public:
     void Reset() { last_check_ = std::chrono::system_clock::now(); }
 
 protected:
-    Atomic<i64> interval_{};
+    std::atomic_int64_t interval_{};
     std::chrono::system_clock::time_point last_check_{};
-    Atomic<i64> duration_{0};
+    std::atomic_int64_t duration_{0};
 };
 
 export class NewCleanupPeriodicTrigger final : public PeriodicTrigger {

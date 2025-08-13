@@ -46,7 +46,6 @@ import :node_info;
 import :persistence_manager;
 
 import std;
-import third_party;
 
 import data_type;
 import logical_type;

@@ -21,8 +21,6 @@ import :singleton;
 import :analyzer;
 import :status;
 
-import third_party;
-
 namespace infinity {
 
 export class AnalyzerPool : public Singleton<AnalyzerPool> {

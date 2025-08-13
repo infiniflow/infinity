@@ -16,7 +16,6 @@ import :status;
 import :character_util;
 
 import std;
-import third_party;
 
 namespace infinity {
 
@@ -45,8 +44,7 @@ void IKAnalyzer::SetFineGrained(bool fine_grained) {
 
 Status IKAnalyzer::Load() {
     dict_ = new Dictionary(dict_path_);
-    Status load_status = dict_->Load();
-    if (!load_status.ok()) {
+    if (auto load_status = dict_->Load(); !load_status.ok()) {
         return load_status;
     }
     own_dict_ = true;

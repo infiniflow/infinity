@@ -17,7 +17,6 @@ module;
 module infinity_core:build_fast_rough_filter_task.impl;
 
 import :build_fast_rough_filter_task;
-import :stl;
 import :infinity_exception;
 import :logger;
 import :buffer_manager;
@@ -120,8 +119,7 @@ void UpdateMax(InnerValueType &max, const InnerValueType &value) {
 }
 
 void UpdateMin(InnerMinMaxDataFilterVarcharType &min, const String &input_str) {
-    std::string_view input_str_view(input_str.begin(), input_str.end());
-    if (input_str_view < min.GetStringView()) {
+    if (std::string_view input_str_view(input_str.begin(), input_str.end()); input_str_view < min.GetStringView()) {
         // update min, truncate if necessary
         min.SetToTruncate(input_str_view);
     }
@@ -141,7 +139,7 @@ inline void Advance(TotalRowCount &total_row_count_handler) {
     }
 }
 
-UniquePtr<BuildingSegmentFastFilters> BuildingSegmentFastFilters::Make(SegmentMeta *segment_meta) {
+std::unique_ptr<BuildingSegmentFastFilters> BuildingSegmentFastFilters::Make(SegmentMeta *segment_meta) {
     auto [block_ids_ptr, status] = segment_meta->GetBlockIDs1();
     if (!status.ok()) {
         UnrecoverableError(status.message());
@@ -181,21 +179,19 @@ void BuildingSegmentFastFilters::SetSegmentFinishBuildMinMaxFilterTask() {
 void BuildingSegmentFastFilters::SetFilter() {
     for (auto &[block_id, block_filter] : block_filters_) {
         BlockMeta block_meta(block_id, *segment_meta_);
-        Status status = block_meta.SetFastRoughFilter(block_filter);
-        if (!status.ok()) {
+        if (auto status = block_meta.SetFastRoughFilter(block_filter); !status.ok()) {
             UnrecoverableError(status.message());
         }
     }
-    Status status = segment_meta_->SetFastRoughFilter(segment_filter_);
-    if (!status.ok()) {
+    if (auto status = segment_meta_->SetFastRoughFilter(segment_filter_); !status.ok()) {
         UnrecoverableError(status.message());
     }
 }
 
 NewBuildFastRoughFilterArg::NewBuildFastRoughFilterArg(SegmentMeta *segment_meta,
                                                        ColumnID column_id,
-                                                       UniquePtr<u64[]> &distinct_keys,
-                                                       UniquePtr<u64[]> &distinct_keys_backup,
+                                                       std::unique_ptr<u64[]> &distinct_keys,
+                                                       std::unique_ptr<u64[]> &distinct_keys_backup,
                                                        BuildingSegmentFastFilters *segment_filters)
     : segment_meta_(segment_meta), column_id_(column_id), distinct_keys_(distinct_keys), distinct_keys_backup_(distinct_keys_backup),
       segment_filters_(segment_filters) {}
@@ -484,8 +480,8 @@ void BuildFastRoughFilterTask::ExecuteOnNewSealedSegment(SegmentMeta *segment_me
 }
 
 void BuildFastRoughFilterTask::ExecuteInner(SegmentMeta *segment_meta, BuildingSegmentFastFilters *segment_filters) {
-    UniquePtr<u64[]> distinct_keys = nullptr;
-    UniquePtr<u64[]> distinct_keys_backup = nullptr;
+    std::unique_ptr<u64[]> distinct_keys = nullptr;
+    std::unique_ptr<u64[]> distinct_keys_backup = nullptr;
     auto [column_defs, status] = segment_meta->table_meta().GetColumnDefs();
     if (!status.ok()) {
         UnrecoverableError(status.message());
