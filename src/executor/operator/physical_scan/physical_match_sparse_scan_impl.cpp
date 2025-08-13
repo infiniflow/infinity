@@ -14,13 +14,9 @@
 
 module;
 
-#include <string>
-#include <vector>
-
 module infinity_core:physical_match_sparse_scan.impl;
 
 import :physical_match_sparse_scan;
-
 import :stl;
 import :query_context;
 import :operator_state;
@@ -63,12 +59,13 @@ import :new_catalog;
 import :column_meta;
 import :mem_index;
 
+import std;
+
 import match_sparse_expr;
 import sparse_info;
 import internal_types;
 import logical_type;
 import create_index_info;
-// import data_type;
 
 namespace infinity {
 

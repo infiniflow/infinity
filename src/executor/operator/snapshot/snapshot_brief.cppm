@@ -17,8 +17,9 @@ module;
 export module infinity_core:snapshot_brief;
 
 import :stl;
-import command_statement;
 import :status;
+
+import command_statement;
 
 namespace infinity {
 

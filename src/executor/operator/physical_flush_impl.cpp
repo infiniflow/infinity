@@ -17,7 +17,6 @@ module;
 module infinity_core:physical_flush.impl;
 
 import :physical_flush;
-
 import :stl;
 import :new_txn;
 import :query_context;
@@ -28,13 +27,15 @@ import :physical_operator_type;
 import :operator_state;
 import :logger;
 import :bg_task;
-import third_party;
 import :status;
 import :infinity_context;
 import :background_process;
 import :new_txn;
 import :new_txn_manager;
 import :kv_store;
+
+import third_party;
+
 import flush_statement;
 
 namespace infinity {

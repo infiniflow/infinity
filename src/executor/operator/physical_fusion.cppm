@@ -21,6 +21,7 @@ import :physical_operator;
 import :base_table_ref;
 import :fusion_expression;
 import :operator_state;
+
 import row_id;
 
 namespace infinity {

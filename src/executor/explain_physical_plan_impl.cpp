@@ -14,14 +14,11 @@
 
 module;
 
-#include <string>
-
 module infinity_core:explain_physical_plan.impl;
 
 import :explain_physical_plan;
 
 import :stl;
-import internal_types;
 import :physical_operator;
 import :physical_union_all;
 import :physical_index_scan;
@@ -86,19 +83,23 @@ import :logical_show;
 import :infinity_exception;
 import :base_expression;
 import :knn_expression;
+import :common_query_filter;
+import :logger;
+import :base_table_ref;
+import :meta_info;
+
+import std;
 import third_party;
+
 import select_statement;
 import knn_expr;
 import extra_ddl_info;
 import column_def;
 import statement_common;
 import flush_statement;
-import :common_query_filter;
-import :logger;
+import internal_types;
 import show_statement;
 import check_statement;
-import :base_table_ref;
-import :meta_info;
 
 namespace infinity {
 

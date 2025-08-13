@@ -17,22 +17,22 @@ module;
 export module infinity_core:physical_export;
 
 import :stl;
-
-// import :query_context;
 import :operator_state;
 import :physical_operator;
 import :physical_operator_type;
 import :load_meta;
 import :infinity_exception;
+import :meta_info;
+import :logger;
+import :column_vector;
+import :knn_filter;
+
+import third_party;
+
 import internal_types;
 import statement_common;
 import data_type;
-import :meta_info;
-import :logger;
-import third_party;
 import column_def;
-import :column_vector;
-import :knn_filter;
 
 namespace infinity {
 

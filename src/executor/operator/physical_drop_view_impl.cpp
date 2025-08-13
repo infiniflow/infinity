@@ -17,12 +17,10 @@ module;
 module infinity_core:physical_drop_view.impl;
 
 import :physical_drop_view;
-
 import :stl;
 import :query_context;
 import :table_def;
 import :data_table;
-
 import :wal_manager;
 import :infinity_context;
 import :status;

@@ -17,7 +17,6 @@ module;
 export module infinity_core:physical_aggregate;
 
 import :stl;
-
 import :query_context;
 import :operator_state;
 import :physical_operator;
@@ -28,9 +27,10 @@ import :base_expression;
 import :load_meta;
 import :infinity_exception;
 import :data_block;
+import :logger;
+
 import internal_types;
 import data_type;
-import :logger;
 
 namespace infinity {
 

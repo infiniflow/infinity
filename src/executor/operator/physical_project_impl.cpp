@@ -14,12 +14,9 @@
 
 module;
 
-#include <string>
-
 module infinity_core:physical_project.impl;
 
 import :physical_project;
-
 import :stl;
 import :query_context;
 import :table_def;
@@ -34,7 +31,10 @@ import :analyzer_pool;
 import :value;
 import :physical_project;
 import :highlighter;
-import data_type;;
+
+import std;
+
+import data_type;
 
 namespace infinity {
 

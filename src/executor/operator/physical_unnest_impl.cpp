@@ -14,35 +14,32 @@
 
 module;
 
-#include <vector>
-
 module infinity_core:physical_unnest.impl;
 
 import :physical_unnest;
-
 import :stl;
 import :query_context;
 import :table_def;
 import :data_table;
-
 import :physical_operator_type;
 import :operator_state;
 import :expression_state;
 import :expression_selector;
 import :data_block;
 import :logger;
-import third_party;
-
 import :infinity_exception;
-import array_info;
 import :column_vector;
-import logical_type;
 import :status;
-
 import :unnest_expression;
 import :reference_expression;
 import :expression_type;
+
+import std;
+import third_party;
+
 import data_type;
+import logical_type;
+import array_info;
 
 namespace infinity {
 

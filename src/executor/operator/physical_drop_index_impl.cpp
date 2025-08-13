@@ -17,23 +17,21 @@ module;
 module infinity_core:physical_drop_index.impl;
 
 import :physical_drop_index;
-
 import :stl;
 import :query_context;
 import :operator_state;
-
 import :table_def;
 import :data_table;
 import :status;
 import :infinity_exception;
-import logical_type;
-import column_def;
-
 import :wal_manager;
 import :infinity_context;
 import :status;
 import :new_txn;
+
 import data_type;
+import logical_type;
+import column_def;
 
 namespace infinity {
 

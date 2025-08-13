@@ -14,17 +14,16 @@
 
 module;
 
-#include <string>
-
 module infinity_core:explain_fragment.impl;
 
 import :explain_fragment;
-
 import :stl;
 import :plan_fragment;
 import :explain_physical_plan;
 import :physical_operator;
 import :explain_fragment;
+
+import std;
 
 namespace infinity {
 

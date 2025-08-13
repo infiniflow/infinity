@@ -14,15 +14,9 @@
 
 module;
 
-#include <bit>
-#include <cstdlib>
-#include <memory>
-#include <string>
-#include <vector>
 module infinity_core:physical_match_tensor_scan.impl;
 
 import :physical_match_tensor_scan;
-
 import :stl;
 import :query_context;
 import :operator_state;
@@ -36,16 +30,11 @@ import :expression_evaluator;
 import :expression_state;
 import :base_expression;
 import :column_expression;
-import knn_expr;
-import create_index_info;
-import match_tensor_expr;
 import :match_tensor_expression;
 import :default_values;
 import :infinity_exception;
-import third_party;
 import :base_table_ref;
 import :load_meta;
-import logical_type;
 import :status;
 import :logger;
 import :physical_index_scan;
@@ -56,10 +45,6 @@ import :emvb_index;
 import :knn_filter;
 import :global_block_id;
 import :block_index;
-import column_def;
-import internal_types;
-import type_info;
-import embedding_info;
 import :buffer_manager;
 import :buffer_handle;
 import :match_tensor_scan_function_data;
@@ -69,10 +54,8 @@ import :filter_value_type_classification;
 import :logical_match_tensor_scan;
 import :simd_functions;
 import :knn_expression;
-import search_options;
 import :result_cache_manager;
 import :buffer_obj;
-
 import :table_meeta;
 import :table_index_meeta;
 import :segment_index_meta;
@@ -85,7 +68,21 @@ import :new_catalog;
 import :index_base;
 import :column_meta;
 import :mem_index;
+
+import std;
+import std.compat;
+import third_party;
+
 import data_type;
+import knn_expr;
+import create_index_info;
+import match_tensor_expr;
+import search_options;
+import column_def;
+import internal_types;
+import type_info;
+import embedding_info;
+import logical_type;
 
 namespace infinity {
 

@@ -3,7 +3,6 @@ module;
 export module infinity_core:physical_check;
 
 import :stl;
-
 import :query_context;
 import :operator_state;
 import :physical_operator;
@@ -12,12 +11,13 @@ import :base_expression;
 import :logical_show;
 import :load_meta;
 import :infinity_exception;
-import internal_types;
-import column_def;
-import data_type;
 import :variables;
 import :data_block;
 import :logger;
+
+import internal_types;
+import column_def;
+import data_type;
 import check_statement;
 
 namespace infinity {

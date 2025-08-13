@@ -19,7 +19,7 @@ export module infinity_core:physical_planner;
 import :stl;
 import :physical_operator;
 import :logical_node;
-// import :query_context;
+
 import global_resource_usage;
 
 namespace infinity {

@@ -14,18 +14,13 @@
 
 module;
 
-#include <vector>
-
 module infinity_core:expression_state.impl;
 
 import :expression_state;
-
 import :infinity_exception;
 import :stl;
-import third_party;
 import :column_vector;
 import :expression_type;
-import logical_type;
 import :aggregate_expression;
 import :base_expression;
 import :case_expression;
@@ -37,11 +32,15 @@ import :reference_expression;
 import :value_expression;
 import :filter_fulltext_expression;
 import :status;
-
 import :default_values;
+import :logger;
+
+import std;
+import third_party;
+
 import internal_types;
 import data_type;
-import :logger;
+import logical_type;
 
 namespace infinity {
 

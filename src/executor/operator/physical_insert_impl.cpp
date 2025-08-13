@@ -14,22 +14,17 @@
 
 module;
 
-#include <string>
-
 module infinity_core:physical_insert.impl;
 
 import :physical_insert;
-
 import :stl;
 import :query_context;
 import :table_def;
 import :data_table;
-
 import :physical_operator_type;
 import :operator_state;
 import :expression_state;
 import :data_block;
-import third_party;
 import :expression_evaluator;
 import :base_expression;
 import :default_values;
@@ -38,19 +33,21 @@ import :infinity_exception;
 import :logger;
 import :meta_info;
 import :txn_state;
-
 import :wal_manager;
 import :infinity_context;
-
-import column_def;
 import :new_txn;
-import data_type;
 import :cast_function;
 import :bound_cast_func;
 import :column_vector;
 import :value;
+
+import std;
+import third_party;
+
 import embedding_info;
 import logical_type;
+import data_type;
+import column_def;
 
 namespace infinity {
 

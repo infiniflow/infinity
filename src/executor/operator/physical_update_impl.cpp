@@ -14,20 +14,15 @@
 
 module;
 
-#include <string>
-
 module infinity_core:physical_update.impl;
 
 import :physical_update;
-
 import :stl;
-
 import :query_context;
 import :operator_state;
 import :physical_operator;
 import :physical_operator_type;
 import :query_context;
-// import :data_table;
 import :operator_state;
 import :data_block;
 import :column_vector;
@@ -35,15 +30,17 @@ import :expression_evaluator;
 import :expression_state;
 import :expression_type;
 import :base_expression;
-import logical_type;
-import internal_types;
 import :value;
-
 import :wal_manager;
 import :infinity_context;
 import :status;
 import :new_txn;
 import :txn_state;
+
+import std;
+
+import logical_type;
+import internal_types;
 import data_type;
 
 namespace infinity {

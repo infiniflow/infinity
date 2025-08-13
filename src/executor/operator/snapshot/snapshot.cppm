@@ -19,7 +19,6 @@ export module infinity_core:snapshot;
 import :stl;
 import :status;
 import :snapshot_info;
-// import :query_context;
 
 namespace infinity {
 class QueryContext;

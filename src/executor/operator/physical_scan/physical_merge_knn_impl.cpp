@@ -17,10 +17,8 @@ module;
 module infinity_core:physical_merge_knn.impl;
 
 import :physical_merge_knn;
-
 import :stl;
 import :query_context;
-
 import :physical_operator_type;
 import :operator_state;
 import :logger;
@@ -31,12 +29,14 @@ import :knn_result_handler;
 import :merge_knn;
 import :block_index;
 import :buffer_manager;
-import third_party;
 import :default_values;
 import :data_block;
 import :knn_expression;
 import :value;
 import :column_vector;
+
+import third_party;
+
 import embedding_type;
 import row_id;
 

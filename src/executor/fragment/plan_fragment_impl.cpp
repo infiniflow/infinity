@@ -14,18 +14,19 @@
 
 module;
 
-#include <vector>
-
 module infinity_core:plan_fragment.impl;
 
 import :plan_fragment;
-
 import :stl;
 import :physical_source;
 import :physical_sink;
 import :data_table;
 import :query_context;
 import :plan_fragment;
+
+import std;
+import third_party;
+
 import data_type;
 
 namespace infinity {

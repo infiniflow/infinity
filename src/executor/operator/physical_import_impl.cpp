@@ -16,57 +16,54 @@ module;
 
 #include <cassert>
 #include <cerrno>
-#include <cstdio>
 #include <cstring>
-#include <vector>
-#include <string>
-#include <memory>
 
 module infinity_core:physical_import.impl;
 
 import :physical_import;
-
 import :stl;
 import :query_context;
 import :table_def;
 import :data_table;
-import internal_types;
-import logical_type;
 import :physical_operator_type;
 import :operator_state;
 import :expression_state;
 import :data_block;
 import :logger;
-import third_party;
 import :defer_op;
-
 import :buffer_handle;
 import :data_file_worker;
-
 import :infinity_exception;
 import :zsv;
 import :status;
 import :column_vector;
 import :default_values;
+import :wal_entry;
+import :value;
+import :build_fast_rough_filter_task;
+import :stream_reader;
+import :virtual_store;
+import :local_file_handle;
+import :wal_manager;
+import :infinity_context;
+import :new_txn;
+import :txn_state;
+
+import std;
+import std.compat;
+import third_party;
+
+import data_type;
+import internal_types;
+import logical_type;
+import statement_common;
+import parser_assert;
+import knn_expr;
 import embedding_info;
 import sparse_info;
 import array_info;
 import column_def;
 import constant_expr;
-import :wal_entry;
-import knn_expr;
-import :value;
-import :build_fast_rough_filter_task;
-import :stream_reader;
-import parser_assert;
-import :virtual_store;
-import :local_file_handle;
-import :wal_manager;
-import :infinity_context;
-import statement_common;
-import :new_txn;
-import :txn_state;
-import data_type;
 
 namespace infinity {
 

@@ -14,23 +14,20 @@
 
 module;
 
-#include <string>
-
 module infinity_core:physical_cross_product.impl;
 
 import :physical_cross_product;
-
 import :stl;
 import :query_context;
 import :table_def;
 import :data_table;
-
 import :physical_operator_type;
 import :operator_state;
-
 import :infinity_exception;
 import :data_block;
 import :column_vector;
+
+import std;
 import data_type;
 
 namespace infinity {

@@ -17,7 +17,6 @@ module;
 export module infinity_core:physical_merge_limit;
 
 import :stl;
-
 import :base_expression;
 import :query_context;
 import :operator_state;
@@ -26,10 +25,11 @@ import :physical_limit;
 import :physical_operator_type;
 import :load_meta;
 import :infinity_exception;
-import internal_types;
-import data_type;
 import :logger;
 import :base_table_ref;
+
+import internal_types;
+import data_type;
 
 namespace infinity {
 

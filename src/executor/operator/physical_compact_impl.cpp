@@ -14,16 +14,15 @@
 
 module;
 
-#include <vector>
-
 module infinity_core:physical_compact.impl;
 
 import :physical_compact;
-
 import :stl;
 import :bg_task;
 import :compaction_process;
 import :infinity_context;
+
+import std;
 
 namespace infinity {
 

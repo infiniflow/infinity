@@ -14,14 +14,9 @@
 
 module;
 
-#include <cstdlib>
-#include <memory>
-#include <string>
-
 module infinity_core:physical_knn_scan.impl;
 
 import :physical_knn_scan;
-
 import :stl;
 import :query_context;
 import :operator_state;
@@ -35,7 +30,6 @@ import :logger;
 import :block_index;
 import :knn_scan_data;
 import :knn_filter;
-import third_party;
 import :infinity_exception;
 import :default_values;
 import :column_expression;
@@ -63,6 +57,10 @@ import :segment_meta;
 import :block_meta;
 import :column_meta;
 import :mem_index;
+
+import std;
+import std.compat;
+import third_party;
 
 import create_index_info;
 import knn_expr;

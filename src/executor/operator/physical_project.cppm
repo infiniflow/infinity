@@ -24,9 +24,10 @@ import :physical_operator_type;
 import :base_expression;
 import :load_meta;
 import :infinity_exception;
+import :highlighter;
+
 import internal_types;
 import data_type;
-import :highlighter;
 
 namespace infinity {
 

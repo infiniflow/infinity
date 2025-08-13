@@ -17,23 +17,21 @@ module;
 module infinity_core:physical_drop_schema.impl;
 
 import :physical_drop_schema;
-
 import :stl;
 import :query_context;
 import :table_def;
 import :data_table;
-
 import :physical_operator_type;
 import :operator_state;
 import :status;
-import logical_type;
 import :infinity_exception;
-import column_def;
-
 import :wal_manager;
 import :infinity_context;
 import :new_txn;
+
 import data_type;
+import column_def;
+import logical_type;
 
 namespace infinity {
 

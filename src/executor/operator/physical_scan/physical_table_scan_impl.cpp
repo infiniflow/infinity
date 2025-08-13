@@ -14,17 +14,13 @@
 
 module;
 
-#include <string>
-
 module infinity_core:physical_table_scan.impl;
 
 import :physical_table_scan;
-
 import :stl;
 import :query_context;
 import :table_def;
 import :data_table;
-
 import :physical_operator_type;
 import :operator_state;
 import :global_block_id;
@@ -32,22 +28,23 @@ import :data_block;
 import :table_scan_function_data;
 import :base_table_ref;
 import :block_index;
-
 import :default_values;
 import :infinity_exception;
-import third_party;
 import :logger;
 import :column_vector;
-import logical_type;
 import :meta_info;
-
 import :new_txn;
 import :block_meta;
 import :new_catalog;
 import :column_meta;
 import :status;
+
+import std;
+import third_party;
+
 import data_type;
 import row_id;
+import logical_type;
 
 namespace infinity {
 

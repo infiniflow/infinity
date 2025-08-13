@@ -22,10 +22,11 @@ import :operator_state;
 import :physical_operator;
 import :match_sparse_expression;
 import :base_table_ref;
-import data_type;
 import :physical_scan_base;
-import match_sparse_expr;
 import :base_expression;
+
+import data_type;
+import match_sparse_expr;
 
 namespace infinity {
 struct LoadMeta;

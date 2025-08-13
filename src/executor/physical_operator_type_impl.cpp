@@ -17,7 +17,6 @@ module;
 module infinity_core:physical_operator_type.impl;
 
 import :physical_operator_type;
-
 import :stl;
 import :status;
 import :infinity_exception;

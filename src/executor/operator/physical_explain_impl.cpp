@@ -14,17 +14,13 @@
 
 module;
 
-#include <vector>
-
 module infinity_core:physical_explain.impl;
 
 import :physical_explain;
-
 import :stl;
 import :query_context;
 import :table_def;
 import :data_table;
-
 import :physical_operator_type;
 import :operator_state;
 import :column_vector;
@@ -33,13 +29,16 @@ import :default_values;
 import :value;
 import :status;
 import :infinity_exception;
-import logical_type;
 import :logger;
 import :plan_fragment;
 import :fragment_task;
+
+import std;
 import third_party;
+
 import explain_statement;
 import data_type;
+import logical_type;
 
 namespace infinity {
 

@@ -14,16 +14,12 @@
 
 module;
 
-#include <map>
-#include <string>
-
 module infinity_core:physical_check.impl;
 
 import :physical_check;
 import :stl;
 import :new_txn;
 import :query_context;
-import third_party;
 import :profiler;
 import :operator_state;
 import :data_block;
@@ -35,6 +31,9 @@ import :status;
 import :value;
 import :meta_tree;
 import :db_meeta;
+
+import std;
+import third_party;
 
 import check_statement;
 import data_type;

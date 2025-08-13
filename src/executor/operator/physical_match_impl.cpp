@@ -15,15 +15,10 @@
 module;
 
 #include <cassert>
-#include <chrono>
-#include <iostream>
-#include <memory>
-#include <string>
 
 module infinity_core:physical_match.impl;
 
 import :physical_match;
-
 import :stl;
 import :query_context;
 import :operator_state;
@@ -40,15 +35,11 @@ import :match_expression;
 import :default_values;
 import :infinity_exception;
 import :value;
-import third_party;
 import :base_table_ref;
 import :block_index;
 import :load_meta;
-import logical_type;
-import search_options;
 import :status;
 import :index_defines;
-
 import :query_node;
 import :query_builder;
 import :doc_iterator;
@@ -70,6 +61,12 @@ import :cached_match;
 import :filter_iterator;
 import :score_threshold_iterator;
 import :new_txn;
+
+import std;
+import third_party;
+
+import logical_type;
+import search_options;
 import row_id;
 import data_type;
 

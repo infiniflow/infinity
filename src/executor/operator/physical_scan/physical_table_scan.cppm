@@ -17,7 +17,6 @@ module;
 export module infinity_core:physical_table_scan;
 
 import :stl;
-
 import :query_context;
 import :operator_state;
 import :physical_operator;
@@ -27,10 +26,11 @@ import :table_function;
 import :base_table_ref;
 import :meta_info;
 import :load_meta;
-import internal_types;
-import data_type;
 import :fast_rough_filter;
 import :physical_scan_base;
+
+import internal_types;
+import data_type;
 
 namespace infinity {
 

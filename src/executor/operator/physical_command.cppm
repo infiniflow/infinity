@@ -17,17 +17,16 @@ module;
 export module infinity_core:physical_command;
 
 import :stl;
-import internal_types;
 import :physical_operator;
 import :physical_operator_type;
-// import :query_context;
-
 import :operator_state;
 import :load_meta;
 import :infinity_exception;
+import :logger;
+
 import command_statement;
 import data_type;
-import :logger;
+import internal_types;
 
 namespace infinity {
 

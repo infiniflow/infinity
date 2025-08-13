@@ -22,15 +22,14 @@ import :query_context;
 import :operator_state;
 import :physical_operator;
 import :physical_operator_type;
-
 import :infinity_exception;
 import :value;
 import :data_block;
 import :stl;
+import :logger;
 
 import internal_types;
 import data_type;
-import :logger;
 
 namespace infinity {
 

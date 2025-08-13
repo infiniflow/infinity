@@ -85,7 +85,6 @@ import :physical_read_cache;
 import :physical_unnest;
 import :physical_unnest_aggregate;
 import :physical_check;
-
 import :logical_node;
 import :logical_node_type;
 import :logical_alter;
@@ -130,22 +129,23 @@ import :logical_read_cache;
 import :logical_unnest;
 import :logical_unnest_aggregate;
 import :logical_check;
-
 import :value;
 import :value_expression;
 import :match_tensor_expression;
 import :match_sparse_expression;
 import :explain_physical_plan;
-import third_party;
 import :status;
 import :infinity_exception;
+import :load_meta;
+import :block_index;
+import :logger;
+
+import third_party;
+
 import create_index_info;
 import command_statement;
 import explain_statement;
 import alter_statement;
-import :load_meta;
-import :block_index;
-import :logger;
 
 namespace infinity {
 

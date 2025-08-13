@@ -14,17 +14,17 @@
 
 module;
 
-#include <string>
-
 module infinity_core:physical_index_join.impl;
 
 import :physical_index_join;
-
 import :stl;
 import :query_context;
 import :operator_state;
 import :physical_index_join;
-import data_type;;
+
+import std;
+
+import data_type;
 
 namespace infinity {
 

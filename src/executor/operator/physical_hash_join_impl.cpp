@@ -14,17 +14,17 @@
 
 module;
 
-#include <string>
-
 module infinity_core:physical_hash_join.impl;
 
 import :physical_hash_join;
-
 import :query_context;
 import :operator_state;
 import :stl;
 import :physical_hash_join;
-import data_type;;
+
+import std;
+
+import data_type;
 
 namespace infinity {
 

@@ -14,12 +14,9 @@
 
 module;
 
-#include <vector>
-
 module infinity_core:fragment_builder.impl;
 
 import :fragment_builder;
-
 import :stl;
 import :plan_fragment;
 import :physical_operator;
@@ -31,11 +28,13 @@ import :physical_knn_scan;
 import :physical_fusion;
 import :status;
 import :infinity_exception;
-
 import :explain_fragment;
 import :fragment_context;
 import :logger;
+
+import std;
 import third_party;
+
 import explain_statement;
 
 namespace infinity {

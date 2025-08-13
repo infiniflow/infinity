@@ -17,7 +17,6 @@ module;
 export module infinity_core:physical_insert;
 
 import :stl;
-
 import :query_context;
 import :operator_state;
 import :physical_operator;
@@ -26,9 +25,10 @@ import :base_expression;
 import :load_meta;
 import :infinity_exception;
 import :meta_info;
+import :logger;
+
 import internal_types;
 import data_type;
-import :logger;
 
 namespace infinity {
 

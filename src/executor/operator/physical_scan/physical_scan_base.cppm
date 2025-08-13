@@ -22,10 +22,11 @@ import :physical_operator_type;
 import :global_block_id;
 import :base_table_ref;
 import :load_meta;
-import internal_types;
 import :operator_state;
 import :query_context;
 import :meta_info;
+
+import internal_types;
 
 namespace infinity {
 

@@ -24,16 +24,16 @@ import :data_block;
 import :match_tensor_scan_function_data;
 import :match_sparse_scan_function_data;
 import :table_def;
-
 import :merge_knn_data;
 import :create_index_data;
 import :blocking_queue;
 import :expression_state;
 import :status;
+import :hash_table;
+
 import internal_types;
 import column_def;
 import data_type;
-import :hash_table;
 
 namespace infinity {
 

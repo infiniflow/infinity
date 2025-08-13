@@ -23,9 +23,10 @@ import :physical_operator;
 import :meta_info;
 import :match_tensor_expression;
 import :base_table_ref;
-import data_type;
 import :base_expression;
 import :logical_match_tensor_scan;
+
+import data_type;
 
 namespace infinity {
 

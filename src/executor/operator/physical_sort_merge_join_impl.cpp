@@ -17,7 +17,6 @@ module;
 module infinity_core:physical_sort_merge_join.impl;
 
 import :physical_sort_merge_join;
-
 import :query_context;
 import :operator_state;
 import :physical_sort_merge_join;

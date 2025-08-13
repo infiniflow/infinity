@@ -17,7 +17,6 @@ module;
 module infinity_core:physical_merge_match_tensor.impl;
 
 import :physical_merge_match_tensor;
-
 import :stl;
 import :query_context;
 import :physical_operator_type;
@@ -26,7 +25,6 @@ import :logger;
 import :status;
 import :infinity_exception;
 import :buffer_manager;
-import third_party;
 import :default_values;
 import :data_block;
 import :value;
@@ -35,6 +33,8 @@ import :cached_match_scan;
 import :result_cache_manager;
 import :meta_info;
 import :new_txn;
+
+import third_party;
 
 namespace infinity {
 

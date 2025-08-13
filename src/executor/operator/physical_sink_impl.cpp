@@ -14,24 +14,23 @@
 
 module;
 
-#include <string>
-
 module infinity_core:physical_sink.impl;
 
 import :physical_sink;
-
 import :stl;
 import :query_context;
-
 import :operator_state;
 import :physical_operator_type;
 import :fragment_context;
-import third_party;
 import :fragment_data;
 import :data_block;
 import :status;
 import :infinity_exception;
 import :logger;
+
+import std;
+import third_party;
+
 import logical_type;
 import column_def;
 import data_type;

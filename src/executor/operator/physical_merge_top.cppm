@@ -17,7 +17,6 @@ module;
 export module infinity_core:physical_merge_top;
 
 import :stl;
-
 import :query_context;
 import :operator_state;
 import :expression_state;
@@ -28,6 +27,7 @@ import :load_meta;
 import :infinity_exception;
 import :base_table_ref;
 import :physical_top;
+
 import internal_types;
 import select_statement;
 import data_type;

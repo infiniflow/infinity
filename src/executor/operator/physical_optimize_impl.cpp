@@ -14,26 +14,23 @@
 
 module;
 
-#include <tuple>
-
 module infinity_core:physical_optimize.impl;
 
 import :physical_optimize;
-
 import :stl;
 import :query_context;
-
 import :operator_state;
 import :infinity_exception;
 import :table_def;
-import third_party;
 import :status;
 import :logger;
 import :base_table_ref;
-
 import :wal_manager;
 import :infinity_context;
 import :new_txn;
+
+import std;
+import third_party;
 
 namespace infinity {
 

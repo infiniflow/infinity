@@ -17,7 +17,6 @@ module;
 module infinity_core:physical_create_view.impl;
 
 import :physical_create_view;
-
 import :stl;
 import :query_context;
 import :table_def;

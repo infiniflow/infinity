@@ -17,7 +17,6 @@ module;
 module infinity_core:physical_merge_match_sparse.impl;
 
 import :physical_merge_match_sparse;
-
 import :stl;
 import :query_context;
 import :physical_operator_type;
@@ -26,21 +25,23 @@ import :logger;
 import :status;
 import :infinity_exception;
 import :buffer_manager;
-import third_party;
 import :default_values;
 import :data_block;
 import :value;
 import :column_vector;
 import :physical_scan_base;
-import sparse_info;
-import match_sparse_expr;
-import internal_types;
-import logical_type;
 import :knn_result_handler;
 import :merge_knn;
 import :match_sparse_scan_function_data;
 import :result_cache_manager;
+
+import third_party;
+
 import data_type;
+import sparse_info;
+import match_sparse_expr;
+import internal_types;
+import logical_type;
 
 namespace infinity {
 

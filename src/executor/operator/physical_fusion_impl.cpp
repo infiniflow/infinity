@@ -13,15 +13,12 @@
 // limitations under the License.
 
 module;
+
 #include <cassert>
-#include <cmath>
-#include <cstdlib>
-#include <string>
 
 module infinity_core:physical_fusion.impl;
 
 import :physical_fusion;
-
 import :stl;
 import :query_context;
 import :operator_state;
@@ -38,25 +35,29 @@ import :base_expression;
 import :fusion_expression;
 import :load_meta;
 import :default_values;
-import third_party;
 import :infinity_exception;
 import :value;
-import internal_types;
 import :logger;
-import logical_type;
-import knn_expr;
-import match_tensor_expr;
 import :buffer_manager;
 import :meta_info;
-import column_def;
-import embedding_info;
 import :block_index;
 import :mlas_matrix_multiply;
 import :physical_match_tensor_scan;
 import :physical_knn_scan;
 import :physical_merge_knn;
 import :physical_read_cache;
+
+import std;
+import std.compat;
+import third_party;
+
 import data_type;
+import column_def;
+import embedding_info;
+import logical_type;
+import knn_expr;
+import match_tensor_expr;
+import internal_types;
 
 namespace infinity {
 
@@ -108,9 +109,7 @@ void PhysicalFusion::Init(QueryContext* query_context) {
         (*output_types_)[output_types_->size() - 2] = MakeShared<DataType>(LogicalType::kFloat);
     }
     if (output_names_->size() != output_types_->size()) {
-        String error_message =
-            fmt::format("output_names_ size {} is not equal to output_types_ size {}.", output_names_->size(), output_types_->size());
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("output_names_ size {} is not equal to output_types_ size {}.", output_names_->size(), output_types_->size()));
     }
 }
 
@@ -123,20 +122,20 @@ void PhysicalFusion::ExecuteRRFWeighted(const Map<u64, Vector<UniquePtr<DataBloc
     Vector<float> weights;
     if (fusion_expr_->options_.get() != nullptr) {
         if (auto it = fusion_expr_->options_->options_.find("window_size"); it != fusion_expr_->options_->options_.end()) {
-            long l = std::strtol(it->second.c_str(), NULL, 10);
+            long l = std::strtol(it->second.c_str(), nullptr, 10);
             if (l >= 1) {
                 topn = (SizeT)l;
             }
         }
         if (auto it = fusion_expr_->options_->options_.find("topn"); it != fusion_expr_->options_->options_.end()) {
-            long l = std::strtol(it->second.c_str(), NULL, 10);
+            long l = std::strtol(it->second.c_str(), nullptr, 10);
             if (l >= 1) {
                 topn = (SizeT)l;
             }
         }
         if (fusion_method_ == FusionMethod::kRRF) {
             if (auto it = fusion_expr_->options_->options_.find("rank_constant"); it != fusion_expr_->options_->options_.end()) {
-                long l = std::strtol(it->second.c_str(), NULL, 10);
+                long l = std::strtol(it->second.c_str(), nullptr, 10);
                 if (l >= 1) {
                     rank_constant = (SizeT)l;
                 }
@@ -172,10 +171,9 @@ void PhysicalFusion::ExecuteRRFWeighted(const Map<u64, Vector<UniquePtr<DataBloc
         u32 from_block_idx = 0;
         for (const UniquePtr<DataBlock> &input_data_block : input_blocks) {
             if (input_data_block->column_count() != GetOutputTypes()->size()) {
-                String error_message = fmt::format("input_data_block column count {} is incorrect, expect {}.",
+                UnrecoverableError(fmt::format("input_data_block column count {} is incorrect, expect {}.",
                                                    input_data_block->column_count(),
-                                                   GetOutputTypes()->size());
-                UnrecoverableError(error_message);
+                                                   GetOutputTypes()->size()));
             }
             auto &row_id_column = *input_data_block->column_vectors[input_data_block->column_count() - 1];
             auto row_ids = reinterpret_cast<RowID *>(row_id_column.data());
@@ -253,13 +251,12 @@ void PhysicalFusion::ExecuteRRFWeighted(const Map<u64, Vector<UniquePtr<DataBloc
                     break;
                 }
                 case PhysicalOperatorType::kReadCache: {
-                    PhysicalReadCache *phy_read_cache = static_cast<PhysicalReadCache *>(child_op);
+                    auto *phy_read_cache = static_cast<PhysicalReadCache *>(child_op);
                     min_heaps[i] = phy_read_cache->is_min_heap();
                     break;
                 }
                 default: {
-                    String error_message = fmt::format("Cannot determine heap type of operator {}", int(child_op->operator_type()));
-                    UnrecoverableError(error_message);
+                    UnrecoverableError(fmt::format("Cannot determine heap type of operator {}", int(child_op->operator_type())));
                 }
             }
         }
@@ -269,7 +266,7 @@ void PhysicalFusion::ExecuteRRFWeighted(const Map<u64, Vector<UniquePtr<DataBloc
                 if (!doc.mask_[i])
                     continue;
                 // Normalize the child score in R to [0, 1]
-                double normalized_score = std::atan(doc.child_scores_[i]) / M_PI + 0.5;
+                double normalized_score = std::atan(doc.child_scores_[i]) / std::numbers::pi  + 0.5;
                 if (!min_heaps[i])
                     normalized_score = 1.0 - normalized_score;
                 doc.fusion_score_ += weights[i] * normalized_score;
@@ -361,10 +358,9 @@ void PhysicalFusion::ExecuteMatchTensor(QueryContext *query_context,
         for (u32 block_id = 0; block_id < input_blocks.size(); ++block_id) {
             const UniquePtr<DataBlock> &input_data_block = input_blocks[block_id];
             if (input_data_block->column_count() != GetOutputTypes()->size()) {
-                String error_message = fmt::format("input_data_block column count {} is incorrect, expect {}.",
+                UnrecoverableError(fmt::format("input_data_block column count {} is incorrect, expect {}.",
                                                    input_data_block->column_count(),
-                                                   GetOutputTypes()->size());
-                UnrecoverableError(error_message);
+                                                   GetOutputTypes()->size()));
             }
             auto &row_id_column = *input_data_block->column_vectors[input_data_block->column_count() - 1];
             auto row_ids = reinterpret_cast<RowID *>(row_id_column.data());
@@ -454,8 +450,7 @@ bool PhysicalFusion::ExecuteFirstOp(QueryContext *query_context, FusionOperatorS
 bool PhysicalFusion::ExecuteNotFirstOp(QueryContext *query_context, OperatorState *operator_state) const {
     // this op has prev fusion op
     if (!operator_state->prev_op_state_->Complete()) {
-        String error_message = "Fusion with previous fusion op, but prev_op_state_ is not complete.";
-        UnrecoverableError(error_message);
+        UnrecoverableError("Fusion with previous fusion op, but prev_op_state_ is not complete.");
         return false;
     }
     if (fusion_method_ == FusionMethod::kMatchTensor) {

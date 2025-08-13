@@ -14,14 +14,9 @@
 
 module;
 
-#include <memory>
-#include <numeric>
-#include <iterator>
-
 module infinity_core:physical_merge_top.impl;
 
 import :physical_merge_top;
-
 import :stl;
 import :query_context;
 import :operator_state;
@@ -35,6 +30,8 @@ import :column_vector;
 import :default_values;
 import :physical_top;
 import :logger;
+
+import std;
 
 namespace infinity {
 

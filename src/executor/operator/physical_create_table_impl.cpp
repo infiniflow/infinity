@@ -17,7 +17,6 @@ module;
 module infinity_core:physical_create_table.impl;
 
 import :physical_create_table;
-
 import :stl;
 import :query_context;
 import :table_def;
@@ -26,11 +25,12 @@ import :physical_operator_type;
 import :operator_state;
 import :status;
 import :load_meta;
-import extra_ddl_info;
 import :wal_manager;
 import :infinity_context;
 import :new_txn;
+
 import data_type;
+import extra_ddl_info;
 
 namespace infinity {
 

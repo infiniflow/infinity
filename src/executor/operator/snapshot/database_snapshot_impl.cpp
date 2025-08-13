@@ -15,13 +15,11 @@
 module infinity_core:database_snapshot.impl;
 
 import :snapshot;
-
 import :stl;
 import :new_txn;
 import :new_txn_manager;
 import :query_context;
 import :status;
-import third_party;
 import :config;
 import :infinity_exception;
 import :snapshot_info;
@@ -29,6 +27,8 @@ import :db_meeta;
 import :table_meeta;
 import :txn_state;
 import :logger;
+
+import third_party;
 
 namespace infinity {
 

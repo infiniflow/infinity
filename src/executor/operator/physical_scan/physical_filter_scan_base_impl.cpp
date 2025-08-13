@@ -15,17 +15,16 @@
 
 module;
 
-#include <vector>
-
 module infinity_core:physical_filter_scan_base.impl;
 
 import :physical_filter_scan_base;
-
 import :stl;
 import :common_query_filter;
 import :base_table_ref;
 import :roaring_bitmap;
 import :default_values;
+
+import std;
 
 namespace infinity {
 

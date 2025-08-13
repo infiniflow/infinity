@@ -17,7 +17,6 @@ module;
 module infinity_core:physical_limit.impl;
 
 import :physical_limit;
-
 import :stl;
 import :base_expression;
 import :default_values;
@@ -26,7 +25,6 @@ import :query_context;
 import :table_def;
 import :data_table;
 import :default_values;
-
 import :physical_operator_type;
 import :operator_state;
 import :data_block;

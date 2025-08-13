@@ -17,7 +17,6 @@ module;
 export module infinity_core:physical_sort;
 
 import :stl;
-
 import :query_context;
 import :operator_state;
 import :expression_evaluator;
@@ -29,6 +28,7 @@ import :data_block;
 import :load_meta;
 import :infinity_exception;
 import :physical_top;
+
 import internal_types;
 import select_statement;
 import data_type;

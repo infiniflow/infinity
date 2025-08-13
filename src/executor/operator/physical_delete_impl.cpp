@@ -14,31 +14,27 @@
 
 module;
 
-#include <string>
-
 module infinity_core:physical_delete.impl;
 
 import :physical_delete;
-
 import :stl;
-
 import :query_context;
 import :operator_state;
 import :physical_operator;
 import :physical_operator_type;
-// import :query_context;
-// import :data_table;
 import :operator_state;
-import logical_type;
 import :data_block;
 import :column_vector;
-import internal_types;
-import third_party;
+import :new_txn;
 import :wal_manager;
 import :infinity_context;
 import :status;
 
-import :new_txn;
+import std;
+import third_party;
+
+import internal_types;
+import logical_type;
 
 namespace infinity {
 

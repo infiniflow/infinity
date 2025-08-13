@@ -17,7 +17,6 @@ module;
 module infinity_core:physical_union_all.impl;
 
 import :physical_union_all;
-
 import :query_context;
 import :operator_state;
 import :physical_union_all;

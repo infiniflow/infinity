@@ -17,7 +17,6 @@ module;
 module infinity_core:physical_merge_limit.impl;
 
 import :physical_merge_limit;
-
 import :stl;
 import :query_context;
 import :base_expression;

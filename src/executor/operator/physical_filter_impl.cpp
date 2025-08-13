@@ -17,18 +17,17 @@ module;
 module infinity_core:physical_filter.impl;
 
 import :physical_filter;
-
 import :stl;
 import :query_context;
 import :table_def;
 import :data_table;
-
 import :physical_operator_type;
 import :operator_state;
 import :expression_state;
 import :expression_selector;
 import :data_block;
 import :logger;
+
 import third_party;
 
 import :infinity_exception;

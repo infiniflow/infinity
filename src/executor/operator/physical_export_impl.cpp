@@ -19,41 +19,41 @@ module;
 #include <arrow/io/file.h>
 #include <parquet/arrow/writer.h>
 #include <parquet/properties.h>
-#include <string>
 
 module infinity_core:physical_export.impl;
 
 import :physical_export;
-
 import :query_context;
 import :operator_state;
 import :logger;
-import statement_common;
-import third_party;
-import column_def;
 import :column_vector;
 import :value;
 import :virtual_store;
 import :stl;
-import logical_type;
-import embedding_info;
-import sparse_info;
-import array_info;
 import :status;
 import :buffer_manager;
 import :default_values;
-import internal_types;
 import :virtual_store;
 import :local_file_handle;
 import :knn_filter;
 import :block_index;
-
 import :new_txn;
 import :block_meta;
 import :column_meta;
 import :new_catalog;
 import :roaring_bitmap;
+
+import std;
+import third_party;
+
+import statement_common;
+import column_def;
+import logical_type;
+import embedding_info;
+import sparse_info;
+import array_info;
 import data_type;
+import internal_types;
 
 namespace infinity {
 

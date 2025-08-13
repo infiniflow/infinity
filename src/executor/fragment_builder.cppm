@@ -17,10 +17,8 @@ module;
 export module infinity_core:fragment_builder;
 
 import :stl;
-// import :query_context;
 import :plan_fragment;
 import :physical_operator;
-// import global_resource_usage;
 
 namespace infinity {
 

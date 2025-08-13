@@ -14,8 +14,6 @@
 
 module;
 
-#include <string>
-
 #ifdef ENABLE_JEMALLOC_PROF
 #include <jemalloc/jemalloc.h>
 #endif
@@ -24,16 +22,13 @@ module infinity_core:physical_command.impl;
 
 import :physical_command;
 import :stl;
-import compilation_config;
 import :query_context;
 import :operator_state;
-
 import :profiler;
 import :file_writer;
 import :table_def;
 import :data_table;
 import :options;
-import third_party;
 import :defer_op;
 import :config;
 import :status;
@@ -50,8 +45,14 @@ import :periodic_trigger_thread;
 import :new_txn;
 import :bg_task_type;
 import :new_catalog;
-import command_statement;
 import :session_manager;
+
+import std;
+import third_party;
+
+import command_statement;
+import compilation_config;
+
 namespace infinity {
 
 void PhysicalCommand::Init(QueryContext *query_context) {}

@@ -14,15 +14,10 @@
 
 module;
 
-#include <tuple>
-#include <vector>
-
 module infinity_core:physical_create_index_prepare.impl;
 
 import :physical_create_index_prepare;
-
 import :stl;
-
 import :physical_operator_type;
 import :physical_operator;
 import :query_context;
@@ -38,11 +33,12 @@ import :buffer_handle;
 import :index_hnsw;
 import :default_values;
 import :base_table_ref;
-import extra_ddl_info;
 import :wal_manager;
 import :infinity_context;
 import :new_txn;
+
 import data_type;
+import extra_ddl_info;
 
 namespace infinity {
 PhysicalCreateIndexPrepare::PhysicalCreateIndexPrepare(u64 id,

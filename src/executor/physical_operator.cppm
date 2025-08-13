@@ -19,6 +19,7 @@ export module infinity_core:physical_operator;
 import :stl;
 import :physical_operator_type;
 import :base_table_ref;
+
 import data_type;
 
 namespace infinity {

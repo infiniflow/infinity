@@ -14,15 +14,9 @@
 
 module;
 
-#include <compare>
-#include <memory>
-#include <numeric>
-#include <iterator>
-
 module infinity_core:physical_top.impl;
 
 import :physical_top;
-
 import :stl;
 import :logger;
 import :query_context;
@@ -36,8 +30,11 @@ import :infinity_exception;
 import :expression_evaluator;
 import :default_values;
 import :expression_type;
-import third_party;
 import :status;
+
+import std;
+import third_party;
+
 import logical_type;
 import internal_types;
 import select_statement;

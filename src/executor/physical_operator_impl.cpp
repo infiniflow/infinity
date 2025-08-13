@@ -14,9 +14,6 @@
 
 module;
 
-#include <vector>
-#include <string>
-
 module infinity_core:physical_operator.impl;
 
 import :physical_operator;
@@ -26,24 +23,25 @@ import :default_values;
 import :operator_state;
 import :column_vector;
 import :query_context;
-
 import :base_table_ref;
-import third_party;
 import :infinity_exception;
-import logical_type;
-import internal_types;
 import :result_cache_manager;
 import :logger;
 import :data_block;
 import :cached_match;
 import :buffer_manager;
 import :block_index;
-
 import :block_meta;
 import :column_meta;
 import :new_catalog;
 import :status;
+
+import std;
+import third_party;
+
 import data_type;
+import logical_type;
+import internal_types;
 
 namespace infinity {
 

@@ -14,12 +14,9 @@
 
 module;
 
-#include <string>
-
 module infinity_core:physical_sort.impl;
 
 import :physical_sort;
-
 import :stl;
 import :query_context;
 import :table_def;
@@ -30,15 +27,16 @@ import :column_vector;
 import :expression_state;
 import :base_expression;
 import :expression_evaluator;
-
 import :physical_operator_type;
 import :operator_state;
 import :data_block;
 import :infinity_exception;
-import third_party;
 import :status;
 import :physical_top;
 import :logger;
+
+import std;
+import third_party;
 
 namespace infinity {
 

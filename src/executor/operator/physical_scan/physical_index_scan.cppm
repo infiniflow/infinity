@@ -17,7 +17,6 @@ module;
 export module infinity_core:physical_index_scan;
 
 import :stl;
-
 import :query_context;
 import :operator_state;
 import :physical_operator;
@@ -26,8 +25,6 @@ import :physical_scan_base;
 import :base_expression;
 import :load_meta;
 import :infinity_exception;
-import internal_types;
-import data_type;
 import :base_table_ref;
 import :value;
 import :knn_filter;
@@ -36,6 +33,9 @@ import :fast_rough_filter;
 import :global_block_id;
 import :roaring_bitmap;
 import :filter_expression_push_down;
+
+import internal_types;
+import data_type;
 
 namespace infinity {
 

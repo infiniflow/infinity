@@ -14,30 +14,28 @@
 
 module;
 
-#include <string>
-#include <vector>
-#include <memory>
-
 module infinity_core:physical_merge_aggregate.impl;
 
 import :physical_merge_aggregate;
-
 import :stl;
-import third_party;
 import :query_context;
 import :operator_state;
 import :logger;
 import :value;
 import :data_block;
-import logical_type;
 import :physical_aggregate;
 import :aggregate_expression;
 import :infinity_exception;
 import :hash_table;
-import column_def;
 import :column_vector;
+
+import std;
+import third_party;
+
 import internal_types;
 import data_type;
+import column_def;
+import logical_type;
 
 namespace infinity {
 

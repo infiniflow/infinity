@@ -17,7 +17,6 @@ module;
 module infinity_core:physical_dummy_scan.impl;
 
 import :physical_dummy_scan;
-
 import :query_context;
 import :operator_state;
 

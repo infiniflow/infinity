@@ -17,22 +17,20 @@ module;
 module infinity_core:physical_create_collection.impl;
 
 import :physical_create_collection;
-
 import :stl;
-// import :query_context;
 import :table_def;
 import :data_table;
-
 import :physical_operator_type;
 import :operator_state;
 import :load_meta;
-import internal_types;
-import extra_ddl_info;
-import data_type;
 import :wal_manager;
 import :infinity_context;
 import :status;
 import :infinity_exception;
+
+import internal_types;
+import extra_ddl_info;
+import data_type;
 
 namespace infinity {
 

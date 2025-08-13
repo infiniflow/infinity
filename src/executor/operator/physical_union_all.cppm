@@ -25,9 +25,10 @@ import :base_expression;
 import :data_table;
 import :load_meta;
 import :infinity_exception;
+import :logger;
+
 import internal_types;
 import data_type;
-import :logger;
 
 namespace infinity {
 

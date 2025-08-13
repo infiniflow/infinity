@@ -18,11 +18,12 @@ import :physical_operator;
 import :query_context;
 import :operator_state;
 import :base_table_ref;
-import data_type;
 import :result_cache_manager;
 import :physical_operator_type;
 import :load_meta;
 import :logical_node_type;
+
+import data_type;
 
 namespace infinity {
 

@@ -17,7 +17,6 @@ module;
 module infinity_core:physical_drop_table.impl;
 
 import :physical_drop_table;
-
 import :stl;
 import :query_context;
 import :table_def;
@@ -27,11 +26,12 @@ import :physical_operator_type;
 import :operator_state;
 import :status;
 import :infinity_exception;
-import logical_type;
-import column_def;
 import :wal_manager;
 import :infinity_context;
 import :new_txn;
+
+import logical_type;
+import column_def;
 import data_type;
 
 namespace infinity {

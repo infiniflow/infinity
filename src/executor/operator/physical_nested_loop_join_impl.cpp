@@ -14,17 +14,17 @@
 
 module;
 
-#include <string>
-
 module infinity_core:physical_nested_loop_join.impl;
 
 import :physical_nested_loop_join;
-
 import :stl;
 import :query_context;
 import :operator_state;
 import :physical_nested_loop_join;
-import data_type;;
+
+import std;
+
+import data_type;
 
 namespace infinity {
 

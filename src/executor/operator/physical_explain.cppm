@@ -18,8 +18,9 @@ export module infinity_core:physical_explain;
 
 import :stl;
 import :physical_operator;
-import explain_statement;
 import :physical_operator_type;
+
+import explain_statement;
 
 namespace infinity {
 class QueryProfiler;

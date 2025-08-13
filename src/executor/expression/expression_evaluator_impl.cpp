@@ -17,7 +17,6 @@ module;
 module infinity_core:expression_evaluator.impl;
 
 import :expression_evaluator;
-
 import :stl;
 import :base_expression;
 import :aggregate_expression;
@@ -33,15 +32,17 @@ import :data_block;
 import :column_vector;
 import :expression_state;
 import :status;
-import third_party;
+import :roaring_bitmap;
+import :block_index;
 import :infinity_exception;
 import :expression_type;
 import :bound_cast_func;
 import :logger;
+
+import third_party;
+
 import logical_type;
 import internal_types;
-import :roaring_bitmap;
-import :block_index;
 
 namespace infinity {
 

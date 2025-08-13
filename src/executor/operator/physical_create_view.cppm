@@ -17,18 +17,17 @@ module;
 export module infinity_core:physical_create_view;
 
 import :stl;
-
-// import :query_context;
 import :operator_state;
 import :physical_operator;
 import :physical_operator_type;
 import :index_base;
 import :load_meta;
 import :infinity_exception;
+import :logger;
+
 import internal_types;
 import create_view_info;
 import data_type;
-import :logger;
 
 namespace infinity {
 

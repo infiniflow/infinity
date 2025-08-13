@@ -14,12 +14,9 @@
 
 module;
 
-#include <vector>
-
 module infinity_core:physical_scan_base.impl;
 
 import :physical_scan_base;
-
 import :stl;
 import :physical_operator;
 import :physical_operator_type;
@@ -29,7 +26,6 @@ import :block_index;
 import :data_block;
 import :operator_state;
 import :default_values;
-import third_party;
 import :infinity_exception;
 import :logger;
 import :column_vector;
@@ -46,11 +42,14 @@ import :physical_merge_match_tensor;
 import :physical_index_scan;
 import :meta_info;
 import :result_cache_manager;
-
 import :table_meeta;
 import :segment_meta;
 import :block_meta;
 import :new_txn;
+
+import std;
+import third_party;
+
 import row_id;
 
 namespace infinity {

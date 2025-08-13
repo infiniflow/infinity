@@ -14,18 +14,18 @@
 
 module;
 
-#include <string>
-
 module infinity_core:hash_table.impl;
 
 import :hash_table;
-
 import :stl;
-import logical_type;
 import :column_vector;
 import :status;
 import :infinity_exception;
+
+import std;
 import third_party;
+
+import logical_type;
 import internal_types;
 import data_type;
 
