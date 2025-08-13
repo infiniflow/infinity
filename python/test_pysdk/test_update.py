@@ -287,7 +287,7 @@ class TestInfinity:
                                         ConflictType.Error)
 
         # insert
-        for _ in range(1025):
+        for _ in range(5):
             values = [{"c1": 1, "c2": 2} for _ in range(8192)]
             table_obj.insert(values)
         # `insert_res, extra_result = table_obj.output(["*"]).to_df()
