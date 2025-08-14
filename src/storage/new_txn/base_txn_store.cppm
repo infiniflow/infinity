@@ -14,8 +14,8 @@
 
 module;
 
-#include <vector>
 #include <ranges>
+#include <vector>
 
 export module infinity_core:base_txn_store;
 
@@ -135,7 +135,6 @@ export struct CreateTableTxnStore final : public BaseTxnStore {
     Vector<SharedPtr<EraseBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
 };
 
-
 export struct CreateTableSnapshotTxnStore final : public BaseTxnStore {
     CreateTableSnapshotTxnStore() : BaseTxnStore(TransactionType::kCreateTableSnapshot) {}
 
@@ -148,7 +147,6 @@ export struct CreateTableSnapshotTxnStore final : public BaseTxnStore {
     SharedPtr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;
     Vector<SharedPtr<EraseBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
 };
-
 
 export struct RestoreTableTxnStore final : public BaseTxnStore {
     RestoreTableTxnStore() : BaseTxnStore(TransactionType::kRestoreTable) {}
@@ -182,7 +180,6 @@ export struct RestoreDatabaseTxnStore final : public BaseTxnStore {
     SharedPtr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;
     Vector<SharedPtr<EraseBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
 };
-
 
 export struct DropTableTxnStore final : public BaseTxnStore {
     DropTableTxnStore() : BaseTxnStore(TransactionType::kDropTable) {}

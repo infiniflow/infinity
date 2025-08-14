@@ -78,7 +78,10 @@ protected:
 
         // Create embedding column with proper type info (4-dimensional float vectors)
         auto embedding_type_info = EmbeddingInfo::Make(EmbeddingDataType::kElemFloat, 4);
-        column_def3 = std::make_shared<ColumnDef>(2, std::make_shared<DataType>(LogicalType::kEmbedding, embedding_type_info), "embedding_col", std::set<ConstraintType>());
+        column_def3 = std::make_shared<ColumnDef>(2,
+                                                  std::make_shared<DataType>(LogicalType::kEmbedding, embedding_type_info),
+                                                  "embedding_col",
+                                                  std::set<ConstraintType>());
 
         column_def4 = std::make_shared<ColumnDef>(3, std::make_shared<DataType>(LogicalType::kFloat), "float_col", std::set<ConstraintType>());
 
@@ -115,7 +118,7 @@ protected:
             index_def3 = IndexHnsw::Make(index_name3, MakeShared<String>(), "idx_file3.idx", {column_def3->name()}, index_param_list_ptr);
             EXPECT_TRUE(index_def3 != nullptr);
             LOG_INFO("Successfully created HNSW index: " + *index_name3);
-        } catch (const std::exception& e) {
+        } catch (const std::exception &e) {
             FAIL() << "Failed to create HNSW index: " << e.what();
         }
 
@@ -158,7 +161,7 @@ protected:
             auto col3 = ColumnVector::Make(column_def3->type());
             col3->Initialize();
             for (u32 i = 0; i < block_row_cnt; ++i) {
-                Vector<f32> embedding = {static_cast<f32>(i), static_cast<f32>(i+1), static_cast<f32>(i+2), static_cast<f32>(i+3)};
+                Vector<f32> embedding = {static_cast<f32>(i), static_cast<f32>(i + 1), static_cast<f32>(i + 2), static_cast<f32>(i + 3)};
                 col3->AppendValue(Value::MakeEmbedding(embedding));
             }
             input_block->InsertVector(col3, 2);
@@ -177,7 +180,6 @@ protected:
         input_block->Finalize();
         return input_block;
     }
-
 
     void CheckIndexBeforeOptimize(const String &index_name) {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check index before"), TransactionType::kNormal);
@@ -254,7 +256,7 @@ protected:
             if (original_chunks_it != original_chunk_ids_.end()) {
                 auto segment_chunks_it = original_chunks_it->second.find(segment_id);
                 if (segment_chunks_it != original_chunks_it->second.end()) {
-                    const Vector<ChunkID>& original_chunk_ids = segment_chunks_it->second;
+                    const Vector<ChunkID> &original_chunk_ids = segment_chunks_it->second;
                     // The new chunk ID should be greater than all original chunk IDs
                     ChunkID max_original_chunk_id = 0;
                     for (auto original_chunk_id : original_chunk_ids) {
@@ -272,7 +274,7 @@ protected:
             status = chunk_index_meta.GetChunkInfo(chunk_info_ptr);
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(chunk_info_ptr->base_row_id_, RowID(segment_id, 0));
-            EXPECT_EQ(chunk_info_ptr->row_cnt_, block_row_cnt*4); // Four blocks per segment
+            EXPECT_EQ(chunk_info_ptr->row_cnt_, block_row_cnt * 4); // Four blocks per segment
         }
 
         status = new_txn_mgr->CommitTxn(txn);
@@ -471,7 +473,6 @@ TEST_P(TestTxnReplayOptimize, test_optimize_rollback) {
     CheckIndexBeforeOptimize(*index_name3);
     CheckIndexBeforeOptimize(*index_name4);
 
-
     // Try to optimize but it will be rolled back due to conflict
     {
         auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
@@ -546,4 +547,3 @@ TEST_P(TestTxnReplayOptimize, test_optimize_interrupt) {
         EXPECT_TRUE(status.ok());
     }
 }
-

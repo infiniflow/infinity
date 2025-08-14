@@ -1333,7 +1333,7 @@ QueryResult Infinity::CreateTableSnapshot(const String &db_name, const String &t
 
     auto command_statement = MakeUnique<CommandStatement>();
     command_statement->command_info_ = MakeUnique<SnapshotCmd>(snapshot_name, SnapshotOp::kCreate, SnapshotScope::kTable, table_name);
-    
+
     QueryResult result = query_context_ptr->QueryStatement(command_statement.get());
     return result;
 }
@@ -1344,7 +1344,7 @@ QueryResult Infinity::CreateDatabaseSnapshot(const String &db_name, const String
 
     auto command_statement = MakeUnique<CommandStatement>();
     command_statement->command_info_ = MakeUnique<SnapshotCmd>(snapshot_name, SnapshotOp::kCreate, SnapshotScope::kDatabase, db_name);
-    
+
     QueryResult result = query_context_ptr->QueryStatement(command_statement.get());
     return result;
 }
@@ -1355,7 +1355,7 @@ QueryResult Infinity::CreateSystemSnapshot(const String &snapshot_name) {
 
     auto command_statement = MakeUnique<CommandStatement>();
     command_statement->command_info_ = MakeUnique<SnapshotCmd>(snapshot_name, SnapshotOp::kCreate, SnapshotScope::kSystem);
-    
+
     QueryResult result = query_context_ptr->QueryStatement(command_statement.get());
     return result;
 }
@@ -1366,7 +1366,7 @@ QueryResult Infinity::RestoreTableSnapshot(const String &snapshot_name) {
 
     auto command_statement = MakeUnique<CommandStatement>();
     command_statement->command_info_ = MakeUnique<SnapshotCmd>(snapshot_name, SnapshotOp::kRestore, SnapshotScope::kTable);
-    
+
     QueryResult result = query_context_ptr->QueryStatement(command_statement.get());
     return result;
 }
@@ -1377,7 +1377,7 @@ QueryResult Infinity::RestoreDatabaseSnapshot(const String &snapshot_name) {
 
     auto command_statement = MakeUnique<CommandStatement>();
     command_statement->command_info_ = MakeUnique<SnapshotCmd>(snapshot_name, SnapshotOp::kRestore, SnapshotScope::kDatabase);
-    
+
     QueryResult result = query_context_ptr->QueryStatement(command_statement.get());
     return result;
 }
@@ -1388,7 +1388,7 @@ QueryResult Infinity::RestoreSystemSnapshot(const String &snapshot_name) {
 
     auto command_statement = MakeUnique<CommandStatement>();
     command_statement->command_info_ = MakeUnique<SnapshotCmd>(snapshot_name, SnapshotOp::kRestore, SnapshotScope::kSystem);
-    
+
     QueryResult result = query_context_ptr->QueryStatement(command_statement.get());
     return result;
 }
@@ -1399,7 +1399,7 @@ QueryResult Infinity::DropSnapshot(const String &snapshot_name) {
 
     auto command_statement = MakeUnique<CommandStatement>();
     command_statement->command_info_ = MakeUnique<SnapshotCmd>(snapshot_name, SnapshotOp::kDrop, SnapshotScope::kIgnore);
-    
+
     QueryResult result = query_context_ptr->QueryStatement(command_statement.get());
     return result;
 }
@@ -1411,7 +1411,7 @@ QueryResult Infinity::ShowSnapshot(const String &snapshot_name) {
     auto show_statement = MakeUnique<ShowStatement>();
     show_statement->show_type_ = ShowStmtType::kShowSnapshot;
     show_statement->snapshot_name_ = snapshot_name;
-    
+
     QueryResult result = query_context_ptr->QueryStatement(show_statement.get());
     return result;
 }
@@ -1422,7 +1422,7 @@ QueryResult Infinity::ListSnapshots() {
 
     auto show_statement = MakeUnique<ShowStatement>();
     show_statement->show_type_ = ShowStmtType::kListSnapshots;
-    
+
     QueryResult result = query_context_ptr->QueryStatement(show_statement.get());
     return result;
 }

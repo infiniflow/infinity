@@ -3061,9 +3061,7 @@ String WalCmdRestoreDatabaseSnapshot::CompactInfo() const {
     return std::move(ss).str();
 }
 
-Vector<SharedPtr<EraseBaseCache>> WalCmdDummy::ToCachedMeta(TxnTimeStamp commit_ts) const {
-    return {};
-}
+Vector<SharedPtr<EraseBaseCache>> WalCmdDummy::ToCachedMeta(TxnTimeStamp commit_ts) const { return {}; }
 
 Vector<SharedPtr<EraseBaseCache>> WalCmdCreateDatabase::ToCachedMeta(TxnTimeStamp commit_ts) const {
     UnrecoverableError("WalCmdDummy::ToCachedMeta, unexpected");
@@ -3282,9 +3280,7 @@ Vector<SharedPtr<EraseBaseCache>> WalCmdDropColumnsV2::ToCachedMeta(TxnTimeStamp
     return cache_items;
 }
 
-Vector<SharedPtr<EraseBaseCache>> WalCmdCleanup::ToCachedMeta(TxnTimeStamp commit_ts) const {
-    return {};
-}
+Vector<SharedPtr<EraseBaseCache>> WalCmdCleanup::ToCachedMeta(TxnTimeStamp commit_ts) const { return {}; }
 
 Vector<SharedPtr<EraseBaseCache>> WalCmdCreateTableSnapshot::ToCachedMeta(TxnTimeStamp commit_ts) const { return {}; }
 
