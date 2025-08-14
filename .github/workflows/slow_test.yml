@@ -324,7 +324,7 @@ jobs:
           sudo ln -s ${RUNNER_WORKSPACE_PREFIX}/benchmark/msmarco1M $PWD/test/data/benchmark/msmarco_1m
 
       - name: Golden benchmark sift
-        if: ${{ !cancelled() && !failure() }}
+        if: ${{ !cancelled() && !failure() && steps.choose_test_type.outputs.RUN_BENCHMARK_KNN_TEST == 'true'  }}
         run: |
           if [[ -f "${RUNNER_WORKSPACE_PREFIX}/benchmark/golden_plain_sift_benchmark.log" ]]; then
               echo "golden benchmark result already exists!"
@@ -377,7 +377,7 @@ jobs:
           python3 tools/ci_tools/check_multiple_benchmark_result.py ${RUNNER_WORKSPACE_PREFIX}/benchmark/golden_lvqlsg_sift_benchmark.log lvqlsg_sift_benchmark.log
 
       - name: Golden benchmark gist
-        if: ${{ !cancelled() && !failure() }}
+        if: ${{ !cancelled() && !failure() && steps.choose_test_type.outputs.RUN_BENCHMARK_KNN_TEST == 'true'  }}
         run: |
           if [[ -f "${RUNNER_WORKSPACE_PREFIX}/benchmark/golden_plain_gist_benchmark.log" ]]; then
               echo "golden benchmark result already exists!"
@@ -430,7 +430,7 @@ jobs:
           python3 tools/ci_tools/check_multiple_benchmark_result.py ${RUNNER_WORKSPACE_PREFIX}/benchmark/golden_lvqlsg_gist_benchmark.log lvqlsg_gist_benchmark.log
 
       - name: Golden benchmark msmarco
-        if: ${{ !cancelled() && !failure() }}
+        if: ${{ !cancelled() && !failure() && steps.choose_test_type.outputs.RUN_BENCHMARK_KNN_TEST == 'true'  }}
         run: |
           if [[ -f "${RUNNER_WORKSPACE_PREFIX}/benchmark/golden_plain_msmarco_benchmark.log" ]]; then
               echo "golden benchmark result already exists!"
