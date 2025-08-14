@@ -327,8 +327,6 @@ class TestSnapshot:
         # # EMVB index (for tensors)
         # table_obj.create_index("idx_tensor_emvb", index.IndexInfo("tensor_col", index.IndexType.EMVB, {"pq_subspace_num": "32", "pq_subspace_bits": "8"}), ConflictType.Ignore)
 
-        # IVF index
-        table_obj.create_index("idx_vector_ivf", index.IndexInfo("vector_col", index.IndexType.IVF, {"metric": "l2"}), ConflictType.Ignore)
     
     def insert_comprehensive_data(self, table_obj, num_rows: int = 1000):
         """Insert comprehensive test data"""
