@@ -16,8 +16,6 @@
 
 #include "extra_ddl_info.h"
 #include "statement/statement_common.h"
-// #include <string>
-// #include <vector>
 
 #ifndef PARESER_USE_STD_MODULE
 #define PARESER_USE_STD_MODULE 1

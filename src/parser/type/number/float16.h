@@ -1,11 +1,5 @@
 #pragma once
 
-// #include <cmath>
-// #include <cstdint>
-// #include <cstring>
-// #include <iostream>
-// #include <limits>
-
 #if defined(__ARM_NEON)
 #include <arm_neon.h>
 #endif

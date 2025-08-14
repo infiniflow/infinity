@@ -68,6 +68,8 @@ import :buffer_handle;
 import :virtual_store;
 import :txn_context;
 import :kv_utility;
+import :mem_index;
+import :catalog_cache;
 
 import std;
 import third_party;

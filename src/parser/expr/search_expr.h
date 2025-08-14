@@ -8,8 +8,6 @@
  * sub searches, and/or knn searches. Requires a minimum of 2 results sets for ranking from the specified sources.
  */
 #include "parsed_expr.h"
-// #include <string>
-// #include <vector>
 
 #ifndef PARESER_USE_STD_MODULE
 #define PARESER_USE_STD_MODULE 1

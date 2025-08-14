@@ -17,7 +17,6 @@
 #include "parser_assert.h"
 #include "stats/global_resource_usage.h"
 #include "type/type_info.h"
-// #include <memory>
 
 #ifndef PARESER_USE_STD_MODULE
 #define PARESER_USE_STD_MODULE 1

@@ -17,14 +17,6 @@
 #include "parser_assert.h"
 #include "type/number/bfloat16.h"
 #include "type/number/float16.h"
-// #include <arrow/type_fwd.h>
-// #include <bitset>
-// #include <cassert>
-// #include <charconv>
-// #include <cstdint>
-// #include <cstring>
-// #include <limits>
-// #include <sstream>
 
 #ifndef PARESER_USE_STD_MODULE
 #define PARESER_USE_STD_MODULE 1

@@ -14,8 +14,6 @@
 
 #pragma once
 
-// #include <string>
-
 #include "base_statement.h"
 
 #ifndef PARESER_USE_STD_MODULE

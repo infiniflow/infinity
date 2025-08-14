@@ -14,17 +14,6 @@
 
 module;
 
-// #include <memory>
-// #include <thrift/TToString.h>
-// #include <thrift/concurrency/ThreadFactory.h>
-// #include <thrift/concurrency/ThreadManager.h>
-// #include <thrift/protocol/TBinaryProtocol.h>
-// #include <thrift/server/TNonblockingServer.h>
-// #include <thrift/server/TThreadPoolServer.h>
-// #include <thrift/server/TThreadedServer.h>
-// #include <thrift/transport/TServerSocket.h>
-// #include <thrift/transport/TTransportUtils.h>
-
 module infinity_core:peer_thrift_server.impl;
 
 import :peer_thrift_server;

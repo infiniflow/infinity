@@ -14,8 +14,6 @@
 
 module;
 
-// #include <memory>
-
 module infinity_core:thrift_server.impl;
 
 import :thrift_server;

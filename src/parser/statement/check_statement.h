@@ -2,7 +2,6 @@
 
 #include "base_statement.h"
 #include "statement/statement_common.h"
-// #include <optional>
 
 #ifndef PARESER_USE_STD_MODULE
 #define PARESER_USE_STD_MODULE 1

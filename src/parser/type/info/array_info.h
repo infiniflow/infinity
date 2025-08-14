@@ -14,8 +14,6 @@
 
 #pragma once
 
-// #include <utility>
-
 #include "type/data_type.h"
 #include "type/type_info.h"
 
