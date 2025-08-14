@@ -169,13 +169,15 @@ include_directories(${OATPP_INCLUDE_DIRS})
 message(STATUS "Using vcpkg toolchain - automatic package discovery enabled")
 
 # https://youtrack.jetbrains.com/issue/CPP-39632/import-std-CLion-cant-resolve-module-std-in-case-of-clang
-add_library(unused_std_target STATIC)
-target_sources(unused_std_target
-        PRIVATE
-        FILE_SET CXX_MODULES
-        BASE_DIRS /usr/include/c++/15
-        FILES /usr/include/c++/15/bits/std.cc /usr/include/c++/15/bits/std.compat.cc
-)
+if (NOT CI)
+    add_library(unused_std_target STATIC)
+    target_sources(unused_std_target
+            PRIVATE
+            FILE_SET CXX_MODULES
+            BASE_DIRS /usr/include/c++/15
+            FILES /usr/include/c++/15/bits/std.cc /usr/include/c++/15/bits/std.compat.cc
+    )
+endif ()
 
 # Get current system time and print the build time
 execute_process(COMMAND "date" +"%Y-%m-%d %H:%M.%S" OUTPUT_VARIABLE CURRENT_SYS_TIME)
