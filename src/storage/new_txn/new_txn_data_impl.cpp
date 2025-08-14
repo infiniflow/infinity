@@ -1124,7 +1124,8 @@ Status NewTxn::CompactBlock(BlockMeta &block_meta, NewTxnCompactState &compact_s
                     return status;
                 }
             }
-            append_size = std::min(static_cast<SizeT>(range.second - range.first), compact_state.block_meta_->block_capacity() - compact_state.cur_block_row_cnt_);
+            append_size = std::min(static_cast<SizeT>(range.second - range.first),
+                                   compact_state.block_meta_->block_capacity() - compact_state.cur_block_row_cnt_);
             if (append_size == 0) {
                 status = compact_state.FinalizeBlock();
                 if (!status.ok()) {
@@ -1507,6 +1508,7 @@ Status NewTxn::CommitBottomAppend(WalCmdAppendV2 *append_cmd) {
     const String &table_id_str = append_cmd->table_id_;
     TxnTimeStamp commit_ts = CommitTS();
     TableMeeta table_meta(db_id_str, table_id_str, this);
+    table_meta.SetDBTableName(db_name, table_name);
     Optional<SegmentMeta> segment_meta;
     Optional<BlockMeta> block_meta;
     SizeT copied_row_cnt = 0;
@@ -1898,7 +1900,6 @@ Status NewTxn::FlushVersionFile(BlockMeta &block_meta, TxnTimeStamp save_ts) {
     version_buffer->Save(VersionFileWorkerSaveCtx(save_ts));
     return Status::OK();
 }
-
 
 Status NewTxn::FlushColumnFiles(BlockMeta &block_meta, TxnTimeStamp save_ts) {
     Status status;

@@ -82,10 +82,11 @@ void DumpIndexProcessor::DoDump(DumpMemIndexTask *dump_task) {
     SegmentID segment_id = dump_task->segment_id_;
     RowID begin_row_id = dump_task->begin_row_id_;
 
-    Status commit_status = Status::OK();
-    Status rollback_status = Status::OK();
-    i64 retry_count = 0;
+    Status commit_status = Status::Ignore();
+    Status rollback_status = Status::Ignore();
+    i64 dump_count = 0;
     do {
+        dump_count++;
         SharedPtr<BGTaskInfo> bg_task_info = MakeShared<BGTaskInfo>(BGTaskType::kDumpMemIndex);
         SharedPtr<NewTxn> new_txn_shared = new_txn_mgr->BeginTxnShared(MakeUnique<String>("Dump index"), TransactionType::kNormal);
 
@@ -119,8 +120,9 @@ void DumpIndexProcessor::DoDump(DumpMemIndexTask *dump_task) {
                 }
             }
         } else {
-            LOG_ERROR(fmt::format("Dump mem index {}.{}.{} in segment: failed: {}", db_name, table_name, index_name, segment_id, status.message()));
-            Status rollback_status = new_txn_mgr->RollBackTxn(new_txn_shared.get());
+            LOG_ERROR(
+                fmt::format("Dump mem index {}.{}.{} in segment: {} failed: {}", db_name, table_name, index_name, segment_id, status.message()));
+            rollback_status = new_txn_mgr->RollBackTxn(new_txn_shared.get());
             if (!rollback_status.ok()) {
                 UnrecoverableError(rollback_status.message());
             }
@@ -133,7 +135,7 @@ void DumpIndexProcessor::DoDump(DumpMemIndexTask *dump_task) {
         if (!bg_task_info->task_info_list_.empty()) {
             new_txn_mgr->AddTaskInfo(bg_task_info);
         }
-    } while (!commit_status.ok() && rollback_status.ok() && (commit_status.code_ == ErrorCode::kTxnConflict || ++retry_count <= 3));
+    } while (!commit_status.ok() && rollback_status.ok() && (commit_status.code_ == ErrorCode::kTxnConflict || dump_count <= 5));
 }
 
 void DumpIndexProcessor::Process() {

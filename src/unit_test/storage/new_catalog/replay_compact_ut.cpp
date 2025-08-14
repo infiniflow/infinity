@@ -68,10 +68,8 @@ protected:
     void SetUp() override {
         NewReplayTest::SetUp();
         db_name = std::make_shared<String>("default_db");
-        column_def1 =
-            std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
-        column_def2 =
-            std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
+        column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
+        column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
         table_name = std::make_shared<std::string>("tb1");
         table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def2});
         index_name1 = std::make_shared<std::string>("index1");
@@ -80,30 +78,6 @@ protected:
         index_def2 = IndexFullText::Make(index_name2, MakeShared<String>(), "file_name", {column_def2->name()}, {});
         block_row_cnt = 8192;
     }
-
-    SharedPtr<DataBlock> make_input_block(const Value &v1, const Value &v2) {
-        auto input_block = MakeShared<DataBlock>();
-        auto append_to_col = [&](ColumnVector &col, Value v) {
-            for (u32 i = 0; i < block_row_cnt; ++i) {
-                col.AppendValue(v);
-            }
-        };
-        // Initialize input block
-        {
-            auto col1 = ColumnVector::Make(column_def1->type());
-            col1->Initialize();
-            append_to_col(*col1, v1);
-            input_block->InsertVector(col1, 0);
-        }
-        {
-            auto col2 = ColumnVector::Make(column_def2->type());
-            col2->Initialize();
-            append_to_col(*col2, v2);
-            input_block->InsertVector(col2, 1);
-        }
-        input_block->Finalize();
-        return input_block;
-    };
 
     void CheckDataAfterSuccesfulCompact() {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check"), TransactionType::kNormal);
@@ -323,8 +297,10 @@ TEST_P(TestTxnReplayCompact, test_compact_commit) {
 
     for (int i = 0; i < 2; ++i) {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("import"), TransactionType::kNormal);
-        Vector<SharedPtr<DataBlock>> input_blocks = {make_input_block(Value::MakeInt(1), Value::MakeVarchar("abc")),
-                                                     make_input_block(Value::MakeInt(2), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"))};
+        Vector<SharedPtr<DataBlock>> input_blocks = {
+            MakeInputBlock(Value::MakeInt(1), Value::MakeVarchar("abc"), block_row_cnt),
+            MakeInputBlock(Value::MakeInt(2), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"), block_row_cnt)};
+
         Status status = txn->Import(*db_name, *table_name, input_blocks);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
@@ -363,8 +339,9 @@ TEST_P(TestTxnReplayCompact, test_compact_rollback) {
 
     for (int i = 0; i < 2; ++i) {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("import"), TransactionType::kNormal);
-        Vector<SharedPtr<DataBlock>> input_blocks = {make_input_block(Value::MakeInt(1), Value::MakeVarchar("abc")),
-                                                     make_input_block(Value::MakeInt(2), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"))};
+        Vector<SharedPtr<DataBlock>> input_blocks = {
+            MakeInputBlock(Value::MakeInt(1), Value::MakeVarchar("abc"), block_row_cnt),
+            MakeInputBlock(Value::MakeInt(2), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"), block_row_cnt)};
         Status status = txn->Import(*db_name, *table_name, input_blocks);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
@@ -418,8 +395,9 @@ TEST_P(TestTxnReplayCompact, test_replay_compact_flush_gap) {
 
     for (int i = 0; i < 2; ++i) {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("import"), TransactionType::kNormal);
-        Vector<SharedPtr<DataBlock>> input_blocks = {make_input_block(Value::MakeInt(1), Value::MakeVarchar("abc")),
-                                                     make_input_block(Value::MakeInt(2), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"))};
+        Vector<SharedPtr<DataBlock>> input_blocks = {
+            MakeInputBlock(Value::MakeInt(1), Value::MakeVarchar("abc"), block_row_cnt),
+            MakeInputBlock(Value::MakeInt(2), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"), block_row_cnt)};
         Status status = txn->Import(*db_name, *table_name, input_blocks);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
@@ -465,8 +443,9 @@ TEST_P(TestTxnReplayCompact, test_compact_interrupt) {
 
     for (int i = 0; i < 2; ++i) {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("import"), TransactionType::kNormal);
-        Vector<SharedPtr<DataBlock>> input_blocks = {make_input_block(Value::MakeInt(1), Value::MakeVarchar("abc")),
-                                                     make_input_block(Value::MakeInt(2), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"))};
+        Vector<SharedPtr<DataBlock>> input_blocks = {
+            MakeInputBlock(Value::MakeInt(1), Value::MakeVarchar("abc"), block_row_cnt),
+            MakeInputBlock(Value::MakeInt(2), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"), block_row_cnt)};
         Status status = txn->Import(*db_name, *table_name, input_blocks);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
@@ -512,8 +491,9 @@ TEST_P(TestTxnReplayCompact, DISABLED_test_compact_with_index) {
 
     for (int i = 0; i < 2; ++i) {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("import"), TransactionType::kNormal);
-        Vector<SharedPtr<DataBlock>> input_blocks = {make_input_block(Value::MakeInt(1), Value::MakeVarchar("abc")),
-                                                     make_input_block(Value::MakeInt(2), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"))};
+        Vector<SharedPtr<DataBlock>> input_blocks = {
+            MakeInputBlock(Value::MakeInt(1), Value::MakeVarchar("abc"), block_row_cnt),
+            MakeInputBlock(Value::MakeInt(2), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"), block_row_cnt)};
         Status status = txn->Import(*db_name, *table_name, input_blocks);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
@@ -563,8 +543,9 @@ TEST_P(TestTxnReplayCompact, test_compact1_rollback) {
 
     for (int i = 0; i < 2; ++i) {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("import"), TransactionType::kNormal);
-        Vector<SharedPtr<DataBlock>> input_blocks = {make_input_block(Value::MakeInt(1), Value::MakeVarchar("abc")),
-                                                     make_input_block(Value::MakeInt(2), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"))};
+        Vector<SharedPtr<DataBlock>> input_blocks = {
+            MakeInputBlock(Value::MakeInt(1), Value::MakeVarchar("abc"), block_row_cnt),
+            MakeInputBlock(Value::MakeInt(2), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"), block_row_cnt)};
         Status status = txn->Import(*db_name, *table_name, input_blocks);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);

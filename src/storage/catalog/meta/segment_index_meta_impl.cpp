@@ -59,14 +59,38 @@ Status SegmentIndexMeta::GetNextChunkID(ChunkID &chunk_id) {
     return Status::OK();
 }
 
-Tuple<ChunkID, Status> SegmentIndexMeta::GetNextChunkID1() {
+Status SegmentIndexMeta::SetNextChunkID(ChunkID chunk_id) {
+    next_chunk_id_ = chunk_id;
+    String next_chunk_id_key = GetSegmentIndexTag("next_chunk_id");
+    String next_chunk_id_str = std::to_string(chunk_id);
+    Status status = kv_instance_.Put(next_chunk_id_key, next_chunk_id_str);
+    if (!status.ok()) {
+        return status;
+    }
+    return Status::OK();
+}
+
+Tuple<ChunkID, Status> SegmentIndexMeta::GetAndSetNextChunkID() {
+    std::lock_guard<std::mutex> lock(mtx_);
+    ChunkID chunk_id = std::numeric_limits<ChunkID>::max();
     if (!next_chunk_id_) {
         Status status = LoadNextChunkID();
-        if (!status.ok()) {
-            return {std::numeric_limits<ChunkID>::max(), status};
+        // If next_chunk_id is not found, it means the segment index is empty.
+        // We can use chunk id 0 and set the next_chunk_id to 1.
+        if (status.code_ == ErrorCode::kNotFound) {
+            next_chunk_id_ = 0;
+        } else if (!status.ok()) {
+            return {chunk_id, status};
         }
     }
-    return {*next_chunk_id_, Status::OK()};
+    chunk_id = *next_chunk_id_;
+
+    (*next_chunk_id_)++;
+    String next_chunk_id_key = GetSegmentIndexTag("next_chunk_id");
+    String next_chunk_id_str = std::to_string(*next_chunk_id_);
+    Status status = kv_instance_.Put(next_chunk_id_key, next_chunk_id_str);
+
+    return {chunk_id, status};
 }
 
 Tuple<Vector<ChunkID> *, Status> SegmentIndexMeta::GetChunkIDs1() {
@@ -138,17 +162,6 @@ Status SegmentIndexMeta::AddChunkIndexID1(ChunkID chunk_id, NewTxn *new_txn) {
     return kv_instance_.Put(chunk_id_key, commit_ts_str);
 }
 
-Status SegmentIndexMeta::SetNextChunkID(ChunkID chunk_id) {
-    next_chunk_id_ = chunk_id;
-    String next_chunk_id_key = GetSegmentIndexTag("next_chunk_id");
-    String next_chunk_id_str = std::to_string(chunk_id);
-    Status status = kv_instance_.Put(next_chunk_id_key, next_chunk_id_str);
-    if (!status.ok()) {
-        return status;
-    }
-    return Status::OK();
-}
-
 Status SegmentIndexMeta::UpdateFtInfo(u64 column_len_sum, u32 column_len_cnt) {
     if (!ft_info_) {
         Status status = LoadFtInfo();
@@ -182,29 +195,12 @@ Status SegmentIndexMeta::SetNoMemIndex() {
     return Status::OK();
 }
 
-Status SegmentIndexMeta::InitSet() {
-    return SetNextChunkID(0);
-}
-
 Status SegmentIndexMeta::InitSet1() {
-    {
-        Status status = SetNextChunkID(0);
-        if (!status.ok()) {
-            return status;
-        }
-    }
+    // next_chunk_id is not set in InitSet1, it will be set when the first chunk is added.
     return Status::OK();
 }
 
-Status SegmentIndexMeta::RestoreSet(const ChunkID &next_chunk_id) {
-   {
-        Status status = SetNextChunkID(next_chunk_id);
-        if (!status.ok()) {
-            return status;
-        }
-    }
-    return Status::OK();
-}
+Status SegmentIndexMeta::RestoreSet(const ChunkID &next_chunk_id) { return SetNextChunkID(next_chunk_id); }
 
 Status SegmentIndexMeta::LoadSet() {
     // {
@@ -458,7 +454,7 @@ Tuple<SharedPtr<SegmentIndexSnapshotInfo>, Status> SegmentIndexMeta::MapMetaToSn
     auto [chunk_ids, status] = GetChunkIDs1();
     if (!status.ok()) {
         return {nullptr, status};
-    }   
+    }
     for (auto &chunk_id : *chunk_ids) {
         ChunkIndexMeta chunk_index_meta(chunk_id, *this);
         auto [chunk_index_snapshot, chunk_index_status] = chunk_index_meta.MapMetaToSnapShotInfo(chunk_id);

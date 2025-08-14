@@ -298,7 +298,7 @@ PersistReadResult PersistenceManager::GetObjCache(const String &file_path) {
     Status status = kv_store_->Get(pm_fp_key, value);
     if (!status.ok()) {
         LOG_WARN(fmt::format("GetObjCache Failed to find object for local path {}: {}", local_path, status.message()));
-        LOG_TRACE(fmt::format("All key-value pairs in kv_store: \n{}", kv_store_->ToString()));
+        // LOG_TRACE(fmt::format("All key-value pairs in kv_store: \n{}", kv_store_->ToString()));
         return result;
     }
     ObjAddr obj_addr;
@@ -356,8 +356,7 @@ Tuple<SizeT, Status> PersistenceManager::GetFileSize(const String &file_path) {
 
     String pm_fp_key = KeyEncode::PMObjectKey(local_path);
     String value;
-    Status status = kv_store_->Get(pm_fp_key, value);
-    if (!status.ok()) {
+    if (auto status = kv_store_->Get(pm_fp_key, value); !status.ok()) {
         LOG_WARN(fmt::format("GetFileSize Failed to find object for local path {}: {}", local_path, status.message()));
         return {0, Status::NotFound(fmt::format("Can't find {}", local_path))};
     }

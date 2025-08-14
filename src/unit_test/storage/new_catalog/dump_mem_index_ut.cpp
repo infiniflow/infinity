@@ -5965,12 +5965,12 @@ TEST_P(TestTxnDumpMemIndex, DISABLED_dump_and_dump) {
 
         auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kNormal);
         status = txn1->DumpMemIndex(*db_name, *table_name, *index_name1, segment_id);
-        EXPECT_FALSE(status.ok());
+        EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
 
-        status = new_txn_mgr->RollBackTxn(txn1);
+        status = new_txn_mgr->CommitTxn(txn1);
         EXPECT_TRUE(status.ok());
 
         check_index0(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->GetSecondaryIndex() == nullptr); });
@@ -6004,8 +6004,8 @@ TEST_P(TestTxnDumpMemIndex, DISABLED_dump_and_dump) {
 
         auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kNormal);
         status = txn1->DumpMemIndex(*db_name, *table_name, *index_name1, segment_id);
-        EXPECT_FALSE(status.ok());
-        status = new_txn_mgr->RollBackTxn(txn1);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn1);
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn);
@@ -6044,8 +6044,8 @@ TEST_P(TestTxnDumpMemIndex, DISABLED_dump_and_dump) {
         EXPECT_TRUE(status.ok());
 
         status = txn1->DumpMemIndex(*db_name, *table_name, *index_name1, segment_id);
-        EXPECT_FALSE(status.ok());
-        status = new_txn_mgr->RollBackTxn(txn1);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn1);
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn);
@@ -6064,7 +6064,7 @@ TEST_P(TestTxnDumpMemIndex, DISABLED_dump_and_dump) {
         drop_db(*db_name);
     }
 
-    //             t1                         dump index (fail)                           rollback (success)
+    //             t1                         dump index                           commit (success)
     //             |-----------------------------|------------------------------------------|
     //         |------------------|--------------------|
     //         t2                dump        commit
@@ -6084,8 +6084,8 @@ TEST_P(TestTxnDumpMemIndex, DISABLED_dump_and_dump) {
         EXPECT_TRUE(status.ok());
 
         status = txn1->DumpMemIndex(*db_name, *table_name, *index_name1, segment_id);
-        EXPECT_FALSE(status.ok());
-        status = new_txn_mgr->RollBackTxn(txn1);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn1);
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn);

@@ -114,7 +114,9 @@ BufferHandle BufferObj::Load() {
             bool from_spill = type_ != BufferType::kPersistent;
             file_worker_->ReadFromFile(from_spill);
 
-            bool free_success = buffer_mgr_->RequestSpace(GetBufferSize());
+            SizeT buffer_size = GetBufferSize();
+            LOG_TRACE(fmt::format("Request memory {}", buffer_size));
+            bool free_success = buffer_mgr_->RequestSpace(buffer_size);
             if (!free_success) {
                 UnrecoverableError("Out of memory.");
             }
@@ -122,13 +124,15 @@ BufferHandle BufferObj::Load() {
         }
         case BufferStatus::kNew: {
             buffer_mgr_->AddCacheMissCount();
-            LOG_TRACE(fmt::format("Request memory {}", GetBufferSize()));
-            bool free_success = buffer_mgr_->RequestSpace(GetBufferSize());
+
+            SizeT buffer_size = GetBufferSize();
+            LOG_TRACE(fmt::format("Request memory {}", buffer_size));
+            bool free_success = buffer_mgr_->RequestSpace(buffer_size);
             if (!free_success) {
                 UnrecoverableError("Out of memory.");
             }
             file_worker_->AllocateInMemory();
-            LOG_TRACE(fmt::format("Allocated memory {}", GetBufferSize()));
+            LOG_TRACE(fmt::format("Allocated memory {}", buffer_size));
             break;
         }
         default: {

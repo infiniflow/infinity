@@ -272,7 +272,9 @@ void VirtualStore::RecursiveCleanupAllEmptyDir(const String &path) {
 
     for (const auto &entry : std::filesystem::directory_iterator(path)) {
         auto entry_path = entry.path();
-        if (std::filesystem::is_empty(entry_path)) {
+
+        // Skip removing empty pos files of fulltext index, because they might be used.
+        if (std::filesystem::is_empty(entry_path) && entry_path.extension().string() != ".pos") {
             std::filesystem::remove(entry_path);
         }
     }
