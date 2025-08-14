@@ -252,6 +252,7 @@ class TestInfinity:
         with pytest.raises(InfinityException) as e:
             db_obj.create_table("test_various_table_create_option"+suffix, {"c1": {"type": "int"}}, conflict_type)
 
+        # http and sdk have different return
         assert e.type == InfinityException
 
     @pytest.mark.parametrize("conflict_type", [
