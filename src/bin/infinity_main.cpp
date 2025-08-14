@@ -171,7 +171,7 @@ void SignalHandler(int signal_number, siginfo_t *, void *) {
         case SIGUSR2: {
             // http://jemalloc.net/jemalloc.3.html
             malloc_stats_print(nullptr, nullptr, "admp");
-            int rc = mallctl("prof.dump", NULL, NULL, NULL, 0);
+            int rc = mallctl("prof.dump", nullptr, nullptr, nullptr, 0);
             printf("Dump memory profile %d\n", rc);
             break;
         }
@@ -189,15 +189,15 @@ void RegisterSignal() {
     sig_action.sa_flags = SA_SIGINFO;
     sig_action.sa_sigaction = SignalHandler;
     sigemptyset(&sig_action.sa_mask);
-    sigaction(SIGUSR1, &sig_action, NULL);
+    sigaction(SIGUSR1, &sig_action, nullptr);
 #ifdef ENABLE_JEMALLOC_PROF
-    sigaction(SIGUSR2, &sig_action, NULL);
+    sigaction(SIGUSR2, &sig_action, nullptr);
 #endif
-    sigaction(SIGINT, &sig_action, NULL);
-    sigaction(SIGQUIT, &sig_action, NULL);
-    sigaction(SIGTERM, &sig_action, NULL);
-    sigaction(SIGSEGV, &sig_action, NULL);
-    sigaction(SIGABRT, &sig_action, NULL);
+    sigaction(SIGINT, &sig_action, nullptr);
+    sigaction(SIGQUIT, &sig_action, nullptr);
+    sigaction(SIGTERM, &sig_action, nullptr);
+    sigaction(SIGSEGV, &sig_action, nullptr);
+    sigaction(SIGABRT, &sig_action, nullptr);
 }
 
 void TerminateHandler() {
