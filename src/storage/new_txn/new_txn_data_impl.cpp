@@ -1126,7 +1126,8 @@ Status NewTxn::CompactBlock(BlockMeta &block_meta, NewTxnCompactState &compact_s
                     return status;
                 }
             }
-            append_size = std::min(static_cast<SizeT>(range.second - range.first), compact_state.block_meta_->block_capacity() - compact_state.cur_block_row_cnt_);
+            append_size = std::min(static_cast<SizeT>(range.second - range.first),
+                                   compact_state.block_meta_->block_capacity() - compact_state.cur_block_row_cnt_);
             if (append_size == 0) {
                 status = compact_state.FinalizeBlock();
                 if (!status.ok()) {
@@ -1901,7 +1902,6 @@ Status NewTxn::FlushVersionFile(BlockMeta &block_meta, TxnTimeStamp save_ts) {
     version_buffer->Save(VersionFileWorkerSaveCtx(save_ts));
     return Status::OK();
 }
-
 
 Status NewTxn::FlushColumnFiles(BlockMeta &block_meta, TxnTimeStamp save_ts) {
     Status status;
