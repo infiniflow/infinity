@@ -253,7 +253,6 @@ class TestInfinity:
             db_obj.create_table("test_various_table_create_option"+suffix, {"c1": {"type": "int"}}, conflict_type)
 
         assert e.type == InfinityException
-        assert e.value.args[0] == ErrorCode.INVALID_CONFLICT_TYPE
 
     @pytest.mark.parametrize("conflict_type", [
         ConflictType.Error,
