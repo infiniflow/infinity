@@ -111,39 +111,205 @@ protected:
             status = new_txn_mgr->CommitTxn(txn);
             EXPECT_TRUE(status.ok());
         }
-        u32 block_row_cnt = 8192;
-        auto make_input_block = [&](const Value &v1, const Value &v2) {
-            auto input_block = MakeShared<DataBlock>();
-            auto append_to_col = [&](ColumnVector &col, const Value &v) {
-                for (u32 i = 0; i < block_row_cnt; ++i) {
-                    col.AppendValue(v);
-                }
-            };
-            // Initialize input block
-            {
-                auto col1 = ColumnVector::Make(column_def1->type());
-                col1->Initialize();
-                append_to_col(*col1, v1);
-                input_block->InsertVector(col1, 0);
-            }
-            {
-                auto col2 = ColumnVector::Make(column_def2->type());
-                col2->Initialize();
-                append_to_col(*col2, v2);
-                input_block->InsertVector(col2, 1);
-            }
-            input_block->Finalize();
-            return input_block;
-        };
         for (int i = 0; i < 2; ++i) {
             auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>(fmt::format("import {}", i)), TransactionType::kNormal);
-            Vector<SharedPtr<DataBlock>> input_blocks = {make_input_block(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"))};
+            Vector<SharedPtr<DataBlock>> input_blocks = {MakeInputBlock(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"), 8192)};
             Status status = txn->Import(*db_name, *table_name, input_blocks);
             EXPECT_TRUE(status.ok());
             status = new_txn_mgr->CommitTxn(txn);
             EXPECT_TRUE(status.ok());
         }
     }
+
+    void CheckDataAfterSuccesfulCompact() {
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check"), TransactionType::kNormal);
+
+        Optional<DBMeeta> db_meta;
+        Optional<TableMeeta> table_meta;
+        Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
+        EXPECT_TRUE(status.ok());
+
+        SizeT table_row_cnt;
+        std::tie(table_row_cnt, status) = table_meta->GetTableRowCount();
+        EXPECT_EQ(table_row_cnt, 8192 * 2);
+
+        Vector<SegmentID> *segment_ids_ptr = nullptr;
+        std::tie(segment_ids_ptr, status) = table_meta->GetSegmentIDs1();
+        EXPECT_TRUE(status.ok());
+        EXPECT_EQ(*segment_ids_ptr, Vector<SegmentID>({2}));
+        for (auto segment_id : *segment_ids_ptr) {
+            SegmentMeta segment_meta(segment_id, *table_meta);
+
+            SizeT segment_row_cnt = 0;
+            std::tie(segment_row_cnt, status) = segment_meta.GetRowCnt1();
+            EXPECT_EQ(segment_row_cnt, 8192 * 2);
+
+            Vector<BlockID> *block_ids_ptr = nullptr;
+            std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1();
+            EXPECT_TRUE(status.ok());
+            EXPECT_EQ(*block_ids_ptr, Vector<BlockID>({0, 1}));
+
+            SizeT block_row_cnt = 0;
+            for (const auto &block_id : *block_ids_ptr) {
+                BlockMeta block_meta(block_id, segment_meta);
+                std::tie(block_row_cnt, status) = block_meta.GetRowCnt1();
+                EXPECT_EQ(block_row_cnt, 8192);
+
+                NewTxnGetVisibleRangeState state;
+                status = NewCatalog::GetBlockVisibleRange(block_meta, txn->BeginTS(), txn->CommitTS(), state);
+                EXPECT_TRUE(status.ok());
+                {
+                    Pair<BlockOffset, BlockOffset> range;
+                    BlockOffset offset = 0;
+                    bool has_next = state.Next(offset, range);
+                    EXPECT_TRUE(has_next);
+                    EXPECT_EQ(range.first, 0);
+                    EXPECT_EQ(range.second, 8192);
+                    offset = range.second;
+                    has_next = state.Next(offset, range);
+                    EXPECT_FALSE(has_next);
+                }
+            }
+        }
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+    };
+
+    void CheckIndexAfterSuccessfulCompact(const String &index_name) {
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check index"), TransactionType::kNormal);
+
+        Optional<DBMeeta> db_meta;
+        Optional<TableMeeta> table_meta;
+        Optional<TableIndexMeeta> table_index_meta;
+        String table_key;
+        String index_key;
+        Status status = txn->GetTableIndexMeta(*db_name, *table_name, index_name, db_meta, table_meta, table_index_meta, &table_key, &index_key);
+        EXPECT_TRUE(status.ok());
+
+        SegmentID segment_id = 0;
+        {
+            auto [segment_ids_ptr, status] = table_index_meta->GetSegmentIndexIDs1();
+            EXPECT_TRUE(status.ok());
+            EXPECT_EQ(*segment_ids_ptr, Vector<SegmentID>({2}));
+            segment_id = (*segment_ids_ptr)[0];
+        }
+
+        SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta);
+        ChunkID chunk_id = 0;
+        {
+            Vector<ChunkID> *chunk_ids_ptr = nullptr;
+            std::tie(chunk_ids_ptr, status) = segment_index_meta.GetChunkIDs1();
+            EXPECT_TRUE(status.ok());
+            EXPECT_EQ(*chunk_ids_ptr, Vector<ChunkID>({0}));
+            chunk_id = (*chunk_ids_ptr)[0];
+        }
+        ChunkIndexMeta chunk_index_meta(chunk_id, segment_index_meta);
+        {
+            ChunkIndexMetaInfo *chunk_info_ptr = nullptr;
+            Status status = chunk_index_meta.GetChunkInfo(chunk_info_ptr);
+            EXPECT_TRUE(status.ok());
+            EXPECT_EQ(chunk_info_ptr->base_row_id_, RowID(segment_id, 0));
+            EXPECT_EQ(chunk_info_ptr->row_cnt_, 8192 * 2);
+        }
+
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+    };
+
+    void CheckDataAfterFailedCompact() {
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check"), TransactionType::kNormal);
+
+        Optional<DBMeeta> db_meta;
+        Optional<TableMeeta> table_meta;
+        Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
+        EXPECT_TRUE(status.ok());
+
+        SizeT table_row_cnt;
+        std::tie(table_row_cnt, status) = table_meta->GetTableRowCount();
+        EXPECT_EQ(table_row_cnt, 8192 * 2);
+
+        Vector<SegmentID> *segment_ids_ptr = nullptr;
+        std::tie(segment_ids_ptr, status) = table_meta->GetSegmentIDs1();
+        EXPECT_TRUE(status.ok());
+        EXPECT_EQ(*segment_ids_ptr, Vector<SegmentID>({0, 1}));
+        for (auto segment_id : *segment_ids_ptr) {
+            SegmentMeta segment_meta(segment_id, *table_meta);
+
+            SizeT segment_row_cnt = 0;
+            std::tie(segment_row_cnt, status) = segment_meta.GetRowCnt1();
+            EXPECT_EQ(segment_row_cnt, 8192);
+
+            Vector<BlockID> *block_ids_ptr = nullptr;
+            std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1();
+            EXPECT_TRUE(status.ok());
+            EXPECT_EQ(*block_ids_ptr, Vector<BlockID>({0}));
+
+            SizeT block_row_cnt = 0;
+            for (const auto &block_id : *block_ids_ptr) {
+                BlockMeta block_meta(block_id, segment_meta);
+                std::tie(block_row_cnt, status) = block_meta.GetRowCnt1();
+                EXPECT_EQ(block_row_cnt, 8192);
+
+                NewTxnGetVisibleRangeState state;
+                status = NewCatalog::GetBlockVisibleRange(block_meta, txn->BeginTS(), txn->CommitTS(), state);
+                EXPECT_TRUE(status.ok());
+                {
+                    Pair<BlockOffset, BlockOffset> range;
+                    BlockOffset offset = 0;
+                    bool has_next = state.Next(offset, range);
+                    EXPECT_TRUE(has_next);
+                    EXPECT_EQ(range.first, 0);
+                    EXPECT_EQ(range.second, 8192);
+                    offset = range.second;
+                    has_next = state.Next(offset, range);
+                    EXPECT_FALSE(has_next);
+                }
+            }
+        }
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+    };
+
+    void CheckIndexAfterFailedCompact(const String &index_name) {
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check index"), TransactionType::kNormal);
+
+        Optional<DBMeeta> db_meta;
+        Optional<TableMeeta> table_meta;
+        Optional<TableIndexMeeta> table_index_meta;
+        String table_key;
+        String index_key;
+        Status status = txn->GetTableIndexMeta(*db_name, *table_name, index_name, db_meta, table_meta, table_index_meta, &table_key, &index_key);
+        EXPECT_TRUE(status.ok());
+
+        SegmentID segment_id = 0;
+        {
+            auto [segment_ids_ptr, status] = table_index_meta->GetSegmentIndexIDs1();
+            EXPECT_TRUE(status.ok());
+            EXPECT_EQ(*segment_ids_ptr, Vector<SegmentID>({0, 1}));
+            segment_id = (*segment_ids_ptr)[0];
+        }
+
+        SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta);
+        ChunkID chunk_id = 0;
+        {
+            Vector<ChunkID> *chunk_ids_ptr = nullptr;
+            std::tie(chunk_ids_ptr, status) = segment_index_meta.GetChunkIDs1();
+            EXPECT_TRUE(status.ok());
+            EXPECT_EQ(*chunk_ids_ptr, Vector<ChunkID>({0}));
+            chunk_id = (*chunk_ids_ptr)[0];
+        }
+        ChunkIndexMeta chunk_index_meta(chunk_id, segment_index_meta);
+        {
+            ChunkIndexMetaInfo *chunk_info_ptr = nullptr;
+            Status status = chunk_index_meta.GetChunkInfo(chunk_info_ptr);
+            EXPECT_TRUE(status.ok());
+            EXPECT_EQ(chunk_info_ptr->base_row_id_, RowID(segment_id, 0));
+            EXPECT_EQ(chunk_info_ptr->row_cnt_, 8192);
+        }
+
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+    };
 
     void DropDB() {
         // drop database
@@ -168,44 +334,72 @@ INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
                          TestTxnCompact,
                          ::testing::Values(BaseTestParamStr::NEW_CONFIG_PATH, BaseTestParamStr::NEW_VFS_OFF_CONFIG_PATH));
 
+TEST_P(TestTxnCompact, compact_with_index_commit) {
+    Status status;
+    PrepareForCompact();
+    auto index_name1 = std::make_shared<std::string>("index1");
+    auto index_def1 = IndexSecondary::Make(index_name1, MakeShared<String>(), "file_name", {column_def1->name()});
+    auto index_name2 = std::make_shared<String>("index2");
+    auto index_def2 = IndexFullText::Make(index_name2, MakeShared<String>(), "file_name", {column_def2->name()}, {});
+    auto create_index = [&](const SharedPtr<IndexBase> &index_base) {
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>(fmt::format("create index {}", *index_base->index_name_)), TransactionType::kNormal);
+        Status status = txn->CreateIndex(*db_name, *table_name, index_base, ConflictType::kIgnore);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+    };
+    create_index(index_def1);
+    create_index(index_def2);
+
+    auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
+
+    status = txn->Compact(*db_name, *table_name, {0, 1});
+    EXPECT_TRUE(status.ok());
+
+    status = new_txn_mgr->CommitTxn(txn);
+    EXPECT_TRUE(status.ok());
+
+    CheckDataAfterSuccesfulCompact();
+    CheckIndexAfterSuccessfulCompact(*index_name1);
+    CheckIndexAfterSuccessfulCompact(*index_name2);
+}
+
 TEST_P(TestTxnCompact, compact_with_index_rollback) {
     Status status;
-    {
-        PrepareForCompact();
-        auto index_name1 = std::make_shared<std::string>("index1");
-        auto index_def1 = IndexSecondary::Make(index_name1, MakeShared<String>(), "file_name", {column_def1->name()});
-        auto index_name2 = std::make_shared<String>("index2");
-        auto index_def2 = IndexFullText::Make(index_name2, MakeShared<String>(), "file_name", {column_def2->name()}, {});
-        auto create_index = [&](const SharedPtr<IndexBase> &index_base) {
-            auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>(fmt::format("create index {}", *index_base->index_name_)), TransactionType::kNormal);
-            Status status = txn->CreateIndex(*db_name, *table_name, index_base, ConflictType::kIgnore);
-            EXPECT_TRUE(status.ok());
-            status = new_txn_mgr->CommitTxn(txn);
-            EXPECT_TRUE(status.ok());
-        };
-        create_index(index_def1);
-        create_index(index_def2);
-
-        //  t1            compact     commit (fail)
-        //  |--------------|---------------|
-        //         |-----|----------|
-        //        t2   drop db    commit
-
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
-
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
-        status = txn2->DropDatabase(*db_name, ConflictType::kError);
+    PrepareForCompact();
+    auto index_name = std::make_shared<String>("index2");
+    auto index_def = IndexFullText::Make(index_name, MakeShared<String>(), "file_name", {column_def2->name()}, {});
+    auto create_index = [&](const SharedPtr<IndexBase> &index_base) {
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>(fmt::format("create index {}", *index_base->index_name_)), TransactionType::kNormal);
+        Status status = txn->CreateIndex(*db_name, *table_name, index_base, ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
-
-        status = txn->Compact(*db_name, *table_name, {0, 1});
-        EXPECT_TRUE(status.ok());
-
-        status = new_txn_mgr->CommitTxn(txn2);
-        EXPECT_TRUE(status.ok());
-
         status = new_txn_mgr->CommitTxn(txn);
-        EXPECT_FALSE(status.ok());
-    }
+        EXPECT_TRUE(status.ok());
+    };
+    create_index(index_def);
+
+    //  t1            compact     commit (fail)
+    //  |--------------|---------------|
+    //         |-----|----------|
+    //        t2   drop column    commit
+
+    auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
+
+    auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop column"), TransactionType::kNormal);
+    status = txn2->DropColumns(*db_name, *table_name, Vector<String>({column_def1->name()}));
+    EXPECT_TRUE(status.ok());
+
+    status = txn->Compact(*db_name, *table_name, {0, 1});
+    EXPECT_TRUE(status.ok());
+
+    status = new_txn_mgr->CommitTxn(txn2);
+    EXPECT_TRUE(status.ok());
+
+    status = new_txn_mgr->CommitTxn(txn);
+    EXPECT_FALSE(status.ok());
+
+    CheckDataAfterFailedCompact();
+    CheckIndexAfterFailedCompact(*index_name);
 }
 
 TEST_P(TestTxnCompact, compact_and_drop_db) {
@@ -1637,7 +1831,7 @@ TEST_P(TestTxnCompact, compact_and_drop_index) {
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_FALSE(status.ok());
 
-        CheckWithNoIndex({0,1});
+        CheckWithNoIndex({0, 1});
         DropDB();
     }
     {
@@ -1662,7 +1856,7 @@ TEST_P(TestTxnCompact, compact_and_drop_index) {
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_FALSE(status.ok());
 
-        CheckWithNoIndex({0,1});
+        CheckWithNoIndex({0, 1});
         DropDB();
     }
     {

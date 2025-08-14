@@ -73,6 +73,7 @@ import :column_meta;
 import :table_index_meeta;
 import :segment_index_meta;
 import :chunk_index_meta;
+import :mem_index;
 import :meta_key;
 import :txn_allocator_task;
 import :meta_type;
@@ -5381,6 +5382,33 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
             break;
         }
         case TransactionType::kDumpMemIndex: {
+            DumpMemIndexTxnStore *dump_index_txn_store = static_cast<DumpMemIndexTxnStore *>(base_txn_store_.get());
+
+            Optional<DBMeeta> db_meta;
+            Optional<TableMeeta> table_meta;
+            Optional<TableIndexMeeta> table_index_meta;
+            String table_key;
+            String index_key;
+            Status status = this->GetTableIndexMeta(dump_index_txn_store->db_name_,
+                                                    dump_index_txn_store->table_name_,
+                                                    dump_index_txn_store->index_name_,
+                                                    db_meta,
+                                                    table_meta,
+                                                    table_index_meta,
+                                                    &table_key,
+                                                    &index_key);
+            if (!status.ok()) {
+                return status;
+            }
+
+            for (SegmentID segment_id : dump_index_txn_store->segment_ids_) {
+                SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta);
+
+                SharedPtr<MemIndex> mem_index = segment_index_meta.GetMemIndex();
+                if (mem_index != nullptr && mem_index->IsDumping()) {
+                    mem_index->SetIsDumping(false);
+                }
+            }
             break;
         }
         case TransactionType::kOptimizeIndex: {

@@ -117,20 +117,15 @@ Status NewTxn::DumpMemIndex(const String &db_name, const String &table_name, con
         SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta);
 
         SharedPtr<MemIndex> mem_index = segment_index_meta.GetMemIndex();
-        if (mem_index == nullptr || (mem_index->GetBaseMemIndex() == nullptr && mem_index->GetEMVBIndex() == nullptr)) {
+        if (mem_index == nullptr || mem_index->IsDumping() || (mem_index->GetBaseMemIndex() == nullptr && mem_index->GetEMVBIndex() == nullptr)) {
             continue;
         }
+        mem_index->SetIsDumping(true);
 
         ChunkID chunk_id = 0;
-        {
-            status = segment_index_meta.GetNextChunkID(chunk_id);
-            if (!status.ok()) {
-                return status;
-            }
-            status = segment_index_meta.SetNextChunkID(chunk_id + 1);
-            if (!status.ok()) {
-                return status;
-            }
+        std::tie(chunk_id, status) = segment_index_meta.GetAndSetNextChunkID();
+        if (!status.ok()) {
+            return status;
         }
 
         ChunkIndexMetaInfo chunk_index_meta_info;
@@ -173,28 +168,24 @@ Status NewTxn::DumpMemIndex(const String &db_name, const String &table_name, con
     SharedPtr<MemIndex> mem_index = segment_index_meta.GetMemIndex();
 
     // Return when there is no mem index to dump.
-    if (mem_index == nullptr || (mem_index->GetBaseMemIndex() == nullptr && mem_index->GetEMVBIndex() == nullptr) ||
+    if (mem_index == nullptr || mem_index->IsDumping() || (mem_index->GetBaseMemIndex() == nullptr && mem_index->GetEMVBIndex() == nullptr) ||
         (begin_row_id != RowID() && mem_index->GetBaseMemIndex() != nullptr && begin_row_id != mem_index->GetBaseMemIndex()->GetBeginRowID())) {
-        LOG_WARN(fmt::format("NewTxn::DumpMemIndex skipped dumping MemIndex {}.{}.{}.{}.{} since it doesn't exist.",
+        LOG_WARN(fmt::format("NewTxn::DumpMemIndex skipped dumping MemIndex {}.{}.{}.{}.{} since it doesn't exist or it is dumped (is_dumping: {})",
                              db_name,
                              table_name,
                              index_name,
                              segment_id,
-                             begin_row_id.ToUint64()));
+                             begin_row_id.ToUint64(),
+                             mem_index->IsDumping()));
         return Status::OK();
     }
+    mem_index->SetIsDumping(true);
 
     // Get chunk id of the chunk index to dump mem index to.
     ChunkID chunk_id = 0;
-    {
-        Status status = segment_index_meta.GetNextChunkID(chunk_id);
-        if (!status.ok()) {
-            return status;
-        }
-        status = segment_index_meta.SetNextChunkID(chunk_id + 1);
-        if (!status.ok()) {
-            return status;
-        }
+    std::tie(chunk_id, status) = segment_index_meta.GetAndSetNextChunkID();
+    if (!status.ok()) {
+        return status;
     }
 
     // Get chunk index info of the mem index and put it to chunk index meta.
@@ -420,16 +411,11 @@ Status NewTxn::OptimizeIndexInner(SegmentIndexMeta &segment_index_meta,
     }
     Vector<ChunkID> deprecate_ids = *old_chunk_ids_ptr;
     ChunkID chunk_id = 0;
-    {
-        status = segment_index_meta.GetNextChunkID(chunk_id);
-        if (!status.ok()) {
-            return status;
-        }
-        status = segment_index_meta.SetNextChunkID(chunk_id + 1);
-        if (!status.ok()) {
-            return status;
-        }
+    std::tie(chunk_id, status) = segment_index_meta.GetAndSetNextChunkID();
+    if (!status.ok()) {
+        return status;
     }
+
     Optional<ChunkIndexMeta> chunk_index_meta;
     BufferObj *buffer_obj = nullptr;
     {
@@ -905,7 +891,7 @@ NewTxn::AppendMemIndex(SegmentIndexMeta &segment_index_meta, BlockID block_id, c
 
     // Trigger dump if necessary
     SizeT row_count = mem_index->GetRowCount();
-    SizeT row_quota = InfinityContext::instance().config()->MemIndexMemoryQuota();
+    SizeT row_quota = InfinityContext::instance().config()->MemIndexCapacity();
     if (row_count >= row_quota) {
         TableMeeta &table_meta = segment_index_meta.table_index_meta().table_meta();
         auto [db_name, table_name] = table_meta.GetDBTableName();
@@ -1000,11 +986,8 @@ Status NewTxn::PopulateIndex(const String &db_name,
             }
         }
         {
-            Status status = segment_index_meta->GetNextChunkID(new_chunk_id);
-            if (!status.ok()) {
-                return status;
-            }
-            status = segment_index_meta->SetNextChunkID(new_chunk_id + 1);
+            Status status;
+            std::tie(new_chunk_id, status) = segment_index_meta->GetAndSetNextChunkID();
             if (!status.ok()) {
                 return status;
             }
@@ -1171,9 +1154,9 @@ Status NewTxn::ReplayDumpIndex(WalCmdDumpIndexV2 *dump_index_cmd) {
                 append_ranges_row_count += range.second;
             }
 
-            if (dump_row_count != append_ranges_row_count) {
+            if (dump_row_count > append_ranges_row_count) {
                 UnrecoverableError(
-                    fmt::format("Dump row count {} is not equal to row count of append ranges {}", dump_row_count, append_ranges_row_count));
+                    fmt::format("Dump row count {} is bigger than row count of append ranges {}", dump_row_count, append_ranges_row_count));
             }
 
             for (const auto &range : append_ranges) {
@@ -1188,7 +1171,7 @@ Status NewTxn::ReplayDumpIndex(WalCmdDumpIndexV2 *dump_index_cmd) {
 
     ChunkID next_chunk_id = 0;
     status = segment_index_meta.GetNextChunkID(next_chunk_id);
-    if (!status.ok()) {
+    if (!status.ok() && status.code_ != ErrorCode::kNotFound) {
         return status;
     }
 
@@ -1313,16 +1296,11 @@ Status NewTxn::PopulateIvfIndexInner(SharedPtr<IndexBase> index_base,
         }
         row_count = rc;
     }
+    Status status;
     ChunkID chunk_id = 0;
-    {
-        Status status = segment_index_meta.GetNextChunkID(chunk_id);
-        if (!status.ok()) {
-            return status;
-        }
-        status = segment_index_meta.SetNextChunkID(chunk_id + 1);
-        if (!status.ok()) {
-            return status;
-        }
+    std::tie(chunk_id, status) = segment_index_meta.GetAndSetNextChunkID();
+    if (!status.ok()) {
+        return status;
     }
     new_chunk_id = chunk_id;
     Optional<ChunkIndexMeta> chunk_index_meta;
@@ -1368,15 +1346,10 @@ Status NewTxn::PopulateEmvbIndexInner(SharedPtr<IndexBase> index_base,
         row_count = rc;
     }
     ChunkID chunk_id = 0;
-    {
-        Status status = segment_index_meta.GetNextChunkID(chunk_id);
-        if (!status.ok()) {
-            return status;
-        }
-        status = segment_index_meta.SetNextChunkID(chunk_id + 1);
-        if (!status.ok()) {
-            return status;
-        }
+    Status status;
+    std::tie(chunk_id, status) = segment_index_meta.GetAndSetNextChunkID();
+    if (!status.ok()) {
+        return status;
     }
     new_chunk_id = chunk_id;
     Optional<ChunkIndexMeta> chunk_index_meta;
@@ -2219,20 +2192,18 @@ Status NewTxn::ManualDumpIndex(const String &db_name, const String &table_name) 
 
             // 4. Get memory index for this segment
             SharedPtr<MemIndex> mem_index = segment_index_meta.GetMemIndex();
-            if (mem_index == nullptr || (mem_index->GetBaseMemIndex() == nullptr && mem_index->GetEMVBIndex() == nullptr)) {
+            if (mem_index == nullptr || mem_index->IsDumping() || (mem_index->GetBaseMemIndex() == nullptr && mem_index->GetEMVBIndex() == nullptr)) {
                 LOG_INFO(fmt::format("Skipping segment {} - no memory index to dump", segment_id));
                 continue;
             }
+            mem_index->SetIsDumping(true);
 
             // 4.5. Additional check for EMVB index - ensure it's built before dumping
 
             // 5. Allocate new chunk ID for this dump
             ChunkID chunk_id = 0;
-            status = segment_index_meta.GetNextChunkID(chunk_id);
-            if (!status.ok()) {
-                return status;
-            }
-            status = segment_index_meta.SetNextChunkID(chunk_id + 1);
+            Status status;
+            std::tie(chunk_id, status) = segment_index_meta.GetAndSetNextChunkID();
             if (!status.ok()) {
                 return status;
             }

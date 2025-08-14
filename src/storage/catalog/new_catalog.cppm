@@ -309,8 +309,6 @@ public:
 
     static Status CleanBlockColumn(ColumnMeta &column_meta, const ColumnDef *column_def, UsageFlag usage_flag);
 
-    static Status AddNewSegmentIndex(TableIndexMeeta &table_index_meta, SegmentID segment_id, Optional<SegmentIndexMeta> &segment_index_meta);
-
     static Status RestoreNewSegmentIndex1(TableIndexMeeta &table_index_meta,
                                           NewTxn *new_txn,
                                           SegmentID segment_id,

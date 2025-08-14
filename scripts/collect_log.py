@@ -6,15 +6,7 @@ import argparse
 import collect_thread_sanitizer_log
 
 
-def collect_log(
-    log_path,
-    stdout_path,
-    stderror_path,
-    executable_path,
-    output_dir,
-    failure,
-    show_lines,
-):
+def collect_log(log_path, stdout_path, stderror_path, executable_path, output_dir, failure, show_lines):
     if not os.path.isdir(output_dir):
         os.makedirs(output_dir)
 
@@ -47,7 +39,7 @@ def collect_log(
                 print(line.strip())
 
     if not os.path.isfile(log_path):
-        print("Error: /var/infinity/log/infinity.log not found")
+        print(f"Error: {log_path} not found")
     else:
         if failure:
             shutil.copy(log_path, f"{output_dir}/{random_name}.log")
@@ -68,50 +60,18 @@ def collect_log(
     if not os.path.isfile(run_parallel_test_log):
         print("Error: run_parallel_test log file not found")
     elif failure:
-        shutil.copy(
-            run_parallel_test_log, f"{output_dir}/{random_name}_{run_parallel_test_log}"
-        )
+        shutil.copy(run_parallel_test_log, f"{output_dir}/{random_name}_{run_parallel_test_log}")
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Collect and copy log files.")
-    parser.add_argument(
-        "--log_path", type=str, required=True, help="Path to the infinity log file"
-    )
-    parser.add_argument(
-        "--stdout_path",
-        type=str,
-        required=True,
-        help="Path to the stdout debug log file",
-    )
-    parser.add_argument(
-        "--stderror_path",
-        type=str,
-        required=True,
-        help="Path to the stderror debug log file",
-    )
-    parser.add_argument(
-        "--executable_path",
-        type=str,
-        required=True,
-        help="Path to the executable file",
-    )
-    parser.add_argument(
-        "--output_dir",
-        type=str,
-        required=True,
-        help="Path to the output directory",
-    )
-    parser.add_argument(
-        "--failure", type=str, required=True, help="If the test failured"
-    )
-    parser.add_argument(
-        "--tsan_log",
-        type=str,
-        required=False,
-        help="Thread sanitizer log prefix",
-        default=None,
-    )
+    parser.add_argument("--log_path", type=str, required=True, help="Path to the infinity log file")
+    parser.add_argument("--stdout_path", type=str, required=True, help="Path to the stdout debug log file")
+    parser.add_argument("--stderror_path", type=str, required=True, help="Path to the stderror debug log file")
+    parser.add_argument("--executable_path", type=str, required=True, help="Path to the executable file")
+    parser.add_argument("--output_dir", type=str, required=True, help="Path to the output directory")
+    parser.add_argument("--failure", type=str, required=True, help="If the test failured")
+    parser.add_argument("--tsan_log", type=str, required=False, help="Thread sanitizer log prefix", default=None)
     args = parser.parse_args()
 
     log_path = args.log_path
@@ -126,12 +86,4 @@ if __name__ == "__main__":
     if not failure and tsan_log is not None:
         collect_thread_sanitizer_log.collect_log(tsan_log, output_dir, show_lines)
     else:
-        collect_log(
-            log_path,
-            stdout_path,
-            stderror_path,
-            executable_path,
-            output_dir,
-            failure,
-            show_lines,
-        )
+        collect_log(log_path, stdout_path, stderror_path, executable_path, output_dir, failure, show_lines, )

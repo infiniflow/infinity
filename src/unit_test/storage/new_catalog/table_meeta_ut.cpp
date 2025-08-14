@@ -78,32 +78,10 @@ TEST_P(TestTxnTableMeeta, table_meeta) {
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());
 
-        SizeT block_row_cnt = 8192;
-        auto make_input_block = [&](const Value &v1, const Value &v2) {
-            auto input_block = MakeShared<DataBlock>();
-            auto make_column = [&](const Value &v) {
-                auto col = ColumnVector::Make(MakeShared<DataType>(v.type()));
-                col->Initialize();
-                for (SizeT i = 0; i < block_row_cnt; ++i) {
-                    col->AppendValue(v);
-                }
-                return col;
-            };
-            {
-                auto col1 = make_column(v1);
-                input_block->InsertVector(col1, 0);
-            }
-            {
-                auto col2 = make_column(v2);
-                input_block->InsertVector(col2, 1);
-            }
-            input_block->Finalize();
-            return input_block;
-        };
-
         auto append = [&] {
             auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
-            Status status = txn->Append(*db_name, *table_name, make_input_block(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz")));
+            Status status =
+                txn->Append(*db_name, *table_name, MakeInputBlock(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"), 8192));
             EXPECT_TRUE(status.ok());
             status = new_txn_mgr->CommitTxn(txn);
             EXPECT_TRUE(status.ok());
