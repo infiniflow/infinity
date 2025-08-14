@@ -150,7 +150,10 @@ void MockWalFile(const String &wal_file_path, const String &ckp_file_path, const
         auto entry = MakeShared<WalEntry>();
         Vector<WalSegmentInfo> new_segment_infos(3, MakeSegmentInfo(1, 0, 2));
         Vector<SegmentID> deprecated_segment_ids{0, 1, 2};
-        entry->cmds_.push_back(MakeShared<WalCmdCompactV2>("db1", "2", "tbl1", "1", std::move(new_segment_infos), std::move(deprecated_segment_ids)));
+        Vector<String> names;
+        Vector<String> ids;
+        entry->cmds_.push_back(
+            MakeShared<WalCmdCompactV2>("db1", "2", "tbl1", "1", names, ids, std::move(new_segment_infos), std::move(deprecated_segment_ids)));
         entry->commit_ts_ = 5;
         i32 expect_size = entry->GetSizeInBytes();
         Vector<char> buf(expect_size);
@@ -355,8 +358,11 @@ TEST_F(WalEntryTest, ReadWriteV2) {
     }
     entry->cmds_.push_back(MakeShared<WalCmdCheckpointV2>(int64_t(123)));
     {
+        Vector<String> names;
+        Vector<String> ids;
         Vector<WalSegmentInfo> new_segment_infos(3, MakeSegmentInfo(1, 0, 2));
-        entry->cmds_.push_back(MakeShared<WalCmdCompactV2>("db1", "1", "tbl1", "2", std::move(new_segment_infos), Vector<SegmentID>{0, 1, 2}));
+        entry->cmds_.push_back(
+            MakeShared<WalCmdCompactV2>("db1", "1", "tbl1", "2", names, ids, std::move(new_segment_infos), Vector<SegmentID>{0, 1, 2}));
     }
     {
         WalChunkIndexInfo info;

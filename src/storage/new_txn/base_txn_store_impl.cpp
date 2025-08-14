@@ -526,8 +526,14 @@ String CompactTxnStore::ToString() const {
 SharedPtr<WalEntry> CompactTxnStore::ToWalEntry(TxnTimeStamp commit_ts) const {
     SharedPtr<WalEntry> wal_entry = MakeShared<WalEntry>();
     wal_entry->commit_ts_ = commit_ts;
-    SharedPtr<WalCmdCompactV2> wal_command =
-        MakeShared<WalCmdCompactV2>(db_name_, db_id_str_, table_name_, table_id_str_, segment_infos_, deprecated_segment_ids_);
+    SharedPtr<WalCmdCompactV2> wal_command = MakeShared<WalCmdCompactV2>(db_name_,
+                                                                         db_id_str_,
+                                                                         table_name_,
+                                                                         table_id_str_,
+                                                                         index_names_,
+                                                                         index_ids_str_,
+                                                                         segment_infos_,
+                                                                         deprecated_segment_ids_);
     wal_entry->cmds_.push_back(wal_command);
 
     SharedPtr<WalCmdDumpIndexV2> dump_command{};

@@ -385,10 +385,7 @@ void SystemCache::AddNewDbCache(const String &db_name, u64 db_id) {
 
 void SystemCache::DropDbCache(u64 db_id) {
     std::unique_lock lock(cache_mtx_);
-    //    LOG_TRACE(fmt::format("Dropping db cache with id: {} db_cache_size: {}, db_name_size: {}",
-    //                         db_id,
-    //                         db_cache_map_.size(),
-    //                         db_name_map_.size()));
+    // LOG_TRACE(fmt::format("Dropping db cache with id: {} db_cache_size: {}, db_name_size: {}", db_id, db_cache_map_.size(), db_name_map_.size()));
     auto cache_iter = db_cache_map_.find(db_id);
     if (cache_iter == db_cache_map_.end()) {
         LOG_ERROR(fmt::format("Db cache with id: {} not found", db_id));
@@ -484,8 +481,10 @@ void SystemCache::CommitAppend(u64 db_id, u64 table_id, const SharedPtr<AppendPr
 }
 
 Status SystemCache::AddDbCacheNolock(const SharedPtr<DbCache> &db_cache) {
+    // LOG_TRACE(fmt::format("Attempt to add db_name: {}, db_id: {}", db_cache->db_name(), db_cache->db_id()));
     auto [iter2, insert_success2] = db_name_map_.emplace(db_cache->db_name(), db_cache->db_id());
     if (!insert_success2) {
+        // LOG_TRACE(fmt::format("Duplicate db_name: {}, db_id: {}", db_cache->db_name(), db_cache->db_id()));
         return Status::DuplicateDatabase(db_cache->db_name());
     }
     auto [iter, insert_success] = db_cache_map_.emplace(db_cache->db_id(), db_cache);

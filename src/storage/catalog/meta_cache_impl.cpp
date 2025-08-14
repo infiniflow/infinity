@@ -218,6 +218,7 @@ SharedPtr<MetaTableCache> MetaCache::GetTable(u64 db_id, const String &table_nam
     std::unique_lock lock(cache_mtx_);
     auto iter = tables_.find(name);
     if (iter != tables_.end()) {
+        LOG_TRACE(fmt::format("Find table cache name: {}", name));
         Map<u64, List<CacheItem>::iterator> &table_map_ref = iter->second;
         for (auto r_cache_iter = table_map_ref.rbegin(); r_cache_iter != table_map_ref.rend(); ++r_cache_iter) {
             TxnTimeStamp commit_ts = r_cache_iter->first;
@@ -233,6 +234,7 @@ SharedPtr<MetaTableCache> MetaCache::GetTable(u64 db_id, const String &table_nam
 void MetaCache::EraseTableNolock(u64 db_id, const String &table_name) {
     String name = KeyEncode::CatalogTablePrefix(std::to_string(db_id), table_name);
     tables_.erase(name);
+    LOG_TRACE(fmt::format("Erase table name: {}", name));
 }
 
 void MetaCache::PutIndexNolock(const SharedPtr<MetaIndexCache> &index_cache) {

@@ -440,20 +440,33 @@ void NewTxnManager::CommitKVInstance(NewTxn *txn) {
 
     TxnTimeStamp commit_ts = txn->CommitTS();
     // Put meta cache items with kv_instance
-    BaseTxnStore *base_txn_store = txn->GetTxnStore();
-    if (base_txn_store != nullptr) {
-        Vector<SharedPtr<EraseBaseCache>> items_to_erase = txn->GetTxnStore()->ToCachedMeta(commit_ts);
-        MetaCache *meta_cache_ptr = this->storage_->meta_cache();
-        Status status = meta_cache_ptr->Erase(items_to_erase, txn->kv_instance_.get());
-        if (!status.ok()) {
-            UnrecoverableError(fmt::format("Put cache: {}", status.message()));
-        }
-    } else {
-        Status status = txn->kv_instance_->Commit();
-        if (!status.ok()) {
-            UnrecoverableError(fmt::format("Commit kv_instance: {}", status.message()));
-        }
+    WalEntry *wal_entry = txn->GetWALEntry();
+    Vector<SharedPtr<EraseBaseCache>> items_to_erase;
+    for (const auto &cmd : wal_entry->cmds_) {
+        Vector<SharedPtr<EraseBaseCache>> items_to_erase_part = cmd->ToCachedMeta(commit_ts);
+        items_to_erase.insert(items_to_erase.end(), items_to_erase_part.begin(), items_to_erase_part.end());
     }
+
+    MetaCache *meta_cache_ptr = this->storage_->meta_cache();
+    Status status = meta_cache_ptr->Erase(items_to_erase, txn->kv_instance_.get());
+    if (!status.ok()) {
+        UnrecoverableError(fmt::format("Put cache: {}", status.message()));
+    }
+
+    //    BaseTxnStore *base_txn_store = txn->GetTxnStore();
+    //    if (base_txn_store != nullptr) {
+    //        Vector<SharedPtr<EraseBaseCache>> items_to_erase = txn->GetTxnStore()->ToCachedMeta(commit_ts);
+    //        MetaCache *meta_cache_ptr = this->storage_->meta_cache();
+    //        Status status = meta_cache_ptr->Erase(items_to_erase, txn->kv_instance_.get());
+    //        if (!status.ok()) {
+    //            UnrecoverableError(fmt::format("Put cache: {}", status.message()));
+    //        }
+    //    } else {
+    //        Status status = txn->kv_instance_->Commit();
+    //        if (!status.ok()) {
+    //            UnrecoverableError(fmt::format("Commit kv_instance: {}", status.message()));
+    //        }
+    //    }
 
     TxnTimeStamp kv_commit_ts;
     {
@@ -535,7 +548,9 @@ void NewTxnManager::UpdateCatalogCache(NewTxn *txn) {
             // base_txn_store means the drop with ignore
             if (base_txn_store != nullptr) {
                 DropTableTxnStore *txn_store = static_cast<DropTableTxnStore *>(base_txn_store);
+                LOG_TRACE(fmt::format("drop table: {}, id: {}, txn_id: {}", txn_store->table_name_, txn_store->table_id_, txn->TxnID()));
                 system_cache_->DropTableCache(txn_store->db_id_, txn_store->table_id_);
+                LOG_TRACE(fmt::format("dropped table: {}, id: {}", txn_store->table_name_, txn_store->table_id_));
             }
             break;
         }

@@ -705,6 +705,13 @@ Status NewTxn::Compact(const String &db_name, const String &table_name, const Ve
         return status;
     }
 
+    Vector<String> *index_id_strs_ptr = nullptr;
+    Vector<String> *index_name_ptr = nullptr;
+    status = table_meta.GetIndexIDs(index_id_strs_ptr, &index_name_ptr);
+    if (!status.ok()) {
+        return status;
+    }
+
     {
         // Put the data into local txn store
         if (base_txn_store_ != nullptr) {
@@ -744,6 +751,8 @@ Status NewTxn::Compact(const String &db_name, const String &table_name, const Ve
                                                            db_meta->db_id_str(),
                                                            table_name,
                                                            table_meta.table_id_str(),
+                                                           *index_name_ptr,
+                                                           *index_id_strs_ptr,
                                                            std::move(segment_infos),
                                                            std::move(deprecated_segment_ids));
         wal_entry_->cmds_.push_back(static_pointer_cast<WalCmd>(compact_command));
@@ -753,13 +762,6 @@ Status NewTxn::Compact(const String &db_name, const String &table_name, const Ve
         if (!status.ok()) {
             return status;
         }
-    }
-
-    Vector<String> *index_id_strs_ptr = nullptr;
-    Vector<String> *index_name_ptr = nullptr;
-    status = table_meta.GetIndexIDs(index_id_strs_ptr, &index_name_ptr);
-    if (!status.ok()) {
-        return status;
     }
 
     CompactTxnStore *compact_txn_store = static_cast<CompactTxnStore *>(base_txn_store_.get());
@@ -1126,7 +1128,8 @@ Status NewTxn::CompactBlock(BlockMeta &block_meta, NewTxnCompactState &compact_s
                     return status;
                 }
             }
-            append_size = std::min(static_cast<SizeT>(range.second - range.first), compact_state.block_meta_->block_capacity() - compact_state.cur_block_row_cnt_);
+            append_size = std::min(static_cast<SizeT>(range.second - range.first),
+                                   compact_state.block_meta_->block_capacity() - compact_state.cur_block_row_cnt_);
             if (append_size == 0) {
                 status = compact_state.FinalizeBlock();
                 if (!status.ok()) {
@@ -1900,7 +1903,6 @@ Status NewTxn::FlushVersionFile(BlockMeta &block_meta, TxnTimeStamp save_ts) {
     version_buffer->Save(VersionFileWorkerSaveCtx(save_ts));
     return Status::OK();
 }
-
 
 Status NewTxn::FlushColumnFiles(BlockMeta &block_meta, TxnTimeStamp save_ts) {
     Status status;

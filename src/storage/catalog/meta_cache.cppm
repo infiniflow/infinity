@@ -77,7 +77,7 @@ export struct MetaDbCache final : public MetaBaseCache {
 export struct MetaTableCache : public MetaBaseCache {
     MetaTableCache(u64 db_id, const String &table_name, u64 table_id, u64 commit_ts, const String &table_key, bool is_dropped)
         : MetaBaseCache(MetaCacheType::kCreateTable), db_id_(db_id), table_name_(table_name), table_id_(table_id), commit_ts_(commit_ts),
-          is_dropped_(is_dropped) {}
+          table_key_(table_key), is_dropped_(is_dropped) {}
     u64 db_id_{};
     String table_name_{};
     u64 table_id_{};
