@@ -46,17 +46,17 @@ CatalogMeta::CatalogMeta(KVInstance *kv_instance, MetaCache *meta_cache)
 
 Status CatalogMeta::GetDBID(const String &db_name, String &db_key, String &db_id_str, TxnTimeStamp &create_ts) {
 
-    SharedPtr<MetaDbCache> db_cache = meta_cache_->GetDb(db_name, this->read_ts_);
-    if (db_cache.get() != nullptr) {
-        if (db_cache->is_dropped_) {
-            return Status::DBNotExist(db_name);
-        }
-        db_id_str = std::to_string(db_cache->db_id_);
-        db_key = db_cache->db_key_;
-        create_ts = db_cache->commit_ts_;
-        LOG_TRACE(fmt::format("Get db meta from cache, db: {}, db_id: {}, commit_ts: {}", db_name, db_cache->db_id_, create_ts));
-        return Status::OK();
-    }
+//    SharedPtr<MetaDbCache> db_cache = meta_cache_->GetDb(db_name, this->read_ts_);
+//    if (db_cache.get() != nullptr) {
+//        if (db_cache->is_dropped_) {
+//            return Status::DBNotExist(db_name);
+//        }
+//        db_id_str = std::to_string(db_cache->db_id_);
+//        db_key = db_cache->db_key_;
+//        create_ts = db_cache->commit_ts_;
+//        LOG_TRACE(fmt::format("Get db meta from cache, db: {}, db_id: {}, commit_ts: {}", db_name, db_cache->db_id_, create_ts));
+//        return Status::OK();
+//    }
 
     String db_key_prefix = KeyEncode::CatalogDbPrefix(db_name);
     auto iter2 = kv_instance_->GetIterator();
@@ -94,19 +94,19 @@ Status CatalogMeta::GetDBID(const String &db_name, String &db_key, String &db_id
     kv_instance_->Get(KeyEncode::DropDBKey(db_name, max_commit_ts, db_id_str), drop_db_ts);
 
     if (!drop_db_ts.empty() && std::stoull(drop_db_ts) <= read_ts_) {
-        db_cache = MakeShared<MetaDbCache>(db_name, std::stoull(db_id_str), max_commit_ts, db_key, true);
-        meta_cache_->Put({db_cache});
+//        db_cache = MakeShared<MetaDbCache>(db_name, std::stoull(db_id_str), max_commit_ts, db_key, true);
+//        meta_cache_->Operate({db_cache}, nullptr);
         return Status::DBNotExist(db_name);
     }
 
-    db_cache = MakeShared<MetaDbCache>(db_name, std::stoull(db_id_str), max_commit_ts, db_key, false);
-    meta_cache_->Put({db_cache});
+//    db_cache = MakeShared<MetaDbCache>(db_name, std::stoull(db_id_str), max_commit_ts, db_key, false);
+//    meta_cache_->Operate({db_cache}, nullptr);
 
-    LOG_TRACE(fmt::format("Save created db meta from cache, db_id: {}, db_key: {}, commit_ts: {}",
-                          db_cache->db_id_,
-                          db_name,
-                          db_key,
-                          db_cache->commit_ts_));
+//    LOG_TRACE(fmt::format("Save created db meta from cache, db_id: {}, db_key: {}, commit_ts: {}",
+//                          db_cache->db_id_,
+//                          db_name,
+//                          db_key,
+//                          db_cache->commit_ts_));
 
     create_ts = max_commit_ts;
     return Status::OK();

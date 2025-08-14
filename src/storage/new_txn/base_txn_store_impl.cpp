@@ -41,7 +41,7 @@ SharedPtr<WalEntry> DummyTxnStore::ToWalEntry(TxnTimeStamp commit_ts) const {
     return wal_entry;
 }
 
-Vector<SharedPtr<EraseBaseCache>> DummyTxnStore::ToCachedMeta(TxnTimeStamp commit_ts) const { return {}; }
+Vector<SharedPtr<MetaBaseCache>> DummyTxnStore::ToCachedMeta(TxnTimeStamp commit_ts) const { return {}; }
 
 String CreateDBTxnStore::ToString() const {
     return fmt::format("{}: database: {}, db_id:{}, comment: {}", TransactionType2Str(type_), db_name_, db_id_, *comment_ptr_);
@@ -55,8 +55,8 @@ SharedPtr<WalEntry> CreateDBTxnStore::ToWalEntry(TxnTimeStamp commit_ts) const {
     return wal_entry;
 }
 
-Vector<SharedPtr<EraseBaseCache>> CreateDBTxnStore::ToCachedMeta(TxnTimeStamp commit_ts) const {
-    Vector<SharedPtr<EraseBaseCache>> cache_items;
+Vector<SharedPtr<MetaBaseCache>> CreateDBTxnStore::ToCachedMeta(TxnTimeStamp commit_ts) const {
+    Vector<SharedPtr<MetaBaseCache>> cache_items;
     cache_items.push_back(MakeShared<MetaEraseDbCache>(db_name_));
     return cache_items;
 }
@@ -73,8 +73,8 @@ SharedPtr<WalEntry> DropDBTxnStore::ToWalEntry(TxnTimeStamp commit_ts) const {
     return wal_entry;
 }
 
-Vector<SharedPtr<EraseBaseCache>> DropDBTxnStore::ToCachedMeta(TxnTimeStamp commit_ts) const {
-    Vector<SharedPtr<EraseBaseCache>> cache_items;
+Vector<SharedPtr<MetaBaseCache>> DropDBTxnStore::ToCachedMeta(TxnTimeStamp commit_ts) const {
+    Vector<SharedPtr<MetaBaseCache>> cache_items;
     cache_items.push_back(MakeShared<MetaEraseDbCache>(db_name_));
     return cache_items;
 }
@@ -91,8 +91,8 @@ SharedPtr<WalEntry> CreateTableTxnStore::ToWalEntry(TxnTimeStamp commit_ts) cons
     return wal_entry;
 }
 
-Vector<SharedPtr<EraseBaseCache>> CreateTableTxnStore::ToCachedMeta(TxnTimeStamp commit_ts) const {
-    Vector<SharedPtr<EraseBaseCache>> cache_items;
+Vector<SharedPtr<MetaBaseCache>> CreateTableTxnStore::ToCachedMeta(TxnTimeStamp commit_ts) const {
+    Vector<SharedPtr<MetaBaseCache>> cache_items;
     cache_items.push_back(MakeShared<MetaEraseDbCache>(db_name_));
     cache_items.push_back(MakeShared<MetaEraseTableCache>(db_id_, table_name_));
     return cache_items;
@@ -116,7 +116,7 @@ SharedPtr<WalEntry> CreateTableSnapshotTxnStore::ToWalEntry(TxnTimeStamp commit_
     return wal_entry;
 }
 
-Vector<SharedPtr<EraseBaseCache>> CreateTableSnapshotTxnStore::ToCachedMeta(TxnTimeStamp commit_ts) const { return {}; }
+Vector<SharedPtr<MetaBaseCache>> CreateTableSnapshotTxnStore::ToCachedMeta(TxnTimeStamp commit_ts) const { return {}; }
 
 String DropTableTxnStore::ToString() const {
     return fmt::format("{}: database: {}, table: {}, table_id: {}, create_ts: {}",
@@ -135,8 +135,8 @@ SharedPtr<WalEntry> DropTableTxnStore::ToWalEntry(TxnTimeStamp commit_ts) const 
     return wal_entry;
 }
 
-Vector<SharedPtr<EraseBaseCache>> DropTableTxnStore::ToCachedMeta(TxnTimeStamp commit_ts) const {
-    Vector<SharedPtr<EraseBaseCache>> cache_items;
+Vector<SharedPtr<MetaBaseCache>> DropTableTxnStore::ToCachedMeta(TxnTimeStamp commit_ts) const {
+    Vector<SharedPtr<MetaBaseCache>> cache_items;
     cache_items.push_back(MakeShared<MetaEraseDbCache>(db_name_));
     cache_items.push_back(MakeShared<MetaEraseTableCache>(db_id_, table_name_));
     return cache_items;
@@ -163,8 +163,8 @@ SharedPtr<WalEntry> RestoreTableTxnStore::ToWalEntry(TxnTimeStamp commit_ts) con
     return wal_entry;
 }
 
-Vector<SharedPtr<EraseBaseCache>> RestoreTableTxnStore::ToCachedMeta(TxnTimeStamp commit_ts) const {
-    Vector<SharedPtr<EraseBaseCache>> cache_items;
+Vector<SharedPtr<MetaBaseCache>> RestoreTableTxnStore::ToCachedMeta(TxnTimeStamp commit_ts) const {
+    Vector<SharedPtr<MetaBaseCache>> cache_items;
     cache_items.push_back(MakeShared<MetaEraseDbCache>(db_name_));
     cache_items.push_back(MakeShared<MetaEraseTableCache>(db_id_, table_name_));
     return cache_items;
@@ -196,8 +196,8 @@ SharedPtr<WalEntry> RestoreDatabaseTxnStore::ToWalEntry(TxnTimeStamp commit_ts) 
     return wal_entry;
 }
 
-Vector<SharedPtr<EraseBaseCache>> RestoreDatabaseTxnStore::ToCachedMeta(TxnTimeStamp commit_ts) const {
-    Vector<SharedPtr<EraseBaseCache>> cache_items;
+Vector<SharedPtr<MetaBaseCache>> RestoreDatabaseTxnStore::ToCachedMeta(TxnTimeStamp commit_ts) const {
+    Vector<SharedPtr<MetaBaseCache>> cache_items;
     cache_items.push_back(MakeShared<MetaEraseDbCache>(db_name_));
     return cache_items;
 }
@@ -221,8 +221,8 @@ SharedPtr<WalEntry> RenameTableTxnStore::ToWalEntry(TxnTimeStamp commit_ts) cons
     return wal_entry;
 }
 
-Vector<SharedPtr<EraseBaseCache>> RenameTableTxnStore::ToCachedMeta(TxnTimeStamp commit_ts) const {
-    Vector<SharedPtr<EraseBaseCache>> cache_items;
+Vector<SharedPtr<MetaBaseCache>> RenameTableTxnStore::ToCachedMeta(TxnTimeStamp commit_ts) const {
+    Vector<SharedPtr<MetaBaseCache>> cache_items;
     cache_items.push_back(MakeShared<MetaEraseDbCache>(db_name_));
     cache_items.push_back(MakeShared<MetaEraseTableCache>(std::stoull(db_id_str_), old_table_name_));
     cache_items.push_back(MakeShared<MetaEraseTableCache>(std::stoull(db_id_str_), new_table_name_));
@@ -248,8 +248,8 @@ SharedPtr<WalEntry> CreateIndexTxnStore::ToWalEntry(TxnTimeStamp commit_ts) cons
     return wal_entry;
 }
 
-Vector<SharedPtr<EraseBaseCache>> CreateIndexTxnStore::ToCachedMeta(TxnTimeStamp commit_ts) const {
-    Vector<SharedPtr<EraseBaseCache>> cache_items;
+Vector<SharedPtr<MetaBaseCache>> CreateIndexTxnStore::ToCachedMeta(TxnTimeStamp commit_ts) const {
+    Vector<SharedPtr<MetaBaseCache>> cache_items;
     cache_items.push_back(MakeShared<MetaEraseDbCache>(db_name_));
     cache_items.push_back(MakeShared<MetaEraseTableCache>(db_id_, table_name_));
     cache_items.push_back(MakeShared<MetaEraseIndexCache>(db_id_, table_id_, *index_base_->index_name_));
@@ -277,8 +277,8 @@ SharedPtr<WalEntry> DropIndexTxnStore::ToWalEntry(TxnTimeStamp commit_ts) const 
     return wal_entry;
 }
 
-Vector<SharedPtr<EraseBaseCache>> DropIndexTxnStore::ToCachedMeta(TxnTimeStamp commit_ts) const {
-    Vector<SharedPtr<EraseBaseCache>> cache_items;
+Vector<SharedPtr<MetaBaseCache>> DropIndexTxnStore::ToCachedMeta(TxnTimeStamp commit_ts) const {
+    Vector<SharedPtr<MetaBaseCache>> cache_items;
     cache_items.push_back(MakeShared<MetaEraseDbCache>(db_name_));
     cache_items.push_back(MakeShared<MetaEraseTableCache>(db_id_, table_name_));
     cache_items.push_back(MakeShared<MetaEraseIndexCache>(db_id_, table_id_, index_name_));
@@ -331,8 +331,8 @@ SharedPtr<WalEntry> OptimizeIndexTxnStore::ToWalEntry(TxnTimeStamp commit_ts) co
     return wal_entry;
 }
 
-Vector<SharedPtr<EraseBaseCache>> OptimizeIndexTxnStore::ToCachedMeta(TxnTimeStamp commit_ts) const {
-    Vector<SharedPtr<EraseBaseCache>> cache_items;
+Vector<SharedPtr<MetaBaseCache>> OptimizeIndexTxnStore::ToCachedMeta(TxnTimeStamp commit_ts) const {
+    Vector<SharedPtr<MetaBaseCache>> cache_items;
     cache_items.reserve(entries_.size());
     for (const auto &entry : entries_) {
         cache_items.push_back(MakeShared<MetaEraseDbCache>(entry.db_name_));
@@ -362,8 +362,8 @@ SharedPtr<WalEntry> AppendTxnStore::ToWalEntry(TxnTimeStamp commit_ts) const {
     return wal_entry;
 }
 
-Vector<SharedPtr<EraseBaseCache>> AppendTxnStore::ToCachedMeta(TxnTimeStamp commit_ts) const {
-    Vector<SharedPtr<EraseBaseCache>> cache_items;
+Vector<SharedPtr<MetaBaseCache>> AppendTxnStore::ToCachedMeta(TxnTimeStamp commit_ts) const {
+    Vector<SharedPtr<MetaBaseCache>> cache_items;
     cache_items.push_back(MakeShared<MetaEraseDbCache>(db_name_));
     cache_items.push_back(MakeShared<MetaEraseTableCache>(db_id_, table_name_));
     return cache_items;
@@ -404,8 +404,8 @@ SharedPtr<WalEntry> ImportTxnStore::ToWalEntry(TxnTimeStamp commit_ts) const {
     return wal_entry;
 }
 
-Vector<SharedPtr<EraseBaseCache>> ImportTxnStore::ToCachedMeta(TxnTimeStamp commit_ts) const {
-    Vector<SharedPtr<EraseBaseCache>> cache_items;
+Vector<SharedPtr<MetaBaseCache>> ImportTxnStore::ToCachedMeta(TxnTimeStamp commit_ts) const {
+    Vector<SharedPtr<MetaBaseCache>> cache_items;
     cache_items.push_back(MakeShared<MetaEraseDbCache>(db_name_));
     cache_items.push_back(MakeShared<MetaEraseTableCache>(db_id_, table_name_));
     return cache_items;
@@ -452,8 +452,8 @@ SharedPtr<WalEntry> DumpMemIndexTxnStore::ToWalEntry(TxnTimeStamp commit_ts) con
     return wal_entry;
 }
 
-Vector<SharedPtr<EraseBaseCache>> DumpMemIndexTxnStore::ToCachedMeta(TxnTimeStamp commit_ts) const {
-    Vector<SharedPtr<EraseBaseCache>> cache_items;
+Vector<SharedPtr<MetaBaseCache>> DumpMemIndexTxnStore::ToCachedMeta(TxnTimeStamp commit_ts) const {
+    Vector<SharedPtr<MetaBaseCache>> cache_items;
     cache_items.push_back(MakeShared<MetaEraseDbCache>(db_name_));
     cache_items.push_back(MakeShared<MetaEraseTableCache>(db_id_, table_name_));
     cache_items.push_back(MakeShared<MetaEraseIndexCache>(db_id_, table_id_, index_name_));
@@ -478,8 +478,8 @@ SharedPtr<WalEntry> AddColumnsTxnStore::ToWalEntry(TxnTimeStamp commit_ts) const
     return wal_entry;
 }
 
-Vector<SharedPtr<EraseBaseCache>> AddColumnsTxnStore::ToCachedMeta(TxnTimeStamp commit_ts) const {
-    Vector<SharedPtr<EraseBaseCache>> cache_items;
+Vector<SharedPtr<MetaBaseCache>> AddColumnsTxnStore::ToCachedMeta(TxnTimeStamp commit_ts) const {
+    Vector<SharedPtr<MetaBaseCache>> cache_items;
     cache_items.push_back(MakeShared<MetaEraseDbCache>(db_name_));
     cache_items.push_back(MakeShared<MetaEraseTableCache>(db_id_, table_name_));
     return cache_items;
@@ -504,8 +504,8 @@ SharedPtr<WalEntry> DropColumnsTxnStore::ToWalEntry(TxnTimeStamp commit_ts) cons
     return wal_entry;
 }
 
-Vector<SharedPtr<EraseBaseCache>> DropColumnsTxnStore::ToCachedMeta(TxnTimeStamp commit_ts) const {
-    Vector<SharedPtr<EraseBaseCache>> cache_items;
+Vector<SharedPtr<MetaBaseCache>> DropColumnsTxnStore::ToCachedMeta(TxnTimeStamp commit_ts) const {
+    Vector<SharedPtr<MetaBaseCache>> cache_items;
     cache_items.push_back(MakeShared<MetaEraseDbCache>(db_name_));
     cache_items.push_back(MakeShared<MetaEraseTableCache>(db_id_, table_name_));
     return cache_items;
@@ -557,8 +557,8 @@ SharedPtr<WalEntry> CompactTxnStore::ToWalEntry(TxnTimeStamp commit_ts) const {
     return wal_entry;
 }
 
-Vector<SharedPtr<EraseBaseCache>> CompactTxnStore::ToCachedMeta(TxnTimeStamp commit_ts) const {
-    Vector<SharedPtr<EraseBaseCache>> cache_items;
+Vector<SharedPtr<MetaBaseCache>> CompactTxnStore::ToCachedMeta(TxnTimeStamp commit_ts) const {
+    Vector<SharedPtr<MetaBaseCache>> cache_items;
     cache_items.push_back(MakeShared<MetaEraseDbCache>(db_name_));
     cache_items.push_back(MakeShared<MetaEraseTableCache>(db_id_, table_name_));
     for (const auto &index_name : index_names_) {
@@ -585,8 +585,8 @@ SharedPtr<WalEntry> DeleteTxnStore::ToWalEntry(TxnTimeStamp commit_ts) const {
     return wal_entry;
 }
 
-Vector<SharedPtr<EraseBaseCache>> DeleteTxnStore::ToCachedMeta(TxnTimeStamp commit_ts) const {
-    Vector<SharedPtr<EraseBaseCache>> cache_items;
+Vector<SharedPtr<MetaBaseCache>> DeleteTxnStore::ToCachedMeta(TxnTimeStamp commit_ts) const {
+    Vector<SharedPtr<MetaBaseCache>> cache_items;
     cache_items.push_back(MakeShared<MetaEraseDbCache>(db_name_));
     cache_items.push_back(MakeShared<MetaEraseTableCache>(db_id_, table_name_));
     return cache_items;
@@ -630,8 +630,8 @@ SharedPtr<WalEntry> UpdateTxnStore::ToWalEntry(TxnTimeStamp commit_ts) const {
     return wal_entry;
 }
 
-Vector<SharedPtr<EraseBaseCache>> UpdateTxnStore::ToCachedMeta(TxnTimeStamp commit_ts) const {
-    Vector<SharedPtr<EraseBaseCache>> cache_items;
+Vector<SharedPtr<MetaBaseCache>> UpdateTxnStore::ToCachedMeta(TxnTimeStamp commit_ts) const {
+    Vector<SharedPtr<MetaBaseCache>> cache_items;
     cache_items.push_back(MakeShared<MetaEraseDbCache>(db_name_));
     cache_items.push_back(MakeShared<MetaEraseTableCache>(db_id_, table_name_));
     return cache_items;
@@ -657,7 +657,7 @@ SharedPtr<WalEntry> CheckpointTxnStore::ToWalEntry(TxnTimeStamp commit_ts) const
     return wal_entry;
 }
 
-Vector<SharedPtr<EraseBaseCache>> CheckpointTxnStore::ToCachedMeta(TxnTimeStamp commit_ts) const { return {}; }
+Vector<SharedPtr<MetaBaseCache>> CheckpointTxnStore::ToCachedMeta(TxnTimeStamp commit_ts) const { return {}; }
 
 String CleanupTxnStore::ToString() const { return fmt::format("{}: timestamp: {}", TransactionType2Str(type_), timestamp_); }
 
@@ -669,6 +669,6 @@ SharedPtr<WalEntry> CleanupTxnStore::ToWalEntry(TxnTimeStamp commit_ts) const {
     return wal_entry;
 }
 
-Vector<SharedPtr<EraseBaseCache>> CleanupTxnStore::ToCachedMeta(TxnTimeStamp commit_ts) const { return {}; }
+Vector<SharedPtr<MetaBaseCache>> CleanupTxnStore::ToCachedMeta(TxnTimeStamp commit_ts) const { return {}; }
 
 } // namespace infinity

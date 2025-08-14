@@ -436,26 +436,28 @@ void NewTxnManager::CommitBottom(NewTxn *txn) {
 
 void NewTxnManager::CommitKVInstance(NewTxn *txn) {
     // Generate meta cache items
-    txn->GetTxnStore();
-
     TxnTimeStamp commit_ts = txn->CommitTS();
-    // Put meta cache items with kv_instance
-    WalEntry *wal_entry = txn->GetWALEntry();
-    Vector<SharedPtr<EraseBaseCache>> items_to_erase;
-    for (const auto &cmd : wal_entry->cmds_) {
-        Vector<SharedPtr<EraseBaseCache>> items_to_erase_part = cmd->ToCachedMeta(commit_ts);
-        items_to_erase.insert(items_to_erase.end(), items_to_erase_part.begin(), items_to_erase_part.end());
-    }
-
-    MetaCache *meta_cache_ptr = this->storage_->meta_cache();
-    Status status = meta_cache_ptr->Erase(items_to_erase, txn->kv_instance_.get());
+    Status status = txn->kv_instance_->Commit();
     if (!status.ok()) {
-        UnrecoverableError(fmt::format("Put cache: {}", status.message()));
+        UnrecoverableError(fmt::format("Commit kv_instance: {}", status.message()));
     }
+    // Put meta cache items with kv_instance
+//    WalEntry *wal_entry = txn->GetWALEntry();
+//    Vector<SharedPtr<MetaBaseCache>> items_to_erase;
+//    for (const auto &cmd : wal_entry->cmds_) {
+//        Vector<SharedPtr<MetaBaseCache>> items_to_erase_part = cmd->ToCachedMeta(commit_ts);
+//        items_to_erase.insert(items_to_erase.end(), items_to_erase_part.begin(), items_to_erase_part.end());
+//    }
+//
+//    MetaCache *meta_cache_ptr = this->storage_->meta_cache();
+//    Status status = meta_cache_ptr->Operate(items_to_erase, txn->kv_instance_.get());
+//    if (!status.ok()) {
+//        UnrecoverableError(fmt::format("Put cache: {}", status.message()));
+//    }
 
     //    BaseTxnStore *base_txn_store = txn->GetTxnStore();
     //    if (base_txn_store != nullptr) {
-    //        Vector<SharedPtr<EraseBaseCache>> items_to_erase = txn->GetTxnStore()->ToCachedMeta(commit_ts);
+    //        Vector<SharedPtr<MetaBaseCache>> items_to_erase = txn->GetTxnStore()->ToCachedMeta(commit_ts);
     //        MetaCache *meta_cache_ptr = this->storage_->meta_cache();
     //        Status status = meta_cache_ptr->Erase(items_to_erase, txn->kv_instance_.get());
     //        if (!status.ok()) {

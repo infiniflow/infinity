@@ -36,7 +36,7 @@ enum class SegmentStatus : u8;
 class ChunkIndexMeta;
 class BlockMeta;
 class SegmentMeta;
-struct EraseBaseCache;
+struct MetaBaseCache;
 
 export enum class WalCommandType : i8 {
     INVALID = 0,
@@ -247,7 +247,7 @@ export struct WalCmd {
 
     virtual String ToString() const = 0;
     virtual String CompactInfo() const = 0;
-    virtual Vector<SharedPtr<EraseBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const = 0;
+    virtual Vector<SharedPtr<MetaBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const = 0;
 
     // Read from a serialized version
     static SharedPtr<WalCmd> ReadAdv(const char *&ptr, i32 max_bytes);
@@ -266,7 +266,7 @@ export struct WalCmdDummy final : public WalCmd {
     void WriteAdv(char *&buf) const final {}
     String ToString() const final { return "Dummy"; }
     String CompactInfo() const final { return "Dummy"; }
-    Vector<SharedPtr<EraseBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
+    Vector<SharedPtr<MetaBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
 };
 
 export struct WalCmdCreateDatabase final : public WalCmd {
@@ -282,7 +282,7 @@ export struct WalCmdCreateDatabase final : public WalCmd {
     void WriteAdv(char *&buf) const final;
     String ToString() const final;
     String CompactInfo() const final;
-    Vector<SharedPtr<EraseBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
+    Vector<SharedPtr<MetaBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
 
     String db_name_{};
     String db_dir_tail_{};
@@ -300,7 +300,7 @@ export struct WalCmdCreateDatabaseV2 final : public WalCmd {
     void WriteAdv(char *&buf) const final;
     String ToString() const final;
     String CompactInfo() const final;
-    Vector<SharedPtr<EraseBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
+    Vector<SharedPtr<MetaBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
 
     String db_name_{};
     String db_id_{};
@@ -317,7 +317,7 @@ export struct WalCmdDropDatabase final : public WalCmd {
     void WriteAdv(char *&buf) const final;
     String ToString() const final;
     String CompactInfo() const final;
-    Vector<SharedPtr<EraseBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
+    Vector<SharedPtr<MetaBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
 
     String db_name_{};
 };
@@ -333,7 +333,7 @@ export struct WalCmdDropDatabaseV2 final : public WalCmd {
     void WriteAdv(char *&buf) const final;
     String ToString() const final;
     String CompactInfo() const final;
-    Vector<SharedPtr<EraseBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
+    Vector<SharedPtr<MetaBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
 
     String db_name_{};
     String db_id_{};
@@ -351,7 +351,7 @@ export struct WalCmdCreateTable final : public WalCmd {
     void WriteAdv(char *&buf) const final;
     String ToString() const final;
     String CompactInfo() const final;
-    Vector<SharedPtr<EraseBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
+    Vector<SharedPtr<MetaBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
 
     String db_name_{};
     String table_dir_tail_{};
@@ -369,7 +369,7 @@ export struct WalCmdCreateTableV2 final : public WalCmd {
     void WriteAdv(char *&buf) const final;
     String ToString() const final;
     String CompactInfo() const final;
-    Vector<SharedPtr<EraseBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
+    Vector<SharedPtr<MetaBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
 
     String db_name_{};
     String db_id_{};
@@ -388,7 +388,7 @@ export struct WalCmdDropTable final : public WalCmd {
     void WriteAdv(char *&buf) const final;
     String ToString() const final;
     String CompactInfo() const final;
-    Vector<SharedPtr<EraseBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
+    Vector<SharedPtr<MetaBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
 
     String db_name_{};
     String table_name_{};
@@ -411,7 +411,7 @@ export struct WalCmdDropTableV2 final : public WalCmd {
     void WriteAdv(char *&buf) const final;
     String ToString() const final;
     String CompactInfo() const final;
-    Vector<SharedPtr<EraseBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
+    Vector<SharedPtr<MetaBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
 
     String db_name_{};
     String db_id_{};
@@ -440,7 +440,7 @@ export struct WalCmdCreateIndex final : public WalCmd {
     void WriteAdv(char *&buf) const final;
     String ToString() const final;
     String CompactInfo() const final;
-    Vector<SharedPtr<EraseBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
+    Vector<SharedPtr<MetaBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
 
     String db_name_{};
     String table_name_{};
@@ -466,7 +466,7 @@ export struct WalCmdCreateIndexV2 final : public WalCmd {
     void WriteAdv(char *&buf) const final;
     String ToString() const final;
     String CompactInfo() const final;
-    Vector<SharedPtr<EraseBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
+    Vector<SharedPtr<MetaBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
 
     String db_name_{};
     String db_id_{};
@@ -509,7 +509,7 @@ export struct WalCmdDropIndex final : public WalCmd {
     void WriteAdv(char *&buf) const final;
     String ToString() const final;
     String CompactInfo() const final;
-    Vector<SharedPtr<EraseBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
+    Vector<SharedPtr<MetaBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
 
     String db_name_{};
     String table_name_{};
@@ -534,7 +534,7 @@ export struct WalCmdDropIndexV2 final : public WalCmd {
     void WriteAdv(char *&buf) const final;
     String ToString() const final;
     String CompactInfo() const final;
-    Vector<SharedPtr<EraseBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
+    Vector<SharedPtr<MetaBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
 
     String db_name_{};
     String db_id_{};
@@ -558,7 +558,7 @@ export struct WalCmdImport final : public WalCmd {
     void WriteAdv(char *&buf) const final;
     String ToString() const final;
     String CompactInfo() const final;
-    Vector<SharedPtr<EraseBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
+    Vector<SharedPtr<MetaBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
 
     String db_name_{};
     String table_name_{};
@@ -576,7 +576,7 @@ export struct WalCmdImportV2 final : public WalCmd {
     void WriteAdv(char *&buf) const final;
     String ToString() const final;
     String CompactInfo() const final;
-    Vector<SharedPtr<EraseBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
+    Vector<SharedPtr<MetaBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
 
     String db_name_{};
     String db_id_{};
@@ -596,7 +596,7 @@ export struct WalCmdAppend final : public WalCmd {
     void WriteAdv(char *&buf) const final;
     String ToString() const final;
     String CompactInfo() const final;
-    Vector<SharedPtr<EraseBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
+    Vector<SharedPtr<MetaBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
 
     String db_name_{};
     String table_name_{};
@@ -620,7 +620,7 @@ export struct WalCmdAppendV2 final : public WalCmd {
     void WriteAdv(char *&buf) const final;
     String ToString() const final;
     String CompactInfo() const final;
-    Vector<SharedPtr<EraseBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
+    Vector<SharedPtr<MetaBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
 
     String db_name_{};
     String db_id_{};
@@ -641,7 +641,7 @@ export struct WalCmdDelete final : public WalCmd {
     void WriteAdv(char *&buf) const final;
     String ToString() const final;
     String CompactInfo() const final;
-    Vector<SharedPtr<EraseBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
+    Vector<SharedPtr<MetaBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
 
     String db_name_{};
     String table_name_{};
@@ -659,7 +659,7 @@ export struct WalCmdDeleteV2 final : public WalCmd {
     void WriteAdv(char *&buf) const final;
     String ToString() const final;
     String CompactInfo() const final;
-    Vector<SharedPtr<EraseBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
+    Vector<SharedPtr<MetaBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
 
     String db_name_{};
     String db_id_{};
@@ -687,7 +687,7 @@ export struct WalCmdSetSegmentStatusSealed final : public WalCmd {
     void WriteAdv(char *&buf) const final;
     String ToString() const final;
     String CompactInfo() const final;
-    Vector<SharedPtr<EraseBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
+    Vector<SharedPtr<MetaBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
 
     static WalCmdSetSegmentStatusSealed ReadBufferAdv(const char *&ptr);
 
@@ -716,7 +716,7 @@ export struct WalCmdSetSegmentStatusSealedV2 final : public WalCmd {
     void WriteAdv(char *&buf) const final;
     String ToString() const final;
     String CompactInfo() const final;
-    Vector<SharedPtr<EraseBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
+    Vector<SharedPtr<MetaBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
 
     static WalCmdSetSegmentStatusSealedV2 ReadBufferAdv(const char *&ptr);
 
@@ -746,7 +746,7 @@ export struct WalCmdUpdateSegmentBloomFilterData final : public WalCmd {
     void WriteAdv(char *&buf) const final;
     String ToString() const final;
     String CompactInfo() const final;
-    Vector<SharedPtr<EraseBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
+    Vector<SharedPtr<MetaBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
 
     static WalCmdUpdateSegmentBloomFilterData ReadBufferAdv(const char *&ptr);
 
@@ -776,7 +776,7 @@ export struct WalCmdUpdateSegmentBloomFilterDataV2 final : public WalCmd {
     void WriteAdv(char *&buf) const final;
     String ToString() const final;
     String CompactInfo() const final;
-    Vector<SharedPtr<EraseBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
+    Vector<SharedPtr<MetaBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
 
     static WalCmdUpdateSegmentBloomFilterDataV2 ReadBufferAdv(const char *&ptr);
 
@@ -802,7 +802,7 @@ export struct WalCmdCheckpoint final : public WalCmd {
     void WriteAdv(char *&buf) const final;
     String ToString() const final;
     String CompactInfo() const final;
-    Vector<SharedPtr<EraseBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
+    Vector<SharedPtr<MetaBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
 
     i64 max_commit_ts_{};
     String catalog_path_{};
@@ -819,7 +819,7 @@ export struct WalCmdCheckpointV2 final : public WalCmd {
     void WriteAdv(char *&buf) const final;
     String ToString() const final;
     String CompactInfo() const final;
-    Vector<SharedPtr<EraseBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
+    Vector<SharedPtr<MetaBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
 
     i64 max_commit_ts_{};
 };
@@ -839,7 +839,7 @@ export struct WalCmdCompact final : public WalCmd {
     void WriteAdv(char *&buf) const final;
     String ToString() const final;
     String CompactInfo() const final;
-    Vector<SharedPtr<EraseBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
+    Vector<SharedPtr<MetaBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
 
     const String db_name_{};
     const String table_name_{};
@@ -871,7 +871,7 @@ export struct WalCmdCompactV2 final : public WalCmd {
     void WriteAdv(char *&buf) const final;
     String ToString() const final;
     String CompactInfo() const final;
-    Vector<SharedPtr<EraseBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
+    Vector<SharedPtr<MetaBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
 
     const String db_name_{};
     const String db_id_{};
@@ -894,7 +894,7 @@ export struct WalCmdOptimize final : public WalCmd {
     void WriteAdv(char *&buf) const final;
     String ToString() const final;
     String CompactInfo() const final;
-    Vector<SharedPtr<EraseBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
+    Vector<SharedPtr<MetaBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
 
     String db_name_{};
     String table_name_{};
@@ -920,7 +920,7 @@ export struct WalCmdOptimizeV2 final : public WalCmd {
     void WriteAdv(char *&buf) const final;
     String ToString() const final;
     String CompactInfo() const final;
-    Vector<SharedPtr<EraseBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
+    Vector<SharedPtr<MetaBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
 
     String db_name_{};
     String db_id_{};
@@ -953,7 +953,7 @@ export struct WalCmdDumpIndex final : public WalCmd {
     void WriteAdv(char *&buf) const final;
     String ToString() const final;
     String CompactInfo() const final;
-    Vector<SharedPtr<EraseBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
+    Vector<SharedPtr<MetaBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
 
     String db_name_{};
     String table_name_{};
@@ -996,7 +996,7 @@ export struct WalCmdDumpIndexV2 final : public WalCmd {
     void WriteAdv(char *&buf) const final;
     String ToString() const final;
     String CompactInfo() const final;
-    Vector<SharedPtr<EraseBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
+    Vector<SharedPtr<MetaBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
 
     String db_name_{};
     String db_id_{};
@@ -1023,7 +1023,7 @@ export struct WalCmdRenameTable : public WalCmd {
     void WriteAdv(char *&buf) const final;
     String ToString() const final;
     String CompactInfo() const final;
-    Vector<SharedPtr<EraseBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
+    Vector<SharedPtr<MetaBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
 
     String db_name_{};
     String table_name_{};
@@ -1046,7 +1046,7 @@ export struct WalCmdRenameTableV2 : public WalCmd {
     void WriteAdv(char *&buf) const final;
     String ToString() const final;
     String CompactInfo() const final;
-    Vector<SharedPtr<EraseBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
+    Vector<SharedPtr<MetaBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
 
     String db_name_{};
     String db_id_{};
@@ -1068,7 +1068,7 @@ export struct WalCmdAddColumns : public WalCmd {
     void WriteAdv(char *&buf) const final;
     String ToString() const final;
     String CompactInfo() const final;
-    Vector<SharedPtr<EraseBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
+    Vector<SharedPtr<MetaBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
 
     String db_name_{};
     String table_name_{};
@@ -1091,7 +1091,7 @@ export struct WalCmdAddColumnsV2 : public WalCmd {
     void WriteAdv(char *&buf) const final;
     String ToString() const final;
     String CompactInfo() const final;
-    Vector<SharedPtr<EraseBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
+    Vector<SharedPtr<MetaBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
 
     String db_name_{};
     String db_id_{};
@@ -1113,7 +1113,7 @@ export struct WalCmdDropColumns : public WalCmd {
     void WriteAdv(char *&buf) const final;
     String ToString() const final;
     String CompactInfo() const final;
-    Vector<SharedPtr<EraseBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
+    Vector<SharedPtr<MetaBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
 
     String db_name_{};
     String table_name_{};
@@ -1142,7 +1142,7 @@ export struct WalCmdDropColumnsV2 : public WalCmd {
     void WriteAdv(char *&buf) const final;
     String ToString() const final;
     String CompactInfo() const final;
-    Vector<SharedPtr<EraseBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
+    Vector<SharedPtr<MetaBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
 
     String db_name_{};
     String db_id_{};
@@ -1165,7 +1165,7 @@ export struct WalCmdCleanup : public WalCmd {
     void WriteAdv(char *&buf) const final;
     String ToString() const final;
     String CompactInfo() const final;
-    Vector<SharedPtr<EraseBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
+    Vector<SharedPtr<MetaBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
 
     i64 timestamp_{};
 };
@@ -1180,7 +1180,7 @@ export struct WalCmdCreateTableSnapshot : public WalCmd {
     void WriteAdv(char *&buf) const final;
     String ToString() const final;
     String CompactInfo() const final;
-    Vector<SharedPtr<EraseBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
+    Vector<SharedPtr<MetaBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
 
     static WalCmdCreateTableSnapshot ReadBufferAdv(const char *&ptr, i32 max_bytes);
 
@@ -1220,7 +1220,7 @@ export struct WalCmdRestoreTableSnapshot : public WalCmd {
     void WriteAdv(char *&buf) const final;
     String ToString() const final;
     String CompactInfo() const final;
-    Vector<SharedPtr<EraseBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
+    Vector<SharedPtr<MetaBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
 
     static WalCmdRestoreTableSnapshot ReadBufferAdv(const char *&ptr, i32 max_bytes);
 
@@ -1249,7 +1249,7 @@ export struct WalCmdRestoreDatabaseSnapshot : public WalCmd {
     void WriteAdv(char *&buf) const final;
     String ToString() const final;
     String CompactInfo() const final;
-    Vector<SharedPtr<EraseBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
+    Vector<SharedPtr<MetaBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
 
     String db_name_{};
     String db_id_str_{};

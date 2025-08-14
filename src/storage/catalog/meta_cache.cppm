@@ -31,13 +31,13 @@ export enum class MetaCacheType {
     kCreateDB,
     kCreateTable,
     kCreateIndex,
+    kEraseDB,
+    kEraseTable,
+    kEraseIndex,
 };
 
 export enum class EraseCacheType {
     kInvalid,
-    kEraseDB,
-    kEraseTable,
-    kEraseIndex,
 };
 
 struct MetaBaseCache {
@@ -109,30 +109,39 @@ export struct MetaIndexCache : public MetaBaseCache {
     String detail() final;
 };
 
-export struct EraseBaseCache {
-    explicit EraseBaseCache(EraseCacheType type) : type_(type) {}
-    virtual ~EraseBaseCache() = default;
-    EraseCacheType type_{EraseCacheType::kInvalid};
-};
-
-export struct MetaEraseDbCache : public EraseBaseCache {
-    explicit MetaEraseDbCache(const String &db_name) : EraseBaseCache(EraseCacheType::kEraseDB), db_name_(db_name) {}
+export struct MetaEraseDbCache : public MetaBaseCache {
+    explicit MetaEraseDbCache(const String &db_name) : MetaBaseCache(MetaCacheType::kEraseDB), db_name_(db_name) {}
     String db_name_{};
+
+    String name() final;
+    u64 commit_ts() final;
+    String type() final;
+    String detail() final;
 };
 
-export struct MetaEraseTableCache : public EraseBaseCache {
+export struct MetaEraseTableCache : public MetaBaseCache {
     explicit MetaEraseTableCache(u64 db_id, const String &table_name)
-        : EraseBaseCache(EraseCacheType::kEraseTable), db_id_(db_id), table_name_(table_name) {}
+        : MetaBaseCache(MetaCacheType::kEraseTable), db_id_(db_id), table_name_(table_name) {}
     u64 db_id_{};
     String table_name_{};
+
+    String name() final;
+    u64 commit_ts() final;
+    String type() final;
+    String detail() final;
 };
 
-export struct MetaEraseIndexCache : public EraseBaseCache {
+export struct MetaEraseIndexCache : public MetaBaseCache {
     explicit MetaEraseIndexCache(u64 db_id, u64 table_id, const String &index_name)
-        : EraseBaseCache(EraseCacheType::kEraseIndex), db_id_(db_id), table_id_(table_id), index_name_(index_name) {}
+        : MetaBaseCache(MetaCacheType::kEraseIndex), db_id_(db_id), table_id_(table_id), index_name_(index_name) {}
     u64 db_id_{};
     u64 table_id_{};
     String index_name_{};
+
+    String name() final;
+    u64 commit_ts() final;
+    String type() final;
+    String detail() final;
 };
 
 struct CacheItem {
@@ -158,11 +167,11 @@ export class MetaCache {
 public:
     explicit MetaCache(SizeT capacity) : capacity_(capacity) {};
 
-    void Put(const Vector<SharedPtr<MetaBaseCache>> &cache_items);
+    Status Operate(const Vector<SharedPtr<MetaBaseCache>> &cache_items, KVInstance *kv_instance);
 
-    Status Erase(const Vector<SharedPtr<EraseBaseCache>> &cache_items, KVInstance *kv_instance);
+    // Status Erase(const Vector<SharedPtr<MetaBaseCache>> &cache_items, KVInstance *kv_instance);
 
-    Status PutOrErase(const Vector<SharedPtr<MetaBaseCache>> &cache_items, KVInstance *kv_instance);
+    // Status PutOrErase(const Vector<SharedPtr<MetaBaseCache>> &cache_items, KVInstance *kv_instance);
 
     SharedPtr<MetaDbCache> GetDb(const String &db_name, TxnTimeStamp begin_ts);
 

@@ -30,7 +30,7 @@ namespace infinity {
 struct DataBlock;
 class IndexBase;
 class TableDef;
-struct EraseBaseCache;
+struct MetaBaseCache;
 
 export struct MemIndexRange {
     String index_id_{};
@@ -75,7 +75,7 @@ export struct BaseTxnStore {
 
     virtual String ToString() const = 0;
     virtual SharedPtr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const = 0;
-    virtual Vector<SharedPtr<EraseBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const = 0;
+    virtual Vector<SharedPtr<MetaBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const = 0;
     virtual ~BaseTxnStore() = default;
     virtual void ClearData();
 };
@@ -87,7 +87,7 @@ export struct DummyTxnStore final : public BaseTxnStore {
 
     String ToString() const final;
     SharedPtr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;
-    Vector<SharedPtr<EraseBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
+    Vector<SharedPtr<MetaBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
 };
 
 export struct CreateDBTxnStore final : public BaseTxnStore {
@@ -101,7 +101,7 @@ export struct CreateDBTxnStore final : public BaseTxnStore {
 
     String ToString() const final;
     SharedPtr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;
-    Vector<SharedPtr<EraseBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
+    Vector<SharedPtr<MetaBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
 };
 
 export struct DropDBTxnStore final : public BaseTxnStore {
@@ -115,7 +115,7 @@ export struct DropDBTxnStore final : public BaseTxnStore {
 
     String ToString() const final;
     SharedPtr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;
-    Vector<SharedPtr<EraseBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
+    Vector<SharedPtr<MetaBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
 };
 
 export struct CreateTableTxnStore final : public BaseTxnStore {
@@ -132,7 +132,7 @@ export struct CreateTableTxnStore final : public BaseTxnStore {
 
     String ToString() const final;
     SharedPtr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;
-    Vector<SharedPtr<EraseBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
+    Vector<SharedPtr<MetaBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
 };
 
 export struct CreateTableSnapshotTxnStore final : public BaseTxnStore {
@@ -145,7 +145,7 @@ export struct CreateTableSnapshotTxnStore final : public BaseTxnStore {
 
     String ToString() const final;
     SharedPtr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;
-    Vector<SharedPtr<EraseBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
+    Vector<SharedPtr<MetaBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
 };
 
 export struct RestoreTableTxnStore final : public BaseTxnStore {
@@ -165,7 +165,7 @@ export struct RestoreTableTxnStore final : public BaseTxnStore {
 
     String ToString() const final;
     SharedPtr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;
-    Vector<SharedPtr<EraseBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
+    Vector<SharedPtr<MetaBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
 };
 
 export struct RestoreDatabaseTxnStore final : public BaseTxnStore {
@@ -178,7 +178,7 @@ export struct RestoreDatabaseTxnStore final : public BaseTxnStore {
 
     String ToString() const final;
     SharedPtr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;
-    Vector<SharedPtr<EraseBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
+    Vector<SharedPtr<MetaBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
 };
 
 export struct DropTableTxnStore final : public BaseTxnStore {
@@ -196,7 +196,7 @@ export struct DropTableTxnStore final : public BaseTxnStore {
 
     String ToString() const final;
     SharedPtr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;
-    Vector<SharedPtr<EraseBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
+    Vector<SharedPtr<MetaBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
 };
 
 export struct RenameTableTxnStore final : public BaseTxnStore {
@@ -212,7 +212,7 @@ export struct RenameTableTxnStore final : public BaseTxnStore {
 
     String ToString() const final;
     SharedPtr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;
-    Vector<SharedPtr<EraseBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
+    Vector<SharedPtr<MetaBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
 };
 
 export struct CreateIndexTxnStore final : public BaseTxnStore {
@@ -231,7 +231,7 @@ export struct CreateIndexTxnStore final : public BaseTxnStore {
 
     String ToString() const final;
     SharedPtr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;
-    Vector<SharedPtr<EraseBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
+    Vector<SharedPtr<MetaBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
 };
 
 export struct DropIndexTxnStore final : public BaseTxnStore {
@@ -252,7 +252,7 @@ export struct DropIndexTxnStore final : public BaseTxnStore {
 
     String ToString() const final;
     SharedPtr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;
-    Vector<SharedPtr<EraseBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
+    Vector<SharedPtr<MetaBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
 };
 
 export struct OptimizeIndexStoreEntry {
@@ -281,7 +281,7 @@ export struct OptimizeIndexTxnStore final : public BaseTxnStore {
 
     String ToString() const final;
     SharedPtr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;
-    Vector<SharedPtr<EraseBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
+    Vector<SharedPtr<MetaBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
 };
 
 export struct AppendTxnStore final : public BaseTxnStore {
@@ -307,7 +307,7 @@ export struct AppendTxnStore final : public BaseTxnStore {
 
     String ToString() const final;
     SharedPtr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;
-    Vector<SharedPtr<EraseBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
+    Vector<SharedPtr<MetaBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
     void ClearData() final;
     SizeT RowCount() const;
 };
@@ -336,7 +336,7 @@ export struct ImportTxnStore final : public BaseTxnStore {
 
     String ToString() const final;
     SharedPtr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;
-    Vector<SharedPtr<EraseBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
+    Vector<SharedPtr<MetaBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
     void ClearData() final;
     SizeT RowCount() const;
     SizeT SegmentCount() const;
@@ -362,7 +362,7 @@ export struct DumpMemIndexTxnStore final : public BaseTxnStore {
 
     String ToString() const final;
     SharedPtr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;
-    Vector<SharedPtr<EraseBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
+    Vector<SharedPtr<MetaBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
 };
 
 export struct AddColumnsTxnStore final : public BaseTxnStore {
@@ -381,7 +381,7 @@ export struct AddColumnsTxnStore final : public BaseTxnStore {
 
     String ToString() const final;
     SharedPtr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;
-    Vector<SharedPtr<EraseBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
+    Vector<SharedPtr<MetaBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
 };
 
 export struct DropColumnsTxnStore final : public BaseTxnStore {
@@ -402,7 +402,7 @@ export struct DropColumnsTxnStore final : public BaseTxnStore {
 
     String ToString() const final;
     SharedPtr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;
-    Vector<SharedPtr<EraseBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
+    Vector<SharedPtr<MetaBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
 };
 
 export struct CompactTxnStore final : public BaseTxnStore {
@@ -430,7 +430,7 @@ export struct CompactTxnStore final : public BaseTxnStore {
 
     String ToString() const final;
     SharedPtr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;
-    Vector<SharedPtr<EraseBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
+    Vector<SharedPtr<MetaBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
 };
 
 export struct DeleteTxnStore final : public BaseTxnStore {
@@ -448,7 +448,7 @@ export struct DeleteTxnStore final : public BaseTxnStore {
 
     String ToString() const final;
     SharedPtr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;
-    Vector<SharedPtr<EraseBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
+    Vector<SharedPtr<MetaBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
 };
 
 export struct UpdateTxnStore final : public BaseTxnStore {
@@ -477,7 +477,7 @@ export struct UpdateTxnStore final : public BaseTxnStore {
 
     String ToString() const final;
     SharedPtr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;
-    Vector<SharedPtr<EraseBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
+    Vector<SharedPtr<MetaBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
     void ClearData() final;
     SizeT RowCount() const;
 };
@@ -500,7 +500,7 @@ export struct CheckpointTxnStore final : public BaseTxnStore {
 
     String ToString() const final;
     SharedPtr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;
-    Vector<SharedPtr<EraseBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
+    Vector<SharedPtr<MetaBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
 };
 
 export struct CleanupTxnStore final : public BaseTxnStore {
@@ -511,7 +511,7 @@ export struct CleanupTxnStore final : public BaseTxnStore {
 
     String ToString() const final;
     SharedPtr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;
-    Vector<SharedPtr<EraseBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
+    Vector<SharedPtr<MetaBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
 };
 
 } // namespace infinity

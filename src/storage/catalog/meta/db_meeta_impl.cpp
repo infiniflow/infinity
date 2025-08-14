@@ -149,23 +149,23 @@ Status DBMeeta::GetTableIDs(Vector<String> *&table_id_strs, Vector<String> **tab
 
 Status DBMeeta::GetTableID(const String &table_name, String &table_key, String &table_id_str, TxnTimeStamp &create_table_ts) {
 
-    u64 db_id = std::stoull(db_id_str_);
-    SharedPtr<MetaTableCache> table_cache = meta_cache_->GetTable(db_id, table_name, txn_begin_ts_);
-    if (table_cache.get() != nullptr) {
-        if (table_cache->is_dropped_) {
-            return Status::TableNotExist(table_name);
-        }
-        table_id_str = std::to_string(table_cache->table_id_);
-        table_key = table_cache->table_key_;
-        create_table_ts = table_cache->commit_ts_;
-        LOG_TRACE(fmt::format("Get table meta from cache, db_id: {}, table_name: {}, table_key: {}, table_id: {}, commit_ts: {}",
-                              table_cache->db_id_,
-                              table_name,
-                              table_cache->table_key_,
-                              table_cache->table_id_,
-                              table_cache->commit_ts_));
-        return Status::OK();
-    }
+//    u64 db_id = std::stoull(db_id_str_);
+//    SharedPtr<MetaTableCache> table_cache = meta_cache_->GetTable(db_id, table_name, txn_begin_ts_);
+//    if (table_cache.get() != nullptr) {
+//        if (table_cache->is_dropped_) {
+//            return Status::TableNotExist(table_name);
+//        }
+//        table_id_str = std::to_string(table_cache->table_id_);
+//        table_key = table_cache->table_key_;
+//        create_table_ts = table_cache->commit_ts_;
+//        LOG_TRACE(fmt::format("Get table meta from cache, db_id: {}, table_name: {}, table_key: {}, table_id: {}, commit_ts: {}",
+//                              table_cache->db_id_,
+//                              table_name,
+//                              table_cache->table_key_,
+//                              table_cache->table_id_,
+//                              table_cache->commit_ts_));
+//        return Status::OK();
+//    }
 
     String table_key_prefix = KeyEncode::CatalogTablePrefix(db_id_str_, table_name);
     auto iter2 = kv_instance_->GetIterator();
@@ -207,28 +207,28 @@ Status DBMeeta::GetTableID(const String &table_name, String &table_key, String &
     if ((!drop_table_ts.empty() && std::stoull(drop_table_ts) <= txn_begin_ts_) ||
         (!rename_table_ts.empty() && std::stoull(rename_table_ts) <= txn_begin_ts_)) {
 
-        table_cache = MakeShared<MetaTableCache>(db_id, table_name, std::stoull(table_id_str), max_commit_ts, table_key, true);
-        meta_cache_->Put({table_cache});
-
-        LOG_TRACE(fmt::format("Save dropped table meta from cache, db_id: {}, table_name: {}, table_key: {}, table_id: {}, commit_ts: {}",
-                              table_cache->db_id_,
-                              table_name,
-                              table_key,
-                              table_cache->table_id_,
-                              table_cache->commit_ts_));
+//        table_cache = MakeShared<MetaTableCache>(db_id, table_name, std::stoull(table_id_str), max_commit_ts, table_key, true);
+//        meta_cache_->Operate({table_cache}, nullptr);
+//
+//        LOG_TRACE(fmt::format("Save dropped table meta from cache, db_id: {}, table_name: {}, table_key: {}, table_id: {}, commit_ts: {}",
+//                              table_cache->db_id_,
+//                              table_name,
+//                              table_key,
+//                              table_cache->table_id_,
+//                              table_cache->commit_ts_));
 
         return Status::TableNotExist(table_name);
     }
 
-    table_cache = MakeShared<MetaTableCache>(db_id, table_name, std::stoull(table_id_str), max_commit_ts, table_key, false);
-    meta_cache_->Put({table_cache});
+//    table_cache = MakeShared<MetaTableCache>(db_id, table_name, std::stoull(table_id_str), max_commit_ts, table_key, false);
+//    meta_cache_->Operate({table_cache}, nullptr);
 
-    LOG_TRACE(fmt::format("Save created table meta from cache, db_id: {}, table_name: {}, table_key: {}, table_id: {}, commit_ts: {}",
-                          table_cache->db_id_,
-                          table_name,
-                          table_key,
-                          table_cache->table_id_,
-                          table_cache->commit_ts_));
+//    LOG_TRACE(fmt::format("Save created table meta from cache, db_id: {}, table_name: {}, table_key: {}, table_id: {}, commit_ts: {}",
+//                          table_cache->db_id_,
+//                          table_name,
+//                          table_key,
+//                          table_cache->table_id_,
+//                          table_cache->commit_ts_));
 
     create_table_ts = max_commit_ts;
     return Status::OK();

@@ -54,7 +54,31 @@ String MetaIndexCache::detail() {
     return fmt::format("db_id: {}, table_id: {}, index_name: {}, index_id: {}, {}", db_id_, table_id_, table_id_, index_name_, index_id_, extend);
 }
 
-void MetaCache::Put(const Vector<SharedPtr<MetaBaseCache>> &cache_items) {
+String MetaEraseDbCache::name() { return db_name_; }
+u64 MetaEraseDbCache::commit_ts() {
+    UnrecoverableError("Not implemented");
+    return UNCOMMIT_TS;
+}
+String MetaEraseDbCache::type() { return "EraseDb"; }
+String MetaEraseDbCache::detail() { return fmt::format("Erase db: {}", db_name_); }
+
+String MetaEraseTableCache::name() { return table_name_; }
+u64 MetaEraseTableCache::commit_ts() {
+    UnrecoverableError("Not implemented");
+    return UNCOMMIT_TS;
+}
+String MetaEraseTableCache::type() { return "EraseTable"; }
+String MetaEraseTableCache::detail() { return fmt::format("Erase table, db_id: {}, table: {}", db_id_, table_name_); }
+
+String MetaEraseIndexCache::name() { return index_name_; }
+u64 MetaEraseIndexCache::commit_ts() {
+    UnrecoverableError("Not implemented");
+    return UNCOMMIT_TS;
+}
+String MetaEraseIndexCache::type() { return "EraseIndex"; }
+String MetaEraseIndexCache::detail() { return fmt::format("Erase table, db_id: {}, table_id: {}, index: {}", db_id_, table_id_, index_name_); }
+
+Status MetaCache::Operate(const Vector<SharedPtr<MetaBaseCache>> &cache_items, KVInstance *kv_instance) {
     std::unique_lock lock(cache_mtx_);
     for (const auto &cache_item : cache_items) {
         switch (cache_item->type_) {
@@ -73,28 +97,17 @@ void MetaCache::Put(const Vector<SharedPtr<MetaBaseCache>> &cache_items) {
                 PutIndexNolock(index_cache);
                 break;
             }
-            default: {
-                UnrecoverableError("Invalid meta type");
-            }
-        }
-    }
-}
-
-Status MetaCache::Erase(const Vector<SharedPtr<EraseBaseCache>> &cache_items, KVInstance *kv_instance) {
-    std::unique_lock lock(cache_mtx_);
-    for (const auto &cache_item : cache_items) {
-        switch (cache_item->type_) {
-            case EraseCacheType::kEraseDB: {
+            case MetaCacheType::kEraseDB: {
                 SharedPtr<MetaEraseDbCache> db_cache = std::static_pointer_cast<MetaEraseDbCache>(cache_item);
                 EraseDbNolock(db_cache->db_name_);
                 break;
             }
-            case EraseCacheType::kEraseTable: {
+            case MetaCacheType::kEraseTable: {
                 SharedPtr<MetaEraseTableCache> table_cache = std::static_pointer_cast<MetaEraseTableCache>(cache_item);
                 EraseTableNolock(table_cache->db_id_, table_cache->table_name_);
                 break;
             }
-            case EraseCacheType::kEraseIndex: {
+            case MetaCacheType::kEraseIndex: {
                 SharedPtr<MetaEraseIndexCache> index_cache = std::static_pointer_cast<MetaEraseIndexCache>(cache_item);
                 EraseIndexNolock(index_cache->db_id_, index_cache->table_id_, index_cache->index_name_);
                 break;
@@ -108,20 +121,51 @@ Status MetaCache::Erase(const Vector<SharedPtr<EraseBaseCache>> &cache_items, KV
     if (kv_instance != nullptr) {
         return kv_instance->Commit();
     }
-
     return Status::OK();
 }
+//
+// Status MetaCache::Erase(const Vector<SharedPtr<MetaBaseCache>> &cache_items, KVInstance *kv_instance) {
+//    std::unique_lock lock(cache_mtx_);
+//    for (const auto &cache_item : cache_items) {
+//        switch (cache_item->type_) {
+//            case EraseCacheType::kEraseDB: {
+//                SharedPtr<MetaEraseDbCache> db_cache = std::static_pointer_cast<MetaEraseDbCache>(cache_item);
+//                EraseDbNolock(db_cache->db_name_);
+//                break;
+//            }
+//            case EraseCacheType::kEraseTable: {
+//                SharedPtr<MetaEraseTableCache> table_cache = std::static_pointer_cast<MetaEraseTableCache>(cache_item);
+//                EraseTableNolock(table_cache->db_id_, table_cache->table_name_);
+//                break;
+//            }
+//            case EraseCacheType::kEraseIndex: {
+//                SharedPtr<MetaEraseIndexCache> index_cache = std::static_pointer_cast<MetaEraseIndexCache>(cache_item);
+//                EraseIndexNolock(index_cache->db_id_, index_cache->table_id_, index_cache->index_name_);
+//                break;
+//            }
+//            default: {
+//                UnrecoverableError("Invalid meta type");
+//            }
+//        }
+//    }
+//
+//    if (kv_instance != nullptr) {
+//        return kv_instance->Commit();
+//    }
+//
+//    return Status::OK();
+//}
 
-Status MetaCache::PutOrErase(const Vector<SharedPtr<MetaBaseCache>> &cache_items, KVInstance *kv_instance) {
-    std::unique_lock lock(cache_mtx_);
-    for (const auto &cache_item : cache_items) {
-        PutOrEraseNolock(cache_item);
-    }
-    if (kv_instance != nullptr) {
-        return kv_instance->Commit();
-    }
-    return Status::OK();
-}
+// Status MetaCache::PutOrErase(const Vector<SharedPtr<MetaBaseCache>> &cache_items, KVInstance *kv_instance) {
+//     std::unique_lock lock(cache_mtx_);
+//     for (const auto &cache_item : cache_items) {
+//         PutOrEraseNolock(cache_item);
+//     }
+//     if (kv_instance != nullptr) {
+//         return kv_instance->Commit();
+//     }
+//     return Status::OK();
+// }
 
 void MetaCache::PutOrEraseNolock(const SharedPtr<MetaBaseCache> &meta_base_cache) {
     switch (meta_base_cache->type_) {

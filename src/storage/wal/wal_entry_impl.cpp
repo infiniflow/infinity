@@ -3061,154 +3061,154 @@ String WalCmdRestoreDatabaseSnapshot::CompactInfo() const {
     return std::move(ss).str();
 }
 
-Vector<SharedPtr<EraseBaseCache>> WalCmdDummy::ToCachedMeta(TxnTimeStamp commit_ts) const { return {}; }
+Vector<SharedPtr<MetaBaseCache>> WalCmdDummy::ToCachedMeta(TxnTimeStamp commit_ts) const { return {}; }
 
-Vector<SharedPtr<EraseBaseCache>> WalCmdCreateDatabase::ToCachedMeta(TxnTimeStamp commit_ts) const {
+Vector<SharedPtr<MetaBaseCache>> WalCmdCreateDatabase::ToCachedMeta(TxnTimeStamp commit_ts) const {
     UnrecoverableError("WalCmdDummy::ToCachedMeta, unexpected");
     return {};
 }
 
-Vector<SharedPtr<EraseBaseCache>> WalCmdCreateDatabaseV2::ToCachedMeta(TxnTimeStamp commit_ts) const {
-    Vector<SharedPtr<EraseBaseCache>> cache_items;
+Vector<SharedPtr<MetaBaseCache>> WalCmdCreateDatabaseV2::ToCachedMeta(TxnTimeStamp commit_ts) const {
+    Vector<SharedPtr<MetaBaseCache>> cache_items;
     cache_items.push_back(MakeShared<MetaEraseDbCache>(db_name_));
     return cache_items;
 }
 
-Vector<SharedPtr<EraseBaseCache>> WalCmdDropDatabase::ToCachedMeta(TxnTimeStamp commit_ts) const {
+Vector<SharedPtr<MetaBaseCache>> WalCmdDropDatabase::ToCachedMeta(TxnTimeStamp commit_ts) const {
     UnrecoverableError("WalCmdDummy::ToCachedMeta, unexpected");
     return {};
 }
 
-Vector<SharedPtr<EraseBaseCache>> WalCmdDropDatabaseV2::ToCachedMeta(TxnTimeStamp commit_ts) const {
-    Vector<SharedPtr<EraseBaseCache>> cache_items;
+Vector<SharedPtr<MetaBaseCache>> WalCmdDropDatabaseV2::ToCachedMeta(TxnTimeStamp commit_ts) const {
+    Vector<SharedPtr<MetaBaseCache>> cache_items;
     cache_items.push_back(MakeShared<MetaEraseDbCache>(db_name_));
     return cache_items;
 }
 
-Vector<SharedPtr<EraseBaseCache>> WalCmdCreateTable::ToCachedMeta(TxnTimeStamp commit_ts) const {
+Vector<SharedPtr<MetaBaseCache>> WalCmdCreateTable::ToCachedMeta(TxnTimeStamp commit_ts) const {
     UnrecoverableError("WalCmdDummy::ToCachedMeta, unexpected");
     return {};
 }
 
-Vector<SharedPtr<EraseBaseCache>> WalCmdCreateTableV2::ToCachedMeta(TxnTimeStamp commit_ts) const {
-    Vector<SharedPtr<EraseBaseCache>> cache_items;
+Vector<SharedPtr<MetaBaseCache>> WalCmdCreateTableV2::ToCachedMeta(TxnTimeStamp commit_ts) const {
+    Vector<SharedPtr<MetaBaseCache>> cache_items;
     cache_items.push_back(MakeShared<MetaEraseDbCache>(db_name_));
     cache_items.push_back(MakeShared<MetaEraseTableCache>(std::stoull(db_id_), *table_def_->table_name()));
     return cache_items;
 }
 
-Vector<SharedPtr<EraseBaseCache>> WalCmdDropTable::ToCachedMeta(TxnTimeStamp commit_ts) const {
+Vector<SharedPtr<MetaBaseCache>> WalCmdDropTable::ToCachedMeta(TxnTimeStamp commit_ts) const {
     UnrecoverableError("WalCmdDummy::ToCachedMeta, unexpected");
     return {};
 }
 
-Vector<SharedPtr<EraseBaseCache>> WalCmdDropTableV2::ToCachedMeta(TxnTimeStamp commit_ts) const {
-    Vector<SharedPtr<EraseBaseCache>> cache_items;
+Vector<SharedPtr<MetaBaseCache>> WalCmdDropTableV2::ToCachedMeta(TxnTimeStamp commit_ts) const {
+    Vector<SharedPtr<MetaBaseCache>> cache_items;
     cache_items.push_back(MakeShared<MetaEraseDbCache>(db_name_));
     cache_items.push_back(MakeShared<MetaEraseTableCache>(std::stoull(db_id_), table_name_));
     return cache_items;
 }
 
-Vector<SharedPtr<EraseBaseCache>> WalCmdCreateIndex::ToCachedMeta(TxnTimeStamp commit_ts) const {
+Vector<SharedPtr<MetaBaseCache>> WalCmdCreateIndex::ToCachedMeta(TxnTimeStamp commit_ts) const {
     UnrecoverableError("WalCmdDummy::ToCachedMeta, unexpected");
     return {};
 }
 
-Vector<SharedPtr<EraseBaseCache>> WalCmdCreateIndexV2::ToCachedMeta(TxnTimeStamp commit_ts) const {
-    Vector<SharedPtr<EraseBaseCache>> cache_items;
+Vector<SharedPtr<MetaBaseCache>> WalCmdCreateIndexV2::ToCachedMeta(TxnTimeStamp commit_ts) const {
+    Vector<SharedPtr<MetaBaseCache>> cache_items;
     cache_items.push_back(MakeShared<MetaEraseDbCache>(db_name_));
     cache_items.push_back(MakeShared<MetaEraseTableCache>(std::stoull(db_id_), table_name_));
     cache_items.push_back(MakeShared<MetaEraseIndexCache>(std::stoull(db_id_), std::stoull(table_id_), *index_base_->index_name_));
     return cache_items;
 }
 
-Vector<SharedPtr<EraseBaseCache>> WalCmdDropIndex::ToCachedMeta(TxnTimeStamp commit_ts) const {
+Vector<SharedPtr<MetaBaseCache>> WalCmdDropIndex::ToCachedMeta(TxnTimeStamp commit_ts) const {
     UnrecoverableError("WalCmdDummy::ToCachedMeta, unexpected");
     return {};
 }
 
-Vector<SharedPtr<EraseBaseCache>> WalCmdDropIndexV2::ToCachedMeta(TxnTimeStamp commit_ts) const {
-    Vector<SharedPtr<EraseBaseCache>> cache_items;
+Vector<SharedPtr<MetaBaseCache>> WalCmdDropIndexV2::ToCachedMeta(TxnTimeStamp commit_ts) const {
+    Vector<SharedPtr<MetaBaseCache>> cache_items;
     cache_items.push_back(MakeShared<MetaEraseDbCache>(db_name_));
     cache_items.push_back(MakeShared<MetaEraseTableCache>(std::stoull(db_id_), table_name_));
     cache_items.push_back(MakeShared<MetaEraseIndexCache>(std::stoull(db_id_), std::stoull(table_id_), index_name_));
     return cache_items;
 }
 
-Vector<SharedPtr<EraseBaseCache>> WalCmdImport::ToCachedMeta(TxnTimeStamp commit_ts) const {
+Vector<SharedPtr<MetaBaseCache>> WalCmdImport::ToCachedMeta(TxnTimeStamp commit_ts) const {
     UnrecoverableError("WalCmdDummy::ToCachedMeta, unexpected");
     return {};
 }
 
-Vector<SharedPtr<EraseBaseCache>> WalCmdImportV2::ToCachedMeta(TxnTimeStamp commit_ts) const {
-    Vector<SharedPtr<EraseBaseCache>> cache_items;
+Vector<SharedPtr<MetaBaseCache>> WalCmdImportV2::ToCachedMeta(TxnTimeStamp commit_ts) const {
+    Vector<SharedPtr<MetaBaseCache>> cache_items;
     cache_items.push_back(MakeShared<MetaEraseDbCache>(db_name_));
     cache_items.push_back(MakeShared<MetaEraseTableCache>(std::stoull(db_id_), table_name_));
     return cache_items;
 }
 
-Vector<SharedPtr<EraseBaseCache>> WalCmdAppend::ToCachedMeta(TxnTimeStamp commit_ts) const {
+Vector<SharedPtr<MetaBaseCache>> WalCmdAppend::ToCachedMeta(TxnTimeStamp commit_ts) const {
     UnrecoverableError("WalCmdDummy::ToCachedMeta, unexpected");
     return {};
 }
 
-Vector<SharedPtr<EraseBaseCache>> WalCmdAppendV2::ToCachedMeta(TxnTimeStamp commit_ts) const {
-    Vector<SharedPtr<EraseBaseCache>> cache_items;
+Vector<SharedPtr<MetaBaseCache>> WalCmdAppendV2::ToCachedMeta(TxnTimeStamp commit_ts) const {
+    Vector<SharedPtr<MetaBaseCache>> cache_items;
     cache_items.push_back(MakeShared<MetaEraseDbCache>(db_name_));
     cache_items.push_back(MakeShared<MetaEraseTableCache>(std::stoull(db_id_), table_name_));
     return cache_items;
 }
 
-Vector<SharedPtr<EraseBaseCache>> WalCmdDelete::ToCachedMeta(TxnTimeStamp commit_ts) const {
+Vector<SharedPtr<MetaBaseCache>> WalCmdDelete::ToCachedMeta(TxnTimeStamp commit_ts) const {
     UnrecoverableError("WalCmdDummy::ToCachedMeta, unexpected");
     return {};
 }
 
-Vector<SharedPtr<EraseBaseCache>> WalCmdDeleteV2::ToCachedMeta(TxnTimeStamp commit_ts) const {
-    Vector<SharedPtr<EraseBaseCache>> cache_items;
+Vector<SharedPtr<MetaBaseCache>> WalCmdDeleteV2::ToCachedMeta(TxnTimeStamp commit_ts) const {
+    Vector<SharedPtr<MetaBaseCache>> cache_items;
     cache_items.push_back(MakeShared<MetaEraseDbCache>(db_name_));
     cache_items.push_back(MakeShared<MetaEraseTableCache>(std::stoull(db_id_), table_name_));
     return cache_items;
 }
 
-Vector<SharedPtr<EraseBaseCache>> WalCmdSetSegmentStatusSealed::ToCachedMeta(TxnTimeStamp commit_ts) const {
+Vector<SharedPtr<MetaBaseCache>> WalCmdSetSegmentStatusSealed::ToCachedMeta(TxnTimeStamp commit_ts) const {
     UnrecoverableError("WalCmdDummy::ToCachedMeta, unexpected");
     return {};
 }
 
-Vector<SharedPtr<EraseBaseCache>> WalCmdSetSegmentStatusSealedV2::ToCachedMeta(TxnTimeStamp commit_ts) const {
-    Vector<SharedPtr<EraseBaseCache>> cache_items;
+Vector<SharedPtr<MetaBaseCache>> WalCmdSetSegmentStatusSealedV2::ToCachedMeta(TxnTimeStamp commit_ts) const {
+    Vector<SharedPtr<MetaBaseCache>> cache_items;
     cache_items.push_back(MakeShared<MetaEraseDbCache>(db_name_));
     cache_items.push_back(MakeShared<MetaEraseTableCache>(std::stoull(db_id_), table_name_));
     return cache_items;
 }
 
-Vector<SharedPtr<EraseBaseCache>> WalCmdUpdateSegmentBloomFilterData::ToCachedMeta(TxnTimeStamp commit_ts) const {
+Vector<SharedPtr<MetaBaseCache>> WalCmdUpdateSegmentBloomFilterData::ToCachedMeta(TxnTimeStamp commit_ts) const {
     UnrecoverableError("WalCmdDummy::ToCachedMeta, unexpected");
     return {};
 }
 
-Vector<SharedPtr<EraseBaseCache>> WalCmdUpdateSegmentBloomFilterDataV2::ToCachedMeta(TxnTimeStamp commit_ts) const {
-    Vector<SharedPtr<EraseBaseCache>> cache_items;
+Vector<SharedPtr<MetaBaseCache>> WalCmdUpdateSegmentBloomFilterDataV2::ToCachedMeta(TxnTimeStamp commit_ts) const {
+    Vector<SharedPtr<MetaBaseCache>> cache_items;
     cache_items.push_back(MakeShared<MetaEraseDbCache>(db_name_));
     cache_items.push_back(MakeShared<MetaEraseTableCache>(std::stoull(db_id_), table_name_));
     return cache_items;
 }
 
-Vector<SharedPtr<EraseBaseCache>> WalCmdCheckpoint::ToCachedMeta(TxnTimeStamp commit_ts) const {
+Vector<SharedPtr<MetaBaseCache>> WalCmdCheckpoint::ToCachedMeta(TxnTimeStamp commit_ts) const {
     UnrecoverableError("WalCmdDummy::ToCachedMeta, unexpected");
     return {};
 }
 
-Vector<SharedPtr<EraseBaseCache>> WalCmdCheckpointV2::ToCachedMeta(TxnTimeStamp commit_ts) const { return {}; }
+Vector<SharedPtr<MetaBaseCache>> WalCmdCheckpointV2::ToCachedMeta(TxnTimeStamp commit_ts) const { return {}; }
 
-Vector<SharedPtr<EraseBaseCache>> WalCmdCompact::ToCachedMeta(TxnTimeStamp commit_ts) const {
+Vector<SharedPtr<MetaBaseCache>> WalCmdCompact::ToCachedMeta(TxnTimeStamp commit_ts) const {
     UnrecoverableError("WalCmdDummy::ToCachedMeta, unexpected");
     return {};
 }
 
-Vector<SharedPtr<EraseBaseCache>> WalCmdCompactV2::ToCachedMeta(TxnTimeStamp commit_ts) const {
-    Vector<SharedPtr<EraseBaseCache>> cache_items;
+Vector<SharedPtr<MetaBaseCache>> WalCmdCompactV2::ToCachedMeta(TxnTimeStamp commit_ts) const {
+    Vector<SharedPtr<MetaBaseCache>> cache_items;
     cache_items.push_back(MakeShared<MetaEraseDbCache>(db_name_));
     cache_items.push_back(MakeShared<MetaEraseTableCache>(std::stoull(db_id_), table_name_));
     for (const auto &index_name : index_names_) {
@@ -3217,82 +3217,82 @@ Vector<SharedPtr<EraseBaseCache>> WalCmdCompactV2::ToCachedMeta(TxnTimeStamp com
     return cache_items;
 }
 
-Vector<SharedPtr<EraseBaseCache>> WalCmdOptimize::ToCachedMeta(TxnTimeStamp commit_ts) const {
+Vector<SharedPtr<MetaBaseCache>> WalCmdOptimize::ToCachedMeta(TxnTimeStamp commit_ts) const {
     UnrecoverableError("WalCmdDummy::ToCachedMeta, unexpected");
     return {};
 }
 
-Vector<SharedPtr<EraseBaseCache>> WalCmdOptimizeV2::ToCachedMeta(TxnTimeStamp commit_ts) const {
-    Vector<SharedPtr<EraseBaseCache>> cache_items;
+Vector<SharedPtr<MetaBaseCache>> WalCmdOptimizeV2::ToCachedMeta(TxnTimeStamp commit_ts) const {
+    Vector<SharedPtr<MetaBaseCache>> cache_items;
     cache_items.push_back(MakeShared<MetaEraseDbCache>(db_name_));
     cache_items.push_back(MakeShared<MetaEraseTableCache>(std::stoull(db_id_), table_name_));
     cache_items.push_back(MakeShared<MetaEraseIndexCache>(std::stoull(db_id_), std::stoull(table_id_), index_name_));
     return cache_items;
 }
 
-Vector<SharedPtr<EraseBaseCache>> WalCmdDumpIndex::ToCachedMeta(TxnTimeStamp commit_ts) const {
+Vector<SharedPtr<MetaBaseCache>> WalCmdDumpIndex::ToCachedMeta(TxnTimeStamp commit_ts) const {
     UnrecoverableError("WalCmdDummy::ToCachedMeta, unexpected");
     return {};
 }
 
-Vector<SharedPtr<EraseBaseCache>> WalCmdDumpIndexV2::ToCachedMeta(TxnTimeStamp commit_ts) const {
-    Vector<SharedPtr<EraseBaseCache>> cache_items;
+Vector<SharedPtr<MetaBaseCache>> WalCmdDumpIndexV2::ToCachedMeta(TxnTimeStamp commit_ts) const {
+    Vector<SharedPtr<MetaBaseCache>> cache_items;
     cache_items.push_back(MakeShared<MetaEraseDbCache>(db_name_));
     cache_items.push_back(MakeShared<MetaEraseTableCache>(std::stoull(db_id_), table_name_));
     cache_items.push_back(MakeShared<MetaEraseIndexCache>(std::stoull(db_id_), std::stoull(table_id_), index_name_));
     return cache_items;
 }
 
-Vector<SharedPtr<EraseBaseCache>> WalCmdRenameTable::ToCachedMeta(TxnTimeStamp commit_ts) const {
+Vector<SharedPtr<MetaBaseCache>> WalCmdRenameTable::ToCachedMeta(TxnTimeStamp commit_ts) const {
     UnrecoverableError("WalCmdDummy::ToCachedMeta, unexpected");
     return {};
 }
 
-Vector<SharedPtr<EraseBaseCache>> WalCmdRenameTableV2::ToCachedMeta(TxnTimeStamp commit_ts) const {
-    Vector<SharedPtr<EraseBaseCache>> cache_items;
+Vector<SharedPtr<MetaBaseCache>> WalCmdRenameTableV2::ToCachedMeta(TxnTimeStamp commit_ts) const {
+    Vector<SharedPtr<MetaBaseCache>> cache_items;
     cache_items.push_back(MakeShared<MetaEraseDbCache>(db_name_));
     cache_items.push_back(MakeShared<MetaEraseTableCache>(std::stoull(db_id_), table_name_));
     cache_items.push_back(MakeShared<MetaEraseTableCache>(std::stoull(db_id_), new_table_name_));
     return cache_items;
 }
 
-Vector<SharedPtr<EraseBaseCache>> WalCmdAddColumns::ToCachedMeta(TxnTimeStamp commit_ts) const {
+Vector<SharedPtr<MetaBaseCache>> WalCmdAddColumns::ToCachedMeta(TxnTimeStamp commit_ts) const {
     UnrecoverableError("WalCmdDummy::ToCachedMeta, unexpected");
     return {};
 }
 
-Vector<SharedPtr<EraseBaseCache>> WalCmdAddColumnsV2::ToCachedMeta(TxnTimeStamp commit_ts) const {
-    Vector<SharedPtr<EraseBaseCache>> cache_items;
+Vector<SharedPtr<MetaBaseCache>> WalCmdAddColumnsV2::ToCachedMeta(TxnTimeStamp commit_ts) const {
+    Vector<SharedPtr<MetaBaseCache>> cache_items;
     cache_items.push_back(MakeShared<MetaEraseDbCache>(db_name_));
     cache_items.push_back(MakeShared<MetaEraseTableCache>(std::stoull(db_id_), table_name_));
     return cache_items;
 }
 
-Vector<SharedPtr<EraseBaseCache>> WalCmdDropColumns::ToCachedMeta(TxnTimeStamp commit_ts) const {
+Vector<SharedPtr<MetaBaseCache>> WalCmdDropColumns::ToCachedMeta(TxnTimeStamp commit_ts) const {
     UnrecoverableError("WalCmdDummy::ToCachedMeta, unexpected");
     return {};
 }
 
-Vector<SharedPtr<EraseBaseCache>> WalCmdDropColumnsV2::ToCachedMeta(TxnTimeStamp commit_ts) const {
-    Vector<SharedPtr<EraseBaseCache>> cache_items;
+Vector<SharedPtr<MetaBaseCache>> WalCmdDropColumnsV2::ToCachedMeta(TxnTimeStamp commit_ts) const {
+    Vector<SharedPtr<MetaBaseCache>> cache_items;
     cache_items.push_back(MakeShared<MetaEraseDbCache>(db_name_));
     cache_items.push_back(MakeShared<MetaEraseTableCache>(std::stoull(db_id_), table_name_));
     return cache_items;
 }
 
-Vector<SharedPtr<EraseBaseCache>> WalCmdCleanup::ToCachedMeta(TxnTimeStamp commit_ts) const { return {}; }
+Vector<SharedPtr<MetaBaseCache>> WalCmdCleanup::ToCachedMeta(TxnTimeStamp commit_ts) const { return {}; }
 
-Vector<SharedPtr<EraseBaseCache>> WalCmdCreateTableSnapshot::ToCachedMeta(TxnTimeStamp commit_ts) const { return {}; }
+Vector<SharedPtr<MetaBaseCache>> WalCmdCreateTableSnapshot::ToCachedMeta(TxnTimeStamp commit_ts) const { return {}; }
 
-Vector<SharedPtr<EraseBaseCache>> WalCmdRestoreTableSnapshot::ToCachedMeta(TxnTimeStamp commit_ts) const {
-    Vector<SharedPtr<EraseBaseCache>> cache_items;
+Vector<SharedPtr<MetaBaseCache>> WalCmdRestoreTableSnapshot::ToCachedMeta(TxnTimeStamp commit_ts) const {
+    Vector<SharedPtr<MetaBaseCache>> cache_items;
     cache_items.push_back(MakeShared<MetaEraseDbCache>(db_name_));
     cache_items.push_back(MakeShared<MetaEraseTableCache>(std::stoull(db_id_), table_name_));
     return cache_items;
 }
 
-Vector<SharedPtr<EraseBaseCache>> WalCmdRestoreDatabaseSnapshot::ToCachedMeta(TxnTimeStamp commit_ts) const {
-    Vector<SharedPtr<EraseBaseCache>> cache_items;
+Vector<SharedPtr<MetaBaseCache>> WalCmdRestoreDatabaseSnapshot::ToCachedMeta(TxnTimeStamp commit_ts) const {
+    Vector<SharedPtr<MetaBaseCache>> cache_items;
     cache_items.push_back(MakeShared<MetaEraseDbCache>(db_name_));
     return cache_items;
 }
