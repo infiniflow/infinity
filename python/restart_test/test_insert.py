@@ -73,7 +73,6 @@ class TestInsert:
                     and cur_insert_n - last_shutdown_insert_n >= insert_n // stop_n
                 ):
                     shutdown = True
-                    infinity_runner.uninit()
                     print("shutdown infinity")
                     shutdown_time += 1
                     return
@@ -98,6 +97,8 @@ class TestInsert:
             t1.start()
             insert_func(table_obj)
             t1.join()
+
+            infinity_obj.flush_data()
 
         while cur_insert_n < insert_n:
             part1()
