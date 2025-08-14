@@ -71,7 +71,7 @@ void DumpIndexProcessor::Stop() {
 }
 
 void DumpIndexProcessor::Submit(SharedPtr<BGTask> bg_task) {
-task_queue_.Enqueue(std::move(bg_task));
+    task_queue_.Enqueue(std::move(bg_task));
     ++task_count_;
 }
 

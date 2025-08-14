@@ -32,7 +32,6 @@ import :logger;
 
 namespace infinity {
 
-
 Status Snapshot::RestoreDatabaseSnapshot(QueryContext *query_context, const String &snapshot_name) {
     auto *txn_ptr = query_context->GetNewTxn();
     String snapshot_dir = query_context->global_config()->SnapshotDir();

@@ -309,14 +309,7 @@ class TestSnapshot:
     
     def _create_indexes(self, table_obj):
         """Create various types of indexes"""
-        # Primary key is already created
-        # Secondary indexes
-        # table_obj.create_index("idx_name", index.IndexInfo("name", index.IndexType.Secondary), ConflictType.Ignore)
-        # table_obj.create_index("idx_age_salary", index.IndexInfo("age", index.IndexType.Secondary), ConflictType.Ignore)
-        
-        # Vector indexes
-        # table_obj.create_index("idx_vector_hnsw", index.IndexInfo("vector_col", index.IndexType.Hnsw, {"metric": "cosine", "m": "16", "ef_construction": "200"}), ConflictType.Ignore)
-        
+
         # Full-text search index
         table_obj.create_index("idx_name_fts", index.IndexInfo("name", index.IndexType.FullText), ConflictType.Ignore)
 

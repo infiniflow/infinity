@@ -745,8 +745,6 @@ Status SnapshotInfo::RestoreSnapshotFiles(const String &snapshot_dir,
         }
     }
 
-    
-
     return Status::OK();
 }
 

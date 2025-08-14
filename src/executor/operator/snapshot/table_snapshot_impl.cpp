@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-
 module infinity_core:table_snapshot.impl;
 
 import :snapshot;
@@ -72,8 +71,8 @@ Status Snapshot::RestoreTableSnapshot(QueryContext *query_context, const String 
 
     // End timing for overall snapshot restoration
     // auto snapshot_restoration_end = std::chrono::high_resolution_clock::now();
-    // auto snapshot_restoration_duration = std::chrono::duration_cast<std::chrono::milliseconds>(snapshot_restoration_end - snapshot_restoration_start);
-    // LOG_INFO(fmt::format("Total snapshot restoration took {} ms", snapshot_restoration_duration.count()));
+    // auto snapshot_restoration_duration = std::chrono::duration_cast<std::chrono::milliseconds>(snapshot_restoration_end -
+    // snapshot_restoration_start); LOG_INFO(fmt::format("Total snapshot restoration took {} ms", snapshot_restoration_duration.count()));
 
     // print txn state
     // LOG_INFO(fmt::format("txn state: {}", TxnState2Str(txn_ptr->GetTxnState())));

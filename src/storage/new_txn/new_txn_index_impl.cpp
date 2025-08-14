@@ -1517,7 +1517,7 @@ Status NewTxn::OptimizeVecIndex(SharedPtr<IndexBase> index_base,
                 LOG_ERROR("Failed to get table info from segment meta");
                 return status;
             }
-            
+
             SizeT col_idx = table_info.GetColumnIdxByID(column_def->id());
             ColumnMeta column_meta(col_idx, block_meta);
             SizeT row_cnt = std::min(block_row_cnt, SizeT(total_row_cnt));
