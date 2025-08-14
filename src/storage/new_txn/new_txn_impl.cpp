@@ -82,6 +82,7 @@ import :buffer_handle;
 import :virtual_store;
 import :txn_context;
 import :kv_utility;
+import :catalog_cache;
 import extra_ddl_info;
 import column_def;
 import row_id;
@@ -5399,6 +5400,7 @@ Status NewTxn::CleanupInner(const Vector<UniquePtr<MetaKey>> &metas) {
     KVInstance *kv_instance = kv_instance_.get();
     TxnTimeStamp begin_ts = BeginTS();
     BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
+    SystemCache *system_cache = this->txn_mgr()->GetSystemCachePtr();
     for (auto &meta : metas) {
         switch (meta->type_) {
             case MetaType::kDB: {
@@ -5414,6 +5416,7 @@ Status NewTxn::CleanupInner(const Vector<UniquePtr<MetaKey>> &metas) {
                 if (!status.ok()) {
                     return status;
                 }
+                system_cache->DropDbCache(std::stoull(db_meta_key->db_id_str_));
                 break;
             }
             case MetaType::kTable: {
@@ -5428,6 +5431,7 @@ Status NewTxn::CleanupInner(const Vector<UniquePtr<MetaKey>> &metas) {
                 if (!status.ok()) {
                     return status;
                 }
+                system_cache->DropTableCache(std::stoull(table_meta_key->db_id_str_), std::stoull(table_meta_key->table_id_str_));
                 break;
             }
             case MetaType::kTableName: {
@@ -5506,6 +5510,9 @@ Status NewTxn::CleanupInner(const Vector<UniquePtr<MetaKey>> &metas) {
                 if (!status.ok()) {
                     return status;
                 }
+                system_cache->DropIndexCache(std::stoull(table_index_meta_key->db_id_str_),
+                                             std::stoull(table_index_meta_key->table_id_str_),
+                                             std::stoull(table_index_meta_key->index_id_str_));
                 break;
             }
             case MetaType::kSegmentIndex: {

@@ -247,7 +247,6 @@ private:
     mutable std::mutex cache_mtx_{};
     u64 next_db_id_{};
     Map<u64, SharedPtr<DbCache>> db_cache_map_{}; // db_id -> db_cache
-    Map<String, u64> db_name_map_{};              // db_name -> db_id
 };
 
 } // namespace infinity
