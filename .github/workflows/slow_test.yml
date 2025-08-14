@@ -80,11 +80,6 @@ jobs:
         run: |
           sudo docker exec ${BUILDER_CONTAINER} bash -c "rm -rf /root/.config/pip/pip.conf && cd /infinity/ && pip3 uninstall -y infinity-sdk && pip3 install python/infinity_sdk -v -i https://pypi.tuna.tsinghua.edu.cn/simple --trusted-host tuna.tsinghua.edu.cn"
 
-      - name: Prepare restart test data
-        if: ${{ !cancelled() && !failure() && steps.choose_test_type.outputs.RUN_TSAN_TEST == 'true' }}
-        run: |
-          sudo python3 scripts/prepare_restart_test_data.py --from_dir=${RUNNER_WORKSPACE_PREFIX} --op=add
-
       - name: Run restart test with thread sanitizer
         if: ${{ !cancelled() && !failure() && steps.choose_test_type.outputs.RUN_TSAN_TEST == 'true' }}
         id: run_restart_test_sanitizer
