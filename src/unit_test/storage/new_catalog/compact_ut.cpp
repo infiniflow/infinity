@@ -317,9 +317,9 @@ TEST_P(TestTxnCompact, compact_and_drop_db) {
         EXPECT_TRUE(status.ok());
 
         status = txn->Compact(*db_name, *table_name, {0, 1});
-        EXPECT_FALSE(status.ok());
-        status = new_txn_mgr->RollBackTxn(txn);
         EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_FALSE(status.ok());
     }
     {
         PrepareForCompact();
@@ -460,9 +460,9 @@ TEST_P(TestTxnCompact, compact_and_drop_table) {
         EXPECT_TRUE(status.ok());
 
         status = txn->Compact(*db_name, *table_name, {0, 1});
-        EXPECT_FALSE(status.ok());
-        status = new_txn_mgr->RollBackTxn(txn);
         EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_FALSE(status.ok());
 
         DropDB();
     }
