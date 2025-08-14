@@ -24,7 +24,6 @@ import :function_set;
 import :function;
 import :status;
 import :infinity_exception;
-import :logger;
 import :new_catalog;
 import :query_context;
 

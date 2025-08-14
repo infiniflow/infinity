@@ -21,7 +21,6 @@ import :stl;
 import :virtual_store;
 import :local_file_handle;
 import :infinity_exception;
-import :logger;
 
 import std;
 

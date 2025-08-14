@@ -23,7 +23,6 @@ import :stl;
 import :boost;
 import :infinity_exception;
 import :connection;
-import :logger;
 
 import std;
 import third_party;
@@ -100,8 +99,7 @@ void PGServer::StartConnection(SharedPtr<Connection> &connection) {
                 String ip_address;
                 u16 port;
                 connection->GetClientInfo(ip_address, port);
-                String msg = fmt::format("closed connection with {}:{} due to exception", ip_address, port);
-                LOG_ERROR(msg);
+                LOG_ERROR(fmt::format("closed connection with {}:{} due to exception", ip_address, port));
             }
 
             // User disconnected

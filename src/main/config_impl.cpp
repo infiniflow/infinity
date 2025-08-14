@@ -14,8 +14,6 @@
 
 module;
 
-#include <chrono>
-#include <string>
 #include <unistd.h>
 
 module infinity_core:config.impl;
@@ -25,6 +23,8 @@ import :logger;
 import :infinity_exception;
 import :boost;
 import :utility;
+
+import std;
 
 import compilation_config;
 import global_resource_usage;

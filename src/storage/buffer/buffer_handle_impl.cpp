@@ -20,7 +20,6 @@ import :buffer_handle;
 import :stl;
 import :buffer_handle;
 import :buffer_obj;
-import :logger;
 import :file_worker_type;
 
 namespace infinity {

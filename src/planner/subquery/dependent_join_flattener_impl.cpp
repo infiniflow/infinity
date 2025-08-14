@@ -38,7 +38,6 @@ import :scalar_function;
 import :scalar_function_set;
 import :corrlated_expr_detector;
 import :rewrite_correlated_expression;
-import :logger;
 import :block_index;
 import :query_context;
 

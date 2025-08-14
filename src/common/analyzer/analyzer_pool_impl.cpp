@@ -33,7 +33,6 @@ import :rag_analyzer;
 import :whitespace_analyzer;
 import :ik_analyzer;
 import :rank_features_analyzer;
-import :logger;
 
 import std.compat;
 

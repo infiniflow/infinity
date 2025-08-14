@@ -20,7 +20,6 @@ import :binding;
 import :stl;
 import :block_index;
 import :infinity_exception;
-import :logger;
 import :meta_info;
 
 import data_type;

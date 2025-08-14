@@ -26,7 +26,6 @@ import :data_block;
 import :data_table;
 import :value;
 import :infinity_exception;
-import :logger;
 import :query_result;
 import :query_options;
 import :column_vector;

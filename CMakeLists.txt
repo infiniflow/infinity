@@ -3,13 +3,8 @@ cmake_minimum_required(VERSION 4.0.3)
 cmake_policy(SET CMP0167 OLD)
 
 #if (CMAKE_)
-    set(CMAKE_EXPERIMENTAL_CXX_IMPORT_STD "d0edc3af-4c50-42ea-a356-e2862fe7a444")
+set(CMAKE_EXPERIMENTAL_CXX_IMPORT_STD "d0edc3af-4c50-42ea-a356-e2862fe7a444")
 #endif ()
-
-set(CMAKE_CXX_STANDARD 23)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_EXTENSIONS OFF)
-set(CMAKE_CXX_MODULE_STD ON)
 
 # Auto-detect and set vcpkg toolchain if not already set
 if (NOT CMAKE_TOOLCHAIN_FILE)
@@ -28,6 +23,10 @@ endif ()
 
 project(infinity VERSION 0.6.0)
 
+set(CMAKE_CXX_STANDARD 23)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS ON)
+set(CMAKE_CXX_MODULE_STD ON)
 
 if (NOT CMAKE_GENERATOR STREQUAL "Ninja")
     message(FATAL_ERROR "This project requires the Ninja generator. Refers to https://cmake.org/cmake/help/latest/manual/cmake-cxxmodules.7.html#generator-support")
@@ -111,7 +110,7 @@ find_library(STDCXX15EXP_STATIC
 
 get_filename_component(GCC15_LIB_DIR ${STDCXX15_STATIC} DIRECTORY)
 
-#set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -L${GCC15_LIB_DIR} -static-libstdc++ -static-libgcc")
+set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -L${GCC15_LIB_DIR} -static-libstdc++ -static-libgcc")
 
 find_package(absl CONFIG REQUIRED)
 find_package(Arrow CONFIG REQUIRED)
@@ -168,6 +167,15 @@ file(GLOB OATPP_INCLUDE_DIRS
 message(STATUS "Found oatpp include directories: ${OATPP_INCLUDE_DIRS}")
 include_directories(${OATPP_INCLUDE_DIRS})
 message(STATUS "Using vcpkg toolchain - automatic package discovery enabled")
+
+# https://youtrack.jetbrains.com/issue/CPP-39632/import-std-CLion-cant-resolve-module-std-in-case-of-clang
+add_library(unused_std_target STATIC)
+target_sources(unused_std_target
+        PRIVATE
+        FILE_SET CXX_MODULES
+        BASE_DIRS /usr/include/c++/15
+        FILES /usr/include/c++/15/bits/std.cc /usr/include/c++/15/bits/std.compat.cc
+)
 
 # Get current system time and print the build time
 execute_process(COMMAND "date" +"%Y-%m-%d %H:%M.%S" OUTPUT_VARIABLE CURRENT_SYS_TIME)

@@ -35,7 +35,6 @@ import :base_expression;
 import :conjunction_expression;
 import :column_expression;
 import :expression_transformer;
-import :logger;
 import :expression_binder;
 import :where_binder;
 import :join_binder;

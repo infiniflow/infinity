@@ -30,7 +30,6 @@ import :column_expression;
 import :value_expression;
 import :filter_fulltext_expression;
 import :base_table_ref;
-import :logger;
 import :scalar_function;
 import :scalar_function_set;
 import :index_base;

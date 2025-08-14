@@ -23,7 +23,6 @@ import :file_reader;
 import :stl;
 import :status;
 import :infinity_exception;
-import :logger;
 import :virtual_store;
 
 import std;

@@ -30,7 +30,6 @@ import :logical_fusion;
 import :query_context;
 import :logical_node_visitor;
 import :infinity_exception;
-import :logger;
 import :filter_expression_push_down;
 import :fast_rough_filter;
 import :logical_match_scan_base;

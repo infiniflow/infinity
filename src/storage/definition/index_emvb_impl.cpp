@@ -21,7 +21,6 @@ import :stl;
 import :status;
 import :base_table_ref;
 import :infinity_exception;
-import :logger;
 
 import std;
 import third_party;

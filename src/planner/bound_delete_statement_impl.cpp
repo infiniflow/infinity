@@ -37,7 +37,6 @@ import :logical_filter;
 import :logical_delete;
 import :subquery_unnest;
 import :conjunction_expression;
-import :logger;
 
 import std;
 

@@ -25,7 +25,6 @@ import :function;
 import :expression_binder;
 import :status;
 import :infinity_exception;
-import :logger;
 import :function_set;
 import :bind_alias_proxy;
 import :new_catalog;
@@ -48,7 +47,7 @@ SharedPtr<BaseExpression> GroupBinder::BuildExpression(const ParsedExpr &expr, B
     if (depth == 0 && root) {
         switch (expr.type_) {
             case ParsedExprType::kConstant: {
-                ConstantExpr &const_expr = (ConstantExpr &)expr;
+                auto &const_expr = (ConstantExpr &)expr;
                 if (const_expr.literal_type_ == LiteralType::kInteger) {
                     // Group by the expression of the given index in select list;
                     // For example: select a, sum(a) from t1 group by 1; # group by a
@@ -78,8 +77,7 @@ SharedPtr<BaseExpression> GroupBinder::BuildExpression(const ParsedExpr &expr, B
         String expr_name = expr.GetName();
 
         if (bind_context_ptr->group_index_by_name_.contains(expr_name)) {
-            Status status = Status::SyntaxError(fmt::format("Duplicated group by expression: {}", expr_name));
-            RecoverableError(status);
+            RecoverableError(Status::SyntaxError(fmt::format("Duplicated group by expression: {}", expr_name)));
         }
 
         // Add the group by expression into bind context
@@ -131,7 +129,7 @@ SharedPtr<BaseExpression> GroupBinder::BindConstantExpression(const ConstantExpr
 
     select_idx -= 1;
 
-    ColumnExpr &col_expr = (ColumnExpr &)(*expr_array[select_idx]);
+    auto &col_expr = static_cast<ColumnExpr &>(*expr_array[select_idx]);
 
     SharedPtr<BaseExpression> result = ExpressionBinder::BuildColExpr(col_expr, bind_context_ptr, 0, false);
     return result;
@@ -152,28 +150,24 @@ SharedPtr<BaseExpression> GroupBinder::BuildColExpr(const ColumnExpr &expr, Bind
 SharedPtr<BaseExpression> GroupBinder::BuildFuncExpr(const FunctionExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root) {
     SharedPtr<FunctionSet> function_set_ptr = FunctionSet::GetFunctionSet(query_context_->storage()->new_catalog(), expr);
     if (function_set_ptr->type_ != FunctionType::kScalar) {
-        Status status = Status::SyntaxError("Only scalar function is supported in group by list.");
-        RecoverableError(status);
+        RecoverableError(Status::SyntaxError("Only scalar function is supported in group by list."));
     }
     return ExpressionBinder::BuildFuncExpr(expr, bind_context_ptr, depth, root);
 }
 
 void GroupBinder::CheckFuncType(FunctionType func_type) const {
     if (func_type != FunctionType::kScalar) {
-        Status status = Status::SyntaxError("Only scalar function is supported in group by list.");
-        RecoverableError(status);
+        RecoverableError(Status::SyntaxError("Only scalar function is supported in group by list."));
     }
 }
 
 SharedPtr<SubqueryExpression> GroupBinder::BuildSubquery(const SubqueryExpr &, BindContext *, SubqueryType, i64, bool) {
-    Status status = Status::SyntaxError("Subquery isn't supported in group by list.");
-    RecoverableError(status);
+    RecoverableError(Status::SyntaxError("Subquery isn't supported in group by list."));
     return nullptr;
 }
 
 SharedPtr<BaseExpression> GroupBinder::BuildKnnExpr(const KnnExpr &, BindContext *, i64, bool) {
-    Status status = Status::SyntaxError("KNN expression isn't supported in group by list");
-    RecoverableError(status);
+    RecoverableError(Status::SyntaxError("KNN expression isn't supported in group by list"));
     return nullptr;
 }
 

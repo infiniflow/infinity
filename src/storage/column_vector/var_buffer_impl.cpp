@@ -21,7 +21,6 @@ import :stl;
 import :infinity_exception;
 import :buffer_manager;
 import :var_file_worker;
-import :logger;
 import :infinity_context;
 
 import std;

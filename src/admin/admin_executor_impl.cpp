@@ -22,7 +22,6 @@ import :query_result;
 import :stl;
 import :status;
 import :log_file;
-import :logger;
 import :table_def;
 import :data_table;
 import :data_block;

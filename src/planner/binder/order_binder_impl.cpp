@@ -23,7 +23,6 @@ import :bind_context;
 import :column_expression;
 import :status;
 import :infinity_exception;
-import :logger;
 
 import third_party;
 

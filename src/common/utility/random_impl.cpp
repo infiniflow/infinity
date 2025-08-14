@@ -75,8 +75,7 @@ SharedPtr<String> DetermineRandomString(const String &parent_dir, const String &
         temp = VirtualStore::ConcatenatePath(parent_dir, result);
         ++cnt;
         if (!use_persistence_manager) {
-            Status status = VirtualStore::MakeDirectory(temp);
-            if (status.ok()) {
+            if (auto status = VirtualStore::MakeDirectory(temp); status.ok()) {
                 created = true;
             } else {
                 created = false;

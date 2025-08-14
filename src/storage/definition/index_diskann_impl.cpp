@@ -23,7 +23,6 @@ import :index_base;
 import :infinity_exception;
 import :default_values;
 import :index_base;
-import :logger;
 import :index_diskann;
 
 import std;

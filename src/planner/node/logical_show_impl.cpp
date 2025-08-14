@@ -20,7 +20,6 @@ import :logical_show;
 import :stl;
 import :infinity_exception;
 import :column_binding;
-import :logger;
 
 import std;
 

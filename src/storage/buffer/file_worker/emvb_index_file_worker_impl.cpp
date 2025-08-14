@@ -24,7 +24,6 @@ import :index_base;
 import :emvb_index;
 import :index_emvb;
 import :infinity_exception;
-import :logger;
 import :file_worker_type;
 import :emvb_product_quantization;
 import :status;

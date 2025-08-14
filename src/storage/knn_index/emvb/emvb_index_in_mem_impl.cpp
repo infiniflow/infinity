@@ -27,7 +27,6 @@ import :emvb_index;
 import :index_emvb;
 import :buffer_handle;
 import :index_base;
-import :logger;
 import :emvb_product_quantization;
 import :column_vector;
 import :block_index;

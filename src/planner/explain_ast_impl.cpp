@@ -20,7 +20,6 @@ import :explain_ast;
 import :stl;
 import :status;
 import :infinity_exception;
-import :logger;
 
 import std;
 import third_party;

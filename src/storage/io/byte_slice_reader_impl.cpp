@@ -9,7 +9,6 @@ import :stl;
 import :byte_slice;
 import :status;
 import :infinity_exception;
-import :logger;
 import :byte_slice_reader;
 
 namespace infinity {

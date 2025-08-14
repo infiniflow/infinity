@@ -71,7 +71,6 @@ import :in_expression;
 import :value_expression;
 import :reference_expression;
 import :infinity_exception;
-import :logger;
 
 import third_party;
 

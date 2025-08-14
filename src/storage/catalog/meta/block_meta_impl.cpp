@@ -56,11 +56,10 @@ Status BlockMeta::GetBlockLock(SharedPtr<BlockLock> &block_lock) {
     return Status::OK();
 }
 
-
 TxnTimeStamp BlockMeta::GetCreateTimestampFromKV() const {
-    String block_key = KeyEncode::CatalogTableSegmentBlockKey(segment_meta_.table_meta().db_id_str(), 
-                                                              segment_meta_.table_meta().table_id_str(), 
-                                                              segment_meta_.segment_id(), 
+    String block_key = KeyEncode::CatalogTableSegmentBlockKey(segment_meta_.table_meta().db_id_str(),
+                                                              segment_meta_.table_meta().table_id_str(),
+                                                              segment_meta_.segment_id(),
                                                               block_id_);
     String create_ts_str;
     Status status = kv_instance_.Get(block_key, create_ts_str);
@@ -69,8 +68,6 @@ TxnTimeStamp BlockMeta::GetCreateTimestampFromKV() const {
     }
     return std::stoull(create_ts_str);
 }
-
-
 
 Status BlockMeta::InitSet() {
     NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
@@ -161,7 +158,7 @@ Status BlockMeta::RestoreSetFromSnapshot() {
                                                              BlockVersion::FileName(),
                                                              this->block_capacity(),
                                                              buffer_mgr->persistence_manager());
-    
+
     version_buffer_ = buffer_mgr->GetBufferObject(std::move(version_file_worker));
     if (!version_buffer_) {
         return Status::BufferManagerError(fmt::format("Get version buffer failed: {}", version_file_worker->GetFilePath()));
@@ -170,19 +167,18 @@ Status BlockMeta::RestoreSetFromSnapshot() {
 
     BufferHandle buffer_handle = version_buffer_->Load();
     auto *block_version = reinterpret_cast<BlockVersion *>(buffer_handle.GetDataMut());
-    block_version -> RestoreFromSnapshot(commit_ts_);
+    block_version->RestoreFromSnapshot(commit_ts_);
 
     return Status::OK();
 }
 
 Status BlockMeta::UninitSet(UsageFlag usage_flag) {
     if (usage_flag == UsageFlag::kOther) {
-        NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
+        auto *new_catalog = InfinityContext::instance().storage()->new_catalog();
         {
             String block_lock_key = GetBlockTag("lock");
             LOG_TRACE(fmt::format("UninitSet: dropping block lock for block key: {}", block_lock_key));
-            Status status = new_catalog->DropBlockLockByBlockKey(block_lock_key);
-            if (!status.ok()) {
+            if (auto status = new_catalog->DropBlockLockByBlockKey(block_lock_key); !status.ok()) {
                 return status;
             }
         }
@@ -190,8 +186,7 @@ Status BlockMeta::UninitSet(UsageFlag usage_flag) {
     {
         String filter_key = GetBlockTag("fast_rough_filter");
         LOG_TRACE(fmt::format("UninitSet: fast rough filter key: {}", filter_key));
-        Status status = kv_instance_.Delete(filter_key);
-        if (!status.ok()) {
+        if (auto status = kv_instance_.Delete(filter_key); !status.ok()) {
             if (status.code() != ErrorCode::kNotFound) {
                 return status;
             }
@@ -222,7 +217,7 @@ Tuple<BufferObj *, Status> BlockMeta::GetVersionBuffer() {
         String version_filepath = InfinityContext::instance().config()->DataDir() + "/" + *block_dir_ + "/" + String(BlockVersion::PATH);
         version_buffer_ = buffer_mgr->GetBufferObject(version_filepath);
         if (version_buffer_ == nullptr) {
-            auto new_txn_mgr = InfinityContext::instance().storage()-> new_txn_manager();
+            auto *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
             new_txn_mgr->PrintAllDroppedKeys();
             return {nullptr, Status::BufferManagerError(fmt::format("Get version buffer failed: {}", version_filepath))};
         }
@@ -404,7 +399,7 @@ Status BlockMeta::SetFastRoughFilter(SharedPtr<FastRoughFilter> fast_rough_filte
     return Status::OK();
 }
 
-Tuple<SharedPtr<BlockSnapshotInfo>, Status> BlockMeta::MapMetaToSnapShotInfo(){
+Tuple<SharedPtr<BlockSnapshotInfo>, Status> BlockMeta::MapMetaToSnapShotInfo() {
     SharedPtr<BlockSnapshotInfo> block_snapshot_info = MakeShared<BlockSnapshotInfo>();
     Status status;
     block_snapshot_info->block_id_ = block_id_;
@@ -430,7 +425,6 @@ Tuple<SharedPtr<BlockSnapshotInfo>, Status> BlockMeta::MapMetaToSnapShotInfo(){
     if (status.ok()) {
         block_snapshot_info->fast_rough_filter_ = fast_rough_filter->SerializeToString();
     }
-    
 
     // Get column ids
     SharedPtr<Vector<SharedPtr<ColumnDef>>> column_defs;
@@ -438,7 +432,7 @@ Tuple<SharedPtr<BlockSnapshotInfo>, Status> BlockMeta::MapMetaToSnapShotInfo(){
     if (!status.ok()) {
         return {nullptr, status};
     }
-    for (auto &column_def: *column_defs) {
+    for (auto &column_def : *column_defs) {
         ColumnMeta column_meta(column_def->id(), *this);
         auto [column_snapshot_info, status] = column_meta.MapMetaToSnapShotInfo();
         if (!status.ok()) {
@@ -450,7 +444,7 @@ Tuple<SharedPtr<BlockSnapshotInfo>, Status> BlockMeta::MapMetaToSnapShotInfo(){
     return {block_snapshot_info, Status::OK()};
 }
 
-Status BlockMeta::RestoreFromSnapshot(){
+Status BlockMeta::RestoreFromSnapshot() {
     Status status = RestoreSetFromSnapshot();
     if (!status.ok()) {
         return status;
@@ -469,8 +463,5 @@ Status BlockMeta::RestoreFromSnapshot(){
     }
     return Status::OK();
 }
-
-
-
 
 } // namespace infinity

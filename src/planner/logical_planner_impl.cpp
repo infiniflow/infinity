@@ -70,7 +70,6 @@ import :index_bmp;
 import :index_full_text;
 import :base_table_ref;
 import :table_ref;
-import :logger;
 import :special_function;
 import :utility;
 import :wal_manager;

@@ -24,7 +24,6 @@ import :column_expression;
 import :subquery_expression;
 import :status;
 import :infinity_exception;
-import :logger;
 
 namespace infinity {
 
@@ -37,8 +36,7 @@ SharedPtr<BaseExpression> CorrelatedExpressionsDetector::VisitReplace(const Shar
     }
 
     if (expression->depth() > 1) {
-        Status status = Status::SyntaxError("Column expression with depth > 1 is detected");
-        RecoverableError(status);
+        RecoverableError(Status::SyntaxError("Column expression with depth > 1 is detected"));
     }
 
     is_correlated_ = true;
@@ -51,8 +49,7 @@ SharedPtr<BaseExpression> CorrelatedExpressionsDetector::VisitReplace(const Shar
         return nullptr;
     }
 
-    Status status = Status::SyntaxError("Not support nested correlated subquery in the subquery plan");
-    RecoverableError(status);
+    RecoverableError(Status::SyntaxError("Not support nested correlated subquery in the subquery plan"));
     return nullptr;
 }
 

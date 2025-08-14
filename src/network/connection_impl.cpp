@@ -22,7 +22,6 @@ import :boost;
 import :stl;
 import :infinity_exception;
 import :pg_message;
-import :logger;
 import :infinity_context;
 import :data_table;
 import :logical_node_type;

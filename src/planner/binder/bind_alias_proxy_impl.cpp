@@ -23,7 +23,6 @@ import :bind_context;
 import :expression_binder;
 import :status;
 import :infinity_exception;
-import :logger;
 import :bind_alias_proxy;
 
 import third_party;
@@ -44,8 +43,7 @@ BindAliasProxy::BindAlias(ExpressionBinder &expression_binder, const ParsedExpr 
     const ParsedExpr *select_expr = bind_context_ptr->select_expression_[alias_pair->second];
 
     if (binding_alias_) {
-        Status status = Status::SyntaxError(fmt::format("Trying to bind an alias table_name: {} in another alias", expr_name));
-        RecoverableError(status);
+        RecoverableError(Status::SyntaxError(fmt::format("Trying to bind an alias table_name: {} in another alias", expr_name)));
     }
 
     binding_alias_ = true;

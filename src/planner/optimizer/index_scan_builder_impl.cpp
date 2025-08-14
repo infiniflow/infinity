@@ -32,7 +32,6 @@ import :logical_fusion;
 import :query_context;
 import :logical_node_visitor;
 import :infinity_exception;
-import :logger;
 import :filter_expression_push_down;
 import :base_table_ref;
 import :lazy_load;

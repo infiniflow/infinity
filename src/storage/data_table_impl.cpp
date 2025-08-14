@@ -22,7 +22,6 @@ import :infinity_exception;
 import :data_block;
 import :table_def;
 import :value;
-import :logger;
 
 import std;
 import third_party;

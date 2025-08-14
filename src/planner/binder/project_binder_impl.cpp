@@ -25,7 +25,6 @@ import :function_set;
 import :column_expression;
 import :unnest_expression;
 import :infinity_exception;
-import :logger;
 import :status;
 import :new_catalog;
 import :query_context;

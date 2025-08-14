@@ -21,7 +21,6 @@ import :kv_store;
 import :kv_code;
 import :default_values;
 import :table_meeta;
-import :logger;
 import :infinity_exception;
 import :block_meta;
 import :meta_info;

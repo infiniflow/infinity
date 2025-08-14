@@ -18,7 +18,6 @@ module infinity_core:stream_reader.impl;
 
 import :stream_reader;
 import :stl;
-import :logger;
 import :status;
 import :infinity_exception;
 import :stream_reader;

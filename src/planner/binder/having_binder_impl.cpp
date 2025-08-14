@@ -26,7 +26,6 @@ import :status;
 import :infinity_exception;
 import :function_set;
 import :bind_alias_proxy;
-import :logger;
 import :new_catalog;
 import :query_context;
 

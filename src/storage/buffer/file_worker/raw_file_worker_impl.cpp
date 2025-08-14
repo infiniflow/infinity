@@ -23,7 +23,6 @@ import :stl;
 import :infinity_exception;
 import :local_file_handle;
 import :status;
-import :logger;
 import :raw_file_worker;
 
 import std;

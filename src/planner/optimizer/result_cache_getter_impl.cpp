@@ -29,7 +29,6 @@ import :logical_index_scan;
 import :cached_match;
 import :cached_match_scan;
 import :cached_index_scan;
-import :logger;
 import :base_table_ref;
 import :knn_expression;
 import :new_txn;

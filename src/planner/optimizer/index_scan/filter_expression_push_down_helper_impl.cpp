@@ -29,7 +29,6 @@ import :function_expression;
 import :infinity_exception;
 import :value;
 import :secondary_index_data;
-import :logger;
 
 import std;
 import std.compat;

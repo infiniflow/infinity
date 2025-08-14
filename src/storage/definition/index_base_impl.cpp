@@ -28,7 +28,6 @@ import :index_bmp;
 import :bmp_util;
 import :infinity_exception;
 import :index_defines;
-import :logger;
 
 import std;
 import std.compat;

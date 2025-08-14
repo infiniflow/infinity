@@ -30,7 +30,6 @@ module infinity_core:peer_thrift_server.impl;
 import :peer_thrift_server;
 import :peer_server_thrift_service;
 import :peer_server_thrift_types;
-import :logger;
 import :stl;
 import :infinity_exception;
 

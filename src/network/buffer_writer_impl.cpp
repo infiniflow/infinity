@@ -24,7 +24,6 @@ import :pg_message;
 import :ring_buffer_iterator;
 import :infinity_exception;
 import :default_values;
-import :logger;
 
 import third_party;
 

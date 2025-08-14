@@ -26,7 +26,6 @@ import :status;
 import :infinity_exception;
 import :function_set;
 import :bind_alias_proxy;
-import :logger;
 import :insert_binder;
 
 import third_party;
@@ -42,8 +41,7 @@ SharedPtr<BaseExpression> InsertBinder::BuildExpression(const ParsedExpr &expr, 
 }
 
 SharedPtr<BaseExpression> InsertBinder::BuildKnnExpr(const KnnExpr &, BindContext *, i64, bool) {
-    Status status = Status::SyntaxError("KNN expression isn't supported in insert clause");
-    RecoverableError(status);
+    RecoverableError(Status::SyntaxError("KNN expression isn't supported in insert clause"));
     return nullptr;
 }
 

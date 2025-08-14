@@ -22,7 +22,6 @@ import :stl;
 import :column_binding;
 import :logical_node_type;
 import :infinity_exception;
-import :logger;
 import :logical_command;
 
 import std;

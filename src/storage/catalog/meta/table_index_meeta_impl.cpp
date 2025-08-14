@@ -20,7 +20,6 @@ import :table_index_meeta;
 import :kv_store;
 import :table_meeta;
 import :kv_code;
-import :logger;
 import :index_base;
 import :meta_info;
 import :new_catalog;

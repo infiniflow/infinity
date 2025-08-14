@@ -20,7 +20,6 @@ module infinity_core:traditional_chinese_analyzer.impl;
 
 import :traditional_chinese_analyzer;
 import :stl;
-import :logger;
 import :chinese_analyzer;
 
 import std;

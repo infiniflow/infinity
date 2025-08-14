@@ -26,7 +26,6 @@ import :stl;
 import :term;
 import :analyzer;
 import :common_analyzer;
-import :logger;
 import :status;
 import :ijma;
 import :korean_analyzer;

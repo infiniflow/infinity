@@ -18,7 +18,6 @@ module infinity_core:index_bmp.impl;
 
 import :index_bmp;
 import :status;
-import :logger;
 import :infinity_exception;
 import :default_values;
 import :index_bmp;

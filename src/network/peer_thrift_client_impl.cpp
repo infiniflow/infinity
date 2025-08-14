@@ -18,7 +18,6 @@ module infinity_core:peer_thrift_client.impl;
 
 import :peer_thrift_client;
 import :stl;
-import :logger;
 import :peer_server_thrift_types;
 import :status;
 import :thrift;
@@ -148,19 +147,19 @@ void PeerClient::Process() {
                 }
                 case PeerTaskType::kRegister: {
                     LOG_TRACE(peer_task->ToString());
-                    RegisterPeerTask *register_peer_task = static_cast<RegisterPeerTask *>(peer_task.get());
+                    auto *register_peer_task = static_cast<RegisterPeerTask *>(peer_task.get());
                     Register(register_peer_task);
                     break;
                 }
                 case PeerTaskType::kUnregister: {
                     LOG_TRACE(peer_task->ToString());
-                    UnregisterPeerTask *unregister_peer_task = static_cast<UnregisterPeerTask *>(peer_task.get());
+                    auto *unregister_peer_task = static_cast<UnregisterPeerTask *>(peer_task.get());
                     Unregister(unregister_peer_task);
                     break;
                 }
                 case PeerTaskType::kHeartBeat: {
                     LOG_TRACE(peer_task->ToString());
-                    HeartBeatPeerTask *heartbeat_peer_task = static_cast<HeartBeatPeerTask *>(peer_task.get());
+                    auto *heartbeat_peer_task = static_cast<HeartBeatPeerTask *>(peer_task.get());
                     HeartBeat(heartbeat_peer_task);
                     break;
                 }
@@ -172,7 +171,7 @@ void PeerClient::Process() {
                 }
                 case PeerTaskType::kChangeRole: {
                     LOG_TRACE(peer_task->ToString());
-                    ChangeRoleTask *change_role_task = static_cast<ChangeRoleTask *>(peer_task.get());
+                    auto *change_role_task = static_cast<ChangeRoleTask *>(peer_task.get());
                     ChangeRole(change_role_task);
                     break;
                 }

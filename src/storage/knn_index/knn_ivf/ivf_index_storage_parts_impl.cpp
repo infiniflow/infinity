@@ -22,7 +22,6 @@ import :ivf_index_storage;
 import :stl;
 import :infinity_exception;
 import :status;
-import :logger;
 import :index_ivf;
 import :column_vector;
 import :kmeans_partition;

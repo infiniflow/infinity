@@ -52,7 +52,6 @@ import :in_expression;
 import :subquery_expression;
 import :knn_expression;
 import :conjunction_expression;
-import :logger;
 
 import std;
 import third_party;

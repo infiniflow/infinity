@@ -20,11 +20,9 @@ module infinity_core:rocksdb_merge_operator.impl;
 
 import :rocksdb_merge_operator;
 import :stl;
-import :logger;
+import :infinity_exception;
 
 import third_party;
-
-import :infinity_exception;
 
 namespace infinity {
 

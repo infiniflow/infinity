@@ -53,7 +53,6 @@ import :cast_function;
 import :bound_cast_func;
 import :status;
 import :query_context;
-import :logger;
 import :expression_type;
 import :meta_info;
 import :column_vector;
@@ -453,7 +452,7 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildFuncExpr(const FunctionExpr &ex
         }
         if (expr.arguments_->size() == 1) {
             if ((*expr.arguments_)[0]->type_ == ParsedExprType::kColumn) {
-                ColumnExpr *col_expr = (ColumnExpr *)(*expr.arguments_)[0];
+                auto *col_expr = static_cast<ColumnExpr *>((*expr.arguments_)[0]);
                 if (col_expr->star_) {
                     String &table_name = bind_context_ptr->table_names_[0];
                     TableInfo *table_info = bind_context_ptr->binding_by_name_[table_name]->table_info_.get();
@@ -631,14 +630,12 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildInExpr(const InExpr &expr, Bind
 
     for (SizeT idx = 0; idx < argument_count; ++idx) {
         if (expr.arguments_->at(idx)->type_ != ParsedExprType::kConstant) {
-            Status status = Status::SyntaxError("In expression now only supports constant list!");
-            RecoverableError(status);
+            RecoverableError(Status::SyntaxError("In expression now only supports constant list!"));
         }
         auto bound_argument_expr = BuildExpression(*expr.arguments_->at(idx), bind_context_ptr, depth, false);
 
         if (arguments_type != nullptr && bound_argument_expr->Type() != *arguments_type) {
-            Status status = Status::SyntaxError("Expressions in In expression must be of the same data type!");
-            RecoverableError(status);
+            RecoverableError(Status::SyntaxError("Expressions in In expression must be of the same data type!"));
         } else if (arguments_type == nullptr) {
             arguments_type = MakeShared<DataType>(bound_argument_expr->Type());
         }
@@ -658,7 +655,7 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildInExpr(const InExpr &expr, Bind
     // if match
     if (arguments_type->type() == bound_left_expr->Type().type()) {
         for (SizeT idx = 0; idx < argument_count; idx++) {
-            ValueExpression *val_expr = static_cast<ValueExpression *>(arguments[idx].get());
+            auto *val_expr = static_cast<ValueExpression *>(arguments[idx].get());
             Value val = val_expr->GetValue();
             in_expression_ptr->TryPut(std::move(val));
         }
@@ -670,7 +667,7 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildInExpr(const InExpr &expr, Bind
         argument_column_vector->Initialize(ColumnVectorType::kFlat, DEFAULT_VECTOR_SIZE);
 
         for (SizeT idx = 0; idx < argument_count; idx++) {
-            ValueExpression *val_expr = static_cast<ValueExpression *>(arguments[idx].get());
+            auto *val_expr = static_cast<ValueExpression *>(arguments[idx].get());
             argument_column_vector->AppendValue(val_expr->GetValue());
         }
 
@@ -685,8 +682,7 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildInExpr(const InExpr &expr, Bind
             in_expression_ptr->TryPut(std::move(val));
         }
     } else {
-        Status status = Status::NotSupportedTypeConversion(arguments_type->ToString(), bound_left_expr->Type().ToString());
-        RecoverableError(status);
+        RecoverableError(Status::NotSupportedTypeConversion(arguments_type->ToString(), bound_left_expr->Type().ToString()));
     }
 
     return in_expression_ptr;
@@ -704,10 +700,9 @@ inline bool EmbeddingEmbeddingQueryTypeValidated(const EmbeddingDataType column_
             if (query_embedding_type == column_embedding_type) {
                 return true;
             }
-            Status status = Status::SyntaxError(fmt::format("Query embedding with data type: {} which doesn't match with column embedding type {}.",
-                                                            EmbeddingInfo::EmbeddingDataTypeToString(query_embedding_type),
-                                                            EmbeddingInfo::EmbeddingDataTypeToString(column_embedding_type)));
-            RecoverableError(std::move(status));
+            RecoverableError(Status::SyntaxError(fmt::format("Query embedding with data type: {} which doesn't match with column embedding type {}.",
+                                                             EmbeddingInfo::EmbeddingDataTypeToString(query_embedding_type),
+                                                             EmbeddingInfo::EmbeddingDataTypeToString(column_embedding_type))));
             return false;
         }
         case EmbeddingDataType::kElemInt16:
@@ -733,11 +728,10 @@ inline bool EmbeddingEmbeddingQueryTypeValidated(const EmbeddingDataType column_
                     return true;
                 }
                 default: {
-                    Status status =
+                    RecoverableError(
                         Status::SyntaxError(fmt::format("Query embedding with int data type: {} which doesn't match with column embedding type {}.",
                                                         EmbeddingInfo::EmbeddingDataTypeToString(query_embedding_type),
-                                                        EmbeddingInfo::EmbeddingDataTypeToString(column_embedding_type)));
-                    RecoverableError(std::move(status));
+                                                        EmbeddingInfo::EmbeddingDataTypeToString(column_embedding_type))));
                     return false;
                 }
             }
@@ -809,34 +803,30 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildKnnExpr(const KnnExpr &parsed_k
     }
     if (parsed_knn_expr.topn_ <= 0) {
         String topn = std::to_string(parsed_knn_expr.topn_);
-        Status status = Status::InvalidParameterValue("topn", topn, "topn should be greater than 0");
-        RecoverableError(status);
+        RecoverableError(Status::InvalidParameterValue("topn", topn, "topn should be greater than 0"));
     }
-    auto expr_ptr = BuildColExpr((ColumnExpr &)*parsed_knn_expr.column_expr_, bind_context_ptr, depth, false);
+    auto expr_ptr = BuildColExpr(static_cast<ColumnExpr &>(*parsed_knn_expr.column_expr_), bind_context_ptr, depth, false);
     TypeInfo *type_info = expr_ptr->Type().type_info().get();
     if (type_info == nullptr or type_info->type() != TypeInfoType::kEmbedding) {
-        Status status = Status::SyntaxError("Expect the column search is an embedding column");
-        RecoverableError(status);
+        RecoverableError(Status::SyntaxError("Expect the column search is an embedding column"));
     } else {
-        EmbeddingInfo *embedding_info = (EmbeddingInfo *)type_info;
+        auto *embedding_info = static_cast<EmbeddingInfo *>(type_info);
 
         // For function expressions (like FDE), skip dimension validation at parse time
         // The dimension will be validated at execution time when the function is evaluated
         if (!parsed_knn_expr.query_embedding_expr_) {
             // Traditional array case - validate dimension
-            if ((i64)embedding_info->Dimension() != parsed_knn_expr.dimension_) {
-                Status status = Status::SyntaxError(fmt::format("Query embedding with dimension: {} which doesn't not matched with {}",
-                                                                parsed_knn_expr.dimension_,
-                                                                embedding_info->Dimension()));
-                RecoverableError(status);
+            if (static_cast<i64>(embedding_info->Dimension()) != parsed_knn_expr.dimension_) {
+                RecoverableError(Status::SyntaxError(fmt::format("Query embedding with dimension: {} which doesn't not matched with {}",
+                                                                 parsed_knn_expr.dimension_,
+                                                                 embedding_info->Dimension())));
             }
             if (const auto column_embedding_type = embedding_info->Type(), query_embedding_type = parsed_knn_expr.embedding_data_type_;
                 !EmbeddingEmbeddingQueryTypeValidated(column_embedding_type, query_embedding_type)) {
-                Status status =
+                RecoverableError(
                     Status::SyntaxError(fmt::format("Query embedding with data type: {} which doesn't match with column embedding type {}.",
                                                     EmbeddingInfo::EmbeddingDataTypeToString(query_embedding_type),
-                                                    EmbeddingInfo::EmbeddingDataTypeToString(column_embedding_type)));
-                RecoverableError(std::move(status));
+                                                    EmbeddingInfo::EmbeddingDataTypeToString(column_embedding_type))));
             }
         }
         // For function expressions, we'll validate compatibility at execution time
@@ -897,8 +887,8 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildKnnExpr(const KnnExpr &parsed_k
         EmbeddingT query_embedding((ptr_t)parsed_knn_expr.embedding_data_ptr_, false);
 
         if (parsed_knn_expr.ignore_index_ && !parsed_knn_expr.index_name_.empty()) {
-            Status status = Status::SyntaxError(fmt::format("Force to use index {} conflicts with Ignore index flag.", parsed_knn_expr.index_name_));
-            RecoverableError(std::move(status));
+            RecoverableError(
+                Status::SyntaxError(fmt::format("Force to use index {} conflicts with Ignore index flag.", parsed_knn_expr.index_name_)));
         }
 
         // create optional filter
@@ -929,30 +919,28 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildMatchTensorExpr(const MatchTens
     if (expr.column_expr_->type_ != ParsedExprType::kColumn) {
         UnrecoverableError("MatchTensor expression expect a column expression");
     }
-    auto expr_ptr = BuildColExpr((ColumnExpr &)*expr.column_expr_.get(), bind_context_ptr, depth, false);
+    auto expr_ptr = BuildColExpr(static_cast<ColumnExpr &>(*expr.column_expr_.get()), bind_context_ptr, depth, false);
     auto column_data_type = expr_ptr->Type();
     TypeInfo *type_info = column_data_type.type_info().get();
     u32 tensor_column_basic_embedding_dim = 0;
     if ((column_data_type.type() == LogicalType::kTensor or column_data_type.type() == LogicalType::kTensorArray) and type_info != nullptr and
         type_info->type() == TypeInfoType::kEmbedding) {
         // valid search column
-        EmbeddingInfo *embedding_info = (EmbeddingInfo *)type_info;
+        auto *embedding_info = static_cast<EmbeddingInfo *>(type_info);
         tensor_column_basic_embedding_dim = embedding_info->Dimension();
         if (tensor_column_basic_embedding_dim == 0) {
-            const auto error_info = "The tensor column basic embedding dimension should be greater than 0";
-            UnrecoverableError(error_info);
+            UnrecoverableError("The tensor column basic embedding dimension should be greater than 0");
         }
         // check if query embedding type and column embedding type can be matched
         if (const auto column_embedding_type = embedding_info->Type(), query_embedding_type = expr.embedding_data_type_;
             !EmbeddingEmbeddingQueryTypeValidated(column_embedding_type, query_embedding_type)) {
-            Status status = Status::SyntaxError(fmt::format("Query embedding with data type: {} which doesn't match with column embedding type {}.",
-                                                            EmbeddingInfo::EmbeddingDataTypeToString(query_embedding_type),
-                                                            EmbeddingInfo::EmbeddingDataTypeToString(column_embedding_type)));
-            RecoverableError(std::move(status));
+            RecoverableError(Status::SyntaxError(fmt::format("Query embedding with data type: {} which doesn't match with column embedding type {}.",
+                                                             EmbeddingInfo::EmbeddingDataTypeToString(query_embedding_type),
+                                                             EmbeddingInfo::EmbeddingDataTypeToString(column_embedding_type))));
         }
     } else {
-        const auto error_info = fmt::format("Expect the column search is an tensor / tensorarray column, but got: {}", column_data_type.ToString());
-        RecoverableError(Status::SyntaxError(error_info));
+        RecoverableError(
+            Status::SyntaxError(fmt::format("Expect the column search is an tensor / tensorarray column, but got: {}", column_data_type.ToString())));
     }
     Vector<SharedPtr<BaseExpression>> arguments;
     arguments.emplace_back(std::move(expr_ptr));
@@ -981,8 +969,7 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildMatchSparseExpr(MatchSparseExpr
     auto column_data_type = expr_ptr->Type();
     TypeInfo *type_info = column_data_type.type_info().get();
     if (column_data_type.type() != LogicalType::kSparse or type_info == nullptr or type_info->type() != TypeInfoType::kSparse) {
-        const auto error_info = fmt::format("Expect the column search is a sparse column, but got: {}", column_data_type.ToString());
-        RecoverableError(Status::SyntaxError(error_info));
+        RecoverableError(Status::SyntaxError(fmt::format("Expect the column search is a sparse column, but got: {}", column_data_type.ToString())));
     }
 
     Vector<SharedPtr<BaseExpression>> arguments;
@@ -1101,13 +1088,11 @@ ExpressionBinder::BuildSubquery(const SubqueryExpr &expr, BindContext *bind_cont
             return subquery_expr;
         }
         case SubqueryType::kAny: {
-            const auto error_info = "Not implement: Any";
-            UnrecoverableError(error_info);
+            UnrecoverableError("Not implement: Any");
         }
     }
 
-    const auto error_info = "Unreachable";
-    UnrecoverableError(error_info);
+    UnrecoverableError("Unreachable");
     return nullptr;
 }
 
@@ -1259,8 +1244,8 @@ bool ExpressionBinder::IsUnnestedFunction(const String &function_name) { return 
 template <typename T, typename U>
 void FillConcatenatedTensorData(T *output_ptr, const Vector<U> &data_array, const u32 expect_dim) {
     if (data_array.size() != expect_dim) {
-        const auto error_info = fmt::format("Mismatch in tensor member dimension, expect: {}, but got: {}", expect_dim, data_array.size());
-        RecoverableError(Status::SyntaxError(error_info));
+        RecoverableError(
+            Status::SyntaxError(fmt::format("Mismatch in tensor member dimension, expect: {}, but got: {}", expect_dim, data_array.size())));
     }
     for (u32 i = 0; i < expect_dim; ++i) {
         output_ptr[i] = data_array[i];
@@ -1290,8 +1275,7 @@ ptr_t GetConcatenatedTensorDataFromSubArray(const Vector<SharedPtr<ConstantExpr>
                 break;
             }
             default: {
-                const auto error_info = "Tensor subarray type should be IntegerArray or DoubleArray.";
-                RecoverableError(Status::SyntaxError(error_info));
+                RecoverableError(Status::SyntaxError("Tensor subarray type should be IntegerArray or DoubleArray."));
                 break;
             }
         }
@@ -1304,8 +1288,8 @@ template <typename T, typename U>
 void FillConcatenatedTensorDataBit(T *output_ptr, const Vector<U> &data_array, const u32 expect_dim) {
     static_assert(std::is_same_v<T, u8>);
     if (data_array.size() != expect_dim) {
-        const auto error_info = fmt::format("Mismatch in tensor member dimension, expect: {}, but got: {}", expect_dim, data_array.size());
-        RecoverableError(Status::SyntaxError(error_info));
+        RecoverableError(
+            Status::SyntaxError(fmt::format("Mismatch in tensor member dimension, expect: {}, but got: {}", expect_dim, data_array.size())));
     }
     for (u32 i = 0; i < expect_dim; ++i) {
         if (data_array[i]) {
@@ -1337,8 +1321,7 @@ ptr_t GetConcatenatedTensorDataFromSubArray<bool>(const Vector<SharedPtr<Constan
                 break;
             }
             default: {
-                const auto error_info = "Tensor subarray type should be IntegerArray or DoubleArray.";
-                RecoverableError(Status::SyntaxError(error_info));
+                RecoverableError(Status::SyntaxError("Tensor subarray type should be IntegerArray or DoubleArray."));
                 break;
             }
         }
@@ -1351,10 +1334,9 @@ template <typename T, typename U>
 ptr_t GetConcatenatedTensorData(const Vector<U> &data_array, const u32 tensor_column_basic_embedding_dim, u32 &query_total_dimension) {
     query_total_dimension = data_array.size();
     if (query_total_dimension == 0 or query_total_dimension % tensor_column_basic_embedding_dim != 0) {
-        const auto error_info = fmt::format("Query embedding with dimension: {} which doesn't match with tensor basic dimension {}",
-                                            query_total_dimension,
-                                            tensor_column_basic_embedding_dim);
-        RecoverableError(Status::SyntaxError(error_info));
+        RecoverableError(Status::SyntaxError(fmt::format("Query embedding with dimension: {} which doesn't match with tensor basic dimension {}",
+                                                         query_total_dimension,
+                                                         tensor_column_basic_embedding_dim)));
     }
     if constexpr (std::is_same_v<T, bool>) {
         auto *embedding_data_ptr = new u8[query_total_dimension / 8]();

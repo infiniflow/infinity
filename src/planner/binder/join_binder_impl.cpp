@@ -22,7 +22,6 @@ import :base_expression;
 import :bind_context;
 import :status;
 import :infinity_exception;
-import :logger;
 import :join_binder;
 
 import parsed_expr;

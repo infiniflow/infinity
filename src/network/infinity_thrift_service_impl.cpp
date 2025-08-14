@@ -19,7 +19,6 @@ module;
 module infinity_core:infinity_thrift_service.impl;
 
 import :infinity_thrift_service;
-import :logger;
 import :query_options;
 import :infinity_thrift_types;
 import :infinity;

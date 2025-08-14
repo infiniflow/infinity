@@ -21,7 +21,6 @@ import :stl;
 import :infinity_exception;
 import :status;
 import :query_context;
-import :logger;
 
 import third_party;
 

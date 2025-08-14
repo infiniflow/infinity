@@ -27,8 +27,6 @@ import :default_values;
 import :status;
 import :logger;
 
-import third_party;
-
 namespace infinity {
 
 SizeT BufferReader::size() const {
@@ -134,8 +132,7 @@ String BufferReader::read_string(const SizeT string_length, NullTerminator null_
 
     if (null_terminator == NullTerminator::kYes) {
         if (result.back() != NULL_END) {
-            String error_message = "Last character isn't null.";
-            RecoverableError(Status::IOError(error_message));
+            RecoverableError(Status::IOError("Last character isn't null."));
         }
         result.pop_back();
     }
@@ -181,8 +178,7 @@ void BufferReader::receive_more(SizeT bytes) {
     }
 
     if (boost_error) {
-        String error_message = boost_error.message();
-        RecoverableError(Status::IOError(error_message));
+        RecoverableError(Status::IOError(boost_error.message()));
     }
 
     current_pos_.increment(bytes_read);

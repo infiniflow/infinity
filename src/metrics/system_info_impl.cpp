@@ -317,7 +317,7 @@ i64 SystemInfo::MemoryUsage() {
         char line_rss[line_length];
         std::memset(line_rss, 0, line_length);
 
-        while (fgets(line_rss, line_length, file) != NULL) {
+        while (fgets(line_rss, line_length, file) != nullptr) {
             if (std::strncmp(line_rss, "VmRSS:", 6) == 0) {
                 LOG_DEBUG(line_rss);
                 String str(line_rss + 6);
@@ -369,12 +369,12 @@ i64 SystemInfo::OpenFileCount() {
     pid_t current_pid = getpid();
     dir_path = fmt::format("/proc/{}/fd", current_pid);
     dir = opendir(dir_path.c_str());
-    if (dir == NULL) {
+    if (dir == nullptr) {
         Status status = Status::FailToGetSysInfo(fmt::format("Can't open dir: {}", dir_path));
         RecoverableError(status);
     }
 
-    while ((entry = readdir(dir)) != NULL) {
+    while ((entry = readdir(dir)) != nullptr) {
         LOG_DEBUG(fmt::format("PID: {}, {}", current_pid, entry->d_name));
         if (entry->d_name[0] == '.') {
             continue;

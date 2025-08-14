@@ -25,7 +25,6 @@ import :local_file_handle;
 import :status;
 import :virtual_store;
 import :infinity_exception;
-import :logger;
 
 import std.compat;
 import third_party;

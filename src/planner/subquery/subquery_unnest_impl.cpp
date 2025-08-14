@@ -48,7 +48,6 @@ import :bound_cast_func;
 import :cast_table;
 import :new_catalog;
 import :infinity_exception;
-import :logger;
 
 import third_party;
 

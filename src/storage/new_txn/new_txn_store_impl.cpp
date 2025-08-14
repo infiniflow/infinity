@@ -21,7 +21,6 @@ import :stl;
 import :status;
 import :infinity_exception;
 import :data_block;
-import :logger;
 import :data_access_state;
 import :new_txn;
 import :default_values;

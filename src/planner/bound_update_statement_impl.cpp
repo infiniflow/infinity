@@ -36,7 +36,6 @@ import :logical_table_scan;
 import :logical_filter;
 import :logical_update;
 import :subquery_unnest;
-import :logger;
 import :conjunction_expression;
 
 import std;

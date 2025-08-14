@@ -19,7 +19,6 @@ module infinity_core:table_def.impl;
 import :table_def;
 import :stl;
 import :infinity_exception;
-import :logger;
 
 import std;
 

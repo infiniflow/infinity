@@ -18,7 +18,6 @@ module infinity_core:bmp_index_file_worker.impl;
 
 import :bmp_index_file_worker;
 import :index_bmp;
-import :logger;
 import :infinity_exception;
 import :bmp_util;
 import :bmp_alg;

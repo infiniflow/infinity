@@ -26,7 +26,6 @@ import :default_values;
 import :explain_logical_plan;
 import :infinity_exception;
 import :status;
-import :logger;
 
 import std;
 import third_party;

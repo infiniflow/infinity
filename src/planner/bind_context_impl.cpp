@@ -25,7 +25,6 @@ import :base_expression;
 import :column_expression;
 import :column_identifier;
 import :block_index;
-import :logger;
 import :meta_info;
 
 import third_party;
@@ -64,8 +63,7 @@ void BindContext::Destroy() {
 }
 
 SharedPtr<CommonTableExpressionInfo> BindContext::GetCTE(const String &name) const {
-    auto entry = CTE_map_.find(name);
-    if (entry != CTE_map_.end()) {
+    if (auto entry = CTE_map_.find(name); entry != CTE_map_.end()) {
         SharedPtr<CommonTableExpressionInfo> matched_cte_info = entry->second;
         if (matched_cte_info->masked_name_set_.contains(name)) {
             // name is visible in this scope.

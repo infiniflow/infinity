@@ -24,7 +24,6 @@ import :bind_context;
 import :infinity_exception;
 import :bind_alias_proxy;
 import :status;
-import :logger;
 
 import third_party;
 

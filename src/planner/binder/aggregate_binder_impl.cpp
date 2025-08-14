@@ -23,7 +23,6 @@ import :bind_context;
 import :expression_binder;
 import :status;
 import :infinity_exception;
-import :logger;
 import :aggregate_binder;
 
 import parsed_expr;

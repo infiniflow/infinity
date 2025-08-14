@@ -69,7 +69,6 @@ import :match_expression;
 import :match_tensor_expression;
 import :match_sparse_expression;
 import :common_query_filter;
-import :logger;
 import :search_driver;
 import :query_node;
 import :doc_iterator;

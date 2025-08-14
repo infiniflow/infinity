@@ -24,7 +24,6 @@ import :infinity_exception;
 import :column_vector;
 import :value;
 import :default_values;
-import :logger;
 
 import std;
 import third_party;
