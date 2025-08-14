@@ -274,7 +274,7 @@ Status TableSnapshotInfo::Serialize(const String &save_dir, TransactionID txn_id
     Config *config = InfinityContext::instance().config();
     PersistenceManager *persistence_manager = InfinityContext::instance().persistence_manager();
 
-    LOG_INFO(fmt::format("Serialize snapshot at {} with txn_id {}", snapshot_name_, txn_id));
+    LOG_TRACE(fmt::format("Save the snapshot at {}, without txn_id. {} ", snapshot_name_, txn_id));
 
     // Start timing for data copying
     auto data_copy_start = std::chrono::high_resolution_clock::now();
@@ -308,7 +308,7 @@ Status TableSnapshotInfo::Serialize(const String &save_dir, TransactionID txn_id
                 return Status::FileNotFound(error_message);
             }
             String read_path = persistence_manager->GetObjPath(obj_addr.obj_key_);
-            LOG_INFO(fmt::format("READ: {} from {}", file, read_path));
+            LOG_TRACE(fmt::format("READ: {} from {}", file, read_path));
 
             auto [reader_handle, reader_open_status] = VirtualStore::Open(read_path, FileAccessMode::kRead);
             if (!reader_open_status.ok()) {
@@ -377,7 +377,7 @@ Status TableSnapshotInfo::Serialize(const String &save_dir, TransactionID txn_id
     // End timing for data copying
     auto data_copy_end = std::chrono::high_resolution_clock::now();
     auto data_copy_duration = std::chrono::duration_cast<std::chrono::milliseconds>(data_copy_end - data_copy_start);
-    LOG_INFO(fmt::format("Data copying took {} ms", data_copy_duration.count()));
+    LOG_TRACE(fmt::format("Data copying took {} ms", data_copy_duration.count()));
 
     // Start timing for JSON serialization
     auto json_start = std::chrono::high_resolution_clock::now();
@@ -389,7 +389,7 @@ Status TableSnapshotInfo::Serialize(const String &save_dir, TransactionID txn_id
     // End timing for JSON serialization
     auto json_end = std::chrono::high_resolution_clock::now();
     auto json_duration = std::chrono::duration_cast<std::chrono::milliseconds>(json_end - json_start);
-    LOG_INFO(fmt::format("JSON serialization took {} ms", json_duration.count()));
+    LOG_TRACE(fmt::format("JSON serialization took {} ms", json_duration.count()));
 
     // Write metadata to temporary location
     String temp_meta_path = fmt::format("{}/{}.json", temp_snapshot_dir, snapshot_name_);
@@ -434,7 +434,7 @@ Status TableSnapshotInfo::Serialize(const String &save_dir, TransactionID txn_id
         return Status::SnapshotAlreadyExists(snapshot_name_);
     }
 
-    LOG_INFO(fmt::format("Atomic snapshot creation completed: {}", json_res.dump()));
+    LOG_TRACE(fmt::format("Atomic snapshot creation completed: {}", json_res.dump()));
     return Status::OK();
 }
 
@@ -472,7 +472,7 @@ Vector<String> TableSnapshotInfo::GetFiles() const {
 
 Tuple<SharedPtr<TableSnapshotInfo>, Status> TableSnapshotInfo::Deserialize(const String &snapshot_dir, const String &snapshot_name) {
 
-    LOG_INFO(fmt::format("Deserialize snapshot: {}/{}", snapshot_dir, snapshot_name));
+    LOG_TRACE(fmt::format("Deserialize snapshot: {}/{}", snapshot_dir, snapshot_name));
 
     // Start timing for JSON deserialization
     auto json_deserialize_start = std::chrono::high_resolution_clock::now();
@@ -503,9 +503,9 @@ Tuple<SharedPtr<TableSnapshotInfo>, Status> TableSnapshotInfo::Deserialize(const
     // End timing for JSON deserialization
     auto json_deserialize_end = std::chrono::high_resolution_clock::now();
     auto json_deserialize_duration = std::chrono::duration_cast<std::chrono::milliseconds>(json_deserialize_end - json_deserialize_start);
-    LOG_INFO(fmt::format("JSON deserialization took {} ms", json_deserialize_duration.count()));
+    LOG_TRACE(fmt::format("JSON deserialization took {} ms", json_deserialize_duration.count()));
 
-    LOG_INFO(fmt::format("Deserialize snapshot: {}", snapshot_meta_json.dump()));
+    LOG_TRACE(fmt::format("Deserialize snapshot: {}", snapshot_meta_json.dump()));
     return Deserialize(snapshot_meta_json);
 }
 
@@ -578,7 +578,7 @@ Tuple<SharedPtr<TableSnapshotInfo>, Status> TableSnapshotInfo::Deserialize(const
         }
     }
 
-    //    LOG_INFO(table_snapshot->ToString());
+    //    LOG_TRACE(table_snapshot->ToString());
     // Status restore_status = RestoreSnapshotFiles(snapshot_dir, snapshot_name, table_snapshot->GetFiles());
     // if (!restore_status.ok()) {
     //     return {nullptr, restore_status};
@@ -659,9 +659,6 @@ Status SnapshotInfo::RestoreSnapshotFiles(const String &snapshot_dir,
                                           bool ignore_table_id) {
     Config *config = InfinityContext::instance().config();
     PersistenceManager *persistence_manager = InfinityContext::instance().persistence_manager();
-
-    // Start timing for file restoration
-    auto file_restore_start = std::chrono::high_resolution_clock::now();
 
     for (const auto &file : files_to_restore) {
         String src_file_path = fmt::format("{}/{}/{}", snapshot_dir, snapshot_name, file);
@@ -748,10 +745,7 @@ Status SnapshotInfo::RestoreSnapshotFiles(const String &snapshot_dir,
         }
     }
 
-    // End timing for file restoration
-    auto file_restore_end = std::chrono::high_resolution_clock::now();
-    auto file_restore_duration = std::chrono::duration_cast<std::chrono::milliseconds>(file_restore_end - file_restore_start);
-    LOG_INFO(fmt::format("File restoration took {} ms", file_restore_duration.count()));
+    
 
     return Status::OK();
 }
@@ -799,7 +793,7 @@ Status DatabaseSnapshotInfo::Serialize(const String &save_dir, TxnTimeStamp comm
                 return Status::FileNotFound(error_message);
             }
             String read_path = persistence_manager->GetObjPath(obj_addr.obj_key_);
-            LOG_INFO(fmt::format("READ: {} from {}", file, read_path));
+            LOG_TRACE(fmt::format("READ: {} from {}", file, read_path));
 
             auto [reader_handle, reader_open_status] = VirtualStore::Open(read_path, FileAccessMode::kRead);
             if (!reader_open_status.ok()) {
@@ -902,7 +896,7 @@ Status DatabaseSnapshotInfo::Serialize(const String &save_dir, TxnTimeStamp comm
         return Status::SnapshotAlreadyExists(snapshot_name_);
     }
 
-    LOG_INFO(fmt::format("Atomic database snapshot creation completed: {}", json_res.dump()));
+    LOG_TRACE(fmt::format("Atomic database snapshot creation completed: {}", json_res.dump()));
     return Status::OK();
 }
 
@@ -929,7 +923,7 @@ nlohmann::json DatabaseSnapshotInfo::CreateSnapshotMetadataJSON() const {
 }
 
 Tuple<SharedPtr<DatabaseSnapshotInfo>, Status> DatabaseSnapshotInfo::Deserialize(const String &snapshot_dir, const String &snapshot_name) {
-    LOG_INFO(fmt::format("Deserialize snapshot: {}/{}", snapshot_dir, snapshot_name));
+    LOG_TRACE(fmt::format("Deserialize snapshot: {}/{}", snapshot_dir, snapshot_name));
 
     String meta_path = fmt::format("{}/{}/{}.json", snapshot_dir, snapshot_name, snapshot_name);
 
@@ -954,7 +948,7 @@ Tuple<SharedPtr<DatabaseSnapshotInfo>, Status> DatabaseSnapshotInfo::Deserialize
 
     nlohmann::json snapshot_meta_json = nlohmann::json::parse(json_str);
 
-    //    LOG_INFO(snapshot_meta_json.dump());
+    //    LOG_TRACE(snapshot_meta_json.dump());
     // Validate snapshot scope
     return Deserialize(snapshot_meta_json);
 }
@@ -1033,7 +1027,7 @@ Status SystemSnapshotInfo::Serialize(const String &save_path, TxnTimeStamp commi
                 return Status::FileNotFound(error_message);
             }
             String read_path = persistence_manager->GetObjPath(obj_addr.obj_key_);
-            LOG_INFO(fmt::format("READ: {} from {}", file, read_path));
+            LOG_TRACE(fmt::format("READ: {} from {}", file, read_path));
 
             auto [reader_handle, reader_open_status] = VirtualStore::Open(read_path, FileAccessMode::kRead);
             if (!reader_open_status.ok()) {
@@ -1136,7 +1130,7 @@ Status SystemSnapshotInfo::Serialize(const String &save_path, TxnTimeStamp commi
         return Status::SnapshotAlreadyExists(snapshot_name_);
     }
 
-    LOG_INFO(fmt::format("Atomic database snapshot creation completed: {}", json_res.dump()));
+    LOG_TRACE(fmt::format("Atomic database snapshot creation completed: {}", json_res.dump()));
     return Status::OK();
 }
 
@@ -1154,7 +1148,7 @@ nlohmann::json SystemSnapshotInfo::CreateSnapshotMetadataJSON() const {
 }
 
 Tuple<SharedPtr<SystemSnapshotInfo>, Status> SystemSnapshotInfo::Deserialize(const String &snapshot_dir, const String &snapshot_name) {
-    LOG_INFO(fmt::format("Deserialize snapshot: {}/{}", snapshot_dir, snapshot_name));
+    LOG_TRACE(fmt::format("Deserialize snapshot: {}/{}", snapshot_dir, snapshot_name));
 
     String meta_path = fmt::format("{}/{}/{}.json", snapshot_dir, snapshot_name, snapshot_name);
 
@@ -1180,7 +1174,7 @@ Tuple<SharedPtr<SystemSnapshotInfo>, Status> SystemSnapshotInfo::Deserialize(con
 
     nlohmann::json snapshot_meta_json = nlohmann::json::parse(json_str);
 
-    //    LOG_INFO(snapshot_meta_json.dump());
+    //    LOG_TRACE(snapshot_meta_json.dump());
     // Validate snapshot scope
     if (!snapshot_meta_json.contains("snapshot_scope") || snapshot_meta_json["snapshot_scope"] != SnapshotScope::kSystem) {
         return {nullptr, Status::Unknown("Invalid snapshot scope")};

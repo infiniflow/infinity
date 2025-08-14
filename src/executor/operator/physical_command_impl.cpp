@@ -440,46 +440,16 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
         }
         case CommandType::kSnapshot: {
             SnapshotCmd *snapshot_cmd = static_cast<SnapshotCmd *>(command_info_.get());
-            LOG_INFO(fmt::format("Execute snapshot command"));
+            LOG_TRACE(fmt::format("Execute snapshot command"));
             SnapshotOp snapshot_operation = snapshot_cmd->operation();
             SnapshotScope snapshot_scope = snapshot_cmd->scope();
             const String &snapshot_name = snapshot_cmd->name();
 
-            // auto new_txn_mgr = InfinityContext::instance().storage()-> new_txn_manager();
-
-            // new_txn_mgr->PrintAllKeyValue();
-
             switch (snapshot_operation) {
                 case SnapshotOp::kCreate: {
-                    LOG_INFO(fmt::format("Execute snapshot create"));
-
-                    // TODO: do we need a new checkpoint in case the last one just create the table
-                    // Get WAL manager and check if checkpoint is already in progress
-                    // auto *wal_manager = query_context->storage()->wal_manager();
-                    // if (wal_manager->IsCheckpointing()) {
-                    //     LOG_ERROR("There is a running checkpoint task, skip this checkpoint triggered by snapshot");
-                    //     Status status = Status::Checkpointing();
-                    //     RecoverableError(status);
-                    // } else {
-                    //     // Get current commit state
-                    //     TxnTimeStamp max_commit_ts{};
-                    //     i64 wal_size{};
-                    //     std::tie(max_commit_ts, wal_size) = wal_manager->GetCommitState();
-                    //     LOG_TRACE(fmt::format("Construct checkpoint task with WAL size: {}, max_commit_ts: {}", wal_size, max_commit_ts));
-
-                    //     // Create and configure checkpoint task
-                    //     auto checkpoint_task = MakeShared<NewCheckpointTask>(wal_size);
-                    //     checkpoint_task->ExecuteWithNewTxn();
-                    // }
-
-                    // // wait for checkpoint to complete
-                    // while (wal_manager->LastCheckpointTS() + 2 < begin_ts) {
-                    //     std::this_thread::sleep_for(std::chrono::milliseconds(10));
-                    // }
-
                     switch (snapshot_scope) {
                         case SnapshotScope::kSystem: {
-                            LOG_INFO(fmt::format("Execute snapshot system"));
+                            LOG_TRACE(fmt::format("CREATE SYSTEM SNAPSHOT"));
                             NewTxn *new_txn = query_context->GetNewTxn();
                             Status snapshot_status = new_txn->CreateSnapshot("", "", snapshot_name, SnapshotScope::kSystem);
                             if (!snapshot_status.ok()) {
@@ -488,7 +458,7 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
                             break;
                         }
                         case SnapshotScope::kDatabase: {
-                            LOG_INFO(fmt::format("Execute snapshot database"));
+                            LOG_TRACE(fmt::format("CREATE DATABASE SNAPSHOT"));
                             const String &db_name = snapshot_cmd->object_name();
                             NewTxn *new_txn = query_context->GetNewTxn();
                             Status snapshot_status = new_txn->CreateSnapshot(db_name, "", snapshot_name, SnapshotScope::kDatabase);
@@ -506,11 +476,11 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
                             if (!snapshot_status.ok()) {
                                 RecoverableError(snapshot_status);
                             }
-                            LOG_INFO(fmt::format("Execute snapshot table"));
+                            LOG_TRACE(fmt::format("CREATE TABLE SNAPSHOT"));
                             break;
                         }
                         case SnapshotScope::kIgnore: {
-                            LOG_INFO(fmt::format("Execute snapshot ignore"));
+                            LOG_TRACE(fmt::format("CREATE IGNORE SNAPSHOT"));
                             break;
                         }
                         default: {
@@ -522,7 +492,7 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
                     break;
                 }
                 case SnapshotOp::kDrop: {
-                    LOG_INFO(fmt::format("Execute snapshot drop"));
+                    LOG_TRACE(fmt::format("DROP SNAPSHOT"));
                     Status snapshot_status = Snapshot::DropSnapshot(query_context, snapshot_name);
                     if (!snapshot_status.ok()) {
                         RecoverableError(snapshot_status);
@@ -530,10 +500,9 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
                     break;
                 }
                 case SnapshotOp::kRestore: {
-                    LOG_INFO(fmt::format("Execute snapshot restore"));
                     switch (snapshot_scope) {
                         case SnapshotScope::kSystem: {
-                            LOG_INFO(fmt::format("Execute snapshot system restore"));
+                            LOG_TRACE(fmt::format("RESTORE SYSTEM SNAPSHOT"));
                             Status snapshot_status = Snapshot::RestoreSystemSnapshot(query_context, snapshot_name);
                             if (!snapshot_status.ok()) {
                                 RecoverableError(snapshot_status);
@@ -541,7 +510,7 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
                             break;
                         }
                         case SnapshotScope::kDatabase: {
-                            LOG_INFO(fmt::format("Execute snapshot database restore"));
+                            LOG_TRACE(fmt::format("RESTORE DATABASE SNAPSHOT"));
                             Status snapshot_status = Snapshot::RestoreDatabaseSnapshot(query_context, snapshot_name);
                             if (!snapshot_status.ok()) {
                                 RecoverableError(snapshot_status);
@@ -553,11 +522,11 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
                             if (!snapshot_status.ok()) {
                                 RecoverableError(snapshot_status);
                             }
-                            LOG_INFO(fmt::format("Execute snapshot table restore"));
+                            LOG_TRACE(fmt::format("RESTORE TABLE SNAPSHOT"));
                             break;
                         }
                         case SnapshotScope::kIgnore: {
-                            LOG_INFO(fmt::format("Execute snapshot ignore restore"));
+                            LOG_TRACE(fmt::format("RESTORE IGNORE SNAPSHOT"));
                             break;
                         }
                         default: {

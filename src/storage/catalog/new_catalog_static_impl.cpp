@@ -801,8 +801,8 @@ Status NewCatalog::LoadImportedOrCompactedSegment(TableMeeta &table_meta, const 
                 return status;
             }
         }
-        for (const auto &column_def : *column_defs_ptr) {
-            ColumnMeta column_meta(column_def->id(), *block_meta);
+        for (SizeT column_idx = 0; column_idx < column_defs_ptr->size(); ++column_idx) {
+            ColumnMeta column_meta(column_idx, *block_meta);
             status = column_meta.LoadSet();
             if (!status.ok()) {
                 return status;
@@ -954,8 +954,9 @@ Status NewCatalog::CleanBlock(BlockMeta &block_meta, UsageFlag usage_flag) {
         return status;
     }
 
-    for (const auto &column_def : *column_defs_ptr) {
-        ColumnMeta column_meta(column_def->id(), block_meta);
+    for (SizeT column_idx = 0; column_idx < column_defs_ptr->size(); ++column_idx) {
+        ColumnMeta column_meta(column_idx, block_meta);
+        const auto &column_def = (*column_defs_ptr)[column_idx];
         status = NewCatalog::CleanBlockColumn(column_meta, column_def.get(), usage_flag);
         if (!status.ok()) {
             return status;

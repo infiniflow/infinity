@@ -305,7 +305,6 @@ Status Storage::AdminToWriter() {
     // Set correct txn_id and timestamp
     new_txn_mgr_->SetCurrentTransactionID(max_txn_id);
     new_txn_mgr_->SetNewSystemTS(system_start_ts);
-    // new_txn_mgr_->PrintPMKeyValue();
 
     if (memory_index_tracer_ != nullptr) {
         UnrecoverableError("Memory index tracer was initialized before.");

@@ -46,7 +46,7 @@ Status Snapshot::RestoreSystemSnapshot(QueryContext *query_context, const String
     }
 
     // check txn_type
-    LOG_INFO(fmt::format("txn type: {}", TransactionType2Str(txn_ptr->GetTxnType())));
+    LOG_TRACE(fmt::format("txn type: {}", TransactionType2Str(txn_ptr->GetTxnType())));
 
     status = txn_ptr->RestoreSystemSnapshot(system_snapshot);
     if (!status.ok()) {

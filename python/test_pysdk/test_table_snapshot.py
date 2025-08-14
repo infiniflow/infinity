@@ -210,12 +210,6 @@ class TestSnapshot:
             new_index_result = restored_table.create_index("idx_test_new", index.IndexInfo("age", index.IndexType.Secondary), ConflictType.Ignore)
             print(f"   Add new index result: {new_index_result.error_code}")
             
-            # # Verify new index
-            # final_response = restored_table.list_indexes().index_names
-            # # final_indexes = [index["index_name"] for index in final_response.index_list]
-            # print(f"   Final indexes: {final_response}")
-            # assert 'idx_test_new' in final_response, "New index not created"
-            # print(f"   New index verification: OK")
             
         except Exception as e:
             print(f"   ERROR in index operations: {e}")
@@ -272,7 +266,7 @@ class TestSnapshot:
             # Don't raise here as column operations might not be supported
         
         # 7. Test complex queries
-        # TODO: test after fix
+        # TODO: test after complex query is fixed
         # print("7. Testing complex queries...")
         # try:
         #     # Complex filter query
@@ -327,21 +321,21 @@ class TestSnapshot:
         table_obj.create_index("idx_name_fts", index.IndexInfo("name", index.IndexType.FullText), ConflictType.Ignore)
 
         # BMP index TODO: have optimzie issue
-        # table_obj.create_index("idx_vector_bmp", index.IndexInfo("sparse_col", index.IndexType.BMP, {"block_size": "16", "compress_type": "compress"}), ConflictType.Ignore)
+        table_obj.create_index("idx_vector_bmp", index.IndexInfo("sparse_col", index.IndexType.BMP, {"block_size": "16", "compress_type": "compress"}), ConflictType.Ignore)
 
         # HNSW index TODO: too slow, need to fix
         # table_obj.create_index("idx_vector_hnsw", index.IndexInfo("vector_col", index.IndexType.Hnsw, {"metric": "cosine", "m": "16", "ef_construction": "200"}), ConflictType.Ignore)
 
-        # table_obj.drop_index("idx_vector_bmp")
+        table_obj.drop_index("idx_vector_bmp")
 
-        # table_obj.create_index("idx_vector_bmp", index.IndexInfo("sparse_col", index.IndexType.BMP, {"block_size": "16", "compress_type": "compress"}), ConflictType.Ignore)
+        table_obj.create_index("idx_vector_bmp", index.IndexInfo("sparse_col", index.IndexType.BMP, {"block_size": "16", "compress_type": "compress"}), ConflictType.Ignore)
 
 
         # # EMVB index (for tensors)
         # table_obj.create_index("idx_tensor_emvb", index.IndexInfo("tensor_col", index.IndexType.EMVB, {"pq_subspace_num": "32", "pq_subspace_bits": "8"}), ConflictType.Ignore)
 
         # IVF index TODO: have optimzie issue
-        # table_obj.create_index("idx_vector_ivf", index.IndexInfo("vector_col", index.IndexType.IVF, {"metric": "l2"}), ConflictType.Ignore)
+        table_obj.create_index("idx_vector_ivf", index.IndexInfo("vector_col", index.IndexType.IVF, {"metric": "l2"}), ConflictType.Ignore)
     
     def insert_comprehensive_data(self, table_obj, num_rows: int = 1000):
         """Insert comprehensive test data"""
@@ -393,28 +387,6 @@ class TestSnapshot:
         table_obj.drop_columns(["salary"])
         table_obj.add_columns({"salary": {"type": "float64", "default": 0}})
         return table_obj
-    
-    # def test_persistence_restore(self, suffix):
-    #     """Test basic snapshot create, list, drop operations"""
-    #     table_name = f"test_basic_snapshot{suffix}"
-    #     snapshot_name = f"basic_snapshot{suffix}"
-    #     db_obj = self.infinity_obj.get_database("default_db")
-    #     # Drop original table
-    #     db_obj.drop_table(table_name, ConflictType.Ignore)
-    #     # Create table and insert data
-    #     table_obj = self.create_comprehensive_table(table_name)
-    #     # Create indexes
-    #     self._create_indexes(table_obj)
-    #     self.insert_comprehensive_data(table_obj, 100)
-    #     self.infinity_obj.flush_data()
-    #     # snapshot_result = db_obj.create_table_snapshot(snapshot_name, table_name)
-        
-        
-    #     # Verify data integrity and functionality
-    #     self.verify_restored_table_functionality(table_name, db_obj, expected_row_count=100)
-
-    #     # Drop table
-    #     db_obj.drop_table(table_name, ConflictType.Error)
     
     def create_snapshot_with_retry(self, db_obj, snapshot_name, table_name, max_retries=3, retry_delay=2):
         """Create snapshot with retry logic for checkpoint failures"""
@@ -499,7 +471,7 @@ class TestSnapshot:
         # Drop table
         db_obj.drop_table(table_name, ConflictType.Error)
     
-    # need to be moved
+    # need to be moved to parallel
     # def test_snapshot_concurrency(self):
     #     """Test concurrent snapshot operations"""
     #     table_name = f"test_concurrency{self.suffix}"
@@ -632,86 +604,6 @@ class TestSnapshot:
             self.infinity_obj.drop_snapshot(snapshot_name)
 
         db_obj.drop_table(table_name, ConflictType.Error)
-    
-    # def test_snapshot_stress_test(self, suffix):
-    #     """Stress test for snapshot operations with concurrent create and restore"""
-    #     num_tables = 10
-    #     tables = []
-        
-    #     # Create multiple tables
-    #     for i in range(num_tables):
-    #         table_name = f"stress_test_table_{i}{suffix}"
-    #         db_obj = self.infinity_obj.get_database("default_db")
-    #         db_obj.drop_table(table_name, ConflictType.Ignore)
-    #         table_obj = self.create_comprehensive_table(table_name)
-    #         self.insert_comprehensive_data(table_obj, 100)
-    #         self._create_indexes(table_obj)
-    #         tables.append((table_name, table_obj))
-        
-    #     # Define snapshot operations
-    #     def create_snapshot_for_table(table_name):
-    #         snapshot_name = f"stress_snapshot_{table_name}"
-    #         db_obj = self.infinity_obj.get_database("default_db")
-    #         return db_obj.create_table_snapshot(snapshot_name, table_name)
-        
-    #     def restore_snapshot_for_table(table_name):
-    #         snapshot_name = f"stress_snapshot_{table_name}"
-    #         db_obj = self.infinity_obj.get_database("default_db")
-    #         return db_obj.restore_table_snapshot(snapshot_name)
-        
-    #     # Create snapshots for all tables concurrently
-    #     print(f"Creating {num_tables} snapshots concurrently...")
-    #     with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
-    #         futures = [executor.submit(create_snapshot_for_table, table_name) 
-    #                   for table_name, _ in tables]
-    #         create_results = [future.result() for future in futures]
-            
-    #         # All should succeed
-    #         for i, result in enumerate(create_results):
-    #             assert result.error_code == ErrorCode.OK, f"Snapshot creation failed for table {i}: {result.error_code}"
-        
-    #     print(f"Successfully created {num_tables} snapshots")
-        
-    #     # Drop original tables before restore to ensure clean restoration
-    #     print(f"Dropping {num_tables} original tables...")
-    #     for table_name, _ in tables:
-    #         try:
-    #             db_obj = self.infinity_obj.get_database("default_db")
-    #             db_obj.drop_table(table_name, ConflictType.Ignore)
-    #             print(f"   Dropped table: {table_name}")
-    #         except Exception as e:
-    #             print(f"   Warning: Failed to drop table {table_name}: {e}")
-        
-    #     # Restore all snapshots concurrently
-    #     print(f"Restoring {num_tables} snapshots concurrently...")
-    #     with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
-    #         futures = [executor.submit(restore_snapshot_for_table, table_name) 
-    #                   for table_name, _ in tables]
-    #         restore_results = [future.result() for future in futures]
-            
-    #         # All should succeed
-    #         for i, result in enumerate(restore_results):
-    #             assert result.error_code == ErrorCode.OK, f"Snapshot restore failed for table {i}: {result.error_code}"
-        
-    #     print(f"Successfully restored {num_tables} snapshots")
-        
-    #     # Verify all restored tables work correctly
-    #     print("Verifying restored tables...")
-    #     for i in range(num_tables):
-    #         restored_table_name = f"stress_test_table_{i}{suffix}"
-            
-    #         # Use comprehensive verification function
-    #         try:
-    #             db_obj = self.infinity_obj.get_database("default_db")
-    #             self.verify_restored_table_functionality(restored_table_name, db_obj, expected_row_count=100)
-    #             print(f"   Table {i}: Comprehensive verification passed")
-    #         except Exception as e:
-    #             print(f"   Table {i}: Verification failed - {e}")
-    #             raise
-    #     # drop all snaphots
-    #     snapshots = self.infinity_obj.list_snapshots().snapshots
-    #     for snapshot in snapshots:
-    #         self.infinity_obj.drop_snapshot(snapshot.name)
 
     def test_restore_table_snapshot_table_exists(self, suffix):
         """Test restore when table already exists"""
@@ -749,6 +641,7 @@ class TestSnapshot:
             pass
         db_obj.drop_table(f"test_table_{suffix}", ConflictType.Ignore)
 
+    # TODO: need to be moved to parallel
     # def test_multithread_snapshot_with_modifications(self, suffix):
     #     """Test snapshot creation and restore while table is being modified by multiple threads - runs 20 times"""
     #     import threading
