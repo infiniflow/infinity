@@ -16,7 +16,6 @@ COPY sqllogic_test_hnsw FROM '/var/infinity/test_data/test.fvecs' WITH ( DELIMIT
 statement ok
 CREATE INDEX idx1 ON sqllogic_test_hnsw (col1) USING Hnsw WITH (M = 16, ef_construction = 50, metric = l2);
 
-
 statement ok
 CREATE SNAPSHOT sqllogic_test_hnsw_backup ON TABLE sqllogic_test_hnsw;
 
@@ -56,3 +55,6 @@ DROP INDEX idx1 ON sqllogic_test_hnsw;
 
 statement ok
 DROP TABLE sqllogic_test_hnsw;
+
+statement ok
+DROP SNAPSHOT sqllogic_test_hnsw_backup;

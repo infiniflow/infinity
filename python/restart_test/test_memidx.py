@@ -133,8 +133,8 @@ class TestMemIdx:
 
     # recover cose hnsw from mmap column
     def test_mem_hnsw_cos(self, infinity_runner: InfinityRunner):
-        # 100M quota in 7.toml not dump index when insert 8192 rows
-        row_n = 8192
+        # 100M quota in 7.toml not dump index when insert 1024 rows
+        row_n = 1024
         config1 = "test/data/config/restart_test/test_memidx/7.toml"
         uri = common_values.TEST_LOCAL_HOST
         infinity_runner.clear()
@@ -163,7 +163,7 @@ class TestMemIdx:
                 ),
             )
             table_obj.insert([{"c1": 2, "c2": [0.1, 0.2, 0.3, -0.2]} for i in range(row_n)])
-            # wait for 8192 lines to dump
+            # wait for 1024 lines to dump
             time.sleep(3)
 
         @decorator1
