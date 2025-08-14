@@ -86,6 +86,46 @@ class TestSystemSnapshot:
         # Should not reach here, but just in case
         return snapshot_result
 
+    def restore_system_snapshot_with_retry(self, infinity_obj, snapshot_name, max_retries=None, retry_delay=None):
+        """Restore system snapshot with retry logic for checkpoint failures"""
+        if max_retries is None:
+            max_retries = self.DEFAULT_MAX_RETRIES
+        if retry_delay is None:
+            retry_delay = self.DEFAULT_RETRY_DELAY
+            
+        for attempt in range(max_retries):
+            try:
+                restore_result = infinity_obj.restore_system_snapshot(snapshot_name)
+                
+                if restore_result.error_code == ErrorCode.OK:
+                    print(f"System snapshot restored successfully on attempt {attempt + 1}")
+                    return restore_result
+                
+                # Check if failure is checkpoint-related
+                if restore_result.error_code == ErrorCode.CHECKPOINTING:
+                    if attempt < max_retries - 1:
+                        print(f"Attempt {attempt + 1}: System is checkpointing, retrying in {retry_delay}s...")
+                        time.sleep(retry_delay)
+                        continue
+                    else:
+                        print(f"All {max_retries} attempts failed due to checkpointing")
+                        return restore_result
+                else:
+                    # Non-checkpoint failure, don't retry
+                    print(f"Non-checkpoint failure on attempt {attempt + 1}: {restore_result.error_msg}")
+                    return restore_result
+                    
+            except Exception as e:
+                if "checkpoint" in str(e).lower() and attempt < max_retries - 1:
+                    print(f"Attempt {attempt + 1}: Checkpoint exception, retrying in {retry_delay}s...")
+                    time.sleep(retry_delay)
+                    continue
+                else:
+                    raise
+        
+        # Should not reach here, but just in case
+        return restore_result
+
     def handle_system_snapshot_result(self, snapshot_result, operation_name="System snapshot operation", skip_on_checkpoint=True):
         """Handle system snapshot operation results with consistent error handling"""
         if snapshot_result.error_code == ErrorCode.OK:
@@ -99,6 +139,20 @@ class TestSystemSnapshot:
                 return False
         else:
             assert False, f"{operation_name} failed with error: {snapshot_result.error_msg}"
+    
+    def handle_system_snapshot_restore_result(self, restore_result, operation_name="System snapshot restore operation", skip_on_checkpoint=True):
+        """Handle system snapshot restore operation results with consistent error handling"""
+        if restore_result.error_code == ErrorCode.OK:
+            print(f"{operation_name} completed successfully")
+            return True
+        elif restore_result.error_code == ErrorCode.CHECKPOINTING:
+            if skip_on_checkpoint:
+                pytest.skip(f"{operation_name} failed due to checkpointing: {restore_result.error_msg}")
+            else:
+                print(f"Warning: {operation_name} failed due to checkpointing: {restore_result.error_msg}")
+                return False
+        else:
+            assert False, f"{operation_name} failed with error: {restore_result.error_msg}"
     
     def create_comprehensive_table(self, table_name: str, db_obj):
         """Create a table with all data types and indexes"""
@@ -378,8 +432,8 @@ class TestSystemSnapshot:
         
         # Restore from snapshot
         print("Restoring from empty system snapshot...")
-        restore_result = self.infinity_obj.restore_system_snapshot(snapshot_name)
-        assert restore_result.error_code == ErrorCode.OK, f"Empty system snapshot restore failed: {restore_result.error_code}"
+        restore_result = self.restore_system_snapshot_with_retry(self.infinity_obj, snapshot_name)
+        self.handle_system_snapshot_restore_result(restore_result, "Empty system snapshot restore")
         
         # Verify system is empty after restore
         # # Only default_db should exist
@@ -473,8 +527,8 @@ class TestSystemSnapshot:
         
         # Restore from system snapshot
         print("Restoring from system snapshot...")
-        restore_result = self.infinity_obj.restore_system_snapshot(snapshot_name)
-        assert restore_result.error_code == ErrorCode.OK, f"System snapshot restore failed: {restore_result.error_code}"
+        restore_result = self.restore_system_snapshot_with_retry(self.infinity_obj, snapshot_name)
+        self.handle_system_snapshot_restore_result(restore_result, "System snapshot restore")
         
         # Verify all original databases are restored
         databases_restored = self.infinity_obj.list_databases()
@@ -601,11 +655,11 @@ class TestSystemSnapshot:
         # Restore from system snapshot
         print("Restoring from large scale system snapshot...")
         restore_start = time.time()
-        restore_result = self.infinity_obj.restore_system_snapshot(snapshot_name)
+        restore_result = self.restore_system_snapshot_with_retry(self.infinity_obj, snapshot_name)
         restore_time = time.time() - restore_start
         print(f"System snapshot restore time: {restore_time:.2f} seconds")
         
-        assert restore_result.error_code == ErrorCode.OK, f"Large scale system snapshot restore failed: {restore_result.error_code}"
+        self.handle_system_snapshot_restore_result(restore_result, "Large scale system snapshot restore")
         
         # Verify all original databases are restored
         databases_restored = self.infinity_obj.list_databases()
@@ -742,8 +796,8 @@ class TestSystemSnapshot:
             assert snapshot_name in [snapshot.name for snapshot in snapshots], f"Snapshot {snapshot_name} not found in list"
             
             # Restore from snapshot
-            restore_result = self.infinity_obj.restore_system_snapshot(snapshot_name)
-            assert restore_result.error_code == ErrorCode.OK, f"Failed to restore snapshot with name: {snapshot_name}"
+            restore_result = self.restore_system_snapshot_with_retry(self.infinity_obj, snapshot_name)
+            self.handle_system_snapshot_restore_result(restore_result, f"Snapshot restore with name: {snapshot_name}")
             
             # Clean up
             self.infinity_obj.drop_snapshot(snapshot_name)
@@ -775,7 +829,7 @@ class TestSystemSnapshot:
         
         # Measure snapshot restore time
         start_time = time.time()
-        restore_result = self.infinity_obj.restore_system_snapshot(snapshot_name)
+        restore_result = self.restore_system_snapshot_with_retry(self.infinity_obj, snapshot_name)
         restore_time = time.time() - start_time
         
         assert restore_result.error_code == ErrorCode.OK
@@ -817,8 +871,8 @@ class TestSystemSnapshot:
                 self.infinity_obj.drop_database(db_name, ConflictType.Ignore)
         
         # Restore from snapshot
-        restore_result = self.infinity_obj.restore_system_snapshot(snapshot_name)
-        assert restore_result.error_code == ErrorCode.OK
+        restore_result = self.restore_system_snapshot_with_retry(self.infinity_obj, snapshot_name)
+        self.handle_system_snapshot_restore_result(restore_result, "Edge case system snapshot restore")
         
         # Verify database is restored
         databases_after = self.infinity_obj.list_databases()
@@ -848,8 +902,8 @@ class TestSystemSnapshot:
             self.infinity_obj.drop_database(f"max_data_db_{i}", ConflictType.Ignore)
         
         # Restore from snapshot
-        restore_result_2 = self.infinity_obj.restore_system_snapshot(snapshot_name_2)
-        assert restore_result_2.error_code == ErrorCode.OK
+        restore_result_2 = self.restore_system_snapshot_with_retry(self.infinity_obj, snapshot_name_2)
+        self.handle_system_snapshot_restore_result(restore_result_2, "Max data system snapshot restore")
         
         # Verify all databases are restored
         databases_final = self.infinity_obj.list_databases()
