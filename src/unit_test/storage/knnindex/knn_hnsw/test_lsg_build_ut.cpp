@@ -164,7 +164,6 @@ TEST_F(LSGBuildTest, test1) {
     auto index_hnsw = MakeIndexHnsw();
     auto column_def = MakeColumnDef();
 
-
     auto iter = DenseVectorIter<f32, LabelT>(data.get(), dim, element_size);
 
     auto hnsw_index = HnswIndexInMem::Make(index_hnsw.get(), column_def);
