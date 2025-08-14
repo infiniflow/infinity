@@ -87,7 +87,7 @@ class TestFullText:
 
             gt_res = (
                 gt_table_obj.output(["id"])
-                    .match_text(
+                .match_text(
                     fields="body",
                     matching_text=matching_text,
                     topn=10,
@@ -97,6 +97,8 @@ class TestFullText:
             )
             gt_data_dict, _, _ = gt_res
             logging.info(f"part1 insert_n: {insert_n}, gt_data_dict: {gt_data_dict}")
+
+            infinity_obj.flush_data()
 
         part1()
 
@@ -185,7 +187,6 @@ class TestFullText:
                 while time.time() < search_time:
                     time.sleep(0.1)
                 if f is None:
-                    infinity_runner.uninit()
                     logging.info(f"shutdown infinity cur_insert_n: {cur_insert_n}")
                     break
                 try:
@@ -213,6 +214,8 @@ class TestFullText:
                 work_func(table_obj, table_obj2, gt_table_obj)
 
                 t2.join()
+
+                infinity_obj.flush_data()
             except Exception:
                 logging.exception("part2 got exception")
                 got_exception = True
@@ -395,7 +398,7 @@ class TestFullText:
             logging.info(f"part1 inserted {enwiki_size} rows and created index")
             res = (
                 table_obj.output(["id"])
-                    .match_text(
+                .match_text(
                     fields="body",
                     matching_text=matching_text,
                     topn=10,
@@ -414,7 +417,7 @@ class TestFullText:
             table_obj = db_obj.get_table(table_name)
             res = (
                 table_obj.output(["id"])
-                    .match_text(
+                .match_text(
                     fields="body",
                     matching_text=matching_text,
                     topn=10,
