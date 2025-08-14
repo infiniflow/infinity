@@ -330,7 +330,7 @@ protected:
     }
 
 public:
-    void InitLSGBuilder(const IndexHnsw *index_hnsw, SharedPtr<ColumnDef>column_def) {
+    void InitLSGBuilder(const IndexHnsw *index_hnsw, SharedPtr<ColumnDef> column_def) {
         if (!LSG) {
             UnrecoverableError("InsertSampleVecs when LSG not use!");
         }

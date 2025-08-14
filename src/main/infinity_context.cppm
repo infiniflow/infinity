@@ -76,6 +76,7 @@ public:
 
     // Only used by UT
     void SetConfig(UniquePtr<Config> &&config);
+
 private:
     friend class Singleton;
 

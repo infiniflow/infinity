@@ -16,9 +16,9 @@
 #include <cstring>
 #include <functional>
 #include <iostream>
+#include <memory>
 #include <set>
 #include <thread>
-#include <memory>
 
 import infinity_core;
 import compilation_config;
