@@ -33,8 +33,7 @@ export inline BoundCastFunc BindBitmapCast(DataType &target) {
             return BoundCastFunc(&ColumnVectorCast::TryCastColumnVectorToVarlen<BitmapT, VarcharT, BitmapTryCastToVarlen>);
         }
         default: {
-            String error_message = fmt::format("Can't cast from Time type to {}", target.ToString());
-            UnrecoverableError(error_message);
+            UnrecoverableError(fmt::format("Can't cast from Time type to {}", target.ToString()));
         }
     }
     return BoundCastFunc(nullptr);
@@ -43,8 +42,7 @@ export inline BoundCastFunc BindBitmapCast(DataType &target) {
 struct BitmapTryCastToVarlen {
     template <typename SourceType, typename TargetType>
     static inline bool Run(const SourceType &source, TargetType &target, const SharedPtr<ColumnVector> &vector_ptr) {
-        String error_message = "Not support to cast from " + DataType::TypeToString<SourceType>() + " to " + DataType::TypeToString<TargetType>();
-        UnrecoverableError(error_message);
+        UnrecoverableError("Not support to cast from " + DataType::TypeToString<SourceType>() + " to " + DataType::TypeToString<TargetType>());
         return false;
     }
 };

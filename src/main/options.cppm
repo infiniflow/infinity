@@ -19,6 +19,8 @@ export module infinity_core:options;
 import :stl;
 import :status;
 
+import third_party;
+
 namespace infinity {
 
 export enum class BaseOptionDataType {

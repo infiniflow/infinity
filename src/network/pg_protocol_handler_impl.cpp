@@ -83,7 +83,7 @@ String PGProtocolHandler::read_command_body() {
     return buffer_reader_.read_string(command_length);
 }
 
-void PGProtocolHandler::send_error_response(const HashMap<PGMessageType, String> &error_response_map) {
+void PGProtocolHandler::send_error_response(const std::unordered_map<PGMessageType, std::string> &error_response_map) {
     // message header
     buffer_writer_.send_value_u8(static_cast<u8>(PGMessageType::kError));
 

@@ -42,8 +42,8 @@
 // especially those whose name start with YY_ or yy_.  They are
 // private implementation details that can be changed or removed.
 
-#ifndef YY_YY_SEARCH_PARSER_H_INCLUDED
-# define YY_YY_SEARCH_PARSER_H_INCLUDED
+#ifndef YY_SEARCH_SEARCH_PARSER_H_INCLUDED
+# define YY_SEARCH_SEARCH_PARSER_H_INCLUDED
 // "%code requires" blocks.
 #line 18 "search_parser.y"
 
@@ -1439,4 +1439,4 @@ switch (yykind)
 
 
 
-#endif // !YY_YY_SEARCH_PARSER_H_INCLUDED
+#endif // !YY_SEARCH_SEARCH_PARSER_H_INCLUDED

@@ -17,8 +17,14 @@
 #include "date_type.h"
 #include "parser_assert.h"
 #include "time_type.h"
-#include <string>
-#include <chrono>
+// #include <string>
+// #include <chrono>
+
+#ifndef PARESER_USE_STD_MODULE
+#define PARESER_USE_STD_MODULE 1
+import std;
+import std.compat;
+#endif
 
 namespace infinity {
 

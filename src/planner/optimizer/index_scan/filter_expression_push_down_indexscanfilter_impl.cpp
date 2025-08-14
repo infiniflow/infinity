@@ -425,17 +425,17 @@ private:
             case Enum::kSecondaryIndexValueCompareExpr: {
                 auto *function_expression = static_cast<FunctionExpression *>(index_filter_tree_node.src_ptr->get());
                 auto const &f_name = function_expression->ScalarFunctionName();
-                constexpr std::array PossibleFunctionNames{"<", ">", "<=", ">=", "="};
-                constexpr std::array PossibleCompareTypes{FilterCompareType::kLess,
-                                                          FilterCompareType::kGreater,
-                                                          FilterCompareType::kLessEqual,
-                                                          FilterCompareType::kGreaterEqual,
-                                                          FilterCompareType::kEqual};
-                constexpr std::array PossibleReverseCompareTypes{FilterCompareType::kGreater,
-                                                                 FilterCompareType::kLess,
-                                                                 FilterCompareType::kGreaterEqual,
-                                                                 FilterCompareType::kLessEqual,
-                                                                 FilterCompareType::kEqual};
+                static constexpr std::array<std::string, 5> PossibleFunctionNames{"<", ">", "<=", ">=", "="};
+                constexpr std::array<FilterCompareType, 5> PossibleCompareTypes{FilterCompareType::kLess,
+                                                                                FilterCompareType::kGreater,
+                                                                                FilterCompareType::kLessEqual,
+                                                                                FilterCompareType::kGreaterEqual,
+                                                                                FilterCompareType::kEqual};
+                constexpr std::array<FilterCompareType, 5> PossibleReverseCompareTypes{FilterCompareType::kGreater,
+                                                                                       FilterCompareType::kLess,
+                                                                                       FilterCompareType::kGreaterEqual,
+                                                                                       FilterCompareType::kLessEqual,
+                                                                                       FilterCompareType::kEqual};
                 const auto it = std::find(PossibleFunctionNames.begin(), PossibleFunctionNames.end(), f_name);
                 if (it == PossibleFunctionNames.end()) {
                     UnrecoverableError("Function name not found");

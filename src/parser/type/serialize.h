@@ -14,12 +14,18 @@
 
 #pragma once
 
-#include <concepts>
-#include <cstdint>
-#include <cstring>
-#include <string>
-#include <type_traits>
-#include <vector>
+// #include <concepts>
+// #include <cstdint>
+// #include <cstring>
+// #include <string>
+// #include <type_traits>
+// #include <vector>
+
+#ifndef PARESER_USE_STD_MODULE
+#define PARESER_USE_STD_MODULE 1
+import std;
+import std.compat;
+#endif
 
 namespace infinity {
 // using String = std::string;

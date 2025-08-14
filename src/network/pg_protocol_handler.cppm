@@ -21,6 +21,8 @@ import :pg_message;
 import :buffer_reader;
 import :buffer_writer;
 
+import std;
+
 namespace infinity {
 
 export class PGProtocolHandler {
@@ -42,7 +44,7 @@ public:
 
     String read_command_body();
 
-    void send_error_response(const HashMap<PGMessageType, String> &error_response_map);
+    void send_error_response(const std::unordered_map<PGMessageType, std::string> &error_response_map);
     //
     //    String read_query_packet();
 

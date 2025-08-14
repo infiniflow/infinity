@@ -14,14 +14,9 @@
 
 module;
 
-#include <sstream>
-#include <string>
-#include <vector>
-
 module infinity_core:index_full_text.impl;
 
 import :index_full_text;
-import :stl;
 import :index_base;
 import :status;
 import :infinity_exception;
@@ -31,8 +26,8 @@ import :analyzer_pool;
 import :analyzer;
 import :logger;
 
-// import std;
-// import std.compat;
+import std;
+import std.compat;
 import third_party;
 
 import logical_type;
@@ -41,7 +36,11 @@ import serialize;
 
 namespace infinity {
 
-void ToLowerString(String &lower) { std::transform(lower.begin(), lower.end(), lower.begin(), ::tolower); }
+void ToLowerString(String &lower) {
+    for (auto &c : lower) {
+        c = tolower(c);
+    }
+}
 
 SharedPtr<IndexBase> IndexFullText::Make(SharedPtr<String> index_name,
                                          SharedPtr<String> index_comment,

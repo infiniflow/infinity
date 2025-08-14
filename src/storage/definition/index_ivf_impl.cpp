@@ -14,22 +14,15 @@
 
 module;
 
-#include <iostream>
-#include <sstream>
-#include <string>
-#include <vector>
-
-#include "nlohmann/json.hpp"
-
 module infinity_core:index_ivf.impl;
 
 import :index_ivf;
 import :infinity_exception;
-import :stl;
 import :index_base;
 import :status;
 
-// import std;
+import std;
+import third_party;
 
 import embedding_info;
 import internal_types;
@@ -342,14 +335,57 @@ void IndexIVF::ValidateColumnDataType(const SharedPtr<BaseTableRef> &base_table_
     }
 }
 
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(IndexIVFCentroidOption, centroids_num_ratio_, min_points_per_centroid_, max_points_per_centroid_);
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(IndexIVFStorageOption,
-                                   type_,
-                                   plain_storage_data_type_,
-                                   scalar_quantization_bits_,
-                                   product_quantization_subspace_num_,
-                                   product_quantization_subspace_bits_);
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(IndexIVFOption, metric_, centroid_option_, storage_option_);
+// NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(IndexIVFCentroidOption, centroids_num_ratio_, min_points_per_centroid_, max_points_per_centroid_);
+template <typename BasicJsonType, nlohmann::detail::enable_if_t<nlohmann::detail::is_basic_json<BasicJsonType>::value, int> = 0>
+void to_json(BasicJsonType &nlohmann_json_j, const IndexIVFCentroidOption &nlohmann_json_t) {
+    nlohmann_json_j["centroids_num_ratio_"] = nlohmann_json_t.centroids_num_ratio_;
+    nlohmann_json_j["min_points_per_centroid_"] = nlohmann_json_t.min_points_per_centroid_;
+    nlohmann_json_j["max_points_per_centroid_"] = nlohmann_json_t.max_points_per_centroid_;
+}
+
+// NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(IndexIVFStorageOption,
+//                                    type_,
+//                                    plain_storage_data_type_,
+//                                    scalar_quantization_bits_,
+//                                    product_quantization_subspace_num_,
+//                                    product_quantization_subspace_bits_);
+template <typename BasicJsonType, nlohmann::detail::enable_if_t<nlohmann::detail::is_basic_json<BasicJsonType>::value, int> = 0>
+void from_json(const BasicJsonType &nlohmann_json_j, IndexIVFCentroidOption &nlohmann_json_t) {
+    nlohmann_json_j.at("centroids_num_ratio_").get_to(nlohmann_json_t.centroids_num_ratio_);
+    nlohmann_json_j.at("min_points_per_centroid_").get_to(nlohmann_json_t.min_points_per_centroid_);
+    nlohmann_json_j.at("max_points_per_centroid_").get_to(nlohmann_json_t.max_points_per_centroid_);
+}
+
+template <typename BasicJsonType, nlohmann::detail::enable_if_t<nlohmann::detail::is_basic_json<BasicJsonType>::value, int> = 0>
+void to_json(BasicJsonType &nlohmann_json_j, const IndexIVFStorageOption &nlohmann_json_t) {
+    nlohmann_json_j["type_"] = nlohmann_json_t.type_;
+    nlohmann_json_j["plain_storage_data_type_"] = nlohmann_json_t.plain_storage_data_type_;
+    nlohmann_json_j["scalar_quantization_bits_"] = nlohmann_json_t.scalar_quantization_bits_;
+    nlohmann_json_j["product_quantization_subspace_num_"] = nlohmann_json_t.product_quantization_subspace_num_;
+    nlohmann_json_j["product_quantization_subspace_bits_"] = nlohmann_json_t.product_quantization_subspace_bits_;
+}
+template <typename BasicJsonType, nlohmann::detail::enable_if_t<nlohmann::detail::is_basic_json<BasicJsonType>::value, int> = 0>
+void from_json(const BasicJsonType &nlohmann_json_j, IndexIVFStorageOption &nlohmann_json_t) {
+    nlohmann_json_j.at("type_").get_to(nlohmann_json_t.type_);
+    nlohmann_json_j.at("plain_storage_data_type_").get_to(nlohmann_json_t.plain_storage_data_type_);
+    nlohmann_json_j.at("scalar_quantization_bits_").get_to(nlohmann_json_t.scalar_quantization_bits_);
+    nlohmann_json_j.at("product_quantization_subspace_num_").get_to(nlohmann_json_t.product_quantization_subspace_num_);
+    nlohmann_json_j.at("product_quantization_subspace_bits_").get_to(nlohmann_json_t.product_quantization_subspace_bits_);
+}
+
+// NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(IndexIVFOption, metric_, centroid_option_, storage_option_);
+template <typename BasicJsonType, nlohmann::detail::enable_if_t<nlohmann::detail::is_basic_json<BasicJsonType>::value, int> = 0>
+void to_json(BasicJsonType &nlohmann_json_j, const IndexIVFOption &nlohmann_json_t) {
+    nlohmann_json_j["metric_"] = nlohmann_json_t.metric_;
+    nlohmann_json_j["centroid_option_"] = nlohmann_json_t.centroid_option_;
+    nlohmann_json_j["storage_option_"] = nlohmann_json_t.storage_option_;
+}
+template <typename BasicJsonType, nlohmann::detail::enable_if_t<nlohmann::detail::is_basic_json<BasicJsonType>::value, int> = 0>
+void from_json(const BasicJsonType &nlohmann_json_j, IndexIVFOption &nlohmann_json_t) {
+    nlohmann_json_j.at("metric_").get_to(nlohmann_json_t.metric_);
+    nlohmann_json_j.at("centroid_option_").get_to(nlohmann_json_t.centroid_option_);
+    nlohmann_json_j.at("storage_option_").get_to(nlohmann_json_t.storage_option_);
+}
 
 nlohmann::json IndexIVF::Serialize() const {
     nlohmann::json res = IndexBase::Serialize();

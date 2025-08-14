@@ -15,9 +15,15 @@
 #pragma once
 
 #include "tensor_type.h"
-#include <cstdint>
-#include <sstream>
-#include <string>
+// #include <cstdint>
+// #include <sstream>
+// #include <string>
+
+#ifndef PARESER_USE_STD_MODULE
+#define PARESER_USE_STD_MODULE 1
+import std;
+import std.compat;
+#endif
 
 namespace infinity {
 

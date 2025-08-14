@@ -114,8 +114,7 @@ void ObjectStorageProcess::Process() {
                     break;
                 }
                 default: {
-                    String error_message = fmt::format("Invalid object storage: {}", (u8)object_storage_task->type_);
-                    UnrecoverableError(error_message);
+                    UnrecoverableError(fmt::format("Invalid object storage: {}", (u8)object_storage_task->type_));
                     break;
                 }
             }

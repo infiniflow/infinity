@@ -14,8 +14,17 @@
 
 #include "date_type.h"
 #include "parser_assert.h"
-#include <format>
-#include "spdlog/fmt/fmt.h"
+
+#ifndef PARESER_USE_STD_MODULE
+#define PARESER_USE_STD_MODULE 1
+import std;
+import std.compat;
+#endif
+
+#ifndef PARESER_USE_THIRD_PARTY_MODULE
+#define PARESER_USE_THIRD_PARTY_MODULE 1
+import third_party;
+#endif
 
 namespace infinity {
 

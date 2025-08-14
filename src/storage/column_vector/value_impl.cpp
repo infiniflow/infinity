@@ -31,7 +31,7 @@ import std.compat;
 import third_party;
 
 import type_info;
-import array_info;
+// import array_info;
 import internal_types;
 import sparse_info;
 import embedding_info;

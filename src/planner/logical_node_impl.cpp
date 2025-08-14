@@ -18,7 +18,6 @@ module infinity_core:logical_node.impl;
 
 import :logical_node;
 import :column_binding;
-import :stl;
 import :logical_node;
 
 import std;
@@ -27,7 +26,7 @@ import data_type;
 
 namespace infinity {
 
-Vector<ColumnBinding> LogicalCommonFunctionUsingLoadMeta::GetColumnBindings(const LogicalNode &op) {
+std::vector<ColumnBinding> LogicalCommonFunctionUsingLoadMeta::GetColumnBindings(const LogicalNode &op) {
     auto bindings = op.left_node()->GetColumnBindings();
     if (auto ptr = op.load_metas(); ptr) {
         for (auto &load_meta : *ptr) {
@@ -37,7 +36,7 @@ Vector<ColumnBinding> LogicalCommonFunctionUsingLoadMeta::GetColumnBindings(cons
     return bindings;
 }
 
-SharedPtr<Vector<String>> LogicalCommonFunctionUsingLoadMeta::GetOutputNames(const LogicalNode &op) {
+std::shared_ptr<std::vector<std::string>> LogicalCommonFunctionUsingLoadMeta::GetOutputNames(const LogicalNode &op) {
     auto output_names = op.left_node()->GetOutputNames();
     if (auto ptr = op.load_metas(); ptr) {
         for (auto &load_meta : *ptr) {
@@ -47,7 +46,7 @@ SharedPtr<Vector<String>> LogicalCommonFunctionUsingLoadMeta::GetOutputNames(con
     return output_names;
 }
 
-SharedPtr<Vector<SharedPtr<DataType>>> LogicalCommonFunctionUsingLoadMeta::GetOutputTypes(const LogicalNode &op) {
+std::shared_ptr<std::vector<std::shared_ptr<DataType>>> LogicalCommonFunctionUsingLoadMeta::GetOutputTypes(const LogicalNode &op) {
     auto output_types = op.left_node()->GetOutputTypes();
     if (auto ptr = op.load_metas(); ptr) {
         for (auto &load_meta : *ptr) {

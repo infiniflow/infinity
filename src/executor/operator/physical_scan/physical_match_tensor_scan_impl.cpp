@@ -158,9 +158,7 @@ void PhysicalMatchTensorScan::CheckColumn() {
     }
     const auto *embedding_info = static_cast<const EmbeddingInfo *>(type_info.get());
     if (embedding_info->Dimension() != src_match_tensor_expr_->tensor_basic_embedding_dimension_) {
-        String error_message =
-            fmt::format("Column {} embedding dimension not match with query {}", column_def->name(), src_match_tensor_expr_->ToString());
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("Column {} embedding dimension not match with query {}", column_def->name(), src_match_tensor_expr_->ToString()));
     }
     // check column basic embedding data type and query embedding data type
     // apply necessary cast
@@ -845,8 +843,7 @@ void CalculateScoreOnColumnVectorT(TensorScanParameterPack &parameter_pack) {
                                                                                                parameter_pack.function_data_);
         }
         case MatchTensorSearchMethod::kInvalid: {
-            const auto error_message = "Invalid search method!";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Invalid search method!");
             break;
         }
     }
@@ -863,8 +860,7 @@ struct ExecuteMatchTensorScanTypes {
                 return CalculateScoreOnColumnVectorT<CalcutateScoreOfTensorArrayRow, T...>(parameter_pack);
             }
             default: {
-                const auto error_message = "Invalid column type! target column is not Tensor or TensorArray type.";
-                UnrecoverableError(error_message);
+                UnrecoverableError("Invalid column type! target column is not Tensor or TensorArray type.");
             }
         }
     }
@@ -920,8 +916,7 @@ void ElemTypeDispatch(Params &parameter_pack, EmbeddingDataType type_enum, Args.
             return ElemTypeDispatch<ExecuteT, AddTypeList<Typelist, TypeList<BFloat16T>>>(parameter_pack, extra_types...);
         }
         case EmbeddingDataType::kElemInvalid: {
-            const auto error_message = "Invalid embedding data type!";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Invalid embedding data type!");
         }
     }
 }
@@ -1003,8 +998,7 @@ void RerankerScoreT(RerankerParameterPack &parameter_pack) {
                                                                                             basic_embedding_dimension);
         }
         case MatchTensorSearchMethod::kInvalid: {
-            const auto error_message = "Invalid search method!";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Invalid search method!");
             break;
         }
     }

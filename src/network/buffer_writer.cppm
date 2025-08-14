@@ -20,7 +20,8 @@ import :boost;
 import :pg_message;
 import :ring_buffer_iterator;
 import :default_values;
-import :stl;
+
+import std;
 
 import global_resource_usage;
 

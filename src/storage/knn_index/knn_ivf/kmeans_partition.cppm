@@ -92,16 +92,13 @@ export template <typename ElemType, typename CentroidsOutputType>
         }
     }
     if (dimension <= 0 || vector_count <= 0) {
-        String error_message = "Dimension and vector_count must be positive";
-        UnrecoverableError(error_message);
+        UnrecoverableError("Dimension and vector_count must be positive");
     }
     if (vectors_ptr == nullptr) {
-        String error_message = "vectors_ptr cannot be nullptr";
-        UnrecoverableError(error_message);
+        UnrecoverableError("vectors_ptr cannot be nullptr");
     }
     if (partition_num > vector_count) {
-        String error_message = "partition_num cannot be greater than vector_count";
-        UnrecoverableError(error_message);
+        UnrecoverableError("partition_num cannot be greater than vector_count");
     }
     if (partition_num <= 0) {
         partition_num = static_cast<int>(sqrt(vector_count) * centroids_num_ratio);

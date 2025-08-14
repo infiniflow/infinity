@@ -18,7 +18,13 @@
 // NOTICE: For more information go to https://github.com/yahoojapan/NGT
 
 #pragma once
-#include <vector>
+// #include <vector>
+
+#ifndef PARESER_USE_STD_MODULE
+#define PARESER_USE_STD_MODULE 1
+import std;
+import std.compat;
+#endif
 
 namespace NGT {
 class CpuInfo {

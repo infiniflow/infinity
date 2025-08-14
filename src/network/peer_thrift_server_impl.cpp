@@ -14,16 +14,16 @@
 
 module;
 
-#include <memory>
-#include <thrift/TToString.h>
-#include <thrift/concurrency/ThreadFactory.h>
-#include <thrift/concurrency/ThreadManager.h>
-#include <thrift/protocol/TBinaryProtocol.h>
-#include <thrift/server/TNonblockingServer.h>
-#include <thrift/server/TThreadPoolServer.h>
-#include <thrift/server/TThreadedServer.h>
-#include <thrift/transport/TServerSocket.h>
-#include <thrift/transport/TTransportUtils.h>
+// #include <memory>
+// #include <thrift/TToString.h>
+// #include <thrift/concurrency/ThreadFactory.h>
+// #include <thrift/concurrency/ThreadManager.h>
+// #include <thrift/protocol/TBinaryProtocol.h>
+// #include <thrift/server/TNonblockingServer.h>
+// #include <thrift/server/TThreadPoolServer.h>
+// #include <thrift/server/TThreadedServer.h>
+// #include <thrift/transport/TServerSocket.h>
+// #include <thrift/transport/TTransportUtils.h>
 
 module infinity_core:peer_thrift_server.impl;
 
@@ -33,6 +33,7 @@ import :peer_server_thrift_types;
 import :stl;
 import :infinity_exception;
 
+import std;
 import third_party;
 
 using namespace apache::thrift;
@@ -47,7 +48,7 @@ class PeerServiceCloneFactory final : public infinity_peer_server::PeerServiceIf
 public:
     ~PeerServiceCloneFactory() final = default;
 
-    infinity_peer_server::PeerServiceIf *getHandler(const ::apache::thrift::TConnectionInfo &connInfo) final { return new PeerServerThriftService; }
+    infinity_peer_server::PeerServiceIf *getHandler(const apache::thrift::TConnectionInfo &connInfo) final { return new PeerServerThriftService; }
 
     void releaseHandler(infinity_peer_server::PeerServiceIf *handler) final { delete handler; }
 };

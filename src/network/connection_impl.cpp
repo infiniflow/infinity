@@ -19,7 +19,6 @@ module infinity_core:connection.impl;
 import :connection;
 import :pg_protocol_handler;
 import :boost;
-import :stl;
 import :infinity_exception;
 import :pg_message;
 import :infinity_context;
@@ -29,6 +28,7 @@ import :session_manager;
 import :query_context;
 
 import std;
+import std.compat;
 import third_party;
 
 import type_info;
@@ -42,7 +42,7 @@ import internal_types;
 namespace infinity {
 
 Connection::Connection(boost::asio::io_context &io_context)
-    : socket_(MakeShared<boost::asio::ip::tcp::socket>(io_context)), pg_handler_(MakeShared<PGProtocolHandler>(socket())) {}
+    : socket_(std::make_shared<boost::asio::ip::tcp::socket>(io_context)), pg_handler_(std::make_shared<PGProtocolHandler>(socket())) {}
 
 Connection::~Connection() {
     if (session_ == nullptr) {
@@ -54,7 +54,7 @@ Connection::~Connection() {
 }
 
 void Connection::HandleError(const char *error_message) {
-    HashMap<PGMessageType, String> error_message_map;
+    std::unordered_map<PGMessageType, std::string> error_message_map;
     error_message_map[PGMessageType::kHumanReadableError] = error_message;
     LOG_ERROR(error_message);
     pg_handler_->send_error_response(error_message_map);
@@ -66,7 +66,7 @@ void Connection::Run() {
     socket_->set_option(boost::asio::ip::tcp::no_delay(true));
 
     SessionManager *session_manager = InfinityContext::instance().session_manager();
-    SharedPtr<RemoteSession> remote_session = session_manager->CreateRemoteSession();
+    std::shared_ptr<RemoteSession> remote_session = session_manager->CreateRemoteSession();
     if (remote_session == nullptr) {
         HandleError("Infinity is running under maintenance mode, only one connection is allowed.");
         return;
@@ -152,7 +152,7 @@ void Connection::HandleRequest() {
 }
 
 void Connection::HandlerSimpleQuery(QueryContext *query_context) {
-    const String &query = pg_handler_->read_command_body();
+    const std::string &query = pg_handler_->read_command_body();
     LOG_TRACE(fmt::format("Query: {}", query));
 
     // Start to execute the query.
@@ -160,7 +160,7 @@ void Connection::HandlerSimpleQuery(QueryContext *query_context) {
 
     // Response to the result message to client
     if (result.result_table_.get() == nullptr) {
-        HashMap<PGMessageType, String> error_message_map;
+        std::unordered_map<PGMessageType, std::string> error_message_map;
         error_message_map[PGMessageType::kHumanReadableError] = result.status_.message();
         pg_handler_->send_error_response(error_message_map);
     } else {
@@ -172,10 +172,10 @@ void Connection::HandlerSimpleQuery(QueryContext *query_context) {
     pg_handler_->send_ready_for_query();
 }
 
-void Connection::SendTableDescription(const SharedPtr<DataTable> &result_table) {
+void Connection::SendTableDescription(const std::shared_ptr<DataTable> &result_table) {
     u32 column_name_length_sum = 0;
-    SizeT column_count = result_table->ColumnCount();
-    for (SizeT idx = 0; idx < column_count; ++idx) {
+    size_t column_count = result_table->ColumnCount();
+    for (size_t idx = 0; idx < column_count; ++idx) {
         column_name_length_sum += result_table->GetColumnNameById(idx).length();
     }
 
@@ -185,8 +185,8 @@ void Connection::SendTableDescription(const SharedPtr<DataTable> &result_table) 
 
     pg_handler_->SendDescriptionHeader(column_name_length_sum, column_count);
 
-    for (SizeT idx = 0; idx < column_count; ++idx) {
-        SharedPtr<DataType> column_type = result_table->GetColumnTypeById(idx);
+    for (size_t idx = 0; idx < column_count; ++idx) {
+        std::shared_ptr<DataType> column_type = result_table->GetColumnTypeById(idx);
 
         u32 object_id = 0;
         i16 object_width = 0;
@@ -272,7 +272,7 @@ void Connection::SendTableDescription(const SharedPtr<DataTable> &result_table) 
                     UnrecoverableError("Not embedding type");
                 }
 
-                EmbeddingInfo *embedding_info = static_cast<EmbeddingInfo *>(column_type->type_info().get());
+                auto *embedding_info = static_cast<EmbeddingInfo *>(column_type->type_info().get());
                 switch (embedding_info->Type()) {
 
                     case EmbeddingDataType::kElemBit: {
@@ -323,8 +323,7 @@ void Connection::SendTableDescription(const SharedPtr<DataTable> &result_table) 
                 if (column_type->type_info()->type() != TypeInfoType::kSparse) {
                     UnrecoverableError("Not sparse type");
                 }
-                const auto *sparse_info = static_cast<SparseInfo *>(column_type->type_info().get());
-                switch (sparse_info->DataType()) {
+                switch (const auto *sparse_info = static_cast<SparseInfo *>(column_type->type_info().get()); sparse_info->DataType()) {
                     case EmbeddingDataType::kElemBit: {
                         object_id = 1000;
                         object_width = 1;
@@ -381,21 +380,21 @@ void Connection::SendTableDescription(const SharedPtr<DataTable> &result_table) 
 
 void Connection::SendQueryResponse(const QueryResult &query_result) {
 
-    const SharedPtr<DataTable> &result_table = query_result.result_table_;
-    SizeT column_count = result_table->ColumnCount();
-    auto values_as_strings = Vector<Optional<String>>(column_count);
-    SizeT block_count = result_table->DataBlockCount();
-    for (SizeT idx = 0; idx < block_count; ++idx) {
+    const std::shared_ptr<DataTable> &result_table = query_result.result_table_;
+    size_t column_count = result_table->ColumnCount();
+    auto values_as_strings = Vector<Optional<std::string>>(column_count);
+    size_t block_count = result_table->DataBlockCount();
+    for (size_t idx = 0; idx < block_count; ++idx) {
         auto block = result_table->GetDataBlockById(idx);
-        SizeT row_count = block->row_count();
+        size_t row_count = block->row_count();
 
-        for (SizeT row_id = 0; row_id < row_count; ++row_id) {
-            SizeT string_length_sum = 0;
+        for (size_t row_id = 0; row_id < row_count; ++row_id) {
+            size_t string_length_sum = 0;
 
             // iterate each column_vector of the block
-            for (SizeT column_id = 0; column_id < column_count; ++column_id) {
+            for (size_t column_id = 0; column_id < column_count; ++column_id) {
                 auto &column_vector = block->column_vectors[column_id];
-                const String string_value = column_vector->ToString(row_id);
+                const std::string string_value = column_vector->ToString(row_id);
                 values_as_strings[column_id] = string_value;
                 string_length_sum += string_value.size();
             }
@@ -403,7 +402,7 @@ void Connection::SendQueryResponse(const QueryResult &query_result) {
         }
     }
 
-    String message;
+    std::string message;
     switch (query_result.root_operator_type_) {
         case LogicalNodeType::kInsert: {
             message = query_result.ToString();

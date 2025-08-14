@@ -27,9 +27,9 @@ import global_resource_usage;
 
 namespace infinity {
 
-using namespace apache::thrift;
-using namespace apache::thrift::protocol;
-using namespace apache::thrift::transport;
+using namespace ::apache::thrift;
+using namespace ::apache::thrift::protocol;
+using namespace ::apache::thrift::transport;
 using namespace infinity_peer_server;
 
 export class PeerClient {

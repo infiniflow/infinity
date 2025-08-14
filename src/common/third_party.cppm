@@ -15,11 +15,57 @@
 module;
 
 #pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wunused-variable"
-#pragma clang diagnostic ignored "-Wunused-but-set-variable"
-#pragma clang diagnostic ignored "-Wmissing-field-initializers"
 #pragma clang diagnostic ignored "-W#pragma-messages"
-#pragma clang diagnostic ignored "-Wpessimizing-move"
+#pragma clang diagnostic ignored "-Wall"
+
+import std;
+import std.compat;
+
+#define _GLIBCXX_FILESYSTEM 1
+#define _GLIBCXX_CODECVT 1
+#define _GLIBCXX_STRING 1
+#define _GLIBCXX_STRING_VIEW 1
+#define _GLIBCXX_VECTOR 1
+#define _GLIBCXX_ALGORITHM 1
+#define _GLIBCXX_IOMANIP 1
+#define _GLIBCXX_LOCALE 1
+#define _GLIBCXX_SSTREAM 1
+#define _GLIBCXX_UTILITY 1
+#define _GLIBCXX_CMATH 1
+#define _GLIBCXX_MEMORY 1
+#define _GLIBCXX_TUPLE 1
+#define _GLIBCXX_FSTREAM 1
+#define _GLIBCXX_IOSTREAM 1
+#define _GLIBCXX_FUNCTIONAL 1
+#define _GLIBCXX_MAP 1
+#define _GLIBCXX_SET 1
+#define _GLIBCXX_ITERATOR 1
+#define _GLIBCXX_NUMERIC 1
+#define _GLIBCXX_ATOMIC 1
+#define _GLIBCXX_CHRONO 1
+#define _GLIBCXX_CONDITION_VARIABLE 1
+#define _GLIBCXX_MUTEX 1
+#define _GLIBCXX_THREAD 1
+#define _GLIBCXX_UNORDERED_MAP 1
+#define _GLIBCXX_ARRAY 1
+#define _GLIBCXX_FORWARD_LIST 1
+#define _GLIBCXX_OPTIONAL 1
+#define _GLIBCXX_RANGES 1
+#define _GLIBCXX_ISTREAM 1
+#define _GLIBCXX_IOS 1
+#define _GLIBCXX_OSTREAM 1
+#define _GLIBCXX_CHARCONV 1
+#define _GLIBCXX_SHARED_MUTEX 1
+#define _GLIBCXX_LIST 1
+#define _GLIBCXX_UNORDERED_SET 1
+#define _GLIBCXX_VARIANT 1
+#define _GLIBXX_STREAMBUF 1
+#define _GLIBCXX_BITSET 1
+#define _GLIBCXX_DEQUE 1
+#define _GLIBCXX_SPAN 1
+#define _EXT_NUMERIC_TRAITS 1
+
+#include <cerrno>
 
 #include <CLI/CLI.hpp>
 
@@ -65,11 +111,15 @@ module;
 
 #include <re2/re2.h>
 
+#include <thrift/server/TThreadedServer.h>
+
 // #include "inc/mlas.h"
 
 #pragma clang diagnostic pop
 
 export module third_party;
+
+import std;
 
 namespace minio {
 namespace s3 {
@@ -151,15 +201,20 @@ export using toml::parse_file;
 } // namespace toml
 
 namespace nlohmann {
-export using nlohmann::json;
+export using ::nlohmann::json;
+namespace detail {
+export using ::nlohmann::detail::enable_if_t;
+export using ::nlohmann::detail::is_basic_json;
+export using ::nlohmann::detail::value_t;
+}
 }
 
 namespace simdjson {
-export using simdjson::padded_string;
-export using simdjson::simdjson_result;
-export using simdjson::deserialize_tag;
-export using simdjson::error_code;
-export using simdjson::simdjson_error;
+export using ::simdjson::padded_string;
+export using ::simdjson::simdjson_result;
+export using ::simdjson::deserialize_tag;
+export using ::simdjson::error_code;
+export using ::simdjson::simdjson_error;
 export using ondemand::parser;
 export using ondemand::document;
 export using ondemand::object;
@@ -259,19 +314,18 @@ export using ::arrow::TimeUnit;
 export using ::arrow::list;
 export using ::arrow::fixed_size_list;
 export using ::arrow::struct_;
+export using ::arrow::Type;
 namespace io {
 export using ::arrow::io::FileOutputStream;
 }
 } // namespace arrow
-
 
 namespace parquet {
 export using ::parquet::default_writer_properties;
 namespace arrow {
 export using ::parquet::arrow::FileWriter;
 }
-};
-
+}; // namespace parquet
 
 namespace infinity {
 
@@ -394,12 +448,21 @@ using MergeOperator = ::ROCKSDB_NAMESPACE::MergeOperator;
 using Logger = ::ROCKSDB_NAMESPACE::Logger;
 } // namespace rocksdb
 
+namespace rocksdb {
+export using ::rocksdb::DestroyDB;
+}
+
 namespace re2 {
 export using ::re2::RE2;
 };
 
+namespace apache {
+namespace thrift {
+export using ::apache::thrift::TConnectionInfo;
+}
+} // namespace apache
+
 // mlas
 // export using CBLAS_TRANSPOSE
-
 
 } // namespace infinity

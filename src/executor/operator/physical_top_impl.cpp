@@ -320,8 +320,7 @@ void PhysicalTop::Init(QueryContext* query_context) {
     // Initialize sort parameters
     sort_expr_count_ = order_by_types_.size();
     if (sort_expr_count_ != sort_expressions_.size()) {
-        String error_message = "order_by_types_.size() != sort_expressions_.size()";
-        UnrecoverableError(error_message);
+        UnrecoverableError("order_by_types_.size() != sort_expressions_.size()");
     }
     Vector<std::function<std::strong_ordering(const SharedPtr<ColumnVector> &, u32, const SharedPtr<ColumnVector> &, u32)>> sort_functions;
     sort_functions.reserve(sort_expr_count_);
@@ -336,8 +335,7 @@ bool PhysicalTop::Execute(QueryContext *, OperatorState *operator_state) {
     TopOperatorState *top_operator_state = (TopOperatorState *)operator_state;
     auto prev_op_state = top_operator_state->prev_op_state_;
     if ((offset_ != 0) and !(prev_op_state->Complete())) {
-        String error_message = "Only 1 PhysicalTop job but !(prev_op_state->Complete())";
-        UnrecoverableError(error_message);
+        UnrecoverableError("Only 1 PhysicalTop job but !(prev_op_state->Complete())");
     }
     auto &input_data_block_array = prev_op_state->data_block_array_;
     auto &output_data_block_array = top_operator_state->data_block_array_;
@@ -358,8 +356,7 @@ bool PhysicalTop::Execute(QueryContext *, OperatorState *operator_state) {
         return true;
     }
     if (!output_data_block_array.empty()) {
-        String error_message = "output data_block_array_ is not empty";
-        UnrecoverableError(error_message);
+        UnrecoverableError("output data_block_array_ is not empty");
     }
     auto eval_columns = GetEvalColumns(sort_expressions_, top_operator_state->expr_states_, input_data_block_array);
     TopSolver solve_top(limit_, prefer_left_function_);

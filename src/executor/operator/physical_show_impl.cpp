@@ -5144,8 +5144,7 @@ void PhysicalShow::ExecuteShowConfig(QueryContext *query_context, ShowOperatorSt
             break;
         }
         default: {
-            String error_message = "Invalid option data type.";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Invalid option data type.");
             break;
         }
     }

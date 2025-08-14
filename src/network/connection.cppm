@@ -17,11 +17,12 @@ module;
 export module infinity_core:connection;
 
 import :boost;
-import :stl;
 import :pg_protocol_handler;
 import :data_table;
 import :query_result;
 import :session;
+
+import std;
 
 namespace infinity {
 class QueryContext;
@@ -34,9 +35,9 @@ public:
 
     void Run();
 
-    inline SharedPtr<boost::asio::ip::tcp::socket> socket() { return socket_; }
+    inline std::shared_ptr<boost::asio::ip::tcp::socket> socket() { return socket_; }
 
-    inline void GetClientInfo(String &ip_address, u16 &port) {
+    inline void GetClientInfo(std::string &ip_address, u16 &port) {
         if (session_.get() != nullptr) {
             session_->GetClientInfo(ip_address, port);
         } else {
@@ -52,20 +53,20 @@ private:
 
     void HandlerSimpleQuery(QueryContext *query_context);
 
-    void SendTableDescription(const SharedPtr<DataTable> &result_table);
+    void SendTableDescription(const std::shared_ptr<DataTable> &result_table);
 
     void SendQueryResponse(const QueryResult &query_result);
 
     void HandleError(const char *error_message);
 
 private:
-    const SharedPtr<boost::asio::ip::tcp::socket> socket_{};
+    const std::shared_ptr<boost::asio::ip::tcp::socket> socket_{};
 
-    const SharedPtr<PGProtocolHandler> pg_handler_{};
+    const std::shared_ptr<PGProtocolHandler> pg_handler_{};
 
     bool terminate_connection_ = false;
 
-    SharedPtr<RemoteSession> session_{};
+    std::shared_ptr<RemoteSession> session_{};
 };
 
 } // namespace infinity

@@ -1,10 +1,10 @@
 #pragma once
 
-#include <cmath>
-#include <cstdint>
-#include <cstring>
-#include <iostream>
-#include <limits>
+// #include <cmath>
+// #include <cstdint>
+// #include <cstring>
+// #include <iostream>
+// #include <limits>
 
 #if defined(__ARM_NEON)
 #include <arm_neon.h>
@@ -13,6 +13,12 @@
 #if defined(__F16C__)
 #include "common/simd/simd_init_h.h"
 #include <x86intrin.h>
+#endif
+
+#ifndef PARESER_USE_STD_MODULE
+#define PARESER_USE_STD_MODULE 1
+import std;
+import std.compat;
 #endif
 
 namespace infinity {

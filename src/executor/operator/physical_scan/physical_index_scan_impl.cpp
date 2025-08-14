@@ -90,8 +90,7 @@ Vector<UniquePtr<Vector<SegmentID>>> PhysicalIndexScan::PlanSegments(u32 paralle
         result.emplace_back(std::move(segment_ids));
     }
     if (next_segment_id != total_segment_num) {
-        String error_message = "PhysicalIndexScan::PlanSegments(): segment number error.";
-        UnrecoverableError(error_message);
+        UnrecoverableError("PhysicalIndexScan::PlanSegments(): segment number error.");
     }
     return result;
 }
@@ -99,8 +98,7 @@ Vector<UniquePtr<Vector<SegmentID>>> PhysicalIndexScan::PlanSegments(u32 paralle
 void PhysicalIndexScan::Init(QueryContext *query_context) {
     // check add_row_id_
     if (!add_row_id_) {
-        String error_message = "ExecuteInternal(): add_row_id_ should be true.";
-        UnrecoverableError(error_message);
+        UnrecoverableError("ExecuteInternal(): add_row_id_ should be true.");
     }
 }
 

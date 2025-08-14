@@ -14,7 +14,12 @@
 
 #include "tensor_array_type.h"
 #include "tensor_type.h"
-#include <sstream>
+
+#ifndef PARESER_USE_STD_MODULE
+#define PARESER_USE_STD_MODULE 1
+import std;
+import std.compat;
+#endif
 
 namespace infinity {
 std::string TensorArrayType::TensorArray2String(const std::vector<std::pair<std::span<const char>, uint64_t>> &raw_data,

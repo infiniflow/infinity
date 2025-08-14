@@ -22,7 +22,6 @@ import :infinity_thrift_service;
 import :query_options;
 import :infinity_thrift_types;
 import :infinity;
-import :stl;
 import :infinity_context;
 import :file_writer;
 import :value;
@@ -70,39 +69,39 @@ import data_type;
 namespace infinity {
 
 ClientVersions::ClientVersions() {
-    client_version_map_[1] = String("0.2.0.dev2");
-    client_version_map_[2] = String("0.2.0.dev3");
-    client_version_map_[3] = String("0.2.0.dev4");
-    client_version_map_[4] = String("0.2.0.dev5");
-    client_version_map_[5] = String("0.2.0.dev6");
-    client_version_map_[6] = String("0.2.0.dev7");
-    client_version_map_[7] = String("0.2.0.dev8");
-    client_version_map_[8] = String("0.2.0");
-    client_version_map_[9] = String("0.2.1.dev5");
-    client_version_map_[10] = String("0.2.1");
-    client_version_map_[11] = String("0.3.0.dev1");
-    client_version_map_[12] = String("0.3.0.dev3");
-    client_version_map_[13] = String("0.3.0.dev4");
-    client_version_map_[14] = String("0.3.0.dev5");
-    client_version_map_[15] = String("0.3.0.dev6");
-    client_version_map_[16] = String("0.3.0.dev7");
-    client_version_map_[17] = String("0.3.0");
-    client_version_map_[18] = String("0.4.0.dev1");
-    client_version_map_[19] = String("0.4.0.dev2");
-    client_version_map_[20] = String("0.4.0.dev3");
-    client_version_map_[21] = String("0.4.0.dev4");
-    client_version_map_[22] = String("0.4.0");
-    client_version_map_[23] = String("0.5.0.dev1");
-    client_version_map_[24] = String("0.5.0.dev2");
-    client_version_map_[25] = String("0.5.0.dev3");
-    client_version_map_[26] = String("0.5.0.dev5");
-    client_version_map_[27] = String("0.5.2");
-    client_version_map_[28] = String("0.6.0.dev2");
-    client_version_map_[29] = String("0.6.0.dev3");
-    client_version_map_[30] = String("0.6.0.dev5");
+    client_version_map_[1] = std::string("0.2.0.dev2");
+    client_version_map_[2] = std::string("0.2.0.dev3");
+    client_version_map_[3] = std::string("0.2.0.dev4");
+    client_version_map_[4] = std::string("0.2.0.dev5");
+    client_version_map_[5] = std::string("0.2.0.dev6");
+    client_version_map_[6] = std::string("0.2.0.dev7");
+    client_version_map_[7] = std::string("0.2.0.dev8");
+    client_version_map_[8] = std::string("0.2.0");
+    client_version_map_[9] = std::string("0.2.1.dev5");
+    client_version_map_[10] = std::string("0.2.1");
+    client_version_map_[11] = std::string("0.3.0.dev1");
+    client_version_map_[12] = std::string("0.3.0.dev3");
+    client_version_map_[13] = std::string("0.3.0.dev4");
+    client_version_map_[14] = std::string("0.3.0.dev5");
+    client_version_map_[15] = std::string("0.3.0.dev6");
+    client_version_map_[16] = std::string("0.3.0.dev7");
+    client_version_map_[17] = std::string("0.3.0");
+    client_version_map_[18] = std::string("0.4.0.dev1");
+    client_version_map_[19] = std::string("0.4.0.dev2");
+    client_version_map_[20] = std::string("0.4.0.dev3");
+    client_version_map_[21] = std::string("0.4.0.dev4");
+    client_version_map_[22] = std::string("0.4.0");
+    client_version_map_[23] = std::string("0.5.0.dev1");
+    client_version_map_[24] = std::string("0.5.0.dev2");
+    client_version_map_[25] = std::string("0.5.0.dev3");
+    client_version_map_[26] = std::string("0.5.0.dev5");
+    client_version_map_[27] = std::string("0.5.2");
+    client_version_map_[28] = std::string("0.6.0.dev2");
+    client_version_map_[29] = std::string("0.6.0.dev3");
+    client_version_map_[30] = std::string("0.6.0.dev5");
 }
 
-Pair<const char *, Status> ClientVersions::GetVersionByIndex(i64 version_index) {
+std::pair<const char *, Status> ClientVersions::GetVersionByIndex(i64 version_index) {
     auto iter = client_version_map_.find(version_index);
     if (iter == client_version_map_.end()) {
         return {nullptr, Status::UnsupportedVersionIndex(version_index)};
@@ -111,7 +110,7 @@ Pair<const char *, Status> ClientVersions::GetVersionByIndex(i64 version_index) 
 }
 
 std::mutex InfinityThriftService::infinity_session_map_mutex_;
-HashMap<u64, SharedPtr<Infinity>> InfinityThriftService::infinity_session_map_;
+std::unordered_map<u64, std::shared_ptr<Infinity>> InfinityThriftService::infinity_session_map_;
 ClientVersions InfinityThriftService::client_version_;
 
 u32 InfinityThriftService::ClearSessionMap() {
@@ -126,7 +125,7 @@ void InfinityThriftService::Connect(infinity_thrift_rpc::CommonResponse &respons
     if (request_client_version != current_version_index_) {
         auto [request_version_ptr, status1] = client_version_.GetVersionByIndex(request_client_version);
         if (!status1.ok()) {
-            response.__set_error_code((i64)(status1.code()));
+            response.__set_error_code(static_cast<i64>(status1.code()));
             response.__set_error_msg(status1.message());
             LOG_ERROR(status1.message());
             return;
@@ -138,7 +137,7 @@ void InfinityThriftService::Connect(infinity_thrift_rpc::CommonResponse &respons
         }
 
         Status status3 = Status::ClientVersionMismatch(expected_version_ptr, request_version_ptr);
-        response.__set_error_code((i64)(status3.code()));
+        response.__set_error_code(static_cast<i64>(status3.code()));
         response.__set_error_msg(status3.message());
         LOG_ERROR(status3.message());
         return;
@@ -148,17 +147,16 @@ void InfinityThriftService::Connect(infinity_thrift_rpc::CommonResponse &respons
     std::lock_guard<std::mutex> lock(infinity_session_map_mutex_);
     infinity_session_map_.emplace(infinity->GetSessionId(), infinity);
     response.__set_session_id(infinity->GetSessionId());
-    response.__set_error_code((i64)(ErrorCode::kOk));
+    response.__set_error_code(static_cast<i64>(ErrorCode::kOk));
     LOG_TRACE(fmt::format("THRIFT: Connect success, new session {}", response.session_id));
 }
 
 void InfinityThriftService::Disconnect(infinity_thrift_rpc::CommonResponse &response, const infinity_thrift_rpc::CommonRequest &request) {
-    auto status = GetAndRemoveSessionID(request.session_id);
-    if (status.ok()) {
+    if (auto status = GetAndRemoveSessionID(request.session_id); status.ok()) {
         response.__set_error_code((i64)(status.code()));
         LOG_TRACE(fmt::format("THRIFT: Disconnect session {} success", request.session_id));
     } else {
-        response.__set_error_code((i64)(status.code()));
+        response.__set_error_code(static_cast<i64>(status.code()));
         response.__set_error_msg(status.message());
         LOG_TRACE(fmt::format("THRIFT: Disconnect session {} failed", request.session_id));
     }
@@ -222,7 +220,7 @@ void InfinityThriftService::DropDatabase(infinity_thrift_rpc::CommonResponse &re
 }
 
 void InfinityThriftService::CreateTable(infinity_thrift_rpc::CommonResponse &response, const infinity_thrift_rpc::CreateTableRequest &request) {
-    Vector<ColumnDef *> column_defs;
+    std::vector<ColumnDef *> column_defs;
 
     for (auto &proto_column_def : request.column_defs) {
         auto [column_def, column_def_status] = GetColumnDefFromProto(proto_column_def);
@@ -253,9 +251,9 @@ void InfinityThriftService::CreateTable(infinity_thrift_rpc::CommonResponse &res
         }
     }
 
-    SizeT properties_count = request.create_option.properties.size();
+    size_t properties_count = request.create_option.properties.size();
     create_table_opts.properties_.reserve(properties_count);
-    for (SizeT idx = 0; idx < properties_count; ++idx) {
+    for (size_t idx = 0; idx < properties_count; ++idx) {
         InitParameter *property = new InitParameter();
         property->param_name_ = request.create_option.properties[idx].key;
         property->param_value_ = request.create_option.properties[idx].value;
@@ -268,7 +266,7 @@ void InfinityThriftService::CreateTable(infinity_thrift_rpc::CommonResponse &res
         return;
     }
 
-    auto result = infinity->CreateTable(request.db_name, request.table_name, column_defs, Vector<TableConstraint *>(), create_table_opts);
+    auto result = infinity->CreateTable(request.db_name, request.table_name, column_defs, std::vector<TableConstraint *>(), create_table_opts);
     ProcessQueryResult(response, result);
 }
 
@@ -313,7 +311,7 @@ void InfinityThriftService::Insert(infinity_thrift_rpc::CommonResponse &response
 
     Status constant_status;
 
-    Vector<InsertRowExpr *> *insert_rows = new Vector<InsertRowExpr *>();
+    std::vector<InsertRowExpr *> *insert_rows = new std::vector<InsertRowExpr *>();
     DeferFn delete_insert_rows([&insert_rows] {
         if (insert_rows != nullptr) {
             for (auto &insert_row : *insert_rows) {
@@ -345,7 +343,7 @@ void InfinityThriftService::Insert(infinity_thrift_rpc::CommonResponse &response
     ProcessQueryResult(response, result);
 }
 
-Tuple<CopyFileType, Status> InfinityThriftService::GetCopyFileType(infinity_thrift_rpc::CopyFileType::type copy_file_type) {
+std::tuple<CopyFileType, Status> InfinityThriftService::GetCopyFileType(infinity_thrift_rpc::CopyFileType::type copy_file_type) {
     switch (copy_file_type) {
         case infinity_thrift_rpc::CopyFileType::CSV:
             return {CopyFileType::kCSV, Status::OK()};
@@ -401,10 +399,10 @@ void InfinityThriftService::Export(infinity_thrift_rpc::CommonResponse &response
         ProcessStatus(response, status);
     }
 
-    Vector<ParsedExpr *> *export_columns = new Vector<ParsedExpr *>();
+    auto *export_columns = new std::vector<ParsedExpr *>();
     export_columns->reserve(request.columns.size());
 
-    for (String column_name : request.columns) {
+    for (std::string column_name : request.columns) {
         ToLower(column_name);
         if (column_name == "_row_id") {
             FunctionExpr *expr = new FunctionExpr();
@@ -462,7 +460,7 @@ void InfinityThriftService::Select(infinity_thrift_rpc::SelectResponse &response
         return;
     }
 
-    Vector<ParsedExpr *> *output_columns = new Vector<ParsedExpr *>();
+    std::vector<ParsedExpr *> *output_columns = new std::vector<ParsedExpr *>();
     DeferFn defer_fn1([&]() {
         if (output_columns != nullptr) {
             for (auto &expr_ptr : *output_columns) {
@@ -494,7 +492,7 @@ void InfinityThriftService::Select(infinity_thrift_rpc::SelectResponse &response
     }
 
     // highlight list
-    Vector<ParsedExpr *> *highlight_columns = nullptr;
+    std::vector<ParsedExpr *> *highlight_columns = nullptr;
     DeferFn defer_fn11([&]() {
         if (highlight_columns != nullptr) {
             for (auto &expr_ptr : *highlight_columns) {
@@ -506,7 +504,7 @@ void InfinityThriftService::Select(infinity_thrift_rpc::SelectResponse &response
         }
     });
     if (!request.highlight_list.empty()) {
-        highlight_columns = new Vector<ParsedExpr *>();
+        highlight_columns = new std::vector<ParsedExpr *>();
         highlight_columns->reserve(request.highlight_list.size());
         for (auto &expr : request.highlight_list) {
             auto parsed_expr = GetParsedExprFromProto(parsed_expr_status, expr);
@@ -536,7 +534,7 @@ void InfinityThriftService::Select(infinity_thrift_rpc::SelectResponse &response
     });
     if (request.__isset.search_expr) {
 
-        auto search_expr_list = new Vector<ParsedExpr *>();
+        auto search_expr_list = new std::vector<ParsedExpr *>();
         DeferFn defer_fn2([&]() {
             if (search_expr_list != nullptr) {
                 for (auto &expr_ptr : *search_expr_list) {
@@ -548,11 +546,11 @@ void InfinityThriftService::Select(infinity_thrift_rpc::SelectResponse &response
             }
         });
 
-        SizeT match_expr_count = request.search_expr.match_exprs.size();
-        SizeT fusion_expr_count = request.search_expr.fusion_exprs.size();
-        SizeT total_expr_count = match_expr_count + fusion_expr_count;
+        size_t match_expr_count = request.search_expr.match_exprs.size();
+        size_t fusion_expr_count = request.search_expr.fusion_exprs.size();
+        size_t total_expr_count = match_expr_count + fusion_expr_count;
         search_expr_list->reserve(total_expr_count);
-        for (SizeT idx = 0; idx < match_expr_count; ++idx) {
+        for (size_t idx = 0; idx < match_expr_count; ++idx) {
             Status status;
             ParsedExpr *match_expr = GetGenericMatchExprFromProto(status, request.search_expr.match_exprs[idx]);
             DeferFn defer_fn3([&]() {
@@ -569,7 +567,7 @@ void InfinityThriftService::Select(infinity_thrift_rpc::SelectResponse &response
             match_expr = nullptr;
         }
 
-        for (SizeT idx = 0; idx < fusion_expr_count; ++idx) {
+        for (size_t idx = 0; idx < fusion_expr_count; ++idx) {
             ParsedExpr *fusion_expr = GetFusionExprFromProto(request.search_expr.fusion_exprs[idx]);
             search_expr_list->emplace_back(fusion_expr);
         }
@@ -628,7 +626,7 @@ void InfinityThriftService::Select(infinity_thrift_rpc::SelectResponse &response
     }
 
     // order by
-    Vector<OrderByExpr *> *order_by_list = nullptr;
+    std::vector<OrderByExpr *> *order_by_list = nullptr;
     DeferFn defer_fn9([&]() {
         if (order_by_list != nullptr) {
             for (auto &expr_ptr : *order_by_list) {
@@ -640,7 +638,7 @@ void InfinityThriftService::Select(infinity_thrift_rpc::SelectResponse &response
         }
     });
     if (!request.order_by_list.empty()) {
-        order_by_list = new Vector<OrderByExpr *>();
+        order_by_list = new std::vector<OrderByExpr *>();
         order_by_list->reserve(request.order_by_list.size());
 
         Status order_by_status;
@@ -663,7 +661,7 @@ void InfinityThriftService::Select(infinity_thrift_rpc::SelectResponse &response
     }
 
     // group by
-    Vector<ParsedExpr *> *group_by_list = nullptr;
+    std::vector<ParsedExpr *> *group_by_list = nullptr;
     DeferFn defer_fn10([&]() {
         if (group_by_list != nullptr) {
             for (auto &expr_ptr : *group_by_list) {
@@ -675,7 +673,7 @@ void InfinityThriftService::Select(infinity_thrift_rpc::SelectResponse &response
         }
     });
     if (!request.group_by_list.empty()) {
-        group_by_list = new Vector<ParsedExpr *>();
+        group_by_list = new std::vector<ParsedExpr *>();
         group_by_list->reserve(request.group_by_list.size());
         for (auto &expr : request.group_by_list) {
             auto parsed_expr = GetParsedExprFromProto(parsed_expr_status, expr);
@@ -779,7 +777,7 @@ void InfinityThriftService::Explain(infinity_thrift_rpc::SelectResponse &respons
         return;
     }
 
-    Vector<ParsedExpr *> *output_columns = new Vector<ParsedExpr *>();
+    std::vector<ParsedExpr *> *output_columns = new std::vector<ParsedExpr *>();
     output_columns->reserve(request.select_list.size());
     DeferFn defer_fn1([&]() {
         if (output_columns != nullptr) {
@@ -808,7 +806,7 @@ void InfinityThriftService::Explain(infinity_thrift_rpc::SelectResponse &respons
     }
 
     // highlight list
-    Vector<ParsedExpr *> *highlight_columns = nullptr;
+    std::vector<ParsedExpr *> *highlight_columns = nullptr;
     DeferFn defer_fn11([&]() {
         if (highlight_columns != nullptr) {
             for (auto &expr_ptr : *highlight_columns) {
@@ -820,7 +818,7 @@ void InfinityThriftService::Explain(infinity_thrift_rpc::SelectResponse &respons
         }
     });
     if (!request.highlight_list.empty()) {
-        highlight_columns = new Vector<ParsedExpr *>();
+        highlight_columns = new std::vector<ParsedExpr *>();
         highlight_columns->reserve(request.highlight_list.size());
 
         for (auto &expr : request.highlight_list) {
@@ -850,7 +848,7 @@ void InfinityThriftService::Explain(infinity_thrift_rpc::SelectResponse &respons
         }
     });
     if (request.__isset.search_expr) {
-        auto search_expr_list = new Vector<ParsedExpr *>();
+        auto search_expr_list = new std::vector<ParsedExpr *>();
         DeferFn defer_fn2([&]() {
             if (search_expr_list != nullptr) {
                 for (auto &expr_ptr : *search_expr_list) {
@@ -862,11 +860,11 @@ void InfinityThriftService::Explain(infinity_thrift_rpc::SelectResponse &respons
             }
         });
 
-        SizeT match_expr_count = request.search_expr.match_exprs.size();
-        SizeT fusion_expr_count = request.search_expr.fusion_exprs.size();
-        SizeT total_expr_count = match_expr_count + fusion_expr_count;
+        size_t match_expr_count = request.search_expr.match_exprs.size();
+        size_t fusion_expr_count = request.search_expr.fusion_exprs.size();
+        size_t total_expr_count = match_expr_count + fusion_expr_count;
         search_expr_list->reserve(total_expr_count);
-        for (SizeT idx = 0; idx < match_expr_count; ++idx) {
+        for (size_t idx = 0; idx < match_expr_count; ++idx) {
             Status status;
             ParsedExpr *match_expr = GetGenericMatchExprFromProto(status, request.search_expr.match_exprs[idx]);
             DeferFn defer_fn3([&]() {
@@ -883,7 +881,7 @@ void InfinityThriftService::Explain(infinity_thrift_rpc::SelectResponse &respons
             match_expr = nullptr;
         }
 
-        for (SizeT idx = 0; idx < fusion_expr_count; ++idx) {
+        for (size_t idx = 0; idx < fusion_expr_count; ++idx) {
             ParsedExpr *fusion_expr = GetFusionExprFromProto(request.search_expr.fusion_exprs[idx]);
             search_expr_list->emplace_back(fusion_expr);
         }
@@ -946,7 +944,7 @@ void InfinityThriftService::Explain(infinity_thrift_rpc::SelectResponse &respons
     }
 
     // order by
-    Vector<OrderByExpr *> *order_by_list = nullptr;
+    std::vector<OrderByExpr *> *order_by_list = nullptr;
     DeferFn defer_fn9([&]() {
         if (order_by_list != nullptr) {
             for (auto &expr_ptr : *order_by_list) {
@@ -958,7 +956,7 @@ void InfinityThriftService::Explain(infinity_thrift_rpc::SelectResponse &respons
         }
     });
     if (!request.order_by_list.empty()) {
-        order_by_list = new Vector<OrderByExpr *>();
+        order_by_list = new std::vector<OrderByExpr *>();
         order_by_list->reserve(request.order_by_list.size());
 
         Status order_by_status;
@@ -981,7 +979,7 @@ void InfinityThriftService::Explain(infinity_thrift_rpc::SelectResponse &respons
     }
 
     // group by
-    Vector<ParsedExpr *> *group_by_list = nullptr;
+    std::vector<ParsedExpr *> *group_by_list = nullptr;
     DeferFn defer_fn10([&]() {
         if (group_by_list != nullptr) {
             for (auto &expr_ptr : *group_by_list) {
@@ -993,7 +991,7 @@ void InfinityThriftService::Explain(infinity_thrift_rpc::SelectResponse &respons
         }
     });
     if (!request.group_by_list.empty()) {
-        group_by_list = new Vector<ParsedExpr *>();
+        group_by_list = new std::vector<ParsedExpr *>();
         group_by_list->reserve(request.group_by_list.size());
         for (auto &expr : request.group_by_list) {
             auto parsed_expr = GetParsedExprFromProto(parsed_expr_status, expr);
@@ -1155,7 +1153,7 @@ void InfinityThriftService::Optimize(infinity_thrift_rpc::CommonResponse &respon
 }
 
 void InfinityThriftService::AddColumns(infinity_thrift_rpc::CommonResponse &response, const infinity_thrift_rpc::AddColumnsRequest &request) {
-    Vector<SharedPtr<ColumnDef>> column_defs;
+    std::vector<SharedPtr<ColumnDef>> column_defs;
     for (auto &proto_column_def : request.column_defs) {
         auto [column_def, column_def_status] = GetColumnDefFromProto(proto_column_def);
         if (!column_def_status.ok()) {
@@ -1174,7 +1172,7 @@ void InfinityThriftService::AddColumns(infinity_thrift_rpc::CommonResponse &resp
 }
 
 void InfinityThriftService::DropColumns(infinity_thrift_rpc::CommonResponse &response, const infinity_thrift_rpc::DropColumnsRequest &request) {
-    Vector<String> column_names = request.column_names;
+    std::vector<std::string> column_names = request.column_names;
     auto [infinity, infinity_status] = GetInfinityBySessionID(request.session_id);
     if (!infinity_status.ok()) {
         ProcessStatus(response, infinity_status);
@@ -1219,7 +1217,7 @@ void InfinityThriftService::ListDatabase(infinity_thrift_rpc::ListDatabaseRespon
         auto row_count = data_block->row_count();
         for (int i = 0; i < row_count; ++i) {
             Value value = data_block->GetValue(0, i);
-            const String &db_name = value.GetVarchar();
+            const std::string &db_name = value.GetVarchar();
             response.db_names.emplace_back(db_name);
         }
     } else {
@@ -1240,7 +1238,7 @@ void InfinityThriftService::ListTable(infinity_thrift_rpc::ListTableResponse &re
         auto row_count = data_block->row_count();
         for (int i = 0; i < row_count; ++i) {
             Value value = data_block->GetValue(1, i);
-            const String &table_name = value.GetVarchar();
+            const std::string &table_name = value.GetVarchar();
             response.table_names.emplace_back(table_name);
         }
         response.__set_error_code((i64)(result.ErrorCode()));
@@ -1450,7 +1448,7 @@ void InfinityThriftService::CreateIndex(infinity_thrift_rpc::CommonResponse &res
 
     index_info_to_use->column_name_ = request.index_info.column_name;
 
-    auto *index_param_list = new Vector<InitParameter *>();
+    auto *index_param_list = new std::vector<InitParameter *>();
     for (auto &index_param : request.index_info.index_param_list) {
         auto init_parameter = new InitParameter();
         init_parameter->param_name_ = index_param.param_name;
@@ -1504,7 +1502,7 @@ void InfinityThriftService::ListIndex(infinity_thrift_rpc::ListIndexResponse &re
         auto row_count = data_block->row_count();
         for (int i = 0; i < row_count; ++i) {
             Value value = data_block->GetValue(0, i);
-            const String &index_name = value.GetVarchar();
+            const std::string &index_name = value.GetVarchar();
             response.index_names.emplace_back(index_name);
         }
         response.__set_error_code((i64)(result.ErrorCode()));
@@ -1874,7 +1872,7 @@ void InfinityThriftService::Compact(infinity_thrift_rpc::CommonResponse &respons
     ProcessQueryResult(response, result);
 }
 
-Tuple<Infinity *, Status> InfinityThriftService::GetInfinityBySessionID(i64 session_id) {
+std::tuple<Infinity *, Status> InfinityThriftService::GetInfinityBySessionID(i64 session_id) {
     std::lock_guard<std::mutex> lock(infinity_session_map_mutex_);
     auto iter = infinity_session_map_.find(session_id);
     if (iter == infinity_session_map_.end()) {
@@ -1895,7 +1893,7 @@ Status InfinityThriftService::GetAndRemoveSessionID(i64 session_id) {
     return Status::OK();
 }
 
-Tuple<ColumnDef *, Status> InfinityThriftService::GetColumnDefFromProto(const infinity_thrift_rpc::ColumnDef &column_def) {
+std::tuple<ColumnDef *, Status> InfinityThriftService::GetColumnDefFromProto(const infinity_thrift_rpc::ColumnDef &column_def) {
     auto column_def_data_type_ptr = GetColumnTypeFromProto(column_def.data_type);
     if (column_def_data_type_ptr->type() == infinity::LogicalType::kInvalid) {
         return {nullptr, Status::InvalidDataType()};
@@ -1917,7 +1915,7 @@ Tuple<ColumnDef *, Status> InfinityThriftService::GetColumnDefFromProto(const in
         return {nullptr, status};
     }
 
-    String comment = column_def.comment;
+    std::string comment = column_def.comment;
     auto col_def = new ColumnDef(column_def.id, column_def_data_type_ptr, column_def.name, constraints, std::move(comment), const_expr);
     return {col_def, Status::OK()};
 }
@@ -2241,8 +2239,8 @@ ColumnExpr *InfinityThriftService::GetColumnExprFromProto(const infinity_thrift_
 FunctionExpr *InfinityThriftService::GetFunctionExprFromProto(Status &status, const infinity_thrift_rpc::FunctionExpr &function_expr) {
     auto *parsed_expr = new FunctionExpr();
     parsed_expr->func_name_ = function_expr.function_name;
-    Vector<ParsedExpr *> *arguments;
-    arguments = new Vector<ParsedExpr *>();
+    std::vector<ParsedExpr *> *arguments;
+    arguments = new std::vector<ParsedExpr *>();
     arguments->reserve(function_expr.arguments.size());
 
     for (auto &args : function_expr.arguments) {
@@ -2301,7 +2299,7 @@ KnnExpr *InfinityThriftService::GetKnnExprFromProto(Status &status, const infini
         return nullptr;
     }
 
-    knn_expr->opt_params_ = new Vector<InitParameter *>();
+    knn_expr->opt_params_ = new std::vector<InitParameter *>();
     for (auto &param : expr.opt_params) {
         if (param.param_name == "index_name") {
             knn_expr->index_name_ = param.param_value;
@@ -2353,7 +2351,7 @@ MatchSparseExpr *InfinityThriftService::GetMatchSparseExprFromProto(Status &stat
 
     match_sparse_expr->SetMetricType(expr.metric_type);
 
-    auto *opt_params_ptr = new Vector<InitParameter *>();
+    auto *opt_params_ptr = new std::vector<InitParameter *>();
     for (auto &param : expr.opt_params) {
         if (param.param_name == "index_name") {
             match_sparse_expr->index_name_ = param.param_value;
@@ -2468,7 +2466,7 @@ InExpr *InfinityThriftService::GetInExprFromProto(Status &status, const infinity
     if (!status.ok()) {
         return nullptr;
     }
-    parsed_expr->arguments_ = new Vector<ParsedExpr *>();
+    parsed_expr->arguments_ = new std::vector<ParsedExpr *>();
     parsed_expr->arguments_->reserve(in_expr.arguments.size());
     for (auto &arg : in_expr.arguments) {
         parsed_expr->arguments_->emplace_back(GetParsedExprFromProto(status, arg));
@@ -2555,7 +2553,7 @@ ExplainType InfinityThriftService::GetExplainTypeFromProto(const infinity_thrift
     }
 }
 
-Tuple<void *, i64, Status> InfinityThriftService::GetEmbeddingDataTypeDataPtrFromProto(const infinity_thrift_rpc::EmbeddingData &embedding_data) {
+std::tuple<void *, i64, Status> InfinityThriftService::GetEmbeddingDataTypeDataPtrFromProto(const infinity_thrift_rpc::EmbeddingData &embedding_data) {
     if (embedding_data.__isset.u8_array_value) {
         auto ptr_i16 = (int16_t *)(embedding_data.u8_array_value.data());
         auto ptr_u8 = (uint8_t *)(embedding_data.u8_array_value.data());
@@ -2604,7 +2602,7 @@ Tuple<void *, i64, Status> InfinityThriftService::GetEmbeddingDataTypeDataPtrFro
     }
 }
 
-Tuple<UpdateExpr *, Status> InfinityThriftService::GetUpdateExprFromProto(const infinity_thrift_rpc::UpdateExpr &update_expr) {
+std::tuple<UpdateExpr *, Status> InfinityThriftService::GetUpdateExprFromProto(const infinity_thrift_rpc::UpdateExpr &update_expr) {
     Status status;
     auto up_expr = new UpdateExpr();
     up_expr->column_name = update_expr.column_name;
@@ -2861,9 +2859,9 @@ infinity_thrift_rpc::ElementType::type InfinityThriftService::EmbeddingDataTypeT
 
 void InfinityThriftService::ProcessDataBlocks(const QueryResult &result,
                                               infinity_thrift_rpc::SelectResponse &response,
-                                              Vector<infinity_thrift_rpc::ColumnField> &columns) {
-    SizeT blocks_count = result.result_table_->DataBlockCount();
-    for (SizeT block_idx = 0; block_idx < blocks_count; ++block_idx) {
+                                              std::vector<infinity_thrift_rpc::ColumnField> &columns) {
+    size_t blocks_count = result.result_table_->DataBlockCount();
+    for (size_t block_idx = 0; block_idx < blocks_count; ++block_idx) {
         auto data_block = result.result_table_->GetDataBlockById(block_idx);
         Status status = ProcessColumns(data_block, result.result_table_->ColumnCount(), columns);
         if (!status.ok()) {
@@ -2882,9 +2880,9 @@ void InfinityThriftService::ProcessDataBlocks(const QueryResult &result,
 }
 
 Status
-InfinityThriftService::ProcessColumns(const SharedPtr<DataBlock> &data_block, SizeT column_count, Vector<infinity_thrift_rpc::ColumnField> &columns) {
+InfinityThriftService::ProcessColumns(const SharedPtr<DataBlock> &data_block, size_t column_count, std::vector<infinity_thrift_rpc::ColumnField> &columns) {
     auto row_count = data_block->row_count();
-    for (SizeT col_index = 0; col_index < column_count; ++col_index) {
+    for (size_t col_index = 0; col_index < column_count; ++col_index) {
         auto &result_column_vector = data_block->column_vectors[col_index];
         infinity_thrift_rpc::ColumnField &output_column_field = columns[col_index];
         output_column_field.__set_column_type(DataTypeToProtoColumnType(result_column_vector->data_type()));
@@ -2897,14 +2895,14 @@ InfinityThriftService::ProcessColumns(const SharedPtr<DataBlock> &data_block, Si
 }
 
 void InfinityThriftService::HandleColumnDef(infinity_thrift_rpc::SelectResponse &response,
-                                            SizeT column_count,
+                                            size_t column_count,
                                             SharedPtr<TableDef> table_def,
-                                            Vector<infinity_thrift_rpc::ColumnField> &all_column_vectors) {
+                                            std::vector<infinity_thrift_rpc::ColumnField> &all_column_vectors) {
     if (column_count != all_column_vectors.size()) {
         ProcessStatus(response, Status::ColumnCountMismatch(fmt::format("expect: {}, actual: {}", column_count, all_column_vectors.size())));
         return;
     }
-    for (SizeT col_index = 0; col_index < column_count; ++col_index) {
+    for (size_t col_index = 0; col_index < column_count; ++col_index) {
         auto column_def = table_def->columns()[col_index];
         infinity_thrift_rpc::ColumnDef proto_column_def;
         proto_column_def.__set_id(column_def->id());
@@ -2919,7 +2917,7 @@ void InfinityThriftService::HandleColumnDef(infinity_thrift_rpc::SelectResponse 
 }
 
 Status InfinityThriftService::ProcessColumnFieldType(infinity_thrift_rpc::ColumnField &output_column_field,
-                                                     SizeT row_count,
+                                                     size_t row_count,
                                                      const SharedPtr<ColumnVector> &column_vector) {
     switch (column_vector->data_type()->type()) {
         case LogicalType::kBoolean: {
@@ -2986,21 +2984,21 @@ Status InfinityThriftService::ProcessColumnFieldType(infinity_thrift_rpc::Column
 }
 
 void InfinityThriftService::HandleTimeRelatedTypes(infinity_thrift_rpc::ColumnField &output_column_field,
-                                                   SizeT row_count,
+                                                   size_t row_count,
                                                    const SharedPtr<ColumnVector> &column_vector) {
     auto size = column_vector->data_type()->Size() * row_count;
-    String dst;
+    std::string dst;
     dst.resize(size);
     std::memcpy(dst.data(), column_vector->data(), size);
     output_column_field.column_vectors.emplace_back(std::move(dst));
 }
 
 void InfinityThriftService::HandleBoolType(infinity_thrift_rpc::ColumnField &output_column_field,
-                                           SizeT row_count,
+                                           size_t row_count,
                                            const SharedPtr<ColumnVector> &column_vector) {
-    String dst;
+    std::string dst;
     dst.reserve(row_count);
-    for (SizeT index = 0; index < row_count; ++index) {
+    for (size_t index = 0; index < row_count; ++index) {
         const char c = column_vector->buffer_->GetCompactBit(index) ? 1 : 0;
         dst.push_back(c);
     }
@@ -3008,10 +3006,10 @@ void InfinityThriftService::HandleBoolType(infinity_thrift_rpc::ColumnField &out
 }
 
 void InfinityThriftService::HandlePodType(infinity_thrift_rpc::ColumnField &output_column_field,
-                                          SizeT row_count,
+                                          size_t row_count,
                                           const SharedPtr<ColumnVector> &column_vector) {
     auto size = column_vector->data_type()->Size() * row_count;
-    String dst;
+    std::string dst;
     dst.resize(size);
     std::memcpy(dst.data(), column_vector->data(), size);
     output_column_field.column_vectors.emplace_back(std::move(dst));
@@ -3019,7 +3017,7 @@ void InfinityThriftService::HandlePodType(infinity_thrift_rpc::ColumnField &outp
 
 #define DECLARE_HANDLE_ARRAY_TYPE_RECURSIVELY(TYPE)                                                                                                  \
     template <>                                                                                                                                      \
-    void InfinityThriftService::HandleArrayTypeRecursively(String &output_str,                                                                       \
+    void InfinityThriftService::HandleArrayTypeRecursively(std::string &output_str,                                                                       \
                                                            const DataType &data_type,                                                                \
                                                            const TYPE &data_value,                                                                   \
                                                            const SharedPtr<ColumnVector> &column_vector);
@@ -3031,7 +3029,7 @@ DECLARE_HANDLE_ARRAY_TYPE_RECURSIVELY(TensorArrayT)
 DECLARE_HANDLE_ARRAY_TYPE_RECURSIVELY(MultiVectorT)
 
 template <>
-void InfinityThriftService::HandleArrayTypeRecursively(String &output_str,
+void InfinityThriftService::HandleArrayTypeRecursively(std::string &output_str,
                                                        const DataType &data_type,
                                                        const ArrayT &data_value,
                                                        const SharedPtr<ColumnVector> &column_vector) {
@@ -3117,15 +3115,15 @@ void InfinityThriftService::HandleArrayTypeRecursively(String &output_str,
 }
 
 void InfinityThriftService::HandleArrayType(infinity_thrift_rpc::ColumnField &output_column_field,
-                                            const SizeT row_count,
+                                            const size_t row_count,
                                             const SharedPtr<ColumnVector> &column_vector) {
     const auto &column_data_type = *column_vector->data_type();
     if (column_data_type.type() != LogicalType::kArray) {
         UnrecoverableError(fmt::format("{}: Unexpected data type: {}, expect Array!", __func__, column_vector->data_type()->ToString()));
     }
     auto *array_data_ptr = reinterpret_cast<const ArrayT *>(column_vector->data());
-    String dst;
-    for (SizeT index = 0; index < row_count; ++index) {
+    std::string dst;
+    for (size_t index = 0; index < row_count; ++index) {
         HandleArrayTypeRecursively(dst, column_data_type, array_data_ptr[index], column_vector);
     }
     output_column_field.column_vectors.emplace_back(std::move(dst));
@@ -3133,7 +3131,7 @@ void InfinityThriftService::HandleArrayType(infinity_thrift_rpc::ColumnField &ou
 }
 
 template <>
-void InfinityThriftService::HandleArrayTypeRecursively(String &output_str,
+void InfinityThriftService::HandleArrayTypeRecursively(std::string &output_str,
                                                        const DataType &data_type,
                                                        const VarcharT &data_value,
                                                        const SharedPtr<ColumnVector> &column_vector) {
@@ -3144,12 +3142,12 @@ void InfinityThriftService::HandleArrayTypeRecursively(String &output_str,
 }
 
 void InfinityThriftService::HandleVarcharType(infinity_thrift_rpc::ColumnField &output_column_field,
-                                              SizeT row_count,
+                                              size_t row_count,
                                               const SharedPtr<ColumnVector> &column_vector) {
-    String dst;
+    std::string dst;
     const auto varchar_ptr = reinterpret_cast<const VarcharT *>(column_vector->data());
     const auto &varchar_type = *column_vector->data_type();
-    for (SizeT i = 0; i < row_count; ++i) {
+    for (size_t i = 0; i < row_count; ++i) {
         HandleArrayTypeRecursively(dst, varchar_type, varchar_ptr[i], column_vector);
     }
     output_column_field.column_vectors.emplace_back(std::move(dst));
@@ -3157,10 +3155,10 @@ void InfinityThriftService::HandleVarcharType(infinity_thrift_rpc::ColumnField &
 }
 
 void InfinityThriftService::HandleEmbeddingType(infinity_thrift_rpc::ColumnField &output_column_field,
-                                                SizeT row_count,
+                                                size_t row_count,
                                                 const SharedPtr<ColumnVector> &column_vector) {
     auto size = column_vector->data_type()->Size() * row_count;
-    String dst;
+    std::string dst;
     dst.resize(size);
     std::memcpy(dst.data(), column_vector->data(), size);
     output_column_field.column_vectors.emplace_back(std::move(dst));
@@ -3168,7 +3166,7 @@ void InfinityThriftService::HandleEmbeddingType(infinity_thrift_rpc::ColumnField
 }
 
 template <>
-void InfinityThriftService::HandleArrayTypeRecursively(String &output_str,
+void InfinityThriftService::HandleArrayTypeRecursively(std::string &output_str,
                                                        const DataType &data_type,
                                                        const MultiVectorT &data_value,
                                                        const SharedPtr<ColumnVector> &column_vector) {
@@ -3180,12 +3178,12 @@ void InfinityThriftService::HandleArrayTypeRecursively(String &output_str,
 }
 
 void InfinityThriftService::HandleMultiVectorType(infinity_thrift_rpc::ColumnField &output_column_field,
-                                                  SizeT row_count,
+                                                  size_t row_count,
                                                   const SharedPtr<ColumnVector> &column_vector) {
-    String dst;
+    std::string dst;
     const auto mv_ptr = reinterpret_cast<const MultiVectorT *>(column_vector->data());
     const auto &mv_type = *column_vector->data_type();
-    for (SizeT i = 0; i < row_count; ++i) {
+    for (size_t i = 0; i < row_count; ++i) {
         HandleArrayTypeRecursively(dst, mv_type, mv_ptr[i], column_vector);
     }
     output_column_field.column_vectors.emplace_back(std::move(dst));
@@ -3193,7 +3191,7 @@ void InfinityThriftService::HandleMultiVectorType(infinity_thrift_rpc::ColumnFie
 }
 
 template <>
-void InfinityThriftService::HandleArrayTypeRecursively(String &output_str,
+void InfinityThriftService::HandleArrayTypeRecursively(std::string &output_str,
                                                        const DataType &data_type,
                                                        const TensorT &data_value,
                                                        const SharedPtr<ColumnVector> &column_vector) {
@@ -3205,12 +3203,12 @@ void InfinityThriftService::HandleArrayTypeRecursively(String &output_str,
 }
 
 void InfinityThriftService::HandleTensorType(infinity_thrift_rpc::ColumnField &output_column_field,
-                                             SizeT row_count,
+                                             size_t row_count,
                                              const SharedPtr<ColumnVector> &column_vector) {
-    String dst;
+    std::string dst;
     const auto tensor_ptr = reinterpret_cast<const TensorT *>(column_vector->data());
     const auto &tensor_type = *column_vector->data_type();
-    for (SizeT i = 0; i < row_count; ++i) {
+    for (size_t i = 0; i < row_count; ++i) {
         HandleArrayTypeRecursively(dst, tensor_type, tensor_ptr[i], column_vector);
     }
     output_column_field.column_vectors.emplace_back(std::move(dst));
@@ -3218,12 +3216,12 @@ void InfinityThriftService::HandleTensorType(infinity_thrift_rpc::ColumnField &o
 }
 
 template <>
-void InfinityThriftService::HandleArrayTypeRecursively(String &output_str,
+void InfinityThriftService::HandleArrayTypeRecursively(std::string &output_str,
                                                        const DataType &data_type,
                                                        const TensorArrayT &data_value,
                                                        const SharedPtr<ColumnVector> &column_vector) {
     const auto embedding_info = dynamic_cast<const EmbeddingInfo *>(data_type.type_info().get());
-    const Vector<Pair<Span<const char>, SizeT>> tensor_data = column_vector->GetTensorArray(data_value, column_vector->buffer_.get(), embedding_info);
+    const std::vector<std::pair<Span<const char>, size_t>> tensor_data = column_vector->GetTensorArray(data_value, column_vector->buffer_.get(), embedding_info);
     const i32 tensor_num = tensor_data.size();
     output_str.append(reinterpret_cast<const char *>(&tensor_num), sizeof(i32));
     for (const auto [raw_data, embedding_num] : tensor_data) {
@@ -3234,12 +3232,12 @@ void InfinityThriftService::HandleArrayTypeRecursively(String &output_str,
 }
 
 void InfinityThriftService::HandleTensorArrayType(infinity_thrift_rpc::ColumnField &output_column_field,
-                                                  SizeT row_count,
+                                                  size_t row_count,
                                                   const SharedPtr<ColumnVector> &column_vector) {
-    String dst;
+    std::string dst;
     const auto tensor_array_ptr = reinterpret_cast<const TensorArrayT *>(column_vector->data());
     const auto &tensor_array_type = *column_vector->data_type();
-    for (SizeT i = 0; i < row_count; ++i) {
+    for (size_t i = 0; i < row_count; ++i) {
         HandleArrayTypeRecursively(dst, tensor_array_type, tensor_array_ptr[i], column_vector);
     }
     output_column_field.column_vectors.emplace_back(std::move(dst));
@@ -3247,7 +3245,7 @@ void InfinityThriftService::HandleTensorArrayType(infinity_thrift_rpc::ColumnFie
 }
 
 template <>
-void InfinityThriftService::HandleArrayTypeRecursively(String &output_str,
+void InfinityThriftService::HandleArrayTypeRecursively(std::string &output_str,
                                                        const DataType &data_type,
                                                        const SparseT &data_value,
                                                        const SharedPtr<ColumnVector> &column_vector) {
@@ -3268,12 +3266,12 @@ void InfinityThriftService::HandleArrayTypeRecursively(String &output_str,
 }
 
 void InfinityThriftService::HandleSparseType(infinity_thrift_rpc::ColumnField &output_column_field,
-                                             SizeT row_count,
+                                             size_t row_count,
                                              const SharedPtr<ColumnVector> &column_vector) {
-    String dst;
+    std::string dst;
     const auto sparse_ptr = reinterpret_cast<const SparseT *>(column_vector->data());
     const auto &sparse_type = *column_vector->data_type();
-    for (SizeT i = 0; i < row_count; ++i) {
+    for (size_t i = 0; i < row_count; ++i) {
         HandleArrayTypeRecursively(dst, sparse_type, sparse_ptr[i], column_vector);
     }
     output_column_field.column_vectors.emplace_back(std::move(dst));
@@ -3281,10 +3279,10 @@ void InfinityThriftService::HandleSparseType(infinity_thrift_rpc::ColumnField &o
 }
 
 void InfinityThriftService::HandleRowIDType(infinity_thrift_rpc::ColumnField &output_column_field,
-                                            SizeT row_count,
+                                            size_t row_count,
                                             const SharedPtr<ColumnVector> &column_vector) {
     auto size = column_vector->data_type()->Size() * row_count;
-    String dst;
+    std::string dst;
     dst.resize(size);
     std::memcpy(dst.data(), column_vector->data(), size);
     output_column_field.column_vectors.emplace_back(std::move(dst));
@@ -3570,18 +3568,18 @@ void InfinityThriftService::ProcessQueryResult(infinity_thrift_rpc::ShowSnapshot
     // Extract snapshot data from result table
     if (result.result_table_ != nullptr) {
         infinity_thrift_rpc::SnapshotInfo snapshot_info;
-        SizeT blocks_count = result.result_table_->DataBlockCount();
+        size_t blocks_count = result.result_table_->DataBlockCount();
         
         // The ShowSnapshot result has key-value pairs in alternating rows
         // We need to extract the values for each field
-        String snapshot_name, scope, create_time, size;
+        std::string snapshot_name, scope, create_time, size;
         i64 commit_ts = 0;
         
-        for (SizeT block_idx = 0; block_idx < blocks_count; ++block_idx) {
+        for (size_t block_idx = 0; block_idx < blocks_count; ++block_idx) {
             auto data_block = result.result_table_->GetDataBlockById(block_idx);
-            SizeT row_count = data_block->row_count();
+            size_t row_count = data_block->row_count();
             
-            for (SizeT row_idx = 0; row_idx < row_count; row_idx += 2) {
+            for (size_t row_idx = 0; row_idx < row_count; row_idx += 2) {
                 // Each pair consists of a key row and a value row
                 if (row_idx + 1 < row_count) {
                     auto &key_column = data_block->column_vectors[0];
@@ -3593,8 +3591,8 @@ void InfinityThriftService::ProcessQueryResult(infinity_thrift_rpc::ShowSnapshot
                         auto key_value = key_column->GetValueByIndex(row_idx);
                         auto value_value = value_column->GetValueByIndex(row_idx + 1);
                         
-                        String key = key_value.GetVarchar();
-                        String value = value_value.GetVarchar();
+                        std::string key = key_value.GetVarchar();
+                        std::string value = value_value.GetVarchar();
                         
                         if (key == "snapshot_name") {
                             snapshot_name = value;
@@ -3635,14 +3633,14 @@ void InfinityThriftService::ProcessQueryResult(infinity_thrift_rpc::ListSnapshot
     
     // Extract snapshot data from result table
     if (result.result_table_ != nullptr) {
-        Vector<infinity_thrift_rpc::SnapshotInfo> snapshots;
-        SizeT blocks_count = result.result_table_->DataBlockCount();
+        std::vector<infinity_thrift_rpc::SnapshotInfo> snapshots;
+        size_t blocks_count = result.result_table_->DataBlockCount();
         
-        for (SizeT block_idx = 0; block_idx < blocks_count; ++block_idx) {
+        for (size_t block_idx = 0; block_idx < blocks_count; ++block_idx) {
             auto data_block = result.result_table_->GetDataBlockById(block_idx);
-            SizeT row_count = data_block->row_count();
+            size_t row_count = data_block->row_count();
             
-            for (SizeT row_idx = 0; row_idx < row_count; ++row_idx) {
+            for (size_t row_idx = 0; row_idx < row_count; ++row_idx) {
                 infinity_thrift_rpc::SnapshotInfo snapshot_info;
                 
                 // Extract snapshot name (column 0)
@@ -3735,7 +3733,7 @@ void InfinityThriftService::RestoreSnapshot(infinity_thrift_rpc::CommonResponse 
         }
     } catch (const std::exception &e) {
         response.__set_error_code((i64)(ErrorCode::kUnexpectedError));
-        response.__set_error_msg("RestoreSnapshot: " + String(e.what()));
+        response.__set_error_msg("RestoreSnapshot: " + std::string(e.what()));
     }
 }
 
@@ -3760,7 +3758,7 @@ void InfinityThriftService::DropSnapshot(infinity_thrift_rpc::CommonResponse &re
         }
     } catch (const std::exception &e) {
         response.__set_error_code((i64)(ErrorCode::kUnexpectedError));
-        response.__set_error_msg("DropSnapshot: " + String(e.what()));
+        response.__set_error_msg("DropSnapshot: " + std::string(e.what()));
     }
 }
 
@@ -3808,7 +3806,7 @@ void InfinityThriftService::CreateDatabaseSnapshot(infinity_thrift_rpc::CommonRe
         }
     } catch (const std::exception &e) {
         response.__set_error_code((i64)(ErrorCode::kUnexpectedError));
-        response.__set_error_msg("CreateDatabaseSnapshot: " + String(e.what()));
+        response.__set_error_msg("CreateDatabaseSnapshot: " + std::string(e.what()));
     }
 }
 
@@ -3833,7 +3831,7 @@ void InfinityThriftService::CreateSystemSnapshot(infinity_thrift_rpc::CommonResp
         }
     } catch (const std::exception &e) {
         response.__set_error_code((i64)(ErrorCode::kUnexpectedError));
-        response.__set_error_msg("CreateSystemSnapshot: " + String(e.what()));
+        response.__set_error_msg("CreateSystemSnapshot: " + std::string(e.what()));
     }
 }
 

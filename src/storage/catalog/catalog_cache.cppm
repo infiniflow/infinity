@@ -20,8 +20,9 @@ import :stl;
 import :default_values;
 import :status;
 
-import internal_types;
 import third_party;
+
+import internal_types;
 
 namespace infinity {
 

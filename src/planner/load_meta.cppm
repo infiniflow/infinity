@@ -16,8 +16,10 @@ module;
 
 export module infinity_core:load_meta;
 
-import :stl;
 import :column_binding;
+
+import std;
+import std.compat;
 
 import internal_types;
 import data_type;
@@ -26,9 +28,9 @@ namespace infinity {
 
 export struct LoadMeta {
     ColumnBinding binding_{};
-    SizeT index_{};
-    SharedPtr<DataType> type_{};
-    String column_name_{};
+    size_t index_{};
+    std::shared_ptr<DataType> type_{};
+    std::string column_name_{};
 };
 
 } // namespace infinity

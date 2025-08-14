@@ -58,8 +58,7 @@ export struct TryCastBoolean {
 
 export inline BoundCastFunc BindBoolCast(const DataType &source, const DataType &target) {
     if (source.type() != LogicalType::kBoolean) {
-        String error_message = fmt::format("Expect boolean type, but it is {}", source.ToString());
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("Expect boolean type, but it is {}", source.ToString()));
     }
 
     switch (target.type()) {

@@ -16,7 +16,6 @@ module;
 
 export module infinity_core:thrift_server;
 
-import :stl;
 import :infinity_thrift_service;
 import :thrift;
 
@@ -56,10 +55,10 @@ public:
     void Shutdown();
 
 private:
-    UniquePtr<apache::thrift::server::TServer> server{nullptr};
+    UniquePtr<::apache::thrift::server::TServer> server{nullptr};
 
     bool initialized_{false};
-    Atomic<ThriftServerStatus> status_ = ThriftServerStatus::kStopped;
+    std::atomic<ThriftServerStatus> status_ = ThriftServerStatus::kStopped;
 };
 
 #elif THRIFT_SERVER_TYPE == 1

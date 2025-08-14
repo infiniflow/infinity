@@ -148,8 +148,7 @@ void PhysicalMergeAggregate::GroupByMergeAggregateExecute(MergeAggregateOperator
                     break;
                 }
                 default: {
-                    String error_message = "Input value type not Implement";
-                    UnrecoverableError(error_message);
+                    UnrecoverableError("Input value type not Implement");
                 }
             }
         }
@@ -197,8 +196,7 @@ void PhysicalMergeAggregate::SimpleMergeAggregateExecute(MergeAggregateOperatorS
                     break;
                 }
                 default: {
-                    String error_message = "Input value type not Implement";
-                    UnrecoverableError(error_message);
+                    UnrecoverableError("Input value type not Implement");
                 }
             }
         }
@@ -224,8 +222,7 @@ void PhysicalMergeAggregate::HandleAggregateFunction(const String &function_name
     } else if (function_name == "COUNT_STAR") {
         // no action for "COUNT_STAR"
     } else {
-        String error_message = fmt::format("Function type {} not Implement.", function_name);
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("Function type {} not Implement.", function_name));
     }
 }
 

@@ -1,7 +1,5 @@
 
 %{
-#include <stdint.h>
-#include <stdio.h>
 #include "parser.h"
 #include "lexer.h"
 
@@ -37,7 +35,11 @@ void yyerror(YYLTYPE * llocp, void* lexer, infinity::ParserResult* result, const
 #include "table_reference/subquery_reference.h"
 #include "parser_helper.h"
 
-#include <vector>
+#ifndef PARESER_USE_STD_MODULE
+#define PARESER_USE_STD_MODULE 1
+import std;
+import std.compat;
+#endif
 
 #define YYSTYPE SQLSTYPE
 #define YYLTYPE SQLLTYPE

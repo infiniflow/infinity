@@ -2,10 +2,17 @@
 #include "fusion_expr.h"
 #include "knn_expr.h"
 #include "match_sparse_expr.h"
-#include "spdlog/fmt/fmt.h"
-#include <cmath>
-#include <sstream>
-#include <utility>
+
+#ifndef PARESER_USE_STD_MODULE
+#define PARESER_USE_STD_MODULE 1
+import std;
+import std.compat;
+#endif
+
+#ifndef PARESER_USE_THIRD_PARTY_MODULE
+#define PARESER_USE_THIRD_PARTY_MODULE 1
+import third_party;
+#endif
 
 namespace infinity {
 

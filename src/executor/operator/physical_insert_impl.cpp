@@ -106,8 +106,7 @@ void HandleEmbeddingDimensionConversion(SharedPtr<ColumnVector> source_column,
             Value target_value = Value::MakeEmbedding(reinterpret_cast<const char *>(target_vector.data()), target_embedding_info);
             target_column->AppendValue(target_value);
         } else {
-            String error_message = fmt::format("Unsupported embedding data type for dimension conversion");
-            UnrecoverableError(error_message);
+            UnrecoverableError(fmt::format("Unsupported embedding data type for dimension conversion"));
         }
     }
 }
@@ -219,16 +218,13 @@ bool PhysicalInsert::Execute(QueryContext *query_context, OperatorState *operato
         // INSERT VALUES case: evaluate expressions to create data block
         SizeT row_count = value_list_.size();
         if (row_count == 0) {
-            String error_message = "No values to insert";
-            UnrecoverableError(error_message);
+            UnrecoverableError("No values to insert");
         }
 
         SizeT column_count = value_list_[0].size();
         SizeT table_collection_column_count = table_info_->column_count_;
         if (column_count != table_collection_column_count) {
-            String error_message =
-                fmt::format("Insert values count{} isn't matched with table column count{}.", column_count, table_collection_column_count);
-            UnrecoverableError(error_message);
+            UnrecoverableError(fmt::format("Insert values count{} isn't matched with table column count{}.", column_count, table_collection_column_count));
         }
 
         // Prepare the output block

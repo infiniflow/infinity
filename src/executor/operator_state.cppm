@@ -32,7 +32,7 @@ import :status;
 import :hash_table;
 
 import internal_types;
-import column_def;
+// import column_def;
 import data_type;
 
 namespace infinity {

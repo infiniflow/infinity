@@ -25,7 +25,7 @@ import global_resource_usage;
 
 namespace infinity {
 
-class QueryContext;
+export class QueryContext;
 
 export class Optimizer {
 public:

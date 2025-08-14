@@ -16,20 +16,21 @@ module;
 
 export module infinity_core:result_cache_getter;
 
-import :stl;
 import :logical_node;
 import :optimizer_rule;
+
+import std;
 
 namespace infinity {
 
 export class ResultCacheGetter final : public OptimizerRule {
 public:
-    void ApplyToPlan(QueryContext *query_context_ptr, SharedPtr<LogicalNode> &logical_plan) override;
+    void ApplyToPlan(QueryContext *query_context_ptr, std::shared_ptr<LogicalNode> &logical_plan) override;
 
-    String name() const override { return "Result Cache Getter"; }
+    std::string name() const override { return "Result Cache Getter"; }
 
 private:
-    void VisitNode(SharedPtr<LogicalNode> &op);
+    void VisitNode(std::shared_ptr<LogicalNode> &op);
 };
 
 } // namespace infinity

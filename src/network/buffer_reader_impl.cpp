@@ -19,7 +19,6 @@ module;
 module infinity_core:buffer_reader.impl;
 
 import :buffer_reader;
-import :stl;
 import :pg_message;
 import :ring_buffer_iterator;
 import :infinity_exception;
@@ -27,16 +26,19 @@ import :default_values;
 import :status;
 import :logger;
 
+import std;
+import std.compat;
+
 namespace infinity {
 
-SizeT BufferReader::size() const {
+size_t BufferReader::size() const {
     const auto current_size = RingBufferIterator::Distance(start_pos_, current_pos_);
     return (current_size < 0) ? (current_size + PG_MSG_BUFFER_SIZE) : current_size;
 }
 
-String BufferReader::read_string() {
+std::string BufferReader::read_string() {
     auto end_pos = RingBufferIterator(data_);
-    String result;
+    std::string result;
 
     if (size() != 0) {
         end_pos = RingBufferIterator::Find(start_pos_, current_pos_, NULL_END);
@@ -114,8 +116,8 @@ u32 BufferReader::read_value_u32() {
     return ntohl(network_value);
 }
 
-String BufferReader::read_string(const SizeT string_length, NullTerminator null_terminator) {
-    String result;
+std::string BufferReader::read_string(const size_t string_length, NullTerminator null_terminator) {
+    std::string result;
     result.reserve(string_length);
 
     if (size() != 0) {
@@ -140,7 +142,7 @@ String BufferReader::read_string(const SizeT string_length, NullTerminator null_
     return result;
 }
 
-void BufferReader::receive_more(SizeT bytes) {
+void BufferReader::receive_more(size_t bytes) {
     if (size() >= bytes) {
         // Current data in buffer is enough for reading.
         return;
@@ -149,7 +151,7 @@ void BufferReader::receive_more(SizeT bytes) {
     // Get the available size of the buffer;
     const auto available_size = max_capacity() - size();
 
-    SizeT bytes_read{0};
+    size_t bytes_read{0};
 
     boost::system::error_code boost_error;
 
@@ -168,7 +170,7 @@ void BufferReader::receive_more(SizeT bytes) {
     }
 
     if (boost_error == boost::asio::error::broken_pipe || boost_error == boost::asio::error::connection_reset) {
-        String error_message = fmt::format("Client close the connection: {}", boost_error.message());
+        std::string error_message = fmt::format("Client close the connection: {}", boost_error.message());
         RecoverableError(Status::ClientClose());
     }
 

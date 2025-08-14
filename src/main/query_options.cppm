@@ -14,7 +14,8 @@
 
 export module infinity_core:query_options;
 
-import :stl;
+import std;
+import std.compat;
 
 import extra_ddl_info;
 import statement_common;
@@ -34,7 +35,7 @@ public:
 export class CreateTableOptions {
 public:
     ConflictType conflict_type_{ConflictType::kError};
-    Vector<InitParameter *> properties_;
+    std::vector<InitParameter *> properties_;
 };
 
 export class DropTableOptions {
@@ -63,16 +64,16 @@ export class ExportOptions {
 public:
     char delimiter_{','};
     bool header_{false};
-    SizeT offset_{0};
-    SizeT limit_{0};
-    SizeT row_limit_{0};
+    size_t offset_{0};
+    size_t limit_{0};
+    size_t row_limit_{0};
     CopyFileType copy_file_type_{CopyFileType::kInvalid};
 };
 
 export class OptimizeOptions {
 public:
-    String index_name_{};
-    Vector<InitParameter *> opt_params_{};
+    std::string index_name_{};
+    std::vector<InitParameter *> opt_params_{};
 };
 
 } // namespace infinity

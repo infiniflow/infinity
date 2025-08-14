@@ -16,8 +16,12 @@
 #include "mixed_array_value.h"
 #include "mixed_tuple_value.h"
 #include "parser_assert.h"
-#include <cmath>
-#include <cstring>
+
+#ifndef PARESER_USE_STD_MODULE
+#define PARESER_USE_STD_MODULE 1
+import std;
+import std.compat;
+#endif
 
 namespace infinity {
 

@@ -14,9 +14,15 @@
 
 #pragma once
 
-#include <string>
+// #include <string>
 
 #include "base_statement.h"
+
+#ifndef PARESER_USE_STD_MODULE
+#define PARESER_USE_STD_MODULE 1
+import std;
+import std.compat;
+#endif
 
 namespace infinity {
 

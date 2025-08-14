@@ -25,7 +25,7 @@ import embedding_info;
 import sparse_info;
 import data_type;
 import knn_expr;
-import third_party;
+// import third_party;
 import global_resource_usage;
 import type_info;
 import logical_type;

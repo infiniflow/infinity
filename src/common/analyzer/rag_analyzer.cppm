@@ -26,6 +26,8 @@ import :lemmatizer;
 import :stemmer;
 import :analyzer;
 
+import third_party;
+
 namespace infinity {
 
 // C++ reimplementation of

@@ -91,8 +91,7 @@ void PhysicalExplain::Init(QueryContext *query_context) {
             break;
         }
         case ExplainType::kInvalid: {
-            String error_message = "Invalid explain type";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Invalid explain type");
         }
     }
     output_types_->emplace_back(varchar_type);
@@ -140,8 +139,7 @@ bool PhysicalExplain::Execute(QueryContext *query_context, OperatorState *operat
             break;
         }
         case ExplainType::kInvalid: {
-            String error_message = "Invalid explain type";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Invalid explain type");
         }
     }
 

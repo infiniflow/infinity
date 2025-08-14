@@ -16,21 +16,22 @@ module;
 
 export module infinity_core:infinity_exception;
 
-import :stl;
 import :status;
+
+import std;
 
 namespace infinity {
 
-Atomic<bool> print_stacktrace = true;
+std::atomic_bool print_stacktrace = true;
 
 export bool GetPrintStacktrace() { return print_stacktrace.load(); }
 export void SetPrintStacktrace(bool enable) { print_stacktrace.store(enable); }
 
-Atomic<bool> print_transaction_history = true;
+std::atomic_bool print_transaction_history = true;
 export bool GetPrintTransactionHistory() { return print_transaction_history.load(); }
 export void SetPrintTransactionHistory(bool enable) { print_transaction_history.store(enable); }
 
-export void PrintStacktrace(const String &err_msg);
+export void PrintStacktrace(const std::string &err_msg);
 export void PrintTransactionHistory();
 
 export class RecoverableException : public std::exception {
@@ -50,11 +51,11 @@ private:
 
 export class UnrecoverableException : public std::exception {
 public:
-    explicit UnrecoverableException(String message) : message_(std::move(message)) {}
+    explicit UnrecoverableException(std::string message) : message_(std::move(message)) {}
     [[nodiscard]] inline const char *what() const noexcept override { return message_.c_str(); }
 
 private:
-    String message_;
+    std::string message_;
 };
 
 #define ADD_LOG_INFO
@@ -65,19 +66,19 @@ export void RecoverableError(Status status,
                              const char *file_name = std::source_location::current().file_name(),
                              u32 line = std::source_location::current().line());
 
-export void UnrecoverableError(const String &message,
+export void UnrecoverableError(const std::string &message,
                                const char *file_name = std::source_location::current().file_name(),
                                u32 line = std::source_location::current().line());
 
-export std::string_view GetErrorMsg(const String &message);
+export std::string_view GetErrorMsg(const std::string &message);
 
 #else
 
 export void RecoverableError(Status status);
 
-export void UnrecoverableError(const String &message);
+export void UnrecoverableError(const std::string &message);
 
-export std::string_view GetErrorMsg(const String &message);
+export std::string_view GetErrorMsg(const std::string &message);
 
 #endif
 

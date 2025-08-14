@@ -18,7 +18,6 @@ module infinity_core:filter_expression_push_down_fastroughfilter.impl;
 
 import :filter_expression_push_down;
 import :fast_rough_filter;
-import :stl;
 import :index_filter_expression_info_tree;
 import :value;
 import :expression_type;
@@ -288,12 +287,12 @@ class FastRoughFilterExpressionPushDownMethod {
                         }
                     }
                 }
-                constexpr std::array Case2FunctionNames{"<", ">", "<=", ">="};
-                constexpr std::array Case2CompareTypes{FilterCompareType::kLess,
+                static constexpr std::array<std::string, 4> Case2FunctionNames{"<", ">", "<=", ">="};
+                constexpr std::array<FilterCompareType, 4> Case2CompareTypes{FilterCompareType::kLess,
                                                        FilterCompareType::kGreater,
                                                        FilterCompareType::kLessEqual,
                                                        FilterCompareType::kGreaterEqual};
-                constexpr std::array Case2ReverseCompareTypes{FilterCompareType::kGreater,
+                constexpr std::array<FilterCompareType, 4> Case2ReverseCompareTypes{FilterCompareType::kGreater,
                                                               FilterCompareType::kLess,
                                                               FilterCompareType::kGreaterEqual,
                                                               FilterCompareType::kLessEqual};

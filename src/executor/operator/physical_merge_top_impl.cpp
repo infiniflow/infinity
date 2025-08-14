@@ -60,8 +60,7 @@ void PhysicalMergeTop::Init(QueryContext* query_context) {
     // Initialize sort parameters
     sort_expr_count_ = order_by_types_.size();
     if (sort_expr_count_ != sort_expressions_.size()) {
-        String error_message = "order_by_types_.size() != sort_expressions_.size()";
-        UnrecoverableError(error_message);
+        UnrecoverableError("order_by_types_.size() != sort_expressions_.size()");
     }
     // copy compare function from PhysicalTop
     prefer_left_function_ = (reinterpret_cast<PhysicalTop *>(left()))->GetInnerCompareFunction();
@@ -70,8 +69,7 @@ void PhysicalMergeTop::Init(QueryContext* query_context) {
 bool PhysicalMergeTop::Execute(QueryContext *, OperatorState *operator_state) {
     auto &output_data_block_array = operator_state->data_block_array_;
     if (!output_data_block_array.empty()) {
-        String error_message = "output data_block_array_ is not empty";
-        UnrecoverableError(error_message);
+        UnrecoverableError("output data_block_array_ is not empty");
     }
     auto merge_top_op_state = static_cast<MergeTopOperatorState *>(operator_state);
     auto &middle_data_block_array = merge_top_op_state->middle_sorted_data_blocks_;

@@ -14,8 +14,6 @@
 
 module;
 
-#include "rocksdb/utilities/transaction_db.h"
-
 module infinity_core:kv_store.impl;
 
 import :kv_store;
@@ -356,10 +354,8 @@ Status KVStore::Destroy(const String &db_path) {
     options.manual_wal_flush = true;
     options.avoid_flush_during_shutdown = true;
 
-    rocksdb::Status s = ::rocksdb::DestroyDB(db_path, options);
-    if (!s.ok()) {
-        String msg = fmt::format("rocksdb::DestroyDB: {}", db_path);
-        return Status::RocksDBError(std::move(s), msg);
+    if (auto s = rocksdb::DestroyDB(db_path, options); !s.ok()) {
+        return Status::RocksDBError(std::move(s), fmt::format("rocksdb::DestroyDB: {}", db_path));
     }
     return Status::OK();
 }

@@ -24,7 +24,7 @@ import :logical_dummy_scan;
 import std;
 
 import data_type;
-import internal_types;
+// import internal_types;
 
 namespace infinity {
 

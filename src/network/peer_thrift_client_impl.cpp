@@ -193,13 +193,13 @@ void PeerClient::Call(std::function<void()> call_func) {
     Config *config_ptr = InfinityContext::instance().config();
     i64 retry_num = config_ptr->PeerRetryCount();
     i64 retry_delay = config_ptr->PeerRetryDelay();
-    Optional<apache::thrift::transport::TTransportException> exception;
+    Optional<::apache::thrift::transport::TTransportException> exception;
     for (i64 retry_count = 0; retry_count <= retry_num; ++retry_count) {
         try {
             call_func();
             exception.reset();
             break;
-        } catch (apache::thrift::transport::TTransportException e) {
+        } catch (const ::apache::thrift::transport::TTransportException &e) {
             LOG_ERROR(fmt::format("Error in data transfer in peer: {}. Retry({})", e.what(), retry_count));
             exception = std::move(e);
         }
@@ -242,7 +242,7 @@ void PeerClient::Register(RegisterPeerTask *peer_task) {
 #else
         client_->Register(response, request);
 #endif
-    } catch (apache::thrift::transport::TTransportException &thrift_exception) {
+    } catch (::apache::thrift::transport::TTransportException &thrift_exception) {
         server_connected_ = false;
         switch (thrift_exception.getType()) {
             case TTransportExceptionType::END_OF_FILE: {
@@ -278,7 +278,7 @@ void PeerClient::Unregister(UnregisterPeerTask *peer_task) {
 #else
         client_->Unregister(response, request);
 #endif
-    } catch (apache::thrift::transport::TTransportException &thrift_exception) {
+    } catch (const ::apache::thrift::transport::TTransportException &thrift_exception) {
         server_connected_ = false;
         switch (thrift_exception.getType()) {
             case TTransportExceptionType::END_OF_FILE: {
@@ -326,7 +326,7 @@ void PeerClient::HeartBeat(HeartBeatPeerTask *peer_task) {
 #else
         client_->HeartBeat(response, request);
 #endif
-    } catch (apache::thrift::transport::TTransportException &thrift_exception) {
+    } catch (const ::apache::thrift::transport::TTransportException &thrift_exception) {
         server_connected_ = false;
         switch (thrift_exception.getType()) {
             case TTransportExceptionType::END_OF_FILE: {
@@ -455,20 +455,20 @@ void PeerClient::SyncLogs(SyncLogTask *peer_task) {
             peer_task->error_message_ = response.error_message;
             LOG_ERROR(fmt::format("Sync log to node: {}, error: {}", peer_task->node_name_, peer_task->error_message_));
         }
-    } catch (apache::thrift::transport::TTransportException &thrift_exception) {
+    } catch (::apache::thrift::transport::TTransportException &thrift_exception) {
         peer_task->error_message_ = fmt::format("Sync log to node, transport error: {}, error: {}", peer_task->node_name_, thrift_exception.what());
         peer_task->error_code_ = static_cast<i64>(ErrorCode::kCantConnectServer);
         LOG_ERROR(peer_task->error_message_);
-        Status status = InfinityContext::instance().cluster_manager()->UpdateNodeByLeader(peer_task->node_name_, UpdateNodeOp::kLostConnection);
-        if (!status.ok()) {
+        if (auto status = InfinityContext::instance().cluster_manager()->UpdateNodeByLeader(peer_task->node_name_, UpdateNodeOp::kLostConnection);
+            !status.ok()) {
             LOG_ERROR(status.message());
         }
-    } catch (apache::thrift::TApplicationException &application_exception) {
+    } catch (::apache::thrift::TApplicationException &application_exception) {
         peer_task->error_message_ = fmt::format("Sync log to node, application: {}, error: {}", peer_task->node_name_, application_exception.what());
         peer_task->error_code_ = static_cast<i64>(ErrorCode::kCantConnectServer);
         LOG_ERROR(peer_task->error_message_);
-        Status status = InfinityContext::instance().cluster_manager()->UpdateNodeByLeader(peer_task->node_name_, UpdateNodeOp::kLostConnection);
-        if (!status.ok()) {
+        if (auto status = InfinityContext::instance().cluster_manager()->UpdateNodeByLeader(peer_task->node_name_, UpdateNodeOp::kLostConnection);
+            !status.ok()) {
             LOG_ERROR(status.message());
         }
     } catch (const std::exception &e) {
@@ -497,7 +497,7 @@ void PeerClient::ChangeRole(ChangeRoleTask *change_role_task) {
             change_role_task->error_message_ = response.error_message;
             LOG_ERROR(fmt::format("Sync log to node: {}, error: {}", change_role_task->node_name_, change_role_task->error_message_));
         }
-    } catch (apache::thrift::transport::TTransportException &thrift_exception) {
+    } catch (::apache::thrift::transport::TTransportException &thrift_exception) {
         change_role_task->error_message_ =
             fmt::format("Sync log to node, transport error: {}, error: {}", change_role_task->node_name_, thrift_exception.what());
         change_role_task->error_code_ = static_cast<i64>(ErrorCode::kCantConnectServer);
@@ -507,7 +507,7 @@ void PeerClient::ChangeRole(ChangeRoleTask *change_role_task) {
         if (!status.ok()) {
             LOG_ERROR(status.message());
         }
-    } catch (apache::thrift::TApplicationException &application_exception) {
+    } catch (::apache::thrift::TApplicationException &application_exception) {
         change_role_task->error_message_ =
             fmt::format("Sync log to node, application: {}, error: {}", change_role_task->node_name_, application_exception.what());
         change_role_task->error_code_ = static_cast<i64>(ErrorCode::kCantConnectServer);

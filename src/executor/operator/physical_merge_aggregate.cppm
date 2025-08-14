@@ -110,8 +110,7 @@ public:
 
     template <typename T>
     Value CreateValue(T value) {
-        String error_message = "Unhandled type for makeValue";
-        UnrecoverableError(error_message);
+        UnrecoverableError("Unhandled type for makeValue");
     }
 
     template <>
