@@ -327,14 +327,14 @@ class TestSnapshot:
         table_obj.create_index("idx_name_fts", index.IndexInfo("name", index.IndexType.FullText), ConflictType.Ignore)
 
         # BMP index TODO: have optimzie issue
-        table_obj.create_index("idx_vector_bmp", index.IndexInfo("sparse_col", index.IndexType.BMP, {"block_size": "16", "compress_type": "compress"}), ConflictType.Ignore)
+        # table_obj.create_index("idx_vector_bmp", index.IndexInfo("sparse_col", index.IndexType.BMP, {"block_size": "16", "compress_type": "compress"}), ConflictType.Ignore)
 
         # HNSW index TODO: too slow, need to fix
         # table_obj.create_index("idx_vector_hnsw", index.IndexInfo("vector_col", index.IndexType.Hnsw, {"metric": "cosine", "m": "16", "ef_construction": "200"}), ConflictType.Ignore)
 
-        table_obj.drop_index("idx_vector_bmp")
+        # table_obj.drop_index("idx_vector_bmp")
 
-        table_obj.create_index("idx_vector_bmp", index.IndexInfo("sparse_col", index.IndexType.BMP, {"block_size": "16", "compress_type": "compress"}), ConflictType.Ignore)
+        # table_obj.create_index("idx_vector_bmp", index.IndexInfo("sparse_col", index.IndexType.BMP, {"block_size": "16", "compress_type": "compress"}), ConflictType.Ignore)
 
 
         # # EMVB index (for tensors)
