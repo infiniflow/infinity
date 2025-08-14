@@ -113,7 +113,7 @@ void HnswFileWorker::ReadFromFileImpl(SizeT file_size, bool from_spill) {
     if (data_ != nullptr) {
         UnrecoverableError("Data is already allocated.");
     }
-    data_ = static_cast<void *>(new HnswHandlerPtr(HnswHandler::Make(index_base_.get(), column_def_.get()).release()));
+    data_ = static_cast<void *>(new HnswHandlerPtr(HnswHandler::Make(index_base_.get(), column_def_).release()));
     auto *hnsw_handler = reinterpret_cast<HnswHandlerPtr *>(data_);
     if (from_spill) {
         (*hnsw_handler)->Load(*file_handle_);
@@ -126,7 +126,7 @@ bool HnswFileWorker::ReadFromMmapImpl(const void *ptr, SizeT size) {
     if (mmap_data_ != nullptr) {
         UnrecoverableError("Mmap data is already allocated.");
     }
-    mmap_data_ = reinterpret_cast<u8 *>(new HnswHandlerPtr(HnswHandler::Make(index_base_.get(), column_def_.get(), false).release()));
+    mmap_data_ = reinterpret_cast<u8 *>(new HnswHandlerPtr(HnswHandler::Make(index_base_.get(), column_def_, false).release()));
     auto *hnsw_handler = reinterpret_cast<HnswHandlerPtr *>(mmap_data_);
     (*hnsw_handler)->LoadFromPtr(static_cast<const char *>(ptr), size);
     return true;

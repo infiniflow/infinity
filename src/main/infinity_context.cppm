@@ -49,6 +49,7 @@ public:
 
     [[nodiscard]] inline ThreadPool &GetFulltextInvertingThreadPool() { return inverting_thread_pool_; }
     [[nodiscard]] inline ThreadPool &GetFulltextCommitingThreadPool() { return commiting_thread_pool_; }
+    [[nodiscard]] inline ThreadPool &GetLsgBuildThreadPool() { return lsg_build_thread_pool_; }
     [[nodiscard]] inline ThreadPool &GetHnswBuildThreadPool() { return hnsw_build_thread_pool_; }
 
     NodeRole GetServerRole() const;
@@ -75,6 +76,7 @@ public:
 
     // Only used by UT
     void SetConfig(UniquePtr<Config> &&config);
+
 private:
     friend class Singleton;
 
@@ -95,6 +97,7 @@ private:
     ThreadPool commiting_thread_pool_{2};
 
     // For hnsw index
+    ThreadPool lsg_build_thread_pool_{8};
     ThreadPool hnsw_build_thread_pool_{2};
 
     std::function<void()> start_servers_func_{};
