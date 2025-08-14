@@ -313,7 +313,7 @@ class TestSnapshot:
         # Full-text search index
         table_obj.create_index("idx_name_fts", index.IndexInfo("name", index.IndexType.FullText), ConflictType.Ignore)
 
-        # BMP index TODO: have optimzie issue
+        # BMP index
         table_obj.create_index("idx_vector_bmp", index.IndexInfo("sparse_col", index.IndexType.BMP, {"block_size": "16", "compress_type": "compress"}), ConflictType.Ignore)
 
         # HNSW index TODO: too slow, need to fix
@@ -327,7 +327,7 @@ class TestSnapshot:
         # # EMVB index (for tensors)
         # table_obj.create_index("idx_tensor_emvb", index.IndexInfo("tensor_col", index.IndexType.EMVB, {"pq_subspace_num": "32", "pq_subspace_bits": "8"}), ConflictType.Ignore)
 
-        # IVF index TODO: have optimzie issue
+        # IVF index
         table_obj.create_index("idx_vector_ivf", index.IndexInfo("vector_col", index.IndexType.IVF, {"metric": "l2"}), ConflictType.Ignore)
     
     def insert_comprehensive_data(self, table_obj, num_rows: int = 1000):
