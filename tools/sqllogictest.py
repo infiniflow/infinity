@@ -116,62 +116,14 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description="SQL Logic Test For Infinity")
 
-    parser.add_argument(
-        "-g",
-        "--generate",
-        type=bool,
-        default=False,
-        dest="generate_if_exists",
-    )
-    parser.add_argument(
-        "-p",
-        "--path",
-        help="path of sqllogictest-rs",
-        type=str,
-        default="sqllogictest",
-        dest="path",
-    )
-    parser.add_argument(
-        "-t",
-        "--test",
-        help="path of test directory",
-        type=str,
-        default=test_dir,
-        dest="test",
-    )
-    parser.add_argument(
-        "--test_case",
-        help="test_case",
-        type=str,
-        default=None,
-    )
-    parser.add_argument(
-        "--loop",
-        type=int,
-        required=False,
-        default=1,
-    )
-    parser.add_argument(
-        "-d",
-        "--data",
-        type=str,
-        default=data_dir,
-        dest="data",
-    )
-    parser.add_argument(
-        "-c",
-        "--copy",
-        type=str,
-        default=copy_dir,
-        dest="copy",
-    )
-    parser.add_argument(
-        "-jc",
-        "--just_copy",
-        type=bool,
-        default=False,
-        dest="just_copy_all_data",
-    )
+    parser.add_argument("-g", "--generate", type=bool, default=False, dest="generate_if_exists")
+    parser.add_argument("-p", "--path", help="path of sqllogictest-rs", type=str, default="sqllogictest", dest="path")
+    parser.add_argument("-t", "--test", help="path of test directory", type=str, default=test_dir, dest="test")
+    parser.add_argument("--test_case", help="test_case", type=str, default=None)
+    parser.add_argument("--loop", type=int, required=False, default=1)
+    parser.add_argument("-d", "--data", type=str, default=data_dir, dest="data")
+    parser.add_argument("-c", "--copy", type=str, default=copy_dir, dest="copy")
+    parser.add_argument("-jc", "--just_copy", type=bool, default=False, dest="just_copy_all_data")
 
     args = parser.parse_args()
 
