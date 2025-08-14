@@ -539,15 +539,15 @@ void NewTxnManager::UpdateCatalogCache(NewTxn *txn) {
             }
             break;
         }
-        case TransactionType::kDropTable: {
-            BaseTxnStore *base_txn_store = txn->GetTxnStore();
-            // base_txn_store means the drop with ignore
-            if (base_txn_store != nullptr) {
-                DropTableTxnStore *txn_store = static_cast<DropTableTxnStore *>(base_txn_store);
-                system_cache_->DropTableCache(txn_store->db_id_, txn_store->table_id_);
-            }
-            break;
-        }
+        // case TransactionType::kDropTable: {
+        //     BaseTxnStore *base_txn_store = txn->GetTxnStore();
+        //     // base_txn_store means the drop with ignore
+        //     if (base_txn_store != nullptr) {
+        //         DropTableTxnStore *txn_store = static_cast<DropTableTxnStore *>(base_txn_store);
+        //         system_cache_->DropTableCache(txn_store->db_id_, txn_store->table_id_);
+        //     }
+        //     break;
+        // }
         case TransactionType::kCreateIndex: {
             BaseTxnStore *base_txn_store = txn->GetTxnStore();
             if (base_txn_store != nullptr) {
