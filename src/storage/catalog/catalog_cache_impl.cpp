@@ -393,23 +393,24 @@ void SystemCache::DropDbCache(u64 db_id) {
     }
     String db_name = cache_iter->second->db_name();
     db_cache_map_.erase(cache_iter);
-    auto name_iter = db_name_map_.find(db_name);
-    if (name_iter == db_name_map_.end()) {
-        LOG_ERROR(fmt::format("Db name cache with name: {} not found", db_name));
-        return;
-    }
-    db_name_map_.erase(name_iter);
 }
 
 void SystemCache::AddNewTableCache(u64 db_id, u64 table_id, const String &table_name) {
     std::unique_lock lock(cache_mtx_);
     DbCache *db_cache = this->GetDbCacheNolock(db_id);
+    if (db_cache == nullptr) {
+        UnrecoverableError(fmt::format("Can't find database {} in cache", db_id));
+    }
     db_cache->AddNewTableCacheNolock(table_id, table_name);
 }
 
 void SystemCache::DropTableCache(u64 db_id, u64 table_id) {
     std::unique_lock lock(cache_mtx_);
     DbCache *db_cache = this->GetDbCacheNolock(db_id);
+    if (db_cache == nullptr) {
+        LOG_WARN(fmt::format("Can't find database: {}", db_id));
+        return;
+    }
     db_cache->DropTableCacheNolock(table_id);
 }
 
@@ -425,9 +426,15 @@ void SystemCache::AddNewIndexCache(u64 db_id, u64 table_id, const String &index_
 void SystemCache::DropIndexCache(u64 db_id, u64 table_id, u64 index_id) {
     std::unique_lock lock(cache_mtx_);
     TableCache *table_cache = this->GetTableCacheNolock(db_id, table_id);
+    if (table_cache == nullptr) {
+        LOG_WARN(fmt::format("Database: {}, table: {} is already dropped", db_id, table_id));
+        return;
+    }
     auto index_iter = table_cache->index_cache_map_.find(index_id);
     if (index_iter == table_cache->index_cache_map_.end()) {
-        UnrecoverableError(fmt::format("Table index cache with id: {} not found", index_id));
+        LOG_WARN(fmt::format("Database: {}, table: {}, index: {} is already dropped", db_id, table_id, index_id));
+        // UnrecoverableError(fmt::format("Table index cache with id: {} not found", index_id));
+        return;
     }
     table_cache->DropTableIndexCacheNolock(index_id);
 }
@@ -481,12 +488,6 @@ void SystemCache::CommitAppend(u64 db_id, u64 table_id, const SharedPtr<AppendPr
 }
 
 Status SystemCache::AddDbCacheNolock(const SharedPtr<DbCache> &db_cache) {
-    // LOG_TRACE(fmt::format("Attempt to add db_name: {}, db_id: {}", db_cache->db_name(), db_cache->db_id()));
-    auto [iter2, insert_success2] = db_name_map_.emplace(db_cache->db_name(), db_cache->db_id());
-    if (!insert_success2) {
-        // LOG_TRACE(fmt::format("Duplicate db_name: {}, db_id: {}", db_cache->db_name(), db_cache->db_id()));
-        return Status::DuplicateDatabase(db_cache->db_name());
-    }
     auto [iter, insert_success] = db_cache_map_.emplace(db_cache->db_id(), db_cache);
     if (!insert_success) {
         UnrecoverableError(fmt::format("Db cache with id: {} already exists", db_cache->db_id()));
@@ -511,7 +512,9 @@ SharedPtr<DbCache> SystemCache::GetDbCache(u64 db_id) const {
 DbCache *SystemCache::GetDbCacheNolock(u64 db_id) {
     auto db_iter = db_cache_map_.find(db_id);
     if (db_iter == db_cache_map_.end()) {
-        UnrecoverableError(fmt::format("Db cache with id: {} not found", db_id));
+        LOG_WARN(fmt::format("Db cache with id: {} not found", db_id));
+        // UnrecoverableError(fmt::format("Db cache with id: {} not found", db_id));
+        return nullptr;
     }
     DbCache *db_cache = db_iter->second.get();
     return db_cache;
@@ -519,10 +522,14 @@ DbCache *SystemCache::GetDbCacheNolock(u64 db_id) {
 
 TableCache *SystemCache::GetTableCacheNolock(u64 db_id, u64 table_id) {
     DbCache *db_cache = this->GetDbCacheNolock(db_id);
+    if (db_cache == nullptr) {
+        return nullptr;
+    }
 
     auto table_iter = db_cache->table_cache_map_.find(table_id);
     if (table_iter == db_cache->table_cache_map_.end()) {
-        UnrecoverableError(fmt::format("Table cache with id: {} not found", table_id));
+        LOG_WARN(fmt::format("Table cache with id: {} not found", table_id));
+        return nullptr;
     }
     TableCache *table_cache = table_iter->second.get();
     return table_cache;

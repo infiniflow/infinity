@@ -73,6 +73,7 @@ import :column_meta;
 import :table_index_meeta;
 import :segment_index_meta;
 import :chunk_index_meta;
+import :mem_index;
 import :meta_key;
 import :txn_allocator_task;
 import :meta_type;
@@ -81,6 +82,7 @@ import :buffer_handle;
 import :virtual_store;
 import :txn_context;
 import :kv_utility;
+import :catalog_cache;
 import extra_ddl_info;
 import column_def;
 import row_id;
@@ -1448,21 +1450,21 @@ NewTxn::GetBlockColumnInfo(const String &db_name, const String &table_name, Segm
 }
 
 Status NewTxn::CreateTableSnapshot(const String &db_name, const String &table_name, const String &snapshot_name) {
-        // Check if the DB is valid
+    // Check if the DB is valid
     this->SetTxnType(TransactionType::kCreateTableSnapshot);
-        this->CheckTxn(db_name);
+    this->CheckTxn(db_name);
 
     SharedPtr<TableSnapshotInfo> table_snapshot_info;
 
     // First, get the meta info of the table
-        Optional<DBMeeta> db_meta;
-        Optional<TableMeeta> table_meta_opt;
+    Optional<DBMeeta> db_meta;
+    Optional<TableMeeta> table_meta_opt;
     Optional<SegmentMeta> segment_meta_opt;
-        String table_key;
-        Status status = GetTableMeta(db_name, table_name, db_meta, table_meta_opt, &table_key);
+    String table_key;
+    Status status = GetTableMeta(db_name, table_name, db_meta, table_meta_opt, &table_key);
 
-        if (!status.ok()) {
-            return status;
+    if (!status.ok()) {
+        return status;
     }
 
     base_txn_store_ = MakeShared<CreateTableSnapshotTxnStore>();
@@ -1963,14 +1965,11 @@ Status NewTxn::Commit() {
     bool retry_query = true;
     bool conflict = txn_mgr_->CheckConflict1(this, conflict_reason, retry_query);
     if (conflict) {
-        // TODO: We are not retrying the query if its transaction is conflicted with other transaction right now. We will add retry logic later.
-        status = Status::TxnConflictNoRetry(txn_context_ptr_->txn_id_, fmt::format("NewTxn conflict reason: {}.", conflict_reason));
-
-        // if (retry_query) {
-        //     status = Status::TxnConflict(txn_context_ptr_->txn_id_, fmt::format("NewTxn conflict reason: {}.", conflict_reason));
-        // } else {
-        //     status = Status::TxnConflictNoRetry(txn_context_ptr_->txn_id_, fmt::format("NewTxn conflict reason: {}.", conflict_reason));
-        // }
+        if (retry_query) {
+            status = Status::TxnConflict(txn_context_ptr_->txn_id_, fmt::format("NewTxn conflict reason: {}.", conflict_reason));
+        } else {
+            status = Status::TxnConflictNoRetry(txn_context_ptr_->txn_id_, fmt::format("NewTxn conflict reason: {}.", conflict_reason));
+        }
 
         this->SetTxnRollbacking(commit_ts);
     }
@@ -2409,7 +2408,10 @@ Status NewTxn::PrepareCommitCreateTableSnapshot(const WalCmdCreateTableSnapshot 
     // After calling Checkpoint()
     TxnTimeStamp last_checkpoint_ts = InfinityContext::instance().storage()->wal_manager()->LastCheckpointTS();
     SharedPtr<CheckpointTxnStore> ckp_txn_store = MakeShared<CheckpointTxnStore>();
-    this->CheckpointInner(last_checkpoint_ts, ckp_txn_store.get());
+    Status status = this->CheckpointforSnapshot(last_checkpoint_ts, ckp_txn_store.get());
+    if (!status.ok()) {
+        return status;
+    }
 
     // Check if checkpoint actually happened
     if (ckp_txn_store != nullptr) {
@@ -5097,6 +5099,33 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
             break;
         }
         case TransactionType::kDumpMemIndex: {
+            DumpMemIndexTxnStore *dump_index_txn_store = static_cast<DumpMemIndexTxnStore *>(base_txn_store_.get());
+
+            Optional<DBMeeta> db_meta;
+            Optional<TableMeeta> table_meta;
+            Optional<TableIndexMeeta> table_index_meta;
+            String table_key;
+            String index_key;
+            Status status = this->GetTableIndexMeta(dump_index_txn_store->db_name_,
+                                                    dump_index_txn_store->table_name_,
+                                                    dump_index_txn_store->index_name_,
+                                                    db_meta,
+                                                    table_meta,
+                                                    table_index_meta,
+                                                    &table_key,
+                                                    &index_key);
+            if (!status.ok()) {
+                return status;
+            }
+
+            for (SegmentID segment_id : dump_index_txn_store->segment_ids_) {
+                SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta);
+
+                SharedPtr<MemIndex> mem_index = segment_index_meta.GetMemIndex();
+                if (mem_index != nullptr && mem_index->IsDumping()) {
+                    mem_index->SetIsDumping(false);
+                }
+            }
             break;
         }
         case TransactionType::kOptimizeIndex: {
@@ -5373,6 +5402,7 @@ Status NewTxn::CleanupInner(const Vector<UniquePtr<MetaKey>> &metas) {
     KVInstance *kv_instance = kv_instance_.get();
     TxnTimeStamp begin_ts = BeginTS();
     BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
+    SystemCache *system_cache = this->txn_mgr()->GetSystemCachePtr();
     for (auto &meta : metas) {
         switch (meta->type_) {
             case MetaType::kDB: {
@@ -5388,6 +5418,7 @@ Status NewTxn::CleanupInner(const Vector<UniquePtr<MetaKey>> &metas) {
                 if (!status.ok()) {
                     return status;
                 }
+                system_cache->DropDbCache(std::stoull(db_meta_key->db_id_str_));
                 break;
             }
             case MetaType::kTable: {
@@ -5402,6 +5433,7 @@ Status NewTxn::CleanupInner(const Vector<UniquePtr<MetaKey>> &metas) {
                 if (!status.ok()) {
                     return status;
                 }
+                system_cache->DropTableCache(std::stoull(table_meta_key->db_id_str_), std::stoull(table_meta_key->table_id_str_));
                 break;
             }
             case MetaType::kTableName: {
@@ -5480,6 +5512,9 @@ Status NewTxn::CleanupInner(const Vector<UniquePtr<MetaKey>> &metas) {
                 if (!status.ok()) {
                     return status;
                 }
+                system_cache->DropIndexCache(std::stoull(table_index_meta_key->db_id_str_),
+                                             std::stoull(table_index_meta_key->table_id_str_),
+                                             std::stoull(table_index_meta_key->index_id_str_));
                 break;
             }
             case MetaType::kSegmentIndex: {
@@ -6133,7 +6168,7 @@ Status NewTxn::CommitBottomCreateTableSnapshot(WalCmdCreateTableSnapshot *create
     return Status::OK();
 }
 
-Status NewTxn::CheckpointInner(TxnTimeStamp last_ckp_ts, CheckpointTxnStore *txn_store) {
+Status NewTxn::CheckpointforSnapshot(TxnTimeStamp last_ckp_ts, CheckpointTxnStore *txn_store) {
     TransactionType txn_type = GetTxnType();
     if (txn_type != TransactionType::kNewCheckpoint && txn_type != TransactionType::kCreateTableSnapshot) {
         UnrecoverableError(fmt::format("Expected transaction type is checkpoint or create table snapshot."));
@@ -6158,13 +6193,8 @@ Status NewTxn::CheckpointInner(TxnTimeStamp last_ckp_ts, CheckpointTxnStore *txn
     }
 
     auto *wal_manager = InfinityContext::instance().storage()->wal_manager();
-    while (!wal_manager->SetCheckpointing()) {
-        // Checkpointing
-        last_ckp_ts = wal_manager->LastCheckpointTS();
-        if (last_ckp_ts + 2 >= checkpoint_ts) {
-            return Status::OK();
-        }
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    if (!wal_manager->SetCheckpointing()) {
+        return Status::Checkpointing();
     }
     DeferFn defer([&] { wal_manager->UnsetCheckpoint(); });
 

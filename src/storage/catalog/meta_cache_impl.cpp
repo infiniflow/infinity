@@ -187,6 +187,7 @@ SharedPtr<MetaDbCache> MetaCache::GetDb(const String &db_name, TxnTimeStamp begi
 void MetaCache::EraseDbNolock(const String &db_name) {
     String name = KeyEncode::CatalogDbPrefix(db_name);
     dbs_.erase(name);
+    LOG_TRACE(fmt::format("Erase db name: {}", name));
 }
 
 void MetaCache::PutTableNolock(const SharedPtr<MetaTableCache> &table_cache) {
@@ -264,6 +265,7 @@ void MetaCache::PutIndexNolock(const SharedPtr<MetaIndexCache> &index_cache) {
 void MetaCache::EraseIndexNolock(u64 db_id, u64 table_id, const String &index_name) {
     String name = KeyEncode::CatalogIndexPrefix(std::to_string(db_id), std::to_string(table_id), index_name);
     indexes_.erase(name);
+    LOG_TRACE(fmt::format("Erase index name: {}", name));
 }
 
 SharedPtr<MetaIndexCache> MetaCache::GetIndex(u64 db_id, u64 table_id, const String &index_name, TxnTimeStamp begin_ts) {

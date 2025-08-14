@@ -343,6 +343,8 @@ TEST_P(TestTxnImport, test_import_with_index_rollback) {
     auto index_def1 = IndexSecondary::Make(index_name1, MakeShared<String>(), "file_name", {column_def1->name()});
     auto index_name2 = std::make_shared<String>("index2");
     auto index_def2 = IndexFullText::Make(index_name2, MakeShared<String>(), "file_name", {column_def2->name()}, {});
+    std::shared_ptr<ConstantExpr> default_varchar = std::make_shared<ConstantExpr>(LiteralType::kString);
+    default_varchar->str_value_ = strdup("");
     {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
         Status status = txn->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
@@ -395,7 +397,7 @@ TEST_P(TestTxnImport, test_import_with_index_rollback) {
 
     {
         auto *txn_import = new_txn_mgr->BeginTxn(MakeUnique<String>("import"), TransactionType::kNormal);
-        Vector<SharedPtr<DataBlock>> input_blocks = {make_input_block()};
+        Vector<SharedPtr<DataBlock>> input_blocks = {make_input_block(), make_input_block()};
         Status status = txn_import->Import(*db_name, *table_name, input_blocks);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn_import);
@@ -404,19 +406,149 @@ TEST_P(TestTxnImport, test_import_with_index_rollback) {
 
     {
         auto *txn_import = new_txn_mgr->BeginTxn(MakeUnique<String>("import"), TransactionType::kNormal);
-        Vector<SharedPtr<DataBlock>> input_blocks = {make_input_block()};
+        Vector<SharedPtr<DataBlock>> input_blocks = {make_input_block(), make_input_block()};
         Status status = txn_import->Import(*db_name, *table_name, input_blocks);
         EXPECT_TRUE(status.ok());
 
-        auto *txn_drop_db = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
-        status = txn_drop_db->DropDatabase(*db_name, ConflictType::kError);
+        auto *txn_add_column = new_txn_mgr->BeginTxn(MakeUnique<String>("add column"), TransactionType::kNormal);
+        // Add two columns
+        auto column_def3 =
+            std::make_shared<ColumnDef>(2, std::make_shared<DataType>(LogicalType::kVarchar), "col3", std::set<ConstraintType>(), default_varchar);
+        Vector<SharedPtr<ColumnDef>> columns;
+        columns.emplace_back(column_def3);
+        status = txn_add_column->AddColumns(*db_name, *table_name, columns);
         EXPECT_TRUE(status.ok());
-        status = new_txn_mgr->CommitTxn(txn_drop_db);
+        status = new_txn_mgr->CommitTxn(txn_add_column);
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn_import);
         EXPECT_FALSE(status.ok());
     }
+
+    {
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
+        TxnTimeStamp begin_ts = txn->BeginTS();
+        TxnTimeStamp commit_ts = txn->CommitTS();
+
+        Optional<DBMeeta> db_meta;
+        Optional<TableMeeta> table_meta;
+        Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
+        EXPECT_TRUE(status.ok());
+
+        auto [segment_ids, seg_status] = table_meta->GetSegmentIDs1();
+        EXPECT_TRUE(seg_status.ok());
+        EXPECT_EQ(*segment_ids, Vector<SegmentID>({0}));
+
+        auto check_block = [&](BlockMeta &block_meta) {
+            NewTxnGetVisibleRangeState state;
+            Status status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, commit_ts, state);
+            EXPECT_TRUE(status.ok());
+
+            BlockOffset offset = 0;
+            Pair<BlockOffset, BlockOffset> range;
+            bool next = state.Next(offset, range);
+            EXPECT_TRUE(next);
+            EXPECT_EQ(range.first, 0);
+            EXPECT_EQ(range.second, block_row_cnt);
+            offset = range.second;
+            next = state.Next(offset, range);
+            EXPECT_FALSE(next);
+
+            SizeT row_count = state.block_offset_end();
+            {
+                SizeT column_idx = 0;
+                ColumnMeta column_meta(column_idx, block_meta);
+                ColumnVector col;
+
+                Status status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorMode::kReadOnly, col);
+                EXPECT_TRUE(status.ok());
+
+                EXPECT_EQ(col.GetValueByIndex(0), Value::MakeInt(1));
+                EXPECT_EQ(col.GetValueByIndex(1), Value::MakeInt(2));
+                EXPECT_EQ(col.GetValueByIndex(8190), Value::MakeInt(1));
+                EXPECT_EQ(col.GetValueByIndex(8191), Value::MakeInt(2));
+            }
+            {
+                SizeT column_idx = 1;
+                ColumnMeta column_meta(column_idx, block_meta);
+                ColumnVector col;
+
+                Status status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorMode::kReadOnly, col);
+                EXPECT_TRUE(status.ok());
+
+                EXPECT_EQ(col.GetValueByIndex(0), Value::MakeVarchar("abc"));
+                EXPECT_EQ(col.GetValueByIndex(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
+                EXPECT_EQ(col.GetValueByIndex(8190), Value::MakeVarchar("abc"));
+                EXPECT_EQ(col.GetValueByIndex(8191), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
+            }
+        };
+
+        auto check_segment = [&](SegmentMeta &segment_meta) {
+            auto [block_ids, status] = segment_meta.GetBlockIDs1();
+            EXPECT_TRUE(status.ok());
+            EXPECT_EQ(*block_ids, Vector<BlockID>({0, 1}));
+
+            for (auto block_id : *block_ids) {
+                BlockMeta block_meta(block_id, segment_meta);
+                check_block(block_meta);
+            }
+        };
+
+        for (auto segment_id : *segment_ids) {
+            SegmentMeta segment_meta(segment_id, *table_meta);
+            check_segment(segment_meta);
+        }
+    }
+
+    auto check_index = [&](const String &index_name) {
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check index1"), TransactionType::kNormal);
+
+        Optional<DBMeeta> db_meta;
+        Optional<TableMeeta> table_meta;
+        Optional<TableIndexMeeta> table_index_meta;
+        String table_key;
+        String index_key;
+        Status status = txn->GetTableIndexMeta(*db_name, *table_name, index_name, db_meta, table_meta, table_index_meta, &table_key, &index_key);
+        EXPECT_TRUE(status.ok());
+
+        auto check_segment = [&](SegmentID segment_id) {
+            SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta);
+
+            {
+                Vector<ChunkID> *chunk_ids = nullptr;
+                std::tie(chunk_ids, status) = segment_index_meta.GetChunkIDs1();
+                EXPECT_TRUE(status.ok());
+                EXPECT_EQ(*chunk_ids, Vector<ChunkID>({0}));
+            }
+            ChunkID chunk_id = 0;
+            ChunkIndexMeta chunk_index_meta(chunk_id, segment_index_meta);
+            {
+                ChunkIndexMetaInfo *chunk_info = nullptr;
+                Status status = chunk_index_meta.GetChunkInfo(chunk_info);
+                EXPECT_TRUE(status.ok());
+                EXPECT_EQ(chunk_info->row_cnt_, block_row_cnt * 2);
+                EXPECT_EQ(chunk_info->base_row_id_, RowID(segment_id, 0));
+            }
+
+            BufferObj *buffer_obj = nullptr;
+            status = chunk_index_meta.GetIndexBuffer(buffer_obj);
+            EXPECT_TRUE(status.ok());
+        };
+        {
+            auto [segment_ids, status] = table_index_meta->GetSegmentIndexIDs1();
+            EXPECT_TRUE(status.ok());
+            EXPECT_EQ(*segment_ids, Vector<SegmentID>({0}));
+
+            for (auto segment_id : *segment_ids) {
+                check_segment(segment_id);
+            }
+        }
+
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+    };
+    check_index(*index_name1);
+    check_index(*index_name2);
 }
 
 TEST_P(TestTxnImport, test_insert_and_import) {
@@ -5223,18 +5355,6 @@ TEST_P(TestTxnImport, test_import_and_drop_index) {
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(index_id_strs_ptr->size(), 0);
         EXPECT_EQ(index_names_ptr->size(), 0);
-        //        EXPECT_EQ(index_names_ptr->at(0), "idx1");
-        //
-        //        TableIndexMeeta table_index_meta(index_id_strs_ptr->at(0), table_meta);
-        //        auto [index_base, index_status] = table_index_meta.GetIndexBase();
-        //        EXPECT_TRUE(index_status.ok());
-        //        EXPECT_EQ(*index_base->index_name_, String("idx1"));
-        //        EXPECT_EQ(index_base->index_type_, IndexType::kSecondary);
-        //
-        //        Vector<SegmentID> *index_segment_ids_ptr = nullptr;
-        //        status = table_index_meta.GetSegmentIndexIDs1(index_segment_ids_ptr);
-        //        EXPECT_TRUE(status.ok());
-        //        EXPECT_EQ(index_segment_ids_ptr->size(), 1);
     };
 
     auto input_block1 = MakeShared<DataBlock>();
@@ -6273,7 +6393,6 @@ TEST_P(TestTxnImport, test_import_and_optimize_index) {
 
         DropDB();
     }
-
 
     //    t1      import      commit (success)
     //    |----------|---------|

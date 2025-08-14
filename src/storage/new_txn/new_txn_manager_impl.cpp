@@ -490,16 +490,16 @@ void NewTxnManager::UpdateCatalogCache(NewTxn *txn) {
 
             break;
         }
-        case TransactionType::kDropDB: {
-            BaseTxnStore *base_txn_store = txn->GetTxnStore();
-            // base_txn_store means the drop with ignore
-            if (base_txn_store != nullptr) {
-                DropDBTxnStore *drop_db_txn_store = static_cast<DropDBTxnStore *>(base_txn_store);
-                system_cache_->DropDbCache(drop_db_txn_store->db_id_);
-            }
-
-            break;
-        }
+            //        case TransactionType::kDropDB: {
+            //            BaseTxnStore *base_txn_store = txn->GetTxnStore();
+            //            // base_txn_store means the drop with ignore
+            //            if (base_txn_store != nullptr) {
+            //                DropDBTxnStore *drop_db_txn_store = static_cast<DropDBTxnStore *>(base_txn_store);
+            //                system_cache_->DropDbCache(drop_db_txn_store->db_id_);
+            //            }
+            //
+            //            break;
+            //        }
         case TransactionType::kCreateTable: {
             BaseTxnStore *base_txn_store = txn->GetTxnStore();
             if (base_txn_store != nullptr) {
@@ -543,17 +543,15 @@ void NewTxnManager::UpdateCatalogCache(NewTxn *txn) {
             }
             break;
         }
-        case TransactionType::kDropTable: {
-            BaseTxnStore *base_txn_store = txn->GetTxnStore();
-            // base_txn_store means the drop with ignore
-            if (base_txn_store != nullptr) {
-                DropTableTxnStore *txn_store = static_cast<DropTableTxnStore *>(base_txn_store);
-                LOG_TRACE(fmt::format("drop table: {}, id: {}, txn_id: {}", txn_store->table_name_, txn_store->table_id_, txn->TxnID()));
-                system_cache_->DropTableCache(txn_store->db_id_, txn_store->table_id_);
-                LOG_TRACE(fmt::format("dropped table: {}, id: {}", txn_store->table_name_, txn_store->table_id_));
-            }
-            break;
-        }
+            //        case TransactionType::kDropTable: {
+            //            BaseTxnStore *base_txn_store = txn->GetTxnStore();
+            //            // base_txn_store means the drop with ignore
+            //            if (base_txn_store != nullptr) {
+            //                DropTableTxnStore *txn_store = static_cast<DropTableTxnStore *>(base_txn_store);
+            //                system_cache_->DropTableCache(txn_store->db_id_, txn_store->table_id_);
+            //            }
+            //            break;
+            //        }
         case TransactionType::kCreateIndex: {
             BaseTxnStore *base_txn_store = txn->GetTxnStore();
             if (base_txn_store != nullptr) {
@@ -563,15 +561,15 @@ void NewTxnManager::UpdateCatalogCache(NewTxn *txn) {
             }
             break;
         }
-        case TransactionType::kDropIndex: {
-            BaseTxnStore *base_txn_store = txn->GetTxnStore();
-            // base_txn_store means the drop with ignore
-            if (base_txn_store != nullptr) {
-                DropIndexTxnStore *txn_store = static_cast<DropIndexTxnStore *>(base_txn_store);
-                system_cache_->DropIndexCache(txn_store->db_id_, txn_store->table_id_, txn_store->index_id_);
-            }
-            break;
-        }
+            //        case TransactionType::kDropIndex: {
+            //            BaseTxnStore *base_txn_store = txn->GetTxnStore();
+            //            // base_txn_store means the drop with ignore
+            //            if (base_txn_store != nullptr) {
+            //                DropIndexTxnStore *txn_store = static_cast<DropIndexTxnStore *>(base_txn_store);
+            //                system_cache_->DropIndexCache(txn_store->db_id_, txn_store->table_id_, txn_store->index_id_);
+            //            }
+            //            break;
+            //        }
         default: {
             break;
         }

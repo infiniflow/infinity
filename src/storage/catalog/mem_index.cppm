@@ -76,8 +76,12 @@ public:
     SharedPtr<DummyIndexInMem> GetDummyIndex();
     void SetDummyIndex(SharedPtr<DummyIndexInMem> dummy_index);
 
+    bool IsDumping() const;
+    void SetIsDumping(bool is_dumping);
+
 private:
     mutable std::mutex mtx_; // Used by append / mem index dump / clear
+    bool is_dumping_{false};
 
     SharedPtr<HnswIndexInMem> memory_hnsw_index_{};
     SharedPtr<IVFIndexInMem> memory_ivf_index_{};

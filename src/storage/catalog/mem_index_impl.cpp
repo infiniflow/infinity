@@ -81,6 +81,8 @@ void MemIndex::ClearMemIndex() {
     memory_secondary_index_.reset();
     memory_emvb_index_.reset();
     memory_bmp_index_.reset();
+
+    is_dumping_ = false;
 }
 
 BaseMemIndex *MemIndex::GetBaseMemIndex(const MemIndexID &mem_index_id) {
@@ -241,6 +243,15 @@ SharedPtr<DummyIndexInMem> MemIndex::GetDummyIndex() {
 void MemIndex::SetDummyIndex(SharedPtr<DummyIndexInMem> dummy_index) {
     std::unique_lock<std::mutex> lock(mtx_);
     memory_dummy_index_ = dummy_index;
+}
+
+bool MemIndex::IsDumping() const {
+    std::unique_lock<std::mutex> lock(mtx_);
+    return is_dumping_;
+}
+void MemIndex::SetIsDumping(bool is_dumping) {
+    std::unique_lock<std::mutex> lock(mtx_);
+    is_dumping_ = is_dumping;
 }
 
 } // namespace infinity
