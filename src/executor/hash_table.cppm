@@ -12,11 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:hash_table;
 
-import :stl;
 import :column_vector;
 
 import internal_types;

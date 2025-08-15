@@ -26,6 +26,7 @@ import :query_result;
 import :data_block;
 import :value;
 import :physical_import;
+import :utility;
 
 import std;
 
@@ -238,7 +239,7 @@ void HTTPSearch::Process(Infinity *infinity_ptr,
                     if (option_key == "total_hits_count") {
                         if (option_value.is_string()) {
                             std::string value_str = option_value.get<std::string>();
-                            ToLower(value);
+                            [[maybe_unused]] auto maybe_a_bug = std::tolower(value);
                             if (value_str == "true") {
                                 total_hits_count_flag = true;
                             } else if (value_str == "false") {

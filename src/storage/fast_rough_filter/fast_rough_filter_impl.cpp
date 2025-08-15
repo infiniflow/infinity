@@ -41,7 +41,7 @@ std::string FastRoughFilter::SerializeToString() const {
             sizeof(total_binary_bytes) + sizeof(build_time_) + probabilistic_data_filter_binary_bytes + min_max_data_filter_binary_bytes;
         std::string save_to_binary;
         save_to_binary.reserve(total_binary_bytes);
-        OStringStream os(std::move(save_to_binary));
+        std::ostringstream os(std::move(save_to_binary));
         os.write(reinterpret_cast<const char *>(&total_binary_bytes), sizeof(total_binary_bytes));
         os.write(reinterpret_cast<const char *>(&build_time_), sizeof(build_time_));
         probabilistic_data_filter_->SerializeToStringStream(os, probabilistic_data_filter_binary_bytes);
@@ -57,7 +57,7 @@ std::string FastRoughFilter::SerializeToString() const {
 
 void FastRoughFilter::DeserializeFromString(const std::string &str) {
     // load necessary parts
-    IStringStream is(str);
+    std::istringstream is(str);
     u32 total_binary_bytes{};
     if (str.empty()) {
         LOG_ERROR(fmt::format("FastRoughFilter: empty fast rough filter"));

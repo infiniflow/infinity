@@ -14,15 +14,13 @@
 
 module;
 
-#include <cstdlib>
-
 export module infinity_core:darts_trie;
 
-import :stl;
 import :darts;
 import :status;
+import :infinity_type;
 
-// import std;
+import std;
 
 namespace infinity {
 

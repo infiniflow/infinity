@@ -201,7 +201,7 @@ void RcuMultiMap<Key, Value>::Insert(const Key &key, const Value &value) {
     MapValue new_value = CreateMapValue(value);
 
     std::lock_guard<std::mutex> lock(dirty_lock_);
-    dirty_map_->insert(MakePair(key, new_value));
+    dirty_map_->insert(std::make_pair(key, new_value));
 }
 
 template <typename Key, typename Value>
@@ -220,7 +220,7 @@ void RcuMultiMap<Key, Value>::Delete(const Key &key) {
         auto read_range = read_map_->equal_range(key);
         for (auto rit = read_range.first; rit != read_range.second; ++rit) {
             if (rit->second.value_ == map_value.value_) {
-                deleted_entries_.insert(MakePair(key, map_value));
+                deleted_entries_.insert(std::make_pair(key, map_value));
                 break;
             }
         }
@@ -244,7 +244,7 @@ void RcuMultiMap<Key, Value>::Delete(const Key &key, const Value &value) {
             auto read_range = read_map_->equal_range(key);
             for (auto rit = read_range.first; rit != read_range.second; ++rit) {
                 if (rit->second.value_ == map_value.value_) {
-                    deleted_entries_.insert(MakePair(key, map_value));
+                    deleted_entries_.insert(std::make_pair(key, map_value));
                     break;
                 }
             }
@@ -583,7 +583,7 @@ public:
             return &proxy;
         }
 
-        value_type operator*() const { return MakePair(it_->first, it_->second.value_); }
+        value_type operator*() const { return std::make_pair(it_->first, it_->second.value_); }
 
         UnsafeIterator &operator++() {
             ++it_;
@@ -859,7 +859,7 @@ void RcuMap<Key, Value>::Insert(const Key &key, const Value &value) {
         // This ensures readers don't see stale values after next swap
         auto read_it = read_map_->find(key);
         if (read_it != read_map_->end()) {
-            deleted_entries_.insert(MakePair(key, old_value));
+            deleted_entries_.insert(std::make_pair(key, old_value));
         }
     }
 
@@ -886,7 +886,7 @@ void RcuMap<Key, Value>::Delete(const Key &key) {
         // Also mark for deletion in read_map if it exists there
         auto read_it = read_map_->find(key);
         if (read_it != read_map_->end()) {
-            deleted_entries_.insert(MakePair(key, map_value));
+            deleted_entries_.insert(std::make_pair(key, map_value));
         }
     } else {
         // If not in dirty_map, check if it exists in read_map
@@ -895,7 +895,7 @@ void RcuMap<Key, Value>::Delete(const Key &key) {
             // Mark the entry from read_map for deletion
             MapValue map_value = read_it->second;
             map_value.used_time_ = GetCurrentTimeMs();
-            deleted_entries_.insert(MakePair(key, map_value));
+            deleted_entries_.insert(std::make_pair(key, map_value));
             deleted_value_list_.push_back(map_value);
         }
     }
@@ -1073,7 +1073,7 @@ void RcuMap<Key, Value>::Clear() {
     for (auto it = read_map_->begin(); it != read_map_->end(); ++it) {
         MapValue map_value = it->second;
         map_value.used_time_ = GetCurrentTimeMs();
-        deleted_entries_.insert(MakePair(it->first, map_value));
+        deleted_entries_.insert(std::make_pair(it->first, map_value));
         deleted_value_list_.push_back(map_value);
     }
 }

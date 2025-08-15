@@ -55,7 +55,7 @@ void PhraseDocIterator::InitBM25Info(std::unique_ptr<FullTextColumnLengthReader>
     f3 = f2 * std::numeric_limits<u16>::max();
     f4 = delta / (k1 + 1.0F);
     if (SHOULD_LOG_TRACE()) {
-        OStringStream oss;
+        std::ostringstream oss;
         oss << "PhraseDocIterator: ";
         if (column_name_ptr_ != nullptr) {
             oss << "column: " << *column_name_ptr_ << ",";

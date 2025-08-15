@@ -12,11 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:segment_meta;
 
-import :stl;
 import :status;
 import :default_values;
 import :new_catalog;

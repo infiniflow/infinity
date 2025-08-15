@@ -167,7 +167,7 @@ void OutputToDataBlockHelper::OutputToDataBlock(BufferManager *buffer_mgr,
     output_job_infos.clear();
 
     if (segment_block_ids_without_blockmeta.size() > 0) {
-        OStringStream oss;
+        std::ostringstream oss;
         for (auto &segment_block_id : segment_block_ids_without_blockmeta) {
             oss << fmt::format("({}, {}) ", segment_block_id.first, segment_block_id.second);
         }

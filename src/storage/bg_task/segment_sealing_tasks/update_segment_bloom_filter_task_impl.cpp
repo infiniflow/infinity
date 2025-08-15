@@ -17,7 +17,6 @@ module;
 module infinity_core:update_segment_bloom_filter_task.impl;
 
 import :update_segment_bloom_filter_task;
-import :stl;
 import :bg_task;
 import :background_process;
 import :buffer_manager;

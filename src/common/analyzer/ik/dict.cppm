@@ -1,8 +1,5 @@
-module;
-
 export module infinity_core:ik_dict;
 
-import :stl;
 import :ik_dict_segment;
 import :hit;
 import :status;

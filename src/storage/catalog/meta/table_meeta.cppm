@@ -12,11 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:table_meeta;
 
-import :stl;
 import :status;
 import :new_catalog;
 import :snapshot_info;
@@ -98,7 +95,7 @@ public:
 
     Status GetTableDetail(TableDetail &table_detail);
 
-    std::pair<std::string, std::string> GetDBTableName() const { return MakePair(db_name_, table_name_); }
+    std::pair<std::string, std::string> GetDBTableName() const { return std::make_pair(db_name_, table_name_); }
     void SetDBTableName(const std::string &db_name, const std::string &table_name) {
         db_name_ = db_name;
         table_name_ = table_name;

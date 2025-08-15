@@ -12,12 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:current_date.impl;
 
 import :current_date;
-import :stl;
 import :config;
 import :new_catalog;
 import :status;

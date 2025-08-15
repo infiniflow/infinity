@@ -12,11 +12,8 @@
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
 
-module;
-
 export module infinity_core:probabilistic_data_filter;
 
-import :stl;
 import :value;
 import :binary_fuse_filter;
 import :infinity_exception;
@@ -59,9 +56,9 @@ public:
 
     u32 GetSerializeSizeInBytes() const;
 
-    void SerializeToStringStream(OStringStream &os, u32 total_binary_bytes = 0) const;
+    void SerializeToStringStream(std::ostringstream &os, u32 total_binary_bytes = 0) const;
 
-    void DeserializeFromStringStream(IStringStream &is);
+    void DeserializeFromStringStream(std::istringstream &is);
 
     void SaveToJsonFile(nlohmann::json &entry_json) const;
 

@@ -12,11 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:wal_manager;
 
-import :stl;
 import :blocking_queue;
 import :log_file;
 import :options;

@@ -12,11 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:session_manager;
 
-import :stl;
 import :profiler;
 import :session;
 
@@ -137,9 +134,9 @@ private:
     std::unordered_map<u64, BaseSession *> sessions_;
 
     // First session is ONE;
-    atomic_u64 session_id_generator_{};
+    std::atomic_uint64_t session_id_generator_{};
 
-    std::atomic<u64> total_query_count_{0};
+    std::atomic_uint64_t total_query_count_{0};
 
     // session id -> query info
     std::mutex query_record_locker_{};

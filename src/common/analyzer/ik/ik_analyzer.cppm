@@ -1,8 +1,5 @@
-module;
-
 export module infinity_core:ik_analyzer;
 
-import :stl;
 import :analyze_context;
 import :lexeme;
 import :arbitrator;

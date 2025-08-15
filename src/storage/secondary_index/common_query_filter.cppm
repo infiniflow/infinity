@@ -12,11 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:common_query_filter;
 
-import :stl;
 import :roaring_bitmap;
 import :default_values;
 import :filter_expression_push_down;
@@ -61,7 +58,7 @@ export struct CommonQueryFilter {
     u32 total_task_num_ = 0;
     std::mutex task_mutex_;
     u32 begin_task_num_ = 0;
-    atomic_u32 end_task_num_ = 0;
+    std::atomic_uint32_t end_task_num_ = 0;
 
 public:
     CommonQueryFilter(std::shared_ptr<BaseExpression> original_filter, std::shared_ptr<BaseTableRef> base_table_ref, NewTxn* new_txn);

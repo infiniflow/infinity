@@ -335,7 +335,7 @@ std::tuple<size_t, Status> PersistenceManager::GetDirectorySize(const std::strin
         return {0, Status::IOError(fmt::format("{} doesn't exist.", path_str))};
     }
 
-    const Path path(path_str);
+    const fs::path path(path_str);
     for (const auto &entry : fs::recursive_directory_iterator(path)) {
         if (fs::is_regular_file(entry.status())) {
             total_size += fs::file_size(entry.path());
@@ -424,7 +424,7 @@ int PersistenceManager::CurrentObjRoomNoLock() { return int(object_size_limit_) 
 
 void PersistenceManager::CurrentObjAppendNoLock(const std::string &tmp_file_path, size_t file_size) {
     fs::path src_fp = tmp_file_path;
-    fs::path dst_fp = Path(workspace_) / current_object_key_;
+    fs::path dst_fp = fs::path(workspace_) / current_object_key_;
 
     // Debug: Check if this is a dictionary file
     bool is_dict_file = tmp_file_path.find(".dic") != std::string::npos;

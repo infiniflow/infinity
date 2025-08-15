@@ -19,7 +19,6 @@ module;
 
 export module infinity_core:maxsim_simd_funcs;
 
-import :stl;
 import :simd_common_tools;
 
 import std;

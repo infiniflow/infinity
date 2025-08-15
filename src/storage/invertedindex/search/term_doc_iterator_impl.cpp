@@ -40,7 +40,7 @@ TermDocIterator::TermDocIterator(std::unique_ptr<PostingIterator> &&iter, const 
 
 TermDocIterator::~TermDocIterator() {
     if (SHOULD_LOG_TRACE()) {
-        OStringStream oss;
+        std::ostringstream oss;
         oss << "TermDocIterator Debug Info:\n    column name: " << *column_name_ptr_ << ", term: " << *term_ptr_
             << "\n    access_bm_score_cnt: " << access_bm_score_cnt_ << ", calc_bm_score_cnt: " << calc_bm_score_cnt_
             << "\n    access_score_cnt: " << access_score_cnt_ << ", calc_score_cnt: " << calc_score_cnt_ << ", seek_cnt: " << seek_cnt_
@@ -67,7 +67,7 @@ void TermDocIterator::InitBM25Info(std::unique_ptr<FullTextColumnLengthReader> &
     f3 = f2 * std::numeric_limits<u16>::max();
     f4 = delta / (k1 + 1.0F);
     if (SHOULD_LOG_TRACE()) {
-        OStringStream oss;
+        std::ostringstream oss;
         oss << "TermDocIterator: ";
         if (column_name_ptr_ != nullptr && term_ptr_ != nullptr) {
             oss << "column: " << *column_name_ptr_ << ", term: " << *term_ptr_ << ",";

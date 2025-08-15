@@ -601,7 +601,7 @@ Status LogicalPlanner::BuildCreateTable(const CreateStatement *statement, std::s
     if (column_count == 0) {
         return Status::NoColumnDefined(create_table_info->table_name_);
     }
-    Set<std::string> dedup_set;
+    std::set<std::string> dedup_set;
     columns.reserve(column_count);
     for (size_t idx = 0; idx < column_count; ++idx) {
         const std::string &column_name = create_table_info->column_defs_[idx]->name();
@@ -665,7 +665,7 @@ Status LogicalPlanner::BuildCreateTable(const CreateStatement *statement, std::s
         if (param_name == "bloom_filter_columns") {
             std::vector<ColumnID> bloom_filter_columns;
             // spilt the param_value string by ',', find corresponding column id and add to bloom_filter_columns
-            IStringStream column_name_stream(param_value);
+            std::istringstream column_name_stream(param_value);
             std::string column_name;
             while (std::getline(column_name_stream, column_name, ',')) {
                 // remove leading and trailing spaces

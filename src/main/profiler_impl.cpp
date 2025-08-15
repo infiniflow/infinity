@@ -98,11 +98,11 @@ std::string BaseProfiler::ElapsedToString(std::chrono::nanoseconds duration, i64
     if (duration.count() <= 1000 * scale) {
         result.append(fmt::format("{}ns", duration.count()));
     } else if (duration.count() <= 1000 * 1000 * scale) {
-        result.append(fmt::format("{}us", ChronoCast<std::chrono::microseconds>(duration).count()));
+        result.append(fmt::format("{}us", std::chrono::duration_cast<std::chrono::microseconds>(duration).count()));
     } else if (duration.count() <= 1000 * 1000 * 1000 * scale) {
-        result.append(fmt::format("{}ms", ChronoCast<std::chrono::milliseconds>(duration).count()));
+        result.append(fmt::format("{}ms", std::chrono::duration_cast<std::chrono::milliseconds>(duration).count()));
     } else {
-        result.append(fmt::format("{}s", ChronoCast<Seconds>(duration).count()));
+        result.append(fmt::format("{}s", std::chrono::duration_cast<std::chrono::seconds>(duration).count()));
     }
     return result;
 }

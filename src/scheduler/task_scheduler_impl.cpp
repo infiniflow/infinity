@@ -227,7 +227,7 @@ void TaskScheduler::ScheduleTask(FragmentTask *task, u64 worker_id) {
 }
 
 void TaskScheduler::WorkerLoop(FragmentTaskBlockQueue *task_queue, i64 worker_id) {
-    List<FragmentTask *> task_lists;
+    std::list<FragmentTask *> task_lists;
     auto iter = task_lists.end();
     auto last_iter = task_lists.end();
     while (true) {

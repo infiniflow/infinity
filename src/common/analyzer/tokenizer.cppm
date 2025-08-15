@@ -16,8 +16,11 @@ module;
 
 export module infinity_core:tokenizer;
 
-import :stl;
 import :term;
+import :infinity_type;
+
+import std;
+import std.compat;
 
 namespace infinity {
 constexpr unsigned BYTE_MAX = 255;

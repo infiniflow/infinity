@@ -12,11 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:cached_scan_base;
 
-import :stl;
 import :cached_node_base;
 import :logical_node_type;
 

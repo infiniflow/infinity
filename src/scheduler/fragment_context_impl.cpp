@@ -12,12 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:fragment_context.impl;
 
 import :fragment_context;
-import :stl;
 import :fragment_task;
 import :infinity_exception;
 import :operator_state;

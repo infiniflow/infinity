@@ -12,11 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:base_txn_store;
 
-import :stl;
 import :txn_state;
 import :wal_entry;
 

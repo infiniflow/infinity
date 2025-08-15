@@ -18,7 +18,6 @@ module;
 
 export module infinity_core:rag_analyzer;
 
-import :stl;
 import :term;
 import :status;
 import :darts_trie;

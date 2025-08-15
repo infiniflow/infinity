@@ -24,7 +24,6 @@ module;
 
 export module infinity_core:plain_vec_store;
 
-import :stl;
 import :local_file_handle;
 import :hnsw_common;
 import :data_store_util;
@@ -167,7 +166,7 @@ public:
         return ret;
     }
 
-    void SetVec(size_t idx, const DataType *vec, const Meta &meta, size_t &mem_usage) { Copy(vec, vec + meta.dim(), GetVecMut(idx, meta)); }
+    void SetVec(size_t idx, const DataType *vec, const Meta &meta, size_t &mem_usage) { std::copy(vec, vec + meta.dim(), GetVecMut(idx, meta)); }
 
 private:
     DataType *GetVecMut(size_t idx, const Meta &meta) { return this->ptr_.get() + idx * meta.dim(); }

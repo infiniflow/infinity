@@ -12,11 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:logical_planner;
 
-import :stl;
 import :bind_context;
 import :load_meta;
 import :logical_node;

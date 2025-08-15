@@ -12,29 +12,25 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:peer_thrift_client;
 
 import :peer_server_thrift_types;
-import :stl;
-import :thrift;
 import :status;
 import :blocking_queue;
 import :peer_task;
+
+import third_party;
 
 import global_resource_usage;
 
 namespace infinity {
 
-using namespace ::apache::thrift;
-using namespace ::apache::thrift::protocol;
-using namespace ::apache::thrift::transport;
 using namespace infinity_peer_server;
 
 export class PeerClient {
 public:
-    PeerClient(const std::string &from_node_name, const std::string &ip_addr, i64 port) : from_node_name_(from_node_name), ip_address_(ip_addr), port_(port) {
+    PeerClient(const std::string &from_node_name, const std::string &ip_addr, i64 port)
+        : from_node_name_(from_node_name), ip_address_(ip_addr), port_(port) {
 #ifdef INFINITY_DEBUG
         GlobalResourceUsage::IncrObjectCount("PeerClient");
 #endif
@@ -74,9 +70,9 @@ private:
     i64 port_{};
 
     // For message transportation
-    std::shared_ptr<TTransport> socket_{};
-    std::shared_ptr<TTransport> transport_{};
-    std::shared_ptr<TProtocol> protocol_{};
+    std::shared_ptr<apache::thrift::protocol::TTransport> socket_{};
+    std::shared_ptr<apache::thrift::protocol::TTransport> transport_{};
+    std::shared_ptr<apache::thrift::protocol::TProtocol> protocol_{};
     std::unique_ptr<PeerServiceClient> client_{};
     std::atomic<bool> server_connected_{false};
 

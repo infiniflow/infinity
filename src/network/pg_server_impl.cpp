@@ -12,14 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:pg_server.impl;
 
 import :pg_server;
 import :thrift_server;
 import :infinity_context;
-import :stl;
 import :boost;
 import :infinity_exception;
 import :connection;

@@ -12,11 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:new_txn_manager;
 
-import :stl;
 import :buffer_manager;
 import :txn_state;
 import :default_values;
@@ -186,10 +183,10 @@ private:
     TxnTimeStamp ckp_begin_ts_ = UNCOMMIT_TS; // current ckp begin ts, UNCOMMIT_TS if no ckp is happening, UNCOMMIT_TS is a maximum u64 integer
 
     // For stop the txn manager
-    atomic_bool is_running_{false};
+    std::atomic_bool is_running_{false};
 
-    std::atomic<u64> total_committed_txn_count_{0};
-    std::atomic<u64> total_rollbacked_txn_count_{0};
+    std::atomic_uint64_t total_committed_txn_count_{0};
+    std::atomic_uint64_t total_rollbacked_txn_count_{0};
 
     std::shared_ptr<SystemCache> system_cache_{};
 

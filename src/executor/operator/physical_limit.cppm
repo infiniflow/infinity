@@ -12,11 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:physical_limit;
 
-import :stl;
 import :query_context;
 import :operator_state;
 import :physical_operator;
@@ -67,8 +64,8 @@ public:
     bool IsLimitOver();
 
 private:
-    ai64 offset_{};
-    ai64 limit_{};
+    std::atomic_int64_t offset_{};
+    std::atomic_int64_t limit_{};
 };
 
 export class UnSyncCounter final : public LimitCounter {

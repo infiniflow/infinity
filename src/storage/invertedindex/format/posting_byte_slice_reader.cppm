@@ -4,7 +4,6 @@ module;
 
 export module infinity_core:posting_byte_slice_reader;
 
-import :stl;
 import :byte_slice;
 import :byte_slice_reader;
 import :posting_byte_slice;

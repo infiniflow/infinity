@@ -19,6 +19,6 @@ struct LogHelper {
         oss.clear();
     }
     ~LogHelper() { LOG_INFO(std::move(oss).str()); }
-    OStringStream oss;
+    std::ostringstream oss;
 };
 }; // namespace infinity

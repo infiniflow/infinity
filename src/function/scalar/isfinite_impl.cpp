@@ -1,9 +1,6 @@
-module;
-
 module infinity_core:isfinite.impl;
 
 import :isfinite;
-import :stl;
 import :new_catalog;
 import :status;
 import :infinity_exception;

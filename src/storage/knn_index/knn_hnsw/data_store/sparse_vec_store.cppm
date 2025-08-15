@@ -22,7 +22,6 @@ module;
 
 export module infinity_core:sparse_vec_store;
 
-import :stl;
 import :local_file_handle;
 import :hnsw_common;
 import :sparse_util;

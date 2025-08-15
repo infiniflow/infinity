@@ -64,7 +64,7 @@ u32 MinMaxDataFilter::GetSerializeSizeInBytes() const {
     return total_binary_bytes;
 }
 
-void MinMaxDataFilter::SerializeToStringStream(OStringStream &os, u32 total_binary_bytes) const {
+void MinMaxDataFilter::SerializeToStringStream(std::ostringstream &os, u32 total_binary_bytes) const {
     // step 0. prepare column_count
     u32 column_count = min_max_filters_.size();
     // step 1. prepare space for binary_fuse_filters_
@@ -89,7 +89,7 @@ void MinMaxDataFilter::SerializeToStringStream(OStringStream &os, u32 total_bina
     }
 }
 
-void MinMaxDataFilter::DeserializeFromStringStream(IStringStream &is) {
+void MinMaxDataFilter::DeserializeFromStringStream(std::istringstream &is) {
     auto begin_pos = is.tellg();
     // step 0. load expected_total_binary_bytes and column_count
     u32 expected_total_binary_bytes;
@@ -144,7 +144,7 @@ void MinMaxDataFilter::SaveToJsonFile(nlohmann::json &entry_json) const {
     // step 2. encode to binary
     std::string save_to_binary;
     save_to_binary.reserve(total_binary_bytes);
-    OStringStream os(std::move(save_to_binary));
+    std::ostringstream os(std::move(save_to_binary));
     SerializeToStringStream(os, total_binary_bytes);
     // step 3. encode to base64, and save to json
     auto result_view = os.view();
@@ -164,7 +164,7 @@ bool MinMaxDataFilter::LoadFromJsonFile(std::string_view json_sv) {
         return false;
     }
     auto filter_binary = base64::from_base64(filter_base64);
-    IStringStream is(filter_binary);
+    std::istringstream is(filter_binary);
     DeserializeFromStringStream(is);
     if (!is or u32(is.tellg()) != is.view().size()) {
         UnrecoverableError("MinMaxDataFilter::LoadFromJsonFile(): position error");

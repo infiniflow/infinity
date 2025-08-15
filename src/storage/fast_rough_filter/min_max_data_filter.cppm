@@ -12,11 +12,8 @@
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
 
-module;
-
 export module infinity_core:min_max_data_filter;
 
-import :stl;
 import :value;
 import :logger;
 import :infinity_exception;
@@ -50,7 +47,7 @@ export struct InnerMinMaxDataFilterVarcharType {
 
     void SetToTruncate(std::string_view &input) {
         length = std::min<u32>(input.size(), INNER_STORED_LENGTH);
-        Copy(input.begin(), input.begin() + length, str.begin());
+        std::copy(input.begin(), input.begin() + length, str.begin());
     }
 
 private:
@@ -89,12 +86,12 @@ public:
 
     [[nodiscard]] u32 SizeInBytes() const { return sizeof(min_) + sizeof(max_); }
 
-    void SaveToOStringStream(OStringStream &os) const {
+    void SaveToOStringStream(std::ostringstream &os) const {
         os.write(reinterpret_cast<const char *>(&min_), sizeof(min_));
         os.write(reinterpret_cast<const char *>(&max_), sizeof(max_));
     }
 
-    void LoadFromIStringStream(IStringStream &is) {
+    void LoadFromIStringStream(std::istringstream &is) {
         is.read(reinterpret_cast<char *>(&min_), sizeof(min_));
         is.read(reinterpret_cast<char *>(&max_), sizeof(max_));
     }
@@ -197,9 +194,9 @@ public:
 
     u32 GetSerializeSizeInBytes() const;
 
-    void SerializeToStringStream(OStringStream &os, u32 total_binary_bytes = 0) const;
+    void SerializeToStringStream(std::ostringstream &os, u32 total_binary_bytes = 0) const;
 
-    void DeserializeFromStringStream(IStringStream &is);
+    void DeserializeFromStringStream(std::istringstream &is);
 
     void SaveToJsonFile(nlohmann::json &entry_json) const;
 

@@ -12,11 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:result_cache_manager;
 
-import :stl;
 import :cached_node_base;
 import :data_block;
 import :logical_read_cache;

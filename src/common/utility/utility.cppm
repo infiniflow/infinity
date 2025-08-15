@@ -12,8 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:utility;
 
 import :infinity_type;
@@ -53,5 +51,15 @@ std::tuple<u64, bool> ExtractU64FromStringSuffix(const std::string &src, size_t 
 std::vector<std::string> Partition(const std::string &text, char delimiter);
 
 std::string Concat(const std::vector<std::string> &v, char delimiter);
+
+void ToLower(std::string &str) {
+    std::ranges::transform(str, str.begin(), [](auto c) { return std::tolower(c); });
+}
+
+void ToUpper(std::string &str) {
+    std::ranges::transform(str, str.begin(), [](auto c) { return std::toupper(c); });
+}
+
+std::vector<std::string> SplitStrByComma(std::string str);
 
 } // namespace infinity

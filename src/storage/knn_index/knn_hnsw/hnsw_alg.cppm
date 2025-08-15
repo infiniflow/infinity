@@ -12,11 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:hnsw_alg;
 
-import :stl;
 import :local_file_handle;
 import :infinity_exception;
 import :knn_result_handler;
@@ -62,7 +59,7 @@ public:
     using PDV = std::pair<DistanceType, VertexType>;
     using CMP = CompareByFirst<DistanceType, VertexType>;
     using CMPReverse = CompareByFirstReverse<DistanceType, VertexType>;
-    using DistHeap = std::priority_queue<PDV, CMP>;
+    using DistHeap = std::priority_queue<PDV, std::vector<PDV>, CMP>;
 
     constexpr static bool LSG = IsLSGDistance<Distance>;
 
@@ -116,7 +113,7 @@ protected:
 
     // return the nearest `ef_construction_` neighbors of `query` in layer `layer_idx`
     template <bool WithLock,
-              FilterConcept<LabelType> Filter = NoneType,
+              FilterConcept<LabelType> Filter = std::nullopt_t,
               LogicalType ColumnLogicalType = LogicalType::kEmbedding,
               typename MultiVectorInnerTopnIndexType = void>
     std::tuple<size_t, std::unique_ptr<DistanceType[]>, std::unique_ptr<SearchLayerReturnParam3T<ColumnLogicalType>[]>>
@@ -131,7 +128,7 @@ protected:
         result_handler.Begin();
         auto add_result = [&](DistanceType add_dist, VertexType add_v) {
             if constexpr (ColumnLogicalType == LogicalType::kEmbedding) {
-                if constexpr (!std::is_same_v<Filter, NoneType>) {
+                if constexpr (!std::is_same_v<Filter, std::nullopt_t>) {
                     if (filter(this->GetLabel(add_v))) {
                         result_handler.AddResult(0, add_dist, add_v);
                     }
@@ -140,7 +137,7 @@ protected:
                 }
             } else if constexpr (ColumnLogicalType == LogicalType::kMultiVector) {
                 const auto l = this->GetLabel(add_v);
-                if constexpr (!std::is_same_v<Filter, NoneType>) {
+                if constexpr (!std::is_same_v<Filter, std::nullopt_t>) {
                     if (filter(l)) {
                         result_handler.AddResult(add_dist, l);
                     }
@@ -308,7 +305,7 @@ protected:
         }
     }
 
-    template <bool WithLock, FilterConcept<LabelType> Filter = NoneType, LogicalType ColumnLogicalType = LogicalType::kEmbedding>
+    template <bool WithLock, FilterConcept<LabelType> Filter = std::nullopt_t, LogicalType ColumnLogicalType = LogicalType::kEmbedding>
     std::tuple<size_t, std::unique_ptr<DistanceType[]>, std::unique_ptr<SearchLayerReturnParam3T<ColumnLogicalType>[]>>
     KnnSearchInner(const QueryVecType &q, size_t k, const Filter &filter, const KnnSearchOption &option) const {
         size_t ef = option.ef_;
@@ -373,7 +370,7 @@ public:
         }
     }
 
-    template <FilterConcept<LabelType> Filter = NoneType, bool WithLock = true>
+    template <FilterConcept<LabelType> Filter = std::nullopt_t, bool WithLock = true>
     std::tuple<size_t, std::unique_ptr<DistanceType[]>, std::unique_ptr<LabelType[]>>
     KnnSearch(const QueryVecType &q, size_t k, const Filter &filter, const KnnSearchOption &option = {}) const {
         switch (option.column_logical_type_) {
@@ -398,11 +395,11 @@ public:
     template <bool WithLock = true>
     std::tuple<size_t, std::unique_ptr<DistanceType[]>, std::unique_ptr<LabelType[]>>
     KnnSearch(const QueryVecType &q, size_t k, const KnnSearchOption &option = {}) const {
-        return KnnSearch<NoneType, WithLock>(q, k, std::nullopt, option);
+        return KnnSearch<std::nullopt_t, WithLock>(q, k, std::nullopt, option);
     }
 
     // function for test, add sort for convenience
-    template <FilterConcept<LabelType> Filter = NoneType, bool WithLock = true>
+    template <FilterConcept<LabelType> Filter = std::nullopt_t, bool WithLock = true>
     std::vector<std::pair<DistanceType, LabelType>>
     KnnSearchSorted(const QueryVecType &q, size_t k, const Filter &filter, const KnnSearchOption &option = {}) const {
         auto [result_n, d_ptr, v_ptr] = KnnSearchInner<WithLock, Filter>(q, k, filter, option);
@@ -416,7 +413,7 @@ public:
 
     // function for test
     std::vector<std::pair<DistanceType, LabelType>> KnnSearchSorted(const QueryVecType &q, size_t k, const KnnSearchOption &option = {}) const {
-        return KnnSearchSorted<NoneType>(q, k, std::nullopt, option);
+        return KnnSearchSorted<std::nullopt_t>(q, k, std::nullopt, option);
     }
 
     size_t GetVecNum() const { return data_store_.cur_vec_num(); }

@@ -1,15 +1,13 @@
-module;
-
 module infinity_core:upper.impl;
 
 import :upper;
 import :column_vector;
-import :stl;
 import :new_catalog;
 import :status;
 import :infinity_exception;
 import :scalar_function;
 import :scalar_function_set;
+import :utility;
 
 import logical_type;
 import internal_types;

@@ -12,8 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:bound_update_statement;
 
 import :bound_statement;
@@ -21,7 +19,6 @@ import :table_ref;
 import :base_expression;
 import :bind_context;
 import :logical_node;
-import :stl;
 
 namespace infinity {
 

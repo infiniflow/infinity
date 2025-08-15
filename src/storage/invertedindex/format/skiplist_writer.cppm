@@ -1,8 +1,5 @@
-module;
-
 export module infinity_core:skiplist_writer;
 
-import :stl;
 import :file_writer;
 import :file_reader;
 import :posting_byte_slice;

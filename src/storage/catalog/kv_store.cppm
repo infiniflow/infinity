@@ -12,11 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:kv_store;
 
-import :stl;
 import :status;
 
 import third_party;

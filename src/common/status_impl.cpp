@@ -288,11 +288,11 @@ Status Status::FunctionArgsError(const std::string &func_name) {
     return Status(ErrorCode::kFunctionArgsError, std::make_unique<std::string>(fmt::format("{} arguments have errors", func_name)));
 }
 
-Status Status::ImportFileFormatError(const infinity::std::string &detailed_info) {
+Status Status::ImportFileFormatError(const std::string &detailed_info) {
     return Status(ErrorCode::kImportFileFormatError, std::make_unique<std::string>(fmt::format("Import file format error: {}", detailed_info)));
 }
 
-Status Status::DataNotExist(const infinity::std::string &detailed_info) {
+Status Status::DataNotExist(const std::string &detailed_info) {
     return Status(ErrorCode::kImportFileFormatError, std::make_unique<std::string>(fmt::format("Data not exist: {}", detailed_info)));
 }
 
@@ -324,7 +324,7 @@ Status Status::ExceedIndexNameLength(u64 index_name_length) {
                   std::make_unique<std::string>(fmt::format("Given index name length exceeds {}", MAX_IDENTIFIER_NAME_LENGTH)));
 }
 
-Status Status::NoColumnDefined(const infinity::std::string &table_name) {
+Status Status::NoColumnDefined(const std::string &table_name) {
     return Status(ErrorCode::kNoColumnDefined, std::make_unique<std::string>(fmt::format("Try to define Table {} without any column.", table_name)));
 }
 
@@ -639,7 +639,7 @@ Status Status::NotRegistered(const std::string &node_info) {
 
 Status Status::CantSwitchRole(const std::string &detailed_info) { return Status(ErrorCode::kCantSwitchRole, std::make_unique<std::string>(detailed_info)); }
 
-Status Status::TooManyFollower(infinity::u8 follower_limit) {
+Status Status::TooManyFollower(u8 follower_limit) {
     return Status(ErrorCode::kTooManyFollower, std::make_unique<std::string>(fmt::format("Too many followers, limit: {}", follower_limit)));
 }
 

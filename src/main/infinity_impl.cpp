@@ -12,16 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:infinity.impl;
 
 import :infinity;
-import :stl;
 import :query_result;
 import :infinity_context;
 import :query_context;
 import :session_manager;
+import :utility;
 
 import std;
 

@@ -54,7 +54,7 @@ public:
         return SearchKnn(query, topk, options, nullptr);
     }
 
-    template <FilterConcept<BMPDocID> Filter = NoneType>
+    template <FilterConcept<BMPDocID> Filter = std::nullopt_t>
     std::pair<std::vector<BMPDocID>, std::vector<DataType>>
     SearchKnn(const SparseVecRef<DataType, IdxType> &query, i32 topk, const BmpSearchOptions &options, const Filter &filter) const {
         if (topk == 0) {
@@ -318,7 +318,7 @@ public:
         return SearchKnn(query, topk, options, nullptr);
     }
 
-    template <FilterConcept<BMPDocID> Filter = NoneType>
+    template <FilterConcept<BMPDocID> Filter = std::nullopt_t>
     std::pair<std::vector<BMPDocID>, std::vector<DataType>>
     SearchKnn(const SparseVecRef<DataType, IdxType> &query, i32 topk, const BmpSearchOptions &options, const Filter &filter) const {
         std::shared_lock lock(mtx_, std::defer_lock);

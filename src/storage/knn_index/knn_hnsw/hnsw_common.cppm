@@ -12,15 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:hnsw_common;
 
-import :stl;
 import :infinity_exception;
 import :sparse_util;
-
-import std;
 
 namespace infinity {
 
@@ -99,7 +94,7 @@ public:
 };
 
 export template <typename Filter, typename LabelType>
-concept FilterConcept = requires(LabelType label) { std::is_same_v<Filter, NoneType> || std::is_base_of_v<FilterBase<LabelType>, Filter>; };
+concept FilterConcept = requires(LabelType label) { std::is_same_v<Filter, std::nullopt_t> || std::is_base_of_v<FilterBase<LabelType>, Filter>; };
 
 export struct HnswInsertConfig {
     bool optimize_;

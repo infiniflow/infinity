@@ -1,8 +1,4 @@
-module;
-
 export module infinity_core:doc_list_encoder;
-
-import :stl;
 
 import :file_writer;
 import :file_reader;

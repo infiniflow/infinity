@@ -12,11 +12,8 @@
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
 
-module;
-
 module infinity_core:filter_expression_push_down_indexscanfilter.impl;
 
-import :stl;
 import :index_filter_evaluators;
 import :index_filter_expression_info_tree;
 import :filter_expression_push_down_helper;
@@ -51,6 +48,7 @@ import :segment_index_meta;
 import :table_meeta;
 import :db_meeta;
 import :kv_store;
+import :utility;
 
 import std;
 import third_party;

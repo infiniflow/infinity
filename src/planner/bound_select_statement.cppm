@@ -12,14 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:bound_select_statement;
 
 import :bound_statement;
 import :logical_knn_scan;
 import :base_expression;
-import :stl;
 import :bind_context;
 import :logical_node;
 import :table_ref;

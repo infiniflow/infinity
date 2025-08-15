@@ -678,7 +678,6 @@ export import :function;
 export import :table_function_set;
 export import :aggregate_function_set;
 export import :function_set;
-export import :thrift;
 export import :peer_thrift_server;
 export import :node_info;
 export import :pg_protocol_handler;
@@ -700,6 +699,6 @@ export import :buffer_reader;
 export import :system_info;
 export import :fixed_dimensional_encoding;
 export import :rcu_multimap;
-
+export import :infinity_type;
 
 export import third_party;

@@ -54,7 +54,7 @@ std::unique_ptr<QueryNode> QueryNode::GetOptimizedQueryTree(std::unique_ptr<Quer
     std::chrono::time_point<std::chrono::high_resolution_clock> start_time{};
     if (SHOULD_LOG_DEBUG()) {
         start_time = std::chrono::high_resolution_clock::now();
-        OStringStream oss;
+        std::ostringstream oss;
         oss << "Query tree before optimization:\n";
         if (root) {
             root->PrintTree(oss);
@@ -102,7 +102,7 @@ std::unique_ptr<QueryNode> QueryNode::GetOptimizedQueryTree(std::unique_ptr<Quer
     if (SHOULD_LOG_DEBUG()) {
         auto end_time = std::chrono::high_resolution_clock::now();
         auto duration = std::chrono::duration_cast<std::chrono::duration<float, std::milli>>(end_time - start_time);
-        OStringStream oss;
+        std::ostringstream oss;
         oss << "Query tree optimization time cost: " << duration << std::endl;
         oss << "Query tree after optimization:\n";
         if (optimized_root) {

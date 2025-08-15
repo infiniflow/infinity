@@ -12,14 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
-#include <type_traits>
-
 export module infinity_core:vector_distance;
 
-import :stl;
 import :simd_functions;
+
+import std;
 
 namespace infinity {
 export template <typename DiffType, typename ElemType1, typename ElemType2, typename DimType = u32>

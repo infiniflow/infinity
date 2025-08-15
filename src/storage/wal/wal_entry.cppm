@@ -21,7 +21,6 @@ export module infinity_core:wal_entry;
 import :table_def;
 import :index_base;
 import :data_block;
-import :stl;
 import :infinity_exception;
 import :persistence_manager;
 

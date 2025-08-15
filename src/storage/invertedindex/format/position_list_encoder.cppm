@@ -1,8 +1,5 @@
-module;
-
 export module infinity_core:position_list_encoder;
 
-import :stl;
 import :byte_slice;
 import :byte_slice_writer;
 import :file_writer;
@@ -13,6 +10,9 @@ import :skiplist_writer;
 import :position_list_format_option;
 import :posting_list_format;
 import :inmem_position_list_decoder;
+import :infinity_type;
+
+import std;
 
 namespace infinity {
 

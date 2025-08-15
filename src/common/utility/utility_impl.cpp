@@ -19,7 +19,6 @@ module;
 module infinity_core:utility.impl;
 
 import :utility;
-import :stl;
 import :default_values;
 
 import std;
@@ -178,8 +177,40 @@ std::vector<std::string> Partition(const std::string &text, char delimiter) {
         }
         tmp_str += c;
     }
-    parts.emplace_back(tmp_str);
     return parts;
+}
+
+std::string TrimString(const std::string &s) {
+    int len = s.length();
+    int i = 0;
+
+    while (i < len && isspace(s[i])) {
+        i++;
+    }
+
+    while (len > i && isspace(s[len - 1])) {
+        len--;
+    }
+
+    if (i == len) {
+        return "";
+    }
+
+    std::string ss = s.substr(i, len - i);
+    return ss;
+}
+
+std::vector<std::string> SplitStrByComma(std::string str) {
+    std::vector<std::string> tokens;
+    for (const auto &token : str | std::views::split(',')) {
+        tokens.emplace_back(token.begin(), token.end());
+    }
+
+    for (auto &s : tokens) {
+        s = TrimString(s);
+    }
+
+    return tokens;
 }
 
 std::string Concat(const std::vector<std::string> &v, char delimiter) {

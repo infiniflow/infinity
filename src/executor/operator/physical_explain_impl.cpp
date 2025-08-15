@@ -12,12 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:physical_explain.impl;
 
 import :physical_explain;
-import :stl;
 import :query_context;
 import :table_def;
 import :data_table;
@@ -211,7 +208,7 @@ void PhysicalExplain::ExplainAnalyze(std::vector<std::shared_ptr<std::string>> &
             for (const auto &operator_info : task_profile.timings_) {
                 std::string operator_info_str = fmt::format("  -> {} : ElapsedTime: {}, Output: {}",
                                                        operator_info.name_,
-                                                       BaseProfiler::ElapsedToString(static_cast<infinity::std::chrono::nanoseconds>(operator_info.elapsed_)),
+                                                       BaseProfiler::ElapsedToString(static_cast<std::chrono::nanoseconds>(operator_info.elapsed_)),
                                                        operator_info.output_rows_);
                 result.emplace_back(std::make_shared<std::string>(operator_info_str));
             }

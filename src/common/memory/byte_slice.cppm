@@ -6,7 +6,7 @@ import std.compat;
 
 namespace infinity {
 
-#pragma pack(push, 1)
+// #pragma pack(push, 1)
 
 export struct ByteSlice {
     ByteSlice() = default;
@@ -35,7 +35,7 @@ export struct ByteSlice {
     ByteSlice *volatile next_ = nullptr;
 };
 
-#pragma pack(pop)
+// #pragma pack(pop)
 
 export class ByteSliceList {
 public:

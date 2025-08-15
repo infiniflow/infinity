@@ -12,11 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:pg_server;
 
-import :stl;
 import :singleton;
 import :boost;
 import :connection;
@@ -42,7 +39,7 @@ private:
     void StartConnection(std::shared_ptr<Connection> &connection);
 
     std::atomic<PGServerStatus> status_{PGServerStatus::kStopped};
-    atomic_u64 running_connection_count_{0};
+    std::atomic_uint64_t running_connection_count_{0};
     std::unique_ptr<boost::asio::io_context> io_context_ptr_{};
     std::unique_ptr<boost::asio::ip::tcp::acceptor> acceptor_ptr_{};
 };

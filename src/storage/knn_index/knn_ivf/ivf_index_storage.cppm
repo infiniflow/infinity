@@ -12,11 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:ivf_index_storage;
 
-import :stl;
 import :index_ivf;
 import :ivf_index_util_func;
 import :infinity_exception;

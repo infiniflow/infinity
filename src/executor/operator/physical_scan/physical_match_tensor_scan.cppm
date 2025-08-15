@@ -16,7 +16,6 @@ module;
 
 export module infinity_core:physical_match_tensor_scan;
 
-import :stl;
 import :query_context;
 import :operator_state;
 import :physical_operator;
@@ -105,7 +104,7 @@ private:
     std::unique_ptr<TableIndexMeeta> table_index_meta_{};
     std::unique_ptr<std::vector<std::shared_ptr<SegmentIndexMeta>>> segment_index_metas_{};
 
-    mutable atomic_u32 task_executed_ = 0;
+    mutable std::atomic_uint32_t task_executed_ = 0;
 
     void ExecuteInner(QueryContext *query_context, MatchTensorScanOperatorState *operator_state) const;
 };

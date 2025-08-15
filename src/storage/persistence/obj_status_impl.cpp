@@ -110,7 +110,7 @@ ObjStat ObjStat::ReadBufAdv(const char *&buf) {
 }
 
 void ObjStat::CheckValid(const std::string &obj_key, size_t current_object_size) const {
-    const Set<Range> &deleted_ranges = deleted_ranges_;
+    const std::set<Range> &deleted_ranges = deleted_ranges_;
     if (deleted_ranges.size() >= 2) {
         auto it1 = deleted_ranges.begin();
         auto it2 = std::next(it1);

@@ -12,11 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:subquery_table_ref;
 
-import :stl;
 import :table_ref;
 import :bound_statement;
 

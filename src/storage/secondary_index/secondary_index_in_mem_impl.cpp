@@ -19,7 +19,6 @@ module;
 module infinity_core:secondary_index_in_mem.impl;
 
 import :secondary_index_in_mem;
-import :stl;
 import :default_values;
 import :buffer_manager;
 import :block_column_iter;
@@ -49,7 +48,7 @@ template <typename RawValueType>
 class SecondaryIndexInMemT final : public SecondaryIndexInMem {
     using KeyType = ConvertToOrderedType<RawValueType>;
     const RowID begin_row_id_;
-    // Replaced MultiMap + mutex with RcuMultiMap for better concurrent performance
+    // Replaced std::multimap + mutex with RcuMultiMap for better concurrent performance
     RcuMultiMap<KeyType, u32> in_mem_secondary_index_;
 
 protected:
@@ -77,7 +76,7 @@ public:
         BufferHandle handle = buffer_obj->Load();
         auto data_ptr = static_cast<SecondaryIndexData *>(handle.GetDataMut());
 
-        MultiMap<KeyType, u32> temp_map;
+        std::multimap<KeyType, u32> temp_map;
         const_cast<RcuMultiMap<KeyType, u32> &>(in_mem_secondary_index_).GetMergedMultiMap(temp_map);
 
         data_ptr->InsertData(&temp_map);

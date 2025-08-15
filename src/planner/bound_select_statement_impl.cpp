@@ -12,13 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:bound_select_statement.impl;
 
 import :bound_select_statement;
 import :logical_node;
-import :stl;
 import :query_context;
 import :bind_context;
 import :table_ref;
@@ -77,6 +74,7 @@ import :default_values;
 import :parse_fulltext_options;
 import :highlighter;
 import :new_txn;
+import :utility;
 
 import std;
 import std.compat;

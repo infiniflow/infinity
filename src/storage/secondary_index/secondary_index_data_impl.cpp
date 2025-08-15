@@ -19,7 +19,6 @@ module;
 module infinity_core:secondary_index_data.impl;
 
 import :secondary_index_data;
-import :stl;
 import :default_values;
 import :index_base;
 import :local_file_handle;
@@ -129,7 +128,7 @@ public:
     }
 
     void InsertData(const void *ptr) override {
-        auto map_ptr = static_cast<const MultiMap<OrderedKeyType, u32> *>(ptr);
+        auto map_ptr = static_cast<const std::multimap<OrderedKeyType, u32> *>(ptr);
         if (!map_ptr) {
             UnrecoverableError("InsertData(): error: map_ptr type error.");
         }
@@ -233,7 +232,7 @@ public:
     }
 
     void InsertData(const void *ptr) override {
-        auto map_ptr = static_cast<const MultiMap<OrderedKeyType, u32> *>(ptr);
+        auto map_ptr = static_cast<const std::multimap<OrderedKeyType, u32> *>(ptr);
         if (!map_ptr) {
             UnrecoverableError("InsertData(): error: map_ptr type error.");
         }

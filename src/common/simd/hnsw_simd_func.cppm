@@ -18,7 +18,6 @@ module;
 
 export module infinity_core:hnsw_simd_func;
 
-import :stl;
 import :simd_common_tools;
 
 import std.compat;

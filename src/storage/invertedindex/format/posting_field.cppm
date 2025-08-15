@@ -1,8 +1,5 @@
-module;
-
 export module infinity_core:posting_field;
 
-import :stl;
 import :int_encoder;
 import :fastpfor;
 import :byte_slice_reader;

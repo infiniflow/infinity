@@ -343,7 +343,7 @@ protected:
     const u32 OUT_BUF_NUM_;    //!< output threads number
 
     // both pre_heap_ and merge_losser_tree are defined as small root heaps
-    std::priority_queue<KeyAddr, std::greater<KeyAddr>> pre_heap_;
+    std::priority_queue<KeyAddr, std::vector<KeyAddr>, std::greater<KeyAddr>> pre_heap_;
     std::shared_ptr<LoserTree<KeyAddr, std::less<KeyAddr>>> merge_loser_tree_;
 
     u32 *micro_run_idx_{nullptr};  //!< the access index of each microruns

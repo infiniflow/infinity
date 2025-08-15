@@ -65,15 +65,15 @@ public:
     static Status Truncate(const std::string &file_name, size_t new_length);
     static Status Merge(const std::string &dst_file, const std::string &src_file);
     static Status Copy(const std::string &dst_file, const std::string &src_file);
-    static std::tuple<std::vector<std::shared_ptr<DirEntry>>, Status> ListDirectory(const std::string &path);
+    static std::tuple<std::vector<std::shared_ptr<std::filesystem::directory_entry>>, Status> ListDirectory(const std::string &path);
     static size_t GetFileSize(const std::string &path);
     static std::string GetParentPath(const std::string &path);
     static size_t GetDirectorySize(const std::string &path);
     static std::string ConcatenatePath(const std::string &dir_path, const std::string &file_path);
 
-    static std::ofstream BeginCompress(const std::string& compressed_file);
-    static Status AddFileCompress(std::ofstream& ofstream, const std::string &filename);
-    static void EndCompress(std::ofstream& ofstream);
+    static std::ofstream BeginCompress(const std::string &compressed_file);
+    static Status AddFileCompress(std::ofstream &ofstream, const std::string &filename);
+    static void EndCompress(std::ofstream &ofstream);
 
     static i32 MmapFile(const std::string &file_path, u8 *&data_ptr, size_t &data_len);
     static i32 MunmapFile(const std::string &file_path);

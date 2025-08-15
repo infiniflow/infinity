@@ -1,9 +1,6 @@
-module;
-
 module infinity_core:char_length.impl;
 
 import :char_length;
-import :stl;
 import :new_catalog;
 import :status;
 import :infinity_exception;

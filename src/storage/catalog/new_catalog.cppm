@@ -230,7 +230,7 @@ public:
 
 private:
     ProfileHistory history_{DEFAULT_PROFILER_HISTORY_SIZE};
-    atomic_bool enable_profile_{false};
+    std::atomic_bool enable_profile_{false};
     // bool is_vfs_{false};
     std::atomic<TxnTimeStamp> last_cleanup_ts_{0};
 

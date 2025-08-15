@@ -16,7 +16,6 @@ module;
 
 export module infinity_core:scalar_function;
 
-import :stl;
 import :function;
 import :function_data;
 import :column_vector;

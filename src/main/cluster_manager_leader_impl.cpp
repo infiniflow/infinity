@@ -12,8 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:cluster_manager_leader.impl;
 
 import :cluster_manager;
@@ -22,6 +20,7 @@ import :infinity_context;
 import :peer_thrift_client;
 
 import std;
+import third_party;
 
 import admin_statement;
 
@@ -418,7 +417,7 @@ void ClusterManager::PrepareLogs(const std::shared_ptr<std::string> &log_string)
 
 Status ClusterManager::SyncLogs() {
     LOG_TRACE("Sync logs to follower and async logs to learner");
-    Set<std::string> sent_nodes;
+    std::set<std::string> sent_nodes;
     while (true) {
         // Get follower and learner node
         std::vector<std::shared_ptr<NodeInfo>> followers;

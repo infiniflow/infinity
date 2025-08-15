@@ -1,9 +1,6 @@
-module;
-
 module infinity_core:position_list_encoder.impl;
 
 import :position_list_encoder;
-import :stl;
 import :byte_slice_writer;
 import :file_writer;
 import :file_reader;

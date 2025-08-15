@@ -19,6 +19,8 @@ import :node_info;
 import :peer_server_thrift_service;
 import :peer_server_thrift_types;
 
+import std;
+
 import admin_statement;
 
 namespace infinity {

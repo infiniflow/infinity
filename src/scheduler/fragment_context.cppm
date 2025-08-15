@@ -12,11 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:fragment_context;
 
-import :stl;
 import :fragment_task;
 import :profiler;
 import :physical_operator;
@@ -182,8 +179,8 @@ protected:
 
     FragmentType fragment_type_{FragmentType::kInvalid};
 
-    atomic_u64 unfinished_task_n_{0};
-    atomic_u64 unfinished_child_n_{0};
+    std::atomic_uint64_t unfinished_task_n_{0};
+    std::atomic_uint64_t unfinished_child_n_{0};
 };
 
 export class SerialMaterializedFragmentCtx final : public FragmentContext {

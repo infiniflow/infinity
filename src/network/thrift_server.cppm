@@ -12,12 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:thrift_server;
 
 import :infinity_thrift_service;
-import :thrift;
+
+import third_party;
 
 using namespace std;
 
@@ -55,7 +54,7 @@ public:
     void Shutdown();
 
 private:
-    std::unique_ptr<::apache::thrift::server::TServer> server{nullptr};
+    std::unique_ptr<apache::thrift::server::TServer> server{nullptr};
 
     bool initialized_{false};
     std::atomic<ThriftServerStatus> status_ = ThriftServerStatus::kStopped;

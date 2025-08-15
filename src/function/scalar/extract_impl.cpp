@@ -12,12 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:extract.impl;
 
 import :extract;
-import :stl;
 import :new_catalog;
 import :status;
 import :infinity_exception;

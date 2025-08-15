@@ -75,7 +75,7 @@ std::unique_ptr<DocIterator> QueryBuilder::CreateSearch(FullTextQueryContext &co
     auto result = context.optimized_query_tree_->CreateSearch(params);
 #ifdef INFINITY_DEBUG
     {
-        OStringStream oss;
+        std::ostringstream oss;
         oss << "DocIterator:\n";
         if (result) {
             result->PrintTree(oss);

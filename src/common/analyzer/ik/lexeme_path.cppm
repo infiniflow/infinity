@@ -1,8 +1,5 @@
-module;
-
 export module infinity_core:lexeme_path;
 
-import :stl;
 import :quick_sort_set;
 import :lexeme;
 

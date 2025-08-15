@@ -46,7 +46,7 @@ constexpr u64 Str2Int(const char *str, u64 last_value = basis) {
 
 u64 AnalyzerPool::AnalyzerNameToInt(const char *str) { return Str2Int(str); }
 
-bool IcharEquals(char a, char b) { return ToLower(static_cast<int>(a)) == ToLower(static_cast<int>(b)); }
+bool IcharEquals(char a, char b) { return std::tolower(static_cast<int>(a)) == std::tolower(static_cast<int>(b)); }
 
 bool IEquals(std::string_view lhs, std::string_view rhs) { return std::ranges::equal(lhs, rhs, IcharEquals); }
 

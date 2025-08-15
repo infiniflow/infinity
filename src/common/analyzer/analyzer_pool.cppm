@@ -18,6 +18,7 @@ import :singleton;
 import :analyzer;
 import :status;
 
+import std;
 import third_party;
 
 namespace infinity {

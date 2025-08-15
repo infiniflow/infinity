@@ -157,7 +157,7 @@ DS\-K3AJ303\/Dm140
     Map<String, String> column2analyzer;
     String default_field("body");
     SearchDriver driver(column2analyzer, default_field);
-    IStringStream iss(row_quires);
+    std::istringstream iss(row_quires);
     int rc = ParseStream(driver, iss);
     EXPECT_EQ(rc, 0);
 }
@@ -221,7 +221,7 @@ graphic cards
     column2analyzer["body"] = "chinese";
     String default_field("body");
     SearchDriver driver(column2analyzer, default_field);
-    IStringStream iss(row_quires);
+    std::istringstream iss(row_quires);
     try {
         int rc = ParseStream(driver, iss);
         EXPECT_EQ(rc, 0);
@@ -263,7 +263,7 @@ graphic cards
         const auto op = ops[i];
         //        LOG_INFO(fmt::format("Test With Operator Option: {}", ops_chars[i]));
         SearchDriver driver(column2analyzer, default_field, op);
-        IStringStream iss(row_quires);
+        std::istringstream iss(row_quires);
         try {
             int rc = ParseStream(driver, iss);
             EXPECT_EQ(rc, 0);
@@ -301,7 +301,7 @@ _exists_:"author" AND page_count:xxx AND name:star^1.3
     }
     String default_field("body");
     SearchDriver driver(column2analyzer, default_field);
-    IStringStream iss(row_quires);
+    std::istringstream iss(row_quires);
     try {
         int rc = ParseStream(driver, iss);
         EXPECT_EQ(rc, 0);

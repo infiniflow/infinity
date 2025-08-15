@@ -56,7 +56,7 @@ void PersistResultHandler::HandleWriteResult(const PersistWriteResult &result) {
 ObjAddr PersistResultHandler::HandleReadResult(const PersistReadResult &result) {
     if (result.obj_stat_ != nullptr) {
         ObjCached expect = ObjCached::kNotCached;
-        Atomic<ObjCached> &cached = result.obj_stat_->cached_;
+        std::atomic<ObjCached> &cached = result.obj_stat_->cached_;
         if (cached.compare_exchange_strong(expect, ObjCached::kDownloading)) {
             VirtualStore::AddRequestCount();
             std::string read_path = InfinityContext::instance().persistence_manager()->GetObjPath(result.obj_addr_.obj_key_);

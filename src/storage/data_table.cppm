@@ -12,13 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:data_table;
 
 import :table_def;
 import :base_table;
-import :stl;
 import :data_block;
 import :infinity_exception;
 import :logger;

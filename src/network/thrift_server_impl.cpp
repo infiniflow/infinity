@@ -12,8 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:thrift_server.impl;
 
 import :thrift_server;
@@ -23,12 +21,6 @@ import :infinity_exception;
 
 import std;
 import third_party;
-
-using namespace apache::thrift;
-using namespace apache::thrift::concurrency;
-using namespace apache::thrift::protocol;
-using namespace apache::thrift::transport;
-using namespace apache::thrift::server;
 
 namespace infinity {
 
@@ -52,10 +44,11 @@ void ThreadedThriftServer::Init(const std::string &server_address, i32 port_no) 
     //    std::cout << "API server listen on: " << server_address << ": " << port_no << std::endl;
     std::shared_ptr<TBinaryProtocolFactory> binary_protocol_factory = std::make_shared<TBinaryProtocolFactory>();
     binary_protocol_factory->setStrict(true, true);
-    server = std::make_unique<TThreadedServer>(std::make_shared<infinity_thrift_rpc::InfinityServiceProcessorFactory>(std::make_shared<InfinityServiceCloneFactory>()),
-                                         std::make_shared<TServerSocket>(server_address, port_no),
-                                         std::make_shared<TBufferedTransportFactory>(),
-                                         binary_protocol_factory);
+    server = std::make_unique<TThreadedServer>(
+        std::make_shared<infinity_thrift_rpc::InfinityServiceProcessorFactory>(std::make_shared<InfinityServiceCloneFactory>()),
+        std::make_shared<TServerSocket>(server_address, port_no),
+        std::make_shared<TBufferedTransportFactory>(),
+        binary_protocol_factory);
 }
 
 void ThreadedThriftServer::Start() {
@@ -77,26 +70,27 @@ void ThreadedThriftServer::Shutdown() {
 
 void PoolThriftServer::Init(const std::string &server_address, i32 port_no, i32 pool_size) {
 
-    std::shared_ptr<TServerSocket> server_socket = std::make_shared<TServerSocket>(server_address, port_no);
+    auto server_socket = std::make_shared<apache::thrift::transport::TServerSocket>(server_address, port_no);
 
-    std::shared_ptr<TBinaryProtocolFactory> protocol_factory = std::make_shared<TBinaryProtocolFactory>();
+    auto protocol_factory = std::make_shared<apache::thrift::protocol::TBinaryProtocolFactory>();
     //    std::shared_ptr<TCompactProtocolFactory> protocol_factory = std::make_shared<TCompactProtocolFactory>();
 
-    std::shared_ptr<ThreadFactory> threadFactory = std::make_shared<ThreadFactory>();
+    auto threadFactory = std::make_shared<apache::thrift::concurrency::ThreadFactory>();
 
-    std::shared_ptr<ThreadManager> threadManager = ThreadManager::newSimpleThreadManager(pool_size);
+    std::shared_ptr<apache::thrift::concurrency::ThreadManager> threadManager =
+        apache::thrift::concurrency::ThreadManager::newSimpleThreadManager(pool_size);
     threadManager->threadFactory(threadFactory);
     threadManager->start();
 
     fmt::print("API server(for Infinity-SDK) listen on {}: {}, connection limit: {}\n", server_address, port_no, pool_size);
     //    std::cout << "API server listen on: " << server_address << ": " << port_no << ", thread pool: " << pool_size << std::endl;
 
-    server =
-        std::make_unique<TThreadPoolServer>(std::make_shared<infinity_thrift_rpc::InfinityServiceProcessorFactory>(std::make_shared<InfinityServiceCloneFactory>()),
-                                      server_socket,
-                                      std::make_shared<TBufferedTransportFactory>(),
-                                      protocol_factory,
-                                      threadManager);
+    server = std::make_unique<apache::thrift::server::TThreadPoolServer>(
+        std::make_shared<infinity_thrift_rpc::InfinityServiceProcessorFactory>(std::make_shared<InfinityServiceCloneFactory>()),
+        server_socket,
+        std::make_shared<apache::thrift::transport::TBufferedTransportFactory>(),
+        protocol_factory,
+        threadManager);
 
     initialized_ = true;
 }
@@ -156,9 +150,11 @@ void NonBlockPoolThriftServer::Init(const std::string &server_address, i32 port_
     //    server_thread_ = thread_factory->newThread(std::shared_ptr<TServer>(
     //        new TNonblockingServer(serviceProcessor, protocolFactory, nbSocket1, threadManager)));
 
-    server_thread_ = thread_factory->newThread(std::make_shared<TNonblockingServer>(service_processor, protocol_factory, non_block_socket, threadManager));
+    server_thread_ =
+        thread_factory->newThread(std::make_shared<TNonblockingServer>(service_processor, protocol_factory, non_block_socket, threadManager));
 
-    //    server = std::make_unique<TThreadPoolServer>(std::make_shared<InfinityServiceProcessorFactory>(std::make_shared<InfinityServiceCloneFactory>()),
+    //    server =
+    //    std::make_unique<TThreadPoolServer>(std::make_shared<InfinityServiceProcessorFactory>(std::make_shared<InfinityServiceCloneFactory>()),
     //                                           std::make_shared<TServerSocket>(port_no),
     //                                           std::make_shared<TBufferedTransportFactory>(),
     //                                           std::make_shared<TBinaryProtocolFactory>(),

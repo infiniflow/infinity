@@ -1,9 +1,6 @@
-module;
-
 module infinity_core:trim.impl;
 
 import :trim;
-import :stl;
 import :new_catalog;
 import :status;
 import :infinity_exception;

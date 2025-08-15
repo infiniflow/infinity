@@ -1,8 +1,4 @@
-module;
-
 export module infinity_core:buf_writer;
-
-import :stl;
 
 import std.compat;
 
@@ -12,7 +8,7 @@ namespace infinity {
 // ColumnInverter will use BufWriter sequentially write data and use spill_file pointer randomly write data
 export struct BufWriter {
     BufWriter(FILE *spill_file, size_t spill_buf_size) : spill_file_(spill_file), spill_buf_size_(spill_buf_size) {
-        spill_buffer_ = std::make_unique<char_t[]>(spill_buf_size_);
+        spill_buffer_ = std::make_unique<char[]>(spill_buf_size_);
     }
 
     void Write(const char *data, size_t data_size) {
@@ -34,7 +30,7 @@ export struct BufWriter {
 
     FILE *spill_file_{nullptr};
     size_t spill_buf_idx_{0};
-    std::unique_ptr<char_t[]> spill_buffer_{};
+    std::unique_ptr<char[]> spill_buffer_{};
     size_t spill_buf_size_{0};
 };
 } // namespace infinity

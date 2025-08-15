@@ -12,12 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:ivf_index_data_in_mem.impl;
 
 import :ivf_index_data_in_mem;
-import :stl;
 import :ivf_index_storage;
 import :buffer_manager;
 import :index_base;

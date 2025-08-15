@@ -2516,7 +2516,7 @@ Status ExplainLogicalPlan::Explain(const LogicalOptimize *optimize_node, std::sh
 }
 
 Status ExplainLogicalPlan::Explain(const LogicalMatch *match_node, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size) {
-    IStringStream iss(match_node->ToString(intent_size));
+    std::istringstream iss(match_node->ToString(intent_size));
     std::string line;
     while (std::getline(iss, line)) {
         result->emplace_back(std::make_shared<std::string>(std::move(line)));
@@ -2525,7 +2525,7 @@ Status ExplainLogicalPlan::Explain(const LogicalMatch *match_node, std::shared_p
 }
 
 Status ExplainLogicalPlan::Explain(const LogicalMatchSparseScan *match_node, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size) {
-    IStringStream iss(match_node->ToString(intent_size));
+    std::istringstream iss(match_node->ToString(intent_size));
     std::string line;
     while (std::getline(iss, line)) {
         result->emplace_back(std::make_shared<std::string>(std::move(line)));
@@ -2534,7 +2534,7 @@ Status ExplainLogicalPlan::Explain(const LogicalMatchSparseScan *match_node, std
 }
 
 Status ExplainLogicalPlan::Explain(const LogicalMatchTensorScan *match_tensor_node, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size) {
-    IStringStream iss(match_tensor_node->ToString(intent_size));
+    std::istringstream iss(match_tensor_node->ToString(intent_size));
     std::string line;
     while (std::getline(iss, line)) {
         result->emplace_back(std::make_shared<std::string>(std::move(line)));
@@ -2543,7 +2543,7 @@ Status ExplainLogicalPlan::Explain(const LogicalMatchTensorScan *match_tensor_no
 }
 
 Status ExplainLogicalPlan::Explain(const LogicalFusion *fusion_node, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size) {
-    IStringStream iss(fusion_node->ToString(intent_size));
+    std::istringstream iss(fusion_node->ToString(intent_size));
     std::string line;
     while (std::getline(iss, line)) {
         result->emplace_back(std::make_shared<std::string>(std::move(line)));

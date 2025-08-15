@@ -1,6 +1,13 @@
 module;
 
-#include "new_pfordelta_compressor.h"
+#include <cassert>
+
+// // wait for clang fix
+// #ifndef PARESER_USE_STD_MODULE
+// #define PARESER_USE_STD_MODULE 1
+// import std;
+// import std.compat;
+// #endif
 
 export module infinity_core:int_encoder;
 
@@ -9,9 +16,11 @@ import :byte_slice_writer;
 import :infinity_exception;
 import :fastpfor;
 
+import third_party;
+
 namespace infinity {
 
-export using NewPForDeltaCompressor = indexlib::NewPForDeltaCompressor;
+// export using NewPForDeltaCompressor = indexlib::NewPForDeltaCompressor;
 
 export template <typename T, typename Compressor>
 class IntEncoder {

@@ -24,7 +24,6 @@ module;
 
 export module infinity_core:lvq_vec_store;
 
-import :stl;
 import :local_file_handle;
 import :hnsw_common;
 import :data_store_util;

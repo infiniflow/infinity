@@ -196,7 +196,7 @@ TEST_F(QueryBuilderTest, test_and) {
         and_root->Add(std::move(and_CDE));
         std::set_intersection(vec_AB_and.begin(), vec_AB_and.end(), vec_CDE_and.begin(), vec_CDE_and.end(), std::back_inserter(expect_result));
     }
-    OStringStream oss;
+    std::ostringstream oss;
     oss << "QueryNode tree:" << std::endl;
     static_cast<QueryNode *>(and_root.get())->PrintTree(oss);
     LOG_INFO(oss.str());
@@ -267,7 +267,7 @@ TEST_F(QueryBuilderTest, test_or) {
         or_root->Add(std::move(or_CDE));
         std::set_union(vec_AB_or.begin(), vec_AB_or.end(), vec_CDE_or.begin(), vec_CDE_or.end(), std::back_inserter(expect_result));
     }
-    OStringStream oss;
+    std::ostringstream oss;
     oss << "QueryNode tree:" << std::endl;
     static_cast<QueryNode *>(or_root.get())->PrintTree(oss);
     LOG_INFO(oss.str());
@@ -344,7 +344,7 @@ TEST_F(QueryBuilderTest, test_and_not) {
         not_E->Add(std::make_unique<MockQueryNode>(std::move(vec_E), "E", "body"));
         and_not_root->Add(std::move(not_E));
     }
-    OStringStream oss;
+    std::ostringstream oss;
     oss << "QueryNode tree:" << std::endl;
     static_cast<QueryNode *>(and_not_root.get())->PrintTree(oss);
     LOG_INFO(oss.str());
@@ -427,7 +427,7 @@ TEST_F(QueryBuilderTest, test_and_not2) {
         not_E->Add(std::make_unique<MockQueryNode>(std::move(vec_E), "E", "body"));
         and_not_root->Add(std::move(not_E));
     }
-    OStringStream oss;
+    std::ostringstream oss;
     oss << "QueryNode tree:" << std::endl;
     static_cast<QueryNode *>(and_not_root.get())->PrintTree(oss);
     LOG_INFO(oss.str());

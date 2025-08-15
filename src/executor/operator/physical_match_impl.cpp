@@ -135,7 +135,7 @@ QueryIterators CreateQueryIterators(QueryBuilder &query_builder,
 void ASSERT_FLOAT_EQ(const float bar, const u32 i, const float a, const float b) {
     const float diff_percent = std::abs(a - b) / std::max(std::abs(a), std::abs(b));
     if (diff_percent > bar) {
-        OStringStream oss;
+        std::ostringstream oss;
         oss << "Debug Info: result mismatch at " << i << " : a: " << a << ", b: " << b << ", diff_percent: " << diff_percent << std::endl;
         LOG_ERROR(std::move(oss).str());
     }

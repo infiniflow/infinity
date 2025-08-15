@@ -18,7 +18,6 @@ module;
 
 module infinity_core:lemmatizer.impl;
 
-import :stl;
 import :lemmatizer;
 
 import std;
@@ -167,7 +166,7 @@ std::vector<std::string> Lemmatizer::ApplyRules(const std::vector<std::string> &
 
 std::vector<std::string> Lemmatizer::FilterForms(const std::vector<std::string> &forms, const std::string &pos) {
     std::vector<std::string> result;
-    Set<std::string> seen;
+    std::set<std::string> seen;
     for (const auto &form : forms) {
         // Check if form exists in lemma_pos_offset_map_
         if (lemma_pos_offset_map_.find(form) != lemma_pos_offset_map_.end()) {

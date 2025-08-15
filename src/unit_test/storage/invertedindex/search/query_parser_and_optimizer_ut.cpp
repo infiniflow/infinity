@@ -146,7 +146,7 @@ sda:rtw AND ((NOT name:god^2 OR NOT kddd:ss^4) OR NOT ee:ff^1.2)
     Map<String, String> column2analyzer;
     String default_field("body");
     SearchDriver driver(column2analyzer, default_field);
-    IStringStream iss(row_quires);
+    std::istringstream iss(row_quires);
     int rc = ParseAndOptimizeFromStream(driver, iss);
     EXPECT_EQ(rc, 0);
 }
@@ -183,7 +183,7 @@ sda:rtw AND ((NOT name:god^2 OR NOT kddd:ss^4) OR NOT ee:ff^1.2)
         const auto op = ops[i];
         LOG_DEBUG(fmt::format("Test With Operator Option: {}", ops_chars[i]));
         SearchDriver driver(column2analyzer, default_field, op);
-        IStringStream iss(row_quires);
+        std::istringstream iss(row_quires);
         int rc = ParseAndOptimizeFromStream(driver, iss);
         EXPECT_EQ(rc, 0);
     }
@@ -219,7 +219,7 @@ graphic cards
         const auto op = ops[i];
         LOG_DEBUG(fmt::format("Test With Operator Option: {}", ops_chars[i]));
         SearchDriver driver(column2analyzer, default_field, op);
-        IStringStream iss(row_quires);
+        std::istringstream iss(row_quires);
         try {
             int rc = ParseAndOptimizeFromStream(driver, iss);
             EXPECT_EQ(rc, 0);

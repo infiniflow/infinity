@@ -12,11 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:physical_scan_base;
 
-import :stl;
 import :physical_operator;
 import :physical_operator_type;
 import :global_block_id;

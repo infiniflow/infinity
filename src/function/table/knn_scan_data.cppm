@@ -12,11 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:knn_scan_data;
 
-import :stl;
 import :table_function;
 import :global_block_id;
 import :merge_knn;
@@ -68,8 +65,8 @@ public:
     const EmbeddingDataType query_elem_type_{EmbeddingDataType::kElemInvalid};
     const KnnDistanceType knn_distance_type_{KnnDistanceType::kInvalid};
 
-    atomic_u64 current_block_idx_{0};
-    atomic_u64 current_index_idx_{0};
+    std::atomic_uint64_t current_block_idx_{0};
+    std::atomic_uint64_t current_index_idx_{0};
 };
 
 //-------------------------------------------------------------------

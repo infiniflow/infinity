@@ -12,11 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.module;
 
-module;
-
 export module infinity_core:highlighter;
 
-import :stl;
 import :singleton;
 import :aho_corasick;
 import :analyzer;

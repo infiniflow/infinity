@@ -2,7 +2,6 @@ module;
 
 export module infinity_core:analyze_context;
 
-import :stl;
 import :quick_sort_set;
 import :character_util;
 import :lexeme;

@@ -18,6 +18,7 @@ module;
 #pragma clang diagnostic ignored "-W#pragma-messages"
 #pragma clang diagnostic ignored "-Wall"
 
+// wait for clang fix
 import std;
 import std.compat;
 
@@ -64,6 +65,8 @@ import std.compat;
 #define _GLIBCXX_DEQUE 1
 #define _GLIBCXX_SPAN 1
 #define _EXT_NUMERIC_TRAITS 1
+#define _GLIBCXX_FUTURE 1
+#define _GLIBCXX_QUEUE 1
 
 #include <cerrno>
 
@@ -111,9 +114,26 @@ import std.compat;
 
 #include <re2/re2.h>
 
+#include <thrift/TApplicationException.h>
+#include <thrift/TBase.h>
+#include <thrift/TDispatchProcessor.h>
+#include <thrift/Thrift.h>
+#include <thrift/async/TConcurrentClientSyncInfo.h>
+#include <thrift/concurrency/ThreadFactory.h>
+#include <thrift/concurrency/ThreadManager.h>
+#include <thrift/protocol/TBinaryProtocol.h>
+#include <thrift/protocol/TProtocol.h>
+#include <thrift/server/TThreadPoolServer.h>
 #include <thrift/server/TThreadedServer.h>
+#include <thrift/transport/TBufferTransports.h>
+#include <thrift/transport/TServerSocket.h>
+#include <thrift/transport/TSocket.h>
 
 // #include "inc/mlas.h"
+
+#include "new_pfordelta_compressor.h"
+
+#include <ctpl_stl.h>
 
 #pragma clang diagnostic pop
 
@@ -206,8 +226,8 @@ namespace detail {
 export using ::nlohmann::detail::enable_if_t;
 export using ::nlohmann::detail::is_basic_json;
 export using ::nlohmann::detail::value_t;
-}
-}
+} // namespace detail
+} // namespace nlohmann
 
 namespace simdjson {
 export using ::simdjson::padded_string;
@@ -459,10 +479,42 @@ export using ::re2::RE2;
 namespace apache {
 namespace thrift {
 export using ::apache::thrift::TConnectionInfo;
-}
+export using ::apache::thrift::TDispatchProcessor;
+export using ::apache::thrift::TProcessorContextFreer;
+export using ::apache::thrift::TBase;
+export using ::apache::thrift::TApplicationException;
+namespace protocol {
+export using ::apache::thrift::protocol::TProtocol;
+export using ::apache::thrift::protocol::TOutputRecursionTracker;
+export using ::apache::thrift::protocol::TTransport;
+export using ::apache::thrift::protocol::TBinaryProtocolFactory;
+export using ::apache::thrift::protocol::TBinaryProtocol;
+} // namespace protocol
+namespace server {
+export using ::apache::thrift::server::TServer;
+export using ::apache::thrift::server::TThreadPoolServer;
+} // namespace server
+namespace transport {
+export using ::apache::thrift::transport::TServerSocket;
+export using ::apache::thrift::transport::TBufferedTransportFactory;
+export using ::apache::thrift::transport::TSocket;
+export using ::apache::thrift::transport::TBufferedTransport;
+export using ::apache::thrift::transport::TTransportException;
+} // namespace transport
+namespace concurrency {
+export using ::apache::thrift::concurrency::ThreadFactory;
+export using ::apache::thrift::concurrency::ThreadManager;
+} // namespace concurrency
+} // namespace thrift
 } // namespace apache
+
+export using NewPForDeltaCompressor = indexlib::NewPForDeltaCompressor;
 
 // mlas
 // export using CBLAS_TRANSPOSE
+
+namespace ctpl {
+export using ::ctpl::thread_pool;
+}
 
 } // namespace infinity

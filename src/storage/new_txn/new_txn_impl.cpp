@@ -737,8 +737,8 @@ Status NewTxn::AddColumns(const std::string &db_name, const std::string &table_n
     }
 
     // Construct added columns name map
-    Set<size_t> column_idx_set;
-    Set<std::string> column_name_set;
+    std::set<size_t> column_idx_set;
+    std::set<std::string> column_name_set;
     for (const auto &column_def : column_defs) {
         column_idx_set.insert(column_def->id());
         column_name_set.insert(column_def->name());
@@ -789,8 +789,8 @@ Status NewTxn::ReplayAddColumns(WalCmdAddColumnsV2 *add_columns_cmd, TxnTimeStam
     }
 
     // Construct added columns name map
-    Set<size_t> column_idx_set;
-    Set<std::string> column_name_set;
+    std::set<size_t> column_idx_set;
+    std::set<std::string> column_name_set;
     for (const auto &column_def : add_columns_cmd->column_defs_) {
         column_idx_set.insert(column_def->id());
         column_name_set.insert(column_def->name());
@@ -833,7 +833,7 @@ Status NewTxn::DropColumns(const std::string &db_name, const std::string &table_
     }
 
     {
-        Set<std::string> name_set;
+        std::set<std::string> name_set;
         for (const auto &name : column_names) {
             if (!name_set.insert(name).second) {
                 return Status::DuplicateColumnName(name);
@@ -3195,7 +3195,7 @@ bool NewTxn::CheckConflictTxnStore(const RestoreTableTxnStore &txn_store, NewTxn
 bool NewTxn::CheckConflictCmd(const WalCmdAppendV2 &cmd, NewTxn *previous_txn, std::string &cause, bool &retry_query) {
     const std::string &db_name = cmd.db_name_;
     const std::string &table_name = cmd.table_name_;
-    Set<SegmentID> segment_ids;
+    std::set<SegmentID> segment_ids;
     for (const auto &row_range : cmd.row_ranges_) {
         RowID row_id = row_range.first;
         segment_ids.insert(row_id.segment_id_);
@@ -3775,7 +3775,7 @@ bool NewTxn::CheckConflictTxnStore(const DropColumnsTxnStore &txn_store, NewTxn 
 bool NewTxn::CheckConflictCmd(const WalCmdCompactV2 &cmd, NewTxn *previous_txn, std::string &cause, bool &retry_query) {
     const std::string &db_name = cmd.db_name_;
     const std::string &table_name = cmd.table_name_;
-    Set<SegmentID> segment_ids;
+    std::set<SegmentID> segment_ids;
     for (const auto segment_id : cmd.deprecated_segment_ids_) {
         segment_ids.insert(segment_id);
     }
@@ -4193,7 +4193,7 @@ bool NewTxn::CheckConflictCmd(const WalCmdDumpIndexV2 &cmd, NewTxn *previous_txn
             case WalCommandType::COMPACT_V2: {
                 auto *compact_cmd = static_cast<WalCmdCompactV2 *>(wal_cmd.get());
                 if (compact_cmd->db_name_ == db_name && compact_cmd->table_name_ == table_name) {
-                    Set<SegmentID> segment_ids;
+                    std::set<SegmentID> segment_ids;
                     for (const auto segment_id : compact_cmd->deprecated_segment_ids_) {
                         segment_ids.insert(segment_id);
                     }
@@ -4684,7 +4684,7 @@ bool NewTxn::CheckConflictTxnStore(const RenameTableTxnStore &txn_store, NewTxn 
 bool NewTxn::CheckConflictTxnStore(const UpdateTxnStore &txn_store, NewTxn *previous_txn, std::string &cause, bool &retry_query) {
     const std::string &db_name = txn_store.db_name_;
     const std::string &table_name = txn_store.table_name_;
-    Set<SegmentID> segment_ids;
+    std::set<SegmentID> segment_ids;
     for (const auto &row_id : txn_store.row_ids_) {
         segment_ids.insert(row_id.segment_id_);
     }

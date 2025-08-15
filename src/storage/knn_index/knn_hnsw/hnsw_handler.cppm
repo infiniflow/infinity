@@ -2,11 +2,8 @@
 // Created by infiniflow on 25-5-13.
 //
 
-module;
-
 export module infinity_core:hnsw_handler;
 
-import :stl;
 import :hnsw_alg;
 import :data_store;
 import :vec_store_type;
@@ -103,7 +100,7 @@ public:
 
     static std::unique_ptr<HnswHandler> Make(const IndexBase *index_base, const ColumnDef *column_def, bool own_mem = true);
 
-    template <typename DistanceT, typename LabelT, typename Filter = NoneType, bool WithLock = true>
+    template <typename DistanceT, typename LabelT, typename Filter = std::nullopt_t, bool WithLock = true>
     std::tuple<size_t, std::unique_ptr<DistanceT[]>, std::unique_ptr<LabelT[]>>
     SearchIndex(const auto &q, size_t k, const Filter &filter, const KnnSearchOption &option = {}) const {
         std::tuple<size_t, std::unique_ptr<DistanceT[]>, std::unique_ptr<LabelT[]>> res{};

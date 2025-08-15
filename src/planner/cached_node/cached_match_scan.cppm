@@ -12,11 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:cached_match_scan;
 
-import :stl;
 import :logical_match_scan_base;
 import :cached_scan_base;
 import :logical_match_tensor_scan;

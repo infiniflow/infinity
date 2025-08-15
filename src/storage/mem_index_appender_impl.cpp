@@ -12,12 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:mem_index_appender.impl;
 
 import :mem_index_appender;
-import :stl;
 import :bg_task;
 import :logger;
 import :infinity_exception;

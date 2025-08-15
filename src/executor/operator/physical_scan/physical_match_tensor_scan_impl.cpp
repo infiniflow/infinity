@@ -181,7 +181,7 @@ void PhysicalMatchTensorScan::PlanWithIndex(QueryContext *query_context) {
 
     TableMeeta *table_meta = base_table_ref_->block_index_->table_meta_.get();
 
-    Set<SegmentID> index_entry_map;
+    std::set<SegmentID> index_entry_map;
 
     if (!src_match_tensor_expr_->ignore_index_) {
         std::vector<std::string> *index_id_strs_ptr = nullptr;

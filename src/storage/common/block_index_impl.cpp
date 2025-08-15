@@ -12,12 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:block_index.impl;
 
 import :block_index;
-import :stl;
 import :global_block_id;
 import :default_values;
 import :status;

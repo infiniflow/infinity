@@ -12,22 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
-#include <cstring>
-#include <random>
-
 export module infinity_core:kmeans_partition;
 
-import :stl;
 import :infinity_exception;
 import :index_base;
 import :vector_distance;
 import :logger;
 import :simd_functions;
 
-// import std;
-// import std.compat;
+import std;
+import std.compat;
 
 namespace infinity {
 

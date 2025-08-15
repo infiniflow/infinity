@@ -12,11 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:physical_source;
 
-import :stl;
 import :operator_state;
 import :physical_operator;
 import :physical_operator_type;

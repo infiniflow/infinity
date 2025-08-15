@@ -14,8 +14,9 @@
 
 export module infinity_core:peer_thrift_server;
 
-import :thrift;
 import :infinity_type;
+
+import third_party;
 
 namespace infinity {
 

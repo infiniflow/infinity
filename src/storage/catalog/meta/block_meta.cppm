@@ -12,11 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:block_meta;
 
-import :stl;
 import :status;
 import :default_values;
 import :meta_info;

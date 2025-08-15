@@ -12,11 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:aggregate_function;
 
-import :stl;
 import :function;
 import :function_data;
 import :column_vector;

@@ -1,9 +1,6 @@
-module;
-
 module infinity_core:position.impl;
 
 import :position;
-import :stl;
 import :new_catalog;
 import :status;
 import :infinity_exception;

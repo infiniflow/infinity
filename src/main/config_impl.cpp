@@ -700,12 +700,12 @@ Status Config::Init(const std::shared_ptr<std::string> &config_path, DefaultConf
                                     major_version_str += c;
                                 }
 
-                                if (IsEqual(major_version_str, invalid_str)) {
+                                if (major_version_str == invalid_str) {
                                     return Status::InvalidConfig("Invalid version field");
                                 } else {
                                     std::string current_major_version = fmt::format("{}.{}", version_major(), version_minor());
                                     std::string current_version = fmt::format("{}.{}.{}", version_major(), version_minor(), version_patch());
-                                    if (IsEqual(major_version_str, current_major_version)) {
+                                    if (major_version_str == current_major_version) {
                                         std::unique_ptr<StringOption> version_option =
                                             std::make_unique<StringOption>(VERSION_OPTION_NAME, current_version);
                                         Status status = global_options_.AddOption(std::move(version_option));
@@ -1432,17 +1432,17 @@ Status Config::Init(const std::shared_ptr<std::string> &config_path, DefaultConf
                             if (elem.second.is_string()) {
                                 std::string log_level_str = elem.second.value_or("info");
                                 ToLower(log_level_str);
-                                if (IsEqual(log_level_str, "trace")) {
+                                if (log_level_str == "trace") {
                                     log_level = LogLevel::kTrace;
-                                } else if (IsEqual(log_level_str, "debug")) {
+                                } else if (log_level_str == "debug") {
                                     log_level = LogLevel::kDebug;
-                                } else if (IsEqual(log_level_str, "info")) {
+                                } else if (log_level_str == "info") {
                                     log_level = LogLevel::kInfo;
-                                } else if (IsEqual(log_level_str, "warning")) {
+                                } else if (log_level_str == "warning") {
                                     log_level = LogLevel::kWarning;
-                                } else if (IsEqual(log_level_str, "error")) {
+                                } else if (log_level_str == "error") {
                                     log_level = LogLevel::kError;
-                                } else if (IsEqual(log_level_str, "critical")) {
+                                } else if (log_level_str == "critical") {
                                     log_level = LogLevel::kCritical;
                                 } else {
                                     return Status::InvalidLogLevel(log_level_str);
@@ -2414,11 +2414,11 @@ Status Config::Init(const std::shared_ptr<std::string> &config_path, DefaultConf
                             if (elem.second.is_string()) {
                                 std::string flush_option_str = elem.second.value_or("flush_at_once");
                                 ToLower(flush_option_str);
-                                if (IsEqual(flush_option_str, "flush_at_once")) {
+                                if (flush_option_str == "flush_at_once") {
                                     flush_option_type = FlushOptionType::kFlushAtOnce;
-                                } else if (IsEqual(flush_option_str, "only_write")) {
+                                } else if (flush_option_str == "only_write") {
                                     flush_option_type = FlushOptionType::kFlushAtOnce;
-                                } else if (IsEqual(flush_option_str, "flush_per_second")) {
+                                } else if (flush_option_str == "flush_per_second") {
                                     flush_option_type = FlushOptionType::kFlushAtOnce;
                                 } else {
                                     return Status::InvalidConfig(fmt::format("Unsupported flush option: {}", flush_option_str));

@@ -12,8 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:bound_insert_statement;
 
 import :bound_statement;
@@ -22,7 +20,6 @@ import :base_expression;
 import :bind_context;
 import :logical_node;
 import :query_context;
-import :stl;
 
 namespace infinity {
 

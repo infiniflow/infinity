@@ -29,28 +29,28 @@ namespace {
 
 #if THRIFT_SERVER_TYPE == 0
 
-infinity::std::thread pool_thrift_thread;
+std::thread pool_thrift_thread;
 infinity::PoolThriftServer pool_thrift_server;
 
 #elif THRIFT_SERVER_TYPE == 1
 
-infinity::std::thread non_block_pool_thrift_thread;
+std::thread non_block_pool_thrift_thread;
 infinity::NonBlockPoolThriftServer non_block_pool_thrift_server;
 
 #else
 
-infinity::std::thread threaded_thrift_thread;
+std::thread threaded_thrift_thread;
 infinity::ThreadedThriftServer threaded_thrift_server;
 
 #endif
 
-infinity::std::thread pool_peer_thrift_thread;
+std::thread pool_peer_thrift_thread;
 infinity::PoolPeerThriftServer pool_peer_thrift_server;
 
-infinity::std::thread http_server_thread;
+std::thread http_server_thread;
 infinity::HTTPServer http_server;
 
-infinity::std::thread pg_thread;
+std::thread pg_thread;
 infinity::PGServer pg_server;
 
 // Used for server shutdown
@@ -59,15 +59,15 @@ std::condition_variable server_cv;
 
 bool server_running = false;
 
-infinity::std::thread shutdown_thread;
+std::thread shutdown_thread;
 
 void StartThriftServer() {
     using namespace infinity;
-    u32 thrift_server_port = InfinityContext::instance().config()->ClientPort();
+    uint32_t thrift_server_port = InfinityContext::instance().config()->ClientPort();
 
 #if THRIFT_SERVER_TYPE == 0
 
-    i32 thrift_server_pool_size = InfinityContext::instance().config()->ConnectionPoolSize();
+    int32_t thrift_server_pool_size = InfinityContext::instance().config()->ConnectionPoolSize();
     pool_thrift_server.Init(InfinityContext::instance().config()->ServerAddress(), thrift_server_port, thrift_server_pool_size);
     pool_thrift_thread = pool_thrift_server.Start();
 
@@ -103,8 +103,8 @@ void StopThriftServer() {
 
 void StartPeerServer() {
     using namespace infinity;
-    u32 peer_server_port = InfinityContext::instance().config()->PeerServerPort();
-    i32 peer_server_connection_pool_size = InfinityContext::instance().config()->PeerServerConnectionPoolSize();
+    uint32_t peer_server_port = InfinityContext::instance().config()->PeerServerPort();
+    int32_t peer_server_connection_pool_size = InfinityContext::instance().config()->PeerServerConnectionPoolSize();
     pool_peer_thrift_server.Init(InfinityContext::instance().config()->PeerServerIP(), peer_server_port, peer_server_connection_pool_size);
     pool_peer_thrift_thread = pool_peer_thrift_server.Start();
     infinity::LOG_INFO("Peer server is started.");
@@ -201,7 +201,7 @@ void RegisterSignal() {
 }
 
 void TerminateHandler() {
-    infinity::String message = "TerminateHandler: ";
+   std::string message = "TerminateHandler: ";
     try {
         std::exception_ptr eptr{std::current_exception()};
         if (eptr) {
@@ -245,7 +245,7 @@ auto main(int argc, char **argv) -> int {
 
     CLI::App app{"infinity_main"};
 
-    std::shared_ptr<String> config_path = std::make_shared<String>();
+    auto config_path = std::make_shared<std::string>();
     bool m_flag{false};
     app.add_option("-f,--config", *config_path, "Specify the config file path. No default config file");
     app.add_flag("-m,--maintenance", m_flag, "Start Infinity in maintenance mode");
@@ -274,7 +274,7 @@ auto main(int argc, char **argv) -> int {
 
     http_server_thread = http_server.Start(InfinityContext::instance().config()->ServerAddress(), InfinityContext::instance().config()->HTTPPort());
 
-    shutdown_thread = infinity::std::thread([&]() { ShutdownServer(); });
+    shutdown_thread = std::thread([&]() { ShutdownServer(); });
 
     RegisterSignal();
 

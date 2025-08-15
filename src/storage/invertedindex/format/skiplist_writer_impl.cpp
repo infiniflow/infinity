@@ -5,7 +5,6 @@ module;
 module infinity_core:skiplist_writer.impl;
 
 import :skiplist_writer;
-import :stl;
 import :byte_slice;
 import :file_writer;
 import :file_reader;

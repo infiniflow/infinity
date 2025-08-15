@@ -33,6 +33,7 @@ import :defer_op;
 import :data_table;
 import :column_vector;
 import :query_result;
+import :utility;
 
 import std;
 import std.compat;
@@ -2093,7 +2094,7 @@ ConstantExpr *InfinityThriftService::GetConstantFromProto(Status &status, const 
             parsed_expr->double_value_ = expr.f64_value;
             return parsed_expr;
         }
-        case infinity_thrift_rpc::LiteralType::std::string: {
+        case infinity_thrift_rpc::LiteralType::String: {
             auto parsed_expr = new ConstantExpr(LiteralType::kString);
             parsed_expr->str_value_ = strdup(expr.str_value.c_str());
             return parsed_expr;

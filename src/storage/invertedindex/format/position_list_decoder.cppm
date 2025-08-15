@@ -1,8 +1,5 @@
-module;
-
 export module infinity_core:position_list_decoder;
 
-import :stl;
 import :byte_slice;
 import :byte_slice_reader;
 import :skiplist_reader;

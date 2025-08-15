@@ -64,7 +64,7 @@ std::shared_ptr<BaseExpression> ComposeExpressionWithDelimiter(const std::vector
 }
 
 void VisitExpression(const std::shared_ptr<BaseExpression> &expression, const std::function<VisitControlType(std::shared_ptr<BaseExpression> &child)> &visitor) {
-    Queue<std::shared_ptr<BaseExpression>> queue;
+    std::queue<std::shared_ptr<BaseExpression>> queue;
     queue.push(expression);
 
     while (!queue.empty()) {

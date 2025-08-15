@@ -358,7 +358,7 @@ Status VirtualStore::Copy(const std::string &dst_path, const std::string &src_pa
     return Status::OK();
 }
 
-std::tuple<std::vector<std::shared_ptr<DirEntry>>, Status> VirtualStore::ListDirectory(const std::string &path) {
+std::tuple<std::vector<std::shared_ptr<std::filesystem::directory_entry>>, Status> VirtualStore::ListDirectory(const std::string &path) {
     if (!std::filesystem::path(path).is_absolute()) {
         UnrecoverableError(fmt::format("{} isn't absolute path.", path));
     }
@@ -367,9 +367,9 @@ std::tuple<std::vector<std::shared_ptr<DirEntry>>, Status> VirtualStore::ListDir
         UnrecoverableError(fmt::format("{} isn't a directory", path));
     }
 
-    std::vector<std::shared_ptr<DirEntry>> file_array;
+    std::vector<std::shared_ptr<std::filesystem::directory_entry>> file_array;
     std::ranges::for_each(std::filesystem::directory_iterator{path},
-                          [&](const auto &dir_entry) { file_array.emplace_back(std::make_shared<DirEntry>(dir_entry)); });
+                          [&](const auto &dir_entry) { file_array.emplace_back(std::make_shared<std::filesystem::directory_entry>(dir_entry)); });
     return {file_array, Status::OK()};
 }
 
@@ -549,8 +549,8 @@ void VirtualStore::MunmapAllFiles() {
 StorageType VirtualStore::storage_type_ = StorageType::kInvalid;
 std::string VirtualStore::bucket_ = "infinity";
 std::unique_ptr<S3Client> VirtualStore::s3_client_ = nullptr;
-Atomic<u64> VirtualStore::total_request_count_ = 0;
-Atomic<u64> VirtualStore::cache_miss_count_ = 0;
+std::atomic_uint64_t VirtualStore::total_request_count_ = 0;
+std::atomic_uint64_t VirtualStore::cache_miss_count_ = 0;
 
 Status VirtualStore::InitRemoteStore(StorageType storage_type,
                                      const std::string &URL,

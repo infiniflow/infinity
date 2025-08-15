@@ -12,18 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:chunk_index_meta;
 
-import :stl;
 import :status;
 import :new_catalog;
 
 import third_party;
 
 import internal_types;
-
 
 namespace infinity {
 export struct ChunkIndexSnapshotInfo;

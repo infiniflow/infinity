@@ -47,7 +47,7 @@ namespace infinity {
 
 // IVF_Centroids_Storage
 
-IVF_Centroids_Storage::IVF_Centroids_Storage(const u32 embedding_dimension, const u32 centroids_num, Vector<f32> &&centroids_data)
+IVF_Centroids_Storage::IVF_Centroids_Storage(const u32 embedding_dimension, const u32 centroids_num, std::vector<f32> &&centroids_data)
     : embedding_dimension_(embedding_dimension), centroids_num_(centroids_num), centroids_data_(std::move(centroids_data)) {
     assert(centroids_data_.size() == embedding_dimension_ * centroids_num_);
 }
@@ -67,7 +67,7 @@ void IVF_Centroids_Storage::Load(LocalFileHandle &file_handle) {
     file_handle.Read(centroids_data_.data(), vec_size * sizeof(f32));
 }
 
-Pair<u32, const f32 *> IVF_Centroids_Storage::GetCentroidDataForMetric(const KnnDistanceBase1 *knn_distance) const {
+std::pair<u32, const f32 *> IVF_Centroids_Storage::GetCentroidDataForMetric(const KnnDistanceBase1 *knn_distance) const {
     switch (knn_distance->dist_type_) {
         case KnnDistanceType::kInnerProduct:
         case KnnDistanceType::kL2: {
@@ -135,7 +135,7 @@ IVF_Index_Storage::IVF_Index_Storage(const IndexIVFOption &ivf_option,
       embedding_dimension_(embedding_dimension) {}
 
 void IVF_Index_Storage::Train(const u32 training_embedding_num, const f32 *training_data, const u32 expect_centroid_num) {
-    Vector<f32> output_centroids;
+    std::vector<f32> output_centroids;
     const auto partition_num = GetKMeansCentroids(ivf_option_.metric_,
                                                   embedding_dimension_,
                                                   training_embedding_num,
@@ -224,7 +224,7 @@ void IVF_Index_Storage::AddEmbeddingBatchT(const SegmentOffset start_segment_off
     assert(ivf_centroids_storage_.embedding_dimension() == embedding_dimension_);
     assert(ivf_centroids_storage_.centroids_num() == ivf_parts_storage_->centroids_num());
     const auto [embedding_f32_ptr, _] = GetF32Ptr(embedding_ptr, embedding_num * embedding_dimension_);
-    auto part_ids = Vector<u32>(embedding_num, std::numeric_limits<u32>::max());
+    auto part_ids = std::vector<u32>(embedding_num, std::numeric_limits<u32>::max());
     search_top_1_without_dis<f32>(embedding_dimension_,
                                   embedding_num,
                                   embedding_f32_ptr,
@@ -249,7 +249,7 @@ void IVF_Index_Storage::AddEmbeddingBatchT(const SegmentOffset *segment_offset_p
     assert(ivf_centroids_storage_.embedding_dimension() == embedding_dimension_);
     assert(ivf_centroids_storage_.centroids_num() == ivf_parts_storage_->centroids_num());
     const auto [embedding_f32_ptr, _] = GetF32Ptr(embedding_ptr, embedding_num * embedding_dimension_);
-    auto part_ids = Vector<u32>(embedding_num, std::numeric_limits<u32>::max());
+    auto part_ids = std::vector<u32>(embedding_num, std::numeric_limits<u32>::max());
     search_top_1_without_dis<f32>(embedding_dimension_,
                                   embedding_num,
                                   embedding_f32_ptr,
@@ -274,7 +274,7 @@ void IVF_Index_Storage::AddMultiVectorT(const SegmentOffset segment_offset,
     assert(ivf_centroids_storage_.embedding_dimension() == embedding_dimension_);
     assert(ivf_centroids_storage_.centroids_num() == ivf_parts_storage_->centroids_num());
     const auto [embedding_f32_ptr, _] = GetF32Ptr(multi_vector_ptr, embedding_num * embedding_dimension_);
-    auto part_ids = Vector<u32>(embedding_num, std::numeric_limits<u32>::max());
+    auto part_ids = std::vector<u32>(embedding_num, std::numeric_limits<u32>::max());
     search_top_1_without_dis<f32>(embedding_dimension_,
                                   embedding_num,
                                   embedding_f32_ptr,
@@ -305,8 +305,8 @@ void IVF_Index_Storage::SearchIndex(const KnnDistanceBase1 *knn_distance,
         [query_ptr, dimension]<EmbeddingDataType query_element_type> {
             return GetF32Ptr(static_cast<const EmbeddingDataTypeToCppTypeT<query_element_type> *>(query_ptr), dimension);
         },
-        [] { return Pair<const f32 *, std::unique_ptr<f32[]>>(); });
-    Vector<u32> nprobe_result;
+        [] { return std::pair<const f32 *, std::unique_ptr<f32[]>>(); });
+    std::vector<u32> nprobe_result;
     switch (knn_distance->dist_type_) {
         case KnnDistanceType::kL2: {
             nprobe_result.resize(nprobe);

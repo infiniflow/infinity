@@ -4,7 +4,6 @@ module;
 
 export module infinity_core:posting_buffer;
 
-import :stl;
 import :posting_field;
 import :file_writer;
 import :file_reader;

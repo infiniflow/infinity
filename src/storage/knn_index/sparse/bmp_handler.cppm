@@ -12,11 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:bmp_handler;
 
-import :stl;
 import :bmp_alg;
 import :bmp_util;
 import :index_base;
@@ -82,7 +79,7 @@ public:
 
     size_t AddDocs(SegmentOffset block_offset, const ColumnVector &col, BlockOffset offset, BlockOffset row_count);
 
-    template <typename ResultType, typename DistFunc, typename Filter = NoneType, typename MergeHeap = NoneType>
+    template <typename ResultType, typename DistFunc, typename Filter = std::nullopt_t, typename MergeHeap = std::nullopt_t>
     void SearchIndex(const auto &query,
                      i32 topn,
                      const BmpSearchOptions &options,

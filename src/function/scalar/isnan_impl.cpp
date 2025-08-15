@@ -1,9 +1,6 @@
-module;
-
 module infinity_core:isnan.impl;
 
 import :isnan;
-import :stl;
 import :new_catalog;
 import :status;
 import :infinity_exception;

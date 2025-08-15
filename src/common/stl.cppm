@@ -372,8 +372,6 @@ export {
     // template <typename T>
     // using MaxHeap = std::priority_queue<T>;
 
-    using NoneType = std::nullopt_t;
-
     // std::string
 
     inline bool IsEqual(const std::string &s1, const std::string &s2) { return s1 == s2; }
@@ -406,27 +404,6 @@ export {
         std::string ss = s.substr(i, len - i);
         return ss;
     }
-
-    std::vector<std::string> SplitStrByComma(std::string str) {
-        std::vector<std::string> tokens;
-        for (const auto &token : str | std::views::split(',')) {
-            tokens.emplace_back(token.begin(), token.end());
-        }
-
-        for (auto &s : tokens) {
-            s = TrimString(s);
-        }
-
-        return tokens;
-    }
-
-    void ToUpper(std::string & str) { std::transform(str.begin(), str.end(), str.begin(), ::toupper); }
-
-    int ToUpper(int c) { return ::toupper(c); }
-
-    void ToLower(std::string & str) { std::transform(str.begin(), str.end(), str.begin(), ::tolower); }
-
-    int ToLower(int c) { return ::tolower(c); }
 
     inline void StringToLower(std::string & str) {
         std::transform(str.begin(), str.end(), str.begin(), [](const auto c) { return std::tolower(c); });
@@ -488,17 +465,9 @@ export {
         return std::chrono::duration_cast<T>(nano_seconds);
     }
 
-    // IsStandLayout
-    template <typename T>
-    concept IsStandLayout = std::is_standard_layout_v<T>;
-
-    // Stringstream
-    using IStringStream = std::istringstream;
-    using OStringStream = std::ostringstream;
-
     // Dir
     using Path = std::filesystem::path;
-    using DirEntry = std::filesystem::directory_entry;
+    // using DirEntry = std::filesystem::directory_entry;
 
     inline std::vector<std::string> GetFilesFromDir(const std::string &path) {
         std::vector<std::string> result;

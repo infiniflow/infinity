@@ -1,8 +1,5 @@
-module;
-
 export module infinity_core:byte_slice_writer;
 
-import :stl;
 import :byte_slice;
 import :memory_chunk;
 import :default_values;

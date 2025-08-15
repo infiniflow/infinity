@@ -12,11 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:file_reader;
 
-import :stl;
 import :status;
 import :infinity_exception;
 import :local_file_handle;
@@ -31,7 +28,7 @@ public:
     FileReader(const FileReader &other) = delete;
 
     std::string path_{};
-    std::unique_ptr<char_t[]> data_{};
+    std::unique_ptr<char[]> data_{};
     u64 buffer_offset_{};
     u64 already_read_size_{};
     size_t buffer_start_{};
@@ -53,7 +50,7 @@ public:
 
     i64 ReadVLong();
 
-    void Read(char_t *buffer, size_t read_size);
+    void Read(char *buffer, size_t read_size);
 
     bool Finished() const;
 

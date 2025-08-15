@@ -5,7 +5,6 @@ module;
 module infinity_core:md5.impl;
 
 import :md5;
-import :stl;
 import :new_catalog;
 import :status;
 import :infinity_exception;

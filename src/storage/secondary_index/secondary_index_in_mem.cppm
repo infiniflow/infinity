@@ -12,11 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:secondary_index_in_mem;
 
-import :stl;
 import :roaring_bitmap;
 import :base_memindex;
 import :memindex_tracer;

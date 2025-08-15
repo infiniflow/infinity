@@ -1,8 +1,5 @@
-module;
-
 export module infinity_core:posting_decoder;
 
-import :stl;
 import :byte_slice_reader;
 import :posting_list_format;
 import :term_meta;

@@ -12,11 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:logical_node_visitor;
 
-import :stl;
 import :base_expression;
 import :logical_node;
 import :aggregate_expression;

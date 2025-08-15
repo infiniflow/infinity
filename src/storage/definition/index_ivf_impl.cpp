@@ -12,14 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:index_ivf.impl;
 
 import :index_ivf;
 import :infinity_exception;
 import :index_base;
 import :status;
+import :utility;
 
 import std;
 import third_party;

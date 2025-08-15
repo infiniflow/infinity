@@ -11,6 +11,7 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+
 module;
 
 #include <cstring>
@@ -33,6 +34,7 @@ import :query_context;
 import :http_search;
 import :status;
 import :physical_import;
+import :utility;
 
 import std;
 import std.compat;
@@ -183,7 +185,7 @@ infinity::Status ParseColumnDefs(std::string_view json_sv, std::vector<ColumnDef
         ToLower(value_type);
 
         std::vector<std::string> tokens;
-        tokens = SplitStrByComma(value_type);
+        tokens = infinity::SplitStrByComma(value_type);
 
         std::shared_ptr<DataType> column_type{nullptr};
         try {
@@ -2559,11 +2561,11 @@ public:
             }
 
             for (auto set_variable : doc.get_object()) {
-                std::string var_name = std::string((std::string_view)set_variable.unescaped_key());
+                auto var_name = std::string(static_cast<std::string_view>(set_variable.unescaped_key()));
                 auto var_value = set_variable.value();
                 switch (var_value.type()) {
                     case simdjson::json_type::boolean: {
-                        bool bool_value = var_value.template get<bool>();
+                        bool bool_value = var_value.get<bool>();
                         result = infinity->SetVariableOrConfig(var_name, bool_value, SetScope::kSession);
                         break;
                     }
@@ -2642,28 +2644,28 @@ public:
             }
 
             for (auto set_config : doc.get_object()) {
-                std::string config_name = std::string((std::string_view)set_config.unescaped_key());
+                auto config_name = std::string(static_cast<std::string_view>(set_config.unescaped_key()));
                 auto config_value = set_config.value();
                 switch (config_value.type()) {
                     case simdjson::json_type::boolean: {
-                        bool bool_value = config_value.template get<bool>();
+                        bool bool_value = config_value.get<bool>();
                         result = infinity->SetVariableOrConfig(config_name, bool_value, SetScope::kConfig);
                         break;
                     }
                     case simdjson::json_type::number: {
                         switch (config_value.get_number_type()) {
                             case simdjson::number_type::signed_integer: {
-                                i64 integer_value = config_value.template get<i64>();
+                                i64 integer_value = config_value.get<i64>();
                                 result = infinity->SetVariableOrConfig(config_name, integer_value, SetScope::kConfig);
                                 break;
                             }
                             case simdjson::number_type::unsigned_integer: {
-                                i64 integer_value = config_value.template get<u64>();
+                                i64 integer_value = config_value.get<u64>();
                                 result = infinity->SetVariableOrConfig(config_name, integer_value, SetScope::kConfig);
                                 break;
                             }
                             case simdjson::number_type::floating_point_number: {
-                                f64 double_value = config_value.template get<f64>();
+                                f64 double_value = config_value.get<f64>();
                                 result = infinity->SetVariableOrConfig(config_name, double_value, SetScope::kConfig);
                                 break;
                             }
@@ -2675,7 +2677,7 @@ public:
                         }
                     }
                     case simdjson::json_type::string: {
-                        std::string str_value = config_value.template get<std::string>();
+                        std::string str_value = config_value.get<std::string>();
                         result = infinity->SetVariableOrConfig(config_name, str_value, SetScope::kConfig);
                         break;
                     }

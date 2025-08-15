@@ -12,11 +12,8 @@
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
 
-module;
-
 export module infinity_core:filter_expression_push_down;
 
-import :stl;
 import :base_expression;
 import :base_table_ref;
 import :index_base;

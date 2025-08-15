@@ -12,11 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:match_sparse_scan_function_data;
 
-import :stl;
 import :table_function;
 import :global_block_id;
 import :merge_knn;

@@ -12,16 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:infinity_context;
 
-import :stl;
 import :status;
 import :singleton;
 import :storage;
 import :task_scheduler;
 import :cluster_manager;
+
+import third_party;
 
 import admin_statement;
 
@@ -48,17 +47,20 @@ public:
 
     [[nodiscard]] inline ClusterManager *cluster_manager() noexcept { return cluster_manager_.get(); }
 
-    [[nodiscard]] inline ThreadPool &GetFulltextInvertingThreadPool() { return inverting_thread_pool_; }
-    [[nodiscard]] inline ThreadPool &GetFulltextCommitingThreadPool() { return commiting_thread_pool_; }
-    [[nodiscard]] inline ThreadPool &GetHnswBuildThreadPool() { return hnsw_build_thread_pool_; }
+    [[nodiscard]] inline ctpl::thread_pool &GetFulltextInvertingThreadPool() { return inverting_thread_pool_; }
+    [[nodiscard]] inline ctpl::thread_pool &GetFulltextCommitingThreadPool() { return commiting_thread_pool_; }
+    [[nodiscard]] inline ctpl::thread_pool &GetHnswBuildThreadPool() { return hnsw_build_thread_pool_; }
 
     NodeRole GetServerRole() const;
 
     void InitPhase1(const std::shared_ptr<std::string> &config_path, DefaultConfig *default_config = nullptr);
     void InitPhase2(bool admin_flag = false);
     //    void InitAdminMode(const std::shared_ptr<std::string> &config_path, bool m_flag = false, DefaultConfig *default_config = nullptr);
-    Status
-    ChangeServerRole(NodeRole target_role, bool from_leader = false, const std::string &node_name = {}, std::string leader_ip = {}, u16 leader_port = {});
+    Status ChangeServerRole(NodeRole target_role,
+                            bool from_leader = false,
+                            const std::string &node_name = {},
+                            std::string leader_ip = {},
+                            u16 leader_port = {});
     bool IsAdminRole() const { return GetServerRole() == NodeRole::kAdmin; }
     bool IsClusterRole() const;
 
@@ -76,6 +78,7 @@ public:
 
     // Only used by UT
     void SetConfig(std::unique_ptr<Config> &&config);
+
 private:
     friend class Singleton;
 
@@ -88,19 +91,19 @@ private:
     std::unique_ptr<Storage> storage_{};
     std::unique_ptr<SessionManager> session_mgr_{};
     std::unique_ptr<ClusterManager> cluster_manager_{};
-    atomic_bool infinity_context_started_{false};
-    atomic_bool infinity_context_inited_{false};
+    std::atomic_bool infinity_context_started_{false};
+    std::atomic_bool infinity_context_inited_{false};
 
     // For fulltext index
-    ThreadPool inverting_thread_pool_{2};
-    ThreadPool commiting_thread_pool_{2};
+    ctpl::thread_pool inverting_thread_pool_{2};
+    ctpl::thread_pool commiting_thread_pool_{2};
 
     // For hnsw index
-    ThreadPool hnsw_build_thread_pool_{2};
+    ctpl::thread_pool hnsw_build_thread_pool_{2};
 
     std::function<void()> start_servers_func_{};
     std::function<void()> stop_servers_func_{};
-    atomic_bool start_server_{false};
+    std::atomic_bool start_server_{false};
 };
 
 } // namespace infinity

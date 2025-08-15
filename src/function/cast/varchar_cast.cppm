@@ -171,8 +171,8 @@ template <>
 inline bool TryCastVarchar::Run(const VarcharT &source, BooleanT &target) {
 
     if (source.length_ == 4) {
-        bool res = ToLower(source.short_.data_[0]) == 't' && ToLower(source.short_.data_[1]) == 'r' && ToLower(source.short_.data_[2]) == 'u' &&
-                   ToLower(source.short_.data_[3]) == 'e';
+        bool res = std::tolower(source.short_.data_[0]) == 't' && std::tolower(source.short_.data_[1]) == 'r' &&
+                   std::tolower(source.short_.data_[2]) == 'u' && std::tolower(source.short_.data_[3]) == 'e';
         if (res) {
             target = true;
             return true;
@@ -181,8 +181,9 @@ inline bool TryCastVarchar::Run(const VarcharT &source, BooleanT &target) {
         }
     }
     if (source.length_ == 5) {
-        bool res = ToLower(source.short_.data_[0]) == 'f' && ToLower(source.short_.data_[1]) == 'a' && ToLower(source.short_.data_[2]) == 'l' &&
-                   ToLower(source.short_.data_[3]) == 's' && ToLower(source.short_.data_[4]) == 'e';
+        bool res = std::tolower(source.short_.data_[0]) == 'f' && std::tolower(source.short_.data_[1]) == 'a' &&
+                   std::tolower(source.short_.data_[2]) == 'l' && std::tolower(source.short_.data_[3]) == 's' &&
+                   std::tolower(source.short_.data_[4]) == 'e';
         if (res) {
             target = false;
             return true;

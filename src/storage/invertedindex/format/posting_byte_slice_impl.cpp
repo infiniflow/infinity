@@ -1,9 +1,6 @@
-module;
-
 module infinity_core:posting_byte_slice.impl;
 
 import :posting_byte_slice;
-import :stl;
 import :posting_field;
 import :flush_info;
 import :file_writer;

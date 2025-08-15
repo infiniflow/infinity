@@ -18,7 +18,6 @@ module;
 
 export module infinity_core:binary_fuse_filter;
 
-import :stl;
 import :default_values;
 import :infinity_exception;
 
@@ -102,7 +101,7 @@ public:
         }
     }
 
-    void SaveToOStringStream(OStringStream &os) const {
+    void SaveToOStringStream(std::ostringstream &os) const {
         u8 finished_build_filter = HaveFilter() ? 1 : 0;
         os.write(reinterpret_cast<const char *>(&finished_build_filter), sizeof(finished_build_filter));
         if (!finished_build_filter) {
@@ -117,7 +116,7 @@ public:
         os.write(reinterpret_cast<const char *>(filter.Fingerprints), filter.ArrayLength * sizeof(uint8_t));
     }
 
-    bool LoadFromIStringStream(IStringStream &is) {
+    bool LoadFromIStringStream(std::istringstream &is) {
         u8 finished_build_filter = 0;
         is.read(reinterpret_cast<char *>(&finished_build_filter), sizeof(finished_build_filter));
         if (!finished_build_filter) {

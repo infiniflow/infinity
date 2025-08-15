@@ -16,7 +16,6 @@ module;
 
 export module infinity_core:chinese_analyzer;
 
-import :stl;
 import :jieba;
 import :term;
 import :analyzer;

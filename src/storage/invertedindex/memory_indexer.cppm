@@ -12,11 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:memory_indexer;
 
-import :stl;
 import :index_defines;
 import :posting_writer;
 import :column_vector;
@@ -163,8 +160,8 @@ private:
     optionflag_t flag_;
     PostingFormat posting_format_;
     std::string analyzer_;
-    ThreadPool &inverting_thread_pool_;
-    ThreadPool &commiting_thread_pool_;
+    ctpl::thread_pool &inverting_thread_pool_;
+    ctpl::thread_pool &commiting_thread_pool_;
     u32 doc_count_{0};
     std::shared_ptr<PostingTable> posting_table_;
     PostingPtr prepared_posting_{nullptr};
@@ -179,7 +176,7 @@ private:
 
     u32 num_runs_{0};                  // For offline index building
     FILE *spill_file_handle_{nullptr}; // Temp file for offline external merge sort
-    std::string spill_full_path_;           // Path of spill file
+    std::string spill_full_path_;      // Path of spill file
     u64 tuple_count_{0};               // Number of tuples for external merge sort
 
     bool is_spilled_{false};
@@ -189,7 +186,7 @@ private:
     std::atomic<u32> column_length_sum_{0};
 
     // spill file write buf
-    std::unique_ptr<char_t[]> spill_buffer_{};
+    std::unique_ptr<char[]> spill_buffer_{};
     size_t spill_buffer_size_{0};
     std::unique_ptr<BufWriter> buf_writer_;
 

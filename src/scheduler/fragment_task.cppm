@@ -12,11 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:fragment_task;
 
-import :stl;
 import :profiler;
 import :operator_state;
 
@@ -36,13 +33,13 @@ export enum class FragmentTaskStatus : i8 {
 export std::string FragmentTaskStatus2String(FragmentTaskStatus status) {
     switch (status) {
         case FragmentTaskStatus::kPending:
-            return std::string("Pending");
+            return "Pending";
         case FragmentTaskStatus::kRunning:
-            return std::string("Running");
+            return "Running";
         case FragmentTaskStatus::kFinished:
-            return std::string("Finished");
+            return "Finished";
         case FragmentTaskStatus::kError:
-            return std::string("Error");
+            return "Error";
     }
 }
 

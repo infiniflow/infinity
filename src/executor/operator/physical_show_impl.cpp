@@ -5974,7 +5974,7 @@ void PhysicalShow::ExecuteShowPersistenceObjects(QueryContext *query_context, Sh
         }
         {
             // deleted ranges
-            OStringStream oss;
+            std::ostringstream oss;
             for (const auto &range : object_pair.second.deleted_ranges_) {
                 oss << fmt::format("[{}, {}) ", range.start_, range.end_);
             }
@@ -6025,7 +6025,7 @@ void PhysicalShow::ExecuteShowPersistenceObject(QueryContext *query_context, Sho
         RecoverableError(status);
     }
 
-    Set<Range> &deleted_ranges = iter->second.deleted_ranges_;
+    std::set<Range> &deleted_ranges = iter->second.deleted_ranges_;
     for (auto &range : deleted_ranges) {
         if (output_block_ptr.get() == nullptr) {
             output_block_ptr = DataBlock::MakeUniquePtr();

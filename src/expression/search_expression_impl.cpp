@@ -37,7 +37,7 @@ std::string SearchExpression::ToString() const {
         return alias_;
     }
 
-    OStringStream oss;
+    std::ostringstream oss;
     oss << "SEARCH(";
     int cnt = 0;
     for (auto &match_expr : match_exprs_) {
