@@ -12,12 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:txn_state;
 
-import :stl;
 import :infinity_exception;
+
+import std;
 
 namespace infinity {
 
@@ -31,7 +30,7 @@ export enum class TxnState {
     kInvalid,
 };
 
-export inline String TxnState2Str(TxnState txn_state) {
+export inline std::string TxnState2Str(TxnState txn_state) {
     switch (txn_state) {
         case TxnState::kNotStarted: {
             return "Not Started";
@@ -56,7 +55,7 @@ export inline String TxnState2Str(TxnState txn_state) {
         }
     }
     UnrecoverableError("Invalid transaction state.");
-    return String();
+    return std::string{};
 }
 
 export enum class TransactionType {
@@ -89,7 +88,7 @@ export enum class TransactionType {
     kCreateTableSnapshot
 };
 
-export inline String TransactionType2Str(TransactionType txn_type) {
+export inline std::string TransactionType2Str(TransactionType txn_type) {
     switch (txn_type) {
         case TransactionType::kCheckpoint: {
             return "Checkpoint";

@@ -87,7 +87,7 @@ inline BoundCastFunc BindFloatCast(const DataType &source, const DataType &targe
 struct FloatTryCastToFixlen {
     template <typename SourceType, typename TargetType>
     static inline bool Run(SourceType, TargetType &) {
-        String error_message =
+        std::string error_message =
             fmt::format("Not implemented to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>());
         UnrecoverableError(error_message);
         return false;
@@ -97,7 +97,7 @@ struct FloatTryCastToFixlen {
 struct FloatTryCastToVarlen {
     template <typename SourceType, typename TargetType>
     static inline bool Run(SourceType, TargetType &, ColumnVector *) {
-        String error_message =
+        std::string error_message =
             fmt::format("Not support to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>());
         UnrecoverableError(error_message);
         return false;
@@ -188,7 +188,7 @@ inline bool FloatTryCastToFixlen::Run(FloatT, DecimalT &) {
 // Cast FloatT to varlen type
 template <>
 inline bool FloatTryCastToVarlen::Run(FloatT source, VarcharT &target, ColumnVector *vector_ptr) {
-    String tmp_str = std::to_string(source);
+    std::string tmp_str = std::to_string(source);
     vector_ptr->AppendVarcharInner({tmp_str.data(), tmp_str.size()}, target);
     return true;
 }
@@ -278,7 +278,7 @@ inline bool FloatTryCastToFixlen::Run(DoubleT, DecimalT &) {
 template <>
 inline bool FloatTryCastToVarlen::Run(DoubleT source, VarcharT &target, ColumnVector *vector_ptr) {
     // TODO: High-performance to_string implementation is needed.
-    String tmp_str = std::to_string(source);
+    std::string tmp_str = std::to_string(source);
     vector_ptr->AppendVarcharInner({tmp_str.data(), tmp_str.size()}, target);
 
     return true;

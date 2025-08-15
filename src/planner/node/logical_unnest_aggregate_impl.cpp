@@ -28,25 +28,25 @@ import data_type;
 
 namespace infinity {
 
-Vector<ColumnBinding> LogicalUnnestAggregate::GetColumnBindings() const { return LogicalCommonFunctionUsingLoadMeta::GetColumnBindings(*this); }
+std::vector<ColumnBinding> LogicalUnnestAggregate::GetColumnBindings() const { return LogicalCommonFunctionUsingLoadMeta::GetColumnBindings(*this); }
 
-SharedPtr<Vector<String>> LogicalUnnestAggregate::GetOutputNames() const { return LogicalCommonFunctionUsingLoadMeta::GetOutputNames(*this); }
+std::shared_ptr<std::vector<std::string>> LogicalUnnestAggregate::GetOutputNames() const { return LogicalCommonFunctionUsingLoadMeta::GetOutputNames(*this); }
 
-SharedPtr<Vector<SharedPtr<DataType>>> LogicalUnnestAggregate::GetOutputTypes() const {
+std::shared_ptr<std::vector<std::shared_ptr<DataType>>> LogicalUnnestAggregate::GetOutputTypes() const {
     return LogicalCommonFunctionUsingLoadMeta::GetOutputTypes(*this);
 }
 
-String LogicalUnnestAggregate::ToString(i64 &space) const {
+std::string LogicalUnnestAggregate::ToString(i64 &space) const {
     std::stringstream ss;
-    String arrow_str;
+    std::string arrow_str;
     if (space > 3) {
         space -= 4;
         arrow_str = "->  ";
     }
-    ss << String(space, ' ') << arrow_str << "Logical Unnest Aggregate: ";
+    ss << std::string(space, ' ') << arrow_str << "Logical Unnest Aggregate: ";
 
-    SizeT expr_count = unnest_expression_list_.size();
-    for (SizeT idx = 0; idx < expr_count; ++idx) {
+    size_t expr_count = unnest_expression_list_.size();
+    for (size_t idx = 0; idx < expr_count; ++idx) {
         ss << unnest_expression_list_[idx]->Name();
         if (idx < expr_count - 1) {
             ss << ", ";
@@ -55,8 +55,8 @@ String LogicalUnnestAggregate::ToString(i64 &space) const {
 
     if (!aggregates_.empty()) {
         ss << "Aggregate on: ";
-        SizeT expression_count = aggregates_.size();
-        for (SizeT i = 0; i < expression_count - 1; ++i) {
+        size_t expression_count = aggregates_.size();
+        for (size_t i = 0; i < expression_count - 1; ++i) {
             ss << aggregates_[i]->Name() << ", ";
         }
         ss << aggregates_.back()->Name();
@@ -68,8 +68,8 @@ String LogicalUnnestAggregate::ToString(i64 &space) const {
         } else {
             ss << ", Group by: ";
         }
-        SizeT expression_count = groups_.size();
-        for (SizeT i = 0; i < expression_count - 1; ++i) {
+        size_t expression_count = groups_.size();
+        for (size_t i = 0; i < expression_count - 1; ++i) {
             ss << groups_[i]->Name() << ", ";
         }
         ss << groups_.back()->Name();

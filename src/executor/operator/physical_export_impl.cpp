@@ -52,19 +52,19 @@ import internal_types;
 namespace infinity {
 
 PhysicalExport::PhysicalExport(u64 id,
-                               const SharedPtr<TableInfo> &table_info,
-                               String schema_name,
-                               String table_name,
-                               String file_path,
+                               const std::shared_ptr<TableInfo> &table_info,
+                               std::string schema_name,
+                               std::string table_name,
+                               std::string file_path,
                                bool header,
                                char delimiter,
                                CopyFileType type,
-                               SizeT offset,
-                               SizeT limit,
-                               SizeT row_limit,
-                               Vector<u64> column_idx_array,
-                               SharedPtr<BlockIndex> block_index,
-                               SharedPtr<Vector<LoadMeta>> load_metas)
+                               size_t offset,
+                               size_t limit,
+                               size_t row_limit,
+                               std::vector<u64> column_idx_array,
+                               std::shared_ptr<BlockIndex> block_index,
+                               std::shared_ptr<std::vector<LoadMeta>> load_metas)
     : PhysicalOperator(PhysicalOperatorType::kExport, nullptr, nullptr, id, load_metas), table_info_(table_info), file_type_(type),
       file_path_(std::move(file_path)), table_name_(std::move(table_name)), schema_name_(std::move(schema_name)), header_(header),
       delimiter_(delimiter), offset_(offset), limit_(limit), row_limit_(row_limit), column_idx_array_(std::move(column_idx_array)),
@@ -76,7 +76,7 @@ void PhysicalExport::Init(QueryContext *query_context) {}
 
 bool PhysicalExport::Execute(QueryContext *query_context, OperatorState *operator_state) {
     ExportOperatorState *export_op_state = static_cast<ExportOperatorState *>(operator_state);
-    SizeT exported_row_count{0};
+    size_t exported_row_count{0};
     switch (file_type_) {
         case CopyFileType::kCSV: {
             exported_row_count = ExportToCSV(query_context, export_op_state);
@@ -99,17 +99,17 @@ bool PhysicalExport::Execute(QueryContext *query_context, OperatorState *operato
         }
     }
 
-    auto result_msg = MakeUnique<String>(fmt::format("EXPORT {} Rows", exported_row_count));
+    auto result_msg = std::make_unique<std::string>(fmt::format("EXPORT {} Rows", exported_row_count));
     export_op_state->result_msg_ = std::move(result_msg);
 
     export_op_state->SetComplete();
     return true;
 }
 
-SizeT PhysicalExport::ExportToCSV(QueryContext *query_context, ExportOperatorState *export_op_state) {
-    return ExportToFileInner(query_context, export_op_state, [this](const Vector<ColumnVector> &column_vectors, SizeT row_idx) {
-        String line;
-        for (SizeT select_column_idx = 0; select_column_idx < column_vectors.size(); ++select_column_idx) {
+size_t PhysicalExport::ExportToCSV(QueryContext *query_context, ExportOperatorState *export_op_state) {
+    return ExportToFileInner(query_context, export_op_state, [this](const std::vector<ColumnVector> &column_vectors, size_t row_idx) {
+        std::string line;
+        for (size_t select_column_idx = 0; select_column_idx < column_vectors.size(); ++select_column_idx) {
             Value v = column_vectors[select_column_idx].GetValueByIndex(row_idx);
             switch (v.type().type()) {
                 case LogicalType::kArray:
@@ -135,13 +135,13 @@ SizeT PhysicalExport::ExportToCSV(QueryContext *query_context, ExportOperatorSta
     });
 }
 
-SizeT PhysicalExport::ExportToJSONL(QueryContext *query_context, ExportOperatorState *export_op_state) {
-    const Vector<SharedPtr<ColumnDef>> &column_defs = table_info_->column_defs_;
+size_t PhysicalExport::ExportToJSONL(QueryContext *query_context, ExportOperatorState *export_op_state) {
+    const std::vector<std::shared_ptr<ColumnDef>> &column_defs = table_info_->column_defs_;
 
-    Vector<ColumnID> select_columns;
+    std::vector<ColumnID> select_columns;
     // export all columns or export specific column index
     if (column_idx_array_.empty()) {
-        SizeT column_count = column_defs.size();
+        size_t column_count = column_defs.size();
         select_columns.reserve(column_count);
         for (ColumnID idx = 0; idx < column_count; ++idx) {
             select_columns.emplace_back(idx);
@@ -150,7 +150,7 @@ SizeT PhysicalExport::ExportToJSONL(QueryContext *query_context, ExportOperatorS
         select_columns = column_idx_array_;
     }
 
-    return ExportToFileInner(query_context, export_op_state, [&](const Vector<ColumnVector> &column_vectors, SizeT row_idx) {
+    return ExportToFileInner(query_context, export_op_state, [&](const std::vector<ColumnVector> &column_vectors, size_t row_idx) {
         nlohmann::json line_json;
         for (ColumnID block_column_idx = 0; block_column_idx < column_vectors.size(); ++block_column_idx) {
             ColumnID select_column_idx = select_columns[block_column_idx];
@@ -177,20 +177,20 @@ SizeT PhysicalExport::ExportToJSONL(QueryContext *query_context, ExportOperatorS
                 }
             }
         }
-        String to_write = line_json.dump() + "\n";
+        std::string to_write = line_json.dump() + "\n";
         return to_write;
     });
 }
 
-SizeT PhysicalExport::ExportToFileInner(QueryContext *query_context,
+size_t PhysicalExport::ExportToFileInner(QueryContext *query_context,
                                         ExportOperatorState *export_op_state,
-                                        std::function<String(const Vector<ColumnVector> &, SizeT)> line_to_string) {
-    const Vector<SharedPtr<ColumnDef>> &column_defs = table_info_->column_defs_;
+                                        std::function<std::string(const std::vector<ColumnVector> &, size_t)> line_to_string) {
+    const std::vector<std::shared_ptr<ColumnDef>> &column_defs = table_info_->column_defs_;
 
-    Vector<ColumnID> select_columns;
+    std::vector<ColumnID> select_columns;
     // export all columns or export specific column index
     if (column_idx_array_.empty()) {
-        SizeT column_count = column_defs.size();
+        size_t column_count = column_defs.size();
         select_columns.reserve(column_count);
         for (ColumnID idx = 0; idx < column_count; ++idx) {
             select_columns.emplace_back(idx);
@@ -199,9 +199,9 @@ SizeT PhysicalExport::ExportToFileInner(QueryContext *query_context,
         select_columns = column_idx_array_;
     }
 
-    SizeT select_column_count = select_columns.size();
+    size_t select_column_count = select_columns.size();
 
-    String parent_path = VirtualStore::GetParentPath(file_path_);
+    std::string parent_path = VirtualStore::GetParentPath(file_path_);
     if (!parent_path.empty()) {
         Status create_status = VirtualStore::MakeDirectory(parent_path);
         if (!create_status.ok()) {
@@ -216,8 +216,8 @@ SizeT PhysicalExport::ExportToFileInner(QueryContext *query_context,
 
     if (header_ && file_type_ == CopyFileType::kCSV) {
         // Output CSV header
-        String header;
-        for (SizeT select_column_idx = 0; select_column_idx < select_column_count; ++select_column_idx) {
+        std::string header;
+        for (size_t select_column_idx = 0; select_column_idx < select_column_count; ++select_column_idx) {
             ColumnID column_idx = select_columns[select_column_idx];
             switch (column_idx) {
                 case COLUMN_IDENTIFIER_ROW_ID: {
@@ -246,14 +246,14 @@ SizeT PhysicalExport::ExportToFileInner(QueryContext *query_context,
         file_handle->Append(header.c_str(), header.size());
     }
 
-    SizeT offset = offset_;
-    SizeT row_count{0};
-    SizeT file_no_{0};
+    size_t offset = offset_;
+    size_t row_count{0};
+    size_t file_no_{0};
 
-    auto append_line = [&](const String &line) {
+    auto append_line = [&](const std::string &line) {
         if (row_count > 0 && this->row_limit_ != 0 && (row_count % this->row_limit_) == 0) {
             ++file_no_;
-            String new_file_path = fmt::format("{}.part{}", file_path_, file_no_);
+            std::string new_file_path = fmt::format("{}.part{}", file_path_, file_no_);
             auto [new_file_handle, new_status] = VirtualStore::Open(new_file_path, FileAccessMode::kWrite);
             if (!new_status.ok()) {
                 RecoverableError(new_status);
@@ -272,17 +272,17 @@ SizeT PhysicalExport::ExportToFileInner(QueryContext *query_context,
     TxnTimeStamp begin_ts = new_txn->BeginTS();
     TxnTimeStamp commit_ts = new_txn->CommitTS();
 
-    const Map<SegmentID, NewSegmentSnapshot> &segment_block_index_ref = block_index_->new_segment_block_index_;
+    const std::map<SegmentID, NewSegmentSnapshot> &segment_block_index_ref = block_index_->new_segment_block_index_;
     LOG_DEBUG(fmt::format("Going to export segment count: {}", segment_block_index_ref.size()));
 
     for (auto &[segment_id, segment_snapshot] : segment_block_index_ref) {
-        SizeT block_count = segment_snapshot.block_map().size();
+        size_t block_count = segment_snapshot.block_map().size();
         LOG_DEBUG(fmt::format("Export segment_id: {}, with block count: {}", segment_id, block_count));
-        for (SizeT block_idx = 0; block_idx < block_count; ++block_idx) {
+        for (size_t block_idx = 0; block_idx < block_count; ++block_idx) {
             LOG_DEBUG(fmt::format("Export block_idx: {}", block_idx));
 
             BlockMeta *block_meta = segment_snapshot.block_map()[block_idx].get();
-            Vector<ColumnVector> column_vectors;
+            std::vector<ColumnVector> column_vectors;
             column_vectors.resize(select_column_count);
             auto [block_row_count, status] = block_meta->GetRowCnt1();
             if (!status.ok()) {
@@ -293,7 +293,7 @@ SizeT PhysicalExport::ExportToFileInner(QueryContext *query_context,
                 ColumnID select_column_idx = select_columns[block_column_idx];
                 switch (select_column_idx) {
                     case COLUMN_IDENTIFIER_ROW_ID: {
-                        column_vectors[block_column_idx] = ColumnVector(MakeShared<DataType>(LogicalType::kRowID));
+                        column_vectors[block_column_idx] = ColumnVector(std::make_shared<DataType>(LogicalType::kRowID));
                         column_vectors[block_column_idx].Initialize();
                         BlockID block_id = block_meta->block_id();
                         u32 segment_offset = block_id * DEFAULT_BLOCK_CAPACITY;
@@ -301,7 +301,7 @@ SizeT PhysicalExport::ExportToFileInner(QueryContext *query_context,
                         break;
                     }
                     case COLUMN_IDENTIFIER_CREATE: {
-                        column_vectors[block_column_idx] = ColumnVector(MakeShared<DataType>(LogicalType::kBigInt));
+                        column_vectors[block_column_idx] = ColumnVector(std::make_shared<DataType>(LogicalType::kBigInt));
                         column_vectors[block_column_idx].Initialize(ColumnVectorType::kFlat, block_row_count);
                         Status status = NewCatalog::GetCreateTSVector(*block_meta, 0, block_row_count, column_vectors[block_column_idx]);
                         if (!status.ok()) {
@@ -310,7 +310,7 @@ SizeT PhysicalExport::ExportToFileInner(QueryContext *query_context,
                         break;
                     }
                     case COLUMN_IDENTIFIER_DELETE: {
-                        column_vectors[block_column_idx] = ColumnVector(MakeShared<DataType>(LogicalType::kBigInt));
+                        column_vectors[block_column_idx] = ColumnVector(std::make_shared<DataType>(LogicalType::kBigInt));
                         column_vectors[block_column_idx].Initialize(ColumnVectorType::kFlat, block_row_count);
                         Status status = NewCatalog::GetDeleteTSVector(*block_meta, 0, block_row_count, column_vectors[block_column_idx]);
                         if (!status.ok()) {
@@ -335,7 +335,7 @@ SizeT PhysicalExport::ExportToFileInner(QueryContext *query_context,
                 UnrecoverableError(status.message());
             }
 
-            for (SizeT row_idx = 0; row_idx < block_row_count; ++row_idx) {
+            for (size_t row_idx = 0; row_idx < block_row_count; ++row_idx) {
                 if (!bitmask.IsTrue(row_idx)) {
                     continue;
                 }
@@ -344,7 +344,7 @@ SizeT PhysicalExport::ExportToFileInner(QueryContext *query_context,
                     continue;
                 }
 
-                String line = line_to_string(column_vectors, row_idx);
+                std::string line = line_to_string(column_vectors, row_idx);
                 bool end = append_line(line);
                 if (end) {
                     goto new_label_return;
@@ -357,14 +357,14 @@ new_label_return:
     return row_count;
 }
 
-SizeT PhysicalExport::ExportToFVECS(QueryContext *query_context, ExportOperatorState *export_op_state) {
+size_t PhysicalExport::ExportToFVECS(QueryContext *query_context, ExportOperatorState *export_op_state) {
 
     if (column_idx_array_.size() != 1) {
         UnrecoverableError("Only one column with embedding data type can be exported as FVECS file");
     }
 
     u64 exported_column_idx = column_idx_array_[0];
-    const Vector<SharedPtr<ColumnDef>> &column_defs = table_info_->column_defs_;
+    const std::vector<std::shared_ptr<ColumnDef>> &column_defs = table_info_->column_defs_;
     DataType *data_type = column_defs[exported_column_idx]->type().get();
     if (data_type->type() != LogicalType::kEmbedding) {
         UnrecoverableError(fmt::format("Only embedding column can be exported as FVECS file, but it is {}", data_type->ToString()));
@@ -385,7 +385,7 @@ SizeT PhysicalExport::ExportToFVECS(QueryContext *query_context, ExportOperatorS
 
     i32 dimension = embedding_type_info->Dimension();
 
-    String parent_path = VirtualStore::GetParentPath(file_path_);
+    std::string parent_path = VirtualStore::GetParentPath(file_path_);
     if (!parent_path.empty()) {
         Status create_status = VirtualStore::MakeDirectory(parent_path);
         if (!create_status.ok()) {
@@ -398,16 +398,16 @@ SizeT PhysicalExport::ExportToFVECS(QueryContext *query_context, ExportOperatorS
         RecoverableError(status);
     }
 
-    SizeT offset = offset_;
-    SizeT row_count{0};
-    SizeT file_no_{0};
+    size_t offset = offset_;
+    size_t row_count{0};
+    size_t file_no_{0};
 
     auto append_line = [&](const Value &v) {
-        Span<char> embedding = v.GetEmbedding();
+        std::span<char> embedding = v.GetEmbedding();
 
         if (row_count > 0 && this->row_limit_ != 0 && (row_count % this->row_limit_) == 0) {
             ++file_no_;
-            String new_file_path = fmt::format("{}.part{}", file_path_, file_no_);
+            std::string new_file_path = fmt::format("{}.part{}", file_path_, file_no_);
             auto [new_file_handle, new_status] = VirtualStore::Open(new_file_path, FileAccessMode::kWrite);
             if (!new_status.ok()) {
                 RecoverableError(new_status);
@@ -424,12 +424,12 @@ SizeT PhysicalExport::ExportToFVECS(QueryContext *query_context, ExportOperatorS
     NewTxn *new_txn = query_context->GetNewTxn();
     TxnTimeStamp begin_ts = new_txn->BeginTS();
     TxnTimeStamp commit_ts = new_txn->CommitTS();
-    Map<SegmentID, NewSegmentSnapshot> &new_segment_block_index_ref = block_index_->new_segment_block_index_;
+    std::map<SegmentID, NewSegmentSnapshot> &new_segment_block_index_ref = block_index_->new_segment_block_index_;
     LOG_DEBUG(fmt::format("Going to export segment count: {}", new_segment_block_index_ref.size()));
     for (auto &[segment_id, segment_snapshot] : new_segment_block_index_ref) {
-        SizeT block_count = segment_snapshot.block_map().size();
+        size_t block_count = segment_snapshot.block_map().size();
         LOG_DEBUG(fmt::format("Export segment_id: {}, with block count: {}", segment_id, block_count));
-        for (SizeT block_idx = 0; block_idx < block_count; ++block_idx) {
+        for (size_t block_idx = 0; block_idx < block_count; ++block_idx) {
             LOG_DEBUG(fmt::format("Export block_idx: {}", block_idx));
             BlockMeta *block_meta = segment_snapshot.block_map()[block_idx].get();
 
@@ -449,7 +449,7 @@ SizeT PhysicalExport::ExportToFVECS(QueryContext *query_context, ExportOperatorS
             if (!status.ok()) {
                 UnrecoverableError(status.message());
             }
-            for (SizeT row_idx = 0; row_idx < block_row_count; ++row_idx) {
+            for (size_t row_idx = 0; row_idx < block_row_count; ++row_idx) {
                 if (!bitmask.IsTrue(row_idx)) {
                     continue;
                 }
@@ -470,16 +470,16 @@ new_label_return:
     return row_count;
 }
 
-SharedPtr<arrow::DataType> GetArrowType(const DataType &column_data_type);
+std::shared_ptr<arrow::DataType> GetArrowType(const DataType &column_data_type);
 
-SharedPtr<arrow::Array> BuildArrowArray(const ColumnDef *column_def, const ColumnVector &column_vector, const Vector<u32> &block_rows_for_output);
+std::shared_ptr<arrow::Array> BuildArrowArray(const ColumnDef *column_def, const ColumnVector &column_vector, const std::vector<u32> &block_rows_for_output);
 
-SizeT PhysicalExport::ExportToPARQUET(QueryContext *query_context, ExportOperatorState *export_op_state) {
-    const Vector<SharedPtr<ColumnDef>> &column_defs = table_info_->column_defs_;
-    Vector<ColumnID> select_columns;
+size_t PhysicalExport::ExportToPARQUET(QueryContext *query_context, ExportOperatorState *export_op_state) {
+    const std::vector<std::shared_ptr<ColumnDef>> &column_defs = table_info_->column_defs_;
+    std::vector<ColumnID> select_columns;
     // export all columns or export specific column index
     if (column_idx_array_.empty()) {
-        SizeT column_count = column_defs.size();
+        size_t column_count = column_defs.size();
         select_columns.reserve(column_count);
         for (ColumnID idx = 0; idx < column_count; ++idx) {
             select_columns.emplace_back(idx);
@@ -488,9 +488,9 @@ SizeT PhysicalExport::ExportToPARQUET(QueryContext *query_context, ExportOperato
         select_columns = column_idx_array_;
     }
 
-    SizeT select_column_count = select_columns.size();
+    size_t select_column_count = select_columns.size();
 
-    Vector<SharedPtr<arrow::Field>> fields;
+    std::vector<std::shared_ptr<arrow::Field>> fields;
     for (auto &column_id : select_columns) {
         ColumnDef *column_def = column_defs[column_id].get();
         auto arrow_type = GetArrowType(*(column_def->type()));
@@ -498,11 +498,11 @@ SizeT PhysicalExport::ExportToPARQUET(QueryContext *query_context, ExportOperato
     }
 
     arrow::MemoryPool *pool = arrow::DefaultMemoryPool();
-    SharedPtr<arrow::Schema> schema = arrow::schema(std::move(fields));
-    SharedPtr<arrow::io::FileOutputStream> file_stream;
-    UniquePtr<parquet::arrow::FileWriter> file_writer;
+    std::shared_ptr<arrow::Schema> schema = arrow::schema(std::move(fields));
+    std::shared_ptr<arrow::io::FileOutputStream> file_stream;
+    std::unique_ptr<parquet::arrow::FileWriter> file_writer;
 
-    String parent_path = VirtualStore::GetParentPath(file_path_);
+    std::string parent_path = VirtualStore::GetParentPath(file_path_);
     if (!parent_path.empty()) {
         Status create_status = VirtualStore::MakeDirectory(parent_path);
         if (!create_status.ok()) {
@@ -510,7 +510,7 @@ SizeT PhysicalExport::ExportToPARQUET(QueryContext *query_context, ExportOperato
         }
     }
 
-    auto init_file_stream_writer = [&pool, &schema, &file_stream, &file_writer](const String &output_file_path) {
+    auto init_file_stream_writer = [&pool, &schema, &file_stream, &file_writer](const std::string &output_file_path) {
         file_writer.reset();
         file_stream.reset();
         auto file_stream_result = arrow::io::FileOutputStream::Open(output_file_path, pool);
@@ -526,14 +526,14 @@ SizeT PhysicalExport::ExportToPARQUET(QueryContext *query_context, ExportOperato
     };
     init_file_stream_writer(file_path_);
 
-    SizeT offset = offset_;
-    SizeT row_count{0};
-    SizeT file_no_{0};
+    size_t offset = offset_;
+    size_t row_count{0};
+    size_t file_no_{0};
     bool switch_to_new_file = false;
     auto consume_block =
-        [&](Vector<ColumnVector> &column_vectors, const Bitmask *bitmask, SegmentOffset segment_offset, const SizeT block_row_count) -> bool {
-        Vector<u32> block_rows_for_output;
-        for (SizeT start_block_row_idx = 0; start_block_row_idx < block_row_count; ++start_block_row_idx) {
+        [&](std::vector<ColumnVector> &column_vectors, const Bitmask *bitmask, SegmentOffset segment_offset, const size_t block_row_count) -> bool {
+        std::vector<u32> block_rows_for_output;
+        for (size_t start_block_row_idx = 0; start_block_row_idx < block_row_count; ++start_block_row_idx) {
             bool need_switch_to_new_file = false;
             for (block_rows_for_output.clear(); start_block_row_idx < block_row_count; ++start_block_row_idx) {
                 if (!bitmask->IsTrue(start_block_row_idx)) {
@@ -560,17 +560,17 @@ SizeT PhysicalExport::ExportToPARQUET(QueryContext *query_context, ExportOperato
                 if (auto status = file_writer->Close(); !status.ok()) {
                     RecoverableError(Status::IOError(fmt::format("Failed to close parquet file: {}", status.ToString())));
                 }
-                const String new_file_path = fmt::format("{}.part{}", file_path_, ++file_no_);
+                const std::string new_file_path = fmt::format("{}.part{}", file_path_, ++file_no_);
                 init_file_stream_writer(new_file_path);
             }
-            Vector<SharedPtr<arrow::Array>> block_arrays;
-            for (SizeT i = 0; i < select_column_count; ++i) {
+            std::vector<std::shared_ptr<arrow::Array>> block_arrays;
+            for (size_t i = 0; i < select_column_count; ++i) {
                 const auto select_column_idx = select_columns[i];
                 ColumnDef *column_def = column_defs[select_column_idx].get();
                 ColumnVector &column_vector = column_vectors[i];
                 block_arrays.emplace_back(BuildArrowArray(column_def, column_vector, block_rows_for_output));
             }
-            SharedPtr<arrow::RecordBatch> block_batch = arrow::RecordBatch::Make(schema, block_rows_for_output.size(), std::move(block_arrays));
+            std::shared_ptr<arrow::RecordBatch> block_batch = arrow::RecordBatch::Make(schema, block_rows_for_output.size(), std::move(block_arrays));
             if (auto status = file_writer->WriteRecordBatch(*block_batch); !status.ok()) {
                 RecoverableError(Status::IOError(fmt::format("Failed to write record batch to parquet file: {}", status.ToString())));
             }
@@ -582,15 +582,15 @@ SizeT PhysicalExport::ExportToPARQUET(QueryContext *query_context, ExportOperato
         return true;
     };
 
-    Map<SegmentID, NewSegmentSnapshot> &segment_block_index_ref = block_index_->new_segment_block_index_;
+    std::map<SegmentID, NewSegmentSnapshot> &segment_block_index_ref = block_index_->new_segment_block_index_;
     NewTxn *new_txn = query_context->GetNewTxn();
     TxnTimeStamp begin_ts = new_txn->BeginTS();
     TxnTimeStamp commit_ts = new_txn->CommitTS();
 
     for (auto &[segment_id, segment_snapshot] : segment_block_index_ref) {
-        SizeT block_count = segment_snapshot.block_map().size();
+        size_t block_count = segment_snapshot.block_map().size();
         LOG_DEBUG(fmt::format("Export segment_id: {}, with block count: {}", segment_id, block_count));
-        for (SizeT block_idx = 0; block_idx < block_count; ++block_idx) {
+        for (size_t block_idx = 0; block_idx < block_count; ++block_idx) {
             LOG_DEBUG(fmt::format("Export block_idx: {}", block_idx));
             BlockMeta *block_meta = segment_snapshot.block_map()[block_idx].get();
             auto [block_row_count, status] = block_meta->GetRowCnt1();
@@ -598,7 +598,7 @@ SizeT PhysicalExport::ExportToPARQUET(QueryContext *query_context, ExportOperato
                 RecoverableError(status);
             }
 
-            Vector<ColumnVector> column_vectors;
+            std::vector<ColumnVector> column_vectors;
             column_vectors.resize(select_column_count);
 
             for (ColumnID block_column_idx = 0; block_column_idx < select_column_count; ++block_column_idx) {
@@ -639,7 +639,7 @@ new_label_return:
     return row_count;
 }
 
-SharedPtr<arrow::DataType> GetArrowType(const DataType &column_data_type) {
+std::shared_ptr<arrow::DataType> GetArrowType(const DataType &column_data_type) {
     switch (const auto column_logical_type = column_data_type.type(); column_logical_type) {
         case LogicalType::kBoolean:
             return arrow::boolean();
@@ -670,8 +670,8 @@ SharedPtr<arrow::DataType> GetArrowType(const DataType &column_data_type) {
             return arrow::utf8();
         case LogicalType::kSparse: {
             const auto *sparse_info = static_cast<const SparseInfo *>(column_data_type.type_info().get());
-            SharedPtr<arrow::DataType> index_type;
-            Optional<SharedPtr<arrow::DataType>> value_type = None;
+            std::shared_ptr<arrow::DataType> index_type;
+            std::optional<std::shared_ptr<arrow::DataType>> value_type = std::nullopt;
             switch (sparse_info->IndexType()) {
                 case EmbeddingDataType::kElemInt8: {
                     index_type = arrow::list(arrow::int8());
@@ -749,8 +749,8 @@ SharedPtr<arrow::DataType> GetArrowType(const DataType &column_data_type) {
         case LogicalType::kTensor:
         case LogicalType::kTensorArray: {
             const auto *embedding_info = static_cast<const EmbeddingInfo *>(column_data_type.type_info().get());
-            const SizeT dimension = embedding_info->Dimension();
-            SharedPtr<arrow::DataType> arrow_embedding_elem_type;
+            const size_t dimension = embedding_info->Dimension();
+            std::shared_ptr<arrow::DataType> arrow_embedding_elem_type;
             switch (embedding_info->Type()) {
                 case EmbeddingDataType::kElemBit: {
                     arrow_embedding_elem_type = arrow::boolean();
@@ -839,85 +839,85 @@ SharedPtr<arrow::DataType> GetArrowType(const DataType &column_data_type) {
     return nullptr;
 }
 
-SharedPtr<arrow::ArrayBuilder> GetArrowBuilder(const DataType &column_type) {
-    SharedPtr<arrow::ArrayBuilder> array_builder{};
+std::shared_ptr<arrow::ArrayBuilder> GetArrowBuilder(const DataType &column_type) {
+    std::shared_ptr<arrow::ArrayBuilder> array_builder{};
     switch (const auto column_logical_type = column_type.type(); column_logical_type) {
         case LogicalType::kBoolean: {
-            array_builder = MakeShared<arrow::BooleanBuilder>();
+            array_builder = std::make_shared<arrow::BooleanBuilder>();
             break;
         }
         case LogicalType::kTinyInt: {
-            array_builder = MakeShared<arrow::Int8Builder>();
+            array_builder = std::make_shared<arrow::Int8Builder>();
             break;
         }
         case LogicalType::kSmallInt: {
-            array_builder = MakeShared<arrow::Int16Builder>();
+            array_builder = std::make_shared<arrow::Int16Builder>();
             break;
         }
         case LogicalType::kInteger: {
-            array_builder = MakeShared<arrow::Int32Builder>();
+            array_builder = std::make_shared<arrow::Int32Builder>();
             break;
         }
         case LogicalType::kBigInt: {
-            array_builder = MakeShared<arrow::Int64Builder>();
+            array_builder = std::make_shared<arrow::Int64Builder>();
             break;
         }
         case LogicalType::kFloat: {
-            array_builder = MakeShared<arrow::FloatBuilder>();
+            array_builder = std::make_shared<arrow::FloatBuilder>();
             break;
         }
         case LogicalType::kDouble: {
-            array_builder = MakeShared<arrow::DoubleBuilder>();
+            array_builder = std::make_shared<arrow::DoubleBuilder>();
             break;
         }
         case LogicalType::kFloat16: {
-            array_builder = MakeShared<arrow::HalfFloatBuilder>();
+            array_builder = std::make_shared<arrow::HalfFloatBuilder>();
             break;
         }
         case LogicalType::kBFloat16: {
-            array_builder = MakeShared<arrow::FloatBuilder>();
+            array_builder = std::make_shared<arrow::FloatBuilder>();
             break;
         }
         case LogicalType::kDate: {
-            array_builder = MakeShared<arrow::Date32Builder>();
+            array_builder = std::make_shared<arrow::Date32Builder>();
             break;
         }
         case LogicalType::kTime: {
-            array_builder = MakeShared<arrow::Time32Builder>(arrow::time32(arrow::TimeUnit::SECOND), arrow::DefaultMemoryPool());
+            array_builder = std::make_shared<arrow::Time32Builder>(arrow::time32(arrow::TimeUnit::SECOND), arrow::DefaultMemoryPool());
             break;
         }
         case LogicalType::kDateTime:
         case LogicalType::kTimestamp: {
-            array_builder = MakeShared<arrow::TimestampBuilder>(arrow::timestamp(arrow::TimeUnit::SECOND), arrow::DefaultMemoryPool());
+            array_builder = std::make_shared<arrow::TimestampBuilder>(arrow::timestamp(arrow::TimeUnit::SECOND), arrow::DefaultMemoryPool());
             break;
         }
         case LogicalType::kVarchar: {
-            array_builder = MakeShared<arrow::StringBuilder>();
+            array_builder = std::make_shared<arrow::StringBuilder>();
             break;
         }
         case LogicalType::kSparse: {
             const auto *sparse_info = static_cast<const SparseInfo *>(column_type.type_info().get());
-            SharedPtr<arrow::ArrayBuilder> index_builder = nullptr;
-            SharedPtr<arrow::ArrayBuilder> value_builder = nullptr;
+            std::shared_ptr<arrow::ArrayBuilder> index_builder = nullptr;
+            std::shared_ptr<arrow::ArrayBuilder> value_builder = nullptr;
             switch (sparse_info->IndexType()) {
                 case EmbeddingDataType::kElemInt8: {
-                    auto int8_builder = MakeShared<arrow::Int8Builder>();
-                    index_builder = MakeShared<arrow::ListBuilder>(arrow::DefaultMemoryPool(), int8_builder);
+                    auto int8_builder = std::make_shared<arrow::Int8Builder>();
+                    index_builder = std::make_shared<arrow::ListBuilder>(arrow::DefaultMemoryPool(), int8_builder);
                     break;
                 }
                 case EmbeddingDataType::kElemInt16: {
-                    auto int16_builder = MakeShared<arrow::Int16Builder>();
-                    index_builder = MakeShared<arrow::ListBuilder>(arrow::DefaultMemoryPool(), int16_builder);
+                    auto int16_builder = std::make_shared<arrow::Int16Builder>();
+                    index_builder = std::make_shared<arrow::ListBuilder>(arrow::DefaultMemoryPool(), int16_builder);
                     break;
                 }
                 case EmbeddingDataType::kElemInt32: {
-                    auto int32_builder = MakeShared<arrow::Int32Builder>();
-                    index_builder = MakeShared<arrow::ListBuilder>(arrow::DefaultMemoryPool(), int32_builder);
+                    auto int32_builder = std::make_shared<arrow::Int32Builder>();
+                    index_builder = std::make_shared<arrow::ListBuilder>(arrow::DefaultMemoryPool(), int32_builder);
                     break;
                 }
                 case EmbeddingDataType::kElemInt64: {
-                    auto int64_builder = MakeShared<arrow::Int64Builder>();
-                    index_builder = MakeShared<arrow::ListBuilder>(arrow::DefaultMemoryPool(), int64_builder);
+                    auto int64_builder = std::make_shared<arrow::Int64Builder>();
+                    index_builder = std::make_shared<arrow::ListBuilder>(arrow::DefaultMemoryPool(), int64_builder);
                     break;
                 }
                 default: {
@@ -929,48 +929,48 @@ SharedPtr<arrow::ArrayBuilder> GetArrowBuilder(const DataType &column_type) {
                     break;
                 }
                 case EmbeddingDataType::kElemInt8: {
-                    auto int8_builder = MakeShared<arrow::Int8Builder>();
-                    value_builder = MakeShared<arrow::ListBuilder>(arrow::DefaultMemoryPool(), int8_builder);
+                    auto int8_builder = std::make_shared<arrow::Int8Builder>();
+                    value_builder = std::make_shared<arrow::ListBuilder>(arrow::DefaultMemoryPool(), int8_builder);
                     break;
                 }
                 case EmbeddingDataType::kElemInt16: {
-                    auto int16_builder = MakeShared<arrow::Int16Builder>();
-                    value_builder = MakeShared<arrow::ListBuilder>(arrow::DefaultMemoryPool(), int16_builder);
+                    auto int16_builder = std::make_shared<arrow::Int16Builder>();
+                    value_builder = std::make_shared<arrow::ListBuilder>(arrow::DefaultMemoryPool(), int16_builder);
                     break;
                 }
                 case EmbeddingDataType::kElemInt32: {
-                    auto int32_builder = MakeShared<arrow::Int32Builder>();
-                    value_builder = MakeShared<arrow::ListBuilder>(arrow::DefaultMemoryPool(), int32_builder);
+                    auto int32_builder = std::make_shared<arrow::Int32Builder>();
+                    value_builder = std::make_shared<arrow::ListBuilder>(arrow::DefaultMemoryPool(), int32_builder);
                     break;
                 }
                 case EmbeddingDataType::kElemInt64: {
-                    auto int64_builder = MakeShared<arrow::Int64Builder>();
-                    value_builder = MakeShared<arrow::ListBuilder>(arrow::DefaultMemoryPool(), int64_builder);
+                    auto int64_builder = std::make_shared<arrow::Int64Builder>();
+                    value_builder = std::make_shared<arrow::ListBuilder>(arrow::DefaultMemoryPool(), int64_builder);
                     break;
                 }
                 case EmbeddingDataType::kElemFloat: {
-                    auto float_builder = MakeShared<arrow::FloatBuilder>();
-                    value_builder = MakeShared<arrow::ListBuilder>(arrow::DefaultMemoryPool(), float_builder);
+                    auto float_builder = std::make_shared<arrow::FloatBuilder>();
+                    value_builder = std::make_shared<arrow::ListBuilder>(arrow::DefaultMemoryPool(), float_builder);
                     break;
                 }
                 case EmbeddingDataType::kElemDouble: {
-                    auto double_builder = MakeShared<arrow::DoubleBuilder>();
-                    value_builder = MakeShared<arrow::ListBuilder>(arrow::DefaultMemoryPool(), double_builder);
+                    auto double_builder = std::make_shared<arrow::DoubleBuilder>();
+                    value_builder = std::make_shared<arrow::ListBuilder>(arrow::DefaultMemoryPool(), double_builder);
                     break;
                 }
                 case EmbeddingDataType::kElemUInt8: {
-                    auto uint8_builder = MakeShared<arrow::UInt8Builder>();
-                    value_builder = MakeShared<arrow::ListBuilder>(arrow::DefaultMemoryPool(), uint8_builder);
+                    auto uint8_builder = std::make_shared<arrow::UInt8Builder>();
+                    value_builder = std::make_shared<arrow::ListBuilder>(arrow::DefaultMemoryPool(), uint8_builder);
                     break;
                 }
                 case EmbeddingDataType::kElemFloat16: {
-                    auto float16_builder = MakeShared<arrow::HalfFloatBuilder>();
-                    value_builder = MakeShared<arrow::ListBuilder>(arrow::DefaultMemoryPool(), float16_builder);
+                    auto float16_builder = std::make_shared<arrow::HalfFloatBuilder>();
+                    value_builder = std::make_shared<arrow::ListBuilder>(arrow::DefaultMemoryPool(), float16_builder);
                     break;
                 }
                 case EmbeddingDataType::kElemBFloat16: {
-                    auto float_builder = MakeShared<arrow::FloatBuilder>();
-                    value_builder = MakeShared<arrow::ListBuilder>(arrow::DefaultMemoryPool(), float_builder);
+                    auto float_builder = std::make_shared<arrow::FloatBuilder>();
+                    value_builder = std::make_shared<arrow::ListBuilder>(arrow::DefaultMemoryPool(), float_builder);
                     break;
                 }
                 default: {
@@ -978,11 +978,11 @@ SharedPtr<arrow::ArrayBuilder> GetArrowBuilder(const DataType &column_type) {
                 }
             }
             auto struct_type = arrow::struct_({arrow::field("index", index_builder->type()), arrow::field("value", value_builder->type())});
-            Vector<SharedPtr<arrow::ArrayBuilder>> field_builders = {index_builder};
+            std::vector<std::shared_ptr<arrow::ArrayBuilder>> field_builders = {index_builder};
             if (value_builder.get() != nullptr) {
                 field_builders.emplace_back(value_builder);
             }
-            array_builder = MakeShared<arrow::StructBuilder>(struct_type, arrow::DefaultMemoryPool(), std::move(field_builders));
+            array_builder = std::make_shared<arrow::StructBuilder>(struct_type, arrow::DefaultMemoryPool(), std::move(field_builders));
             break;
         }
         case LogicalType::kEmbedding:
@@ -990,46 +990,46 @@ SharedPtr<arrow::ArrayBuilder> GetArrowBuilder(const DataType &column_type) {
         case LogicalType::kTensor:
         case LogicalType::kTensorArray: {
             const auto *embedding_info = static_cast<const EmbeddingInfo *>(column_type.type_info().get());
-            SharedPtr<arrow::ArrayBuilder> embedding_element_builder;
+            std::shared_ptr<arrow::ArrayBuilder> embedding_element_builder;
             switch (embedding_info->Type()) {
                 case EmbeddingDataType::kElemBit: {
-                    embedding_element_builder = MakeShared<arrow::BooleanBuilder>();
+                    embedding_element_builder = std::make_shared<arrow::BooleanBuilder>();
                     break;
                 }
                 case EmbeddingDataType::kElemInt8: {
-                    embedding_element_builder = MakeShared<arrow::Int8Builder>();
+                    embedding_element_builder = std::make_shared<arrow::Int8Builder>();
                     break;
                 }
                 case EmbeddingDataType::kElemInt16: {
-                    embedding_element_builder = MakeShared<arrow::Int16Builder>();
+                    embedding_element_builder = std::make_shared<arrow::Int16Builder>();
                     break;
                 }
                 case EmbeddingDataType::kElemInt32: {
-                    embedding_element_builder = MakeShared<arrow::Int32Builder>();
+                    embedding_element_builder = std::make_shared<arrow::Int32Builder>();
                     break;
                 }
                 case EmbeddingDataType::kElemInt64: {
-                    embedding_element_builder = MakeShared<arrow::Int64Builder>();
+                    embedding_element_builder = std::make_shared<arrow::Int64Builder>();
                     break;
                 }
                 case EmbeddingDataType::kElemFloat: {
-                    embedding_element_builder = MakeShared<arrow::FloatBuilder>();
+                    embedding_element_builder = std::make_shared<arrow::FloatBuilder>();
                     break;
                 }
                 case EmbeddingDataType::kElemDouble: {
-                    embedding_element_builder = MakeShared<arrow::DoubleBuilder>();
+                    embedding_element_builder = std::make_shared<arrow::DoubleBuilder>();
                     break;
                 }
                 case EmbeddingDataType::kElemUInt8: {
-                    embedding_element_builder = MakeShared<arrow::UInt8Builder>();
+                    embedding_element_builder = std::make_shared<arrow::UInt8Builder>();
                     break;
                 }
                 case EmbeddingDataType::kElemFloat16: {
-                    embedding_element_builder = MakeShared<arrow::HalfFloatBuilder>();
+                    embedding_element_builder = std::make_shared<arrow::HalfFloatBuilder>();
                     break;
                 }
                 case EmbeddingDataType::kElemBFloat16: {
-                    embedding_element_builder = MakeShared<arrow::FloatBuilder>();
+                    embedding_element_builder = std::make_shared<arrow::FloatBuilder>();
                     break;
                 }
                 case EmbeddingDataType::kElemInvalid: {
@@ -1037,19 +1037,19 @@ SharedPtr<arrow::ArrayBuilder> GetArrowBuilder(const DataType &column_type) {
                     break;
                 }
             }
-            const SizeT dimension = embedding_info->Dimension();
+            const size_t dimension = embedding_info->Dimension();
             auto embedding_arrow_array_builder =
-                MakeShared<arrow::FixedSizeListBuilder>(arrow::DefaultMemoryPool(), embedding_element_builder, dimension);
+                std::make_shared<arrow::FixedSizeListBuilder>(arrow::DefaultMemoryPool(), embedding_element_builder, dimension);
             if (column_logical_type == LogicalType::kEmbedding) {
                 array_builder = std::move(embedding_arrow_array_builder);
                 break;
             }
-            auto tensor_arrow_array_builder = MakeShared<arrow::ListBuilder>(arrow::DefaultMemoryPool(), embedding_arrow_array_builder);
+            auto tensor_arrow_array_builder = std::make_shared<arrow::ListBuilder>(arrow::DefaultMemoryPool(), embedding_arrow_array_builder);
             if (column_logical_type == LogicalType::kTensor || column_logical_type == LogicalType::kMultiVector) {
                 array_builder = std::move(tensor_arrow_array_builder);
                 break;
             }
-            auto tensor_array_arrow_array_builder = MakeShared<arrow::ListBuilder>(arrow::DefaultMemoryPool(), tensor_arrow_array_builder);
+            auto tensor_array_arrow_array_builder = std::make_shared<arrow::ListBuilder>(arrow::DefaultMemoryPool(), tensor_arrow_array_builder);
             if (column_logical_type == LogicalType::kTensorArray) {
                 array_builder = std::move(tensor_array_arrow_array_builder);
                 break;
@@ -1060,7 +1060,7 @@ SharedPtr<arrow::ArrayBuilder> GetArrowBuilder(const DataType &column_type) {
         case LogicalType::kArray: {
             const auto *array_info = static_cast<const ArrayInfo *>(column_type.type_info().get());
             auto element_arrow_builder = GetArrowBuilder(array_info->ElemType());
-            array_builder = MakeShared<arrow::ListBuilder>(arrow::DefaultMemoryPool(), element_arrow_builder);
+            array_builder = std::make_shared<arrow::ListBuilder>(arrow::DefaultMemoryPool(), element_arrow_builder);
             break;
         }
         case LogicalType::kRowID:
@@ -1085,16 +1085,16 @@ SharedPtr<arrow::ArrayBuilder> GetArrowBuilder(const DataType &column_type) {
     return array_builder;
 }
 
-SharedPtr<arrow::Array> BuildArrowArray(const ColumnDef *column_def, const ColumnVector &column_vector, const Vector<u32> &block_rows_for_output) {
+std::shared_ptr<arrow::Array> BuildArrowArray(const ColumnDef *column_def, const ColumnVector &column_vector, const std::vector<u32> &block_rows_for_output) {
     auto &column_type = column_def->type();
-    SharedPtr<arrow::ArrayBuilder> array_builder = GetArrowBuilder(*column_type);
+    std::shared_ptr<arrow::ArrayBuilder> array_builder = GetArrowBuilder(*column_type);
 
     for (const auto idx : block_rows_for_output) {
         auto value = column_vector.GetValueByIndex(idx);
         value.AppendToArrowArray(*column_type, array_builder.get());
     }
 
-    SharedPtr<arrow::Array> array;
+    std::shared_ptr<arrow::Array> array;
     if (auto status = array_builder->Finish(&array); !status.ok()) {
         UnrecoverableError(fmt::format("Failed to build arrow array: {}", status.message()));
     }

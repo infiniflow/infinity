@@ -43,14 +43,14 @@ class SQLFileParsingTest : public BaseTest {};
 TEST_F(SQLFileParsingTest, tpch) {
     using namespace infinity;
 
-    SharedPtr<SQLParser> parser = MakeShared<SQLParser>();
-    SharedPtr<ParserResult> result = MakeShared<ParserResult>();
+    std::shared_ptr<SQLParser> parser = std::make_shared<SQLParser>();
+    std::shared_ptr<ParserResult> result = std::make_shared<ParserResult>();
 
     // Get all tpch sql text;
     String path = String(test_data_path()) + "/tpch";
     Vector<String> files = GetFilesFromDir(path);
-    SizeT file_count = files.size();
-    for (SizeT idx = 0; idx < file_count; ++idx) {
+    size_t file_count = files.size();
+    for (size_t idx = 0; idx < file_count; ++idx) {
         const String &filename = files[idx];
         if (filename == "README.md") {
             continue;
@@ -85,8 +85,8 @@ void ReadSQLs(const String &file_path, Vector<String> &sqls) {
 TEST_F(SQLFileParsingTest, hyrise) {
     using namespace infinity;
 
-    SharedPtr<SQLParser> parser = MakeShared<SQLParser>();
-    SharedPtr<ParserResult> result = MakeShared<ParserResult>();
+    std::shared_ptr<SQLParser> parser = std::make_shared<SQLParser>();
+    std::shared_ptr<ParserResult> result = std::make_shared<ParserResult>();
 
     // Get all tpch sql text;
     String good_sql = String(test_data_path()) + "/hyrise/good.sql";
@@ -113,8 +113,8 @@ TEST_F(SQLFileParsingTest, hyrise) {
 TEST_F(SQLFileParsingTest, infinity) {
     using namespace infinity;
 
-    SharedPtr<SQLParser> parser = MakeShared<SQLParser>();
-    SharedPtr<ParserResult> result = MakeShared<ParserResult>();
+    std::shared_ptr<SQLParser> parser = std::make_shared<SQLParser>();
+    std::shared_ptr<ParserResult> result = std::make_shared<ParserResult>();
 
     // Get all tpch sql text;
     String good_sql = String(test_data_path()) + "/infinity/good.sql";

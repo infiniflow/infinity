@@ -106,7 +106,7 @@ void PhysicalMergeKnn::ExecuteInner(QueryContext *query_context, MergeKnnOperato
 
     auto dists = reinterpret_cast<DataType *>(dist_column.data());
     auto row_ids = reinterpret_cast<RowID *>(row_id_column.data());
-    SizeT row_n = input_data.row_count();
+    size_t row_n = input_data.row_count();
     merge_knn->Search(dists, row_ids, row_n);
 
     if (merge_knn_state->input_complete_) {
@@ -118,10 +118,10 @@ void PhysicalMergeKnn::ExecuteInner(QueryContext *query_context, MergeKnnOperato
             merge_knn_state->data_block_array_[0]->Init(*GetOutputTypes());
         }
 
-        SizeT query_n = merge_knn_data.query_count_;
-        Vector<char *> result_dists_list;
-        Vector<RowID *> row_ids_list;
-        for (SizeT query_id = 0; query_id < query_n; ++query_id) {
+        size_t query_n = merge_knn_data.query_count_;
+        std::vector<char *> result_dists_list;
+        std::vector<RowID *> row_ids_list;
+        for (size_t query_id = 0; query_id < query_n; ++query_id) {
             result_dists_list.emplace_back(reinterpret_cast<char *>(merge_knn->GetDistancesByIdx(query_id)));
             row_ids_list.emplace_back(merge_knn->GetIDsByIdx(query_id));
         }

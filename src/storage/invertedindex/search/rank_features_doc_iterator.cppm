@@ -27,13 +27,13 @@ namespace infinity {
 
 export class RankFeaturesDocIterator : public MultiDocIterator {
 public:
-    explicit RankFeaturesDocIterator(Vector<UniquePtr<DocIterator>> &&iterators);
+    explicit RankFeaturesDocIterator(std::vector<std::unique_ptr<DocIterator>> &&iterators);
 
     ~RankFeaturesDocIterator() override;
 
     DocIteratorType GetType() const override { return DocIteratorType::kRankFeaturesDocIterator; }
 
-    String Name() const override { return "RankFeaturesDocIterator"; }
+    std::string Name() const override { return "RankFeaturesDocIterator"; }
 
     void UpdateScoreThreshold(float threshold) override {}
 

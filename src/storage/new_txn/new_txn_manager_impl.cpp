@@ -60,7 +60,7 @@ NewTxnManager::~NewTxnManager() {
 }
 
 void NewTxnManager::Start() {
-    txn_allocator_ = MakeShared<TxnAllocator>(storage_);
+    txn_allocator_ = std::make_shared<TxnAllocator>(storage_);
     txn_allocator_->Start();
 
     is_running_.store(true, std::memory_order::relaxed);
@@ -99,7 +99,7 @@ void NewTxnManager::Stop() {
     LOG_INFO("NewTxn manager is stopped");
 }
 
-SharedPtr<NewTxn> NewTxnManager::BeginTxnShared(UniquePtr<String> txn_text, TransactionType txn_type) {
+std::shared_ptr<NewTxn> NewTxnManager::BeginTxnShared(std::unique_ptr<std::string> txn_text, TransactionType txn_type) {
     // Check if the is_running_ is true
     if (is_running_.load() == false) {
         UnrecoverableError("NewTxnManager is not running, cannot create txn");
@@ -133,7 +133,7 @@ SharedPtr<NewTxn> NewTxnManager::BeginTxnShared(UniquePtr<String> txn_text, Tran
 
     // Create txn instance
     auto new_txn =
-        MakeShared<NewTxn>(this, new_txn_id, begin_ts, last_kv_commit_ts_, last_commit_ts_, kv_store_->GetInstance(), std::move(txn_text), txn_type);
+        std::make_shared<NewTxn>(this, new_txn_id, begin_ts, last_kv_commit_ts_, last_commit_ts_, kv_store_->GetInstance(), std::move(txn_text), txn_type);
 
     // Storage txn in txn manager
     txn_map_[new_txn_id] = new_txn;
@@ -143,9 +143,9 @@ SharedPtr<NewTxn> NewTxnManager::BeginTxnShared(UniquePtr<String> txn_text, Tran
     return new_txn;
 }
 
-NewTxn *NewTxnManager::BeginTxn(UniquePtr<String> txn_text, TransactionType txn_type) { return BeginTxnShared(std::move(txn_text), txn_type).get(); }
+NewTxn *NewTxnManager::BeginTxn(std::unique_ptr<std::string> txn_text, TransactionType txn_type) { return BeginTxnShared(std::move(txn_text), txn_type).get(); }
 
-UniquePtr<NewTxn> NewTxnManager::BeginReplayTxn(const SharedPtr<WalEntry> &wal_entry) {
+std::unique_ptr<NewTxn> NewTxnManager::BeginReplayTxn(const std::shared_ptr<WalEntry> &wal_entry) {
     // Check if the is_running_ is true
     if (is_running_.load() == false) {
         UnrecoverableError("NewTxnManager is not running, cannot replay txn");
@@ -156,11 +156,11 @@ UniquePtr<NewTxn> NewTxnManager::BeginReplayTxn(const SharedPtr<WalEntry> &wal_e
     TxnTimeStamp begin_ts = commit_ts - 1;
 
     // Create txn instance
-    UniquePtr<NewTxn> replay_txn = NewTxn::NewReplayTxn(this, txn_id, begin_ts, commit_ts, kv_store_->GetInstance());
+    std::unique_ptr<NewTxn> replay_txn = NewTxn::NewReplayTxn(this, txn_id, begin_ts, commit_ts, kv_store_->GetInstance());
     return replay_txn;
 }
 
-UniquePtr<NewTxn> NewTxnManager::BeginRecoveryTxn() {
+std::unique_ptr<NewTxn> NewTxnManager::BeginRecoveryTxn() {
     // Check if the is_running_ is true
     if (is_running_.load() == false) {
         UnrecoverableError("NewTxnManager is not running, cannot replay txn");
@@ -173,7 +173,7 @@ UniquePtr<NewTxn> NewTxnManager::BeginRecoveryTxn() {
     TxnTimeStamp begin_ts = current_ts_ + 1;  // current_ts_ > 0
 
     // Create txn instance
-    UniquePtr<NewTxn> recovery_txn = NewTxn::NewRecoveryTxn(this, begin_ts, commit_ts);
+    std::unique_ptr<NewTxn> recovery_txn = NewTxn::NewRecoveryTxn(this, begin_ts, commit_ts);
     return recovery_txn;
 }
 
@@ -207,7 +207,7 @@ TxnTimeStamp NewTxnManager::GetCurrentTS() {
 }
 
 // Prepare to commit WriteTxn
-TxnTimeStamp NewTxnManager::GetWriteCommitTS(SharedPtr<NewTxn> txn) {
+TxnTimeStamp NewTxnManager::GetWriteCommitTS(std::shared_ptr<NewTxn> txn) {
     std::lock_guard guard(locker_);
     prepare_commit_ts_ += 2;
     TxnTimeStamp commit_ts = prepare_commit_ts_;
@@ -222,11 +222,11 @@ TxnTimeStamp NewTxnManager::GetWriteCommitTS(SharedPtr<NewTxn> txn) {
     return commit_ts;
 }
 
-bool NewTxnManager::CheckConflict1(NewTxn *txn, String &conflict_reason, bool &retry_query) {
+bool NewTxnManager::CheckConflict1(NewTxn *txn, std::string &conflict_reason, bool &retry_query) {
 
-    Vector<SharedPtr<NewTxn>> check_txns = GetCheckCandidateTxns(txn);
+    std::vector<std::shared_ptr<NewTxn>> check_txns = GetCheckCandidateTxns(txn);
     LOG_DEBUG(fmt::format("CheckConflict1:: Txn {} check conflict with check_txns {}", txn->TxnID(), check_txns.size()));
-    for (SharedPtr<NewTxn> &check_txn : check_txns) {
+    for (std::shared_ptr<NewTxn> &check_txn : check_txns) {
         if (txn->CheckConflictTxnStores(check_txn, conflict_reason, retry_query)) {
             return true;
         }
@@ -261,7 +261,7 @@ void NewTxnManager::SendToWAL(NewTxn *txn) {
         wait_conflict_ck_.at(commit_ts) = txn;
     }
     if (!wait_conflict_ck_.empty() && wait_conflict_ck_.begin()->second != nullptr) {
-        Vector<NewTxn *> txn_array;
+        std::vector<NewTxn *> txn_array;
         do {
             txn_array.push_back(wait_conflict_ck_.begin()->second);
             wait_conflict_ck_.erase(wait_conflict_ck_.begin());
@@ -310,13 +310,13 @@ Status NewTxnManager::RollBackTxn(NewTxn *txn) {
     return status;
 }
 
-SizeT NewTxnManager::ActiveTxnCount() {
+size_t NewTxnManager::ActiveTxnCount() {
     std::unique_lock w_lock(locker_);
     return txn_map_.size();
 }
 
-Vector<TxnInfo> NewTxnManager::GetTxnInfoArray() const {
-    Vector<TxnInfo> res;
+std::vector<TxnInfo> NewTxnManager::GetTxnInfoArray() const {
+    std::vector<TxnInfo> res;
 
     std::unique_lock w_lock(locker_);
     res.reserve(txn_map_.size());
@@ -330,18 +330,18 @@ Vector<TxnInfo> NewTxnManager::GetTxnInfoArray() const {
     return res;
 }
 
-UniquePtr<TxnInfo> NewTxnManager::GetTxnInfoByID(TransactionID txn_id) const {
+std::unique_ptr<TxnInfo> NewTxnManager::GetTxnInfoByID(TransactionID txn_id) const {
     std::unique_lock w_lock(locker_);
     auto iter = txn_map_.find(txn_id);
     if (iter == txn_map_.end()) {
         return nullptr;
     }
-    return MakeUnique<TxnInfo>(iter->first, iter->second->GetTxnText());
+    return std::make_unique<TxnInfo>(iter->first, iter->second->GetTxnText());
 }
 
-Vector<SharedPtr<TxnContext>> NewTxnManager::GetTxnContextHistories() const {
+std::vector<std::shared_ptr<TxnContext>> NewTxnManager::GetTxnContextHistories() const {
     std::unique_lock w_lock(locker_);
-    Vector<SharedPtr<TxnContext>> txn_context_histories;
+    std::vector<std::shared_ptr<TxnContext>> txn_context_histories;
     txn_context_histories.reserve(txn_context_histories_.size());
 
     for (const auto &context_ptr : txn_context_histories_) {
@@ -382,7 +382,7 @@ void NewTxnManager::CommitBottom(NewTxn *txn) {
     TxnTimeStamp commit_ts = txn->CommitTS();
     TransactionID txn_id = txn->TxnID();
 
-    Vector<SharedPtr<NewTxn>> txns_to_update;
+    std::vector<std::shared_ptr<NewTxn>> txns_to_update;
     {
         std::lock_guard guard(locker_);
         auto iter = bottom_txns_.find(commit_ts);
@@ -401,7 +401,7 @@ void NewTxnManager::CommitBottom(NewTxn *txn) {
         while (!bottom_txns_.empty()) {
             iter = bottom_txns_.begin();
             TxnTimeStamp it_ts = iter->first;
-            SharedPtr<NewTxn> it_txn = iter->second;
+            std::shared_ptr<NewTxn> it_txn = iter->second;
             if (current_ts_ > it_ts || it_ts > prepare_commit_ts_) {
                 UnrecoverableError(fmt::format("Commit ts error: {}, {}, {}", current_ts_, it_ts, prepare_commit_ts_));
             }
@@ -558,12 +558,12 @@ void NewTxnManager::CleanupTxn(NewTxn *txn) {
         }
         {
             std::lock_guard guard(locker_);
-            SharedPtr<NewTxn> txn_ptr = txn_map_[txn_id];
+            std::shared_ptr<NewTxn> txn_ptr = txn_map_[txn_id];
             if (txn_context_histories_.size() >= DEFAULT_TXN_HISTORY_SIZE) {
                 txn_context_histories_.pop_front();
             }
             txn_context_histories_.push_back(txn_ptr->txn_context());
-            SizeT remove_n = txn_map_.erase(txn_id);
+            size_t remove_n = txn_map_.erase(txn_id);
             if (remove_n == 0) {
                 UnrecoverableError(fmt::format("NewTxn: {} not found in txn map", txn_id));
             }
@@ -573,7 +573,7 @@ void NewTxnManager::CleanupTxn(NewTxn *txn) {
     } else {
         // For read-only NewTxn only remove txn from txn_map
         std::lock_guard guard(locker_);
-        //            SharedPtr<NewTxn> txn_ptr = txn_map_[txn_id];
+        //            std::shared_ptr<NewTxn> txn_ptr = txn_map_[txn_id];
         //            if (txn_contexts_.size() >= DEFAULT_TXN_HISTORY_SIZE) {
         //                txn_contexts_.pop_front();
         //            }
@@ -617,10 +617,10 @@ void NewTxnManager::PrintAllKeyValue() const {
 }
 
 void NewTxnManager::PrintPMKeyValue() const {
-    std::cout << String("Persistence Manager keys and values: ") << std::endl;
+    std::cout << std::string("Persistence Manager keys and values: ") << std::endl;
 
     // Get all key-value pairs from the KV store
-    Vector<Pair<String, String>> all_key_values = kv_store_->GetAllKeyValue();
+    std::vector<std::pair<std::string, std::string>> all_key_values = kv_store_->GetAllKeyValue();
 
     for (const auto &[key, value] : all_key_values) {
         // Check if the key is a PM key by looking for "pm|" prefix
@@ -628,14 +628,14 @@ void NewTxnManager::PrintPMKeyValue() const {
             std::cout << "PM Key: " << key << " -> Value: " << value << std::endl;
         }
     }
-    std::cout << String(" -------------- ") << std::endl;
+    std::cout << std::string(" -------------- ") << std::endl;
 }
 
 void NewTxnManager::PrintAllDroppedKeys() const {
-    std::cout << String("All dropped keys: ") << std::endl;
+    std::cout << std::string("All dropped keys: ") << std::endl;
 
     // Get all key-value pairs from the KV store
-    Vector<Pair<String, String>> all_key_values = kv_store_->GetAllKeyValue();
+    std::vector<std::pair<std::string, std::string>> all_key_values = kv_store_->GetAllKeyValue();
 
     for (const auto &[key, value] : all_key_values) {
         // Check if the key is a dropped key by looking for "drop|" prefix
@@ -646,13 +646,13 @@ void NewTxnManager::PrintAllDroppedKeys() const {
     }
 }
 
-SizeT NewTxnManager::KeyValueNum() const { return kv_store_->KeyValueNum(); }
+size_t NewTxnManager::KeyValueNum() const { return kv_store_->KeyValueNum(); }
 
 //
 //
 //
 //
-Vector<SharedPtr<NewTxn>> NewTxnManager::GetCheckCandidateTxns(NewTxn *this_txn) {
+std::vector<std::shared_ptr<NewTxn>> NewTxnManager::GetCheckCandidateTxns(NewTxn *this_txn) {
 
     TxnTimeStamp this_begin_ts = this_txn->BeginTS();
     TxnTimeStamp this_commit_ts = this_txn->CommitTS(); // Already got commit ts, but without kv_commit ts.
@@ -660,12 +660,12 @@ Vector<SharedPtr<NewTxn>> NewTxnManager::GetCheckCandidateTxns(NewTxn *this_txn)
     TxnTimeStamp this_last_system_kv_commit_ts = this_txn->LastSystemKVCommitTS();
     TxnTimeStamp this_last_system_commit_ts = this_txn->LastSystemCommitTS();
 
-    Vector<SharedPtr<NewTxn>> res;
+    std::vector<std::shared_ptr<NewTxn>> res;
     {
         std::lock_guard guard(locker_);
         res.reserve(check_txn_map_.size());
         for (const auto &other_txn_pair : check_txn_map_) {
-            const SharedPtr<NewTxn> &other_txn = other_txn_pair.second;
+            const std::shared_ptr<NewTxn> &other_txn = other_txn_pair.second;
             //            LOG_TRACE(fmt::format("This txn: {}, check txn: {}, begin_ts: {}, commit_ts: {}",
             //                                 this_txn_id,
             //                                 other_txn->TxnID(),
@@ -738,7 +738,7 @@ Vector<SharedPtr<NewTxn>> NewTxnManager::GetCheckCandidateTxns(NewTxn *this_txn)
     return res;
 }
 
-void NewTxnManager::SubmitForAllocation(SharedPtr<TxnAllocatorTask> txn_allocator_task) {
+void NewTxnManager::SubmitForAllocation(std::shared_ptr<TxnAllocatorTask> txn_allocator_task) {
     // Check if the is_running_ is true
     if (is_running_.load() == false) {
         UnrecoverableError("NewTxnManager is not running, cannot put wal entry");
@@ -782,7 +782,7 @@ void NewTxnManager::SubmitForAllocation(SharedPtr<TxnAllocatorTask> txn_allocato
     }
 }
 
-void NewTxnManager::SetSystemCache(UniquePtr<SystemCache> system_cache) {
+void NewTxnManager::SetSystemCache(std::unique_ptr<SystemCache> system_cache) {
     system_cache_ = std::move(system_cache);
     txn_allocator_->SetSystemCache(system_cache_.get());
 }
@@ -807,7 +807,7 @@ void NewTxnManager::RemoveMapElementForRollbackNoLock(TxnTimeStamp commit_ts, Ne
     }
 }
 
-void NewTxnManager::AddTaskInfo(SharedPtr<BGTaskInfo> task_info) {
+void NewTxnManager::AddTaskInfo(std::shared_ptr<BGTaskInfo> task_info) {
     std::lock_guard<std::mutex> lock(task_lock_);
     if (task_info_list_.size() >= DEFAULT_TXN_HISTORY_SIZE) {
         task_info_list_.pop_front(); // Remove the oldest task info if the list exceeds the size limit
@@ -815,9 +815,9 @@ void NewTxnManager::AddTaskInfo(SharedPtr<BGTaskInfo> task_info) {
     task_info_list_.push_back(std::move(task_info));
 }
 
-Vector<SharedPtr<BGTaskInfo>> NewTxnManager::GetTaskInfoList() const {
+std::vector<std::shared_ptr<BGTaskInfo>> NewTxnManager::GetTaskInfoList() const {
     std::lock_guard<std::mutex> lock(task_lock_);
-    Vector<SharedPtr<BGTaskInfo>> task_info_list;
+    std::vector<std::shared_ptr<BGTaskInfo>> task_info_list;
     task_info_list.reserve(task_info_list_.size());
     for (const auto &task_info : task_info_list_) {
         task_info_list.push_back(task_info);

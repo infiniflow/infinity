@@ -12,12 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:special_function;
 
-import :stl;
 import :function;
+
+import std;
+import std.compat;
 
 import data_type;
 import internal_types;
@@ -39,22 +39,22 @@ export enum class SpecialType {
 
 export class SpecialFunction final : public Function {
 public:
-    SpecialFunction(String func_name, DataType data_type, const SizeT extra_idx, const SpecialType special_type)
+    SpecialFunction(std::string func_name, DataType data_type, const size_t extra_idx, const SpecialType special_type)
         : Function(std::move(func_name), FunctionType::kSpecial), data_type_(std::move(data_type)), special_type_(special_type),
           extra_idx_(extra_idx) {}
 
     const DataType &data_type() const { return data_type_; }
 
-    SizeT extra_idx() const { return extra_idx_; }
+    size_t extra_idx() const { return extra_idx_; }
 
     SpecialType special_type() const { return special_type_; }
 
-    String ToString() const override { return name(); }
+    std::string ToString() const override { return name(); }
 
 private:
     DataType data_type_;
     SpecialType special_type_;
-    SizeT extra_idx_{0};
+    size_t extra_idx_{0};
 };
 
 } // namespace infinity

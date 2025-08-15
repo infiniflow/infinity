@@ -1,5 +1,3 @@
-module;
-
 module infinity_core:aho_corasick.impl;
 
 import :aho_corasick;
@@ -11,9 +9,9 @@ import std.compat;
 
 namespace infinity {
 
-int AhoCorasick::Build(const Vector<String> &patterns) {
-    Vector<const char *> keys;
-    Vector<std::size_t> lengths;
+int AhoCorasick::Build(const std::vector<std::string> &patterns) {
+    std::vector<const char *> keys;
+    std::vector<std::size_t> lengths;
     std::size_t num_keys = patterns.size();
     for (auto &pattern : patterns) {
         keys.push_back(pattern.c_str());
@@ -41,7 +39,7 @@ int AhoCorasick::Build(const Vector<String> &patterns) {
     return BuildFailureLinks(num_keys, keys.data(), lengths.data());
 }
 
-u32 AhoCorasick::Find(const String &text, ResultType *results, u32 max_num_results) const {
+u32 AhoCorasick::Find(const std::string &text, ResultType *results, u32 max_num_results) const {
     u32 num_results = 0;
     std::size_t node_pos = 0; // starts from the root node.
 

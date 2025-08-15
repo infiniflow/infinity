@@ -30,20 +30,20 @@ namespace infinity {
 export class LogicalDelete final : public LogicalNode {
 
 public:
-    LogicalDelete(u64 node_id, SharedPtr<TableInfo> table_info)
+    LogicalDelete(u64 node_id, std::shared_ptr<TableInfo> table_info)
         : LogicalNode(node_id, LogicalNodeType::kDelete), table_info_(std::move(table_info)) {}
 
-    [[nodiscard]] Vector<ColumnBinding> GetColumnBindings() const final;
+    [[nodiscard]] std::vector<ColumnBinding> GetColumnBindings() const final;
 
-    [[nodiscard]] SharedPtr<Vector<String>> GetOutputNames() const final;
+    [[nodiscard]] std::shared_ptr<std::vector<std::string>> GetOutputNames() const final;
 
-    [[nodiscard]] SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const final;
+    [[nodiscard]] std::shared_ptr<std::vector<std::shared_ptr<DataType>>> GetOutputTypes() const final;
 
-    String ToString(i64 &space) const final;
+    std::string ToString(i64 &space) const final;
 
-    inline String name() final { return "LogicalDelete"; }
+    inline std::string name() final { return "LogicalDelete"; }
 
-    SharedPtr<TableInfo> table_info_{};
+    std::shared_ptr<TableInfo> table_info_{};
 };
 
 } // namespace infinity

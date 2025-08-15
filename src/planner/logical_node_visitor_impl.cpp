@@ -194,8 +194,8 @@ void LogicalNodeVisitor::VisitNodeExpression(LogicalNode &op) {
     }
 }
 
-void LogicalNodeVisitor::VisitExpression(SharedPtr<BaseExpression> &expression) {
-    SharedPtr<BaseExpression> result;
+void LogicalNodeVisitor::VisitExpression(std::shared_ptr<BaseExpression> &expression) {
+    std::shared_ptr<BaseExpression> result;
     switch (expression->type()) {
         case ExpressionType::kUnnest: {
             auto unnest_expression = static_pointer_cast<UnnestExpression>(expression);
@@ -343,7 +343,7 @@ void LogicalNodeVisitor::VisitExpression(SharedPtr<BaseExpression> &expression) 
     }
 }
 
-void LogicalNodeVisitor::VisitExpressionChildren(SharedPtr<BaseExpression> &expression) {
+void LogicalNodeVisitor::VisitExpressionChildren(std::shared_ptr<BaseExpression> &expression) {
     switch (expression->type()) {
 
         case ExpressionType::kAggregate: {
@@ -444,28 +444,28 @@ void LogicalNodeVisitor::VisitExpressionChildren(SharedPtr<BaseExpression> &expr
     }
 }
 
-SharedPtr<BaseExpression> LogicalNodeVisitor::VisitReplace(const SharedPtr<AggregateExpression> &) { return nullptr; }
+std::shared_ptr<BaseExpression> LogicalNodeVisitor::VisitReplace(const std::shared_ptr<AggregateExpression> &) { return nullptr; }
 
-SharedPtr<BaseExpression> LogicalNodeVisitor::VisitReplace(const SharedPtr<BetweenExpression> &) { return nullptr; }
+std::shared_ptr<BaseExpression> LogicalNodeVisitor::VisitReplace(const std::shared_ptr<BetweenExpression> &) { return nullptr; }
 
-SharedPtr<BaseExpression> LogicalNodeVisitor::VisitReplace(const SharedPtr<CaseExpression> &) { return nullptr; }
+std::shared_ptr<BaseExpression> LogicalNodeVisitor::VisitReplace(const std::shared_ptr<CaseExpression> &) { return nullptr; }
 
-SharedPtr<BaseExpression> LogicalNodeVisitor::VisitReplace(const SharedPtr<CastExpression> &) { return nullptr; }
+std::shared_ptr<BaseExpression> LogicalNodeVisitor::VisitReplace(const std::shared_ptr<CastExpression> &) { return nullptr; }
 
-SharedPtr<BaseExpression> LogicalNodeVisitor::VisitReplace(const SharedPtr<ColumnExpression> &) { return nullptr; }
+std::shared_ptr<BaseExpression> LogicalNodeVisitor::VisitReplace(const std::shared_ptr<ColumnExpression> &) { return nullptr; }
 
-SharedPtr<BaseExpression> LogicalNodeVisitor::VisitReplace(const SharedPtr<ConjunctionExpression> &) { return nullptr; }
+std::shared_ptr<BaseExpression> LogicalNodeVisitor::VisitReplace(const std::shared_ptr<ConjunctionExpression> &) { return nullptr; }
 
-SharedPtr<BaseExpression> LogicalNodeVisitor::VisitReplace(const SharedPtr<FunctionExpression> &) { return nullptr; }
+std::shared_ptr<BaseExpression> LogicalNodeVisitor::VisitReplace(const std::shared_ptr<FunctionExpression> &) { return nullptr; }
 
-SharedPtr<BaseExpression> LogicalNodeVisitor::VisitReplace(const SharedPtr<ValueExpression> &) { return nullptr; }
+std::shared_ptr<BaseExpression> LogicalNodeVisitor::VisitReplace(const std::shared_ptr<ValueExpression> &) { return nullptr; }
 
-SharedPtr<BaseExpression> LogicalNodeVisitor::VisitReplace(const SharedPtr<InExpression> &) { return nullptr; }
+std::shared_ptr<BaseExpression> LogicalNodeVisitor::VisitReplace(const std::shared_ptr<InExpression> &) { return nullptr; }
 
-SharedPtr<BaseExpression> LogicalNodeVisitor::VisitReplace(const SharedPtr<SubqueryExpression> &) { return nullptr; }
+std::shared_ptr<BaseExpression> LogicalNodeVisitor::VisitReplace(const std::shared_ptr<SubqueryExpression> &) { return nullptr; }
 
-SharedPtr<BaseExpression> LogicalNodeVisitor::VisitReplace(const SharedPtr<KnnExpression> &) { return nullptr; }
+std::shared_ptr<BaseExpression> LogicalNodeVisitor::VisitReplace(const std::shared_ptr<KnnExpression> &) { return nullptr; }
 
-SharedPtr<BaseExpression> LogicalNodeVisitor::VisitReplace(const SharedPtr<UnnestExpression> &) { return nullptr; }
+std::shared_ptr<BaseExpression> LogicalNodeVisitor::VisitReplace(const std::shared_ptr<UnnestExpression> &) { return nullptr; }
 
 } // namespace infinity

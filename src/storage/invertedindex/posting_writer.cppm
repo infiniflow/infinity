@@ -35,9 +35,9 @@ public:
 
     tf_t GetCurrentTF() const;
 
-    void Dump(const SharedPtr<FileWriter> &file_writer, TermMeta &term_meta, bool spill = false);
+    void Dump(const std::shared_ptr<FileWriter> &file_writer, TermMeta &term_meta, bool spill = false);
 
-    void Load(const SharedPtr<FileReader> &file_reader);
+    void Load(const std::shared_ptr<FileReader> &file_reader);
 
     u32 GetDumpLength();
 
@@ -51,7 +51,7 @@ public:
 
 private:
     // for memory tracing
-    SizeT last_size_{0};
+    size_t last_size_{0};
     const PostingFormat &posting_format_;
     DocListEncoder *doc_list_encoder_{nullptr};
     PositionListEncoder *position_list_encoder_{nullptr};
@@ -59,6 +59,6 @@ private:
     VectorWithLock<u32> &column_lengths_;
 };
 
-export using PostingWriterProvider = std::function<SharedPtr<PostingWriter>(const String &)>;
+export using PostingWriterProvider = std::function<std::shared_ptr<PostingWriter>(const std::string &)>;
 
 } // namespace infinity

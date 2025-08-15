@@ -39,9 +39,9 @@ public:
 
     void EndDocument(docid_t doc_id, u32 doc_len, docpayload_t doc_payload);
 
-    void Dump(const SharedPtr<FileWriter> &file, bool spill = false);
+    void Dump(const std::shared_ptr<FileWriter> &file, bool spill = false);
 
-    void Load(const SharedPtr<FileReader> &file);
+    void Load(const std::shared_ptr<FileReader> &file);
 
     u32 GetDumpLength();
 
@@ -51,14 +51,14 @@ public:
 
     PostingByteSlice *GetDocListBuffer() { return &doc_list_buffer_; }
 
-    inline SizeT GetSizeInBytes() const { return doc_list_buffer_.GetSizeInBytes() + doc_skiplist_writer_->GetSizeInBytes(); }
+    inline size_t GetSizeInBytes() const { return doc_list_buffer_.GetSizeInBytes() + doc_skiplist_writer_->GetSizeInBytes(); }
 
 private:
     void AddDocument(docid_t doc_id, docpayload_t doc_payload, tf_t tf, u32 doc_len);
 
     void FlushDocListBuffer();
 
-    SharedPtr<SkipListWriter> GetDocSkipListWriter();
+    std::shared_ptr<SkipListWriter> GetDocSkipListWriter();
 
     void AddSkipListItem(u32 item_size);
 
@@ -77,7 +77,7 @@ private:
 
     mutable std::shared_mutex rw_mutex_; // Protect df_ and doc_skiplist_writer_
     df_t df_;
-    SharedPtr<SkipListWriter> doc_skiplist_writer_;
+    std::shared_ptr<SkipListWriter> doc_skiplist_writer_;
 
     friend class InMemDocListDecoderTest;
 };

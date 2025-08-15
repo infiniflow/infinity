@@ -12,11 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:bmp_util;
 
-import :stl;
+import :infinity_type;
 
 import statement_common;
 
@@ -45,50 +43,50 @@ export template <typename T>
 class VecPtr<T, BMPOwnMem::kTrue> {
 public:
     VecPtr() = default;
-    VecPtr(Vector<T> ptr) : vec_(std::move(ptr)) {}
+    VecPtr(std::vector<T> ptr) : vec_(std::move(ptr)) {}
 
-    T &operator[](SizeT idx) { return vec_[idx]; }
-    const T &operator[](SizeT idx) const { return vec_[idx]; }
+    T &operator[](size_t idx) { return vec_[idx]; }
+    const T &operator[](size_t idx) const { return vec_[idx]; }
 
     T *data() { return vec_.data(); }
     const T *data() const { return vec_.data(); }
-    SizeT size() const { return vec_.size(); }
+    size_t size() const { return vec_.size(); }
 
     template<typename U>
     void push_back(U&& val) { vec_.push_back(std::forward<U>(val)); }
 
-    Vector<T> exchange(Vector<T> vec) { return std::exchange(vec_, std::move(vec)); }
+    std::vector<T> exchange(std::vector<T> vec) { return std::exchange(vec_, std::move(vec)); }
 
 private:
-    Vector<T> vec_;
+    std::vector<T> vec_;
 };
 
 export template <typename T>
 class VecPtr<T, BMPOwnMem::kFalse> {
 public:
     VecPtr() = default;
-    VecPtr(const T *ptr, SizeT size) : ptr_(ptr), size_(size) {}
+    VecPtr(const T *ptr, size_t size) : ptr_(ptr), size_(size) {}
 
-    const T &operator[](SizeT idx) const { return ptr_[idx]; }
+    const T &operator[](size_t idx) const { return ptr_[idx]; }
 
-    SizeT size() const { return size_; }
+    size_t size() const { return size_; }
 
 private:
     const T *ptr_ = nullptr;
-    SizeT size_ = 0;
+    size_t size_ = 0;
 };
 
-export BMPCompressType BMPCompressTypeFromString(const String &compress_type_str) {
-    if (IsEqual(compress_type_str, "raww")) {
+export BMPCompressType BMPCompressTypeFromString(const std::string &compress_type_str) {
+    if (compress_type_str == "raww") {
         return BMPCompressType::kRaw;
-    } else if (IsEqual(compress_type_str, "compress")) {
+    } else if (compress_type_str == "compress") {
         return BMPCompressType::kCompressed;
     } else {
         return BMPCompressType::kInvalid;
     }
 }
 
-export String BMPCompressTypeToString(BMPCompressType compress_type) {
+export std::string BMPCompressTypeToString(BMPCompressType compress_type) {
     switch (compress_type) {
         case BMPCompressType::kRaw: {
             return "raw";
@@ -115,9 +113,9 @@ export struct BMPOptimizeOptions {
 
 export class BMPUtil {
 public:
-    static BmpSearchOptions ParseBmpSearchOptions(const Vector<UniquePtr<InitParameter>> &opt_params);
+    static BmpSearchOptions ParseBmpSearchOptions(const std::vector<std::unique_ptr<InitParameter>> &opt_params);
 
-    static Optional<BMPOptimizeOptions> ParseBMPOptimizeOptions(const Vector<UniquePtr<InitParameter>> &opt_params);
+    static std::optional<BMPOptimizeOptions> ParseBMPOptimizeOptions(const std::vector<std::unique_ptr<InitParameter>> &opt_params);
 };
 
 } // namespace infinity

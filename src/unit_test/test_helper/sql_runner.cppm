@@ -30,7 +30,7 @@ namespace infinity {
 export class SQLRunner {
 
 public:
-    static SharedPtr<DataTable> Run(const String &sql_text, bool print = true);
+    static std::shared_ptr<DataTable> Run(const std::string &sql_text, bool print = true);
 };
 
 } // namespace infinity

@@ -12,11 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:hnsw_lsg_builder;
 
-import :stl;
+import std;
+import std.compat;
 
 import column_def;
 import row_id;
@@ -32,33 +31,33 @@ class IndexHnsw;
 
 export class HnswLSGBuilder {
 public:
-    HnswLSGBuilder(const IndexHnsw *index_hnsw, SharedPtr<ColumnDef> column_def);
+    HnswLSGBuilder(const IndexHnsw *index_hnsw, std::shared_ptr<ColumnDef> column_def);
 
     ~HnswLSGBuilder();
 
     template <typename Iter, typename DataType, typename DistanceDataType>
-    UniquePtr<HnswIndexInMem> MakeImplIter(Iter iter, SizeT row_count, const RowID &base_row_id, bool trace);
+    std::unique_ptr<HnswIndexInMem> MakeImplIter(Iter iter, size_t row_count, const RowID &base_row_id, bool trace);
 
 public:
     template <typename Iter, typename DataType, typename DistanceDataType>
-    UniquePtr<float[]> GetLSAvg(Iter iter, SizeT row_count, const RowID &base_row_id);
+    std::unique_ptr<float[]> GetLSAvg(Iter iter, size_t row_count, const RowID &base_row_id);
 
 private:
-    UniquePtr<IVFIndexInChunk> MakeIVFIndex();
+    std::unique_ptr<IVFIndexInChunk> MakeIVFIndex();
 
     IVF_Search_Params MakeIVFSearchParams() const;
 
     template <typename Iter, typename DataType, template <typename, typename> typename Compare, typename DistanceDataType>
-    UniquePtr<float[]> GetAvgByIVF(Iter iter, SizeT row_count);
+    std::unique_ptr<float[]> GetAvgByIVF(Iter iter, size_t row_count);
 
     template <typename Iter, typename DataType, template <typename, typename> typename Compare, typename DistanceDataType>
-    UniquePtr<float[]> GetAvgBF(Iter iter, SizeT row_count);
+    std::unique_ptr<float[]> GetAvgBF(Iter iter, size_t row_count);
 
 private:
     const IndexHnsw *index_hnsw_ = nullptr;
-    const SharedPtr<ColumnDef> column_def_ = nullptr;
+    const std::shared_ptr<ColumnDef> column_def_ = nullptr;
 
-    UniquePtr<KnnDistanceBase1> knn_distance_;
+    std::unique_ptr<KnnDistanceBase1> knn_distance_;
 };
 
 } // namespace infinity

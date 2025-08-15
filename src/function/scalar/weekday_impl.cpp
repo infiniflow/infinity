@@ -70,9 +70,9 @@ inline bool WeekdayFunction::Run(TimestampT left, BigIntT &result) {
 }
 
 void RegisterWeekdayFunction(NewCatalog *catalog_ptr) {
-    String func_name = "weekday";
+    std::string func_name = "weekday";
 
-    SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
+    std::shared_ptr<ScalarFunctionSet> function_set_ptr = std::make_shared<ScalarFunctionSet>(func_name);
 
     ScalarFunction weekday_date_function(func_name,
                                   {DataType(LogicalType::kDate)},

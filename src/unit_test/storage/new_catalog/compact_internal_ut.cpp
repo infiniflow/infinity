@@ -89,21 +89,21 @@ TEST_P(TestTxnCompactInternal, test_compact) {
 
     NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
 
-    SharedPtr<String> db_name = std::make_shared<String>("db1");
+    std::shared_ptr<String> db_name = std::make_shared<String>("db1");
     auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
     auto column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
     auto table_name = std::make_shared<std::string>("tb1");
-    auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def2});
+    auto table_def = TableDef::Make(db_name, table_name, std::make_shared<String>(), {column_def1, column_def2});
 
     {
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
-        Status status = txn->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("create db"), TransactionType::kNormal);
+        Status status = txn->CreateDatabase(*db_name, ConflictType::kError, std::make_shared<String>());
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
     }
     {
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("create table"), TransactionType::kNormal);
         Status status = txn->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
@@ -112,7 +112,7 @@ TEST_P(TestTxnCompactInternal, test_compact) {
 
     u32 block_row_cnt = 8192;
     auto make_input_block = [&] {
-        auto input_block = MakeShared<DataBlock>();
+        auto input_block = std::make_shared<DataBlock>();
         auto append_to_col = [&](ColumnVector &col, Value v1, Value v2) {
             for (u32 i = 0; i < block_row_cnt; i += 2) {
                 col.AppendValue(v1);
@@ -136,15 +136,15 @@ TEST_P(TestTxnCompactInternal, test_compact) {
         return input_block;
     };
     for (int i = 0; i < 2; ++i) {
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("import"), TransactionType::kNormal);
-        Vector<SharedPtr<DataBlock>> input_blocks = {make_input_block(), make_input_block()};
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("import"), TransactionType::kNormal);
+        Vector<std::shared_ptr<DataBlock>> input_blocks = {make_input_block(), make_input_block()};
         Status status = txn->Import(*db_name, *table_name, input_blocks);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
     }
     {
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("delete"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("delete"), TransactionType::kNormal);
         Vector<RowID> row_ids;
         for (u32 i = 1; i < block_row_cnt; i += 2) {
             row_ids.push_back(RowID(0, i));
@@ -155,14 +155,14 @@ TEST_P(TestTxnCompactInternal, test_compact) {
         EXPECT_TRUE(status.ok());
     }
     {
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("compact"), TransactionType::kNormal);
         Status status = txn->Compact(*db_name, *table_name, {0, 1});
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
     }
     {
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("scan"), TransactionType::kNormal);
         TxnTimeStamp begin_ts = txn->BeginTS();
         TxnTimeStamp commit_ts = txn->CommitTS();
 
@@ -199,7 +199,7 @@ TEST_P(TestTxnCompactInternal, test_compact) {
             EXPECT_FALSE(next);
 
             {
-                SizeT column_idx = 0;
+                size_t column_idx = 0;
                 ColumnMeta column_meta(column_idx, block_meta);
                 ColumnVector col;
 
@@ -238,7 +238,7 @@ TEST_P(TestTxnCompactInternal, test_compact) {
             EXPECT_FALSE(next);
 
             {
-                SizeT column_idx = 0;
+                size_t column_idx = 0;
                 ColumnMeta column_meta(column_idx, block_meta);
                 ColumnVector col;
 
@@ -264,32 +264,32 @@ TEST_P(TestTxnCompactInternal, test_compact_with_index) {
 
     NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
 
-    SharedPtr<String> db_name = std::make_shared<String>("db1");
+    std::shared_ptr<String> db_name = std::make_shared<String>("db1");
     auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
     auto column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
     auto table_name = std::make_shared<std::string>("tb1");
-    auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def2});
+    auto table_def = TableDef::Make(db_name, table_name, std::make_shared<String>(), {column_def1, column_def2});
 
     auto index_name1 = std::make_shared<std::string>("index1");
-    auto index_def1 = IndexSecondary::Make(index_name1, MakeShared<String>(), "file_name", {column_def1->name()});
+    auto index_def1 = IndexSecondary::Make(index_name1, std::make_shared<String>(), "file_name", {column_def1->name()});
     auto index_name2 = std::make_shared<String>("index2");
-    auto index_def2 = IndexFullText::Make(index_name2, MakeShared<String>(), "file_name", {column_def2->name()}, {});
+    auto index_def2 = IndexFullText::Make(index_name2, std::make_shared<String>(), "file_name", {column_def2->name()}, {});
     {
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
-        Status status = txn->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("create db"), TransactionType::kNormal);
+        Status status = txn->CreateDatabase(*db_name, ConflictType::kError, std::make_shared<String>());
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
     }
     {
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("create table"), TransactionType::kNormal);
         Status status = txn->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
     }
-    auto create_index = [&](const SharedPtr<IndexBase> &index_base) {
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>(fmt::format("create index {}", *index_base->index_name_)), TransactionType::kNormal);
+    auto create_index = [&](const std::shared_ptr<IndexBase> &index_base) {
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>(fmt::format("create index {}", *index_base->index_name_)), TransactionType::kNormal);
         Status status = txn->CreateIndex(*db_name, *table_name, index_base, ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
@@ -300,7 +300,7 @@ TEST_P(TestTxnCompactInternal, test_compact_with_index) {
 
     u32 block_row_cnt = 8192;
     auto make_input_block = [&] {
-        auto input_block = MakeShared<DataBlock>();
+        auto input_block = std::make_shared<DataBlock>();
         auto append_to_col = [&](ColumnVector &col, Value v1, Value v2) {
             for (u32 i = 0; i < block_row_cnt; i += 2) {
                 col.AppendValue(v1);
@@ -324,15 +324,15 @@ TEST_P(TestTxnCompactInternal, test_compact_with_index) {
         return input_block;
     };
     for (int i = 0; i < 2; ++i) {
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("import"), TransactionType::kNormal);
-        Vector<SharedPtr<DataBlock>> input_blocks = {make_input_block(), make_input_block()};
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("import"), TransactionType::kNormal);
+        Vector<std::shared_ptr<DataBlock>> input_blocks = {make_input_block(), make_input_block()};
         Status status = txn->Import(*db_name, *table_name, input_blocks);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
     }
     {
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("delete"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("delete"), TransactionType::kNormal);
         Vector<RowID> row_ids;
         for (u32 i = 1; i < block_row_cnt; i += 2) {
             row_ids.push_back(RowID(0, i));
@@ -343,14 +343,14 @@ TEST_P(TestTxnCompactInternal, test_compact_with_index) {
         EXPECT_TRUE(status.ok());
     }
     {
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("compact"), TransactionType::kNormal);
         Status status = txn->Compact(*db_name, *table_name, {0, 1});
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
     }
     {
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("scan"), TransactionType::kNormal);
         TxnTimeStamp begin_ts = txn->BeginTS();
         TxnTimeStamp commit_ts = txn->CommitTS();
 
@@ -387,7 +387,7 @@ TEST_P(TestTxnCompactInternal, test_compact_with_index) {
             EXPECT_FALSE(next);
 
             {
-                SizeT column_idx = 0;
+                size_t column_idx = 0;
                 ColumnMeta column_meta(column_idx, block_meta);
                 ColumnVector col;
 
@@ -426,7 +426,7 @@ TEST_P(TestTxnCompactInternal, test_compact_with_index) {
             EXPECT_FALSE(next);
 
             {
-                SizeT column_idx = 0;
+                size_t column_idx = 0;
                 ColumnMeta column_meta(column_idx, block_meta);
                 ColumnVector col;
 
@@ -446,7 +446,7 @@ TEST_P(TestTxnCompactInternal, test_compact_with_index) {
         }
     }
     auto check_index = [&](const String &index_name) {
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check index1"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("check index1"), TransactionType::kNormal);
 
         Optional<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;

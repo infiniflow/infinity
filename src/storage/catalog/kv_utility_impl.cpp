@@ -38,11 +38,11 @@ import third_party;
 
 namespace infinity {
 
-Vector<SegmentID>
-GetTableSegments(KVInstance *kv_instance, const String &db_id_str, const String &table_id_str, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts) {
-    Vector<SegmentID> segment_ids;
+std::vector<SegmentID>
+GetTableSegments(KVInstance *kv_instance, const std::string &db_id_str, const std::string &table_id_str, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts) {
+    std::vector<SegmentID> segment_ids;
 
-    String segment_id_prefix = KeyEncode::CatalogTableSegmentKeyPrefix(db_id_str, table_id_str);
+    std::string segment_id_prefix = KeyEncode::CatalogTableSegmentKeyPrefix(db_id_str, table_id_str);
     auto iter = kv_instance->GetIterator();
     iter->Seek(segment_id_prefix);
     while (iter->Valid() && iter->Key().starts_with(segment_id_prefix)) {
@@ -54,7 +54,7 @@ GetTableSegments(KVInstance *kv_instance, const String &db_id_str, const String 
         }
         // the key is committed before the txn or the key isn't committed
         SegmentID segment_id = std::stoull(iter->Key().ToString().substr(segment_id_prefix.size()));
-        String drop_segment_ts{};
+        std::string drop_segment_ts{};
         kv_instance->Get(KeyEncode::DropSegmentKey(db_id_str, table_id_str, segment_id), drop_segment_ts);
 
         if (drop_segment_ts.empty() || (std::stoull(drop_segment_ts) > begin_ts && std::stoull(drop_segment_ts) != commit_ts)) {
@@ -66,19 +66,19 @@ GetTableSegments(KVInstance *kv_instance, const String &db_id_str, const String 
     return segment_ids;
 }
 
-Vector<SegmentID> GetTableIndexSegments(KVInstance *kv_instance,
-                                        const String &db_id_str,
-                                        const String &table_id_str,
-                                        const String &index_id_str,
+std::vector<SegmentID> GetTableIndexSegments(KVInstance *kv_instance,
+                                        const std::string &db_id_str,
+                                        const std::string &table_id_str,
+                                        const std::string &index_id_str,
                                         TxnTimeStamp begin_ts,
                                         TxnTimeStamp commit_ts) {
-    Vector<SegmentID> segment_ids;
+    std::vector<SegmentID> segment_ids;
 
-    String segment_id_prefix = KeyEncode::CatalogIdxSegmentKeyPrefix(db_id_str, table_id_str, index_id_str);
+    std::string segment_id_prefix = KeyEncode::CatalogIdxSegmentKeyPrefix(db_id_str, table_id_str, index_id_str);
     auto iter = kv_instance->GetIterator();
     iter->Seek(segment_id_prefix);
     while (iter->Valid() && iter->Key().starts_with(segment_id_prefix)) {
-        String key = iter->Key().ToString();
+        std::string key = iter->Key().ToString();
         auto [segment_id, is_segment_id] = ExtractU64FromStringSuffix(key, segment_id_prefix.size());
         if (is_segment_id) {
             TxnTimeStamp segment_commit_ts = std::stoull(iter->Value().ToString());
@@ -98,15 +98,15 @@ Vector<SegmentID> GetTableIndexSegments(KVInstance *kv_instance,
     return segment_ids;
 }
 
-Vector<BlockID> GetTableSegmentBlocks(KVInstance *kv_instance,
-                                      const String &db_id_str,
-                                      const String &table_id_str,
+std::vector<BlockID> GetTableSegmentBlocks(KVInstance *kv_instance,
+                                      const std::string &db_id_str,
+                                      const std::string &table_id_str,
                                       SegmentID segment_id,
                                       TxnTimeStamp begin_ts,
                                       TxnTimeStamp commit_ts) {
-    Vector<BlockID> block_ids;
+    std::vector<BlockID> block_ids;
 
-    String block_id_prefix = KeyEncode::CatalogTableSegmentBlockKeyPrefix(db_id_str, table_id_str, segment_id);
+    std::string block_id_prefix = KeyEncode::CatalogTableSegmentBlockKeyPrefix(db_id_str, table_id_str, segment_id);
     auto iter = kv_instance->GetIterator();
     iter->Seek(block_id_prefix);
     while (iter->Valid() && iter->Key().starts_with(block_id_prefix)) {
@@ -126,14 +126,14 @@ Vector<BlockID> GetTableSegmentBlocks(KVInstance *kv_instance,
     return block_ids;
 }
 
-Vector<ColumnID> GetTableSegmentBlockColumns(KVInstance *kv_instance,
-                                             const String &db_id_str,
-                                             const String &table_id_str,
+std::vector<ColumnID> GetTableSegmentBlockColumns(KVInstance *kv_instance,
+                                             const std::string &db_id_str,
+                                             const std::string &table_id_str,
                                              SegmentID segment_id,
                                              BlockID block_id,
                                              TxnTimeStamp begin_ts) {
-    Vector<ColumnID> column_ids;
-    String block_column_id_prefix = KeyEncode::CatalogTableSegmentBlockColumnKeyPrefix(db_id_str, table_id_str, segment_id, block_id);
+    std::vector<ColumnID> column_ids;
+    std::string block_column_id_prefix = KeyEncode::CatalogTableSegmentBlockColumnKeyPrefix(db_id_str, table_id_str, segment_id, block_id);
     auto iter = kv_instance->GetIterator();
     iter->Seek(block_column_id_prefix);
     while (iter->Valid() && iter->Key().starts_with(block_column_id_prefix)) {
@@ -151,38 +151,38 @@ Vector<ColumnID> GetTableSegmentBlockColumns(KVInstance *kv_instance,
     return column_ids;
 }
 
-SharedPtr<IndexBase>
-GetTableIndexDef(KVInstance *kv_instance, const String &db_id_str, const String &table_id_str, const String &index_id_str, TxnTimeStamp begin_ts) {
-    String index_def_key = KeyEncode::CatalogIndexTagKey(db_id_str, table_id_str, index_id_str, "index_base");
-    String index_def_str;
+std::shared_ptr<IndexBase>
+GetTableIndexDef(KVInstance *kv_instance, const std::string &db_id_str, const std::string &table_id_str, const std::string &index_id_str, TxnTimeStamp begin_ts) {
+    std::string index_def_key = KeyEncode::CatalogIndexTagKey(db_id_str, table_id_str, index_id_str, "index_base");
+    std::string index_def_str;
     Status status = kv_instance->Get(index_def_key, index_def_str);
     if (!status.ok()) {
         LOG_ERROR(fmt::format("Fail to get index definition from kv store, key: {}, cause: {}", index_def_key, status.message()));
         return nullptr;
     }
-    SharedPtr<IndexBase> index_base = IndexBase::Deserialize(index_def_str);
+    std::shared_ptr<IndexBase> index_base = IndexBase::Deserialize(index_def_str);
     return index_base;
 }
 
-SizeT GetBlockRowCount(KVInstance *kv_instance,
-                       const String &db_id_str,
-                       const String &table_id_str,
+size_t GetBlockRowCount(KVInstance *kv_instance,
+                       const std::string &db_id_str,
+                       const std::string &table_id_str,
                        SegmentID segment_id,
                        BlockID block_id,
                        TxnTimeStamp begin_ts,
                        TxnTimeStamp commit_ts) {
     
     NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
-    String block_lock_key = KeyEncode::CatalogTableSegmentBlockTagKey(db_id_str, table_id_str, segment_id, block_id, "lock");
+    std::string block_lock_key = KeyEncode::CatalogTableSegmentBlockTagKey(db_id_str, table_id_str, segment_id, block_id, "lock");
 
-    SharedPtr<BlockLock> block_lock;
+    std::shared_ptr<BlockLock> block_lock;
     Status status = new_catalog->GetBlockLock(block_lock_key, block_lock);
     if (!status.ok()) {
         UnrecoverableError("Failed to get block lock");
     }
 
     BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
-    String version_filepath = fmt::format("{}/db_{}/tbl_{}/seg_{}/blk_{}/{}",
+    std::string version_filepath = fmt::format("{}/db_{}/tbl_{}/seg_{}/blk_{}/{}",
                                           InfinityContext::instance().config()->DataDir(),
                                           db_id_str,
                                           table_id_str,
@@ -197,7 +197,7 @@ SizeT GetBlockRowCount(KVInstance *kv_instance,
     BufferHandle buffer_handle = version_buffer->Load();
     const auto *block_version = reinterpret_cast<const BlockVersion *>(buffer_handle.GetData());
 
-    SizeT row_cnt = 0;
+    size_t row_cnt = 0;
     {
         std::shared_lock lock(block_lock->mtx_);
         row_cnt = block_version->GetRowCount(begin_ts);
@@ -208,24 +208,24 @@ SizeT GetBlockRowCount(KVInstance *kv_instance,
     return row_cnt;
 }
 
-SizeT GetSegmentRowCount(KVInstance *kv_instance,
-                         const String &db_id_str,
-                         const String &table_id_str,
+size_t GetSegmentRowCount(KVInstance *kv_instance,
+                         const std::string &db_id_str,
+                         const std::string &table_id_str,
                          SegmentID segment_id,
                          TxnTimeStamp begin_ts,
                          TxnTimeStamp commit_ts) {
-    Vector<BlockID> blocks = GetTableSegmentBlocks(kv_instance, db_id_str, table_id_str, segment_id, begin_ts, commit_ts);
+    std::vector<BlockID> blocks = GetTableSegmentBlocks(kv_instance, db_id_str, table_id_str, segment_id, begin_ts, commit_ts);
     
-    SizeT segment_row_count = 0;
+    size_t segment_row_count = 0;
     for (BlockID block_id : blocks) {
-        SizeT block_row_cnt = GetBlockRowCount(kv_instance, db_id_str, table_id_str, segment_id, block_id, begin_ts, commit_ts);
+        size_t block_row_cnt = GetBlockRowCount(kv_instance, db_id_str, table_id_str, segment_id, block_id, begin_ts, commit_ts);
         segment_row_count += block_row_cnt;
     }
     
     return segment_row_count;
 }
 
-String GetLastPartOfKey(const String &key, char delimiter) {
+std::string GetLastPartOfKey(const std::string &key, char delimiter) {
     size_t last_pos = key.rfind(delimiter);
 
     if (last_pos != std::string::npos) {
@@ -236,8 +236,8 @@ String GetLastPartOfKey(const String &key, char delimiter) {
     return key;
 }
 
-u64 GetTimestampFromKey(const String &key) {
-    String ts_str = GetLastPartOfKey(key, '|');
+u64 GetTimestampFromKey(const std::string &key) {
+    std::string ts_str = GetLastPartOfKey(key, '|');
     return std::stoull(ts_str);
 }
 

@@ -35,22 +35,22 @@ import table_reference;
 
 namespace infinity {
 
-SharedPtr<LogicalNode> BoundInsertStatement::BuildPlan(QueryContext *query_context) {
-    const SharedPtr<BindContext> &bind_context = this->bind_context_;
+std::shared_ptr<LogicalNode> BoundInsertStatement::BuildPlan(QueryContext *query_context) {
+    const std::shared_ptr<BindContext> &bind_context = this->bind_context_;
     
     auto base_table_ref = std::static_pointer_cast<BaseTableRef>(table_ref_ptr_);
     
     if (select_plan_) {
         // INSERT SELECT case
-        auto logical_insert = MakeShared<LogicalInsert>(bind_context->GetNewLogicalNodeId(),
+        auto logical_insert = std::make_shared<LogicalInsert>(bind_context->GetNewLogicalNodeId(),
                                                         base_table_ref->table_info_,
                                                         bind_context->GenerateTableIndex(),
-                                                        Vector<Vector<SharedPtr<BaseExpression>>>{});
+                                                        std::vector<std::vector<std::shared_ptr<BaseExpression>>>{});
         logical_insert->set_left_node(select_plan_);
         return logical_insert;
     } else {
         // INSERT VALUES case
-        auto logical_insert = MakeShared<LogicalInsert>(bind_context->GetNewLogicalNodeId(),
+        auto logical_insert = std::make_shared<LogicalInsert>(bind_context->GetNewLogicalNodeId(),
                                                         base_table_ref->table_info_,
                                                         bind_context->GenerateTableIndex(),
                                                         std::move(value_list_));
@@ -58,19 +58,19 @@ SharedPtr<LogicalNode> BoundInsertStatement::BuildPlan(QueryContext *query_conte
     }
 }
 
-SharedPtr<LogicalNode>
-BoundInsertStatement::BuildFrom(SharedPtr<TableRef> &table_ref, QueryContext *query_context, const SharedPtr<BindContext> &bind_context) {
+std::shared_ptr<LogicalNode>
+BoundInsertStatement::BuildFrom(std::shared_ptr<TableRef> &table_ref, QueryContext *query_context, const std::shared_ptr<BindContext> &bind_context) {
     if (table_ref.get() == nullptr || table_ref->type_ != TableRefType::kTable) {
         UnrecoverableError("Unsupported table reference type in INSERT statement");
     }
     return BuildBaseTable(table_ref, query_context, bind_context);
 }
 
-SharedPtr<LogicalNode>
-BoundInsertStatement::BuildBaseTable(SharedPtr<TableRef> &table_ref, QueryContext *, const SharedPtr<BindContext> &bind_context) {
+std::shared_ptr<LogicalNode>
+BoundInsertStatement::BuildBaseTable(std::shared_ptr<TableRef> &table_ref, QueryContext *, const std::shared_ptr<BindContext> &bind_context) {
     auto base_table_ref = std::static_pointer_cast<BaseTableRef>(table_ref);
     u64 table_index = bind_context->GenerateTableIndex();
-    auto logical_table_scan = MakeShared<LogicalTableScan>(bind_context->GetNewLogicalNodeId(), base_table_ref, table_index);
+    auto logical_table_scan = std::make_shared<LogicalTableScan>(bind_context->GetNewLogicalNodeId(), base_table_ref, table_index);
     return logical_table_scan;
 }
 

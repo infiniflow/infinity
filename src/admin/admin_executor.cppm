@@ -12,11 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:admin_executor;
 
-import :stl;
 import :status;
 
 import admin_statement;

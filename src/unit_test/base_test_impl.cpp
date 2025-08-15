@@ -39,11 +39,11 @@ import logical_type;
 namespace infinity {
 
 template <typename T>
-SharedPtr<DataBlock> BaseTestWithParam<T>::MakeInputBlock(const Value &v1, const Value &v2, SizeT row_cnt) {
+std::shared_ptr<DataBlock> BaseTestWithParam<T>::MakeInputBlock(const Value &v1, const Value &v2, size_t row_cnt) {
     auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
     auto column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
 
-    auto input_block = MakeShared<DataBlock>();
+    auto input_block = std::make_shared<DataBlock>();
     {
         auto col1 = ColumnVector::Make(column_def1->type());
         col1->Initialize();
@@ -65,10 +65,10 @@ SharedPtr<DataBlock> BaseTestWithParam<T>::MakeInputBlock(const Value &v1, const
 };
 
 template <typename T>
-SharedPtr<DataBlock> BaseTestWithParam<T>::MakeInputBlock1(SizeT row_cnt) {
+std::shared_ptr<DataBlock> BaseTestWithParam<T>::MakeInputBlock1(size_t row_cnt) {
     auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
     auto column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
-    auto input_block = MakeShared<DataBlock>();
+    auto input_block = std::make_shared<DataBlock>();
     {
         auto col1 = ColumnVector::Make(column_def1->type());
         col1->Initialize();
@@ -90,10 +90,10 @@ SharedPtr<DataBlock> BaseTestWithParam<T>::MakeInputBlock1(SizeT row_cnt) {
 };
 
 template <typename T>
-SharedPtr<DataBlock> BaseTestWithParam<T>::MakeInputBlock2(SizeT row_cnt) {
+std::shared_ptr<DataBlock> BaseTestWithParam<T>::MakeInputBlock2(size_t row_cnt) {
     auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
     auto column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
-    auto input_block = MakeShared<DataBlock>();
+    auto input_block = std::make_shared<DataBlock>();
     {
         auto col1 = ColumnVector::Make(column_def1->type());
         col1->Initialize();
@@ -115,7 +115,7 @@ SharedPtr<DataBlock> BaseTestWithParam<T>::MakeInputBlock2(SizeT row_cnt) {
 };
 
 template <typename T>
-void BaseTestWithParam<T>::CheckFilePaths(Vector<String> &delete_file_paths, Vector<String> &exist_file_paths) {
+void BaseTestWithParam<T>::CheckFilePaths(std::vector<std::string> &delete_file_paths, std::vector<std::string> &exist_file_paths) {
     auto *pm = infinity::InfinityContext::instance().persistence_manager();
     if (pm == nullptr) {
         Path data_dir = this->GetFullDataDir();

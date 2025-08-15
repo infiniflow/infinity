@@ -38,17 +38,17 @@ int main(int argc, char *argv[]) {
     switch (opt.mode_type_) {
         case ModeType::kShuffle: {
             SparseMatrix<f32, i32> data_mat = DecodeSparseDataset(opt.data_path_);
-            Vector<SizeT> idx = ShuffleSparseMatrix(data_mat);
-            Vector<SizeT> inv_idx(data_mat.nrow_);
+            Vector<size_t> idx = ShuffleSparseMatrix(data_mat);
+            Vector<size_t> inv_idx(data_mat.nrow_);
             for (i64 i = 0; i < data_mat.nrow_; i++) {
                 inv_idx[idx[i]] = i;
             }
             SaveSparseMatrix(data_mat, opt.data_save_path_);
 
             auto [topk, query_n, indices, scores] = DecodeGroundtruth(opt.groundtruth_path_, false);
-            auto new_indices = MakeUniqueForOverwrite<i32[]>(query_n * topk);
-            for (SizeT i = 0; i < query_n; i++) {
-                for (SizeT j = 0; j < topk; j++) {
+            auto new_indices = std::make_unique_for_overwrite<i32[]>(query_n * topk);
+            for (size_t i = 0; i < query_n; i++) {
+                for (size_t j = 0; j < topk; j++) {
                     new_indices.get()[i * topk + j] = inv_idx[indices.get()[i * topk + j]];
                 }
             }

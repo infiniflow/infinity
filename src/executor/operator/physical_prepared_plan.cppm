@@ -33,7 +33,7 @@ namespace infinity {
 
 export class PhysicalPreparedPlan : public PhysicalOperator {
 public:
-    explicit PhysicalPreparedPlan(u64 id, SharedPtr<Vector<LoadMeta>> load_metas)
+    explicit PhysicalPreparedPlan(u64 id, std::shared_ptr<std::vector<LoadMeta>> load_metas)
         : PhysicalOperator(PhysicalOperatorType::kPreparedPlan, nullptr, nullptr, id, load_metas) {}
 
     ~PhysicalPreparedPlan() override = default;
@@ -42,13 +42,13 @@ public:
 
     bool Execute(QueryContext *query_context, OperatorState *operator_state) final;
 
-    inline SharedPtr<Vector<String>> GetOutputNames() const final { return output_names_; }
+    inline std::shared_ptr<std::vector<std::string>> GetOutputNames() const final { return output_names_; }
 
-    inline SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const final { return output_types_; }
+    inline std::shared_ptr<std::vector<std::shared_ptr<DataType>>> GetOutputTypes() const final { return output_types_; }
 
 private:
-    SharedPtr<Vector<String>> output_names_{};
-    SharedPtr<Vector<SharedPtr<DataType>>> output_types_{};
+    std::shared_ptr<std::vector<std::string>> output_names_{};
+    std::shared_ptr<std::vector<std::shared_ptr<DataType>>> output_types_{};
 };
 
 } // namespace infinity

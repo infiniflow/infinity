@@ -12,13 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:options;
 
-import :stl;
 import :status;
 
+import std;
 import third_party;
 
 namespace infinity {
@@ -37,7 +35,7 @@ export struct BaseOption {
     explicit BaseOption(std::string_view name, BaseOptionDataType data_type) : name_(std::move(name)), data_type_(data_type) {}
     virtual ~BaseOption() = default;
 
-    String name_{};
+    std::string name_{};
     BaseOptionDataType data_type_{BaseOptionDataType::kInvalid};
 };
 
@@ -65,7 +63,7 @@ export struct StringOption : public BaseOption {
     explicit StringOption(std::string_view name, std::string_view default_value)
         : BaseOption(std::move(name), BaseOptionDataType::kString), value_(std::move(default_value)) {}
 
-    String value_{};
+    std::string value_{};
 };
 
 export struct BooleanOption : public BaseOption {
@@ -88,8 +86,8 @@ export enum class FlushOptionType {
     kFlushPerSecond,
 };
 
-export String FlushOptionTypeToString(FlushOptionType flush_option_type) {
-    String flush_str;
+export std::string FlushOptionTypeToString(FlushOptionType flush_option_type) {
+    std::string flush_str;
     switch (flush_option_type) {
         case FlushOptionType::kFlushAtOnce: {
             flush_str = "FlushAtOnce";
@@ -178,17 +176,17 @@ export enum class GlobalOptionIndex : i8 {
 
 export struct GlobalOptions {
     GlobalOptions();
-    Status AddOption(UniquePtr<BaseOption> option);
-    GlobalOptionIndex GetOptionIndex(const String &option_name) const;
-    Tuple<BaseOption *, Status> GetOptionByName(const String &option_name);
+    Status AddOption(std::unique_ptr<BaseOption> option);
+    GlobalOptionIndex GetOptionIndex(const std::string &option_name) const;
+    std::tuple<BaseOption *, Status> GetOptionByName(const std::string &option_name);
     BaseOption *GetOptionByIndex(GlobalOptionIndex option_index);
 
-    String GetStringValue(GlobalOptionIndex option_index);
+    std::string GetStringValue(GlobalOptionIndex option_index);
     i64 GetIntegerValue(GlobalOptionIndex option_index);
     bool GetBoolValue(GlobalOptionIndex option_index);
 
-    Vector<UniquePtr<BaseOption>> options_;
-    HashMap<String, GlobalOptionIndex> name2index_;
+    std::vector<std::unique_ptr<BaseOption>> options_;
+    std::unordered_map<std::string, GlobalOptionIndex> name2index_;
 };
 
 } // namespace infinity

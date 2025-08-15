@@ -30,8 +30,8 @@ import internal_types;
 namespace infinity {
 
 export struct FullTextQueryContext {
-    UniquePtr<QueryNode> query_tree_{};
-    UniquePtr<QueryNode> optimized_query_tree_{};
+    std::unique_ptr<QueryNode> query_tree_{};
+    std::unique_ptr<QueryNode> optimized_query_tree_{};
     const FulltextSimilarity ft_similarity_{};
     const BM25Params bm25_params_{};
     const MinimumShouldMatchOption minimum_should_match_option_{};
@@ -39,32 +39,32 @@ export struct FullTextQueryContext {
     u32 minimum_should_match_ = 0;
     u32 topn_ = 0;
     EarlyTermAlgo early_term_algo_ = EarlyTermAlgo::kNaive;
-    const Vector<String> &index_names_;
+    const std::vector<std::string> &index_names_;
 
     FullTextQueryContext(const FulltextSimilarity ft_similarity,
                          const BM25Params &bm25_params,
                          const MinimumShouldMatchOption &minimum_should_match_option,
                          const RankFeaturesOption &rank_features_option,
                          const u32 topn,
-                         const Vector<String> &index_names)
+                         const std::vector<std::string> &index_names)
         : ft_similarity_(ft_similarity), bm25_params_(bm25_params), minimum_should_match_option_(minimum_should_match_option),
           rank_features_option_(rank_features_option), topn_(topn), index_names_(index_names) {}
 };
 
 export class QueryBuilder {
 public:
-    explicit QueryBuilder(SharedPtr<TableInfo> table_info) : table_info_(std::move(table_info)) {};
+    explicit QueryBuilder(std::shared_ptr<TableInfo> table_info) : table_info_(std::move(table_info)) {};
 
-    void Init(SharedPtr<IndexReader> index_reader);
+    void Init(std::shared_ptr<IndexReader> index_reader);
 
     ~QueryBuilder();
 
-    Map<String, String> GetColumn2Analyzer(const Vector<String> &hints) const { return index_reader_->GetColumn2Analyzer(hints); }
+    std::map<std::string, std::string> GetColumn2Analyzer(const std::vector<std::string> &hints) const { return index_reader_->GetColumn2Analyzer(hints); }
 
-    UniquePtr<DocIterator> CreateSearch(FullTextQueryContext &context);
+    std::unique_ptr<DocIterator> CreateSearch(FullTextQueryContext &context);
 
 private:
-    SharedPtr<TableInfo> table_info_{nullptr};
-    SharedPtr<IndexReader> index_reader_{};
+    std::shared_ptr<TableInfo> table_info_{nullptr};
+    std::shared_ptr<IndexReader> index_reader_{};
 };
 } // namespace infinity

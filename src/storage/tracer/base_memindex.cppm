@@ -24,7 +24,7 @@ import row_id;
 
 namespace infinity {
 
-export class BaseMemIndex : public EnableSharedFromThis<BaseMemIndex> {
+export class BaseMemIndex : public std::enable_shared_from_this<BaseMemIndex> {
 public:
     virtual ~BaseMemIndex() = default;
 
@@ -34,25 +34,25 @@ public:
 
     virtual RowID GetBeginRowID() const = 0;
 
-    SizeT GetMemUsed() const;
+    size_t GetMemUsed() const;
 
-    SizeT GetRowCount() const;
+    size_t GetRowCount() const;
 
 protected:
-    void IncreaseMemoryUsageBase(SizeT mem);
-    void DecreaseMemoryUsageBase(SizeT mem);
+    void IncreaseMemoryUsageBase(size_t mem);
+    void DecreaseMemoryUsageBase(size_t mem);
 
 public:
-    String db_name_;
-    String table_name_;
-    String index_name_;
+    std::string db_name_;
+    std::string table_name_;
+    std::string index_name_;
     SegmentID segment_id_ = 0;
 };
 
 // Only for test
 export class DummyIndexInMem : public BaseMemIndex {
 public:
-    DummyIndexInMem(String db_name, String table_name, String index_name, SegmentID segment_id, MemIndexTracer *tracer)
+    DummyIndexInMem(std::string db_name, std::string table_name, std::string index_name, SegmentID segment_id, MemIndexTracer *tracer)
         : db_name_(std::move(db_name)), table_name_(std::move(table_name)), index_name_(std::move(index_name)), segment_id_(segment_id),
           tracer_(tracer) {}
 
@@ -62,7 +62,7 @@ public:
         }
     }
 
-    void Append(SizeT row_cnt, SizeT mem_used) {
+    void Append(size_t row_cnt, size_t mem_used) {
         {
             std::lock_guard lck(mtx_);
             row_cnt_ += row_cnt;
@@ -77,9 +77,9 @@ public:
 
     MemIndexTracerInfo GetInfo() const override {
         std::lock_guard lck(mtx_);
-        return MemIndexTracerInfo(MakeShared<String>(index_name_),
-                                  MakeShared<String>(table_name_),
-                                  MakeShared<String>(db_name_),
+        return MemIndexTracerInfo(std::make_shared<std::string>(index_name_),
+                                  std::make_shared<std::string>(table_name_),
+                                  std::make_shared<std::string>(db_name_),
                                   mem_used_,
                                   row_cnt_);
     }
@@ -92,15 +92,15 @@ public:
     RowID GetBeginRowID() const override { return RowID{segment_id_, 0}; }
 
 public:
-    String db_name_;
-    String table_name_;
-    String index_name_;
+    std::string db_name_;
+    std::string table_name_;
+    std::string index_name_;
     SegmentID segment_id_{};
     MemIndexTracer *tracer_{nullptr};
 
     mutable std::mutex mtx_; // protect row_cnt_, mem_used_;
-    SizeT row_cnt_{};
-    SizeT mem_used_{};
+    size_t row_cnt_{};
+    size_t mem_used_{};
 };
 
 } // namespace infinity

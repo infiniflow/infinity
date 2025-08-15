@@ -55,7 +55,7 @@ public:
 
     u8 *GetData(const ByteSliceList *list) {
         u8 *buffer = new u8[list->GetTotalSize()];
-        SizeT n = 0;
+        size_t n = 0;
         ByteSlice *slice = list->GetHead();
         while (slice) {
             memcpy(buffer + n, slice->data_, slice->size_);

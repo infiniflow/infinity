@@ -4,7 +4,9 @@ module;
 
 export module infinity_core:ring;
 
-import :stl;
+import :infinity_type;
+
+import std;
 
 namespace infinity {
 
@@ -14,7 +16,7 @@ private:
     std::condition_variable cv_full_;
     std::condition_variable cv_empty_;
     std::mutex mutex_;
-    Vector<T> ring_buf_; // An element is allowed to insert into the ring if its offset in inside [off_ground_, off_ground_+2^cap_mask_)
+    std::vector<T> ring_buf_; // An element is allowed to insert into the ring if its offset in inside [off_ground_, off_ground_+2^cap_mask_)
     u64 cap_shift_;
     u64 cap_mask_;
     u64 off_ground_;  // min element offset inside the ring
@@ -73,7 +75,7 @@ public:
         return seq;
     }
 
-    u64 GetBatch(Vector<T> &batch, SizeT wait_if_empty_ms = 0) {
+    u64 GetBatch(std::vector<T> &batch, size_t wait_if_empty_ms = 0) {
         batch.clear();
         std::unique_lock<std::mutex> lock(mutex_);
         if (off_ground_ == off_filled_) {

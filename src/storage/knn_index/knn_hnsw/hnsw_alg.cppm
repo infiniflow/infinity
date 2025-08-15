@@ -43,7 +43,7 @@ import serialize;
 namespace infinity {
 
 export struct KnnSearchOption {
-    SizeT ef_ = 0;
+    size_t ef_ = 0;
     LogicalType column_logical_type_ = LogicalType::kEmbedding;
 };
 
@@ -59,14 +59,14 @@ public:
     using Distance = typename VecStoreType::Distance;
     using DistanceType = typename Distance::DistanceType;
 
-    using PDV = Pair<DistanceType, VertexType>;
+    using PDV = std::pair<DistanceType, VertexType>;
     using CMP = CompareByFirst<DistanceType, VertexType>;
     using CMPReverse = CompareByFirstReverse<DistanceType, VertexType>;
-    using DistHeap = Heap<PDV, CMP>;
+    using DistHeap = std::priority_queue<PDV, CMP>;
 
     constexpr static bool LSG = IsLSGDistance<Distance>;
 
-    static Pair<SizeT, SizeT> GetMmax(SizeT M) { return {2 * M, M}; }
+    static std::pair<size_t, size_t> GetMmax(size_t M) { return {2 * M, M}; }
 
 public:
     KnnHnswBase() : M_(0), ef_construction_(0), mult_(0), prefetch_step_(DEFAULT_PREFETCH_SIZE) {}
@@ -85,7 +85,7 @@ public:
         return *this;
     }
 
-    SizeT GetSizeInBytes() const { return sizeof(M_) + sizeof(ef_construction_) + data_store_.GetSizeInBytes(); }
+    size_t GetSizeInBytes() const { return sizeof(M_) + sizeof(ef_construction_) + data_store_.GetSizeInBytes(); }
 
     LabelType GetLabel(VertexType vertex_i) const { return data_store_.GetLabel(vertex_i); }
 
@@ -119,11 +119,11 @@ protected:
               FilterConcept<LabelType> Filter = NoneType,
               LogicalType ColumnLogicalType = LogicalType::kEmbedding,
               typename MultiVectorInnerTopnIndexType = void>
-    Tuple<SizeT, UniquePtr<DistanceType[]>, UniquePtr<SearchLayerReturnParam3T<ColumnLogicalType>[]>>
-    SearchLayer(VertexType enter_point, const StoreType &query, VertexType query_i, i32 layer_idx, SizeT result_n, const Filter &filter) const {
+    std::tuple<size_t, std::unique_ptr<DistanceType[]>, std::unique_ptr<SearchLayerReturnParam3T<ColumnLogicalType>[]>>
+    SearchLayer(VertexType enter_point, const StoreType &query, VertexType query_i, i32 layer_idx, size_t result_n, const Filter &filter) const {
         static_assert(ColumnLogicalType == LogicalType::kEmbedding || ColumnLogicalType == LogicalType::kMultiVector);
-        auto d_ptr = MakeUniqueForOverwrite<DistanceType[]>(result_n);
-        auto i_ptr = MakeUniqueForOverwrite<SearchLayerReturnParam3T<ColumnLogicalType>[]>(result_n);
+        auto d_ptr = std::make_unique_for_overwrite<DistanceType[]>(result_n);
+        auto i_ptr = std::make_unique_for_overwrite<SearchLayerReturnParam3T<ColumnLogicalType>[]>(result_n);
         using ResultHandler = std::conditional_t<ColumnLogicalType == LogicalType::kEmbedding,
                                                  HeapResultHandler<CompareMax<DistanceType, VertexType>>,
                                                  MultiVectorResultHandler<DistanceType, LabelType, MultiVectorInnerTopnIndexType>>;
@@ -161,8 +161,8 @@ protected:
             add_result(dist, enter_point);
         }
 
-        SizeT cur_vec_num = data_store_.cur_vec_num();
-        Vector<bool> visited(cur_vec_num, false);
+        size_t cur_vec_num = data_store_.cur_vec_num();
+        std::vector<bool> visited(cur_vec_num, false);
         visited[enter_point] = true;
 
         while (!candidate.empty()) {
@@ -227,7 +227,7 @@ protected:
     }
 
     // the function does not need mutex because the lock of `result_p` is already acquired
-    void SelectNeighborsHeuristic(Vector<PDV> candidates, SizeT M, VertexType *result_p, VertexListSize *result_size_p) const {
+    void SelectNeighborsHeuristic(std::vector<PDV> candidates, size_t M, VertexType *result_p, VertexListSize *result_size_p) const {
         VertexListSize result_size = 0;
         if (candidates.size() < M) {
             std::sort(candidates.begin(), candidates.end(), CMPReverse());
@@ -236,12 +236,12 @@ protected:
             }
         } else {
             std::make_heap(candidates.begin(), candidates.end(), CMPReverse());
-            while (!candidates.empty() && SizeT(result_size) < M) {
+            while (!candidates.empty() && size_t(result_size) < M) {
                 std::pop_heap(candidates.begin(), candidates.end(), CMPReverse());
                 const auto &[c_dist, c_idx] = candidates.back();
                 StoreType c_data = data_store_.GetVec(c_idx);
                 bool check = true;
-                for (SizeT i = 0; i < SizeT(result_size); ++i) {
+                for (size_t i = 0; i < size_t(result_size); ++i) {
                     VertexType r_idx = result_p[i];
                     auto cr_dist = distance_(c_data, r_idx, data_store_, c_idx);
                     if (cr_dist < c_dist) {
@@ -267,7 +267,7 @@ protected:
 
             auto [n_neighbors_p, n_neighbor_size_p] = data_store_.GetNeighborsMut(n_idx, layer_idx);
             VertexListSize n_neighbor_size = *n_neighbor_size_p;
-            SizeT Mmax = layer_idx == 0 ? data_store_.Mmax0() : data_store_.Mmax();
+            size_t Mmax = layer_idx == 0 ? data_store_.Mmax0() : data_store_.Mmax();
             if (n_neighbor_size < VertexListSize(Mmax)) {
                 *(n_neighbors_p + n_neighbor_size) = vertex_i;
                 *n_neighbor_size_p = n_neighbor_size + 1;
@@ -276,7 +276,7 @@ protected:
             StoreType n_data = data_store_.GetVec(n_idx);
             auto n_dist = distance_(n_data, vertex_i, data_store_, n_idx);
 
-            Vector<PDV> candidates;
+            std::vector<PDV> candidates;
             candidates.reserve(n_neighbor_size + 1);
             candidates.emplace_back(n_dist, vertex_i);
             for (int j = 0; j < n_neighbor_size; ++j) {
@@ -288,7 +288,7 @@ protected:
     }
 
     template <bool WithLock, FilterConcept<LabelType> Filter, LogicalType ColumnLogicalType>
-    auto SearchLayerHelper(VertexType enter_point, const StoreType &query, i32 layer_idx, SizeT result_n, const Filter &filter) const {
+    auto SearchLayerHelper(VertexType enter_point, const StoreType &query, i32 layer_idx, size_t result_n, const Filter &filter) const {
         if constexpr (ColumnLogicalType == LogicalType::kEmbedding) {
             return SearchLayer<WithLock, Filter, ColumnLogicalType>(enter_point, query, kInvalidVertex, layer_idx, result_n, filter);
         } else if constexpr (ColumnLogicalType == LogicalType::kMultiVector) {
@@ -302,16 +302,16 @@ protected:
                 return SearchLayer<WithLock, Filter, ColumnLogicalType, u32>(enter_point, query, kInvalidVertex, layer_idx, result_n, filter);
             }
             UnrecoverableError(fmt::format("Unsupported result_n : {}, which is larger than u32::max()", result_n));
-            return Tuple<SizeT, UniquePtr<DistanceType[]>, UniquePtr<SearchLayerReturnParam3T<ColumnLogicalType>[]>>{};
+            return std::tuple<size_t, std::unique_ptr<DistanceType[]>, std::unique_ptr<SearchLayerReturnParam3T<ColumnLogicalType>[]>>{};
         } else {
             static_assert(false, "Unsupported column logical type");
         }
     }
 
     template <bool WithLock, FilterConcept<LabelType> Filter = NoneType, LogicalType ColumnLogicalType = LogicalType::kEmbedding>
-    Tuple<SizeT, UniquePtr<DistanceType[]>, UniquePtr<SearchLayerReturnParam3T<ColumnLogicalType>[]>>
-    KnnSearchInner(const QueryVecType &q, SizeT k, const Filter &filter, const KnnSearchOption &option) const {
-        SizeT ef = option.ef_;
+    std::tuple<size_t, std::unique_ptr<DistanceType[]>, std::unique_ptr<SearchLayerReturnParam3T<ColumnLogicalType>[]>>
+    KnnSearchInner(const QueryVecType &q, size_t k, const Filter &filter, const KnnSearchOption &option) const {
+        size_t ef = option.ef_;
         if (ef == 0) {
             ef = k;
         }
@@ -328,7 +328,7 @@ protected:
 
 public:
     template <DataIteratorConcept<QueryVecType, LabelType> Iterator>
-    Pair<SizeT, SizeT> InsertVecs(Iterator &&iter, const HnswInsertConfig &config = kDefaultHnswInsertConfig) {
+    std::pair<size_t, size_t> InsertVecs(Iterator &&iter, const HnswInsertConfig &config = kDefaultHnswInsertConfig) {
         auto [start_i, end_i] = StoreData(std::move(iter), config);
         for (VertexType vertex_i = start_i; vertex_i < end_i; ++vertex_i) {
             Build(vertex_i);
@@ -337,7 +337,7 @@ public:
     }
 
     template <DataIteratorConcept<QueryVecType, LabelType> Iterator>
-    Pair<VertexType, VertexType> StoreData(Iterator &&iter, const HnswInsertConfig &config = kDefaultHnswInsertConfig) {
+    std::pair<VertexType, VertexType> StoreData(Iterator &&iter, const HnswInsertConfig &config = kDefaultHnswInsertConfig) {
         if (config.optimize_) {
             return data_store_.OptAddVec(std::move(iter));
         }
@@ -360,9 +360,9 @@ public:
             ep = SearchLayerNearest<true>(ep, query, vertex_i, cur_layer);
         }
         for (i32 cur_layer = std::min(q_layer, max_layer); cur_layer >= 0; --cur_layer) {
-            auto [result_n, d_ptr, v_ptr] = SearchLayer<true>(ep, query, vertex_i, cur_layer, ef_construction_, None);
-            auto search_result = Vector<PDV>(result_n);
-            for (SizeT i = 0; i < result_n; ++i) {
+            auto [result_n, d_ptr, v_ptr] = SearchLayer<true>(ep, query, vertex_i, cur_layer, ef_construction_, std::nullopt);
+            auto search_result = std::vector<PDV>(result_n);
+            for (size_t i = 0; i < result_n; ++i) {
                 search_result[i] = {d_ptr[i], v_ptr[i]};
             }
 
@@ -374,13 +374,13 @@ public:
     }
 
     template <FilterConcept<LabelType> Filter = NoneType, bool WithLock = true>
-    Tuple<SizeT, UniquePtr<DistanceType[]>, UniquePtr<LabelType[]>>
-    KnnSearch(const QueryVecType &q, SizeT k, const Filter &filter, const KnnSearchOption &option = {}) const {
+    std::tuple<size_t, std::unique_ptr<DistanceType[]>, std::unique_ptr<LabelType[]>>
+    KnnSearch(const QueryVecType &q, size_t k, const Filter &filter, const KnnSearchOption &option = {}) const {
         switch (option.column_logical_type_) {
             case LogicalType::kEmbedding: {
                 auto [result_n, d_ptr, v_ptr] = KnnSearchInner<WithLock, Filter>(q, k, filter, option);
-                auto labels = MakeUniqueForOverwrite<LabelType[]>(result_n);
-                for (SizeT i = 0; i < result_n; ++i) {
+                auto labels = std::make_unique_for_overwrite<LabelType[]>(result_n);
+                for (size_t i = 0; i < result_n; ++i) {
                     labels[i] = GetLabel(v_ptr[i]);
                 }
                 return {result_n, std::move(d_ptr), std::move(labels)};
@@ -396,18 +396,18 @@ public:
     }
 
     template <bool WithLock = true>
-    Tuple<SizeT, UniquePtr<DistanceType[]>, UniquePtr<LabelType[]>>
-    KnnSearch(const QueryVecType &q, SizeT k, const KnnSearchOption &option = {}) const {
-        return KnnSearch<NoneType, WithLock>(q, k, None, option);
+    std::tuple<size_t, std::unique_ptr<DistanceType[]>, std::unique_ptr<LabelType[]>>
+    KnnSearch(const QueryVecType &q, size_t k, const KnnSearchOption &option = {}) const {
+        return KnnSearch<NoneType, WithLock>(q, k, std::nullopt, option);
     }
 
     // function for test, add sort for convenience
     template <FilterConcept<LabelType> Filter = NoneType, bool WithLock = true>
-    Vector<Pair<DistanceType, LabelType>>
-    KnnSearchSorted(const QueryVecType &q, SizeT k, const Filter &filter, const KnnSearchOption &option = {}) const {
+    std::vector<std::pair<DistanceType, LabelType>>
+    KnnSearchSorted(const QueryVecType &q, size_t k, const Filter &filter, const KnnSearchOption &option = {}) const {
         auto [result_n, d_ptr, v_ptr] = KnnSearchInner<WithLock, Filter>(q, k, filter, option);
-        Vector<Pair<DistanceType, LabelType>> result(result_n);
-        for (SizeT i = 0; i < result_n; ++i) {
+        std::vector<std::pair<DistanceType, LabelType>> result(result_n);
+        for (size_t i = 0; i < result_n; ++i) {
             result[i] = {d_ptr[i], GetLabel(v_ptr[i])};
         }
         std::sort(result.begin(), result.end(), [](const auto &a, const auto &b) { return a.first < b.first; });
@@ -415,19 +415,19 @@ public:
     }
 
     // function for test
-    Vector<Pair<DistanceType, LabelType>> KnnSearchSorted(const QueryVecType &q, SizeT k, const KnnSearchOption &option = {}) const {
-        return KnnSearchSorted<NoneType>(q, k, None, option);
+    std::vector<std::pair<DistanceType, LabelType>> KnnSearchSorted(const QueryVecType &q, size_t k, const KnnSearchOption &option = {}) const {
+        return KnnSearchSorted<NoneType>(q, k, std::nullopt, option);
     }
 
-    SizeT GetVecNum() const { return data_store_.cur_vec_num(); }
+    size_t GetVecNum() const { return data_store_.cur_vec_num(); }
 
-    SizeT mem_usage() const { return data_store_.mem_usage(); }
+    size_t mem_usage() const { return data_store_.mem_usage(); }
 
     Distance &distance() { return distance_; }
 
 protected:
-    SizeT M_;
-    SizeT ef_construction_;
+    size_t M_;
+    size_t ef_construction_;
 
     // 1 / log(1.0 * M_)
     double mult_;
@@ -435,7 +435,7 @@ protected:
     DataStore data_store_;
     Distance distance_;
 
-    SizeT prefetch_step_;
+    size_t prefetch_step_;
 
     // //---------------------------------------------- Following is the tmp debug function. ----------------------------------------------
 public:
@@ -458,7 +458,7 @@ public:
     using CompressVecStoreType = decltype(VecStoreType::template ToLVQ<i8>());
     constexpr static bool kOwnMem = OwnMem;
 
-    KnnHnsw(SizeT M, SizeT ef_construction, DataStore data_store, Distance distance) {
+    KnnHnsw(size_t M, size_t ef_construction, DataStore data_store, Distance distance) {
         this->M_ = M;
         this->ef_construction_ = std::max(M, ef_construction);
         this->mult_ = 1 / std::log(1.0 * M);
@@ -467,47 +467,47 @@ public:
     }
 
 public:
-    static UniquePtr<This> Make(SizeT chunk_size, SizeT max_chunk_n, SizeT dim, SizeT M, SizeT ef_construction) {
+    static std::unique_ptr<This> Make(size_t chunk_size, size_t max_chunk_n, size_t dim, size_t M, size_t ef_construction) {
         auto [Mmax0, Mmax] = This::GetMmax(M);
         auto data_store = DataStore::Make(chunk_size, max_chunk_n, dim, Mmax0, Mmax);
         Distance distance(data_store.dim());
-        return MakeUnique<This>(M, ef_construction, std::move(data_store), std::move(distance));
+        return std::make_unique<This>(M, ef_construction, std::move(data_store), std::move(distance));
     }
 
-    static UniquePtr<This> Load(LocalFileHandle &file_handle) {
-        SizeT M;
+    static std::unique_ptr<This> Load(LocalFileHandle &file_handle) {
+        size_t M;
         file_handle.Read(&M, sizeof(M));
-        SizeT ef_construction;
+        size_t ef_construction;
         file_handle.Read(&ef_construction, sizeof(ef_construction));
 
         auto data_store = DataStore::Load(file_handle);
         Distance distance(data_store.dim());
 
-        return MakeUnique<This>(M, ef_construction, std::move(data_store), std::move(distance));
+        return std::make_unique<This>(M, ef_construction, std::move(data_store), std::move(distance));
     }
 
-    static UniquePtr<This> LoadFromPtr(LocalFileHandle &file_handle, SizeT size) {
-        auto buffer = MakeUnique<char[]>(size);
+    static std::unique_ptr<This> LoadFromPtr(LocalFileHandle &file_handle, size_t size) {
+        auto buffer = std::make_unique<char[]>(size);
         file_handle.Read(buffer.get(), size);
         const char *ptr = buffer.get();
-        SizeT M = ReadBufAdv<SizeT>(ptr);
-        SizeT ef_construction = ReadBufAdv<SizeT>(ptr);
+        size_t M = ReadBufAdv<size_t>(ptr);
+        size_t ef_construction = ReadBufAdv<size_t>(ptr);
         auto data_store = DataStore::LoadFromPtr(ptr);
         Distance distance(data_store.dim());
-        if (SizeT diff = ptr - buffer.get(); diff != size) {
+        if (size_t diff = ptr - buffer.get(); diff != size) {
             UnrecoverableError("LoadFromPtr failed");
         }
-        return MakeUnique<This>(M, ef_construction, std::move(data_store), std::move(distance));
+        return std::make_unique<This>(M, ef_construction, std::move(data_store), std::move(distance));
     }
 
-    UniquePtr<KnnHnsw<CompressVecStoreType, LabelType>> CompressToLVQ() && {
+    std::unique_ptr<KnnHnsw<CompressVecStoreType, LabelType>> CompressToLVQ() && {
         if constexpr (std::is_same_v<VecStoreType, CompressVecStoreType>) {
-            return MakeUnique<This>(std::move(*this));
+            return std::make_unique<This>(std::move(*this));
         } else {
             using CompressedDistance = typename CompressVecStoreType::Distance;
             CompressedDistance distance = std::move(this->distance_).ToLVQDistance(this->data_store_.dim());
             auto compressed_datastore = std::move(this->data_store_).template CompressToLVQ<CompressVecStoreType>();
-            return MakeUnique<KnnHnsw<CompressVecStoreType, LabelType>>(this->M_,
+            return std::make_unique<KnnHnsw<CompressVecStoreType, LabelType>>(this->M_,
                                                                         this->ef_construction_,
                                                                         std::move(compressed_datastore),
                                                                         std::move(distance));
@@ -523,7 +523,7 @@ public:
     using Distance = typename VecStoreType::Distance;
     constexpr static bool kOwnMem = false;
 
-    KnnHnsw(SizeT M, SizeT ef_construction, DataStore data_store, Distance distance) {
+    KnnHnsw(size_t M, size_t ef_construction, DataStore data_store, Distance distance) {
         this->M_ = M;
         this->ef_construction_ = std::max(M, ef_construction);
         this->mult_ = 1 / std::log(1.0 * M);
@@ -539,16 +539,16 @@ public:
     }
 
 public:
-    static UniquePtr<This> LoadFromPtr(const char *&ptr, SizeT size) {
+    static std::unique_ptr<This> LoadFromPtr(const char *&ptr, size_t size) {
         const char *ptr_end = ptr + size;
-        SizeT M = ReadBufAdv<SizeT>(ptr);
-        SizeT ef_construction = ReadBufAdv<SizeT>(ptr);
+        size_t M = ReadBufAdv<size_t>(ptr);
+        size_t ef_construction = ReadBufAdv<size_t>(ptr);
         auto data_store = DataStore::LoadFromPtr(ptr);
         Distance distance(data_store.dim());
-        if (SizeT diff = ptr_end - ptr; diff != 0) {
+        if (size_t diff = ptr_end - ptr; diff != 0) {
             UnrecoverableError("LoadFromPtr failed");
         }
-        return MakeUnique<This>(M, ef_construction, std::move(data_store), std::move(distance));
+        return std::make_unique<This>(M, ef_construction, std::move(data_store), std::move(distance));
     }
 };
 

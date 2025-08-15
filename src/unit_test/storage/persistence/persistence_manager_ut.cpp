@@ -35,12 +35,12 @@ public:
         system(("mkdir -p " + file_dir_).c_str());
         system(("mkdir -p " + catalog_dir_).c_str());
 
-        kv_store_ = MakeUnique<KVStore>();
+        kv_store_ = std::make_unique<KVStore>();
         Status status = kv_store_->Init(catalog_dir_);
         EXPECT_TRUE(status.ok());
-        pm_ = MakeUnique<PersistenceManager>(workspace_, file_dir_, ObjSizeLimit);
+        pm_ = std::make_unique<PersistenceManager>(workspace_, file_dir_, ObjSizeLimit);
         pm_->SetKvStore(kv_store_.get());
-        handler_ = MakeUnique<PersistResultHandler>(pm_.get());
+        handler_ = std::make_unique<PersistResultHandler>(pm_.get());
     }
 
     void CheckObjData(const String &obj_addr, const String &data);
@@ -49,10 +49,10 @@ protected:
     String workspace_{};
     String file_dir_{};
     String catalog_dir_{};
-    UniquePtr<KVStore> kv_store_{};
-    UniquePtr<PersistenceManager> pm_{};
+    std::unique_ptr<KVStore> kv_store_{};
+    std::unique_ptr<PersistenceManager> pm_{};
     static constexpr int ObjSizeLimit = 128;
-    UniquePtr<PersistResultHandler> handler_;
+    std::unique_ptr<PersistResultHandler> handler_;
 };
 
 void PersistenceManagerTest::CheckObjData(const String &local_file_path, const String &data) {
@@ -62,7 +62,7 @@ void PersistenceManagerTest::CheckObjData(const String &local_file_path, const S
     fs::path obj_fp(obj_path);
     ASSERT_TRUE(fs::exists(obj_fp));
     ASSERT_EQ(obj_addr.part_size_, data.size());
-    SizeT obj_file_size = fs::file_size(obj_fp);
+    size_t obj_file_size = fs::file_size(obj_fp);
     ASSERT_LE(obj_file_size, ObjSizeLimit);
 
     auto [pm_file_handle, status] = VirtualStore::Open(obj_path, FileAccessMode::kRead);
@@ -101,7 +101,7 @@ TEST_F(PersistenceManagerTest, PersistMultiFile) {
     Vector<String> file_paths;
     Vector<String> persist_strs;
     Vector<ObjAddr> obj_addrs;
-    for (SizeT i = 0; i < 10; ++i) {
+    for (size_t i = 0; i < 10; ++i) {
         String file_path = file_path_base + std::to_string(i);
         std::ofstream out_file(file_path);
         String persist_str = "Persistence Manager Test " + std::to_string(i);
@@ -122,7 +122,7 @@ TEST_F(PersistenceManagerTest, PersistMultiFile) {
     PersistWriteResult result = pm_->CurrentObjFinalize();
     handler_->HandleWriteResult(result);
 
-    for (SizeT i = 0; i < file_paths.size(); ++i) {
+    for (size_t i = 0; i < file_paths.size(); ++i) {
         CheckObjData(file_paths[i], persist_strs[i]);
     }
 }
@@ -135,7 +135,7 @@ TEST_F(PersistenceManagerTest, PersistFileMultiThread) {
     Vector<std::thread> threads;
     std::mutex obj_mutex;
 
-    for (SizeT i = 0; i < 10; ++i) {
+    for (size_t i = 0; i < 10; ++i) {
         String file_path = file_path_base + std::to_string(i);
         std::ofstream out_file(file_path);
         String persist_str = "Persistence Manager Test " + std::to_string(i);
@@ -162,7 +162,7 @@ TEST_F(PersistenceManagerTest, PersistFileMultiThread) {
     PersistWriteResult result = pm_->CurrentObjFinalize();
     handler_->HandleWriteResult(result);
 
-    for (SizeT i = 0; i < file_paths.size(); ++i) {
+    for (size_t i = 0; i < file_paths.size(); ++i) {
         CheckObjData(file_paths[i], persist_strs[i]);
     }
 }
@@ -174,7 +174,7 @@ TEST_F(PersistenceManagerTest, CleanupBasic) {
     Vector<ObjAddr> obj_addrs;
     Set<String> obj_paths;
 
-    for (SizeT i = 0; i < 10; ++i) {
+    for (size_t i = 0; i < 10; ++i) {
         String file_path = file_path_base + std::to_string(i);
         std::ofstream out_file(file_path);
         String persist_str = "Persistence Manager Test " + std::to_string(i);
@@ -196,7 +196,7 @@ TEST_F(PersistenceManagerTest, CleanupBasic) {
     PersistWriteResult result = pm_->CurrentObjFinalize();
     handler_->HandleWriteResult(result);
 
-    for (SizeT i = 0; i < file_paths.size(); ++i) {
+    for (size_t i = 0; i < file_paths.size(); ++i) {
         CheckObjData(file_paths[i], persist_strs[i]);
     }
 

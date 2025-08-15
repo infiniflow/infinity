@@ -40,9 +40,9 @@ import insert_row_expr;
 
 using namespace infinity;
 
-void ReadJsonl(std::ifstream &input_file, SizeT lines_to_read, Vector<Tuple<char *, char *, char *>> &batch) {
+void ReadJsonl(std::ifstream &input_file, size_t lines_to_read, Vector<Tuple<char *, char *, char *>> &batch) {
     String line;
-    SizeT lines_readed = 0;
+    size_t lines_readed = 0;
     batch.clear();
     static const char *columns[3] = {"id", "title", "text"};
     while (lines_readed < lines_to_read) {
@@ -57,7 +57,7 @@ void ReadJsonl(std::ifstream &input_file, SizeT lines_to_read, Vector<Tuple<char
             simdjson::parser parser;
             simdjson::document doc = parser.iterate(json_str);
             char *elems[3];
-            for (SizeT i = 0; i < 3; i++) {
+            for (size_t i = 0; i < 3; i++) {
                 String val_str;
                 [[maybe_unused]] auto error = doc[columns[i]].get<String>(val_str);
                 assert(error == simdjson::SUCCESS);
@@ -72,7 +72,7 @@ void ReadJsonl(std::ifstream &input_file, SizeT lines_to_read, Vector<Tuple<char
     }
 }
 
-SharedPtr<Infinity> CreateDbAndTable(const String &db_name, const String &table_name) {
+std::shared_ptr<Infinity> CreateDbAndTable(const String &db_name, const String &table_name) {
     Vector<ColumnDef *> column_defs;
     {
         String col1_name = "id";
@@ -98,7 +98,7 @@ SharedPtr<Infinity> CreateDbAndTable(const String &db_name, const String &table_
     Infinity::LocalInit(data_path);
     // SetLogLevel(LogLevel::kTrace);
 
-    SharedPtr<Infinity> infinity = Infinity::LocalConnect();
+    std::shared_ptr<Infinity> infinity = Infinity::LocalConnect();
     CreateDatabaseOptions create_db_options;
     create_db_options.conflict_type_ = ConflictType::kIgnore;
     infinity->CreateDatabase(db_name, std::move(create_db_options), "");
@@ -113,7 +113,7 @@ SharedPtr<Infinity> CreateDbAndTable(const String &db_name, const String &table_
     return infinity;
 }
 
-void BenchmarkImport(SharedPtr<Infinity> infinity, const String &db_name, const String &table_name, const String &import_from) {
+void BenchmarkImport(std::shared_ptr<Infinity> infinity, const String &db_name, const String &table_name, const String &import_from) {
     if (!VirtualStore::Exists(import_from)) {
         LOG_ERROR(fmt::format("Data file doesn't exist: {}", import_from));
         return;
@@ -139,7 +139,7 @@ void BenchmarkImport(SharedPtr<Infinity> infinity, const String &db_name, const 
     profiler.End();
 }
 
-void BenchmarkInsert(SharedPtr<Infinity> infinity, const String &db_name, const String &table_name, const String &insert_from, SizeT insert_batch) {
+void BenchmarkInsert(std::shared_ptr<Infinity> infinity, const String &db_name, const String &table_name, const String &insert_from, size_t insert_batch) {
     std::ifstream input_file(insert_from);
     if (!input_file.is_open()) {
         LOG_ERROR(fmt::format("Failed to open file {}", insert_from));
@@ -150,29 +150,29 @@ void BenchmarkInsert(SharedPtr<Infinity> infinity, const String &db_name, const 
 
     profiler.Begin();
     Vector<Tuple<char *, char *, char *>> batch_cache;
-    ReadJsonl(input_file, (SizeT)(-1), batch_cache);
-    SizeT num_rows = batch_cache.size();
+    ReadJsonl(input_file, (size_t)(-1), batch_cache);
+    size_t num_rows = batch_cache.size();
     LOG_INFO(fmt::format("ReadJsonl {} rows cost: {}", num_rows, profiler.ElapsedToString()));
     profiler.End();
 
     profiler.Begin();
     Vector<String> orig_columns{"id", "title", "text"};
-    UniquePtr<ConstantExpr> const_expr;
-    SizeT num_inserted = 0;
+    std::unique_ptr<ConstantExpr> const_expr;
+    size_t num_inserted = 0;
     while (num_inserted < num_rows) {
         auto insert_rows = new Vector<InsertRowExpr *>();
         insert_rows->reserve(insert_batch);
-        for (SizeT i = 0; i < insert_batch && (num_inserted + i) < num_rows; i++) {
+        for (size_t i = 0; i < insert_batch && (num_inserted + i) < num_rows; i++) {
             auto &t = batch_cache[num_inserted + i];
-            auto insert_row = MakeUnique<InsertRowExpr>();
+            auto insert_row = std::make_unique<InsertRowExpr>();
             insert_row->columns_ = orig_columns;
-            const_expr = MakeUnique<ConstantExpr>(LiteralType::kString);
+            const_expr = std::make_unique<ConstantExpr>(LiteralType::kString);
             const_expr->str_value_ = std::get<0>(t);
             insert_row->values_.emplace_back(std::move(const_expr));
-            const_expr = MakeUnique<ConstantExpr>(LiteralType::kString);
+            const_expr = std::make_unique<ConstantExpr>(LiteralType::kString);
             const_expr->str_value_ = std::get<1>(t);
             insert_row->values_.emplace_back(std::move(const_expr));
-            const_expr = MakeUnique<ConstantExpr>(LiteralType::kString);
+            const_expr = std::make_unique<ConstantExpr>(LiteralType::kString);
             const_expr->str_value_ = std::get<2>(t);
             insert_row->values_.emplace_back(std::move(const_expr));
             insert_rows->push_back(insert_row.release());
@@ -186,7 +186,7 @@ void BenchmarkInsert(SharedPtr<Infinity> infinity, const String &db_name, const 
     profiler.End();
 }
 
-void BenchmarkCreateIndex(SharedPtr<Infinity> infinity, const String &db_name, const String &table_name, const String &index_name) {
+void BenchmarkCreateIndex(std::shared_ptr<Infinity> infinity, const String &db_name, const String &table_name, const String &index_name) {
     BaseProfiler profiler;
     profiler.Begin();
     auto index_info = new IndexInfo();
@@ -208,7 +208,7 @@ void BenchmarkCreateIndex(SharedPtr<Infinity> infinity, const String &db_name, c
     profiler.End();
 }
 
-void BenchmarkOptimize(SharedPtr<Infinity> infinity, const String &db_name, const String &table_name) {
+void BenchmarkOptimize(std::shared_ptr<Infinity> infinity, const String &db_name, const String &table_name) {
     BaseProfiler profiler;
     profiler.Begin();
     infinity->Optimize(db_name, table_name);
@@ -216,7 +216,7 @@ void BenchmarkOptimize(SharedPtr<Infinity> infinity, const String &db_name, cons
     profiler.End();
 }
 
-void BenchmarkQuery(SharedPtr<Infinity> infinity, const String &db_name, const String &table_name) {
+void BenchmarkQuery(std::shared_ptr<Infinity> infinity, const String &db_name, const String &table_name) {
     std::string fields = "text";
     std::vector<std::string> query_vec = {"harmful \"social custom\"",
                                           "social custom \"harmful chemical\"",
@@ -292,7 +292,7 @@ void RegisterSignal() {
     sigaction(SIGUSR2, &sig_action, NULL);
 #endif
 }
-void BenchmarkMoreQuery(SharedPtr<Infinity> infinity, const String &db_name, const String &table_name, int query_times = 10) {
+void BenchmarkMoreQuery(std::shared_ptr<Infinity> infinity, const String &db_name, const String &table_name, int query_times = 10) {
     BaseProfiler profiler;
     profiler.Begin();
     for (int i = 0; i < query_times; i++) {
@@ -309,7 +309,7 @@ int main(int argc, char *argv[]) {
     enum class Mode : u8 { kInsert, kImport, kMerge, kQuery };
     Map<String, Mode> mode_map{{"insert", Mode::kInsert}, {"import", Mode::kImport}, {"merge", Mode::kMerge}, {"query", Mode::kQuery}};
     Mode mode(Mode::kInsert);
-    SizeT insert_batch = 500;
+    size_t insert_batch = 500;
     app.add_option("--mode", mode, "Benchmark mode, one of insert, import, merge, query")
         ->required()
         ->transform(CLI::CheckedTransformer(mode_map, CLI::ignore_case));
@@ -331,7 +331,7 @@ int main(int argc, char *argv[]) {
     printf("Cleanup /var/infinity\n");
     system("rm -rf /var/infinity/data /var/infinity/log /var/infinity/persistence /var/infinity/tmp /var/infinity/wal");
 
-    SharedPtr<Infinity> infinity = CreateDbAndTable(db_name, table_name);
+    std::shared_ptr<Infinity> infinity = CreateDbAndTable(db_name, table_name);
 
     switch (mode) {
         case Mode::kInsert: {

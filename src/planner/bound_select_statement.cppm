@@ -33,99 +33,99 @@ namespace infinity {
 
 export struct BoundSelectStatement final : public BoundStatement {
 public:
-    static inline UniquePtr<BoundSelectStatement> Make(SharedPtr<BindContext> bind_context) {
-        return MakeUnique<BoundSelectStatement>(std::move(bind_context));
+    static inline std::unique_ptr<BoundSelectStatement> Make(std::shared_ptr<BindContext> bind_context) {
+        return std::make_unique<BoundSelectStatement>(std::move(bind_context));
     }
 
 public:
-    inline explicit BoundSelectStatement(SharedPtr<BindContext> bind_context) : bind_context_(std::move(bind_context)) {}
+    inline explicit BoundSelectStatement(std::shared_ptr<BindContext> bind_context) : bind_context_(std::move(bind_context)) {}
 
-    SharedPtr<LogicalNode> BuildPlan(QueryContext *query_context) final;
+    std::shared_ptr<LogicalNode> BuildPlan(QueryContext *query_context) final;
 
-    SharedPtr<LogicalKnnScan> BuildInitialKnnScan(SharedPtr<TableRef> &table_ref,
-                                                  SharedPtr<KnnExpression> knn_expr,
+    std::shared_ptr<LogicalKnnScan> BuildInitialKnnScan(std::shared_ptr<TableRef> &table_ref,
+                                                  std::shared_ptr<KnnExpression> knn_expr,
                                                   QueryContext *query_context,
-                                                  const SharedPtr<BindContext> &bind_context);
+                                                  const std::shared_ptr<BindContext> &bind_context);
 
-    SharedPtr<LogicalNode> BuildFrom(SharedPtr<TableRef> &table_ref, QueryContext *query_context, const SharedPtr<BindContext> &bind_context);
+    std::shared_ptr<LogicalNode> BuildFrom(std::shared_ptr<TableRef> &table_ref, QueryContext *query_context, const std::shared_ptr<BindContext> &bind_context);
 
-    SharedPtr<LogicalNode> BuildBaseTable(SharedPtr<TableRef> &table_ref, QueryContext *query_context, const SharedPtr<BindContext> &bind_context);
+    std::shared_ptr<LogicalNode> BuildBaseTable(std::shared_ptr<TableRef> &table_ref, QueryContext *query_context, const std::shared_ptr<BindContext> &bind_context);
 
-    SharedPtr<LogicalNode>
-    BuildSubqueryTable(SharedPtr<TableRef> &table_ref, QueryContext *query_context, const SharedPtr<BindContext> &bind_context);
+    std::shared_ptr<LogicalNode>
+    BuildSubqueryTable(std::shared_ptr<TableRef> &table_ref, QueryContext *query_context, const std::shared_ptr<BindContext> &bind_context);
 
-    SharedPtr<LogicalNode>
-    BuildCrossProductTable(SharedPtr<TableRef> &table_ref, QueryContext *query_context, const SharedPtr<BindContext> &bind_context);
+    std::shared_ptr<LogicalNode>
+    BuildCrossProductTable(std::shared_ptr<TableRef> &table_ref, QueryContext *query_context, const std::shared_ptr<BindContext> &bind_context);
 
-    SharedPtr<LogicalNode> BuildJoinTable(SharedPtr<TableRef> &table_ref, QueryContext *query_context, const SharedPtr<BindContext> &bind_context);
+    std::shared_ptr<LogicalNode> BuildJoinTable(std::shared_ptr<TableRef> &table_ref, QueryContext *query_context, const std::shared_ptr<BindContext> &bind_context);
 
-    SharedPtr<LogicalNode> BuildDummyTable(SharedPtr<TableRef> &table_ref, QueryContext *query_context, const SharedPtr<BindContext> &bind_context);
+    std::shared_ptr<LogicalNode> BuildDummyTable(std::shared_ptr<TableRef> &table_ref, QueryContext *query_context, const std::shared_ptr<BindContext> &bind_context);
 
-    SharedPtr<LogicalNode> BuildFilter(SharedPtr<LogicalNode> &root,
-                                       Vector<SharedPtr<BaseExpression>> &conditions,
+    std::shared_ptr<LogicalNode> BuildFilter(std::shared_ptr<LogicalNode> &root,
+                                       std::vector<std::shared_ptr<BaseExpression>> &conditions,
                                        QueryContext *query_context,
-                                       const SharedPtr<BindContext> &bind_context);
+                                       const std::shared_ptr<BindContext> &bind_context);
 
-    SharedPtr<LogicalNode> BuildUnnest(SharedPtr<LogicalNode> &root,
-                                       Vector<SharedPtr<BaseExpression>> &expressions,
+    std::shared_ptr<LogicalNode> BuildUnnest(std::shared_ptr<LogicalNode> &root,
+                                       std::vector<std::shared_ptr<BaseExpression>> &expressions,
                                        QueryContext *query_context,
-                                       const SharedPtr<BindContext> &bind_context);
+                                       const std::shared_ptr<BindContext> &bind_context);
 
-    void BuildSubquery(SharedPtr<LogicalNode> &root,
-                       SharedPtr<BaseExpression> &condition,
+    void BuildSubquery(std::shared_ptr<LogicalNode> &root,
+                       std::shared_ptr<BaseExpression> &condition,
                        QueryContext *query_context,
-                       const SharedPtr<BindContext> &bind_context);
+                       const std::shared_ptr<BindContext> &bind_context);
 
-    SharedPtr<BaseExpression> UnnestSubquery(SharedPtr<LogicalNode> &root,
-                                             SharedPtr<BaseExpression> &condition,
+    std::shared_ptr<BaseExpression> UnnestSubquery(std::shared_ptr<LogicalNode> &root,
+                                             std::shared_ptr<BaseExpression> &condition,
                                              QueryContext *query_context,
-                                             const SharedPtr<BindContext> &bind_context);
+                                             const std::shared_ptr<BindContext> &bind_context);
 
 public:
-    SharedPtr<BindContext> bind_context_{};
+    std::shared_ptr<BindContext> bind_context_{};
 
     // From clause
-    SharedPtr<TableRef> table_ref_ptr_{};
+    std::shared_ptr<TableRef> table_ref_ptr_{};
 
     // Search expression
-    SharedPtr<SearchExpression> search_expr_{};
+    std::shared_ptr<SearchExpression> search_expr_{};
 
     // Where conditions
-    Vector<SharedPtr<BaseExpression>> where_conditions_{};
+    std::vector<std::shared_ptr<BaseExpression>> where_conditions_{};
 
     // Aggregate expression
-    Vector<SharedPtr<BaseExpression>> aggregate_expressions_{};
+    std::vector<std::shared_ptr<BaseExpression>> aggregate_expressions_{};
 
     // Group by expression list
-    Vector<SharedPtr<BaseExpression>> group_by_expressions_{};
+    std::vector<std::shared_ptr<BaseExpression>> group_by_expressions_{};
 
     // Having expression list
-    Vector<SharedPtr<BaseExpression>> having_expressions_{};
+    std::vector<std::shared_ptr<BaseExpression>> having_expressions_{};
 
     // Project expression list
-    Vector<SharedPtr<BaseExpression>> projection_expressions_{};
+    std::vector<std::shared_ptr<BaseExpression>> projection_expressions_{};
     bool total_hits_count_flag_{false};
 
     // Highlight info
-    Map<SizeT, SharedPtr<HighlightInfo>> highlight_columns_{};
+    std::map<size_t, std::shared_ptr<HighlightInfo>> highlight_columns_{};
 
     // Unnest columns
-    Vector<SharedPtr<BaseExpression>> unnest_expressions_{};
+    std::vector<std::shared_ptr<BaseExpression>> unnest_expressions_{};
 
     // Order by expression list
-    Vector<SharedPtr<BaseExpression>> order_by_expressions_{};
-    Vector<OrderType> order_by_types_{};
+    std::vector<std::shared_ptr<BaseExpression>> order_by_expressions_{};
+    std::vector<OrderType> order_by_types_{};
 
     // limit expression
-    SharedPtr<BaseExpression> limit_expression_{};
-    SharedPtr<BaseExpression> offset_expression_{};
+    std::shared_ptr<BaseExpression> limit_expression_{};
+    std::shared_ptr<BaseExpression> offset_expression_{};
 
     // Pruned output expression list
-    Vector<SharedPtr<BaseExpression>> pruned_expression_{};
+    std::vector<std::shared_ptr<BaseExpression>> pruned_expression_{};
 
     bool distinct_ = false;
 
-    //    SharedPtr<LogicalNode>
+    //    std::shared_ptr<LogicalNode>
     //    BuildPlan() override {
     //        return this->logical_plan_;
     //    }

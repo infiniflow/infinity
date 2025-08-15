@@ -16,8 +16,9 @@ module;
 
 export module infinity_core:file_worker_type;
 
-import :stl;
 import :infinity_exception;
+
+import std;
 
 namespace infinity {
 
@@ -35,7 +36,7 @@ export enum class FileWorkerType {
     kInvalid,
 };
 
-export String FileWorkerType2Str(FileWorkerType type) {
+export std::string FileWorkerType2Str(FileWorkerType type) {
     switch (type) {
         case FileWorkerType::kDataFile: {
             return "data";

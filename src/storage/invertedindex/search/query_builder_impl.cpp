@@ -36,11 +36,11 @@ import internal_types;
 
 namespace infinity {
 
-void QueryBuilder::Init(SharedPtr<IndexReader> index_reader) { index_reader_ = std::move(index_reader); }
+void QueryBuilder::Init(std::shared_ptr<IndexReader> index_reader) { index_reader_ = std::move(index_reader); }
 
 QueryBuilder::~QueryBuilder() {}
 
-UniquePtr<DocIterator> QueryBuilder::CreateSearch(FullTextQueryContext &context) {
+std::unique_ptr<DocIterator> QueryBuilder::CreateSearch(FullTextQueryContext &context) {
     // Optimize the query tree.
     if (!context.optimized_query_tree_) {
         context.optimized_query_tree_ = QueryNode::GetOptimizedQueryTree(std::move(context.query_tree_));

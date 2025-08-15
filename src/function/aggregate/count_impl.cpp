@@ -36,19 +36,19 @@ public:
 
     void Initialize() { this->count_ = 0; }
 
-    void Update(ValueType *__restrict, SizeT) { count_++; }
+    void Update(ValueType *__restrict, size_t) { count_++; }
 
-    inline void ConstantUpdate(ValueType *__restrict, SizeT, SizeT count) { count_ += count; }
+    inline void ConstantUpdate(ValueType *__restrict, size_t, size_t count) { count_ += count; }
 
-    inline ptr_t Finalize() { return (ptr_t)&count_; }
+    inline char * Finalize() { return (char *)&count_; }
 
-    inline static SizeT Size(const DataType &) { return sizeof(i64); }
+    inline static size_t Size(const DataType &) { return sizeof(i64); }
 };
 
 void RegisterCountFunction(NewCatalog *catalog_ptr) {
-    String func_name = "COUNT";
+    std::string func_name = "COUNT";
 
-    SharedPtr<AggregateFunctionSet> function_set_ptr = MakeShared<AggregateFunctionSet>(func_name);
+    std::shared_ptr<AggregateFunctionSet> function_set_ptr = std::make_shared<AggregateFunctionSet>(func_name);
 
     {
         AggregateFunction count_function = UnaryAggregate<CountState<BooleanT, BigIntT>, BooleanT, BigIntT>(func_name,

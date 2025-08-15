@@ -65,7 +65,7 @@ class ColumnVectorIntegerTest : public BaseTest {
 TEST_F(ColumnVectorIntegerTest, flat_tinyint) {
     using namespace infinity;
 
-    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kTinyInt);
+    std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kTinyInt);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
@@ -163,7 +163,7 @@ TEST_F(ColumnVectorIntegerTest, contant_tinyint) {
 
     using namespace infinity;
 
-    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kTinyInt);
+    std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kTinyInt);
     ColumnVector column_vector(data_type);
 
     column_vector.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
@@ -240,7 +240,7 @@ TEST_F(ColumnVectorIntegerTest, contant_tinyint) {
 TEST_F(ColumnVectorIntegerTest, tinyint_column_vector_select) {
     using namespace infinity;
 
-    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kTinyInt);
+    std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kTinyInt);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
@@ -257,7 +257,7 @@ TEST_F(ColumnVectorIntegerTest, tinyint_column_vector_select) {
 
     Selection input_select;
     input_select.Initialize(DEFAULT_VECTOR_SIZE / 2);
-    for (SizeT idx = 0; idx < DEFAULT_VECTOR_SIZE / 2; ++idx) {
+    for (size_t idx = 0; idx < DEFAULT_VECTOR_SIZE / 2; ++idx) {
         input_select.Append(idx * 2);
     }
 
@@ -274,7 +274,7 @@ TEST_F(ColumnVectorIntegerTest, tinyint_column_vector_select) {
 TEST_F(ColumnVectorIntegerTest, tinyint_column_slice_init) {
     using namespace infinity;
 
-    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kTinyInt);
+    std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kTinyInt);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
@@ -308,7 +308,7 @@ TEST_F(ColumnVectorIntegerTest, tinyint_column_slice_init) {
 TEST_F(ColumnVectorIntegerTest, flat_smallint) {
     using namespace infinity;
 
-    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kSmallInt);
+    std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kSmallInt);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
@@ -401,7 +401,7 @@ TEST_F(ColumnVectorIntegerTest, contant_smallint) {
 
     using namespace infinity;
 
-    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kSmallInt);
+    std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kSmallInt);
     ColumnVector column_vector(data_type);
 
     column_vector.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
@@ -478,7 +478,7 @@ TEST_F(ColumnVectorIntegerTest, contant_smallint) {
 TEST_F(ColumnVectorIntegerTest, smallint_column_vector_select) {
     using namespace infinity;
 
-    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kSmallInt);
+    std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kSmallInt);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
@@ -495,7 +495,7 @@ TEST_F(ColumnVectorIntegerTest, smallint_column_vector_select) {
 
     Selection input_select;
     input_select.Initialize(DEFAULT_VECTOR_SIZE / 2);
-    for (SizeT idx = 0; idx < DEFAULT_VECTOR_SIZE / 2; ++idx) {
+    for (size_t idx = 0; idx < DEFAULT_VECTOR_SIZE / 2; ++idx) {
         input_select.Append(idx * 2);
     }
 
@@ -512,7 +512,7 @@ TEST_F(ColumnVectorIntegerTest, smallint_column_vector_select) {
 TEST_F(ColumnVectorIntegerTest, smallint_column_slice_init) {
     using namespace infinity;
 
-    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kSmallInt);
+    std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kSmallInt);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
@@ -546,7 +546,7 @@ TEST_F(ColumnVectorIntegerTest, smallint_column_slice_init) {
 TEST_F(ColumnVectorIntegerTest, flat_int) {
     using namespace infinity;
 
-    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kInteger);
+    std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kInteger);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
@@ -639,7 +639,7 @@ TEST_F(ColumnVectorIntegerTest, contant_int) {
 
     using namespace infinity;
 
-    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kInteger);
+    std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kInteger);
     ColumnVector column_vector(data_type);
 
     column_vector.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
@@ -716,7 +716,7 @@ TEST_F(ColumnVectorIntegerTest, contant_int) {
 TEST_F(ColumnVectorIntegerTest, integer_column_vector_select) {
     using namespace infinity;
 
-    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kInteger);
+    std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kInteger);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
@@ -733,7 +733,7 @@ TEST_F(ColumnVectorIntegerTest, integer_column_vector_select) {
 
     Selection input_select;
     input_select.Initialize(DEFAULT_VECTOR_SIZE / 2);
-    for (SizeT idx = 0; idx < DEFAULT_VECTOR_SIZE / 2; ++idx) {
+    for (size_t idx = 0; idx < DEFAULT_VECTOR_SIZE / 2; ++idx) {
         input_select.Append(idx * 2);
     }
 
@@ -750,7 +750,7 @@ TEST_F(ColumnVectorIntegerTest, integer_column_vector_select) {
 TEST_F(ColumnVectorIntegerTest, integer_column_slice_init) {
     using namespace infinity;
 
-    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kInteger);
+    std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kInteger);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
@@ -784,7 +784,7 @@ TEST_F(ColumnVectorIntegerTest, integer_column_slice_init) {
 TEST_F(ColumnVectorIntegerTest, flat_bigint) {
     using namespace infinity;
 
-    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kBigInt);
+    std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kBigInt);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
@@ -877,7 +877,7 @@ TEST_F(ColumnVectorIntegerTest, contant_bigint) {
 
     using namespace infinity;
 
-    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kBigInt);
+    std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kBigInt);
     ColumnVector column_vector(data_type);
 
     column_vector.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
@@ -954,7 +954,7 @@ TEST_F(ColumnVectorIntegerTest, contant_bigint) {
 TEST_F(ColumnVectorIntegerTest, bigint_column_vector_select) {
     using namespace infinity;
 
-    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kBigInt);
+    std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kBigInt);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
@@ -971,7 +971,7 @@ TEST_F(ColumnVectorIntegerTest, bigint_column_vector_select) {
 
     Selection input_select;
     input_select.Initialize(DEFAULT_VECTOR_SIZE / 2);
-    for (SizeT idx = 0; idx < DEFAULT_VECTOR_SIZE / 2; ++idx) {
+    for (size_t idx = 0; idx < DEFAULT_VECTOR_SIZE / 2; ++idx) {
         input_select.Append(idx * 2);
     }
 
@@ -988,7 +988,7 @@ TEST_F(ColumnVectorIntegerTest, bigint_column_vector_select) {
 TEST_F(ColumnVectorIntegerTest, bigint_column_slice_init) {
     using namespace infinity;
 
-    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kBigInt);
+    std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kBigInt);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
@@ -1023,7 +1023,7 @@ TEST_F(ColumnVectorIntegerTest, bigint_column_slice_init) {
 TEST_F(ColumnVectorIntegerTest, flat_hugeint) {
     using namespace infinity;
 
-    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kHugeInt);
+    std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kHugeInt);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
@@ -1117,7 +1117,7 @@ TEST_F(ColumnVectorIntegerTest, contant_hugeint) {
 
     using namespace infinity;
 
-    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kHugeInt);
+    std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kHugeInt);
     ColumnVector column_vector(data_type);
 
     column_vector.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
@@ -1195,7 +1195,7 @@ TEST_F(ColumnVectorIntegerTest, contant_hugeint) {
 TEST_F(ColumnVectorIntegerTest, hugeint_column_vector_select) {
     using namespace infinity;
 
-    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kHugeInt);
+    std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kHugeInt);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
@@ -1213,7 +1213,7 @@ TEST_F(ColumnVectorIntegerTest, hugeint_column_vector_select) {
 
     Selection input_select;
     input_select.Initialize(DEFAULT_VECTOR_SIZE / 2);
-    for (SizeT idx = 0; idx < DEFAULT_VECTOR_SIZE / 2; ++idx) {
+    for (size_t idx = 0; idx < DEFAULT_VECTOR_SIZE / 2; ++idx) {
         input_select.Append(idx * 2);
     }
 
@@ -1232,7 +1232,7 @@ TEST_F(ColumnVectorIntegerTest, hugeint_column_vector_select) {
 TEST_F(ColumnVectorIntegerTest, hugeint_column_slice_init) {
     using namespace infinity;
 
-    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kHugeInt);
+    std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kHugeInt);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 

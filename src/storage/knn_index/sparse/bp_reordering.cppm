@@ -12,11 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:bp_reordering;
 
-import :stl;
+import :infinity_type;
 
 import std;
 import std.compat;
@@ -30,21 +28,21 @@ namespace infinity {
 
 struct BPReorderContext {
 public:
-    BPReorderContext(SizeT term_num, SizeT doc_num)
+    BPReorderContext(size_t term_num, size_t doc_num)
         : ldegs(term_num), rdegs(term_num), term_gains_toright_(term_num), term_gains_toleft_(term_num), term_gains_toright_valid_(term_num),
           term_gains_toleft_valid_(term_num), gains_(doc_num), gains_permu_(doc_num) {}
 
 public:
-    Vector<i32> ldegs;
-    Vector<i32> rdegs;
+    std::vector<i32> ldegs;
+    std::vector<i32> rdegs;
 
-    Vector<std::atomic<float>> term_gains_toright_;
-    Vector<std::atomic<float>> term_gains_toleft_;
-    Vector<std::atomic_uint8_t> term_gains_toright_valid_;
-    Vector<std::atomic_uint8_t> term_gains_toleft_valid_;
+    std::vector<std::atomic<float>> term_gains_toright_;
+    std::vector<std::atomic<float>> term_gains_toleft_;
+    std::vector<std::atomic_uint8_t> term_gains_toright_valid_;
+    std::vector<std::atomic_uint8_t> term_gains_toleft_valid_;
 
-    Vector<float> gains_;
-    Vector<i32> gains_permu_;
+    std::vector<float> gains_;
+    std::vector<i32> gains_permu_;
 };
 
 export template <typename IdxType, typename DocID>
@@ -56,18 +54,18 @@ public:
     void set_iter_n(i32 iter_n) { iter_n_ = iter_n; }
     void set_log_thread_n(i32 log_thread_n) { log_thread_n_ = log_thread_n; }
 
-    void AddDoc(const Vector<IdxType> *terms) { fwd_.push_back(terms); }
+    void AddDoc(const std::vector<IdxType> *terms) { fwd_.push_back(terms); }
 
-    Vector<DocID> operator()() {
-        SizeT data_n = fwd_.size();
-        Vector<DocID> permutation(data_n);
+    std::vector<DocID> operator()() {
+        size_t data_n = fwd_.size();
+        std::vector<DocID> permutation(data_n);
         std::iota(permutation.begin(), permutation.end(), 0);
-        Thread([&] { Work(0 /*start*/, data_n, 0 /*depth*/, permutation); }).join();
+        std::thread([&] { Work(0 /*start*/, data_n, 0 /*depth*/, permutation); }).join();
         return permutation;
     }
 
 private:
-    void Work(i32 start, i32 end, SizeT depth, Vector<DocID> &permutation) {
+    void Work(i32 start, i32 end, size_t depth, std::vector<DocID> &permutation) {
         std::sort(permutation.begin() + start, permutation.begin() + end);
         if (end - start <= terminate_length_) {
             return;
@@ -77,7 +75,7 @@ private:
         i32 mid = (start + end) / 2;
         Bisection(start, mid, end, ctx, permutation, depth);
         if (depth < log_thread_n_) {
-            auto t = Thread([&] { Work(start, mid, depth + 1, permutation); });
+            auto t = std::thread([&] { Work(start, mid, depth + 1, permutation); });
             Work(mid, end, depth + 1, permutation);
             t.join();
         } else {
@@ -86,7 +84,7 @@ private:
         }
     }
 
-    void Bisection(i32 start, i32 mid, i32 end, BPReorderContext &ctx, Vector<DocID> &permutation, SizeT depth) {
+    void Bisection(i32 start, i32 mid, i32 end, BPReorderContext &ctx, std::vector<DocID> &permutation, size_t depth) {
         std::fill(ctx.ldegs.begin(), ctx.ldegs.end(), 0);
         std::fill(ctx.rdegs.begin(), ctx.rdegs.end(), 0);
         std::fill(ctx.term_gains_toright_valid_.begin(), ctx.term_gains_toright_valid_.end(), false);
@@ -109,10 +107,10 @@ private:
             ComputeGains(start, mid, end, ctx, permutation, depth);
             std::iota(ctx.gains_permu_.begin() + start, ctx.gains_permu_.begin() + end, start);
 
-            std::sort(ctx.gains_permu_.begin() + start, ctx.gains_permu_.begin() + mid, [&ctx](SizeT i, SizeT j) {
+            std::sort(ctx.gains_permu_.begin() + start, ctx.gains_permu_.begin() + mid, [&ctx](size_t i, size_t j) {
                 return ctx.gains_[i] > ctx.gains_[j];
             });
-            std::sort(ctx.gains_permu_.begin() + mid, ctx.gains_permu_.begin() + end, [&ctx](SizeT i, SizeT j) {
+            std::sort(ctx.gains_permu_.begin() + mid, ctx.gains_permu_.begin() + end, [&ctx](size_t i, size_t j) {
                 return ctx.gains_[i] > ctx.gains_[j];
             });
 
@@ -145,11 +143,11 @@ private:
         }
     }
 
-    void ComputeGains(SizeT start, SizeT mid, SizeT end, BPReorderContext &ctx, const Vector<DocID> &permutation, SizeT depth) const {
+    void ComputeGains(size_t start, size_t mid, size_t end, BPReorderContext &ctx, const std::vector<DocID> &permutation, size_t depth) const {
         float left_log_n = std::log2(mid - start);
         float right_log_n = std::log2(end - mid);
-        auto work = [&](SizeT i1, SizeT i2) {
-            for (SizeT i = i1; i < i2; ++i) {
+        auto work = [&](size_t i1, size_t i2) {
+            for (size_t i = i1; i < i2; ++i) {
                 if (i < mid) {
                     ctx.gains_[i] = ComputeGain(permutation[i],
                                                 left_log_n,
@@ -170,12 +168,12 @@ private:
             }
         };
         if (depth < log_thread_n_) {
-            Vector<Thread> threads;
-            SizeT thread_n = 1 << (log_thread_n_ - depth);
-            SizeT step = (end - start) / thread_n;
-            for (SizeT i = 0; i < thread_n; ++i) {
-                SizeT i1 = start + i * step;
-                SizeT i2 = i == thread_n - 1 ? end : start + (i + 1) * step;
+            std::vector<std::thread> threads;
+            size_t thread_n = 1 << (log_thread_n_ - depth);
+            size_t step = (end - start) / thread_n;
+            for (size_t i = 0; i < thread_n; ++i) {
+                size_t i1 = start + i * step;
+                size_t i2 = i == thread_n - 1 ? end : start + (i + 1) * step;
                 threads.emplace_back(work, i1, i2);
             }
             for (auto &t : threads) {
@@ -189,10 +187,10 @@ private:
     float ComputeGain(DocID doc_id,
                       float from_log_n,
                       float to_log_n,
-                      const Vector<i32> &from_degs,
-                      const Vector<i32> &to_degs,
-                      Vector<std::atomic<float>> &term_gains,
-                      Vector<std::atomic<uint8_t>> &term_gains_valid) const {
+                      const std::vector<i32> &from_degs,
+                      const std::vector<i32> &to_degs,
+                      std::vector<std::atomic<float>> &term_gains,
+                      std::vector<std::atomic<uint8_t>> &term_gains_valid) const {
         float gain = 0;
         for (const auto &term_id : *fwd_[doc_id]) {
             if (!term_gains_valid[term_id].load(std::memory_order_relaxed)) {
@@ -215,11 +213,11 @@ private:
     }
 
 private:
-    Vector<const Vector<IdxType> *> fwd_;
+    std::vector<const std::vector<IdxType> *> fwd_;
     i32 query_n_;
     i32 terminate_length_;
     i32 iter_n_;
-    SizeT log_thread_n_;
+    size_t log_thread_n_;
 };
 
 } // namespace infinity

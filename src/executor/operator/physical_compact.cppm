@@ -32,11 +32,11 @@ namespace infinity {
 export class PhysicalCompact : public PhysicalOperator {
 public:
     PhysicalCompact(u64 id,
-                    SharedPtr<BaseTableRef> base_table_ref,
+                    std::shared_ptr<BaseTableRef> base_table_ref,
                     CompactStatementType compact_type,
-                    SharedPtr<Vector<String>> output_names,
-                    SharedPtr<Vector<SharedPtr<DataType>>> output_types,
-                    SharedPtr<Vector<LoadMeta>> load_metas)
+                    std::shared_ptr<std::vector<std::string>> output_names,
+                    std::shared_ptr<std::vector<std::shared_ptr<DataType>>> output_types,
+                    std::shared_ptr<std::vector<LoadMeta>> load_metas)
         : PhysicalOperator(PhysicalOperatorType::kCompact, nullptr, nullptr, id, load_metas), base_table_ref_(base_table_ref),
           compact_type_(compact_type), output_names_(output_names), output_types_(output_types) {}
 
@@ -46,23 +46,23 @@ public:
 
     bool Execute(QueryContext *query_context, OperatorState *operator_state) final;
 
-    SizeT TaskletCount() override { return 1; }
+    size_t TaskletCount() override { return 1; }
 
-    // Vector<Vector<Vector<SegmentEntry *>>> PlanCompact(SizeT parallel_count);
+    // std::vector<std::vector<std::vector<SegmentEntry *>>> PlanCompact(size_t parallel_count);
 
-    SharedPtr<Vector<String>> GetOutputNames() const override { return output_names_; }
+    std::shared_ptr<std::vector<std::string>> GetOutputNames() const override { return output_names_; }
 
-    SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const override { return output_types_; }
+    std::shared_ptr<std::vector<std::shared_ptr<DataType>>> GetOutputTypes() const override { return output_types_; }
 
 public:
-    SharedPtr<BaseTableRef> base_table_ref_;
+    std::shared_ptr<BaseTableRef> base_table_ref_;
 
 private:
     CompactStatementType compact_type_;
-    // Vector<Vector<SegmentEntry *>> compactible_segments_group_;
+    // std::vector<std::vector<SegmentEntry *>> compactible_segments_group_;
 
-    SharedPtr<Vector<String>> output_names_{};
-    SharedPtr<Vector<SharedPtr<DataType>>> output_types_{};
+    std::shared_ptr<std::vector<std::string>> output_names_{};
+    std::shared_ptr<std::vector<std::shared_ptr<DataType>>> output_types_{};
 };
 
 } // namespace infinity

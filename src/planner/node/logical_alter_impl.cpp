@@ -26,31 +26,31 @@ import data_type;
 
 namespace infinity {
 
-Vector<ColumnBinding> LogicalAlter::GetColumnBindings() const { return {}; }
+std::vector<ColumnBinding> LogicalAlter::GetColumnBindings() const { return {}; }
 
-SharedPtr<Vector<String>> LogicalAlter::GetOutputNames() const {
-    SharedPtr<Vector<String>> result = MakeShared<Vector<String>>();
+std::shared_ptr<std::vector<std::string>> LogicalAlter::GetOutputNames() const {
+    std::shared_ptr<std::vector<std::string>> result = std::make_shared<std::vector<std::string>>();
     result->emplace_back("OK");
     return result;
 }
 
-SharedPtr<Vector<SharedPtr<DataType>>> LogicalAlter::GetOutputTypes() const {
-    SharedPtr<Vector<SharedPtr<DataType>>> result_type = MakeShared<Vector<SharedPtr<DataType>>>();
-    result_type->emplace_back(MakeShared<DataType>(LogicalType::kInteger));
+std::shared_ptr<std::vector<std::shared_ptr<DataType>>> LogicalAlter::GetOutputTypes() const {
+    std::shared_ptr<std::vector<std::shared_ptr<DataType>>> result_type = std::make_shared<std::vector<std::shared_ptr<DataType>>>();
+    result_type->emplace_back(std::make_shared<DataType>(LogicalType::kInteger));
     return result_type;
 }
 
-String LogicalRenameTable::ToString(i64 &space) const {
+std::string LogicalRenameTable::ToString(i64 &space) const {
     //
     return "";
 }
 
-String LogicalAddColumns::ToString(i64 &space) const {
+std::string LogicalAddColumns::ToString(i64 &space) const {
     //
     return "";
 }
 
-String LogicalDropColumns::ToString(i64 &space) const {
+std::string LogicalDropColumns::ToString(i64 &space) const {
     //
     return "";
 }

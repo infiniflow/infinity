@@ -39,10 +39,10 @@ public:
     explicit KnnFlatL2Top1(const DistType *queries, i64 query_count, i64 dimension, EmbeddingDataType elem_data_type)
         : KnnDistance<DistType>(KnnDistanceAlgoType::kKnnFlatL2Top1, elem_data_type, query_count, dimension, 1), queries_(queries) {
 
-        id_array_ = MakeUniqueForOverwrite<RowID[]>(this->query_count_);
-        distance_array_ = MakeUniqueForOverwrite<DistType[]>(this->query_count_);
+        id_array_ = std::make_unique_for_overwrite<RowID[]>(this->query_count_);
+        distance_array_ = std::make_unique_for_overwrite<DistType[]>(this->query_count_);
 
-        result_handler_ = MakeUnique<ResultHandler>(query_count, distance_array_.get(), id_array_.get());
+        result_handler_ = std::make_unique<ResultHandler>(query_count, distance_array_.get(), id_array_.get());
     }
 
     void Begin() final {
@@ -137,10 +137,10 @@ public:
     }
 
 private:
-    UniquePtr<RowID[]> id_array_{};
-    UniquePtr<DistType[]> distance_array_{};
+    std::unique_ptr<RowID[]> id_array_{};
+    std::unique_ptr<DistType[]> distance_array_{};
 
-    UniquePtr<ResultHandler> result_handler_{};
+    std::unique_ptr<ResultHandler> result_handler_{};
 
     const DistType *queries_{};
     bool begin_{false};

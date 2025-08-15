@@ -28,20 +28,20 @@ struct NewCatalog;
 
 export class FunctionSet {
 public:
-    static SharedPtr<FunctionSet> GetFunctionSet(NewCatalog *catalog, const FunctionExpr &expr);
+    static std::shared_ptr<FunctionSet> GetFunctionSet(NewCatalog *catalog, const FunctionExpr &expr);
 
-    static String ToString(const String &name, const Vector<SharedPtr<BaseExpression>> &arguments);
+    static std::string ToString(const std::string &name, const std::vector<std::shared_ptr<BaseExpression>> &arguments);
 
 public:
-    explicit FunctionSet(String name, FunctionType type) : name_(std::move(name)), type_(type) {}
+    explicit FunctionSet(std::string name, FunctionType type) : name_(std::move(name)), type_(type) {}
 
     virtual ~FunctionSet() = default;
 
-    [[nodiscard]] const String &name() const { return name_; }
+    [[nodiscard]] const std::string &name() const { return name_; }
 
     FunctionType type() const { return type_; }
 
-    String name_;
+    std::string name_;
     FunctionType type_;
 };
 

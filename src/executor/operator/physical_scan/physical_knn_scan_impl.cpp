@@ -128,7 +128,7 @@ auto GetKnnExprForCalculation(const KnnExpression &src_knn_expr, const Embedding
             break;
         }
     }
-    Pair<std::unique_ptr<void, decltype([](void *ptr) { std::free(ptr); })>, EmbeddingDataType> result = {nullptr, EmbeddingDataType::kElemInvalid};
+    std::pair<std::unique_ptr<void, decltype([](void *ptr) { std::free(ptr); })>, EmbeddingDataType> result = {nullptr, EmbeddingDataType::kElemInvalid};
     if (new_query_embedding_type != EmbeddingDataType::kElemInvalid) {
         const auto aligned_ptr =
             GetAlignedCast(src_knn_expr.query_embedding_.ptr, src_knn_expr.dimension_, src_query_embedding_type, new_query_embedding_type);
@@ -139,13 +139,13 @@ auto GetKnnExprForCalculation(const KnnExpression &src_knn_expr, const Embedding
 }
 
 PhysicalKnnScan::PhysicalKnnScan(u64 id,
-                                 SharedPtr<BaseTableRef> base_table_ref,
-                                 SharedPtr<KnnExpression> knn_expression,
-                                 const SharedPtr<CommonQueryFilter> &common_query_filter,
-                                 SharedPtr<Vector<String>> output_names,
-                                 SharedPtr<Vector<SharedPtr<DataType>>> output_types,
+                                 std::shared_ptr<BaseTableRef> base_table_ref,
+                                 std::shared_ptr<KnnExpression> knn_expression,
+                                 const std::shared_ptr<CommonQueryFilter> &common_query_filter,
+                                 std::shared_ptr<std::vector<std::string>> output_names,
+                                 std::shared_ptr<std::vector<std::shared_ptr<DataType>>> output_types,
                                  u64 knn_table_index,
-                                 SharedPtr<Vector<LoadMeta>> load_metas)
+                                 std::shared_ptr<std::vector<LoadMeta>> load_metas)
     : PhysicalFilterScanBase(id, PhysicalOperatorType::kKnnScan, nullptr, nullptr, knn_table_index, base_table_ref, common_query_filter, load_metas),
       knn_expression_(std::move(knn_expression)), output_names_(std::move(output_names)), output_types_(std::move(output_types)) {}
 
@@ -174,7 +174,7 @@ void PhysicalKnnScan::Init(QueryContext *query_context) {
         new_query_embedding_type != EmbeddingDataType::kElemInvalid) {
         // have new query ptr
         const auto new_query_embedding_ptr_ = new_query_embedding_ptr.release();
-        real_knn_query_embedding_holder_ = SharedPtr<void>(new_query_embedding_ptr_, std::free);
+        real_knn_query_embedding_holder_ = std::shared_ptr<void>(new_query_embedding_ptr_, std::free);
         real_knn_query_embedding_ptr_ = new_query_embedding_ptr_;
         real_knn_query_elem_type_ = new_query_embedding_type;
     } else {
@@ -192,9 +192,9 @@ void PhysicalKnnScan::InitBlockParallelOption() {
     block_parallel_options_.emplace_back(100, 3);
 }
 
-SizeT PhysicalKnnScan::BlockScanTaskCount() const {
+size_t PhysicalKnnScan::BlockScanTaskCount() const {
     const u32 block_cnt = block_column_entries_size_;
-    SizeT brute_task_n = 1;
+    size_t brute_task_n = 1;
     for (const auto &[block_n, job_n] : block_parallel_options_) {
         if (block_cnt < block_n) {
             break;
@@ -204,7 +204,7 @@ SizeT PhysicalKnnScan::BlockScanTaskCount() const {
     return brute_task_n;
 }
 
-SizeT PhysicalKnnScan::TaskletCount() { return BlockScanTaskCount() + index_entries_size_; }
+size_t PhysicalKnnScan::TaskletCount() { return BlockScanTaskCount() + index_entries_size_; }
 
 bool PhysicalKnnScan::Execute(QueryContext *query_context, OperatorState *operator_state) {
     auto *knn_scan_operator_state = static_cast<KnnScanOperatorState *>(operator_state);
@@ -363,11 +363,11 @@ void PhysicalKnnScan::ExecuteInternalByColumnDataType(QueryContext *query_contex
 
 // TableInfo *PhysicalKnnScan::table_info() const { return base_table_ref_->table_info_.get(); }
 
-String PhysicalKnnScan::TableAlias() const { return base_table_ref_->alias_; }
+std::string PhysicalKnnScan::TableAlias() const { return base_table_ref_->alias_; }
 
-Vector<SizeT> &PhysicalKnnScan::ColumnIDs() const { return base_table_ref_->column_ids_; }
+std::vector<size_t> &PhysicalKnnScan::ColumnIDs() const { return base_table_ref_->column_ids_; }
 
-SizeT PhysicalKnnScan::GetColumnID() const {
+size_t PhysicalKnnScan::GetColumnID() const {
     KnnExpression *knn_expr = knn_expression_.get();
     ColumnExpression *column_expr = static_cast<ColumnExpression *>(knn_expr->arguments()[0].get());
     return column_expr->binding().column_idx;
@@ -377,11 +377,11 @@ void PhysicalKnnScan::PlanWithIndex(QueryContext *query_context) { // TODO: retu
     InitBlockParallelOption();                                     // PlanWithIndex() will be called in physical planner
 
     Status status;
-    SizeT knn_column_id = GetColumnID();
+    size_t knn_column_id = GetColumnID();
     auto &knn_column_name = base_table_ref_->table_info_->column_defs_[knn_column_id]->name();
 
-    block_metas_ = MakeUnique<Vector<BlockMeta *>>();
-    segment_index_metas_ = MakeUnique<Vector<SharedPtr<SegmentIndexMeta>>>();
+    block_metas_ = std::make_unique<std::vector<BlockMeta *>>();
+    segment_index_metas_ = std::make_unique<std::vector<std::shared_ptr<SegmentIndexMeta>>>();
 
     TableMeeta *table_meta = base_table_ref_->block_index_->table_meta_.get();
 
@@ -390,8 +390,8 @@ void PhysicalKnnScan::PlanWithIndex(QueryContext *query_context) { // TODO: retu
     if (knn_expression_->ignore_index_) {
         LOG_TRACE("Not use index"); // No index need to check
     } else {
-        Vector<String> *index_id_strs_ptr = nullptr;
-        Vector<String> *index_names_ptr = nullptr;
+        std::vector<std::string> *index_id_strs_ptr = nullptr;
+        std::vector<std::string> *index_names_ptr = nullptr;
         status = table_meta->GetIndexIDs(index_id_strs_ptr, &index_names_ptr);
         if (!status.ok()) {
             RecoverableError(status);
@@ -399,10 +399,10 @@ void PhysicalKnnScan::PlanWithIndex(QueryContext *query_context) { // TODO: retu
 
         if (knn_expression_->using_index_.empty()) {
             LOG_TRACE("Try to find a index to use");
-            for (SizeT i = 0; i < index_id_strs_ptr->size(); ++i) {
+            for (size_t i = 0; i < index_id_strs_ptr->size(); ++i) {
                 auto it = base_table_ref_->block_index_->table_index_meta_map_[i];
 
-                SharedPtr<IndexBase> index_base;
+                std::shared_ptr<IndexBase> index_base;
                 std::tie(index_base, status) = it->GetIndexBase();
                 if (!status.ok()) {
                     RecoverableError(status);
@@ -429,7 +429,7 @@ void PhysicalKnnScan::PlanWithIndex(QueryContext *query_context) { // TODO: retu
             }
             auto it = base_table_ref_->block_index_->table_index_meta_map_[iter - index_names_ptr->begin()];
 
-            SharedPtr<IndexBase> index_base;
+            std::shared_ptr<IndexBase> index_base;
             std::tie(index_base, status) = it->GetIndexBase();
             if (!status.ok()) {
                 RecoverableError(status);
@@ -451,7 +451,7 @@ void PhysicalKnnScan::PlanWithIndex(QueryContext *query_context) { // TODO: retu
         }
         // Fill the segment with index
         if (table_index_meta_) {
-            Vector<SegmentID> *segment_ids_ptr = nullptr;
+            std::vector<SegmentID> *segment_ids_ptr = nullptr;
             std::tie(segment_ids_ptr, status) = table_index_meta_->GetSegmentIndexIDs1();
             if (!status.ok()) {
                 RecoverableError(status);
@@ -464,7 +464,7 @@ void PhysicalKnnScan::PlanWithIndex(QueryContext *query_context) { // TODO: retu
     BlockIndex *block_index = base_table_ref_->block_index_.get();
     for (const auto &[segment_id, segment_info] : block_index->new_segment_block_index_) {
         if (auto iter = index_entry_map.find(segment_id); iter != index_entry_map.end()) {
-            segment_index_metas_->push_back(MakeShared<SegmentIndexMeta>(segment_id, *table_index_meta_));
+            segment_index_metas_->push_back(std::make_shared<SegmentIndexMeta>(segment_id, *table_index_meta_));
         } else {
             const auto &block_map = segment_info.block_map();
             for (const auto &block_meta : block_map) {
@@ -479,7 +479,7 @@ void PhysicalKnnScan::PlanWithIndex(QueryContext *query_context) { // TODO: retu
     return;
 }
 
-SizeT PhysicalKnnScan::BlockEntryCount() const { return base_table_ref_->block_index_->BlockCount(); }
+size_t PhysicalKnnScan::BlockEntryCount() const { return base_table_ref_->block_index_->BlockCount(); }
 
 template <LogicalType t, typename ColumnDataType, typename QueryDataType, template <typename, typename> typename C, typename DistanceDataType>
 struct BruteForceBlockScan;
@@ -489,7 +489,7 @@ void MultiVectorSearchOneLine(MergeKnn<QueryDataType, C, DistanceDataType> *merg
                               KnnDistance1<QueryDataType, DistanceDataType> *dist_func,
                               const QueryDataType *knn_query_ptr,
                               u32 embedding_dim,
-                              UniquePtr<QueryDataType[]> &buffer_ptr_for_cast,
+                              std::unique_ptr<QueryDataType[]> &buffer_ptr_for_cast,
                               const ColumnVector &column_vector,
                               SegmentID segment_id,
                               SegmentOffset segment_offset,
@@ -527,16 +527,16 @@ void PhysicalKnnScan::ExecuteInternalByColumnDataTypeAndQueryDataType(QueryConte
         UnrecoverableError(err);
     }
 
-    SizeT index_task_n = knn_scan_shared_data->segment_index_metas_->size();
-    SizeT brute_task_n = knn_scan_shared_data->block_metas_->size();
+    size_t index_task_n = knn_scan_shared_data->segment_index_metas_->size();
+    size_t brute_task_n = knn_scan_shared_data->block_metas_->size();
     NewTxn *new_txn = query_context->GetNewTxn();
     TxnTimeStamp begin_ts = new_txn->BeginTS();
     TxnTimeStamp commit_ts = new_txn->CommitTS();
 
     BlockIndex *block_index = knn_scan_shared_data->table_ref_->block_index_.get();
-    SizeT knn_column_id = GetColumnID();
+    size_t knn_column_id = GetColumnID();
 
-    UniquePtr<QueryDataType[]> buffer_ptr_for_cast;
+    std::unique_ptr<QueryDataType[]> buffer_ptr_for_cast;
     if (u64 block_column_idx =
             knn_scan_function_data->execute_block_scan_job_ ? knn_scan_shared_data->current_block_idx_++ : std::numeric_limits<u64>::max();
         block_column_idx < brute_task_n) {
@@ -610,13 +610,13 @@ void PhysicalKnnScan::ExecuteInternalByColumnDataTypeAndQueryDataType(QueryConte
             if (!status.ok()) {
                 UnrecoverableError(status.message());
             }
-            SharedPtr<MemIndex> mem_index = segment_index_meta->GetMemIndex();
+            std::shared_ptr<MemIndex> mem_index = segment_index_meta->GetMemIndex();
             return std::make_tuple(chunk_ids_ptr, mem_index);
         };
 
         if (has_some_result) {
             const IndexBase *index_base;
-            SharedPtr<IndexBase> index_base_ptr;
+            std::shared_ptr<IndexBase> index_base_ptr;
             std::tie(index_base_ptr, status) = segment_index_meta->table_index_meta().GetIndexBase();
             if (!status.ok()) {
                 UnrecoverableError(status.message());
@@ -643,14 +643,14 @@ void PhysicalKnnScan::ExecuteInternalByColumnDataTypeAndQueryDataType(QueryConte
                         ivf_result_handler->Search(ivf_chunk);
                     }
                     if (mem_index) {
-                        SharedPtr<IVFIndexInMem> memory_ivf_index = mem_index->GetIVFIndex();
+                        std::shared_ptr<IVFIndexInMem> memory_ivf_index = mem_index->GetIVFIndex();
                         if (memory_ivf_index != nullptr) {
                             ivf_result_handler->Search(memory_ivf_index.get());
                         }
                     }
                     auto [result_n, d_ptr, offset_ptr] = ivf_result_handler->EndWithoutSort();
-                    auto row_ids = MakeUniqueForOverwrite<RowID[]>(result_n);
-                    for (SizeT i = 0; i < result_n; ++i) {
+                    auto row_ids = std::make_unique_for_overwrite<RowID[]>(result_n);
+                    for (size_t i = 0; i < result_n; ++i) {
                         row_ids[i] = RowID{segment_id, offset_ptr[i]};
                     }
                     merge_heap->Search(0, d_ptr.get(), row_ids.get(), result_n);
@@ -678,9 +678,9 @@ void PhysicalKnnScan::ExecuteInternalByColumnDataTypeAndQueryDataType(QueryConte
                                 const auto *query = static_cast<const QueryDataType *>(knn_scan_shared_data->query_embedding_) +
                                                     query_idx * knn_scan_shared_data->dimension_;
 
-                                SizeT result_n1 = 0;
-                                UniquePtr<DistanceDataType[]> d_ptr = nullptr;
-                                UniquePtr<SegmentOffset[]> l_ptr = nullptr;
+                                size_t result_n1 = 0;
+                                std::unique_ptr<DistanceDataType[]> d_ptr = nullptr;
+                                std::unique_ptr<SegmentOffset[]> l_ptr = nullptr;
                                 if (use_bitmask) {
                                     BitmaskFilter<SegmentOffset> filter(bitmask);
                                     if (with_lock) {
@@ -723,14 +723,14 @@ void PhysicalKnnScan::ExecuteInternalByColumnDataTypeAndQueryDataType(QueryConte
                                 }
 
                                 if (rerank) {
-                                    Vector<SizeT> idxes(result_n);
+                                    std::vector<size_t> idxes(result_n);
                                     std::iota(idxes.begin(), idxes.end(), 0);
-                                    std::sort(idxes.begin(), idxes.end(), [&](SizeT i, SizeT j) {
+                                    std::sort(idxes.begin(), idxes.end(), [&](size_t i, size_t j) {
                                         return l_ptr[i] < l_ptr[j];
                                     }); // sort by segment offset
                                     BlockID prev_block_id = -1;
                                     ColumnVector column_vector;
-                                    for (SizeT idx : idxes) {
+                                    for (size_t idx : idxes) {
                                         SegmentOffset segment_offset = l_ptr[idx];
                                         BlockID block_id = segment_offset / DEFAULT_BLOCK_CAPACITY;
                                         BlockOffset block_offset = segment_offset % DEFAULT_BLOCK_CAPACITY;
@@ -787,7 +787,7 @@ void PhysicalKnnScan::ExecuteInternalByColumnDataTypeAndQueryDataType(QueryConte
                                         }
                                     }
 
-                                    auto row_ids = MakeUniqueForOverwrite<RowID[]>(result_n);
+                                    auto row_ids = std::make_unique_for_overwrite<RowID[]>(result_n);
                                     for (i64 i = 0; i < result_n; ++i) {
                                         row_ids[i] = RowID{segment_id, l_ptr[i]};
                                     }
@@ -809,7 +809,7 @@ void PhysicalKnnScan::ExecuteInternalByColumnDataTypeAndQueryDataType(QueryConte
                             hnsw_search(*hnsw_handler, false);
                         }
                         if (mem_index) {
-                            SharedPtr<HnswIndexInMem> memory_hnsw_index = mem_index->GetHnswIndex();
+                            std::shared_ptr<HnswIndexInMem> memory_hnsw_index = mem_index->GetHnswIndex();
                             if (memory_hnsw_index) {
                                 const HnswHandlerPtr hnsw_handler = memory_hnsw_index->get();
                                 hnsw_search(hnsw_handler, true);
@@ -831,10 +831,10 @@ void PhysicalKnnScan::ExecuteInternalByColumnDataTypeAndQueryDataType(QueryConte
         merge_heap->End();
         i64 result_n = merge_heap->GetSize();
 
-        SizeT query_n = knn_scan_shared_data->query_count_;
-        Vector<char *> result_dists_list;
-        Vector<RowID *> row_ids_list;
-        for (SizeT query_id = 0; query_id < query_n; ++query_id) {
+        size_t query_n = knn_scan_shared_data->query_count_;
+        std::vector<char *> result_dists_list;
+        std::vector<RowID *> row_ids_list;
+        for (size_t query_id = 0; query_id < query_n; ++query_id) {
             result_dists_list.emplace_back(reinterpret_cast<char *>(merge_heap->GetDistancesByIdx(query_id)));
             row_ids_list.emplace_back(merge_heap->GetIDsByIdx(query_id));
         }
@@ -850,7 +850,7 @@ struct BruteForceBlockScan<LogicalType::kEmbedding, ColumnDataType, QueryDataTyp
                         KnnDistance1<QueryDataType, DistanceDataType> *dist_func,
                         const QueryDataType *knn_query_ptr,
                         const u32 embedding_dim,
-                        UniquePtr<QueryDataType[]> &buffer_ptr_for_cast,
+                        std::unique_ptr<QueryDataType[]> &buffer_ptr_for_cast,
                         const ColumnVector &column_vector,
                         const SegmentID segment_id,
                         const BlockID block_id,
@@ -862,10 +862,10 @@ struct BruteForceBlockScan<LogicalType::kEmbedding, ColumnDataType, QueryDataTyp
             target_ptr = data;
         } else {
             if (!buffer_ptr_for_cast) {
-                buffer_ptr_for_cast = MakeUniqueForOverwrite<QueryDataType[]>(DEFAULT_BLOCK_CAPACITY * embedding_dim);
+                buffer_ptr_for_cast = std::make_unique_for_overwrite<QueryDataType[]>(DEFAULT_BLOCK_CAPACITY * embedding_dim);
             }
-            const SizeT total_elem_num = row_count * embedding_dim;
-            for (SizeT i = 0; i < total_elem_num; ++i) {
+            const size_t total_elem_num = row_count * embedding_dim;
+            for (size_t i = 0; i < total_elem_num; ++i) {
                 buffer_ptr_for_cast[i] = static_cast<QueryDataType>(data[i]);
             }
             target_ptr = buffer_ptr_for_cast.get();
@@ -885,7 +885,7 @@ struct BruteForceBlockScan<LogicalType::kMultiVector, ColumnDataType, QueryDataT
                         KnnDistance1<QueryDataType, DistanceDataType> *dist_func,
                         const QueryDataType *knn_query_ptr,
                         const u32 embedding_dim,
-                        UniquePtr<QueryDataType[]> &buffer_ptr_for_cast,
+                        std::unique_ptr<QueryDataType[]> &buffer_ptr_for_cast,
                         const ColumnVector &column_vector,
                         const SegmentID segment_id,
                         const BlockID block_id,
@@ -913,7 +913,7 @@ void MultiVectorSearchOneLine(MergeKnn<QueryDataType, C, DistanceDataType> *merg
                               KnnDistance1<QueryDataType, DistanceDataType> *dist_func,
                               const QueryDataType *knn_query_ptr,
                               const u32 embedding_dim,
-                              UniquePtr<QueryDataType[]> &buffer_ptr_for_cast,
+                              std::unique_ptr<QueryDataType[]> &buffer_ptr_for_cast,
                               const ColumnVector &column_vector,
                               const SegmentID segment_id,
                               const SegmentOffset segment_offset,
@@ -922,7 +922,7 @@ void MultiVectorSearchOneLine(MergeKnn<QueryDataType, C, DistanceDataType> *merg
     const QueryDataType *target_ptr = nullptr;
     if constexpr (!std::is_same_v<ColumnDataType, QueryDataType>) {
         if (!buffer_ptr_for_cast) {
-            buffer_ptr_for_cast = MakeUniqueForOverwrite<QueryDataType[]>(embedding_dim);
+            buffer_ptr_for_cast = std::make_unique_for_overwrite<QueryDataType[]>(embedding_dim);
         }
         target_ptr = buffer_ptr_for_cast.get();
     }

@@ -47,67 +47,67 @@ namespace infinity {
 
 export class QueryBinder {
 public:
-    explicit QueryBinder(QueryContext *query_context, SharedPtr<BindContext> bind_context_ptr)
+    explicit QueryBinder(QueryContext *query_context, std::shared_ptr<BindContext> bind_context_ptr)
         : query_context_ptr_(std::move(query_context)), bind_context_ptr_(std::move(bind_context_ptr)) {}
 
-    UniquePtr<BoundSelectStatement> BindSelect(const SelectStatement &statement);
+    std::unique_ptr<BoundSelectStatement> BindSelect(const SelectStatement &statement);
 
-    UniquePtr<BoundInsertStatement> BindInsert(const InsertStatement &statement);
+    std::unique_ptr<BoundInsertStatement> BindInsert(const InsertStatement &statement);
 
-    UniquePtr<BoundDeleteStatement> BindDelete(const DeleteStatement &statement);
+    std::unique_ptr<BoundDeleteStatement> BindDelete(const DeleteStatement &statement);
 
-    UniquePtr<BoundUpdateStatement> BindUpdate(const UpdateStatement &statement);
+    std::unique_ptr<BoundUpdateStatement> BindUpdate(const UpdateStatement &statement);
 
-    UniquePtr<BoundCompactStatement> BindCompact(const CompactStatement &statement);
+    std::unique_ptr<BoundCompactStatement> BindCompact(const CompactStatement &statement);
 
-    SharedPtr<BaseTableRef> GetTableRef(const String &db_name, const String &table_name, bool update = false);
+    std::shared_ptr<BaseTableRef> GetTableRef(const std::string &db_name, const std::string &table_name, bool update = false);
 
     QueryContext *query_context_ptr_;
 
-    SharedPtr<BindContext> bind_context_ptr_;
+    std::shared_ptr<BindContext> bind_context_ptr_;
 
 private:
-    SharedPtr<TableRef> BuildFromClause(QueryContext *query_context, const BaseTableReference *from_table);
+    std::shared_ptr<TableRef> BuildFromClause(QueryContext *query_context, const BaseTableReference *from_table);
 
-    SharedPtr<TableRef> BuildDummyTable(QueryContext *query_context);
+    std::shared_ptr<TableRef> BuildDummyTable(QueryContext *query_context);
 
-    SharedPtr<TableRef> BuildTable(QueryContext *query_context, const TableReference *table_reference);
+    std::shared_ptr<TableRef> BuildTable(QueryContext *query_context, const TableReference *table_reference);
 
-    SharedPtr<TableRef> BuildSubquery(QueryContext *query_context, const SubqueryReference *subquery_reference);
+    std::shared_ptr<TableRef> BuildSubquery(QueryContext *query_context, const SubqueryReference *subquery_reference);
 
-    SharedPtr<TableRef> BuildCTE(QueryContext *query_context, const String &name);
+    std::shared_ptr<TableRef> BuildCTE(QueryContext *query_context, const std::string &name);
 
-    SharedPtr<BaseTableRef> BuildBaseTable(QueryContext *query_context, const TableReference *table_reference, bool update = false);
+    std::shared_ptr<BaseTableRef> BuildBaseTable(QueryContext *query_context, const TableReference *table_reference, bool update = false);
 
-    SharedPtr<TableRef> BuildView(QueryContext *query_context, const TableReference *from_table);
+    std::shared_ptr<TableRef> BuildView(QueryContext *query_context, const TableReference *from_table);
 
-    SharedPtr<TableRef> BuildCrossProduct(QueryContext *query_context, const CrossProductReference *cross_product);
+    std::shared_ptr<TableRef> BuildCrossProduct(QueryContext *query_context, const CrossProductReference *cross_product);
 
-    SharedPtr<TableRef> BuildJoin(QueryContext *query_context, const JoinReference *join_reference);
+    std::shared_ptr<TableRef> BuildJoin(QueryContext *query_context, const JoinReference *join_reference);
 
-    void UnfoldStarExpression(QueryContext *query_context, const Vector<ParsedExpr *> &input_select_list, Vector<ParsedExpr *> &output_select_list);
+    void UnfoldStarExpression(QueryContext *query_context, const std::vector<ParsedExpr *> &input_select_list, std::vector<ParsedExpr *> &output_select_list);
 
-    void GenerateColumns(const SharedPtr<Binding> &binding, const String &table_name, Vector<ParsedExpr *> &output_select_list);
+    void GenerateColumns(const std::shared_ptr<Binding> &binding, const std::string &table_name, std::vector<ParsedExpr *> &output_select_list);
 
     void BuildGroupBy(QueryContext *query_context,
                       const SelectStatement &select,
-                      const SharedPtr<BindAliasProxy> &bind_alias_proxy,
-                      UniquePtr<BoundSelectStatement> &select_statement);
+                      const std::shared_ptr<BindAliasProxy> &bind_alias_proxy,
+                      std::unique_ptr<BoundSelectStatement> &select_statement);
 
     void BuildHaving(QueryContext *query_context,
                      const SelectStatement &select,
-                     const SharedPtr<BindAliasProxy> &bind_alias_proxy,
-                     UniquePtr<BoundSelectStatement> &select_statement);
+                     const std::shared_ptr<BindAliasProxy> &bind_alias_proxy,
+                     std::unique_ptr<BoundSelectStatement> &select_statement);
 
     void PushOrderByToProject(QueryContext *query_context, const SelectStatement &statement);
 
-    void BuildSelectList(QueryContext *query_context, UniquePtr<BoundSelectStatement> &select_statement);
+    void BuildSelectList(QueryContext *query_context, std::unique_ptr<BoundSelectStatement> &select_statement);
 
-    void BuildOrderBy(QueryContext *query_context, const SelectStatement &statement, UniquePtr<BoundSelectStatement> &bound_statement) const;
+    void BuildOrderBy(QueryContext *query_context, const SelectStatement &statement, std::unique_ptr<BoundSelectStatement> &bound_statement) const;
 
-    void BuildLimit(QueryContext *query_context, const SelectStatement &statement, UniquePtr<BoundSelectStatement> &bound_statement) const;
+    void BuildLimit(QueryContext *query_context, const SelectStatement &statement, std::unique_ptr<BoundSelectStatement> &bound_statement) const;
 
-    void PruneOutput(QueryContext *query_context, i64 select_column_count, UniquePtr<BoundSelectStatement> &bound_statement);
+    void PruneOutput(QueryContext *query_context, i64 select_column_count, std::unique_ptr<BoundSelectStatement> &bound_statement);
 
     static void CheckKnnAndOrderBy(KnnDistanceType distance_type, OrderType order_type);
 };

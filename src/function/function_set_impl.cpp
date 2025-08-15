@@ -27,26 +27,26 @@ import function_expr;
 
 namespace infinity {
 
-SharedPtr<FunctionSet> FunctionSet::GetFunctionSet(NewCatalog *catalog, const FunctionExpr &expr) {
-    String function_name = expr.func_name_;
+std::shared_ptr<FunctionSet> FunctionSet::GetFunctionSet(NewCatalog *catalog, const FunctionExpr &expr) {
+    std::string function_name = expr.func_name_;
 
-    // SharedPtr<Catalog>& catalog
-    SharedPtr<FunctionSet> function_set_ptr = NewCatalog::GetFunctionSetByName(catalog, function_name);
+    // std::shared_ptr<Catalog>& catalog
+    std::shared_ptr<FunctionSet> function_set_ptr = NewCatalog::GetFunctionSetByName(catalog, function_name);
 
     return function_set_ptr;
 }
 
-String FunctionSet::ToString(const String &name, const Vector<SharedPtr<BaseExpression>> &arguments) {
+std::string FunctionSet::ToString(const std::string &name, const std::vector<std::shared_ptr<BaseExpression>> &arguments) {
     std::stringstream ss;
 
     ss << name;
-    SizeT argument_count = arguments.size();
+    size_t argument_count = arguments.size();
     if (argument_count == 0) {
         ss << "()";
 
     } else {
         ss << "(";
-        for (SizeT i = 0; i < argument_count - 1; ++i) {
+        for (size_t i = 0; i < argument_count - 1; ++i) {
             ss << arguments[i]->Type().ToString() << ", ";
         }
         ss << arguments.back()->Type().ToString();

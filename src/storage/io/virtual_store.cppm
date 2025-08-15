@@ -12,17 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:virtual_store;
 
-import :stl;
 import :status;
 import :local_file_handle;
 import :stream_reader;
 import :s3_client;
 import :object_storage_process;
 
+import std;
 import third_party;
 
 namespace infinity {
@@ -41,65 +39,65 @@ export enum class StorageType {
     kNFS,
 };
 
-export StorageType String2StorageType(const String &storage_type);
+export StorageType String2StorageType(const std::string &storage_type);
 
-export String ToString(StorageType storage_type);
+export std::string ToString(StorageType storage_type);
 
 export struct MmapInfo {
     u8 *data_ptr_{};
-    SizeT data_len_{};
-    SizeT rc_{};
+    size_t data_len_{};
+    size_t rc_{};
 };
 
 export class VirtualStore {
 public:
-    static Tuple<UniquePtr<LocalFileHandle>, Status> Open(const String &path, FileAccessMode access_mode);
-    static UniquePtr<StreamReader> OpenStreamReader(const String &path);
-    static bool IsRegularFile(const String &path);
-    static bool Exists(const String &path);
-    static Status DeleteFile(const String &path);
-    static Status DeleteFileBG(const String &path);
-    static Status MakeDirectory(const String &path);
-    static Status RemoveDirectory(const String &path);
-    static Status CleanupDirectory(const String &path);
-    static void RecursiveCleanupAllEmptyDir(const String &path);
-    static Status Rename(const String &old_path, const String &new_path);
-    static Status Truncate(const String &file_name, SizeT new_length);
-    static Status Merge(const String &dst_file, const String &src_file);
-    static Status Copy(const String &dst_file, const String &src_file);
-    static Tuple<Vector<SharedPtr<DirEntry>>, Status> ListDirectory(const String &path);
-    static SizeT GetFileSize(const String &path);
-    static String GetParentPath(const String &path);
-    static SizeT GetDirectorySize(const String &path);
-    static String ConcatenatePath(const String &dir_path, const String &file_path);
+    static std::tuple<std::unique_ptr<LocalFileHandle>, Status> Open(const std::string &path, FileAccessMode access_mode);
+    static std::unique_ptr<StreamReader> OpenStreamReader(const std::string &path);
+    static bool IsRegularFile(const std::string &path);
+    static bool Exists(const std::string &path);
+    static Status DeleteFile(const std::string &path);
+    static Status DeleteFileBG(const std::string &path);
+    static Status MakeDirectory(const std::string &path);
+    static Status RemoveDirectory(const std::string &path);
+    static Status CleanupDirectory(const std::string &path);
+    static void RecursiveCleanupAllEmptyDir(const std::string &path);
+    static Status Rename(const std::string &old_path, const std::string &new_path);
+    static Status Truncate(const std::string &file_name, size_t new_length);
+    static Status Merge(const std::string &dst_file, const std::string &src_file);
+    static Status Copy(const std::string &dst_file, const std::string &src_file);
+    static std::tuple<std::vector<std::shared_ptr<DirEntry>>, Status> ListDirectory(const std::string &path);
+    static size_t GetFileSize(const std::string &path);
+    static std::string GetParentPath(const std::string &path);
+    static size_t GetDirectorySize(const std::string &path);
+    static std::string ConcatenatePath(const std::string &dir_path, const std::string &file_path);
 
-    static std::ofstream BeginCompress(const String& compressed_file);
-    static Status AddFileCompress(std::ofstream& ofstream, const String &filename);
+    static std::ofstream BeginCompress(const std::string& compressed_file);
+    static Status AddFileCompress(std::ofstream& ofstream, const std::string &filename);
     static void EndCompress(std::ofstream& ofstream);
 
-    static i32 MmapFile(const String &file_path, u8 *&data_ptr, SizeT &data_len);
-    static i32 MunmapFile(const String &file_path);
+    static i32 MmapFile(const std::string &file_path, u8 *&data_ptr, size_t &data_len);
+    static i32 MunmapFile(const std::string &file_path);
 
-    static i32 MmapFilePart(const String &file_path, SizeT offset, SizeT length, u8 *&data_ptr);
-    static i32 MunmapFilePart(u8 *data_ptr, SizeT offset, SizeT length);
+    static i32 MmapFilePart(const std::string &file_path, size_t offset, size_t length, u8 *&data_ptr);
+    static i32 MunmapFilePart(u8 *data_ptr, size_t offset, size_t length);
 
     static void MunmapAllFiles();
 
     static Status InitRemoteStore(StorageType storage_type = StorageType::kMinio,
-                                  const String &URL = "http://localhost:9000",
+                                  const std::string &URL = "http://localhost:9000",
                                   bool HTTPS = false,
-                                  const String &access_key = "minioadmin",
-                                  const String &secret_key = "minioadmin",
-                                  const String &bucket = "infinity");
+                                  const std::string &access_key = "minioadmin",
+                                  const std::string &secret_key = "minioadmin",
+                                  const std::string &bucket = "infinity");
 
     static Status UnInitRemoteStore();
 
     static bool IsInit();
     static Status CreateBucket();
-    static Status DownloadObject(const String &file_dir, const String &object_name);
-    static Status UploadObject(const String &file_dir, const String &object_name);
-    static Status RemoveObject(const String &object_name);
-    static Status CopyObject(const String &src_object_name, const String &dst_object_name);
+    static Status DownloadObject(const std::string &file_dir, const std::string &object_name);
+    static Status UploadObject(const std::string &file_dir, const std::string &object_name);
+    static Status RemoveObject(const std::string &object_name);
+    static Status CopyObject(const std::string &src_object_name, const std::string &dst_object_name);
     //
     static Status BucketExists();
 
@@ -110,14 +108,14 @@ public:
 
 private:
     static std::mutex mtx_;
-    static HashMap<String, MmapInfo> mapped_files_;
+    static std::unordered_map<std::string, MmapInfo> mapped_files_;
 
     static StorageType storage_type_;
-    static String bucket_;
-    static UniquePtr<S3Client> s3_client_;
+    static std::string bucket_;
+    static std::unique_ptr<S3Client> s3_client_;
 
-    static Atomic<u64> total_request_count_;
-    static Atomic<u64> cache_miss_count_;
+    static std::atomic<u64> total_request_count_;
+    static std::atomic<u64> cache_miss_count_;
 
     friend class ObjectStorageProcess;
 };

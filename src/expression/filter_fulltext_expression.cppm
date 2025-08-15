@@ -30,13 +30,13 @@ struct BlockIndex;
 
 export class FilterFulltextExpression final : public BaseExpression {
 public:
-    FilterFulltextExpression(String fields, String matching_text, String options_text);
+    FilterFulltextExpression(std::string fields, std::string matching_text, std::string options_text);
 
     ~FilterFulltextExpression() override;
 
-    static SharedPtr<FilterFulltextExpression> BuildFilterFulltextExpression(const FunctionExpr &expr);
+    static std::shared_ptr<FilterFulltextExpression> BuildFilterFulltextExpression(const FunctionExpr &expr);
 
-    String ToString() const override;
+    std::string ToString() const override;
 
     DataType Type() const override;
 
@@ -44,14 +44,14 @@ public:
 
     bool Eq(const BaseExpression &other_base) const override;
 
-    String fields_;
-    String matching_text_;
-    String options_text_;
+    std::string fields_;
+    std::string matching_text_;
+    std::string options_text_;
 
     // for expression_evaluator
-    SharedPtr<BlockIndex> block_index_;
-    UniquePtr<IndexFilterEvaluator> filter_fulltext_evaluator_;
-    Map<SegmentID, Bitmask> segment_results_;
+    std::shared_ptr<BlockIndex> block_index_;
+    std::unique_ptr<IndexFilterEvaluator> filter_fulltext_evaluator_;
+    std::map<SegmentID, Bitmask> segment_results_;
     std::shared_mutex rw_mutex_;
 };
 

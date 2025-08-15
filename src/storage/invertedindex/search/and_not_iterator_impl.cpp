@@ -26,7 +26,7 @@ import internal_types;
 
 namespace infinity {
 
-AndNotIterator::AndNotIterator(Vector<UniquePtr<DocIterator>> iterators) : MultiDocIterator(std::move(iterators)) {
+AndNotIterator::AndNotIterator(std::vector<std::unique_ptr<DocIterator>> iterators) : MultiDocIterator(std::move(iterators)) {
     std::sort(children_.begin() + 1, children_.end(), [](const auto &lhs, const auto &rhs) {
         return lhs->GetEstimateIterateCost() < rhs->GetEstimateIterateCost();
     });

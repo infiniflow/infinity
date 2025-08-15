@@ -29,7 +29,7 @@ namespace infinity {
 
 StreamReader::~StreamReader() { Close(); }
 
-Status StreamReader::Init(const String &file_name) {
+Status StreamReader::Init(const std::string &file_name) {
     file_.open(file_name);
     if (!file_.is_open()) {
         return Status::IOError(fmt::format("{} can't open", file_name));
@@ -37,7 +37,7 @@ Status StreamReader::Init(const String &file_name) {
     return Status::OK();
 }
 
-bool StreamReader::ReadLine(String &line) {
+bool StreamReader::ReadLine(std::string &line) {
     if (getline(file_, line)) {
         return true;
     } else {

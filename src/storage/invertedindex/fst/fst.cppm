@@ -38,17 +38,17 @@ struct Meta {
     u64 version_;
     CompiledAddr root_addr_;
     FstType ty_;
-    SizeT len_;
+    size_t len_;
     /// A checksum is missing when the FST version is <= 2. (Checksums were
     /// added in version 3.)
-    Optional<u32> checksum_;
+    std::optional<u32> checksum_;
 };
 
 export class Fst {
 private:
     Meta meta_;
     u8 *data_ptr_;
-    SizeT data_len_;
+    size_t data_len_;
 
     friend class FstStream;
 
@@ -64,7 +64,7 @@ public:
     /// transducer builder (`Builder` qualifies). If the format is invalid or
     /// if there is a mismatch between the API version of this library and the
     /// fst, then an error is returned.
-    Fst(u8 *data_ptr, SizeT data_len) : data_ptr_(data_ptr), data_len_(data_len) {
+    Fst(u8 *data_ptr, size_t data_len) : data_ptr_(data_ptr), data_len_(data_len) {
         if (data_len < 36) {
             UnrecoverableError(fmt::format("FST invalid fst size, data_len {}", data_len));
         }
@@ -73,12 +73,12 @@ public:
             UnrecoverableError(fmt::format("FST version mismatch, expected {}, got {}", VERSION, version));
         }
         u64 ty = ReadU64LE(data_ptr + 8);
-        SizeT end;
-        Optional<u32> checksum;
+        size_t end;
+        std::optional<u32> checksum;
         end = data_len - 4;
         checksum = ReadU32LE(data_ptr + data_len - 4);
-        SizeT root_addr = ReadU64LE(data_ptr + end - 8);
-        SizeT len = ReadU64LE(data_ptr + end - 16);
+        size_t root_addr = ReadU64LE(data_ptr + end - 8);
+        size_t len = ReadU64LE(data_ptr + end - 16);
         // The root node is always the last node written, so its address should
         // be near the end. After the root node is written, we still have to
         // write the root *address* and the number of keys in the FST, along
@@ -101,7 +101,7 @@ public:
         //
         // And finally, our calculation changes somewhat based on version.
         // If the FST version is less than 3, then it does not have a checksum.
-        SizeT empty_total, addr_offset;
+        size_t empty_total, addr_offset;
         empty_total = 36;
         addr_offset = 21;
         if ((root_addr == EMPTY_ADDRESS && data_len != empty_total) || (root_addr != EMPTY_ADDRESS && root_addr + addr_offset != data_len)) {
@@ -115,13 +115,13 @@ public:
     }
 
     /// Returns the number of keys in this fst.
-    SizeT Len() const { return meta_.len_; }
+    size_t Len() const { return meta_.len_; }
 
     /// Returns true if and only if this fst has no keys.
     bool IsEmpty() const { return meta_.len_ == 0; }
 
     /// Returns the number of bytes used by this fst.
-    SizeT Size() const { return data_len_; }
+    size_t Size() const { return data_len_; }
 
     /// Attempts to verify this FST by computing its checksum.
     ///
@@ -156,11 +156,11 @@ public:
     CompiledAddr RootAddr() { return meta_.root_addr_; }
 
     /// Retrieves the value associated with a key.
-    bool Get(u8 *key_ptr, SizeT key_len, u64 &val) {
+    bool Get(u8 *key_ptr, size_t key_len, u64 &val) {
         Output out;
-        SizeT ti;
+        size_t ti;
         Node node = Root();
-        for (SizeT i = 0; i < key_len; i++) {
+        for (size_t i = 0; i < key_len; i++) {
             bool found = node.FindInput(key_ptr[i], ti);
             if (!found) {
                 return false;
@@ -178,7 +178,7 @@ public:
     }
 
     /// Returns true if and only if the given key is in this FST.
-    bool ContainsKey(u8 *key_ptr, SizeT key_len) {
+    bool ContainsKey(u8 *key_ptr, size_t key_len) {
         u64 val;
         return Get(key_ptr, key_len, val);
     }
@@ -199,13 +199,13 @@ export struct Bound {
         kExcluded,
         kUnbounded,
     } ty_ = kUnbounded;
-    Vector<u8> key_;
+    std::vector<u8> key_;
 
     Bound() : ty_(kUnbounded) {};
     Bound(BoundType ty) : ty_(ty) {};
-    Bound(BoundType ty, u8 *key_ptr, SizeT key_len) : ty_(ty), key_(key_ptr, key_ptr + key_len) {}
+    Bound(BoundType ty, u8 *key_ptr, size_t key_len) : ty_(ty), key_(key_ptr, key_ptr + key_len) {}
 
-    bool ExceededBy(u8 *inp_ptr, SizeT inp_len) {
+    bool ExceededBy(u8 *inp_ptr, size_t inp_len) {
         if (ty_ == kUnbounded) {
             return false;
         }
@@ -224,9 +224,9 @@ export struct Bound {
 
 struct StreamState {
     Node node_;
-    SizeT trans_;
+    size_t trans_;
     Output out_;
-    StreamState(const Node &node, SizeT trans, Output out) : node_(node), trans_(trans), out_(out) {}
+    StreamState(const Node &node, size_t trans, Output out) : node_(node), trans_(trans), out_(out) {}
     StreamState(const StreamState &other) : node_(other.node_), trans_(other.trans_), out_(other.out_) {}
 };
 
@@ -235,25 +235,25 @@ export class FstStream {
 private:
     Fst &fst_;
     Bound end_at_;
-    Vector<u8> inp_;
-    Vector<StreamState> stack_;
+    std::vector<u8> inp_;
+    std::vector<StreamState> stack_;
 
 public:
     FstStream(Fst &fst, Bound min = Bound(), Bound max = Bound()) : fst_(fst) { Reset(min, max); }
-    FstStream(Fst &fst, u8 *prefix_ptr, SizeT prefix_len) : fst_(fst) { Reset(prefix_ptr, prefix_len); }
+    FstStream(Fst &fst, u8 *prefix_ptr, size_t prefix_len) : fst_(fst) { Reset(prefix_ptr, prefix_len); }
 
     void Reset(Bound min = Bound(), Bound max = Bound()) {
         end_at_ = max;
         SeekMin(min);
     }
 
-    void Reset(u8 *min_ptr, SizeT min_len, u8 *max_ptr, SizeT max_len) {
+    void Reset(u8 *min_ptr, size_t min_len, u8 *max_ptr, size_t max_len) {
         Bound min(Bound::kIncluded, min_ptr, min_len);
         Bound max(Bound::kIncluded, max_ptr, max_len);
         Reset(min, max);
     }
 
-    void Reset(u8 *prefix_ptr, SizeT prefix_len) {
+    void Reset(u8 *prefix_ptr, size_t prefix_len) {
         Bound min(Bound::kIncluded, prefix_ptr, prefix_len);
         Bound max(Bound::kExcluded, prefix_ptr, prefix_len);
         int i;
@@ -273,7 +273,7 @@ public:
     /// @param key Stores the key of the pair when found
     /// @param val Stores the value of the pair when found
     /// @return true if found next pair, false if not
-    bool Next(Vector<u8> &key, u64 &val) {
+    bool Next(std::vector<u8> &key, u64 &val) {
         while (!stack_.empty()) {
             StreamState &state = stack_.back();
             if (state.trans_ >= state.node_.Len()) {
@@ -320,7 +320,7 @@ private:
             stack_.emplace_back(fst_.Root(), 0, Output());
             return;
         }
-        Vector<u8> &key = min.key_;
+        std::vector<u8> &key = min.key_;
         bool inclusive = min.IsInclusive();
         // At this point, we need to find the starting location of `min` in
         // the FST. However, as we search, we need to maintain a stack of
@@ -330,8 +330,8 @@ private:
         // not actually exist in the FST.
         Node node = fst_.Root();
         Output out;
-        SizeT ti;
-        for (SizeT i = 0; i < key.size(); i++) {
+        size_t ti;
+        for (size_t i = 0; i < key.size(); i++) {
             u8 b = key[i];
             bool found = node.FindInput(b, ti);
             if (found) {
@@ -346,7 +346,7 @@ private:
                 // Since this is a minimum bound, we need to find the
                 // first transition in this node that proceeds the current
                 // input byte.
-                SizeT j = 0;
+                size_t j = 0;
                 for (; j < node.ntrans_; j++) {
                     Transition t = node.TransAt(j);
                     if (t.inp_ > b) {

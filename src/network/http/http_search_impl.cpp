@@ -283,15 +283,15 @@ void HTTPSearch::Process(Infinity *infinity_ptr,
         order_by_list = nullptr;
         group_by_columns = nullptr;
         if (result.IsOk()) {
-            SizeT block_rows = result.result_table_->DataBlockCount();
-            for (SizeT block_id = 0; block_id < block_rows; ++block_id) {
+            size_t block_rows = result.result_table_->DataBlockCount();
+            for (size_t block_id = 0; block_id < block_rows; ++block_id) {
                 DataBlock *data_block = result.result_table_->GetDataBlockById(block_id).get();
                 auto row_count = data_block->row_count();
                 auto column_cnt = result.result_table_->ColumnCount();
 
                 for (int row = 0; row < row_count; ++row) {
                     nlohmann::json json_result_row;
-                    for (SizeT col = 0; col < column_cnt; ++col) {
+                    for (size_t col = 0; col < column_cnt; ++col) {
                         nlohmann::json json_result_cell;
                         Value value = data_block->GetValue(col, row);
                         const std::string &column_name = result.result_table_->GetColumnNameById(col);
@@ -549,15 +549,15 @@ void HTTPSearch::Explain(Infinity *infinity_ptr,
         order_by_list = nullptr;
         group_by_columns = nullptr;
         if (result.IsOk()) {
-            SizeT block_rows = result.result_table_->DataBlockCount();
-            for (SizeT block_id = 0; block_id < block_rows; ++block_id) {
+            size_t block_rows = result.result_table_->DataBlockCount();
+            for (size_t block_id = 0; block_id < block_rows; ++block_id) {
                 DataBlock *data_block = result.result_table_->GetDataBlockById(block_id).get();
                 auto row_count = data_block->row_count();
                 auto column_cnt = result.result_table_->ColumnCount();
 
                 for (int row = 0; row < row_count; ++row) {
                     nlohmann::json json_result_row;
-                    for (SizeT col = 0; col < column_cnt; ++col) {
+                    for (size_t col = 0; col < column_cnt; ++col) {
                         Value value = data_block->GetValue(col, row);
                         const std::string &column_name = result.result_table_->GetColumnNameById(col);
                         const std::string &column_value = value.ToString();
@@ -591,7 +591,7 @@ std::unique_ptr<ParsedExpr> HTTPSearch::ParseFilter(std::string_view json_sv, HT
         response["error_message"] = "Filter field should be string";
         return nullptr;
     }
-    std::unique_ptr<ExpressionParserResult> expr_parsed_result = MakeUnique<ExpressionParserResult>();
+    std::unique_ptr<ExpressionParserResult> expr_parsed_result = std::make_unique<ExpressionParserResult>();
     ExprParser expr_parser;
     expr_parser.Parse(doc.get<std::string>(), expr_parsed_result.get());
     if (expr_parsed_result->IsError() || expr_parsed_result->exprs_ptr_->size() != 1) {
@@ -659,7 +659,7 @@ std::vector<ParsedExpr *> *HTTPSearch::ParseOutput(std::string_view json_sv, HTT
             output_columns->emplace_back(parsed_expr);
             parsed_expr = nullptr;
         } else {
-            std::unique_ptr<ExpressionParserResult> expr_parsed_result = MakeUnique<ExpressionParserResult>();
+            std::unique_ptr<ExpressionParserResult> expr_parsed_result = std::make_unique<ExpressionParserResult>();
             ExprParser expr_parser;
             expr_parser.Parse(output_expr_str, expr_parsed_result.get());
             if (expr_parsed_result->IsError() || expr_parsed_result->exprs_ptr_->empty()) {
@@ -707,7 +707,7 @@ std::vector<OrderByExpr *> *HTTPSearch::ParseSort(std::string_view json_sv, HTTP
         for (auto expression : order_expr.get_object()) {
             std::string key = std::string((std::string_view)expression.unescaped_key());
             ToLower(key);
-            auto order_by_expr = MakeUnique<OrderByExpr>();
+            auto order_by_expr = std::make_unique<OrderByExpr>();
             if (key == "_row_id" or key == "_similarity" or key == "_distance" or key == "_score") {
                 auto parsed_expr = new FunctionExpr();
                 if (key == "_row_id") {
@@ -722,7 +722,7 @@ std::vector<OrderByExpr *> *HTTPSearch::ParseSort(std::string_view json_sv, HTTP
                 order_by_expr->expr_ = parsed_expr;
                 parsed_expr = nullptr;
             } else {
-                std::unique_ptr<ExpressionParserResult> expr_parsed_result = MakeUnique<ExpressionParserResult>();
+                std::unique_ptr<ExpressionParserResult> expr_parsed_result = std::make_unique<ExpressionParserResult>();
                 ExprParser expr_parser;
                 expr_parser.Parse(key, expr_parsed_result.get());
                 if (expr_parsed_result->IsError() || expr_parsed_result->exprs_ptr_->empty()) {
@@ -865,7 +865,7 @@ std::unique_ptr<FusionExpr> HTTPSearch::ParseFusion(std::string_view json_sv, HT
     }
     i64 topn = -1;
     nlohmann::json fusion_params;
-    auto fusion_expr = MakeUnique<FusionExpr>();
+    auto fusion_expr = std::make_unique<FusionExpr>();
     // must have: "fusion_method", "topn"
     // may have: "params"
     static constexpr std::array<std::string, 3> possible_keys{"fusion_method", "topn", "params"};
@@ -953,7 +953,7 @@ std::unique_ptr<KnnExpr> HTTPSearch::ParseMatchDense(std::string_view json_sv, H
         response["error_message"] = "MatchDense field should be object";
         return nullptr;
     }
-    auto knn_expr = MakeUnique<KnnExpr>();
+    auto knn_expr = std::make_unique<KnnExpr>();
     i64 topn = -1;
     std::string_view query_vector_json;
     // must have: "match_method", "fields", "query_vector", "element_type", "metric_type", "topn"
@@ -978,7 +978,7 @@ std::unique_ptr<KnnExpr> HTTPSearch::ParseMatchDense(std::string_view json_sv, H
                 return nullptr;
             }
         } else if (key == "fields") {
-            auto column_expr = MakeUnique<ColumnExpr>();
+            auto column_expr = std::make_unique<ColumnExpr>();
             auto column_str = value.get<std::string>();
             column_expr->names_.push_back(std::move(column_str));
             knn_expr->column_expr_ = column_expr.release();
@@ -1042,7 +1042,7 @@ std::unique_ptr<KnnExpr> HTTPSearch::ParseMatchDense(std::string_view json_sv, H
                 if (knn_expr->opt_params_ == nullptr) {
                     knn_expr->opt_params_ = new std::vector<InitParameter *>();
                 }
-                auto parameter = MakeUnique<InitParameter>();
+                auto parameter = std::make_unique<InitParameter>();
                 parameter->param_name_ = param_k;
                 parameter->param_value_ = param_v.get<std::string>();
                 knn_expr->opt_params_->emplace_back(parameter.release());
@@ -1083,7 +1083,7 @@ std::unique_ptr<MatchExpr> HTTPSearch::ParseMatchText(std::string_view json_sv, 
         response["error_message"] = "MatchText field should be object";
         return nullptr;
     }
-    auto match_expr = MakeUnique<MatchExpr>();
+    auto match_expr = std::make_unique<MatchExpr>();
     i64 topn = -1;
     std::string extra_params{};
     // must have: "match_method", "fields", "matching_text", "topn"
@@ -1176,10 +1176,10 @@ std::unique_ptr<MatchTensorExpr> HTTPSearch::ParseMatchTensor(std::string_view j
         response["error_message"] = "MatchTensor field should be object";
         return nullptr;
     }
-    auto match_tensor_expr = MakeUnique<MatchTensorExpr>();
+    auto match_tensor_expr = std::make_unique<MatchTensorExpr>();
     match_tensor_expr->SetSearchMethodStr("maxsim");
     std::string element_type{};
-    SharedPtr<ConstantExpr> tensor_expr{};
+    std::shared_ptr<ConstantExpr> tensor_expr{};
     i64 topn = -1;
     std::string extra_params{};
     // must have: "match_method", "fields", "query_tensor", "element_type", "topn"
@@ -1205,7 +1205,7 @@ std::unique_ptr<MatchTensorExpr> HTTPSearch::ParseMatchTensor(std::string_view j
             }
         } else if (key == "field") {
             auto column_str = value.get<std::string>();
-            auto column_expr = MakeUnique<ColumnExpr>();
+            auto column_expr = std::make_unique<ColumnExpr>();
             column_expr->names_.push_back(std::move(column_str));
             match_tensor_expr->column_expr_ = std::move(column_expr);
         } else if (key == "query_tensor") {
@@ -1301,7 +1301,7 @@ std::unique_ptr<MatchSparseExpr> HTTPSearch::ParseMatchSparse(std::string_view j
         response["error_message"] = "MatchSparse field should be object";
         return nullptr;
     }
-    auto match_sparse_expr = MakeUnique<MatchSparseExpr>();
+    auto match_sparse_expr = std::make_unique<MatchSparseExpr>();
     auto *opt_params_ptr = new std::vector<InitParameter *>();
     DeferFn release_opt([&]() {
         if (opt_params_ptr != nullptr) {
@@ -1335,7 +1335,7 @@ std::unique_ptr<MatchSparseExpr> HTTPSearch::ParseMatchSparse(std::string_view j
                 return nullptr;
             }
         } else if (key == "fields") {
-            auto column_expr = MakeUnique<ColumnExpr>();
+            auto column_expr = std::make_unique<ColumnExpr>();
             auto column_str = value.get<std::string>();
             column_expr->names_.push_back(std::move(column_str));
             match_sparse_expr->column_expr_ = std::move(column_expr);
@@ -1448,11 +1448,11 @@ std::unique_ptr<ConstantExpr> HTTPSearch::ParseSparseVector(std::string_view jso
         switch (first_kv.value().get_number_type()) {
             case simdjson::number_type::unsigned_integer:
             case simdjson::number_type::signed_integer: {
-                const_sparse_expr = MakeUnique<ConstantExpr>(LiteralType::kLongSparseArray);
+                const_sparse_expr = std::make_unique<ConstantExpr>(LiteralType::kLongSparseArray);
                 break;
             }
             case simdjson::number_type::floating_point_number: {
-                const_sparse_expr = MakeUnique<ConstantExpr>(LiteralType::kDoubleSparseArray);
+                const_sparse_expr = std::make_unique<ConstantExpr>(LiteralType::kDoubleSparseArray);
                 break;
             }
             default: {
@@ -1463,7 +1463,7 @@ std::unique_ptr<ConstantExpr> HTTPSearch::ParseSparseVector(std::string_view jso
         }
     }
 
-    for (HashSet<i64> key_set; auto sparse_it : doc.get_object()) {
+    for (std::unordered_set<i64> key_set; auto sparse_it : doc.get_object()) {
         auto sparse_k = std::string(static_cast<std::string_view>(sparse_it.unescaped_key()));
         auto sparse_v = sparse_it.value();
         i64 key_val = {};
@@ -1511,7 +1511,7 @@ std::unique_ptr<ConstantExpr> HTTPSearch::ParseSparseVector(std::string_view jso
     return const_sparse_expr;
 }
 
-Tuple<i64, void *> HTTPSearch::ParseVector(std::string_view json_sv, EmbeddingDataType elem_type, HTTPStatus &http_status, nlohmann::json &response) {
+std::tuple<i64, void *> HTTPSearch::ParseVector(std::string_view json_sv, EmbeddingDataType elem_type, HTTPStatus &http_status, nlohmann::json &response) {
     simdjson::padded_string json_pad(json_sv);
     simdjson::parser parser;
     simdjson::document doc = parser.iterate(json_pad);
@@ -1521,7 +1521,7 @@ Tuple<i64, void *> HTTPSearch::ParseVector(std::string_view json_sv, EmbeddingDa
         response["error_message"] = "Can't recognize embedding/vector.";
         return {0, nullptr};
     }
-    SizeT dimension = doc.count_elements();
+    size_t dimension = doc.count_elements();
     if (dimension == 0) {
         response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
         response["error_message"] = "Empty embedding data";
@@ -1542,9 +1542,9 @@ Tuple<i64, void *> HTTPSearch::ParseVector(std::string_view json_sv, EmbeddingDa
                     embedding_data_ptr = nullptr;
                 }
             });
-            for (SizeT i = 0; i < dimension / 8; ++i) {
+            for (size_t i = 0; i < dimension / 8; ++i) {
                 u8 unit = 0;
-                for (SizeT bit_idx = 0; bit_idx < 8; bit_idx++) {
+                for (size_t bit_idx = 0; bit_idx < 8; bit_idx++) {
                     simdjson::padded_string sub_pad(json_sv);
                     simdjson::parser sub_parser;
                     simdjson::document sub_doc = sub_parser.iterate(sub_pad);
@@ -1583,7 +1583,7 @@ Tuple<i64, void *> HTTPSearch::ParseVector(std::string_view json_sv, EmbeddingDa
                     embedding_data_ptr = nullptr;
                 }
             });
-            for (SizeT idx = 0; auto value_ref : doc.get_array()) {
+            for (size_t idx = 0; auto value_ref : doc.get_array()) {
                 if (value_ref.type() != simdjson::json_type::number) {
                     response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
                     response["error_message"] = "Embedding element type should be integer";
@@ -1615,7 +1615,7 @@ Tuple<i64, void *> HTTPSearch::ParseVector(std::string_view json_sv, EmbeddingDa
                     embedding_data_ptr = nullptr;
                 }
             });
-            for (SizeT idx = 0; auto value_ref : doc.get_array()) {
+            for (size_t idx = 0; auto value_ref : doc.get_array()) {
                 if (value_ref.type() != simdjson::json_type::number) {
                     response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
                     response["error_message"] = "Embedding element type should be integer";
@@ -1647,7 +1647,7 @@ Tuple<i64, void *> HTTPSearch::ParseVector(std::string_view json_sv, EmbeddingDa
                     embedding_data_ptr = nullptr;
                 }
             });
-            for (SizeT idx = 0; auto value_ref : doc.get_array()) {
+            for (size_t idx = 0; auto value_ref : doc.get_array()) {
                 if (value_ref.type() != simdjson::json_type::number) {
                     response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
                     response["error_message"] = "Embedding element type should be integer";
@@ -1679,7 +1679,7 @@ Tuple<i64, void *> HTTPSearch::ParseVector(std::string_view json_sv, EmbeddingDa
                     embedding_data_ptr = nullptr;
                 }
             });
-            for (SizeT idx = 0; auto value_ref : doc.get_array()) {
+            for (size_t idx = 0; auto value_ref : doc.get_array()) {
                 if (value_ref.type() != simdjson::json_type::number) {
                     response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
                     response["error_message"] = "Embedding element type should be float";
@@ -1715,7 +1715,7 @@ Tuple<i64, void *> HTTPSearch::ParseVector(std::string_view json_sv, EmbeddingDa
                     embedding_data_ptr = nullptr;
                 }
             });
-            for (SizeT idx = 0; auto value_ref : doc.get_array()) {
+            for (size_t idx = 0; auto value_ref : doc.get_array()) {
                 if (value_ref.type() != simdjson::json_type::number) {
                     response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
                     response["error_message"] = "Embedding element type should be float";
@@ -1751,7 +1751,7 @@ Tuple<i64, void *> HTTPSearch::ParseVector(std::string_view json_sv, EmbeddingDa
                     embedding_data_ptr = nullptr;
                 }
             });
-            for (SizeT idx = 0; auto value_ref : doc.get_array()) {
+            for (size_t idx = 0; auto value_ref : doc.get_array()) {
                 if (value_ref.type() != simdjson::json_type::number) {
                     response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
                     response["error_message"] = "Embedding element type should be float";

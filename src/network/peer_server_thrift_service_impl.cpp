@@ -56,7 +56,7 @@ void PeerServerThriftService::Register(infinity_peer_server::RegisterResponse &r
         auto now = std::chrono::system_clock::now();
         auto time_since_epoch = now.time_since_epoch();
 
-        SharedPtr<NodeInfo> register_node_info = MakeShared<NodeInfo>(register_node_role,
+        std::shared_ptr<NodeInfo> register_node_info = std::make_shared<NodeInfo>(register_node_role,
                                                                       NodeStatus::kAlive,
                                                                       request.node_name,
                                                                       request.node_ip,
@@ -66,7 +66,7 @@ void PeerServerThriftService::Register(infinity_peer_server::RegisterResponse &r
         Status status = InfinityContext::instance().cluster_manager()->AddNodeInfo(register_node_info);
         if (status.ok()) {
             LOG_INFO(fmt::format("Node: {} registered as {}.", request.node_name, infinity_peer_server::to_string(request.node_type)));
-            SharedPtr<NodeInfo> leader_node = InfinityContext::instance().cluster_manager()->ThisNode();
+            std::shared_ptr<NodeInfo> leader_node = InfinityContext::instance().cluster_manager()->ThisNode();
             response.leader_name = leader_node->node_name();
             response.leader_term = leader_node->leader_term();
             response.heart_beat_interval = leader_node->heartbeat_interval();
@@ -125,7 +125,7 @@ void PeerServerThriftService::HeartBeat(infinity_peer_server::HeartBeatResponse 
 
         auto now = std::chrono::system_clock::now();
         auto time_since_epoch = now.time_since_epoch();
-        SharedPtr<NodeInfo> register_node_info = MakeShared<NodeInfo>(non_leader_node_role,
+        std::shared_ptr<NodeInfo> register_node_info = std::make_shared<NodeInfo>(non_leader_node_role,
                                                                       NodeStatus::kAlive,
                                                                       request.node_name,
                                                                       request.node_ip,

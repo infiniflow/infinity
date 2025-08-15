@@ -12,12 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:logical_create_collection.impl;
 
 import :logical_create_collection;
-import :stl;
 import :column_binding;
 import :base_expression;
 
@@ -29,30 +26,30 @@ import data_type;
 
 namespace infinity {
 
-String LogicalCreateCollection::ToString(i64 &space) const {
+std::string LogicalCreateCollection::ToString(i64 &space) const {
     std::stringstream ss;
-    String arrow_str;
+    std::string arrow_str;
     if (space > 3) {
         space -= 4;
         arrow_str = "->  ";
     }
-    ss << String(space, ' ') << arrow_str << "Create Collection: " << *schema_name_ << "." << *collection_name_;
+    ss << std::string(space, ' ') << arrow_str << "Create Collection: " << *schema_name_ << "." << *collection_name_;
     space += arrow_str.size();
 
     return ss.str();
 }
 
-Vector<ColumnBinding> LogicalCreateCollection::GetColumnBindings() const { return {}; }
+std::vector<ColumnBinding> LogicalCreateCollection::GetColumnBindings() const { return {}; }
 
-SharedPtr<Vector<String>> LogicalCreateCollection::GetOutputNames() const {
-    SharedPtr<Vector<String>> result = MakeShared<Vector<String>>();
+std::shared_ptr<std::vector<std::string>> LogicalCreateCollection::GetOutputNames() const {
+    std::shared_ptr<std::vector<std::string>> result = std::make_shared<std::vector<std::string>>();
     result->emplace_back("OK");
     return result;
 }
 
-SharedPtr<Vector<SharedPtr<DataType>>> LogicalCreateCollection::GetOutputTypes() const {
-    SharedPtr<Vector<SharedPtr<DataType>>> result_type = MakeShared<Vector<SharedPtr<DataType>>>();
-    result_type->emplace_back(MakeShared<DataType>(LogicalType::kInteger));
+std::shared_ptr<std::vector<std::shared_ptr<DataType>>> LogicalCreateCollection::GetOutputTypes() const {
+    std::shared_ptr<std::vector<std::shared_ptr<DataType>>> result_type = std::make_shared<std::vector<std::shared_ptr<DataType>>>();
+    result_type->emplace_back(std::make_shared<DataType>(LogicalType::kInteger));
     return result_type;
 }
 

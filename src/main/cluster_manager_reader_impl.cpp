@@ -28,7 +28,7 @@ import admin_statement;
 
 namespace infinity {
 
-Status ClusterManager::InitAsFollower(const String &node_name, const String &leader_ip, i64 leader_port) {
+Status ClusterManager::InitAsFollower(const std::string &node_name, const std::string &leader_ip, i64 leader_port) {
 
     Config *config_ptr = InfinityContext::instance().config();
     auto now = std::chrono::system_clock::now();
@@ -39,14 +39,14 @@ Status ClusterManager::InitAsFollower(const String &node_name, const String &lea
         return Status::ErrorInit("Init node as follower error: already initialized.");
     }
 
-    this_node_ = MakeShared<NodeInfo>(NodeRole::kFollower,
+    this_node_ = std::make_shared<NodeInfo>(NodeRole::kFollower,
                                       NodeStatus::kAlive,
                                       node_name,
                                       config_ptr->PeerServerIP(),
                                       config_ptr->PeerServerPort(),
                                       std::chrono::duration_cast<std::chrono::seconds>(time_since_epoch).count());
 
-    leader_node_ = MakeShared<NodeInfo>(NodeRole::kLeader, leader_ip, leader_port);
+    leader_node_ = std::make_shared<NodeInfo>(NodeRole::kLeader, leader_ip, leader_port);
     Status client_status = Status::OK();
     std::tie(client_to_leader_, client_status) = ClusterManager::ConnectToServerNoLock(node_name, leader_ip, leader_port);
     if (!client_status.ok()) {
@@ -58,7 +58,7 @@ Status ClusterManager::InitAsFollower(const String &node_name, const String &lea
     return Status::OK();
 }
 
-Status ClusterManager::InitAsLearner(const String &node_name, const String &leader_ip, i64 leader_port) {
+Status ClusterManager::InitAsLearner(const std::string &node_name, const std::string &leader_ip, i64 leader_port) {
 
     Config *config_ptr = InfinityContext::instance().config();
     auto now = std::chrono::system_clock::now();
@@ -69,14 +69,14 @@ Status ClusterManager::InitAsLearner(const String &node_name, const String &lead
         return Status::ErrorInit("Init node as learner error: already initialized.");
     }
 
-    this_node_ = MakeShared<NodeInfo>(NodeRole::kLearner,
+    this_node_ = std::make_shared<NodeInfo>(NodeRole::kLearner,
                                       NodeStatus::kAlive,
                                       node_name,
                                       config_ptr->PeerServerIP(),
                                       config_ptr->PeerServerPort(),
                                       std::chrono::duration_cast<std::chrono::seconds>(time_since_epoch).count());
 
-    leader_node_ = MakeShared<NodeInfo>(NodeRole::kLeader, leader_ip, leader_port);
+    leader_node_ = std::make_shared<NodeInfo>(NodeRole::kLeader, leader_ip, leader_port);
 
     Status client_status = Status::OK();
     std::tie(client_to_leader_, client_status) = ClusterManager::ConnectToServerNoLock(node_name, leader_ip, leader_port);
@@ -98,21 +98,21 @@ Status ClusterManager::RegisterToLeader() {
     }
 
     this->hb_running_ = true;
-    hb_periodic_thread_ = MakeShared<Thread>([this] { this->HeartBeatToLeaderThread(); });
+    hb_periodic_thread_ = std::make_shared<std::thread>([this] { this->HeartBeatToLeaderThread(); });
     return status;
 }
 
 Status ClusterManager::RegisterToLeaderNoLock() {
     // Register to leader, used by follower and learner
     Storage *storage_ptr = InfinityContext::instance().storage();
-    SharedPtr<RegisterPeerTask> register_peer_task = nullptr;
+    std::shared_ptr<RegisterPeerTask> register_peer_task = nullptr;
     if (storage_ptr->reader_init_phase() == ReaderInitPhase::kPhase2) {
         register_peer_task =
-            MakeShared<RegisterPeerTask>(this_node_->node_name(), this_node_->node_role(), this_node_->node_ip(), this_node_->node_port(), 0);
+            std::make_shared<RegisterPeerTask>(this_node_->node_name(), this_node_->node_role(), this_node_->node_ip(), this_node_->node_port(), 0);
         //                                                          storage_ptr->txn_manager()->CurrentTS());
     } else {
         register_peer_task =
-            MakeShared<RegisterPeerTask>(this_node_->node_name(), this_node_->node_role(), this_node_->node_ip(), this_node_->node_port(), 0);
+            std::make_shared<RegisterPeerTask>(this_node_->node_name(), this_node_->node_role(), this_node_->node_ip(), this_node_->node_port(), 0);
     }
 
     client_to_leader_->Send(register_peer_task);
@@ -121,7 +121,7 @@ Status ClusterManager::RegisterToLeaderNoLock() {
     Status status = Status::OK();
     if (register_peer_task->error_code_ != 0) {
         status.code_ = static_cast<ErrorCode>(register_peer_task->error_code_);
-        status.msg_ = MakeUnique<String>(fmt::format("From leader: {}", register_peer_task->error_message_));
+        status.msg_ = std::make_unique<std::string>(fmt::format("From leader: {}", register_peer_task->error_message_));
         return status;
     }
     auto now = std::chrono::system_clock::now();
@@ -145,13 +145,13 @@ Status ClusterManager::UnregisterToLeaderNoLock() {
     if (current_node_role_ == NodeRole::kFollower or current_node_role_ == NodeRole::kLearner) {
         if (leader_node_->node_status() == NodeStatus::kAlive) {
             // Leader is alive, need to unregister
-            SharedPtr<UnregisterPeerTask> unregister_task = MakeShared<UnregisterPeerTask>(this_node_->node_name());
+            std::shared_ptr<UnregisterPeerTask> unregister_task = std::make_shared<UnregisterPeerTask>(this_node_->node_name());
             client_to_leader_->Send(unregister_task);
             unregister_task->Wait();
             if (unregister_task->error_code_ != 0) {
                 LOG_ERROR(fmt::format("Fail to unregister from leader: {}", unregister_task->error_message_));
                 status.code_ = static_cast<ErrorCode>(unregister_task->error_code_);
-                status.msg_ = MakeUnique<String>(unregister_task->error_message_);
+                status.msg_ = std::make_unique<std::string>(unregister_task->error_message_);
             }
         }
     }
@@ -182,18 +182,18 @@ void ClusterManager::HeartBeatToLeaderThread() {
         // Update latest update time
         auto hb_now = std::chrono::system_clock::now();
         auto hb_time_since_epoch = hb_now.time_since_epoch();
-        SharedPtr<HeartBeatPeerTask> hb_task = nullptr;
+        std::shared_ptr<HeartBeatPeerTask> hb_task = nullptr;
         {
             std::unique_lock<std::mutex> cluster_lock(cluster_mutex_);
             this_node_->set_update_ts(std::chrono::duration_cast<std::chrono::seconds>(hb_time_since_epoch).count());
 
-            String this_node_name = this_node_->node_name();
+            std::string this_node_name = this_node_->node_name();
             NodeRole this_node_role = this_node_->node_role();
-            String this_node_ip = this_node_->node_ip();
+            std::string this_node_ip = this_node_->node_ip();
             i64 this_node_port = this_node_->node_port();
 
             // Send heartbeat
-            hb_task = MakeShared<HeartBeatPeerTask>(this_node_name,
+            hb_task = std::make_shared<HeartBeatPeerTask>(this_node_name,
                                                     this_node_role,
                                                     this_node_ip,
                                                     this_node_port,
@@ -245,9 +245,9 @@ void ClusterManager::HeartBeatToLeaderThread() {
     return;
 }
 
-Status ClusterManager::UpdateNodeInfoNoLock(const Vector<SharedPtr<NodeInfo>> &info_of_nodes) {
+Status ClusterManager::UpdateNodeInfoNoLock(const std::vector<std::shared_ptr<NodeInfo>> &info_of_nodes) {
     // Only follower and learner will use this function.
-    HashMap<String, bool> exist_node_name_map;
+    std::unordered_map<std::string, bool> exist_node_name_map;
     exist_node_name_map.reserve(other_node_map_.size());
     for (const auto &node_pair : other_node_map_) {
         exist_node_name_map.emplace(node_pair.first, false);
@@ -256,7 +256,7 @@ Status ClusterManager::UpdateNodeInfoNoLock(const Vector<SharedPtr<NodeInfo>> &i
     auto now = std::chrono::system_clock::now();
     auto time_since_epoch = now.time_since_epoch();
 
-    for (const SharedPtr<NodeInfo> &node_info : info_of_nodes) {
+    for (const std::shared_ptr<NodeInfo> &node_info : info_of_nodes) {
         auto iter = other_node_map_.find(node_info->node_name());
         if (iter == other_node_map_.end()) {
             node_info->set_update_ts(std::chrono::duration_cast<std::chrono::seconds>(time_since_epoch).count());
@@ -282,7 +282,7 @@ Status ClusterManager::UpdateNodeInfoNoLock(const Vector<SharedPtr<NodeInfo>> &i
     return Status::OK();
 }
 
-Status ClusterManager::ApplySyncedLogNolock(const Vector<String> &synced_logs) {
+Status ClusterManager::ApplySyncedLogNolock(const std::vector<std::string> &synced_logs) {
     //    Storage *storage_ptr = InfinityContext::instance().storage();
     //    WalManager *wal_manager = storage_ptr->wal_manager();
     //    TransactionID last_txn_id = 0;
@@ -290,7 +290,7 @@ Status ClusterManager::ApplySyncedLogNolock(const Vector<String> &synced_logs) {
     //    for (auto &log_str : synced_logs) {
     //        const i32 entry_size = log_str.size();
     //        const char *ptr = log_str.data();
-    //        SharedPtr<WalEntry> entry = WalEntry::ReadAdv(ptr, entry_size);
+    //        std::shared_ptr<WalEntry> entry = WalEntry::ReadAdv(ptr, entry_size);
     //        LOG_DEBUG(fmt::format("WAL Entry: {}", entry->ToString()));
     //        last_txn_id = entry->txn_id_;
     //        last_commit_ts = entry->commit_ts_;
@@ -305,7 +305,7 @@ Status ClusterManager::ApplySyncedLogNolock(const Vector<String> &synced_logs) {
     return Status::OK();
 }
 
-Status ClusterManager::ContinueStartup(const Vector<String> &synced_logs) {
+Status ClusterManager::ContinueStartup(const std::vector<std::string> &synced_logs) {
     //    Storage *storage_ptr = InfinityContext::instance().storage();
     //    WalManager *wal_manager = storage_ptr->wal_manager();
     //    bool is_checkpoint = true;
@@ -313,7 +313,7 @@ Status ClusterManager::ContinueStartup(const Vector<String> &synced_logs) {
     //    for (auto &log_str : synced_logs) {
     //        const i32 entry_size = log_str.size();
     //        const char *ptr = log_str.data();
-    //        SharedPtr<WalEntry> entry = WalEntry::ReadAdv(ptr, entry_size);
+    //        std::shared_ptr<WalEntry> entry = WalEntry::ReadAdv(ptr, entry_size);
     //        for (const auto &cmd : entry->cmds_) {
     //            if (is_checkpoint) {
     //                if (cmd->GetType() != WalCommandType::CHECKPOINT) {

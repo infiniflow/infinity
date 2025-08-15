@@ -36,7 +36,7 @@ import global_resource_usage;
 
 namespace infinity {
 
-BufferObj::BufferObj(BufferManager *buffer_mgr, bool is_ephemeral, UniquePtr<FileWorker> file_worker, u32 id)
+BufferObj::BufferObj(BufferManager *buffer_mgr, bool is_ephemeral, std::unique_ptr<FileWorker> file_worker, u32 id)
     : buffer_mgr_(buffer_mgr), file_worker_(std::move(file_worker)), id_(id) {
     if (is_ephemeral) {
         type_ = BufferType::kEphemeral;
@@ -56,7 +56,7 @@ BufferObj::~BufferObj() {
 #endif
 }
 
-void BufferObj::UpdateFileWorkerInfo(UniquePtr<FileWorker> new_file_worker) {
+void BufferObj::UpdateFileWorkerInfo(std::unique_ptr<FileWorker> new_file_worker) {
     switch (file_worker_->Type()) {
         case FileWorkerType::kVarFile: {
             assert(new_file_worker->Type() == FileWorkerType::kVarFile);
@@ -114,7 +114,7 @@ BufferHandle BufferObj::Load() {
             bool from_spill = type_ != BufferType::kPersistent;
             file_worker_->ReadFromFile(from_spill);
 
-            SizeT buffer_size = GetBufferSize();
+            size_t buffer_size = GetBufferSize();
             LOG_TRACE(fmt::format("Request memory {}", buffer_size));
             bool free_success = buffer_mgr_->RequestSpace(buffer_size);
             if (!free_success) {
@@ -125,7 +125,7 @@ BufferHandle BufferObj::Load() {
         case BufferStatus::kNew: {
             buffer_mgr_->AddCacheMissCount();
 
-            SizeT buffer_size = GetBufferSize();
+            size_t buffer_size = GetBufferSize();
             LOG_TRACE(fmt::format("Request memory {}", buffer_size));
             bool free_success = buffer_mgr_->RequestSpace(buffer_size);
             if (!free_success) {
@@ -204,7 +204,7 @@ bool BufferObj::Save(const FileWorkerSaveCtx &ctx) {
                 break;
             }
             default: {
-                UniquePtr<String> err_msg = MakeUnique<String>(fmt::format("Invalid buffer status: {}.", BufferStatusToString(status_)));
+                std::unique_ptr<std::string> err_msg = std::make_unique<std::string>(fmt::format("Invalid buffer status: {}.", BufferStatusToString(status_)));
                 UnrecoverableError(*err_msg);
             }
         }
@@ -361,7 +361,7 @@ void BufferObj::UnloadInner() {
     }
 }
 
-bool BufferObj::AddBufferSize(SizeT add_size) {
+bool BufferObj::AddBufferSize(size_t add_size) {
     if (file_worker_->Type() != FileWorkerType::kVarFile) {
         UnrecoverableError("Invalid file worker type");
     }
@@ -436,7 +436,7 @@ void BufferObj::SetData(void *data) {
     type_ = BufferType::kEphemeral;
 }
 
-void BufferObj::SetDataSize(SizeT size) {
+void BufferObj::SetDataSize(size_t size) {
     std::unique_lock<std::mutex> locker(w_locker_);
     file_worker_->SetDataSize(size);
 }

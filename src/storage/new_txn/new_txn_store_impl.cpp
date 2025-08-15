@@ -41,11 +41,11 @@ NewTxnTableStore1::NewTxnTableStore1() = default;
 
 NewTxnTableStore1::~NewTxnTableStore1() = default;
 
-Status NewTxnTableStore1::Delete(const Vector<RowID> &row_ids) {
+Status NewTxnTableStore1::Delete(const std::vector<RowID> &row_ids) {
     if (!delete_state_) {
-        delete_state_ = MakeUnique<DeleteState>();
+        delete_state_ = std::make_unique<DeleteState>();
     }
-    HashMap<SegmentID, HashMap<BlockID, Vector<BlockOffset>>> &row_hash_table = delete_state_->rows_;
+    std::unordered_map<SegmentID, std::unordered_map<BlockID, std::vector<BlockOffset>>> &row_hash_table = delete_state_->rows_;
     for (auto row_id : row_ids) {
         BlockID block_id = row_id.segment_offset_ / DEFAULT_BLOCK_CAPACITY;
         BlockOffset block_offset = row_id.segment_offset_ % DEFAULT_BLOCK_CAPACITY;
@@ -60,8 +60,8 @@ Status NewTxnTableStore1::Delete(const Vector<RowID> &row_ids) {
     return Status::OK();
 }
 
-void NewTxnTableStore1::GetAccessState(const Vector<RowID> &row_ids, AccessState &access_state) {
-    HashMap<SegmentID, HashMap<BlockID, Vector<BlockOffset>>> &row_hash_table = access_state.rows_;
+void NewTxnTableStore1::GetAccessState(const std::vector<RowID> &row_ids, AccessState &access_state) {
+    std::unordered_map<SegmentID, std::unordered_map<BlockID, std::vector<BlockOffset>>> &row_hash_table = access_state.rows_;
     for (auto row_id : row_ids) {
         BlockID block_id = row_id.segment_offset_ / DEFAULT_BLOCK_CAPACITY;
         BlockOffset block_offset = row_id.segment_offset_ % DEFAULT_BLOCK_CAPACITY;
@@ -77,17 +77,17 @@ void NewTxnTableStore1::GetAccessState(const Vector<RowID> &row_ids, AccessState
 DeleteState &NewTxnTableStore1::undo_delete_state() {
     if (!undo_delete_state_) {
 
-        undo_delete_state_ = MakeUnique<DeleteState>();
+        undo_delete_state_ = std::make_unique<DeleteState>();
     }
     return *undo_delete_state_;
 }
 
 NewTxnStore::NewTxnStore() = default;
 
-NewTxnTableStore1 *NewTxnStore::GetNewTxnTableStore1(const String &db_id_str, const String &table_id_str) {
+NewTxnTableStore1 *NewTxnStore::GetNewTxnTableStore1(const std::string &db_id_str, const std::string &table_id_str) {
     auto iter = txn_tables_store1_.find(table_id_str);
     if (iter == txn_tables_store1_.end()) {
-        iter = txn_tables_store1_.emplace(table_id_str, MakeUnique<NewTxnTableStore1>()).first;
+        iter = txn_tables_store1_.emplace(table_id_str, std::make_unique<NewTxnTableStore1>()).first;
     }
     return iter->second.get();
 }

@@ -12,26 +12,25 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:logger;
 
-import :stl;
 import :status;
 
+import std;
+import std.compat;
 import third_party;
 
 namespace infinity {
 
-export extern SharedPtr<spdlog::logger> infinity_logger;
+export extern std::shared_ptr<spdlog::logger> infinity_logger;
 
 class Config;
 
 export struct LoggerConfig {
     bool log_to_stdout_ = true;
-    String log_file_path_ = "tmp.log";
-    SizeT log_file_max_size_ = 1024 * 1024 * 10;
-    SizeT log_file_rotate_count_ = 5;
+    std::string log_file_path_ = "tmp.log";
+    size_t log_file_max_size_ = 1024 * 1024 * 10;
+    size_t log_file_rotate_count_ = 5;
     LogLevel log_level_ = LogLevel::kInfo;
 };
 
@@ -53,7 +52,7 @@ export inline bool SHOULD_LOG_DEBUG() { return IS_LOGGER_INITIALIZED() && infini
 
 export inline bool SHOULD_LOG_INFO() { return IS_LOGGER_INITIALIZED() && infinity_logger->should_log(spdlog::level::level_enum::info); }
 
-export inline void LOG_TRACE(const String &msg) {
+export inline void LOG_TRACE(const std::string &msg) {
     if (IS_LOGGER_INITIALIZED()) {
         infinity_logger->trace(msg);
     } else {
@@ -61,7 +60,7 @@ export inline void LOG_TRACE(const String &msg) {
     }
 }
 
-export inline void LOG_DEBUG(const String &msg) {
+export inline void LOG_DEBUG(const std::string &msg) {
     if (IS_LOGGER_INITIALIZED()) {
         infinity_logger->debug(msg);
     } else {
@@ -69,7 +68,7 @@ export inline void LOG_DEBUG(const String &msg) {
     }
 }
 
-export inline void LOG_INFO(const String &msg) {
+export inline void LOG_INFO(const std::string &msg) {
     if (IS_LOGGER_INITIALIZED()) {
         infinity_logger->info(msg);
     } else {
@@ -77,7 +76,7 @@ export inline void LOG_INFO(const String &msg) {
     }
 }
 
-export inline void LOG_WARN(const String &msg) {
+export inline void LOG_WARN(const std::string &msg) {
     if (IS_LOGGER_INITIALIZED()) {
         infinity_logger->warn(msg);
     } else {
@@ -85,7 +84,7 @@ export inline void LOG_WARN(const String &msg) {
     }
 }
 
-export inline void LOG_ERROR(const String &msg) {
+export inline void LOG_ERROR(const std::string &msg) {
     if (IS_LOGGER_INITIALIZED()) {
         infinity_logger->error(msg);
     } else {
@@ -93,7 +92,7 @@ export inline void LOG_ERROR(const String &msg) {
     }
 }
 
-export inline void LOG_CRITICAL(const String &msg) {
+export inline void LOG_CRITICAL(const std::string &msg) {
     if (IS_LOGGER_INITIALIZED()) {
         infinity_logger->critical(msg);
     } else {

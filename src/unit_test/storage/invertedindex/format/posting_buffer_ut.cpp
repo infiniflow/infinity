@@ -24,8 +24,8 @@ namespace infinity {
 template <typename T>
 class SimpleFormat : public PostingFields {
 public:
-    SimpleFormat(SizeT count) {
-        for (SizeT i = 0; i < count; ++i) {
+    SimpleFormat(size_t count) {
+        for (size_t i = 0; i < count; ++i) {
             PostingField *value = new TypedPostingField<T>();
             value->location_ = i;
             value->offset_ = i * sizeof(T);
@@ -39,14 +39,14 @@ class PostingBufferTest : public BaseTest {
 
 protected:
     void
-    CheckPostingBuffer(u32 *expect_posting_buffer, SizeT row_num, SizeT col_num, PostingBuffer *posting_buffer = nullptr, u8 *capacity = nullptr);
+    CheckPostingBuffer(u32 *expect_posting_buffer, size_t row_num, size_t col_num, PostingBuffer *posting_buffer = nullptr, u8 *capacity = nullptr);
 
-    void CheckEqual(u32 *expect_posting_buffer, SizeT row_num, SizeT col_num, PostingBuffer *posting_buffer);
+    void CheckEqual(u32 *expect_posting_buffer, size_t row_num, size_t col_num, PostingBuffer *posting_buffer);
 };
 
-void PostingBufferTest::CheckPostingBuffer(u32 *expect_posting_buffer, SizeT row_num, SizeT col_num, PostingBuffer *posting_buffer, u8 *capacity) {
+void PostingBufferTest::CheckPostingBuffer(u32 *expect_posting_buffer, size_t row_num, size_t col_num, PostingBuffer *posting_buffer, u8 *capacity) {
     using namespace infinity;
-    UniquePtr<PostingBuffer> posting_buffer_ptr;
+    std::unique_ptr<PostingBuffer> posting_buffer_ptr;
     SimpleFormat<u32> posting_fields(row_num);
     if (!posting_buffer) {
         posting_buffer = new PostingBuffer;
@@ -58,8 +58,8 @@ void PostingBufferTest::CheckPostingBuffer(u32 *expect_posting_buffer, SizeT row
     ASSERT_EQ((u8)0, posting_buffer->Size());
     ASSERT_EQ(row_num, posting_buffer->GetRowCount());
 
-    for (SizeT c = 0; c < col_num; ++c) {
-        for (SizeT r = 0; r < row_num; ++r) {
+    for (size_t c = 0; c < col_num; ++c) {
+        for (size_t r = 0; r < row_num; ++r) {
             ASSERT_TRUE(posting_buffer->PushBack(r, expect_posting_buffer[c + r * col_num]));
         }
         posting_buffer->EndPushBack();
@@ -71,13 +71,13 @@ void PostingBufferTest::CheckPostingBuffer(u32 *expect_posting_buffer, SizeT row
     CheckEqual(expect_posting_buffer, row_num, col_num, posting_buffer);
 }
 
-void PostingBufferTest::CheckEqual(u32 *expect_posting_buffer, SizeT row_num, SizeT col_num, PostingBuffer *posting_buffer) {
+void PostingBufferTest::CheckEqual(u32 *expect_posting_buffer, size_t row_num, size_t col_num, PostingBuffer *posting_buffer) {
     using namespace infinity;
-    ASSERT_EQ(row_num, (SizeT)posting_buffer->GetRowCount());
-    ASSERT_EQ(col_num, (SizeT)posting_buffer->Size());
-    for (SizeT r = 0; r < row_num; ++r) {
+    ASSERT_EQ(row_num, (size_t)posting_buffer->GetRowCount());
+    ASSERT_EQ(col_num, (size_t)posting_buffer->Size());
+    for (size_t r = 0; r < row_num; ++r) {
         u32 *row = posting_buffer->GetRowTyped<u32>(r);
-        for (SizeT c = 0; c < col_num; ++c) {
+        for (size_t c = 0; c < col_num; ++c) {
             ASSERT_EQ(expect_posting_buffer[c + r * col_num], row[c]);
             u32 *row = posting_buffer->GetRowTyped<u32>(r);
             ASSERT_EQ(expect_posting_buffer[c + r * col_num], row[c]);
@@ -113,8 +113,8 @@ TEST_F(PostingBufferTest, test3) {
     posting_buffer.Init(&posting_fields);
 
     u32 expect_posting_buffer[128 * 8];
-    for (SizeT c = 0; c < 128; ++c) {
-        for (SizeT r = 0; r < 8; ++r) {
+    for (size_t c = 0; c < 128; ++c) {
+        for (size_t r = 0; r < 8; ++r) {
             expect_posting_buffer[c + r * 128] = random();
         }
     }
@@ -144,7 +144,7 @@ TEST_F(PostingBufferTest, test4) {
         SimpleFormat<u32> posting_fields(1);
         posting_buffer.Init(&posting_fields);
 
-        for (SizeT col = 0; col < 128; ++col) {
+        for (size_t col = 0; col < 128; ++col) {
             ASSERT_TRUE(posting_buffer.PushBack<u32>(0, col));
             posting_buffer.EndPushBack();
         }
@@ -217,8 +217,8 @@ TEST_F(PostingBufferTest, test8) {
     macro(uint16_t);
 
     PostingFields posting_fields;
-    SizeT offset = 0;
-    SizeT pos = 0;
+    size_t offset = 0;
+    size_t pos = 0;
 
 #define ADD_VALUE_HELPER_FOR_TEST(type)                                                                                                              \
     {                                                                                                                                                \
@@ -237,7 +237,7 @@ TEST_F(PostingBufferTest, test8) {
     ASSERT_EQ((u8)0, posting_buffer.Capacity());
     ASSERT_EQ((u8)0, posting_buffer.Size());
 
-    for (SizeT i = 0; i < 128; ++i) {
+    for (size_t i = 0; i < 128; ++i) {
         pos = 0;
 #define TEST_PUSH_BACK_HELPER(type) ASSERT_TRUE(posting_buffer.PushBack<type>(pos++, i));
 
@@ -248,7 +248,7 @@ TEST_F(PostingBufferTest, test8) {
     ASSERT_EQ((u8)128, posting_buffer.Capacity());
     ASSERT_EQ((u8)128, posting_buffer.Size());
 
-    for (SizeT i = 0; i < 128; ++i) {
+    for (size_t i = 0; i < 128; ++i) {
         pos = 0;
 #define ASSERT_GET_VALUE_HELPER(type) ASSERT_EQ((type)(i), posting_buffer.GetRowTyped<type>(pos++)[i]);
 

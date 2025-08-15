@@ -39,7 +39,7 @@ public:
     }
 
 protected:
-    void CheckDecode(u32 doc_count, u32 flush_count, SharedPtr<PostingByteSliceReader> &reader) {
+    void CheckDecode(u32 doc_count, u32 flush_count, std::shared_ptr<PostingByteSliceReader> &reader) {
         Vector<u32> doc_id(doc_count);
         Vector<uint16_t> payload(doc_count);
 
@@ -51,20 +51,20 @@ protected:
         Vector<u32> doc_id_buffer(doc_count * 2);
         Vector<uint16_t> doc_payload_buffer(doc_count * 2);
 
-        SizeT decode_len;
+        size_t decode_len;
         u32 i = 0;
         for (; i < doc_count / flush_count; ++i) {
             ASSERT_TRUE(reader->Decode(doc_id_buffer.data() + i * flush_count, flush_count, decode_len));
-            ASSERT_EQ(decode_len, (SizeT)flush_count);
+            ASSERT_EQ(decode_len, (size_t)flush_count);
             ASSERT_TRUE(reader->Decode(doc_payload_buffer.data() + i * flush_count, flush_count, decode_len));
-            ASSERT_EQ(decode_len, (SizeT)flush_count);
+            ASSERT_EQ(decode_len, (size_t)flush_count);
         }
 
         if (doc_count % flush_count > 0) {
             ASSERT_TRUE(reader->Decode(doc_id_buffer.data() + i * flush_count, flush_count, decode_len));
-            ASSERT_EQ(decode_len, (SizeT)doc_count % flush_count);
+            ASSERT_EQ(decode_len, (size_t)doc_count % flush_count);
             ASSERT_TRUE(reader->Decode(doc_payload_buffer.data() + i * flush_count, flush_count, decode_len));
-            ASSERT_EQ(decode_len, (SizeT)doc_count % flush_count);
+            ASSERT_EQ(decode_len, (size_t)doc_count % flush_count);
         }
         ASSERT_TRUE(!reader->Decode(doc_id_buffer.data() + i * flush_count, flush_count, decode_len));
         ASSERT_TRUE(!reader->Decode(doc_payload_buffer.data() + i * flush_count, flush_count, decode_len));
@@ -75,7 +75,7 @@ protected:
         }
     }
 
-    SharedPtr<PostingByteSliceReader> CreateReader(u32 doc_id[], uint16_t doc_payload[], u32 doc_count, u32 flush_count) {
+    std::shared_ptr<PostingByteSliceReader> CreateReader(u32 doc_id[], uint16_t doc_payload[], u32 doc_count, u32 flush_count) {
         posting_byte_slice_.reset(new PostingByteSlice());
         posting_byte_slice_->Init(doc_list_format_.get());
 
@@ -88,20 +88,20 @@ protected:
                 posting_byte_slice_->Flush();
             }
         }
-        SharedPtr<PostingByteSliceReader> reader(new PostingByteSliceReader);
+        std::shared_ptr<PostingByteSliceReader> reader(new PostingByteSliceReader);
         reader->Open(posting_byte_slice_.get());
         return reader;
     }
 
     void TestCheck(const u32 doc_count, u32 flush_count) {
-        SharedPtr<PostingByteSliceReader> reader = CreateReader(doc_count, flush_count);
+        std::shared_ptr<PostingByteSliceReader> reader = CreateReader(doc_count, flush_count);
         CheckDecode(doc_count, flush_count, reader);
 
         reader->Open(posting_byte_slice_.get());
         CheckDecode(doc_count, flush_count, reader);
     }
 
-    SharedPtr<PostingByteSliceReader> CreateReader(u32 doc_count, u32 flush_count) {
+    std::shared_ptr<PostingByteSliceReader> CreateReader(u32 doc_count, u32 flush_count) {
         Vector<u32> doc_id(doc_count);
         Vector<uint16_t> payload(doc_count);
 
@@ -113,8 +113,8 @@ protected:
         return CreateReader(doc_id.data(), payload.data(), doc_count, flush_count);
     }
 
-    SharedPtr<PostingByteSlice> posting_byte_slice_;
-    SharedPtr<DocListFormat> doc_list_format_;
+    std::shared_ptr<PostingByteSlice> posting_byte_slice_;
+    std::shared_ptr<DocListFormat> doc_list_format_;
 };
 
 TEST_F(PostingByteSliceReaderTest, test1) {
@@ -130,7 +130,7 @@ TEST_F(PostingByteSliceReaderTest, test1) {
         reader.Open(&posting_buffer);
 
         u32 doc_id_buffer[MAX_DOC_PER_RECORD];
-        SizeT decode_len;
+        size_t decode_len;
         ASSERT_TRUE(!reader.Decode(doc_id_buffer, MAX_DOC_PER_RECORD, decode_len));
     }
     {
@@ -145,7 +145,7 @@ TEST_F(PostingByteSliceReaderTest, test1) {
         reader.Open(&posting_buffer);
 
         u32 doc_id_buffer[MAX_DOC_PER_RECORD];
-        SizeT decode_len;
+        size_t decode_len;
         ASSERT_TRUE(!reader.Decode(doc_id_buffer, 0, decode_len));
     }
     {
@@ -162,7 +162,7 @@ TEST_F(PostingByteSliceReaderTest, test1) {
         reader.Open(&posting_buffer);
 
         u32 doc_id_buffer[MAX_DOC_PER_RECORD];
-        SizeT decode_len;
+        size_t decode_len;
         ASSERT_TRUE(!reader.Decode(doc_id_buffer, 0, decode_len));
     }
     {
@@ -182,7 +182,7 @@ TEST_F(PostingByteSliceReaderTest, test1) {
         reader.Open(&posting_buffer);
 
         u32 doc_id_buffer[MAX_DOC_PER_RECORD];
-        SizeT decode_len;
+        size_t decode_len;
         ASSERT_TRUE(!reader.Decode(doc_id_buffer, 0, decode_len));
     }
 }
@@ -190,12 +190,12 @@ TEST_F(PostingByteSliceReaderTest, test1) {
 TEST_F(PostingByteSliceReaderTest, test2) {
     using namespace infinity;
     u32 flush_size = 5;
-    SharedPtr<PostingByteSliceReader> reader = CreateReader(33, flush_size);
+    std::shared_ptr<PostingByteSliceReader> reader = CreateReader(33, flush_size);
 
     docid_t doc_id_buffer[MAX_DOC_PER_RECORD];
     docpayload_t doc_payload_buffer[MAX_DOC_PER_RECORD];
 
-    SizeT decode_len;
+    size_t decode_len;
     ASSERT_TRUE(reader->Decode(doc_id_buffer, MAX_DOC_PER_RECORD, decode_len));
     ASSERT_EQ(flush_size, decode_len);
     ASSERT_EQ((u32)4, doc_id_buffer[4]);

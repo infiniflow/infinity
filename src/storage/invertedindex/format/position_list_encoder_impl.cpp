@@ -26,7 +26,7 @@ PositionListEncoder::PositionListEncoder(const PostingFormatOption &format_optio
         is_own_format_ = true;
     }
     pos_list_buffer_.Init(pos_list_format_);
-    pos_skiplist_writer_ = MakeShared<SkipListWriter>();
+    pos_skiplist_writer_ = std::make_shared<SkipListWriter>();
     pos_skiplist_writer_->Init(pos_list_format_->GetPositionSkipListFormat());
 }
 
@@ -56,7 +56,7 @@ void PositionListEncoder::EndDocument() { last_pos_in_cur_doc_ = 0; }
 
 void PositionListEncoder::Flush() {
     FlushPositionBuffer();
-    SharedPtr<SkipListWriter> pos_skiplist_writer;
+    std::shared_ptr<SkipListWriter> pos_skiplist_writer;
     {
         std::shared_lock<std::shared_mutex> lock(rw_mutex_);
         pos_skiplist_writer = pos_skiplist_writer_;
@@ -66,9 +66,9 @@ void PositionListEncoder::Flush() {
     }
 }
 
-void PositionListEncoder::Dump(const SharedPtr<FileWriter> &file, bool spill) {
+void PositionListEncoder::Dump(const std::shared_ptr<FileWriter> &file, bool spill) {
     u32 total_pos_count;
-    SharedPtr<SkipListWriter> pos_skiplist_writer;
+    std::shared_ptr<SkipListWriter> pos_skiplist_writer;
     {
         std::shared_lock<std::shared_mutex> lock(rw_mutex_);
         total_pos_count = total_pos_count_;
@@ -94,7 +94,7 @@ void PositionListEncoder::Dump(const SharedPtr<FileWriter> &file, bool spill) {
     pos_list_buffer_.Dump(file, spill);
 }
 
-void PositionListEncoder::Load(const SharedPtr<FileReader> &file) {
+void PositionListEncoder::Load(const std::shared_ptr<FileReader> &file) {
     last_pos_in_cur_doc_ = file->ReadVInt();
     total_pos_count_ = file->ReadVInt();
     pos_skiplist_writer_->Load(file);
@@ -103,7 +103,7 @@ void PositionListEncoder::Load(const SharedPtr<FileReader> &file) {
 
 u32 PositionListEncoder::GetDumpLength() const {
     u32 pos_skiplist_size = 0;
-    SharedPtr<SkipListWriter> pos_skiplist_writer;
+    std::shared_ptr<SkipListWriter> pos_skiplist_writer;
     {
         std::shared_lock<std::shared_mutex> lock(rw_mutex_);
         pos_skiplist_writer = pos_skiplist_writer_;
@@ -116,17 +116,17 @@ u32 PositionListEncoder::GetDumpLength() const {
     return VByteCompressor::GetVInt32Length(pos_skiplist_size) + VByteCompressor::GetVInt32Length(pos_list_size) + pos_skiplist_size + pos_list_size;
 }
 
-SharedPtr<SkipListWriter> PositionListEncoder::GetPosSkipListWriter() {
+std::shared_ptr<SkipListWriter> PositionListEncoder::GetPosSkipListWriter() {
     std::unique_lock<std::shared_mutex> lock(rw_mutex_);
     if (!pos_skiplist_writer_.get()) {
-        pos_skiplist_writer_ = MakeShared<SkipListWriter>();
+        pos_skiplist_writer_ = std::make_shared<SkipListWriter>();
         pos_skiplist_writer_->Init(pos_list_format_->GetPositionSkipListFormat());
     }
     return pos_skiplist_writer_;
 }
 
 void PositionListEncoder::AddPosSkipListItem(u32 total_pos_count, u32 compressed_pos_size, bool need_flush) {
-    SharedPtr<SkipListWriter> pos_skiplist_writer = GetPosSkipListWriter();
+    std::shared_ptr<SkipListWriter> pos_skiplist_writer = GetPosSkipListWriter();
     pos_skiplist_writer->AddItem(total_pos_count, compressed_pos_size);
 }
 
@@ -148,7 +148,7 @@ void PositionListEncoder::FlushPositionBuffer() {
 InMemPositionListDecoder *PositionListEncoder::GetInMemPositionListDecoder() const {
     // doclist -> ttf -> pos skiplist -> poslist
     ttf_t ttf;
-    SharedPtr<SkipListWriter> pos_skiplist_writer;
+    std::shared_ptr<SkipListWriter> pos_skiplist_writer;
     {
         std::shared_lock<std::shared_mutex> lock(rw_mutex_);
         ttf = total_pos_count_;

@@ -12,13 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
-#include <chrono>
-
 export module infinity_core:config;
 
-import :stl;
 import :status;
 import :virtual_store;
 import :options;
@@ -36,14 +31,14 @@ export constexpr std::string_view log_level = "log_level";
 export struct DefaultConfig {
     LogLevel default_log_level_{LogLevel::kInfo};
     bool default_log_to_stdout_{false};
-    String default_log_dir_ = "/var/infinity/log";
-    String default_catalog_dir_ = "/var/infinity/catalog";
-    String default_snapshot_dir_ = "/var/infinity/snapshot";
-    String default_data_dir_ = "/var/infinity/data";
-    String default_wal_dir_ = "/var/infinity/wal";
-    String default_temp_dir_ = "/var/infinity/tmp";
-    String default_resource_dir_ = "/var/infinity/resource";
-    String default_persistence_dir_ = "/var/infinity/persistence";
+    std::string default_log_dir_ = "/var/infinity/log";
+    std::string default_catalog_dir_ = "/var/infinity/catalog";
+    std::string default_snapshot_dir_ = "/var/infinity/snapshot";
+    std::string default_data_dir_ = "/var/infinity/data";
+    std::string default_wal_dir_ = "/var/infinity/wal";
+    std::string default_temp_dir_ = "/var/infinity/tmp";
+    std::string default_resource_dir_ = "/var/infinity/resource";
+    std::string default_persistence_dir_ = "/var/infinity/persistence";
 };
 
 export struct Config {
@@ -51,14 +46,14 @@ public:
     Config();
     ~Config();
 
-    Status Init(const SharedPtr<String> &config_path, DefaultConfig *default_config);
+    Status Init(const std::shared_ptr<std::string> &config_path, DefaultConfig *default_config);
 
     void PrintAll();
 
     // General
-    String Version();
-    String ServerMode();
-    String TimeZone();
+    std::string Version();
+    std::string ServerMode();
+    std::string TimeZone();
     i64 TimeZoneBias();
 
     void SetCPULimit(i64 new_cpu_limit);
@@ -67,8 +62,8 @@ public:
     void SetRecordRunningQuery(bool flag);
 
     // Network
-    String ServerAddress();
-    String PeerServerIP();
+    std::string ServerAddress();
+    std::string PeerServerIP();
     i64 PeerServerPort();
     i64 PostgresPort();
     i64 HTTPPort();
@@ -83,9 +78,9 @@ public:
     i64 PeerSendTimeout();
 
     // Log
-    String LogFileName();
-    String LogDir();
-    String LogFilePath();
+    std::string LogFileName();
+    std::string LogDir();
+    std::string LogFilePath();
 
     void SetLogToStdout(bool log_to_stdout);
     bool LogToStdout();
@@ -98,9 +93,9 @@ public:
 
     // Storage
     bool ReplayWal();
-    String DataDir();
-    String CatalogDir();
-    String SnapshotDir();
+    std::string DataDir();
+    std::string CatalogDir();
+    std::string SnapshotDir();
 
     i64 CleanupInterval();
     void SetCleanupInterval(i64);
@@ -118,30 +113,30 @@ public:
     i64 BottomExecutorWorker();
 
     StorageType StorageType();
-    String ObjectStorageUrl();
-    String ObjectStorageBucket();
-    String ObjectStorageAccessKey();
-    String ObjectStorageSecretKey();
+    std::string ObjectStorageUrl();
+    std::string ObjectStorageBucket();
+    std::string ObjectStorageAccessKey();
+    std::string ObjectStorageSecretKey();
     bool ObjectStorageHttps();
 
     // Persistence
-    String PersistenceDir();
+    std::string PersistenceDir();
     i64 PersistenceObjectSizeLimit();
     bool UseVFS();
 
     // Buffer
     i64 BufferManagerSize();
-    SizeT LRUNum();
-    String TempDir();
+    size_t LRUNum();
+    std::string TempDir();
 
     i64 MemIndexMemoryQuota();
 
-    String ResultCache();
+    std::string ResultCache();
     i64 CacheResultNum();
-    void SetCacheResult(const String &mode);
+    void SetCacheResult(const std::string &mode);
 
     // WAL
-    String WALDir();
+    std::string WALDir();
 
     i64 WALCompactThreshold();
 
@@ -156,32 +151,32 @@ public:
     FlushOptionType FlushMethodAtCommit();
 
     // Resource
-    String ResourcePath();
+    std::string ResourcePath();
 
     // Date and Time
 
-    void SetTimeZone(const String &value);
+    void SetTimeZone(const std::string &value);
 
     void SetTimeZoneBias(i64);
 
 public:
     // Get config by name
-    Tuple<BaseOption *, Status> GetConfigByName(const String &name);
+    std::tuple<BaseOption *, Status> GetConfigByName(const std::string &name);
 
-    GlobalOptionIndex GetOptionIndex(const String &var_name) const { return global_options_.GetOptionIndex(var_name); }
+    GlobalOptionIndex GetOptionIndex(const std::string &var_name) const { return global_options_.GetOptionIndex(var_name); }
 
-    void SetOption(const String &var_name, const String &value);
+    void SetOption(const std::string &var_name, const std::string &value);
 
-    static void SetTimeZoneOuter(const String &value);
+    static void SetTimeZoneOuter(const std::string &value);
 
-    static void ParseTimeZoneStr(const String &time_zone_str, String &parsed_time_zone, i32 &parsed_time_zone_bias);
+    static void ParseTimeZoneStr(const std::string &time_zone_str, std::string &parsed_time_zone, i32 &parsed_time_zone_bias);
 
 private:
-    // static void ParseTimeZoneStr(const String &time_zone_str);
+    // static void ParseTimeZoneStr(const std::string &time_zone_str);
 
-    static Status ParseByteSize(const String &byte_size_str, i64 &byte_size);
+    static Status ParseByteSize(const std::string &byte_size_str, i64 &byte_size);
 
-    static Status ParseTimeInfo(const String &time_info, i64 &time_seconds);
+    static Status ParseTimeInfo(const std::string &time_info, i64 &time_seconds);
 
     static u64 GetAvailableMem();
 
@@ -189,7 +184,7 @@ private:
     mutable std::mutex mutex_;
     GlobalOptions global_options_;
     // record running query flag
-    Atomic<bool> record_running_query_{false};
+    std::atomic<bool> record_running_query_{false};
 
 public:
     hours hour_offset_{};

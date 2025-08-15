@@ -12,11 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:logical_show;
 
-import :stl;
 import :logical_node_type;
 import :column_binding;
 import :logical_node;
@@ -27,79 +24,79 @@ import show_statement;
 
 namespace infinity {
 
-export String ToString(ShowStmtType type);
+export std::string ToString(ShowStmtType type);
 
 export class LogicalShow : public LogicalNode {
 public:
     explicit LogicalShow(u64 node_id,
                          ShowStmtType type,
-                         String schema_name,
-                         Optional<String> object_name,
+                         std::string schema_name,
+                         std::optional<std::string> object_name,
                          u64 table_index,
-                         Optional<String> file_path = None,
-                         Optional<SegmentID> segment_id = None,
-                         Optional<BlockID> block_id = None,
-                         Optional<ChunkID> chunk_id = None,
-                         Optional<ColumnID> column_id = None,
-                         Optional<String> index_name = None,
-                         Optional<TransactionID> session_id = None,
-                         Optional<u64> txn_id = None,
-                         Optional<String> function_name = None)
+                         std::optional<std::string> file_path = std::nullopt,
+                         std::optional<SegmentID> segment_id = std::nullopt,
+                         std::optional<BlockID> block_id = std::nullopt,
+                         std::optional<ChunkID> chunk_id = std::nullopt,
+                         std::optional<ColumnID> column_id = std::nullopt,
+                         std::optional<std::string> index_name = std::nullopt,
+                         std::optional<TransactionID> session_id = std::nullopt,
+                         std::optional<u64> txn_id = std::nullopt,
+                         std::optional<std::string> function_name = std::nullopt)
         : LogicalNode(node_id, LogicalNodeType::kShow), show_type_(type), schema_name_(std::move(schema_name)), object_name_(std::move(object_name)),
           table_index_(table_index), file_path_(std::move(file_path)), segment_id_(segment_id), block_id_(block_id), chunk_id_(chunk_id),
           column_id_(column_id), index_name_(index_name), session_id_(session_id), txn_id_(txn_id), function_name_(function_name) {}
 
-    [[nodiscard]] Vector<ColumnBinding> GetColumnBindings() const final;
+    [[nodiscard]] std::vector<ColumnBinding> GetColumnBindings() const final;
 
-    [[nodiscard]] SharedPtr<Vector<String>> GetOutputNames() const final;
+    [[nodiscard]] std::shared_ptr<std::vector<std::string>> GetOutputNames() const final;
 
-    [[nodiscard]] SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const final;
+    [[nodiscard]] std::shared_ptr<std::vector<std::shared_ptr<DataType>>> GetOutputTypes() const final;
 
-    String ToString(i64 &space) const final;
+    std::string ToString(i64 &space) const final;
 
-    inline String name() final { return "LogicalShow"; }
+    inline std::string name() final { return "LogicalShow"; }
 
     [[nodiscard]] ShowStmtType show_type() const { return show_type_; }
 
     [[nodiscard]] inline u64 table_index() const { return table_index_; }
 
-    [[nodiscard]] inline const String &schema_name() const { return schema_name_; }
+    [[nodiscard]] inline const std::string &schema_name() const { return schema_name_; }
 
-    [[nodiscard]] inline const Optional<String> object_name() const { return object_name_; }
+    [[nodiscard]] inline const std::optional<std::string> object_name() const { return object_name_; }
 
-    [[nodiscard]] inline const Optional<u64> session_id() const { return session_id_; }
+    [[nodiscard]] inline const std::optional<u64> session_id() const { return session_id_; }
 
-    [[nodiscard]] inline const Optional<String> file_path() const { return file_path_; }
+    [[nodiscard]] inline const std::optional<std::string> file_path() const { return file_path_; }
 
-    [[nodiscard]] inline const Optional<SegmentID> segment_id() const { return segment_id_; }
+    [[nodiscard]] inline const std::optional<SegmentID> segment_id() const { return segment_id_; }
 
-    [[nodiscard]] inline const Optional<TransactionID> transaction_id() const { return txn_id_; }
+    [[nodiscard]] inline const std::optional<TransactionID> transaction_id() const { return txn_id_; }
 
-    [[nodiscard]] inline const Optional<BlockID> block_id() const { return block_id_; }
+    [[nodiscard]] inline const std::optional<BlockID> block_id() const { return block_id_; }
 
-    [[nodiscard]] inline const Optional<ChunkID> chunk_id() const { return chunk_id_; }
+    [[nodiscard]] inline const std::optional<ChunkID> chunk_id() const { return chunk_id_; }
 
-    [[nodiscard]] inline const Optional<ColumnID> column_id() const { return column_id_; }
+    [[nodiscard]] inline const std::optional<ColumnID> column_id() const { return column_id_; }
 
-    [[nodiscard]] inline const Optional<String> index_name() const { return index_name_; }
+    [[nodiscard]] inline const std::optional<std::string> index_name() const { return index_name_; }
 
-    [[nodiscard]] inline const Optional<String> function_name() const { return function_name_; }
+    [[nodiscard]] inline const std::optional<std::string> function_name() const { return function_name_; }
 
 private:
     ShowStmtType show_type_{ShowStmtType::kInvalid};
-    String schema_name_;
-    Optional<String> object_name_; // It could be table/collection/view name
+    std::string schema_name_;
+    std::optional<std::string> object_name_; // It could be table/collection/view name
     u64 table_index_{};
 
-    Optional<String> file_path_;
-    Optional<SegmentID> segment_id_{};
-    Optional<BlockID> block_id_{};
-    Optional<ChunkID> chunk_id_{};
-    Optional<ColumnID> column_id_{};
-    Optional<String> index_name_{};
-    Optional<u64> session_id_{};
-    Optional<TransactionID> txn_id_{};
-    Optional<String> function_name_{};
+    std::optional<std::string> file_path_;
+    std::optional<SegmentID> segment_id_{};
+    std::optional<BlockID> block_id_{};
+    std::optional<ChunkID> chunk_id_{};
+    std::optional<ColumnID> column_id_{};
+    std::optional<std::string> index_name_{};
+    std::optional<u64> session_id_{};
+    std::optional<TransactionID> txn_id_{};
+    std::optional<std::string> function_name_{};
 };
 
 } // namespace infinity

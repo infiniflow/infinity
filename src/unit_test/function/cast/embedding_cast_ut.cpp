@@ -69,12 +69,12 @@ TEST_F(EmbeddingCastTest, embedding_cast1) {
     }
 
     auto embedding_info = EmbeddingInfo::Make(EmbeddingDataType::kElemFloat, 16);
-    SharedPtr<DataType> source_type = MakeShared<DataType>(LogicalType::kEmbedding, embedding_info);
-    auto col_source = MakeShared<ColumnVector>(source_type);
+    std::shared_ptr<DataType> source_type = std::make_shared<DataType>(LogicalType::kEmbedding, embedding_info);
+    auto col_source = std::make_shared<ColumnVector>(source_type);
     col_source->Initialize();
     Vector<float> data(embedding_info->Dimension());
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
-        for (SizeT j = 0; j < embedding_info->Dimension(); ++j) {
+        for (size_t j = 0; j < embedding_info->Dimension(); ++j) {
             data[j] = static_cast<float>(i) + static_cast<float>(j) + 0.5f;
         }
         Value v = Value::MakeEmbedding(data);
@@ -82,7 +82,7 @@ TEST_F(EmbeddingCastTest, embedding_cast1) {
     }
 
     for (i64 i = 0; i < 1; ++i) {
-        for (SizeT j = 0; j < embedding_info->Dimension(); ++j) {
+        for (size_t j = 0; j < embedding_info->Dimension(); ++j) {
             data[j] = static_cast<float>(i) + static_cast<float>(j) + 0.5f;
         }
         Value v = Value::MakeEmbedding(data);
@@ -93,11 +93,11 @@ TEST_F(EmbeddingCastTest, embedding_cast1) {
     // cast embedding float column vector to embedding double column vector
     {
         auto embedding_info = EmbeddingInfo::Make(EmbeddingDataType::kElemDouble, 16);
-        SharedPtr<DataType> target_type = MakeShared<DataType>(LogicalType::kEmbedding, embedding_info);
+        std::shared_ptr<DataType> target_type = std::make_shared<DataType>(LogicalType::kEmbedding, embedding_info);
         auto source2target_ptr = BindEmbeddingCast(*source_type, *target_type);
         EXPECT_NE(source2target_ptr.function, nullptr);
 
-        auto col_target = MakeShared<ColumnVector>(target_type);
+        auto col_target = std::make_shared<ColumnVector>(target_type);
         col_target->Initialize();
 
         CastParameters cast_parameters;
@@ -105,7 +105,7 @@ TEST_F(EmbeddingCastTest, embedding_cast1) {
 
         Vector<double> data2(embedding_info->Dimension());
         for (i64 i = 0; i < 1; ++i) {
-            for (SizeT j = 0; j < embedding_info->Dimension(); ++j) {
+            for (size_t j = 0; j < embedding_info->Dimension(); ++j) {
                 data2[j] = double(static_cast<float>(i) + static_cast<float>(j) + 0.5f);
             }
             Value v = Value::MakeEmbedding(data2);

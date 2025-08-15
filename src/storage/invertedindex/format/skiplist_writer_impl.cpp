@@ -77,7 +77,7 @@ void SkipListWriter::AddItem(u32 value_delta) {
     }
 }
 
-void SkipListWriter::Dump(const SharedPtr<FileWriter> &file, bool spill) {
+void SkipListWriter::Dump(const std::shared_ptr<FileWriter> &file, bool spill) {
     if (spill) {
         file->WriteVInt(posting_writer_.GetSize());
         if (posting_writer_.GetSize() == 0)
@@ -88,7 +88,7 @@ void SkipListWriter::Dump(const SharedPtr<FileWriter> &file, bool spill) {
     posting_writer_.Dump(file);
 }
 
-void SkipListWriter::Load(const SharedPtr<FileReader> &file) {
+void SkipListWriter::Load(const std::shared_ptr<FileReader> &file) {
     u32 size = file->ReadVInt();
     if (size == 0)
         return;

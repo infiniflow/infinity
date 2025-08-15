@@ -36,7 +36,7 @@ namespace infinity {
 
 template <std::unsigned_integral SUBSPACE_CENTROID_TAG, u32 SUBSPACE_NUM>
 void PQ<SUBSPACE_CENTROID_TAG, SUBSPACE_NUM>::EncodeEmbedding(const f32 *embedding_data, const u32 embedding_num, auto output_iter) const {
-    const auto buffer = MakeUniqueForOverwrite<f32[]>(embedding_num * subspace_centroid_num_);
+    const auto buffer = std::make_unique_for_overwrite<f32[]>(embedding_num * subspace_centroid_num_);
     const f32 *part_embedding = embedding_data; // size: embedding_num * subspace_dimension_, stride: dimension_
     for (u32 j = 0; j < SUBSPACE_NUM; ++j) {
         MlasGemm(CblasNoTrans,
@@ -68,7 +68,7 @@ void PQ<SUBSPACE_CENTROID_TAG, SUBSPACE_NUM>::EncodeEmbedding(const f32 *embeddi
                 }
             }
             buffer_ptr += subspace_centroid_num_;
-            Array<SUBSPACE_CENTROID_TAG, SUBSPACE_NUM> &encoded_target = *copy_output_iter;
+            std::array<SUBSPACE_CENTROID_TAG, SUBSPACE_NUM> &encoded_target = *copy_output_iter;
             ++copy_output_iter;
             encoded_target[j] = max_id;
         }
@@ -76,11 +76,11 @@ void PQ<SUBSPACE_CENTROID_TAG, SUBSPACE_NUM>::EncodeEmbedding(const f32 *embeddi
 }
 
 template <std::unsigned_integral SUBSPACE_CENTROID_TAG, u32 SUBSPACE_NUM>
-UniquePtr<f32[]> PQ<SUBSPACE_CENTROID_TAG, SUBSPACE_NUM>::DecodeEmbedding(auto input_iter_begin, const u32 embedding_num) const {
-    auto result = MakeUniqueForOverwrite<f32[]>(embedding_num * dimension_);
+std::unique_ptr<f32[]> PQ<SUBSPACE_CENTROID_TAG, SUBSPACE_NUM>::DecodeEmbedding(auto input_iter_begin, const u32 embedding_num) const {
+    auto result = std::make_unique_for_overwrite<f32[]>(embedding_num * dimension_);
     auto output_ptr = result.get();
     for (u32 i = 0; i < embedding_num; ++i) {
-        const Array<SUBSPACE_CENTROID_TAG, SUBSPACE_NUM> &encoded_embedding = *input_iter_begin;
+        const std::array<SUBSPACE_CENTROID_TAG, SUBSPACE_NUM> &encoded_embedding = *input_iter_begin;
         for (u32 j = 0; j < SUBSPACE_NUM; ++j) {
             const auto src_from = subspace_centroids_[j].data() + encoded_embedding[j] * subspace_dimension_;
             std::copy_n(src_from, subspace_dimension_, output_ptr);
@@ -101,12 +101,12 @@ PQ<SUBSPACE_CENTROID_TAG, SUBSPACE_NUM>::PQ(const u32 subspace_dimension) : subs
 
 template <std::unsigned_integral SUBSPACE_CENTROID_TAG, u32 SUBSPACE_NUM>
 OPQ<SUBSPACE_CENTROID_TAG, SUBSPACE_NUM>::OPQ(const u32 subspace_dimension) : PQ<SUBSPACE_CENTROID_TAG, SUBSPACE_NUM>(subspace_dimension) {
-    matrix_R_ = MakeUniqueForOverwrite<f32[]>(this->dimension_ * this->dimension_);
+    matrix_R_ = std::make_unique_for_overwrite<f32[]>(this->dimension_ * this->dimension_);
 }
 
 template <std::unsigned_integral SUBSPACE_CENTROID_TAG, u32 SUBSPACE_NUM>
 void PQ<SUBSPACE_CENTROID_TAG, SUBSPACE_NUM>::Train(const f32 *embedding_data, const u32 embedding_num, const u32 iter_cnt) {
-    const auto part_train_data = MakeUniqueForOverwrite<f32[]>(embedding_num * subspace_dimension_);
+    const auto part_train_data = std::make_unique_for_overwrite<f32[]>(embedding_num * subspace_dimension_);
     for (u32 i = 0; i < SUBSPACE_NUM; ++i) {
         // copy subspace data
         const f32 *copy_src = embedding_data + i * subspace_dimension_;
@@ -155,8 +155,8 @@ void OPQ<SUBSPACE_CENTROID_TAG, SUBSPACE_NUM>::Train(const f32 *embedding_data, 
         matrix_R_[i * this->dimension_ + i] = 1.0f;
     }
     // step 2. train R for iter_cnt times
-    const auto transformed_embedding = MakeUniqueForOverwrite<f32[]>(embedding_num * this->dimension_);
-    const auto encoded_transformed = MakeUniqueForOverwrite<Array<SUBSPACE_CENTROID_TAG, SUBSPACE_NUM>[]>(embedding_num);
+    const auto transformed_embedding = std::make_unique_for_overwrite<f32[]>(embedding_num * this->dimension_);
+    const auto encoded_transformed = std::make_unique_for_overwrite<std::array<SUBSPACE_CENTROID_TAG, SUBSPACE_NUM>[]>(embedding_num);
     if constexpr (false) {
         // TODO: Fix svd, and remove this code block.
         matrixA_multiply_matrixB_output_to_C(embedding_data,
@@ -176,10 +176,10 @@ void OPQ<SUBSPACE_CENTROID_TAG, SUBSPACE_NUM>::Train(const f32 *embedding_data, 
         }
         return;
     }
-    const auto square_for_svd = MakeUniqueForOverwrite<f32[]>(this->dimension_ * this->dimension_);
-    const auto svd_u = MakeUniqueForOverwrite<f32[]>(this->dimension_ * this->dimension_);
-    const auto svd_v = MakeUniqueForOverwrite<f32[]>(this->dimension_ * this->dimension_);
-    auto old_R = MakeUniqueForOverwrite<f32[]>(this->dimension_ * this->dimension_);
+    const auto square_for_svd = std::make_unique_for_overwrite<f32[]>(this->dimension_ * this->dimension_);
+    const auto svd_u = std::make_unique_for_overwrite<f32[]>(this->dimension_ * this->dimension_);
+    const auto svd_v = std::make_unique_for_overwrite<f32[]>(this->dimension_ * this->dimension_);
+    auto old_R = std::make_unique_for_overwrite<f32[]>(this->dimension_ * this->dimension_);
     const u32 loop_short = std::min<u32>(3, (iter_cnt + 1) / 2);
     const u32 loop_middle = std::max<u32>(3, (iter_cnt + 1) / 2);
     const u32 loop_long = iter_cnt;
@@ -264,10 +264,10 @@ void OPQ<SUBSPACE_CENTROID_TAG, SUBSPACE_NUM>::AddEmbeddings(const f32 *embeddin
         std::shared_lock lock(this->rw_mutex_);
     }
     // step 1. rotate by R
-    const auto input_buffer = MakeUniqueForOverwrite<f32[]>(embedding_num * this->dimension_);
+    const auto input_buffer = std::make_unique_for_overwrite<f32[]>(embedding_num * this->dimension_);
     matrixA_multiply_matrixB_output_to_C(embedding_data, matrix_R_.get(), embedding_num, this->dimension_, this->dimension_, input_buffer.get());
     // step 2. use PQ encoder
-    const auto encoded_buffer = MakeUniqueForOverwrite<Array<SUBSPACE_CENTROID_TAG, SUBSPACE_NUM>[]>(embedding_num);
+    const auto encoded_buffer = std::make_unique_for_overwrite<std::array<SUBSPACE_CENTROID_TAG, SUBSPACE_NUM>[]>(embedding_num);
     PQ_BASE::EncodeEmbedding(input_buffer.get(), embedding_num, encoded_buffer.get());
     // step 3. save encoded data
     std::unique_lock lock(this->rw_mutex_);
@@ -280,13 +280,13 @@ void OPQ<SUBSPACE_CENTROID_TAG, SUBSPACE_NUM>::AddEmbeddings(const f32 *embeddin
 }
 
 template <std::unsigned_integral SUBSPACE_CENTROID_TAG, u32 SUBSPACE_NUM>
-UniquePtr<f32[]> OPQ<SUBSPACE_CENTROID_TAG, SUBSPACE_NUM>::GetIPDistanceTable(const f32 *query_data, const u32 query_num) const {
+std::unique_ptr<f32[]> OPQ<SUBSPACE_CENTROID_TAG, SUBSPACE_NUM>::GetIPDistanceTable(const f32 *query_data, const u32 query_num) const {
     {
         std::shared_lock lock(this->rw_mutex_);
     }
-    auto result = MakeUniqueForOverwrite<f32[]>(SUBSPACE_NUM * this->subspace_centroid_num_ * query_num);
+    auto result = std::make_unique_for_overwrite<f32[]>(SUBSPACE_NUM * this->subspace_centroid_num_ * query_num);
     // step 1. rotate by R
-    const auto q_buffer = MakeUniqueForOverwrite<f32[]>(this->dimension_ * query_num);
+    const auto q_buffer = std::make_unique_for_overwrite<f32[]>(this->dimension_ * query_num);
     transpose_matrixA_multiply_transpose_matrixB_output_to_C(matrix_R_.get(),
                                                              query_data,
                                                              this->dimension_,
@@ -319,7 +319,7 @@ f32 PQ<SUBSPACE_CENTROID_TAG, SUBSPACE_NUM>::GetSingleIPDistance(const u32 embed
     f32 result = 0.0f;
     ip_table += query_id;
     const u32 stride = subspace_centroid_num_ * query_num;
-    const Array<SUBSPACE_CENTROID_TAG, SUBSPACE_NUM> *encoded_embedding_ptr_ = nullptr;
+    const std::array<SUBSPACE_CENTROID_TAG, SUBSPACE_NUM> *encoded_embedding_ptr_ = nullptr;
     {
         std::shared_lock lock(this->rw_mutex_);
         encoded_embedding_ptr_ = &encoded_embedding_data_[embedding_id];
@@ -340,8 +340,8 @@ void PQ<SUBSPACE_CENTROID_TAG, SUBSPACE_NUM>::GetMultipleIPDistance(const u32 em
                                                                     f32 *output_ptr) const {
     ip_table += query_id;
     const u32 stride = subspace_centroid_num_ * query_num;
-    using PtrT = const Array<SUBSPACE_CENTROID_TAG, SUBSPACE_NUM> *;
-    const auto encoded_embedding_ptrs = MakeUniqueForOverwrite<PtrT[]>(embedding_num);
+    using PtrT = const std::array<SUBSPACE_CENTROID_TAG, SUBSPACE_NUM> *;
+    const auto encoded_embedding_ptrs = std::make_unique_for_overwrite<PtrT[]>(embedding_num);
     {
         std::shared_lock lock(this->rw_mutex_);
         std::transform(encoded_embedding_data_.begin() + embedding_offset,
@@ -421,7 +421,7 @@ void OPQ<SUBSPACE_CENTROID_TAG, SUBSPACE_NUM>::Load(LocalFileHandle &file_handle
 constexpr u32 current_max_subspace_num = 128;
 
 template <std::unsigned_integral T>
-UniquePtr<EMVBProductQuantizer> GetEMVBOPQT_Helper(const u32 pq_subspace_num, const u32 subspace_dimension) {
+std::unique_ptr<EMVBProductQuantizer> GetEMVBOPQT_Helper(const u32 pq_subspace_num, const u32 subspace_dimension) {
     auto error_msg = fmt::format("requested pq_subspace_num {} bigger than max value: {}.", pq_subspace_num, current_max_subspace_num);
     error_msg += " Please Add instantiation of OPQ with a bigger SUBSPACE_NUM value.";
     LOG_ERROR(error_msg);
@@ -429,9 +429,9 @@ UniquePtr<EMVBProductQuantizer> GetEMVBOPQT_Helper(const u32 pq_subspace_num, co
 }
 
 template <std::unsigned_integral T, u32 I, u32... J>
-UniquePtr<EMVBProductQuantizer> GetEMVBOPQT_Helper(const u32 pq_subspace_num, const u32 subspace_dimension) {
+std::unique_ptr<EMVBProductQuantizer> GetEMVBOPQT_Helper(const u32 pq_subspace_num, const u32 subspace_dimension) {
     if (pq_subspace_num == I) {
-        return MakeUnique<OPQ<T, I>>(subspace_dimension);
+        return std::make_unique<OPQ<T, I>>(subspace_dimension);
     }
     if (pq_subspace_num < I) {
         auto error_info = fmt::format("unsupported pq subspace num: {}", pq_subspace_num);
@@ -443,11 +443,11 @@ UniquePtr<EMVBProductQuantizer> GetEMVBOPQT_Helper(const u32 pq_subspace_num, co
 }
 
 template <std::unsigned_integral T>
-UniquePtr<EMVBProductQuantizer> GetEMVBOPQT(const u32 pq_subspace_num, const u32 subspace_dimension) {
+std::unique_ptr<EMVBProductQuantizer> GetEMVBOPQT(const u32 pq_subspace_num, const u32 subspace_dimension) {
     return GetEMVBOPQT_Helper<T, 1, 2, 4, 8, 16, 32, 64, 128>(pq_subspace_num, subspace_dimension);
 }
 
-UniquePtr<EMVBProductQuantizer> GetEMVBOPQ(const u32 pq_subspace_num, const u32 pq_subspace_bits, const u32 embedding_dimension) {
+std::unique_ptr<EMVBProductQuantizer> GetEMVBOPQ(const u32 pq_subspace_num, const u32 pq_subspace_bits, const u32 embedding_dimension) {
     if (embedding_dimension % pq_subspace_num != 0) {
         const auto error_info = fmt::format("embedding dimension {} is not a multiple of subspace number {}", embedding_dimension, pq_subspace_num);
         UnrecoverableError(error_info);

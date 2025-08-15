@@ -33,12 +33,12 @@ class BufferObj;
 
 export struct ChunkIndexMetaInfo {
     ChunkIndexMetaInfo() = default;
-    ChunkIndexMetaInfo(String base_name, RowID base_row_id, SizeT row_cnt, SizeT index_size)
+    ChunkIndexMetaInfo(std::string base_name, RowID base_row_id, size_t row_cnt, size_t index_size)
         : base_name_(base_name), base_row_id_(base_row_id), row_cnt_(row_cnt), index_size_(index_size) {}
-    String base_name_{};
+    std::string base_name_{};
     RowID base_row_id_{};
-    SizeT row_cnt_{};
-    SizeT index_size_{};
+    size_t row_cnt_{};
+    size_t index_size_{};
 
     void ToJson(nlohmann::json &json) const;
 
@@ -46,9 +46,9 @@ export struct ChunkIndexMetaInfo {
 
     nlohmann::json Serialize();
 
-    static SharedPtr<ChunkIndexMetaInfo> Deserialize(const nlohmann::json &chunk_index_json);
+    static std::shared_ptr<ChunkIndexMetaInfo> Deserialize(const nlohmann::json &chunk_index_json);
 
-    static String IndexFileName(ChunkID chunk_id) { return fmt::format("chunk_{}.idx", chunk_id); }
+    static std::string IndexFileName(ChunkID chunk_id) { return fmt::format("chunk_{}.idx", chunk_id); }
 };
 
 export class ChunkIndexMeta {
@@ -77,16 +77,16 @@ public:
 
     Status SetChunkInfoNoPutKV(const ChunkIndexMetaInfo &chunk_info);
 
-    Status FilePaths(Vector<String> &paths);
+    Status FilePaths(std::vector<std::string> &paths);
 
-    Tuple<SharedPtr<ChunkIndexSnapshotInfo>, Status> MapMetaToSnapShotInfo(ChunkID chunk_id);
+    std::tuple<std::shared_ptr<ChunkIndexSnapshotInfo>, Status> MapMetaToSnapShotInfo(ChunkID chunk_id);
 
 private:
     Status LoadChunkInfo();
 
     Status LoadIndexBuffer();
 
-    String GetChunkIndexTag(const String &tag) const;
+    std::string GetChunkIndexTag(const std::string &tag) const;
 
 
 
@@ -97,7 +97,7 @@ private:
     SegmentIndexMeta &segment_index_meta_;
     ChunkID chunk_id_;
 
-    Optional<ChunkIndexMetaInfo> chunk_info_;
+    std::optional<ChunkIndexMetaInfo> chunk_info_;
 
     BufferObj *index_buffer_ = nullptr;
 };

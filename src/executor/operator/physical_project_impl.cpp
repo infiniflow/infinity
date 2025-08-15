@@ -41,13 +41,13 @@ namespace infinity {
 void PhysicalProject::Init(QueryContext *query_context) {
     //    executor.Init(expressions_);
     //
-    //    Vector<SharedPtr<ColumnDef>> columns;
+    //    std::vector<std::shared_ptr<ColumnDef>> columns;
     //    for(i64 idx = 0; auto& expr: expressions_) {
-    //        SharedPtr<ColumnDef> col_def = ColumnDef::Make(expr->ToString(), idx, expr->Type(), Set<ConstrainType>());
+    //        std::shared_ptr<ColumnDef> col_def = ColumnDef::Make(expr->ToString(), idx, expr->Type(), Set<ConstrainType>());
     //        columns.emplace_back(col_def);
     //        ++ idx;
     //    }
-    //    SharedPtr<TableDef> table_def = TableDef::Make("project", columns, false);
+    //    std::shared_ptr<TableDef> table_def = TableDef::Make("project", columns, false);
     //
     //    outputs_[output_table_index_] = DataTable::Make(table_def, TableType::kIntermediate);
 }
@@ -62,10 +62,10 @@ bool PhysicalProject::Execute(QueryContext *, OperatorState *operator_state) {
         ExpressionEvaluator evaluator;
         evaluator.Init(nullptr);
 
-        SizeT expression_count = expressions_.size();
+        size_t expression_count = expressions_.size();
 
         // Prepare the expression states
-        Vector<SharedPtr<ExpressionState>> expr_states;
+        std::vector<std::shared_ptr<ExpressionState>> expr_states;
         expr_states.reserve(expression_count);
 
         for (const auto &expr : expressions_) {
@@ -73,8 +73,8 @@ bool PhysicalProject::Execute(QueryContext *, OperatorState *operator_state) {
             expr_states.emplace_back(ExpressionState::CreateState(expr));
         }
 
-        for (SizeT expr_idx = 0; expr_idx < expression_count; ++expr_idx) {
-            //        Vector<SharedPtr<ColumnVector>> blocks_column;
+        for (size_t expr_idx = 0; expr_idx < expression_count; ++expr_idx) {
+            //        std::vector<std::shared_ptr<ColumnVector>> blocks_column;
             //        blocks_column.emplace_back(output_data_block->column_vectors[expr_idx]);
             evaluator.Execute(expressions_[expr_idx], expr_states[expr_idx], output_data_block->column_vectors[expr_idx]);
         }
@@ -83,8 +83,8 @@ bool PhysicalProject::Execute(QueryContext *, OperatorState *operator_state) {
     } else {
         OperatorState *prev_op_state = operator_state->prev_op_state_;
 
-        SizeT input_block_count = prev_op_state->data_block_array_.size();
-        for (SizeT block_idx = 0; block_idx < input_block_count; ++block_idx) {
+        size_t input_block_count = prev_op_state->data_block_array_.size();
+        for (size_t block_idx = 0; block_idx < input_block_count; ++block_idx) {
             DataBlock *input_data_block = prev_op_state->data_block_array_[block_idx].get();
 
             project_operator_state->data_block_array_.emplace_back(DataBlock::MakeUniquePtr());
@@ -94,10 +94,10 @@ bool PhysicalProject::Execute(QueryContext *, OperatorState *operator_state) {
             ExpressionEvaluator evaluator;
             evaluator.Init(input_data_block);
 
-            SizeT expression_count = expressions_.size();
+            size_t expression_count = expressions_.size();
 
             // Prepare the expression states
-            Vector<SharedPtr<ExpressionState>> expr_states;
+            std::vector<std::shared_ptr<ExpressionState>> expr_states;
             expr_states.reserve(expression_count);
 
             for (const auto &expr : expressions_) {
@@ -105,34 +105,34 @@ bool PhysicalProject::Execute(QueryContext *, OperatorState *operator_state) {
                 expr_states.emplace_back(ExpressionState::CreateState(expr));
             }
 
-            for (SizeT expr_idx = 0; expr_idx < expression_count; ++expr_idx) {
+            for (size_t expr_idx = 0; expr_idx < expression_count; ++expr_idx) {
                 evaluator.Execute(expressions_[expr_idx], expr_states[expr_idx], output_data_block->column_vectors[expr_idx]);
 
                 auto it = highlight_columns_.find(expr_idx);
                 if (it != highlight_columns_.end()) {
-                    SizeT num_rows = output_data_block->column_vectors[expr_idx]->Size();
-                    SharedPtr<ColumnVector> highlight_column = ColumnVector::Make(output_data_block->column_vectors[expr_idx]->data_type());
+                    size_t num_rows = output_data_block->column_vectors[expr_idx]->Size();
+                    std::shared_ptr<ColumnVector> highlight_column = ColumnVector::Make(output_data_block->column_vectors[expr_idx]->data_type());
                     highlight_column->Initialize(ColumnVectorType::kFlat, num_rows);
 
-                    SharedPtr<HighlightInfo> highlight_info = it->second;
-                    Vector<String> &query_terms = highlight_info->query_terms_;
-                    String &analyzer_name = highlight_info->analyzer_;
+                    std::shared_ptr<HighlightInfo> highlight_info = it->second;
+                    std::vector<std::string> &query_terms = highlight_info->query_terms_;
+                    std::string &analyzer_name = highlight_info->analyzer_;
                     if (analyzer_name.find("standard") != std::string::npos) {
                         auto [analyzer, status] = AnalyzerPool::instance().GetAnalyzer(analyzer_name);
                         if (!status.ok()) {
                             RecoverableError(status);
                         }
                         analyzer->SetCharOffset(true);
-                        for (SizeT i = 0; i < num_rows; ++i) {
-                            String raw_content = output_data_block->column_vectors[expr_idx]->GetValueByIndex(i).GetVarchar();
-                            String output;
+                        for (size_t i = 0; i < num_rows; ++i) {
+                            std::string raw_content = output_data_block->column_vectors[expr_idx]->GetValueByIndex(i).GetVarchar();
+                            std::string output;
                             Highlighter::instance().GetHighlightWithStemmer(query_terms, raw_content, output, analyzer.get());
                             highlight_column->AppendValue(Value::MakeVarchar(output));
                         }
                     } else {
-                        for (SizeT i = 0; i < num_rows; ++i) {
-                            String raw_content = output_data_block->column_vectors[expr_idx]->GetValueByIndex(i).GetVarchar();
-                            String output;
+                        for (size_t i = 0; i < num_rows; ++i) {
+                            std::string raw_content = output_data_block->column_vectors[expr_idx]->GetValueByIndex(i).GetVarchar();
+                            std::string output;
                             Highlighter::instance().GetHighlightWithoutStemmer(query_terms, raw_content, output);
                             highlight_column->AppendValue(Value::MakeVarchar(output));
                         }
@@ -162,23 +162,23 @@ bool PhysicalProject::Execute(QueryContext *, OperatorState *operator_state) {
     return true;
 }
 
-SharedPtr<Vector<String>> PhysicalProject::GetOutputNames() const {
-    SharedPtr<Vector<String>> result = MakeShared<Vector<String>>();
-    SizeT expression_count = expressions_.size();
+std::shared_ptr<std::vector<std::string>> PhysicalProject::GetOutputNames() const {
+    std::shared_ptr<std::vector<std::string>> result = std::make_shared<std::vector<std::string>>();
+    size_t expression_count = expressions_.size();
     result->reserve(expression_count);
-    for (SizeT i = 0; i < expression_count; ++i) {
+    for (size_t i = 0; i < expression_count; ++i) {
         result->emplace_back(expressions_[i]->Name());
     }
 
     return result;
 }
 
-SharedPtr<Vector<SharedPtr<DataType>>> PhysicalProject::GetOutputTypes() const {
-    SharedPtr<Vector<SharedPtr<DataType>>> result = MakeShared<Vector<SharedPtr<DataType>>>();
-    SizeT expression_count = expressions_.size();
+std::shared_ptr<std::vector<std::shared_ptr<DataType>>> PhysicalProject::GetOutputTypes() const {
+    std::shared_ptr<std::vector<std::shared_ptr<DataType>>> result = std::make_shared<std::vector<std::shared_ptr<DataType>>>();
+    size_t expression_count = expressions_.size();
     result->reserve(expression_count);
-    for (SizeT i = 0; i < expression_count; ++i) {
-        result->emplace_back(MakeShared<DataType>(expressions_[i]->Type()));
+    for (size_t i = 0; i < expression_count; ++i) {
+        result->emplace_back(std::make_shared<DataType>(expressions_[i]->Type()));
     }
 
     return result;

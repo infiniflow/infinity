@@ -108,7 +108,7 @@ void Connection::HandleRequest() {
     const auto cmd_type = pg_handler_->read_command_type();
 
     // FIXME
-    UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>(session_.get());
+    std::unique_ptr<QueryContext> query_context_ptr = std::make_unique<QueryContext>(session_.get());
     query_context_ptr->Init(InfinityContext::instance().config(),
                             InfinityContext::instance().task_scheduler(),
                             InfinityContext::instance().storage(),
@@ -382,7 +382,7 @@ void Connection::SendQueryResponse(const QueryResult &query_result) {
 
     const std::shared_ptr<DataTable> &result_table = query_result.result_table_;
     size_t column_count = result_table->ColumnCount();
-    auto values_as_strings = Vector<Optional<std::string>>(column_count);
+    auto values_as_strings = std::vector<std::optional<std::string>>(column_count);
     size_t block_count = result_table->DataBlockCount();
     for (size_t idx = 0; idx < block_count; ++idx) {
         auto block = result_table->GetDataBlockById(idx);

@@ -54,12 +54,12 @@ bool PhysicalDelete::Execute(QueryContext *query_context, OperatorState *operato
 
     OperatorState *prev_op_state = operator_state->prev_op_state_;
 
-    Vector<RowID> row_ids;
-    SizeT data_block_count = prev_op_state->data_block_array_.size();
-    for (SizeT block_idx = 0; block_idx < data_block_count; ++block_idx) {
+    std::vector<RowID> row_ids;
+    size_t data_block_count = prev_op_state->data_block_array_.size();
+    for (size_t block_idx = 0; block_idx < data_block_count; ++block_idx) {
         DataBlock *input_data_block_ptr = prev_op_state->data_block_array_[block_idx].get();
-        for (SizeT i = 0; i < input_data_block_ptr->column_count(); i++) {
-            SharedPtr<ColumnVector> column_vector = input_data_block_ptr->column_vectors[i];
+        for (size_t i = 0; i < input_data_block_ptr->column_count(); i++) {
+            std::shared_ptr<ColumnVector> column_vector = input_data_block_ptr->column_vectors[i];
             if (column_vector->data_type()->type() == LogicalType::kRowID) {
                 row_ids.resize(column_vector->Size());
                 std::memcpy(row_ids.data(), column_vector->data(), column_vector->Size() * sizeof(RowID));

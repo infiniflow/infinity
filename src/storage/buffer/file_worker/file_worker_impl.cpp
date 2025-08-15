@@ -41,10 +41,10 @@ import global_resource_usage;
 
 namespace infinity {
 
-FileWorker::FileWorker(SharedPtr<String> data_dir,
-                       SharedPtr<String> temp_dir,
-                       SharedPtr<String> file_dir,
-                       SharedPtr<String> file_name,
+FileWorker::FileWorker(std::shared_ptr<std::string> data_dir,
+                       std::shared_ptr<std::string> temp_dir,
+                       std::shared_ptr<std::string> file_dir,
+                       std::shared_ptr<std::string> file_name,
                        PersistenceManager *persistence_manager)
     : data_dir_(std::move(data_dir)), temp_dir_(std::move(temp_dir)), file_dir_(std::move(file_dir)), file_name_(std::move(file_name)),
       persistence_manager_(persistence_manager) {
@@ -68,9 +68,9 @@ bool FileWorker::WriteToFile(bool to_spill, const FileWorkerSaveCtx &ctx) {
     }
 
     if (persistence_manager_ != nullptr && !to_spill) {
-        String write_dir = *file_dir_;
-        String write_path = Path(*data_dir_) / write_dir / *file_name_;
-        String tmp_write_path = Path(*temp_dir_) / StringTransform(write_path, "/", "_");
+        std::string write_dir = *file_dir_;
+        std::string write_path = Path(*data_dir_) / write_dir / *file_name_;
+        std::string tmp_write_path = Path(*temp_dir_) / StringTransform(write_path, "/", "_");
 
         auto [file_handle, status] = VirtualStore::Open(tmp_write_path, FileAccessMode::kWrite);
         if (!status.ok()) {
@@ -96,11 +96,11 @@ bool FileWorker::WriteToFile(bool to_spill, const FileWorkerSaveCtx &ctx) {
 
         return all_save;
     } else {
-        String write_dir = ChooseFileDir(to_spill);
+        std::string write_dir = ChooseFileDir(to_spill);
         if (!VirtualStore::Exists(write_dir)) {
             VirtualStore::MakeDirectory(write_dir);
         }
-        String write_path = fmt::format("{}/{}", write_dir, *file_name_);
+        std::string write_path = fmt::format("{}/{}", write_dir, *file_name_);
 
         auto [file_handle, status] = VirtualStore::Open(write_path, FileAccessMode::kWrite);
         if (!status.ok()) {
@@ -128,7 +128,7 @@ bool FileWorker::WriteToFile(bool to_spill, const FileWorkerSaveCtx &ctx) {
 void FileWorker::ReadFromFile(bool from_spill) {
     auto [defer_fn, read_path] = GetFilePathInner(from_spill);
     bool use_object_cache = !from_spill && persistence_manager_ != nullptr;
-    SizeT file_size = 0;
+    size_t file_size = 0;
     auto [file_handle, status] = VirtualStore::Open(read_path, FileAccessMode::kRead);
     if (!status.ok()) {
         UnrecoverableError(fmt::format("Read path: {}, error: {}", read_path, status.message()));
@@ -145,9 +145,9 @@ void FileWorker::ReadFromFile(bool from_spill) {
 }
 
 void FileWorker::MoveFile() {
-    String src_path = fmt::format("{}/{}", ChooseFileDir(true), *file_name_);
-    String dest_dir = ChooseFileDir(false);
-    String dest_path = fmt::format("{}/{}", dest_dir, *file_name_);
+    std::string src_path = fmt::format("{}/{}", ChooseFileDir(true), *file_name_);
+    std::string dest_dir = ChooseFileDir(false);
+    std::string dest_path = fmt::format("{}/{}", dest_dir, *file_name_);
     if (persistence_manager_ == nullptr) {
         if (!VirtualStore::Exists(src_path)) {
             Status status = Status::FileNotFound(src_path);
@@ -176,25 +176,25 @@ void FileWorker::SetData(void *data) {
     data_ = data;
 }
 
-void FileWorker::SetDataSize(SizeT size) {
+void FileWorker::SetDataSize(size_t size) {
     UnrecoverableError("Not implemented");
 }
 
 // Get absolute file path. As key of buffer handle.
-String FileWorker::GetFilePath() const { return Path(*data_dir_) / *file_dir_ / *file_name_; }
+std::string FileWorker::GetFilePath() const { return Path(*data_dir_) / *file_dir_ / *file_name_; }
 
-String FileWorker::ChooseFileDir(bool spill) const { return spill ? (Path(*temp_dir_) / *file_dir_) : (Path(*data_dir_) / *file_dir_); }
+std::string FileWorker::ChooseFileDir(bool spill) const { return spill ? (Path(*temp_dir_) / *file_dir_) : (Path(*data_dir_) / *file_dir_); }
 
-Pair<Optional<DeferFn<std::function<void()>>>, String> FileWorker::GetFilePathInner(bool from_spill) {
+std::pair<std::optional<DeferFn<std::function<void()>>>, std::string> FileWorker::GetFilePathInner(bool from_spill) {
     bool use_object_cache = !from_spill && persistence_manager_ != nullptr;
-    Optional<DeferFn<std::function<void()>>> defer_fn;
-    String read_path;
+    std::optional<DeferFn<std::function<void()>>> defer_fn;
+    std::string read_path;
     read_path = fmt::format("{}/{}", ChooseFileDir(from_spill), *file_name_);
     if (use_object_cache) {
         PersistReadResult result = persistence_manager_->GetObjCache(read_path);
         defer_fn.emplace(([=, this]() {
             if (use_object_cache && obj_addr_.Valid()) {
-                String read_path = fmt::format("{}/{}", ChooseFileDir(from_spill), *file_name_);
+                std::string read_path = fmt::format("{}/{}", ChooseFileDir(from_spill), *file_name_);
                 PersistWriteResult res = persistence_manager_->PutObjCache(read_path);
                 PersistResultHandler handler = PersistResultHandler(persistence_manager_);
                 handler.HandleWriteResult(res);
@@ -213,24 +213,24 @@ Pair<Optional<DeferFn<std::function<void()>>>, String> FileWorker::GetFilePathIn
 Status FileWorker::CleanupFile() const {
     if (persistence_manager_ != nullptr) {
         PersistResultHandler handler(persistence_manager_);
-        String path = fmt::format("{}/{}", ChooseFileDir(false), *file_name_);
+        std::string path = fmt::format("{}/{}", ChooseFileDir(false), *file_name_);
         PersistWriteResult result = persistence_manager_->Cleanup(path);
         handler.HandleWriteResult(result);
         // Delete from RocksDB
         auto *kv_store = InfinityContext::instance().storage()->kv_store();
-        String relevant_full_path = KeyEncode::PMObjectKey(fmt::format("{}/{}", *file_dir_, *file_name_));
+        std::string relevant_full_path = KeyEncode::PMObjectKey(fmt::format("{}/{}", *file_dir_, *file_name_));
         kv_store->Delete(relevant_full_path);
         LOG_TRACE(fmt::format("Fileworker: cleanup pm object key: {}", relevant_full_path));
         return Status::OK();
     }
 
-    String path_str = fmt::format("{}/{}", ChooseFileDir(false), *file_name_);
+    std::string path_str = fmt::format("{}/{}", ChooseFileDir(false), *file_name_);
 
     return VirtualStore::DeleteFile(path_str);
 }
 
 void FileWorker::CleanupTempFile() const {
-    String path = fmt::format("{}/{}", ChooseFileDir(true), *file_name_);
+    std::string path = fmt::format("{}/{}", ChooseFileDir(true), *file_name_);
     if (VirtualStore::Exists(path)) {
         LOG_TRACE(fmt::format("Clean temp file: {}", path));
         VirtualStore::DeleteFile(path);
@@ -252,7 +252,7 @@ void FileWorker::Mmap() {
         }
         this->ReadFromMmapImpl(mmap_addr_, obj_addr_.part_size_);
     } else {
-        SizeT file_size = VirtualStore::GetFileSize(read_path);
+        size_t file_size = VirtualStore::GetFileSize(read_path);
         int ret = VirtualStore::MmapFile(read_path, mmap_addr_, file_size);
         if (ret < 0) {
             UnrecoverableError(fmt::format("Mmap file {} failed. {}", read_path, strerror(errno)));
@@ -279,7 +279,7 @@ void FileWorker::Munmap() {
 
 void FileWorker::MmapNotNeed() {}
 
-bool FileWorker::ReadFromMmapImpl([[maybe_unused]] const void *ptr, [[maybe_unused]] SizeT size) {
+bool FileWorker::ReadFromMmapImpl([[maybe_unused]] const void *ptr, [[maybe_unused]] size_t size) {
     UnrecoverableError("Not implemented");
     return false;
 }

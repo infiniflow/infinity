@@ -60,12 +60,12 @@ using namespace infinity;
 
 class TestTxnAppend : public BaseTestParamStr {
 public:
-    Tuple<SizeT, Status> GetTableRowCount(const String &db_name, const String &table_name);
+    Tuple<size_t, Status> GetTableRowCount(const String &db_name, const String &table_name);
 };
 
-Tuple<SizeT, Status> TestTxnAppend::GetTableRowCount(const String &db_name, const String &table_name) {
+Tuple<size_t, Status> TestTxnAppend::GetTableRowCount(const String &db_name, const String &table_name) {
     NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
-    auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("get row count"), TransactionType::kNormal);
+    auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("get row count"), TransactionType::kNormal);
     TxnTimeStamp begin_ts = txn->BeginTS();
     TxnTimeStamp commit_ts = txn->CommitTS();
 
@@ -76,7 +76,7 @@ Tuple<SizeT, Status> TestTxnAppend::GetTableRowCount(const String &db_name, cons
         return {0, status};
     }
 
-    SizeT row_count = 0;
+    size_t row_count = 0;
     auto [segment_ids, seg_status] = table_meta->GetSegmentIDs1();
     if (!status.ok()) {
         return {0, status};
@@ -120,20 +120,20 @@ TEST_P(TestTxnAppend, test_append0) {
 
     NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
 
-    SharedPtr<String> db_name = std::make_shared<String>("db1");
+    std::shared_ptr<String> db_name = std::make_shared<String>("db1");
     auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
     auto column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
     auto table_name = std::make_shared<std::string>("tb1");
-    auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def2});
+    auto table_def = TableDef::Make(db_name, table_name, std::make_shared<String>(), {column_def1, column_def2});
     {
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
-        Status status = txn->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("create db"), TransactionType::kNormal);
+        Status status = txn->CreateDatabase(*db_name, ConflictType::kError, std::make_shared<String>());
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
     }
     {
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("create table"), TransactionType::kNormal);
         Status status = txn->CreateTable(*db_name, table_def, ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
@@ -141,7 +141,7 @@ TEST_P(TestTxnAppend, test_append0) {
     }
 
     auto append = [&] {
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("append"), TransactionType::kNormal);
         auto input_block = MakeInputBlock(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"), 4);
         Status status = txn->Append(*db_name, *table_name, input_block);
         EXPECT_TRUE(status.ok());
@@ -154,7 +154,7 @@ TEST_P(TestTxnAppend, test_append0) {
     new_txn_mgr->PrintAllKeyValue();
 
     {
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("check"), TransactionType::kNormal);
 
         Optional<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
@@ -169,7 +169,7 @@ TEST_P(TestTxnAppend, test_append0) {
 
         SegmentMeta segment_meta(segment_id, *table_meta);
 
-        SizeT segment_row_cnt = 0;
+        size_t segment_row_cnt = 0;
         std::tie(segment_row_cnt, status) = segment_meta.GetRowCnt1();
         EXPECT_EQ(segment_row_cnt, 8);
 
@@ -180,7 +180,7 @@ TEST_P(TestTxnAppend, test_append0) {
 
         BlockID block_id = (*block_ids_ptr)[0];
         BlockMeta block_meta(block_id, segment_meta);
-        SizeT block_row_cnt = 0;
+        size_t block_row_cnt = 0;
         std::tie(block_row_cnt, status) = block_meta.GetRowCnt1();
         EXPECT_EQ(block_row_cnt, 8);
 
@@ -194,27 +194,27 @@ TEST_P(TestTxnAppend, test_append1) {
 
     NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
 
-    SharedPtr<String> db_name = std::make_shared<String>("db1");
+    std::shared_ptr<String> db_name = std::make_shared<String>("db1");
     auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
     auto column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
     auto table_name = std::make_shared<std::string>("tb1");
-    auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def2});
+    auto table_def = TableDef::Make(db_name, table_name, std::make_shared<String>(), {column_def1, column_def2});
     {
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
-        Status status = txn->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("create db"), TransactionType::kNormal);
+        Status status = txn->CreateDatabase(*db_name, ConflictType::kError, std::make_shared<String>());
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
     }
     {
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("create table"), TransactionType::kNormal);
         Status status = txn->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
     }
 
-    auto input_block = MakeShared<DataBlock>();
+    auto input_block = std::make_shared<DataBlock>();
     {
         // Initialize input block
         {
@@ -238,7 +238,7 @@ TEST_P(TestTxnAppend, test_append1) {
     //                            |----------------------|----------|
     //                           t2                  append      commit (success)
     {
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("append"), TransactionType::kNormal);
 
         Status status = txn->Append(*db_name, *table_name, input_block);
         EXPECT_TRUE(status.ok());
@@ -246,7 +246,7 @@ TEST_P(TestTxnAppend, test_append1) {
         EXPECT_TRUE(status.ok());
     }
     {
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("append again"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("append again"), TransactionType::kNormal);
 
         Status status = txn->Append(*db_name, *table_name, input_block);
         EXPECT_TRUE(status.ok());
@@ -261,8 +261,8 @@ TEST_P(TestTxnAppend, test_append1) {
     //            |----------------------|----------|
     //           t2                  append      commit (success)
     {
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("concurrent append 1"), TransactionType::kNormal);
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("concurrent append 2"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("concurrent append 1"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<String>("concurrent append 2"), TransactionType::kNormal);
 
         Status status1 = txn->Append(*db_name, *table_name, input_block);
         EXPECT_TRUE(status1.ok());
@@ -277,11 +277,11 @@ TEST_P(TestTxnAppend, test_append1) {
         status2 = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status2.ok());
     }
-    SizeT total_row_count = 8;
+    size_t total_row_count = 8;
 
     // Check the appended data.
     {
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("scan"), TransactionType::kNormal);
         TxnTimeStamp begin_ts = txn->BeginTS();
         TxnTimeStamp commit_ts = txn->CommitTS();
 
@@ -317,10 +317,10 @@ TEST_P(TestTxnAppend, test_append1) {
             EXPECT_FALSE(has_next);
         }
 
-        SizeT row_count = state.block_offset_end();
+        size_t row_count = state.block_offset_end();
 
         {
-            SizeT column_idx = 0;
+            size_t column_idx = 0;
             ColumnMeta column_meta(column_idx, block_meta);
             ColumnVector col;
 
@@ -334,7 +334,7 @@ TEST_P(TestTxnAppend, test_append1) {
         }
 
         {
-            SizeT column_idx = 1;
+            size_t column_idx = 1;
             ColumnMeta column_meta(column_idx, block_meta);
             ColumnVector col;
             status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorMode::kReadOnly, col);
@@ -353,34 +353,34 @@ TEST_P(TestTxnAppend, test_append2) {
 
     NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
 
-    SharedPtr<String> db_name = std::make_shared<String>("db1");
+    std::shared_ptr<String> db_name = std::make_shared<String>("db1");
     auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
     auto column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
     auto table_name = std::make_shared<std::string>("tb1");
-    auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def2});
+    auto table_def = TableDef::Make(db_name, table_name, std::make_shared<String>(), {column_def1, column_def2});
     {
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
-        Status status = txn->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("create db"), TransactionType::kNormal);
+        Status status = txn->CreateDatabase(*db_name, ConflictType::kError, std::make_shared<String>());
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
     }
     {
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("create table"), TransactionType::kNormal);
         Status status = txn->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
     }
 
-    SizeT insert_row = 8192;
+    size_t insert_row = 8192;
 
     //    t1      append      commit (success)
     //    |----------|---------|
     //                            |----------------------|----------|
     //                           t2                  append      commit (success)
     {
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("append"), TransactionType::kNormal);
         auto input_block1 = MakeInputBlock1(insert_row);
         Status status = txn->Append(*db_name, *table_name, input_block1);
         EXPECT_TRUE(status.ok());
@@ -388,7 +388,7 @@ TEST_P(TestTxnAppend, test_append2) {
         EXPECT_TRUE(status.ok());
     }
     {
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("append again"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("append again"), TransactionType::kNormal);
         auto input_block2 = MakeInputBlock2(insert_row);
         Status status = txn->Append(*db_name, *table_name, input_block2);
         EXPECT_TRUE(status.ok());
@@ -401,8 +401,8 @@ TEST_P(TestTxnAppend, test_append2) {
     //            |----------------------|----------|
     //           t2                  append      commit (success)
     {
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("concurrent append 1"), TransactionType::kNormal);
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("concurrent append 2"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("concurrent append 1"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<String>("concurrent append 2"), TransactionType::kNormal);
         auto input_block1 = MakeInputBlock1(8192);
         auto input_block2 = MakeInputBlock2(8192);
         Status status1 = txn->Append(*db_name, *table_name, input_block1);
@@ -415,11 +415,11 @@ TEST_P(TestTxnAppend, test_append2) {
         status2 = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status2.ok());
     }
-    SizeT total_row_count = insert_row * 4;
+    size_t total_row_count = insert_row * 4;
 
     // Check the appended data.
     {
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("scan"), TransactionType::kNormal);
         TxnTimeStamp begin_ts = txn->BeginTS();
         TxnTimeStamp commit_ts = txn->CommitTS();
 
@@ -440,10 +440,10 @@ TEST_P(TestTxnAppend, test_append2) {
 
         EXPECT_TRUE(status.ok());
 
-        SizeT block_count = (total_row_count / DEFAULT_BLOCK_CAPACITY) + (total_row_count % DEFAULT_BLOCK_CAPACITY == 0 ? 0 : 1);
+        size_t block_count = (total_row_count / DEFAULT_BLOCK_CAPACITY) + (total_row_count % DEFAULT_BLOCK_CAPACITY == 0 ? 0 : 1);
         EXPECT_EQ(block_ids_ptr->size(), block_count);
 
-        for (SizeT idx = 0; idx < block_count; ++idx) {
+        for (size_t idx = 0; idx < block_count; ++idx) {
             BlockID block_id = block_ids_ptr->at(idx);
             EXPECT_EQ(block_id, idx);
             BlockMeta block_meta(block_id, segment_meta);
@@ -463,11 +463,11 @@ TEST_P(TestTxnAppend, test_append2) {
             has_next = state.Next(offset, range);
             EXPECT_FALSE(has_next);
 
-            SizeT row_count = state.block_offset_end();
+            size_t row_count = state.block_offset_end();
             EXPECT_EQ(row_count, DEFAULT_BLOCK_CAPACITY);
 
             {
-                SizeT column_idx = 0;
+                size_t column_idx = 0;
                 ColumnMeta column_meta(column_idx, block_meta);
                 ColumnVector col;
 
@@ -475,12 +475,12 @@ TEST_P(TestTxnAppend, test_append2) {
                 EXPECT_TRUE(status.ok());
 
                 if (idx % 2 == 0) {
-                    for (SizeT row_id = 0; row_id < row_count; ++row_id) {
+                    for (size_t row_id = 0; row_id < row_count; ++row_id) {
                         Value v1 = col.GetValueByIndex(row_id);
                         EXPECT_EQ(v1, Value::MakeInt(row_id));
                     }
                 } else {
-                    for (SizeT row_id = 0; row_id < row_count; ++row_id) {
+                    for (size_t row_id = 0; row_id < row_count; ++row_id) {
                         Value v1 = col.GetValueByIndex(row_id);
                         EXPECT_EQ(v1, Value::MakeInt(2 * row_id));
                     }
@@ -488,19 +488,19 @@ TEST_P(TestTxnAppend, test_append2) {
             }
 
             {
-                SizeT column_idx = 1;
+                size_t column_idx = 1;
                 ColumnMeta column_meta(column_idx, block_meta);
                 ColumnVector col;
                 status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorMode::kReadOnly, col);
                 EXPECT_TRUE(status.ok());
 
                 if (idx % 2 == 0) {
-                    for (SizeT row_id = 0; row_id < row_count; ++row_id) {
+                    for (size_t row_id = 0; row_id < row_count; ++row_id) {
                         Value v1 = col.GetValueByIndex(row_id);
                         EXPECT_EQ(v1, Value::MakeVarchar(fmt::format("abc_{}", row_id)));
                     }
                 } else {
-                    for (SizeT row_id = 0; row_id < row_count; ++row_id) {
+                    for (size_t row_id = 0; row_id < row_count; ++row_id) {
                         Value v1 = col.GetValueByIndex(row_id);
                         EXPECT_EQ(v1, Value::MakeVarchar(fmt::format("abcdefghijklmnopqrstuvwxyz_{}", row_id)));
                     }
@@ -523,18 +523,18 @@ TEST_P(TestTxnAppend, test_append_drop_db) {
     //                            |----------------------|----------|
     //                           t2                  dropdb      commit (success)
     {
-        SharedPtr<String> db_name = std::make_shared<String>("db1");
+        std::shared_ptr<String> db_name = std::make_shared<String>("db1");
         auto table_name = std::make_shared<std::string>("tb1");
-        auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def2});
+        auto table_def = TableDef::Make(db_name, table_name, std::make_shared<String>(), {column_def1, column_def2});
         {
-            auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
-            Status status = txn->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
+            auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("create db"), TransactionType::kNormal);
+            Status status = txn->CreateDatabase(*db_name, ConflictType::kError, std::make_shared<String>());
             EXPECT_TRUE(status.ok());
             status = new_txn_mgr->CommitTxn(txn);
             EXPECT_TRUE(status.ok());
         }
         {
-            auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+            auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("create table"), TransactionType::kNormal);
             Status status = txn->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
             EXPECT_TRUE(status.ok());
             status = new_txn_mgr->CommitTxn(txn);
@@ -542,7 +542,7 @@ TEST_P(TestTxnAppend, test_append_drop_db) {
         }
 
         {
-            auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+            auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("append"), TransactionType::kNormal);
             auto input_block1 = MakeInputBlock1(8192);
             Status status = txn->Append(*db_name, *table_name, input_block1);
             EXPECT_TRUE(status.ok());
@@ -551,7 +551,7 @@ TEST_P(TestTxnAppend, test_append_drop_db) {
         }
         {
             // drop database
-            auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
+            auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<String>("drop db"), TransactionType::kNormal);
             Status status = txn6->DropDatabase("db1", ConflictType::kError);
             EXPECT_TRUE(status.ok());
             status = new_txn_mgr->CommitTxn(txn6);
@@ -560,7 +560,7 @@ TEST_P(TestTxnAppend, test_append_drop_db) {
 
         // Check the appended data.
         {
-            auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
+            auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("scan"), TransactionType::kNormal);
             Optional<DBMeeta> db_meta;
             Optional<TableMeeta> table_meta;
             Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
@@ -573,28 +573,28 @@ TEST_P(TestTxnAppend, test_append_drop_db) {
     //                    |----------------------|----------|
     //                    t2                  dropdb      commit (success)
     {
-        SharedPtr<String> db_name = std::make_shared<String>("db1");
+        std::shared_ptr<String> db_name = std::make_shared<String>("db1");
         auto table_name = std::make_shared<std::string>("tb1");
-        auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def2});
+        auto table_def = TableDef::Make(db_name, table_name, std::make_shared<String>(), {column_def1, column_def2});
 
-        auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
-        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
+        auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<String>("create db"), TransactionType::kNormal);
+        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, std::make_shared<String>());
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn1);
         EXPECT_TRUE(status.ok());
 
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<String>("create table"), TransactionType::kNormal);
         status = txn2->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());
 
-        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+        auto *txn3 = new_txn_mgr->BeginTxn(std::make_unique<String>("append"), TransactionType::kNormal);
         auto input_block1 = MakeInputBlock1(8192);
         status = txn3->Append(*db_name, *table_name, input_block1);
         EXPECT_TRUE(status.ok());
 
-        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
+        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<String>("drop db"), TransactionType::kNormal);
 
         status = new_txn_mgr->CommitTxn(txn3);
         EXPECT_TRUE(status.ok());
@@ -605,7 +605,7 @@ TEST_P(TestTxnAppend, test_append_drop_db) {
         EXPECT_TRUE(status.ok());
 
         // Check the appended data.
-        auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
+        auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<String>("scan"), TransactionType::kNormal);
         Optional<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
@@ -619,28 +619,28 @@ TEST_P(TestTxnAppend, test_append_drop_db) {
     //                    |----------------------|----------|
     //                    t2                  dropdb      commit (success)
     {
-        SharedPtr<String> db_name = std::make_shared<String>("db1");
+        std::shared_ptr<String> db_name = std::make_shared<String>("db1");
         auto table_name = std::make_shared<std::string>("tb1");
-        auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def2});
+        auto table_def = TableDef::Make(db_name, table_name, std::make_shared<String>(), {column_def1, column_def2});
 
-        auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
-        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
+        auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<String>("create db"), TransactionType::kNormal);
+        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, std::make_shared<String>());
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn1);
         EXPECT_TRUE(status.ok());
 
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<String>("create table"), TransactionType::kNormal);
         status = txn2->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());
 
-        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+        auto *txn3 = new_txn_mgr->BeginTxn(std::make_unique<String>("append"), TransactionType::kNormal);
         auto input_block1 = MakeInputBlock1(8192);
         status = txn3->Append(*db_name, *table_name, input_block1);
         EXPECT_TRUE(status.ok());
 
-        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
+        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<String>("drop db"), TransactionType::kNormal);
         status = txn4->DropDatabase("db1", ConflictType::kError);
         EXPECT_TRUE(status.ok());
 
@@ -651,7 +651,7 @@ TEST_P(TestTxnAppend, test_append_drop_db) {
         EXPECT_TRUE(status.ok());
 
         // Check the appended data.
-        auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
+        auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<String>("scan"), TransactionType::kNormal);
         Optional<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
@@ -665,28 +665,28 @@ TEST_P(TestTxnAppend, test_append_drop_db) {
     //                    |----------------------|----------|
     //                    t2                  dropdb      commit (success)
     {
-        SharedPtr<String> db_name = std::make_shared<String>("db1");
+        std::shared_ptr<String> db_name = std::make_shared<String>("db1");
         auto table_name = std::make_shared<std::string>("tb1");
-        auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def2});
+        auto table_def = TableDef::Make(db_name, table_name, std::make_shared<String>(), {column_def1, column_def2});
 
-        auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
-        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
+        auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<String>("create db"), TransactionType::kNormal);
+        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, std::make_shared<String>());
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn1);
         EXPECT_TRUE(status.ok());
 
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<String>("create table"), TransactionType::kNormal);
         status = txn2->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());
 
-        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+        auto *txn3 = new_txn_mgr->BeginTxn(std::make_unique<String>("append"), TransactionType::kNormal);
         auto input_block1 = MakeInputBlock1(8192);
         status = txn3->Append(*db_name, *table_name, input_block1);
         EXPECT_TRUE(status.ok());
 
-        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
+        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<String>("drop db"), TransactionType::kNormal);
         status = txn4->DropDatabase("db1", ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn4);
@@ -696,7 +696,7 @@ TEST_P(TestTxnAppend, test_append_drop_db) {
         EXPECT_FALSE(status.ok());
 
         // Check the appended data.
-        auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
+        auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<String>("scan"), TransactionType::kNormal);
         Optional<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
@@ -710,25 +710,25 @@ TEST_P(TestTxnAppend, test_append_drop_db) {
     //                    |----------------------|----------|
     //                    t2                  dropdb      commit (success)
     {
-        SharedPtr<String> db_name = std::make_shared<String>("db1");
+        std::shared_ptr<String> db_name = std::make_shared<String>("db1");
         auto table_name = std::make_shared<std::string>("tb1");
-        auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def2});
+        auto table_def = TableDef::Make(db_name, table_name, std::make_shared<String>(), {column_def1, column_def2});
 
-        auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
-        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
+        auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<String>("create db"), TransactionType::kNormal);
+        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, std::make_shared<String>());
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn1);
         EXPECT_TRUE(status.ok());
 
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<String>("create table"), TransactionType::kNormal);
         status = txn2->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());
 
-        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+        auto *txn3 = new_txn_mgr->BeginTxn(std::make_unique<String>("append"), TransactionType::kNormal);
 
-        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
+        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<String>("drop db"), TransactionType::kNormal);
         status = txn4->DropDatabase("db1", ConflictType::kError);
         EXPECT_TRUE(status.ok());
 
@@ -743,7 +743,7 @@ TEST_P(TestTxnAppend, test_append_drop_db) {
         EXPECT_FALSE(status.ok());
 
         // Check the appended data.
-        auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
+        auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<String>("scan"), TransactionType::kNormal);
         Optional<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
@@ -757,25 +757,25 @@ TEST_P(TestTxnAppend, test_append_drop_db) {
     //                    |----------------------|----------|
     //                    t2                  dropdb      commit (success)
     {
-        SharedPtr<String> db_name = std::make_shared<String>("db1");
+        std::shared_ptr<String> db_name = std::make_shared<String>("db1");
         auto table_name = std::make_shared<std::string>("tb1");
-        auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def2});
+        auto table_def = TableDef::Make(db_name, table_name, std::make_shared<String>(), {column_def1, column_def2});
 
-        auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
-        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
+        auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<String>("create db"), TransactionType::kNormal);
+        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, std::make_shared<String>());
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn1);
         EXPECT_TRUE(status.ok());
 
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<String>("create table"), TransactionType::kNormal);
         status = txn2->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());
 
-        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+        auto *txn3 = new_txn_mgr->BeginTxn(std::make_unique<String>("append"), TransactionType::kNormal);
 
-        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
+        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<String>("drop db"), TransactionType::kNormal);
         status = txn4->DropDatabase("db1", ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn4);
@@ -789,7 +789,7 @@ TEST_P(TestTxnAppend, test_append_drop_db) {
         EXPECT_FALSE(status.ok());
 
         // Check the appended data.
-        auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
+        auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<String>("scan"), TransactionType::kNormal);
         Optional<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
@@ -803,28 +803,28 @@ TEST_P(TestTxnAppend, test_append_drop_db) {
     //                    |----------------------|----------|
     //                    t2                  dropdb      commit (success)
     {
-        SharedPtr<String> db_name = std::make_shared<String>("db1");
+        std::shared_ptr<String> db_name = std::make_shared<String>("db1");
         auto table_name = std::make_shared<std::string>("tb1");
-        auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def2});
+        auto table_def = TableDef::Make(db_name, table_name, std::make_shared<String>(), {column_def1, column_def2});
 
-        auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
-        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
+        auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<String>("create db"), TransactionType::kNormal);
+        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, std::make_shared<String>());
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn1);
         EXPECT_TRUE(status.ok());
 
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<String>("create table"), TransactionType::kNormal);
         status = txn2->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());
 
-        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
+        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<String>("drop db"), TransactionType::kNormal);
 
         status = txn4->DropDatabase("db1", ConflictType::kError);
         EXPECT_TRUE(status.ok());
 
-        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+        auto *txn3 = new_txn_mgr->BeginTxn(std::make_unique<String>("append"), TransactionType::kNormal);
 
         status = new_txn_mgr->CommitTxn(txn4);
         EXPECT_TRUE(status.ok());
@@ -837,7 +837,7 @@ TEST_P(TestTxnAppend, test_append_drop_db) {
         EXPECT_FALSE(status.ok());
 
         // Check the appended data.
-        auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
+        auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<String>("scan"), TransactionType::kNormal);
         Optional<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
@@ -851,29 +851,29 @@ TEST_P(TestTxnAppend, test_append_drop_db) {
     //                    |----------------------|----------|
     //                    t2                  dropdb      commit (success)
     {
-        SharedPtr<String> db_name = std::make_shared<String>("db1");
+        std::shared_ptr<String> db_name = std::make_shared<String>("db1");
         auto table_name = std::make_shared<std::string>("tb1");
-        auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def2});
+        auto table_def = TableDef::Make(db_name, table_name, std::make_shared<String>(), {column_def1, column_def2});
 
-        auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
-        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
+        auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<String>("create db"), TransactionType::kNormal);
+        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, std::make_shared<String>());
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn1);
         EXPECT_TRUE(status.ok());
 
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<String>("create table"), TransactionType::kNormal);
         status = txn2->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());
 
-        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
+        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<String>("drop db"), TransactionType::kNormal);
         status = txn4->DropDatabase("db1", ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn4);
         EXPECT_TRUE(status.ok());
 
-        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+        auto *txn3 = new_txn_mgr->BeginTxn(std::make_unique<String>("append"), TransactionType::kNormal);
         auto input_block1 = MakeInputBlock1(8192);
         status = txn3->Append(*db_name, *table_name, input_block1);
         EXPECT_FALSE(status.ok());
@@ -881,7 +881,7 @@ TEST_P(TestTxnAppend, test_append_drop_db) {
         EXPECT_TRUE(status.ok());
 
         // Check the appended data.
-        auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
+        auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<String>("scan"), TransactionType::kNormal);
         Optional<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
@@ -904,18 +904,18 @@ TEST_P(TestTxnAppend, test_append_drop_table) {
     //                            |----------------------|----------|
     //                           t2                  droptable      commit (success)
     {
-        SharedPtr<String> db_name = std::make_shared<String>("db1");
+        std::shared_ptr<String> db_name = std::make_shared<String>("db1");
         auto table_name = std::make_shared<std::string>("tb1");
-        auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def2});
+        auto table_def = TableDef::Make(db_name, table_name, std::make_shared<String>(), {column_def1, column_def2});
         {
-            auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
-            Status status = txn->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
+            auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("create db"), TransactionType::kNormal);
+            Status status = txn->CreateDatabase(*db_name, ConflictType::kError, std::make_shared<String>());
             EXPECT_TRUE(status.ok());
             status = new_txn_mgr->CommitTxn(txn);
             EXPECT_TRUE(status.ok());
         }
         {
-            auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+            auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("create table"), TransactionType::kNormal);
             Status status = txn->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
             EXPECT_TRUE(status.ok());
             status = new_txn_mgr->CommitTxn(txn);
@@ -923,7 +923,7 @@ TEST_P(TestTxnAppend, test_append_drop_table) {
         }
 
         {
-            auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+            auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("append"), TransactionType::kNormal);
             auto input_block1 = MakeInputBlock1(8192);
             Status status = txn->Append(*db_name, *table_name, input_block1);
             EXPECT_TRUE(status.ok());
@@ -933,7 +933,7 @@ TEST_P(TestTxnAppend, test_append_drop_table) {
 
         {
             // drop table
-            auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("drop table"), TransactionType::kNormal);
+            auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("drop table"), TransactionType::kNormal);
             Status status = txn->DropTable("db1", "tb1", ConflictType::kError);
             EXPECT_TRUE(status.ok());
             status = new_txn_mgr->CommitTxn(txn);
@@ -942,7 +942,7 @@ TEST_P(TestTxnAppend, test_append_drop_table) {
 
         {
             // drop database
-            auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
+            auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<String>("drop db"), TransactionType::kNormal);
             Status status = txn6->DropDatabase("db1", ConflictType::kError);
             EXPECT_TRUE(status.ok());
             status = new_txn_mgr->CommitTxn(txn6);
@@ -951,7 +951,7 @@ TEST_P(TestTxnAppend, test_append_drop_table) {
 
         // Check the appended data.
         {
-            auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
+            auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("scan"), TransactionType::kNormal);
             Optional<DBMeeta> db_meta;
             Optional<TableMeeta> table_meta;
             Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
@@ -964,28 +964,28 @@ TEST_P(TestTxnAppend, test_append_drop_table) {
     //                    |----------------------|----------|
     //                    t2                  droptable      commit (success)
     {
-        SharedPtr<String> db_name = std::make_shared<String>("db1");
+        std::shared_ptr<String> db_name = std::make_shared<String>("db1");
         auto table_name = std::make_shared<std::string>("tb1");
-        auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def2});
+        auto table_def = TableDef::Make(db_name, table_name, std::make_shared<String>(), {column_def1, column_def2});
 
-        auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
-        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
+        auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<String>("create db"), TransactionType::kNormal);
+        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, std::make_shared<String>());
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn1);
         EXPECT_TRUE(status.ok());
 
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<String>("create table"), TransactionType::kNormal);
         status = txn2->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());
 
-        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+        auto *txn3 = new_txn_mgr->BeginTxn(std::make_unique<String>("append"), TransactionType::kNormal);
         auto input_block1 = MakeInputBlock1(8192);
         status = txn3->Append(*db_name, *table_name, input_block1);
         EXPECT_TRUE(status.ok());
 
-        auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop table"), TransactionType::kNormal);
+        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<String>("drop table"), TransactionType::kNormal);
 
         status = new_txn_mgr->CommitTxn(txn3);
         EXPECT_TRUE(status.ok());
@@ -995,14 +995,14 @@ TEST_P(TestTxnAppend, test_append_drop_table) {
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
 
-        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
+        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<String>("drop db"), TransactionType::kNormal);
         status = txn4->DropDatabase("db1", ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn4);
         EXPECT_TRUE(status.ok());
 
         // Check the appended data.
-        auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
+        auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<String>("scan"), TransactionType::kNormal);
         Optional<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
@@ -1016,28 +1016,28 @@ TEST_P(TestTxnAppend, test_append_drop_table) {
     //                    |----------------------|----------|
     //                    t2                  droptable      commit (success)
     {
-        SharedPtr<String> db_name = std::make_shared<String>("db1");
+        std::shared_ptr<String> db_name = std::make_shared<String>("db1");
         auto table_name = std::make_shared<std::string>("tb1");
-        auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def2});
+        auto table_def = TableDef::Make(db_name, table_name, std::make_shared<String>(), {column_def1, column_def2});
 
-        auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
-        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
+        auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<String>("create db"), TransactionType::kNormal);
+        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, std::make_shared<String>());
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn1);
         EXPECT_TRUE(status.ok());
 
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<String>("create table"), TransactionType::kNormal);
         status = txn2->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());
 
-        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+        auto *txn3 = new_txn_mgr->BeginTxn(std::make_unique<String>("append"), TransactionType::kNormal);
         auto input_block1 = MakeInputBlock1(8192);
         status = txn3->Append(*db_name, *table_name, input_block1);
         EXPECT_TRUE(status.ok());
 
-        auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop table"), TransactionType::kNormal);
+        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<String>("drop table"), TransactionType::kNormal);
         status = txn6->DropTable("db1", "tb1", ConflictType::kError);
         EXPECT_TRUE(status.ok());
 
@@ -1047,14 +1047,14 @@ TEST_P(TestTxnAppend, test_append_drop_table) {
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
 
-        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
+        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<String>("drop db"), TransactionType::kNormal);
         status = txn4->DropDatabase("db1", ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn4);
         EXPECT_TRUE(status.ok());
 
         // Check the appended data.
-        auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
+        auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<String>("scan"), TransactionType::kNormal);
         Optional<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
@@ -1068,28 +1068,28 @@ TEST_P(TestTxnAppend, test_append_drop_table) {
     //                    |----------------------|----------|
     //                    t2                  droptable      commit (success)
     {
-        SharedPtr<String> db_name = std::make_shared<String>("db1");
+        std::shared_ptr<String> db_name = std::make_shared<String>("db1");
         auto table_name = std::make_shared<std::string>("tb1");
-        auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def2});
+        auto table_def = TableDef::Make(db_name, table_name, std::make_shared<String>(), {column_def1, column_def2});
 
-        auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
-        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
+        auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<String>("create db"), TransactionType::kNormal);
+        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, std::make_shared<String>());
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn1);
         EXPECT_TRUE(status.ok());
 
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<String>("create table"), TransactionType::kNormal);
         status = txn2->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());
 
-        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+        auto *txn3 = new_txn_mgr->BeginTxn(std::make_unique<String>("append"), TransactionType::kNormal);
         auto input_block1 = MakeInputBlock1(8192);
         status = txn3->Append(*db_name, *table_name, input_block1);
         EXPECT_TRUE(status.ok());
 
-        auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop table"), TransactionType::kNormal);
+        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<String>("drop table"), TransactionType::kNormal);
         status = txn6->DropTable("db1", "tb1", ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
@@ -1098,14 +1098,14 @@ TEST_P(TestTxnAppend, test_append_drop_table) {
         status = new_txn_mgr->CommitTxn(txn3);
         EXPECT_FALSE(status.ok());
 
-        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
+        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<String>("drop db"), TransactionType::kNormal);
         status = txn4->DropDatabase("db1", ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn4);
         EXPECT_TRUE(status.ok());
 
         // Check the appended data.
-        auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
+        auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<String>("scan"), TransactionType::kNormal);
         Optional<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
@@ -1119,25 +1119,25 @@ TEST_P(TestTxnAppend, test_append_drop_table) {
     //                    |----------------------|----------|
     //                    t2                  drop table   commit (success)
     {
-        SharedPtr<String> db_name = std::make_shared<String>("db1");
+        std::shared_ptr<String> db_name = std::make_shared<String>("db1");
         auto table_name = std::make_shared<std::string>("tb1");
-        auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def2});
+        auto table_def = TableDef::Make(db_name, table_name, std::make_shared<String>(), {column_def1, column_def2});
 
-        auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
-        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
+        auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<String>("create db"), TransactionType::kNormal);
+        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, std::make_shared<String>());
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn1);
         EXPECT_TRUE(status.ok());
 
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<String>("create table"), TransactionType::kNormal);
         status = txn2->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());
 
-        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+        auto *txn3 = new_txn_mgr->BeginTxn(std::make_unique<String>("append"), TransactionType::kNormal);
 
-        auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop table"), TransactionType::kNormal);
+        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<String>("drop table"), TransactionType::kNormal);
         status = txn6->DropTable("db1", "tb1", ConflictType::kError);
         EXPECT_TRUE(status.ok());
 
@@ -1151,14 +1151,14 @@ TEST_P(TestTxnAppend, test_append_drop_table) {
         status = new_txn_mgr->CommitTxn(txn3);
         EXPECT_FALSE(status.ok());
 
-        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
+        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<String>("drop db"), TransactionType::kNormal);
         status = txn4->DropDatabase("db1", ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn4);
         EXPECT_TRUE(status.ok());
 
         // Check the appended data.
-        auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
+        auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<String>("scan"), TransactionType::kNormal);
         Optional<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
@@ -1172,25 +1172,25 @@ TEST_P(TestTxnAppend, test_append_drop_table) {
     //                    |----------------------|----------|
     //                    t2                  drop table   commit (success)
     {
-        SharedPtr<String> db_name = std::make_shared<String>("db1");
+        std::shared_ptr<String> db_name = std::make_shared<String>("db1");
         auto table_name = std::make_shared<std::string>("tb1");
-        auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def2});
+        auto table_def = TableDef::Make(db_name, table_name, std::make_shared<String>(), {column_def1, column_def2});
 
-        auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
-        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
+        auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<String>("create db"), TransactionType::kNormal);
+        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, std::make_shared<String>());
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn1);
         EXPECT_TRUE(status.ok());
 
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<String>("create table"), TransactionType::kNormal);
         status = txn2->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());
 
-        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+        auto *txn3 = new_txn_mgr->BeginTxn(std::make_unique<String>("append"), TransactionType::kNormal);
 
-        auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop table"), TransactionType::kNormal);
+        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<String>("drop table"), TransactionType::kNormal);
         status = txn6->DropTable("db1", "tb1", ConflictType::kError);
         EXPECT_TRUE(status.ok());
 
@@ -1204,14 +1204,14 @@ TEST_P(TestTxnAppend, test_append_drop_table) {
         status = new_txn_mgr->CommitTxn(txn3);
         EXPECT_FALSE(status.ok());
 
-        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
+        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<String>("drop db"), TransactionType::kNormal);
         status = txn4->DropDatabase("db1", ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn4);
         EXPECT_TRUE(status.ok());
 
         // Check the appended data.
-        auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
+        auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<String>("scan"), TransactionType::kNormal);
         Optional<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
@@ -1225,27 +1225,27 @@ TEST_P(TestTxnAppend, test_append_drop_table) {
     //                    |----------------------|----------|
     //                    t2                  dropdb      commit (success)
     {
-        SharedPtr<String> db_name = std::make_shared<String>("db1");
+        std::shared_ptr<String> db_name = std::make_shared<String>("db1");
         auto table_name = std::make_shared<std::string>("tb1");
-        auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def2});
+        auto table_def = TableDef::Make(db_name, table_name, std::make_shared<String>(), {column_def1, column_def2});
 
-        auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
-        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
+        auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<String>("create db"), TransactionType::kNormal);
+        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, std::make_shared<String>());
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn1);
         EXPECT_TRUE(status.ok());
 
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<String>("create table"), TransactionType::kNormal);
         status = txn2->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());
 
-        auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop table"), TransactionType::kNormal);
+        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<String>("drop table"), TransactionType::kNormal);
         status = txn6->DropTable("db1", "tb1", ConflictType::kError);
         EXPECT_TRUE(status.ok());
 
-        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+        auto *txn3 = new_txn_mgr->BeginTxn(std::make_unique<String>("append"), TransactionType::kNormal);
 
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
@@ -1257,14 +1257,14 @@ TEST_P(TestTxnAppend, test_append_drop_table) {
         status = new_txn_mgr->CommitTxn(txn3);
         EXPECT_FALSE(status.ok());
 
-        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
+        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<String>("drop db"), TransactionType::kNormal);
         status = txn4->DropDatabase("db1", ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn4);
         EXPECT_TRUE(status.ok());
 
         // Check the appended data.
-        auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
+        auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<String>("scan"), TransactionType::kNormal);
         Optional<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
@@ -1278,43 +1278,43 @@ TEST_P(TestTxnAppend, test_append_drop_table) {
     //                    |----------------------|----------|
     //                    t2                  dropdb      commit (success)
     {
-        SharedPtr<String> db_name = std::make_shared<String>("db1");
+        std::shared_ptr<String> db_name = std::make_shared<String>("db1");
         auto table_name = std::make_shared<std::string>("tb1");
-        auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def2});
+        auto table_def = TableDef::Make(db_name, table_name, std::make_shared<String>(), {column_def1, column_def2});
 
-        auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
-        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
+        auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<String>("create db"), TransactionType::kNormal);
+        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, std::make_shared<String>());
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn1);
         EXPECT_TRUE(status.ok());
 
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<String>("create table"), TransactionType::kNormal);
         status = txn2->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());
 
-        auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop table"), TransactionType::kNormal);
+        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<String>("drop table"), TransactionType::kNormal);
         status = txn6->DropTable("db1", "tb1", ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
 
-        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+        auto *txn3 = new_txn_mgr->BeginTxn(std::make_unique<String>("append"), TransactionType::kNormal);
         auto input_block1 = MakeInputBlock1(8192);
         status = txn3->Append(*db_name, *table_name, input_block1);
         EXPECT_FALSE(status.ok());
         status = new_txn_mgr->RollBackTxn(txn3);
         EXPECT_TRUE(status.ok());
 
-        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
+        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<String>("drop db"), TransactionType::kNormal);
         status = txn4->DropDatabase("db1", ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn4);
         EXPECT_TRUE(status.ok());
 
         // Check the appended data.
-        auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
+        auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<String>("scan"), TransactionType::kNormal);
         Optional<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
@@ -1341,33 +1341,33 @@ TEST_P(TestTxnAppend, test_append_add_column) {
     //                            |----------------------|----------|
     //                           t2                  add column    commit (success)
     {
-        SharedPtr<String> db_name = std::make_shared<String>("db1");
+        std::shared_ptr<String> db_name = std::make_shared<String>("db1");
         auto table_name = std::make_shared<std::string>("tb1");
-        auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def2});
-        auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
-        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
+        auto table_def = TableDef::Make(db_name, table_name, std::make_shared<String>(), {column_def1, column_def2});
+        auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<String>("create db"), TransactionType::kNormal);
+        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, std::make_shared<String>());
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn1);
         EXPECT_TRUE(status.ok());
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<String>("create table"), TransactionType::kNormal);
         status = txn2->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());
 
-        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+        auto *txn3 = new_txn_mgr->BeginTxn(std::make_unique<String>("append"), TransactionType::kNormal);
         auto input_block1 = MakeInputBlock1(8192);
         status = txn3->Append(*db_name, *table_name, input_block1);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn3);
         EXPECT_TRUE(status.ok());
 
-        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("add column"), TransactionType::kNormal);
+        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<String>("add column"), TransactionType::kNormal);
         auto column_def3 =
             std::make_shared<ColumnDef>(2, std::make_shared<DataType>(LogicalType::kVarchar), "col3", std::set<ConstraintType>(), default_varchar);
         auto column_def4 =
             std::make_shared<ColumnDef>(3, std::make_shared<DataType>(LogicalType::kVarchar), "col4", std::set<ConstraintType>(), default_varchar);
-        Vector<SharedPtr<ColumnDef>> columns;
+        Vector<std::shared_ptr<ColumnDef>> columns;
         columns.emplace_back(column_def3);
         columns.emplace_back(column_def4);
         status = txn4->AddColumns(*db_name, *table_name, columns);
@@ -1376,14 +1376,14 @@ TEST_P(TestTxnAppend, test_append_add_column) {
         EXPECT_TRUE(status.ok());
 
         // drop database
-        auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
+        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<String>("drop db"), TransactionType::kNormal);
         status = txn6->DropDatabase("db1", ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
 
         // Check the appended data.
-        auto *txn7 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
+        auto *txn7 = new_txn_mgr->BeginTxn(std::make_unique<String>("scan"), TransactionType::kNormal);
         Optional<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         status = txn7->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
@@ -1397,26 +1397,26 @@ TEST_P(TestTxnAppend, test_append_add_column) {
     //                    |----------------------|----------|
     //                    t2                  add column   commit (fail)
     {
-        SharedPtr<String> db_name = std::make_shared<String>("db1");
+        std::shared_ptr<String> db_name = std::make_shared<String>("db1");
         auto table_name = std::make_shared<std::string>("tb1");
-        auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def2});
-        auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
-        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
+        auto table_def = TableDef::Make(db_name, table_name, std::make_shared<String>(), {column_def1, column_def2});
+        auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<String>("create db"), TransactionType::kNormal);
+        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, std::make_shared<String>());
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn1);
         EXPECT_TRUE(status.ok());
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<String>("create table"), TransactionType::kNormal);
         status = txn2->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());
 
-        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+        auto *txn3 = new_txn_mgr->BeginTxn(std::make_unique<String>("append"), TransactionType::kNormal);
         auto input_block1 = MakeInputBlock1(8192);
         status = txn3->Append(*db_name, *table_name, input_block1);
         EXPECT_TRUE(status.ok());
 
-        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("add column"), TransactionType::kNormal);
+        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<String>("add column"), TransactionType::kNormal);
 
         status = new_txn_mgr->CommitTxn(txn3);
         EXPECT_TRUE(status.ok());
@@ -1425,7 +1425,7 @@ TEST_P(TestTxnAppend, test_append_add_column) {
             std::make_shared<ColumnDef>(2, std::make_shared<DataType>(LogicalType::kVarchar), "col3", std::set<ConstraintType>(), default_varchar);
         auto column_def4 =
             std::make_shared<ColumnDef>(3, std::make_shared<DataType>(LogicalType::kVarchar), "col4", std::set<ConstraintType>(), default_varchar);
-        Vector<SharedPtr<ColumnDef>> columns;
+        Vector<std::shared_ptr<ColumnDef>> columns;
         columns.emplace_back(column_def3);
         columns.emplace_back(column_def4);
         status = txn4->AddColumns(*db_name, *table_name, columns);
@@ -1434,14 +1434,14 @@ TEST_P(TestTxnAppend, test_append_add_column) {
         EXPECT_FALSE(status.ok());
 
         // drop database
-        auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
+        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<String>("drop db"), TransactionType::kNormal);
         status = txn6->DropDatabase("db1", ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
 
         // Check the appended data.
-        auto *txn7 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
+        auto *txn7 = new_txn_mgr->BeginTxn(std::make_unique<String>("scan"), TransactionType::kNormal);
         Optional<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         status = txn7->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
@@ -1455,31 +1455,31 @@ TEST_P(TestTxnAppend, test_append_add_column) {
     //                    |-----------------------|-------------------------|
     //                    t2                  add column              commit (fail)
     {
-        SharedPtr<String> db_name = std::make_shared<String>("db1");
+        std::shared_ptr<String> db_name = std::make_shared<String>("db1");
         auto table_name = std::make_shared<std::string>("tb1");
-        auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def2});
-        auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
-        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
+        auto table_def = TableDef::Make(db_name, table_name, std::make_shared<String>(), {column_def1, column_def2});
+        auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<String>("create db"), TransactionType::kNormal);
+        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, std::make_shared<String>());
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn1);
         EXPECT_TRUE(status.ok());
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<String>("create table"), TransactionType::kNormal);
         status = txn2->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());
 
-        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+        auto *txn3 = new_txn_mgr->BeginTxn(std::make_unique<String>("append"), TransactionType::kNormal);
         auto input_block1 = MakeInputBlock1(8192);
         status = txn3->Append(*db_name, *table_name, input_block1);
         EXPECT_TRUE(status.ok());
 
-        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("add column"), TransactionType::kNormal);
+        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<String>("add column"), TransactionType::kNormal);
         auto column_def3 =
             std::make_shared<ColumnDef>(2, std::make_shared<DataType>(LogicalType::kVarchar), "col3", std::set<ConstraintType>(), default_varchar);
         auto column_def4 =
             std::make_shared<ColumnDef>(3, std::make_shared<DataType>(LogicalType::kVarchar), "col4", std::set<ConstraintType>(), default_varchar);
-        Vector<SharedPtr<ColumnDef>> columns;
+        Vector<std::shared_ptr<ColumnDef>> columns;
         columns.emplace_back(column_def3);
         columns.emplace_back(column_def4);
         status = txn4->AddColumns(*db_name, *table_name, columns);
@@ -1492,14 +1492,14 @@ TEST_P(TestTxnAppend, test_append_add_column) {
         EXPECT_FALSE(status.ok());
 
         // drop database
-        auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
+        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<String>("drop db"), TransactionType::kNormal);
         status = txn6->DropDatabase("db1", ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
 
         // Check the appended data.
-        auto *txn7 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
+        auto *txn7 = new_txn_mgr->BeginTxn(std::make_unique<String>("scan"), TransactionType::kNormal);
         Optional<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         status = txn7->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
@@ -1513,31 +1513,31 @@ TEST_P(TestTxnAppend, test_append_add_column) {
     //                    |-------------|-------------------|
     //                    t2        add column        commit (success)
     {
-        SharedPtr<String> db_name = std::make_shared<String>("db1");
+        std::shared_ptr<String> db_name = std::make_shared<String>("db1");
         auto table_name = std::make_shared<std::string>("tb1");
-        auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def2});
-        auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
-        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
+        auto table_def = TableDef::Make(db_name, table_name, std::make_shared<String>(), {column_def1, column_def2});
+        auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<String>("create db"), TransactionType::kNormal);
+        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, std::make_shared<String>());
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn1);
         EXPECT_TRUE(status.ok());
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<String>("create table"), TransactionType::kNormal);
         status = txn2->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());
 
-        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+        auto *txn3 = new_txn_mgr->BeginTxn(std::make_unique<String>("append"), TransactionType::kNormal);
         auto input_block1 = MakeInputBlock1(8192);
         status = txn3->Append(*db_name, *table_name, input_block1);
         EXPECT_TRUE(status.ok());
 
-        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("add column"), TransactionType::kNormal);
+        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<String>("add column"), TransactionType::kNormal);
         auto column_def3 =
             std::make_shared<ColumnDef>(2, std::make_shared<DataType>(LogicalType::kVarchar), "col3", std::set<ConstraintType>(), default_varchar);
         auto column_def4 =
             std::make_shared<ColumnDef>(3, std::make_shared<DataType>(LogicalType::kVarchar), "col4", std::set<ConstraintType>(), default_varchar);
-        Vector<SharedPtr<ColumnDef>> columns;
+        Vector<std::shared_ptr<ColumnDef>> columns;
         columns.emplace_back(column_def3);
         columns.emplace_back(column_def4);
         status = txn4->AddColumns(*db_name, *table_name, columns);
@@ -1550,14 +1550,14 @@ TEST_P(TestTxnAppend, test_append_add_column) {
         EXPECT_FALSE(status.ok());
 
         // drop database
-        auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
+        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<String>("drop db"), TransactionType::kNormal);
         status = txn6->DropDatabase("db1", ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
 
         // Check the appended data.
-        auto *txn7 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
+        auto *txn7 = new_txn_mgr->BeginTxn(std::make_unique<String>("scan"), TransactionType::kNormal);
         Optional<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         status = txn7->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
@@ -1571,28 +1571,28 @@ TEST_P(TestTxnAppend, test_append_add_column) {
     //                    |----------------------|----------|
     //                    t2                  add column   commit (success)
     {
-        SharedPtr<String> db_name = std::make_shared<String>("db1");
+        std::shared_ptr<String> db_name = std::make_shared<String>("db1");
         auto table_name = std::make_shared<std::string>("tb1");
-        auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def2});
-        auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
-        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
+        auto table_def = TableDef::Make(db_name, table_name, std::make_shared<String>(), {column_def1, column_def2});
+        auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<String>("create db"), TransactionType::kNormal);
+        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, std::make_shared<String>());
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn1);
         EXPECT_TRUE(status.ok());
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<String>("create table"), TransactionType::kNormal);
         status = txn2->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());
 
-        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+        auto *txn3 = new_txn_mgr->BeginTxn(std::make_unique<String>("append"), TransactionType::kNormal);
 
-        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("add column"), TransactionType::kNormal);
+        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<String>("add column"), TransactionType::kNormal);
         auto column_def3 =
             std::make_shared<ColumnDef>(2, std::make_shared<DataType>(LogicalType::kVarchar), "col3", std::set<ConstraintType>(), default_varchar);
         auto column_def4 =
             std::make_shared<ColumnDef>(3, std::make_shared<DataType>(LogicalType::kVarchar), "col4", std::set<ConstraintType>(), default_varchar);
-        Vector<SharedPtr<ColumnDef>> columns;
+        Vector<std::shared_ptr<ColumnDef>> columns;
         columns.emplace_back(column_def3);
         columns.emplace_back(column_def4);
         status = txn4->AddColumns(*db_name, *table_name, columns);
@@ -1609,14 +1609,14 @@ TEST_P(TestTxnAppend, test_append_add_column) {
         EXPECT_FALSE(status.ok());
 
         // drop database
-        auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
+        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<String>("drop db"), TransactionType::kNormal);
         status = txn6->DropDatabase("db1", ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
 
         // Check the appended data.
-        auto *txn7 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
+        auto *txn7 = new_txn_mgr->BeginTxn(std::make_unique<String>("scan"), TransactionType::kNormal);
         Optional<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         status = txn7->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
@@ -1630,28 +1630,28 @@ TEST_P(TestTxnAppend, test_append_add_column) {
     //                    |----------------------|----------|
     //                    t2                  add column  commit (success)
     {
-        SharedPtr<String> db_name = std::make_shared<String>("db1");
+        std::shared_ptr<String> db_name = std::make_shared<String>("db1");
         auto table_name = std::make_shared<std::string>("tb1");
-        auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def2});
-        auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
-        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
+        auto table_def = TableDef::Make(db_name, table_name, std::make_shared<String>(), {column_def1, column_def2});
+        auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<String>("create db"), TransactionType::kNormal);
+        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, std::make_shared<String>());
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn1);
         EXPECT_TRUE(status.ok());
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<String>("create table"), TransactionType::kNormal);
         status = txn2->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());
 
-        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+        auto *txn3 = new_txn_mgr->BeginTxn(std::make_unique<String>("append"), TransactionType::kNormal);
 
-        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("add column"), TransactionType::kNormal);
+        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<String>("add column"), TransactionType::kNormal);
         auto column_def3 =
             std::make_shared<ColumnDef>(2, std::make_shared<DataType>(LogicalType::kVarchar), "col3", std::set<ConstraintType>(), default_varchar);
         auto column_def4 =
             std::make_shared<ColumnDef>(3, std::make_shared<DataType>(LogicalType::kVarchar), "col4", std::set<ConstraintType>(), default_varchar);
-        Vector<SharedPtr<ColumnDef>> columns;
+        Vector<std::shared_ptr<ColumnDef>> columns;
         columns.emplace_back(column_def3);
         columns.emplace_back(column_def4);
         status = txn4->AddColumns(*db_name, *table_name, columns);
@@ -1666,14 +1666,14 @@ TEST_P(TestTxnAppend, test_append_add_column) {
         EXPECT_FALSE(status.ok());
 
         // drop database
-        auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
+        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<String>("drop db"), TransactionType::kNormal);
         status = txn6->DropDatabase("db1", ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
 
         // Check the appended data.
-        auto *txn7 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
+        auto *txn7 = new_txn_mgr->BeginTxn(std::make_unique<String>("scan"), TransactionType::kNormal);
         Optional<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         status = txn7->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
@@ -1687,32 +1687,32 @@ TEST_P(TestTxnAppend, test_append_add_column) {
     //                    |----------------------|----------|
     //                    t2                  add column   commit (success)
     {
-        SharedPtr<String> db_name = std::make_shared<String>("db1");
+        std::shared_ptr<String> db_name = std::make_shared<String>("db1");
         auto table_name = std::make_shared<std::string>("tb1");
-        auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def2});
-        auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
-        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
+        auto table_def = TableDef::Make(db_name, table_name, std::make_shared<String>(), {column_def1, column_def2});
+        auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<String>("create db"), TransactionType::kNormal);
+        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, std::make_shared<String>());
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn1);
         EXPECT_TRUE(status.ok());
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<String>("create table"), TransactionType::kNormal);
         status = txn2->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());
 
-        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("add column"), TransactionType::kNormal);
+        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<String>("add column"), TransactionType::kNormal);
         auto column_def3 =
             std::make_shared<ColumnDef>(2, std::make_shared<DataType>(LogicalType::kVarchar), "col3", std::set<ConstraintType>(), default_varchar);
         auto column_def4 =
             std::make_shared<ColumnDef>(3, std::make_shared<DataType>(LogicalType::kVarchar), "col4", std::set<ConstraintType>(), default_varchar);
-        Vector<SharedPtr<ColumnDef>> columns;
+        Vector<std::shared_ptr<ColumnDef>> columns;
         columns.emplace_back(column_def3);
         columns.emplace_back(column_def4);
         status = txn4->AddColumns(*db_name, *table_name, columns);
         EXPECT_TRUE(status.ok());
 
-        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+        auto *txn3 = new_txn_mgr->BeginTxn(std::make_unique<String>("append"), TransactionType::kNormal);
 
         status = new_txn_mgr->CommitTxn(txn4);
         EXPECT_TRUE(status.ok());
@@ -1724,14 +1724,14 @@ TEST_P(TestTxnAppend, test_append_add_column) {
         EXPECT_FALSE(status.ok());
 
         // drop database
-        auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
+        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<String>("drop db"), TransactionType::kNormal);
         status = txn6->DropDatabase("db1", ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
 
         // Check the appended data.
-        auto *txn7 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
+        auto *txn7 = new_txn_mgr->BeginTxn(std::make_unique<String>("scan"), TransactionType::kNormal);
         Optional<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         status = txn7->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
@@ -1745,26 +1745,26 @@ TEST_P(TestTxnAppend, test_append_add_column) {
     //                    |----------------------|----------|
     //                    t2                  add column   commit (success)
     {
-        SharedPtr<String> db_name = std::make_shared<String>("db1");
+        std::shared_ptr<String> db_name = std::make_shared<String>("db1");
         auto table_name = std::make_shared<std::string>("tb1");
-        auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def2});
-        auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
-        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
+        auto table_def = TableDef::Make(db_name, table_name, std::make_shared<String>(), {column_def1, column_def2});
+        auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<String>("create db"), TransactionType::kNormal);
+        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, std::make_shared<String>());
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn1);
         EXPECT_TRUE(status.ok());
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<String>("create table"), TransactionType::kNormal);
         status = txn2->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());
 
-        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("add column"), TransactionType::kNormal);
+        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<String>("add column"), TransactionType::kNormal);
         auto column_def3 =
             std::make_shared<ColumnDef>(2, std::make_shared<DataType>(LogicalType::kVarchar), "col3", std::set<ConstraintType>(), default_varchar);
         auto column_def4 =
             std::make_shared<ColumnDef>(3, std::make_shared<DataType>(LogicalType::kVarchar), "col4", std::set<ConstraintType>(), default_varchar);
-        Vector<SharedPtr<ColumnDef>> columns;
+        Vector<std::shared_ptr<ColumnDef>> columns;
         columns.emplace_back(column_def3);
         columns.emplace_back(column_def4);
         status = txn4->AddColumns(*db_name, *table_name, columns);
@@ -1772,7 +1772,7 @@ TEST_P(TestTxnAppend, test_append_add_column) {
         status = new_txn_mgr->CommitTxn(txn4);
         EXPECT_TRUE(status.ok());
 
-        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+        auto *txn3 = new_txn_mgr->BeginTxn(std::make_unique<String>("append"), TransactionType::kNormal);
         auto input_block1 = MakeInputBlock1(8192);
         status = txn3->Append(*db_name, *table_name, input_block1);
         EXPECT_FALSE(status.ok());
@@ -1780,14 +1780,14 @@ TEST_P(TestTxnAppend, test_append_add_column) {
         EXPECT_TRUE(status.ok());
 
         // drop database
-        auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
+        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<String>("drop db"), TransactionType::kNormal);
         status = txn6->DropDatabase("db1", ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
 
         // Check the appended data.
-        auto *txn7 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
+        auto *txn7 = new_txn_mgr->BeginTxn(std::make_unique<String>("scan"), TransactionType::kNormal);
         Optional<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         status = txn7->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
@@ -1815,28 +1815,28 @@ TEST_P(TestTxnAppend, test_append_drop_column) {
     //                            |----------------------|----------|
     //                           t2                  drop column    commit (success)
     {
-        SharedPtr<String> db_name = std::make_shared<String>("db1");
+        std::shared_ptr<String> db_name = std::make_shared<String>("db1");
         auto table_name = std::make_shared<std::string>("tb1");
-        auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def2});
-        auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
-        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
+        auto table_def = TableDef::Make(db_name, table_name, std::make_shared<String>(), {column_def1, column_def2});
+        auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<String>("create db"), TransactionType::kNormal);
+        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, std::make_shared<String>());
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn1);
         EXPECT_TRUE(status.ok());
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<String>("create table"), TransactionType::kNormal);
         status = txn2->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());
 
-        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+        auto *txn3 = new_txn_mgr->BeginTxn(std::make_unique<String>("append"), TransactionType::kNormal);
         auto input_block1 = MakeInputBlock1(8192);
         status = txn3->Append(*db_name, *table_name, input_block1);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn3);
         EXPECT_TRUE(status.ok());
 
-        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop column"), TransactionType::kNormal);
+        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<String>("drop column"), TransactionType::kNormal);
         Vector<String> column_names;
         column_names.push_back("col2");
         status = txn4->DropColumns(*db_name, *table_name, column_names);
@@ -1845,14 +1845,14 @@ TEST_P(TestTxnAppend, test_append_drop_column) {
         EXPECT_TRUE(status.ok());
 
         // drop database
-        auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
+        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<String>("drop db"), TransactionType::kNormal);
         status = txn6->DropDatabase("db1", ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
 
         // Check the appended data.
-        auto *txn7 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
+        auto *txn7 = new_txn_mgr->BeginTxn(std::make_unique<String>("scan"), TransactionType::kNormal);
         Optional<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         status = txn7->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
@@ -1866,26 +1866,26 @@ TEST_P(TestTxnAppend, test_append_drop_column) {
     //                    |----------------------|----------|
     //                    t2                  drop column   commit (fail)
     {
-        SharedPtr<String> db_name = std::make_shared<String>("db1");
+        std::shared_ptr<String> db_name = std::make_shared<String>("db1");
         auto table_name = std::make_shared<std::string>("tb1");
-        auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def2});
-        auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
-        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
+        auto table_def = TableDef::Make(db_name, table_name, std::make_shared<String>(), {column_def1, column_def2});
+        auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<String>("create db"), TransactionType::kNormal);
+        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, std::make_shared<String>());
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn1);
         EXPECT_TRUE(status.ok());
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<String>("create table"), TransactionType::kNormal);
         status = txn2->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());
 
-        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+        auto *txn3 = new_txn_mgr->BeginTxn(std::make_unique<String>("append"), TransactionType::kNormal);
         auto input_block1 = MakeInputBlock1(8192);
         status = txn3->Append(*db_name, *table_name, input_block1);
         EXPECT_TRUE(status.ok());
 
-        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop column"), TransactionType::kNormal);
+        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<String>("drop column"), TransactionType::kNormal);
 
         status = new_txn_mgr->CommitTxn(txn3);
         EXPECT_TRUE(status.ok());
@@ -1898,14 +1898,14 @@ TEST_P(TestTxnAppend, test_append_drop_column) {
         EXPECT_FALSE(status.ok());
 
         // drop database
-        auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
+        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<String>("drop db"), TransactionType::kNormal);
         status = txn6->DropDatabase("db1", ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
 
         // Check the appended data.
-        auto *txn7 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
+        auto *txn7 = new_txn_mgr->BeginTxn(std::make_unique<String>("scan"), TransactionType::kNormal);
         Optional<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         status = txn7->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
@@ -1919,26 +1919,26 @@ TEST_P(TestTxnAppend, test_append_drop_column) {
     //                    |-----------------------|-------------------------|
     //                    t2                  drop column           commit (fail)
     {
-        SharedPtr<String> db_name = std::make_shared<String>("db1");
+        std::shared_ptr<String> db_name = std::make_shared<String>("db1");
         auto table_name = std::make_shared<std::string>("tb1");
-        auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def2});
-        auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
-        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
+        auto table_def = TableDef::Make(db_name, table_name, std::make_shared<String>(), {column_def1, column_def2});
+        auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<String>("create db"), TransactionType::kNormal);
+        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, std::make_shared<String>());
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn1);
         EXPECT_TRUE(status.ok());
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<String>("create table"), TransactionType::kNormal);
         status = txn2->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());
 
-        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+        auto *txn3 = new_txn_mgr->BeginTxn(std::make_unique<String>("append"), TransactionType::kNormal);
         auto input_block1 = MakeInputBlock1(8192);
         status = txn3->Append(*db_name, *table_name, input_block1);
         EXPECT_TRUE(status.ok());
 
-        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop column"), TransactionType::kNormal);
+        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<String>("drop column"), TransactionType::kNormal);
         Vector<String> column_names;
         column_names.push_back("col2");
         status = txn4->DropColumns(*db_name, *table_name, column_names);
@@ -1951,14 +1951,14 @@ TEST_P(TestTxnAppend, test_append_drop_column) {
         EXPECT_FALSE(status.ok());
 
         // drop database
-        auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
+        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<String>("drop db"), TransactionType::kNormal);
         status = txn6->DropDatabase("db1", ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
 
         // Check the appended data.
-        auto *txn7 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
+        auto *txn7 = new_txn_mgr->BeginTxn(std::make_unique<String>("scan"), TransactionType::kNormal);
         Optional<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         status = txn7->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
@@ -1972,26 +1972,26 @@ TEST_P(TestTxnAppend, test_append_drop_column) {
     //                    |-------------|-------------------|
     //                    t2        drop column      commit (success)
     {
-        SharedPtr<String> db_name = std::make_shared<String>("db1");
+        std::shared_ptr<String> db_name = std::make_shared<String>("db1");
         auto table_name = std::make_shared<std::string>("tb1");
-        auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def2});
-        auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
-        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
+        auto table_def = TableDef::Make(db_name, table_name, std::make_shared<String>(), {column_def1, column_def2});
+        auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<String>("create db"), TransactionType::kNormal);
+        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, std::make_shared<String>());
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn1);
         EXPECT_TRUE(status.ok());
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<String>("create table"), TransactionType::kNormal);
         status = txn2->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());
 
-        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+        auto *txn3 = new_txn_mgr->BeginTxn(std::make_unique<String>("append"), TransactionType::kNormal);
         auto input_block1 = MakeInputBlock1(8192);
         status = txn3->Append(*db_name, *table_name, input_block1);
         EXPECT_TRUE(status.ok());
 
-        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop column"), TransactionType::kNormal);
+        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<String>("drop column"), TransactionType::kNormal);
         Vector<String> column_names;
         column_names.push_back("col2");
         status = txn4->DropColumns(*db_name, *table_name, column_names);
@@ -2002,20 +2002,20 @@ TEST_P(TestTxnAppend, test_append_drop_column) {
         status = new_txn_mgr->CommitTxn(txn3);
         EXPECT_FALSE(status.ok());
 
-        SizeT row_count = 0;
+        size_t row_count = 0;
         std::tie(row_count, status) = GetTableRowCount(*db_name, *table_name);
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(row_count, 0);
 
         // drop database
-        auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
+        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<String>("drop db"), TransactionType::kNormal);
         status = txn6->DropDatabase("db1", ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
 
         // Check the appended data.
-        auto *txn7 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
+        auto *txn7 = new_txn_mgr->BeginTxn(std::make_unique<String>("scan"), TransactionType::kNormal);
         Optional<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         status = txn7->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
@@ -2029,23 +2029,23 @@ TEST_P(TestTxnAppend, test_append_drop_column) {
     //                    |----------------------|------------------------------|
     //                    t2                drop column                 commit (success)
     {
-        SharedPtr<String> db_name = std::make_shared<String>("db1");
+        std::shared_ptr<String> db_name = std::make_shared<String>("db1");
         auto table_name = std::make_shared<std::string>("tb1");
-        auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def2});
-        auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
-        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
+        auto table_def = TableDef::Make(db_name, table_name, std::make_shared<String>(), {column_def1, column_def2});
+        auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<String>("create db"), TransactionType::kNormal);
+        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, std::make_shared<String>());
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn1);
         EXPECT_TRUE(status.ok());
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<String>("create table"), TransactionType::kNormal);
         status = txn2->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());
 
-        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+        auto *txn3 = new_txn_mgr->BeginTxn(std::make_unique<String>("append"), TransactionType::kNormal);
 
-        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop column"), TransactionType::kNormal);
+        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<String>("drop column"), TransactionType::kNormal);
         Vector<String> column_names;
         column_names.push_back("col2");
         status = txn4->DropColumns(*db_name, *table_name, column_names);
@@ -2062,14 +2062,14 @@ TEST_P(TestTxnAppend, test_append_drop_column) {
         EXPECT_FALSE(status.ok());
 
         // drop database
-        auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
+        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<String>("drop db"), TransactionType::kNormal);
         status = txn6->DropDatabase("db1", ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
 
         // Check the appended data.
-        auto *txn7 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
+        auto *txn7 = new_txn_mgr->BeginTxn(std::make_unique<String>("scan"), TransactionType::kNormal);
         Optional<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         status = txn7->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
@@ -2083,23 +2083,23 @@ TEST_P(TestTxnAppend, test_append_drop_column) {
     //                    |----------------------|----------|
     //                    t2                  drop column  commit (success)
     {
-        SharedPtr<String> db_name = std::make_shared<String>("db1");
+        std::shared_ptr<String> db_name = std::make_shared<String>("db1");
         auto table_name = std::make_shared<std::string>("tb1");
-        auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def2});
-        auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
-        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
+        auto table_def = TableDef::Make(db_name, table_name, std::make_shared<String>(), {column_def1, column_def2});
+        auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<String>("create db"), TransactionType::kNormal);
+        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, std::make_shared<String>());
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn1);
         EXPECT_TRUE(status.ok());
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<String>("create table"), TransactionType::kNormal);
         status = txn2->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());
 
-        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+        auto *txn3 = new_txn_mgr->BeginTxn(std::make_unique<String>("append"), TransactionType::kNormal);
 
-        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop column"), TransactionType::kNormal);
+        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<String>("drop column"), TransactionType::kNormal);
         Vector<String> column_names;
         column_names.push_back("col2");
         status = txn4->DropColumns(*db_name, *table_name, column_names);
@@ -2110,7 +2110,7 @@ TEST_P(TestTxnAppend, test_append_drop_column) {
         auto input_block1 = MakeInputBlock1(8192);
         status = txn3->Append(*db_name, *table_name, input_block1);
         EXPECT_TRUE(status.ok());
-        SizeT row_count = 0;
+        size_t row_count = 0;
         std::tie(row_count, status) = GetTableRowCount(*db_name, *table_name);
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(row_count, 0);
@@ -2119,14 +2119,14 @@ TEST_P(TestTxnAppend, test_append_drop_column) {
         EXPECT_FALSE(status.ok());
 
         // drop database
-        auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
+        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<String>("drop db"), TransactionType::kNormal);
         status = txn6->DropDatabase("db1", ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
 
         // Check the appended data.
-        auto *txn7 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
+        auto *txn7 = new_txn_mgr->BeginTxn(std::make_unique<String>("scan"), TransactionType::kNormal);
         Optional<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         status = txn7->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
@@ -2140,32 +2140,32 @@ TEST_P(TestTxnAppend, test_append_drop_column) {
     //                    |----------------------|----------|
     //                    t2                  drop column   commit (success)
     {
-        SharedPtr<String> db_name = std::make_shared<String>("db1");
+        std::shared_ptr<String> db_name = std::make_shared<String>("db1");
         auto table_name = std::make_shared<std::string>("tb1");
-        auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def2});
-        auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
-        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
+        auto table_def = TableDef::Make(db_name, table_name, std::make_shared<String>(), {column_def1, column_def2});
+        auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<String>("create db"), TransactionType::kNormal);
+        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, std::make_shared<String>());
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn1);
         EXPECT_TRUE(status.ok());
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<String>("create table"), TransactionType::kNormal);
         status = txn2->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());
 
-        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("add column"), TransactionType::kNormal);
+        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<String>("add column"), TransactionType::kNormal);
         auto column_def3 =
             std::make_shared<ColumnDef>(2, std::make_shared<DataType>(LogicalType::kVarchar), "col3", std::set<ConstraintType>(), default_varchar);
         auto column_def4 =
             std::make_shared<ColumnDef>(3, std::make_shared<DataType>(LogicalType::kVarchar), "col4", std::set<ConstraintType>(), default_varchar);
-        Vector<SharedPtr<ColumnDef>> columns;
+        Vector<std::shared_ptr<ColumnDef>> columns;
         columns.emplace_back(column_def3);
         columns.emplace_back(column_def4);
         status = txn4->AddColumns(*db_name, *table_name, columns);
         EXPECT_TRUE(status.ok());
 
-        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+        auto *txn3 = new_txn_mgr->BeginTxn(std::make_unique<String>("append"), TransactionType::kNormal);
 
         status = new_txn_mgr->CommitTxn(txn4);
         EXPECT_TRUE(status.ok());
@@ -2177,14 +2177,14 @@ TEST_P(TestTxnAppend, test_append_drop_column) {
         EXPECT_FALSE(status.ok());
 
         // drop database
-        auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
+        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<String>("drop db"), TransactionType::kNormal);
         status = txn6->DropDatabase("db1", ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
 
         // Check the appended data.
-        auto *txn7 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
+        auto *txn7 = new_txn_mgr->BeginTxn(std::make_unique<String>("scan"), TransactionType::kNormal);
         Optional<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         status = txn7->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
@@ -2198,21 +2198,21 @@ TEST_P(TestTxnAppend, test_append_drop_column) {
     //                    |----------------------|----------|
     //                    t2                  drop column   commit (success)
     {
-        SharedPtr<String> db_name = std::make_shared<String>("db1");
+        std::shared_ptr<String> db_name = std::make_shared<String>("db1");
         auto table_name = std::make_shared<std::string>("tb1");
-        auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def2});
-        auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
-        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
+        auto table_def = TableDef::Make(db_name, table_name, std::make_shared<String>(), {column_def1, column_def2});
+        auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<String>("create db"), TransactionType::kNormal);
+        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, std::make_shared<String>());
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn1);
         EXPECT_TRUE(status.ok());
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<String>("create table"), TransactionType::kNormal);
         status = txn2->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());
 
-        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop column"), TransactionType::kNormal);
+        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<String>("drop column"), TransactionType::kNormal);
         Vector<String> column_names;
         column_names.push_back("col2");
         status = txn4->DropColumns(*db_name, *table_name, column_names);
@@ -2220,7 +2220,7 @@ TEST_P(TestTxnAppend, test_append_drop_column) {
         status = new_txn_mgr->CommitTxn(txn4);
         EXPECT_TRUE(status.ok());
 
-        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+        auto *txn3 = new_txn_mgr->BeginTxn(std::make_unique<String>("append"), TransactionType::kNormal);
         auto input_block1 = MakeInputBlock1(8192);
         status = txn3->Append(*db_name, *table_name, input_block1);
         EXPECT_FALSE(status.ok());
@@ -2228,14 +2228,14 @@ TEST_P(TestTxnAppend, test_append_drop_column) {
         EXPECT_TRUE(status.ok());
 
         // drop database
-        auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
+        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<String>("drop db"), TransactionType::kNormal);
         status = txn6->DropDatabase("db1", ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
 
         // Check the appended data.
-        auto *txn7 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
+        auto *txn7 = new_txn_mgr->BeginTxn(std::make_unique<String>("scan"), TransactionType::kNormal);
         Optional<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         status = txn7->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
@@ -2262,21 +2262,21 @@ TEST_P(TestTxnAppend, test_append_rename) {
     //                            |----------------------|----------|
     //                           t2                  rename    commit (success)
     {
-        SharedPtr<String> db_name = std::make_shared<String>("db1");
+        std::shared_ptr<String> db_name = std::make_shared<String>("db1");
         auto table_name = std::make_shared<std::string>("tb1");
-        auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def2});
-        auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
-        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
+        auto table_def = TableDef::Make(db_name, table_name, std::make_shared<String>(), {column_def1, column_def2});
+        auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<String>("create db"), TransactionType::kNormal);
+        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, std::make_shared<String>());
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn1);
         EXPECT_TRUE(status.ok());
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<String>("create table"), TransactionType::kNormal);
         status = txn2->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());
 
-        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+        auto *txn3 = new_txn_mgr->BeginTxn(std::make_unique<String>("append"), TransactionType::kNormal);
         auto input_block1 = MakeInputBlock1(8192);
         status = txn3->Append(*db_name, *table_name, input_block1);
         EXPECT_TRUE(status.ok());
@@ -2284,21 +2284,21 @@ TEST_P(TestTxnAppend, test_append_rename) {
         EXPECT_TRUE(status.ok());
 
         // rename table
-        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("rename table"), TransactionType::kNormal);
+        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<String>("rename table"), TransactionType::kNormal);
         status = txn4->RenameTable(*db_name, *table_name, "table2");
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn4);
         EXPECT_TRUE(status.ok());
 
         // drop database
-        auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
+        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<String>("drop db"), TransactionType::kNormal);
         status = txn6->DropDatabase("db1", ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
 
         // Check the appended data.
-        auto *txn7 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
+        auto *txn7 = new_txn_mgr->BeginTxn(std::make_unique<String>("scan"), TransactionType::kNormal);
         Optional<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         status = txn7->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
@@ -2312,27 +2312,27 @@ TEST_P(TestTxnAppend, test_append_rename) {
     //                    |----------------------|----------|
     //                    t2                  rename   commit (success)
     {
-        SharedPtr<String> db_name = std::make_shared<String>("db1");
+        std::shared_ptr<String> db_name = std::make_shared<String>("db1");
         auto table_name = std::make_shared<std::string>("tb1");
-        auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def2});
-        auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
-        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
+        auto table_def = TableDef::Make(db_name, table_name, std::make_shared<String>(), {column_def1, column_def2});
+        auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<String>("create db"), TransactionType::kNormal);
+        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, std::make_shared<String>());
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn1);
         EXPECT_TRUE(status.ok());
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<String>("create table"), TransactionType::kNormal);
         status = txn2->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());
 
-        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+        auto *txn3 = new_txn_mgr->BeginTxn(std::make_unique<String>("append"), TransactionType::kNormal);
         auto input_block1 = MakeInputBlock1(8192);
         status = txn3->Append(*db_name, *table_name, input_block1);
         EXPECT_TRUE(status.ok());
 
         // rename table
-        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("rename table"), TransactionType::kNormal);
+        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<String>("rename table"), TransactionType::kNormal);
 
         status = new_txn_mgr->CommitTxn(txn3);
         EXPECT_TRUE(status.ok());
@@ -2343,14 +2343,14 @@ TEST_P(TestTxnAppend, test_append_rename) {
         EXPECT_TRUE(status.ok());
 
         // drop database
-        auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
+        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<String>("drop db"), TransactionType::kNormal);
         status = txn6->DropDatabase("db1", ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
 
         // Check the appended data.
-        auto *txn7 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
+        auto *txn7 = new_txn_mgr->BeginTxn(std::make_unique<String>("scan"), TransactionType::kNormal);
         Optional<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         status = txn7->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
@@ -2364,27 +2364,27 @@ TEST_P(TestTxnAppend, test_append_rename) {
     //                    |-----------------------|-------------------------|
     //                    t2                  rename table         commit (success)
     {
-        SharedPtr<String> db_name = std::make_shared<String>("db1");
+        std::shared_ptr<String> db_name = std::make_shared<String>("db1");
         auto table_name = std::make_shared<std::string>("tb1");
-        auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def2});
-        auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
-        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
+        auto table_def = TableDef::Make(db_name, table_name, std::make_shared<String>(), {column_def1, column_def2});
+        auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<String>("create db"), TransactionType::kNormal);
+        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, std::make_shared<String>());
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn1);
         EXPECT_TRUE(status.ok());
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<String>("create table"), TransactionType::kNormal);
         status = txn2->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());
 
-        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+        auto *txn3 = new_txn_mgr->BeginTxn(std::make_unique<String>("append"), TransactionType::kNormal);
         auto input_block1 = MakeInputBlock1(8192);
         status = txn3->Append(*db_name, *table_name, input_block1);
         EXPECT_TRUE(status.ok());
 
         // rename table
-        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("rename table"), TransactionType::kNormal);
+        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<String>("rename table"), TransactionType::kNormal);
         status = txn4->RenameTable(*db_name, *table_name, "table2");
         EXPECT_TRUE(status.ok());
 
@@ -2395,14 +2395,14 @@ TEST_P(TestTxnAppend, test_append_rename) {
         EXPECT_TRUE(status.ok());
 
         // drop database
-        auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
+        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<String>("drop db"), TransactionType::kNormal);
         status = txn6->DropDatabase("db1", ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
 
         // Check the appended data.
-        auto *txn7 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
+        auto *txn7 = new_txn_mgr->BeginTxn(std::make_unique<String>("scan"), TransactionType::kNormal);
         Optional<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         status = txn7->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
@@ -2416,27 +2416,27 @@ TEST_P(TestTxnAppend, test_append_rename) {
     //                    |-------------|-------------------|
     //                    t2        rename table (success) commit (success)
     {
-        SharedPtr<String> db_name = std::make_shared<String>("db1");
+        std::shared_ptr<String> db_name = std::make_shared<String>("db1");
         auto table_name = std::make_shared<std::string>("tb1");
-        auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def2});
-        auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
-        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
+        auto table_def = TableDef::Make(db_name, table_name, std::make_shared<String>(), {column_def1, column_def2});
+        auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<String>("create db"), TransactionType::kNormal);
+        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, std::make_shared<String>());
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn1);
         EXPECT_TRUE(status.ok());
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<String>("create table"), TransactionType::kNormal);
         status = txn2->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());
 
-        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+        auto *txn3 = new_txn_mgr->BeginTxn(std::make_unique<String>("append"), TransactionType::kNormal);
         auto input_block1 = MakeInputBlock1(8192);
         status = txn3->Append(*db_name, *table_name, input_block1);
         EXPECT_TRUE(status.ok());
 
         // rename table
-        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("rename table"), TransactionType::kNormal);
+        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<String>("rename table"), TransactionType::kNormal);
         status = txn4->RenameTable(*db_name, *table_name, "table2");
         EXPECT_TRUE(status.ok());
 
@@ -2447,14 +2447,14 @@ TEST_P(TestTxnAppend, test_append_rename) {
         EXPECT_FALSE(status.ok());
 
         // drop database
-        auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
+        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<String>("drop db"), TransactionType::kNormal);
         status = txn6->DropDatabase("db1", ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
 
         // Check the appended data.
-        auto *txn7 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
+        auto *txn7 = new_txn_mgr->BeginTxn(std::make_unique<String>("scan"), TransactionType::kNormal);
         Optional<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         status = txn7->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
@@ -2468,24 +2468,24 @@ TEST_P(TestTxnAppend, test_append_rename) {
     //                    |----------------------|------------------------------|
     //                    t2                rename                 commit (success)
     {
-        SharedPtr<String> db_name = std::make_shared<String>("db1");
+        std::shared_ptr<String> db_name = std::make_shared<String>("db1");
         auto table_name = std::make_shared<std::string>("tb1");
-        auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def2});
-        auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
-        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
+        auto table_def = TableDef::Make(db_name, table_name, std::make_shared<String>(), {column_def1, column_def2});
+        auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<String>("create db"), TransactionType::kNormal);
+        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, std::make_shared<String>());
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn1);
         EXPECT_TRUE(status.ok());
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<String>("create table"), TransactionType::kNormal);
         status = txn2->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());
 
-        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+        auto *txn3 = new_txn_mgr->BeginTxn(std::make_unique<String>("append"), TransactionType::kNormal);
 
         // rename table
-        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("rename table"), TransactionType::kNormal);
+        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<String>("rename table"), TransactionType::kNormal);
         status = txn4->RenameTable(*db_name, *table_name, "table2");
         EXPECT_TRUE(status.ok());
 
@@ -2500,14 +2500,14 @@ TEST_P(TestTxnAppend, test_append_rename) {
         EXPECT_FALSE(status.ok());
 
         // drop database
-        auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
+        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<String>("drop db"), TransactionType::kNormal);
         status = txn6->DropDatabase("db1", ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
 
         // Check the appended data.
-        auto *txn7 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
+        auto *txn7 = new_txn_mgr->BeginTxn(std::make_unique<String>("scan"), TransactionType::kNormal);
         Optional<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         status = txn7->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
@@ -2521,24 +2521,24 @@ TEST_P(TestTxnAppend, test_append_rename) {
     //                    |----------------------|----------|
     //                    t2                  rename table  commit (success)
     {
-        SharedPtr<String> db_name = std::make_shared<String>("db1");
+        std::shared_ptr<String> db_name = std::make_shared<String>("db1");
         auto table_name = std::make_shared<std::string>("tb1");
-        auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def2});
-        auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
-        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
+        auto table_def = TableDef::Make(db_name, table_name, std::make_shared<String>(), {column_def1, column_def2});
+        auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<String>("create db"), TransactionType::kNormal);
+        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, std::make_shared<String>());
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn1);
         EXPECT_TRUE(status.ok());
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<String>("create table"), TransactionType::kNormal);
         status = txn2->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());
 
-        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+        auto *txn3 = new_txn_mgr->BeginTxn(std::make_unique<String>("append"), TransactionType::kNormal);
 
         // rename table
-        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("rename table"), TransactionType::kNormal);
+        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<String>("rename table"), TransactionType::kNormal);
         status = txn4->RenameTable(*db_name, *table_name, "table2");
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn4);
@@ -2552,14 +2552,14 @@ TEST_P(TestTxnAppend, test_append_rename) {
         EXPECT_FALSE(status.ok());
 
         // drop database
-        auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
+        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<String>("drop db"), TransactionType::kNormal);
         status = txn6->DropDatabase("db1", ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
 
         // Check the appended data.
-        auto *txn7 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
+        auto *txn7 = new_txn_mgr->BeginTxn(std::make_unique<String>("scan"), TransactionType::kNormal);
         Optional<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         status = txn7->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
@@ -2573,26 +2573,26 @@ TEST_P(TestTxnAppend, test_append_rename) {
     //                    |----------------------|----------|
     //                    t2                  rename   commit (success)
     {
-        SharedPtr<String> db_name = std::make_shared<String>("db1");
+        std::shared_ptr<String> db_name = std::make_shared<String>("db1");
         auto table_name = std::make_shared<std::string>("tb1");
-        auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def2});
-        auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
-        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
+        auto table_def = TableDef::Make(db_name, table_name, std::make_shared<String>(), {column_def1, column_def2});
+        auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<String>("create db"), TransactionType::kNormal);
+        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, std::make_shared<String>());
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn1);
         EXPECT_TRUE(status.ok());
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<String>("create table"), TransactionType::kNormal);
         status = txn2->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());
 
         // rename table
-        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("rename table"), TransactionType::kNormal);
+        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<String>("rename table"), TransactionType::kNormal);
         status = txn4->RenameTable(*db_name, *table_name, "table2");
         EXPECT_TRUE(status.ok());
 
-        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+        auto *txn3 = new_txn_mgr->BeginTxn(std::make_unique<String>("append"), TransactionType::kNormal);
 
         status = new_txn_mgr->CommitTxn(txn4);
         EXPECT_TRUE(status.ok());
@@ -2605,14 +2605,14 @@ TEST_P(TestTxnAppend, test_append_rename) {
         EXPECT_FALSE(status.ok());
 
         // drop database
-        auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
+        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<String>("drop db"), TransactionType::kNormal);
         status = txn6->DropDatabase("db1", ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
 
         // Check the appended data.
-        auto *txn7 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
+        auto *txn7 = new_txn_mgr->BeginTxn(std::make_unique<String>("scan"), TransactionType::kNormal);
         Optional<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         status = txn7->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
@@ -2626,29 +2626,29 @@ TEST_P(TestTxnAppend, test_append_rename) {
     //                    |-----------------|----------|
     //                    t2           rename table   commit (success)
     {
-        SharedPtr<String> db_name = std::make_shared<String>("db1");
+        std::shared_ptr<String> db_name = std::make_shared<String>("db1");
         auto table_name = std::make_shared<std::string>("tb1");
-        auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def2});
-        auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
-        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
+        auto table_def = TableDef::Make(db_name, table_name, std::make_shared<String>(), {column_def1, column_def2});
+        auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<String>("create db"), TransactionType::kNormal);
+        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, std::make_shared<String>());
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn1);
         EXPECT_TRUE(status.ok());
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<String>("create table"), TransactionType::kNormal);
         status = txn2->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());
 
         // rename table
-        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("rename table"), TransactionType::kNormal);
+        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<String>("rename table"), TransactionType::kNormal);
         status = txn4->RenameTable(*db_name, *table_name, "table2");
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn4);
         EXPECT_TRUE(status.ok());
 
-        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+        auto *txn3 = new_txn_mgr->BeginTxn(std::make_unique<String>("append"), TransactionType::kNormal);
 
         auto input_block1 = MakeInputBlock1(8192);
         status = txn3->Append(*db_name, *table_name, input_block1);
@@ -2658,14 +2658,14 @@ TEST_P(TestTxnAppend, test_append_rename) {
         EXPECT_TRUE(status.ok());
 
         // drop database
-        auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
+        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<String>("drop db"), TransactionType::kNormal);
         status = txn6->DropDatabase("db1", ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
 
         // Check the appended data.
-        auto *txn7 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
+        auto *txn7 = new_txn_mgr->BeginTxn(std::make_unique<String>("scan"), TransactionType::kNormal);
         Optional<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         status = txn7->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
@@ -2692,28 +2692,28 @@ TEST_P(TestTxnAppend, test_append_append) {
     //                            |----------------------|----------|
     //                           t2                  append    commit (success)
     {
-        SharedPtr<String> db_name = std::make_shared<String>("db1");
+        std::shared_ptr<String> db_name = std::make_shared<String>("db1");
         auto table_name = std::make_shared<std::string>("tb1");
-        auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def2});
-        auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
-        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
+        auto table_def = TableDef::Make(db_name, table_name, std::make_shared<String>(), {column_def1, column_def2});
+        auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<String>("create db"), TransactionType::kNormal);
+        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, std::make_shared<String>());
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn1);
         EXPECT_TRUE(status.ok());
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<String>("create table"), TransactionType::kNormal);
         status = txn2->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());
 
-        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+        auto *txn3 = new_txn_mgr->BeginTxn(std::make_unique<String>("append"), TransactionType::kNormal);
         auto input_block1 = MakeInputBlock1(4096);
         status = txn3->Append(*db_name, *table_name, input_block1);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn3);
         EXPECT_TRUE(status.ok());
 
-        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<String>("append"), TransactionType::kNormal);
         status = txn4->Append(*db_name, *table_name, input_block1);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn4);
@@ -2721,7 +2721,7 @@ TEST_P(TestTxnAppend, test_append_append) {
 
         // Check the appended data.
         {
-            auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
+            auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("scan"), TransactionType::kNormal);
             TxnTimeStamp begin_ts = txn->BeginTS();
             TxnTimeStamp commit_ts = txn->CommitTS();
 
@@ -2757,19 +2757,19 @@ TEST_P(TestTxnAppend, test_append_append) {
                 EXPECT_FALSE(has_next);
             }
 
-            SizeT row_count = state.block_offset_end();
+            size_t row_count = state.block_offset_end();
             EXPECT_EQ(row_count, 8192);
         }
 
         // drop database
-        auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
+        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<String>("drop db"), TransactionType::kNormal);
         status = txn6->DropDatabase("db1", ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
 
         // Check the appended data.
-        auto *txn7 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
+        auto *txn7 = new_txn_mgr->BeginTxn(std::make_unique<String>("scan"), TransactionType::kNormal);
         Optional<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         status = txn7->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
@@ -2783,26 +2783,26 @@ TEST_P(TestTxnAppend, test_append_append) {
     //                    |----------------------|----------|
     //                    t2                  append    commit (success)
     {
-        SharedPtr<String> db_name = std::make_shared<String>("db1");
+        std::shared_ptr<String> db_name = std::make_shared<String>("db1");
         auto table_name = std::make_shared<std::string>("tb1");
-        auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def2});
-        auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
-        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
+        auto table_def = TableDef::Make(db_name, table_name, std::make_shared<String>(), {column_def1, column_def2});
+        auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<String>("create db"), TransactionType::kNormal);
+        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, std::make_shared<String>());
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn1);
         EXPECT_TRUE(status.ok());
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<String>("create table"), TransactionType::kNormal);
         status = txn2->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());
 
         auto input_block1 = MakeInputBlock1(4096);
-        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+        auto *txn3 = new_txn_mgr->BeginTxn(std::make_unique<String>("append"), TransactionType::kNormal);
         status = txn3->Append(*db_name, *table_name, input_block1);
         EXPECT_TRUE(status.ok());
 
-        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<String>("append"), TransactionType::kNormal);
 
         status = new_txn_mgr->CommitTxn(txn3);
         EXPECT_TRUE(status.ok());
@@ -2812,20 +2812,20 @@ TEST_P(TestTxnAppend, test_append_append) {
         status = new_txn_mgr->CommitTxn(txn4);
         EXPECT_TRUE(status.ok());
 
-        SizeT row_count = 0;
+        size_t row_count = 0;
         std::tie(row_count, status) = GetTableRowCount(*db_name, *table_name);
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(row_count, 8192);
 
         // drop database
-        auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
+        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<String>("drop db"), TransactionType::kNormal);
         status = txn6->DropDatabase("db1", ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
 
         // Check the appended data.
-        auto *txn7 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
+        auto *txn7 = new_txn_mgr->BeginTxn(std::make_unique<String>("scan"), TransactionType::kNormal);
         Optional<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         status = txn7->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
@@ -2839,26 +2839,26 @@ TEST_P(TestTxnAppend, test_append_append) {
     //                    |-----------------------|-------------------------|
     //                    t2                  append             commit (success)
     {
-        SharedPtr<String> db_name = std::make_shared<String>("db1");
+        std::shared_ptr<String> db_name = std::make_shared<String>("db1");
         auto table_name = std::make_shared<std::string>("tb1");
-        auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def2});
-        auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
-        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
+        auto table_def = TableDef::Make(db_name, table_name, std::make_shared<String>(), {column_def1, column_def2});
+        auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<String>("create db"), TransactionType::kNormal);
+        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, std::make_shared<String>());
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn1);
         EXPECT_TRUE(status.ok());
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<String>("create table"), TransactionType::kNormal);
         status = txn2->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());
 
         auto input_block1 = MakeInputBlock1(4096);
-        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+        auto *txn3 = new_txn_mgr->BeginTxn(std::make_unique<String>("append"), TransactionType::kNormal);
         status = txn3->Append(*db_name, *table_name, input_block1);
         EXPECT_TRUE(status.ok());
 
-        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<String>("append"), TransactionType::kNormal);
         status = txn4->Append(*db_name, *table_name, input_block1);
         EXPECT_TRUE(status.ok());
 
@@ -2870,7 +2870,7 @@ TEST_P(TestTxnAppend, test_append_append) {
 
         // Check the appended data.
         {
-            auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
+            auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("scan"), TransactionType::kNormal);
             TxnTimeStamp begin_ts = txn->BeginTS();
             TxnTimeStamp commit_ts = txn->CommitTS();
 
@@ -2906,19 +2906,19 @@ TEST_P(TestTxnAppend, test_append_append) {
                 EXPECT_FALSE(has_next);
             }
 
-            SizeT row_count = state.block_offset_end();
+            size_t row_count = state.block_offset_end();
             EXPECT_EQ(row_count, 8192);
         }
 
         // drop database
-        auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
+        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<String>("drop db"), TransactionType::kNormal);
         status = txn6->DropDatabase("db1", ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
 
         // Check the appended data.
-        auto *txn7 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
+        auto *txn7 = new_txn_mgr->BeginTxn(std::make_unique<String>("scan"), TransactionType::kNormal);
         Optional<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         status = txn7->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
@@ -2932,15 +2932,15 @@ TEST_P(TestTxnAppend, test_append_append) {
     //                    |-------------|-------------------|
     //                    t2        append           commit (success)
     {
-        SharedPtr<String> db_name = std::make_shared<String>("db1");
+        std::shared_ptr<String> db_name = std::make_shared<String>("db1");
         auto table_name = std::make_shared<std::string>("tb1");
-        auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def2});
-        auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
-        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
+        auto table_def = TableDef::Make(db_name, table_name, std::make_shared<String>(), {column_def1, column_def2});
+        auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<String>("create db"), TransactionType::kNormal);
+        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, std::make_shared<String>());
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn1);
         EXPECT_TRUE(status.ok());
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<String>("create table"), TransactionType::kNormal);
         status = txn2->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn2);
@@ -2948,11 +2948,11 @@ TEST_P(TestTxnAppend, test_append_append) {
 
         auto input_block1 = MakeInputBlock1(4096);
 
-        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+        auto *txn3 = new_txn_mgr->BeginTxn(std::make_unique<String>("append"), TransactionType::kNormal);
         status = txn3->Append(*db_name, *table_name, input_block1);
         EXPECT_TRUE(status.ok());
 
-        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<String>("append"), TransactionType::kNormal);
         status = txn4->Append(*db_name, *table_name, input_block1);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn4);
@@ -2961,20 +2961,20 @@ TEST_P(TestTxnAppend, test_append_append) {
         status = new_txn_mgr->CommitTxn(txn3);
         EXPECT_TRUE(status.ok());
 
-        SizeT row_count = 0;
+        size_t row_count = 0;
         std::tie(row_count, status) = GetTableRowCount(*db_name, *table_name);
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(row_count, 8192);
 
         // drop database
-        auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
+        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<String>("drop db"), TransactionType::kNormal);
         status = txn6->DropDatabase("db1", ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
 
         // Check the appended data.
-        auto *txn7 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
+        auto *txn7 = new_txn_mgr->BeginTxn(std::make_unique<String>("scan"), TransactionType::kNormal);
         Optional<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         status = txn7->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
@@ -2988,15 +2988,15 @@ TEST_P(TestTxnAppend, test_append_append) {
     //                    |----------------------|----------|
     //                    t2                  append   commit (success)
     {
-        SharedPtr<String> db_name = std::make_shared<String>("db1");
+        std::shared_ptr<String> db_name = std::make_shared<String>("db1");
         auto table_name = std::make_shared<std::string>("tb1");
-        auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def2});
-        auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
-        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
+        auto table_def = TableDef::Make(db_name, table_name, std::make_shared<String>(), {column_def1, column_def2});
+        auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<String>("create db"), TransactionType::kNormal);
+        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, std::make_shared<String>());
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn1);
         EXPECT_TRUE(status.ok());
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<String>("create table"), TransactionType::kNormal);
         status = txn2->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn2);
@@ -3004,9 +3004,9 @@ TEST_P(TestTxnAppend, test_append_append) {
 
         auto input_block1 = MakeInputBlock1(4096);
 
-        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+        auto *txn3 = new_txn_mgr->BeginTxn(std::make_unique<String>("append"), TransactionType::kNormal);
 
-        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<String>("append"), TransactionType::kNormal);
         status = txn4->Append(*db_name, *table_name, input_block1);
         EXPECT_TRUE(status.ok());
 
@@ -3021,7 +3021,7 @@ TEST_P(TestTxnAppend, test_append_append) {
 
         // Check the appended data.
         {
-            auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
+            auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("scan"), TransactionType::kNormal);
             TxnTimeStamp begin_ts = txn->BeginTS();
             TxnTimeStamp commit_ts = txn->CommitTS();
 
@@ -3057,19 +3057,19 @@ TEST_P(TestTxnAppend, test_append_append) {
                 EXPECT_FALSE(has_next);
             }
 
-            SizeT row_count = state.block_offset_end();
+            size_t row_count = state.block_offset_end();
             EXPECT_EQ(row_count, 8192);
         }
 
         // drop database
-        auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
+        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<String>("drop db"), TransactionType::kNormal);
         status = txn6->DropDatabase("db1", ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
 
         // Check the appended data.
-        auto *txn7 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
+        auto *txn7 = new_txn_mgr->BeginTxn(std::make_unique<String>("scan"), TransactionType::kNormal);
         Optional<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         status = txn7->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
@@ -3083,15 +3083,15 @@ TEST_P(TestTxnAppend, test_append_append) {
     //                    |----------------------|----------|
     //                    t2                  add column  commit (success)
     {
-        SharedPtr<String> db_name = std::make_shared<String>("db1");
+        std::shared_ptr<String> db_name = std::make_shared<String>("db1");
         auto table_name = std::make_shared<std::string>("tb1");
-        auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def2});
-        auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
-        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
+        auto table_def = TableDef::Make(db_name, table_name, std::make_shared<String>(), {column_def1, column_def2});
+        auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<String>("create db"), TransactionType::kNormal);
+        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, std::make_shared<String>());
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn1);
         EXPECT_TRUE(status.ok());
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<String>("create table"), TransactionType::kNormal);
         status = txn2->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn2);
@@ -3099,9 +3099,9 @@ TEST_P(TestTxnAppend, test_append_append) {
 
         auto input_block1 = MakeInputBlock1(4096);
 
-        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+        auto *txn3 = new_txn_mgr->BeginTxn(std::make_unique<String>("append"), TransactionType::kNormal);
 
-        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<String>("append"), TransactionType::kNormal);
         status = txn4->Append(*db_name, *table_name, input_block1);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn4);
@@ -3114,7 +3114,7 @@ TEST_P(TestTxnAppend, test_append_append) {
 
         // Check the appended data.
         {
-            auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
+            auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("scan"), TransactionType::kNormal);
             TxnTimeStamp begin_ts = txn->BeginTS();
             TxnTimeStamp commit_ts = txn->CommitTS();
 
@@ -3150,19 +3150,19 @@ TEST_P(TestTxnAppend, test_append_append) {
                 EXPECT_FALSE(has_next);
             }
 
-            SizeT row_count = state.block_offset_end();
+            size_t row_count = state.block_offset_end();
             EXPECT_EQ(row_count, 8192);
         }
 
         // drop database
-        auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
+        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<String>("drop db"), TransactionType::kNormal);
         status = txn6->DropDatabase("db1", ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
 
         // Check the appended data.
-        auto *txn7 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
+        auto *txn7 = new_txn_mgr->BeginTxn(std::make_unique<String>("scan"), TransactionType::kNormal);
         Optional<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         status = txn7->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
@@ -3176,15 +3176,15 @@ TEST_P(TestTxnAppend, test_append_append) {
     //                    |----------------------|----------|
     //                    t2                  append   commit (success)
     {
-        SharedPtr<String> db_name = std::make_shared<String>("db1");
+        std::shared_ptr<String> db_name = std::make_shared<String>("db1");
         auto table_name = std::make_shared<std::string>("tb1");
-        auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def2});
-        auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
-        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
+        auto table_def = TableDef::Make(db_name, table_name, std::make_shared<String>(), {column_def1, column_def2});
+        auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<String>("create db"), TransactionType::kNormal);
+        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, std::make_shared<String>());
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn1);
         EXPECT_TRUE(status.ok());
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<String>("create table"), TransactionType::kNormal);
         status = txn2->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn2);
@@ -3192,11 +3192,11 @@ TEST_P(TestTxnAppend, test_append_append) {
 
         auto input_block1 = MakeInputBlock1(4096);
 
-        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<String>("append"), TransactionType::kNormal);
         status = txn4->Append(*db_name, *table_name, input_block1);
         EXPECT_TRUE(status.ok());
 
-        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+        auto *txn3 = new_txn_mgr->BeginTxn(std::make_unique<String>("append"), TransactionType::kNormal);
 
         status = new_txn_mgr->CommitTxn(txn4);
         EXPECT_TRUE(status.ok());
@@ -3208,7 +3208,7 @@ TEST_P(TestTxnAppend, test_append_append) {
 
         // Check the appended data.
         {
-            auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
+            auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("scan"), TransactionType::kNormal);
             TxnTimeStamp begin_ts = txn->BeginTS();
             TxnTimeStamp commit_ts = txn->CommitTS();
 
@@ -3244,19 +3244,19 @@ TEST_P(TestTxnAppend, test_append_append) {
                 EXPECT_FALSE(has_next);
             }
 
-            SizeT row_count = state.block_offset_end();
+            size_t row_count = state.block_offset_end();
             EXPECT_EQ(row_count, 8192);
         }
 
         // drop database
-        auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
+        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<String>("drop db"), TransactionType::kNormal);
         status = txn6->DropDatabase("db1", ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
 
         // Check the appended data.
-        auto *txn7 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
+        auto *txn7 = new_txn_mgr->BeginTxn(std::make_unique<String>("scan"), TransactionType::kNormal);
         Optional<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         status = txn7->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
@@ -3283,15 +3283,15 @@ TEST_P(TestTxnAppend, test_append_append_concurrent) {
     //  thread2      |------------------- |----------|
     //               t2                  append   commit (success)
     {
-        SharedPtr<String> db_name = std::make_shared<String>("db1");
+        std::shared_ptr<String> db_name = std::make_shared<String>("db1");
         auto table_name = std::make_shared<std::string>("tb1");
-        auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def2});
-        auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
-        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
+        auto table_def = TableDef::Make(db_name, table_name, std::make_shared<String>(), {column_def1, column_def2});
+        auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<String>("create db"), TransactionType::kNormal);
+        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, std::make_shared<String>());
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn1);
         EXPECT_TRUE(status.ok());
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<String>("create table"), TransactionType::kNormal);
         status = txn2->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn2);
@@ -3300,16 +3300,16 @@ TEST_P(TestTxnAppend, test_append_append_concurrent) {
         auto input_block1 = MakeInputBlock1(4096);
 
         std::vector<std::thread> worker_threads;
-        SizeT thread_count = 4;
-        SizeT loop_count = 128;
-        SizeT block_num = thread_count * loop_count / 2;
-        for (SizeT i = 0; i < thread_count; ++i) {
+        size_t thread_count = 4;
+        size_t loop_count = 128;
+        size_t block_num = thread_count * loop_count / 2;
+        for (size_t i = 0; i < thread_count; ++i) {
             worker_threads.emplace_back([&, i] {
-                for (SizeT j = 0; j < loop_count; ++j) {
+                for (size_t j = 0; j < loop_count; ++j) {
                     Status status;
                     int k = 0;
                     do {
-                        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>(fmt::format("append_{}_{}_{}", i, j, k)), TransactionType::kNormal);
+                        auto *txn3 = new_txn_mgr->BeginTxn(std::make_unique<String>(fmt::format("append_{}_{}_{}", i, j, k)), TransactionType::kNormal);
                         status = txn3->Append(*db_name, *table_name, input_block1);
                         EXPECT_TRUE(status.ok());
                         status = new_txn_mgr->CommitTxn(txn3);
@@ -3318,13 +3318,13 @@ TEST_P(TestTxnAppend, test_append_append_concurrent) {
                 }
             });
         }
-        for (SizeT i = 0; i < thread_count; ++i) {
+        for (size_t i = 0; i < thread_count; ++i) {
             worker_threads[i].join();
         }
 
         // Check the appended data.
         {
-            auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
+            auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("scan"), TransactionType::kNormal);
             TxnTimeStamp begin_ts = txn->BeginTS();
             TxnTimeStamp commit_ts = txn->CommitTS();
 
@@ -3346,7 +3346,7 @@ TEST_P(TestTxnAppend, test_append_append_concurrent) {
 
                 EXPECT_TRUE(status.ok());
                 EXPECT_EQ(block_ids_ptr->size(), block_num);
-                for (SizeT idx = 0; idx < block_ids_ptr->size(); ++idx) {
+                for (size_t idx = 0; idx < block_ids_ptr->size(); ++idx) {
                     BlockID block_id = block_ids_ptr->at(idx);
                     EXPECT_EQ(block_id, idx);
                     BlockMeta block_meta(block_id, segment_meta);
@@ -3354,7 +3354,7 @@ TEST_P(TestTxnAppend, test_append_append_concurrent) {
                     NewTxnGetVisibleRangeState state;
                     status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, commit_ts, state);
                     EXPECT_TRUE(status.ok());
-                    SizeT row_count = state.block_offset_end();
+                    size_t row_count = state.block_offset_end();
                     {
                         Pair<BlockOffset, BlockOffset> range;
                         BlockOffset offset = 0;
@@ -3367,32 +3367,32 @@ TEST_P(TestTxnAppend, test_append_append_concurrent) {
                         EXPECT_FALSE(has_next);
 
                         {
-                            SizeT column_idx = 0;
+                            size_t column_idx = 0;
                             ColumnMeta column_meta(column_idx, block_meta);
                             ColumnVector col;
 
                             Status status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorMode::kReadOnly, col);
                             EXPECT_TRUE(status.ok());
 
-                            for (SizeT row_id = 0; row_id < 4096; ++row_id) {
+                            for (size_t row_id = 0; row_id < 4096; ++row_id) {
                                 EXPECT_EQ(col.GetValueByIndex(row_id), Value::MakeInt(row_id));
                             }
-                            for (SizeT row_id = 4096; row_id < 8192; ++row_id) {
+                            for (size_t row_id = 4096; row_id < 8192; ++row_id) {
                                 EXPECT_EQ(col.GetValueByIndex(row_id), Value::MakeInt(row_id - 4096));
                             }
                         }
                         {
-                            SizeT column_idx = 1;
+                            size_t column_idx = 1;
                             ColumnMeta column_meta(column_idx, block_meta);
                             ColumnVector col;
 
                             Status status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorMode::kReadOnly, col);
                             EXPECT_TRUE(status.ok());
 
-                            for (SizeT row_id = 0; row_id < 4096; ++row_id) {
+                            for (size_t row_id = 0; row_id < 4096; ++row_id) {
                                 EXPECT_EQ(col.GetValueByIndex(row_id), Value::MakeVarchar(fmt::format("abc_{}", row_id)));
                             }
-                            for (SizeT row_id = 4096; row_id < 8192; ++row_id) {
+                            for (size_t row_id = 4096; row_id < 8192; ++row_id) {
                                 EXPECT_EQ(col.GetValueByIndex(row_id), Value::MakeVarchar(fmt::format("abc_{}", row_id - 4096)));
                             }
                         }
@@ -3403,14 +3403,14 @@ TEST_P(TestTxnAppend, test_append_append_concurrent) {
         }
 
         // drop database
-        auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
+        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<String>("drop db"), TransactionType::kNormal);
         status = txn6->DropDatabase("db1", ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
 
         // Check the appended data.
-        auto *txn7 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
+        auto *txn7 = new_txn_mgr->BeginTxn(std::make_unique<String>("scan"), TransactionType::kNormal);
         Optional<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         status = txn7->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
@@ -3430,7 +3430,7 @@ TEST_P(TestTxnAppend, test_append_and_create_index) {
     std::shared_ptr<ConstantExpr> default_varchar = std::make_shared<ConstantExpr>(LiteralType::kString);
     default_varchar->str_value_ = strdup("");
 
-    SharedPtr<String> db_name = std::make_shared<String>("db1");
+    std::shared_ptr<String> db_name = std::make_shared<String>("db1");
     auto table_name = std::make_shared<std::string>("tb1");
     auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
     auto column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
@@ -3462,12 +3462,12 @@ TEST_P(TestTxnAppend, test_append_and_create_index) {
             EXPECT_FALSE(has_next);
         }
 
-        SizeT row_count = state.block_offset_end();
+        size_t row_count = state.block_offset_end();
         EXPECT_EQ(row_count, 4096);
     };
     auto check_table = [&]() {
         // Check the appended data.
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("scan"), TransactionType::kNormal);
 
         Optional<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
@@ -3502,7 +3502,7 @@ TEST_P(TestTxnAppend, test_append_and_create_index) {
     };
     auto check_no_index = [&] {
         // Check the appended data.
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("scan"), TransactionType::kNormal);
 
         Optional<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
@@ -3524,7 +3524,7 @@ TEST_P(TestTxnAppend, test_append_and_create_index) {
     };
     auto check_no_data = [&] {
         // Check the appended data.
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("scan"), TransactionType::kNormal);
 
         Optional<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
@@ -3547,13 +3547,13 @@ TEST_P(TestTxnAppend, test_append_and_create_index) {
     //                            |----------------------|----------|
     //                           t2                  create index  commit (success)
     {
-        auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def2});
-        auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
-        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
+        auto table_def = TableDef::Make(db_name, table_name, std::make_shared<String>(), {column_def1, column_def2});
+        auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<String>("create db"), TransactionType::kNormal);
+        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, std::make_shared<String>());
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn1);
         EXPECT_TRUE(status.ok());
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<String>("create table"), TransactionType::kNormal);
         status = txn2->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn2);
@@ -3561,7 +3561,7 @@ TEST_P(TestTxnAppend, test_append_and_create_index) {
 
         auto input_block1 = MakeInputBlock1(4096);
 
-        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<String>("append"), TransactionType::kNormal);
         status = txn4->Append(*db_name, *table_name, input_block1);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn4);
@@ -3569,8 +3569,8 @@ TEST_P(TestTxnAppend, test_append_and_create_index) {
 
         // create index idx1
         auto index_name1 = std::make_shared<String>("idx1");
-        auto index_def1 = IndexSecondary::Make(index_name1, MakeShared<String>(), "file_name", {column_def1->name()});
-        auto *txn7 = new_txn_mgr->BeginTxn(MakeUnique<String>("create index"), TransactionType::kNormal);
+        auto index_def1 = IndexSecondary::Make(index_name1, std::make_shared<String>(), "file_name", {column_def1->name()});
+        auto *txn7 = new_txn_mgr->BeginTxn(std::make_unique<String>("create index"), TransactionType::kNormal);
         status = txn7->CreateIndex(*db_name, *table_name, index_def1, ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn7);
@@ -3580,7 +3580,7 @@ TEST_P(TestTxnAppend, test_append_and_create_index) {
         check_table();
 
         // drop database
-        auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
+        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<String>("drop db"), TransactionType::kNormal);
         status = txn6->DropDatabase("db1", ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
@@ -3592,31 +3592,31 @@ TEST_P(TestTxnAppend, test_append_and_create_index) {
     //                    |------------------|----------------|
     //                    t2             create index     commit (fail)
     {
-        auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def2});
-        auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
-        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
+        auto table_def = TableDef::Make(db_name, table_name, std::make_shared<String>(), {column_def1, column_def2});
+        auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<String>("create db"), TransactionType::kNormal);
+        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, std::make_shared<String>());
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn1);
         EXPECT_TRUE(status.ok());
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<String>("create table"), TransactionType::kNormal);
         status = txn2->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());
 
-        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<String>("append"), TransactionType::kNormal);
         auto input_block1 = MakeInputBlock1(4096);
         status = txn4->Append(*db_name, *table_name, input_block1);
         EXPECT_TRUE(status.ok());
 
-        auto *txn7 = new_txn_mgr->BeginTxn(MakeUnique<String>("create index"), TransactionType::kNormal);
+        auto *txn7 = new_txn_mgr->BeginTxn(std::make_unique<String>("create index"), TransactionType::kNormal);
 
         status = new_txn_mgr->CommitTxn(txn4);
         EXPECT_TRUE(status.ok());
 
         // create index idx1
         auto index_name1 = std::make_shared<String>("idx1");
-        auto index_def1 = IndexSecondary::Make(index_name1, MakeShared<String>(), "file_name", {column_def1->name()});
+        auto index_def1 = IndexSecondary::Make(index_name1, std::make_shared<String>(), "file_name", {column_def1->name()});
         status = txn7->CreateIndex(*db_name, *table_name, index_def1, ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn7);
@@ -3625,7 +3625,7 @@ TEST_P(TestTxnAppend, test_append_and_create_index) {
         check_no_index();
 
         // drop database
-        auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
+        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<String>("drop db"), TransactionType::kNormal);
         status = txn6->DropDatabase("db1", ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
@@ -3637,27 +3637,27 @@ TEST_P(TestTxnAppend, test_append_and_create_index) {
     //                    |-----------------------|-------------------------|
     //                    t2                  create index         commit (fail)
     {
-        auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def2});
-        auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
-        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
+        auto table_def = TableDef::Make(db_name, table_name, std::make_shared<String>(), {column_def1, column_def2});
+        auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<String>("create db"), TransactionType::kNormal);
+        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, std::make_shared<String>());
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn1);
         EXPECT_TRUE(status.ok());
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<String>("create table"), TransactionType::kNormal);
         status = txn2->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());
 
-        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<String>("append"), TransactionType::kNormal);
         auto input_block1 = MakeInputBlock1(4096);
         status = txn4->Append(*db_name, *table_name, input_block1);
         EXPECT_TRUE(status.ok());
 
-        auto *txn7 = new_txn_mgr->BeginTxn(MakeUnique<String>("create index"), TransactionType::kNormal);
+        auto *txn7 = new_txn_mgr->BeginTxn(std::make_unique<String>("create index"), TransactionType::kNormal);
         // create index idx1
         auto index_name1 = std::make_shared<String>("idx1");
-        auto index_def1 = IndexSecondary::Make(index_name1, MakeShared<String>(), "file_name", {column_def1->name()});
+        auto index_def1 = IndexSecondary::Make(index_name1, std::make_shared<String>(), "file_name", {column_def1->name()});
         status = txn7->CreateIndex(*db_name, *table_name, index_def1, ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
 
@@ -3670,7 +3670,7 @@ TEST_P(TestTxnAppend, test_append_and_create_index) {
         check_no_index();
 
         // drop database
-        auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
+        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<String>("drop db"), TransactionType::kNormal);
         status = txn6->DropDatabase("db1", ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
@@ -3682,27 +3682,27 @@ TEST_P(TestTxnAppend, test_append_and_create_index) {
     //                    |-------------|-----------------------|
     //                    t2        create index (success)    commit (success)
     {
-        auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def2});
-        auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
-        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
+        auto table_def = TableDef::Make(db_name, table_name, std::make_shared<String>(), {column_def1, column_def2});
+        auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<String>("create db"), TransactionType::kNormal);
+        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, std::make_shared<String>());
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn1);
         EXPECT_TRUE(status.ok());
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<String>("create table"), TransactionType::kNormal);
         status = txn2->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());
 
-        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<String>("append"), TransactionType::kNormal);
         auto input_block1 = MakeInputBlock1(4096);
         status = txn4->Append(*db_name, *table_name, input_block1);
         EXPECT_TRUE(status.ok());
 
-        auto *txn7 = new_txn_mgr->BeginTxn(MakeUnique<String>("create index"), TransactionType::kNormal);
+        auto *txn7 = new_txn_mgr->BeginTxn(std::make_unique<String>("create index"), TransactionType::kNormal);
         // create index idx1
         auto index_name1 = std::make_shared<String>("idx1");
-        auto index_def1 = IndexSecondary::Make(index_name1, MakeShared<String>(), "file_name", {column_def1->name()});
+        auto index_def1 = IndexSecondary::Make(index_name1, std::make_shared<String>(), "file_name", {column_def1->name()});
         status = txn7->CreateIndex(*db_name, *table_name, index_def1, ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn7);
@@ -3714,7 +3714,7 @@ TEST_P(TestTxnAppend, test_append_and_create_index) {
         check_no_data();
 
         // drop database
-        auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
+        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<String>("drop db"), TransactionType::kNormal);
         status = txn6->DropDatabase("db1", ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
@@ -3726,24 +3726,24 @@ TEST_P(TestTxnAppend, test_append_and_create_index) {
     //                    |----------------------|------------------------------|
     //                    t2                create index                 commit (success)
     {
-        auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def2});
-        auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
-        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
+        auto table_def = TableDef::Make(db_name, table_name, std::make_shared<String>(), {column_def1, column_def2});
+        auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<String>("create db"), TransactionType::kNormal);
+        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, std::make_shared<String>());
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn1);
         EXPECT_TRUE(status.ok());
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<String>("create table"), TransactionType::kNormal);
         status = txn2->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());
 
-        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<String>("append"), TransactionType::kNormal);
 
-        auto *txn7 = new_txn_mgr->BeginTxn(MakeUnique<String>("create index"), TransactionType::kNormal);
+        auto *txn7 = new_txn_mgr->BeginTxn(std::make_unique<String>("create index"), TransactionType::kNormal);
         // create index idx1
         auto index_name1 = std::make_shared<String>("idx1");
-        auto index_def1 = IndexSecondary::Make(index_name1, MakeShared<String>(), "file_name", {column_def1->name()});
+        auto index_def1 = IndexSecondary::Make(index_name1, std::make_shared<String>(), "file_name", {column_def1->name()});
         status = txn7->CreateIndex(*db_name, *table_name, index_def1, ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
 
@@ -3760,7 +3760,7 @@ TEST_P(TestTxnAppend, test_append_and_create_index) {
         check_no_data();
 
         // drop database
-        auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
+        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<String>("drop db"), TransactionType::kNormal);
         status = txn6->DropDatabase("db1", ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
@@ -3772,24 +3772,24 @@ TEST_P(TestTxnAppend, test_append_and_create_index) {
     //                    |----------------------|------------|
     //                    t2                  create index  commit (success)
     {
-        auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def2});
-        auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
-        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
+        auto table_def = TableDef::Make(db_name, table_name, std::make_shared<String>(), {column_def1, column_def2});
+        auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<String>("create db"), TransactionType::kNormal);
+        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, std::make_shared<String>());
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn1);
         EXPECT_TRUE(status.ok());
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<String>("create table"), TransactionType::kNormal);
         status = txn2->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());
 
-        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<String>("append"), TransactionType::kNormal);
 
-        auto *txn7 = new_txn_mgr->BeginTxn(MakeUnique<String>("create index"), TransactionType::kNormal);
+        auto *txn7 = new_txn_mgr->BeginTxn(std::make_unique<String>("create index"), TransactionType::kNormal);
         // create index idx1
         auto index_name1 = std::make_shared<String>("idx1");
-        auto index_def1 = IndexSecondary::Make(index_name1, MakeShared<String>(), "file_name", {column_def1->name()});
+        auto index_def1 = IndexSecondary::Make(index_name1, std::make_shared<String>(), "file_name", {column_def1->name()});
         status = txn7->CreateIndex(*db_name, *table_name, index_def1, ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn7);
@@ -3804,7 +3804,7 @@ TEST_P(TestTxnAppend, test_append_and_create_index) {
         check_no_data();
 
         // drop database
-        auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
+        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<String>("drop db"), TransactionType::kNormal);
         status = txn6->DropDatabase("db1", ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
@@ -3816,26 +3816,26 @@ TEST_P(TestTxnAppend, test_append_and_create_index) {
     //                    |----------------------|---------------|
     //                    t2                  create index   commit (success)
     {
-        auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def2});
-        auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
-        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
+        auto table_def = TableDef::Make(db_name, table_name, std::make_shared<String>(), {column_def1, column_def2});
+        auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<String>("create db"), TransactionType::kNormal);
+        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, std::make_shared<String>());
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn1);
         EXPECT_TRUE(status.ok());
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<String>("create table"), TransactionType::kNormal);
         status = txn2->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());
 
-        auto *txn7 = new_txn_mgr->BeginTxn(MakeUnique<String>("create index"), TransactionType::kNormal);
+        auto *txn7 = new_txn_mgr->BeginTxn(std::make_unique<String>("create index"), TransactionType::kNormal);
         // create index idx1
         auto index_name1 = std::make_shared<String>("idx1");
-        auto index_def1 = IndexSecondary::Make(index_name1, MakeShared<String>(), "file_name", {column_def1->name()});
+        auto index_def1 = IndexSecondary::Make(index_name1, std::make_shared<String>(), "file_name", {column_def1->name()});
         status = txn7->CreateIndex(*db_name, *table_name, index_def1, ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
 
-        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<String>("append"), TransactionType::kNormal);
 
         status = new_txn_mgr->CommitTxn(txn7);
         EXPECT_TRUE(status.ok());
@@ -3849,7 +3849,7 @@ TEST_P(TestTxnAppend, test_append_and_create_index) {
         check_no_data();
 
         // drop database
-        auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
+        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<String>("drop db"), TransactionType::kNormal);
         status = txn6->DropDatabase("db1", ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
@@ -3861,28 +3861,28 @@ TEST_P(TestTxnAppend, test_append_and_create_index) {
     //                    |-----------------|------------|
     //                    t2           create index   commit (success)
     {
-        auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def2});
-        auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
-        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
+        auto table_def = TableDef::Make(db_name, table_name, std::make_shared<String>(), {column_def1, column_def2});
+        auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<String>("create db"), TransactionType::kNormal);
+        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, std::make_shared<String>());
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn1);
         EXPECT_TRUE(status.ok());
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<String>("create table"), TransactionType::kNormal);
         status = txn2->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());
 
-        auto *txn7 = new_txn_mgr->BeginTxn(MakeUnique<String>("create index"), TransactionType::kNormal);
+        auto *txn7 = new_txn_mgr->BeginTxn(std::make_unique<String>("create index"), TransactionType::kNormal);
         // create index idx1
         auto index_name1 = std::make_shared<String>("idx1");
-        auto index_def1 = IndexSecondary::Make(index_name1, MakeShared<String>(), "file_name", {column_def1->name()});
+        auto index_def1 = IndexSecondary::Make(index_name1, std::make_shared<String>(), "file_name", {column_def1->name()});
         status = txn7->CreateIndex(*db_name, *table_name, index_def1, ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn7);
         EXPECT_TRUE(status.ok());
 
-        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<String>("append"), TransactionType::kNormal);
         auto input_block1 = MakeInputBlock1(4096);
         status = txn4->Append(*db_name, *table_name, input_block1);
         EXPECT_TRUE(status.ok());
@@ -3892,7 +3892,7 @@ TEST_P(TestTxnAppend, test_append_and_create_index) {
         check_table();
 
         // drop database
-        auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
+        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<String>("drop db"), TransactionType::kNormal);
         status = txn6->DropDatabase("db1", ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
@@ -3910,7 +3910,7 @@ TEST_P(TestTxnAppend, test_append_and_drop_index) {
     std::shared_ptr<ConstantExpr> default_varchar = std::make_shared<ConstantExpr>(LiteralType::kString);
     default_varchar->str_value_ = strdup("");
 
-    SharedPtr<String> db_name = std::make_shared<String>("db1");
+    std::shared_ptr<String> db_name = std::make_shared<String>("db1");
     auto table_name = std::make_shared<std::string>("tb1");
     auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
     auto column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
@@ -3942,13 +3942,13 @@ TEST_P(TestTxnAppend, test_append_and_drop_index) {
             EXPECT_FALSE(has_next);
         }
 
-        SizeT row_count = state.block_offset_end();
+        size_t row_count = state.block_offset_end();
         EXPECT_EQ(row_count, 4096);
     };
 
     auto check_index = [&]() {
         // Check the appended data.
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("scan"), TransactionType::kNormal);
 
         Optional<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
@@ -3984,7 +3984,7 @@ TEST_P(TestTxnAppend, test_append_and_drop_index) {
 
     auto check_table = [&]() {
         // Check the appended data.
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("scan"), TransactionType::kNormal);
 
         Optional<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
@@ -4011,13 +4011,13 @@ TEST_P(TestTxnAppend, test_append_and_drop_index) {
     //                            |----------------------|----------|
     //                           t2                  drop index  commit (success)
     {
-        auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def2});
-        auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
-        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
+        auto table_def = TableDef::Make(db_name, table_name, std::make_shared<String>(), {column_def1, column_def2});
+        auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<String>("create db"), TransactionType::kNormal);
+        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, std::make_shared<String>());
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn1);
         EXPECT_TRUE(status.ok());
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<String>("create table"), TransactionType::kNormal);
         status = txn2->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn2);
@@ -4025,14 +4025,14 @@ TEST_P(TestTxnAppend, test_append_and_drop_index) {
 
         // create index idx1
         auto index_name1 = std::make_shared<String>("idx1");
-        auto index_def1 = IndexSecondary::Make(index_name1, MakeShared<String>(), "file_name", {column_def1->name()});
-        auto *txn7 = new_txn_mgr->BeginTxn(MakeUnique<String>("create index"), TransactionType::kNormal);
+        auto index_def1 = IndexSecondary::Make(index_name1, std::make_shared<String>(), "file_name", {column_def1->name()});
+        auto *txn7 = new_txn_mgr->BeginTxn(std::make_unique<String>("create index"), TransactionType::kNormal);
         status = txn7->CreateIndex(*db_name, *table_name, index_def1, ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn7);
         EXPECT_TRUE(status.ok());
 
-        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<String>("append"), TransactionType::kNormal);
         auto input_block1 = MakeInputBlock1(4096);
         status = txn4->Append(*db_name, *table_name, input_block1);
         EXPECT_TRUE(status.ok());
@@ -4042,7 +4042,7 @@ TEST_P(TestTxnAppend, test_append_and_drop_index) {
         check_index();
 
         // drop index idx1
-        auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop index"), TransactionType::kNormal);
+        auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<String>("drop index"), TransactionType::kNormal);
         status = txn5->DropIndexByName(*db_name, *table_name, *index_name1, ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn5);
@@ -4051,7 +4051,7 @@ TEST_P(TestTxnAppend, test_append_and_drop_index) {
         check_table();
 
         // drop database
-        auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
+        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<String>("drop db"), TransactionType::kNormal);
         status = txn6->DropDatabase("db1", ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
@@ -4063,13 +4063,13 @@ TEST_P(TestTxnAppend, test_append_and_drop_index) {
     //                    |------------------|----------------|
     //                    t2             drop index     commit (success)
     {
-        auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def2});
-        auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
-        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
+        auto table_def = TableDef::Make(db_name, table_name, std::make_shared<String>(), {column_def1, column_def2});
+        auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<String>("create db"), TransactionType::kNormal);
+        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, std::make_shared<String>());
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn1);
         EXPECT_TRUE(status.ok());
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<String>("create table"), TransactionType::kNormal);
         status = txn2->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn2);
@@ -4077,20 +4077,20 @@ TEST_P(TestTxnAppend, test_append_and_drop_index) {
 
         // create index idx1
         auto index_name1 = std::make_shared<String>("idx1");
-        auto index_def1 = IndexSecondary::Make(index_name1, MakeShared<String>(), "file_name", {column_def1->name()});
-        auto *txn7 = new_txn_mgr->BeginTxn(MakeUnique<String>("create index"), TransactionType::kNormal);
+        auto index_def1 = IndexSecondary::Make(index_name1, std::make_shared<String>(), "file_name", {column_def1->name()});
+        auto *txn7 = new_txn_mgr->BeginTxn(std::make_unique<String>("create index"), TransactionType::kNormal);
         status = txn7->CreateIndex(*db_name, *table_name, index_def1, ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn7);
         EXPECT_TRUE(status.ok());
 
-        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<String>("append"), TransactionType::kNormal);
         auto input_block1 = MakeInputBlock1(4096);
         status = txn4->Append(*db_name, *table_name, input_block1);
         EXPECT_TRUE(status.ok());
 
         // drop index idx1
-        auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop index"), TransactionType::kNormal);
+        auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<String>("drop index"), TransactionType::kNormal);
 
         status = new_txn_mgr->CommitTxn(txn4);
         EXPECT_TRUE(status.ok());
@@ -4104,7 +4104,7 @@ TEST_P(TestTxnAppend, test_append_and_drop_index) {
         check_table();
 
         // drop database
-        auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
+        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<String>("drop db"), TransactionType::kNormal);
         status = txn6->DropDatabase("db1", ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
@@ -4116,13 +4116,13 @@ TEST_P(TestTxnAppend, test_append_and_drop_index) {
     //                    |-----------------------|-------------------------|
     //                    t2                  drop index         commit (success)
     {
-        auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def2});
-        auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
-        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
+        auto table_def = TableDef::Make(db_name, table_name, std::make_shared<String>(), {column_def1, column_def2});
+        auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<String>("create db"), TransactionType::kNormal);
+        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, std::make_shared<String>());
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn1);
         EXPECT_TRUE(status.ok());
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<String>("create table"), TransactionType::kNormal);
         status = txn2->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn2);
@@ -4130,20 +4130,20 @@ TEST_P(TestTxnAppend, test_append_and_drop_index) {
 
         // create index idx1
         auto index_name1 = std::make_shared<String>("idx1");
-        auto index_def1 = IndexSecondary::Make(index_name1, MakeShared<String>(), "file_name", {column_def1->name()});
-        auto *txn7 = new_txn_mgr->BeginTxn(MakeUnique<String>("create index"), TransactionType::kNormal);
+        auto index_def1 = IndexSecondary::Make(index_name1, std::make_shared<String>(), "file_name", {column_def1->name()});
+        auto *txn7 = new_txn_mgr->BeginTxn(std::make_unique<String>("create index"), TransactionType::kNormal);
         status = txn7->CreateIndex(*db_name, *table_name, index_def1, ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn7);
         EXPECT_TRUE(status.ok());
 
-        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<String>("append"), TransactionType::kNormal);
         auto input_block1 = MakeInputBlock1(4096);
         status = txn4->Append(*db_name, *table_name, input_block1);
         EXPECT_TRUE(status.ok());
 
         // drop index idx1
-        auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop index"), TransactionType::kNormal);
+        auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<String>("drop index"), TransactionType::kNormal);
         status = txn5->DropIndexByName(*db_name, *table_name, *index_name1, ConflictType::kError);
         EXPECT_TRUE(status.ok());
 
@@ -4157,7 +4157,7 @@ TEST_P(TestTxnAppend, test_append_and_drop_index) {
         check_table();
 
         // drop database
-        auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
+        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<String>("drop db"), TransactionType::kNormal);
         status = txn6->DropDatabase("db1", ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
@@ -4169,13 +4169,13 @@ TEST_P(TestTxnAppend, test_append_and_drop_index) {
     //                    |-------------|-----------------------|
     //                    t2        drop index (success)    commit (success)
     {
-        auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def2});
-        auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
-        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
+        auto table_def = TableDef::Make(db_name, table_name, std::make_shared<String>(), {column_def1, column_def2});
+        auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<String>("create db"), TransactionType::kNormal);
+        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, std::make_shared<String>());
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn1);
         EXPECT_TRUE(status.ok());
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<String>("create table"), TransactionType::kNormal);
         status = txn2->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn2);
@@ -4183,20 +4183,20 @@ TEST_P(TestTxnAppend, test_append_and_drop_index) {
 
         // create index idx1
         auto index_name1 = std::make_shared<String>("idx1");
-        auto index_def1 = IndexSecondary::Make(index_name1, MakeShared<String>(), "file_name", {column_def1->name()});
-        auto *txn7 = new_txn_mgr->BeginTxn(MakeUnique<String>("create index"), TransactionType::kNormal);
+        auto index_def1 = IndexSecondary::Make(index_name1, std::make_shared<String>(), "file_name", {column_def1->name()});
+        auto *txn7 = new_txn_mgr->BeginTxn(std::make_unique<String>("create index"), TransactionType::kNormal);
         status = txn7->CreateIndex(*db_name, *table_name, index_def1, ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn7);
         EXPECT_TRUE(status.ok());
 
-        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<String>("append"), TransactionType::kNormal);
         auto input_block1 = MakeInputBlock1(4096);
         status = txn4->Append(*db_name, *table_name, input_block1);
         EXPECT_TRUE(status.ok());
 
         // drop index idx1
-        auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop index"), TransactionType::kNormal);
+        auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<String>("drop index"), TransactionType::kNormal);
         status = txn5->DropIndexByName(*db_name, *table_name, *index_name1, ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn5);
@@ -4206,7 +4206,7 @@ TEST_P(TestTxnAppend, test_append_and_drop_index) {
         EXPECT_FALSE(status.ok());
 
         // drop database
-        auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
+        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<String>("drop db"), TransactionType::kNormal);
         status = txn6->DropDatabase("db1", ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
@@ -4218,13 +4218,13 @@ TEST_P(TestTxnAppend, test_append_and_drop_index) {
     //                    |----------------------|------------------------------|
     //                    t2                drop index                 commit (success)
     {
-        auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def2});
-        auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
-        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
+        auto table_def = TableDef::Make(db_name, table_name, std::make_shared<String>(), {column_def1, column_def2});
+        auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<String>("create db"), TransactionType::kNormal);
+        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, std::make_shared<String>());
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn1);
         EXPECT_TRUE(status.ok());
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<String>("create table"), TransactionType::kNormal);
         status = txn2->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn2);
@@ -4232,17 +4232,17 @@ TEST_P(TestTxnAppend, test_append_and_drop_index) {
 
         // create index idx1
         auto index_name1 = std::make_shared<String>("idx1");
-        auto index_def1 = IndexSecondary::Make(index_name1, MakeShared<String>(), "file_name", {column_def1->name()});
-        auto *txn7 = new_txn_mgr->BeginTxn(MakeUnique<String>("create index"), TransactionType::kNormal);
+        auto index_def1 = IndexSecondary::Make(index_name1, std::make_shared<String>(), "file_name", {column_def1->name()});
+        auto *txn7 = new_txn_mgr->BeginTxn(std::make_unique<String>("create index"), TransactionType::kNormal);
         status = txn7->CreateIndex(*db_name, *table_name, index_def1, ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn7);
         EXPECT_TRUE(status.ok());
 
-        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<String>("append"), TransactionType::kNormal);
 
         // drop index idx1
-        auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop index"), TransactionType::kNormal);
+        auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<String>("drop index"), TransactionType::kNormal);
         status = txn5->DropIndexByName(*db_name, *table_name, *index_name1, ConflictType::kError);
         EXPECT_TRUE(status.ok());
 
@@ -4257,7 +4257,7 @@ TEST_P(TestTxnAppend, test_append_and_drop_index) {
         EXPECT_FALSE(status.ok());
 
         // drop database
-        auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
+        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<String>("drop db"), TransactionType::kNormal);
         status = txn6->DropDatabase("db1", ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
@@ -4269,13 +4269,13 @@ TEST_P(TestTxnAppend, test_append_and_drop_index) {
     //                    |----------------------|------------|
     //                    t2                  drop index  commit (success)
     {
-        auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def2});
-        auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
-        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
+        auto table_def = TableDef::Make(db_name, table_name, std::make_shared<String>(), {column_def1, column_def2});
+        auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<String>("create db"), TransactionType::kNormal);
+        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, std::make_shared<String>());
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn1);
         EXPECT_TRUE(status.ok());
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<String>("create table"), TransactionType::kNormal);
         status = txn2->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn2);
@@ -4283,17 +4283,17 @@ TEST_P(TestTxnAppend, test_append_and_drop_index) {
 
         // create index idx1
         auto index_name1 = std::make_shared<String>("idx1");
-        auto index_def1 = IndexSecondary::Make(index_name1, MakeShared<String>(), "file_name", {column_def1->name()});
-        auto *txn7 = new_txn_mgr->BeginTxn(MakeUnique<String>("create index"), TransactionType::kNormal);
+        auto index_def1 = IndexSecondary::Make(index_name1, std::make_shared<String>(), "file_name", {column_def1->name()});
+        auto *txn7 = new_txn_mgr->BeginTxn(std::make_unique<String>("create index"), TransactionType::kNormal);
         status = txn7->CreateIndex(*db_name, *table_name, index_def1, ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn7);
         EXPECT_TRUE(status.ok());
 
-        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<String>("append"), TransactionType::kNormal);
 
         // drop index idx1
-        auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop index"), TransactionType::kNormal);
+        auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<String>("drop index"), TransactionType::kNormal);
         status = txn5->DropIndexByName(*db_name, *table_name, *index_name1, ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn5);
@@ -4306,7 +4306,7 @@ TEST_P(TestTxnAppend, test_append_and_drop_index) {
         EXPECT_FALSE(status.ok());
 
         // drop database
-        auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
+        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<String>("drop db"), TransactionType::kNormal);
         status = txn6->DropDatabase("db1", ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
@@ -4318,13 +4318,13 @@ TEST_P(TestTxnAppend, test_append_and_drop_index) {
     //                    |----------------------|---------------|
     //                    t2                  drop index   commit (success)
     {
-        auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def2});
-        auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
-        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
+        auto table_def = TableDef::Make(db_name, table_name, std::make_shared<String>(), {column_def1, column_def2});
+        auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<String>("create db"), TransactionType::kNormal);
+        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, std::make_shared<String>());
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn1);
         EXPECT_TRUE(status.ok());
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<String>("create table"), TransactionType::kNormal);
         status = txn2->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn2);
@@ -4332,19 +4332,19 @@ TEST_P(TestTxnAppend, test_append_and_drop_index) {
 
         // create index idx1
         auto index_name1 = std::make_shared<String>("idx1");
-        auto index_def1 = IndexSecondary::Make(index_name1, MakeShared<String>(), "file_name", {column_def1->name()});
-        auto *txn7 = new_txn_mgr->BeginTxn(MakeUnique<String>("create index"), TransactionType::kNormal);
+        auto index_def1 = IndexSecondary::Make(index_name1, std::make_shared<String>(), "file_name", {column_def1->name()});
+        auto *txn7 = new_txn_mgr->BeginTxn(std::make_unique<String>("create index"), TransactionType::kNormal);
         status = txn7->CreateIndex(*db_name, *table_name, index_def1, ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn7);
         EXPECT_TRUE(status.ok());
 
         // drop index idx1
-        auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop index"), TransactionType::kNormal);
+        auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<String>("drop index"), TransactionType::kNormal);
         status = txn5->DropIndexByName(*db_name, *table_name, *index_name1, ConflictType::kError);
         EXPECT_TRUE(status.ok());
 
-        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<String>("append"), TransactionType::kNormal);
 
         status = new_txn_mgr->CommitTxn(txn5);
         EXPECT_TRUE(status.ok());
@@ -4356,7 +4356,7 @@ TEST_P(TestTxnAppend, test_append_and_drop_index) {
         EXPECT_FALSE(status.ok());
 
         // drop database
-        auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
+        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<String>("drop db"), TransactionType::kNormal);
         status = txn6->DropDatabase("db1", ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
@@ -4368,13 +4368,13 @@ TEST_P(TestTxnAppend, test_append_and_drop_index) {
     //                    |-----------------|------------|
     //                    t2           drop index   commit (success)
     {
-        auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def2});
-        auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
-        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
+        auto table_def = TableDef::Make(db_name, table_name, std::make_shared<String>(), {column_def1, column_def2});
+        auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<String>("create db"), TransactionType::kNormal);
+        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, std::make_shared<String>());
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn1);
         EXPECT_TRUE(status.ok());
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<String>("create table"), TransactionType::kNormal);
         status = txn2->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn2);
@@ -4382,21 +4382,21 @@ TEST_P(TestTxnAppend, test_append_and_drop_index) {
 
         // create index idx1
         auto index_name1 = std::make_shared<String>("idx1");
-        auto index_def1 = IndexSecondary::Make(index_name1, MakeShared<String>(), "file_name", {column_def1->name()});
-        auto *txn7 = new_txn_mgr->BeginTxn(MakeUnique<String>("create index"), TransactionType::kNormal);
+        auto index_def1 = IndexSecondary::Make(index_name1, std::make_shared<String>(), "file_name", {column_def1->name()});
+        auto *txn7 = new_txn_mgr->BeginTxn(std::make_unique<String>("create index"), TransactionType::kNormal);
         status = txn7->CreateIndex(*db_name, *table_name, index_def1, ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn7);
         EXPECT_TRUE(status.ok());
 
         // drop index idx1
-        auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop index"), TransactionType::kNormal);
+        auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<String>("drop index"), TransactionType::kNormal);
         status = txn5->DropIndexByName(*db_name, *table_name, *index_name1, ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn5);
         EXPECT_TRUE(status.ok());
 
-        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<String>("append"), TransactionType::kNormal);
         auto input_block1 = MakeInputBlock1(4096);
         status = txn4->Append(*db_name, *table_name, input_block1);
         EXPECT_TRUE(status.ok());
@@ -4406,7 +4406,7 @@ TEST_P(TestTxnAppend, test_append_and_drop_index) {
         check_table();
 
         // drop database
-        auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
+        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<String>("drop db"), TransactionType::kNormal);
         status = txn6->DropDatabase("db1", ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
@@ -4418,21 +4418,21 @@ TEST_P(TestTxnAppend, test_append_and_compact) {
 
     using namespace infinity;
     NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
-    SharedPtr<String> db_name = std::make_shared<String>("db1");
+    std::shared_ptr<String> db_name = std::make_shared<String>("db1");
     auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
     auto column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
     auto table_name = std::make_shared<std::string>("tb1");
-    auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def2});
+    auto table_def = TableDef::Make(db_name, table_name, std::make_shared<String>(), {column_def1, column_def2});
     auto PrepareForCompact = [&] {
         {
-            auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
-            Status status = txn->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
+            auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("create db"), TransactionType::kNormal);
+            Status status = txn->CreateDatabase(*db_name, ConflictType::kError, std::make_shared<String>());
             EXPECT_TRUE(status.ok());
             status = new_txn_mgr->CommitTxn(txn);
             EXPECT_TRUE(status.ok());
         }
         {
-            auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+            auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("create table"), TransactionType::kNormal);
             Status status = txn->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
             EXPECT_TRUE(status.ok());
             status = new_txn_mgr->CommitTxn(txn);
@@ -4441,8 +4441,8 @@ TEST_P(TestTxnAppend, test_append_and_compact) {
 
         // For compact
         for (int i = 0; i < 2; ++i) {
-            auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>(fmt::format("import {}", i)), TransactionType::kNormal);
-            Vector<SharedPtr<DataBlock>> input_blocks = {MakeInputBlock(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"), 8192)};
+            auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>(fmt::format("import {}", i)), TransactionType::kNormal);
+            Vector<std::shared_ptr<DataBlock>> input_blocks = {MakeInputBlock(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"), 8192)};
             Status status = txn->Import(*db_name, *table_name, input_blocks);
             EXPECT_TRUE(status.ok());
             status = new_txn_mgr->CommitTxn(txn);
@@ -4451,7 +4451,7 @@ TEST_P(TestTxnAppend, test_append_and_compact) {
     };
 
     auto CheckTable = [&](const Vector<SegmentID> &segment_ids) {
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check table"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("check table"), TransactionType::kNormal);
 
         Optional<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
@@ -4466,7 +4466,7 @@ TEST_P(TestTxnAppend, test_append_and_compact) {
 
     auto DropDB = [&] {
         // drop database
-        auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
+        auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<String>("create db"), TransactionType::kNormal);
         Status status = txn5->DropDatabase("db1", ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn5);
@@ -4480,15 +4480,15 @@ TEST_P(TestTxnAppend, test_append_and_compact) {
     {
         PrepareForCompact();
 
-        SharedPtr<DataBlock> input_block1 = MakeInputBlock(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"), 8192);
+        std::shared_ptr<DataBlock> input_block1 = MakeInputBlock(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"), 8192);
 
-        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kAppend);
+        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<String>("append"), TransactionType::kAppend);
         Status status = txn4->Append(*db_name, *table_name, input_block1);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn4);
         EXPECT_TRUE(status.ok());
         // compact
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<String>("compact"), TransactionType::kNormal);
         status = txn2->Compact(*db_name, *table_name, {0, 1});
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn2);
@@ -4506,14 +4506,14 @@ TEST_P(TestTxnAppend, test_append_and_compact) {
     {
         PrepareForCompact();
 
-        SharedPtr<DataBlock> input_block1 = MakeInputBlock(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"), 8192);
+        std::shared_ptr<DataBlock> input_block1 = MakeInputBlock(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"), 8192);
 
-        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<String>("append"), TransactionType::kNormal);
         Status status = txn4->Append(*db_name, *table_name, input_block1);
         EXPECT_TRUE(status.ok());
 
         // compact
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<String>("compact"), TransactionType::kNormal);
 
         status = new_txn_mgr->CommitTxn(txn4);
         EXPECT_TRUE(status.ok());
@@ -4535,14 +4535,14 @@ TEST_P(TestTxnAppend, test_append_and_compact) {
     {
         PrepareForCompact();
 
-        SharedPtr<DataBlock> input_block1 = MakeInputBlock(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"), 8192);
+        std::shared_ptr<DataBlock> input_block1 = MakeInputBlock(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"), 8192);
 
-        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<String>("append"), TransactionType::kNormal);
         Status status = txn4->Append(*db_name, *table_name, input_block1);
         EXPECT_TRUE(status.ok());
 
         // compact
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<String>("compact"), TransactionType::kNormal);
         status = txn2->Compact(*db_name, *table_name, {0, 1});
         EXPECT_TRUE(status.ok());
 
@@ -4564,14 +4564,14 @@ TEST_P(TestTxnAppend, test_append_and_compact) {
     {
         PrepareForCompact();
 
-        SharedPtr<DataBlock> input_block1 = MakeInputBlock(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"), 8192);
+        std::shared_ptr<DataBlock> input_block1 = MakeInputBlock(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"), 8192);
 
-        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<String>("append"), TransactionType::kNormal);
         Status status = txn4->Append(*db_name, *table_name, input_block1);
         EXPECT_TRUE(status.ok());
 
         // compact
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<String>("compact"), TransactionType::kNormal);
         status = txn2->Compact(*db_name, *table_name, {0, 1});
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn2);
@@ -4592,12 +4592,12 @@ TEST_P(TestTxnAppend, test_append_and_compact) {
     {
         PrepareForCompact();
 
-        SharedPtr<DataBlock> input_block1 = MakeInputBlock(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"), 8192);
+        std::shared_ptr<DataBlock> input_block1 = MakeInputBlock(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"), 8192);
 
-        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<String>("append"), TransactionType::kNormal);
 
         // compact
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<String>("compact"), TransactionType::kNormal);
         Status status = txn2->Compact(*db_name, *table_name, {0, 1});
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn2);
@@ -4620,16 +4620,16 @@ TEST_P(TestTxnAppend, test_append_and_compact) {
     {
         PrepareForCompact();
 
-        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+        auto *txn3 = new_txn_mgr->BeginTxn(std::make_unique<String>("append"), TransactionType::kNormal);
 
         // compact
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<String>("compact"), TransactionType::kNormal);
         Status status = txn2->Compact(*db_name, *table_name, {0, 1});
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());
 
-        SharedPtr<DataBlock> input_block1 = MakeInputBlock(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"), 8192);
+        std::shared_ptr<DataBlock> input_block1 = MakeInputBlock(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"), 8192);
         status = txn3->Append(*db_name, *table_name, input_block1);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn3);
@@ -4648,16 +4648,16 @@ TEST_P(TestTxnAppend, test_append_and_compact) {
         PrepareForCompact();
 
         // compact
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<String>("compact"), TransactionType::kNormal);
         Status status = txn2->Compact(*db_name, *table_name, {0, 1});
         EXPECT_TRUE(status.ok());
 
-        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+        auto *txn3 = new_txn_mgr->BeginTxn(std::make_unique<String>("append"), TransactionType::kNormal);
 
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());
 
-        SharedPtr<DataBlock> input_block1 = MakeInputBlock(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"), 8192);
+        std::shared_ptr<DataBlock> input_block1 = MakeInputBlock(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"), 8192);
         status = txn3->Append(*db_name, *table_name, input_block1);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn3);
@@ -4676,14 +4676,14 @@ TEST_P(TestTxnAppend, test_append_and_compact) {
         PrepareForCompact();
 
         // compact
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<String>("compact"), TransactionType::kNormal);
         Status status = txn2->Compact(*db_name, *table_name, {0, 1});
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());
 
-        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
-        SharedPtr<DataBlock> input_block1 = MakeInputBlock(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"), 8192);
+        auto *txn3 = new_txn_mgr->BeginTxn(std::make_unique<String>("append"), TransactionType::kNormal);
+        std::shared_ptr<DataBlock> input_block1 = MakeInputBlock(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"), 8192);
         status = txn3->Append(*db_name, *table_name, input_block1);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn3);
@@ -4699,32 +4699,32 @@ TEST_P(TestTxnAppend, test_append_and_optimize_index) {
 
     using namespace infinity;
     NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
-    SharedPtr<String> db_name = std::make_shared<String>("db1");
+    std::shared_ptr<String> db_name = std::make_shared<String>("db1");
     auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
     auto column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
     auto table_name = std::make_shared<std::string>("tb1");
-    auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def2});
+    auto table_def = TableDef::Make(db_name, table_name, std::make_shared<String>(), {column_def1, column_def2});
 
     auto index_name1 = std::make_shared<std::string>("index1");
-    auto index_def1 = IndexSecondary::Make(index_name1, MakeShared<String>(), "file_name", {column_def1->name()});
+    auto index_def1 = IndexSecondary::Make(index_name1, std::make_shared<String>(), "file_name", {column_def1->name()});
 
     auto PrepareForAppendAndOptimize = [&] {
         {
-            auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
-            Status status = txn->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
+            auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("create db"), TransactionType::kNormal);
+            Status status = txn->CreateDatabase(*db_name, ConflictType::kError, std::make_shared<String>());
             EXPECT_TRUE(status.ok());
             status = new_txn_mgr->CommitTxn(txn);
             EXPECT_TRUE(status.ok());
         }
         {
-            auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+            auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("create table"), TransactionType::kNormal);
             Status status = txn->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
             EXPECT_TRUE(status.ok());
             status = new_txn_mgr->CommitTxn(txn);
             EXPECT_TRUE(status.ok());
         }
         {
-            auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create index"), TransactionType::kNormal);
+            auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("create index"), TransactionType::kNormal);
             Status status = txn->CreateIndex(*db_name, *table_name, index_def1, ConflictType::kError);
             EXPECT_TRUE(status.ok());
             status = new_txn_mgr->CommitTxn(txn);
@@ -4734,8 +4734,8 @@ TEST_P(TestTxnAppend, test_append_and_optimize_index) {
         // For optimize
         for (int i = 0; i < 2; ++i) {
             {
-                auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>(fmt::format("append {}", i)), TransactionType::kNormal);
-                SharedPtr<DataBlock> input_block = MakeInputBlock(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"), 8192);
+                auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>(fmt::format("append {}", i)), TransactionType::kNormal);
+                std::shared_ptr<DataBlock> input_block = MakeInputBlock(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"), 8192);
                 Status status = txn->Append(*db_name, *table_name, input_block);
                 EXPECT_TRUE(status.ok());
                 status = new_txn_mgr->CommitTxn(txn);
@@ -4744,7 +4744,7 @@ TEST_P(TestTxnAppend, test_append_and_optimize_index) {
 
             //            new_txn_mgr->PrintAllKeyValue();
             {
-                auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>(fmt::format("dump index {}", i)), TransactionType::kNormal);
+                auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>(fmt::format("dump index {}", i)), TransactionType::kNormal);
                 Status status = txn->DumpMemIndex(*db_name, *table_name, *index_name1, 0);
                 EXPECT_TRUE(status.ok());
                 status = new_txn_mgr->CommitTxn(txn);
@@ -4753,8 +4753,8 @@ TEST_P(TestTxnAppend, test_append_and_optimize_index) {
         }
 
         {
-            auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
-            SharedPtr<DataBlock> input_block = MakeInputBlock(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"), 8192);
+            auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("append"), TransactionType::kNormal);
+            std::shared_ptr<DataBlock> input_block = MakeInputBlock(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"), 8192);
             Status status = txn->Append(*db_name, *table_name, input_block);
             EXPECT_TRUE(status.ok());
             status = new_txn_mgr->CommitTxn(txn);
@@ -4763,7 +4763,7 @@ TEST_P(TestTxnAppend, test_append_and_optimize_index) {
     };
 
     auto CheckTable = [&](const Vector<SegmentID> &segment_ids) {
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check table"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("check table"), TransactionType::kNormal);
 
         Optional<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
@@ -4774,7 +4774,7 @@ TEST_P(TestTxnAppend, test_append_and_optimize_index) {
         status = txn->GetTableIndexMeta(*index_name1, *table_meta, table_index_meta);
         EXPECT_TRUE(status.ok());
 
-        SharedPtr<IndexBase> index_base;
+        std::shared_ptr<IndexBase> index_base;
         std::tie(index_base, status) = table_index_meta->GetIndexBase();
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(*index_base->index_name_, *index_name1);
@@ -4792,7 +4792,7 @@ TEST_P(TestTxnAppend, test_append_and_optimize_index) {
     };
 
     auto CheckTableRollback = [&](const Vector<SegmentID> &segment_ids) {
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check table"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("check table"), TransactionType::kNormal);
 
         Optional<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
@@ -4803,7 +4803,7 @@ TEST_P(TestTxnAppend, test_append_and_optimize_index) {
         status = txn->GetTableIndexMeta(*index_name1, *table_meta, table_index_meta);
         EXPECT_TRUE(status.ok());
 
-        SharedPtr<IndexBase> index_base;
+        std::shared_ptr<IndexBase> index_base;
         std::tie(index_base, status) = table_index_meta->GetIndexBase();
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(*index_base->index_name_, *index_name1);
@@ -4822,7 +4822,7 @@ TEST_P(TestTxnAppend, test_append_and_optimize_index) {
 
     auto DropDB = [&] {
         // drop database
-        auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
+        auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<String>("create db"), TransactionType::kNormal);
         Status status = txn5->DropDatabase("db1", ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn5);
@@ -4836,16 +4836,16 @@ TEST_P(TestTxnAppend, test_append_and_optimize_index) {
     {
         PrepareForAppendAndOptimize();
 
-        SharedPtr<DataBlock> input_block1 = MakeInputBlock(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"), 8192);
+        std::shared_ptr<DataBlock> input_block1 = MakeInputBlock(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"), 8192);
 
-        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<String>("append"), TransactionType::kNormal);
         Status status = txn4->Append(*db_name, *table_name, input_block1);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn4);
         EXPECT_TRUE(status.ok());
 
         // optimize index
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("optimize index"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<String>("optimize index"), TransactionType::kNormal);
         status = txn2->OptimizeIndex(*db_name, *table_name, *index_name1, 0);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn2);
@@ -4863,14 +4863,14 @@ TEST_P(TestTxnAppend, test_append_and_optimize_index) {
     {
         PrepareForAppendAndOptimize();
 
-        SharedPtr<DataBlock> input_block1 = MakeInputBlock(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"), 8192);
+        std::shared_ptr<DataBlock> input_block1 = MakeInputBlock(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"), 8192);
 
-        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<String>("append"), TransactionType::kNormal);
         Status status = txn4->Append(*db_name, *table_name, input_block1);
         EXPECT_TRUE(status.ok());
 
         // optimize index
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("optimize index"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<String>("optimize index"), TransactionType::kNormal);
 
         status = new_txn_mgr->CommitTxn(txn4);
         EXPECT_TRUE(status.ok());
@@ -4893,14 +4893,14 @@ TEST_P(TestTxnAppend, test_append_and_optimize_index) {
     {
         PrepareForAppendAndOptimize();
 
-        SharedPtr<DataBlock> input_block1 = MakeInputBlock(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"), 8192);
+        std::shared_ptr<DataBlock> input_block1 = MakeInputBlock(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"), 8192);
 
-        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<String>("append"), TransactionType::kNormal);
         Status status = txn4->Append(*db_name, *table_name, input_block1);
         EXPECT_TRUE(status.ok());
 
         // optimize index
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("optimize index"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<String>("optimize index"), TransactionType::kNormal);
         status = txn2->OptimizeIndex(*db_name, *table_name, *index_name1, 0);
         EXPECT_TRUE(status.ok());
 
@@ -4922,14 +4922,14 @@ TEST_P(TestTxnAppend, test_append_and_optimize_index) {
     {
         PrepareForAppendAndOptimize();
 
-        SharedPtr<DataBlock> input_block1 = MakeInputBlock(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"), 8192);
+        std::shared_ptr<DataBlock> input_block1 = MakeInputBlock(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"), 8192);
 
-        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<String>("append"), TransactionType::kNormal);
         Status status = txn4->Append(*db_name, *table_name, input_block1);
         EXPECT_TRUE(status.ok());
 
         // optimize index
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("optimize index"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<String>("optimize index"), TransactionType::kNormal);
         status = txn2->OptimizeIndex(*db_name, *table_name, *index_name1, 0);
         EXPECT_TRUE(status.ok());
 
@@ -4951,12 +4951,12 @@ TEST_P(TestTxnAppend, test_append_and_optimize_index) {
     {
         PrepareForAppendAndOptimize();
 
-        SharedPtr<DataBlock> input_block1 = MakeInputBlock(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"), 8192);
+        std::shared_ptr<DataBlock> input_block1 = MakeInputBlock(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"), 8192);
 
-        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<String>("append"), TransactionType::kNormal);
 
         // optimize index
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("optimize index"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<String>("optimize index"), TransactionType::kNormal);
         Status status = txn2->OptimizeIndex(*db_name, *table_name, *index_name1, 0);
         EXPECT_TRUE(status.ok());
 
@@ -4981,12 +4981,12 @@ TEST_P(TestTxnAppend, test_append_and_optimize_index) {
     {
         PrepareForAppendAndOptimize();
 
-        SharedPtr<DataBlock> input_block1 = MakeInputBlock(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"), 8192);
+        std::shared_ptr<DataBlock> input_block1 = MakeInputBlock(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"), 8192);
 
-        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<String>("append"), TransactionType::kNormal);
 
         // optimize index
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("optimize index"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<String>("optimize index"), TransactionType::kNormal);
         Status status = txn2->OptimizeIndex(*db_name, *table_name, *index_name1, 0);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn2);
@@ -5009,14 +5009,14 @@ TEST_P(TestTxnAppend, test_append_and_optimize_index) {
     {
         PrepareForAppendAndOptimize();
 
-        SharedPtr<DataBlock> input_block1 = MakeInputBlock(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"), 8192);
+        std::shared_ptr<DataBlock> input_block1 = MakeInputBlock(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"), 8192);
 
         // optimize index
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("optimize index"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<String>("optimize index"), TransactionType::kNormal);
         Status status = txn2->OptimizeIndex(*db_name, *table_name, *index_name1, 0);
         EXPECT_TRUE(status.ok());
 
-        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<String>("append"), TransactionType::kNormal);
 
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());
@@ -5038,16 +5038,16 @@ TEST_P(TestTxnAppend, test_append_and_optimize_index) {
     {
         PrepareForAppendAndOptimize();
 
-        SharedPtr<DataBlock> input_block1 = MakeInputBlock(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"), 8192);
+        std::shared_ptr<DataBlock> input_block1 = MakeInputBlock(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"), 8192);
 
         // optimize index
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("optimize index"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<String>("optimize index"), TransactionType::kNormal);
         Status status = txn2->OptimizeIndex(*db_name, *table_name, *index_name1, 0);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());
 
-        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<String>("append"), TransactionType::kNormal);
         status = txn4->Append(*db_name, *table_name, input_block1);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn4);

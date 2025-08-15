@@ -27,21 +27,21 @@ import data_type;
 
 namespace infinity {
 
-Vector<ColumnBinding> LogicalOptimize::GetColumnBindings() const { return {}; }
+std::vector<ColumnBinding> LogicalOptimize::GetColumnBindings() const { return {}; }
 
-SharedPtr<Vector<String>> LogicalOptimize::GetOutputNames() const { return MakeShared<Vector<String>>(); }
+std::shared_ptr<std::vector<std::string>> LogicalOptimize::GetOutputNames() const { return std::make_shared<std::vector<std::string>>(); }
 
-SharedPtr<Vector<SharedPtr<DataType>>> LogicalOptimize::GetOutputTypes() const { return MakeShared<Vector<SharedPtr<DataType>>>(); }
+std::shared_ptr<std::vector<std::shared_ptr<DataType>>> LogicalOptimize::GetOutputTypes() const { return std::make_shared<std::vector<std::shared_ptr<DataType>>>(); }
 
-String LogicalOptimize::ToString(i64 &space) const {
+std::string LogicalOptimize::ToString(i64 &space) const {
     std::stringstream ss;
-    String arrow_str;
+    std::string arrow_str;
     if (space > 3) {
         space -= 4;
         arrow_str = "->  ";
     }
 
-    ss << String(space, ' ') << "-> " << "Optimize Table: ";
+    ss << std::string(space, ' ') << "-> " << "Optimize Table: ";
     space += arrow_str.size();
 
     return ss.str();

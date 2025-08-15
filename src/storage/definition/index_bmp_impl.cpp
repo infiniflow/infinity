@@ -32,12 +32,12 @@ import logical_type;
 
 namespace infinity {
 
-SharedPtr<IndexBMP> IndexBMP::Make(SharedPtr<String> index_name,
-                                   SharedPtr<String> index_comment,
-                                   const String &file_name,
-                                   Vector<String> column_names,
-                                   const Vector<InitParameter *> &index_param_list) {
-    SizeT block_size = BMP_BLOCK_SIZE;
+std::shared_ptr<IndexBMP> IndexBMP::Make(std::shared_ptr<std::string> index_name,
+                                   std::shared_ptr<std::string> index_comment,
+                                   const std::string &file_name,
+                                   std::vector<std::string> column_names,
+                                   const std::vector<InitParameter *> &index_param_list) {
+    size_t block_size = BMP_BLOCK_SIZE;
     BMPCompressType compress_type = BMPCompressType::kCompressed;
     for (const auto *para : index_param_list) {
         if (para->param_name_ == "block_size") {
@@ -57,13 +57,13 @@ SharedPtr<IndexBMP> IndexBMP::Make(SharedPtr<String> index_name,
         Status status = Status::InvalidIndexParam("Compress type");
         RecoverableError(status);
     }
-    return MakeShared<IndexBMP>(index_name, index_comment, file_name, column_names, block_size, compress_type);
+    return std::make_shared<IndexBMP>(index_name, index_comment, file_name, column_names, block_size, compress_type);
 }
 
-void IndexBMP::ValidateColumnDataType(const SharedPtr<BaseTableRef> &base_table_ref, const String &column_name) {
+void IndexBMP::ValidateColumnDataType(const std::shared_ptr<BaseTableRef> &base_table_ref, const std::string &column_name) {
     auto &column_names_vector = *(base_table_ref->column_names_);
     auto &column_types_vector = *(base_table_ref->column_types_);
-    SizeT column_id = std::find(column_names_vector.begin(), column_names_vector.end(), column_name) - column_names_vector.begin();
+    size_t column_id = std::find(column_names_vector.begin(), column_names_vector.end(), column_name) - column_names_vector.begin();
     if (column_id == column_names_vector.size()) {
         Status status = Status::ColumnNotExist(column_name);
         RecoverableError(status);
@@ -101,14 +101,14 @@ void IndexBMP::WriteAdv(char *&ptr) const {
     WriteBufAdv(ptr, static_cast<i8>(compress_type_));
 }
 
-String IndexBMP::ToString() const {
+std::string IndexBMP::ToString() const {
     std::stringstream ss;
     ss << IndexBase::ToString() << ", " << block_size_;
     ss << ", " << BMPCompressTypeToString(compress_type_);
     return ss.str();
 }
 
-String IndexBMP::BuildOtherParamsString() const {
+std::string IndexBMP::BuildOtherParamsString() const {
     std::stringstream ss;
     ss << "block_size = " << block_size_;
     ss << ", compress_type = " << BMPCompressTypeToString(compress_type_);

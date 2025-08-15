@@ -32,18 +32,18 @@ import third_party;
 
 namespace infinity {
 
-Status Snapshot::CreateDatabaseSnapshot(QueryContext *query_context, const String &snapshot_name, const String &db_name) {
+Status Snapshot::CreateDatabaseSnapshot(QueryContext *query_context, const std::string &snapshot_name, const std::string &db_name) {
     auto *txn_ptr = query_context->GetNewTxn();
     auto *txn_mgr = txn_ptr->txn_mgr();
 
-    SharedPtr<DatabaseSnapshotInfo> database_snapshot;
+    std::shared_ptr<DatabaseSnapshotInfo> database_snapshot;
     Status status;
     std::tie(database_snapshot, status) = txn_ptr->GetDatabaseSnapshotInfo(db_name);
     if (!status.ok()) {
         RecoverableError(status);
     }
     database_snapshot->snapshot_name_ = snapshot_name;
-    String snapshot_dir = query_context->global_config()->SnapshotDir();
+    std::string snapshot_dir = query_context->global_config()->SnapshotDir();
     status = database_snapshot->Serialize(snapshot_dir, txn_mgr->GetReadCommitTS(txn_ptr));
     if (!status.ok()) {
         return status;
@@ -52,11 +52,11 @@ Status Snapshot::CreateDatabaseSnapshot(QueryContext *query_context, const Strin
     return Status::OK();
 }
 
-Status Snapshot::RestoreDatabaseSnapshot(QueryContext *query_context, const String &snapshot_name) {
+Status Snapshot::RestoreDatabaseSnapshot(QueryContext *query_context, const std::string &snapshot_name) {
     auto *txn_ptr = query_context->GetNewTxn();
-    String snapshot_dir = query_context->global_config()->SnapshotDir();
+    std::string snapshot_dir = query_context->global_config()->SnapshotDir();
 
-    SharedPtr<DatabaseSnapshotInfo> database_snapshot;
+    std::shared_ptr<DatabaseSnapshotInfo> database_snapshot;
     Status status;
     std::tie(database_snapshot, status) = DatabaseSnapshotInfo::Deserialize(snapshot_dir, snapshot_name);
     if (!status.ok()) {

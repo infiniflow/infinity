@@ -60,11 +60,11 @@ export {
     constexpr const char *SPILL_SUFFIX = ".spill";
     constexpr const char *LENGTH_SUFFIX = ".len";
 
-    using ScoredId = Pair<float, u32>;
-    using ScoredIds = Vector<ScoredId>;
+    using ScoredId = std::pair<float, u32>;
+    using ScoredIds = std::vector<ScoredId>;
     constexpr std::string_view DEFAULT_SCORER = "bm25";
     constexpr std::string_view DEFAULT_SCORER_ARG = "";
-    constexpr SizeT DEFAULT_TOPN = 100;
+    constexpr size_t DEFAULT_TOPN = 100;
 }
 
 // iresearch doc_id begins with 1

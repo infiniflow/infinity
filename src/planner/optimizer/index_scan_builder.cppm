@@ -26,9 +26,9 @@ export class IndexScanBuilder final : public OptimizerRule {
 public:
     ~IndexScanBuilder() final = default;
 
-    void ApplyToPlan(QueryContext *query_context_ptr, SharedPtr<LogicalNode> &logical_plan) override;
+    void ApplyToPlan(QueryContext *query_context_ptr, std::shared_ptr<LogicalNode> &logical_plan) override;
 
-    String name() const final { return "Build SecondaryIndexScan"; }
+    std::string name() const final { return "Build SecondaryIndexScan"; }
 };
 
 } // namespace infinity

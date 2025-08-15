@@ -56,7 +56,7 @@ export inline BoundCastFunc BindDateTimeCast(DataType &target) {
 struct DateTimeTryCastToFixlen {
     template <typename SourceType, typename TargetType>
     static inline bool Run(SourceType, TargetType &) {
-        String error_message =
+        std::string error_message =
             fmt::format("Not support to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>());
         UnrecoverableError(error_message);
 
@@ -67,7 +67,7 @@ struct DateTimeTryCastToFixlen {
 struct DateTimeTryCastToVarlen {
     template <typename SourceType, typename TargetType>
     static inline bool Run(SourceType, TargetType &, ColumnVector *) {
-        String error_message =
+        std::string error_message =
             fmt::format("Not support to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>());
         UnrecoverableError(error_message);
         return false;

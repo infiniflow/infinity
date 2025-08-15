@@ -25,15 +25,15 @@ namespace infinity {
 export class DiskAnnMemGraphStore {
 public:
     using This = DiskAnnMemGraphStore;
-    using GraphStruct = Vector<Vector<SizeT>>;
-    using VectorStruct = Vector<SizeT>;
+    using GraphStruct = std::vector<std::vector<size_t>>;
+    using VectorStruct = std::vector<size_t>;
 
     DiskAnnMemGraphStore() : capacity_(0), reserve_graph_degree_(0), graph_(0), max_range_of_graph_(0), max_observecd_degree_(0) {}
 
-    DiskAnnMemGraphStore(SizeT capacity, u32 reserve_graph_degree)
+    DiskAnnMemGraphStore(size_t capacity, u32 reserve_graph_degree)
         : capacity_(capacity), reserve_graph_degree_(reserve_graph_degree), graph_(capacity), max_range_of_graph_(0), max_observecd_degree_(0) {
         graph_.resize(capacity);
-        for (SizeT i = 0; i < capacity; i++) {
+        for (size_t i = 0; i < capacity; i++) {
             graph_[i].reserve(reserve_graph_degree);
         }
     }
@@ -56,84 +56,84 @@ public:
         return *this;
     }
 
-    static This Make(SizeT capacity, SizeT reserve_graph_degree) { return This(capacity, reserve_graph_degree); }
+    static This Make(size_t capacity, size_t reserve_graph_degree) { return This(capacity, reserve_graph_degree); }
 
-    // return Tuple of (load_point_num, enterpoint, frozen_pts)
-    Tuple<SizeT, SizeT, SizeT> Load(LocalFileHandle &load_handle, SizeT expected_num_points) {
-        SizeT expected_file_size = 0;
-        SizeT start = 0; // enterpoint
-        SizeT file_frozen_pts = 0;
-        load_handle.Read(&expected_file_size, sizeof(SizeT));
+    // return std::tuple of (load_point_num, enterpoint, frozen_pts)
+    std::tuple<size_t, size_t, size_t> Load(LocalFileHandle &load_handle, size_t expected_num_points) {
+        size_t expected_file_size = 0;
+        size_t start = 0; // enterpoint
+        size_t file_frozen_pts = 0;
+        load_handle.Read(&expected_file_size, sizeof(size_t));
         load_handle.Read(&max_observecd_degree_, sizeof(u32));
-        load_handle.Read(&start, sizeof(SizeT));
-        load_handle.Read(&file_frozen_pts, sizeof(SizeT));
+        load_handle.Read(&start, sizeof(size_t));
+        load_handle.Read(&file_frozen_pts, sizeof(size_t));
 
         if (this->capacity_ < expected_num_points) {
             this->ResizeGraph(expected_num_points);
         }
 
-        SizeT bytes_read = 28; // meta data size
-        SizeT nodes_read = 0;  // number of nodes read
+        size_t bytes_read = 28; // meta data size
+        size_t nodes_read = 0;  // number of nodes read
         while (bytes_read != expected_file_size) {
             u32 k; // number of neighbors
             load_handle.Read(&k, sizeof(u32));
-            Vector<SizeT> tmp(k);
+            std::vector<size_t> tmp(k);
             tmp.reserve(k);
-            load_handle.Read(tmp.data(), sizeof(SizeT) * k);
+            load_handle.Read(tmp.data(), sizeof(size_t) * k);
             graph_[nodes_read - 1].swap(tmp);
-            bytes_read += sizeof(SizeT) * k + sizeof(u32);
+            bytes_read += sizeof(size_t) * k + sizeof(u32);
             nodes_read++;
             if (k > max_range_of_graph_) {
                 max_range_of_graph_ = k;
             }
         }
 
-        return Tuple<SizeT, SizeT, SizeT>(nodes_read, start, file_frozen_pts);
+        return std::tuple<size_t, size_t, size_t>(nodes_read, start, file_frozen_pts);
     }
 
-    void Save(LocalFileHandle &save_handle, SizeT num_points, SizeT num_frozen_points, SizeT start) {
-        SizeT index_size = 28; // init size of meta data :(sizeof(SizeT) * 3 + sizeof(u32)) bytes
+    void Save(LocalFileHandle &save_handle, size_t num_points, size_t num_frozen_points, size_t start) {
+        size_t index_size = 28; // init size of meta data :(sizeof(size_t) * 3 + sizeof(u32)) bytes
         u32 max_degree = 0;
-        for (SizeT i = 0; i < num_points; i++) {
+        for (size_t i = 0; i < num_points; i++) {
             u32 gk = static_cast<u32>(graph_[i].size());
-            index_size += static_cast<SizeT>(sizeof(SizeT) * gk + sizeof(u32));
+            index_size += static_cast<size_t>(sizeof(size_t) * gk + sizeof(u32));
             max_degree = std::max(max_degree, gk);
         }
 
-        save_handle.Append(&index_size, sizeof(SizeT));
+        save_handle.Append(&index_size, sizeof(size_t));
         save_handle.Append(&max_degree, sizeof(u32));
-        save_handle.Append(&start, sizeof(SizeT));
-        save_handle.Append(&num_frozen_points, sizeof(SizeT));
-        for (SizeT i = 0; i < num_points; i++) {
+        save_handle.Append(&start, sizeof(size_t));
+        save_handle.Append(&num_frozen_points, sizeof(size_t));
+        for (size_t i = 0; i < num_points; i++) {
             u32 gk = static_cast<u32>(graph_[i].size());
             save_handle.Append(&gk, sizeof(u32));
-            save_handle.Append(graph_[i].data(), sizeof(SizeT) * gk);
+            save_handle.Append(graph_[i].data(), sizeof(size_t) * gk);
         }
     }
 
-    SizeT GetTotalPoints() const { return this->capacity_; }
+    size_t GetTotalPoints() const { return this->capacity_; }
 
-    VectorStruct &GetNeighbours(const SizeT vertex_id) { return graph_[vertex_id]; }
+    VectorStruct &GetNeighbours(const size_t vertex_id) { return graph_[vertex_id]; }
 
-    void AddNeighbour(const SizeT vertex_id, const SizeT neighbour_id) {
+    void AddNeighbour(const size_t vertex_id, const size_t neighbour_id) {
         graph_[vertex_id].emplace_back(neighbour_id);
         if (graph_[vertex_id].size() > max_observecd_degree_) {
             max_observecd_degree_ = static_cast<u32>(graph_[vertex_id].size());
         }
     }
 
-    void ClearNeighbours(const SizeT vertex_id) { graph_[vertex_id].clear(); }
+    void ClearNeighbours(const size_t vertex_id) { graph_[vertex_id].clear(); }
 
-    void SwapNeighbours(const SizeT vertex_a, const SizeT vertex_b) { graph_[vertex_a].swap(graph_[vertex_b]); }
+    void SwapNeighbours(const size_t vertex_a, const size_t vertex_b) { graph_[vertex_a].swap(graph_[vertex_b]); }
 
-    void SetNeighbours(const SizeT vertex_id, const VectorStruct &neighbours) {
+    void SetNeighbours(const size_t vertex_id, const VectorStruct &neighbours) {
         graph_[vertex_id].assign(neighbours.begin(), neighbours.end());
         if (neighbours.size() > max_observecd_degree_) {
             max_observecd_degree_ = static_cast<u32>(neighbours.size());
         }
     }
 
-    SizeT ResizeGraph(const SizeT new_capacity) {
+    size_t ResizeGraph(const size_t new_capacity) {
         graph_.resize(new_capacity);
         capacity_ = new_capacity;
         return graph_.size();
@@ -141,19 +141,19 @@ public:
 
     void ClearGraph() { graph_.clear(); }
 
-    SizeT GetMaxRangeOfGraph() const { return max_range_of_graph_; }
+    size_t GetMaxRangeOfGraph() const { return max_range_of_graph_; }
 
-    SizeT GetMaxObservedDegree() const { return max_observecd_degree_; }
+    size_t GetMaxObservedDegree() const { return max_observecd_degree_; }
 
-    void InitRandomKnn(SizeT num_points) {
+    void InitRandomKnn(size_t num_points) {
         std::random_device rd;
         std::mt19937 gen(rd());
-        std::uniform_int_distribution<SizeT> dis(0, num_points - 1);
+        std::uniform_int_distribution<size_t> dis(0, num_points - 1);
 
-        for (SizeT i = 0; i < num_points; i++) {
-            SizeT k = dis(gen);
-            for (SizeT j = 0; j < k; j++) {
-                SizeT neighbor_id = dis(gen);
+        for (size_t i = 0; i < num_points; i++) {
+            size_t k = dis(gen);
+            for (size_t j = 0; j < k; j++) {
+                size_t neighbor_id = dis(gen);
                 while (neighbor_id == i) {
                     neighbor_id = dis(gen);
                 }
@@ -163,8 +163,8 @@ public:
     }
 
 private:
-    SizeT capacity_;             // point num in graph
-    SizeT reserve_graph_degree_; // max degree to reserve
+    size_t capacity_;             // point num in graph
+    size_t reserve_graph_degree_; // max degree to reserve
 
     GraphStruct graph_;
     u32 max_range_of_graph_;

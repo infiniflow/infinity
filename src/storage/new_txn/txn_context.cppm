@@ -24,11 +24,11 @@ namespace infinity {
 
 export struct TxnContext {
     // This struct is used to store the operation history of a transaction. This history can be used for debugging purposes.
-    static UniquePtr<TxnContext> Make() { return MakeUnique<TxnContext>(); }
+    static std::unique_ptr<TxnContext> Make() { return std::make_unique<TxnContext>(); }
 
-    void AddOperation(const SharedPtr<String> &operation_text) { operations_.push_back(operation_text); }
-    Vector<SharedPtr<String>> GetOperations() const { return operations_; }
-    String ToString();
+    void AddOperation(const std::shared_ptr<std::string> &operation_text) { operations_.push_back(operation_text); }
+    std::vector<std::shared_ptr<std::string>> GetOperations() const { return operations_; }
+    std::string ToString();
 
     TransactionID txn_id_{};
     TxnTimeStamp begin_ts_{};
@@ -42,8 +42,8 @@ export struct TxnContext {
     bool is_write_transaction_{false};
     bool replay_{false};
 
-    SharedPtr<String> text_{};
-    Vector<SharedPtr<String>> operations_;
+    std::shared_ptr<std::string> text_{};
+    std::vector<std::shared_ptr<std::string>> operations_;
 };
 
 } // namespace infinity

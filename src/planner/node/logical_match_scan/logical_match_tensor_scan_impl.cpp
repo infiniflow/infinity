@@ -37,7 +37,7 @@ import internal_types;
 namespace infinity {
 
 void LogicalMatchTensorScan::InitExtraOptions() {
-    static const std::set<String> valid_options = {"topn",
+    static const std::set<std::string> valid_options = {"topn",
                                                    "threshold",
                                                    "emvb_centroid_nprobe",
                                                    "emvb_threshold_first",
@@ -66,7 +66,7 @@ void LogicalMatchTensorScan::InitExtraOptions() {
     } else {
         topn_ = DEFAULT_MATCH_TENSOR_OPTION_TOP_N;
     }
-    index_options_ = MakeUnique<MatchTensorScanIndexOptions>(topn_);
+    index_options_ = std::make_unique<MatchTensorScanIndexOptions>(topn_);
     if (const auto emvb_centroid_nprobe_it = options.options_.find("emvb_centroid_nprobe"); emvb_centroid_nprobe_it != options.options_.end()) {
         const auto emvb_centroid_nprobe_candidate = std::stoi(emvb_centroid_nprobe_it->second);
         if (emvb_centroid_nprobe_candidate <= 0) {

@@ -33,7 +33,7 @@ struct BlockIndex;
 class NewTxn;
 class SegmentMeta;
 
-using EMVBQueryResultType = Tuple<u32, UniquePtr<f32[]>, UniquePtr<u32[]>>;
+using EMVBQueryResultType = std::tuple<u32, std::unique_ptr<f32[]>, std::unique_ptr<u32[]>>;
 
 // created with fixed embedding dimension and number of centroids
 // should be trained with embeddings no less than ExpectLeastTrainingDataNum() before use
@@ -44,21 +44,21 @@ export class EMVBIndex {
     const u32 residual_pq_subspace_num_ = 0;             // number of subspaces in the residual product quantizer
     const u32 residual_pq_subspace_bits_ = 0;            // number of bits for each centroid representation in the residual product quantizer
     u32 n_centroids_ = 0;                                // number of centroids, need to be a multiple of 8
-    Vector<f32> centroids_data_;                         // centroids data
-    Vector<f32> centroid_norms_neg_half_;                // (-0.5 * norm) for each centroid
+    std::vector<f32> centroids_data_;                         // centroids data
+    std::vector<f32> centroid_norms_neg_half_;                // (-0.5 * norm) for each centroid
     atomic_u32 n_docs_ = 0;                              // number of documents in the entire collection
     u32 n_total_embeddings_ = 0;                         // number of embeddings in the entire collection
     EMVBSharedVec<u32> doc_lens_;                        // array of document lengths
     EMVBSharedVec<u32> doc_offsets_;                     // start offsets of each document in all the embeddings
     EMVBSharedVec<u32> centroid_id_assignments_;         // centroid id assignments for each embedding
-    UniquePtr<EMVBSharedVec<u32>[]> centroids_to_docid_; // docids belonging to each centroid
-    UniquePtr<EMVBProductQuantizer> product_quantizer_;  // product quantizer for residuals of the embeddings
+    std::unique_ptr<EMVBSharedVec<u32>[]> centroids_to_docid_; // docids belonging to each centroid
+    std::unique_ptr<EMVBProductQuantizer> product_quantizer_;  // product quantizer for residuals of the embeddings
     mutable std::shared_mutex rw_mutex_;                 // mutex for append all embeddings for one doc
 
 public:
     EMVBIndex(u32 start_segment_offset, u32 embedding_dimension, u32 residual_pq_subspace_num, u32 residual_pq_subspace_bits);
 
-    void BuildEMVBIndex(const RowID base_rowid, const u32 row_count, SegmentMeta &segment_meta, const SharedPtr<ColumnDef> &column_def);
+    void BuildEMVBIndex(const RowID base_rowid, const u32 row_count, SegmentMeta &segment_meta, const std::shared_ptr<ColumnDef> &column_def);
 
     void Train(u32 centroids_num, const f32 *embedding_data, u64 embedding_num, u32 iter_cnt = 20);
 

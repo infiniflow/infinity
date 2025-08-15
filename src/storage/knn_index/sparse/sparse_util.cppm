@@ -12,13 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
-#include <vector>
-
 export module infinity_core:sparse_util;
 
-import :stl;
 import :sparse_vector_distance;
 import :knn_result_handler;
 import :infinity_exception;
@@ -43,8 +38,8 @@ struct SparseVecRef {
 export template <typename DataT, typename IdxT>
 struct SparseVec {
     i32 nnz_ = 0;
-    UniquePtr<IdxT[]> indices_;
-    UniquePtr<DataT[]> data_;
+    std::unique_ptr<IdxT[]> indices_;
+    std::unique_ptr<DataT[]> data_;
 
     SparseVecRef<DataT, IdxT> ToRef() const { return {nnz_, indices_.get(), data_.get()}; }
 };
@@ -53,10 +48,10 @@ export template <typename DataType, typename IdxType>
 struct SparseVecEle {
     SparseVecEle() = default;
 
-    void Init(const Vector<SizeT> &keep_idxes, const DataType *data, const IdxType *indices) {
+    void Init(const std::vector<size_t> &keep_idxes, const DataType *data, const IdxType *indices) {
         nnz_ = keep_idxes.size();
-        indices_ = MakeUniqueForOverwrite<IdxType[]>(nnz_);
-        data_ = MakeUniqueForOverwrite<DataType[]>(nnz_);
+        indices_ = std::make_unique_for_overwrite<IdxType[]>(nnz_);
+        data_ = std::make_unique_for_overwrite<DataType[]>(nnz_);
         for (i32 i = 0; i < nnz_; ++i) {
             indices_[i] = indices[keep_idxes[i]];
             data_[i] = data[keep_idxes[i]];
@@ -64,8 +59,8 @@ struct SparseVecEle {
     }
 
     i32 nnz_{};
-    UniquePtr<IdxType[]> indices_;
-    UniquePtr<DataType[]> data_;
+    std::unique_ptr<IdxType[]> indices_;
+    std::unique_ptr<DataType[]> data_;
 };
 
 export template <typename DataT, typename IdxT>
@@ -87,13 +82,13 @@ public:
         file_handle.Read(&ncol, sizeof(ncol));
         file_handle.Read(&nnz, sizeof(nnz));
 
-        auto indptr = MakeUnique<i64[]>(nrow + 1);
+        auto indptr = std::make_unique<i64[]>(nrow + 1);
         file_handle.Read(indptr.get(), sizeof(i64) * (nrow + 1));
         if (indptr[nrow] != nnz) {
             UnrecoverableError("Invalid indptr.");
         }
 
-        auto indices = MakeUnique<IdxT[]>(nnz);
+        auto indices = std::make_unique<IdxT[]>(nnz);
         file_handle.Read(indices.get(), sizeof(IdxT) * nnz);
         // assert all element in indices >= 0 and < ncol
         {
@@ -103,7 +98,7 @@ public:
             }
         }
 
-        auto data = MakeUnique<DataT[]>(nnz);
+        auto data = std::make_unique<DataT[]>(nnz);
         file_handle.Read(data.get(), sizeof(DataT) * nnz);
         return {std::move(data), std::move(indices), std::move(indptr), nrow, ncol, nnz};
     }
@@ -127,9 +122,9 @@ public:
     }
 
 public:
-    UniquePtr<DataT[]> data_{};
-    UniquePtr<IdxT[]> indices_{};
-    UniquePtr<i64[]> indptr_{}; // row i's data and indice is stored in data_[indptr_[i]:indptr_[i+1]], indices_[indptr_[i]:indptr_[i+1]]
+    std::unique_ptr<DataT[]> data_{};
+    std::unique_ptr<IdxT[]> indices_{};
+    std::unique_ptr<i64[]> indptr_{}; // row i's data and indice is stored in data_[indptr_[i]:indptr_[i+1]], indices_[indptr_[i]:indptr_[i+1]]
     i64 nrow_{};
     i64 ncol_{};
     i64 nnz_{};
@@ -169,10 +164,10 @@ export struct SparseVecUtil {
     }
 
     template <typename DataT, typename IdxT>
-    static Pair<Vector<u32>, Vector<DataT>>
-    Rerank(const SparseMatrix<DataT, IdxT> &mat, const SparseVecRef<DataT, IdxT> &query, Vector<u32> candidates, u32 topk) {
-        Vector<u32> result(topk);
-        Vector<DataT> result_score(topk);
+    static std::pair<std::vector<u32>, std::vector<DataT>>
+    Rerank(const SparseMatrix<DataT, IdxT> &mat, const SparseVecRef<DataT, IdxT> &query, std::vector<u32> candidates, u32 topk) {
+        std::vector<u32> result(topk);
+        std::vector<DataT> result_score(topk);
 
         HeapResultHandler<CompareMin<DataT, u32>> result_handler(1 /*query_n*/, topk, result_score.data(), result.data());
         for (u32 row_id : candidates) {

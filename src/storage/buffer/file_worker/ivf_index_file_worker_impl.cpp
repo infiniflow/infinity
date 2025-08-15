@@ -67,7 +67,7 @@ bool IVFIndexFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_success, c
     return true;
 }
 
-void IVFIndexFileWorker::ReadFromFileImpl(SizeT file_size, bool from_spill) {
+void IVFIndexFileWorker::ReadFromFileImpl(size_t file_size, bool from_spill) {
     if (!data_) [[likely]] {
         auto index = IVFIndexInChunk::GetNewIVFIndexInChunk(index_base_.get(), column_def_.get());
         index->ReadIndexInner(*file_handle_);

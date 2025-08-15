@@ -26,9 +26,9 @@ export class PhysicalCheck : public PhysicalOperator {
 public:
     explicit PhysicalCheck(u64 id,
                            CheckStmtType type,
-                           Optional<String> schema_name,
-                           Optional<String> table_name,
-                           SharedPtr<Vector<LoadMeta>> load_metas)
+                           std::optional<std::string> schema_name,
+                           std::optional<std::string> table_name,
+                           std::shared_ptr<std::vector<LoadMeta>> load_metas)
         : PhysicalOperator(PhysicalOperatorType::kCheck, nullptr, nullptr, id, load_metas), check_type_(type), schema_name_(std::move(schema_name)),
           table_name_(std::move(table_name)) {}
 
@@ -38,9 +38,9 @@ public:
 
     bool Execute(QueryContext *query_context, OperatorState *output_state) final;
 
-    inline SharedPtr<Vector<String>> GetOutputNames() const final { return output_names_; }
+    inline std::shared_ptr<std::vector<std::string>> GetOutputNames() const final { return output_names_; }
 
-    inline SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const final { return output_types_; }
+    inline std::shared_ptr<std::vector<std::shared_ptr<DataType>>> GetOutputTypes() const final { return output_types_; }
 
     inline CheckStmtType check_type() const { return check_type_; }
 
@@ -51,11 +51,11 @@ private:
 
 private:
     CheckStmtType check_type_{CheckStmtType::kInvalid};
-    Optional<String> schema_name_;
-    Optional<String> table_name_;
+    std::optional<std::string> schema_name_;
+    std::optional<std::string> table_name_;
 
-    SharedPtr<Vector<String>> output_names_{};
-    SharedPtr<Vector<SharedPtr<DataType>>> output_types_{};
+    std::shared_ptr<std::vector<std::string>> output_names_{};
+    std::shared_ptr<std::vector<std::shared_ptr<DataType>>> output_types_{};
 };
 
 } // namespace infinity

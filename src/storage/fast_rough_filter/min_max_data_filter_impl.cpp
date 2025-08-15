@@ -142,7 +142,7 @@ void MinMaxDataFilter::SaveToJsonFile(nlohmann::json &entry_json) const {
     // step 1. prepare space for binary_fuse_filters_
     u32 total_binary_bytes = GetSerializeSizeInBytes();
     // step 2. encode to binary
-    String save_to_binary;
+    std::string save_to_binary;
     save_to_binary.reserve(total_binary_bytes);
     OStringStream os(std::move(save_to_binary));
     SerializeToStringStream(os, total_binary_bytes);
@@ -158,8 +158,8 @@ bool MinMaxDataFilter::LoadFromJsonFile(std::string_view json_sv) {
     simdjson::padded_string json_pad(json_sv);
     simdjson::parser parser;
     simdjson::document doc = parser.iterate(json_pad);
-    String filter_base64;
-    if (doc[JsonTag].get<String>(filter_base64) != simdjson::SUCCESS) {
+    std::string filter_base64;
+    if (doc[JsonTag].get<std::string>(filter_base64) != simdjson::SUCCESS) {
         LOG_ERROR("MinMaxDataFilter::LoadFromJsonFile(): found no data.");
         return false;
     }

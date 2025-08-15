@@ -35,9 +35,9 @@ class SegmentMeta;
 
 export class IVFDataAccessorBase {
 public:
-    virtual const_ptr_t GetEmbedding(SizeT offset) = 0;
+    virtual const char * GetEmbedding(size_t offset) = 0;
 
-    virtual Pair<Span<const char>, SizeT> GetMultiVector(SizeT offset) = 0;
+    virtual std::pair<std::span<const char>, size_t> GetMultiVector(size_t offset) = 0;
 };
 
 export class IVFIndexInChunk : protected IVF_Index_Storage {
@@ -50,9 +50,9 @@ public:
 
     const IVF_Index_Storage *GetIVFIndexStoragePtr() const { return this; }
 
-    void BuildIVFIndex(SegmentMeta &segment_meta, u32 row_count, SharedPtr<ColumnDef> column_def);
+    void BuildIVFIndex(SegmentMeta &segment_meta, u32 row_count, std::shared_ptr<ColumnDef> column_def);
 
-    void BuildIVFIndex(RowID base_rowid, u32 row_count, IVFDataAccessorBase *data_accessor, const SharedPtr<ColumnDef> &column_def);
+    void BuildIVFIndex(RowID base_rowid, u32 row_count, IVFDataAccessorBase *data_accessor, const std::shared_ptr<ColumnDef> &column_def);
 
     void SaveIndexInner(LocalFileHandle &file_handle) const;
 
@@ -62,7 +62,7 @@ public:
 
 private:
     template <LogicalType column_t, EmbeddingDataType embedding_t>
-    void BuildIVFIndexT(RowID base_rowid, u32 row_count, IVFDataAccessorBase *data_accessor, const SharedPtr<ColumnDef> &column_def);
+    void BuildIVFIndexT(RowID base_rowid, u32 row_count, IVFDataAccessorBase *data_accessor, const std::shared_ptr<ColumnDef> &column_def);
 };
 
 } // namespace infinity

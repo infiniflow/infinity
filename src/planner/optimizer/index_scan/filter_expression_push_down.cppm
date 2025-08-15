@@ -55,22 +55,22 @@ protected:
 };
 
 export struct IndexScanFilterExpressionPushDownResult {
-    SharedPtr<BaseExpression> index_filter_;
-    SharedPtr<BaseExpression> leftover_filter_;
+    std::shared_ptr<BaseExpression> index_filter_;
+    std::shared_ptr<BaseExpression> leftover_filter_;
 
-    UniquePtr<IndexFilterEvaluator> index_filter_evaluator_;
+    std::unique_ptr<IndexFilterEvaluator> index_filter_evaluator_;
 };
 
 export class FilterExpressionPushDown {
 public:
     static IndexScanFilterExpressionPushDownResult
-    PushDownToIndexScan(QueryContext *query_context, const BaseTableRef *base_table_ref_ptr, const SharedPtr<BaseExpression> &expression);
+    PushDownToIndexScan(QueryContext *query_context, const BaseTableRef *base_table_ref_ptr, const std::shared_ptr<BaseExpression> &expression);
 
     static void BuildFilterFulltextExpression(QueryContext *query_context,
                                               const BaseTableRef *base_table_ref_ptr,
-                                              const Vector<SharedPtr<BaseExpression>> &expressions);
+                                              const std::vector<std::shared_ptr<BaseExpression>> &expressions);
 
-    static UniquePtr<FastRoughFilterEvaluator> PushDownToFastRoughFilter(SharedPtr<BaseExpression> &expression);
+    static std::unique_ptr<FastRoughFilterEvaluator> PushDownToFastRoughFilter(std::shared_ptr<BaseExpression> &expression);
 };
 
 } // namespace infinity

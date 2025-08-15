@@ -55,9 +55,9 @@ inline void CurrentTimeFunction::Run(TimeT &result) {
 }
 
 void RegisterCurrentTimeFunction(NewCatalog *catalog_ptr) {
-    String func_name = "current_time";
+    std::string func_name = "current_time";
 
-    SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
+    std::shared_ptr<ScalarFunctionSet> function_set_ptr = std::make_shared<ScalarFunctionSet>(func_name);
 
     ScalarFunction current_time_function(func_name,
                                   {},

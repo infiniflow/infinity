@@ -64,7 +64,7 @@ export struct FixedDimensionalEncodingConfig {
     bool fill_empty_partitions = false;
 
     // Final projection dimension using Count-Sketch
-    Optional<i32> final_projection_dimension = None;
+    std::optional<i32> final_projection_dimension = std::nullopt;
 
     bool has_final_projection_dimension() const {
         return final_projection_dimension.has_value();
@@ -74,12 +74,12 @@ export struct FixedDimensionalEncodingConfig {
 // Tensor representation for multi-dimensional data
 export class Tensor {
 private:
-    Vector<float> buffer_;
+    std::vector<float> buffer_;
     i32 point_count_;
     i32 dimension_;
 
 public:
-    Tensor(const Vector<float>& data, i32 dimension)
+    Tensor(const std::vector<float>& data, i32 dimension)
         : buffer_(data), dimension_(dimension) {
         point_count_ = static_cast<i32>(data.size()) / dimension;
     }
@@ -87,8 +87,8 @@ public:
     i32 GetPointCount() const { return point_count_; }
     i32 GetDimension() const { return dimension_; }
 
-    Vector<float> GetPoint(i32 index) const {
-        Vector<float> point(dimension_);
+    std::vector<float> GetPoint(i32 index) const {
+        std::vector<float> point(dimension_);
         for (i32 i = 0; i < dimension_; ++i) {
             point[i] = buffer_[index * dimension_ + i];
         }
@@ -96,7 +96,7 @@ public:
     }
 
     const float* GetRawData() const { return buffer_.data(); }
-    SizeT GetTotalSize() const { return buffer_.size(); }
+    size_t GetTotalSize() const { return buffer_.size(); }
 };
 
 // Random number generator wrapper for reproducible results
@@ -117,39 +117,39 @@ public:
 // Hash-based partitioning system
 export class HashPartitioner {
 private:
-    Vector<Vector<float>> projection_vectors_;
+    std::vector<std::vector<float>> projection_vectors_;
     i32 num_bits_;
 
 public:
     HashPartitioner(i32 dimension, i32 num_bits, RandomGenerator& rng);
-    u32 ComputePartition(const Vector<float>& point) const;
-    u32 ComputeDistance(const Vector<float>& point, u32 target_partition) const;
+    u32 ComputePartition(const std::vector<float>& point) const;
+    u32 ComputeDistance(const std::vector<float>& point, u32 target_partition) const;
 };
 
 // Dimensionality reduction through sparse random projections
 export class SparseProjector {
 private:
-    Vector<Pair<u32, float>> projection_map_;
+    std::vector<std::pair<u32, float>> projection_map_;
     i32 input_dim_;
     i32 output_dim_;
 
 public:
     SparseProjector(i32 input_dim, i32 output_dim, RandomGenerator& rng);
-    Vector<float> Project(const Vector<float>& input) const;
+    std::vector<float> Project(const std::vector<float>& input) const;
 };
 
 // Encoding accumulator for different aggregation strategies
 export class EncodingAccumulator {
 private:
-    Vector<float> accumulator_;
-    Vector<i32> counts_;
+    std::vector<float> accumulator_;
+    std::vector<i32> counts_;
     bool use_averaging_;
 
 public:
     EncodingAccumulator(i32 size, bool use_averaging);
-    void AddToPartition(i32 partition_start, const Vector<float>& values);
-    void FillEmptyPartition(i32 partition_start, const Vector<float>& values);
-    Vector<float> Finalize() const;
+    void AddToPartition(i32 partition_start, const std::vector<float>& values);
+    void FillEmptyPartition(i32 partition_start, const std::vector<float>& values);
+    std::vector<float> Finalize() const;
 };
 
 // Main encoding pipeline orchestrator
@@ -158,32 +158,32 @@ private:
     const FixedDimensionalEncodingConfig& config_;
 
     bool ValidateInput(const Tensor& tensor) const;
-    Vector<float> ProcessSingleRepetition(const Tensor& tensor, i32 rep_index) const;
+    std::vector<float> ProcessSingleRepetition(const Tensor& tensor, i32 rep_index) const;
 
 public:
     explicit EncodingPipeline(const FixedDimensionalEncodingConfig& config) : config_(config) {}
-    Optional<Vector<float>> Execute(const Tensor& tensor) const;
+    std::optional<std::vector<float>> Execute(const Tensor& tensor) const;
 };
 
 // Public API functions
-export Optional<Vector<float>> GenerateFixedDimensionalEncoding(
-    const Vector<float>& tensor_data, const FixedDimensionalEncodingConfig& config);
+export std::optional<std::vector<float>> GenerateFixedDimensionalEncoding(
+    const std::vector<float>& tensor_data, const FixedDimensionalEncodingConfig& config);
 
-export Optional<Vector<float>> GenerateQueryFixedDimensionalEncoding(
-    const Vector<float>& tensor_data, const FixedDimensionalEncodingConfig& config);
+export std::optional<std::vector<float>> GenerateQueryFixedDimensionalEncoding(
+    const std::vector<float>& tensor_data, const FixedDimensionalEncodingConfig& config);
 
-export Optional<Vector<float>> GenerateDocumentFixedDimensionalEncoding(
-    const Vector<float>& tensor_data, const FixedDimensionalEncodingConfig& config);
+export std::optional<std::vector<float>> GenerateDocumentFixedDimensionalEncoding(
+    const std::vector<float>& tensor_data, const FixedDimensionalEncodingConfig& config);
 
 // SQL Function API
 export void RegisterFDEFunction(NewCatalog *catalog_ptr);
-export void FDEFunction(const DataBlock &input, SharedPtr<ColumnVector> &output);
+export void FDEFunction(const DataBlock &input, std::shared_ptr<ColumnVector> &output);
 
 // Legacy compatibility functions for testing
 export namespace internal {
-    u32 SimHashPartitionIndex(const Vector<float>& input_vector);
-    u32 DistanceToSimHashPartition(const Vector<float>& input_vector, u32 index);
-    Vector<float> ApplyCountSketchToVector(Span<const float> input_vector, u32 final_dimension, u32 seed);
+    u32 SimHashPartitionIndex(const std::vector<float>& input_vector);
+    u32 DistanceToSimHashPartition(const std::vector<float>& input_vector, u32 index);
+    std::vector<float> ApplyCountSketchToVector(std::span<const float> input_vector, u32 final_dimension, u32 seed);
 }
 
 }  // namespace infinity

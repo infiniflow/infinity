@@ -31,7 +31,7 @@ public:
 
     // u32: block max tf
     // u16: block max (ceil(tf / doc length) * numeric_limits<u16>::max())
-    Pair<u32, u16> GetBlockMaxInfo() const override;
+    std::pair<u32, u16> GetBlockMaxInfo() const override;
 
     bool DecodeCurrentDocIDBuffer(docid_t *doc_buffer) override;
 
@@ -52,7 +52,7 @@ private:
     bool finish_decoded_ = false;
     bool finish_copy_prepared_doc_buffer_ = false;
     docid_t *doc_buffer_to_copy_ = nullptr;
-    SizeT decode_count_ = 0;
+    size_t decode_count_ = 0;
 };
 
 } // namespace infinity

@@ -37,7 +37,7 @@ public:
 
     inline void Initialize() { is_set_ = false; }
 
-    inline void Update(const ValueType *__restrict input, SizeT idx) {
+    inline void Update(const ValueType *__restrict input, size_t idx) {
         if (is_set_)
             return;
 
@@ -45,7 +45,7 @@ public:
         value_ = input[idx];
     }
 
-    inline void ConstantUpdate(const ValueType *__restrict input, SizeT idx, SizeT) {
+    inline void ConstantUpdate(const ValueType *__restrict input, size_t idx, size_t) {
         if (is_set_)
             return;
 
@@ -53,9 +53,9 @@ public:
         value_ = input[idx];
     }
 
-    [[nodiscard]] inline ptr_t Finalize() const { return (ptr_t)&value_; }
+    [[nodiscard]] inline char * Finalize() const { return (char *)&value_; }
 
-    inline static SizeT Size(const DataType &) { return sizeof(FirstState<ValueType, ResultType>); }
+    inline static size_t Size(const DataType &) { return sizeof(FirstState<ValueType, ResultType>); }
 };
 
 template <>
@@ -66,7 +66,7 @@ public:
 
     inline void Initialize() { is_set_ = false; }
 
-    inline void Update(const VarcharT *__restrict input, SizeT idx) {
+    inline void Update(const VarcharT *__restrict input, size_t idx) {
         if (is_set_)
             return;
 
@@ -75,7 +75,7 @@ public:
         value_ = input[idx];
     }
 
-    inline void ConstantUpdate(const VarcharT *__restrict input, SizeT idx, SizeT) {
+    inline void ConstantUpdate(const VarcharT *__restrict input, size_t idx, size_t) {
         if (is_set_)
             return;
 
@@ -84,9 +84,9 @@ public:
         value_ = input[idx];
     }
 
-    inline ptr_t Finalize() { return (ptr_t)&value_; }
+    inline char * Finalize() { return (char *)&value_; }
 
-    inline static SizeT Size(const DataType &) { return sizeof(FirstState<VarcharT, VarcharT>); }
+    inline static size_t Size(const DataType &) { return sizeof(FirstState<VarcharT, VarcharT>); }
 };
 //
 // template <>
@@ -97,7 +97,7 @@ public:
 //
 //    inline void Initialize() { is_set_ = false; }
 //
-//    inline void Update(const PathT *__restrict input, SizeT idx) {
+//    inline void Update(const PathT *__restrict input, size_t idx) {
 //        if (is_set_)
 //            return;
 //
@@ -106,7 +106,7 @@ public:
 //        value_ = input[idx];
 //    }
 //
-//    inline void ConstantUpdate(const PathT *__restrict input, SizeT idx, SizeT) {
+//    inline void ConstantUpdate(const PathT *__restrict input, size_t idx, size_t) {
 //        if (is_set_)
 //            return;
 //
@@ -115,15 +115,15 @@ public:
 //        value_ = input[idx];
 //    }
 //
-//    inline ptr_t Finalize() { return (ptr_t)&value_; }
+//    inline char * Finalize() { return (char *)&value_; }
 //
-//    inline static SizeT Size(const DataType &data_type) { return sizeof(FirstState<PathT, PathT>); }
+//    inline static size_t Size(const DataType &data_type) { return sizeof(FirstState<PathT, PathT>); }
 //};
 
 void RegisterFirstFunction(NewCatalog *catalog_ptr) {
-    String func_name = "FIRST";
+    std::string func_name = "FIRST";
 
-    SharedPtr<AggregateFunctionSet> function_set_ptr = MakeShared<AggregateFunctionSet>(func_name);
+    std::shared_ptr<AggregateFunctionSet> function_set_ptr = std::make_shared<AggregateFunctionSet>(func_name);
 
     {
         AggregateFunction first_function = UnaryAggregate<FirstState<BooleanT, BooleanT>, BooleanT, BooleanT>(func_name,

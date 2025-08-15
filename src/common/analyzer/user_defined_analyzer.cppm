@@ -29,15 +29,15 @@ import :status;
 namespace infinity {
 export class UserDefinedAnalyzer : public Analyzer {
 public:
-    UserDefinedAnalyzer(const String &analyzer_path) : analyzer_path_(analyzer_path) {}
+    UserDefinedAnalyzer(const std::string &analyzer_path) : analyzer_path_(analyzer_path) {}
 
     ~UserDefinedAnalyzer() = default;
 
-    Tuple<Vector<String>, Status> Analyze(const String &text);
+    std::tuple<std::vector<std::string>, Status> Analyze(const std::string &text);
 
 protected:
 private:
-    const String analyzer_path_;
+    const std::string analyzer_path_;
 };
 } // namespace infinity
 #endif

@@ -46,19 +46,19 @@ import logical_type;
 namespace infinity {
 
 PhysicalMergeMatchSparse::PhysicalMergeMatchSparse(u64 id,
-                                                   UniquePtr<PhysicalOperator> left,
+                                                   std::unique_ptr<PhysicalOperator> left,
                                                    u64 table_index,
-                                                   SharedPtr<BaseTableRef> base_table_ref,
-                                                   SharedPtr<MatchSparseExpression> match_sparse_expr,
-                                                   SharedPtr<BaseExpression> filter_expression,
-                                                   SharedPtr<Vector<LoadMeta>> load_metas,
+                                                   std::shared_ptr<BaseTableRef> base_table_ref,
+                                                   std::shared_ptr<MatchSparseExpression> match_sparse_expr,
+                                                   std::shared_ptr<BaseExpression> filter_expression,
+                                                   std::shared_ptr<std::vector<LoadMeta>> load_metas,
                                                    bool cache_result)
     : PhysicalScanBase(id, PhysicalOperatorType::kMergeMatchSparse, std::move(left), nullptr, table_index, base_table_ref, load_metas, cache_result),
       match_sparse_expr_(std::move(match_sparse_expr)), filter_expression_(std::move(filter_expression)) {}
 
 void PhysicalMergeMatchSparse::Init(QueryContext* query_context) { left_->Init(query_context); }
 
-SizeT PhysicalMergeMatchSparse::TaskletCount() {
+size_t PhysicalMergeMatchSparse::TaskletCount() {
     UnrecoverableError("Not Expected: TaskletCount of PhysicalMergeMatchSparse?");
     return 0;
 }
@@ -116,13 +116,13 @@ void PhysicalMergeMatchSparse::ExecuteInner(QueryContext *query_context, MergeMa
 
 template <typename ResultType, template <typename, typename> typename C>
 void PhysicalMergeMatchSparse::ExecuteInner(QueryContext *query_context, MergeMatchSparseOperatorState *operator_state) {
-    SizeT query_n = match_sparse_expr_->query_n_;
-    SizeT topn = match_sparse_expr_->topn_;
+    size_t query_n = match_sparse_expr_->query_n_;
+    size_t topn = match_sparse_expr_->topn_;
     MergeSparseFunctionData &match_sparse_data = operator_state->merge_sparse_function_data_;
 
     using MergeHeap = MergeKnn<ResultType, C, ResultType>;
     if (match_sparse_data.merge_knn_base_.get() == nullptr) {
-        auto merge_knn = MakeUnique<MergeHeap>(query_n, topn, Optional<f32>());
+        auto merge_knn = std::make_unique<MergeHeap>(query_n, topn, std::optional<f32>());
         merge_knn->Begin();
         match_sparse_data.merge_knn_base_ = std::move(merge_knn);
     }
@@ -140,7 +140,7 @@ void PhysicalMergeMatchSparse::ExecuteInner(QueryContext *query_context, MergeMa
     auto &row_id_column = *input_data.column_vectors[column_n + 1];
     auto dists = reinterpret_cast<ResultType *>(dist_column.data());
     auto row_ids = reinterpret_cast<RowID *>(row_id_column.data());
-    SizeT row_n = input_data.row_count();
+    size_t row_n = input_data.row_count();
     merge_knn->Search(dists, row_ids, row_n);
 
     if (operator_state->input_complete_) {
@@ -152,9 +152,9 @@ void PhysicalMergeMatchSparse::ExecuteInner(QueryContext *query_context, MergeMa
             operator_state->data_block_array_[0]->Init(*GetOutputTypes());
         }
 
-        Vector<char *> result_dists_list;
-        Vector<RowID *> row_ids_list;
-        for (SizeT query_id = 0; query_id < query_n; ++query_id) {
+        std::vector<char *> result_dists_list;
+        std::vector<RowID *> row_ids_list;
+        for (size_t query_id = 0; query_id < query_n; ++query_id) {
             result_dists_list.emplace_back(reinterpret_cast<char *>(merge_knn->GetDistancesByIdx(query_id)));
             row_ids_list.emplace_back(merge_knn->GetIDsByIdx(query_id));
         }

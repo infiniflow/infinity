@@ -22,7 +22,7 @@ public:
 
     // u32: block max tf
     // u16: block max (ceil(tf / doc length) * numeric_limits<u16>::max())
-    virtual Pair<u32, u16> GetBlockMaxInfo() const = 0;
+    virtual std::pair<u32, u16> GetBlockMaxInfo() const = 0;
 
     virtual bool DecodeCurrentDocIDBuffer(docid_t *doc_buffer) = 0;
 
@@ -86,7 +86,7 @@ public:
 
     // u32: block max tf
     // u16: block max (ceil(tf / doc length) * numeric_limits<u16>::max())
-    Pair<u32, u16> GetBlockMaxInfo() const { return skiplist_reader_->GetBlockMaxInfo(); }
+    std::pair<u32, u16> GetBlockMaxInfo() const { return skiplist_reader_->GetBlockMaxInfo(); }
 
     bool DecodeCurrentDocIDBuffer(docid_t *doc_buffer) {
         doc_list_reader_->Seek(offset_ + doc_list_begin_pos_);

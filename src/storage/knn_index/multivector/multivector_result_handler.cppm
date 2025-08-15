@@ -36,7 +36,7 @@ struct SegmentTreeForTopnDistance {
     RawDataT max_raw_data_ = std::numeric_limits<RawDataT>::max();
     RawLabelT max_raw_label_ = {};
     const u32 topn_ = 0;
-    UniquePtr<InnerIndexT[]> inner_index_ = MakeUniqueForOverwrite<InnerIndexT[]>(topn_ << 1);
+    std::unique_ptr<InnerIndexT[]> inner_index_ = std::make_unique_for_overwrite<InnerIndexT[]>(topn_ << 1);
 
     explicit SegmentTreeForTopnDistance(RawDataT *raw_data, RawLabelT *raw_label, const u32 topn)
         : raw_data_(raw_data), raw_label_(raw_label), topn_(topn) {}
@@ -70,15 +70,15 @@ struct SegmentTreeForTopnDistance {
 // now only support one query
 export template <typename DistanceType, typename LabelType, typename InnerTopnIndexType>
 class MultiVectorResultHandler {
-    const SizeT top_k_ = 0;
+    const size_t top_k_ = 0;
     FlatHashMap<LabelType, InnerTopnIndexType> label_index_map_;
     SegmentTreeForTopnDistance<DistanceType, LabelType, InnerTopnIndexType> segment_tree_for_top_n_distance_;
 
 public:
-    explicit MultiVectorResultHandler(const SizeT top_k, DistanceType *distance_ptr, LabelType *label_ptr)
+    explicit MultiVectorResultHandler(const size_t top_k, DistanceType *distance_ptr, LabelType *label_ptr)
         : top_k_(top_k), segment_tree_for_top_n_distance_(distance_ptr, label_ptr, top_k) {}
 
-    MultiVectorResultHandler(const int query_num, const SizeT top_k, DistanceType *distance_ptr, LabelType *label_ptr)
+    MultiVectorResultHandler(const int query_num, const size_t top_k, DistanceType *distance_ptr, LabelType *label_ptr)
         : MultiVectorResultHandler(top_k, distance_ptr, label_ptr) {
         if (query_num != 1) [[unlikely]] {
             UnrecoverableError("MultiVectorResultHandler only support one query at a time.");

@@ -32,12 +32,12 @@ namespace infinity {
 export class PhysicalCreateIndexPrepare : public PhysicalOperator {
 public:
     PhysicalCreateIndexPrepare(u64 id,
-                               SharedPtr<BaseTableRef> base_table_ref,
-                               SharedPtr<IndexBase> index_definition,
+                               std::shared_ptr<BaseTableRef> base_table_ref,
+                               std::shared_ptr<IndexBase> index_definition,
                                ConflictType conflict_type,
-                               SharedPtr<Vector<String>> output_names,
-                               SharedPtr<Vector<SharedPtr<DataType>>> output_types,
-                               SharedPtr<Vector<LoadMeta>> load_metas,
+                               std::shared_ptr<std::vector<std::string>> output_names,
+                               std::shared_ptr<std::vector<std::shared_ptr<DataType>>> output_types,
+                               std::shared_ptr<std::vector<LoadMeta>> load_metas,
                                bool prepare);
 
 public:
@@ -45,18 +45,18 @@ public:
 
     bool Execute(QueryContext *query_context, OperatorState *operator_state) override;
 
-    SharedPtr<Vector<String>> GetOutputNames() const override { return output_names_; }
+    std::shared_ptr<std::vector<std::string>> GetOutputNames() const override { return output_names_; }
 
-    SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const override { return output_types_; }
+    std::shared_ptr<std::vector<std::shared_ptr<DataType>>> GetOutputTypes() const override { return output_types_; }
 
 public:
-    const SharedPtr<BaseTableRef> base_table_ref_{};
+    const std::shared_ptr<BaseTableRef> base_table_ref_{};
 
-    const SharedPtr<IndexBase> index_def_ptr_{};
+    const std::shared_ptr<IndexBase> index_def_ptr_{};
     const ConflictType conflict_type_{};
 
-    const SharedPtr<Vector<String>> output_names_{};
-    const SharedPtr<Vector<SharedPtr<DataType>>> output_types_{};
+    const std::shared_ptr<std::vector<std::string>> output_names_{};
+    const std::shared_ptr<std::vector<std::shared_ptr<DataType>>> output_types_{};
 
     // if prepare_ is true, then index is constructed with multiple threads
     const bool prepare_;

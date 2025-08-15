@@ -23,7 +23,7 @@ import std;
 
 namespace infinity {
 
-String TxnContext::ToString() {
+std::string TxnContext::ToString() {
     std::stringstream ss;
     ss << "Txn ID: " << txn_id_;
     if (text_ != nullptr) {

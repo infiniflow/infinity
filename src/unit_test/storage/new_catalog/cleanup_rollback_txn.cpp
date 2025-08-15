@@ -81,7 +81,7 @@ public:
     void TearDown() override {
         new_txn_mgr_->PrintAllKeyValue();
 
-        SizeT kv_num = new_txn_mgr_->KeyValueNum();
+        size_t kv_num = new_txn_mgr_->KeyValueNum();
         EXPECT_EQ(kv_num, 3);
 
         new_txn_mgr_ = nullptr;
@@ -105,7 +105,7 @@ public:
     }
 
     void Cleanup() {
-        auto *txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("cleanup"), TransactionType::kCleanup);
+        auto *txn = new_txn_mgr_->BeginTxn(std::make_unique<String>("cleanup"), TransactionType::kCleanup);
         Status status = txn->Cleanup();
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr_->CommitTxn(txn);
@@ -113,7 +113,7 @@ public:
     }
 
     void Checkpoint() {
-        auto *txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("checkpoint"), TransactionType::kNewCheckpoint);
+        auto *txn = new_txn_mgr_->BeginTxn(std::make_unique<String>("checkpoint"), TransactionType::kNewCheckpoint);
         Status status = txn->Checkpoint(wal_manager_->LastCheckpointTS());
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr_->CommitTxn(txn);
@@ -135,31 +135,31 @@ TEST_P(TestTxnCleanupRollbackTxn, test_import_with_index_rollback_cleanup) {
     // there may be many rollback, add rollback test case
     using namespace infinity;
 
-    SharedPtr<String> db_name = std::make_shared<String>("db1");
+    std::shared_ptr<String> db_name = std::make_shared<String>("db1");
     auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
     auto column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
     auto table_name = std::make_shared<std::string>("tb1");
-    auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def2});
+    auto table_def = TableDef::Make(db_name, table_name, std::make_shared<String>(), {column_def1, column_def2});
     auto index_name1 = std::make_shared<std::string>("index1");
-    auto index_def1 = IndexSecondary::Make(index_name1, MakeShared<String>(), "file_name", {column_def1->name()});
+    auto index_def1 = IndexSecondary::Make(index_name1, std::make_shared<String>(), "file_name", {column_def1->name()});
     auto index_name2 = std::make_shared<String>("index2");
-    auto index_def2 = IndexFullText::Make(index_name2, MakeShared<String>(), "file_name", {column_def2->name()}, {});
+    auto index_def2 = IndexFullText::Make(index_name2, std::make_shared<String>(), "file_name", {column_def2->name()}, {});
     {
-        auto *txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
-        Status status = txn->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
+        auto *txn = new_txn_mgr_->BeginTxn(std::make_unique<String>("create db"), TransactionType::kNormal);
+        Status status = txn->CreateDatabase(*db_name, ConflictType::kError, std::make_shared<String>());
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr_->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
     }
     {
-        auto *txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr_->BeginTxn(std::make_unique<String>("create table"), TransactionType::kNormal);
         Status status = txn->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr_->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
     }
-    auto create_index = [&](const SharedPtr<IndexBase> &index_base) {
-        auto *txn = new_txn_mgr_->BeginTxn(MakeUnique<String>(fmt::format("create index {}", *index_base->index_name_)), TransactionType::kNormal);
+    auto create_index = [&](const std::shared_ptr<IndexBase> &index_base) {
+        auto *txn = new_txn_mgr_->BeginTxn(std::make_unique<String>(fmt::format("create index {}", *index_base->index_name_)), TransactionType::kNormal);
         Status status = txn->CreateIndex(*db_name, *table_name, index_base, ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr_->CommitTxn(txn);
@@ -170,7 +170,7 @@ TEST_P(TestTxnCleanupRollbackTxn, test_import_with_index_rollback_cleanup) {
 
     u32 block_row_cnt = 8192;
     auto make_input_block = [&] {
-        auto input_block = MakeShared<DataBlock>();
+        auto input_block = std::make_shared<DataBlock>();
         auto append_to_col = [&](ColumnVector &col, const Value &v1, const Value &v2) {
             for (u32 i = 0; i < block_row_cnt; i += 2) {
                 col.AppendValue(v1);
@@ -195,12 +195,12 @@ TEST_P(TestTxnCleanupRollbackTxn, test_import_with_index_rollback_cleanup) {
     };
 
     {
-        auto *txn_import = new_txn_mgr_->BeginTxn(MakeUnique<String>("import"), TransactionType::kNormal);
-        Vector<SharedPtr<DataBlock>> input_blocks = {make_input_block()};
+        auto *txn_import = new_txn_mgr_->BeginTxn(std::make_unique<String>("import"), TransactionType::kNormal);
+        Vector<std::shared_ptr<DataBlock>> input_blocks = {make_input_block()};
         Status status = txn_import->Import(*db_name, *table_name, input_blocks);
         EXPECT_TRUE(status.ok());
 
-        auto *txn_drop_db = new_txn_mgr_->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
+        auto *txn_drop_db = new_txn_mgr_->BeginTxn(std::make_unique<String>("drop db"), TransactionType::kNormal);
         status = txn_drop_db->DropDatabase(*db_name, ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr_->CommitTxn(txn_drop_db);

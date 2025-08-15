@@ -30,7 +30,7 @@ export struct CreateIndexSharedData {
 
     void Init(BlockIndex *block_index);
 
-    HashMap<u32, atomic_u64> create_index_idxes_{};
+    std::unordered_map<u32, atomic_u64> create_index_idxes_{};
 };
 
 }; // namespace infinity

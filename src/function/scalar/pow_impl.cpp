@@ -57,15 +57,15 @@ inline bool PowFunction::Run(BFloat16T base, BFloat16T exponent, BFloat16T &resu
 
 template <>
 inline bool PowFunction::Run(MixedT, DoubleT, DoubleT &) {
-    String error_message = "Not implement: PowFunction::Run";
+    std::string error_message = "Not implement: PowFunction::Run";
     UnrecoverableError(error_message);
     return false;
 }
 
 void RegisterPowFunction(NewCatalog *catalog_ptr) {
-    String func_name = "POW";
+    std::string func_name = "POW";
 
-    SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
+    std::shared_ptr<ScalarFunctionSet> function_set_ptr = std::make_shared<ScalarFunctionSet>(func_name);
 
     ScalarFunction pow_function_float(func_name,
                                       {DataType(LogicalType::kFloat), DataType(LogicalType::kFloat)},

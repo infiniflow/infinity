@@ -28,11 +28,11 @@ import third_party;
 
 namespace infinity {
 
-VersionFileWorker::VersionFileWorker(SharedPtr<String> data_dir,
-                                     SharedPtr<String> temp_dir,
-                                     SharedPtr<String> file_dir,
-                                     SharedPtr<String> file_name,
-                                     SizeT capacity,
+VersionFileWorker::VersionFileWorker(std::shared_ptr<std::string> data_dir,
+                                     std::shared_ptr<std::string> temp_dir,
+                                     std::shared_ptr<std::string> file_dir,
+                                     std::shared_ptr<std::string> file_name,
+                                     size_t capacity,
                                      PersistenceManager *persistence_manager)
     : FileWorker(std::move(data_dir), std::move(temp_dir), std::move(file_dir), std::move(file_name), persistence_manager), capacity_(capacity) {}
 
@@ -64,7 +64,7 @@ void VersionFileWorker::FreeInMemory() {
 }
 
 // FIXME
-SizeT VersionFileWorker::GetMemoryCost() const { return capacity_ * sizeof(TxnTimeStamp); }
+size_t VersionFileWorker::GetMemoryCost() const { return capacity_ * sizeof(TxnTimeStamp); }
 
 bool VersionFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_success, const FileWorkerSaveCtx &base_ctx) {
     if (data_ == nullptr) {
@@ -88,7 +88,7 @@ bool VersionFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_success, co
     return false;
 }
 
-void VersionFileWorker::ReadFromFileImpl(SizeT file_size, bool from_spill) {
+void VersionFileWorker::ReadFromFileImpl(size_t file_size, bool from_spill) {
     if (data_ != nullptr) {
         UnrecoverableError("Data is already allocated.");
     }

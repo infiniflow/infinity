@@ -31,13 +31,13 @@ import :simd_functions;
 
 namespace infinity {
 
-inline Vector<u32> RandomPermutatePartially(const u32 vector_count, u32 random_num = 0) {
+inline std::vector<u32> RandomPermutatePartially(const u32 vector_count, u32 random_num = 0) {
     if (random_num == 0 || random_num > vector_count) {
         random_num = vector_count;
     }
     std::random_device rd;
     std::mt19937 gen(rd());
-    Vector<u32> permutation(vector_count);
+    std::vector<u32> permutation(vector_count);
     std::iota(permutation.begin(), permutation.end(), static_cast<u32>(0));
     for (u32 i = 0; i < random_num; ++i) {
         // generate j in range [i, vector_count)
@@ -74,7 +74,7 @@ export template <typename ElemType, typename CentroidsOutputType>
                                      const u32 dimension,
                                      const u32 vector_count,
                                      const ElemType *vectors_ptr,
-                                     Vector<CentroidsOutputType> &centroids_output_vector,
+                                     std::vector<CentroidsOutputType> &centroids_output_vector,
                                      u32 partition_num = 0,
                                      u32 iteration_max = 0,
                                      u32 min_points_per_centroid = 32,
@@ -113,11 +113,11 @@ export template <typename ElemType, typename CentroidsOutputType>
     centroids_output_vector.resize(dimension * partition_num);
     CentroidsOutputType *centroids_output = centroids_output_vector.data();
     CentroidsType *centroids = nullptr;
-    UniquePtr<CentroidsType[]> centroids_destructor;
+    std::unique_ptr<CentroidsType[]> centroids_destructor;
     if constexpr (std::is_same_v<CentroidsOutputType, CentroidsType>) {
         centroids = centroids_output;
     } else {
-        centroids_destructor = MakeUnique<CentroidsType[]>(dimension * partition_num);
+        centroids_destructor = std::make_unique<CentroidsType[]>(dimension * partition_num);
         centroids = centroids_destructor.get();
     }
 
@@ -125,7 +125,7 @@ export template <typename ElemType, typename CentroidsOutputType>
 
     const ElemType *elemtype_training_data = vectors_ptr;
     // Release temporary random training data when out of scope
-    UniquePtr<ElemType[]> random_elemtype_training_data_destructor;
+    std::unique_ptr<ElemType[]> random_elemtype_training_data_destructor;
 
     // If input vectors are too few, warning and use all vectors to train.
     // If input vectors are too many, randomly choose some vectors to train.
@@ -138,8 +138,8 @@ export template <typename ElemType, typename CentroidsOutputType>
             training_data_num = max_num;
             // generate random training data
             {
-                Vector<u32> random_ids = RandomPermutatePartially(vector_count, training_data_num);
-                random_elemtype_training_data_destructor = MakeUnique<ElemType[]>(dimension * training_data_num);
+                std::vector<u32> random_ids = RandomPermutatePartially(vector_count, training_data_num);
+                random_elemtype_training_data_destructor = std::make_unique<ElemType[]>(dimension * training_data_num);
                 elemtype_training_data = random_elemtype_training_data_destructor.get();
                 for (u32 i = 0; i < training_data_num; ++i) {
                     memcpy(random_elemtype_training_data_destructor.get() + i * dimension,
@@ -150,12 +150,12 @@ export template <typename ElemType, typename CentroidsOutputType>
         }
     }
 
-    UniquePtr<CentroidsType[]> training_data_holder;
+    std::unique_ptr<CentroidsType[]> training_data_holder;
     const CentroidsType *training_data = nullptr;
     if constexpr (std::is_same_v<ElemType, CentroidsType>) {
         training_data = elemtype_training_data;
     } else {
-        training_data_holder = MakeUnique<CentroidsType[]>(dimension * training_data_num);
+        training_data_holder = std::make_unique<CentroidsType[]>(dimension * training_data_num);
         training_data = training_data_holder.get();
         for (u32 i = 0; i < dimension * training_data_num; ++i) {
             training_data_holder[i] = elemtype_training_data[i];
@@ -175,7 +175,7 @@ export template <typename ElemType, typename CentroidsOutputType>
                 }
             }
         } else {
-            Vector<u32> random_ids = RandomPermutatePartially(training_data_num, partition_num);
+            std::vector<u32> random_ids = RandomPermutatePartially(training_data_num, partition_num);
             if constexpr (std::is_same_v<ElemType, CentroidsType>) {
                 for (u32 i = 0; i < partition_num; ++i) {
                     memcpy(centroids + i * dimension, training_data + random_ids[i] * dimension, sizeof(ElemType) * dimension);
@@ -197,11 +197,11 @@ export template <typename ElemType, typename CentroidsOutputType>
     // Record some information
     f32 previous_total_distance = std::numeric_limits<f32>::max();
     // Assign each vector to a partition
-    Vector<u32> training_data_partition_id(training_data_num);
+    std::vector<u32> training_data_partition_id(training_data_num);
     // Distance
-    Vector<f32> partition_element_distance(training_data_num);
+    std::vector<f32> partition_element_distance(training_data_num);
     // Record the number of vectors in each partition
-    Vector<u32> partition_element_count(partition_num);
+    std::vector<u32> partition_element_count(partition_num);
 
     // Iteration
     for (u32 iter = 1; iter <= iteration_max; ++iter) {

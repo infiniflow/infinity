@@ -114,7 +114,7 @@ void SkipListReaderByteSlice::Load(ByteSlice *byte_slice, u32 start, u32 end) {
     byte_slice_reader_.Seek(start);
 }
 
-Pair<int, bool> SkipListReaderByteSlice::LoadBuffer() {
+std::pair<int, bool> SkipListReaderByteSlice::LoadBuffer() {
     u32 end = byte_slice_reader_.Tell();
     if (end < end_) {
         const Int32Encoder *doc_id_encoder = GetSkipListEncoder();
@@ -138,7 +138,7 @@ Pair<int, bool> SkipListReaderByteSlice::LoadBuffer() {
             const Int16Encoder *tf_percentage_encoder = GetTermPercentageEncoder();
             u32 tf_percentage_num = tf_percentage_encoder->Decode(block_max_tf_percentage_buffer_.get(), SKIP_LIST_BUFFER_SIZE, byte_slice_reader_);
             if (tf_percentage_num != doc_num) {
-                String error_message =
+                std::string error_message =
                     fmt::format("SKipList decode error, doc_num = {} block_max_tf_percentage_num = {}", doc_num, tf_percentage_num);
                 UnrecoverableError(error_message);
                 return MakePair(-1, false);
@@ -172,11 +172,11 @@ void SkipListReaderPostingByteSlice::Load(const PostingByteSlice *posting_buffer
     skiplist_reader_.Open(skiplist_buffer_);
 }
 
-Pair<int, bool> SkipListReaderPostingByteSlice::LoadBuffer() {
-    SizeT flush_count = skiplist_buffer_->GetTotalCount();
+std::pair<int, bool> SkipListReaderPostingByteSlice::LoadBuffer() {
+    size_t flush_count = skiplist_buffer_->GetTotalCount();
     FlushInfo flush_info = skiplist_buffer_->GetFlushInfo();
 
-    SizeT decode_count = SKIP_LIST_BUFFER_SIZE;
+    size_t decode_count = SKIP_LIST_BUFFER_SIZE;
     if (flush_info.IsValidPostingBuffer() == false) {
         decode_count = flush_count;
     }
@@ -184,13 +184,13 @@ Pair<int, bool> SkipListReaderPostingByteSlice::LoadBuffer() {
         return MakePair(0, false);
     }
 
-    SizeT doc_num = 0;
+    size_t doc_num = 0;
     if (!skiplist_reader_.Decode(doc_id_buffer_, decode_count, doc_num)) {
         return MakePair(0, false);
     }
 
     if (has_tf_list_) {
-        SizeT ttf_num = 0;
+        size_t ttf_num = 0;
         if (!skiplist_reader_.Decode(ttf_buffer_.get(), decode_count, ttf_num)) {
             return MakePair(0, false);
         }
@@ -201,7 +201,7 @@ Pair<int, bool> SkipListReaderPostingByteSlice::LoadBuffer() {
     }
 
     if (has_block_max_) {
-        SizeT block_max_tf_num = 0;
+        size_t block_max_tf_num = 0;
         if (!skiplist_reader_.Decode(block_max_tf_buffer_.get(), decode_count, block_max_tf_num)) {
             return MakePair(0, false);
         }
@@ -210,7 +210,7 @@ Pair<int, bool> SkipListReaderPostingByteSlice::LoadBuffer() {
             return MakePair(-1, false);
         }
 
-        SizeT tf_percentage_num = 0;
+        size_t tf_percentage_num = 0;
         if (!skiplist_reader_.Decode(block_max_tf_percentage_buffer_.get(), decode_count, tf_percentage_num)) {
             return MakePair(0, false);
         }
@@ -220,7 +220,7 @@ Pair<int, bool> SkipListReaderPostingByteSlice::LoadBuffer() {
         }
     }
 
-    SizeT len_num = 0;
+    size_t len_num = 0;
     if (!skiplist_reader_.Decode(offset_buffer_, decode_count, len_num)) {
         return MakePair(0, false);
     }

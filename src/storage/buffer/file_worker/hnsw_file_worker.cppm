@@ -33,14 +33,14 @@ namespace infinity {
 
 export class HnswFileWorker : public IndexFileWorker {
 public:
-    explicit HnswFileWorker(SharedPtr<String> data_dir,
-                            SharedPtr<String> temp_dir,
-                            SharedPtr<String> file_dir,
-                            SharedPtr<String> file_name,
-                            SharedPtr<IndexBase> index_base,
-                            SharedPtr<ColumnDef> column_def,
+    explicit HnswFileWorker(std::shared_ptr<std::string> data_dir,
+                            std::shared_ptr<std::string> temp_dir,
+                            std::shared_ptr<std::string> file_dir,
+                            std::shared_ptr<std::string> file_name,
+                            std::shared_ptr<IndexBase> index_base,
+                            std::shared_ptr<ColumnDef> column_def,
                             PersistenceManager *persistence_manager,
-                            SizeT index_size = 0);
+                            size_t index_size = 0);
 
     virtual ~HnswFileWorker() override;
 
@@ -50,19 +50,19 @@ public:
 
     FileWorkerType Type() const override { return FileWorkerType::kHNSWIndexFile; }
 
-    SizeT GetMemoryCost() const override { return index_size_; }
+    size_t GetMemoryCost() const override { return index_size_; }
 
 protected:
     bool WriteToFileImpl(bool to_spill, bool &prepare_success, const FileWorkerSaveCtx &ctx) override;
 
-    void ReadFromFileImpl(SizeT file_size, bool from_spill) override;
+    void ReadFromFileImpl(size_t file_size, bool from_spill) override;
 
-    bool ReadFromMmapImpl(const void *ptr, SizeT size) override;
+    bool ReadFromMmapImpl(const void *ptr, size_t size) override;
 
     void FreeFromMmapImpl() override;
 
 private:
-    SizeT index_size_{};
+    size_t index_size_{};
 };
 
 } // namespace infinity

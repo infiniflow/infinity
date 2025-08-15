@@ -12,12 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:peer_thrift_server;
 
-import :stl;
 import :thrift;
+import :infinity_type;
 
 namespace infinity {
 
@@ -29,15 +27,15 @@ enum class PeerThriftServerStatus : u8 {
 
 export class PoolPeerThriftServer {
 public:
-    void Init(const String &server_address, i32 port_no, i32 pool_size);
-    Thread Start();
+    void Init(const std::string &server_address, i32 port_no, i32 pool_size);
+    std::thread Start();
     void Shutdown();
 
 private:
-    UniquePtr<apache::thrift::server::TServer> server{nullptr};
+    std::unique_ptr<apache::thrift::server::TServer> server{nullptr};
 
     bool initialized_{false};
-    Atomic<PeerThriftServerStatus> status_{PeerThriftServerStatus::kStopped};
+    std::atomic<PeerThriftServerStatus> status_{PeerThriftServerStatus::kStopped};
 };
 
 } // namespace infinity

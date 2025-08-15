@@ -222,7 +222,7 @@ int get_open_fd_count(pid_t pid) {
         return -1;
     }
 
-    UniquePtr<char[]> buffer(new char[static_cast<size_t>(rv)]);
+    std::unique_ptr<char[]> buffer(new char[static_cast<size_t>(rv)]);
     rv = proc_pidinfo(pid, PROC_PIDLISTFDS, 0, buffer.get(), rv);
     if (rv < 0) {
         return -1;
@@ -265,10 +265,10 @@ u64 cpu_total_cost() {
         return 0;
     }
 
-    String line;
+    std::string line;
     if (std::getline(file, line)) {
         std::istringstream iss(line);
-        String name;
+        std::string name;
         iss >> name >> user_time >> nice_time >> system_time >> idle_time;
     }
     return (user_time + nice_time + system_time + idle_time);
@@ -284,7 +284,7 @@ u64 cpu_cost_of_process(pid_t pid) {
 
     FILE *fd;
     char line_buff[1024] = {0};
-    String file_name = fmt::format("/proc/{}/stat", pid);
+    std::string file_name = fmt::format("/proc/{}/stat", pid);
 
     fd = std::fopen(file_name.c_str(), "r");
     if (nullptr == fd)
@@ -320,8 +320,8 @@ i64 SystemInfo::MemoryUsage() {
         while (fgets(line_rss, line_length, file) != nullptr) {
             if (std::strncmp(line_rss, "VmRSS:", 6) == 0) {
                 LOG_DEBUG(line_rss);
-                String str(line_rss + 6);
-                String kb;
+                std::string str(line_rss + 6);
+                std::string kb;
                 std::istringstream iss(str);
                 iss >> vm_rss_in_kb >> kb;
             }
@@ -362,7 +362,7 @@ i64 SystemInfo::OpenFileCount() {
     pid_t current_pid = getpid();
     count = get_open_fd_count(current_pid);
 #elif defined(linux) || defined(__linux) || defined(__linux__)
-    String dir_path;
+    std::string dir_path;
     DIR *dir;
     struct dirent *entry;
 

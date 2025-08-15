@@ -37,7 +37,7 @@ export struct IntervalTryCastToVarlen;
 //             return BoundCastFunc(&ColumnVectorCast::TryCastColumnVectorToVarlen<IntervalT, VarcharT, IntervalTryCastToVarlen>);
 //         }
 //         default: {
-//             String error_message = fmt::format("Can't cast from Interval type to {}", target.ToString());
+//             std::string error_message = fmt::format("Can't cast from Interval type to {}", target.ToString());
 //             UnrecoverableError(error_message);
 //         }
 //     }
@@ -47,7 +47,7 @@ export struct IntervalTryCastToVarlen;
 struct IntervalTryCastToVarlen {
     template <typename SourceType, typename TargetType>
     static inline bool Run(SourceType, TargetType &, ColumnVector *) {
-        String error_message =
+        std::string error_message =
             fmt::format("Not support to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>());
         UnrecoverableError(error_message);
         return false;
@@ -56,7 +56,7 @@ struct IntervalTryCastToVarlen {
 
 template <>
 inline bool IntervalTryCastToVarlen::Run(IntervalT, VarcharT &, ColumnVector *) {
-    String error_message = "Not implement: IntegerTryCastToFixlen::Run";
+    std::string error_message = "Not implement: IntegerTryCastToFixlen::Run";
     UnrecoverableError(error_message);
     return false;
 }

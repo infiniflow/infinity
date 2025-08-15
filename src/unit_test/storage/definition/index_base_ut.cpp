@@ -46,8 +46,8 @@ TEST_F(IndexBaseTest, ivf_readwrite) {
     parameters.emplace_back(new InitParameter("metric", "l2"));
     parameters.emplace_back(new InitParameter("plain_storage_data_type", "float"));
 
-    SharedPtr<IndexBase> index_base =
-        IndexIVF::Make(MakeShared<String>("idx1"), MakeShared<String>("test comment"), "tbl1_idx1", columns, parameters);
+    std::shared_ptr<IndexBase> index_base =
+        IndexIVF::Make(std::make_shared<String>("idx1"), std::make_shared<String>("test comment"), "tbl1_idx1", columns, parameters);
     //    std::cout << "index_base: " << index_base->ToString() << std::endl;
     for (auto parameter : parameters) {
         delete parameter;
@@ -62,7 +62,7 @@ TEST_F(IndexBaseTest, ivf_readwrite) {
 
     const char *ptr_r = buf_beg;
     int32_t maxbytes = exp_size;
-    SharedPtr<IndexBase> index_base1 = IndexBase::ReadAdv(ptr_r, maxbytes);
+    std::shared_ptr<IndexBase> index_base1 = IndexBase::ReadAdv(ptr_r, maxbytes);
     //    std::cout << "index_base1: " << index_base1->ToString() << std::endl;
     EXPECT_EQ(ptr_r - buf_beg, exp_size);
     EXPECT_NE(index_base.get(), nullptr);
@@ -79,7 +79,7 @@ TEST_F(IndexBaseTest, hnsw_readwrite) {
     parameters.emplace_back(new InitParameter("ef_construction", "200"));
     parameters.emplace_back(new InitParameter("encode", "plain"));
 
-    auto index_base = IndexHnsw::Make(MakeShared<String>("idx1"), MakeShared<String>("test comment"), "tbl1_idx1", columns, parameters);
+    auto index_base = IndexHnsw::Make(std::make_shared<String>("idx1"), std::make_shared<String>("test comment"), "tbl1_idx1", columns, parameters);
     //    std::cout << "index_base: " << index_base->ToString() << std::endl;
 
     for (auto parameter : parameters) {
@@ -95,7 +95,7 @@ TEST_F(IndexBaseTest, hnsw_readwrite) {
 
     const char *ptr_r = buf_beg;
     int32_t maxbytes = exp_size;
-    SharedPtr<IndexBase> index_base1 = IndexBase::ReadAdv(ptr_r, maxbytes);
+    std::shared_ptr<IndexBase> index_base1 = IndexBase::ReadAdv(ptr_r, maxbytes);
     //    std::cout << "index_base1: " << index_base1->ToString() << std::endl;
     EXPECT_EQ(ptr_r - buf_beg, exp_size);
     EXPECT_NE(index_base.get(), nullptr);
@@ -107,7 +107,7 @@ TEST_F(IndexBaseTest, full_text_readwrite) {
 
     Vector<String> columns{"col1", "col2"};
     Vector<InitParameter *> parameters;
-    auto index_base = IndexFullText::Make(MakeShared<String>("idx1"), MakeShared<String>("test comment"), "tbl1_idx1", columns, parameters);
+    auto index_base = IndexFullText::Make(std::make_shared<String>("idx1"), std::make_shared<String>("test comment"), "tbl1_idx1", columns, parameters);
     //    std::cout << "index_base: " << index_base->ToString() << std::endl;
 
     for (auto parameter : parameters) {
@@ -123,7 +123,7 @@ TEST_F(IndexBaseTest, full_text_readwrite) {
 
     const char *ptr_r = buf_beg;
     int32_t maxbytes = exp_size;
-    SharedPtr<IndexBase> index_base1 = IndexBase::ReadAdv(ptr_r, maxbytes);
+    std::shared_ptr<IndexBase> index_base1 = IndexBase::ReadAdv(ptr_r, maxbytes);
     //    std::cout << "index_base1: " << index_base1->ToString() << std::endl;
     EXPECT_EQ(ptr_r - buf_beg, exp_size);
     EXPECT_NE(index_base.get(), nullptr);

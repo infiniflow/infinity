@@ -27,15 +27,15 @@ import :status;
 namespace infinity {
 export class UserDefinedTermWeight {
 public:
-    UserDefinedTermWeight(const String &tw_path) : tw_path_(tw_path) {}
+    UserDefinedTermWeight(const std::string &tw_path) : tw_path_(tw_path) {}
 
     ~UserDefinedTermWeight() = default;
 
-    Tuple<HashMap<String, double>, Status> Run(const Vector<String> &text);
+    std::tuple<std::unordered_map<std::string, double>, Status> Run(const std::vector<std::string> &text);
 
 protected:
 private:
-    const String tw_path_;
+    const std::string tw_path_;
 
 
 };

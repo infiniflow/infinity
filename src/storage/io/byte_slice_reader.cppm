@@ -1,8 +1,5 @@
-module;
-
 export module infinity_core:byte_slice_reader;
 
-import :stl;
 import :byte_slice;
 import :infinity_exception;
 
@@ -10,7 +7,7 @@ namespace infinity {
 
 export class ByteSliceReader {
 public:
-    static const SizeT BYTE_SLICE_EOF = -1;
+    static const size_t BYTE_SLICE_EOF = -1;
 
 public:
     ByteSliceReader();
@@ -36,17 +33,17 @@ public:
 
     u32 ReadVUInt64();
 
-    SizeT Read(void *value, SizeT len);
+    size_t Read(void *value, size_t len);
 
-    SizeT ReadMayCopy(void *&value, SizeT len);
+    size_t ReadMayCopy(void *&value, size_t len);
 
     i32 PeekInt32();
 
-    SizeT Seek(SizeT offset);
+    size_t Seek(size_t offset);
 
-    SizeT Tell() const { return global_offset_; }
+    size_t Tell() const { return global_offset_; }
 
-    bool CurrentSliceEnough(SizeT len) { return current_slice_offset_ + len <= GetSliceDataSize(current_slice_); }
+    bool CurrentSliceEnough(size_t len) { return current_slice_offset_ + len <= GetSliceDataSize(current_slice_); }
 
     u8 *GetCurrentSliceData() { return current_slice_->data_ + current_slice_offset_; }
 
@@ -57,7 +54,7 @@ public:
 
     void Close();
 
-    SizeT GetSize() const { return slice_list_->GetTotalSize(); }
+    size_t GetSize() const { return slice_list_->GetTotalSize(); }
 
     ByteSliceList *GetByteSliceList() const { return slice_list_; }
     bool End() const { return Tell() + 1 >= size_; }
@@ -71,14 +68,14 @@ private:
 
     ByteSlice *NextSlice(ByteSlice *byte_slice) { return byte_slice->next_; }
 
-    SizeT GetSliceDataSize(ByteSlice *byte_slice) const { return byte_slice->size_; }
+    size_t GetSliceDataSize(ByteSlice *byte_slice) const { return byte_slice->size_; }
 
 private:
     ByteSlice *current_slice_;
-    SizeT current_slice_offset_;
-    SizeT global_offset_;
+    size_t current_slice_offset_;
+    size_t global_offset_;
     ByteSliceList *slice_list_;
-    SizeT size_;
+    size_t size_;
 };
 
 inline u8 ByteSliceReader::ReadByte() {
@@ -145,8 +142,8 @@ inline i32 ByteSliceReader::PeekInt32() {
     char *buffer = (char *)bytes;
     ByteSlice *slice = current_slice_;
     ByteSlice *next_slice = nullptr;
-    SizeT cur_slice_offset = current_slice_offset_;
-    for (SizeT i = 0; i < sizeof(i32); ++i) {
+    size_t cur_slice_offset = current_slice_offset_;
+    for (size_t i = 0; i < sizeof(i32); ++i) {
         if (cur_slice_offset >= GetSliceDataSize(slice)) {
             next_slice = NextSlice(slice);
             if (next_slice == nullptr || next_slice->data_ == nullptr) {
@@ -174,7 +171,7 @@ inline T ByteSliceReader::ReadInt() {
 
     u8 bytes[sizeof(T)];
     char *buffer = (char *)bytes;
-    for (SizeT i = 0; i < sizeof(T); ++i) {
+    for (size_t i = 0; i < sizeof(T); ++i) {
         bytes[i] = ReadByte();
     }
     return *((T *)buffer);

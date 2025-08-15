@@ -57,8 +57,8 @@ public:
     TermMetaLoader(const PostingFormatOption &option);
 
     void Load(ByteSliceReader *byte_slice_reader, TermMeta &term_meta) const;
-    void Load(const SharedPtr<FileReader> &reader, TermMeta &term_meta) const;
-    void Load(u8 *&data_cursor, SizeT &left_size, TermMeta &term_meta) const;
+    void Load(const std::shared_ptr<FileReader> &reader, TermMeta &term_meta) const;
+    void Load(u8 *&data_cursor, size_t &left_size, TermMeta &term_meta) const;
 
 private:
     PostingFormatOption option_;
@@ -69,10 +69,10 @@ public:
     explicit TermMetaDumper(const PostingFormatOption &option) : option_(option) {}
 
     u32 CalculateStoreSize(const TermMeta &term_meta) const;
-    void Dump(const SharedPtr<FileWriter> &file, const TermMeta &term_meta) const;
+    void Dump(const std::shared_ptr<FileWriter> &file, const TermMeta &term_meta) const;
 
     // ReadVUInt32 + ReadVUInt32 + sizeof(payload)
-    static SizeT MaxStoreSize() { return sizeof(u32) + 1 + sizeof(u32) + 1 + sizeof(termpayload_t); }
+    static size_t MaxStoreSize() { return sizeof(u32) + 1 + sizeof(u32) + 1 + sizeof(termpayload_t); }
 
 private:
     PostingFormatOption option_;

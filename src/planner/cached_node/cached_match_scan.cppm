@@ -55,8 +55,8 @@ public:
     const BaseExpression *query_expression() const { return query_expression_.get(); }
 
 private:
-    SharedPtr<BaseExpression> query_expression_{};
-    SharedPtr<BaseExpression> filter_expression_{};
+    std::shared_ptr<BaseExpression> query_expression_{};
+    std::shared_ptr<BaseExpression> filter_expression_{};
 };
 
 export class CachedKnnScan final : public CachedMatchScanBase {
@@ -91,7 +91,7 @@ public:
 
 private:
     u32 topn_;
-    SharedPtr<MatchTensorScanIndexOptions> index_options_;
+    std::shared_ptr<MatchTensorScanIndexOptions> index_options_;
 };
 
 } // namespace infinity

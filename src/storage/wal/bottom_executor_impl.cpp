@@ -32,17 +32,17 @@ BottomExecutor::BottomExecutor() = default;
 
 BottomExecutor::~BottomExecutor() = default;
 
-void BottomExecutor::Start(SizeT executor_size) {
-    for (SizeT i = 0; i < executor_size; ++i) {
-        String name = fmt::format("Start bottom executor {}", i);
-        txn_queues_.emplace_back(MakeShared<BlockingQueue<NewTxn *>>(name));
-        SharedPtr<BlockingQueue<NewTxn *>> queue = txn_queues_.back();
+void BottomExecutor::Start(size_t executor_size) {
+    for (size_t i = 0; i < executor_size; ++i) {
+        std::string name = fmt::format("Start bottom executor {}", i);
+        txn_queues_.emplace_back(std::make_shared<BlockingQueue<NewTxn *>>(name));
+        std::shared_ptr<BlockingQueue<NewTxn *>> queue = txn_queues_.back();
         auto executor = [&, queue] {
-            Deque<NewTxn *> txns;
+            std::deque<NewTxn *> txns;
             while (true) {
                 queue->DequeueBulk(txns);
-                SizeT txns_size = txns.size();
-                for (SizeT txn_idx = 0; txn_idx < txns_size; ++txn_idx) {
+                size_t txns_size = txns.size();
+                for (size_t txn_idx = 0; txn_idx < txns_size; ++txn_idx) {
                     NewTxn *txn = txns[txn_idx];
                     if (txn == nullptr) {
                         // Stop signal
@@ -57,26 +57,26 @@ void BottomExecutor::Start(SizeT executor_size) {
                 txns.clear();
             }
         };
-        auto thr = Thread(executor);
+        auto thr = std::thread(executor);
         executors_.emplace_back(std::move(thr));
     }
     LOG_INFO(fmt::format("BottomExecutor is started with {} workers.", executor_size));
 }
 void BottomExecutor::Stop() {
-    SizeT num_workers = executors_.size();
-    for (SizeT i = 0; i < num_workers; ++i) {
+    size_t num_workers = executors_.size();
+    for (size_t i = 0; i < num_workers; ++i) {
         txn_queues_[i]->Enqueue(nullptr);
     }
-    for (SizeT i = 0; i < num_workers; ++i) {
+    for (size_t i = 0; i < num_workers; ++i) {
         executors_[i].join();
     }
     LOG_INFO("BottomExecutor is stopped.");
 }
 
 void BottomExecutor::Submit(NewTxn *txn) {
-    String table_id_str = txn->GetTableIdStr();
+    std::string table_id_str = txn->GetTableIdStr();
     u32 checksum = CRC32IEEE::makeCRC((const unsigned char *)table_id_str.data(), table_id_str.size());
-    SizeT idx = checksum % txn_queues_.size();
+    size_t idx = checksum % txn_queues_.size();
     txn_queues_[idx]->Enqueue(txn);
 }
 

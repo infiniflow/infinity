@@ -171,8 +171,8 @@ TEST_F(TinyIntegerCastTest, tiny_integer_cast0) {
         VarcharT target;
         String src_str, tgt_str;
 
-        SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kVarchar);
-        SharedPtr<ColumnVector> col_varchar_ptr = MakeShared<ColumnVector>(data_type);
+        std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kVarchar);
+        std::shared_ptr<ColumnVector> col_varchar_ptr = std::make_shared<ColumnVector>(data_type);
         col_varchar_ptr->Initialize();
 
         source = std::numeric_limits<TinyIntT>::min();
@@ -228,8 +228,8 @@ TEST_F(TinyIntegerCastTest, tiny_integer_cast0) {
 TEST_F(TinyIntegerCastTest, tiny_integer_cast1) {
     using namespace infinity;
 
-    SharedPtr<DataType> source_type = MakeShared<DataType>(LogicalType::kTinyInt);
-    SharedPtr<ColumnVector> col_source = MakeShared<ColumnVector>(source_type);
+    std::shared_ptr<DataType> source_type = std::make_shared<DataType>(LogicalType::kTinyInt);
+    std::shared_ptr<ColumnVector> col_source = std::make_shared<ColumnVector>(source_type);
     col_source->Initialize();
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         Value v = Value::MakeTinyInt(static_cast<TinyIntT>(i));
@@ -244,11 +244,11 @@ TEST_F(TinyIntegerCastTest, tiny_integer_cast1) {
 
     // cast tiny int column vector to small column vector
     {
-        SharedPtr<DataType> target_type = MakeShared<DataType>(LogicalType::kSmallInt);
+        std::shared_ptr<DataType> target_type = std::make_shared<DataType>(LogicalType::kSmallInt);
         auto tiny2small_ptr = BindIntegerCast<TinyIntT>(*source_type, *target_type);
         EXPECT_NE(tiny2small_ptr.function, nullptr);
 
-        SharedPtr<ColumnVector> col_target = MakeShared<ColumnVector>(target_type);
+        std::shared_ptr<ColumnVector> col_target = std::make_shared<ColumnVector>(target_type);
         col_target->Initialize();
 
         CastParameters cast_parameters;
@@ -264,11 +264,11 @@ TEST_F(TinyIntegerCastTest, tiny_integer_cast1) {
 
     // cast tiny int column vector to integer column vector
     {
-        SharedPtr<DataType> target_type = MakeShared<DataType>(LogicalType::kInteger);
+        std::shared_ptr<DataType> target_type = std::make_shared<DataType>(LogicalType::kInteger);
         auto tiny2integer_ptr = BindIntegerCast<TinyIntT>(*source_type, *target_type);
         EXPECT_NE(tiny2integer_ptr.function, nullptr);
 
-        SharedPtr<ColumnVector> col_target = MakeShared<ColumnVector>(target_type);
+        std::shared_ptr<ColumnVector> col_target = std::make_shared<ColumnVector>(target_type);
         col_target->Initialize();
 
         CastParameters cast_parameters;
@@ -284,11 +284,11 @@ TEST_F(TinyIntegerCastTest, tiny_integer_cast1) {
 
     // cast tiny int column vector to big int column vector
     {
-        SharedPtr<DataType> target_type = MakeShared<DataType>(LogicalType::kBigInt);
+        std::shared_ptr<DataType> target_type = std::make_shared<DataType>(LogicalType::kBigInt);
         auto tiny2bigint_ptr = BindIntegerCast<TinyIntT>(*source_type, *target_type);
         EXPECT_NE(tiny2bigint_ptr.function, nullptr);
 
-        SharedPtr<ColumnVector> col_target = MakeShared<ColumnVector>(target_type);
+        std::shared_ptr<ColumnVector> col_target = std::make_shared<ColumnVector>(target_type);
         col_target->Initialize();
 
         CastParameters cast_parameters;
@@ -304,11 +304,11 @@ TEST_F(TinyIntegerCastTest, tiny_integer_cast1) {
 
     // cast tiny int column vector to huge int column vector
     {
-        SharedPtr<DataType> target_type = MakeShared<DataType>(LogicalType::kHugeInt);
+        std::shared_ptr<DataType> target_type = std::make_shared<DataType>(LogicalType::kHugeInt);
         auto tiny2hugeint_ptr = BindIntegerCast<TinyIntT>(*source_type, *target_type);
         EXPECT_NE(tiny2hugeint_ptr.function, nullptr);
 
-        SharedPtr<ColumnVector> col_target = MakeShared<ColumnVector>(target_type);
+        std::shared_ptr<ColumnVector> col_target = std::make_shared<ColumnVector>(target_type);
         col_target->Initialize();
 
         CastParameters cast_parameters;
@@ -324,11 +324,11 @@ TEST_F(TinyIntegerCastTest, tiny_integer_cast1) {
 
     // cast tiny int column vector to float column vector
     {
-        SharedPtr<DataType> target_type = MakeShared<DataType>(LogicalType::kFloat);
+        std::shared_ptr<DataType> target_type = std::make_shared<DataType>(LogicalType::kFloat);
         auto tiny2float_ptr = BindIntegerCast<TinyIntT>(*source_type, *target_type);
         EXPECT_NE(tiny2float_ptr.function, nullptr);
 
-        SharedPtr<ColumnVector> col_target = MakeShared<ColumnVector>(target_type);
+        std::shared_ptr<ColumnVector> col_target = std::make_shared<ColumnVector>(target_type);
         col_target->Initialize();
 
         CastParameters cast_parameters;
@@ -344,11 +344,11 @@ TEST_F(TinyIntegerCastTest, tiny_integer_cast1) {
 
     // cast tiny int column vector to double column vector
     {
-        SharedPtr<DataType> target_type = MakeShared<DataType>(LogicalType::kDouble);
+        std::shared_ptr<DataType> target_type = std::make_shared<DataType>(LogicalType::kDouble);
         auto tiny2double_ptr = BindIntegerCast<TinyIntT>(*source_type, *target_type);
         EXPECT_NE(tiny2double_ptr.function, nullptr);
 
-        SharedPtr<ColumnVector> col_target = MakeShared<ColumnVector>(target_type);
+        std::shared_ptr<ColumnVector> col_target = std::make_shared<ColumnVector>(target_type);
         col_target->Initialize();
 
         CastParameters cast_parameters;
@@ -364,11 +364,11 @@ TEST_F(TinyIntegerCastTest, tiny_integer_cast1) {
 
     // cast tiny int column vector to decimal column vector
     {
-        SharedPtr<DataType> target_type = MakeShared<DataType>(LogicalType::kDecimal);
+        std::shared_ptr<DataType> target_type = std::make_shared<DataType>(LogicalType::kDecimal);
         auto tiny2decimal_ptr = BindIntegerCast<TinyIntT>(*source_type, *target_type);
         EXPECT_NE(tiny2decimal_ptr.function, nullptr);
 
-        SharedPtr<ColumnVector> col_target = MakeShared<ColumnVector>(target_type);
+        std::shared_ptr<ColumnVector> col_target = std::make_shared<ColumnVector>(target_type);
         col_target->Initialize();
 
         CastParameters cast_parameters;
@@ -378,11 +378,11 @@ TEST_F(TinyIntegerCastTest, tiny_integer_cast1) {
 
     // cast tiny int column vector to Varchar vector
     {
-        SharedPtr<DataType> target_type = MakeShared<DataType>(LogicalType::kVarchar);
+        std::shared_ptr<DataType> target_type = std::make_shared<DataType>(LogicalType::kVarchar);
         auto tiny2varchar_ptr = BindIntegerCast<TinyIntT>(*source_type, *target_type);
         EXPECT_NE(tiny2varchar_ptr.function, nullptr);
 
-        SharedPtr<ColumnVector> col_target = MakeShared<ColumnVector>(target_type);
+        std::shared_ptr<ColumnVector> col_target = std::make_shared<ColumnVector>(target_type);
         col_target->Initialize();
 
         CastParameters cast_parameters;

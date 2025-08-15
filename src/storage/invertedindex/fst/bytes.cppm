@@ -183,8 +183,8 @@ u64 UnpackUint(u8 *ptr, u8 nbytes) {
 }
 
 /// Compare two byte slice according to the lexicographically order
-int CompareBytes(u8 *bs1_data, SizeT bs1_len, u8 *bs2_data, SizeT bs2_len) {
-    SizeT common_len = std::min(bs1_len, bs2_len);
+int CompareBytes(u8 *bs1_data, size_t bs1_len, u8 *bs2_data, size_t bs2_len) {
+    size_t common_len = std::min(bs1_len, bs2_len);
     int ret = std::memcmp(bs1_data, bs2_data, common_len);
     if (ret != 0) {
         return ret;

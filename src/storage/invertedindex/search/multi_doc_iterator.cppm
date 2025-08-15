@@ -24,13 +24,13 @@ import :term_doc_iterator;
 namespace infinity {
 export class MultiDocIterator : public DocIterator {
 public:
-    explicit MultiDocIterator(Vector<UniquePtr<DocIterator>> &&children) : children_(std::move(children)) {}
+    explicit MultiDocIterator(std::vector<std::unique_ptr<DocIterator>> &&children) : children_(std::move(children)) {}
 
-    const Vector<UniquePtr<DocIterator>> &GetChildren() { return children_; }
+    const std::vector<std::unique_ptr<DocIterator>> &GetChildren() { return children_; }
 
-    void PrintTree(std::ostream &os, const String &prefix, bool is_final) const override;
+    void PrintTree(std::ostream &os, const std::string &prefix, bool is_final) const override;
 
 protected:
-    Vector<UniquePtr<DocIterator>> children_;
+    std::vector<std::unique_ptr<DocIterator>> children_;
 };
 } // namespace infinity

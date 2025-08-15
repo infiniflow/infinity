@@ -27,7 +27,7 @@ namespace infinity {
 
 export class PGProtocolHandler {
 public:
-    explicit PGProtocolHandler(const SharedPtr<boost::asio::ip::tcp::socket> &socket);
+    explicit PGProtocolHandler(const std::shared_ptr<boost::asio::ip::tcp::socket> &socket);
     ~PGProtocolHandler();
 
     u32 read_startup_header();
@@ -36,27 +36,27 @@ public:
 
     void send_authentication();
 
-    void send_parameter(const String &key, const String &value);
+    void send_parameter(const std::string &key, const std::string &value);
 
     void send_ready_for_query();
 
     PGMessageType read_command_type();
 
-    String read_command_body();
+    std::string read_command_body();
 
     void send_error_response(const std::unordered_map<PGMessageType, std::string> &error_response_map);
     //
-    //    String read_query_packet();
+    //    std::string read_query_packet();
 
     void SendDescriptionHeader(u32 total_column_name_length, u32 column_count);
 
-    void SendDescription(const String &column_name, u32 object_id, u16 width);
+    void SendDescription(const std::string &column_name, u32 object_id, u16 width);
 
-    void SendData(const Vector<Optional<String>> &values_as_strings, u64 string_length_sum);
+    void SendData(const std::vector<std::optional<std::string>> &values_as_strings, u64 string_length_sum);
 
-    void SendComplete(const String &complete_message);
+    void SendComplete(const std::string &complete_message);
     //
-    //    pair<String, String> read_parse_packet();
+    //    pair<std::string, std::string> read_parse_packet();
     //    void read_sync_packet();
     //
     //    void send_status_message(const PGMessageType message_type);

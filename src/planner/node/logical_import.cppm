@@ -31,38 +31,38 @@ namespace infinity {
 export class LogicalImport : public LogicalNode {
 public:
     explicit inline LogicalImport(u64 node_id,
-                                  const SharedPtr<TableInfo> &table_info,
-                                  String file_path,
+                                  const std::shared_ptr<TableInfo> &table_info,
+                                  std::string file_path,
                                   bool header,
                                   char delimiter,
                                   CopyFileType type)
         : LogicalNode(node_id, LogicalNodeType::kImport), table_info_(table_info), file_type_(type), file_path_(std::move(file_path)),
           header_(header), delimiter_(delimiter) {}
 
-    [[nodiscard]] Vector<ColumnBinding> GetColumnBindings() const final;
+    [[nodiscard]] std::vector<ColumnBinding> GetColumnBindings() const final;
 
-    [[nodiscard]] SharedPtr<Vector<String>> GetOutputNames() const final;
+    [[nodiscard]] std::shared_ptr<std::vector<std::string>> GetOutputNames() const final;
 
-    [[nodiscard]] SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const final;
+    [[nodiscard]] std::shared_ptr<std::vector<std::shared_ptr<DataType>>> GetOutputTypes() const final;
 
-    String ToString(i64 &space) const final;
+    std::string ToString(i64 &space) const final;
 
-    inline String name() final { return "LogicalImport"; }
+    inline std::string name() final { return "LogicalImport"; }
 
-    [[nodiscard]] inline const SharedPtr<TableInfo> table_info() const { return table_info_; }
+    [[nodiscard]] inline const std::shared_ptr<TableInfo> table_info() const { return table_info_; }
 
     [[nodiscard]] inline CopyFileType FileType() const { return file_type_; }
 
-    [[nodiscard]] inline const String &file_path() const { return file_path_; }
+    [[nodiscard]] inline const std::string &file_path() const { return file_path_; }
 
     [[nodiscard]] bool header() const { return header_; }
 
     [[nodiscard]] char delimiter() const { return delimiter_; }
 
 private:
-    SharedPtr<TableInfo> table_info_{};
+    std::shared_ptr<TableInfo> table_info_{};
     CopyFileType file_type_{CopyFileType::kInvalid};
-    String file_path_{};
+    std::string file_path_{};
     bool header_{false};
     char delimiter_{','};
 };

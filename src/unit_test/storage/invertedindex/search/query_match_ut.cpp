@@ -86,7 +86,7 @@ public:
     const String index_name_ = "test_fulltext_index";
     String config_path_{};
     Vector<Vector<String>> datas_;
-    SharedPtr<TableDef> table_def_;
+    std::shared_ptr<TableDef> table_def_;
 };
 
 INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
@@ -120,7 +120,7 @@ TEST_P(QueryMatchTest, basic_term) {
     Vector<float> expected_term_freq = {16.0F, 2.0F, 2.0F, 2.0F};
     EXPECT_EQ(terms.size(), expected_doc_freq.size());
     EXPECT_EQ(terms.size(), expected_term_freq.size());
-    for (SizeT i = 0; i < terms.size(); ++i) {
+    for (size_t i = 0; i < terms.size(); ++i) {
         auto term = terms[i];
         auto doc_freq = expected_doc_freq[i];
         auto term_freq = expected_term_freq[i];
@@ -156,7 +156,7 @@ TEST_P(QueryMatchTest, phrase) {
         };
         EXPECT_EQ(phrases.size(), expected_doc_freq.size());
         EXPECT_EQ(phrases.size(), expected_phrase_freq.size());
-        for (SizeT i = 0; i < phrases.size(); ++i) {
+        for (size_t i = 0; i < phrases.size(); ++i) {
             auto phrase = phrases[i];
             auto doc_freq = expected_doc_freq[i];
             auto phrase_freq = expected_phrase_freq[i];
@@ -166,36 +166,36 @@ TEST_P(QueryMatchTest, phrase) {
 }
 
 void QueryMatchTest::CreateDBAndTable(const String &db_name, const String &table_name) {
-    Vector<SharedPtr<ColumnDef>> column_defs;
+    Vector<std::shared_ptr<ColumnDef>> column_defs;
     {
         String col1_name = "id";
-        auto col1_type = MakeShared<DataType>(LogicalType::kVarchar);
-        auto col1_def = MakeShared<ColumnDef>(0, col1_type, std::move(col1_name), std::set<ConstraintType>());
+        auto col1_type = std::make_shared<DataType>(LogicalType::kVarchar);
+        auto col1_def = std::make_shared<ColumnDef>(0, col1_type, std::move(col1_name), std::set<ConstraintType>());
         column_defs.push_back(col1_def);
     }
     {
         String col2_name = "title";
-        auto col2_type = MakeShared<DataType>(LogicalType::kVarchar);
-        auto col2_def = MakeShared<ColumnDef>(1, col2_type, std::move(col2_name), std::set<ConstraintType>());
+        auto col2_type = std::make_shared<DataType>(LogicalType::kVarchar);
+        auto col2_def = std::make_shared<ColumnDef>(1, col2_type, std::move(col2_name), std::set<ConstraintType>());
         column_defs.push_back(col2_def);
     }
     {
         String col3_name = "text";
-        auto col3_type = MakeShared<DataType>(LogicalType::kVarchar);
-        auto col3_def = MakeShared<ColumnDef>(2, col3_type, std::move(col3_name), std::set<ConstraintType>());
+        auto col3_type = std::make_shared<DataType>(LogicalType::kVarchar);
+        auto col3_def = std::make_shared<ColumnDef>(2, col3_type, std::move(col3_name), std::set<ConstraintType>());
         column_defs.push_back(col3_def);
     }
-    auto table_def = TableDef::Make(MakeShared<String>(db_name), MakeShared<String>(table_name), MakeShared<String>(), std::move(column_defs));
+    auto table_def = TableDef::Make(std::make_shared<String>(db_name), std::make_shared<String>(table_name), std::make_shared<String>(), std::move(column_defs));
     Storage *storage = InfinityContext::instance().storage();
     NewTxnManager *txn_mgr = storage->new_txn_manager();
     {
-        auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("drop table"), TransactionType::kNormal);
+        auto *txn = txn_mgr->BeginTxn(std::make_unique<String>("drop table"), TransactionType::kNormal);
         txn->DropTable(db_name, table_name, ConflictType::kIgnore);
         Status status = txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
     }
     {
-        auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+        auto *txn = txn_mgr->BeginTxn(std::make_unique<String>("create table"), TransactionType::kNormal);
         txn->CreateTable(db_name, table_def, ConflictType::kError);
 
         Status status = txn_mgr->CommitTxn(txn);
@@ -208,15 +208,15 @@ void QueryMatchTest::CreateIndex(const String &db_name, const String &table_name
     Storage *storage = InfinityContext::instance().storage();
 
     NewTxnManager *txn_mgr = storage->new_txn_manager();
-    auto *txn_idx = txn_mgr->BeginTxn(MakeUnique<String>("get db"), TransactionType::kRead);
+    auto *txn_idx = txn_mgr->BeginTxn(std::make_unique<String>("get db"), TransactionType::kRead);
     Status status = txn_idx->DropIndexByName(db_name, table_name, index_name, ConflictType::kIgnore);
     // EXPECT_TRUE(status.ok());
 
     Vector<String> col_name_list{"text"};
     String index_file_name = index_name + ".json";
     auto index_def =
-        MakeShared<IndexFullText>(MakeShared<String>(index_name), MakeShared<String>("test comment"), index_file_name, col_name_list, analyzer);
-    auto *txn7 = txn_mgr->BeginTxn(MakeUnique<String>("create index"), TransactionType::kNormal);
+        std::make_shared<IndexFullText>(std::make_shared<String>(index_name), std::make_shared<String>("test comment"), index_file_name, col_name_list, analyzer);
+    auto *txn7 = txn_mgr->BeginTxn(std::make_unique<String>("create index"), TransactionType::kNormal);
     status = txn7->CreateIndex(db_name, table_name, index_def, ConflictType::kError);
     EXPECT_TRUE(status.ok());
     status = txn_mgr->CommitTxn(txn7);
@@ -227,12 +227,12 @@ void QueryMatchTest::InsertData(const String &db_name, const String &table_name)
     Storage *storage = InfinityContext::instance().storage();
     NewTxnManager *txn_mgr = storage->new_txn_manager();
 
-    auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("import data"), TransactionType::kNormal);
-    auto input_block = MakeShared<DataBlock>();
-    for (SizeT column_id = 0; column_id < table_def_->column_count(); ++column_id) {
+    auto *txn = txn_mgr->BeginTxn(std::make_unique<String>("import data"), TransactionType::kNormal);
+    auto input_block = std::make_shared<DataBlock>();
+    for (size_t column_id = 0; column_id < table_def_->column_count(); ++column_id) {
         auto col1 = ColumnVector::Make(table_def_->columns()[column_id]->type());
         col1->Initialize();
-        for (SizeT row_id = 0; row_id < datas_.size(); ++row_id) {
+        for (size_t row_id = 0; row_id < datas_.size(); ++row_id) {
             auto &row = datas_[row_id];
             auto &cell = row[column_id];
             col1->AppendByStringView(cell);
@@ -240,7 +240,7 @@ void QueryMatchTest::InsertData(const String &db_name, const String &table_name)
         input_block->InsertVector(col1, column_id);
     }
     input_block->Finalize();
-    Vector<SharedPtr<DataBlock>> input_blocks{input_block};
+    Vector<std::shared_ptr<DataBlock>> input_blocks{input_block};
     txn->Import(db_name, table_name, input_blocks);
 
     Status status = txn_mgr->CommitTxn(txn);
@@ -258,11 +258,11 @@ void QueryMatchTest::QueryMatch(const String &db_name,
     Storage *storage = InfinityContext::instance().storage();
     NewTxnManager *txn_mgr = storage->new_txn_manager();
 
-    auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("query match"), TransactionType::kRead);
+    auto *txn = txn_mgr->BeginTxn(std::make_unique<String>("query match"), TransactionType::kRead);
     auto [table_info, status] = txn->GetTableInfo(db_name, table_name);
     EXPECT_TRUE(status.ok());
 
-    SharedPtr<IndexReader> index_reader;
+    std::shared_ptr<IndexReader> index_reader;
     status = txn->GetFullTextIndexReader(db_name, table_name, index_reader);
     EXPECT_TRUE(status.ok());
 
@@ -271,7 +271,7 @@ void QueryMatchTest::QueryMatch(const String &db_name,
     Vector<String> index_hints;
     const Map<String, String> &column2analyzer = query_builder.GetColumn2Analyzer(index_hints);
 
-    auto match_expr = MakeShared<MatchExpr>();
+    auto match_expr = std::make_shared<MatchExpr>();
     match_expr->fields_ = fields;
     match_expr->matching_text_ = match_text;
 
@@ -280,7 +280,7 @@ void QueryMatchTest::QueryMatch(const String &db_name,
 
     SearchDriver driver(column2analyzer, default_field);
 
-    UniquePtr<QueryNode> query_tree = driver.ParseSingleWithFields(match_expr->fields_, match_expr->matching_text_);
+    std::unique_ptr<QueryNode> query_tree = driver.ParseSingleWithFields(match_expr->fields_, match_expr->matching_text_);
     if (!query_tree) {
         Status status = Status::ParseMatchExprFailed(match_expr->fields_, match_expr->matching_text_);
         RecoverableError(status);
@@ -293,7 +293,7 @@ void QueryMatchTest::QueryMatch(const String &db_name,
                                                  index_hints);
     full_text_query_context.early_term_algo_ = EarlyTermAlgo::kNaive;
     full_text_query_context.query_tree_ = std::move(query_tree);
-    UniquePtr<DocIterator> doc_iterator = query_builder.CreateSearch(full_text_query_context);
+    std::unique_ptr<DocIterator> doc_iterator = query_builder.CreateSearch(full_text_query_context);
 
     RowID iter_row_id = doc_iterator.get() == nullptr ? INVALID_ROWID : (doc_iterator->Next(), doc_iterator->DocID());
     if (iter_row_id == INVALID_ROWID) {

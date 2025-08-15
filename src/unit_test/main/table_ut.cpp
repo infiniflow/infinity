@@ -57,7 +57,7 @@ TEST_F(InfinityTableTest, test1) {
     RemoveDbDirs();
     Infinity::LocalInit(path);
 
-    SharedPtr<Infinity> infinity = Infinity::LocalConnect();
+    std::shared_ptr<Infinity> infinity = Infinity::LocalConnect();
     {
         CreateDatabaseOptions create_db_opts;
         infinity->CreateDatabase("db1", create_db_opts, "");

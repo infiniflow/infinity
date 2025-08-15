@@ -49,11 +49,11 @@ public:
 };
 
 class FastRoughFilterEvaluatorCombineAnd final : public FastRoughFilterEvaluator {
-    UniquePtr<FastRoughFilterEvaluator> left_;
-    UniquePtr<FastRoughFilterEvaluator> right_;
+    std::unique_ptr<FastRoughFilterEvaluator> left_;
+    std::unique_ptr<FastRoughFilterEvaluator> right_;
 
 public:
-    FastRoughFilterEvaluatorCombineAnd(UniquePtr<FastRoughFilterEvaluator> left, UniquePtr<FastRoughFilterEvaluator> right)
+    FastRoughFilterEvaluatorCombineAnd(std::unique_ptr<FastRoughFilterEvaluator> left, std::unique_ptr<FastRoughFilterEvaluator> right)
         : FastRoughFilterEvaluator(FastRoughFilterEvaluatorTag::kCombineAnd), left_(std::move(left)), right_(std::move(right)) {}
     ~FastRoughFilterEvaluatorCombineAnd() override = default;
     bool EvaluateInner(TxnTimeStamp query_ts, const FastRoughFilter &filter) const override {
@@ -62,11 +62,11 @@ public:
 };
 
 class FastRoughFilterEvaluatorCombineOr final : public FastRoughFilterEvaluator {
-    UniquePtr<FastRoughFilterEvaluator> left_;
-    UniquePtr<FastRoughFilterEvaluator> right_;
+    std::unique_ptr<FastRoughFilterEvaluator> left_;
+    std::unique_ptr<FastRoughFilterEvaluator> right_;
 
 public:
-    FastRoughFilterEvaluatorCombineOr(UniquePtr<FastRoughFilterEvaluator> left, UniquePtr<FastRoughFilterEvaluator> right)
+    FastRoughFilterEvaluatorCombineOr(std::unique_ptr<FastRoughFilterEvaluator> left, std::unique_ptr<FastRoughFilterEvaluator> right)
         : FastRoughFilterEvaluator(FastRoughFilterEvaluatorTag::kCombineOr), left_(std::move(left)), right_(std::move(right)) {}
     ~FastRoughFilterEvaluatorCombineOr() override = default;
     bool EvaluateInner(TxnTimeStamp query_ts, const FastRoughFilter &filter) const override {
@@ -123,7 +123,7 @@ struct ExpressionFastRoughFilterInfo {
         kOrExpr,
     };
 
-    ExpressionInfoTree<ExpressionFastRoughFilterInfo> BuildTree(const SharedPtr<BaseExpression> &expression, const u32 depth = 0) const {
+    ExpressionInfoTree<ExpressionFastRoughFilterInfo> BuildTree(const std::shared_ptr<BaseExpression> &expression, const u32 depth = 0) const {
         ExpressionInfoTree<ExpressionFastRoughFilterInfo> tree;
         tree.src_ptr = &expression;
         switch (expression->type()) {
@@ -201,11 +201,11 @@ class FastRoughFilterExpressionPushDownMethod {
     using TreeT = ExpressionInfoTree<ExpressionFastRoughFilterInfo>;
     using Enum = ExpressionFastRoughFilterInfo::Enum;
 
-    static inline UniquePtr<FastRoughFilterEvaluator> ReturnAlwaysTrue() { return MakeUnique<FastRoughFilterEvaluatorTrue>(); }
+    static inline std::unique_ptr<FastRoughFilterEvaluator> ReturnAlwaysTrue() { return std::make_unique<FastRoughFilterEvaluatorTrue>(); }
 
-    static inline UniquePtr<FastRoughFilterEvaluator> ReturnAlwaysFalse() { return MakeUnique<FastRoughFilterEvaluatorFalse>(); }
+    static inline std::unique_ptr<FastRoughFilterEvaluator> ReturnAlwaysFalse() { return std::make_unique<FastRoughFilterEvaluatorFalse>(); }
 
-    static inline UniquePtr<FastRoughFilterEvaluator> ReturnValue(const SharedPtr<BaseExpression> &expression) {
+    static inline std::unique_ptr<FastRoughFilterEvaluator> ReturnValue(const std::shared_ptr<BaseExpression> &expression) {
         auto value = FilterExpressionPushDownHelper::CalcValueResult(expression);
         if (value.type().type() == LogicalType::kBoolean && !value.GetValue<BooleanT>()) {
             return ReturnAlwaysFalse();
@@ -213,7 +213,7 @@ class FastRoughFilterExpressionPushDownMethod {
         return ReturnAlwaysTrue();
     }
 
-    static inline UniquePtr<FastRoughFilterEvaluator> GetFastRoughFilterFromtreeNode(const TreeT &tree_node) {
+    static inline std::unique_ptr<FastRoughFilterEvaluator> GetFastRoughFilterFromtreeNode(const TreeT &tree_node) {
         switch (tree_node.info) {
             case Enum::kUnknownExpr:
             case Enum::kColumnExprOrAfterCast: {
@@ -227,8 +227,8 @@ class FastRoughFilterExpressionPushDownMethod {
                 auto *function_expression = static_cast<FunctionExpression *>(tree_node.src_ptr->get());
                 auto const &f_name = function_expression->ScalarFunctionName();
                 if (f_name == "=") {
-                    auto SolveForExpr1 = [](SharedPtr<BaseExpression> &col_expr,
-                                            SharedPtr<BaseExpression> &val_expr) -> UniquePtr<FastRoughFilterEvaluator> {
+                    auto SolveForExpr1 = [](std::shared_ptr<BaseExpression> &col_expr,
+                                            std::shared_ptr<BaseExpression> &val_expr) -> std::unique_ptr<FastRoughFilterEvaluator> {
                         auto val_right = FilterExpressionPushDownHelper::CalcValueResult(val_expr);
                         auto [column_id, value, compare_type] =
                             FilterExpressionPushDownHelper::UnwindCast(col_expr, std::move(val_right), FilterCompareType::kEqual);
@@ -237,26 +237,26 @@ class FastRoughFilterExpressionPushDownMethod {
                                 switch (value.type().type()) {
                                     case LogicalType::kBoolean:
                                     case LogicalType::kDecimal: {
-                                        return MakeUnique<FastRoughFilterEvaluatorProbabilisticDataFilter>(column_id, std::move(value));
+                                        return std::make_unique<FastRoughFilterEvaluatorProbabilisticDataFilter>(column_id, std::move(value));
                                     }
                                     case LogicalType::kFloat:
                                     case LogicalType::kDouble: {
                                         auto minmax_filter_le =
-                                            MakeUnique<FastRoughFilterEvaluatorMinMaxFilter>(column_id, value, FilterCompareType::kLessEqual);
+                                            std::make_unique<FastRoughFilterEvaluatorMinMaxFilter>(column_id, value, FilterCompareType::kLessEqual);
                                         auto minmax_filter_ge =
-                                            MakeUnique<FastRoughFilterEvaluatorMinMaxFilter>(column_id, value, FilterCompareType::kGreaterEqual);
-                                        return MakeUnique<FastRoughFilterEvaluatorCombineAnd>(std::move(minmax_filter_le),
+                                            std::make_unique<FastRoughFilterEvaluatorMinMaxFilter>(column_id, value, FilterCompareType::kGreaterEqual);
+                                        return std::make_unique<FastRoughFilterEvaluatorCombineAnd>(std::move(minmax_filter_le),
                                                                                               std::move(minmax_filter_ge));
                                     }
                                     default: {
                                         auto minmax_filter_le =
-                                            MakeUnique<FastRoughFilterEvaluatorMinMaxFilter>(column_id, value, FilterCompareType::kLessEqual);
+                                            std::make_unique<FastRoughFilterEvaluatorMinMaxFilter>(column_id, value, FilterCompareType::kLessEqual);
                                         auto minmax_filter_ge =
-                                            MakeUnique<FastRoughFilterEvaluatorMinMaxFilter>(column_id, value, FilterCompareType::kGreaterEqual);
+                                            std::make_unique<FastRoughFilterEvaluatorMinMaxFilter>(column_id, value, FilterCompareType::kGreaterEqual);
                                         auto minmax_filter =
-                                            MakeUnique<FastRoughFilterEvaluatorCombineAnd>(std::move(minmax_filter_le), std::move(minmax_filter_ge));
-                                        auto bloom_filter = MakeUnique<FastRoughFilterEvaluatorProbabilisticDataFilter>(column_id, std::move(value));
-                                        return MakeUnique<FastRoughFilterEvaluatorCombineAnd>(std::move(bloom_filter), std::move(minmax_filter));
+                                            std::make_unique<FastRoughFilterEvaluatorCombineAnd>(std::move(minmax_filter_le), std::move(minmax_filter_ge));
+                                        auto bloom_filter = std::make_unique<FastRoughFilterEvaluatorProbabilisticDataFilter>(column_id, std::move(value));
+                                        return std::make_unique<FastRoughFilterEvaluatorCombineAnd>(std::move(bloom_filter), std::move(minmax_filter));
                                     }
                                 }
                             }
@@ -298,16 +298,16 @@ class FastRoughFilterExpressionPushDownMethod {
                                                               FilterCompareType::kLessEqual};
                 if (auto it = std::find(Case2FunctionNames.begin(), Case2FunctionNames.end(), f_name); it != Case2FunctionNames.end()) {
                     // maybe known expression 2
-                    auto SolveForExpr2 = [](SharedPtr<BaseExpression> &col_expr,
-                                            SharedPtr<BaseExpression> &val_expr,
-                                            FilterCompareType initial_compare_type) -> UniquePtr<FastRoughFilterEvaluator> {
+                    auto SolveForExpr2 = [](std::shared_ptr<BaseExpression> &col_expr,
+                                            std::shared_ptr<BaseExpression> &val_expr,
+                                            FilterCompareType initial_compare_type) -> std::unique_ptr<FastRoughFilterEvaluator> {
                         auto val_right = FilterExpressionPushDownHelper::CalcValueResult(val_expr);
                         auto [column_id, value, compare_type] =
                             FilterExpressionPushDownHelper::UnwindCast(col_expr, std::move(val_right), initial_compare_type);
                         switch (compare_type) {
                             case FilterCompareType::kLessEqual:
                             case FilterCompareType::kGreaterEqual: {
-                                return MakeUnique<FastRoughFilterEvaluatorMinMaxFilter>(column_id, std::move(value), compare_type);
+                                return std::make_unique<FastRoughFilterEvaluatorMinMaxFilter>(column_id, std::move(value), compare_type);
                             }
                             case FilterCompareType::kInvalid: // special cast expression, e.g., cast varchar column to int and compare with int
                             case FilterCompareType::kAlwaysTrue: {
@@ -344,7 +344,7 @@ class FastRoughFilterExpressionPushDownMethod {
                 return {};
             }
             case Enum::kAndExpr: {
-                std::vector<UniquePtr<FastRoughFilterEvaluator>> children;
+                std::vector<std::unique_ptr<FastRoughFilterEvaluator>> children;
                 for (const auto &child : tree_node.children) {
                     auto child_filter = GetFastRoughFilterFromtreeNode(child);
                     if (child_filter->Tag() == FastRoughFilterEvaluatorTag::kAlwaysFalse) {
@@ -361,13 +361,13 @@ class FastRoughFilterExpressionPushDownMethod {
                     return std::move(children[0]);
                 }
                 if (children.size() == 2) {
-                    return MakeUnique<FastRoughFilterEvaluatorCombineAnd>(std::move(children[0]), std::move(children[1]));
+                    return std::make_unique<FastRoughFilterEvaluatorCombineAnd>(std::move(children[0]), std::move(children[1]));
                 }
                 UnrecoverableError("Wrong number of children in AND expression!");
                 return {};
             }
             case Enum::kOrExpr: {
-                std::vector<UniquePtr<FastRoughFilterEvaluator>> children;
+                std::vector<std::unique_ptr<FastRoughFilterEvaluator>> children;
                 for (const auto &child : tree_node.children) {
                     auto child_filter = GetFastRoughFilterFromtreeNode(child);
                     if (child_filter->Tag() == FastRoughFilterEvaluatorTag::kAlwaysTrue) {
@@ -384,7 +384,7 @@ class FastRoughFilterExpressionPushDownMethod {
                     return std::move(children[0]);
                 }
                 if (children.size() == 2) {
-                    return MakeUnique<FastRoughFilterEvaluatorCombineOr>(std::move(children[0]), std::move(children[1]));
+                    return std::make_unique<FastRoughFilterEvaluatorCombineOr>(std::move(children[0]), std::move(children[1]));
                 }
                 UnrecoverableError("Wrong number of children in OR expression!");
                 return {};
@@ -393,7 +393,7 @@ class FastRoughFilterExpressionPushDownMethod {
     }
 
 public:
-    static inline UniquePtr<FastRoughFilterEvaluator> GetFastRoughFilter(SharedPtr<BaseExpression> &expression) {
+    static inline std::unique_ptr<FastRoughFilterEvaluator> GetFastRoughFilter(std::shared_ptr<BaseExpression> &expression) {
         if (!expression) {
             return ReturnAlwaysTrue();
         }
@@ -411,7 +411,7 @@ public:
     }
 };
 
-UniquePtr<FastRoughFilterEvaluator> FilterExpressionPushDown::PushDownToFastRoughFilter(SharedPtr<BaseExpression> &expression) {
+std::unique_ptr<FastRoughFilterEvaluator> FilterExpressionPushDown::PushDownToFastRoughFilter(std::shared_ptr<BaseExpression> &expression) {
     return FastRoughFilterExpressionPushDownMethod::GetFastRoughFilter(expression);
 }
 

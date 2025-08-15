@@ -64,26 +64,26 @@ template <FastPForCodec Codec>
 FastPForWrapper<Codec>::~FastPForWrapper() = default;
 
 template <FastPForCodec Codec>
-u32 FastPForWrapper<Codec>::Compress(const u32 *src, u32 count, u32 *dest, SizeT &outsize) const {
+u32 FastPForWrapper<Codec>::Compress(const u32 *src, u32 count, u32 *dest, size_t &outsize) const {
     auto &codec = this->impl_->codec;
     codec.encodeArray(src, count, dest, reinterpret_cast<size_t &>(outsize));
     return outsize;
 }
 // -------------------------------------------------------------------------------------
 template <FastPForCodec Codec>
-const u32 *FastPForWrapper<Codec>::Decompress(const u32 *src, u32 count, u32 *dest, SizeT &outsize) const {
+const u32 *FastPForWrapper<Codec>::Decompress(const u32 *src, u32 count, u32 *dest, size_t &outsize) const {
     auto &codec = this->impl_->codec;
     return codec.decodeArray(src, count, dest, reinterpret_cast<size_t &>(outsize));
 }
 
 template <FastPForCodec Codec>
-void FastPForWrapper<Codec>::ApplyDelta(u32 *src, SizeT count) {
+void FastPForWrapper<Codec>::ApplyDelta(u32 *src, size_t count) {
     using namespace FastPForLib;
     FastPForLib::Delta::deltaSIMD(src, count);
 }
 
 template <FastPForCodec Codec>
-void FastPForWrapper<Codec>::RevertDelta(u32 *src, SizeT count) {
+void FastPForWrapper<Codec>::RevertDelta(u32 *src, size_t count) {
     using namespace FastPForLib;
     FastPForLib::Delta::inverseDeltaSIMD(src, count);
 }

@@ -42,10 +42,10 @@ import logical_type;
 namespace infinity {
 
 void PhysicalCheck::Init(QueryContext *query_context) {
-    auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
+    auto varchar_type = std::make_shared<DataType>(LogicalType::kVarchar);
 
-    output_names_ = MakeShared<Vector<String>>();
-    output_types_ = MakeShared<Vector<SharedPtr<DataType>>>();
+    output_names_ = std::make_shared<std::vector<std::string>>();
+    output_types_ = std::make_shared<std::vector<std::shared_ptr<DataType>>>();
 
     switch (check_type_) {
         case CheckStmtType::kSystem: {
@@ -93,20 +93,20 @@ bool PhysicalCheck::Execute(QueryContext *query_context, OperatorState *operator
 
 void PhysicalCheck::ExecuteCheckSystem(QueryContext *query_context, CheckOperatorState *check_operator_state) {
     // Define output database detailed info
-    auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
+    auto varchar_type = std::make_shared<DataType>(LogicalType::kVarchar);
 
     auto *new_catalog = query_context->storage()->new_catalog();
     auto meta_tree_ptr = new_catalog->MakeMetaTree();
 
-    auto data_mismatch_entries = meta_tree_ptr->CheckMetaDataMapping(CheckStmtType::kSystem, None);
+    auto data_mismatch_entries = meta_tree_ptr->CheckMetaDataMapping(CheckStmtType::kSystem, std::nullopt);
 
     // Prepare the output data block
-    UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
-    Vector<SharedPtr<DataType>> column_types{varchar_type};
+    std::unique_ptr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
+    std::vector<std::shared_ptr<DataType>> column_types{varchar_type};
 
     output_block_ptr->Init(column_types);
 
-    SizeT row_count = 0;
+    size_t row_count = 0;
     for (const auto &data_mismatch_entry : data_mismatch_entries) {
         if (row_count == output_block_ptr->capacity()) {
             output_block_ptr->Finalize();
@@ -126,7 +126,7 @@ void PhysicalCheck::ExecuteCheckSystem(QueryContext *query_context, CheckOperato
 
 void PhysicalCheck::ExecuteCheckTable(QueryContext *query_context, CheckOperatorState *check_operator_state) {
     // Define output database detailed info
-    auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
+    auto varchar_type = std::make_shared<DataType>(LogicalType::kVarchar);
 
     auto *new_catalog = query_context->storage()->new_catalog();
     auto meta_tree_ptr = new_catalog->MakeMetaTree();
@@ -138,7 +138,7 @@ void PhysicalCheck::ExecuteCheckTable(QueryContext *query_context, CheckOperator
     //     schema_name = "default_db";
     // }
 
-    Optional<DBMeeta> db_meta;
+    std::optional<DBMeeta> db_meta;
     TxnTimeStamp db_create_ts;
     Status status = new_txn->GetDBMeta(schema_name, db_meta, db_create_ts);
 
@@ -150,11 +150,11 @@ void PhysicalCheck::ExecuteCheckTable(QueryContext *query_context, CheckOperator
         output_names_->emplace_back("check_fail_message");
         output_types_->emplace_back(varchar_type);
 
-        UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
-        Vector<SharedPtr<DataType>> column_types{varchar_type};
+        std::unique_ptr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
+        std::vector<std::shared_ptr<DataType>> column_types{varchar_type};
 
         output_block_ptr->Init(column_types);
-        String message;
+        std::string message;
         if (status.code() == ErrorCode::kDBNotExist) {
             message = fmt::format("Database: {} is not exists", schema_name);
         } else {
@@ -169,8 +169,8 @@ void PhysicalCheck::ExecuteCheckTable(QueryContext *query_context, CheckOperator
     }
 
     auto db_id_str = db_meta->db_id_str();
-    String table_id_str;
-    String table_key;
+    std::string table_id_str;
+    std::string table_key;
     TxnTimeStamp create_table_ts;
     status = db_meta->GetTableID(table_name, table_key, table_id_str, create_table_ts);
 
@@ -182,11 +182,11 @@ void PhysicalCheck::ExecuteCheckTable(QueryContext *query_context, CheckOperator
         output_names_->emplace_back("check_fail_message");
         output_types_->emplace_back(varchar_type);
 
-        UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
-        Vector<SharedPtr<DataType>> column_types{varchar_type};
+        std::unique_ptr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
+        std::vector<std::shared_ptr<DataType>> column_types{varchar_type};
 
         output_block_ptr->Init(column_types);
-        String message;
+        std::string message;
         if (status.code() == ErrorCode::kTableNotExist) {
             message = fmt::format("Table: {}.{} is not exists", schema_name, table_name);
         } else {
@@ -204,8 +204,8 @@ void PhysicalCheck::ExecuteCheckTable(QueryContext *query_context, CheckOperator
     auto data_mismatch_entries = meta_tree_ptr->CheckMetaDataMapping(CheckStmtType::kTable, db_table_str);
 
     // Prepare the output data block
-    UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
-    Vector<SharedPtr<DataType>> column_types{varchar_type};
+    std::unique_ptr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
+    std::vector<std::shared_ptr<DataType>> column_types{varchar_type};
 
     output_block_ptr->Init(column_types);
 

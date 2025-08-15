@@ -29,7 +29,7 @@ namespace infinity {
 
 void RewriteCorrelatedExpressions::VisitNode(LogicalNode &op) { VisitNodeExpression(op); }
 
-SharedPtr<BaseExpression> RewriteCorrelatedExpressions::VisitReplace(const SharedPtr<ColumnExpression> &expression) {
+std::shared_ptr<BaseExpression> RewriteCorrelatedExpressions::VisitReplace(const std::shared_ptr<ColumnExpression> &expression) {
     if (expression->depth() == 0) {
         return expression;
     }
@@ -50,7 +50,7 @@ SharedPtr<BaseExpression> RewriteCorrelatedExpressions::VisitReplace(const Share
     return expression;
 }
 
-SharedPtr<BaseExpression> RewriteCorrelatedExpressions::VisitReplace(const SharedPtr<SubqueryExpression> &expression) {
+std::shared_ptr<BaseExpression> RewriteCorrelatedExpressions::VisitReplace(const std::shared_ptr<SubqueryExpression> &expression) {
     if (expression->correlated_columns.empty()) {
         // Not correlated
         return nullptr;

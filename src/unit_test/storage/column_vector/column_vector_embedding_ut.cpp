@@ -67,7 +67,7 @@ TEST_F(ColumnVectorEmbeddingTest, flat_embedding) {
     using namespace infinity;
 
     auto embedding_info = EmbeddingInfo::Make(EmbeddingDataType::kElemFloat, 16);
-    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kEmbedding, embedding_info);
+    std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kEmbedding, embedding_info);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
@@ -179,7 +179,7 @@ TEST_F(ColumnVectorEmbeddingTest, contant_embedding) {
     using namespace infinity;
 
     auto embedding_info = EmbeddingInfo::Make(EmbeddingDataType::kElemFloat, 16);
-    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kEmbedding, embedding_info);
+    std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kEmbedding, embedding_info);
     ColumnVector column_vector(data_type);
 
     column_vector.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
@@ -258,7 +258,7 @@ TEST_F(ColumnVectorEmbeddingTest, embedding_column_vector_select) {
     using namespace infinity;
 
     auto embedding_info = EmbeddingInfo::Make(EmbeddingDataType::kElemFloat, 16);
-    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kEmbedding, embedding_info);
+    std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kEmbedding, embedding_info);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
@@ -282,7 +282,7 @@ TEST_F(ColumnVectorEmbeddingTest, embedding_column_vector_select) {
 
     Selection input_select;
     input_select.Initialize(DEFAULT_VECTOR_SIZE / 2);
-    for (SizeT idx = 0; idx < DEFAULT_VECTOR_SIZE / 2; ++idx) {
+    for (size_t idx = 0; idx < DEFAULT_VECTOR_SIZE / 2; ++idx) {
         input_select.Append(idx * 2);
     }
 
@@ -304,7 +304,7 @@ TEST_F(ColumnVectorEmbeddingTest, embedding_column_slice_init) {
     using namespace infinity;
 
     auto embedding_info = EmbeddingInfo::Make(EmbeddingDataType::kElemFloat, 16);
-    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kEmbedding, embedding_info);
+    std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kEmbedding, embedding_info);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 

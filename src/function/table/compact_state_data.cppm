@@ -30,10 +30,10 @@ namespace infinity {
 struct BlockIndex;
 
 export class RowIDRemap {
-    using RowIDMap = HashMap<GlobalBlockID, Map<BlockOffset, RowID>, GlobalBlockIDHash>;
+    using RowIDMap = std::unordered_map<GlobalBlockID, std::map<BlockOffset, RowID>, GlobalBlockIDHash>;
 
 public:
-    RowIDRemap(SizeT block_capacity = DEFAULT_BLOCK_CAPACITY) : block_capacity_(block_capacity) {}
+    RowIDRemap(size_t block_capacity = DEFAULT_BLOCK_CAPACITY) : block_capacity_(block_capacity) {}
 
     void AddMap(SegmentID segment_id, BlockID block_id, BlockOffset block_offset, RowID new_row_id);
 
@@ -45,28 +45,28 @@ public:
 
 private:
     std::mutex mutex_;
-    const SizeT block_capacity_;
+    const size_t block_capacity_;
 
     RowIDMap row_id_map_;
 };
 
 export class CompactSegmentData {
 public:
-    // SharedPtr<SegmentEntry> new_segment_{};
-    // Vector<SegmentEntry *> old_segments_{};
+    // std::shared_ptr<SegmentEntry> new_segment_{};
+    // std::vector<SegmentEntry *> old_segments_{};
 };
 
 export class CompactStateData {
 public:
-    CompactStateData(SharedPtr<TableInfo> table_info);
+    CompactStateData(std::shared_ptr<TableInfo> table_info);
 
-    void AddToDelete(TxnTimeStamp commit_ts, SegmentID segment_id, Vector<SegmentOffset> delete_offsets);
+    void AddToDelete(TxnTimeStamp commit_ts, SegmentID segment_id, std::vector<SegmentOffset> delete_offsets);
 
-    Vector<Pair<SegmentID, Vector<SegmentOffset>>> GetToDelete() const;
+    std::vector<std::pair<SegmentID, std::vector<SegmentOffset>>> GetToDelete() const;
 
     BaseTableRef *GetNewTableRef() const { return new_table_ref_.get(); }
 
-    // Map<SegmentID, SegmentIndexEntry *> GetSegmentIndexEntries(const String &index_name);
+    // std::map<SegmentID, SegmentIndexEntry *> GetSegmentIndexEntries(const std::string &index_name);
 
     void SetScanTS(TxnTimeStamp scan_ts) {
         std::lock_guard lock(mutex_);
@@ -74,16 +74,16 @@ public:
     }
 
 public:
-    Vector<CompactSegmentData> segment_data_list_;
+    std::vector<CompactSegmentData> segment_data_list_;
     RowIDRemap remapper_{};
     TxnTimeStamp scan_ts_ = UNCOMMIT_TS; // ts when compact get the visible range
 
 private:
     std::mutex mutex_;
-    Vector<Tuple<TxnTimeStamp, SegmentID, Vector<SegmentOffset>>> to_delete_;
+    std::vector<std::tuple<TxnTimeStamp, SegmentID, std::vector<SegmentOffset>>> to_delete_;
 
     std::mutex mutex2_;
-    SharedPtr<BaseTableRef> new_table_ref_{}; // table ref after compact
+    std::shared_ptr<BaseTableRef> new_table_ref_{}; // table ref after compact
 };
 
 } // namespace infinity

@@ -39,14 +39,14 @@ struct NotFunction {
         } else if constexpr (std::is_same_v<std::remove_cv_t<TA>, BooleanT> && std::is_same_v<std::remove_cv_t<TB>, BooleanT>) {
             result = !input;
         } else {
-            String error_message = "NOT function accepts only u8 and BooleanT.";
+            std::string error_message = "NOT function accepts only u8 and BooleanT.";
             UnrecoverableError(error_message);
         }
     }
 };
 
-static void GenerateNotFunction(SharedPtr<ScalarFunctionSet> &function_set_ptr) {
-    String func_name = "NOT";
+static void GenerateNotFunction(std::shared_ptr<ScalarFunctionSet> &function_set_ptr) {
+    std::string func_name = "NOT";
 
     ScalarFunction not_function(func_name,
                                 {DataType(LogicalType::kBoolean)},
@@ -56,9 +56,9 @@ static void GenerateNotFunction(SharedPtr<ScalarFunctionSet> &function_set_ptr) 
 }
 
 void RegisterNotFunction(NewCatalog *catalog_ptr) {
-    String func_name = "NOT";
+    std::string func_name = "NOT";
 
-    SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
+    std::shared_ptr<ScalarFunctionSet> function_set_ptr = std::make_shared<ScalarFunctionSet>(func_name);
 
     GenerateNotFunction(function_set_ptr);
 

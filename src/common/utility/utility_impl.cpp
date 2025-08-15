@@ -27,7 +27,7 @@ import third_party;
 
 namespace infinity::Utility {
 
-SizeT NextPowerOfTwo(SizeT input) {
+size_t NextPowerOfTwo(size_t input) {
     --input;
     input |= input >> 1;
     input |= input >> 2;
@@ -38,7 +38,7 @@ SizeT NextPowerOfTwo(SizeT input) {
     return ++input;
 }
 
-String FormatByteSize(u64 byte_size) {
+std::string FormatByteSize(u64 byte_size) {
     static const char *sizeSuffixes[] = {"B", "KB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB"};
 
     if (byte_size == 0) {
@@ -53,7 +53,7 @@ String FormatByteSize(u64 byte_size) {
     return oss.str();
 }
 
-String FormatTimeInfo(u64 seconds) {
+std::string FormatTimeInfo(u64 seconds) {
     u64 second = seconds % 60;
     seconds -= second;
     if (seconds == 0) {
@@ -75,7 +75,7 @@ String FormatTimeInfo(u64 seconds) {
 
 namespace infinity {
 
-IdentifierValidationStatus IdentifierValidation(const String &identifier) {
+IdentifierValidationStatus IdentifierValidation(const std::string &identifier) {
     if (identifier.empty()) {
         return IdentifierValidationStatus::kEmpty;
     }
@@ -88,7 +88,7 @@ IdentifierValidationStatus IdentifierValidation(const String &identifier) {
     if (!std::isalpha(identifier[0]) && identifier[0] != '_') {
         return IdentifierValidationStatus::kInvalidName;
     }
-    for (SizeT i = 1; i < identifier_len; i++) {
+    for (size_t i = 1; i < identifier_len; i++) {
         char ch = identifier[i];
         if (!std::isalnum(ch) && ch != '_') {
             return IdentifierValidationStatus::kInvalidName;
@@ -98,7 +98,7 @@ IdentifierValidationStatus IdentifierValidation(const String &identifier) {
     return IdentifierValidationStatus::kOk;
 }
 
-bool ParseIPPort(const String &str, String &ip, i64 &port) {
+bool ParseIPPort(const std::string &str, std::string &ip, i64 &port) {
     static const std::regex pattern("^(\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}):(\\d{1,5})$");
     std::smatch matches;
 
@@ -115,17 +115,17 @@ bool ParseIPPort(const String &str, String &ip, i64 &port) {
     }
 }
 
-String StringTransform(const String &source, const String &from, const String &to) {
-    String ret(source);
+std::string StringTransform(const std::string &source, const std::string &from, const std::string &to) {
+    std::string ret(source);
     size_t start_pos = 0;
-    while ((start_pos = ret.find(from, start_pos)) != String::npos) {
+    while ((start_pos = ret.find(from, start_pos)) != std::string::npos) {
         ret.replace(start_pos, from.length(), to);
         start_pos += to.length();
     }
     return ret;
 }
 
-String CalcMD5(const char *input_str, SizeT length) {
+std::string CalcMD5(const char *input_str, size_t length) {
     MD5_CTX ctx;
     MD5_Init(&ctx);
     MD5_Update(&ctx, input_str, length);
@@ -141,7 +141,7 @@ String CalcMD5(const char *input_str, SizeT length) {
     return hex_stream.str();
 }
 
-String CalcMD5(const String &input_file) {
+std::string CalcMD5(const std::string &input_file) {
     std::ifstream input(input_file, std::ios::binary);
     input.seekg(0, input.end);
     size_t raw_file_size = input.tellg();
@@ -149,14 +149,14 @@ String CalcMD5(const String &input_file) {
     std::vector<char> raw_data(raw_file_size);
     input.read(raw_data.data(), raw_file_size);
     input.close();
-    String md5 = CalcMD5(raw_data.data(), raw_file_size);
+    std::string md5 = CalcMD5(raw_data.data(), raw_file_size);
     return md5;
 }
 
-Tuple<u64, bool> ExtractU64FromStringSuffix(const String &src, SizeT offset) {
-    SizeT len = src.size();
-    SizeT res = 0;
-    for (SizeT i = offset; i < len; ++i) {
+std::tuple<u64, bool> ExtractU64FromStringSuffix(const std::string &src, size_t offset) {
+    size_t len = src.size();
+    size_t res = 0;
+    for (size_t i = offset; i < len; ++i) {
         char ch = src[i];
         if (std::isalnum(ch)) {
             res = res * 10 + (ch - '0');
@@ -167,9 +167,9 @@ Tuple<u64, bool> ExtractU64FromStringSuffix(const String &src, SizeT offset) {
     return {res, true};
 }
 
-Vector<String> Partition(const String &text, char delimiter) {
-    Vector<String> parts;
-    String tmp_str;
+std::vector<std::string> Partition(const std::string &text, char delimiter) {
+    std::vector<std::string> parts;
+    std::string tmp_str;
     for (auto c : text) {
         if (c == delimiter) {
             parts.emplace_back(tmp_str);
@@ -182,8 +182,8 @@ Vector<String> Partition(const String &text, char delimiter) {
     return parts;
 }
 
-String Concat(const Vector<String> &v, char delimiter) {
-    String ret;
+std::string Concat(const std::vector<std::string> &v, char delimiter) {
+    std::string ret;
     for (const auto &s : v) {
         ret += (s + delimiter);
     }

@@ -66,7 +66,7 @@ TEST_P(PostingWriterTest, test1) {
     Vector<docid_t> expected = {1, 3, 5, 7, 9};
     VectorWithLock<u32> column_length_array(20, 10);
     {
-        SharedPtr<PostingWriter> posting = MakeShared<PostingWriter>(posting_format_, column_length_array);
+        std::shared_ptr<PostingWriter> posting = std::make_shared<PostingWriter>(posting_format_, column_length_array);
 
         for (u32 i = 0; i < expected.size(); ++i) {
             posting->AddPosition(1);
@@ -75,14 +75,14 @@ TEST_P(PostingWriterTest, test1) {
             posting->EndDocument(expected[i], 0);
         }
 
-        SharedPtr<FileWriter> file_writer = MakeShared<FileWriter>(file_, 128000);
+        std::shared_ptr<FileWriter> file_writer = std::make_shared<FileWriter>(file_, 128000);
         TermMeta term_meta(posting->GetDF(), posting->GetTotalTF());
         posting->Dump(file_writer, term_meta, true);
         file_writer->Sync();
     }
     {
-        SharedPtr<PostingWriter> posting = MakeShared<PostingWriter>(posting_format_, column_length_array);
-        SharedPtr<FileReader> file_reader = MakeShared<FileReader>(file_, 128000);
+        std::shared_ptr<PostingWriter> posting = std::make_shared<PostingWriter>(posting_format_, column_length_array);
+        std::shared_ptr<FileReader> file_reader = std::make_shared<FileReader>(file_, 128000);
         posting->Load(file_reader);
 
         docid_t docid = 10;
@@ -93,7 +93,7 @@ TEST_P(PostingWriterTest, test1) {
             posting->EndDocument(docid, 0);
         }
 
-        SharedPtr<Vector<SegmentPosting>> seg_postings = MakeShared<Vector<SegmentPosting>>();
+        std::shared_ptr<Vector<SegmentPosting>> seg_postings = std::make_shared<Vector<SegmentPosting>>();
         SegmentPosting seg_posting;
         RowID base_row_id = 0;
         seg_posting.Init(base_row_id, posting);
@@ -102,7 +102,7 @@ TEST_P(PostingWriterTest, test1) {
         iter.Init(seg_postings, 0);
 
         RowID doc_id = INVALID_ROWID;
-        for (SizeT j = 0; j < expected.size(); ++j) {
+        for (size_t j = 0; j < expected.size(); ++j) {
             doc_id = iter.SeekDoc(expected[j]);
             ASSERT_EQ(doc_id, expected[j]);
             u32 tf = iter.GetCurrentTF();

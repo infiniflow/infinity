@@ -28,11 +28,11 @@ namespace infinity {
 
 export class AggregateExpression : public BaseExpression {
 public:
-    explicit AggregateExpression(AggregateFunction aggregate_function, Vector<SharedPtr<BaseExpression>> arguments);
+    explicit AggregateExpression(AggregateFunction aggregate_function, std::vector<std::shared_ptr<BaseExpression>> arguments);
 
     DataType Type() const override;
 
-    [[nodiscard]] String ToString() const override;
+    [[nodiscard]] std::string ToString() const override;
 
     bool IsCountStar() const;
 

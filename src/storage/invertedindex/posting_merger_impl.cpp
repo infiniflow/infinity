@@ -118,12 +118,12 @@ bool DocMerger::HasNext() {
 class PostingDumper {
 public:
     PostingDumper(const PostingFormat &posting_format, VectorWithLock<u32> &column_length_array) : column_lengths_(column_length_array) {
-        posting_writer_ = MakeShared<PostingWriter>(posting_format, column_lengths_);
+        posting_writer_ = std::make_shared<PostingWriter>(posting_format, column_lengths_);
     }
 
     ~PostingDumper() {}
 
-    void Dump(const String &term);
+    void Dump(const std::string &term);
 
     void EndSegment() { posting_writer_->EndSegment(); }
 
@@ -133,10 +133,10 @@ public:
 
     u64 GetPostingLength() const { return posting_writer_->GetDumpLength(); }
 
-    SharedPtr<PostingWriter> GetPostingWriter() { return posting_writer_; }
+    std::shared_ptr<PostingWriter> GetPostingWriter() { return posting_writer_; }
 
 private:
-    SharedPtr<PostingWriter> posting_writer_;
+    std::shared_ptr<PostingWriter> posting_writer_;
     // for column length info
     VectorWithLock<u32> &column_lengths_;
 };
@@ -155,12 +155,12 @@ public:
         return ret;
     }
 
-    void Merge(const SharedPtr<PostingDumper> &pos_dumper) {
+    void Merge(const std::shared_ptr<PostingDumper> &pos_dumper) {
         if (current_doc_id_ == INVALID_DOCID) {
             doc_merger_.Merge(INVALID_DOCID, nullptr);
             return;
         }
-        SharedPtr<PostingWriter> posting_writer = pos_dumper->GetPostingWriter();
+        std::shared_ptr<PostingWriter> posting_writer = pos_dumper->GetPostingWriter();
         doc_merger_.Merge(base_doc_id_ + current_doc_id_, posting_writer.get());
     }
 
@@ -173,12 +173,12 @@ private:
 
 PostingMerger::PostingMerger(optionflag_t flag, VectorWithLock<u32> &column_length_array)
     : posting_format_(PostingFormatOption(flag)), column_lengths_(column_length_array) {
-    posting_dumper_ = MakeShared<PostingDumper>(posting_format_, column_lengths_);
+    posting_dumper_ = std::make_shared<PostingDumper>(posting_format_, column_lengths_);
 }
 
 PostingMerger::~PostingMerger() {}
 
-void PostingMerger::Merge(const Vector<SegmentTermPosting *> &segment_term_postings, const RowID &merge_base_rowid) {
+void PostingMerger::Merge(const std::vector<SegmentTermPosting *> &segment_term_postings, const RowID &merge_base_rowid) {
     // segment_term_postings is already sorted by base_row_id
     for (u32 i = 0; i < segment_term_postings.size(); ++i) {
         SegmentTermPosting *term_posting = segment_term_postings[i];
@@ -194,7 +194,7 @@ void PostingMerger::Merge(const Vector<SegmentTermPosting *> &segment_term_posti
     posting_dumper_->EndSegment();
 }
 
-void PostingMerger::Dump(const SharedPtr<FileWriter> &file_writer, TermMeta &term_meta) {
+void PostingMerger::Dump(const std::shared_ptr<FileWriter> &file_writer, TermMeta &term_meta) {
     posting_dumper_->GetPostingWriter()->Dump(file_writer, term_meta);
 }
 

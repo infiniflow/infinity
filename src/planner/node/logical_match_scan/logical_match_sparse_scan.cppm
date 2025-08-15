@@ -34,10 +34,10 @@ namespace infinity {
 
 export class LogicalMatchSparseScan final : public LogicalMatchScanBase {
 public:
-    explicit LogicalMatchSparseScan(u64 node_id, SharedPtr<BaseTableRef> base_table_ref, SharedPtr<MatchSparseExpression> match_sparse_expr)
+    explicit LogicalMatchSparseScan(u64 node_id, std::shared_ptr<BaseTableRef> base_table_ref, std::shared_ptr<MatchSparseExpression> match_sparse_expr)
         : LogicalMatchScanBase(node_id, LogicalNodeType::kMatchSparseScan, base_table_ref, match_sparse_expr) {}
 
-    String name() override { return "LogicalMatchSparseScan"; }
+    std::string name() override { return "LogicalMatchSparseScan"; }
 
 public:
 };

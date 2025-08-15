@@ -38,7 +38,7 @@ void BindingRemapper::VisitNode(LogicalNode &op) {
 
         if (load_metas.get() != nullptr) {
             column_cnt_ += load_metas->size();
-            for (SizeT i = 0; i < load_metas->size(); ++i) {
+            for (size_t i = 0; i < load_metas->size(); ++i) {
                 auto &load_meta = (*load_metas)[i];
                 // fix index_ value (will be used in PhysicalOperator::InputLoad), now always append to the end
                 load_meta.index_ = bindings_.size();
@@ -85,7 +85,7 @@ void BindingRemapper::VisitNode(LogicalNode &op) {
     }
 }
 
-SharedPtr<BaseExpression> BindingRemapper::VisitReplace(const SharedPtr<ColumnExpression> &expression) {
+std::shared_ptr<BaseExpression> BindingRemapper::VisitReplace(const std::shared_ptr<ColumnExpression> &expression) {
     auto special = expression->special();
     if (special.has_value()) {
         switch (special.value()) {
@@ -124,8 +124,8 @@ SharedPtr<BaseExpression> BindingRemapper::VisitReplace(const SharedPtr<ColumnEx
         }
     }
 
-    SizeT binding_count = bindings_.size();
-    for (SizeT idx = 0; idx < binding_count; ++idx) {
+    size_t binding_count = bindings_.size();
+    for (size_t idx = 0; idx < binding_count; ++idx) {
         if (expression->binding() == bindings_[idx]) {
             return ReferenceExpression::Make(expression->Type(), expression->table_name(), expression->column_name(), expression->alias_, idx);
         }

@@ -28,13 +28,13 @@ namespace infinity {
 
 export template <typename T>
 struct ExpressionInfoTree {
-    const SharedPtr<BaseExpression> *src_ptr = nullptr;
-    Vector<ExpressionInfoTree> children{};
+    const std::shared_ptr<BaseExpression> *src_ptr = nullptr;
+    std::vector<ExpressionInfoTree> children{};
     typename T::Enum info = T::Enum::kUnknownExpr;
 };
 
 export template <typename T>
-void CommonCheckCast(const T *src_info, ExpressionInfoTree<T> &tree, const SharedPtr<BaseExpression> &cast_expression, const u32 depth) {
+void CommonCheckCast(const T *src_info, ExpressionInfoTree<T> &tree, const std::shared_ptr<BaseExpression> &cast_expression, const u32 depth) {
     // check cast
     if (cast_expression->arguments().size() != 1) {
         UnrecoverableError(fmt::format("Expression depth: {}. Unsupported expression type: the cast expression {} has more than 1 argument.",

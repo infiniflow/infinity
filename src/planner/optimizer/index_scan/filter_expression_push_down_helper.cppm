@@ -28,10 +28,10 @@ export enum class FilterCompareType : i8 { kEqual, kLess, kLessEqual, kGreater, 
 
 export class FilterExpressionPushDownHelper {
 public:
-    static Value CalcValueResult(const SharedPtr<BaseExpression> &expression);
+    static Value CalcValueResult(const std::shared_ptr<BaseExpression> &expression);
 
-    static Tuple<ColumnID, Value, FilterCompareType>
-    UnwindCast(const SharedPtr<BaseExpression> &cast_expr, Value &&right_val, FilterCompareType compare_type);
+    static std::tuple<ColumnID, Value, FilterCompareType>
+    UnwindCast(const std::shared_ptr<BaseExpression> &cast_expr, Value &&right_val, FilterCompareType compare_type);
 };
 
 } // namespace infinity

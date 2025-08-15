@@ -11,11 +11,11 @@ namespace infinity {
 // Now only used for ColumnInverter
 // ColumnInverter will use BufWriter sequentially write data and use spill_file pointer randomly write data
 export struct BufWriter {
-    BufWriter(FILE *spill_file, SizeT spill_buf_size) : spill_file_(spill_file), spill_buf_size_(spill_buf_size) {
-        spill_buffer_ = MakeUnique<char_t[]>(spill_buf_size_);
+    BufWriter(FILE *spill_file, size_t spill_buf_size) : spill_file_(spill_file), spill_buf_size_(spill_buf_size) {
+        spill_buffer_ = std::make_unique<char_t[]>(spill_buf_size_);
     }
 
-    void Write(const char *data, SizeT data_size) {
+    void Write(const char *data, size_t data_size) {
         if (spill_buf_idx_ + data_size > spill_buf_size_) {
             Flush();
         }
@@ -30,11 +30,11 @@ export struct BufWriter {
         }
     }
 
-    SizeT Tell() { return ftell(spill_file_); }
+    size_t Tell() { return ftell(spill_file_); }
 
     FILE *spill_file_{nullptr};
-    SizeT spill_buf_idx_{0};
-    UniquePtr<char_t[]> spill_buffer_{};
-    SizeT spill_buf_size_{0};
+    size_t spill_buf_idx_{0};
+    std::unique_ptr<char_t[]> spill_buffer_{};
+    size_t spill_buf_size_{0};
 };
 } // namespace infinity

@@ -220,7 +220,7 @@ inline void RewriteCompareT(TIME &right_val_time, FilterCompareType &compare_typ
 }
 
 template <typename Varchar>
-    requires IsAnyOf<Varchar, String>
+    requires IsAnyOf<Varchar, std::string>
 inline void RewriteCompareT(Varchar &right_val, FilterCompareType &compare_type) {
     // used when try to convert "<" into "<=", or ">" into ">="
     switch (compare_type) {
@@ -233,7 +233,7 @@ inline void RewriteCompareT(Varchar &right_val, FilterCompareType &compare_type)
                     right_val.pop_back();
                 } else {
                     --right_val.back();
-                    right_val += String(16, std::numeric_limits<char>::max());
+                    right_val += std::string(16, std::numeric_limits<char>::max());
                 }
                 compare_type = FilterCompareType::kLessEqual;
             }
@@ -313,7 +313,7 @@ inline void RewriteCompare(Value &right_val, FilterCompareType &compare_type) {
             break;
         }
         case LogicalType::kVarchar: {
-            String right_val_varchar = right_val.GetVarchar();
+            std::string right_val_varchar = right_val.GetVarchar();
             RewriteCompareT(right_val_varchar, compare_type);
             right_val = Value::MakeVarchar(right_val_varchar);
             break;
@@ -348,8 +348,8 @@ inline void SimplifyCompareTypeAndValue(Value &right_val, FilterCompareType &com
     }
 }
 
-Tuple<ColumnID, Value, FilterCompareType>
-FilterExpressionPushDownHelper::UnwindCast(const SharedPtr<BaseExpression> &cast_expr, Value &&right_val, FilterCompareType compare_type) {
+std::tuple<ColumnID, Value, FilterCompareType>
+FilterExpressionPushDownHelper::UnwindCast(const std::shared_ptr<BaseExpression> &cast_expr, Value &&right_val, FilterCompareType compare_type) {
     SimplifyCompareTypeAndValue(right_val, compare_type);
     if (compare_type == FilterCompareType::kAlwaysFalse or compare_type == FilterCompareType::kAlwaysTrue) {
         return {0, Value::MakeNull(), compare_type};
@@ -469,14 +469,14 @@ FilterExpressionPushDownHelper::UnwindCast(const SharedPtr<BaseExpression> &cast
     }
 }
 
-Value FilterExpressionPushDownHelper::CalcValueResult(const SharedPtr<BaseExpression> &expression) {
+Value FilterExpressionPushDownHelper::CalcValueResult(const std::shared_ptr<BaseExpression> &expression) {
     if (expression->type() == ExpressionType::kValue) {
         // does not need ExpressionEvaluator
         auto *value_expression = static_cast<const ValueExpression *>(expression.get());
         return value_expression->GetValue();
     } else {
         auto expression_state = ExpressionState::CreateState(expression);
-        auto result_vector = MakeShared<ColumnVector>(MakeShared<DataType>(expression->Type()));
+        auto result_vector = std::make_shared<ColumnVector>(std::make_shared<DataType>(expression->Type()));
         result_vector->Initialize();
         ExpressionEvaluator expr_evaluator; // does not need input_data_block_
         expr_evaluator.Execute(expression, expression_state, result_vector);

@@ -54,9 +54,9 @@ namespace infinity {
 // case IndexFilterEvaluator::Type::kFulltextIndex:
 // case IndexFilterEvaluator::Type::kSecondaryIndex:
 
-void AddToFulltextEvaluator(UniquePtr<IndexFilterEvaluatorFulltext> &target_fulltext_evaluator,
-                            Vector<UniquePtr<IndexFilterEvaluator>> &other_children_evaluators,
-                            UniquePtr<IndexFilterEvaluatorFulltext> input,
+void AddToFulltextEvaluator(std::unique_ptr<IndexFilterEvaluatorFulltext> &target_fulltext_evaluator,
+                            std::vector<std::unique_ptr<IndexFilterEvaluator>> &other_children_evaluators,
+                            std::unique_ptr<IndexFilterEvaluatorFulltext> input,
                             const IndexFilterEvaluator::Type op) {
     if (!target_fulltext_evaluator) {
         target_fulltext_evaluator = std::move(input);
@@ -73,13 +73,13 @@ void AddToFulltextEvaluator(UniquePtr<IndexFilterEvaluatorFulltext> &target_full
                                                                                input->src_filter_fulltext_expressions_.end());
             if (op == IndexFilterEvaluator::Type::kAnd) {
                 // merge two node
-                auto new_node = MakeUnique<AndQueryNode>();
+                auto new_node = std::make_unique<AndQueryNode>();
                 new_node->Add(std::move(target_fulltext_evaluator->query_tree_));
                 new_node->Add(std::move(input->query_tree_));
                 target_fulltext_evaluator->query_tree_ = std::move(new_node);
             } else if (op == IndexFilterEvaluator::Type::kOr) {
                 // merge two node
-                auto new_node = MakeUnique<OrQueryNode>();
+                auto new_node = std::make_unique<OrQueryNode>();
                 new_node->Add(std::move(target_fulltext_evaluator->query_tree_));
                 new_node->Add(std::move(input->query_tree_));
                 target_fulltext_evaluator->query_tree_ = std::move(new_node);
@@ -90,10 +90,10 @@ void AddToFulltextEvaluator(UniquePtr<IndexFilterEvaluatorFulltext> &target_full
     }
 }
 
-UniquePtr<IndexFilterEvaluatorSecondary> MergeSameColumn(Vector<UniquePtr<IndexFilterEvaluatorSecondary>> &evaluators,
+std::unique_ptr<IndexFilterEvaluatorSecondary> MergeSameColumn(std::vector<std::unique_ptr<IndexFilterEvaluatorSecondary>> &evaluators,
                                                          const IndexFilterEvaluator::Type op) {
     assert(evaluators.size() > 0);
-    UniquePtr<IndexFilterEvaluatorSecondary> result = std::move(evaluators[0]);
+    std::unique_ptr<IndexFilterEvaluatorSecondary> result = std::move(evaluators[0]);
     for (size_t i = 1; i < evaluators.size(); ++i) {
         result->Merge(*evaluators[i], op);
         if (!result->IsValid()) {
@@ -106,11 +106,11 @@ UniquePtr<IndexFilterEvaluatorSecondary> MergeSameColumn(Vector<UniquePtr<IndexF
 // return:
 // true: use evaluators
 // false: return all true / all false according to op
-bool SimplifySecondaryIndexEvaluators(Vector<UniquePtr<IndexFilterEvaluatorSecondary>> &evaluators, const IndexFilterEvaluator::Type op) {
+bool SimplifySecondaryIndexEvaluators(std::vector<std::unique_ptr<IndexFilterEvaluatorSecondary>> &evaluators, const IndexFilterEvaluator::Type op) {
     if (evaluators.empty()) {
         return true;
     }
-    Map<ColumnID, Vector<UniquePtr<IndexFilterEvaluatorSecondary>>> classify_evaluators;
+    std::map<ColumnID, std::vector<std::unique_ptr<IndexFilterEvaluatorSecondary>>> classify_evaluators;
     for (auto &evaluator : evaluators) {
         const auto column_id = evaluator->column_id();
         classify_evaluators[column_id].push_back(std::move(evaluator));
@@ -126,16 +126,16 @@ bool SimplifySecondaryIndexEvaluators(Vector<UniquePtr<IndexFilterEvaluatorSecon
     return true;
 }
 
-UniquePtr<IndexFilterEvaluator> IndexFilterEvaluatorBuildFromAnd(Vector<UniquePtr<IndexFilterEvaluator>> candidates) {
+std::unique_ptr<IndexFilterEvaluator> IndexFilterEvaluatorBuildFromAnd(std::vector<std::unique_ptr<IndexFilterEvaluator>> candidates) {
     using Type = IndexFilterEvaluator::Type;
     constexpr auto combine_type = Type::kAnd;
     assert(candidates.size() == 2);
     // 1. several IndexFilterEvaluatorSecondary from different columns
-    Vector<UniquePtr<IndexFilterEvaluatorSecondary>> secondary_index_evaluators;
+    std::vector<std::unique_ptr<IndexFilterEvaluatorSecondary>> secondary_index_evaluators;
     // 2. optional filter_fulltext expr
-    UniquePtr<IndexFilterEvaluatorFulltext> fulltext_evaluator;
+    std::unique_ptr<IndexFilterEvaluatorFulltext> fulltext_evaluator;
     // 3. complex logic
-    Vector<UniquePtr<IndexFilterEvaluator>> other_children_evaluators;
+    std::vector<std::unique_ptr<IndexFilterEvaluator>> other_children_evaluators;
 
     for (auto &child : candidates) {
         switch (child->type()) {
@@ -152,13 +152,13 @@ UniquePtr<IndexFilterEvaluator> IndexFilterEvaluatorBuildFromAnd(Vector<UniquePt
             case Type::kFulltextIndex: {
                 AddToFulltextEvaluator(fulltext_evaluator,
                                        other_children_evaluators,
-                                       UniquePtr<IndexFilterEvaluatorFulltext>{static_cast<IndexFilterEvaluatorFulltext *>(child.release())},
+                                       std::unique_ptr<IndexFilterEvaluatorFulltext>{static_cast<IndexFilterEvaluatorFulltext *>(child.release())},
                                        combine_type);
                 break;
             }
             case Type::kAnd: {
                 // flatten all children
-                UniquePtr<IndexFilterEvaluatorLogicalChildren> child_logical(static_cast<IndexFilterEvaluatorLogicalChildren *>(child.release()));
+                std::unique_ptr<IndexFilterEvaluatorLogicalChildren> child_logical(static_cast<IndexFilterEvaluatorLogicalChildren *>(child.release()));
                 for (auto &chi : child_logical->secondary_index_evaluators_) {
                     secondary_index_evaluators.push_back(std::move(chi));
                 }
@@ -178,7 +178,7 @@ UniquePtr<IndexFilterEvaluator> IndexFilterEvaluatorBuildFromAnd(Vector<UniquePt
         }
     }
     if (!SimplifySecondaryIndexEvaluators(secondary_index_evaluators, combine_type)) {
-        return MakeUnique<IndexFilterEvaluatorAllFalse>();
+        return std::make_unique<IndexFilterEvaluatorAllFalse>();
     }
     if (secondary_index_evaluators.empty() && other_children_evaluators.empty() && !fulltext_evaluator) {
         UnrecoverableError("Wrong status!");
@@ -194,23 +194,23 @@ UniquePtr<IndexFilterEvaluator> IndexFilterEvaluatorBuildFromAnd(Vector<UniquePt
             return std::move(secondary_index_evaluators.front());
         }
     }
-    auto result = MakeUnique<IndexFilterEvaluatorAND>();
+    auto result = std::make_unique<IndexFilterEvaluatorAND>();
     result->secondary_index_evaluators_ = std::move(secondary_index_evaluators);
     result->fulltext_evaluator_ = std::move(fulltext_evaluator);
     result->other_children_evaluators_ = std::move(other_children_evaluators);
     return result;
 }
 
-UniquePtr<IndexFilterEvaluator> IndexFilterEvaluatorBuildFromOr(Vector<UniquePtr<IndexFilterEvaluator>> candidates) {
+std::unique_ptr<IndexFilterEvaluator> IndexFilterEvaluatorBuildFromOr(std::vector<std::unique_ptr<IndexFilterEvaluator>> candidates) {
     using Type = IndexFilterEvaluator::Type;
     constexpr auto combine_type = Type::kOr;
     assert(candidates.size() == 2);
     // 1. several IndexFilterEvaluatorSecondary from different columns
-    Vector<UniquePtr<IndexFilterEvaluatorSecondary>> secondary_index_evaluators;
+    std::vector<std::unique_ptr<IndexFilterEvaluatorSecondary>> secondary_index_evaluators;
     // 2. optional filter_fulltext expr
-    UniquePtr<IndexFilterEvaluatorFulltext> fulltext_evaluator;
+    std::unique_ptr<IndexFilterEvaluatorFulltext> fulltext_evaluator;
     // 3. complex logic
-    Vector<UniquePtr<IndexFilterEvaluator>> other_children_evaluators;
+    std::vector<std::unique_ptr<IndexFilterEvaluator>> other_children_evaluators;
 
     for (auto &child : candidates) {
         switch (child->type()) {
@@ -227,13 +227,13 @@ UniquePtr<IndexFilterEvaluator> IndexFilterEvaluatorBuildFromOr(Vector<UniquePtr
             case Type::kFulltextIndex: {
                 AddToFulltextEvaluator(fulltext_evaluator,
                                        other_children_evaluators,
-                                       UniquePtr<IndexFilterEvaluatorFulltext>{static_cast<IndexFilterEvaluatorFulltext *>(child.release())},
+                                       std::unique_ptr<IndexFilterEvaluatorFulltext>{static_cast<IndexFilterEvaluatorFulltext *>(child.release())},
                                        combine_type);
                 break;
             }
             case Type::kOr: {
                 // flatten all children
-                UniquePtr<IndexFilterEvaluatorLogicalChildren> child_logical(static_cast<IndexFilterEvaluatorLogicalChildren *>(child.release()));
+                std::unique_ptr<IndexFilterEvaluatorLogicalChildren> child_logical(static_cast<IndexFilterEvaluatorLogicalChildren *>(child.release()));
                 for (auto &chi : child_logical->secondary_index_evaluators_) {
                     secondary_index_evaluators.push_back(std::move(chi));
                 }
@@ -253,7 +253,7 @@ UniquePtr<IndexFilterEvaluator> IndexFilterEvaluatorBuildFromOr(Vector<UniquePtr
         }
     }
     if (!SimplifySecondaryIndexEvaluators(secondary_index_evaluators, combine_type)) {
-        return MakeUnique<IndexFilterEvaluatorAllTrue>();
+        return std::make_unique<IndexFilterEvaluatorAllTrue>();
     }
     if (secondary_index_evaluators.empty() && other_children_evaluators.empty() && !fulltext_evaluator) {
         UnrecoverableError("Wrong status!");
@@ -269,7 +269,7 @@ UniquePtr<IndexFilterEvaluator> IndexFilterEvaluatorBuildFromOr(Vector<UniquePtr
             return std::move(secondary_index_evaluators.front());
         }
     }
-    auto result = MakeUnique<IndexFilterEvaluatorOR>();
+    auto result = std::make_unique<IndexFilterEvaluatorOR>();
     result->secondary_index_evaluators_ = std::move(secondary_index_evaluators);
     result->fulltext_evaluator_ = std::move(fulltext_evaluator);
     result->other_children_evaluators_ = std::move(other_children_evaluators);
@@ -283,7 +283,7 @@ ConvertToOrderedType<ColumnValueT> GetOrderedV(const Value &val) {
 
 template <>
 ConvertToOrderedType<VarcharT> GetOrderedV<VarcharT>(const Value &val) {
-    const String &str = val.GetVarchar();
+    const std::string &str = val.GetVarchar();
     return ConvertToOrderedKeyValue(static_cast<std::string_view>(str));
 }
 
@@ -297,7 +297,7 @@ template <typename ColumnValueT>
 struct IndexFilterEvaluatorSecondaryT final : IndexFilterEvaluatorSecondary {
     using SecondaryIndexOrderedT = ConvertToOrderedType<ColumnValueT>;
 
-    Vector<Pair<SecondaryIndexOrderedT, SecondaryIndexOrderedT>> secondary_index_start_end_pairs_;
+    std::vector<std::pair<SecondaryIndexOrderedT, SecondaryIndexOrderedT>> secondary_index_start_end_pairs_;
 
     Bitmask Evaluate(SegmentID segment_id, SegmentOffset segment_row_count) const override;
 
@@ -317,7 +317,7 @@ struct IndexFilterEvaluatorSecondaryT final : IndexFilterEvaluatorSecondary {
         if (secondary_index_start_end_pairs_.empty() || other_start_end_pairs.empty()) {
             UnrecoverableError("Invalid Merge input!");
         }
-        Vector<Pair<SecondaryIndexOrderedT, SecondaryIndexOrderedT>> new_start_end_pairs;
+        std::vector<std::pair<SecondaryIndexOrderedT, SecondaryIndexOrderedT>> new_start_end_pairs;
         auto self_it = secondary_index_start_end_pairs_.cbegin();
         auto other_it = other_start_end_pairs.cbegin();
         const auto self_end = secondary_index_start_end_pairs_.cend();
@@ -343,7 +343,7 @@ struct IndexFilterEvaluatorSecondaryT final : IndexFilterEvaluatorSecondary {
                 }
             }
             // final element
-            const auto full_range_v = Pair<SecondaryIndexOrderedT, SecondaryIndexOrderedT>{std::numeric_limits<SecondaryIndexOrderedT>::lowest(),
+            const auto full_range_v = std::pair<SecondaryIndexOrderedT, SecondaryIndexOrderedT>{std::numeric_limits<SecondaryIndexOrderedT>::lowest(),
                                                                                            std::numeric_limits<SecondaryIndexOrderedT>::max()};
             if (back_v != full_range_v) {
                 new_start_end_pairs.push_back(back_v);
@@ -377,16 +377,16 @@ struct IndexFilterEvaluatorSecondaryT final : IndexFilterEvaluatorSecondary {
     IndexFilterEvaluatorSecondaryT(const BaseExpression *src_expr,
                                    const ColumnID column_id,
                                    const LogicalType column_logical_type,
-                                   SharedPtr<TableIndexMeeta> new_secondary_index)
+                                   std::shared_ptr<TableIndexMeeta> new_secondary_index)
         : IndexFilterEvaluatorSecondary(src_expr, column_id, column_logical_type, new_secondary_index) {}
 
-    static UniquePtr<IndexFilterEvaluatorSecondaryT> Make(const BaseExpression *src_expr,
+    static std::unique_ptr<IndexFilterEvaluatorSecondaryT> Make(const BaseExpression *src_expr,
                                                           const ColumnID column_id,
-                                                          SharedPtr<TableIndexMeeta> new_secondary_index,
+                                                          std::shared_ptr<TableIndexMeeta> new_secondary_index,
                                                           const FilterCompareType compare_type,
                                                           const Value &val) {
         constexpr auto expect_logical_type = GetLogicalType<ColumnValueT>;
-        auto result = MakeUnique<IndexFilterEvaluatorSecondaryT>(src_expr, column_id, expect_logical_type, new_secondary_index);
+        auto result = std::make_unique<IndexFilterEvaluatorSecondaryT>(src_expr, column_id, expect_logical_type, new_secondary_index);
         const SecondaryIndexOrderedT val_ordered = GetOrderedV<ColumnValueT>(val);
         switch (compare_type) {
             case FilterCompareType::kEqual: {
@@ -409,9 +409,9 @@ struct IndexFilterEvaluatorSecondaryT final : IndexFilterEvaluatorSecondary {
     }
 };
 
-UniquePtr<IndexFilterEvaluatorSecondary> IndexFilterEvaluatorSecondary::Make(const BaseExpression *src_expr,
+std::unique_ptr<IndexFilterEvaluatorSecondary> IndexFilterEvaluatorSecondary::Make(const BaseExpression *src_expr,
                                                                              ColumnID column_id,
-                                                                             SharedPtr<TableIndexMeeta> new_secondary_index,
+                                                                             std::shared_ptr<TableIndexMeeta> new_secondary_index,
                                                                              FilterCompareType compare_type,
                                                                              const Value &val) {
     ColumnDef *column_def;
@@ -493,7 +493,7 @@ Bitmask IndexFilterEvaluatorFulltext::Evaluate(const SegmentID segment_id, const
         params{table_info_, index_reader_.get(), early_term_algo_, ft_similarity_, bm25_params_, minimum_should_match_, 0u, index_names_};
     auto ft_iter = query_tree_->CreateSearch(params);
     if (ft_iter && score_threshold_ > 0.0f) {
-        auto new_ft_iter = MakeUnique<ScoreThresholdIterator>(std::move(ft_iter), score_threshold_);
+        auto new_ft_iter = std::make_unique<ScoreThresholdIterator>(std::move(ft_iter), score_threshold_);
         ft_iter = std::move(new_ft_iter);
     }
     if (ft_iter && ft_iter->Next(begin_rowid)) {
@@ -539,7 +539,7 @@ Bitmask IndexFilterEvaluatorAND::Evaluate(const SegmentID segment_id, const Segm
                                             fulltext_evaluator_->index_names_};
             auto ft_iter = fulltext_evaluator_->query_tree_->CreateSearch(params);
             if (ft_iter && fulltext_evaluator_->score_threshold_ > 0.0f) {
-                auto new_ft_iter = MakeUnique<ScoreThresholdIterator>(std::move(ft_iter), fulltext_evaluator_->score_threshold_);
+                auto new_ft_iter = std::make_unique<ScoreThresholdIterator>(std::move(ft_iter), fulltext_evaluator_->score_threshold_);
                 ft_iter = std::move(new_ft_iter);
             }
             if (ft_iter) {
@@ -618,7 +618,7 @@ template <typename ColumnValueType>
 struct TrunkReader<ColumnValueType, HighCardinalityTag> {
     using SecondaryIndexOrderedT = ConvertToOrderedType<ColumnValueType>;
     virtual ~TrunkReader() = default;
-    virtual u32 GetResultCnt(Pair<SecondaryIndexOrderedT, SecondaryIndexOrderedT> interval_range) = 0;
+    virtual u32 GetResultCnt(std::pair<SecondaryIndexOrderedT, SecondaryIndexOrderedT> interval_range) = 0;
     virtual void OutPut(Bitmask &selected_rows) = 0;
 };
 
@@ -631,14 +631,14 @@ struct TrunkReaderT final : TrunkReader<ColumnValueType, CardinalityTag> {
     u32 begin_pos_ = 0;
     u32 end_pos_ = 0;
     // For LowCardinality: store the range for processing
-    Pair<KeyType, KeyType> current_range_;
+    std::pair<KeyType, KeyType> current_range_;
 
     TrunkReaderT(const u32 segment_row_count, BufferObj *index_buffer) : segment_row_count_(segment_row_count), index_buffer_(index_buffer) {}
     TrunkReaderT(const u32 segment_row_count, const SecondaryIndexDataBase<CardinalityTag> *index)
         : segment_row_count_(segment_row_count), index_(index) {}
 
     // Method to set range for LowCardinality processing
-    void SetRange(const Pair<KeyType, KeyType> &range) { current_range_ = range; }
+    void SetRange(const std::pair<KeyType, KeyType> &range) { current_range_ = range; }
 
     void OutPut(Bitmask &selected_rows) override {
         if constexpr (std::is_same_v<CardinalityTag, HighCardinalityTag>) {
@@ -696,8 +696,8 @@ struct TrunkReaderT<ColumnValueType, HighCardinalityTag> final : TrunkReader<Col
     TrunkReaderT(const u32 segment_row_count, const SecondaryIndexDataBase<HighCardinalityTag> *index)
         : segment_row_count_(segment_row_count), index_(index) {}
 
-    u32 GetResultCnt(const Pair<KeyType, KeyType> interval_range) override {
-        Optional<BufferHandle> index_handle;
+    u32 GetResultCnt(const std::pair<KeyType, KeyType> interval_range) override {
+        std::optional<BufferHandle> index_handle;
         const SecondaryIndexDataBase<HighCardinalityTag> *index = nullptr;
         if (index_buffer_) {
             index_handle = index_buffer_->Load();
@@ -798,9 +798,9 @@ template <typename ColumnValueType, typename CardinalityTag>
 struct TrunkReaderM final : TrunkReader<ColumnValueType, CardinalityTag> {
     using KeyType = typename TrunkReader<ColumnValueType, CardinalityTag>::SecondaryIndexOrderedT;
     const u32 segment_row_count_;
-    SharedPtr<SecondaryIndexInMem> memory_secondary_index_;
-    Pair<u32, Bitmask> result_cache_;
-    TrunkReaderM(const u32 segment_row_count, const SharedPtr<SecondaryIndexInMem> &memory_secondary_index)
+    std::shared_ptr<SecondaryIndexInMem> memory_secondary_index_;
+    std::pair<u32, Bitmask> result_cache_;
+    TrunkReaderM(const u32 segment_row_count, const std::shared_ptr<SecondaryIndexInMem> &memory_secondary_index)
         : segment_row_count_(segment_row_count), memory_secondary_index_(memory_secondary_index) {}
     void OutPut(Bitmask &selected_rows) override { selected_rows.MergeOr(result_cache_.second); }
 };
@@ -810,13 +810,13 @@ template <typename ColumnValueType>
 struct TrunkReaderM<ColumnValueType, HighCardinalityTag> final : TrunkReader<ColumnValueType, HighCardinalityTag> {
     using KeyType = typename TrunkReader<ColumnValueType, HighCardinalityTag>::SecondaryIndexOrderedT;
     const u32 segment_row_count_;
-    SharedPtr<SecondaryIndexInMem> memory_secondary_index_;
-    Pair<u32, Bitmask> result_cache_;
-    TrunkReaderM(const u32 segment_row_count, const SharedPtr<SecondaryIndexInMem> &memory_secondary_index)
+    std::shared_ptr<SecondaryIndexInMem> memory_secondary_index_;
+    std::pair<u32, Bitmask> result_cache_;
+    TrunkReaderM(const u32 segment_row_count, const std::shared_ptr<SecondaryIndexInMem> &memory_secondary_index)
         : segment_row_count_(segment_row_count), memory_secondary_index_(memory_secondary_index) {}
-    u32 GetResultCnt(const Pair<KeyType, KeyType> interval_range) override {
+    u32 GetResultCnt(const std::pair<KeyType, KeyType> interval_range) override {
         const auto [begin_val, end_val] = interval_range;
-        Tuple<u32, KeyType, KeyType> arg_tuple = {segment_row_count_, begin_val, end_val};
+        std::tuple<u32, KeyType, KeyType> arg_tuple = {segment_row_count_, begin_val, end_val};
         result_cache_ = memory_secondary_index_->RangeQuery(&arg_tuple);
         return result_cache_.first;
     }
@@ -824,10 +824,10 @@ struct TrunkReaderM<ColumnValueType, HighCardinalityTag> final : TrunkReader<Col
 };
 
 template <typename ColumnValueType>
-Bitmask ExecuteSingleRangeHighCardinalityT(const Pair<ConvertToOrderedType<ColumnValueType>, ConvertToOrderedType<ColumnValueType>> interval_range,
+Bitmask ExecuteSingleRangeHighCardinalityT(const std::pair<ConvertToOrderedType<ColumnValueType>, ConvertToOrderedType<ColumnValueType>> interval_range,
                                            SegmentIndexMeta *index_meta,
                                            const SegmentOffset segment_row_count) {
-    Vector<UniquePtr<TrunkReader<ColumnValueType, HighCardinalityTag>>> trunk_readers;
+    std::vector<std::unique_ptr<TrunkReader<ColumnValueType, HighCardinalityTag>>> trunk_readers;
     auto [chunk_ids_ptr, status] = index_meta->GetChunkIDs1();
     if (!status.ok()) {
         UnrecoverableError(status.message());
@@ -839,13 +839,13 @@ Bitmask ExecuteSingleRangeHighCardinalityT(const Pair<ConvertToOrderedType<Colum
         if (!status.ok()) {
             UnrecoverableError(status.message());
         }
-        trunk_readers.emplace_back(MakeUnique<TrunkReaderT<ColumnValueType, HighCardinalityTag>>(segment_row_count, index_buffer));
+        trunk_readers.emplace_back(std::make_unique<TrunkReaderT<ColumnValueType, HighCardinalityTag>>(segment_row_count, index_buffer));
     }
-    SharedPtr<MemIndex> mem_index = index_meta->GetMemIndex();
+    std::shared_ptr<MemIndex> mem_index = index_meta->GetMemIndex();
     if (mem_index) {
-        SharedPtr<SecondaryIndexInMem> secondary_index = mem_index->GetSecondaryIndex();
+        std::shared_ptr<SecondaryIndexInMem> secondary_index = mem_index->GetSecondaryIndex();
         if (secondary_index) {
-            trunk_readers.emplace_back(MakeUnique<TrunkReaderM<ColumnValueType, HighCardinalityTag>>(segment_row_count, secondary_index));
+            trunk_readers.emplace_back(std::make_unique<TrunkReaderM<ColumnValueType, HighCardinalityTag>>(segment_row_count, secondary_index));
         }
     }
 
@@ -863,10 +863,10 @@ Bitmask ExecuteSingleRangeHighCardinalityT(const Pair<ConvertToOrderedType<Colum
 }
 
 template <typename ColumnValueType>
-Bitmask ExecuteSingleRangeLowCardinalityT(const Pair<ConvertToOrderedType<ColumnValueType>, ConvertToOrderedType<ColumnValueType>> interval_range,
+Bitmask ExecuteSingleRangeLowCardinalityT(const std::pair<ConvertToOrderedType<ColumnValueType>, ConvertToOrderedType<ColumnValueType>> interval_range,
                                           SegmentIndexMeta *index_meta,
                                           const SegmentOffset segment_row_count) {
-    Vector<UniquePtr<TrunkReader<ColumnValueType, LowCardinalityTag>>> trunk_readers;
+    std::vector<std::unique_ptr<TrunkReader<ColumnValueType, LowCardinalityTag>>> trunk_readers;
     auto [chunk_ids_ptr, status] = index_meta->GetChunkIDs1();
     if (!status.ok()) {
         UnrecoverableError(status.message());
@@ -878,13 +878,13 @@ Bitmask ExecuteSingleRangeLowCardinalityT(const Pair<ConvertToOrderedType<Column
         if (!status.ok()) {
             UnrecoverableError(status.message());
         }
-        trunk_readers.emplace_back(MakeUnique<TrunkReaderT<ColumnValueType, LowCardinalityTag>>(segment_row_count, index_buffer));
+        trunk_readers.emplace_back(std::make_unique<TrunkReaderT<ColumnValueType, LowCardinalityTag>>(segment_row_count, index_buffer));
     }
-    SharedPtr<MemIndex> mem_index = index_meta->GetMemIndex();
+    std::shared_ptr<MemIndex> mem_index = index_meta->GetMemIndex();
     if (mem_index) {
-        SharedPtr<SecondaryIndexInMem> secondary_index = mem_index->GetSecondaryIndex();
+        std::shared_ptr<SecondaryIndexInMem> secondary_index = mem_index->GetSecondaryIndex();
         if (secondary_index) {
-            trunk_readers.emplace_back(MakeUnique<TrunkReaderM<ColumnValueType, LowCardinalityTag>>(segment_row_count, secondary_index));
+            trunk_readers.emplace_back(std::make_unique<TrunkReaderM<ColumnValueType, LowCardinalityTag>>(segment_row_count, secondary_index));
         }
     }
 
@@ -904,7 +904,7 @@ Bitmask ExecuteSingleRangeLowCardinalityT(const Pair<ConvertToOrderedType<Column
 
 template <typename ColumnValueT>
 Bitmask IndexFilterEvaluatorSecondaryT<ColumnValueT>::Evaluate(const SegmentID segment_id, const SegmentOffset segment_row_count) const {
-    Optional<SegmentIndexMeta> index_meta;
+    std::optional<SegmentIndexMeta> index_meta;
     index_meta.emplace(segment_id, *new_secondary_index_);
 
     // Check cardinality to determine which execution path to use

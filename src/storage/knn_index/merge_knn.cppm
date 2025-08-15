@@ -31,7 +31,7 @@ export class KnnScanSharedData;
 
 export class MergeKnnBase {
 public:
-    static UniquePtr<MergeKnnBase> Make(KnnScanSharedData *knn_scan_shared_data);
+    static std::unique_ptr<MergeKnnBase> Make(KnnScanSharedData *knn_scan_shared_data);
 
     virtual ~MergeKnnBase() = default;
 };
@@ -42,8 +42,8 @@ public:
     virtual void Begin() = 0;
     virtual void End() = 0;
     virtual void EndWithoutSort() = 0;
-    virtual u32 GetSize(SizeT q_id) const = 0;
-    virtual void AddResult(SizeT q_id, DistType d, RowID i) = 0;
+    virtual u32 GetSize(size_t q_id) const = 0;
+    virtual void AddResult(size_t q_id, DistType d, RowID i) = 0;
     virtual ~MergeKnnResultHandler() = default;
 };
 
@@ -60,17 +60,17 @@ class MergeKnnResultHandlerT final : public MergeKnnResultHandler<DistType>, Res
     using RH = ResultHandler<C<DistType, RowID>>;
 
 public:
-    MergeKnnResultHandlerT(SizeT n_queries, SizeT top_k, DistType *distance, RowID *id)
+    MergeKnnResultHandlerT(size_t n_queries, size_t top_k, DistType *distance, RowID *id)
         requires(!use_threshold)
         : RH(n_queries, top_k, distance, id) {}
-    MergeKnnResultHandlerT(SizeT n_queries, SizeT top_k, DistType *distance, RowID *id, f32 threshold)
+    MergeKnnResultHandlerT(size_t n_queries, size_t top_k, DistType *distance, RowID *id, f32 threshold)
         requires(use_threshold)
         : RH(n_queries, top_k, distance, id), KnnThresholdT<use_threshold>(threshold) {}
     void Begin() override { RH::Begin(); }
     void End() override { RH::End(); }
     void EndWithoutSort() override { RH::EndWithoutSort(); }
-    u32 GetSize(SizeT q_id) const override { return RH::GetSize(q_id); }
-    void AddResult(SizeT q_id, DistType d, RowID i) override {
+    u32 GetSize(size_t q_id) const override { return RH::GetSize(q_id); }
+    void AddResult(size_t q_id, DistType d, RowID i) override {
         if constexpr (use_threshold) {
             if (C<DistType, RowID>::Compare(d, this->knn_threshold_)) {
                 return;
@@ -81,26 +81,26 @@ public:
 };
 
 export template <template <typename> typename ResultHandler, template <typename, typename> typename C, typename DistType>
-UniquePtr<MergeKnnResultHandler<DistType>>
-GetMergeKnnResultHandler(const SizeT n_queries, const SizeT top_k, DistType *distance, RowID *id, const Optional<f32> threshold) {
+std::unique_ptr<MergeKnnResultHandler<DistType>>
+GetMergeKnnResultHandler(const size_t n_queries, const size_t top_k, DistType *distance, RowID *id, const std::optional<f32> threshold) {
     if (threshold.has_value()) {
-        return MakeUnique<MergeKnnResultHandlerT<ResultHandler, C, DistType, true>>(n_queries, top_k, distance, id, threshold.value());
+        return std::make_unique<MergeKnnResultHandlerT<ResultHandler, C, DistType, true>>(n_queries, top_k, distance, id, threshold.value());
     }
-    return MakeUnique<MergeKnnResultHandlerT<ResultHandler, C, DistType, false>>(n_queries, top_k, distance, id);
+    return std::make_unique<MergeKnnResultHandlerT<ResultHandler, C, DistType, false>>(n_queries, top_k, distance, id);
 }
 
-export Optional<f32> GetKnnThreshold(const Vector<InitParameter> &opt_params);
+export std::optional<f32> GetKnnThreshold(const std::vector<InitParameter> &opt_params);
 
-export Optional<f32> GetKnnThreshold(const Vector<UniquePtr<InitParameter>> &opt_params);
+export std::optional<f32> GetKnnThreshold(const std::vector<std::unique_ptr<InitParameter>> &opt_params);
 
 export template <typename QueryElemType, template <typename, typename> typename C, typename DistType>
 class MergeKnn final : public MergeKnnBase {
-    using DistFunc = DistType (*)(const QueryElemType *, const QueryElemType *, SizeT);
+    using DistFunc = DistType (*)(const QueryElemType *, const QueryElemType *, size_t);
 
 public:
-    explicit MergeKnn(const u64 query_count, const u64 topk, const Optional<f32> knn_threshold)
-        : total_count_(0), query_count_(query_count), topk_(topk), idx_array_(MakeUniqueForOverwrite<RowID[]>(topk * query_count)),
-          distance_array_(MakeUniqueForOverwrite<DistType[]>(topk * query_count)) {
+    explicit MergeKnn(const u64 query_count, const u64 topk, const std::optional<f32> knn_threshold)
+        : total_count_(0), query_count_(query_count), topk_(topk), idx_array_(std::make_unique_for_overwrite<RowID[]>(topk * query_count)),
+          distance_array_(std::make_unique_for_overwrite<DistType[]>(topk * query_count)) {
         result_handler_ = GetMergeKnnResultHandler<HeapResultHandler, C, DistType>(query_count,
                                                                                    topk,
                                                                                    this->distance_array_.get(),
@@ -126,7 +126,7 @@ public:
 
     void Search(const DistType *dist, const RowID *row_ids, u16 count);
 
-    void Search(SizeT query_id, const DistType *dist, const RowID *row_ids, u16 count);
+    void Search(size_t query_id, const DistType *dist, const RowID *row_ids, u16 count);
 
     void Begin();
 
@@ -151,12 +151,12 @@ private:
     bool begin_{false};
     u64 query_count_{};
     i64 topk_{};
-    UniquePtr<RowID[]> idx_array_{};
-    UniquePtr<DistType[]> distance_array_{};
-    Optional<u32> result_size_;
+    std::unique_ptr<RowID[]> idx_array_{};
+    std::unique_ptr<DistType[]> distance_array_{};
+    std::optional<u32> result_size_;
 
 private:
-    UniquePtr<MergeKnnResultHandler<DistType>> result_handler_{};
+    std::unique_ptr<MergeKnnResultHandler<DistType>> result_handler_{};
 };
 
 template <typename QueryElemType, template <typename, typename> typename C, typename DistType>
@@ -236,7 +236,7 @@ void MergeKnn<QueryElemType, C, DistType>::Search(const DistType *dist, const Ro
 }
 
 template <typename QueryElemType, template <typename, typename> typename C, typename DistType>
-void MergeKnn<QueryElemType, C, DistType>::Search(SizeT query_id, const DistType *dist, const RowID *row_ids, u16 count) {
+void MergeKnn<QueryElemType, C, DistType>::Search(size_t query_id, const DistType *dist, const RowID *row_ids, u16 count) {
     if (query_id == 0) {
         this->total_count_ += count;
     }

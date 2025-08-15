@@ -30,7 +30,7 @@ KVIterator::KVIterator(rocksdb::Iterator *iterator_) : iterator_(iterator_) {}
 
 KVIterator::~KVIterator() { delete iterator_; }
 
-void KVIterator::Seek(const String &key) {
+void KVIterator::Seek(const std::string &key) {
     if (key.empty()) {
         iterator_->SeekToFirst();
     } else {
@@ -58,29 +58,29 @@ KVInstance::~KVInstance() {
     }
 }
 
-Status KVInstance::Put(const String &key, const String &value) {
+Status KVInstance::Put(const std::string &key, const std::string &value) {
     //    LOG_TRACE(fmt::format("To put key: {}, value: {}", key, value));
     rocksdb::Status s = transaction_->Put(key, value);
     if (!s.ok()) {
-        String msg = fmt::format("rocksdb::Transaction::Put key: {}, value: {}", key, value);
+        std::string msg = fmt::format("rocksdb::Transaction::Put key: {}, value: {}", key, value);
         LOG_DEBUG(msg);
         return Status::RocksDBError(std::move(s), msg);
     }
     return Status::OK();
 }
 
-Status KVInstance::Delete(const String &key) {
+Status KVInstance::Delete(const std::string &key) {
     //    LOG_TRACE(fmt::format("To delete key: {}", key));
     rocksdb::Status s = transaction_->Delete(key);
     if (!s.ok()) {
-        String msg = fmt::format("rocksdb::Transaction::Delete key: {}", key);
+        std::string msg = fmt::format("rocksdb::Transaction::Delete key: {}", key);
         LOG_DEBUG(msg);
         return Status::RocksDBError(std::move(s), msg);
     }
     return Status::OK();
 }
 
-Status KVInstance::Get(const String &key, String &value) {
+Status KVInstance::Get(const std::string &key, std::string &value) {
     rocksdb::Status s = transaction_->Get(read_options_, key, &value);
     if (!s.ok()) {
         switch (s.code()) {
@@ -88,7 +88,7 @@ Status KVInstance::Get(const String &key, String &value) {
                 return Status::NotFound(fmt::format("Key not found: {}", key));
             }
             default: {
-                String msg = fmt::format("rocksdb::Transaction::Get key: {}", key);
+                std::string msg = fmt::format("rocksdb::Transaction::Get key: {}", key);
                 LOG_DEBUG(msg);
                 return Status::RocksDBError(std::move(s), msg);
             }
@@ -97,7 +97,7 @@ Status KVInstance::Get(const String &key, String &value) {
     return Status::OK();
 }
 
-Status KVInstance::GetForUpdate(const String &key, String &value) {
+Status KVInstance::GetForUpdate(const std::string &key, std::string &value) {
     rocksdb::Status s = transaction_->GetForUpdate(read_options_, key, &value);
     if (!s.ok()) {
         switch (s.code()) {
@@ -105,7 +105,7 @@ Status KVInstance::GetForUpdate(const String &key, String &value) {
                 return Status::NotFound(fmt::format("Key not found: {}", key));
             }
             default: {
-                String msg = fmt::format("rocksdb::Transaction::GetForUpdate key: {}", key);
+                std::string msg = fmt::format("rocksdb::Transaction::GetForUpdate key: {}", key);
                 LOG_DEBUG(msg);
                 return Status::RocksDBError(std::move(s), key);
             }
@@ -114,22 +114,22 @@ Status KVInstance::GetForUpdate(const String &key, String &value) {
     return Status::OK();
 }
 
-UniquePtr<KVIterator> KVInstance::GetIterator() { return MakeUnique<KVIterator>(transaction_->GetIterator(read_options_)); }
+std::unique_ptr<KVIterator> KVInstance::GetIterator() { return std::make_unique<KVIterator>(transaction_->GetIterator(read_options_)); }
 
-UniquePtr<KVIterator> KVInstance::GetIterator(const char *lower_bound_key, const char *upper_bound_key) {
+std::unique_ptr<KVIterator> KVInstance::GetIterator(const char *lower_bound_key, const char *upper_bound_key) {
     if (lower_bound_key != nullptr) {
         read_options_.iterate_lower_bound = new rocksdb::Slice(lower_bound_key);
     }
     if (upper_bound_key != nullptr) {
         read_options_.iterate_upper_bound = new rocksdb::Slice(upper_bound_key);
     }
-    return MakeUnique<KVIterator>(transaction_->GetIterator(read_options_));
+    return std::make_unique<KVIterator>(transaction_->GetIterator(read_options_));
 }
 
-Vector<Pair<String, String>> KVInstance::GetAllKeyValue() {
-    Vector<Pair<String, String>> result;
+std::vector<std::pair<std::string, std::string>> KVInstance::GetAllKeyValue() {
+    std::vector<std::pair<std::string, std::string>> result;
     rocksdb::ReadOptions read_option;
-    UniquePtr<rocksdb::Iterator> iter{transaction_->GetIterator(read_options_)};
+    std::unique_ptr<rocksdb::Iterator> iter{transaction_->GetIterator(read_options_)};
     iter->SeekToFirst();
     for (; iter->Valid(); iter->Next()) {
         result.push_back({iter->key().ToString(), iter->value().ToString()});
@@ -137,10 +137,10 @@ Vector<Pair<String, String>> KVInstance::GetAllKeyValue() {
     return result;
 }
 
-String KVInstance::ToString() const {
+std::string KVInstance::ToString() const {
     std::stringstream ss;
     rocksdb::ReadOptions read_option;
-    UniquePtr<rocksdb::Iterator> iter{transaction_->GetIterator(read_options_)};
+    std::unique_ptr<rocksdb::Iterator> iter{transaction_->GetIterator(read_options_)};
     iter->SeekToFirst();
     for (; iter->Valid(); iter->Next()) {
         auto key = iter->key().ToString();
@@ -157,7 +157,7 @@ String KVInstance::ToString() const {
 Status KVInstance::Commit() {
     rocksdb::Status s = transaction_->Commit();
     if (!s.ok()) {
-        String msg("rocksdb::Transaction::Commit");
+        std::string msg("rocksdb::Transaction::Commit");
         return Status::RocksDBError(std::move(s), msg);
     }
     if (transaction_) {
@@ -169,7 +169,7 @@ Status KVInstance::Commit() {
 Status KVInstance::Rollback() {
     rocksdb::Status s = transaction_->Rollback();
     if (!s.ok()) {
-        String msg("rocksdb::Transaction::Rollback");
+        std::string msg("rocksdb::Transaction::Rollback");
         return Status::RocksDBError(std::move(s), msg);
     }
     if (transaction_) {
@@ -179,7 +179,7 @@ Status KVInstance::Rollback() {
     return Status::OK();
 }
 
-Status KVStore::Init(const String &db_path) {
+Status KVStore::Init(const std::string &db_path) {
     db_path_ = db_path;
     options_.create_if_missing = true;
     options_.manual_wal_flush = true;
@@ -192,7 +192,7 @@ Status KVStore::Init(const String &db_path) {
 
     rocksdb::Status s = rocksdb::TransactionDB::Open(options_, txn_db_options_, db_path_, &transaction_db_);
     if (!s.ok()) {
-        String msg = fmt::format("rocksdb::TransactionDB::Open db path: {}", db_path);
+        std::string msg = fmt::format("rocksdb::TransactionDB::Open db path: {}", db_path);
         return Status::RocksDBError(std::move(s), msg);
     }
     return Status::OK();
@@ -219,23 +219,23 @@ Status KVStore::Flush() {
     rocksdb::FlushOptions flush_opts;
     rocksdb::Status s = transaction_db_->Flush(flush_opts);
     if (!s.ok()) {
-        String msg("rocksdb::TransactionDB::Flush");
+        std::string msg("rocksdb::TransactionDB::Flush");
         return Status::RocksDBError(std::move(s), msg);
     }
     return Status::OK();
 }
 
-Status KVStore::CreateBackup(const String &backup_path, Vector<rocksdb::BackupInfo> &backup_info_list) {
+Status KVStore::CreateBackup(const std::string &backup_path, std::vector<rocksdb::BackupInfo> &backup_info_list) {
     rocksdb::BackupEngine *backup_engine;
     rocksdb::Status s = rocksdb::BackupEngine::Open(rocksdb::Env::Default(), rocksdb::BackupEngineOptions(backup_path), &backup_engine);
     if (!s.ok()) {
-        String msg = fmt::format("rocksdb::BackupEngine::Open: {}", backup_path);
+        std::string msg = fmt::format("rocksdb::BackupEngine::Open: {}", backup_path);
         return Status::RocksDBError(std::move(s), msg);
     }
 
     rocksdb::IOStatus io_status = backup_engine->CreateNewBackup(transaction_db_);
     if (!io_status.ok()) {
-        String msg = fmt::format("rocksdb::BackupEngine::CreateNewBackup: {}", backup_path);
+        std::string msg = fmt::format("rocksdb::BackupEngine::CreateNewBackup: {}", backup_path);
         return Status::RocksDBError(std::move(io_status), msg);
     }
 
@@ -244,47 +244,47 @@ Status KVStore::CreateBackup(const String &backup_path, Vector<rocksdb::BackupIn
     return Status::OK();
 }
 
-Status KVStore::RestoreFromBackup(const String &backup_path, const String &db_path) {
+Status KVStore::RestoreFromBackup(const std::string &backup_path, const std::string &db_path) {
     rocksdb::BackupEngineReadOnly *backup_engine_ro{};
     rocksdb::IOStatus s = rocksdb::BackupEngineReadOnly::Open(rocksdb::Env::Default(), rocksdb::BackupEngineOptions(backup_path), &backup_engine_ro);
     if (!s.ok()) {
-        String msg = fmt::format("rocksdb::BackupEngineReadOnly::Open: {}", backup_path);
+        std::string msg = fmt::format("rocksdb::BackupEngineReadOnly::Open: {}", backup_path);
         return Status::RocksDBError(std::move(s), msg);
     }
     s = backup_engine_ro->RestoreDBFromLatestBackup(db_path, db_path);
     if (!s.ok()) {
-        String msg = fmt::format("rocksdb::BackupEngineReadOnly::RestoreDBFromLatestBackup: {}", backup_path);
+        std::string msg = fmt::format("rocksdb::BackupEngineReadOnly::RestoreDBFromLatestBackup: {}", backup_path);
         return Status::RocksDBError(std::move(s), msg);
     }
     return Status::OK();
 }
 
-UniquePtr<KVInstance> KVStore::GetInstance() {
-    UniquePtr<KVInstance> kv_instance = MakeUnique<KVInstance>();
+std::unique_ptr<KVInstance> KVStore::GetInstance() {
+    std::unique_ptr<KVInstance> kv_instance = std::make_unique<KVInstance>();
     kv_instance->transaction_ = transaction_db_->BeginTransaction(write_options_, txn_options_);
     kv_instance->read_options_.snapshot = kv_instance->transaction_->GetSnapshot();
     return kv_instance;
 }
 
-Status KVStore::Put(const String &key, const String &value) {
+Status KVStore::Put(const std::string &key, const std::string &value) {
     rocksdb::Status s = transaction_db_->Put(write_options_, key, value);
     if (!s.ok()) {
-        String msg = fmt::format("rocksdb::TransactionDB::Put key: {}, value: {}", key, value);
+        std::string msg = fmt::format("rocksdb::TransactionDB::Put key: {}, value: {}", key, value);
         return Status::RocksDBError(std::move(s), msg);
     }
     return Status::OK();
 }
 
-Status KVStore::Delete(const String &key) {
+Status KVStore::Delete(const std::string &key) {
     rocksdb::Status s = transaction_db_->Delete(write_options_, key);
     if (!s.ok()) {
-        String msg = fmt::format("rocksdb::TransactionDB::Delete key: {}", key);
+        std::string msg = fmt::format("rocksdb::TransactionDB::Delete key: {}", key);
         return Status::RocksDBError(std::move(s), msg);
     }
     return Status::OK();
 }
 
-Status KVStore::Get(const String &key, String &value) {
+Status KVStore::Get(const std::string &key, std::string &value) {
     rocksdb::Status s = transaction_db_->Get(read_options_, key, &value);
     if (!s.ok()) {
         switch (s.code()) {
@@ -292,7 +292,7 @@ Status KVStore::Get(const String &key, String &value) {
                 return Status::NotFound(fmt::format("Key not found: {}", key));
             }
             default: {
-                String msg = fmt::format("rocksdb::TransactionDB::Get key: {}", key);
+                std::string msg = fmt::format("rocksdb::TransactionDB::Get key: {}", key);
                 return Status::RocksDBError(std::move(s), msg);
             }
         }
@@ -300,19 +300,19 @@ Status KVStore::Get(const String &key, String &value) {
     return Status::OK();
 }
 
-Status KVStore::Merge(const String &key, const String &value) {
+Status KVStore::Merge(const std::string &key, const std::string &value) {
     rocksdb::Status s = transaction_db_->Merge(write_options_, nullptr, key, value);
     if (!s.ok()) {
-        String msg = fmt::format("rocksdb::TransactionDB::Merge key: {}, value: {}", key, value);
+        std::string msg = fmt::format("rocksdb::TransactionDB::Merge key: {}, value: {}", key, value);
         return Status::RocksDBError(std::move(s), msg);
     }
     return Status::OK();
 }
 
-String KVStore::ToString() const {
+std::string KVStore::ToString() const {
     std::stringstream ss;
     rocksdb::ReadOptions read_option;
-    UniquePtr<rocksdb::Iterator> iter{transaction_db_->NewIterator(read_option)};
+    std::unique_ptr<rocksdb::Iterator> iter{transaction_db_->NewIterator(read_option)};
     iter->SeekToFirst();
     for (; iter->Valid(); iter->Next()) {
         auto key = iter->key().ToString();
@@ -326,10 +326,10 @@ String KVStore::ToString() const {
     return ss.str();
 }
 
-SizeT KVStore::KeyValueNum() const {
-    SizeT cnt = 0;
+size_t KVStore::KeyValueNum() const {
+    size_t cnt = 0;
     rocksdb::ReadOptions read_option;
-    UniquePtr<rocksdb::Iterator> iter{transaction_db_->NewIterator(read_option)};
+    std::unique_ptr<rocksdb::Iterator> iter{transaction_db_->NewIterator(read_option)};
     iter->SeekToFirst();
     for (; iter->Valid(); iter->Next()) {
         ++cnt;
@@ -337,10 +337,10 @@ SizeT KVStore::KeyValueNum() const {
     return cnt;
 }
 
-Vector<Pair<String, String>> KVStore::GetAllKeyValue() {
-    Vector<Pair<String, String>> result;
+std::vector<std::pair<std::string, std::string>> KVStore::GetAllKeyValue() {
+    std::vector<std::pair<std::string, std::string>> result;
     rocksdb::ReadOptions read_option;
-    UniquePtr<rocksdb::Iterator> iter{transaction_db_->NewIterator(read_option)};
+    std::unique_ptr<rocksdb::Iterator> iter{transaction_db_->NewIterator(read_option)};
     iter->SeekToFirst();
     for (; iter->Valid(); iter->Next()) {
         result.push_back({iter->key().ToString(), iter->value().ToString()});
@@ -348,7 +348,7 @@ Vector<Pair<String, String>> KVStore::GetAllKeyValue() {
     return result;
 }
 
-Status KVStore::Destroy(const String &db_path) {
+Status KVStore::Destroy(const std::string &db_path) {
     rocksdb::Options options;
     options.create_if_missing = true;
     options.manual_wal_flush = true;

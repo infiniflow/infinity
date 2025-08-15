@@ -36,36 +36,36 @@ namespace infinity {
 
 export class PhysicalAlter : public PhysicalOperator {
 public:
-    explicit PhysicalAlter(const SharedPtr<TableInfo>& table_info,
+    explicit PhysicalAlter(const std::shared_ptr<TableInfo>& table_info,
                            AlterStatementType type,
-                           SharedPtr<Vector<String>> output_names,
-                           SharedPtr<Vector<SharedPtr<DataType>>> output_types,
+                           std::shared_ptr<std::vector<std::string>> output_names,
+                           std::shared_ptr<std::vector<std::shared_ptr<DataType>>> output_types,
                            u64 id,
-                           SharedPtr<Vector<LoadMeta>> load_metas)
+                           std::shared_ptr<std::vector<LoadMeta>> load_metas)
         : PhysicalOperator(PhysicalOperatorType::kAlter, nullptr, nullptr, id, load_metas), table_info_(table_info),
           output_names_(std::move(output_names)), output_types_(std::move(output_types)) {}
 
     ~PhysicalAlter() override = default;
 
-    inline SharedPtr<Vector<String>> GetOutputNames() const final { return output_names_; }
+    inline std::shared_ptr<std::vector<std::string>> GetOutputNames() const final { return output_names_; }
 
-    inline SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const final { return output_types_; }
+    inline std::shared_ptr<std::vector<std::shared_ptr<DataType>>> GetOutputTypes() const final { return output_types_; }
 
 protected:
     AlterStatementType type_;
-    SharedPtr<TableInfo> table_info_{};
-    SharedPtr<Vector<String>> output_names_{};
-    SharedPtr<Vector<SharedPtr<DataType>>> output_types_{};
+    std::shared_ptr<TableInfo> table_info_{};
+    std::shared_ptr<std::vector<std::string>> output_names_{};
+    std::shared_ptr<std::vector<std::shared_ptr<DataType>>> output_types_{};
 };
 
 export class PhysicalRenameTable final : public PhysicalAlter {
 public:
-    PhysicalRenameTable(const SharedPtr<TableInfo>& table_info,
-                        String &&new_table_name,
-                        SharedPtr<Vector<String>> output_names,
-                        SharedPtr<Vector<SharedPtr<DataType>>> output_types,
+    PhysicalRenameTable(const std::shared_ptr<TableInfo>& table_info,
+                        std::string &&new_table_name,
+                        std::shared_ptr<std::vector<std::string>> output_names,
+                        std::shared_ptr<std::vector<std::shared_ptr<DataType>>> output_types,
                         u64 id,
-                        SharedPtr<Vector<LoadMeta>> load_metas)
+                        std::shared_ptr<std::vector<LoadMeta>> load_metas)
         : PhysicalAlter(table_info, AlterStatementType::kRenameTable, std::move(output_names), std::move(output_types), id, load_metas),
           new_table_name_(std::move(new_table_name)) {}
 
@@ -74,17 +74,17 @@ public:
     bool Execute(QueryContext *query_context, OperatorState *operator_state) override;
 
 private:
-    String new_table_name_;
+    std::string new_table_name_;
 };
 
 export class PhysicalAddColumns final : public PhysicalAlter {
 public:
-    PhysicalAddColumns(const SharedPtr<TableInfo>& table_info,
-                       const Vector<SharedPtr<ColumnDef>> &column_defs,
-                       SharedPtr<Vector<String>> output_names,
-                       SharedPtr<Vector<SharedPtr<DataType>>> output_types,
+    PhysicalAddColumns(const std::shared_ptr<TableInfo>& table_info,
+                       const std::vector<std::shared_ptr<ColumnDef>> &column_defs,
+                       std::shared_ptr<std::vector<std::string>> output_names,
+                       std::shared_ptr<std::vector<std::shared_ptr<DataType>>> output_types,
                        u64 id,
-                       SharedPtr<Vector<LoadMeta>> load_metas)
+                       std::shared_ptr<std::vector<LoadMeta>> load_metas)
         : PhysicalAlter(table_info, AlterStatementType::kAddColumns, std::move(output_names), std::move(output_types), id, load_metas),
           column_defs_(column_defs) {}
 
@@ -93,17 +93,17 @@ public:
     bool Execute(QueryContext *query_context, OperatorState *operator_state) override;
 
 private:
-    const Vector<SharedPtr<ColumnDef>> &column_defs_;
+    const std::vector<std::shared_ptr<ColumnDef>> &column_defs_;
 };
 
 export class PhysicalDropColumns final : public PhysicalAlter {
 public:
-    PhysicalDropColumns(const SharedPtr<TableInfo>& table_info,
-                        const Vector<String> &column_names,
-                        SharedPtr<Vector<String>> output_names,
-                        SharedPtr<Vector<SharedPtr<DataType>>> output_types,
+    PhysicalDropColumns(const std::shared_ptr<TableInfo>& table_info,
+                        const std::vector<std::string> &column_names,
+                        std::shared_ptr<std::vector<std::string>> output_names,
+                        std::shared_ptr<std::vector<std::shared_ptr<DataType>>> output_types,
                         u64 id,
-                        SharedPtr<Vector<LoadMeta>> load_metas)
+                        std::shared_ptr<std::vector<LoadMeta>> load_metas)
         : PhysicalAlter(table_info, AlterStatementType::kDropColumns, std::move(output_names), std::move(output_types), id, load_metas),
           column_names_(column_names) {}
 
@@ -112,7 +112,7 @@ public:
     bool Execute(QueryContext *query_context, OperatorState *operator_state) override;
 
 private:
-    const Vector<String> &column_names_;
+    const std::vector<std::string> &column_names_;
 };
 
 } // namespace infinity

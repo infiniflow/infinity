@@ -12,11 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:table_ref;
 
-import :stl;
+import std;
 
 import table_reference;
 
@@ -24,14 +22,14 @@ namespace infinity {
 
 export class TableRef {
 public:
-    explicit TableRef(TableRefType type, String alias) : type_(type), alias_(std::move(alias)) {}
+    explicit TableRef(TableRefType type, std::string alias) : type_(type), alias_(std::move(alias)) {}
     virtual ~TableRef() = default;
 
     [[nodiscard]] inline TableRefType type() const { return type_; }
-    [[nodiscard]] inline const String &alias() const { return alias_; }
+    [[nodiscard]] inline const std::string &alias() const { return alias_; }
 
     TableRefType type_{TableRefType::kTable};
-    String alias_{};
+    std::string alias_{};
 };
 
 } // namespace infinity

@@ -37,25 +37,25 @@ export class ExpressionEvaluator {
 public:
     void Init(const DataBlock *input_data_block);
 
-    void Execute(const SharedPtr<BaseExpression> &expr, SharedPtr<ExpressionState> &state, SharedPtr<ColumnVector> &output_column_vector);
+    void Execute(const std::shared_ptr<BaseExpression> &expr, std::shared_ptr<ExpressionState> &state, std::shared_ptr<ColumnVector> &output_column_vector);
 
-    void Execute(const SharedPtr<AggregateExpression> &expr, SharedPtr<ExpressionState> &state, SharedPtr<ColumnVector> &output_column_vector);
+    void Execute(const std::shared_ptr<AggregateExpression> &expr, std::shared_ptr<ExpressionState> &state, std::shared_ptr<ColumnVector> &output_column_vector);
 
-    void Execute(const SharedPtr<CastExpression> &expr, SharedPtr<ExpressionState> &state, SharedPtr<ColumnVector> &output_column_vector);
+    void Execute(const std::shared_ptr<CastExpression> &expr, std::shared_ptr<ExpressionState> &state, std::shared_ptr<ColumnVector> &output_column_vector);
 
-    void Execute(const SharedPtr<CaseExpression> &expr, SharedPtr<ExpressionState> &state, SharedPtr<ColumnVector> &output_column_vector);
+    void Execute(const std::shared_ptr<CaseExpression> &expr, std::shared_ptr<ExpressionState> &state, std::shared_ptr<ColumnVector> &output_column_vector);
 
-    void Execute(const SharedPtr<ColumnExpression> &expr, SharedPtr<ExpressionState> &state, SharedPtr<ColumnVector> &output_column_vector);
+    void Execute(const std::shared_ptr<ColumnExpression> &expr, std::shared_ptr<ExpressionState> &state, std::shared_ptr<ColumnVector> &output_column_vector);
 
-    void Execute(const SharedPtr<FunctionExpression> &expr, SharedPtr<ExpressionState> &state, SharedPtr<ColumnVector> &output_column_vector);
+    void Execute(const std::shared_ptr<FunctionExpression> &expr, std::shared_ptr<ExpressionState> &state, std::shared_ptr<ColumnVector> &output_column_vector);
 
-    void Execute(const SharedPtr<ValueExpression> &expr, SharedPtr<ExpressionState> &state, SharedPtr<ColumnVector> &output_column_vector);
+    void Execute(const std::shared_ptr<ValueExpression> &expr, std::shared_ptr<ExpressionState> &state, std::shared_ptr<ColumnVector> &output_column_vector);
 
-    void Execute(const SharedPtr<ReferenceExpression> &expr, SharedPtr<ExpressionState> &state, SharedPtr<ColumnVector> &output_column_vector);
+    void Execute(const std::shared_ptr<ReferenceExpression> &expr, std::shared_ptr<ExpressionState> &state, std::shared_ptr<ColumnVector> &output_column_vector);
 
-    void Execute(const SharedPtr<InExpression> &expr, SharedPtr<ExpressionState> &state, SharedPtr<ColumnVector> &output_column_vector);
+    void Execute(const std::shared_ptr<InExpression> &expr, std::shared_ptr<ExpressionState> &state, std::shared_ptr<ColumnVector> &output_column_vector);
 
-    void Execute(const SharedPtr<FilterFulltextExpression> &expr, SharedPtr<ExpressionState> &state, SharedPtr<ColumnVector> &output_column_vector);
+    void Execute(const std::shared_ptr<FilterFulltextExpression> &expr, std::shared_ptr<ExpressionState> &state, std::shared_ptr<ColumnVector> &output_column_vector);
 
 private:
     const DataBlock *input_data_block_{};

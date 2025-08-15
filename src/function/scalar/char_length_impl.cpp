@@ -32,9 +32,9 @@ inline bool CharLengthFunction::Run(VarcharT &left, int &result) {
 }
 
 void RegisterCharLengthFunction(NewCatalog *catalog_ptr) {
-    String func_name = "char_length";
+    std::string func_name = "char_length";
 
-    SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
+    std::shared_ptr<ScalarFunctionSet> function_set_ptr = std::make_shared<ScalarFunctionSet>(func_name);
 
     ScalarFunction char_length_function(func_name,
                                         {DataType(LogicalType::kVarchar)},

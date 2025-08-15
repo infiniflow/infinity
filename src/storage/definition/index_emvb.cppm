@@ -30,32 +30,32 @@ namespace infinity {
 
 export class IndexEMVB final : public IndexBase {
 public:
-    IndexEMVB(SharedPtr<String> index_name,
-              SharedPtr<String> index_comment,
-              const String &file_name,
-              Vector<String> column_names,
+    IndexEMVB(std::shared_ptr<std::string> index_name,
+              std::shared_ptr<std::string> index_comment,
+              const std::string &file_name,
+              std::vector<std::string> column_names,
               const u32 residual_pq_subspace_num,
               const u32 residual_pq_subspace_bits)
         : IndexBase(IndexType::kEMVB, std::move(index_name), index_comment, file_name, std::move(column_names)),
           residual_pq_subspace_num_(residual_pq_subspace_num), residual_pq_subspace_bits_(residual_pq_subspace_bits) {}
 
-    static SharedPtr<IndexBase> Make(SharedPtr<String> index_name,
-                                     SharedPtr<String> index_comment,
-                                     const String &file_name,
-                                     Vector<String> column_names,
-                                     const Vector<InitParameter *> &index_param_list);
+    static std::shared_ptr<IndexBase> Make(std::shared_ptr<std::string> index_name,
+                                     std::shared_ptr<std::string> index_comment,
+                                     const std::string &file_name,
+                                     std::vector<std::string> column_names,
+                                     const std::vector<InitParameter *> &index_param_list);
 
     ~IndexEMVB() override = default;
 
-    String BuildOtherParamsString() const override;
+    std::string BuildOtherParamsString() const override;
 
-    static void ValidateColumnDataType(const SharedPtr<BaseTableRef> &base_table_ref, const String &column_name);
+    static void ValidateColumnDataType(const std::shared_ptr<BaseTableRef> &base_table_ref, const std::string &column_name);
 
     i32 GetSizeInBytes() const override;
 
     void WriteAdv(char *&ptr) const override;
 
-    String ToString() const override;
+    std::string ToString() const override;
 
     nlohmann::json Serialize() const override;
 

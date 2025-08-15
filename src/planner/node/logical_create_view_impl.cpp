@@ -12,14 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:logical_create_view.impl;
 
 import :logical_create_view;
-import :stl;
 import :column_binding;
 import :logical_create_view;
+import :infinity_type;
 
 import std;
 
@@ -30,30 +28,30 @@ import data_type;
 
 namespace infinity {
 
-Vector<ColumnBinding> LogicalCreateView::GetColumnBindings() const { return {}; }
+std::vector<ColumnBinding> LogicalCreateView::GetColumnBindings() const { return {}; }
 
-SharedPtr<Vector<String>> LogicalCreateView::GetOutputNames() const {
-    SharedPtr<Vector<String>> result = MakeShared<Vector<String>>();
+std::shared_ptr<std::vector<std::string>> LogicalCreateView::GetOutputNames() const {
+    std::shared_ptr<std::vector<std::string>> result = std::make_shared<std::vector<std::string>>();
     result->emplace_back("OK");
     return result;
 }
 
-SharedPtr<Vector<SharedPtr<DataType>>> LogicalCreateView::GetOutputTypes() const {
-    SharedPtr<Vector<SharedPtr<DataType>>> result_type = MakeShared<Vector<SharedPtr<DataType>>>();
-    result_type->emplace_back(MakeShared<DataType>(LogicalType::kInteger));
+std::shared_ptr<std::vector<std::shared_ptr<DataType>>> LogicalCreateView::GetOutputTypes() const {
+    std::shared_ptr<std::vector<std::shared_ptr<DataType>>> result_type = std::make_shared<std::vector<std::shared_ptr<DataType>>>();
+    result_type->emplace_back(std::make_shared<DataType>(LogicalType::kInteger));
     return result_type;
 }
 
-const SharedPtr<CreateViewInfo> LogicalCreateView::create_view_info() const { return create_view_info_; }
+const std::shared_ptr<CreateViewInfo> LogicalCreateView::create_view_info() const { return create_view_info_; }
 
-String LogicalCreateView::ToString(i64 &space) const {
+std::string LogicalCreateView::ToString(i64 &space) const {
     std::stringstream ss;
-    String arrow_str;
+    std::string arrow_str;
     if (space > 3) {
         space -= 4;
         arrow_str = "->  ";
     }
-    ss << String(space, ' ') << arrow_str << "Create View: " << create_view_info_->schema_name_ << "." << create_view_info_->view_name_;
+    ss << std::string(space, ' ') << arrow_str << "Create View: " << create_view_info_->schema_name_ << "." << create_view_info_->view_name_;
     space += arrow_str.size();
 
     return ss.str();

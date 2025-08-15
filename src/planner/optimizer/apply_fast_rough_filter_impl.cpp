@@ -41,7 +41,7 @@ namespace infinity {
 
 class ApplyFastRoughFilterMethod {
 public:
-    inline static void VisitNode(SharedPtr<LogicalNode> &op) {
+    inline static void VisitNode(std::shared_ptr<LogicalNode> &op) {
         if (!op) {
             return;
         }
@@ -97,6 +97,6 @@ public:
     }
 };
 
-void ApplyFastRoughFilter::ApplyToPlan(QueryContext *, SharedPtr<LogicalNode> &logical_plan) { ApplyFastRoughFilterMethod::VisitNode(logical_plan); }
+void ApplyFastRoughFilter::ApplyToPlan(QueryContext *, std::shared_ptr<LogicalNode> &logical_plan) { ApplyFastRoughFilterMethod::VisitNode(logical_plan); }
 
 } // namespace infinity

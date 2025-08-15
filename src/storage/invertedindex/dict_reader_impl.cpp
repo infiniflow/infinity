@@ -28,7 +28,7 @@ import :infinity_exception;
 
 namespace infinity {
 
-DictionaryReader::DictionaryReader(const String &dict_path, const PostingFormatOption &option)
+DictionaryReader::DictionaryReader(const std::string &dict_path, const PostingFormatOption &option)
     : dict_path_(dict_path), meta_loader_(option), data_ptr_(nullptr), data_len_(0) {
     // Check if file exists before mmap
     if (!VirtualStore::Exists(dict_path)) {
@@ -45,8 +45,8 @@ DictionaryReader::DictionaryReader(const String &dict_path, const PostingFormatO
     }
     
     // fst_root_addr + addr_offset(21) == fst_len
-    SizeT fst_root_addr = ReadU64LE(data_ptr_ + data_len_ - 4 - 8);
-    SizeT fst_len;
+    size_t fst_root_addr = ReadU64LE(data_ptr_ + data_len_ - 4 - 8);
+    size_t fst_len;
     if (fst_root_addr == 0UL)
         fst_len = 36;
     else
@@ -64,8 +64,8 @@ DictionaryReader::DictionaryReader(const String &dict_path, const PostingFormatO
         throw UnrecoverableException("Invalid FST data pointer");
     }
     
-    fst_ = MakeUnique<Fst>(fst_data, fst_len);
-    s_ = MakeUnique<FstStream>(*fst_);
+    fst_ = std::make_unique<Fst>(fst_data, fst_len);
+    s_ = std::make_unique<FstStream>(*fst_);
 }
 
 DictionaryReader::~DictionaryReader() {
@@ -78,33 +78,33 @@ DictionaryReader::~DictionaryReader() {
     }
 }
 
-bool DictionaryReader::Lookup(const String &key, TermMeta &term_meta) {
+bool DictionaryReader::Lookup(const std::string &key, TermMeta &term_meta) {
     u64 val;
     bool found = fst_->Get((u8 *)key.c_str(), key.length(), val);
     if (!found) {
         return false;
     }
     u8 *data_cursor = data_ptr_ + val;
-    SizeT left_size = data_len_ - val;
+    size_t left_size = data_len_ - val;
     meta_loader_.Load(data_cursor, left_size, term_meta);
     return true;
 }
 
-void DictionaryReader::InitIterator(const String &min, const String &max) {
+void DictionaryReader::InitIterator(const std::string &min, const std::string &max) {
     s_->Reset((u8 *)min.c_str(), min.length(), (u8 *)max.c_str(), max.length());
 }
 
-void DictionaryReader::InitIterator(const String &prefix) { s_->Reset((u8 *)prefix.c_str(), prefix.length()); }
+void DictionaryReader::InitIterator(const std::string &prefix) { s_->Reset((u8 *)prefix.c_str(), prefix.length()); }
 
-bool DictionaryReader::Next(String &term, TermMeta &term_meta) {
-    Vector<u8> key;
+bool DictionaryReader::Next(std::string &term, TermMeta &term_meta) {
+    std::vector<u8> key;
     u64 val;
     if (!s_->Next(key, val)) {
         return false;
     }
-    term = String((char *)key.data(), key.size());
+    term = std::string((char *)key.data(), key.size());
     u8 *data_cursor = data_ptr_ + val;
-    SizeT left_size = data_len_ - val;
+    size_t left_size = data_len_ - val;
     meta_loader_.Load(data_cursor, left_size, term_meta);
     return true;
 }

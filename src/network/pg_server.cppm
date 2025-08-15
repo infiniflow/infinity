@@ -32,19 +32,19 @@ enum struct PGServerStatus : u8 {
 
 export class PGServer {
 public:
-    Thread Run();
+    std::thread Run();
 
     void Shutdown();
 
 private:
     void CreateConnection();
 
-    void StartConnection(SharedPtr<Connection> &connection);
+    void StartConnection(std::shared_ptr<Connection> &connection);
 
-    Atomic<PGServerStatus> status_{PGServerStatus::kStopped};
+    std::atomic<PGServerStatus> status_{PGServerStatus::kStopped};
     atomic_u64 running_connection_count_{0};
-    UniquePtr<boost::asio::io_context> io_context_ptr_{};
-    UniquePtr<boost::asio::ip::tcp::acceptor> acceptor_ptr_{};
+    std::unique_ptr<boost::asio::io_context> io_context_ptr_{};
+    std::unique_ptr<boost::asio::ip::tcp::acceptor> acceptor_ptr_{};
 };
 
 } // namespace infinity

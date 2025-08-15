@@ -37,34 +37,34 @@ namespace infinity {
 
 export class LogicalMatch : public LogicalNode {
 public:
-    explicit LogicalMatch(u64 node_id, SharedPtr<BaseTableRef> base_table_ref, SharedPtr<MatchExpression> match_expr);
+    explicit LogicalMatch(u64 node_id, std::shared_ptr<BaseTableRef> base_table_ref, std::shared_ptr<MatchExpression> match_expr);
 
-    [[nodiscard]] Vector<ColumnBinding> GetColumnBindings() const final;
+    [[nodiscard]] std::vector<ColumnBinding> GetColumnBindings() const final;
 
-    [[nodiscard]] SharedPtr<Vector<String>> GetOutputNames() const final;
+    [[nodiscard]] std::shared_ptr<std::vector<std::string>> GetOutputNames() const final;
 
-    [[nodiscard]] SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const final;
+    [[nodiscard]] std::shared_ptr<std::vector<std::shared_ptr<DataType>>> GetOutputTypes() const final;
 
     [[nodiscard]] TableInfo *table_info() const;
 
-    [[nodiscard]] String TableAlias() const;
+    [[nodiscard]] std::string TableAlias() const;
 
     [[nodiscard]] u64 TableIndex() const;
 
-    String ToString(i64 &space) const final;
+    std::string ToString(i64 &space) const final;
 
-    inline String name() final { return "LogicalMatch"; }
+    inline std::string name() final { return "LogicalMatch"; }
 
-    SharedPtr<BaseTableRef> base_table_ref_{};
-    SharedPtr<MatchExpression> match_expr_{};
-    SharedPtr<BaseExpression> filter_expression_{};
-    SharedPtr<IndexReader> index_reader_;
-    UniquePtr<QueryNode> query_tree_;
+    std::shared_ptr<BaseTableRef> base_table_ref_{};
+    std::shared_ptr<MatchExpression> match_expr_{};
+    std::shared_ptr<BaseExpression> filter_expression_{};
+    std::shared_ptr<IndexReader> index_reader_;
+    std::unique_ptr<QueryNode> query_tree_;
     float begin_threshold_;
     EarlyTermAlgo early_term_algo_{EarlyTermAlgo::kAuto};
     u32 top_n_{1};
 
-    SharedPtr<CommonQueryFilter> common_query_filter_{};
+    std::shared_ptr<CommonQueryFilter> common_query_filter_{};
     MinimumShouldMatchOption minimum_should_match_option_{};
     RankFeaturesOption rank_features_option_{};
     f32 score_threshold_{};

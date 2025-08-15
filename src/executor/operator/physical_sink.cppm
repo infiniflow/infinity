@@ -38,15 +38,15 @@ export enum class SinkType {
     kResult,
 };
 
-export String ToString(SinkType sink_type);
+export std::string ToString(SinkType sink_type);
 
 export class PhysicalSink final : public PhysicalOperator {
 public:
     explicit PhysicalSink(u64 id,
                           SinkType sink_type,
-                          SharedPtr<Vector<String>> names,
-                          SharedPtr<Vector<SharedPtr<DataType>>> types,
-                          SharedPtr<Vector<LoadMeta>> load_metas)
+                          std::shared_ptr<std::vector<std::string>> names,
+                          std::shared_ptr<std::vector<std::shared_ptr<DataType>>> types,
+                          std::shared_ptr<std::vector<LoadMeta>> load_metas)
         : PhysicalOperator(PhysicalOperatorType::kSink, nullptr, nullptr, id, load_metas), output_names_(std::move(names)),
           output_types_(std::move(types)), type_(sink_type) {}
 
@@ -58,9 +58,9 @@ public:
 
     bool Execute(QueryContext *query_context, FragmentContext *fragment_context, SinkState *sink_state);
 
-    inline SharedPtr<Vector<String>> GetOutputNames() const final { return output_names_; }
+    inline std::shared_ptr<std::vector<std::string>> GetOutputNames() const final { return output_names_; }
 
-    inline SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const final { return output_types_; }
+    inline std::shared_ptr<std::vector<std::shared_ptr<DataType>>> GetOutputTypes() const final { return output_types_; }
 
     inline SinkType sink_type() const { return type_; }
 
@@ -76,8 +76,8 @@ private:
     void FillSinkStateFromLastOperatorState(FragmentContext *fragment_context, QueueSinkState *queue_sink_state, OperatorState *task_operator_state);
 
 private:
-    SharedPtr<Vector<String>> output_names_{};
-    SharedPtr<Vector<SharedPtr<DataType>>> output_types_{};
+    std::shared_ptr<std::vector<std::string>> output_names_{};
+    std::shared_ptr<std::vector<std::shared_ptr<DataType>>> output_types_{};
     SinkType type_{SinkType::kInvalid};
 };
 

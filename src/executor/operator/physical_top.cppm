@@ -42,12 +42,12 @@ export class CompareTwoRowAndPreferLeft {
 public:
     CompareTwoRowAndPreferLeft() = default;
     explicit CompareTwoRowAndPreferLeft(
-        Vector<std::function<std::strong_ordering(const SharedPtr<ColumnVector> &, u32, const SharedPtr<ColumnVector> &, u32)>> &&sort_functions)
+        std::vector<std::function<std::strong_ordering(const std::shared_ptr<ColumnVector> &, u32, const std::shared_ptr<ColumnVector> &, u32)>> &&sort_functions)
         : sort_functions_(std::move(sort_functions)) {
         sort_expr_count_ = sort_functions_.size();
     }
     ~CompareTwoRowAndPreferLeft() = default;
-    bool Compare(const Vector<SharedPtr<ColumnVector>> &left, u32 left_id, const Vector<SharedPtr<ColumnVector>> &right, u32 right_id) const {
+    bool Compare(const std::vector<std::shared_ptr<ColumnVector>> &left, u32 left_id, const std::vector<std::shared_ptr<ColumnVector>> &right, u32 right_id) const {
         for (u32 i = 0; i < sort_expr_count_; ++i) {
             auto compare_result = sort_functions_[i](left[i], left_id, right[i], right_id);
             if (compare_result != std::strong_ordering::equal) {
@@ -60,19 +60,19 @@ public:
 
 private:
     u32 sort_expr_count_{};
-    Vector<std::function<std::strong_ordering(const SharedPtr<ColumnVector> &, u32, const SharedPtr<ColumnVector> &, u32)>>
+    std::vector<std::function<std::strong_ordering(const std::shared_ptr<ColumnVector> &, u32, const std::shared_ptr<ColumnVector> &, u32)>>
         sort_functions_; // sort functions
 };
 
 export class PhysicalTop : public PhysicalOperator {
 public:
     explicit PhysicalTop(u64 id,
-                         UniquePtr<PhysicalOperator> left,
+                         std::unique_ptr<PhysicalOperator> left,
                          u32 limit,
                          u32 offset,
-                         Vector<SharedPtr<BaseExpression>> sort_expressions,
-                         Vector<OrderType> order_by_types,
-                         SharedPtr<Vector<LoadMeta>> load_metas,
+                         std::vector<std::shared_ptr<BaseExpression>> sort_expressions,
+                         std::vector<OrderType> order_by_types,
+                         std::shared_ptr<std::vector<LoadMeta>> load_metas,
                          bool total_hits_count_flag)
         : PhysicalOperator(PhysicalOperatorType::kTop, std::move(left), nullptr, id, load_metas), limit_(limit), offset_(offset),
           order_by_types_(std::move(order_by_types)), sort_expressions_(std::move(sort_expressions)), total_hits_count_flag_(total_hits_count_flag) {}
@@ -83,11 +83,11 @@ public:
 
     bool Execute(QueryContext *query_context, OperatorState *operator_state) final;
 
-    inline SharedPtr<Vector<String>> GetOutputNames() const final { return PhysicalCommonFunctionUsingLoadMeta::GetOutputNames(*this); }
+    inline std::shared_ptr<std::vector<std::string>> GetOutputNames() const final { return PhysicalCommonFunctionUsingLoadMeta::GetOutputNames(*this); }
 
-    inline SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const final { return PhysicalCommonFunctionUsingLoadMeta::GetOutputTypes(*this); }
+    inline std::shared_ptr<std::vector<std::shared_ptr<DataType>>> GetOutputTypes() const final { return PhysicalCommonFunctionUsingLoadMeta::GetOutputTypes(*this); }
 
-    SizeT TaskletCount() override { return left_->TaskletCount(); }
+    size_t TaskletCount() override { return left_->TaskletCount(); }
 
     // for OperatorState and Explain
     inline auto const &GetSortExpressions() const { return sort_expressions_; }
@@ -105,23 +105,23 @@ public:
     inline auto const &GetInnerCompareFunction() const { return prefer_left_function_; }
 
     // for Top and MergeTop
-    static void HandleOutputOffset(u32 total_row_cnt, u32 offset, Vector<UniquePtr<DataBlock>> &output_data_block_array);
+    static void HandleOutputOffset(u32 total_row_cnt, u32 offset, std::vector<std::unique_ptr<DataBlock>> &output_data_block_array);
 
     // for Top and MergeTop
-    static Vector<Vector<SharedPtr<ColumnVector>>> GetEvalColumns(const Vector<SharedPtr<BaseExpression>> &expressions,
-                                                                  Vector<SharedPtr<ExpressionState>> &expr_states,
-                                                                  const Vector<UniquePtr<DataBlock>> &data_block_array);
+    static std::vector<std::vector<std::shared_ptr<ColumnVector>>> GetEvalColumns(const std::vector<std::shared_ptr<BaseExpression>> &expressions,
+                                                                  std::vector<std::shared_ptr<ExpressionState>> &expr_states,
+                                                                  const std::vector<std::unique_ptr<DataBlock>> &data_block_array);
 
     // for Top and Sort
-    static std::function<std::strong_ordering(const SharedPtr<ColumnVector> &, u32, const SharedPtr<ColumnVector> &, u32)>
-    GenerateSortFunction(OrderType compare_order, SharedPtr<BaseExpression> &sort_expression);
+    static std::function<std::strong_ordering(const std::shared_ptr<ColumnVector> &, u32, const std::shared_ptr<ColumnVector> &, u32)>
+    GenerateSortFunction(OrderType compare_order, std::shared_ptr<BaseExpression> &sort_expression);
 
 private:
     u32 limit_{};                                        // limit value
     u32 offset_{};                                       // offset value
     u32 sort_expr_count_{};                              // number of expressions to sort
-    Vector<OrderType> order_by_types_;                   // ASC or DESC
-    Vector<SharedPtr<BaseExpression>> sort_expressions_; // expressions to sort
+    std::vector<OrderType> order_by_types_;                   // ASC or DESC
+    std::vector<std::shared_ptr<BaseExpression>> sort_expressions_; // expressions to sort
     CompareTwoRowAndPreferLeft prefer_left_function_;    // compare function
     bool total_hits_count_flag_{};
     // TODO: save a common threshold value for all tasks

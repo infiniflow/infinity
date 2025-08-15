@@ -42,14 +42,14 @@ struct OrFunction {
                              std::is_same_v<std::remove_cv_t<TC>, BooleanT>) {
             result = left or right;
         } else {
-            String error_message = "OR function accepts only u8 and BooleanT.";
+            std::string error_message = "OR function accepts only u8 and BooleanT.";
             UnrecoverableError(error_message);
         }
     }
 };
 
-static void GenerateOrFunction(SharedPtr<ScalarFunctionSet> &function_set_ptr) {
-    String func_name = "OR";
+static void GenerateOrFunction(std::shared_ptr<ScalarFunctionSet> &function_set_ptr) {
+    std::string func_name = "OR";
     ScalarFunction or_function(func_name,
                                {DataType(LogicalType::kBoolean), DataType(LogicalType::kBoolean)},
                                {DataType(LogicalType::kBoolean)},
@@ -58,9 +58,9 @@ static void GenerateOrFunction(SharedPtr<ScalarFunctionSet> &function_set_ptr) {
 }
 
 void RegisterOrFunction(NewCatalog *catalog_ptr) {
-    String func_name = "OR";
+    std::string func_name = "OR";
 
-    SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
+    std::shared_ptr<ScalarFunctionSet> function_set_ptr = std::make_shared<ScalarFunctionSet>(func_name);
 
     GenerateOrFunction(function_set_ptr);
 

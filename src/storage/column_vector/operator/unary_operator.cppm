@@ -33,17 +33,17 @@ struct ColumnVectorCastData;
 export class UnaryOperator {
 public:
     template <typename InputType, typename ResultType, typename Operator>
-    static void inline Execute(const SharedPtr<ColumnVector> &input,
-                               SharedPtr<ColumnVector> &result,
-                               SizeT count,
+    static void inline Execute(const std::shared_ptr<ColumnVector> &input,
+                               std::shared_ptr<ColumnVector> &result,
+                               size_t count,
                                void *state_ptr_input,
                                void *state_ptr,
                                bool nullable) {
         const auto *input_ptr = (const InputType *)(input->data());
-        const SharedPtr<Bitmask> &input_null = input->nulls_ptr_;
+        const std::shared_ptr<Bitmask> &input_null = input->nulls_ptr_;
 
         auto *result_ptr = (ResultType *)(result->data());
-        SharedPtr<Bitmask> &result_null = result->nulls_ptr_;
+        std::shared_ptr<Bitmask> &result_null = result->nulls_ptr_;
 
         switch (input->vector_type()) {
             case ColumnVectorType::kInvalid: {
@@ -140,21 +140,21 @@ private:
     template <typename InputType, typename ResultType, typename Operator>
     static void inline ExecuteFlat(const InputType *__restrict input_ptr,
                                    ResultType *__restrict result_ptr,
-                                   SharedPtr<Bitmask> &result_null,
-                                   SizeT count,
+                                   std::shared_ptr<Bitmask> &result_null,
+                                   size_t count,
                                    void *state_ptr_input,
                                    void *state_ptr) {
-        for (SizeT i = 0; i < count; i++) {
+        for (size_t i = 0; i < count; i++) {
             Operator::template Execute<InputType, ResultType>(input_ptr[i], result_ptr[i], result_null.get(), i, state_ptr_input, state_ptr);
         }
     }
 
     template <typename InputType, typename ResultType, typename Operator>
     static void inline ExecuteFlatWithNull(const InputType *__restrict input_ptr,
-                                           const SharedPtr<Bitmask> &input_null,
+                                           const std::shared_ptr<Bitmask> &input_null,
                                            ResultType *__restrict result_ptr,
-                                           SharedPtr<Bitmask> &result_null,
-                                           SizeT count,
+                                           std::shared_ptr<Bitmask> &result_null,
+                                           size_t count,
                                            void *state_ptr_input,
                                            void *state_ptr) {
         *result_null = *input_null;
@@ -175,28 +175,28 @@ private:
     template <typename InputType, typename ResultType, typename Operator>
     static void inline ExecuteHeterogeneous(const InputType *__restrict input_ptr,
                                             ResultType *__restrict result_ptr,
-                                            SharedPtr<Bitmask> &result_null,
-                                            SizeT count,
+                                            std::shared_ptr<Bitmask> &result_null,
+                                            size_t count,
                                             void *state_ptr_input,
                                             void *state_ptr) {
-        for (SizeT i = 0; i < count; i++) {
+        for (size_t i = 0; i < count; i++) {
             Operator::template Execute<InputType, ResultType>(input_ptr[i], result_ptr[i], result_null.get(), i, state_ptr_input, state_ptr);
         }
     }
 
     template <typename Operator>
-    static void inline ExecuteBoolean(const SharedPtr<ColumnVector> &input,
-                                      SharedPtr<ColumnVector> &result,
-                                      SizeT count,
+    static void inline ExecuteBoolean(const std::shared_ptr<ColumnVector> &input,
+                                      std::shared_ptr<ColumnVector> &result,
+                                      size_t count,
                                       void *state_ptr_input,
                                       void *state_ptr) {
-        SharedPtr<Bitmask> &result_null = result->nulls_ptr_;
+        std::shared_ptr<Bitmask> &result_null = result->nulls_ptr_;
         result_null->SetAllTrue();
-        SizeT count_bytes = count / 8;
-        SizeT count_tail = count % 8;
+        size_t count_bytes = count / 8;
+        size_t count_tail = count % 8;
         auto input_u8 = reinterpret_cast<const u8 *>(input->data());
         auto result_u8 = reinterpret_cast<u8 *>(result->data());
-        for (SizeT i = 0; i < count_bytes; ++i) {
+        for (size_t i = 0; i < count_bytes; ++i) {
             Operator::Execute(input_u8[i], result_u8[i], result_null.get(), 0, state_ptr_input, state_ptr);
         }
         if (count_tail > 0) {
@@ -209,9 +209,9 @@ private:
     }
 
     template <typename Operator>
-    static void inline ExecuteBooleanWithNull(const SharedPtr<ColumnVector> &input,
-                                              SharedPtr<ColumnVector> &result,
-                                              SizeT count,
+    static void inline ExecuteBooleanWithNull(const std::shared_ptr<ColumnVector> &input,
+                                              std::shared_ptr<ColumnVector> &result,
+                                              size_t count,
                                               void *state_ptr_input,
                                               void *state_ptr) {
         const auto &input_null = input->nulls_ptr_;
@@ -231,11 +231,11 @@ private:
 
     template <typename InputType, typename ResultType, typename Operator>
     static void inline ExecuteFlatToBoolean(const InputType *__restrict input_ptr,
-                                            SharedPtr<ColumnVector> &result,
-                                            SizeT count,
+                                            std::shared_ptr<ColumnVector> &result,
+                                            size_t count,
                                             void *state_ptr_input,
                                             void *state_ptr) {
-        for (SizeT i = 0; i < count; i++) {
+        for (size_t i = 0; i < count; i++) {
             BooleanT answer;
             Operator::Execute(input_ptr[i], answer, result->nulls_ptr_.get(), i, state_ptr_input, state_ptr);
             result->buffer_->SetCompactBit(i, answer);
@@ -244,8 +244,8 @@ private:
 
     template <typename InputType, typename ResultType, typename Operator>
     static void inline ExecuteFlatToBooleanWithNull(const InputType *__restrict input_ptr,
-                                                    SharedPtr<ColumnVector> &result,
-                                                    SizeT count,
+                                                    std::shared_ptr<ColumnVector> &result,
+                                                    size_t count,
                                                     void *state_ptr_input,
                                                     void *state_ptr) {
         auto &result_null = result->nulls_ptr_;

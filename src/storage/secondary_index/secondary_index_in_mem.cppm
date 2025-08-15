@@ -56,9 +56,9 @@ public:
 
     virtual void Dump(BufferObj *buffer_obj) const = 0;
 
-    virtual Pair<u32, Bitmask> RangeQuery(const void *input) const = 0;
+    virtual std::pair<u32, Bitmask> RangeQuery(const void *input) const = 0;
 
-    static SharedPtr<SecondaryIndexInMem> NewSecondaryIndexInMem(const SharedPtr<ColumnDef> &column_def, RowID begin_row_id);
+    static std::shared_ptr<SecondaryIndexInMem> NewSecondaryIndexInMem(const std::shared_ptr<ColumnDef> &column_def, RowID begin_row_id);
 };
 
 } // namespace infinity

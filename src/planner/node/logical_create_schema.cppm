@@ -12,11 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:logical_create_schema;
 
-import :stl;
 import :logical_node_type;
 import :column_binding;
 import :logical_node;
@@ -29,36 +26,36 @@ namespace infinity {
 
 export class LogicalCreateSchema : public LogicalNode {
 public:
-    static inline SharedPtr<LogicalCreateSchema>
-    Make(u64 node_id, SharedPtr<String> schema_name, ConflictType conflict_type, SharedPtr<String> comment) {
-        return MakeShared<LogicalCreateSchema>(node_id, std::move(schema_name), conflict_type, std::move(comment));
+    static inline std::shared_ptr<LogicalCreateSchema>
+    Make(u64 node_id, std::shared_ptr<std::string> schema_name, ConflictType conflict_type, std::shared_ptr<std::string> comment) {
+        return std::make_shared<LogicalCreateSchema>(node_id, std::move(schema_name), conflict_type, std::move(comment));
     }
 
 public:
-    LogicalCreateSchema(u64 node_id, const SharedPtr<String> schema_name, ConflictType conflict_type, SharedPtr<String> comment)
+    LogicalCreateSchema(u64 node_id, const std::shared_ptr<std::string> schema_name, ConflictType conflict_type, std::shared_ptr<std::string> comment)
         : LogicalNode(node_id, LogicalNodeType::kCreateSchema), schema_name_(std::move(schema_name)), conflict_type_(conflict_type),
           comment_(std::move(comment)) {}
 
-    [[nodiscard]] Vector<ColumnBinding> GetColumnBindings() const final;
+    [[nodiscard]] std::vector<ColumnBinding> GetColumnBindings() const final;
 
-    [[nodiscard]] SharedPtr<Vector<String>> GetOutputNames() const final;
+    [[nodiscard]] std::shared_ptr<std::vector<std::string>> GetOutputNames() const final;
 
-    [[nodiscard]] SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const final;
+    [[nodiscard]] std::shared_ptr<std::vector<std::shared_ptr<DataType>>> GetOutputTypes() const final;
 
-    String ToString(i64 &space) const final;
+    std::string ToString(i64 &space) const final;
 
-    inline String name() final { return "LogicalCreateSchema"; }
+    inline std::string name() final { return "LogicalCreateSchema"; }
 
-    [[nodiscard]] inline SharedPtr<String> schema_name() const { return schema_name_; }
+    [[nodiscard]] inline std::shared_ptr<std::string> schema_name() const { return schema_name_; }
 
     [[nodiscard]] inline ConflictType conflict_type() const { return conflict_type_; }
 
-    [[nodiscard]] inline SharedPtr<String> comment() const { return comment_; }
+    [[nodiscard]] inline std::shared_ptr<std::string> comment() const { return comment_; }
 
 private:
-    SharedPtr<String> schema_name_{};
+    std::shared_ptr<std::string> schema_name_{};
     ConflictType conflict_type_{ConflictType::kInvalid};
-    SharedPtr<String> comment_{};
+    std::shared_ptr<std::string> comment_{};
 };
 
 } // namespace infinity

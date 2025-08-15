@@ -33,13 +33,13 @@ namespace infinity {
 
 bool FastRoughFilter::IsValid() const { return min_max_data_filter_ != nullptr; }
 
-String FastRoughFilter::SerializeToString() const {
+std::string FastRoughFilter::SerializeToString() const {
     if (HaveMinMaxFilter()) {
         u32 probabilistic_data_filter_binary_bytes = probabilistic_data_filter_->GetSerializeSizeInBytes();
         u32 min_max_data_filter_binary_bytes = min_max_data_filter_->GetSerializeSizeInBytes();
         u32 total_binary_bytes =
             sizeof(total_binary_bytes) + sizeof(build_time_) + probabilistic_data_filter_binary_bytes + min_max_data_filter_binary_bytes;
-        String save_to_binary;
+        std::string save_to_binary;
         save_to_binary.reserve(total_binary_bytes);
         OStringStream os(std::move(save_to_binary));
         os.write(reinterpret_cast<const char *>(&total_binary_bytes), sizeof(total_binary_bytes));
@@ -55,7 +55,7 @@ String FastRoughFilter::SerializeToString() const {
     return {};
 }
 
-void FastRoughFilter::DeserializeFromString(const String &str) {
+void FastRoughFilter::DeserializeFromString(const std::string &str) {
     // load necessary parts
     IStringStream is(str);
     u32 total_binary_bytes{};
@@ -70,11 +70,11 @@ void FastRoughFilter::DeserializeFromString(const String &str) {
     }
     is.read(reinterpret_cast<char *>(&build_time_), sizeof(build_time_));
     if (!probabilistic_data_filter_) {
-        probabilistic_data_filter_ = MakeUnique<ProbabilisticDataFilter>();
+        probabilistic_data_filter_ = std::make_unique<ProbabilisticDataFilter>();
     }
     probabilistic_data_filter_->DeserializeFromStringStream(is);
     if (!min_max_data_filter_) {
-        min_max_data_filter_ = MakeUnique<MinMaxDataFilter>();
+        min_max_data_filter_ = std::make_unique<MinMaxDataFilter>();
     }
     min_max_data_filter_->DeserializeFromStringStream(is);
     // check position
@@ -114,7 +114,7 @@ bool FastRoughFilter::LoadFromJsonFile(std::string_view json_sv) {
     bool load_success = true;
     {
         // load ProbabilisticDataFilter
-        auto load_probabilistic_data_filter = MakeUnique<ProbabilisticDataFilter>();
+        auto load_probabilistic_data_filter = std::make_unique<ProbabilisticDataFilter>();
         if (load_probabilistic_data_filter->LoadFromJsonFile(json_sv)) {
             probabilistic_data_filter_ = std::move(load_probabilistic_data_filter);
             // LOG_TRACE("FastRoughFilter::LoadFromJsonFile(): Finish load ProbabilisticDataFilter data from json.");
@@ -125,7 +125,7 @@ bool FastRoughFilter::LoadFromJsonFile(std::string_view json_sv) {
     }
     {
         // load MinMaxDataFilter
-        auto load_min_max_data_filter = MakeUnique<MinMaxDataFilter>();
+        auto load_min_max_data_filter = std::make_unique<MinMaxDataFilter>();
         if (load_min_max_data_filter->LoadFromJsonFile(json_sv)) {
             min_max_data_filter_ = std::move(load_min_max_data_filter);
             // LOG_TRACE("FastRoughFilter::LoadFromJsonFile(): Finish load MinMaxDataFilter data from json.");

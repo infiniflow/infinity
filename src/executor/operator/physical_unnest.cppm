@@ -34,9 +34,9 @@ namespace infinity {
 export class PhysicalUnnest : public PhysicalOperator {
 public:
     explicit PhysicalUnnest(u64 id,
-                            UniquePtr<PhysicalOperator> left,
-                            Vector<SharedPtr<BaseExpression>> expression_list,
-                            SharedPtr<Vector<LoadMeta>> load_metas)
+                            std::unique_ptr<PhysicalOperator> left,
+                            std::vector<std::shared_ptr<BaseExpression>> expression_list,
+                            std::shared_ptr<std::vector<LoadMeta>> load_metas)
         : PhysicalOperator(PhysicalOperatorType::kUnnest, std::move(left), nullptr, id, load_metas), expression_list_(std::move(expression_list)) {}
 
     ~PhysicalUnnest() override = default;
@@ -45,21 +45,21 @@ public:
 
     bool Execute(QueryContext *query_context, OperatorState *operator_state) final;
 
-    SharedPtr<Vector<String>> GetOutputNames() const final;
+    std::shared_ptr<std::vector<std::string>> GetOutputNames() const final;
 
-    SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const final;
+    std::shared_ptr<std::vector<std::shared_ptr<DataType>>> GetOutputTypes() const final;
 
-    SizeT TaskletCount() override { return left_->TaskletCount(); }
+    size_t TaskletCount() override { return left_->TaskletCount(); }
 
-    Vector<SharedPtr<BaseExpression>> expression_list() const { return expression_list_; }
-
-private:
-    SizeT GetUnnestIdx() const;
+    std::vector<std::shared_ptr<BaseExpression>> expression_list() const { return expression_list_; }
 
 private:
-    Vector<SharedPtr<BaseExpression>> expression_list_;
+    size_t GetUnnestIdx() const;
 
-    SharedPtr<DataTable> input_table_{};
+private:
+    std::vector<std::shared_ptr<BaseExpression>> expression_list_;
+
+    std::shared_ptr<DataTable> input_table_{};
 };
 
 } // namespace infinity

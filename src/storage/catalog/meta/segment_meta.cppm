@@ -39,7 +39,7 @@ export enum class SegmentStatus : u8 {
     kDeprecated,
 };
 
-export String ToString(SegmentStatus segment_status) {
+export std::string ToString(SegmentStatus segment_status) {
     switch (segment_status) {
         case SegmentStatus::kUnsealed:
             return "Unsealed";
@@ -69,9 +69,9 @@ public:
 
     SegmentID segment_id() const { return segment_id_; }
 
-    SizeT segment_capacity() const { return DEFAULT_SEGMENT_CAPACITY; }
+    size_t segment_capacity() const { return DEFAULT_SEGMENT_CAPACITY; }
 
-    // Status SetBlockIDs(const Vector<BlockID> &block_ids);
+    // Status SetBlockIDs(const std::vector<BlockID> &block_ids);
 
     Status SetNextBlockID(BlockID next_block_id);
 
@@ -86,30 +86,30 @@ public:
     // New
     Status Init();
 
-    Pair<BlockID, Status> AddBlockID1(TxnTimeStamp commit_ts);
+    std::pair<BlockID, Status> AddBlockID1(TxnTimeStamp commit_ts);
     Status AddBlockWithID(TxnTimeStamp commit_ts, BlockID block_id);
 
     Status CommitBlock(BlockID block_id, TxnTimeStamp commit_ts);
 
-    Tuple<SharedPtr<String>, Status> GetSegmentDir();
-    // Tuple<SharedPtr<Vector<BlockID>>, Status> GetBlockIDs();
+    std::tuple<std::shared_ptr<std::string>, Status> GetSegmentDir();
+    // std::tuple<std::shared_ptr<std::vector<BlockID>>, Status> GetBlockIDs();
 
-    Tuple<Vector<BlockID> *, Status> GetBlockIDs1();
-    Tuple<Vector<BlockID> *, Status> GetBlockIDs1(TxnTimeStamp commit_ts);
+    std::tuple<std::vector<BlockID> *, Status> GetBlockIDs1();
+    std::tuple<std::vector<BlockID> *, Status> GetBlockIDs1(TxnTimeStamp commit_ts);
 
-    // Tuple<SizeT, Status> GetRowCnt();
-    Tuple<SizeT, Status> GetRowCnt1();
-    Tuple<BlockID, Status> GetNextBlockID();
+    // std::tuple<size_t, Status> GetRowCnt();
+    std::tuple<size_t, Status> GetRowCnt1();
+    std::tuple<BlockID, Status> GetNextBlockID();
 
     Status GetFirstDeleteTS(TxnTimeStamp &first_delete_ts);
 
-    Tuple<SharedPtr<SegmentInfo>, Status> GetSegmentInfo();
+    std::tuple<std::shared_ptr<SegmentInfo>, Status> GetSegmentInfo();
 
-    Status GetFastRoughFilter(SharedPtr<FastRoughFilter> &fast_rough_filter);
+    Status GetFastRoughFilter(std::shared_ptr<FastRoughFilter> &fast_rough_filter);
 
-    Status SetFastRoughFilter(SharedPtr<FastRoughFilter> fast_rough_filter);
+    Status SetFastRoughFilter(std::shared_ptr<FastRoughFilter> fast_rough_filter);
 
-    Tuple<SharedPtr<SegmentSnapshotInfo>, Status> MapMetaToSnapShotInfo();
+    std::tuple<std::shared_ptr<SegmentSnapshotInfo>, Status> MapMetaToSnapShotInfo();
 
     Status RestoreSet();
 
@@ -126,7 +126,7 @@ private:
 
     // Status LoadRowCnt();
 
-    String GetSegmentTag(const String &tag) const;
+    std::string GetSegmentTag(const std::string &tag) const;
 
 private:
     TxnTimeStamp begin_ts_;
@@ -134,17 +134,17 @@ private:
     KVInstance &kv_instance_;
     TableMeeta &table_meta_;
     SegmentID segment_id_;
-    Optional<String> segment_dir_; // TODO: check if it is no longer in use
+    std::optional<std::string> segment_dir_; // TODO: check if it is no longer in use
 
-    // SharedPtr<Vector<BlockID>> block_ids_;
-    Optional<BlockID> next_block_id_;
-    // Optional<SizeT> row_cnt_;
+    // std::shared_ptr<std::vector<BlockID>> block_ids_;
+    std::optional<BlockID> next_block_id_;
+    // std::optional<size_t> row_cnt_;
 
-    Optional<Vector<BlockID>> block_ids1_;
-    Optional<SizeT> row_cnt_;
+    std::optional<std::vector<BlockID>> block_ids1_;
+    std::optional<size_t> row_cnt_;
 
-    Optional<TxnTimeStamp> first_delete_ts_;
-    SharedPtr<FastRoughFilter> fast_rough_filter_;
+    std::optional<TxnTimeStamp> first_delete_ts_;
+    std::shared_ptr<FastRoughFilter> fast_rough_filter_;
 
     std::mutex mtx_;
 };

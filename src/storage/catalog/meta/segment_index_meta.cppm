@@ -12,11 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:segment_index_meta;
 
-import :stl;
 import :status;
 import :meta_info;
 import :new_catalog;
@@ -46,15 +43,15 @@ public:
 
     Status GetNextChunkID(ChunkID &chunk_id);
     Status SetNextChunkID(ChunkID chunk_id);
-    Tuple<ChunkID, Status> GetAndSetNextChunkID();
+    std::tuple<ChunkID, Status> GetAndSetNextChunkID();
 
-    Tuple<Vector<ChunkID> *, Status> GetChunkIDs1();
+    std::tuple<std::vector<ChunkID> *, Status> GetChunkIDs1();
 
-    Status GetFtInfo(SharedPtr<SegmentIndexFtInfo> &ft_info);
+    Status GetFtInfo(std::shared_ptr<SegmentIndexFtInfo> &ft_info);
 
-    Status SetChunkIDs(const Vector<ChunkID> &chunk_ids);
+    Status SetChunkIDs(const std::vector<ChunkID> &chunk_ids);
 
-    Status RemoveChunkIDs(const Vector<ChunkID> &chunk_ids);
+    Status RemoveChunkIDs(const std::vector<ChunkID> &chunk_ids);
 
     Status AddChunkIndexID1(ChunkID chunk_id, NewTxn *new_txn);
 
@@ -72,15 +69,15 @@ public:
 
     Status UninitSet1(UsageFlag usage_flag);
 
-    SharedPtr<MemIndex> GetMemIndex();
-    SharedPtr<MemIndex> PopMemIndex();
+    std::shared_ptr<MemIndex> GetMemIndex();
+    std::shared_ptr<MemIndex> PopMemIndex();
     bool HasMemIndex();
 
-    SharedPtr<String> GetSegmentIndexDir() const;
+    std::shared_ptr<std::string> GetSegmentIndexDir() const;
 
-    SharedPtr<SegmentIndexInfo> GetSegmentIndexInfo();
+    std::shared_ptr<SegmentIndexInfo> GetSegmentIndexInfo();
 
-    Tuple<SharedPtr<SegmentIndexSnapshotInfo>, Status> MapMetaToSnapShotInfo();
+    std::tuple<std::shared_ptr<SegmentIndexSnapshotInfo>, Status> MapMetaToSnapShotInfo();
 
 private:
     Status LoadChunkIDs1();
@@ -89,7 +86,7 @@ private:
 
     Status LoadFtInfo();
 
-    String GetSegmentIndexTag(const String &tag);
+    std::string GetSegmentIndexTag(const std::string &tag);
 
 private:
     mutable std::mutex mtx_;
@@ -100,10 +97,10 @@ private:
     TableIndexMeeta &table_index_meta_;
     SegmentID segment_id_{};
 
-    Optional<Vector<ChunkID>> chunk_ids_{};
-    Optional<ChunkID> next_chunk_id_{};
+    std::optional<std::vector<ChunkID>> chunk_ids_{};
+    std::optional<ChunkID> next_chunk_id_{};
 
-    SharedPtr<SegmentIndexFtInfo> ft_info_{};
+    std::shared_ptr<SegmentIndexFtInfo> ft_info_{};
 };
 
 } // namespace infinity

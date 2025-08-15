@@ -26,9 +26,9 @@ export class ApplyFastRoughFilter final : public OptimizerRule {
 public:
     ~ApplyFastRoughFilter() final = default;
 
-    void ApplyToPlan(QueryContext *, SharedPtr<LogicalNode> &logical_plan) final;
+    void ApplyToPlan(QueryContext *, std::shared_ptr<LogicalNode> &logical_plan) final;
 
-    String name() const final { return "Apply FastRoughFilter"; }
+    std::string name() const final { return "Apply FastRoughFilter"; }
 };
 
 } // namespace infinity

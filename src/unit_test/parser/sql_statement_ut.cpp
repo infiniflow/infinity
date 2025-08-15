@@ -62,8 +62,8 @@ class StatementParsingTest : public BaseTest {};
 
 TEST_F(StatementParsingTest, good_test1) {
     using namespace infinity;
-    SharedPtr<SQLParser> parser = MakeShared<SQLParser>();
-    SharedPtr<ParserResult> result = MakeShared<ParserResult>();
+    std::shared_ptr<SQLParser> parser = std::make_shared<SQLParser>();
+    std::shared_ptr<ParserResult> result = std::make_shared<ParserResult>();
 
     {
         String input_sql = "SHOW DATABASE default_db";

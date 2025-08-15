@@ -28,9 +28,9 @@ ByteSlice *ByteSliceWriter::CreateSlice(u32 size) {
     return slice;
 }
 
-SizeT ByteSliceWriter::GetSize() const { return SizeT(slice_list_->GetTotalSize()); }
+size_t ByteSliceWriter::GetSize() const { return size_t(slice_list_->GetTotalSize()); }
 
-void ByteSliceWriter::Dump(const SharedPtr<FileWriter> &file) {
+void ByteSliceWriter::Dump(const std::shared_ptr<FileWriter> &file) {
     ByteSlice *slice = slice_list_->GetHead();
     while (slice != nullptr) {
         file->Write((char *)(slice->data_), slice->size_);
@@ -38,7 +38,7 @@ void ByteSliceWriter::Dump(const SharedPtr<FileWriter> &file) {
     }
 }
 
-void ByteSliceWriter::Load(const SharedPtr<FileReader> &file, u32 size) {
+void ByteSliceWriter::Load(const std::shared_ptr<FileReader> &file, u32 size) {
     ByteSlice *slice = CreateSlice(size);
     file->Read((char *)slice->data_, size);
     slice_list_->Clear();
@@ -62,7 +62,7 @@ void ByteSliceWriter::Close() {
     }
 }
 
-void ByteSliceWriter::Write(const void *value, SizeT len) {
+void ByteSliceWriter::Write(const void *value, size_t len) {
     u32 left = (u32)len;
     u8 *data = (u8 *)(value);
     ByteSlice *slice = slice_list_->GetTail();

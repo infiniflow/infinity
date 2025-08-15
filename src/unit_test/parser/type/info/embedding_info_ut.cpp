@@ -56,7 +56,7 @@ TEST_F(EmbeddingInfoTest, embedding_info_A) {
     EXPECT_EQ(embedding_info_ptr->Type(), EmbeddingDataType::kElemBit);
 
     embedding_info_ptr = EmbeddingInfo::Make(EmbeddingDataType::kElemInt64, PARSER_EMBEDDING_LIMIT_INTERNAL);
-    EXPECT_EQ(embedding_info_ptr->Size(), SizeT(PARSER_EMBEDDING_LIMIT_INTERNAL * 8));
+    EXPECT_EQ(embedding_info_ptr->Size(), size_t(PARSER_EMBEDDING_LIMIT_INTERNAL * 8));
     EXPECT_EQ(embedding_info_ptr->Dimension(), (u64)PARSER_EMBEDDING_LIMIT_INTERNAL);
     EXPECT_EQ(embedding_info_ptr->Type(), EmbeddingDataType::kElemInt64);
 

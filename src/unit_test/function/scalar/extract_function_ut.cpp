@@ -59,32 +59,32 @@ class ExtractFunctionTest : public BaseTest {};
 TEST_F(ExtractFunctionTest, extract_year_test) {
     using namespace infinity;
 
-    UniquePtr<Config> config_ptr = MakeUnique<Config>();
+    std::unique_ptr<Config> config_ptr = std::make_unique<Config>();
     Status status = config_ptr->Init(nullptr, nullptr);
     EXPECT_TRUE(status.ok());
-    UniquePtr<KVStore> kv_store_ptr = MakeUnique<KVStore>();
+    std::unique_ptr<KVStore> kv_store_ptr = std::make_unique<KVStore>();
     status = kv_store_ptr->Init(config_ptr->CatalogDir());
     EXPECT_TRUE(status.ok());
-    UniquePtr<NewCatalog> catalog_ptr = MakeUnique<NewCatalog>(kv_store_ptr.get());
+    std::unique_ptr<NewCatalog> catalog_ptr = std::make_unique<NewCatalog>(kv_store_ptr.get());
 
     RegisterExtractFunction(catalog_ptr.get());
 
     {
         String op = "extract_year";
-        SharedPtr<FunctionSet> function_set = NewCatalog::GetFunctionSetByName(catalog_ptr.get(), op);
+        std::shared_ptr<FunctionSet> function_set = NewCatalog::GetFunctionSetByName(catalog_ptr.get(), op);
         EXPECT_EQ(function_set->type_, FunctionType::kScalar);
-        SharedPtr<ScalarFunctionSet> scalar_function_set = std::static_pointer_cast<ScalarFunctionSet>(function_set);
+        std::shared_ptr<ScalarFunctionSet> scalar_function_set = std::static_pointer_cast<ScalarFunctionSet>(function_set);
 
-        Vector<SharedPtr<BaseExpression>> inputs;
+        Vector<std::shared_ptr<BaseExpression>> inputs;
 
-        SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kDate);
-        SharedPtr<ColumnExpression> col_expr_ptr = MakeShared<ColumnExpression>(*data_type, "t1", 1, "c1", 0, 0);
+        std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kDate);
+        std::shared_ptr<ColumnExpression> col_expr_ptr = std::make_shared<ColumnExpression>(*data_type, "t1", 1, "c1", 0, 0);
 
         inputs.emplace_back(col_expr_ptr);
         ScalarFunction func = scalar_function_set->GetMostMatchFunction(inputs);
         EXPECT_STREQ("extract_year(Date)->BigInt", func.ToString().c_str());
 
-        Vector<SharedPtr<DataType>> column_types;
+        Vector<std::shared_ptr<DataType>> column_types;
         column_types.emplace_back(data_type);
 
         i64 row_count = DEFAULT_VECTOR_SIZE;
@@ -109,8 +109,8 @@ TEST_F(ExtractFunctionTest, extract_year_test) {
             EXPECT_EQ(v.value_.date.ToString(), ss.str());
         }
 
-        SharedPtr<DataType> result_type = MakeShared<DataType>(LogicalType::kBigInt);
-        SharedPtr<ColumnVector> result = MakeShared<ColumnVector>(result_type);
+        std::shared_ptr<DataType> result_type = std::make_shared<DataType>(LogicalType::kBigInt);
+        std::shared_ptr<ColumnVector> result = std::make_shared<ColumnVector>(result_type);
         result->Initialize();
         func.function_(data_block, result);
 
@@ -123,20 +123,20 @@ TEST_F(ExtractFunctionTest, extract_year_test) {
 
     {
         String op = "extract_month";
-        SharedPtr<FunctionSet> function_set = NewCatalog::GetFunctionSetByName(catalog_ptr.get(), op);
+        std::shared_ptr<FunctionSet> function_set = NewCatalog::GetFunctionSetByName(catalog_ptr.get(), op);
         EXPECT_EQ(function_set->type_, FunctionType::kScalar);
-        SharedPtr<ScalarFunctionSet> scalar_function_set = std::static_pointer_cast<ScalarFunctionSet>(function_set);
+        std::shared_ptr<ScalarFunctionSet> scalar_function_set = std::static_pointer_cast<ScalarFunctionSet>(function_set);
 
-        Vector<SharedPtr<BaseExpression>> inputs;
+        Vector<std::shared_ptr<BaseExpression>> inputs;
 
-        SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kDate);
-        SharedPtr<ColumnExpression> col_expr_ptr = MakeShared<ColumnExpression>(*data_type, "t1", 1, "c1", 0, 0);
+        std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kDate);
+        std::shared_ptr<ColumnExpression> col_expr_ptr = std::make_shared<ColumnExpression>(*data_type, "t1", 1, "c1", 0, 0);
 
         inputs.emplace_back(col_expr_ptr);
         ScalarFunction func = scalar_function_set->GetMostMatchFunction(inputs);
         EXPECT_STREQ("extract_month(Date)->BigInt", func.ToString().c_str());
 
-        Vector<SharedPtr<DataType>> column_types;
+        Vector<std::shared_ptr<DataType>> column_types;
         column_types.emplace_back(data_type);
 
         i64 row_count = DEFAULT_VECTOR_SIZE;
@@ -153,8 +153,8 @@ TEST_F(ExtractFunctionTest, extract_year_test) {
         }
         data_block.Finalize();
 
-        SharedPtr<DataType> result_type = MakeShared<DataType>(LogicalType::kBigInt);
-        SharedPtr<ColumnVector> result = MakeShared<ColumnVector>(result_type);
+        std::shared_ptr<DataType> result_type = std::make_shared<DataType>(LogicalType::kBigInt);
+        std::shared_ptr<ColumnVector> result = std::make_shared<ColumnVector>(result_type);
         result->Initialize();
         func.function_(data_block, result);
 
@@ -167,20 +167,20 @@ TEST_F(ExtractFunctionTest, extract_year_test) {
 
     {
         String op = "extract_day";
-        SharedPtr<FunctionSet> function_set = NewCatalog::GetFunctionSetByName(catalog_ptr.get(), op);
+        std::shared_ptr<FunctionSet> function_set = NewCatalog::GetFunctionSetByName(catalog_ptr.get(), op);
         EXPECT_EQ(function_set->type_, FunctionType::kScalar);
-        SharedPtr<ScalarFunctionSet> scalar_function_set = std::static_pointer_cast<ScalarFunctionSet>(function_set);
+        std::shared_ptr<ScalarFunctionSet> scalar_function_set = std::static_pointer_cast<ScalarFunctionSet>(function_set);
 
-        Vector<SharedPtr<BaseExpression>> inputs;
+        Vector<std::shared_ptr<BaseExpression>> inputs;
 
-        SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kDate);
-        SharedPtr<ColumnExpression> col_expr_ptr = MakeShared<ColumnExpression>(*data_type, "t1", 1, "c1", 0, 0);
+        std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kDate);
+        std::shared_ptr<ColumnExpression> col_expr_ptr = std::make_shared<ColumnExpression>(*data_type, "t1", 1, "c1", 0, 0);
 
         inputs.emplace_back(col_expr_ptr);
         ScalarFunction func = scalar_function_set->GetMostMatchFunction(inputs);
         EXPECT_STREQ("extract_day(Date)->BigInt", func.ToString().c_str());
 
-        Vector<SharedPtr<DataType>> column_types;
+        Vector<std::shared_ptr<DataType>> column_types;
         column_types.emplace_back(data_type);
 
         i64 row_count = DEFAULT_VECTOR_SIZE;
@@ -198,8 +198,8 @@ TEST_F(ExtractFunctionTest, extract_year_test) {
         }
         data_block.Finalize();
 
-        SharedPtr<DataType> result_type = MakeShared<DataType>(LogicalType::kBigInt);
-        SharedPtr<ColumnVector> result = MakeShared<ColumnVector>(result_type);
+        std::shared_ptr<DataType> result_type = std::make_shared<DataType>(LogicalType::kBigInt);
+        std::shared_ptr<ColumnVector> result = std::make_shared<ColumnVector>(result_type);
         result->Initialize();
         func.function_(data_block, result);
 

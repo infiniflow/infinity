@@ -23,8 +23,6 @@ module;
 module infinity_core:external_sort_merger.impl;
 
 import :external_sort_merger;
-
-import :stl;
 import :file_writer;
 import :profiler;
 import :logger;
@@ -71,9 +69,9 @@ SortMerger<KeyType, LenType>::SortMerger(const char *filenm, u32 group_size, u32
     CYCLE_BUF_THRESHOLD_ = MAX_GROUP_SIZE_;
     OUT_BATCH_SIZE_ = 10240;
     assert(CYCLE_BUF_THRESHOLD_ <= CYCLE_BUF_SIZE_);
-    cycle_buffer_ = MakeUnique<CycleBuffer>(CYCLE_BUF_SIZE_, PRE_BUF_SIZE_);
+    cycle_buffer_ = std::make_unique<CycleBuffer>(CYCLE_BUF_SIZE_, PRE_BUF_SIZE_);
 
-    merge_loser_tree_ = MakeShared<LoserTree<KeyAddr, std::less<KeyAddr>>>(MAX_GROUP_SIZE_);
+    merge_loser_tree_ = std::make_shared<LoserTree<KeyAddr, std::less<KeyAddr>>>(MAX_GROUP_SIZE_);
 }
 
 template <typename KeyType, typename LenType>
@@ -225,7 +223,7 @@ void SortMerger<KeyType, LenType>::Init(DirectIO &io_stream) {
 
 template <typename KeyType, typename LenType>
 void SortMerger<KeyType, LenType>::Predict(DirectIO &io_stream) {
-    UniquePtr<char[]> data_buf = MakeUnique<char[]>(PRE_BUF_SIZE_);
+    std::unique_ptr<char[]> data_buf = std::make_unique<char[]>(PRE_BUF_SIZE_);
     while (pre_heap_.size() > 0) {
         KeyAddr top = pre_heap_.top();
         pre_heap_.pop();
@@ -354,7 +352,7 @@ void SortMerger<KeyType, LenType>::Merge() {
 }
 
 template <typename KeyType, typename LenType>
-void SortMerger<KeyType, LenType>::Unpin(Vector<UniquePtr<Thread>> &threads) {
+void SortMerger<KeyType, LenType>::Unpin(std::vector<std::unique_ptr<std::thread>> &threads) {
 #if defined(linux) || defined(__linux) || defined(__linux__)
     int num_cores = std::thread::hardware_concurrency();
     cpu_set_t cpuset;
@@ -419,17 +417,17 @@ void SortMerger<KeyType, LenType>::Run() {
 
     Init(io_stream);
 
-    UniquePtr<Thread> predict_thread = MakeUnique<Thread>(std::bind(&self_t::Predict, this, io_stream));
-    UniquePtr<Thread> merge_thread = MakeUnique<Thread>(std::bind(&self_t::Merge, this));
+    std::unique_ptr<std::thread> predict_thread = std::make_unique<std::thread>(std::bind(&self_t::Predict, this, io_stream));
+    std::unique_ptr<std::thread> merge_thread = std::make_unique<std::thread>(std::bind(&self_t::Merge, this));
     FILE *out_f = fopen((filenm_ + ".out").c_str(), "w+");
     IASSERT(out_f);
     IASSERT(fwrite(&count_, sizeof(u64), 1, out_f) == 1);
 
-    Vector<UniquePtr<Thread>> threads;
+    std::vector<std::unique_ptr<std::thread>> threads;
     threads.push_back(std::move(predict_thread));
     threads.push_back(std::move(merge_thread));
     for (u32 i = 0; i < OUT_BUF_NUM_; ++i) {
-        UniquePtr<Thread> out_thread = MakeUnique<Thread>(std::bind(&self_t::Output, this, out_f, i));
+        std::unique_ptr<std::thread> out_thread = std::make_unique<std::thread>(std::bind(&self_t::Output, this, out_f, i));
         threads.push_back(std::move(out_thread));
     }
 
@@ -454,7 +452,7 @@ template <typename KeyType, typename LenType>
 SortMergerTermTuple<KeyType, LenType>::SortMergerTermTuple(const char *filenm, u32 group_size, u32 bs, u32 output_num)
     : Super(filenm, group_size, bs, output_num) {
     InitRunFile();
-    io_stream_ = MakeUnique<DirectIO>(run_file_);
+    io_stream_ = std::make_unique<DirectIO>(run_file_);
     this->FILE_LEN_ = io_stream_->Length();
     io_stream_->Read((char *)(&this->count_), sizeof(u64));
     Super::Init(*io_stream_);
@@ -463,14 +461,14 @@ SortMergerTermTuple<KeyType, LenType>::SortMergerTermTuple(const char *filenm, u
 template <typename KeyType, typename LenType>
     requires std::same_as<KeyType, TermTuple>
 void SortMergerTermTuple<KeyType, LenType>::MergeImpl() {
-    SharedPtr<TermTupleList> tuple_list = nullptr;
+    std::shared_ptr<TermTupleList> tuple_list = nullptr;
     u32 last_idx = -1;
     while (this->merge_loser_tree_->TopSource() != LoserTree<KeyAddr>::invalid_) {
         auto top = this->merge_loser_tree_->TopKey();
         u32 idx = top.IDX();
         auto out_key = top.KEY();
         if (tuple_list == nullptr) {
-            tuple_list = MakeShared<TermTupleList>(out_key.term_);
+            tuple_list = std::make_shared<TermTupleList>(out_key.term_);
             tuple_list->Add(out_key.doc_id_, out_key.term_pos_, out_key.doc_payload_);
         } else if (idx != last_idx) {
             if (tuple_list->IsFull() || out_key.term_ != tuple_list->term_) {
@@ -478,7 +476,7 @@ void SortMergerTermTuple<KeyType, LenType>::MergeImpl() {
                 {
                     this->term_tuple_list_queue_.Enqueue(std::move(tuple_list));
                 }
-                tuple_list = MakeShared<TermTupleList>(out_key.term_);
+                tuple_list = std::make_shared<TermTupleList>(out_key.term_);
             }
             tuple_list->Add(out_key.doc_id_, out_key.term_pos_, out_key.doc_payload_);
         }
@@ -548,7 +546,7 @@ void SortMergerTermTuple<KeyType, LenType>::UnInitRunFile() {
 
 template <typename KeyType, typename LenType>
     requires std::same_as<KeyType, TermTuple>
-void SortMergerTermTuple<KeyType, LenType>::JoinThreads(Vector<UniquePtr<Thread>> &threads) {
+void SortMergerTermTuple<KeyType, LenType>::JoinThreads(std::vector<std::unique_ptr<std::thread>> &threads) {
     this->Unpin(threads);
     for (auto &thread : threads) {
         thread->join();
@@ -557,9 +555,9 @@ void SortMergerTermTuple<KeyType, LenType>::JoinThreads(Vector<UniquePtr<Thread>
 
 template <typename KeyType, typename LenType>
     requires std::same_as<KeyType, TermTuple>
-void SortMergerTermTuple<KeyType, LenType>::Run(Vector<UniquePtr<Thread>> &threads) {
-    UniquePtr<Thread> predict_thread = MakeUnique<Thread>(std::bind(&self_t::PredictImpl, this, *io_stream_));
-    UniquePtr<Thread> merge_thread = MakeUnique<Thread>(std::bind(&self_t::MergeImpl, this));
+void SortMergerTermTuple<KeyType, LenType>::Run(std::vector<std::unique_ptr<std::thread>> &threads) {
+    std::unique_ptr<std::thread> predict_thread = std::make_unique<std::thread>(std::bind(&self_t::PredictImpl, this, *io_stream_));
+    std::unique_ptr<std::thread> merge_thread = std::make_unique<std::thread>(std::bind(&self_t::MergeImpl, this));
 
     threads.push_back(std::move(predict_thread));
     threads.push_back(std::move(merge_thread));

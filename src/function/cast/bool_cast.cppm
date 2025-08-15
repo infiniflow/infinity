@@ -32,7 +32,7 @@ namespace infinity {
 export struct TryCastBoolean {
     template <typename SourceType, typename TargetType>
     static inline bool Run(SourceType, TargetType &) {
-        String error_message =
+        std::string error_message =
             fmt::format("No implementation to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>());
         RecoverableError(Status::NotSupport(error_message));
         return false;
@@ -66,7 +66,7 @@ export inline BoundCastFunc BindBoolCast(const DataType &source, const DataType 
             return BoundCastFunc(&ColumnVectorCast::TryCastColumnVector<BooleanT, VarcharT, TryCastBoolean>);
         }
         default: {
-            String error_message = fmt::format("Can't cast from Boolean to {}", target.ToString());
+            std::string error_message = fmt::format("Can't cast from Boolean to {}", target.ToString());
             RecoverableError(Status::NotSupport(error_message));
         }
     }

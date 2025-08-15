@@ -40,7 +40,7 @@ public:
     using LVQDist = LVQCosDist<DataType, i8>;
 
 private:
-    using SIMDFuncType = f32 (*)(const DataType *, const DataType *, SizeT);
+    using SIMDFuncType = f32 (*)(const DataType *, const DataType *, size_t);
 
     SIMDFuncType SIMDFunc = nullptr;
 
@@ -55,7 +55,7 @@ public:
     }
     ~PlainCosDist() = default;
 
-    PlainCosDist(SizeT dim) {
+    PlainCosDist(size_t dim) {
         if constexpr (std::is_same<DataType, float>()) {
             if (dim % 16 == 0) {
                 SIMDFunc = GetSIMD_FUNCTIONS().HNSW_F32Cos_16_ptr_;
@@ -79,32 +79,32 @@ public:
         return Inner(v1, data_store.GetVec(v2_i), data_store.dim());
     }
 
-    LVQDist ToLVQDistance(SizeT dim) &&;
+    LVQDist ToLVQDistance(size_t dim) &&;
 
 private:
-    DistanceType Inner(const StoreType &v1, const StoreType &v2, SizeT dim) const { return -SIMDFunc(v1, v2, dim); }
+    DistanceType Inner(const StoreType &v1, const StoreType &v2, size_t dim) const { return -SIMDFunc(v1, v2, dim); }
 };
 
 export template <typename DataType, typename CompressType>
 class LVQCosCache {
 public:
-    using LocalCacheType = Pair<DataType, DataType>;
-    using GlobalCacheType = Pair<DataType, DataType>;
+    using LocalCacheType = std::pair<DataType, DataType>;
+    using GlobalCacheType = std::pair<DataType, DataType>;
 
-    static LocalCacheType MakeLocalCache(const CompressType *c, DataType scale, SizeT dim, const MeanType *mean) {
+    static LocalCacheType MakeLocalCache(const CompressType *c, DataType scale, size_t dim, const MeanType *mean) {
         i64 norm1 = 0;
         MeanType mean_c = 0;
-        for (SizeT i = 0; i < dim; ++i) {
+        for (size_t i = 0; i < dim; ++i) {
             norm1 += c[i];
             mean_c += mean[i] * c[i];
         }
         return {norm1 * scale, mean_c * scale};
     }
 
-    static GlobalCacheType MakeGlobalCache(const MeanType *mean, SizeT dim) {
+    static GlobalCacheType MakeGlobalCache(const MeanType *mean, size_t dim) {
         MeanType norm1 = 0;
         MeanType norm2 = 0;
-        for (SizeT i = 0; i < dim; ++i) {
+        for (size_t i = 0; i < dim; ++i) {
             norm1 += mean[i];
             norm2 += mean[i] * mean[i];
         }
@@ -130,7 +130,7 @@ public:
     using DistanceType = typename VecStoreMetaType::DistanceType;
 
 private:
-    using SIMDFuncType = i32 (*)(const CompressType *, const CompressType *, SizeT);
+    using SIMDFuncType = i32 (*)(const CompressType *, const CompressType *, size_t);
 
     SIMDFuncType SIMDFunc = nullptr;
 
@@ -144,7 +144,7 @@ public:
         return *this;
     }
     ~LVQCosDist() = default;
-    LVQCosDist(SizeT dim) {
+    LVQCosDist(size_t dim) {
         if constexpr (std::is_same<CompressType, i8>()) {
             if (dim % 64 == 0) {
                 SIMDFunc = GetSIMD_FUNCTIONS().HNSW_I8IP_64_ptr_;
@@ -171,7 +171,7 @@ public:
 private:
     template <typename VecStoreMeta>
     DistanceType Inner(const StoreType &v1, const StoreType &v2, VecStoreMeta &vec_store_meta) const {
-        SizeT dim = vec_store_meta.dim();
+        size_t dim = vec_store_meta.dim();
         i32 c1c2_ip = SIMDFunc(v1->compress_vec_, v2->compress_vec_, dim);
         auto scale1 = v1->scale_;
         auto scale2 = v2->scale_;
@@ -188,7 +188,7 @@ private:
 };
 
 template <typename DataType>
-LVQCosDist<DataType, i8> PlainCosDist<DataType>::ToLVQDistance(SizeT dim) && {
+LVQCosDist<DataType, i8> PlainCosDist<DataType>::ToLVQDistance(size_t dim) && {
     return LVQCosDist<DataType, i8>(dim);
 }
 

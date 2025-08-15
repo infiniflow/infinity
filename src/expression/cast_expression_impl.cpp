@@ -29,14 +29,14 @@ import logical_type;
 
 namespace infinity {
 
-SharedPtr<BaseExpression> CastExpression::AddCastToType(const SharedPtr<BaseExpression> &source_expr_ptr, const DataType &target_type) {
+std::shared_ptr<BaseExpression> CastExpression::AddCastToType(const std::shared_ptr<BaseExpression> &source_expr_ptr, const DataType &target_type) {
     if (source_expr_ptr->Type() == target_type) {
         return source_expr_ptr;
     }
 
     if (CastExpression::CanCast(source_expr_ptr->Type(), target_type)) {
         BoundCastFunc cast = CastFunction::GetBoundFunc(source_expr_ptr->Type(), target_type);
-        return MakeShared<CastExpression>(cast, source_expr_ptr, target_type);
+        return std::make_shared<CastExpression>(cast, source_expr_ptr, target_type);
     } else {
         RecoverableError(Status::NotSupportedTypeConversion(source_expr_ptr->Type().ToString(), target_type.ToString()));
     }
@@ -173,11 +173,11 @@ bool CastExpression::CanCast(const DataType &source, const DataType &target) {
     return false;
 }
 
-String CastExpression::ToString() const { return fmt::format("Cast({} AS {})", arguments_[0]->Name(), target_type_.ToString()); }
+std::string CastExpression::ToString() const { return fmt::format("Cast({} AS {})", arguments_[0]->Name(), target_type_.ToString()); }
 
 u64 CastExpression::Hash() const {
     u64 h = 0;
-    h ^= std::hash<SizeT>()(reinterpret_cast<SizeT>(func_.function));
+    h ^= std::hash<size_t>()(reinterpret_cast<size_t>(func_.function));
     h ^= arguments_[0]->Hash();
     return h;
 }

@@ -27,7 +27,7 @@ export class NullaryOperator {
 
 public:
     template <typename ResultType, typename Operator>
-    static void inline Execute(SharedPtr<ColumnVector> &result, void *state_ptr) {
+    static void inline Execute(std::shared_ptr<ColumnVector> &result, void *state_ptr) {
         result->Reset();
         result->Initialize(ColumnVectorType::kConstant);
         auto *result_ptr = (ResultType *)(result->data());

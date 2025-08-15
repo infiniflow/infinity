@@ -133,7 +133,7 @@ enum class TxnType {
     kInvalid,
 };
 
-export class NewTxn : public EnableSharedFromThis<NewTxn> {
+export class NewTxn : public std::enable_shared_from_this<NewTxn> {
 public:
     // For new txn
     explicit NewTxn(NewTxnManager *txn_manager,
@@ -448,37 +448,37 @@ private:
     void CheckTxn(const std::string &db_name);
 
 public:
-    Status GetDBMeta(const std::string &db_name, Optional<DBMeeta> &db_meta, TxnTimeStamp &db_create_ts, std::string *db_key = nullptr);
+    Status GetDBMeta(const std::string &db_name, std::optional<DBMeeta> &db_meta, TxnTimeStamp &db_create_ts, std::string *db_key = nullptr);
 
     Status GetTableMeta(const std::string &db_name,
                         const std::string &table_name,
-                        Optional<DBMeeta> &db_meta,
-                        Optional<TableMeeta> &table_meta,
+                        std::optional<DBMeeta> &db_meta,
+                        std::optional<TableMeeta> &table_meta,
                         std::string *table_key = nullptr);
 
-    Status GetTableMeta(const std::string &table_name, DBMeeta &db_meta, Optional<TableMeeta> &table_meta, std::string *table_key = nullptr);
+    Status GetTableMeta(const std::string &table_name, DBMeeta &db_meta, std::optional<TableMeeta> &table_meta, std::string *table_key = nullptr);
 
     Status GetTableIndexMeta(const std::string &db_name,
                              const std::string &table_name,
                              const std::string &index_name,
-                             Optional<DBMeeta> &db_meta,
-                             Optional<TableMeeta> &table_meta,
-                             Optional<TableIndexMeeta> &table_index_meta,
+                             std::optional<DBMeeta> &db_meta,
+                             std::optional<TableMeeta> &table_meta,
+                             std::optional<TableIndexMeeta> &table_index_meta,
                              std::string *table_key,
                              std::string *index_key);
 
     Status GetTableIndexMeta(const std::string &index_name,
                              TableMeeta &table_meta,
-                             Optional<TableIndexMeeta> &table_index_meta,
+                             std::optional<TableIndexMeeta> &table_index_meta,
                              std::string *index_key = nullptr);
 
 private:
     friend struct NewTxnCompactState;
 
     // DML
-    Status AppendInBlock(BlockMeta &block_meta, SizeT block_offset, SizeT append_rows, const DataBlock *input_block, SizeT input_offset);
+    Status AppendInBlock(BlockMeta &block_meta, size_t block_offset, size_t append_rows, const DataBlock *input_block, size_t input_offset);
 
-    Status AppendInColumn(ColumnMeta &column_meta, SizeT dest_offset, SizeT append_rows, const ColumnVector &column_vector, SizeT source_offset);
+    Status AppendInColumn(ColumnMeta &column_meta, size_t dest_offset, size_t append_rows, const ColumnVector &column_vector, size_t source_offset);
 
     Status DeleteInBlock(BlockMeta &block_meta, const std::vector<BlockOffset> &block_offsets, std::vector<BlockOffset> &undo_block_offsets);
 
@@ -510,19 +510,19 @@ private:
                          const std::string &table_key,
                          TableIndexMeeta &table_index_meta,
                          SegmentMeta &segment_meta,
-                         SizeT segment_row_cnt,
+                         size_t segment_row_cnt,
                          DumpIndexCause dump_index_cause,
                          WalCmdCreateIndexV2 *create_index_cmd_ptr = nullptr);
 
     Status ReplayDumpIndex(WalCmdDumpIndexV2 *dump_index_cmd);
 
-    Status PopulateIndexToMem(SegmentIndexMeta &segment_index_meta, SegmentMeta &segment_meta, ColumnID column_id, SizeT segment_row_cnt);
+    Status PopulateIndexToMem(SegmentIndexMeta &segment_index_meta, SegmentMeta &segment_meta, ColumnID column_id, size_t segment_row_cnt);
 
     Status PopulateFtIndexInner(std::shared_ptr<IndexBase> index_base,
                                 SegmentIndexMeta &segment_index_meta,
                                 SegmentMeta &segment_meta,
                                 ColumnID column_id,
-                                SizeT segment_row_cnt);
+                                size_t segment_row_cnt);
 
     Status PopulateIvfIndexInner(std::shared_ptr<IndexBase> index_base,
                                  SegmentIndexMeta &segment_index_meta,
@@ -739,7 +739,7 @@ private:
 
     // Used for new checkpoint
     TxnTimeStamp current_ckp_ts_{};
-    SizeT wal_size_{};
+    size_t wal_size_{};
 
     // Use for commit and rollback
     std::vector<std::unique_ptr<std::binary_semaphore>> semas_{};

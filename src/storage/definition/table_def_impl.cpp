@@ -31,10 +31,10 @@ import internal_types;
 
 namespace infinity {
 
-String TableDef::ToString() const {
+std::string TableDef::ToString() const {
     std::stringstream ss;
     ss << *table_name_ << '[';
-    for (SizeT i = 0; auto &column_ptr : this->columns_) {
+    for (size_t i = 0; auto &column_ptr : this->columns_) {
         ss << column_ptr->ToString();
         ++i;
         if (i != this->column_count()) {
@@ -46,14 +46,14 @@ String TableDef::ToString() const {
     return ss.str();
 }
 
-void TableDef::UnionWith(const SharedPtr<TableDef> &other) {
-    SizeT this_column_count = this->column_count();
-    SizeT other_column_count = other->column_count();
+void TableDef::UnionWith(const std::shared_ptr<TableDef> &other) {
+    size_t this_column_count = this->column_count();
+    size_t other_column_count = other->column_count();
     this->columns_.reserve(this_column_count + other_column_count);
     this->columns_.insert(this->columns_.end(), other->columns_.begin(), other->columns_.end());
 
-    SizeT total_column_count = this_column_count + other_column_count;
-    for (SizeT idx = this_column_count; idx < total_column_count; ++idx) {
+    size_t total_column_count = this_column_count + other_column_count;
+    for (size_t idx = this_column_count; idx < total_column_count; ++idx) {
         column_name2id_[columns_[idx]->name()] = idx;
     }
 }
@@ -96,24 +96,24 @@ void TableDef::WriteAdv(char *&ptr) const {
     WriteBufAdv(ptr, *table_name_);
     WriteBufAdv(ptr, *table_comment_);
     WriteBufAdv(ptr, static_cast<i32>(columns_.size()));
-    SizeT column_count = columns_.size();
-    for (SizeT idx = 0; idx < column_count; ++idx) {
+    size_t column_count = columns_.size();
+    for (size_t idx = 0; idx < column_count; ++idx) {
         const ColumnDef &cd = *columns_[idx];
         cd.WriteAdv(ptr);
     }
     return;
 }
 
-SharedPtr<TableDef> TableDef::ReadAdv(const char *&ptr, i32 maxbytes) {
+std::shared_ptr<TableDef> TableDef::ReadAdv(const char *&ptr, i32 maxbytes) {
     const char *const ptr_end = ptr + maxbytes;
     if (maxbytes <= 0) {
         UnrecoverableError("ptr goes out of range when reading TableDef");
     }
-    String schema_name = ReadBufAdv<String>(ptr);
-    String table_name = ReadBufAdv<String>(ptr);
-    String table_comment = ReadBufAdv<String>(ptr);
+    std::string schema_name = ReadBufAdv<std::string>(ptr);
+    std::string table_name = ReadBufAdv<std::string>(ptr);
+    std::string table_comment = ReadBufAdv<std::string>(ptr);
     i32 columns_size = ReadBufAdv<i32>(ptr);
-    Vector<SharedPtr<ColumnDef>> columns;
+    std::vector<std::shared_ptr<ColumnDef>> columns;
     for (i32 i = 0; i < columns_size; i++) {
         auto cd = ColumnDef::ReadAdv(ptr, maxbytes);
         columns.push_back(cd);
@@ -122,7 +122,7 @@ SharedPtr<TableDef> TableDef::ReadAdv(const char *&ptr, i32 maxbytes) {
     if (maxbytes < 0) {
         UnrecoverableError("ptr goes out of range when reading TableDef");
     }
-    return TableDef::Make(MakeShared<String>(schema_name), MakeShared<String>(table_name), MakeShared<String>(table_comment), columns);
+    return TableDef::Make(std::make_shared<std::string>(schema_name), std::make_shared<std::string>(table_name), std::make_shared<std::string>(table_comment), columns);
 }
 
 } // namespace infinity

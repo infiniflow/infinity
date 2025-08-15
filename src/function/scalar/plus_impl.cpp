@@ -32,7 +32,7 @@ namespace infinity {
 struct PlusFunction {
     template <typename TA, typename TB>
     static inline bool Run(TA, TB &) {
-        String error_message = "Not implement: PlusFunction::Run";
+        std::string error_message = "Not implement: PlusFunction::Run";
         UnrecoverableError(error_message);
         return false;
     }
@@ -49,10 +49,10 @@ inline bool PlusFunction::Run(MixedT value, MixedT &result) {
     }
 }
 
-SharedPtr<ScalarFunctionSet> GetPlusFunctionSet() {
-    String func_name = "+";
+std::shared_ptr<ScalarFunctionSet> GetPlusFunctionSet() {
+    std::string func_name = "+";
 
-    SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
+    std::shared_ptr<ScalarFunctionSet> function_set_ptr = std::make_shared<ScalarFunctionSet>(func_name);
 
     // Plus operator
     ScalarFunction plus_int8(func_name, {DataType(LogicalType::kTinyInt)}, DataType(LogicalType::kTinyInt), &ScalarFunction::NoOpFunction);

@@ -77,30 +77,30 @@ INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
 TEST_P(DumpMemIndexTaskTest, row_cnt_exceed_memindex_capacity) {
     NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
 
-    SharedPtr<String> db_name = std::make_shared<String>("db1");
+    std::shared_ptr<String> db_name = std::make_shared<String>("db1");
     auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
     auto column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
     auto table_name = std::make_shared<std::string>("tb1");
-    auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def2});
+    auto table_def = TableDef::Make(db_name, table_name, std::make_shared<String>(), {column_def1, column_def2});
     auto index_name1 = std::make_shared<String>("idx1");
-    auto index_def1 = IndexSecondary::Make(index_name1, MakeShared<String>(), "file_name", {column_def1->name()});
+    auto index_def1 = IndexSecondary::Make(index_name1, std::make_shared<String>(), "file_name", {column_def1->name()});
 
     {
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
-        Status status = txn->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("create db"), TransactionType::kNormal);
+        Status status = txn->CreateDatabase(*db_name, ConflictType::kError, std::make_shared<String>());
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
     }
     {
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("create table"), TransactionType::kNormal);
         Status status = txn->CreateTable(*db_name, table_def, ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
     }
     {
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create index"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("create index"), TransactionType::kNormal);
         Status status = txn->CreateIndex(*db_name, *table_name, index_def1, ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
@@ -108,7 +108,7 @@ TEST_P(DumpMemIndexTaskTest, row_cnt_exceed_memindex_capacity) {
     }
 
     auto append = [&] {
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("append"), TransactionType::kNormal);
         auto input_block = MakeInputBlock(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"), 8192);
         Status status = txn->Append(*db_name, *table_name, input_block);
         EXPECT_TRUE(status.ok());
@@ -121,7 +121,7 @@ TEST_P(DumpMemIndexTaskTest, row_cnt_exceed_memindex_capacity) {
     LOG_INFO(fmt::format("mem_index_capacity: {}", mem_index_capacity));
 
     // Append 8192 rows for 8 times to exceed the mem index capacity
-    for (SizeT i = 0; i < 8; ++i) {
+    for (size_t i = 0; i < 8; ++i) {
         append();
     }
 
@@ -131,7 +131,7 @@ TEST_P(DumpMemIndexTaskTest, row_cnt_exceed_memindex_capacity) {
     // Check chunk index after first mem index dump
     {
         NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check index"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("check index"), TransactionType::kNormal);
 
         Optional<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
@@ -172,7 +172,7 @@ TEST_P(DumpMemIndexTaskTest, row_cnt_exceed_memindex_capacity) {
     }
 
     // Second time: append 8192 rows for 8 times to exceed the mem index capacity
-    for (SizeT i = 0; i < 8; ++i) {
+    for (size_t i = 0; i < 8; ++i) {
         append();
     }
 
@@ -182,7 +182,7 @@ TEST_P(DumpMemIndexTaskTest, row_cnt_exceed_memindex_capacity) {
     // Check chunk index after second mem index dump
     {
         NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check index"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("check index"), TransactionType::kNormal);
 
         Optional<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;

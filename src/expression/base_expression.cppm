@@ -40,19 +40,19 @@ export struct SourcePosition {
 
     u64 bind_context_id_{std::numeric_limits<u64>::max()};
     ExprSourceType source_type_{ExprSourceType::kInvalid};
-    String binding_name_{};
+    std::string binding_name_{};
 };
 
-export class BaseExpression : public EnableSharedFromThis<BaseExpression> {
+export class BaseExpression : public std::enable_shared_from_this<BaseExpression> {
 public:
-    explicit BaseExpression(ExpressionType type, Vector<SharedPtr<BaseExpression>> arguments) : type_(type), arguments_(std::move(arguments)) {};
+    explicit BaseExpression(ExpressionType type, std::vector<std::shared_ptr<BaseExpression>> arguments) : type_(type), arguments_(std::move(arguments)) {};
 
-    explicit BaseExpression(ExpressionType type, Vector<SharedPtr<BaseExpression>> arguments, String alias)
+    explicit BaseExpression(ExpressionType type, std::vector<std::shared_ptr<BaseExpression>> arguments, std::string alias)
         : alias_(std::move(alias)), type_(type), arguments_(std::move(arguments)) {};
 
     virtual ~BaseExpression() = default;
 
-    inline String Name() const {
+    inline std::string Name() const {
         if (alias_.empty()) {
             return ToString();
         } else {
@@ -64,12 +64,12 @@ public:
 
     [[nodiscard]] inline ExpressionType type() const { return type_; }
 
-    inline Vector<SharedPtr<BaseExpression>> &arguments() { return arguments_; }
+    inline std::vector<std::shared_ptr<BaseExpression>> &arguments() { return arguments_; }
 
     SourcePosition source_position_{};
-    String alias_{};
+    std::string alias_{};
 
-    [[nodiscard]] virtual String ToString() const = 0;
+    [[nodiscard]] virtual std::string ToString() const = 0;
 
     virtual u64 Hash() const {
         UnrecoverableError(fmt::format("Not implemented {}'s Hash", int(type_)));
@@ -83,7 +83,7 @@ public:
 
 protected:
     ExpressionType type_{};
-    Vector<SharedPtr<BaseExpression>> arguments_{};
+    std::vector<std::shared_ptr<BaseExpression>> arguments_{};
 };
 
 } // namespace infinity

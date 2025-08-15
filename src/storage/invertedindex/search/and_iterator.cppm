@@ -27,11 +27,11 @@ namespace infinity {
 
 export class AndIterator : public MultiDocIterator {
 public:
-    AndIterator(Vector<UniquePtr<DocIterator>> iterators);
+    AndIterator(std::vector<std::unique_ptr<DocIterator>> iterators);
 
     DocIteratorType GetType() const override { return DocIteratorType::kAndIterator; }
 
-    String Name() const override { return "AndIterator"; }
+    std::string Name() const override { return "AndIterator"; }
 
     /* pure virtual methods implementation */
     bool Next(RowID doc_id) override;
@@ -48,7 +48,7 @@ private:
     float score_cache_ = 0.0f;
     // for minimum_should_match
     u32 fixed_match_count_ = 0;
-    Vector<u32> dyn_match_ids_{};
+    std::vector<u32> dyn_match_ids_{};
 };
 
 } // namespace infinity

@@ -70,7 +70,7 @@ protected:
     }
 
     NewTxn *DeleteRow(const String &db_name, const String &table_name, Vector<SegmentOffset> segment_offsets) {
-        auto *txn = txn_mgr_->BeginTxn(MakeUnique<String>("Delete row"), TransactionType::kNormal);
+        auto *txn = txn_mgr_->BeginTxn(std::make_unique<String>("Delete row"), TransactionType::kNormal);
 
         Vector<RowID> row_ids;
         for (auto segment_offset : segment_offsets) {
@@ -87,20 +87,20 @@ protected:
         EXPECT_EQ(status.code(), ErrorCode::kTxnConflict);
     };
 
-    void InitTable(const String &db_name, const String &table_name, SharedPtr<TableDef> table_def, SizeT row_cnt) {
-        auto *txn = txn_mgr_->BeginTxn(MakeUnique<String>("Init table"), TransactionType::kNormal);
+    void InitTable(const String &db_name, const String &table_name, std::shared_ptr<TableDef> table_def, size_t row_cnt) {
+        auto *txn = txn_mgr_->BeginTxn(std::make_unique<String>("Init table"), TransactionType::kNormal);
 
         Status status = txn->CreateTable(db_name, table_def, ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = txn_mgr_->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
 
-        txn = txn_mgr_->BeginTxn(MakeUnique<String>("insert table"), TransactionType::kNormal);
-        Vector<SharedPtr<ColumnVector>> column_vectors;
+        txn = txn_mgr_->BeginTxn(std::make_unique<String>("insert table"), TransactionType::kNormal);
+        Vector<std::shared_ptr<ColumnVector>> column_vectors;
         {
-            auto column_vector = MakeShared<ColumnVector>(table_def->columns()[0]->type());
+            auto column_vector = std::make_shared<ColumnVector>(table_def->columns()[0]->type());
             column_vector->Initialize();
-            for (SizeT i = 0; i < row_cnt; i++) {
+            for (size_t i = 0; i < row_cnt; i++) {
                 column_vector->AppendValue(Value::MakeInt(i));
             }
             column_vectors.push_back(column_vector);
@@ -114,8 +114,8 @@ protected:
         txn_mgr_->CommitTxn(txn);
     }
 
-    void CheckRowCnt(const String &db_name, const String &table_name, SizeT expected_row_cnt) {
-        auto *txn = txn_mgr_->BeginTxn(MakeUnique<String>("Check row count"), TransactionType::kNormal);
+    void CheckRowCnt(const String &db_name, const String &table_name, size_t expected_row_cnt) {
+        auto *txn = txn_mgr_->BeginTxn(std::make_unique<String>("Check row count"), TransactionType::kNormal);
 
         Optional<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
@@ -138,9 +138,9 @@ TEST_F(ConflictCheckTest, conflict_check_delete) {
     auto db_name = std::make_shared<std::string>("default_db");
     auto table_name = std::make_shared<std::string>("table1");
     auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
-    auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1});
+    auto table_def = TableDef::Make(db_name, table_name, std::make_shared<String>(), {column_def1});
 
-    SizeT row_cnt = 10;
+    size_t row_cnt = 10;
 
     InitTable(*db_name, *table_name, table_def, row_cnt);
     {

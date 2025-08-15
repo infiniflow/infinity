@@ -36,9 +36,9 @@ struct RoundFunctionFloat {
 };
 
 void RegisterRoundFunction(NewCatalog *catalog_ptr) {
-    String func_name = "round";
+    std::string func_name = "round";
 
-    SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
+    std::shared_ptr<ScalarFunctionSet> function_set_ptr = std::make_shared<ScalarFunctionSet>(func_name);
 
     ScalarFunction round_int8(func_name,
                               {DataType(LogicalType::kTinyInt)},

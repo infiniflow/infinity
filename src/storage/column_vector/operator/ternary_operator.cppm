@@ -27,26 +27,26 @@ namespace infinity {
 export class TernaryOperator {
 public:
     template <typename FirstType, typename SecondType, typename ThirdType, typename ResultType, typename Operator>
-    static void inline Execute(const SharedPtr<ColumnVector> &first,
-                               const SharedPtr<ColumnVector> &second,
-                               const SharedPtr<ColumnVector> &third,
-                               SharedPtr<ColumnVector> &result,
-                               SizeT count,
+    static void inline Execute(const std::shared_ptr<ColumnVector> &first,
+                               const std::shared_ptr<ColumnVector> &second,
+                               const std::shared_ptr<ColumnVector> &third,
+                               std::shared_ptr<ColumnVector> &result,
+                               size_t count,
                                void *state_ptr_first,
                                void *state_ptr,
                                bool nullable) {
 
         const auto *first_ptr = (const FirstType *)(first->data());
-        const SharedPtr<Bitmask> &first_null = first->nulls_ptr_;
+        const std::shared_ptr<Bitmask> &first_null = first->nulls_ptr_;
 
         const auto *second_ptr = (const SecondType *)(second->data());
-        const SharedPtr<Bitmask> &second_null = second->nulls_ptr_;
+        const std::shared_ptr<Bitmask> &second_null = second->nulls_ptr_;
 
         const auto *third_ptr = (const ThirdType *)(third->data());
-        const SharedPtr<Bitmask> &third_null = second->nulls_ptr_;
+        const std::shared_ptr<Bitmask> &third_null = second->nulls_ptr_;
 
         auto *result_ptr = (ResultType *)(result->data());
-        SharedPtr<Bitmask> &result_null = result->nulls_ptr_;
+        std::shared_ptr<Bitmask> &result_null = result->nulls_ptr_;
 
         // 8 cases for first/second/third
         // Flat Flat Flat
@@ -187,11 +187,11 @@ private:
                                   const SecondType *__restrict second_ptr,
                                   const ThirdType *__restrict third_ptr,
                                   ResultType *__restrict result_ptr,
-                                  SharedPtr<Bitmask> &result_null,
-                                  SizeT count,
+                                  std::shared_ptr<Bitmask> &result_null,
+                                  size_t count,
                                   void *state_ptr_first,
                                   void *state_ptr) {
-        for (SizeT i = 0; i < count; i++) {
+        for (size_t i = 0; i < count; i++) {
             Operator::template Execute<FirstType, SecondType, ThirdType, ResultType>(first_ptr[i],
                                                                                      second_ptr[i],
                                                                                      third_ptr[i],
@@ -205,14 +205,14 @@ private:
 
     template <typename FirstType, typename SecondType, typename ThirdType, typename ResultType, typename Operator>
     static void inline ExecuteFFFWithNull(const FirstType *__restrict first_ptr,
-                                          const SharedPtr<Bitmask> &first_null,
+                                          const std::shared_ptr<Bitmask> &first_null,
                                           const SecondType *__restrict second_ptr,
-                                          const SharedPtr<Bitmask> &second_null,
+                                          const std::shared_ptr<Bitmask> &second_null,
                                           const ThirdType *__restrict third_ptr,
-                                          const SharedPtr<Bitmask> &third_null,
+                                          const std::shared_ptr<Bitmask> &third_null,
                                           ResultType *__restrict result_ptr,
-                                          SharedPtr<Bitmask> &result_null,
-                                          SizeT count,
+                                          std::shared_ptr<Bitmask> &result_null,
+                                          size_t count,
                                           void *state_ptr_first,
                                           void *state_ptr) {
         *result_null = *first_null;
@@ -240,11 +240,11 @@ private:
                                   const SecondType *__restrict second_ptr,
                                   const ThirdType *__restrict third_ptr,
                                   ResultType *__restrict result_ptr,
-                                  SharedPtr<Bitmask> &result_null,
-                                  SizeT count,
+                                  std::shared_ptr<Bitmask> &result_null,
+                                  size_t count,
                                   void *state_ptr_first,
                                   void *state_ptr) {
-        for (SizeT i = 0; i < count; i++) {
+        for (size_t i = 0; i < count; i++) {
             Operator::template Execute<FirstType, SecondType, ThirdType, ResultType>(first_ptr[i],
                                                                                      second_ptr[0],
                                                                                      third_ptr[0],
@@ -258,14 +258,14 @@ private:
 
     template <typename FirstType, typename SecondType, typename ThirdType, typename ResultType, typename Operator>
     static void inline ExecuteFCCWithNull(const FirstType *__restrict first_ptr,
-                                          const SharedPtr<Bitmask> &first_null,
+                                          const std::shared_ptr<Bitmask> &first_null,
                                           const SecondType *__restrict second_ptr,
-                                          const SharedPtr<Bitmask> &second_null,
+                                          const std::shared_ptr<Bitmask> &second_null,
                                           const ThirdType *__restrict third_ptr,
-                                          const SharedPtr<Bitmask> &third_null,
+                                          const std::shared_ptr<Bitmask> &third_null,
                                           ResultType *__restrict result_ptr,
-                                          SharedPtr<Bitmask> &result_null,
-                                          SizeT count,
+                                          std::shared_ptr<Bitmask> &result_null,
+                                          size_t count,
                                           void *state_ptr_first,
                                           void *state_ptr) {
         *result_null = *first_null;

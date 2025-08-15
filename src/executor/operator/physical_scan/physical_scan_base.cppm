@@ -38,44 +38,44 @@ export class PhysicalScanBase : public PhysicalOperator {
 public:
     PhysicalScanBase(const u64 id,
                      const PhysicalOperatorType type,
-                     UniquePtr<PhysicalOperator> left,
-                     UniquePtr<PhysicalOperator> right,
+                     std::unique_ptr<PhysicalOperator> left,
+                     std::unique_ptr<PhysicalOperator> right,
                      const u64 table_index,
-                     SharedPtr<BaseTableRef> base_table_ref,
-                     SharedPtr<Vector<LoadMeta>> load_metas,
+                     std::shared_ptr<BaseTableRef> base_table_ref,
+                     std::shared_ptr<std::vector<LoadMeta>> load_metas,
                      const bool cache_result = false)
         : PhysicalOperator(type, std::move(left), std::move(right), id, std::move(load_metas), cache_result), table_index_(table_index),
           base_table_ref_(std::move(base_table_ref)) {}
 
-    virtual Vector<SharedPtr<Vector<GlobalBlockID>>> PlanBlockEntries(i64 parallel_count) const;
+    virtual std::vector<std::shared_ptr<std::vector<GlobalBlockID>>> PlanBlockEntries(i64 parallel_count) const;
 
-    SizeT TaskletCount() override;
+    size_t TaskletCount() override;
 
     virtual BlockIndex *GetBlockIndex() const;
 
-    void FillingTableRefs(HashMap<SizeT, SharedPtr<BaseTableRef>> &table_refs) override {
+    void FillingTableRefs(std::unordered_map<size_t, std::shared_ptr<BaseTableRef>> &table_refs) override {
         table_refs.insert({base_table_ref_->table_index_, base_table_ref_});
     }
 
     u64 table_index() const { return table_index_; }
 
-    [[nodiscard]] inline String TableAlias() const { return base_table_ref_->alias_; }
+    [[nodiscard]] inline std::string TableAlias() const { return base_table_ref_->alias_; }
 
     [[nodiscard]] inline TableInfo *table_info() const { return base_table_ref_->table_info_.get(); }
 
 protected:
-    void SetOutput(const Vector<char *> &raw_result_dists_list,
-                   const Vector<RowID *> &row_ids_list,
-                   SizeT result_size,
+    void SetOutput(const std::vector<char *> &raw_result_dists_list,
+                   const std::vector<RowID *> &row_ids_list,
+                   size_t result_size,
                    i64 result_n,
                    QueryContext *query_context,
                    OperatorState *operator_state) const;
 
-    void AddCache(QueryContext *query_context, ResultCacheManager *cache_mgr, const Vector<UniquePtr<DataBlock>> &output_data_blocks) const;
+    void AddCache(QueryContext *query_context, ResultCacheManager *cache_mgr, const std::vector<std::unique_ptr<DataBlock>> &output_data_blocks) const;
 
 public:
     u64 table_index_ = 0;
-    SharedPtr<BaseTableRef> base_table_ref_{};
+    std::shared_ptr<BaseTableRef> base_table_ref_{};
 };
 
 } // namespace infinity

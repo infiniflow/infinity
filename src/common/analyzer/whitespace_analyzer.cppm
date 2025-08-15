@@ -23,7 +23,7 @@ import :analyzer;
 namespace infinity {
 
 export class WhitespaceAnalyzer : public Analyzer {
-    String delimiters_{};
+    std::string delimiters_{};
 
 public:
     WhitespaceAnalyzer() = default;

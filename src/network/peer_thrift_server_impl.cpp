@@ -42,29 +42,29 @@ public:
     void releaseHandler(infinity_peer_server::PeerServiceIf *handler) final { delete handler; }
 };
 
-void PoolPeerThriftServer::Init(const String &server_address, i32 port_no, i32 pool_size) {
+void PoolPeerThriftServer::Init(const std::string &server_address, i32 port_no, i32 pool_size) {
 
-    SharedPtr<TServerSocket> server_socket = MakeShared<TServerSocket>(server_address, port_no);
+    std::shared_ptr<TServerSocket> server_socket = std::make_shared<TServerSocket>(server_address, port_no);
 
-    SharedPtr<TBinaryProtocolFactory> protocol_factory = MakeShared<TBinaryProtocolFactory>();
+    std::shared_ptr<TBinaryProtocolFactory> protocol_factory = std::make_shared<TBinaryProtocolFactory>();
 
-    SharedPtr<ThreadFactory> threadFactory = MakeShared<ThreadFactory>();
+    std::shared_ptr<ThreadFactory> threadFactory = std::make_shared<ThreadFactory>();
 
-    SharedPtr<ThreadManager> threadManager = ThreadManager::newSimpleThreadManager(pool_size);
+    std::shared_ptr<ThreadManager> threadManager = ThreadManager::newSimpleThreadManager(pool_size);
     threadManager->threadFactory(threadFactory);
     threadManager->start();
 
     fmt::print("Peer server listen on {}: {}, connection limit: {}\n", server_address, port_no, pool_size);
 
-    server = MakeUnique<TThreadPoolServer>(MakeShared<infinity_peer_server::PeerServiceProcessorFactory>(MakeShared<PeerServiceCloneFactory>()),
+    server = std::make_unique<TThreadPoolServer>(std::make_shared<infinity_peer_server::PeerServiceProcessorFactory>(std::make_shared<PeerServiceCloneFactory>()),
                                            server_socket,
-                                           MakeShared<TBufferedTransportFactory>(),
+                                           std::make_shared<TBufferedTransportFactory>(),
                                            protocol_factory,
                                            threadManager);
     initialized_ = true;
 }
 
-Thread PoolPeerThriftServer::Start() {
+std::thread PoolPeerThriftServer::Start() {
     if (!initialized_) {
         UnrecoverableError("Peer server is not initialized.");
     }
@@ -74,7 +74,7 @@ Thread PoolPeerThriftServer::Start() {
             UnrecoverableError(fmt::format("Peer server in unexpected state: {}", u8(expect)));
         }
     }
-    return Thread([this] {
+    return std::thread([this] {
         server->serve();
 
         status_.store(PeerThriftServerStatus::kStopped);

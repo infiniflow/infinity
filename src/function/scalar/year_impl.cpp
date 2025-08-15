@@ -59,9 +59,9 @@ inline bool YearFunction::Run(TimestampT left, BigIntT &result) {
 }
 
 void RegisterYearFunction(NewCatalog *catalog_ptr) {
-    String func_name = "year";
+    std::string func_name = "year";
 
-    SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
+    std::shared_ptr<ScalarFunctionSet> function_set_ptr = std::make_shared<ScalarFunctionSet>(func_name);
 
     ScalarFunction year_date_function(func_name,
                                   {DataType(LogicalType::kDate)},

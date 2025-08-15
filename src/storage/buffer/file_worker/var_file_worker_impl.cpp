@@ -29,11 +29,11 @@ import third_party;
 
 namespace infinity {
 
-VarFileWorker::VarFileWorker(SharedPtr<String> data_dir,
-                             SharedPtr<String> temp_dir,
-                             SharedPtr<String> file_dir,
-                             SharedPtr<String> file_name,
-                             SizeT buffer_size,
+VarFileWorker::VarFileWorker(std::shared_ptr<std::string> data_dir,
+                             std::shared_ptr<std::string> temp_dir,
+                             std::shared_ptr<std::string> file_dir,
+                             std::shared_ptr<std::string> file_name,
+                             size_t buffer_size,
                              PersistenceManager *persistence_manager)
     : FileWorker(std::move(data_dir), std::move(temp_dir), std::move(file_dir), std::move(file_name), persistence_manager),
       buffer_size_(buffer_size) {}
@@ -69,7 +69,7 @@ void VarFileWorker::FreeInMemory() {
     data_ = nullptr;
 }
 
-SizeT VarFileWorker::GetMemoryCost() const {
+size_t VarFileWorker::GetMemoryCost() const {
     if (data_ == nullptr) {
         return buffer_size_;
     }
@@ -82,8 +82,8 @@ bool VarFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_success, const 
         UnrecoverableError("Data is not allocated.");
     }
     const auto *buffer = static_cast<const VarBuffer *>(data_);
-    SizeT data_size = buffer->TotalSize();
-    auto buffer_data = MakeUnique<char[]>(data_size);
+    size_t data_size = buffer->TotalSize();
+    auto buffer_data = std::make_unique<char[]>(data_size);
     char *ptr = buffer_data.get();
     buffer->Write(ptr);
 
@@ -96,7 +96,7 @@ bool VarFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_success, const 
     return true;
 }
 
-void VarFileWorker::ReadFromFileImpl(SizeT file_size, bool from_spill) {
+void VarFileWorker::ReadFromFileImpl(size_t file_size, bool from_spill) {
     if (data_ != nullptr) {
         UnrecoverableError("Data is not allocated.");
     }
@@ -106,7 +106,7 @@ void VarFileWorker::ReadFromFileImpl(SizeT file_size, bool from_spill) {
         buffer_size_ = file_size;
     }
 
-    auto buffer = MakeUnique<char[]>(buffer_size_);
+    auto buffer = std::make_unique<char[]>(buffer_size_);
     auto [nbytes, status] = file_handle_->Read(buffer.get(), buffer_size_);
     if (!status.ok()) {
         UnrecoverableError(status.message());
@@ -118,7 +118,7 @@ void VarFileWorker::ReadFromFileImpl(SizeT file_size, bool from_spill) {
     data_ = static_cast<void *>(var_buffer);
 }
 
-bool VarFileWorker::ReadFromMmapImpl(const void *ptr, SizeT file_size) {
+bool VarFileWorker::ReadFromMmapImpl(const void *ptr, size_t file_size) {
     if (file_size < buffer_size_) {
         UnrecoverableError(fmt::format("File size {} is smaller than buffer size {}.", file_size, buffer_size_));
     } else {

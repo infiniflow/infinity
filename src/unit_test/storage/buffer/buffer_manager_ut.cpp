@@ -50,8 +50,8 @@ using namespace infinity;
 
 class BufferManagerTest : public BaseTest {
 private:
-    Vector<SharedPtr<DirEntry>> ListAllFile(const String &path) {
-        Vector<SharedPtr<DirEntry>> res;
+    Vector<std::shared_ptr<DirEntry>> ListAllFile(const String &path) {
+        Vector<std::shared_ptr<DirEntry>> res;
         std::function<void(const String &)> f = [&](const String &path) {
             auto [entries, status] = VirtualStore::ListDirectory(path);
             for (auto &entry : entries) {
@@ -67,13 +67,13 @@ private:
     }
 
 protected:
-    Vector<SharedPtr<DirEntry>> ListAllData() { return ListAllFile(*data_dir_); }
+    Vector<std::shared_ptr<DirEntry>> ListAllData() { return ListAllFile(*data_dir_); }
 
-    Vector<SharedPtr<DirEntry>> ListAllTemp() { return ListAllFile(*temp_dir_); }
+    Vector<std::shared_ptr<DirEntry>> ListAllTemp() { return ListAllFile(*temp_dir_); }
 
-    SharedPtr<String> data_dir_;
-    SharedPtr<String> temp_dir_;
-    SharedPtr<String> persistence_dir_;
+    std::shared_ptr<String> data_dir_;
+    std::shared_ptr<String> temp_dir_;
+    std::shared_ptr<String> persistence_dir_;
 
     void SetUp() override {
         Config config;
@@ -82,9 +82,9 @@ protected:
 
         Logger::Initialize(&config);
 
-        data_dir_ = MakeShared<String>(std::string(tmp_data_path()) + "/buffer/data");
-        temp_dir_ = MakeShared<String>(std::string(tmp_data_path()) + "/buffer/temp");
-        persistence_dir_ = MakeShared<String>(std::string(tmp_data_path()) + "/buffer/persistence");
+        data_dir_ = std::make_shared<String>(std::string(tmp_data_path()) + "/buffer/data");
+        temp_dir_ = std::make_shared<String>(std::string(tmp_data_path()) + "/buffer/temp");
+        persistence_dir_ = std::make_shared<String>(std::string(tmp_data_path()) + "/buffer/persistence");
         ResetDir();
     }
 
@@ -107,14 +107,14 @@ protected:
 };
 
 TEST_F(BufferManagerTest, cleanup_test) {
-    const SizeT k = 2;
-    const SizeT file_size = 100;
-    const SizeT buffer_size = k * file_size;
-    const SizeT file_num = 100;
-    const SizeT file_num1 = file_num / 2;
+    const size_t k = 2;
+    const size_t file_size = 100;
+    const size_t buffer_size = k * file_size;
+    const size_t file_num = 100;
+    const size_t file_num1 = file_num / 2;
     EXPECT_GT(file_num, k + file_num1);
 
-    auto CheckFileNum = [&](SizeT data_num, SizeT temp_num) {
+    auto CheckFileNum = [&](size_t data_num, size_t temp_num) {
         auto datas = ListAllData();
         auto temps = ListAllTemp();
         EXPECT_EQ(datas.size(), data_num);
@@ -125,17 +125,17 @@ TEST_F(BufferManagerTest, cleanup_test) {
         BufferManager buffer_mgr(buffer_size, data_dir_, temp_dir_, nullptr);
         Vector<BufferObj *> buffer_objs;
 
-        for (SizeT i = 0; i < file_num; ++i) {
-            auto file_name = MakeShared<String>(fmt::format("file_{}", i));
+        for (size_t i = 0; i < file_num; ++i) {
+            auto file_name = std::make_shared<String>(fmt::format("file_{}", i));
             auto file_worker =
-                MakeUnique<DataFileWorker>(data_dir_, temp_dir_, MakeShared<String>(""), file_name, file_size, buffer_mgr.persistence_manager());
+                std::make_unique<DataFileWorker>(data_dir_, temp_dir_, std::make_shared<String>(""), file_name, file_size, buffer_mgr.persistence_manager());
             BufferObj *buffer_obj = buffer_mgr.AllocateBufferObject(std::move(file_worker));
             buffer_obj->AddObjRc();
             buffer_objs.push_back(buffer_obj);
             {
                 auto buffer_handle = buffer_obj->Load();
                 auto *data = reinterpret_cast<char *>(buffer_handle.GetDataMut());
-                for (SizeT j = 0; j < file_size; ++j) {
+                for (size_t j = 0; j < file_size; ++j) {
                     data[j] = 'a' + (i + j) % 26;
                 }
                 buffer_obj->SetDataSize(file_size);
@@ -143,7 +143,7 @@ TEST_F(BufferManagerTest, cleanup_test) {
         }
         CheckFileNum(0, file_num - k);
         {
-            SizeT write_n = 0;
+            size_t write_n = 0;
             for (auto *buffer_obj : buffer_objs) {
                 if (buffer_obj->Save()) {
                     ++write_n;
@@ -152,26 +152,26 @@ TEST_F(BufferManagerTest, cleanup_test) {
             EXPECT_EQ(write_n, k);
         }
         CheckFileNum(file_num, 0);
-        for (SizeT i = 0; i < file_num; ++i) {
+        for (size_t i = 0; i < file_num; ++i) {
             auto *buffer_obj = buffer_objs[i];
             auto buffer_handle = buffer_obj->Load();
             const auto *data = reinterpret_cast<const char *>(buffer_handle.GetData());
-            for (SizeT j = 0; j < file_size; ++j) {
+            for (size_t j = 0; j < file_size; ++j) {
                 EXPECT_EQ(data[j], char('a' + (i + j) % 26));
             }
         }
         CheckFileNum(file_num, 0);
-        for (SizeT i = 0; i < file_num; ++i) {
+        for (size_t i = 0; i < file_num; ++i) {
             auto *buffer_obj = buffer_objs[i];
             auto buffer_handle = buffer_obj->Load();
             auto *data = reinterpret_cast<char *>(buffer_handle.GetDataMut());
-            for (SizeT j = 0; j < file_size; ++j) {
+            for (size_t j = 0; j < file_size; ++j) {
                 data[j] = 'a' + (i + j) % 26;
             }
         }
         {
-            SizeT write_n = 0;
-            for (SizeT i = 0; i < file_num1; ++i) {
+            size_t write_n = 0;
+            for (size_t i = 0; i < file_num1; ++i) {
                 auto *buffer_obj = buffer_objs[i];
                 bool write = buffer_obj->Save();
                 if (write) {
@@ -184,12 +184,12 @@ TEST_F(BufferManagerTest, cleanup_test) {
             buffer_mgr.RemoveClean(nullptr);
             CheckFileNum(file_num, file_num - k - file_num1);
         }
-        for (SizeT i = file_num1; i < file_num; ++i) {
+        for (size_t i = file_num1; i < file_num; ++i) {
             auto *buffer_obj = buffer_objs[i];
             {
                 auto buffer_handle = buffer_obj->Load();
                 auto *data = reinterpret_cast<char *>(buffer_handle.GetDataMut());
-                for (SizeT j = 0; j < file_size; ++j) {
+                for (size_t j = 0; j < file_size; ++j) {
                     data[j] = 'A' + (i + j) % 26;
                 }
             }
@@ -208,23 +208,23 @@ TEST_F(BufferManagerTest, cleanup_test) {
 }
 
 TEST_F(BufferManagerTest, varfile_test) {
-    SizeT buffer_size = 100;
-    SizeT file_num = 10;
+    size_t buffer_size = 100;
+    size_t file_num = 10;
 
-    SharedPtr<PersistenceManager> persistence_manager_ =
-        MakeShared<PersistenceManager>(*persistence_dir_, *data_dir_, DEFAULT_PERSISTENCE_OBJECT_SIZE_LIMIT);
+    std::shared_ptr<PersistenceManager> persistence_manager_ =
+        std::make_shared<PersistenceManager>(*persistence_dir_, *data_dir_, DEFAULT_PERSISTENCE_OBJECT_SIZE_LIMIT);
     BufferManager buffer_mgr(buffer_size, data_dir_, temp_dir_, persistence_manager_.get());
     Vector<BufferObj *> buffer_objs;
-    for (SizeT i = 0; i < file_num; ++i) {
-        auto file_name = MakeShared<String>(fmt::format("file_{}", i));
-        auto file_worker = MakeUnique<VarFileWorker>(data_dir_, temp_dir_, MakeShared<String>(), file_name, 0, buffer_mgr.persistence_manager());
+    for (size_t i = 0; i < file_num; ++i) {
+        auto file_name = std::make_shared<String>(fmt::format("file_{}", i));
+        auto file_worker = std::make_unique<VarFileWorker>(data_dir_, temp_dir_, std::make_shared<String>(), file_name, 0, buffer_mgr.persistence_manager());
         auto *buffer_obj = buffer_mgr.AllocateBufferObject(std::move(file_worker));
         buffer_objs.push_back(buffer_obj);
     }
 
-    SizeT data_size = 25;
-    auto data = MakeUnique<char[]>(data_size);
-    for (SizeT i = 0; i < data_size; ++i) {
+    size_t data_size = 25;
+    auto data = std::make_unique<char[]>(data_size);
+    for (size_t i = 0; i < data_size; ++i) {
         data[i] = 'a' + i % 26;
     }
     {
@@ -242,7 +242,7 @@ TEST_F(BufferManagerTest, varfile_test) {
         buffer3->Append(data.get(), data_size, &free_success);
         EXPECT_TRUE(free_success);
 
-        SizeT cur_mem = buffer_mgr.memory_usage();
+        size_t cur_mem = buffer_mgr.memory_usage();
         EXPECT_EQ(cur_mem, 3 * data_size);
     }
     {
@@ -289,8 +289,8 @@ struct FileInfo {
 
     int file_id_;
     BufferObj *buffer_obj_ = nullptr;
-    SizeT file_size_ = 0;
-    SizeT visit_cnt_ = 0;
+    size_t file_size_ = 0;
+    size_t visit_cnt_ = 0;
     std::shared_mutex mtx_{};
 };
 
@@ -311,17 +311,17 @@ protected:
 
     void TearDown() override { BufferManagerTest::TearDown(); }
 
-    const SizeT thread_n = 2;
-    const SizeT file_n = 100;
-    const SizeT avg_file_size = 100;
-    const SizeT max_file_size = avg_file_size + avg_file_size / 2;
+    const size_t thread_n = 2;
+    const size_t file_n = 100;
+    const size_t avg_file_size = 100;
+    const size_t max_file_size = avg_file_size + avg_file_size / 2;
     // *2 because BufferManager::RequestSpace may scan buffer obj that is loading/cleaning
-    const SizeT buffer_size = max_file_size * thread_n * 2;
-    const SizeT loop_n = 10;
-    const SizeT test_n_ = 2;
-    const SizeT var_file_step = max_file_size / loop_n / test_n_;
+    const size_t buffer_size = max_file_size * thread_n * 2;
+    const size_t loop_n = 10;
+    const size_t test_n_ = 2;
+    const size_t var_file_step = max_file_size / loop_n / test_n_;
 
-    void TestRoutine(Vector<FileInfo> &file_infos, SizeT test_i, SizeT thread_i, TestObj *test_obj, Atomic<SizeT> &finished_n) {
+    void TestRoutine(Vector<FileInfo> &file_infos, size_t test_i, size_t thread_i, TestObj *test_obj, Atomic<size_t> &finished_n) {
         bool alloc_new = test_i == 0;
         bool clean = test_i == test_n_ - 1;
         while (finished_n.load() < file_n) {
@@ -334,7 +334,7 @@ protected:
             auto &file_info = file_infos[file_id];
             if (op < 2) { // write
                 std::unique_lock lck(file_info.mtx_);
-                SizeT &visit_cnt = file_info.visit_cnt_;
+                size_t &visit_cnt = file_info.visit_cnt_;
                 BufferObj *&buffer_obj = file_info.buffer_obj_;
                 if (visit_cnt == test_i * loop_n) {
                     EXPECT_EQ(buffer_obj, nullptr);
@@ -359,7 +359,7 @@ protected:
                 }
             } else {
                 std::shared_lock lck(file_info.mtx_);
-                SizeT visit_cnt = file_info.visit_cnt_;
+                size_t visit_cnt = file_info.visit_cnt_;
                 if (visit_cnt == test_i * loop_n) {
                     continue;
                 } else if (visit_cnt == (test_i + 1) * loop_n) {
@@ -374,45 +374,45 @@ protected:
 
 class Test1Obj : public TestObj {
 public:
-    Test1Obj(SizeT avg_file_size, BufferManager *buffer_mgr, SharedPtr<String> data_dir, SharedPtr<String> temp_dir)
+    Test1Obj(size_t avg_file_size, BufferManager *buffer_mgr, std::shared_ptr<String> data_dir, std::shared_ptr<String> temp_dir)
         : avg_file_size(avg_file_size), buffer_mgr_(buffer_mgr), data_dir_(data_dir), temp_dir_(temp_dir) {}
 
 private:
-    const SizeT avg_file_size;
+    const size_t avg_file_size;
     BufferManager *buffer_mgr_;
-    SharedPtr<String> data_dir_;
-    SharedPtr<String> temp_dir_;
+    std::shared_ptr<String> data_dir_;
+    std::shared_ptr<String> temp_dir_;
 
 public:
     void Init(bool alloc_new, FileInfo &file_info) override {
-        auto file_name = MakeShared<String>(fmt::format("file_{}", file_info.file_id_));
+        auto file_name = std::make_shared<String>(fmt::format("file_{}", file_info.file_id_));
         if (alloc_new) {
-            SizeT file_size = rand() % avg_file_size + avg_file_size / 2;
+            size_t file_size = rand() % avg_file_size + avg_file_size / 2;
             file_info.file_size_ = file_size;
-            auto file_worker = MakeUnique<DataFileWorker>(data_dir_, temp_dir_, MakeShared<String>(""), file_name, file_size, nullptr);
+            auto file_worker = std::make_unique<DataFileWorker>(data_dir_, temp_dir_, std::make_shared<String>(""), file_name, file_size, nullptr);
             file_info.buffer_obj_ = buffer_mgr_->AllocateBufferObject(std::move(file_worker));
             file_info.buffer_obj_->AddObjRc();
         } else {
-            auto file_worker = MakeUnique<DataFileWorker>(data_dir_, temp_dir_, MakeShared<String>(""), file_name, file_info.file_size_, nullptr);
+            auto file_worker = std::make_unique<DataFileWorker>(data_dir_, temp_dir_, std::make_shared<String>(""), file_name, file_info.file_size_, nullptr);
             file_info.buffer_obj_ = buffer_mgr_->GetBufferObject(std::move(file_worker));
         }
     }
 
     void Write(FileInfo &file_info) override {
-        SizeT visit_cnt = file_info.visit_cnt_;
+        size_t visit_cnt = file_info.visit_cnt_;
         BufferHandle buffer_handle = file_info.buffer_obj_->Load();
         auto *data = reinterpret_cast<char *>(buffer_handle.GetDataMut());
-        for (SizeT i = 0; i < file_info.file_size_; ++i) {
+        for (size_t i = 0; i < file_info.file_size_; ++i) {
             data[i] = 'a' + (visit_cnt % 26);
         }
         file_info.buffer_obj_->SetDataSize(file_info.file_size_);
     }
 
     void Check(const FileInfo &file_info) override {
-        SizeT visit_cnt = file_info.visit_cnt_;
+        size_t visit_cnt = file_info.visit_cnt_;
         BufferHandle buffer_handle = file_info.buffer_obj_->Load();
         const auto *data = reinterpret_cast<const char *>(buffer_handle.GetData());
-        for (SizeT i = 0; i < file_info.file_size_; ++i) {
+        for (size_t i = 0; i < file_info.file_size_; ++i) {
             EXPECT_EQ(data[i], char('a' + (visit_cnt - 1) % 26));
         }
     }
@@ -420,24 +420,24 @@ public:
 
 TEST_F(BufferManagerParallelTest, parallel_test1) {
     for (int i = 0; i < 1; ++i) {
-        SharedPtr<PersistenceManager> persistence_manager_ =
-            MakeShared<PersistenceManager>(*persistence_dir_, *data_dir_, DEFAULT_PERSISTENCE_OBJECT_SIZE_LIMIT);
-        auto buffer_mgr = MakeUnique<BufferManager>(buffer_size, data_dir_, temp_dir_, persistence_manager_.get());
-        auto test1_obj = MakeUnique<Test1Obj>(avg_file_size, buffer_mgr.get(), data_dir_, temp_dir_);
+        std::shared_ptr<PersistenceManager> persistence_manager_ =
+            std::make_shared<PersistenceManager>(*persistence_dir_, *data_dir_, DEFAULT_PERSISTENCE_OBJECT_SIZE_LIMIT);
+        auto buffer_mgr = std::make_unique<BufferManager>(buffer_size, data_dir_, temp_dir_, persistence_manager_.get());
+        auto test1_obj = std::make_unique<Test1Obj>(avg_file_size, buffer_mgr.get(), data_dir_, temp_dir_);
 
         Vector<FileInfo> file_infos;
-        for (SizeT i = 0; i < file_n; ++i) {
+        for (size_t i = 0; i < file_n; ++i) {
             file_infos.emplace_back(i);
         }
         //        LOG_INFO(fmt::format("Start parallel test1 {}", i));
-        for (SizeT test_i = 0; test_i < test_n_; test_i++) {
-            Atomic<SizeT> finished_n = 0;
+        for (size_t test_i = 0; test_i < test_n_; test_i++) {
+            Atomic<size_t> finished_n = 0;
             for (auto &file_info : file_infos) {
                 file_info.buffer_obj_ = nullptr;
             }
 
-            Vector<Thread> threads;
-            for (SizeT thread_i = 0; thread_i < thread_n; ++thread_i) {
+            Vector<std::thread> threads;
+            for (size_t thread_i = 0; thread_i < thread_n; ++thread_i) {
                 threads.emplace_back([&, thread_i]() { TestRoutine(file_infos, test_i, thread_i, test1_obj.get(), finished_n); });
             }
             for (auto &thread : threads) {
@@ -454,24 +454,24 @@ TEST_F(BufferManagerParallelTest, parallel_test1) {
 
 class Test2Obj : public TestObj {
 public:
-    Test2Obj(SizeT var_file_step, BufferManager *buffer_mgr, SharedPtr<String> data_dir, SharedPtr<String> temp_dir)
+    Test2Obj(size_t var_file_step, BufferManager *buffer_mgr, std::shared_ptr<String> data_dir, std::shared_ptr<String> temp_dir)
         : var_file_step(var_file_step), buffer_mgr_(buffer_mgr), data_dir_(data_dir), temp_dir_(temp_dir) {}
 
 private:
-    const SizeT var_file_step;
+    const size_t var_file_step;
     BufferManager *buffer_mgr_;
-    SharedPtr<String> data_dir_;
-    SharedPtr<String> temp_dir_;
+    std::shared_ptr<String> data_dir_;
+    std::shared_ptr<String> temp_dir_;
 
 public:
     void Init(bool alloc_new, FileInfo &file_info) override {
-        auto file_name = MakeShared<String>(fmt::format("file_{}", file_info.file_id_));
+        auto file_name = std::make_shared<String>(fmt::format("file_{}", file_info.file_id_));
         if (alloc_new) {
-            auto file_worker = MakeUnique<VarFileWorker>(data_dir_, temp_dir_, MakeShared<String>(""), file_name, 0, nullptr);
+            auto file_worker = std::make_unique<VarFileWorker>(data_dir_, temp_dir_, std::make_shared<String>(""), file_name, 0, nullptr);
             file_info.buffer_obj_ = buffer_mgr_->AllocateBufferObject(std::move(file_worker));
             file_info.buffer_obj_->AddObjRc();
         } else {
-            auto file_worker = MakeUnique<VarFileWorker>(data_dir_, temp_dir_, MakeShared<String>(""), file_name, file_info.file_size_, nullptr);
+            auto file_worker = std::make_unique<VarFileWorker>(data_dir_, temp_dir_, std::make_shared<String>(""), file_name, file_info.file_size_, nullptr);
             file_info.buffer_obj_ = buffer_mgr_->GetBufferObject(std::move(file_worker));
         }
     }
@@ -479,8 +479,8 @@ public:
     void Write(FileInfo &file_info) override {
         BufferHandle buffer_handle = file_info.buffer_obj_->Load();
         auto *buffer = reinterpret_cast<VarBuffer *>(buffer_handle.GetDataMut());
-        auto data = MakeUnique<char[]>(var_file_step);
-        for (SizeT i = 0; i < var_file_step; ++i) {
+        auto data = std::make_unique<char[]>(var_file_step);
+        for (size_t i = 0; i < var_file_step; ++i) {
             data[i] = 'a' + (i + file_info.file_size_) % 26;
         }
         buffer->Append(data.get(), var_file_step);
@@ -493,9 +493,9 @@ public:
     void Check(const FileInfo &file_info) override {
         BufferHandle buffer_handle = file_info.buffer_obj_->Load();
         const auto *buffer = reinterpret_cast<const VarBuffer *>(buffer_handle.GetData());
-        for (SizeT i = 0; i < file_info.file_size_; i += var_file_step) {
+        for (size_t i = 0; i < file_info.file_size_; i += var_file_step) {
             const char *data = buffer->Get(i, var_file_step);
-            for (SizeT j = 0; j < var_file_step; ++j) {
+            for (size_t j = 0; j < var_file_step; ++j) {
                 EXPECT_EQ(data[j], char('a' + (i + j) % 26));
             }
         }
@@ -504,22 +504,22 @@ public:
 
 TEST_F(BufferManagerParallelTest, parallel_test2) {
     for (int i = 0; i < 1; ++i) {
-        auto buffer_mgr = MakeUnique<BufferManager>(buffer_size, data_dir_, temp_dir_, nullptr);
-        auto test2_obj = MakeUnique<Test2Obj>(var_file_step, buffer_mgr.get(), data_dir_, temp_dir_);
+        auto buffer_mgr = std::make_unique<BufferManager>(buffer_size, data_dir_, temp_dir_, nullptr);
+        auto test2_obj = std::make_unique<Test2Obj>(var_file_step, buffer_mgr.get(), data_dir_, temp_dir_);
 
         Vector<FileInfo> file_infos;
-        for (SizeT i = 0; i < file_n; ++i) {
+        for (size_t i = 0; i < file_n; ++i) {
             file_infos.emplace_back(i);
         }
         //        LOG_INFO(fmt::format("Start parallel test2 {}", i));
-        for (SizeT test_i = 0; test_i < test_n_; test_i++) {
-            Atomic<SizeT> finished_n = 0;
+        for (size_t test_i = 0; test_i < test_n_; test_i++) {
+            Atomic<size_t> finished_n = 0;
             for (auto &file_info : file_infos) {
                 file_info.buffer_obj_ = nullptr;
             }
 
             Vector<std::future<bool>> futures;
-            for (SizeT thread_i = 0; thread_i < thread_n; ++thread_i) {
+            for (size_t thread_i = 0; thread_i < thread_n; ++thread_i) {
                 auto f = std::async(std::launch::async, [&, thread_i]() {
                     try {
                         TestRoutine(file_infos, test_i, thread_i, test2_obj.get(), finished_n);

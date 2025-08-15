@@ -12,12 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:logical_flush.impl;
 
 import :logical_flush;
-import :stl;
 import :column_binding;
 import :logical_flush;
 
@@ -29,15 +26,15 @@ import data_type;
 
 namespace infinity {
 
-Vector<ColumnBinding> LogicalFlush::GetColumnBindings() const { return {}; }
+std::vector<ColumnBinding> LogicalFlush::GetColumnBindings() const { return {}; }
 
-SharedPtr<Vector<String>> LogicalFlush::GetOutputNames() const { return MakeShared<Vector<String>>(); }
+std::shared_ptr<std::vector<std::string>> LogicalFlush::GetOutputNames() const { return std::make_shared<std::vector<std::string>>(); }
 
-SharedPtr<Vector<SharedPtr<DataType>>> LogicalFlush::GetOutputTypes() const { return MakeShared<Vector<SharedPtr<DataType>>>(); }
+std::shared_ptr<std::vector<std::shared_ptr<DataType>>> LogicalFlush::GetOutputTypes() const { return std::make_shared<std::vector<std::shared_ptr<DataType>>>(); }
 
-String LogicalFlush::ToString(i64 &space) const {
+std::string LogicalFlush::ToString(i64 &space) const {
     std::stringstream ss;
-    String arrow_str;
+    std::string arrow_str;
     if (space > 3) {
         space -= 4;
         arrow_str = "->  ";
@@ -45,19 +42,19 @@ String LogicalFlush::ToString(i64 &space) const {
 
     switch (flush_type_) {
         case FlushType::kCatalog:
-            ss << String(space, ' ') << "-> "
+            ss << std::string(space, ' ') << "-> "
                << "Flush Catalog: ";
             break;
         case FlushType::kData:
-            ss << String(space, ' ') << "-> "
+            ss << std::string(space, ' ') << "-> "
                << "Flush Data: ";
             break;
         case FlushType::kLog:
-            ss << String(space, ' ') << "-> "
+            ss << std::string(space, ' ') << "-> "
                << "Flush Log: ";
             break;
         case FlushType::kBuffer:
-            ss << String(space, ' ') << "-> "
+            ss << std::string(space, ' ') << "-> "
                << "Flush Buffer: ";
             break;
     }

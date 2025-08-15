@@ -33,7 +33,7 @@ FullTextColumnLengthReader::FullTextColumnLengthReader(ColumnIndexReader *reader
     : index_dir_(reader->index_dir_), memory_indexer_(reader->memory_indexer_) {
     chunk_index_meta_infos_ = reader->chunk_index_meta_infos_;
 
-    Pair<u64, float> df_and_avg_column_len = reader->GetTotalDfAndAvgColumnLength();
+    std::pair<u64, float> df_and_avg_column_len = reader->GetTotalDfAndAvgColumnLength();
     total_df_ = df_and_avg_column_len.first;
     avg_column_len_ = df_and_avg_column_len.second;
 }
@@ -43,11 +43,11 @@ FullTextColumnLengthReader::~FullTextColumnLengthReader() = default;
 u32 FullTextColumnLengthReader::SeekFile(RowID row_id) {
     // determine the chunk index which contains row_id
     current_chunk_buffer_handle_.~BufferHandle();
-    SizeT left = 0;
-    SizeT right = chunk_index_meta_infos_.size();
-    SizeT current_chunk = std::numeric_limits<SizeT>::max();
+    size_t left = 0;
+    size_t right = chunk_index_meta_infos_.size();
+    size_t current_chunk = std::numeric_limits<size_t>::max();
     while (left < right) {
-        SizeT mid = left + (right - left) / 2;
+        size_t mid = left + (right - left) / 2;
         if (chunk_index_meta_infos_[mid].base_rowid_ > row_id) {
             right = mid;
         } else if (chunk_index_meta_infos_[mid].base_rowid_ + chunk_index_meta_infos_[mid].row_count_ <= row_id) {
@@ -57,7 +57,7 @@ u32 FullTextColumnLengthReader::SeekFile(RowID row_id) {
             break;
         }
     }
-    if (current_chunk == std::numeric_limits<SizeT>::max()) {
+    if (current_chunk == std::numeric_limits<size_t>::max()) {
         return 0;
     }
 

@@ -24,8 +24,8 @@ import data_type;
 
 namespace infinity {
 
-void TaskResult::Init(const Vector<SharedPtr<DataType>> &types, SizeT capacity) {
-    data_ = MakeUnique<DataBlock>();
+void TaskResult::Init(const std::vector<std::shared_ptr<DataType>> &types, size_t capacity) {
+    data_ = std::make_unique<DataBlock>();
     data_->Init(types, capacity);
 }
 

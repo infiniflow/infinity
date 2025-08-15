@@ -48,7 +48,7 @@ Status PeerClient::Init() {
 
     Status status = Reconnect();
     if (status.ok()) {
-        processor_thread_ = MakeShared<Thread>([this] { this->Process(); });
+        processor_thread_ = std::make_shared<std::thread>([this] { this->Process(); });
     }
 
     return status;
@@ -59,7 +59,7 @@ Status PeerClient::UnInit(bool sync) {
     LOG_INFO(fmt::format("Peer client: {} is stopping.", from_node_name_));
 
     if (processor_thread_.get() != nullptr) {
-        SharedPtr<TerminatePeerTask> terminate_task = MakeShared<TerminatePeerTask>(!sync);
+        std::shared_ptr<TerminatePeerTask> terminate_task = std::make_shared<TerminatePeerTask>(!sync);
         peer_task_queue_.Enqueue(terminate_task);
         terminate_task->Wait();
         if (sync) {
@@ -83,7 +83,7 @@ Status PeerClient::Reconnect() {
     try {
         Config *config_ptr = InfinityContext::instance().config();
 
-        socket_ = MakeShared<TSocket>(ip_address_, port_);
+        socket_ = std::make_shared<TSocket>(ip_address_, port_);
 
         TSocket *socket = static_cast<TSocket *>(socket_.get());
         if (i64 timeout = config_ptr->PeerConnectTimeout(); timeout > 0) {
@@ -95,9 +95,9 @@ Status PeerClient::Reconnect() {
         if (i64 timeout = config_ptr->PeerSendTimeout(); timeout > 0) {
             socket->setSendTimeout(timeout);
         }
-        transport_ = MakeShared<TBufferedTransport>(socket_);
-        protocol_ = MakeShared<TBinaryProtocol>(transport_);
-        client_ = MakeUnique<PeerServiceClient>(protocol_);
+        transport_ = std::make_shared<TBufferedTransport>(socket_);
+        protocol_ = std::make_shared<TBinaryProtocol>(transport_);
+        client_ = std::make_unique<PeerServiceClient>(protocol_);
         transport_->open();
         server_connected_ = true;
     } catch (const std::exception &e) {
@@ -125,7 +125,7 @@ Status PeerClient::Disconnect() {
     return status;
 }
 
-void PeerClient::Send(SharedPtr<PeerTask> peer_task) {
+void PeerClient::Send(std::shared_ptr<PeerTask> peer_task) {
     if (peer_task->Type() == PeerTaskType::kTerminate) {
         UnrecoverableError("Terminate the background processor");
     }
@@ -134,7 +134,7 @@ void PeerClient::Send(SharedPtr<PeerTask> peer_task) {
 }
 
 void PeerClient::Process() {
-    Deque<SharedPtr<PeerTask>> peer_tasks;
+    std::deque<std::shared_ptr<PeerTask>> peer_tasks;
     bool running = true;
     while (running) {
         peer_task_queue_.DequeueBulk(peer_tasks);
@@ -193,7 +193,7 @@ void PeerClient::Call(std::function<void()> call_func) {
     Config *config_ptr = InfinityContext::instance().config();
     i64 retry_num = config_ptr->PeerRetryCount();
     i64 retry_delay = config_ptr->PeerRetryDelay();
-    Optional<::apache::thrift::transport::TTransportException> exception;
+    std::optional<::apache::thrift::transport::TTransportException> exception;
     for (i64 retry_count = 0; retry_count <= retry_num; ++retry_count) {
         try {
             call_func();
@@ -377,9 +377,9 @@ void PeerClient::HeartBeat(HeartBeatPeerTask *peer_task) {
         }
 
         peer_task->leader_term_ = response.leader_term;
-        SizeT node_count = response.other_nodes.size();
+        size_t node_count = response.other_nodes.size();
         peer_task->other_nodes_.reserve(node_count);
-        for (SizeT idx = 0; idx < node_count; ++idx) {
+        for (size_t idx = 0; idx < node_count; ++idx) {
 
             auto &other_node = response.other_nodes[idx];
             if (from_node_name_ == other_node.node_name) {
@@ -419,7 +419,7 @@ void PeerClient::HeartBeat(HeartBeatPeerTask *peer_task) {
                 }
             }
 
-            SharedPtr<NodeInfo> node_info = MakeShared<NodeInfo>(node_role,
+            std::shared_ptr<NodeInfo> node_info = std::make_shared<NodeInfo>(node_role,
                                                                  node_status,
                                                                  other_node.node_name,
                                                                  other_node.node_ip,
@@ -436,10 +436,10 @@ void PeerClient::SyncLogs(SyncLogTask *peer_task) {
     SyncLogRequest request;
     SyncLogResponse response;
     request.node_name = peer_task->node_name_;
-    SizeT log_count = peer_task->log_strings_.size();
+    size_t log_count = peer_task->log_strings_.size();
     request.log_entries.reserve(log_count);
     request.on_startup = peer_task->on_register_;
-    for (SizeT i = 0; i < log_count; ++i) {
+    for (size_t i = 0; i < log_count; ++i) {
         request.log_entries.emplace_back(*peer_task->log_strings_[i]);
     }
 

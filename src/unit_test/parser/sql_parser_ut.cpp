@@ -116,8 +116,8 @@ TEST_F(SQLParserTest, good_test1) {
     inputs.emplace_back("delete from s1.products where obsoletion_date = 'today'");
     inputs.emplace_back("UPDATE products SET price = price * 1.10 WHERE price <= 99.99;");
 
-    SharedPtr<SQLParser> parser = MakeShared<SQLParser>();
-    SharedPtr<ParserResult> result = MakeShared<ParserResult>();
+    std::shared_ptr<SQLParser> parser = std::make_shared<SQLParser>();
+    std::shared_ptr<ParserResult> result = std::make_shared<ParserResult>();
 
     for (const String &input : inputs) {
         parser->Parse(input, result.get());
@@ -128,8 +128,8 @@ TEST_F(SQLParserTest, good_test1) {
 
 TEST_F(SQLParserTest, good_test2) {
     using namespace infinity;
-    SharedPtr<SQLParser> parser = MakeShared<SQLParser>();
-    SharedPtr<ParserResult> result = MakeShared<ParserResult>();
+    std::shared_ptr<SQLParser> parser = std::make_shared<SQLParser>();
+    std::shared_ptr<ParserResult> result = std::make_shared<ParserResult>();
 
     {
         String input_sql = "create table t1 (a boolean primary key not null null unique,"
@@ -389,7 +389,7 @@ TEST_F(SQLParserTest, good_test2) {
             {
                 auto &column_def = create_table_info->column_defs_[column_id++];
                 EXPECT_EQ(column_def->name_, "x");
-                SharedPtr<TypeInfo> type_info = DecimalInfo::Make(0, 0);
+                std::shared_ptr<TypeInfo> type_info = DecimalInfo::Make(0, 0);
                 DataType column_type(LogicalType::kDecimal, type_info);
                 EXPECT_EQ(*column_def->column_type_, column_type);
                 EXPECT_EQ(column_def->constraints_.size(), 0u);
@@ -398,7 +398,7 @@ TEST_F(SQLParserTest, good_test2) {
             {
                 auto &column_def = create_table_info->column_defs_[column_id++];
                 EXPECT_EQ(column_def->name_, "y");
-                SharedPtr<TypeInfo> type_info = DecimalInfo::Make(10, 0);
+                std::shared_ptr<TypeInfo> type_info = DecimalInfo::Make(10, 0);
                 DataType column_type(LogicalType::kDecimal, type_info);
                 EXPECT_EQ(*column_def->column_type_, column_type);
                 EXPECT_EQ(column_def->constraints_.size(), 0u);
@@ -407,7 +407,7 @@ TEST_F(SQLParserTest, good_test2) {
             {
                 auto &column_def = create_table_info->column_defs_[column_id++];
                 EXPECT_EQ(column_def->name_, "z");
-                SharedPtr<TypeInfo> type_info = DecimalInfo::Make(14, 12);
+                std::shared_ptr<TypeInfo> type_info = DecimalInfo::Make(14, 12);
                 DataType column_type(LogicalType::kDecimal, type_info);
                 EXPECT_EQ(*column_def->column_type_, column_type);
                 EXPECT_EQ(column_def->constraints_.size(), 0u);
@@ -424,7 +424,7 @@ TEST_F(SQLParserTest, good_test2) {
             //            {
             //                auto &column_def = create_table_info->column_defs_[column_id++];
             //                EXPECT_EQ(column_def->name_, "ab");
-            //                SharedPtr<TypeInfo> type_info = BitmapInfo::Make(16);
+            //                std::shared_ptr<TypeInfo> type_info = BitmapInfo::Make(16);
             //                DataType column_type(LogicalType::kBitmap, type_info);
             //                EXPECT_EQ(*column_def->column_type_, column_type);
             //                EXPECT_EQ(column_def->constraints_.size(), 0);
@@ -433,7 +433,7 @@ TEST_F(SQLParserTest, good_test2) {
             {
                 auto &column_def = create_table_info->column_defs_[column_id++];
                 EXPECT_EQ(column_def->name_, "ac");
-                SharedPtr<TypeInfo> type_info = EmbeddingInfo::Make(EmbeddingDataType::kElemBit, 256);
+                std::shared_ptr<TypeInfo> type_info = EmbeddingInfo::Make(EmbeddingDataType::kElemBit, 256);
                 DataType column_type(LogicalType::kEmbedding, type_info);
                 EXPECT_EQ(*column_def->column_type_, column_type);
                 EXPECT_EQ(column_def->constraints_.size(), 0u);
@@ -442,7 +442,7 @@ TEST_F(SQLParserTest, good_test2) {
             {
                 auto &column_def = create_table_info->column_defs_[column_id++];
                 EXPECT_EQ(column_def->name_, "ad");
-                SharedPtr<TypeInfo> type_info = EmbeddingInfo::Make(EmbeddingDataType::kElemFloat, 512);
+                std::shared_ptr<TypeInfo> type_info = EmbeddingInfo::Make(EmbeddingDataType::kElemFloat, 512);
                 DataType column_type(LogicalType::kEmbedding, type_info);
                 EXPECT_EQ(*column_def->column_type_, column_type);
                 EXPECT_EQ(column_def->constraints_.size(), 0u);
@@ -477,7 +477,7 @@ TEST_F(SQLParserTest, good_test2) {
             {
                 auto &column_def = create_table_info->column_defs_[column_id++];
                 EXPECT_EQ(column_def->name_, "af");
-                SharedPtr<TypeInfo> type_info = EmbeddingInfo::Make(EmbeddingDataType::kElemInt32, 32);
+                std::shared_ptr<TypeInfo> type_info = EmbeddingInfo::Make(EmbeddingDataType::kElemInt32, 32);
                 DataType column_type(LogicalType::kEmbedding, type_info);
                 EXPECT_EQ(*column_def->column_type_, column_type);
                 EXPECT_EQ(column_def->constraints_.size(), 0u);
@@ -490,8 +490,8 @@ TEST_F(SQLParserTest, good_test2) {
 
 TEST_F(SQLParserTest, bad_test1) {
     using namespace infinity;
-    SharedPtr<SQLParser> parser = MakeShared<SQLParser>();
-    SharedPtr<ParserResult> result = MakeShared<ParserResult>();
+    std::shared_ptr<SQLParser> parser = std::make_shared<SQLParser>();
+    std::shared_ptr<ParserResult> result = std::make_shared<ParserResult>();
 
     {
         String input_sql = "create table t1 (a boolean primary key not null null unique,"
@@ -529,8 +529,8 @@ TEST_F(SQLParserTest, bad_test1) {
 
 TEST_F(SQLParserTest, good_create_index_1) {
     using namespace infinity;
-    auto parser = MakeShared<SQLParser>();
-    auto result = MakeShared<ParserResult>();
+    auto parser = std::make_shared<SQLParser>();
+    auto result = std::make_shared<ParserResult>();
 
     {
         String input_sql = "CREATE INDEX ON t1 (a) USING IVF;";
@@ -675,8 +675,8 @@ TEST_F(SQLParserTest, good_create_index_1) {
 
 TEST_F(SQLParserTest, bad_create_index_1) {
     using namespace infinity;
-    SharedPtr<SQLParser> parser = MakeShared<SQLParser>();
-    SharedPtr<ParserResult> result = MakeShared<ParserResult>();
+    std::shared_ptr<SQLParser> parser = std::make_shared<SQLParser>();
+    std::shared_ptr<ParserResult> result = std::make_shared<ParserResult>();
 
     {
         String input_sql = "CREATE INDEX IF NOT EXISTS ON t1 (a) USING IVF;";

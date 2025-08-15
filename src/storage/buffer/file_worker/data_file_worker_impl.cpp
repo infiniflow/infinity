@@ -31,11 +31,11 @@ import serialize;
 
 namespace infinity {
 
-DataFileWorker::DataFileWorker(SharedPtr<String> data_dir,
-                               SharedPtr<String> temp_dir,
-                               SharedPtr<String> file_dir,
-                               SharedPtr<String> file_name,
-                               SizeT buffer_size,
+DataFileWorker::DataFileWorker(std::shared_ptr<std::string> data_dir,
+                               std::shared_ptr<std::string> temp_dir,
+                               std::shared_ptr<std::string> file_dir,
+                               std::shared_ptr<std::string> file_name,
+                               size_t buffer_size,
                                PersistenceManager *persistence_manager)
     : FileWorker(std::move(data_dir), std::move(temp_dir), std::move(file_dir), std::move(file_name), persistence_manager),
       buffer_size_(buffer_size) {}
@@ -79,12 +79,12 @@ bool DataFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_success, const
         RecoverableError(status);
     }
 
-    status = file_handle_->Append(const_cast<SizeT *>(&buffer_size_), sizeof(buffer_size_));
+    status = file_handle_->Append(const_cast<size_t *>(&buffer_size_), sizeof(buffer_size_));
     if (!status.ok()) {
         RecoverableError(status);
     }
 
-    SizeT data_size = data_size_.load();
+    size_t data_size = data_size_.load();
     status = file_handle_->Append(data_, data_size);
     if (!status.ok()) {
         RecoverableError(status);
@@ -93,8 +93,8 @@ bool DataFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_success, const
     // Record data_[:min(512,data_size)] to log
     std::ostringstream hex_stream;
     hex_stream << std::hex << std::setfill('0');
-    SizeT log_size = std::min(data_size, static_cast<SizeT>(512));
-    for (SizeT i = 0; i < log_size; ++i) {
+    size_t log_size = std::min(data_size, static_cast<size_t>(512));
+    for (size_t i = 0; i < log_size; ++i) {
         hex_stream << std::setw(2) << static_cast<unsigned int>(static_cast<const u8 *>(data_)[i]);
         if ((i + 1) % 8 == 0 && i + 1 < log_size) { // insert a space every 8 bytes
             hex_stream << " ";
@@ -105,9 +105,9 @@ bool DataFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_success, const
     }
     LOG_TRACE(fmt::format("DataFileWorker::WriteToFileImpl data: data_={:p}, size={}, hex={}", data_, data_size, hex_stream.str()));
 
-    SizeT unused_size = buffer_size_ - data_size;
+    size_t unused_size = buffer_size_ - data_size;
     if (unused_size > 0) {
-        String str(unused_size, '\0');
+        std::string str(unused_size, '\0');
         file_handle_->Append(str, unused_size);
     }
 
@@ -120,7 +120,7 @@ bool DataFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_success, const
     return true;
 }
 
-void DataFileWorker::ReadFromFileImpl(SizeT file_size, bool from_spill) {
+void DataFileWorker::ReadFromFileImpl(size_t file_size, bool from_spill) {
 
     if (file_size < sizeof(u64) * 3) {
         Status status = Status::DataIOError(fmt::format("Incorrect file length {}.", file_size));
@@ -171,7 +171,7 @@ void DataFileWorker::ReadFromFileImpl(SizeT file_size, bool from_spill) {
     }
 }
 
-bool DataFileWorker::ReadFromMmapImpl(const void *p, SizeT file_size) {
+bool DataFileWorker::ReadFromMmapImpl(const void *p, size_t file_size) {
     const char *ptr = static_cast<const char *>(p);
     u64 magic_number = ReadBufAdv<u64>(ptr);
     if (magic_number != 0x00dd3344) {
@@ -191,7 +191,7 @@ bool DataFileWorker::ReadFromMmapImpl(const void *p, SizeT file_size) {
 
 void DataFileWorker::FreeFromMmapImpl() {}
 
-void DataFileWorker::SetDataSize(SizeT size) {
+void DataFileWorker::SetDataSize(size_t size) {
     if (data_ == nullptr) {
         UnrecoverableError("Data has not been set.");
     }

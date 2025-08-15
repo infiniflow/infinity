@@ -44,7 +44,7 @@ TEST_F(PositionListEncoderTest, test1) {
         position_encoder.AddPosition(i);
     }
     position_encoder.EndDocument();
-    SharedPtr<FileWriter> file_writer = MakeShared<FileWriter>(file_, 128);
+    std::shared_ptr<FileWriter> file_writer = std::make_shared<FileWriter>(file_, 128);
     position_encoder.Dump(file_writer);
     file_writer->Sync();
 
@@ -64,13 +64,13 @@ TEST_F(PositionListEncoderTest, test2) {
     reader.Open(position_encoder.GetBufferedByteSlice());
 
     pos_t pos_buffer[MAX_POS_PER_RECORD];
-    SizeT decode_count = 0;
+    size_t decode_count = 0;
     ASSERT_TRUE(reader.Decode(pos_buffer, MAX_POS_PER_RECORD, decode_count));
     ASSERT_EQ(MAX_POS_PER_RECORD, decode_count);
     for (u32 i = 0; i < MAX_POS_PER_RECORD; i++) {
         ASSERT_EQ((pos_t)1, pos_buffer[i]);
     }
     ASSERT_TRUE(reader.Decode(pos_buffer, MAX_POS_PER_RECORD, decode_count));
-    ASSERT_EQ((SizeT)1, decode_count);
+    ASSERT_EQ((size_t)1, decode_count);
     ASSERT_TRUE(!reader.Decode(pos_buffer, MAX_POS_PER_RECORD, decode_count));
 }

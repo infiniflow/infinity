@@ -26,7 +26,7 @@ import std;
 
 namespace infinity {
 
-void MultiDocIterator::PrintTree(std::ostream &os, const String &prefix, bool is_final) const {
+void MultiDocIterator::PrintTree(std::ostream &os, const std::string &prefix, bool is_final) const {
     os << prefix;
     os << (is_final ? "└──" : "├──");
     os << Name();

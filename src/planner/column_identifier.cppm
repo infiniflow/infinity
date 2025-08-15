@@ -12,11 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:column_identifier;
 
-import :stl;
+import std;
 
 import column_expr;
 
@@ -28,21 +26,21 @@ public:
     static ColumnIdentifier MakeColumnIdentifier(QueryContext *query_context, const ColumnExpr &expr);
 
 public:
-    explicit ColumnIdentifier(SharedPtr<String> db_name,
-                              SharedPtr<String> schema_name,
-                              SharedPtr<String> table_name,
-                              SharedPtr<String> column_name,
-                              SharedPtr<String> alias_name);
+    explicit ColumnIdentifier(std::shared_ptr<std::string> db_name,
+                              std::shared_ptr<std::string> schema_name,
+                              std::shared_ptr<std::string> table_name,
+                              std::shared_ptr<std::string> column_name,
+                              std::shared_ptr<std::string> alias_name);
 
-    [[nodiscard]] String ToString() const;
+    [[nodiscard]] std::string ToString() const;
 
     [[nodiscard]] bool operator==(const ColumnIdentifier &other) const;
 
-    SharedPtr<String> db_name_ptr_;
-    SharedPtr<String> schema_name_ptr_;
-    SharedPtr<String> column_name_ptr_;
-    SharedPtr<String> table_name_ptr_;
-    SharedPtr<String> alias_name_ptr_;
+    std::shared_ptr<std::string> db_name_ptr_;
+    std::shared_ptr<std::string> schema_name_ptr_;
+    std::shared_ptr<std::string> column_name_ptr_;
+    std::shared_ptr<std::string> table_name_ptr_;
+    std::shared_ptr<std::string> alias_name_ptr_;
 };
 
 } // namespace infinity

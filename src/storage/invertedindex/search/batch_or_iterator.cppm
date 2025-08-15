@@ -27,13 +27,13 @@ namespace infinity {
 
 export class BatchOrIterator : public MultiDocIterator {
 public:
-    explicit BatchOrIterator(Vector<UniquePtr<DocIterator>> &&iterators);
+    explicit BatchOrIterator(std::vector<std::unique_ptr<DocIterator>> &&iterators);
 
     ~BatchOrIterator() override;
 
     DocIteratorType GetType() const override { return DocIteratorType::kBatchOrIterator; }
 
-    String Name() const override { return "BatchOrIterator"; }
+    std::string Name() const override { return "BatchOrIterator"; }
 
     void UpdateScoreThreshold(float threshold) override {}
 
@@ -48,9 +48,9 @@ public:
     void DecodeFrom(RowID buffer_start_doc_id);
 
 private:
-    Vector<f32> f1_;
-    Vector<f32> f2_;
-    Vector<f32> bm25_common_score_;
+    std::vector<f32> f1_;
+    std::vector<f32> f2_;
+    std::vector<f32> bm25_common_score_;
     RowID buffer_start_doc_id_ = INVALID_ROWID;
     u32 memset_bytes_ = 0;
     void *aligned_buffer_ = nullptr;

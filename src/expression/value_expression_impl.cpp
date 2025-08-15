@@ -23,7 +23,7 @@ import :value_expression;
 
 namespace infinity {
 
-String ValueExpression::ToString() const { return value_.ToString(); }
+std::string ValueExpression::ToString() const { return value_.ToString(); }
 
 u64 ValueExpression::Hash() const { return 0; }
 

@@ -29,7 +29,7 @@ import statement_common;
 
 namespace infinity {
 
-BmpSearchOptions BMPUtil::ParseBmpSearchOptions(const Vector<UniquePtr<InitParameter>> &opt_params) {
+BmpSearchOptions BMPUtil::ParseBmpSearchOptions(const std::vector<std::unique_ptr<InitParameter>> &opt_params) {
     BmpSearchOptions options;
     for (const auto &opt_param : opt_params) {
         if (opt_param->param_name_ == "alpha") {
@@ -63,7 +63,7 @@ BmpSearchOptions BMPUtil::ParseBmpSearchOptions(const Vector<UniquePtr<InitParam
     return options;
 };
 
-Optional<BMPOptimizeOptions> BMPUtil::ParseBMPOptimizeOptions(const Vector<UniquePtr<InitParameter>> &opt_params) {
+std::optional<BMPOptimizeOptions> BMPUtil::ParseBMPOptimizeOptions(const std::vector<std::unique_ptr<InitParameter>> &opt_params) {
     BMPOptimizeOptions options;
     for (const auto &opt_param : opt_params) {
         if (opt_param->param_name_ == "topk") {
@@ -80,7 +80,7 @@ Optional<BMPOptimizeOptions> BMPUtil::ParseBMPOptimizeOptions(const Vector<Uniqu
         }
     }
     if (options.topk_ == 0 && !options.bp_reorder_) {
-        return None;
+        return std::nullopt;
     }
     return options;
 }

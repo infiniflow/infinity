@@ -32,7 +32,7 @@ import :physical_source;
 
 namespace infinity {
 
-String ToString(SourceType source_type) {
+std::string ToString(SourceType source_type) {
     switch (source_type) {
         case SourceType::kInvalid: {
             return "Invalid";

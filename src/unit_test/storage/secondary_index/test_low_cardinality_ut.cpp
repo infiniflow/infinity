@@ -64,7 +64,7 @@ TEST_F(LowCardinalitySecondaryIndexTest, TestIntegerLowCardinality) {
     auto test_data = CreateLowCardinalityData<i32>(chunk_row_count, unique_values);
 
     // Create low cardinality secondary index
-    auto data_type = MakeShared<DataType>(LogicalType::kInteger);
+    auto data_type = std::make_shared<DataType>(LogicalType::kInteger);
     auto *index = GetSecondaryIndexDataWithCardinality<LowCardinalityTag>(data_type, chunk_row_count, true);
     ASSERT_NE(index, nullptr);
 
@@ -124,7 +124,7 @@ TEST_F(LowCardinalitySecondaryIndexTest, TestFloatLowCardinality) {
     }
 
     // Create low cardinality secondary index
-    auto data_type = MakeShared<DataType>(LogicalType::kFloat);
+    auto data_type = std::make_shared<DataType>(LogicalType::kFloat);
     auto *index = GetSecondaryIndexDataWithCardinality<LowCardinalityTag>(data_type, chunk_row_count, true);
 
     // Insert data
@@ -169,7 +169,7 @@ TEST_F(LowCardinalitySecondaryIndexTest, TestEmptyIndex) {
     MultiMap<i32, u32> test_data;
 
     // Create low cardinality secondary index
-    auto data_type = MakeShared<DataType>(LogicalType::kInteger);
+    auto data_type = std::make_shared<DataType>(LogicalType::kInteger);
     auto *index = GetSecondaryIndexDataWithCardinality<LowCardinalityTag>(data_type, chunk_row_count, true);
 
     // Insert empty data
@@ -190,7 +190,7 @@ TEST_F(LowCardinalitySecondaryIndexTest, TestSingleValueCardinality) {
     auto test_data = CreateLowCardinalityData<i16>(chunk_row_count, unique_values);
 
     // Create low cardinality secondary index
-    auto data_type = MakeShared<DataType>(LogicalType::kSmallInt);
+    auto data_type = std::make_shared<DataType>(LogicalType::kSmallInt);
     auto *index = GetSecondaryIndexDataWithCardinality<LowCardinalityTag>(data_type, chunk_row_count, true);
 
     // Insert data
@@ -224,7 +224,7 @@ TEST_F(LowCardinalitySecondaryIndexTest, TestComparisonWithHighCardinality) {
     auto test_data = CreateLowCardinalityData<i32>(chunk_row_count, unique_values);
 
     // Create both high and low cardinality indexes
-    auto data_type = MakeShared<DataType>(LogicalType::kInteger);
+    auto data_type = std::make_shared<DataType>(LogicalType::kInteger);
     auto *high_card_index = GetSecondaryIndexDataWithCardinality<HighCardinalityTag>(data_type, chunk_row_count, true);
     auto *low_card_index = GetSecondaryIndexDataWithCardinality<LowCardinalityTag>(data_type, chunk_row_count, true);
 

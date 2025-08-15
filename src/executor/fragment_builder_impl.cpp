@@ -39,10 +39,10 @@ import explain_statement;
 
 namespace infinity {
 
-SharedPtr<PlanFragment> FragmentBuilder::BuildFragment(const Vector<PhysicalOperator *> &phys_ops) {
-    SharedPtr<PlanFragment> result = nullptr;
+std::shared_ptr<PlanFragment> FragmentBuilder::BuildFragment(const std::vector<PhysicalOperator *> &phys_ops) {
+    std::shared_ptr<PlanFragment> result = nullptr;
     for (auto *phys_op : phys_ops) {
-        auto plan_fragment = MakeUnique<PlanFragment>(GetFragmentId());
+        auto plan_fragment = std::make_unique<PlanFragment>(GetFragmentId());
         plan_fragment->SetSinkNode(query_context_ptr_, SinkType::kResult, phys_op->GetOutputNames(), phys_op->GetOutputTypes());
         BuildFragments(phys_op, plan_fragment.get());
         if (plan_fragment->GetSourceNode() == nullptr) {
@@ -77,8 +77,8 @@ void FragmentBuilder::BuildExplain(PhysicalOperator *phys_op, PlanFragment *curr
         }
         case ExplainType::kFragment: {
             // Build explain pipeline fragment
-            SharedPtr<Vector<SharedPtr<String>>> texts_ptr = MakeShared<Vector<SharedPtr<String>>>();
-            Vector<PhysicalOperator *> phys_ops{phys_op->left()};
+            std::shared_ptr<std::vector<std::shared_ptr<std::string>>> texts_ptr = std::make_shared<std::vector<std::shared_ptr<std::string>>>();
+            std::vector<PhysicalOperator *> phys_ops{phys_op->left()};
             auto explain_child_fragment = this->BuildFragment(phys_ops);
 
             // Generate explain context of the child fragment
@@ -223,7 +223,7 @@ void FragmentBuilder::BuildFragments(PhysicalOperator *phys_op, PlanFragment *cu
             }
             current_fragment_ptr->SetFragmentType(FragmentType::kSerialMaterialize);
 
-            auto next_plan_fragment = MakeUnique<PlanFragment>(GetFragmentId());
+            auto next_plan_fragment = std::make_unique<PlanFragment>(GetFragmentId());
             next_plan_fragment->SetSinkNode(query_context_ptr_,
                                             SinkType::kLocalQueue,
                                             phys_op->left()->GetOutputNames(),
@@ -231,7 +231,7 @@ void FragmentBuilder::BuildFragments(PhysicalOperator *phys_op, PlanFragment *cu
             BuildFragments(phys_op->left(), next_plan_fragment.get());
             current_fragment_ptr->AddChild(std::move(next_plan_fragment));
             if (phys_op->right() != nullptr) {
-                auto next_plan_fragment = MakeUnique<PlanFragment>(GetFragmentId());
+                auto next_plan_fragment = std::make_unique<PlanFragment>(GetFragmentId());
                 next_plan_fragment->SetSinkNode(query_context_ptr_,
                                                 SinkType::kLocalQueue,
                                                 phys_op->right()->GetOutputNames(),
@@ -242,7 +242,7 @@ void FragmentBuilder::BuildFragments(PhysicalOperator *phys_op, PlanFragment *cu
             if (phys_op->operator_type() == PhysicalOperatorType::kFusion) {
                 PhysicalFusion *phys_fusion = static_cast<PhysicalFusion *>(phys_op);
                 for (auto &child_op : phys_fusion->other_children_) {
-                    auto next_plan_fragment = MakeUnique<PlanFragment>(GetFragmentId());
+                    auto next_plan_fragment = std::make_unique<PlanFragment>(GetFragmentId());
                     next_plan_fragment->SetSinkNode(query_context_ptr_,
                                                     SinkType::kLocalQueue,
                                                     child_op->GetOutputNames(),

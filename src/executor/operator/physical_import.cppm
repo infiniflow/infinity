@@ -43,12 +43,12 @@ struct DataBlock;
 export class PhysicalImport : public PhysicalOperator {
 public:
     explicit PhysicalImport(u64 id,
-                            const SharedPtr<TableInfo> &table_info,
-                            String file_path,
+                            const std::shared_ptr<TableInfo> &table_info,
+                            std::string file_path,
                             bool header,
                             char delimiter,
                             CopyFileType type,
-                            SharedPtr<Vector<LoadMeta>> load_metas)
+                            std::shared_ptr<std::vector<LoadMeta>> load_metas)
         : PhysicalOperator(PhysicalOperatorType::kImport, nullptr, nullptr, id, load_metas), table_info_(table_info), file_type_(type),
           file_path_(std::move(file_path)), header_(header), delimiter_(delimiter) {}
 
@@ -58,34 +58,34 @@ public:
 
     bool Execute(QueryContext *query_context, OperatorState *operator_state) final;
 
-    inline SharedPtr<Vector<String>> GetOutputNames() const final { return output_names_; }
+    inline std::shared_ptr<std::vector<std::string>> GetOutputNames() const final { return output_names_; }
 
-    inline SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const final { return output_types_; }
+    inline std::shared_ptr<std::vector<std::shared_ptr<DataType>>> GetOutputTypes() const final { return output_types_; }
 
-    void NewImportFVECS(QueryContext *query_context, ImportOperatorState *import_op_state, Vector<SharedPtr<DataBlock>> &data_blocks);
+    void NewImportFVECS(QueryContext *query_context, ImportOperatorState *import_op_state, std::vector<std::shared_ptr<DataBlock>> &data_blocks);
 
-    void NewImportCSR(QueryContext *query_context, ImportOperatorState *import_op_state, Vector<SharedPtr<DataBlock>> &data_blocks);
+    void NewImportCSR(QueryContext *query_context, ImportOperatorState *import_op_state, std::vector<std::shared_ptr<DataBlock>> &data_blocks);
 
-    void NewImportBVECS(QueryContext *query_context, ImportOperatorState *import_op_state, Vector<SharedPtr<DataBlock>> &data_blocks);
+    void NewImportBVECS(QueryContext *query_context, ImportOperatorState *import_op_state, std::vector<std::shared_ptr<DataBlock>> &data_blocks);
 
     void NewImportTypeVecs(QueryContext *query_context,
                            ImportOperatorState *import_op_state,
                            EmbeddingDataType embedding_data_type,
-                           Vector<SharedPtr<DataBlock>> &data_blocks);
+                           std::vector<std::shared_ptr<DataBlock>> &data_blocks);
 
-    void NewImportCSV(QueryContext *query_context, ImportOperatorState *import_op_state, Vector<SharedPtr<DataBlock>> &data_blocks);
+    void NewImportCSV(QueryContext *query_context, ImportOperatorState *import_op_state, std::vector<std::shared_ptr<DataBlock>> &data_blocks);
 
-    void NewImportJSON(QueryContext *query_context, ImportOperatorState *import_op_state, Vector<SharedPtr<DataBlock>> &data_blocks);
+    void NewImportJSON(QueryContext *query_context, ImportOperatorState *import_op_state, std::vector<std::shared_ptr<DataBlock>> &data_blocks);
 
-    void NewImportJSONL(QueryContext *query_context, ImportOperatorState *import_op_state, Vector<SharedPtr<DataBlock>> &data_blocks);
+    void NewImportJSONL(QueryContext *query_context, ImportOperatorState *import_op_state, std::vector<std::shared_ptr<DataBlock>> &data_blocks);
 
-    void NewImportPARQUET(QueryContext *query_context, ImportOperatorState *import_op_state, Vector<SharedPtr<DataBlock>> &data_blocks);
+    void NewImportPARQUET(QueryContext *query_context, ImportOperatorState *import_op_state, std::vector<std::shared_ptr<DataBlock>> &data_blocks);
 
     inline const TableInfo *table_info() const { return table_info_.get(); }
 
     inline CopyFileType FileType() const { return file_type_; }
 
-    inline const String &file_path() const { return file_path_; }
+    inline const std::string &file_path() const { return file_path_; }
 
     inline bool header() const { return header_; }
 
@@ -95,22 +95,22 @@ private:
 
     static void NewCSVRowHandler(void *);
 
-    void JSONLRowHandler(std::string_view line_json, Vector<SharedPtr<ColumnVector>> &column_vectors);
+    void JSONLRowHandler(std::string_view line_json, std::vector<std::shared_ptr<ColumnVector>> &column_vectors);
 
-    void ParquetValueHandler(const SharedPtr<arrow::Array> &array, ColumnVector &column_vector, u64 value_idx);
+    void ParquetValueHandler(const std::shared_ptr<arrow::Array> &array, ColumnVector &column_vector, u64 value_idx);
 
 private:
-    SharedPtr<Vector<String>> output_names_{};
-    SharedPtr<Vector<SharedPtr<DataType>>> output_types_{};
+    std::shared_ptr<std::vector<std::string>> output_names_{};
+    std::shared_ptr<std::vector<std::shared_ptr<DataType>>> output_types_{};
 
-    SharedPtr<TableInfo> table_info_{};
+    std::shared_ptr<TableInfo> table_info_{};
     CopyFileType file_type_{CopyFileType::kInvalid};
-    String file_path_{};
+    std::string file_path_{};
     bool header_{false};
     char delimiter_{','};
 };
 
-export SharedPtr<ConstantExpr> BuildConstantExprFromJson(std::string_view json_object);
-export SharedPtr<ConstantExpr> BuildConstantSparseExprFromJson(std::string_view json_object, const SparseInfo *sparse_info);
+export std::shared_ptr<ConstantExpr> BuildConstantExprFromJson(std::string_view json_object);
+export std::shared_ptr<ConstantExpr> BuildConstantSparseExprFromJson(std::string_view json_object, const SparseInfo *sparse_info);
 
 } // namespace infinity

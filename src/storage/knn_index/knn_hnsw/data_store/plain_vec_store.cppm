@@ -45,7 +45,7 @@ public:
     using DistanceType = f32;
 
 private:
-    PlainVecStoreMeta(SizeT dim) : dim_(dim) {}
+    PlainVecStoreMeta(size_t dim) : dim_(dim) {}
 
 public:
     PlainVecStoreMeta() : dim_(0) {}
@@ -57,33 +57,33 @@ public:
     //     return *this;
     // }
 
-    static This Make(SizeT dim) { return This(dim); }
-    static This Make(SizeT dim, bool) { return This(dim); }
+    static This Make(size_t dim) { return This(dim); }
+    static This Make(size_t dim, bool) { return This(dim); }
 
-    SizeT GetSizeInBytes() const { return sizeof(SizeT); }
+    size_t GetSizeInBytes() const { return sizeof(size_t); }
 
     // Get size of vector in search
-    SizeT GetVecSizeInBytes() const { return sizeof(DataType) * dim_; }
+    size_t GetVecSizeInBytes() const { return sizeof(DataType) * dim_; }
 
     void Save(LocalFileHandle &file_handle) const { file_handle.Append(&dim_, sizeof(dim_)); }
 
     static This Load(LocalFileHandle &file_handle) {
-        SizeT dim;
+        size_t dim;
         file_handle.Read(&dim, sizeof(dim));
         return This(dim);
     }
 
     static This LoadFromPtr(const char *&ptr) {
-        SizeT dim = ReadBufAdv<SizeT>(ptr);
+        size_t dim = ReadBufAdv<size_t>(ptr);
         return This(dim);
     }
 
     QueryType MakeQuery(const DataType *vec) const { return vec; }
 
-    SizeT dim() const { return dim_; }
+    size_t dim() const { return dim_; }
 
 private:
-    SizeT dim_;
+    size_t dim_;
 
 public:
     void Dump(std::ostream &os) const { os << "[CONST] dim: " << dim_ << std::endl; }
@@ -99,21 +99,21 @@ public:
 public:
     PlainVecStoreInnerBase() = default;
 
-    SizeT GetSizeInBytes(SizeT cur_vec_num, const Meta &meta) const { return sizeof(OtherDataType) * cur_vec_num * meta.dim(); }
+    size_t GetSizeInBytes(size_t cur_vec_num, const Meta &meta) const { return sizeof(OtherDataType) * cur_vec_num * meta.dim(); }
 
-    void Save(LocalFileHandle &file_handle, SizeT cur_vec_num, const Meta &meta) const {
+    void Save(LocalFileHandle &file_handle, size_t cur_vec_num, const Meta &meta) const {
         file_handle.Append(ptr_.get(), sizeof(OtherDataType) * cur_vec_num * meta.dim());
     }
 
     static void
-    SaveToPtr(LocalFileHandle &file_handle, const Vector<const This *> &inners, const Meta &meta, SizeT ck_size, SizeT chunk_num, SizeT last_chunk_size) {
-        for (SizeT i = 0; i < chunk_num; ++i) {
-            SizeT chunk_size = (i < chunk_num - 1) ? ck_size : last_chunk_size;
+    SaveToPtr(LocalFileHandle &file_handle, const std::vector<const This *> &inners, const Meta &meta, size_t ck_size, size_t chunk_num, size_t last_chunk_size) {
+        for (size_t i = 0; i < chunk_num; ++i) {
+            size_t chunk_size = (i < chunk_num - 1) ? ck_size : last_chunk_size;
             file_handle.Append(inners[i]->ptr_.get(), sizeof(OtherDataType) * chunk_size * meta.dim());
         }
     }
 
-    const OtherDataType *GetVec(SizeT idx, const Meta &meta) const { return ptr_.get() + idx * meta.dim(); }
+    const OtherDataType *GetVec(size_t idx, const Meta &meta) const { return ptr_.get() + idx * meta.dim(); }
 
     void Prefetch(VertexType vec_i, const Meta &meta) const { _mm_prefetch(reinterpret_cast<const char *>(GetVec(vec_i, meta)), _MM_HINT_T0); }
 
@@ -121,11 +121,11 @@ protected:
     ArrayPtr<OtherDataType, OwnMem> ptr_;
 
 public:
-    void Dump(std::ostream &os, SizeT offset, SizeT chunk_size, const Meta &meta) const {
+    void Dump(std::ostream &os, size_t offset, size_t chunk_size, const Meta &meta) const {
         for (int i = 0; i < (int)chunk_size; i++) {
             os << "vec " << i << "(" << offset + i << "): ";
             const OtherDataType *v = GetVec(i, meta);
-            for (SizeT j = 0; j < meta.dim(); j++) {
+            for (size_t j = 0; j < meta.dim(); j++) {
                 os << v[j] << " ";
             }
             os << std::endl;
@@ -141,17 +141,17 @@ public:
     using Base = PlainVecStoreInnerBase<DataType, OwnMem>;
 
 protected:
-    PlainVecStoreInner(SizeT max_vec_num, const Meta &meta) { this->ptr_ = MakeUnique<DataType[]>(max_vec_num * meta.dim()); }
+    PlainVecStoreInner(size_t max_vec_num, const Meta &meta) { this->ptr_ = std::make_unique<DataType[]>(max_vec_num * meta.dim()); }
 
 public:
     PlainVecStoreInner() = default;
 
-    static This Make(SizeT max_vec_num, const Meta &meta, SizeT &mem_usage) {
+    static This Make(size_t max_vec_num, const Meta &meta, size_t &mem_usage) {
         mem_usage += sizeof(DataType) * max_vec_num * meta.dim();
         return This(max_vec_num, meta);
     }
 
-    static This Load(LocalFileHandle &file_handle, SizeT cur_vec_num, SizeT max_vec_num, const Meta &meta, SizeT &mem_usage) {
+    static This Load(LocalFileHandle &file_handle, size_t cur_vec_num, size_t max_vec_num, const Meta &meta, size_t &mem_usage) {
         assert(cur_vec_num <= max_vec_num);
         This ret(max_vec_num, meta);
         file_handle.Read(ret.ptr_.get(), sizeof(DataType) * cur_vec_num * meta.dim());
@@ -159,7 +159,7 @@ public:
         return ret;
     }
 
-    static This LoadFromPtr(const char *&ptr, SizeT cur_vec_num, SizeT max_vec_num, const Meta &meta, SizeT &mem_usage) {
+    static This LoadFromPtr(const char *&ptr, size_t cur_vec_num, size_t max_vec_num, const Meta &meta, size_t &mem_usage) {
         This ret(max_vec_num, meta);
         std::memcpy(ret.ptr_.get(), ptr, sizeof(DataType) * cur_vec_num * meta.dim());
         ptr += sizeof(DataType) * cur_vec_num * meta.dim();
@@ -167,10 +167,10 @@ public:
         return ret;
     }
 
-    void SetVec(SizeT idx, const DataType *vec, const Meta &meta, SizeT &mem_usage) { Copy(vec, vec + meta.dim(), GetVecMut(idx, meta)); }
+    void SetVec(size_t idx, const DataType *vec, const Meta &meta, size_t &mem_usage) { Copy(vec, vec + meta.dim(), GetVecMut(idx, meta)); }
 
 private:
-    DataType *GetVecMut(SizeT idx, const Meta &meta) { return this->ptr_.get() + idx * meta.dim(); }
+    DataType *GetVecMut(size_t idx, const Meta &meta) { return this->ptr_.get() + idx * meta.dim(); }
 };
 
 export template <typename DataType>
@@ -184,7 +184,7 @@ protected:
 public:
     explicit PlainVecStoreInner(const DataType *ptr) { this->ptr_ = ptr; }
     PlainVecStoreInner() = default;
-    static This LoadFromPtr(const char *&ptr, SizeT cur_vec_num, const Meta &meta) {
+    static This LoadFromPtr(const char *&ptr, size_t cur_vec_num, const Meta &meta) {
         const auto *p = reinterpret_cast<const DataType *>(ptr); // fixme
         ptr += sizeof(DataType) * cur_vec_num * meta.dim();
         return This(p);

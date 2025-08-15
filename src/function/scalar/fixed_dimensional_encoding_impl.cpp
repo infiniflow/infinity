@@ -67,7 +67,7 @@ HashPartitioner::HashPartitioner(i32 dimension, i32 num_bits, RandomGenerator& r
     }
 }
 
-u32 HashPartitioner::ComputePartition(const Vector<float>& point) const {
+u32 HashPartitioner::ComputePartition(const std::vector<float>& point) const {
     u32 hash_code = 0;
     for (i32 bit = 0; bit < num_bits_; ++bit) {
         float dot_product = 0.0f;
@@ -87,7 +87,7 @@ u32 HashPartitioner::ComputePartition(const Vector<float>& point) const {
     return hash_code;
 }
 
-u32 HashPartitioner::ComputeDistance(const Vector<float>& point, u32 target_partition) const {
+u32 HashPartitioner::ComputeDistance(const std::vector<float>& point, u32 target_partition) const {
     u32 actual_partition = ComputePartition(point);
     return __builtin_popcount(actual_partition ^ target_partition);
 }
@@ -104,8 +104,8 @@ SparseProjector::SparseProjector(i32 input_dim, i32 output_dim, RandomGenerator&
     }
 }
 
-Vector<float> SparseProjector::Project(const Vector<float>& input) const {
-    Vector<float> output(output_dim_, 0.0f);
+std::vector<float> SparseProjector::Project(const std::vector<float>& input) const {
+    std::vector<float> output(output_dim_, 0.0f);
     for (i32 i = 0; i < static_cast<i32>(input.size()); ++i) {
         const auto& [target_idx, sign] = projection_map_[i];
         output[target_idx] += input[i] * sign;
@@ -117,14 +117,14 @@ Vector<float> SparseProjector::Project(const Vector<float>& input) const {
 EncodingAccumulator::EncodingAccumulator(i32 size, bool use_averaging)
     : accumulator_(size, 0.0f), counts_(size, 0), use_averaging_(use_averaging) {}
 
-void EncodingAccumulator::AddToPartition(i32 partition_start, const Vector<float>& values) {
+void EncodingAccumulator::AddToPartition(i32 partition_start, const std::vector<float>& values) {
     for (i32 i = 0; i < static_cast<i32>(values.size()); ++i) {
         accumulator_[partition_start + i] += values[i];
         counts_[partition_start + i]++;
     }
 }
 
-void EncodingAccumulator::FillEmptyPartition(i32 partition_start, const Vector<float>& values) {
+void EncodingAccumulator::FillEmptyPartition(i32 partition_start, const std::vector<float>& values) {
     for (i32 i = 0; i < static_cast<i32>(values.size()); ++i) {
         if (counts_[partition_start + i] == 0) {
             accumulator_[partition_start + i] = values[i];
@@ -133,8 +133,8 @@ void EncodingAccumulator::FillEmptyPartition(i32 partition_start, const Vector<f
     }
 }
 
-Vector<float> EncodingAccumulator::Finalize() const {
-    Vector<float> result = accumulator_;
+std::vector<float> EncodingAccumulator::Finalize() const {
+    std::vector<float> result = accumulator_;
     if (use_averaging_) {
         for (i32 i = 0; i < static_cast<i32>(result.size()); ++i) {
             if (counts_[i] > 0) {
@@ -152,7 +152,7 @@ bool EncodingPipeline::ValidateInput(const Tensor& tensor) const {
     return true;
 }
 
-Vector<float> EncodingPipeline::ProcessSingleRepetition(const Tensor& tensor, i32 rep_index) const {
+std::vector<float> EncodingPipeline::ProcessSingleRepetition(const Tensor& tensor, i32 rep_index) const {
     RandomGenerator rng(config_.seed + rep_index);
 
     // Setup partitioning
@@ -163,7 +163,7 @@ Vector<float> EncodingPipeline::ProcessSingleRepetition(const Tensor& tensor, i3
     i32 proj_dim = (config_.projection_type == FixedDimensionalEncodingConfig::ProjectionType::DEFAULT_IDENTITY)
                    ? config_.dimension : config_.projection_dimension;
 
-    Optional<SparseProjector> projector = None;
+    std::optional<SparseProjector> projector = std::nullopt;
     if (config_.projection_type == FixedDimensionalEncodingConfig::ProjectionType::AMS_SKETCH) {
         if (config_.projection_dimension <= 0) return {};
         projector = SparseProjector(config_.dimension, proj_dim, rng);
@@ -175,10 +175,10 @@ Vector<float> EncodingPipeline::ProcessSingleRepetition(const Tensor& tensor, i3
 
     // Process each point
     for (i32 point_idx = 0; point_idx < tensor.GetPointCount(); ++point_idx) {
-        Vector<float> point = tensor.GetPoint(point_idx);
+        std::vector<float> point = tensor.GetPoint(point_idx);
 
         // Apply projection if needed
-        Vector<float> projected_point = projector.has_value() ? projector->Project(point) : point;
+        std::vector<float> projected_point = projector.has_value() ? projector->Project(point) : point;
 
         // Determine partition
         u32 partition_idx = (config_.num_simhash_projections > 0) ? partitioner.ComputePartition(point) : 0;
@@ -198,7 +198,7 @@ Vector<float> EncodingPipeline::ProcessSingleRepetition(const Tensor& tensor, i3
             u32 min_distance = std::numeric_limits<u32>::max();
 
             for (i32 point_idx = 0; point_idx < tensor.GetPointCount(); ++point_idx) {
-                Vector<float> point = tensor.GetPoint(point_idx);
+                std::vector<float> point = tensor.GetPoint(point_idx);
                 u32 distance = partitioner.ComputeDistance(point, partition_idx);
                 if (distance < min_distance) {
                     min_distance = distance;
@@ -207,8 +207,8 @@ Vector<float> EncodingPipeline::ProcessSingleRepetition(const Tensor& tensor, i3
             }
 
             if (best_point_idx >= 0) {
-                Vector<float> best_point = tensor.GetPoint(best_point_idx);
-                Vector<float> projected_best = projector.has_value() ? projector->Project(best_point) : best_point;
+                std::vector<float> best_point = tensor.GetPoint(best_point_idx);
+                std::vector<float> projected_best = projector.has_value() ? projector->Project(best_point) : best_point;
                 accumulator.FillEmptyPartition(partition_start, projected_best);
             }
         }
@@ -217,27 +217,27 @@ Vector<float> EncodingPipeline::ProcessSingleRepetition(const Tensor& tensor, i3
     return accumulator.Finalize();
 }
 
-Optional<Vector<float>> EncodingPipeline::Execute(const Tensor& tensor) const {
-    if (!ValidateInput(tensor)) return None;
+std::optional<std::vector<float>> EncodingPipeline::Execute(const Tensor& tensor) const {
+    if (!ValidateInput(tensor)) return std::nullopt;
 
     // Special validation for query encoding
     if (config_.encoding_type == FixedDimensionalEncodingConfig::EncodingType::DEFAULT_SUM &&
         config_.fill_empty_partitions) {
-        return None;
+        return std::nullopt;
     }
 
-    Vector<Vector<float>> repetition_results;
+    std::vector<std::vector<float>> repetition_results;
     repetition_results.reserve(config_.num_repetitions);
 
     // Process each repetition
     for (i32 rep = 0; rep < config_.num_repetitions; ++rep) {
-        Vector<float> rep_result = ProcessSingleRepetition(tensor, rep);
-        if (rep_result.empty()) return None;
+        std::vector<float> rep_result = ProcessSingleRepetition(tensor, rep);
+        if (rep_result.empty()) return std::nullopt;
         repetition_results.push_back(std::move(rep_result));
     }
 
     // Concatenate all repetitions
-    Vector<float> final_result;
+    std::vector<float> final_result;
     for (const auto& rep_result : repetition_results) {
         final_result.insert(final_result.end(), rep_result.begin(), rep_result.end());
     }
@@ -253,22 +253,22 @@ Optional<Vector<float>> EncodingPipeline::Execute(const Tensor& tensor) const {
 }
 
 // Public API functions
-Optional<Vector<float>> GenerateFixedDimensionalEncoding(
-    const Vector<float>& tensor_data, const FixedDimensionalEncodingConfig& config) {
+std::optional<std::vector<float>> GenerateFixedDimensionalEncoding(
+    const std::vector<float>& tensor_data, const FixedDimensionalEncodingConfig& config) {
     Tensor tensor(tensor_data, config.dimension);
     EncodingPipeline pipeline(config);
     return pipeline.Execute(tensor);
 }
 
-Optional<Vector<float>> GenerateQueryFixedDimensionalEncoding(
-    const Vector<float>& tensor_data, const FixedDimensionalEncodingConfig& config) {
+std::optional<std::vector<float>> GenerateQueryFixedDimensionalEncoding(
+    const std::vector<float>& tensor_data, const FixedDimensionalEncodingConfig& config) {
     auto modified_config = config;
     modified_config.encoding_type = FixedDimensionalEncodingConfig::EncodingType::DEFAULT_SUM;
     return GenerateFixedDimensionalEncoding(tensor_data, modified_config);
 }
 
-Optional<Vector<float>> GenerateDocumentFixedDimensionalEncoding(
-    const Vector<float>& tensor_data, const FixedDimensionalEncodingConfig& config) {
+std::optional<std::vector<float>> GenerateDocumentFixedDimensionalEncoding(
+    const std::vector<float>& tensor_data, const FixedDimensionalEncodingConfig& config) {
     auto modified_config = config;
     modified_config.encoding_type = FixedDimensionalEncodingConfig::EncodingType::AVERAGE;
     return GenerateFixedDimensionalEncoding(tensor_data, modified_config);
@@ -276,36 +276,36 @@ Optional<Vector<float>> GenerateDocumentFixedDimensionalEncoding(
 
 // Legacy compatibility functions for testing
 namespace internal {
-    u32 SimHashPartitionIndex(const Vector<float>& input_vector) {
+    u32 SimHashPartitionIndex(const std::vector<float>& input_vector) {
         RandomGenerator rng(1);  // Use default seed
         HashPartitioner partitioner(input_vector.size(), std::min(32, static_cast<i32>(input_vector.size())), rng);
         return partitioner.ComputePartition(input_vector);
     }
 
-    u32 DistanceToSimHashPartition(const Vector<float>& input_vector, u32 index) {
+    u32 DistanceToSimHashPartition(const std::vector<float>& input_vector, u32 index) {
         RandomGenerator rng(1);
         HashPartitioner partitioner(input_vector.size(), std::min(32, static_cast<i32>(input_vector.size())), rng);
         return partitioner.ComputeDistance(input_vector, index);
     }
 
-    Vector<float> ApplyCountSketchToVector(Span<const float> input_vector, u32 final_dimension, u32 seed) {
+    std::vector<float> ApplyCountSketchToVector(std::span<const float> input_vector, u32 final_dimension, u32 seed) {
         RandomGenerator rng(seed);
-        Vector<float> input_vec(input_vector.begin(), input_vector.end());
+        std::vector<float> input_vec(input_vector.begin(), input_vector.end());
         SparseProjector projector(input_vec.size(), final_dimension, rng);
         return projector.Project(input_vec);
     }
 }
 
 // FDE Scalar Function Implementation
-void FDEFunction(const DataBlock &input, SharedPtr<ColumnVector> &output) {
+void FDEFunction(const DataBlock &input, std::shared_ptr<ColumnVector> &output) {
     if (input.column_count() != 2) {
-        String error_message = fmt::format("FDE function: input column count is {}, expected 2.", input.column_count());
+        std::string error_message = fmt::format("FDE function: input column count is {}, expected 2.", input.column_count());
         UnrecoverableError(error_message);
     }
 
-    SizeT row_count = input.row_count();
+    size_t row_count = input.row_count();
 
-    for (SizeT row_idx = 0; row_idx < row_count; ++row_idx) {
+    for (size_t row_idx = 0; row_idx < row_count; ++row_idx) {
         // Get the dimension parameter
         Value dimension_value = input.GetValue(1, row_idx);
         BigIntT target_dimension = dimension_value.GetValue<BigIntT>();
@@ -314,74 +314,74 @@ void FDEFunction(const DataBlock &input, SharedPtr<ColumnVector> &output) {
         Value tensor_value = input.GetValue(0, row_idx);
 
         // Extract tensor data based on the tensor type
-        Vector<float> tensor_data;
+        std::vector<float> tensor_data;
 
         if (tensor_value.type().type() == LogicalType::kTensor || tensor_value.type().type() == LogicalType::kEmbedding) {
             const auto *embedding_info = static_cast<const EmbeddingInfo *>(tensor_value.type().type_info().get());
 
             // Get tensor data from the value - for tensor values, the data is stored as embedding data
-            Span<char> raw_data = tensor_value.GetEmbedding();
+            std::span<char> raw_data = tensor_value.GetEmbedding();
 
             // Calculate total elements based on raw data size and element size
-            SizeT element_size = 0;
+            size_t element_size = 0;
             if (embedding_info->Type() == EmbeddingDataType::kElemFloat) {
                 element_size = sizeof(float);
             } else if (embedding_info->Type() == EmbeddingDataType::kElemDouble) {
                 element_size = sizeof(double);
             } else {
-                String error_message =
+                std::string error_message =
                     fmt::format("FDE function: unsupported tensor data type: {}", EmbeddingInfo::EmbeddingDataTypeToString(embedding_info->Type()));
                 UnrecoverableError(error_message);
             }
 
-            SizeT total_elements = raw_data.size() / element_size;
+            size_t total_elements = raw_data.size() / element_size;
             tensor_data.reserve(total_elements);
 
             // Convert raw data to float vector
             if (embedding_info->Type() == EmbeddingDataType::kElemFloat) {
                 const float *float_ptr = reinterpret_cast<const float *>(raw_data.data());
-                for (SizeT i = 0; i < total_elements; ++i) {
+                for (size_t i = 0; i < total_elements; ++i) {
                     tensor_data.push_back(float_ptr[i]);
                 }
             } else if (embedding_info->Type() == EmbeddingDataType::kElemDouble) {
                 const double *double_ptr = reinterpret_cast<const double *>(raw_data.data());
-                for (SizeT i = 0; i < total_elements; ++i) {
+                for (size_t i = 0; i < total_elements; ++i) {
                     tensor_data.push_back(static_cast<float>(double_ptr[i]));
                 }
             }
         } else if (tensor_value.type().type() == LogicalType::kArray) {
             // Handle Array input (including SubArrayArray from [[0.0, -10.0], [9.2, 45.6]] syntax)
-            const Vector<Value> &array_elements = tensor_value.GetArray();
+            const std::vector<Value> &array_elements = tensor_value.GetArray();
 
             // Check if this is a nested array (SubArrayArray)
             if (!array_elements.empty() && array_elements[0].type().type() == LogicalType::kArray) {
                 // Nested array case: [[1.0, 2.0], [3.0, 4.0]]
-                const Vector<Value> &first_sub_array = array_elements[0].GetArray();
-                SizeT sub_array_size = first_sub_array.size();
+                const std::vector<Value> &first_sub_array = array_elements[0].GetArray();
+                size_t sub_array_size = first_sub_array.size();
 
                 // Validate all sub-arrays have the same size
-                for (SizeT i = 1; i < array_elements.size(); ++i) {
+                for (size_t i = 1; i < array_elements.size(); ++i) {
                     if (array_elements[i].type().type() != LogicalType::kArray) {
-                        String error_message = "FDE function: mixed array types not supported";
+                        std::string error_message = "FDE function: mixed array types not supported";
                         UnrecoverableError(error_message);
                     }
-                    const Vector<Value> &sub_array = array_elements[i].GetArray();
+                    const std::vector<Value> &sub_array = array_elements[i].GetArray();
                     if (sub_array.size() != sub_array_size) {
-                        String error_message = "FDE function: all sub-arrays must have the same dimension";
+                        std::string error_message = "FDE function: all sub-arrays must have the same dimension";
                         UnrecoverableError(error_message);
                     }
                 }
 
                 // Flatten nested arrays
                 tensor_data.reserve(array_elements.size() * sub_array_size); // Pre-allocate memory
-                for (SizeT i = 0; i < array_elements.size(); ++i) {
-                    const Vector<Value> &sub_array = array_elements[i].GetArray();
+                for (size_t i = 0; i < array_elements.size(); ++i) {
+                    const std::vector<Value> &sub_array = array_elements[i].GetArray();
                     if (sub_array.size() != sub_array_size) {
-                        String error_message =
+                        std::string error_message =
                             fmt::format("FDE function: sub-array {} has size {}, expected {}", i, sub_array.size(), sub_array_size);
                         UnrecoverableError(error_message);
                     }
-                    for (SizeT j = 0; j < sub_array.size(); ++j) {
+                    for (size_t j = 0; j < sub_array.size(); ++j) {
                         const Value &element_value = sub_array[j];
                         if (element_value.type().type() == LogicalType::kFloat) {
                             tensor_data.push_back(element_value.GetValue<FloatT>());
@@ -392,14 +392,14 @@ void FDEFunction(const DataBlock &input, SharedPtr<ColumnVector> &output) {
                         } else if (element_value.type().type() == LogicalType::kInteger) {
                             tensor_data.push_back(static_cast<float>(element_value.GetValue<IntegerT>()));
                         } else {
-                            String error_message = fmt::format("FDE function: unsupported array element type: {}", element_value.type().ToString());
+                            std::string error_message = fmt::format("FDE function: unsupported array element type: {}", element_value.type().ToString());
                             UnrecoverableError(error_message);
                         }
                     }
                 }
             } else {
                 // Single-level array case: [1.0, 2.0, 3.0, 4.0]
-                for (SizeT i = 0; i < array_elements.size(); ++i) {
+                for (size_t i = 0; i < array_elements.size(); ++i) {
                     const Value &element_value = array_elements[i];
                     if (element_value.type().type() == LogicalType::kFloat) {
                         tensor_data.push_back(element_value.GetValue<FloatT>());
@@ -410,34 +410,34 @@ void FDEFunction(const DataBlock &input, SharedPtr<ColumnVector> &output) {
                     } else if (element_value.type().type() == LogicalType::kInteger) {
                         tensor_data.push_back(static_cast<float>(element_value.GetValue<IntegerT>()));
                     } else {
-                        String error_message = fmt::format("FDE function: unsupported array element type: {}", element_value.type().ToString());
+                        std::string error_message = fmt::format("FDE function: unsupported array element type: {}", element_value.type().ToString());
                         UnrecoverableError(error_message);
                     }
                 }
             }
 
             if (tensor_data.empty()) {
-                String error_message = "FDE function: empty array input";
+                std::string error_message = "FDE function: empty array input";
                 UnrecoverableError(error_message);
             }
         } else {
-            String error_message = fmt::format("FDE function: expected tensor, embedding, or array input, got: {}", tensor_value.type().ToString());
+            std::string error_message = fmt::format("FDE function: expected tensor, embedding, or array input, got: {}", tensor_value.type().ToString());
             UnrecoverableError(error_message);
         }
 
         // Validate input dimensions
         if (tensor_data.empty()) {
-            String error_message = "FDE function: empty tensor data";
+            std::string error_message = "FDE function: empty tensor data";
             UnrecoverableError(error_message);
         }
 
         if (tensor_data.size() > 100000) {
-            String error_message = fmt::format("FDE function: input dimension {} is too large (max 100000)", tensor_data.size());
+            std::string error_message = fmt::format("FDE function: input dimension {} is too large (max 100000)", tensor_data.size());
             UnrecoverableError(error_message);
         }
 
         if (target_dimension <= 0 || target_dimension > 65536) {
-            String error_message = fmt::format("FDE function: target dimension {} is invalid (must be 1-10000)", target_dimension);
+            std::string error_message = fmt::format("FDE function: target dimension {} is invalid (must be 1-10000)", target_dimension);
             UnrecoverableError(error_message);
         }
 
@@ -453,15 +453,15 @@ void FDEFunction(const DataBlock &input, SharedPtr<ColumnVector> &output) {
         config.fill_empty_partitions = false;
 
         // Apply FDE encoding
-        Optional<Vector<float>> result = GenerateFixedDimensionalEncoding(tensor_data, config);
+        std::optional<std::vector<float>> result = GenerateFixedDimensionalEncoding(tensor_data, config);
 
         if (!result.has_value()) {
-            String error_message = "FDE function: encoding failed";
+            std::string error_message = "FDE function: encoding failed";
             UnrecoverableError(error_message);
         }
 
         // Extract the result and make an explicit copy to avoid any reference issues
-        Vector<float> result_vector;
+        std::vector<float> result_vector;
         result_vector.reserve(result.value().size());
         for (const auto &val : result.value()) {
             result_vector.push_back(val);
@@ -475,9 +475,9 @@ void FDEFunction(const DataBlock &input, SharedPtr<ColumnVector> &output) {
 }
 
 void RegisterFDEFunction(NewCatalog *catalog_ptr) {
-    String func_name = "FDE";
+    std::string func_name = "FDE";
 
-    SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
+    std::shared_ptr<ScalarFunctionSet> function_set_ptr = std::make_shared<ScalarFunctionSet>(func_name);
 
     // Use a generic output type that will be resolved at runtime
     // We'll register with dimension 1 as a placeholder - the actual dimension will be determined by the target_dimension parameter
@@ -490,7 +490,7 @@ void RegisterFDEFunction(NewCatalog *catalog_ptr) {
     function_set_ptr->AddFunction(fde_array_function);
 
     // Register representative functions for embedding and tensor types
-    Vector<EmbeddingDataType> data_types = {EmbeddingDataType::kElemFloat, EmbeddingDataType::kElemDouble};
+    std::vector<EmbeddingDataType> data_types = {EmbeddingDataType::kElemFloat, EmbeddingDataType::kElemDouble};
 
     for (auto data_type : data_types) {
         // Register one representative function per data type - the matching logic will handle any dimension

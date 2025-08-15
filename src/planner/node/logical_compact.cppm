@@ -29,21 +29,21 @@ namespace infinity {
 
 export class LogicalCompact : public LogicalNode {
 public:
-    LogicalCompact(u64 node_id, SharedPtr<BaseTableRef> base_table_ref, CompactStatementType compact_type)
+    LogicalCompact(u64 node_id, std::shared_ptr<BaseTableRef> base_table_ref, CompactStatementType compact_type)
         : LogicalNode(node_id, LogicalNodeType::kCompact), base_table_ref_(base_table_ref), compact_type_(compact_type) {}
 
-    [[nodiscard]] Vector<ColumnBinding> GetColumnBindings() const final;
+    [[nodiscard]] std::vector<ColumnBinding> GetColumnBindings() const final;
 
-    [[nodiscard]] SharedPtr<Vector<String>> GetOutputNames() const final;
+    [[nodiscard]] std::shared_ptr<std::vector<std::string>> GetOutputNames() const final;
 
-    [[nodiscard]] SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const final;
+    [[nodiscard]] std::shared_ptr<std::vector<std::shared_ptr<DataType>>> GetOutputTypes() const final;
 
-    String ToString(i64 &space) const final;
+    std::string ToString(i64 &space) const final;
 
-    inline String name() final { return "LogicalCompact"; }
+    inline std::string name() final { return "LogicalCompact"; }
 
 public:
-    SharedPtr<BaseTableRef> base_table_ref_;
+    std::shared_ptr<BaseTableRef> base_table_ref_;
     CompactStatementType compact_type_;
 };
 

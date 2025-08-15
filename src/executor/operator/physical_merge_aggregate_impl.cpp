@@ -70,16 +70,16 @@ bool PhysicalMergeAggregate::Execute(QueryContext *query_context, OperatorState 
 
 void PhysicalMergeAggregate::GroupByMergeAggregateExecute(MergeAggregateOperatorState *op_state) {
     auto *agg_op = static_cast<PhysicalAggregate *>(this->left());
-    SizeT group_count = agg_op->groups_.size();
+    size_t group_count = agg_op->groups_.size();
     MergeHashTable &hash_table = op_state->hash_table_;
 
     auto &input_block = op_state->input_data_block_;
     if (!hash_table.Initialized()) {
-        Vector<SharedPtr<DataType>> groupby_types;
+        std::vector<std::shared_ptr<DataType>> groupby_types;
         groupby_types.reserve(group_count);
         for (i64 idx = 0; auto &expr : agg_op->groups_) {
-            SharedPtr<ColumnDef> col_def = MakeShared<ColumnDef>(idx, MakeShared<DataType>(expr->Type()), expr->Name(), std::set<ConstraintType>());
-            groupby_types.emplace_back(MakeShared<DataType>(expr->Type()));
+            std::shared_ptr<ColumnDef> col_def = std::make_shared<ColumnDef>(idx, std::make_shared<DataType>(expr->Type()), expr->Name(), std::set<ConstraintType>());
+            groupby_types.emplace_back(std::make_shared<DataType>(expr->Type()));
             ++idx;
         }
 
@@ -90,7 +90,7 @@ void PhysicalMergeAggregate::GroupByMergeAggregateExecute(MergeAggregateOperator
         return;
     }
 
-    Vector<SharedPtr<ColumnVector>> input_groupby_columns(input_block->column_vectors.begin(), input_block->column_vectors.begin() + group_count);
+    std::vector<std::shared_ptr<ColumnVector>> input_groupby_columns(input_block->column_vectors.begin(), input_block->column_vectors.begin() + group_count);
     if (op_state->data_block_array_.empty()) {
         hash_table.Append(input_groupby_columns, 0, input_block->row_count());
         op_state->data_block_array_.emplace_back(std::move(input_block));
@@ -99,22 +99,22 @@ void PhysicalMergeAggregate::GroupByMergeAggregateExecute(MergeAggregateOperator
     }
 
     DataBlock *last_data_block = op_state->data_block_array_.back().get();
-    for (SizeT row_id = 0; row_id < input_block->row_count(); ++row_id) {
+    for (size_t row_id = 0; row_id < input_block->row_count(); ++row_id) {
         if (last_data_block->available_capacity() == 0) {
-            Vector<SharedPtr<DataType>> types = last_data_block->types();
+            std::vector<std::shared_ptr<DataType>> types = last_data_block->types();
             op_state->data_block_array_.emplace_back(DataBlock::MakeUniquePtr());
             last_data_block = op_state->data_block_array_.back().get();
             last_data_block->Init(std::move(types), input_block->capacity());
         }
-        Pair<SizeT, SizeT> block_row_id = {op_state->data_block_array_.size() - 1, last_data_block->row_count()};
+        std::pair<size_t, size_t> block_row_id = {op_state->data_block_array_.size() - 1, last_data_block->row_count()};
         bool found = hash_table.GetOrInsert(input_groupby_columns, row_id, block_row_id);
         if (!found) {
             last_data_block->AppendWith(input_block.get(), row_id, 1);
             continue;
         }
-        SizeT agg_count = agg_op->aggregates_.size();
-        Pair<SizeT, SizeT> input_block_row_id = {0, row_id};
-        for (SizeT col_idx = group_count; col_idx < group_count + agg_count; ++col_idx) {
+        size_t agg_count = agg_op->aggregates_.size();
+        std::pair<size_t, size_t> input_block_row_id = {0, row_id};
+        for (size_t col_idx = group_count; col_idx < group_count + agg_count; ++col_idx) {
             auto *agg_expression = static_cast<AggregateExpression *>(agg_op->aggregates_[col_idx - group_count].get());
 
             auto function_name = agg_expression->aggregate_function_.GetFuncName();
@@ -162,7 +162,7 @@ void PhysicalMergeAggregate::SimpleMergeAggregateExecute(MergeAggregateOperatorS
     } else {
         auto agg_op = dynamic_cast<PhysicalAggregate *>(this->left());
         auto aggs_size = agg_op->aggregates_.size();
-        for (SizeT col_idx = 0; col_idx < aggs_size; ++col_idx) {
+        for (size_t col_idx = 0; col_idx < aggs_size; ++col_idx) {
             auto agg_expression = static_cast<AggregateExpression *>(agg_op->aggregates_[col_idx].get());
 
             auto function_name = agg_expression->aggregate_function_.GetFuncName();
@@ -204,11 +204,11 @@ void PhysicalMergeAggregate::SimpleMergeAggregateExecute(MergeAggregateOperatorS
 }
 
 template <typename T>
-void PhysicalMergeAggregate::HandleAggregateFunction(const String &function_name,
+void PhysicalMergeAggregate::HandleAggregateFunction(const std::string &function_name,
                                                      MergeAggregateOperatorState *op_state,
-                                                     SizeT col_idx,
-                                                     const Pair<SizeT, SizeT> &input_block_row_id,
-                                                     const Pair<SizeT, SizeT> &output_block_row_id) {
+                                                     size_t col_idx,
+                                                     const std::pair<size_t, size_t> &input_block_row_id,
+                                                     const std::pair<size_t, size_t> &output_block_row_id) {
     LOG_TRACE(function_name);
     if (function_name == "COUNT") {
         LOG_TRACE("COUNT");
@@ -228,63 +228,63 @@ void PhysicalMergeAggregate::HandleAggregateFunction(const String &function_name
 
 template <typename T>
 void PhysicalMergeAggregate::HandleMin(MergeAggregateOperatorState *op_state,
-                                       SizeT col_idx,
-                                       const Pair<SizeT, SizeT> &input_block_row_id,
-                                       const Pair<SizeT, SizeT> &output_block_row_id) {
+                                       size_t col_idx,
+                                       const std::pair<size_t, size_t> &input_block_row_id,
+                                       const std::pair<size_t, size_t> &output_block_row_id) {
     MathOperation<T> minOperation = [](T a, T b) -> T { return (a < b) ? a : b; };
     UpdateData<T>(op_state, minOperation, col_idx, input_block_row_id, output_block_row_id);
 }
 
 template <typename T>
 void PhysicalMergeAggregate::HandleMax(MergeAggregateOperatorState *op_state,
-                                       SizeT col_idx,
-                                       const Pair<SizeT, SizeT> &input_block_row_id,
-                                       const Pair<SizeT, SizeT> &output_block_row_id) {
+                                       size_t col_idx,
+                                       const std::pair<size_t, size_t> &input_block_row_id,
+                                       const std::pair<size_t, size_t> &output_block_row_id) {
     MathOperation<T> maxOperation = [](T a, T b) -> T { return (a > b) ? a : b; };
     UpdateData<T>(op_state, maxOperation, col_idx, input_block_row_id, output_block_row_id);
 }
 
 template <typename T>
 void PhysicalMergeAggregate::HandleCount(MergeAggregateOperatorState *op_state,
-                                         SizeT col_idx,
-                                         const Pair<SizeT, SizeT> &input_block_row_id,
-                                         const Pair<SizeT, SizeT> &output_block_row_id) {
+                                         size_t col_idx,
+                                         const std::pair<size_t, size_t> &input_block_row_id,
+                                         const std::pair<size_t, size_t> &output_block_row_id) {
     MathOperation<T> countOperation = [](T a, T b) -> T { return a + b; };
     UpdateData<T>(op_state, countOperation, col_idx, input_block_row_id, output_block_row_id);
 }
 
 template <typename T>
 void PhysicalMergeAggregate::HandleSum(MergeAggregateOperatorState *op_state,
-                                       SizeT col_idx,
-                                       const Pair<SizeT, SizeT> &input_block_row_id,
-                                       const Pair<SizeT, SizeT> &output_block_row_id) {
+                                       size_t col_idx,
+                                       const std::pair<size_t, size_t> &input_block_row_id,
+                                       const std::pair<size_t, size_t> &output_block_row_id) {
     MathOperation<T> sumOperation = [](T a, T b) -> T { return a + b; };
     UpdateData<T>(op_state, sumOperation, col_idx, input_block_row_id, output_block_row_id);
 }
 
 template <typename T>
-T PhysicalMergeAggregate::GetInputData(MergeAggregateOperatorState *op_state, SizeT block_index, SizeT col_idx, SizeT row_idx) {
+T PhysicalMergeAggregate::GetInputData(MergeAggregateOperatorState *op_state, size_t block_index, size_t col_idx, size_t row_idx) {
     Value value = op_state->input_data_block_->GetValue(col_idx, row_idx);
     return value.GetValue<T>();
 }
 
 template <typename T>
-T PhysicalMergeAggregate::GetOutputData(MergeAggregateOperatorState *op_state, SizeT block_index, SizeT col_idx, SizeT row_idx) {
+T PhysicalMergeAggregate::GetOutputData(MergeAggregateOperatorState *op_state, size_t block_index, size_t col_idx, size_t row_idx) {
     Value value = op_state->data_block_array_[block_index]->GetValue(col_idx, row_idx);
     return value.GetValue<T>();
 }
 
 template <typename T>
-void PhysicalMergeAggregate::WriteValueAtPosition(MergeAggregateOperatorState *op_state, SizeT block_index, SizeT col_idx, SizeT row_idx, T value) {
+void PhysicalMergeAggregate::WriteValueAtPosition(MergeAggregateOperatorState *op_state, size_t block_index, size_t col_idx, size_t row_idx, T value) {
     op_state->data_block_array_[block_index]->SetValue(col_idx, row_idx, CreateValue(value));
 }
 
 template <typename T>
 void PhysicalMergeAggregate::UpdateData(MergeAggregateOperatorState *op_state,
                                         MathOperation<T> operation,
-                                        SizeT col_idx,
-                                        const Pair<SizeT, SizeT> &input_block_row_id,
-                                        const Pair<SizeT, SizeT> &output_block_row_id) {
+                                        size_t col_idx,
+                                        const std::pair<size_t, size_t> &input_block_row_id,
+                                        const std::pair<size_t, size_t> &output_block_row_id) {
     const auto &[input_block_id, input_row_id] = input_block_row_id;
     const auto &[output_block_id, output_row_id] = output_block_row_id;
     T input = GetInputData<T>(op_state, input_block_id, col_idx, input_row_id);

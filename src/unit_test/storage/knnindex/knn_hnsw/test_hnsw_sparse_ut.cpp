@@ -55,7 +55,7 @@ protected:
         int ef_construction = 200;
         int chunk_size = 128;
         int max_chunk_n = 10;
-        SizeT element_size = max_chunk_n * chunk_size;
+        size_t element_size = max_chunk_n * chunk_size;
 
         SparseMatrix dataset = SparseTestUtil<f32, i32>::GenerateDataset(element_size, max_dim, sparsity, 0, 1.0);
         auto [gt_idx, gt_score] = SparseTestUtil<f32, i32>::GenerateGroundtruth(dataset, dataset, 1);
@@ -76,7 +76,7 @@ protected:
             }
 
             KnnSearchOption search_option{.ef_ = 50};
-            for (SizeT i = 0; i < element_size; ++i) {
+            for (size_t i = 0; i < element_size; ++i) {
                 SparseVecRef<f32, IdxT> query = dataset.at(i);
                 if (gt_score[i] == 0.0 || query.nnz_ == 0) {
                     continue;
@@ -104,7 +104,7 @@ protected:
 
             auto hnsw_index = Hnsw::Load(*file_handle);
             KnnSearchOption search_option{.ef_ = 50};
-            for (SizeT i = 0; i < element_size; ++i) {
+            for (size_t i = 0; i < element_size; ++i) {
                 SparseVecRef<f32, IdxT> query = dataset.at(i);
                 if (gt_score[i] == 0.0 || query.nnz_ == 0) {
                     continue;
@@ -122,7 +122,7 @@ protected:
 
 private:
     template <typename T>
-    Vector<T> MakeRandom(T min, T max, SizeT num, std::mt19937 &rng) {
+    Vector<T> MakeRandom(T min, T max, size_t num, std::mt19937 &rng) {
         std::uniform_real_distribution<float> distrib_real;
         HashSet<T> set;
         while (set.size() < num) {

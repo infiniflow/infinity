@@ -12,13 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:blocking_queue;
 
-import :stl;
 import :default_values;
 
+import std;
+import std.compat;
 import third_party;
 
 import global_resource_usage;
@@ -28,7 +27,7 @@ namespace infinity {
 export template <typename T>
 class BlockingQueue {
 public:
-    explicit BlockingQueue(const String &name, SizeT capacity = DEFAULT_BLOCKING_QUEUE_SIZE) : capacity_(capacity) {
+    explicit BlockingQueue(const std::string &name, size_t capacity = DEFAULT_BLOCKING_QUEUE_SIZE) : capacity_(capacity) {
         name_ = name;
 #ifdef INFINITY_DEBUG
         GlobalResourceUsage::IncrObjectCount(fmt::format("BlockingQueue: {}", name_));
@@ -70,7 +69,7 @@ public:
         return true;
     }
 
-    void EnqueueBulk(Vector<T> &input_array) {
+    void EnqueueBulk(std::vector<T> &input_array) {
         {
             std::unique_lock<std::mutex> lock(queue_mutex_);
             full_cv_.wait(lock, [&] { return queue_.size() + input_array.size() < capacity_; });
@@ -79,7 +78,7 @@ public:
         empty_cv_.notify_one();
     }
 
-    void EnqueueBulk(List<T> &input_queue) {
+    void EnqueueBulk(std::list<T> &input_queue) {
         {
             std::unique_lock<std::mutex> lock(queue_mutex_);
             full_cv_.wait(lock, [&] { return queue_.size() + input_queue.size() < capacity_; });
@@ -107,7 +106,7 @@ public:
         return res;
     }
 
-    void DequeueBulk(List<T> &output_queue) {
+    void DequeueBulk(std::list<T> &output_queue) {
         {
             std::unique_lock<std::mutex> lock(queue_mutex_);
             empty_cv_.wait(lock, [this] { return !queue_.empty(); });
@@ -116,7 +115,7 @@ public:
         full_cv_.notify_one();
     }
 
-    void DequeueBulk(Vector<T> &output_array) {
+    void DequeueBulk(std::vector<T> &output_array) {
         {
             std::unique_lock<std::mutex> lock(queue_mutex_);
             empty_cv_.wait(lock, [this] { return !queue_.empty(); });
@@ -126,7 +125,7 @@ public:
         full_cv_.notify_one();
     }
 
-    void DequeueBulk(Deque<T> &output_array) {
+    void DequeueBulk(std::deque<T> &output_array) {
         {
             std::unique_lock<std::mutex> lock(queue_mutex_);
             empty_cv_.wait(lock, [this] { return !queue_.empty(); });
@@ -150,7 +149,7 @@ public:
         return true;
     }
 
-    bool TryDequeueBulk(Vector<T> &output_array) {
+    bool TryDequeueBulk(std::vector<T> &output_array) {
         {
             std::unique_lock<std::mutex> lock(queue_mutex_);
             if (queue_.empty()) {
@@ -163,7 +162,7 @@ public:
         return true;
     }
 
-    bool TryDequeueBulkWait(Vector<T> &output_array, SizeT wait_ms) {
+    bool TryDequeueBulkWait(std::vector<T> &output_array, size_t wait_ms) {
         {
             std::unique_lock<std::mutex> lock(queue_mutex_);
             bool ok = empty_cv_.wait_for(lock, std::chrono::milliseconds(wait_ms), [this] { return !queue_.empty(); });
@@ -177,7 +176,7 @@ public:
         return true;
     }
 
-    [[nodiscard]] SizeT Size() const {
+    [[nodiscard]] size_t Size() const {
         std::lock_guard<std::mutex> lock(queue_mutex_);
         return queue_.size();
     }
@@ -188,13 +187,13 @@ public:
     }
 
 protected:
-    atomic_bool allow_enqueue_{true};
+    std::atomic_bool allow_enqueue_{true};
     mutable std::mutex queue_mutex_{};
     std::condition_variable full_cv_{};
     std::condition_variable empty_cv_{};
-    Deque<T> queue_{};
-    SizeT capacity_{DEFAULT_BLOCKING_QUEUE_SIZE};
-    String name_{};
+    std::deque<T> queue_{};
+    size_t capacity_{DEFAULT_BLOCKING_QUEUE_SIZE};
+    std::string name_{};
 };
 
 } // namespace infinity

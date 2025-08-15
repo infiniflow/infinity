@@ -45,7 +45,7 @@ void CJKSegmenter::Analyze(AnalyzeContext *context) {
             }
         }
 
-        UniquePtr<Hit> single_char_hit(dict_->MatchInMainDict(context->GetSegmentBuff(), context->GetCursor(), 1));
+        std::unique_ptr<Hit> single_char_hit(dict_->MatchInMainDict(context->GetSegmentBuff(), context->GetCursor(), 1));
         if (single_char_hit->IsMatch()) {
             Lexeme *new_lexeme = new Lexeme(context->GetBufferOffset(), context->GetCursor(), 1, Lexeme::TYPE_CNWORD);
             if (!context->AddLexeme(new_lexeme))

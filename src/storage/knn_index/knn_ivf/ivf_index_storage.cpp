@@ -97,7 +97,7 @@ Pair<u32, const f32 *> IVF_Centroids_Storage::GetCentroidDataForMetric(const Knn
 
 // IVF_Index_Storage
 
-SizeT IVF_Index_Storage::MemoryUsed() const { return ivf_centroids_storage_.MemoryUsed() + ivf_parts_storage_->MemoryUsed(); }
+size_t IVF_Index_Storage::MemoryUsed() const { return ivf_centroids_storage_.MemoryUsed() + ivf_parts_storage_->MemoryUsed(); }
 
 void IVF_Index_Storage::Save(LocalFileHandle &file_handle) const {
     file_handle.Append(&row_count_, sizeof(row_count_));
@@ -305,7 +305,7 @@ void IVF_Index_Storage::SearchIndex(const KnnDistanceBase1 *knn_distance,
         [query_ptr, dimension]<EmbeddingDataType query_element_type> {
             return GetF32Ptr(static_cast<const EmbeddingDataTypeToCppTypeT<query_element_type> *>(query_ptr), dimension);
         },
-        [] { return Pair<const f32 *, UniquePtr<f32[]>>(); });
+        [] { return Pair<const f32 *, std::unique_ptr<f32[]>>(); });
     Vector<u32> nprobe_result;
     switch (knn_distance->dist_type_) {
         case KnnDistanceType::kL2: {
@@ -313,7 +313,7 @@ void IVF_Index_Storage::SearchIndex(const KnnDistanceBase1 *knn_distance,
             if (nprobe == 1) {
                 search_top_1_without_dis<f32>(dimension, 1, query_f32_ptr, centroids_num, centroids_data, nprobe_result.data());
             } else {
-                const auto centroid_dists = MakeUniqueForOverwrite<f32[]>(nprobe);
+                const auto centroid_dists = std::make_unique_for_overwrite<f32[]>(nprobe);
                 search_top_k_with_dis(nprobe,
                                       dimension,
                                       1,
@@ -328,7 +328,7 @@ void IVF_Index_Storage::SearchIndex(const KnnDistanceBase1 *knn_distance,
         }
         case KnnDistanceType::kCosine:
         case KnnDistanceType::kInnerProduct: {
-            const auto ip_result = MakeUniqueForOverwrite<f32[]>(centroids_num);
+            const auto ip_result = std::make_unique_for_overwrite<f32[]>(centroids_num);
             matrixA_multiply_matrixB_output_to_C(centroids_data, query_f32_ptr, centroids_num, 1, dimension, ip_result.get());
             nprobe_result.resize(centroids_num);
             std::iota(nprobe_result.begin(), nprobe_result.end(), static_cast<u32>(0));

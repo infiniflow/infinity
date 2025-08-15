@@ -46,13 +46,13 @@ import data_type;
 namespace infinity {
 
 struct SearchIndexPartsReuseContext {
-    UniquePtr<f32[]> pq_query_ip_table_;
+    std::unique_ptr<f32[]> pq_query_ip_table_;
     u32 dim_ = 0;
     const f32 *x_ptr_ = nullptr;
     const f32 *a_ptr_ = nullptr;
     f32 x_l2_ = 0.0f;
-    UniquePtr<f32[]> x_mult_a_;
-    UniquePtr<f32[]> a_square_;
+    std::unique_ptr<f32[]> x_mult_a_;
+    std::unique_ptr<f32[]> a_square_;
     f32 get_x_l2() {
         if (x_l2_ == 0.0f) {
             x_l2_ = L2NormSquare<f32>(x_ptr_, dim_);
@@ -61,7 +61,7 @@ struct SearchIndexPartsReuseContext {
     }
     const auto &get_x_mult_a() {
         if (!x_mult_a_) {
-            x_mult_a_ = MakeUniqueForOverwrite<f32[]>(dim_);
+            x_mult_a_ = std::make_unique_for_overwrite<f32[]>(dim_);
             for (u32 i = 0; i < dim_; ++i) {
                 x_mult_a_[i] = x_ptr_[i] * a_ptr_[i];
             }
@@ -70,7 +70,7 @@ struct SearchIndexPartsReuseContext {
     }
     const auto &get_a_square() {
         if (!a_square_) {
-            a_square_ = MakeUniqueForOverwrite<f32[]>(dim_);
+            a_square_ = std::make_unique_for_overwrite<f32[]>(dim_);
             for (u32 i = 0; i < dim_; ++i) {
                 a_square_[i] = a_ptr_[i] * a_ptr_[i];
             }
@@ -84,12 +84,12 @@ class IVF_Part_Storage {
 
 protected:
     u32 embedding_num_ = 0;
-    Vector<SegmentOffset> embedding_segment_offsets_ = {};
+    std::vector<SegmentOffset> embedding_segment_offsets_ = {};
 
 public:
     explicit IVF_Part_Storage(const u32 part_id) : part_id_(part_id) {}
     virtual ~IVF_Part_Storage() = default;
-    static UniquePtr<IVF_Part_Storage>
+    static std::unique_ptr<IVF_Part_Storage>
     Make(u32 part_id, u32 embedding_dimension, EmbeddingDataType embedding_data_type, const IndexIVFStorageOption &ivf_storage_option);
     u32 part_id() const { return part_id_; }
     u32 embedding_num() const { return embedding_num_; }
@@ -166,15 +166,15 @@ public:
     void Train(const u32 training_embedding_num, const f32 *training_data, const IVF_Centroids_Storage *ivf_centroids_storage) final {}
 };
 
-UniquePtr<f32[]> GetTrainingResidual(const u32 training_embedding_num,
+std::unique_ptr<f32[]> GetTrainingResidual(const u32 training_embedding_num,
                                      const f32 *training_data,
                                      const IVF_Centroids_Storage *ivf_centroids_storage,
                                      const u32 embedding_dimension,
                                      const u32 centroids_num) {
-    auto residuals = MakeUniqueForOverwrite<f32[]>(training_embedding_num * embedding_dimension);
+    auto residuals = std::make_unique_for_overwrite<f32[]>(training_embedding_num * embedding_dimension);
     const f32 *centroids_data = ivf_centroids_storage->data();
     // (-0.5 * norm) for each centroid
-    UniquePtr<f32[]> centroid_norms_neg_half = MakeUniqueForOverwrite<f32[]>(centroids_num);
+    std::unique_ptr<f32[]> centroid_norms_neg_half = std::make_unique_for_overwrite<f32[]>(centroids_num);
     {
         // prepare centroid_norms_neg_half_
         const f32 *centroids_data_ptr = centroids_data;
@@ -184,7 +184,7 @@ UniquePtr<f32[]> GetTrainingResidual(const u32 training_embedding_num,
         }
     }
     // distance: for every embedding, e * c - 0.5 * c^2, find max
-    const auto dist_table = MakeUniqueForOverwrite<f32[]>(training_embedding_num * centroids_num);
+    const auto dist_table = std::make_unique_for_overwrite<f32[]>(training_embedding_num * centroids_num);
     matrixA_multiply_transpose_matrixB_output_to_C(training_data,
                                                    centroids_data,
                                                    training_embedding_num,
@@ -223,8 +223,8 @@ UniquePtr<f32[]> GetTrainingResidual(const u32 training_embedding_num,
 template <>
 class IVF_Parts_Storage_Info<IndexIVFStorageOption::Type::kScalarQuantization> : public IVF_Parts_Storage {
     const u32 sq_bits_ = 0; // 4 or 8
-    Vector<f32> common_vec_a_;
-    Vector<f32> common_vec_b_;
+    std::vector<f32> common_vec_a_;
+    std::vector<f32> common_vec_b_;
 
 public:
     IVF_Parts_Storage_Info(const u32 embedding_dimension,
@@ -269,7 +269,7 @@ public:
         const auto exclude_num_each_end = std::min<u32>((training_embedding_num / 200u) + 1u, training_embedding_num);
         for (u32 i = 0; i < embedding_dimension(); ++i) {
             std::priority_queue<f32> min_heap;                              // biggest on top
-            std::priority_queue<f32, Vector<f32>, std::greater<>> max_heap; // smallest on top
+            std::priority_queue<f32, std::vector<f32>, std::greater<>> max_heap; // smallest on top
             const f32 *residual_data = residuals.get() + i;
             for (u32 j = 0; j < exclude_num_each_end; ++j) {
                 const f32 x = *residual_data;
@@ -309,9 +309,9 @@ class IVF_Parts_Storage_Info<IndexIVFStorageOption::Type::kProductQuantization> 
 
     u32 real_subspace_centroid_num_ = 0;
     // centroids for each subspace, size: subspace_dimension_ * real_subspace_centroid_num_ * subspace_num_
-    UniquePtr<f32[]> subspace_centroids_data_ = {};
+    std::unique_ptr<f32[]> subspace_centroids_data_ = {};
     // size: real_subspace_centroid_num_ * subspace_num_
-    UniquePtr<f32[]> subspace_centroid_norms_neg_half_ = {};
+    std::unique_ptr<f32[]> subspace_centroid_norms_neg_half_ = {};
 
 public:
     auto real_subspace_centroid_num() const { return real_subspace_centroid_num_; }
@@ -362,9 +362,9 @@ public:
 
     void Load(LocalFileHandle &file_handle) override {
         file_handle.Read(&real_subspace_centroid_num_, sizeof(real_subspace_centroid_num_));
-        subspace_centroids_data_ = MakeUniqueForOverwrite<f32[]>(embedding_dimension() * real_subspace_centroid_num_);
+        subspace_centroids_data_ = std::make_unique_for_overwrite<f32[]>(embedding_dimension() * real_subspace_centroid_num_);
         file_handle.Read(subspace_centroids_data_.get(), embedding_dimension() * real_subspace_centroid_num_ * sizeof(f32));
-        subspace_centroid_norms_neg_half_ = MakeUniqueForOverwrite<f32[]>(real_subspace_centroid_num_ * subspace_num_);
+        subspace_centroid_norms_neg_half_ = std::make_unique_for_overwrite<f32[]>(real_subspace_centroid_num_ * subspace_num_);
         file_handle.Read(subspace_centroid_norms_neg_half_.get(), real_subspace_centroid_num_ * subspace_num_ * sizeof(f32));
     }
 
@@ -377,10 +377,10 @@ public:
 
     void TrainResidual(const u32 training_embedding_num, const f32 *residual_data) {
         real_subspace_centroid_num_ = std::min(expect_subspace_centroid_num_, training_embedding_num);
-        subspace_centroids_data_ = MakeUniqueForOverwrite<f32[]>(embedding_dimension() * real_subspace_centroid_num_);
-        subspace_centroid_norms_neg_half_ = MakeUniqueForOverwrite<f32[]>(real_subspace_centroid_num_ * subspace_num_);
-        const auto part_train_data = MakeUniqueForOverwrite<f32[]>(training_embedding_num * subspace_dimension_);
-        Vector<f32> subspace_centroids_v;
+        subspace_centroids_data_ = std::make_unique_for_overwrite<f32[]>(embedding_dimension() * real_subspace_centroid_num_);
+        subspace_centroid_norms_neg_half_ = std::make_unique_for_overwrite<f32[]>(real_subspace_centroid_num_ * subspace_num_);
+        const auto part_train_data = std::make_unique_for_overwrite<f32[]>(training_embedding_num * subspace_dimension_);
+        std::vector<f32> subspace_centroids_v;
         for (u32 i = 0; i < subspace_num_; ++i) {
             auto *const output_centroids_data = subspace_centroids_data_at_subspace(i);
             auto *const output_centroid_norms_neg_half = subspace_centroid_norms_neg_half_at_subspace(i);
@@ -427,7 +427,7 @@ public:
     }
 
     void EncodeResidual(const f32 *residual, u32 *encode_output) const {
-        const auto xy_buffer = MakeUniqueForOverwrite<f32[]>(real_subspace_centroid_num_);
+        const auto xy_buffer = std::make_unique_for_overwrite<f32[]>(real_subspace_centroid_num_);
         for (u32 j = 0; j < subspace_num_; ++j) {
             matrixA_multiply_transpose_matrixB_output_to_C(residual + j * subspace_dimension_,
                                                            subspace_centroids_data_at_subspace(j),
@@ -449,8 +449,8 @@ public:
         }
     }
 
-    UniquePtr<f32[]> GetIPTable(const f32 *query) const {
-        auto ip_table = MakeUniqueForOverwrite<f32[]>(subspace_num_ * real_subspace_centroid_num_);
+    std::unique_ptr<f32[]> GetIPTable(const f32 *query) const {
+        auto ip_table = std::make_unique_for_overwrite<f32[]>(subspace_num_ * real_subspace_centroid_num_);
         for (u32 i = 0; i < subspace_num_; ++i) {
             matrixA_multiply_matrixB_output_to_C(subspace_centroids_data_at_subspace(i),
                                                  query + i * subspace_dimension_,
@@ -468,7 +468,7 @@ class IVF_Parts_Storage_T final : public IVF_Parts_Storage_Info<t> {
     using BaseT = IVF_Parts_Storage_Info<t>;
     static_assert(std::derived_from<BaseT, IVF_Parts_Storage>);
 
-    Vector<UniquePtr<IVF_Part_Storage>> ivf_part_storages_ = {};
+    std::vector<std::unique_ptr<IVF_Part_Storage>> ivf_part_storages_ = {};
 
 public:
     IVF_Parts_Storage_T(const u32 embedding_dimension,
@@ -505,7 +505,7 @@ public:
         return ivf_part_storages_[part_id]->AppendOneEmbedding(embedding_ptr, segment_offset, ivf_centroids_storage, this);
     }
 
-    void SearchIndex(const Vector<u32> &part_ids,
+    void SearchIndex(const std::vector<u32> &part_ids,
                      const IVF_Index_Storage *ivf_index_storage,
                      const KnnDistanceBase1 *knn_distance,
                      const void *query_ptr,
@@ -520,12 +520,12 @@ public:
     }
 };
 
-UniquePtr<IVF_Parts_Storage> IVF_Parts_Storage::Make(const u32 embedding_dimension,
+std::unique_ptr<IVF_Parts_Storage> IVF_Parts_Storage::Make(const u32 embedding_dimension,
                                                      const u32 centroids_num,
                                                      const EmbeddingDataType embedding_data_type,
                                                      const IndexIVFStorageOption &ivf_storage_option) {
     auto GetPartsStorageT = [&]<IndexIVFStorageOption::Type t>() {
-        return MakeUnique<IVF_Parts_Storage_T<t>>(embedding_dimension, centroids_num, embedding_data_type, ivf_storage_option);
+        return std::make_unique<IVF_Parts_Storage_T<t>>(embedding_dimension, centroids_num, embedding_data_type, ivf_storage_option);
     };
     switch (ivf_storage_option.type_) {
         case IndexIVFStorageOption::Type::kPlain: {
@@ -552,7 +552,7 @@ class IVF_Part_Storage_Plain final : public IVF_Part_Storage {
                   (!IsAnyOf<StorageDataT, i8, u8> && !IsAnyOf<ColumnEmbeddingElementT, i8, u8>));
 
     const u32 embedding_dimension_ = 0;
-    Vector<StorageDataT> data_{};
+    std::vector<StorageDataT> data_{};
 
 public:
     IVF_Part_Storage_Plain(const u32 part_id, const u32 embedding_dimension) : IVF_Part_Storage(part_id), embedding_dimension_(embedding_dimension) {}
@@ -665,8 +665,8 @@ class IVF_Part_Storage_SQ final : public IVF_Part_Storage {
 
     const u32 embedding_dimension_ = 0;
     const u32 embedding_sq_bytes_ = (sq_bits == 8) ? embedding_dimension_ : ((embedding_dimension_ + 1) / 2);
-    Vector<u8> sq_data_{};
-    Vector<f32> dot_v_e_{};
+    std::vector<u8> sq_data_{};
+    std::vector<f32> dot_v_e_{};
 
 public:
     IVF_Part_Storage_SQ(const u32 part_id, const u32 embedding_dimension) : IVF_Part_Storage(part_id), embedding_dimension_(embedding_dimension) {}
@@ -695,8 +695,8 @@ public:
                             const IVF_Parts_Storage *ivf_parts_storage) override {
         const auto *src_embedding_data = static_cast<const ColumnEmbeddingElementT *>(embedding_ptr);
         const auto [src_embedding_f32, _] = GetF32Ptr(src_embedding_data, embedding_dimension_);
-        Vector<u8> encode_output(embedding_sq_bytes_);
-        Vector<f32> error_v(embedding_dimension_);
+        std::vector<u8> encode_output(embedding_sq_bytes_);
+        std::vector<f32> error_v(embedding_dimension_);
         const auto *ivf_parts_storage_info =
             dynamic_cast<const IVF_Parts_Storage_Info<IndexIVFStorageOption::Type::kScalarQuantization> *>(ivf_parts_storage);
         assert(ivf_parts_storage_info);
@@ -800,7 +800,7 @@ public:
         switch (knn_distance->dist_type_) {
             case KnnDistanceType::kInnerProduct: {
                 // dot(x, v) = dot(x, c + b) + dot((x * a), n) + dot(v, e)
-                const auto c_plus_b = MakeUniqueForOverwrite<f32[]>(dimension);
+                const auto c_plus_b = std::make_unique_for_overwrite<f32[]>(dimension);
                 for (u32 i = 0; i < dimension; ++i) {
                     c_plus_b[i] = c_ptr[i] + b_ptr[i];
                 }
@@ -827,8 +827,8 @@ public:
                 const auto x_l2 = context.get_x_l2();
                 const auto &x_mult_a = context.get_x_mult_a();
                 const auto &a_square = context.get_a_square();
-                const auto c_plus_b = MakeUniqueForOverwrite<f32[]>(dimension);
-                const auto c_plus_b_mult_a_2 = MakeUniqueForOverwrite<f32[]>(dimension);
+                const auto c_plus_b = std::make_unique_for_overwrite<f32[]>(dimension);
+                const auto c_plus_b_mult_a_2 = std::make_unique_for_overwrite<f32[]>(dimension);
                 for (u32 i = 0; i < dimension; ++i) {
                     c_plus_b[i] = c_ptr[i] + b_ptr[i];
                     c_plus_b_mult_a_2[i] = 2.0f * c_plus_b[i] * a_ptr[i];
@@ -856,8 +856,8 @@ public:
             case KnnDistanceType::kL2: {
                 // l2(a * n + b + c - x) = dot(a^2, n^2) + l2(b + c - x) + 2 * dot(a * (b + c - x), n)
                 const auto &a_square = context.get_a_square();
-                const auto b_plus_c_minus_x = MakeUniqueForOverwrite<f32[]>(dimension);
-                const auto a_mult_b_plus_c_minus_x_2 = MakeUniqueForOverwrite<f32[]>(dimension);
+                const auto b_plus_c_minus_x = std::make_unique_for_overwrite<f32[]>(dimension);
+                const auto a_mult_b_plus_c_minus_x_2 = std::make_unique_for_overwrite<f32[]>(dimension);
                 for (u32 i = 0; i < dimension; ++i) {
                     b_plus_c_minus_x[i] = b_ptr[i] + c_ptr[i] - x_ptr[i];
                     a_mult_b_plus_c_minus_x_2[i] = 2.0f * a_ptr[i] * b_plus_c_minus_x[i];
@@ -901,7 +901,7 @@ struct PQ_Code_Storage {
 template <std::unsigned_integral T>
 struct PQ_Code_StorageB : PQ_Code_Storage {
     u64 last_code_id_ = 0;
-    Vector<T> storage_{};
+    std::vector<T> storage_{};
     using PQ_Code_Storage::PQ_Code_Storage;
     void Save(LocalFileHandle &file_handle) const final {
         file_handle.Append(&last_code_id_, sizeof(last_code_id_));
@@ -1023,21 +1023,21 @@ struct PQ_Code_StorageT<16> final : PQ_Code_StorageB<u16> {
 };
 
 template <typename = void>
-UniquePtr<PQ_Code_Storage> GetPQCodeStorageT(const u32 subspace_num, const u32 subspace_bits) {
+std::unique_ptr<PQ_Code_Storage> GetPQCodeStorageT(const u32 subspace_num, const u32 subspace_bits) {
     UnrecoverableError(fmt::format("Invalid subspace_bits: {}, expect number no bigger than 16.", subspace_bits));
     return {};
 }
 
 template <u32 I, u32... J>
     requires(I == std::min({I, J...}))
-UniquePtr<PQ_Code_Storage> GetPQCodeStorageT(const u32 subspace_num, const u32 subspace_bits) {
+std::unique_ptr<PQ_Code_Storage> GetPQCodeStorageT(const u32 subspace_num, const u32 subspace_bits) {
     if (I >= subspace_bits) {
-        return MakeUnique<PQ_Code_StorageT<I>>(subspace_num);
+        return std::make_unique<PQ_Code_StorageT<I>>(subspace_num);
     }
     return GetPQCodeStorageT<J...>(subspace_num, subspace_bits);
 }
 
-UniquePtr<PQ_Code_Storage> GetPQCodeStorage(const u32 subspace_num, const u32 subspace_bits) {
+std::unique_ptr<PQ_Code_Storage> GetPQCodeStorage(const u32 subspace_num, const u32 subspace_bits) {
     return GetPQCodeStorageT<4, 8, 12, 16>(subspace_num, subspace_bits);
 }
 
@@ -1048,7 +1048,7 @@ class IVF_Part_Storage_PQ final : public IVF_Part_Storage {
 
     const u32 subspace_num_ = 0;
     const u32 subspace_bits_ = 0;
-    UniquePtr<PQ_Code_Storage> pq_code_storage_ = GetPQCodeStorage(subspace_num_, subspace_bits_);
+    std::unique_ptr<PQ_Code_Storage> pq_code_storage_ = GetPQCodeStorage(subspace_num_, subspace_bits_);
 
 public:
     IVF_Part_Storage_PQ(const u32 part_id, const u32 subspace_num, const u32 subspace_bits)
@@ -1070,8 +1070,8 @@ public:
                             const IVF_Centroids_Storage *ivf_centroids_storage,
                             const IVF_Parts_Storage *ivf_parts_storage) override {
         const auto dimension = ivf_centroids_storage->embedding_dimension();
-        const auto residual = MakeUniqueForOverwrite<f32[]>(dimension);
-        const auto encoded_codes = MakeUniqueForOverwrite<u32[]>(subspace_num_);
+        const auto residual = std::make_unique_for_overwrite<f32[]>(dimension);
+        const auto encoded_codes = std::make_unique_for_overwrite<u32[]>(subspace_num_);
         {
             const auto [src_embedding_f32, _] = GetF32Ptr(static_cast<const ColumnEmbeddingElementT *>(embedding_ptr), dimension);
             const auto centroid_data = ivf_centroids_storage->data() + part_id() * dimension;
@@ -1151,7 +1151,7 @@ public:
                 if (!ip_table) {
                     ip_table = ivf_parts_storage.GetIPTable(query_f32);
                 }
-                const auto encoded_codes = MakeUniqueForOverwrite<u32[]>(subspace_num_);
+                const auto encoded_codes = std::make_unique_for_overwrite<u32[]>(subspace_num_);
                 for (u32 i = 0; i < total_embedding_num; ++i) {
                     const auto segment_offset = embedding_segment_offset(i);
                     if (!satisfy_filter_func(segment_offset)) {
@@ -1175,7 +1175,7 @@ public:
                     query_ip_table = ivf_parts_storage.GetIPTable(query_f32);
                 }
                 const auto centroid_ip_table = ivf_parts_storage.GetIPTable(centroid_data);
-                const auto encoded_codes = MakeUniqueForOverwrite<u32[]>(subspace_num_);
+                const auto encoded_codes = std::make_unique_for_overwrite<u32[]>(subspace_num_);
                 for (u32 i = 0; i < total_embedding_num; ++i) {
                     const auto segment_offset = embedding_segment_offset(i);
                     if (!satisfy_filter_func(segment_offset)) {
@@ -1196,13 +1196,13 @@ public:
                 break;
             }
             case KnnDistanceType::kL2: {
-                const auto residual_query = MakeUniqueForOverwrite<f32[]>(dimension);
+                const auto residual_query = std::make_unique_for_overwrite<f32[]>(dimension);
                 for (u32 i = 0; i < dimension; ++i) {
                     residual_query[i] = query_f32[i] - centroid_data[i];
                 }
                 const auto residual_query_l2 = L2NormSquare<f32>(residual_query.get(), dimension);
                 const auto residual_ip_table = ivf_parts_storage.GetIPTable(residual_query.get());
-                const auto encoded_codes = MakeUniqueForOverwrite<u32[]>(subspace_num_);
+                const auto encoded_codes = std::make_unique_for_overwrite<u32[]>(subspace_num_);
                 for (u32 i = 0; i < total_embedding_num; ++i) {
                     const auto segment_offset = embedding_segment_offset(i);
                     if (!satisfy_filter_func(segment_offset)) {
@@ -1228,28 +1228,28 @@ public:
     }
 };
 
-UniquePtr<IVF_Part_Storage> IVF_Part_Storage::Make(const u32 part_id,
+std::unique_ptr<IVF_Part_Storage> IVF_Part_Storage::Make(const u32 part_id,
                                                    const u32 embedding_dimension,
                                                    const EmbeddingDataType embedding_data_type,
                                                    const IndexIVFStorageOption &ivf_storage_option) {
     switch (ivf_storage_option.type_) {
         case IndexIVFStorageOption::Type::kPlain: {
             auto GetPlainResult =
-                [part_id, embedding_dimension, embedding_data_type]<EmbeddingDataType plain_data_type>() -> UniquePtr<IVF_Part_Storage> {
+                [part_id, embedding_dimension, embedding_data_type]<EmbeddingDataType plain_data_type>() -> std::unique_ptr<IVF_Part_Storage> {
                 return ApplyEmbeddingDataTypeToFunc(
                     embedding_data_type,
-                    [part_id, embedding_dimension]<EmbeddingDataType src_embedding_data_type>() -> UniquePtr<IVF_Part_Storage> {
+                    [part_id, embedding_dimension]<EmbeddingDataType src_embedding_data_type>() -> std::unique_ptr<IVF_Part_Storage> {
                         auto not_i8_u8 = [](const EmbeddingDataType t) consteval {
                             return t != EmbeddingDataType::kElemInt8 && t != EmbeddingDataType::kElemUInt8;
                         };
                         if constexpr (plain_data_type == src_embedding_data_type ||
                                       (not_i8_u8(plain_data_type) && not_i8_u8(src_embedding_data_type))) {
-                            return MakeUnique<IVF_Part_Storage_Plain<plain_data_type, src_embedding_data_type>>(part_id, embedding_dimension);
+                            return std::make_unique<IVF_Part_Storage_Plain<plain_data_type, src_embedding_data_type>>(part_id, embedding_dimension);
                         } else {
                             return nullptr;
                         }
                     },
-                    [] { return UniquePtr<IVF_Part_Storage>(); });
+                    [] { return std::unique_ptr<IVF_Part_Storage>(); });
             };
             switch (ivf_storage_option.plain_storage_data_type_) {
                 case EmbeddingDataType::kElemInt8: {
@@ -1281,13 +1281,13 @@ UniquePtr<IVF_Part_Storage> IVF_Part_Storage::Make(const u32 part_id,
         }
         case IndexIVFStorageOption::Type::kScalarQuantization: {
             const auto sq_bits = ivf_storage_option.scalar_quantization_bits_;
-            auto GetSQResult = [part_id, embedding_dimension, sq_bits]<EmbeddingDataType src_embedding_data_type>() -> UniquePtr<IVF_Part_Storage> {
+            auto GetSQResult = [part_id, embedding_dimension, sq_bits]<EmbeddingDataType src_embedding_data_type>() -> std::unique_ptr<IVF_Part_Storage> {
                 switch (sq_bits) {
                     case 4: {
-                        return MakeUnique<IVF_Part_Storage_SQ<4, src_embedding_data_type>>(part_id, embedding_dimension);
+                        return std::make_unique<IVF_Part_Storage_SQ<4, src_embedding_data_type>>(part_id, embedding_dimension);
                     }
                     case 8: {
-                        return MakeUnique<IVF_Part_Storage_SQ<8, src_embedding_data_type>>(part_id, embedding_dimension);
+                        return std::make_unique<IVF_Part_Storage_SQ<8, src_embedding_data_type>>(part_id, embedding_dimension);
                     }
                     default: {
                         UnrecoverableError(fmt::format("Invalid scalar quantization bits: {}", sq_bits));
@@ -1319,7 +1319,7 @@ UniquePtr<IVF_Part_Storage> IVF_Part_Storage::Make(const u32 part_id,
             const auto subspace_num = ivf_storage_option.product_quantization_subspace_num_;
             const auto subspace_bits = ivf_storage_option.product_quantization_subspace_bits_;
             auto GetPQResult = [part_id, subspace_num, subspace_bits]<EmbeddingDataType src_embedding_data_type>() {
-                return MakeUnique<IVF_Part_Storage_PQ<src_embedding_data_type>>(part_id, subspace_num, subspace_bits);
+                return std::make_unique<IVF_Part_Storage_PQ<src_embedding_data_type>>(part_id, subspace_num, subspace_bits);
             };
             switch (embedding_data_type) {
                 case EmbeddingDataType::kElemDouble: {

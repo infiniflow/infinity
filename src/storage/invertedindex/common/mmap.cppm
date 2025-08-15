@@ -17,9 +17,9 @@ namespace fs = std::filesystem;
 
 namespace infinity {
 
-export int MmapFile(const String &fp,
+export int MmapFile(const std::string &fp,
                     u8 *&data_ptr,
-                    SizeT &data_len,
+                    size_t &data_len,
                     int advice = (MADV_RANDOM
 #if defined(linux) || defined(__linux) || defined(__linux__)
                                   | MADV_DONTDUMP
@@ -44,7 +44,7 @@ export int MmapFile(const String &fp,
     return 0;
 }
 
-export int MunmapFile(u8 *&data_ptr, SizeT &data_len, SizeT offset_diff = 0) {
+export int MunmapFile(u8 *&data_ptr, size_t &data_len, size_t offset_diff = 0) {
     if (data_ptr != nullptr) {
         int rc = munmap(data_ptr - offset_diff, data_len + offset_diff);
         if (rc < 0)
@@ -56,7 +56,7 @@ export int MunmapFile(u8 *&data_ptr, SizeT &data_len, SizeT offset_diff = 0) {
 }
 
 export struct MmapReader {
-    MmapReader(const String &filename, SizeT offset = 0, SizeT len = SizeT(-1), int advice = MADV_SEQUENTIAL) {
+    MmapReader(const std::string &filename, size_t offset = 0, size_t len = size_t(-1), int advice = MADV_SEQUENTIAL) {
         int rc = MmapPartFile(filename, data_ptr_, len, advice, offset);
         idx_ = 0;
         data_len_ = len;
@@ -67,7 +67,7 @@ export struct MmapReader {
 
     ~MmapReader() { MunmapFile(data_ptr_, data_len_, offset_diff_); }
 
-    void Seek(SizeT pos, bool set = false) {
+    void Seek(size_t pos, bool set = false) {
         if (set) {
             idx_ = pos;
         } else {
@@ -85,52 +85,52 @@ export struct MmapReader {
         idx_ += sizeof(u32);
     }
 
-    SizeT ReadBuf(char *buf, SizeT len) {
+    size_t ReadBuf(char *buf, size_t len) {
         if (idx_ + len <= data_len_) {
             memcpy(buf, data_ptr_ + idx_, len);
             idx_ += len;
             return len;
         } else {
-            SizeT left = data_len_ - idx_;
+            size_t left = data_len_ - idx_;
             memcpy(buf, data_ptr_ + idx_, left);
             idx_ = data_len_;
             return left;
         }
     }
 
-    char *ReadBufNonCopy(SizeT len) {
+    char *ReadBufNonCopy(size_t len) {
         char *buf = (char *)(data_ptr_ + idx_);
         idx_ = std::min(idx_ + len, data_len_);
         return buf;
     }
 
-    int MmapPartFile(const String &fp,
+    int MmapPartFile(const std::string &fp,
                      u8 *&data_ptr,
-                     SizeT &data_len,
+                     size_t &data_len,
                      int advice = (MADV_RANDOM
 #if defined(linux) || defined(__linux) || defined(__linux__)
                                    | MADV_DONTDUMP
 #endif
                                    ),
-                     SizeT offset = 0) {
+                     size_t offset = 0) {
         assert(std::filesystem::path(fp).is_absolute());
         data_ptr = nullptr;
         long len_f = fs::file_size(fp);
         if (len_f == 0) {
             return -1;
         }
-        if (data_len == SizeT(-1)) {
+        if (data_len == size_t(-1)) {
             data_len = len_f;
-        } else if (data_len > (SizeT)len_f) {
+        } else if (data_len > (size_t)len_f) {
             return -1;
         }
 
-        SizeT page_size = getpagesize();
+        size_t page_size = getpagesize();
 
-        SizeT aligned_offset = offset & ~(page_size - 1);
+        size_t aligned_offset = offset & ~(page_size - 1);
         offset_diff_ = offset - aligned_offset;
 
-        SizeT mapped_length = data_len + offset_diff_;
+        size_t mapped_length = data_len + offset_diff_;
 
         int f = open(fp.c_str(), O_RDONLY);
         void *tmpd = mmap(NULL, mapped_length, PROT_READ, MAP_SHARED, f, aligned_offset);
@@ -144,17 +144,17 @@ export struct MmapReader {
         return 0;
     }
 
-    SizeT Tell() { return idx_; }
+    size_t Tell() { return idx_; }
 
-    SizeT DataLen() { return data_len_; }
+    size_t DataLen() { return data_len_; }
 
     u8 *data_ptr_ = nullptr;
 
-    SizeT data_len_{0};
+    size_t data_len_{0};
 
-    SizeT idx_{0};
+    size_t idx_{0};
 
-    SizeT offset_diff_{0};
+    size_t offset_diff_{0};
 };
 
 } // namespace infinity

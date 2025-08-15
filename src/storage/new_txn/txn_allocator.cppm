@@ -35,19 +35,19 @@ public:
 
     void Start();
     void Stop();
-    void Submit(SharedPtr<TxnAllocatorTask> task);
+    void Submit(std::shared_ptr<TxnAllocatorTask> task);
 
 private:
     void Process();
 
 private:
-    BlockingQueue<SharedPtr<TxnAllocatorTask>> task_queue_{"TxnAllocatorQueue"};
+    BlockingQueue<std::shared_ptr<TxnAllocatorTask>> task_queue_{"TxnAllocatorQueue"};
 
-    Thread processor_thread_{};
+    std::thread processor_thread_{};
 
     Storage *storage_{};
 
-    Atomic<u64> task_count_{};
+    std::atomic<u64> task_count_{};
 
     SystemCache* system_cache_{};
 };

@@ -49,44 +49,44 @@ class PhysicalSortTest : public BaseTest {};
 TEST_F(PhysicalSortTest, test1) {
     using namespace infinity;
 
-    SizeT column_count = 2;
-    SizeT block_count = 3;
-    SizeT row_count = DEFAULT_VECTOR_SIZE;
-    Vector<SharedPtr<ColumnDef>> columns;
-    Vector<SharedPtr<DataType>> column_types;
+    size_t column_count = 2;
+    size_t block_count = 3;
+    size_t row_count = DEFAULT_VECTOR_SIZE;
+    Vector<std::shared_ptr<ColumnDef>> columns;
+    Vector<std::shared_ptr<DataType>> column_types;
     columns.reserve(column_count);
     column_types.reserve(column_count);
 
-    SharedPtr<DataType> col_type = MakeShared<DataType>(LogicalType::kBoolean);
+    std::shared_ptr<DataType> col_type = std::make_shared<DataType>(LogicalType::kBoolean);
     column_types.emplace_back(col_type);
     String col_name = "col1";
-    SharedPtr<ColumnDef> col_def = MakeShared<ColumnDef>(0,
+    std::shared_ptr<ColumnDef> col_def = std::make_shared<ColumnDef>(0,
                                                          col_type,
                                                          col_name,
                                                          std::set<ConstraintType>());
     columns.emplace_back(col_def);
 
-    col_type = MakeShared<DataType>(LogicalType::kBigInt);
+    col_type = std::make_shared<DataType>(LogicalType::kBigInt);
     column_types.emplace_back(col_type);
     col_name = "col2";
-    col_def = MakeShared<ColumnDef>(1,
+    col_def = std::make_shared<ColumnDef>(1,
                                     col_type,
                                     col_name,
                                     std::set<ConstraintType>());
     columns.emplace_back(col_def);
 
-    SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"),
-                                                   MakeShared<String>("input_table"),
+    std::shared_ptr<TableDef> table_def = TableDef::Make(std::make_shared<String>("default_db"),
+                                                   std::make_shared<String>("input_table"),
                                                    columns);
 
-    SharedPtr<DataTable> input_table = DataTable::Make(table_def, TableType::kIntermediate);
+    std::shared_ptr<DataTable> input_table = DataTable::Make(table_def, TableType::kIntermediate);
 
-    for(SizeT block_id = 0; block_id < block_count; ++block_id) {
-        SharedPtr<DataBlock> data_block = DataBlock::Make();
+    for(size_t block_id = 0; block_id < block_count; ++block_id) {
+        std::shared_ptr<DataBlock> data_block = DataBlock::Make();
         data_block->Init(column_types);
 
         // Column 1 & 2
-        for(SizeT row_id = 0; row_id < row_count; ++row_id) {
+        for(size_t row_id = 0; row_id < row_count; ++row_id) {
             Value v1 = Value::MakeBool(row_id % 2 == 0);
             data_block->column_vectors[0]->AppendValue(v1);
             Value v2 = Value::MakeBigInt(row_id + block_id * 10000);
@@ -96,7 +96,7 @@ TEST_F(PhysicalSortTest, test1) {
         input_table->Append(data_block);
     }
 
-    SharedPtr<Vector<RowID>> rowid_vector = MakeShared<Vector<RowID>>();
+    std::shared_ptr<Vector<RowID>> rowid_vector = std::make_shared<Vector<RowID>>();
     rowid_vector->reserve(block_count * DEFAULT_VECTOR_SIZE);
     for(i64 block_id = block_count - 1; block_id >= 0; --block_id) {
         for(i64 row_id = DEFAULT_VECTOR_SIZE - 1; row_id >= 0; --row_id) {
@@ -104,7 +104,7 @@ TEST_F(PhysicalSortTest, test1) {
         }
     }
 
-    SharedPtr<DataTable> output_table = PhysicalSort::GenerateOutput(input_table, rowid_vector);
+    std::shared_ptr<DataTable> output_table = PhysicalSort::GenerateOutput(input_table, rowid_vector);
     std::cout << output_table->ToString() << std::endl;
 }
 #endif

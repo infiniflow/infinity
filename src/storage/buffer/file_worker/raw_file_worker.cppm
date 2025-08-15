@@ -29,10 +29,10 @@ namespace infinity {
 // - The file size is consistant since creation.
 export class RawFileWorker : public FileWorker {
 public:
-    explicit RawFileWorker(SharedPtr<String> data_dir,
-                           SharedPtr<String> temp_dir,
-                           SharedPtr<String> file_dir,
-                           SharedPtr<String> file_name,
+    explicit RawFileWorker(std::shared_ptr<std::string> data_dir,
+                           std::shared_ptr<std::string> temp_dir,
+                           std::shared_ptr<std::string> file_dir,
+                           std::shared_ptr<std::string> file_name,
                            u32 file_size,
                            PersistenceManager *persistence_manager);
 
@@ -43,16 +43,16 @@ public:
 
     void FreeInMemory() override;
 
-    SizeT GetMemoryCost() const override { return buffer_size_; }
+    size_t GetMemoryCost() const override { return buffer_size_; }
 
     FileWorkerType Type() const override { return FileWorkerType::kRawFile; }
 
 protected:
     bool WriteToFileImpl(bool to_spill, bool &prepare_success, const FileWorkerSaveCtx &ctx) override;
 
-    void ReadFromFileImpl(SizeT file_size, bool from_spill) override;
+    void ReadFromFileImpl(size_t file_size, bool from_spill) override;
 
 private:
-    SizeT buffer_size_;
+    size_t buffer_size_;
 };
 } // namespace infinity

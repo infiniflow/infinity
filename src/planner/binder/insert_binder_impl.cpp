@@ -35,18 +35,18 @@ import knn_expr;
 
 namespace infinity {
 
-SharedPtr<BaseExpression> InsertBinder::BuildExpression(const ParsedExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root) {
-    SharedPtr<BaseExpression> result = ExpressionBinder::BuildExpression(expr, bind_context_ptr, depth, root);
+std::shared_ptr<BaseExpression> InsertBinder::BuildExpression(const ParsedExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root) {
+    std::shared_ptr<BaseExpression> result = ExpressionBinder::BuildExpression(expr, bind_context_ptr, depth, root);
     return result;
 }
 
-SharedPtr<BaseExpression> InsertBinder::BuildKnnExpr(const KnnExpr &, BindContext *, i64, bool) {
+std::shared_ptr<BaseExpression> InsertBinder::BuildKnnExpr(const KnnExpr &, BindContext *, i64, bool) {
     RecoverableError(Status::SyntaxError("KNN expression isn't supported in insert clause"));
     return nullptr;
 }
 
-// SharedPtr<BaseExpression>
-// InsertBinder::BuildColRefExpr(const hsql::Expr &expr, const SharedPtr<BindContext>& bind_context_ptr) {
+// std::shared_ptr<BaseExpression>
+// InsertBinder::BuildColRefExpr(const hsql::Expr &expr, const std::shared_ptr<BindContext>& bind_context_ptr) {
 //     PlannerError("HavingBinder::BuildColRefExpr");
 // }
 

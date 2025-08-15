@@ -45,13 +45,13 @@ TEST_F(FileWriteReadTest, test1) {
     String path = String(GetFullTmpDir()) + "/test_file1.abc";
     FileWriter file_writer(path, 128);
 
-    for (SizeT i = 0; i < 128; ++i) {
+    for (size_t i = 0; i < 128; ++i) {
         String buffer = "abc";
         file_writer.Write(buffer.c_str(), buffer.size());
     }
     file_writer.Flush();
     EXPECT_EQ(file_writer.GetFileSize(), 128 * 3);
-    EXPECT_EQ(file_writer.total_written_, (SizeT)128 * 3);
+    EXPECT_EQ(file_writer.total_written_, (size_t)128 * 3);
 
     FileReader file_reader(path, 128);
     String read_str;
@@ -88,7 +88,7 @@ TEST_F(FileWriteReadTest, test3) {
     for (u32 i = 0; i < 128; ++i) {
         file_writer.WriteVInt(i);
     }
-    for (SizeT i = 0; i < 3; ++i) {
+    for (size_t i = 0; i < 3; ++i) {
         String buffer = "abc";
         file_writer.Write(buffer.c_str(), buffer.size());
     }

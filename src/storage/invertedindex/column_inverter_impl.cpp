@@ -50,7 +50,7 @@ static u32 Align(u32 unaligned) {
 ColumnInverter::ColumnInverter(PostingWriterProvider posting_writer_provider, VectorWithLock<u32> &column_lengths)
     : posting_writer_provider_(posting_writer_provider), column_lengths_(column_lengths) {}
 
-void ColumnInverter::InitAnalyzer(const String &analyzer_name) {
+void ColumnInverter::InitAnalyzer(const std::string &analyzer_name) {
     auto [analyzer, status] = AnalyzerPool::instance().GetAnalyzer(analyzer_name);
     if (!status.ok()) {
         Status status = Status::UnexpectedError(fmt::format("Invalid analyzer: {}", analyzer_name));
@@ -63,17 +63,17 @@ ColumnInverter::~ColumnInverter() = default;
 
 bool ColumnInverter::CompareTermRef::operator()(const u32 lhs, const u32 rhs) const { return std::strcmp(GetTerm(lhs), GetTerm(rhs)) < 0; }
 
-SizeT ColumnInverter::InvertColumn(SharedPtr<ColumnVector> column_vector, u32 row_offset, u32 row_count, u32 begin_doc_id) {
+size_t ColumnInverter::InvertColumn(std::shared_ptr<ColumnVector> column_vector, u32 row_offset, u32 row_count, u32 begin_doc_id) {
     begin_doc_id_ = begin_doc_id;
     doc_count_ = row_count;
-    Vector<u32> column_lengths(row_count);
-    SizeT term_count_sum = 0;
-    for (SizeT i = 0; i < row_count; ++i) {
-        String data = column_vector->ToString(row_offset + i);
+    std::vector<u32> column_lengths(row_count);
+    size_t term_count_sum = 0;
+    for (size_t i = 0; i < row_count; ++i) {
+        std::string data = column_vector->ToString(row_offset + i);
         if (data.empty()) {
             continue;
         }
-        SizeT term_count = InvertColumn(begin_doc_id + i, data);
+        size_t term_count = InvertColumn(begin_doc_id + i, data);
         column_lengths[i] = term_count;
         term_count_sum += term_count;
     }
@@ -81,11 +81,11 @@ SizeT ColumnInverter::InvertColumn(SharedPtr<ColumnVector> column_vector, u32 ro
     return term_count_sum;
 }
 
-SizeT ColumnInverter::InvertColumn(u32 doc_id, const String &val) {
-    auto terms_once_ = MakeUnique<TermList>();
+size_t ColumnInverter::InvertColumn(u32 doc_id, const std::string &val) {
+    auto terms_once_ = std::make_unique<TermList>();
     analyzer_->Analyze(val, *terms_once_);
-    SizeT term_count = terms_once_->size();
-    terms_per_doc_.push_back(Pair<u32, UniquePtr<TermList>>(doc_id, std::move(terms_once_)));
+    size_t term_count = terms_once_->size();
+    terms_per_doc_.push_back(std::pair<u32, std::unique_ptr<TermList>>(doc_id, std::move(terms_once_)));
     return term_count;
 }
 
@@ -145,12 +145,12 @@ void ColumnInverter::Merge(ColumnInverter &rhs) {
     rhs.merged_ = 0;
 }
 
-void ColumnInverter::Merge(Vector<SharedPtr<ColumnInverter>> &inverters) {
+void ColumnInverter::Merge(std::vector<std::shared_ptr<ColumnInverter>> &inverters) {
     assert(!inverters.empty());
     inverters[0]->MergePrepare();
-    SizeT end = inverters.size();
-    for (SizeT i = 1; i < end; i++) {
-        SharedPtr<ColumnInverter> &rhs = inverters[i];
+    size_t end = inverters.size();
+    for (size_t i = 1; i < end; i++) {
+        std::shared_ptr<ColumnInverter> &rhs = inverters[i];
         inverters[0]->Merge(*rhs);
     }
 }
@@ -162,7 +162,7 @@ struct TermRefRadix {
 void ColumnInverter::SortTerms() {
     if (term_refs_.empty())
         return;
-    Vector<u64> first_four_bytes(term_refs_.size());
+    std::vector<u64> first_four_bytes(term_refs_.size());
     for (u32 i = 0; i < term_refs_.size(); ++i) {
         u64 first_four = ntohl(*reinterpret_cast<const u32 *>(GetTermFromRef(term_refs_[i])));
         first_four_bytes[i] = (first_four << 32) | term_refs_[i];
@@ -219,9 +219,9 @@ MemUsageChange ColumnInverter::GeneratePosting() {
     u32 last_doc_id = INVALID_DOCID;
     u16 last_doc_payload = 0;
     StringRef last_term, term;
-    SharedPtr<PostingWriter> posting = nullptr;
+    std::shared_ptr<PostingWriter> posting = nullptr;
     MemUsageChange ret{true, 0};
-    Map<StringRef, PostingWriter *> modified_writers;
+    std::map<StringRef, PostingWriter *> modified_writers;
     // printf("GeneratePosting() begin begin_doc_id_ %u, doc_count_ %u, merged_ %u", begin_doc_id_, doc_count_, merged_);
     for (auto &i : positions_) {
         if (last_term_num != i.term_num_) {
@@ -231,7 +231,7 @@ MemUsageChange ColumnInverter::GeneratePosting() {
                 // printf(" EndDocument1-%u\n", last_doc_id);
             }
             term = GetTermFromNum(i.term_num_);
-            posting = posting_writer_provider_(String(term.data()));
+            posting = posting_writer_provider_(std::string(term.data()));
             if (modified_writers.find(term) == modified_writers.end()) {
                 modified_writers[term] = posting.get();
             }
@@ -282,12 +282,12 @@ void ColumnInverter::SortForOfflineDump() {
 //                   ----------------------------------------------------------------------------------------------------------------------------+
 //                                                            Data within each group
 
-void ColumnInverter::SpillSortResults(FILE *spill_file, u64 &tuple_count, UniquePtr<BufWriter> &buf_writer) {
+void ColumnInverter::SpillSortResults(FILE *spill_file, u64 &tuple_count, std::unique_ptr<BufWriter> &buf_writer) {
     // spill sort results for external merge sort
     // if (positions_.empty()) {
     //    return;
     //}
-    SizeT spill_file_tell = ftell(spill_file);
+    size_t spill_file_tell = ftell(spill_file);
     // size of this Run in bytes
     u32 data_size = 0;
     u64 data_size_pos = spill_file_tell;

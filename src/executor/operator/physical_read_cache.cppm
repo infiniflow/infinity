@@ -31,23 +31,23 @@ export class PhysicalReadCache : public PhysicalOperator {
 public:
     PhysicalReadCache(u64 id,
                       LogicalNodeType origin_type,
-                      SharedPtr<BaseTableRef> base_table_ref,
-                      SharedPtr<CacheContent> cache_content,
-                      Vector<SizeT> column_map,
-                      SharedPtr<Vector<LoadMeta>> load_metas,
+                      std::shared_ptr<BaseTableRef> base_table_ref,
+                      std::shared_ptr<CacheContent> cache_content,
+                      std::vector<size_t> column_map,
+                      std::shared_ptr<std::vector<LoadMeta>> load_metas,
                       bool is_min_heap);
 
     void Init(QueryContext* query_context) override;
 
-    virtual SizeT TaskletCount() override { return 1; }
+    virtual size_t TaskletCount() override { return 1; }
 
     bool Execute(QueryContext *query_context, OperatorState *operator_state) override;
 
-    SharedPtr<Vector<String>> GetOutputNames() const override;
+    std::shared_ptr<std::vector<std::string>> GetOutputNames() const override;
 
-    SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const override;
+    std::shared_ptr<std::vector<std::shared_ptr<DataType>>> GetOutputTypes() const override;
 
-    void FillingTableRefs(HashMap<SizeT, SharedPtr<BaseTableRef>> &table_refs) override {
+    void FillingTableRefs(std::unordered_map<size_t, std::shared_ptr<BaseTableRef>> &table_refs) override {
         table_refs.insert({base_table_ref_->table_index_, base_table_ref_});
     }
 
@@ -58,12 +58,12 @@ public:
     bool is_min_heap() const { return is_min_heap_; }
 
 private:
-    SharedPtr<BaseTableRef> base_table_ref_;
+    std::shared_ptr<BaseTableRef> base_table_ref_;
 
-    SharedPtr<CacheContent> cache_content_;
+    std::shared_ptr<CacheContent> cache_content_;
 
     PhysicalOperatorType origin_type_;
-    Vector<SizeT> column_map_; // result column id -> cache column id
+    std::vector<size_t> column_map_; // result column id -> cache column id
     bool is_min_heap_;
 };
 

@@ -25,8 +25,8 @@ public:
     void AddPosition(pos_t pos);
     void EndDocument();
     void Flush();
-    void Dump(const SharedPtr<FileWriter> &file, bool spill = false);
-    void Load(const SharedPtr<FileReader> &file);
+    void Dump(const std::shared_ptr<FileWriter> &file, bool spill = false);
+    void Load(const std::shared_ptr<FileReader> &file);
     u32 GetDumpLength() const;
 
     InMemPositionListDecoder *GetInMemPositionListDecoder() const;
@@ -37,10 +37,10 @@ public:
 
     const PositionListFormat *GetPositionListFormat() const { return pos_list_format_; }
 
-    inline SizeT GetSizeInBytes() const { return pos_list_buffer_.GetSizeInBytes() + pos_skiplist_writer_->GetSizeInBytes(); }
+    inline size_t GetSizeInBytes() const { return pos_list_buffer_.GetSizeInBytes() + pos_skiplist_writer_->GetSizeInBytes(); }
 
 private:
-    SharedPtr<SkipListWriter> GetPosSkipListWriter();
+    std::shared_ptr<SkipListWriter> GetPosSkipListWriter();
     void AddPosSkipListItem(u32 total_pos_count, u32 compressed_pos_size, bool need_flush);
     void FlushPositionBuffer();
 
@@ -53,7 +53,7 @@ private:
 
     mutable std::shared_mutex rw_mutex_; // Protect total_pos_count_ and pos_skiplist_writer_
     u32 total_pos_count_; // 4byte
-    SharedPtr<SkipListWriter> pos_skiplist_writer_;
+    std::shared_ptr<SkipListWriter> pos_skiplist_writer_;
 };
 
 } // namespace infinity

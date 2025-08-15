@@ -44,10 +44,10 @@ import global_resource_usage;
 namespace infinity {
 
 void MemIndexTracer::InitMemUsed() {
-    SizeT cur_index_memory = 0;
+    size_t cur_index_memory = 0;
     auto *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
-    SharedPtr<NewTxn> new_txn_shared = new_txn_mgr->BeginTxnShared(MakeUnique<String>("Init mem index tracer"), TransactionType::kNormal);
-    Vector<SharedPtr<MemIndexDetail>> mem_index_details = GetAllMemIndexes(new_txn_shared.get());
+    std::shared_ptr<NewTxn> new_txn_shared = new_txn_mgr->BeginTxnShared(std::make_unique<std::string>("Init mem index tracer"), TransactionType::kNormal);
+    std::vector<std::shared_ptr<MemIndexDetail>> mem_index_details = GetAllMemIndexes(new_txn_shared.get());
     for (auto &mem_index_detail : mem_index_details) {
         if (mem_index_detail->is_emvb_index_) {
             continue;
@@ -62,7 +62,7 @@ void MemIndexTracer::InitMemUsed() {
     cur_index_memory_ = cur_index_memory;
 }
 
-void MemIndexTracer::DecreaseMemUsed(SizeT mem_dec) {
+void MemIndexTracer::DecreaseMemUsed(size_t mem_dec) {
     std::lock_guard lck(mtx_);
     LOG_TRACE(fmt::format("DecreaseMemUsed mem_dec {}, cur_index_memory_ {}", mem_dec, cur_index_memory_));
     if (cur_index_memory_ >= mem_dec) {
@@ -74,7 +74,7 @@ void MemIndexTracer::DecreaseMemUsed(SizeT mem_dec) {
 }
 
 bool MemIndexTracer::TryTriggerDump() {
-    Vector<SharedPtr<DumpMemIndexTask>> dump_tasks = MakeDumpTask();
+    std::vector<std::shared_ptr<DumpMemIndexTask>> dump_tasks = MakeDumpTask();
     if (dump_tasks.empty()) {
         return false;
     }
@@ -86,13 +86,13 @@ bool MemIndexTracer::TryTriggerDump() {
     return true;
 }
 
-void MemIndexTracer::DumpDone(SharedPtr<MemIndex> mem_index) {
+void MemIndexTracer::DumpDone(std::shared_ptr<MemIndex> mem_index) {
     std::lock_guard lck(mtx_);
     auto iter = proposed_dump_.find(mem_index);
     if (iter == proposed_dump_.end()) {
         return;
     }
-    SizeT dump_size = iter->second;
+    size_t dump_size = iter->second;
     proposed_dump_.erase(iter);
     if (proposed_dump_size_ >= dump_size) {
         proposed_dump_size_ -= dump_size;
@@ -104,13 +104,13 @@ void MemIndexTracer::DumpDone(SharedPtr<MemIndex> mem_index) {
     }
 }
 
-Vector<SharedPtr<DumpMemIndexTask>> MemIndexTracer::MakeDumpTask() {
+std::vector<std::shared_ptr<DumpMemIndexTask>> MemIndexTracer::MakeDumpTask() {
     auto *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
-    SharedPtr<NewTxn> new_txn_shared = new_txn_mgr->BeginTxnShared(MakeUnique<String>("Dump index"), TransactionType::kNormal);
+    std::shared_ptr<NewTxn> new_txn_shared = new_txn_mgr->BeginTxnShared(std::make_unique<std::string>("Dump index"), TransactionType::kNormal);
 
-    Vector<SharedPtr<MemIndexDetail>> mem_index_details = GetAllMemIndexes(new_txn_shared.get());
+    std::vector<std::shared_ptr<MemIndexDetail>> mem_index_details = GetAllMemIndexes(new_txn_shared.get());
     // Generate dump task for all EMVB index and at most one non-EMVB index
-    Vector<SharedPtr<DumpMemIndexTask>> dump_tasks;
+    std::vector<std::shared_ptr<DumpMemIndexTask>> dump_tasks;
     for (auto &mem_index_detail : mem_index_details) {
         {
             std::lock_guard lck(mtx_);
@@ -123,7 +123,7 @@ Vector<SharedPtr<DumpMemIndexTask>> MemIndexTracer::MakeDumpTask() {
             proposed_dump_size_ += mem_index_detail->mem_used_;
         }
 
-        auto dump_task = MakeShared<DumpMemIndexTask>(mem_index_detail->db_name_,
+        auto dump_task = std::make_shared<DumpMemIndexTask>(mem_index_detail->db_name_,
                                                       mem_index_detail->table_name_,
                                                       mem_index_detail->index_name_,
                                                       mem_index_detail->segment_id_,
@@ -140,7 +140,7 @@ Vector<SharedPtr<DumpMemIndexTask>> MemIndexTracer::MakeDumpTask() {
     return dump_tasks;
 }
 
-BGMemIndexTracer::BGMemIndexTracer(SizeT index_memory_limit, NewTxnManager *txn_mgr) : MemIndexTracer(index_memory_limit), txn_mgr_(txn_mgr) {
+BGMemIndexTracer::BGMemIndexTracer(size_t index_memory_limit, NewTxnManager *txn_mgr) : MemIndexTracer(index_memory_limit), txn_mgr_(txn_mgr) {
 #ifdef INFINITY_DEBUG
     GlobalResourceUsage::IncrObjectCount("BGMemIndexTracer");
 #endif
@@ -152,7 +152,7 @@ BGMemIndexTracer::~BGMemIndexTracer() {
 #endif
 }
 
-void BGMemIndexTracer::TriggerDump(SharedPtr<DumpMemIndexTask> dump_task) {
+void BGMemIndexTracer::TriggerDump(std::shared_ptr<DumpMemIndexTask> dump_task) {
     auto *dump_index_processor = InfinityContext::instance().storage()->dump_index_processor();
     LOG_INFO(fmt::format("Submit dump task: {}", dump_task->ToString()));
     dump_index_processor->Submit(std::move(dump_task));
@@ -162,21 +162,21 @@ NewTxn *BGMemIndexTracer::GetTxn() {
     if (!txn_mgr_) {
         return nullptr;
     }
-    NewTxn *txn = txn_mgr_->BeginTxn(MakeUnique<String>("Dump index"), TransactionType::kNormal);
+    NewTxn *txn = txn_mgr_->BeginTxn(std::make_unique<std::string>("Dump index"), TransactionType::kNormal);
     return txn;
 }
 
-Vector<SharedPtr<MemIndexDetail>> BGMemIndexTracer::GetAllMemIndexes(NewTxn *new_txn) {
-    Vector<SharedPtr<MemIndexDetail>> mem_index_details;
-    Vector<SharedPtr<MemIndex>> mem_indexes;
-    Vector<MemIndexID> mem_index_ids;
+std::vector<std::shared_ptr<MemIndexDetail>> BGMemIndexTracer::GetAllMemIndexes(NewTxn *new_txn) {
+    std::vector<std::shared_ptr<MemIndexDetail>> mem_index_details;
+    std::vector<std::shared_ptr<MemIndex>> mem_indexes;
+    std::vector<MemIndexID> mem_index_ids;
     Status status = NewCatalog::GetAllMemIndexes(new_txn, mem_indexes, mem_index_ids);
     if (!status.ok()) {
         UnrecoverableError(status.message());
     }
 
-    for (SizeT i = 0; i < mem_indexes.size(); ++i) {
-        SharedPtr<MemIndexDetail> detail = MakeShared<MemIndexDetail>();
+    for (size_t i = 0; i < mem_indexes.size(); ++i) {
+        std::shared_ptr<MemIndexDetail> detail = std::make_shared<MemIndexDetail>();
         auto &mem_index = mem_indexes[i];
         auto &mem_index_id = mem_index_ids[i];
         const BaseMemIndex *base_mem_index = mem_index->GetBaseMemIndex();
@@ -196,7 +196,7 @@ Vector<SharedPtr<MemIndexDetail>> BGMemIndexTracer::GetAllMemIndexes(NewTxn *new
 
     // Sort the mem indexes.
     // EMVB indexes will be sorted to the front of the list. Non-EMVB indexes will be sorted by mem_used_ in descending order.
-    std::sort(mem_index_details.begin(), mem_index_details.end(), [](const SharedPtr<MemIndexDetail> &lhs, const SharedPtr<MemIndexDetail> &rhs) {
+    std::sort(mem_index_details.begin(), mem_index_details.end(), [](const std::shared_ptr<MemIndexDetail> &lhs, const std::shared_ptr<MemIndexDetail> &rhs) {
         if (lhs->is_emvb_index_ != rhs->is_emvb_index_) {
             return lhs->is_emvb_index_;
         }

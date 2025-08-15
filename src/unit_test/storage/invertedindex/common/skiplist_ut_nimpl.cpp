@@ -40,8 +40,8 @@ static String available_chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTU
 static String RandStr() {
     u32 len = random() % 100 + 50;
     String ret(len, '\0');
-    for (SizeT i = 0; i < len; i++) {
-        SizeT rand_i = random() % available_chars.size();
+    for (size_t i = 0; i < len; i++) {
+        size_t rand_i = random() % available_chars.size();
         ret[i] = available_chars[rand_i];
     }
     return ret;

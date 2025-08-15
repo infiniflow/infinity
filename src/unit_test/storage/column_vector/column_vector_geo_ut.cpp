@@ -65,7 +65,7 @@ class ColumnVectorGeoTest : public BaseTest {
 TEST_F(ColumnVectorGeoTest, flat_point) {
     using namespace infinity;
 
-    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kPoint);
+    std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kPoint);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
@@ -170,7 +170,7 @@ TEST_F(ColumnVectorGeoTest, contant_point) {
 
     using namespace infinity;
 
-    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kPoint);
+    std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kPoint);
     ColumnVector column_vector(data_type);
 
     column_vector.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
@@ -253,7 +253,7 @@ TEST_F(ColumnVectorGeoTest, contant_point) {
 TEST_F(ColumnVectorGeoTest, point_column_vector_select) {
     using namespace infinity;
 
-    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kPoint);
+    std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kPoint);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
@@ -272,7 +272,7 @@ TEST_F(ColumnVectorGeoTest, point_column_vector_select) {
 
     Selection input_select;
     input_select.Initialize(DEFAULT_VECTOR_SIZE / 2);
-    for (SizeT idx = 0; idx < DEFAULT_VECTOR_SIZE / 2; ++idx) {
+    for (size_t idx = 0; idx < DEFAULT_VECTOR_SIZE / 2; ++idx) {
         input_select.Append(idx * 2);
     }
 
@@ -291,7 +291,7 @@ TEST_F(ColumnVectorGeoTest, point_column_vector_select) {
 TEST_F(ColumnVectorGeoTest, point_column_slice_init) {
     using namespace infinity;
 
-    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kPoint);
+    std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kPoint);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
@@ -328,7 +328,7 @@ TEST_F(ColumnVectorGeoTest, point_column_slice_init) {
 TEST_F(ColumnVectorGeoTest, flat_line) {
     using namespace infinity;
 
-    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kLine);
+    std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kLine);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
@@ -437,7 +437,7 @@ TEST_F(ColumnVectorGeoTest, contant_line) {
 
     using namespace infinity;
 
-    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kLine);
+    std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kLine);
     ColumnVector column_vector(data_type);
 
     column_vector.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
@@ -523,7 +523,7 @@ TEST_F(ColumnVectorGeoTest, contant_line) {
 TEST_F(ColumnVectorGeoTest, line_column_vector_select) {
     using namespace infinity;
 
-    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kLine);
+    std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kLine);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
@@ -543,7 +543,7 @@ TEST_F(ColumnVectorGeoTest, line_column_vector_select) {
 
     Selection input_select;
     input_select.Initialize(DEFAULT_VECTOR_SIZE / 2);
-    for (SizeT idx = 0; idx < DEFAULT_VECTOR_SIZE / 2; ++idx) {
+    for (size_t idx = 0; idx < DEFAULT_VECTOR_SIZE / 2; ++idx) {
         input_select.Append(idx * 2);
     }
 
@@ -563,7 +563,7 @@ TEST_F(ColumnVectorGeoTest, line_column_vector_select) {
 TEST_F(ColumnVectorGeoTest, line_column_slice_init) {
     using namespace infinity;
 
-    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kLine);
+    std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kLine);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
@@ -602,7 +602,7 @@ TEST_F(ColumnVectorGeoTest, line_column_slice_init) {
 TEST_F(ColumnVectorGeoTest, flat_line_seg) {
     using namespace infinity;
 
-    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kLineSeg);
+    std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kLineSeg);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
@@ -719,7 +719,7 @@ TEST_F(ColumnVectorGeoTest, contant_line_seg) {
 
     using namespace infinity;
 
-    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kLineSeg);
+    std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kLineSeg);
     ColumnVector column_vector(data_type);
 
     column_vector.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
@@ -812,7 +812,7 @@ TEST_F(ColumnVectorGeoTest, contant_line_seg) {
 TEST_F(ColumnVectorGeoTest, line_seg_column_vector_select) {
     using namespace infinity;
 
-    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kLineSeg);
+    std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kLineSeg);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
@@ -835,7 +835,7 @@ TEST_F(ColumnVectorGeoTest, line_seg_column_vector_select) {
 
     Selection input_select;
     input_select.Initialize(DEFAULT_VECTOR_SIZE / 2);
-    for (SizeT idx = 0; idx < DEFAULT_VECTOR_SIZE / 2; ++idx) {
+    for (size_t idx = 0; idx < DEFAULT_VECTOR_SIZE / 2; ++idx) {
         input_select.Append(idx * 2);
     }
 
@@ -856,7 +856,7 @@ TEST_F(ColumnVectorGeoTest, line_seg_column_vector_select) {
 TEST_F(ColumnVectorGeoTest, line_seg_column_slice_init) {
     using namespace infinity;
 
-    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kLineSeg);
+    std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kLineSeg);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
@@ -899,7 +899,7 @@ TEST_F(ColumnVectorGeoTest, line_seg_column_slice_init) {
 TEST_F(ColumnVectorGeoTest, flat_box) {
     using namespace infinity;
 
-    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kBox);
+    std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kBox);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
@@ -1017,7 +1017,7 @@ TEST_F(ColumnVectorGeoTest, contant_box) {
 
     using namespace infinity;
 
-    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kBox);
+    std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kBox);
     ColumnVector column_vector(data_type);
 
     column_vector.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
@@ -1110,7 +1110,7 @@ TEST_F(ColumnVectorGeoTest, contant_box) {
 TEST_F(ColumnVectorGeoTest, box_column_vector_select) {
     using namespace infinity;
 
-    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kBox);
+    std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kBox);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
@@ -1133,7 +1133,7 @@ TEST_F(ColumnVectorGeoTest, box_column_vector_select) {
 
     Selection input_select;
     input_select.Initialize(DEFAULT_VECTOR_SIZE / 2);
-    for (SizeT idx = 0; idx < DEFAULT_VECTOR_SIZE / 2; ++idx) {
+    for (size_t idx = 0; idx < DEFAULT_VECTOR_SIZE / 2; ++idx) {
         input_select.Append(idx * 2);
     }
 
@@ -1154,7 +1154,7 @@ TEST_F(ColumnVectorGeoTest, box_column_vector_select) {
 TEST_F(ColumnVectorGeoTest, box_column_slice_init) {
     using namespace infinity;
 
-    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kBox);
+    std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kBox);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
@@ -1200,7 +1200,7 @@ TEST_F(ColumnVectorGeoTest, flat_path) {
 
     using namespace infinity;
 
-    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kPath);
+    std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kPath);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
@@ -1391,7 +1391,7 @@ TEST_F(ColumnVectorGeoTest, contant_path) {
 
     using namespace infinity;
 
-    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kPath);
+    std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kPath);
     ColumnVector column_vector(data_type);
 
     column_vector.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
@@ -1520,7 +1520,7 @@ TEST_F(ColumnVectorGeoTest, contant_path) {
 TEST_F(ColumnVectorGeoTest, path_column_vector_select) {
     using namespace infinity;
 
-    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kPath);
+    std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kPath);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
@@ -1557,7 +1557,7 @@ TEST_F(ColumnVectorGeoTest, path_column_vector_select) {
 
     Selection input_select;
     input_select.Initialize(DEFAULT_VECTOR_SIZE / 2);
-    for (SizeT idx = 0; idx < DEFAULT_VECTOR_SIZE / 2; ++idx) {
+    for (size_t idx = 0; idx < DEFAULT_VECTOR_SIZE / 2; ++idx) {
         input_select.Append(idx * 2);
     }
 
@@ -1585,7 +1585,7 @@ TEST_F(ColumnVectorGeoTest, path_column_vector_select) {
 TEST_F(ColumnVectorGeoTest, path_column_slice_init) {
     using namespace infinity;
 
-    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kPath);
+    std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kPath);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
@@ -1650,7 +1650,7 @@ TEST_F(ColumnVectorGeoTest, flat_polygon) {
 
     using namespace infinity;
 
-    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kPolygon);
+    std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kPolygon);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
@@ -1865,7 +1865,7 @@ TEST_F(ColumnVectorGeoTest, contant_polygon) {
 
     using namespace infinity;
 
-    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kPolygon);
+    std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kPolygon);
     ColumnVector column_vector(data_type);
 
     column_vector.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
@@ -2009,7 +2009,7 @@ TEST_F(ColumnVectorGeoTest, contant_polygon) {
 TEST_F(ColumnVectorGeoTest, polygon_column_vector_select) {
     using namespace infinity;
 
-    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kPolygon);
+    std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kPolygon);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
@@ -2051,7 +2051,7 @@ TEST_F(ColumnVectorGeoTest, polygon_column_vector_select) {
 
     Selection input_select;
     input_select.Initialize(DEFAULT_VECTOR_SIZE / 2);
-    for (SizeT idx = 0; idx < DEFAULT_VECTOR_SIZE / 2; ++idx) {
+    for (size_t idx = 0; idx < DEFAULT_VECTOR_SIZE / 2; ++idx) {
         input_select.Append(idx * 2);
     }
 
@@ -2084,7 +2084,7 @@ TEST_F(ColumnVectorGeoTest, polygon_column_vector_select) {
 TEST_F(ColumnVectorGeoTest, polygon_column_slice_init) {
     using namespace infinity;
 
-    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kPolygon);
+    std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kPolygon);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
@@ -2161,7 +2161,7 @@ TEST_F(ColumnVectorGeoTest, polygon_column_slice_init) {
 TEST_F(ColumnVectorGeoTest, flat_circle) {
     using namespace infinity;
 
-    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kCircle);
+    std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kCircle);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
@@ -2274,7 +2274,7 @@ TEST_F(ColumnVectorGeoTest, contant_circle) {
 
     using namespace infinity;
 
-    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kCircle);
+    std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kCircle);
     ColumnVector column_vector(data_type);
 
     column_vector.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
@@ -2364,7 +2364,7 @@ TEST_F(ColumnVectorGeoTest, contant_circle) {
 TEST_F(ColumnVectorGeoTest, circle_column_vector_select) {
     using namespace infinity;
 
-    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kCircle);
+    std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kCircle);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
@@ -2386,7 +2386,7 @@ TEST_F(ColumnVectorGeoTest, circle_column_vector_select) {
 
     Selection input_select;
     input_select.Initialize(DEFAULT_VECTOR_SIZE / 2);
-    for (SizeT idx = 0; idx < DEFAULT_VECTOR_SIZE / 2; ++idx) {
+    for (size_t idx = 0; idx < DEFAULT_VECTOR_SIZE / 2; ++idx) {
         input_select.Append(idx * 2);
     }
 
@@ -2406,7 +2406,7 @@ TEST_F(ColumnVectorGeoTest, circle_column_vector_select) {
 TEST_F(ColumnVectorGeoTest, circle_column_slice_init) {
     using namespace infinity;
 
-    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kCircle);
+    std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kCircle);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 

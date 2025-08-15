@@ -33,7 +33,7 @@ namespace infinity {
 struct SubstrFunction {
     template <typename TA, typename TB, typename TC, typename TD>
     static inline bool Run(TA &first, TB &second, TC &third, TD &result, ColumnVector *first_ptr, ColumnVector *result_ptr) {
-        String error_message = "Not implement: SubstrFunction::Run";
+        std::string error_message = "Not implement: SubstrFunction::Run";
         UnrecoverableError(error_message);
     }
 };
@@ -49,41 +49,41 @@ SubstrFunction::Run(VarcharT &first, BigIntT &second, BigIntT &third, VarcharT &
         UnrecoverableError(fmt::format("substring length should >= 0, currently it is {}", second));
     }
 
-    Span<const char> first_v = first_ptr->GetVarcharInner(first);
+    std::span<const char> first_v = first_ptr->GetVarcharInner(first);
     if (third == 0) {
         // Construct empty varchar value;
-        Span<const char> substr_span = Span<const char>(first_v.data(), 0);
+        std::span<const char> substr_span = std::span<const char>(first_v.data(), 0);
         result_ptr->AppendVarcharInner(substr_span, result);
         return true;
     }
 
-    SizeT source_len = first_v.size();
-    if ((SizeT)second >= source_len) {
+    size_t source_len = first_v.size();
+    if ((size_t)second >= source_len) {
         // Construct empty varchar value;
-        Span<const char> substr_span = Span<const char>(first_v.data(), 0);
+        std::span<const char> substr_span = std::span<const char>(first_v.data(), 0);
         ;
         result_ptr->AppendVarcharInner(substr_span, result);
         return true;
     }
 
-    SizeT start_offset = second;
-    SizeT end_offset = 0;
+    size_t start_offset = second;
+    size_t end_offset = 0;
     if (start_offset + third >= source_len) {
         end_offset = source_len;
     } else {
         end_offset = start_offset + third;
     }
 
-    Span<const char> substr_span = Span<const char>(first_v.data() + start_offset, end_offset - start_offset);
+    std::span<const char> substr_span = std::span<const char>(first_v.data() + start_offset, end_offset - start_offset);
     result_ptr->AppendVarcharInner(substr_span, result);
 
     return true;
 }
 
 void RegisterSubstringFunction(NewCatalog *catalog_ptr) {
-    String func_name = "substring";
+    std::string func_name = "substring";
 
-    SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
+    std::shared_ptr<ScalarFunctionSet> function_set_ptr = std::make_shared<ScalarFunctionSet>(func_name);
 
     ScalarFunction varchar_substr(func_name,
                                   {DataType(LogicalType::kVarchar), DataType(LogicalType::kBigInt), DataType(LogicalType::kBigInt)},

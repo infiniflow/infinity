@@ -28,14 +28,14 @@ import search_options;
 
 namespace infinity {
 
-FusionExpression::FusionExpression(const String &method, SharedPtr<SearchOptions> options)
-    : BaseExpression(ExpressionType::kFusion, Vector<SharedPtr<BaseExpression>>()), method_(method), options_(std::move(options)) {}
+FusionExpression::FusionExpression(const std::string &method, std::shared_ptr<SearchOptions> options)
+    : BaseExpression(ExpressionType::kFusion, std::vector<std::shared_ptr<BaseExpression>>()), method_(method), options_(std::move(options)) {}
 
-String FusionExpression::ToString() const {
+std::string FusionExpression::ToString() const {
     if (!alias_.empty()) {
         return alias_;
     }
-    String expr_str = fmt::format("FUSION('{}', '{}')", method_, options_ ? options_->ToString() : "");
+    std::string expr_str = fmt::format("FUSION('{}', '{}')", method_, options_ ? options_->ToString() : "");
     return expr_str;
 }
 

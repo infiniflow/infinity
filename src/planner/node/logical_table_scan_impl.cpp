@@ -35,24 +35,24 @@ import data_type;
 
 namespace infinity {
 
-LogicalTableScan::LogicalTableScan(u64 node_id, SharedPtr<BaseTableRef> base_table_ref, bool add_row_id)
+LogicalTableScan::LogicalTableScan(u64 node_id, std::shared_ptr<BaseTableRef> base_table_ref, bool add_row_id)
     : LogicalNode(node_id, LogicalNodeType::kTableScan), base_table_ref_(std::move(base_table_ref)), add_row_id_(add_row_id) {}
 
-Vector<ColumnBinding> LogicalTableScan::GetColumnBindings() const {
-    Vector<ColumnBinding> result;
+std::vector<ColumnBinding> LogicalTableScan::GetColumnBindings() const {
+    std::vector<ColumnBinding> result;
     auto &column_ids = base_table_ref_->column_ids_;
     result.reserve(column_ids.size());
-    for (SizeT col_id : column_ids) {
+    for (size_t col_id : column_ids) {
         result.emplace_back(base_table_ref_->table_index_, col_id);
     }
     return result;
 }
 
-SharedPtr<Vector<String>> LogicalTableScan::GetOutputNames() const {
-    SharedPtr<Vector<String>> result_names = MakeShared<Vector<String>>();
-    SizeT column_count = base_table_ref_->column_names_->size();
+std::shared_ptr<std::vector<std::string>> LogicalTableScan::GetOutputNames() const {
+    std::shared_ptr<std::vector<std::string>> result_names = std::make_shared<std::vector<std::string>>();
+    size_t column_count = base_table_ref_->column_names_->size();
     result_names->reserve(column_count + 1);
-    for (SizeT col_idx = 0; col_idx < column_count; ++col_idx) {
+    for (size_t col_idx = 0; col_idx < column_count; ++col_idx) {
         const auto &column_name = base_table_ref_->column_names_->at(col_idx);
         result_names->emplace_back(column_name);
     }
@@ -62,30 +62,30 @@ SharedPtr<Vector<String>> LogicalTableScan::GetOutputNames() const {
     return result_names;
 }
 
-SharedPtr<Vector<SharedPtr<DataType>>> LogicalTableScan::GetOutputTypes() const {
-    auto result_types = MakeShared<Vector<SharedPtr<DataType>>>(*(base_table_ref_->column_types_)); // copy initialization
+std::shared_ptr<std::vector<std::shared_ptr<DataType>>> LogicalTableScan::GetOutputTypes() const {
+    auto result_types = std::make_shared<std::vector<std::shared_ptr<DataType>>>(*(base_table_ref_->column_types_)); // copy initialization
     if (add_row_id_) {
-        result_types->emplace_back(MakeShared<DataType>(LogicalType::kRowID));
+        result_types->emplace_back(std::make_shared<DataType>(LogicalType::kRowID));
     }
     return result_types;
 }
 
 TableInfo *LogicalTableScan::table_info() const { return base_table_ref_->table_info_.get(); }
 
-String LogicalTableScan::TableAlias() const { return base_table_ref_->alias_; }
+std::string LogicalTableScan::TableAlias() const { return base_table_ref_->alias_; }
 
 u64 LogicalTableScan::TableIndex() const { return base_table_ref_->table_index_; }
 
-String LogicalTableScan::ToString(i64 &space) const {
+std::string LogicalTableScan::ToString(i64 &space) const {
     std::stringstream ss;
-    String arrow_str;
+    std::string arrow_str;
     if (space > 3) {
         space -= 4;
         arrow_str = "->  ";
     }
-    ss << String(space, ' ') << arrow_str << "TableScan: " << *base_table_ref_->table_info_->table_name_ << ", on: ";
-    SizeT column_count = base_table_ref_->column_names_->size();
-    for (SizeT i = 0; i < column_count - 1; ++i) {
+    ss << std::string(space, ' ') << arrow_str << "TableScan: " << *base_table_ref_->table_info_->table_name_ << ", on: ";
+    size_t column_count = base_table_ref_->column_names_->size();
+    for (size_t i = 0; i < column_count - 1; ++i) {
         ss << base_table_ref_->column_names_->at(i) << " ";
     }
     ss << base_table_ref_->column_names_->back();

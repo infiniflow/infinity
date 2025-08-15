@@ -66,8 +66,8 @@ TEST_F(LineCastTest, line_cast0) {
         LineT source(1, 1, 1);
         VarcharT target;
 
-        SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kVarchar);
-        SharedPtr<ColumnVector> col_varchar_ptr = MakeShared<ColumnVector>(data_type);
+        std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kVarchar);
+        std::shared_ptr<ColumnVector> col_varchar_ptr = std::make_shared<ColumnVector>(data_type);
         col_varchar_ptr->Initialize();
 
         EXPECT_THROW_WITHOUT_STACKTRACE(GeographyTryCastToVarlen::Run(source, target, col_varchar_ptr.get()), UnrecoverableException);
@@ -84,8 +84,8 @@ TEST_F(LineCastTest, line_cast1) {
         EXPECT_THROW_WITHOUT_STACKTRACE(BindGeographyCast<LineT>(source_type, target_type), UnrecoverableException);
     }
 
-    SharedPtr<DataType> source_type = MakeShared<DataType>(LogicalType::kLine);
-    SharedPtr<ColumnVector> col_source = MakeShared<ColumnVector>(source_type);
+    std::shared_ptr<DataType> source_type = std::make_shared<DataType>(LogicalType::kLine);
+    std::shared_ptr<ColumnVector> col_source = std::make_shared<ColumnVector>(source_type);
     col_source->Initialize();
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         Value v = Value::MakeLine(LineT(static_cast<f64>(i), static_cast<f64>(i), static_cast<f64>(i)));
@@ -101,11 +101,11 @@ TEST_F(LineCastTest, line_cast1) {
     }
     // cast line column vector to varchar column vector
     {
-        SharedPtr<DataType> target_type = MakeShared<DataType>(LogicalType::kVarchar);
+        std::shared_ptr<DataType> target_type = std::make_shared<DataType>(LogicalType::kVarchar);
         auto source2target_ptr = BindGeographyCast<LineT>(*source_type, *target_type);
         EXPECT_NE(source2target_ptr.function, nullptr);
 
-        SharedPtr<ColumnVector> col_target = MakeShared<ColumnVector>(target_type);
+        std::shared_ptr<ColumnVector> col_target = std::make_shared<ColumnVector>(target_type);
         col_target->Initialize();
 
         CastParameters cast_parameters;

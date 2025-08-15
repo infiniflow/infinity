@@ -147,7 +147,7 @@ TEST_F(FstTest, Iterate) {
     FstStream s(f);
     Vector<u8> key;
     u64 val;
-    SizeT i = 0;
+    size_t i = 0;
     while (s.Next(key, val)) {
         String name((char *)key.data(), key.size());
         EXPECT_EQ(name, months[i].first);
@@ -155,7 +155,7 @@ TEST_F(FstTest, Iterate) {
         i++;
     }
 
-    SizeT b1_num = 3, b2_num = 7;
+    size_t b1_num = 3, b2_num = 7;
     Bound b1(Bound::kIncluded, (u8 *)months[b1_num].first.data(), months[b1_num].first.length());
     Bound b2(Bound::kExcluded, (u8 *)months[b2_num].first.data(), months[b2_num].first.length());
     s.Reset(b1, b2);

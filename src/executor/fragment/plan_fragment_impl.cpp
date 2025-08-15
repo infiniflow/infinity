@@ -33,20 +33,20 @@ namespace infinity {
 
 void PlanFragment::SetSourceNode(QueryContext *query_context,
                                  SourceType source_type,
-                                 const SharedPtr<Vector<String>> &names,
-                                 const SharedPtr<Vector<SharedPtr<DataType>>> &types) {
-    source_ = MakeUnique<PhysicalSource>(query_context->GetNextNodeID(), source_type, names, types, nullptr);
+                                 const std::shared_ptr<std::vector<std::string>> &names,
+                                 const std::shared_ptr<std::vector<std::shared_ptr<DataType>>> &types) {
+    source_ = std::make_unique<PhysicalSource>(query_context->GetNextNodeID(), source_type, names, types, nullptr);
 }
 
 void PlanFragment::SetSinkNode(QueryContext *query_context,
                                SinkType sink_type,
-                               const SharedPtr<Vector<String>> &names,
-                               const SharedPtr<Vector<SharedPtr<DataType>>> &types) {
-    sink_ = MakeUnique<PhysicalSink>(query_context->GetNextNodeID(), sink_type, names, types, nullptr);
+                               const std::shared_ptr<std::vector<std::string>> &names,
+                               const std::shared_ptr<std::vector<std::shared_ptr<DataType>>> &types) {
+    sink_ = std::make_unique<PhysicalSink>(query_context->GetNextNodeID(), sink_type, names, types, nullptr);
 }
 
-SharedPtr<Vector<String>> PlanFragment::ToString() {
-    auto result = MakeShared<Vector<String>>();
+std::shared_ptr<std::vector<std::string>> PlanFragment::ToString() {
+    auto result = std::make_shared<std::vector<std::string>>();
     if (source_.get() != nullptr) {
         result->push_back(source_->GetName());
     }
@@ -59,19 +59,19 @@ SharedPtr<Vector<String>> PlanFragment::ToString() {
     return result;
 }
 
-SharedPtr<DataTable> PlanFragment::GetResult() { return context_->GetResult(); }
+std::shared_ptr<DataTable> PlanFragment::GetResult() { return context_->GetResult(); }
 
-void PlanFragment::AddNext(SharedPtr<PlanFragment> root, PlanFragment *next) {
-    Vector<PlanFragment *> next_leaves;
+void PlanFragment::AddNext(std::shared_ptr<PlanFragment> root, PlanFragment *next) {
+    std::vector<PlanFragment *> next_leaves;
     next->GetStartFragments(next_leaves);
     for (auto &leaf : next_leaves) {
         leaf->AddChild(root);
     }
 }
 
-SizeT PlanFragment::GetStartFragments(Vector<PlanFragment *> &leaf_fragments) {
-    SizeT all_fragment_n = 0;
-    HashSet<PlanFragment *> visited;
+size_t PlanFragment::GetStartFragments(std::vector<PlanFragment *> &leaf_fragments) {
+    size_t all_fragment_n = 0;
+    std::unordered_set<PlanFragment *> visited;
     std::function<void(PlanFragment *)> TraversePlanFragmentGraph = [&](PlanFragment *fragment) {
         if (visited.find(fragment) != visited.end()) {
             return;

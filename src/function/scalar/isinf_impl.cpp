@@ -47,9 +47,9 @@ inline void IsinfFunction::Run(BFloat16T &left, BooleanT &result) {
 }
 
 void RegisterIsinfFunction(NewCatalog *catalog_ptr) {
-    String func_name = "isinf";
+    std::string func_name = "isinf";
 
-    SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
+    std::shared_ptr<ScalarFunctionSet> function_set_ptr = std::make_shared<ScalarFunctionSet>(func_name);
 
     ScalarFunction isinf_function_float(func_name,
                                         {DataType(LogicalType::kFloat)},

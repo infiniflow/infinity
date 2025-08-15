@@ -12,12 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:logical_check.impl;
 
 import :logical_check;
-import :stl;
 import :infinity_exception;
 import :column_binding;
 import :logical_check;
@@ -30,7 +27,7 @@ import internal_types;
 
 namespace infinity {
 
-String ToString(CheckStmtType type) {
+std::string ToString(CheckStmtType type) {
     switch (type) {
         case CheckStmtType::kSystem:
             return "Check system";
@@ -43,20 +40,22 @@ String ToString(CheckStmtType type) {
     return {};
 }
 
-Vector<ColumnBinding> LogicalCheck::GetColumnBindings() const { return {}; }
+std::vector<ColumnBinding> LogicalCheck::GetColumnBindings() const { return {}; }
 
-SharedPtr<Vector<String>> LogicalCheck::GetOutputNames() const { return MakeShared<Vector<String>>(); }
+std::shared_ptr<std::vector<std::string>> LogicalCheck::GetOutputNames() const { return std::make_shared<std::vector<std::string>>(); }
 
-SharedPtr<Vector<SharedPtr<DataType>>> LogicalCheck::GetOutputTypes() const { return MakeShared<Vector<SharedPtr<DataType>>>(); }
+std::shared_ptr<std::vector<std::shared_ptr<DataType>>> LogicalCheck::GetOutputTypes() const {
+    return std::make_shared<std::vector<std::shared_ptr<DataType>>>();
+}
 
-String LogicalCheck::ToString(i64 &space) const {
+std::string LogicalCheck::ToString(i64 &space) const {
     std::stringstream ss;
-    String arrow_str;
+    std::string arrow_str;
     if (space > 3) {
         space -= 4;
         arrow_str = "->  ";
     }
-    ss << String(space, ' ') << "-> "
+    ss << std::string(space, ' ') << "-> "
        << "Check: ";
     space += arrow_str.size();
 

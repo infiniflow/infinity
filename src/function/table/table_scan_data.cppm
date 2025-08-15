@@ -28,16 +28,16 @@ class BlockIndex;
 
 export class TableScanFunctionData : public TableFunctionData {
 public:
-    TableScanFunctionData(const BlockIndex *block_index, const SharedPtr<Vector<GlobalBlockID>> &global_block_ids, const Vector<SizeT> &column_ids);
+    TableScanFunctionData(const BlockIndex *block_index, const std::shared_ptr<std::vector<GlobalBlockID>> &global_block_ids, const std::vector<size_t> &column_ids);
 
     const BlockIndex *block_index_{};
-    const SharedPtr<Vector<GlobalBlockID>> &global_block_ids_{};
-    const Vector<SizeT> &column_ids_{};
+    const std::shared_ptr<std::vector<GlobalBlockID>> &global_block_ids_{};
+    const std::vector<size_t> &column_ids_{};
 
     u64 current_block_ids_idx_{0};
-    SizeT current_read_offset_{0};
+    size_t current_read_offset_{0};
 
-    Optional<NewTxnGetVisibleRangeState> get_visible_range_state_{};
+    std::optional<NewTxnGetVisibleRangeState> get_visible_range_state_{};
 };
 
 } // namespace infinity

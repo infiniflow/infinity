@@ -26,18 +26,18 @@ namespace infinity {
 
 export class AggregateFunctionSet final : public FunctionSet {
 public:
-    explicit AggregateFunctionSet(String name) : FunctionSet(std::move(name), FunctionType::kAggregate) {}
+    explicit AggregateFunctionSet(std::string name) : FunctionSet(std::move(name), FunctionType::kAggregate) {}
 
     ~AggregateFunctionSet() final;
 
     void AddFunction(const AggregateFunction &func);
 
-    AggregateFunction GetMostMatchFunction(const SharedPtr<BaseExpression> &input_argument);
+    AggregateFunction GetMostMatchFunction(const std::shared_ptr<BaseExpression> &input_argument);
 
 private:
-    static i64 MatchFunctionCost(const AggregateFunction &func, const SharedPtr<BaseExpression> &argument);
+    static i64 MatchFunctionCost(const AggregateFunction &func, const std::shared_ptr<BaseExpression> &argument);
 
-    Vector<AggregateFunction> functions_;
+    std::vector<AggregateFunction> functions_;
 };
 
 } // namespace infinity

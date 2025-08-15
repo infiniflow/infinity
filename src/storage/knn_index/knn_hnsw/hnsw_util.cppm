@@ -32,7 +32,7 @@ export struct HnswOptimizeOptions {
 };
 
 export struct HnswUtil {
-    static Optional<HnswOptimizeOptions> ParseOptimizeOptions(const Vector<UniquePtr<InitParameter>> &opt_params) {
+    static std::optional<HnswOptimizeOptions> ParseOptimizeOptions(const std::vector<std::unique_ptr<InitParameter>> &opt_params) {
         HnswOptimizeOptions options;
         for (const auto &param : opt_params) {
             if (IsEqual(param->param_name_, "compress_to_lvq")) {
@@ -45,7 +45,7 @@ export struct HnswUtil {
             RecoverableError(Status::InvalidIndexParam("compress_to_lvq and lvq_avg cannot be set at the same time"));
         }
         if (!options.compress_to_lvq && !options.lvq_avg) {
-            return None;
+            return std::nullopt;
         }
         return options;
     }

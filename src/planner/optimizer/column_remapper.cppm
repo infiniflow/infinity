@@ -31,18 +31,18 @@ public:
     void VisitNode(LogicalNode &op) final;
 
 private:
-    virtual SharedPtr<BaseExpression> VisitReplace(const SharedPtr<ColumnExpression> &expression) override;
+    virtual std::shared_ptr<BaseExpression> VisitReplace(const std::shared_ptr<ColumnExpression> &expression) override;
 
-    Vector<ColumnBinding> bindings_;
-    SharedPtr<Vector<SharedPtr<DataType>>> output_types_;
+    std::vector<ColumnBinding> bindings_;
+    std::shared_ptr<std::vector<std::shared_ptr<DataType>>> output_types_;
     u32 column_cnt_{};
 };
 
 export class ColumnRemapper : public OptimizerRule {
 public:
-    inline void ApplyToPlan(QueryContext *, SharedPtr<LogicalNode> &logical_plan) final { return remapper_.VisitNode(*logical_plan); }
+    inline void ApplyToPlan(QueryContext *, std::shared_ptr<LogicalNode> &logical_plan) final { return remapper_.VisitNode(*logical_plan); }
 
-    [[nodiscard]] inline String name() const final { return "Column Remapper"; }
+    [[nodiscard]] inline std::string name() const final { return "Column Remapper"; }
 
 private:
     BindingRemapper remapper_{};

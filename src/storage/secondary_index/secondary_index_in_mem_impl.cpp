@@ -82,7 +82,7 @@ public:
 
         data_ptr->InsertData(&temp_map);
     }
-    Pair<u32, Bitmask> RangeQuery(const void *input) const override {
+    std::pair<u32, Bitmask> RangeQuery(const void *input) const override {
         const auto &[segment_row_count, b, e] = *static_cast<const std::tuple<u32, KeyType, KeyType> *>(input);
         return RangeQueryInner(segment_row_count, b, e);
     }
@@ -99,7 +99,7 @@ private:
             const auto &[v_ptr, offset] = opt.value();
             if constexpr (std::is_same_v<RawValueType, VarcharT>) {
                 auto column_vector = iter.column_vector();
-                Span<const char> data = column_vector->GetVarcharInner(*v_ptr);
+                std::span<const char> data = column_vector->GetVarcharInner(*v_ptr);
                 const KeyType key = ConvertToOrderedKeyValue(std::string_view{data.data(), data.size()});
                 // Insert u32 offset directly
                 in_mem_secondary_index_.Insert(key, offset);
@@ -113,10 +113,10 @@ private:
         return inserted_count;
     }
 
-    Pair<u32, Bitmask> RangeQueryInner(const u32 segment_row_count, const KeyType b, const KeyType e) const {
-        Vector<u32> result;
+    std::pair<u32, Bitmask> RangeQueryInner(const u32 segment_row_count, const KeyType b, const KeyType e) const {
+        std::vector<u32> result;
         const u32 result_size = in_mem_secondary_index_.range(b, e, result);
-        Pair<u32, Bitmask> result_var(result_size, Bitmask(segment_row_count));
+        std::pair<u32, Bitmask> result_var(result_size, Bitmask(segment_row_count));
         result_var.second.SetAllFalse();
 
         for (const u32 offset : result) {
@@ -138,43 +138,43 @@ MemIndexTracerInfo SecondaryIndexInMem::GetInfo() const {
 
 const ChunkIndexMetaInfo SecondaryIndexInMem::GetChunkIndexMetaInfo() const { return ChunkIndexMetaInfo{"", GetBeginRowID(), GetRowCount(), 0}; }
 
-SharedPtr<SecondaryIndexInMem> SecondaryIndexInMem::NewSecondaryIndexInMem(const SharedPtr<ColumnDef> &column_def, RowID begin_row_id) {
+std::shared_ptr<SecondaryIndexInMem> SecondaryIndexInMem::NewSecondaryIndexInMem(const std::shared_ptr<ColumnDef> &column_def, RowID begin_row_id) {
     if (!column_def->type()->CanBuildSecondaryIndex()) {
         UnrecoverableError("Column type can't build secondary index");
     }
     switch (column_def->type()->type()) {
         case LogicalType::kTinyInt: {
-            return MakeShared<SecondaryIndexInMemT<TinyIntT>>(begin_row_id);
+            return std::make_shared<SecondaryIndexInMemT<TinyIntT>>(begin_row_id);
         }
         case LogicalType::kSmallInt: {
-            return MakeShared<SecondaryIndexInMemT<SmallIntT>>(begin_row_id);
+            return std::make_shared<SecondaryIndexInMemT<SmallIntT>>(begin_row_id);
         }
         case LogicalType::kInteger: {
-            return MakeShared<SecondaryIndexInMemT<IntegerT>>(begin_row_id);
+            return std::make_shared<SecondaryIndexInMemT<IntegerT>>(begin_row_id);
         }
         case LogicalType::kBigInt: {
-            return MakeShared<SecondaryIndexInMemT<BigIntT>>(begin_row_id);
+            return std::make_shared<SecondaryIndexInMemT<BigIntT>>(begin_row_id);
         }
         case LogicalType::kFloat: {
-            return MakeShared<SecondaryIndexInMemT<FloatT>>(begin_row_id);
+            return std::make_shared<SecondaryIndexInMemT<FloatT>>(begin_row_id);
         }
         case LogicalType::kDouble: {
-            return MakeShared<SecondaryIndexInMemT<DoubleT>>(begin_row_id);
+            return std::make_shared<SecondaryIndexInMemT<DoubleT>>(begin_row_id);
         }
         case LogicalType::kDate: {
-            return MakeShared<SecondaryIndexInMemT<DateT>>(begin_row_id);
+            return std::make_shared<SecondaryIndexInMemT<DateT>>(begin_row_id);
         }
         case LogicalType::kTime: {
-            return MakeShared<SecondaryIndexInMemT<TimeT>>(begin_row_id);
+            return std::make_shared<SecondaryIndexInMemT<TimeT>>(begin_row_id);
         }
         case LogicalType::kDateTime: {
-            return MakeShared<SecondaryIndexInMemT<DateTimeT>>(begin_row_id);
+            return std::make_shared<SecondaryIndexInMemT<DateTimeT>>(begin_row_id);
         }
         case LogicalType::kTimestamp: {
-            return MakeShared<SecondaryIndexInMemT<TimestampT>>(begin_row_id);
+            return std::make_shared<SecondaryIndexInMemT<TimestampT>>(begin_row_id);
         }
         case LogicalType::kVarchar: {
-            return MakeShared<SecondaryIndexInMemT<VarcharT>>(begin_row_id);
+            return std::make_shared<SecondaryIndexInMemT<VarcharT>>(begin_row_id);
         }
         default: {
             return nullptr;

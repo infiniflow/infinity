@@ -38,14 +38,14 @@ public:
     void VisitNode(LogicalNode &op) final;
 
 private:
-    SharedPtr<BaseExpression> VisitReplace(const SharedPtr<ColumnExpression> &expression) final;
+    std::shared_ptr<BaseExpression> VisitReplace(const std::shared_ptr<ColumnExpression> &expression) final;
 
-    HashMap<SizeT, Vector<ColumnBinding>> scan_bindings_{};
-    HashMap<SizeT, SharedPtr<Vector<SharedPtr<DataType>>>> column_types_{};
-    HashMap<SizeT, SharedPtr<Vector<String>>> column_names_{};
+    std::unordered_map<size_t, std::vector<ColumnBinding>> scan_bindings_{};
+    std::unordered_map<size_t, std::shared_ptr<std::vector<std::shared_ptr<DataType>>>> column_types_{};
+    std::unordered_map<size_t, std::shared_ptr<std::vector<std::string>>> column_names_{};
 
-    HashSet<ColumnBinding> unloaded_bindings_;
-    Vector<LoadMeta> load_metas_;
+    std::unordered_set<ColumnBinding> unloaded_bindings_;
+    std::vector<LoadMeta> load_metas_;
 };
 
 class CleanScan : public LogicalNodeVisitor {
@@ -53,16 +53,16 @@ public:
     void VisitNode(LogicalNode &op) final;
 
 private:
-    SharedPtr<BaseExpression> VisitReplace(const SharedPtr<ColumnExpression> &expression) final;
+    std::shared_ptr<BaseExpression> VisitReplace(const std::shared_ptr<ColumnExpression> &expression) final;
 
-    SharedPtr<Vector<LoadMeta>> last_op_load_metas_{};
+    std::shared_ptr<std::vector<LoadMeta>> last_op_load_metas_{};
     u64 last_op_node_id_{};
-    Vector<SizeT> scan_table_indexes_{};
+    std::vector<size_t> scan_table_indexes_{};
 };
 
 export class LazyLoad : public OptimizerRule {
 public:
-    inline void ApplyToPlan(QueryContext *query_context_ptr, SharedPtr<LogicalNode> &logical_plan) final {
+    inline void ApplyToPlan(QueryContext *query_context_ptr, std::shared_ptr<LogicalNode> &logical_plan) final {
         auto logic_op_type = logical_plan->operator_type();
         switch (logic_op_type) {
             case LogicalNodeType::kInsert:
@@ -84,13 +84,13 @@ public:
         }
     }
 
-    [[nodiscard]] inline String name() const final { return "Lazy Load"; }
+    [[nodiscard]] inline std::string name() const final { return "Lazy Load"; }
 
 private:
     RefencecColumnCollection collector{};
     CleanScan cleaner_{};
 };
 
-export Optional<BaseTableRef *> GetScanTableRef(LogicalNode &op);
+export std::optional<BaseTableRef *> GetScanTableRef(LogicalNode &op);
 
 } // namespace infinity

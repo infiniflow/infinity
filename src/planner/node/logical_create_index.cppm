@@ -31,31 +31,31 @@ namespace infinity {
 
 export class LogicalCreateIndex : public LogicalNode {
 public:
-    [[nodiscard]] Vector<ColumnBinding> GetColumnBindings() const final;
+    [[nodiscard]] std::vector<ColumnBinding> GetColumnBindings() const final;
 
-    [[nodiscard]] SharedPtr<Vector<String>> GetOutputNames() const final;
+    [[nodiscard]] std::shared_ptr<std::vector<std::string>> GetOutputNames() const final;
 
-    [[nodiscard]] SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const final;
+    [[nodiscard]] std::shared_ptr<std::vector<std::shared_ptr<DataType>>> GetOutputTypes() const final;
 
-    String ToString(i64 &space) const final; // TTT shenyushi: should be const
+    std::string ToString(i64 &space) const final; // TTT shenyushi: should be const
 
-    inline String name() override { return "LogicalCreateIndex"; }
+    inline std::string name() override { return "LogicalCreateIndex"; }
 
 public:
-    inline LogicalCreateIndex(u64 node_id, SharedPtr<BaseTableRef> base_table_ref, SharedPtr<IndexBase> index_base, ConflictType conflict_type)
+    inline LogicalCreateIndex(u64 node_id, std::shared_ptr<BaseTableRef> base_table_ref, std::shared_ptr<IndexBase> index_base, ConflictType conflict_type)
         : LogicalNode(node_id, LogicalNodeType::kCreateIndex), base_table_ref_(base_table_ref), index_definition_(index_base),
           conflict_type_(conflict_type) {}
 
 public:
-    [[nodiscard]] inline SharedPtr<BaseTableRef> base_table_ref() const { return base_table_ref_; }
+    [[nodiscard]] inline std::shared_ptr<BaseTableRef> base_table_ref() const { return base_table_ref_; }
 
-    [[nodiscard]] inline SharedPtr<IndexBase> index_definition() const { return index_definition_; }
+    [[nodiscard]] inline std::shared_ptr<IndexBase> index_definition() const { return index_definition_; }
 
     [[nodiscard]] inline ConflictType conflict_type() const { return conflict_type_; }
 
 private:
-    SharedPtr<BaseTableRef> base_table_ref_{};
-    SharedPtr<IndexBase> index_definition_{};
+    std::shared_ptr<BaseTableRef> base_table_ref_{};
+    std::shared_ptr<IndexBase> index_definition_{};
     ConflictType conflict_type_{ConflictType::kInvalid};
 };
 } // namespace infinity

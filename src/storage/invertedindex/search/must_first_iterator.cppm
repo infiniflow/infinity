@@ -27,7 +27,7 @@ namespace infinity {
 
 export class MustFirstIterator final : public MultiDocIterator {
 public:
-    MustFirstIterator(Vector<UniquePtr<DocIterator>> iterators) : MultiDocIterator(std::move(iterators)) {
+    MustFirstIterator(std::vector<std::unique_ptr<DocIterator>> iterators) : MultiDocIterator(std::move(iterators)) {
         bm25_score_upper_bound_ = {};
         estimate_iterate_cost_ = children_[0]->GetEstimateIterateCost();
         for (u32 i = 0; i < children_.size(); ++i) {
@@ -37,7 +37,7 @@ public:
 
     DocIteratorType GetType() const override { return DocIteratorType::kMustFirstIterator; }
 
-    String Name() const override { return "MustFirstIterator"; }
+    std::string Name() const override { return "MustFirstIterator"; }
 
     bool Next(const RowID doc_id) override {
         children_[0]->Next(doc_id);

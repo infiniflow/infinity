@@ -57,11 +57,11 @@ public:
         u32 num_parts = 1;
         u32 num_centers = 256;
 
-        Vector<SizeT> labels(num_points);
+        Vector<size_t> labels(num_points);
         for (u32 i = 0; i < num_points; i++) {
             labels[i] = i;
         }
-        auto data = MakeUnique<f32[]>(dim * num_points);
+        auto data = std::make_unique<f32[]>(dim * num_points);
         std::mt19937 rng;
         rng.seed(0);
         std::uniform_real_distribution<float> distrib_real;
@@ -108,7 +108,7 @@ public:
             // 1. load index
             pq_flash_index->Load(index_prefix);
             // 2. cache node by BFS order
-            std::vector<SizeT> cache_node_list;
+            std::vector<size_t> cache_node_list;
             pq_flash_index->CacheBfsLevels(num_nodes_to_cache, cache_node_list);
             // 3. load cached nodes from cache_node_list
             pq_flash_index->LoadCacheList(cache_node_list);
@@ -117,8 +117,8 @@ public:
             u32 num_queries = 10000;
             std::vector<u32> hit_labels;
             u64 beam_width = 2;
-            UniquePtr<u64[]> indices = MakeUnique<u64[]>(1);
-            UniquePtr<f32[]> distances = MakeUnique<f32[]>(1);
+            std::unique_ptr<u64[]> indices = std::make_unique<u64[]>(1);
+            std::unique_ptr<f32[]> distances = std::make_unique<f32[]>(1);
             for (u32 i = 0; i < num_queries; i++) {
                 pq_flash_index->CachedBeamSearch(data.get() + i * dim, 1, 100, indices.get(), distances.get(), beam_width);
                 if (indices[0] == i) {
@@ -133,8 +133,8 @@ public:
 };
 
 TEST_F(DiskAnnTest, test1) {
-    using DiskAnnIndexData = DiskAnnIndexData<f32, SizeT, MetricType::kMetricL2>;
-    using PqFlashIndexType = PqFlashIndex<f32, SizeT>;
+    using DiskAnnIndexData = DiskAnnIndexData<f32, size_t, MetricType::kMetricL2>;
+    using PqFlashIndexType = PqFlashIndex<f32, size_t>;
     TestCreateIndex<DiskAnnIndexData, PqFlashIndexType>();
 }
 

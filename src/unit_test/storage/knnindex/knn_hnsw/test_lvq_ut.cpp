@@ -170,7 +170,7 @@ TEST_F(HnswLVQTest, test1) {
     {
         auto lvq_store = DataStore::Make(vec_n_, 1 /*chunk_n*/, dim_, 0 /*Mmax0*/, 0 /*Mmax*/);
         {
-            for (SizeT i = 0; i < vec_n_; ++i) {
+            for (size_t i = 0; i < vec_n_; ++i) {
                 auto iter = DenseVectorIter<float, LabelT>(data.get() + i * dim_, dim_, 1);
                 auto [start_i, end_i] = lvq_store.OptAddVec(std::move(iter));
                 EXPECT_EQ(start_i, i);

@@ -48,7 +48,7 @@ class ExpressionExecutorSelectTest : public BaseTest {};
 TEST_F(ExpressionExecutorSelectTest, test1) {
     using namespace infinity;
 
-    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kBoolean);
+    std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kBoolean);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
@@ -64,7 +64,7 @@ TEST_F(ExpressionExecutorSelectTest, test1) {
         EXPECT_EQ(vx.value_.boolean, static_cast<BooleanT>(i % 2 == 0));
     }
 
-    SharedPtr<Selection> output_true_select = MakeShared<Selection>();
+    std::shared_ptr<Selection> output_true_select = std::make_shared<Selection>();
     output_true_select->Initialize(DEFAULT_VECTOR_SIZE);
 #if 0
     ExpressionSelector::Select((const u8 *)(column_vector.data()),
@@ -74,7 +74,7 @@ TEST_F(ExpressionExecutorSelectTest, test1) {
                                true);
 #endif
     //    EXPECT_EQ(output_true_select->Size(), DEFAULT_VECTOR_SIZE / 2);
-    //    for(SizeT idx = 0; idx < DEFAULT_VECTOR_SIZE / 2; ++ idx) {
+    //    for(size_t idx = 0; idx < DEFAULT_VECTOR_SIZE / 2; ++ idx) {
     //        EXPECT_EQ((*output_true_select)[idx], idx * 2);
     //    }
 }
@@ -82,7 +82,7 @@ TEST_F(ExpressionExecutorSelectTest, test1) {
 TEST_F(ExpressionExecutorSelectTest, test2) {
     using namespace infinity;
 
-    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kBoolean);
+    std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kBoolean);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
@@ -98,7 +98,7 @@ TEST_F(ExpressionExecutorSelectTest, test2) {
         EXPECT_EQ(vx.value_.boolean, true);
     }
 
-    SharedPtr<Selection> output_true_select = MakeShared<Selection>();
+    std::shared_ptr<Selection> output_true_select = std::make_shared<Selection>();
     output_true_select->Initialize(DEFAULT_VECTOR_SIZE);
 #if 0
     ExpressionExecutor::Select((const u8 *)(column_vector.data()),
@@ -108,7 +108,7 @@ TEST_F(ExpressionExecutorSelectTest, test2) {
                                true);
 #endif
     //    EXPECT_EQ(output_true_select->Size(), DEFAULT_VECTOR_SIZE);
-    //    for(SizeT idx = 0; idx < DEFAULT_VECTOR_SIZE; ++ idx) {
+    //    for(size_t idx = 0; idx < DEFAULT_VECTOR_SIZE; ++ idx) {
     //        EXPECT_EQ((*output_true_select)[idx], idx);
     //    }
 }
@@ -116,7 +116,7 @@ TEST_F(ExpressionExecutorSelectTest, test2) {
 TEST_F(ExpressionExecutorSelectTest, test3) {
     using namespace infinity;
 
-    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kBoolean);
+    std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kBoolean);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
@@ -132,7 +132,7 @@ TEST_F(ExpressionExecutorSelectTest, test3) {
         EXPECT_EQ(vx.value_.boolean, false);
     }
 
-    SharedPtr<Selection> output_true_select = MakeShared<Selection>();
+    std::shared_ptr<Selection> output_true_select = std::make_shared<Selection>();
     output_true_select->Initialize(DEFAULT_VECTOR_SIZE);
 #if 0
     ExpressionExecutor::Select((const u8 *)(column_vector.data()),

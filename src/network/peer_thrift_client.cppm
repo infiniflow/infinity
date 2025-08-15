@@ -34,14 +34,14 @@ using namespace infinity_peer_server;
 
 export class PeerClient {
 public:
-    PeerClient(const String &from_node_name, const String &ip_addr, i64 port) : from_node_name_(from_node_name), ip_address_(ip_addr), port_(port) {
+    PeerClient(const std::string &from_node_name, const std::string &ip_addr, i64 port) : from_node_name_(from_node_name), ip_address_(ip_addr), port_(port) {
 #ifdef INFINITY_DEBUG
         GlobalResourceUsage::IncrObjectCount("PeerClient");
 #endif
     }
 
     ~PeerClient();
-    //    void SetPeerNode(NodeRole role, const String& node_name, i64 update_ts) {
+    //    void SetPeerNode(NodeRole role, const std::string& node_name, i64 update_ts) {
     //        node_info_.node_name_ = node_name;
     //        node_info_.last_update_ts_ = update_ts;
     //        node_info_.node_status_ = NodeStatus::kAlive;
@@ -54,7 +54,7 @@ public:
 
     Status Reconnect();
     Status Disconnect();
-    void Send(SharedPtr<PeerTask> task);
+    void Send(std::shared_ptr<PeerTask> task);
 
     bool ServerConnected() const { return server_connected_; }
 
@@ -69,20 +69,20 @@ private:
     void ChangeRole(ChangeRoleTask *change_role_task);
 
 private:
-    String from_node_name_{};
-    String ip_address_{};
+    std::string from_node_name_{};
+    std::string ip_address_{};
     i64 port_{};
 
     // For message transportation
-    SharedPtr<TTransport> socket_{};
-    SharedPtr<TTransport> transport_{};
-    SharedPtr<TProtocol> protocol_{};
-    UniquePtr<PeerServiceClient> client_{};
-    Atomic<bool> server_connected_{false};
+    std::shared_ptr<TTransport> socket_{};
+    std::shared_ptr<TTransport> transport_{};
+    std::shared_ptr<TProtocol> protocol_{};
+    std::unique_ptr<PeerServiceClient> client_{};
+    std::atomic<bool> server_connected_{false};
 
-    BlockingQueue<SharedPtr<PeerTask>> peer_task_queue_{"PeerClient"};
-    SharedPtr<Thread> processor_thread_{};
-    Atomic<u64> peer_task_count_{};
+    BlockingQueue<std::shared_ptr<PeerTask>> peer_task_queue_{"PeerClient"};
+    std::shared_ptr<std::thread> processor_thread_{};
+    std::atomic<u64> peer_task_count_{};
 };
 
 } // namespace infinity

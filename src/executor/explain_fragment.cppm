@@ -23,7 +23,7 @@ namespace infinity {
 
 export class ExplainFragment {
 public:
-    static void Explain(PlanFragment *op, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size = 0);
+    static void Explain(PlanFragment *op, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size = 0);
 };
 
 } // namespace infinity

@@ -28,7 +28,7 @@ namespace infinity {
 
 export class POSTable {
 public:
-    POSTable(const String &path);
+    POSTable(const std::string &path);
 
     ~POSTable() = default;
 
@@ -36,37 +36,37 @@ public:
 
     const char *GetPOS(i32 index) const;
 
-    i32 GetPOSIndex(const String &tag) const;
+    i32 GetPOSIndex(const std::string &tag) const;
 
 private:
-    String file_;
+    std::string file_;
     i32 table_size_{0};
-    Vector<String> pos_vec_;
-    Map<String, i32> pos_map_;
+    std::vector<std::string> pos_vec_;
+    std::map<std::string, i32> pos_map_;
 };
 
 export using DartsCore = DoubleArrayImpl<void, void, int, void>;
 
 export struct DartsTuple {
-    DartsTuple(const String &k, const int &v) : key_(k), value_(v) {}
-    String key_;
+    DartsTuple(const std::string &k, const int &v) : key_(k), value_(v) {}
+    std::string key_;
     int value_;
 };
 
 export class DartsTrie {
-    UniquePtr<DartsCore> darts_;
-    Vector<DartsTuple> buffer_;
+    std::unique_ptr<DartsCore> darts_;
+    std::vector<DartsTuple> buffer_;
 
 public:
     DartsTrie();
 
-    void Add(const String &key, const int &value);
+    void Add(const std::string &key, const int &value);
 
     void Build();
 
-    void Load(const String &file_name);
+    void Load(const std::string &file_name);
 
-    void Save(const String &file_name);
+    void Save(const std::string &file_name);
 
     bool HasKeysWithPrefix(std::string_view key) const;
 

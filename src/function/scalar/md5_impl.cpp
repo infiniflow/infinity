@@ -31,19 +31,19 @@ template <>
 inline void Md5Function::Run(VarcharT &left, VarcharT &result, ColumnVector *left_ptr, ColumnVector *result_ptr) {
     unsigned char digest[MD5_DIGEST_LENGTH];
     const char *input = nullptr;
-    SizeT input_len = 0;
-    Span<const char> left_v = left_ptr->GetVarcharInner(left);
+    size_t input_len = 0;
+    std::span<const char> left_v = left_ptr->GetVarcharInner(left);
     input = left_v.data();
     input_len = left_v.size();
     MD5(reinterpret_cast<const unsigned char *>(input), input_len, digest);
-    Span<const char> digest_span = Span<const char>(reinterpret_cast<const char *>(digest), MD5_DIGEST_LENGTH);
+    std::span<const char> digest_span = std::span<const char>(reinterpret_cast<const char *>(digest), MD5_DIGEST_LENGTH);
     result_ptr->AppendVarcharInner(digest_span, result);
 }
 
 void RegisterMd5Function(NewCatalog *catalog_ptr) {
-    String func_name = "md5";
+    std::string func_name = "md5";
 
-    SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
+    std::shared_ptr<ScalarFunctionSet> function_set_ptr = std::make_shared<ScalarFunctionSet>(func_name);
 
     ScalarFunction md5_function(func_name,
                                 {DataType(LogicalType::kVarchar)},

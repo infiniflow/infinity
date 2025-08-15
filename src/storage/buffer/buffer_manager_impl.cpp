@@ -37,7 +37,7 @@ import global_resource_usage;
 
 namespace infinity {
 
-void LRUCache::RemoveClean(const Vector<BufferObj *> &buffer_obj) {
+void LRUCache::RemoveClean(const std::vector<BufferObj *> &buffer_obj) {
     std::unique_lock lock(locker_);
     for (auto *buffer_obj : buffer_obj) {
         if (auto iter = gc_map_.find(buffer_obj); iter != gc_map_.end()) {
@@ -47,13 +47,13 @@ void LRUCache::RemoveClean(const Vector<BufferObj *> &buffer_obj) {
     }
 }
 
-SizeT LRUCache::WaitingGCObjectCount() {
+size_t LRUCache::WaitingGCObjectCount() {
     std::unique_lock lock(locker_);
     return gc_map_.size();
 }
 
-SizeT LRUCache::RequestSpace(SizeT need_space) {
-    SizeT free_space = 0;
+size_t LRUCache::RequestSpace(size_t need_space) {
+    size_t free_space = 0;
     std::unique_lock lock(locker_);
     auto iter = gc_list_.begin();
     while (free_space < need_space && iter != gc_list_.end()) {
@@ -92,10 +92,10 @@ bool LRUCache::RemoveFromGCQueue(BufferObj *buffer_obj) {
 }
 
 BufferManager::BufferManager(u64 memory_limit,
-                             SharedPtr<String> data_dir,
-                             SharedPtr<String> temp_dir,
+                             std::shared_ptr<std::string> data_dir,
+                             std::shared_ptr<std::string> temp_dir,
                              PersistenceManager *persistence_manager,
-                             SizeT lru_count)
+                             size_t lru_count)
     : data_dir_(std::move(data_dir)), temp_dir_(std::move(temp_dir)), memory_limit_(memory_limit), persistence_manager_(persistence_manager),
       current_memory_size_(0), lru_caches_(lru_count) {
 #ifdef INFINITY_DEBUG
@@ -122,8 +122,8 @@ void BufferManager::Stop() {
     LOG_INFO("Buffer manager is stopped.");
 }
 
-BufferObj *BufferManager::AllocateBufferObject(UniquePtr<FileWorker> file_worker) {
-    String file_path = file_worker->GetFilePath();
+BufferObj *BufferManager::AllocateBufferObject(std::unique_ptr<FileWorker> file_worker) {
+    std::string file_path = file_worker->GetFilePath();
     auto buffer_obj = MakeBufferObj(std::move(file_worker), true);
 
     BufferObj *res = buffer_obj.get();
@@ -138,8 +138,8 @@ BufferObj *BufferManager::AllocateBufferObject(UniquePtr<FileWorker> file_worker
     return res;
 }
 
-BufferObj *BufferManager::GetBufferObject(UniquePtr<FileWorker> file_worker, bool restart) {
-    String file_path = file_worker->GetFilePath();
+BufferObj *BufferManager::GetBufferObject(std::unique_ptr<FileWorker> file_worker, bool restart) {
+    std::string file_path = file_worker->GetFilePath();
     // LOG_TRACE(fmt::format("Get buffer object: {}", file_path));
 
     std::unique_lock lock(w_locker_);
@@ -159,7 +159,7 @@ BufferObj *BufferManager::GetBufferObject(UniquePtr<FileWorker> file_worker, boo
     return res;
 }
 
-BufferObj *BufferManager::GetBufferObject(const String &file_path) {
+BufferObj *BufferManager::GetBufferObject(const std::string &file_path) {
     std::unique_lock lock(w_locker_);
     if (auto iter = buffer_map_.find(file_path); iter != buffer_map_.end()) {
         return iter->second.get();
@@ -168,15 +168,15 @@ BufferObj *BufferManager::GetBufferObject(const String &file_path) {
     return nullptr;
 }
 
-Vector<SizeT> BufferManager::WaitingGCObjectCount() {
-    Vector<SizeT> size_list(lru_caches_.size());
-    for (SizeT i = 0; i < lru_caches_.size(); ++i) {
+std::vector<size_t> BufferManager::WaitingGCObjectCount() {
+    std::vector<size_t> size_list(lru_caches_.size());
+    for (size_t i = 0; i < lru_caches_.size(); ++i) {
         size_list[i] = lru_caches_[i].WaitingGCObjectCount();
     }
     return size_list;
 }
 
-SizeT BufferManager::BufferedObjectCount() {
+size_t BufferManager::BufferedObjectCount() {
     std::unique_lock lock(w_locker_);
     return buffer_map_.size();
 }
@@ -184,7 +184,7 @@ SizeT BufferManager::BufferedObjectCount() {
 Status BufferManager::RemoveClean(KVInstance *kv_instance) {
     LOG_TRACE(fmt::format("BufferManager::RemoveClean, start to clean objects"));
     Status status;
-    Vector<BufferObj *> clean_list;
+    std::vector<BufferObj *> clean_list;
     {
         std::unique_lock lock(clean_locker_);
         clean_list.swap(clean_list_);
@@ -195,7 +195,7 @@ Status BufferManager::RemoveClean(KVInstance *kv_instance) {
             return status;
         }
     }
-    HashSet<BufferObj *> clean_temp_set;
+    std::unordered_set<BufferObj *> clean_temp_set;
     {
         std::unique_lock lock(temp_locker_);
         clean_temp_set.swap(clean_temp_set_);
@@ -221,8 +221,8 @@ Status BufferManager::RemoveClean(KVInstance *kv_instance) {
     return Status::OK();
 }
 
-Vector<BufferObjectInfo> BufferManager::GetBufferObjectsInfo() {
-    Vector<BufferObjectInfo> result;
+std::vector<BufferObjectInfo> BufferManager::GetBufferObjectsInfo() {
+    std::vector<BufferObjectInfo> result;
     {
         std::unique_lock lock(w_locker_);
         result.reserve(buffer_map_.size());
@@ -240,15 +240,15 @@ Vector<BufferObjectInfo> BufferManager::GetBufferObjectsInfo() {
     return result;
 }
 
-bool BufferManager::RequestSpace(SizeT need_size) {
+bool BufferManager::RequestSpace(size_t need_size) {
     std::unique_lock lock(gc_locker_);
-    SizeT freed_space = 0;
-    const SizeT free_space = memory_limit_ - current_memory_size_;
+    size_t freed_space = 0;
+    const size_t free_space = memory_limit_ - current_memory_size_;
     if (free_space >= need_size) {
         [[maybe_unused]] auto cur_mem_size = current_memory_size_.fetch_add(need_size);
         return true;
     }
-    SizeT round_robin = round_robin_;
+    size_t round_robin = round_robin_;
     do {
         freed_space += lru_caches_[round_robin_].RequestSpace(need_size);
         round_robin_ = (round_robin_ + 1) % lru_caches_.size();
@@ -259,18 +259,18 @@ bool BufferManager::RequestSpace(SizeT need_size) {
 }
 
 void BufferManager::PushGCQueue(BufferObj *buffer_obj) {
-    SizeT idx = LRUIdx(buffer_obj);
+    size_t idx = LRUIdx(buffer_obj);
     lru_caches_[idx].PushGCQueue(buffer_obj);
 
     if (auto mem_usage = memory_usage(); mem_usage > memory_limit_) {
-        SizeT need_size = mem_usage - memory_limit_;
+        size_t need_size = mem_usage - memory_limit_;
         // caller buffer obj is in kLoad state, and RequestSpace will lock those in kNew or kFree state, so no dead lock
         RequestSpace(need_size);
     }
 }
 
 bool BufferManager::RemoveFromGCQueue(BufferObj *buffer_obj) {
-    SizeT idx = LRUIdx(buffer_obj);
+    size_t idx = LRUIdx(buffer_obj);
     return lru_caches_[idx].RemoveFromGCQueue(buffer_obj);
 }
 
@@ -280,10 +280,10 @@ void BufferManager::AddToCleanList(BufferObj *buffer_obj, bool do_free) {
         clean_list_.emplace_back(buffer_obj);
     }
     if (do_free) {
-        SizeT buffer_size = buffer_obj->GetBufferSize();
+        size_t buffer_size = buffer_obj->GetBufferSize();
         [[maybe_unused]] auto memory_size = current_memory_size_.fetch_sub(buffer_size);
         if (memory_size < buffer_size) {
-            String err_msg = fmt::format("BufferManager::AddToCleanList: memory_size < buffer_size: {} < {}", memory_size, buffer_size);
+            std::string err_msg = fmt::format("BufferManager::AddToCleanList: memory_size < buffer_size: {} < {}", memory_size, buffer_size);
             LOG_WARN(err_msg);
             current_memory_size_ = 0;
             // UnrecoverableError(err_msg);
@@ -295,7 +295,7 @@ void BufferManager::AddToCleanList(BufferObj *buffer_obj, bool do_free) {
 }
 
 void BufferManager::FreeUnloadBuffer(BufferObj *buffer_obj) {
-    SizeT buffer_size = buffer_obj->GetBufferSize();
+    size_t buffer_size = buffer_obj->GetBufferSize();
     [[maybe_unused]] auto memory_size = current_memory_size_.fetch_sub(buffer_size);
     if (memory_size < buffer_size) {
         UnrecoverableError(fmt::format("BufferManager::FreeUnloadBuffer: memory_size < buffer_size: {} < {}", memory_size, buffer_size));
@@ -331,14 +331,14 @@ void BufferManager::MoveTemp(BufferObj *buffer_obj) {
     }
 }
 
-SizeT BufferManager::LRUIdx(BufferObj *buffer_obj) const {
+size_t BufferManager::LRUIdx(BufferObj *buffer_obj) const {
     auto id = buffer_obj->id();
     return id % lru_caches_.size();
 }
 
-UniquePtr<BufferObj> BufferManager::MakeBufferObj(UniquePtr<FileWorker> file_worker, bool is_ephemeral) {
+std::unique_ptr<BufferObj> BufferManager::MakeBufferObj(std::unique_ptr<FileWorker> file_worker, bool is_ephemeral) {
     auto *file_worker_ptr = file_worker.get();
-    auto ret = MakeUnique<BufferObj>(this, is_ephemeral, std::move(file_worker), buffer_id_++);
+    auto ret = std::make_unique<BufferObj>(this, is_ephemeral, std::move(file_worker), buffer_id_++);
     if (file_worker_ptr->Type() == FileWorkerType::kVarFile) {
         auto *var_file_worker = static_cast<VarFileWorker *>(file_worker_ptr);
         var_file_worker->SetBufferObj(ret.get());
@@ -346,7 +346,7 @@ UniquePtr<BufferObj> BufferManager::MakeBufferObj(UniquePtr<FileWorker> file_wor
     return ret;
 }
 
-void BufferManager::RemoveBufferObjects(const Vector<String> &object_paths) {
+void BufferManager::RemoveBufferObjects(const std::vector<std::string> &object_paths) {
     std::unique_lock lock(w_locker_);
     size_t erase_object = 0;
     for (auto &object_path : object_paths) {

@@ -36,11 +36,11 @@ namespace infinity {
 export class PhysicalOptimize final : public PhysicalOperator {
 public:
     explicit PhysicalOptimize(u64 id,
-                              String db_name,
-                              String table_name,
-                              String index_name,
-                              Vector<UniquePtr<InitParameter>> opt_params,
-                              SharedPtr<Vector<LoadMeta>> load_metas)
+                              std::string db_name,
+                              std::string table_name,
+                              std::string index_name,
+                              std::vector<std::unique_ptr<InitParameter>> opt_params,
+                              std::shared_ptr<std::vector<LoadMeta>> load_metas)
         : PhysicalOperator(PhysicalOperatorType::kOptimize, nullptr, nullptr, id, load_metas), db_name_(std::move(db_name)),
           table_name_(std::move(table_name)), index_name_(std::move(index_name)), opt_params_(std::move(opt_params)) {}
 
@@ -50,9 +50,9 @@ public:
 
     bool Execute(QueryContext *query_context, OperatorState *operator_state) final;
 
-    inline SharedPtr<Vector<String>> GetOutputNames() const final { return output_names_; }
+    inline std::shared_ptr<std::vector<std::string>> GetOutputNames() const final { return output_names_; }
 
-    inline SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const final { return output_types_; }
+    inline std::shared_ptr<std::vector<std::shared_ptr<DataType>>> GetOutputTypes() const final { return output_types_; }
 
 private:
     void OptimizeIndex(QueryContext *query_context, OperatorState *operator_state);
@@ -60,13 +60,13 @@ private:
     void OptIndex(QueryContext *query_context, OperatorState *operator_state);
 
 private:
-    String db_name_{};
-    String table_name_{};
-    String index_name_{};
-    Vector<UniquePtr<InitParameter>> opt_params_;
+    std::string db_name_{};
+    std::string table_name_{};
+    std::string index_name_{};
+    std::vector<std::unique_ptr<InitParameter>> opt_params_;
 
-    SharedPtr<Vector<String>> output_names_{};
-    SharedPtr<Vector<SharedPtr<DataType>>> output_types_{};
+    std::shared_ptr<std::vector<std::string>> output_names_{};
+    std::shared_ptr<std::vector<std::shared_ptr<DataType>>> output_types_{};
 };
 
 } // namespace infinity

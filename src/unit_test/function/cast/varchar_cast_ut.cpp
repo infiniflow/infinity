@@ -168,8 +168,8 @@ TEST_F(VarcharCastTest, varchar_cast1) {
     using namespace infinity;
 
     {
-        SharedPtr<DataType> source_type = MakeShared<DataType>(LogicalType::kVarchar);
-        SharedPtr<ColumnVector> input_column_vector = MakeShared<ColumnVector>(source_type);
+        std::shared_ptr<DataType> source_type = std::make_shared<DataType>(LogicalType::kVarchar);
+        std::shared_ptr<ColumnVector> input_column_vector = std::make_shared<ColumnVector>(source_type);
         input_column_vector->Initialize();
 
         // Case 1
@@ -216,8 +216,8 @@ TEST_F(VarcharCastTest, varchar_cast1) {
     }
 
     {
-        SharedPtr<DataType> source_type = MakeShared<DataType>(LogicalType::kVarchar);
-        SharedPtr<ColumnVector> input_column_vector = MakeShared<ColumnVector>(source_type);
+        std::shared_ptr<DataType> source_type = std::make_shared<DataType>(LogicalType::kVarchar);
+        std::shared_ptr<ColumnVector> input_column_vector = std::make_shared<ColumnVector>(source_type);
         input_column_vector->Initialize();
 
         // Case 1
@@ -264,8 +264,8 @@ TEST_F(VarcharCastTest, varchar_cast1) {
     }
 
     {
-        SharedPtr<DataType> source_type = MakeShared<DataType>(LogicalType::kVarchar);
-        SharedPtr<ColumnVector> input_column_vector = MakeShared<ColumnVector>(source_type);
+        std::shared_ptr<DataType> source_type = std::make_shared<DataType>(LogicalType::kVarchar);
+        std::shared_ptr<ColumnVector> input_column_vector = std::make_shared<ColumnVector>(source_type);
         input_column_vector->Initialize();
 
         // Case 1

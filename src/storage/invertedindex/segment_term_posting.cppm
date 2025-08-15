@@ -18,7 +18,7 @@ export class SegmentTermPosting {
 public:
     SegmentTermPosting();
 
-    SegmentTermPosting(const String &index_dir, const String &base_name, RowID base_row_id, optionflag_t flag);
+    SegmentTermPosting(const std::string &index_dir, const std::string &base_name, RowID base_row_id, optionflag_t flag);
 
     RowID GetBeginRowID() const { return base_row_id_; }
 
@@ -28,9 +28,9 @@ public:
 
 public:
     RowID base_row_id_{};
-    String term_{};
+    std::string term_{};
     PostingDecoder *posting_decoder_{nullptr};
-    SharedPtr<ColumnIndexIterator> column_index_iterator_{};
+    std::shared_ptr<ColumnIndexIterator> column_index_iterator_{};
 };
 
 class SegmentTermPostingComparator {
@@ -45,24 +45,27 @@ public:
 
 export class SegmentTermPostingQueue {
 public:
-    SegmentTermPostingQueue(const String &index_dir, const Vector<String> &base_names, const Vector<RowID> &base_rowids, optionflag_t flag);
+    SegmentTermPostingQueue(const std::string &index_dir,
+                            const std::vector<std::string> &base_names,
+                            const std::vector<RowID> &base_rowids,
+                            optionflag_t flag);
 
     ~SegmentTermPostingQueue();
 
     bool Empty() const { return segment_term_postings_.empty(); }
 
-    const Vector<SegmentTermPosting *> &GetCurrentMerging(String &term);
+    const std::vector<SegmentTermPosting *> &GetCurrentMerging(std::string &term);
 
     void MoveToNextTerm();
 
 private:
-    using PriorityQueue = Heap<SegmentTermPosting *, SegmentTermPostingComparator>;
-    const String &index_dir_;
-    const Vector<String> &base_names_;
-    const Vector<RowID> &base_rowids_;
+    using PriorityQueue = std::priority_queue<SegmentTermPosting *, std::vector<SegmentTermPosting *>, SegmentTermPostingComparator>;
+    const std::string &index_dir_;
+    const std::vector<std::string> &base_names_;
+    const std::vector<RowID> &base_rowids_;
 
     PriorityQueue segment_term_postings_;
-    Vector<SegmentTermPosting *> merging_term_postings_;
+    std::vector<SegmentTermPosting *> merging_term_postings_;
 };
 
 } // namespace infinity

@@ -29,8 +29,8 @@ import knn_expr;
 
 namespace infinity {
 
-SharedPtr<BaseExpression> JoinBinder::BuildExpression(const ParsedExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root) {
-    SharedPtr<BaseExpression> result;
+std::shared_ptr<BaseExpression> JoinBinder::BuildExpression(const ParsedExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root) {
+    std::shared_ptr<BaseExpression> result;
     switch (expr.type_) {
         case ParsedExprType::kSubquery: {
             Status status = Status::SyntaxError("Subquery isn't allowed in JOIN condition.");
@@ -43,7 +43,7 @@ SharedPtr<BaseExpression> JoinBinder::BuildExpression(const ParsedExpr &expr, Bi
     return result;
 }
 
-SharedPtr<BaseExpression> JoinBinder::BuildKnnExpr(const KnnExpr &, BindContext *, i64, bool) {
+std::shared_ptr<BaseExpression> JoinBinder::BuildKnnExpr(const KnnExpr &, BindContext *, i64, bool) {
 
     Status status = Status::SyntaxError("KNN expression isn't supported in join clause.");
     RecoverableError(status);

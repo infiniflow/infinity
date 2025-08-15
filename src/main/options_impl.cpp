@@ -26,85 +26,85 @@ GlobalOptions::GlobalOptions() {
     i32 invalid_option_index = static_cast<i32>(GlobalOptionIndex::kInvalid);
     options_.resize(invalid_option_index);
 
-    name2index_[String(VERSION_OPTION_NAME)] = GlobalOptionIndex::kVersion;
-    name2index_[String(SERVER_MODE_OPTION_NAME)] = GlobalOptionIndex::kServerMode;
-    name2index_[String(TIME_ZONE_OPTION_NAME)] = GlobalOptionIndex::kTimeZone;
-    name2index_[String(TIME_ZONE_BIAS_OPTION_NAME)] = GlobalOptionIndex::kTimeZoneBias;
-    name2index_[String(CPU_LIMIT_OPTION_NAME)] = GlobalOptionIndex::kWorkerCPULimit;
-    name2index_[String(SERVER_ADDRESS_OPTION_NAME)] = GlobalOptionIndex::kServerAddress;
-    name2index_[String(PEER_SERVER_IP_OPTION_NAME)] = GlobalOptionIndex::kPeerServerIP;
-    name2index_[String(PEER_SERVER_PORT_OPTION_NAME)] = GlobalOptionIndex::kPeerServerPort;
+    name2index_[std::string(VERSION_OPTION_NAME)] = GlobalOptionIndex::kVersion;
+    name2index_[std::string(SERVER_MODE_OPTION_NAME)] = GlobalOptionIndex::kServerMode;
+    name2index_[std::string(TIME_ZONE_OPTION_NAME)] = GlobalOptionIndex::kTimeZone;
+    name2index_[std::string(TIME_ZONE_BIAS_OPTION_NAME)] = GlobalOptionIndex::kTimeZoneBias;
+    name2index_[std::string(CPU_LIMIT_OPTION_NAME)] = GlobalOptionIndex::kWorkerCPULimit;
+    name2index_[std::string(SERVER_ADDRESS_OPTION_NAME)] = GlobalOptionIndex::kServerAddress;
+    name2index_[std::string(PEER_SERVER_IP_OPTION_NAME)] = GlobalOptionIndex::kPeerServerIP;
+    name2index_[std::string(PEER_SERVER_PORT_OPTION_NAME)] = GlobalOptionIndex::kPeerServerPort;
 
-    name2index_[String(PEER_RETRY_DELAY_OPTION_NAME)] = GlobalOptionIndex::kPeerRetryDelay;
-    name2index_[String(PEER_RETRY_COUNT_OPTION_NAME)] = GlobalOptionIndex::kPeerRetryCount;
-    name2index_[String(PEER_CONNECT_TIMEOUT_OPTION_NAME)] = GlobalOptionIndex::kPeerConnectTimeout;
-    name2index_[String(PEER_RECV_TIMEOUT_OPTION_NAME)] = GlobalOptionIndex::kPeerRecvTimeout;
-    name2index_[String(PEER_SEND_TIMEOUT_OPTION_NAME)] = GlobalOptionIndex::kPeerSendTimeout;
+    name2index_[std::string(PEER_RETRY_DELAY_OPTION_NAME)] = GlobalOptionIndex::kPeerRetryDelay;
+    name2index_[std::string(PEER_RETRY_COUNT_OPTION_NAME)] = GlobalOptionIndex::kPeerRetryCount;
+    name2index_[std::string(PEER_CONNECT_TIMEOUT_OPTION_NAME)] = GlobalOptionIndex::kPeerConnectTimeout;
+    name2index_[std::string(PEER_RECV_TIMEOUT_OPTION_NAME)] = GlobalOptionIndex::kPeerRecvTimeout;
+    name2index_[std::string(PEER_SEND_TIMEOUT_OPTION_NAME)] = GlobalOptionIndex::kPeerSendTimeout;
 
-    name2index_[String(POSTGRES_PORT_OPTION_NAME)] = GlobalOptionIndex::kPostgresPort;
-    name2index_[String(HTTP_PORT_OPTION_NAME)] = GlobalOptionIndex::kHTTPPort;
-    name2index_[String(CLIENT_PORT_OPTION_NAME)] = GlobalOptionIndex::kClientPort;
-    name2index_[String(CONNECTION_POOL_SIZE_OPTION_NAME)] = GlobalOptionIndex::kConnectionPoolSize;
-    name2index_[String(PEER_SERVER_CONNECTION_POOL_SIZE_OPTION_NAME)] = GlobalOptionIndex::kPeerServerConnectionPoolSize;
-    name2index_[String(LOG_FILENAME_OPTION_NAME)] = GlobalOptionIndex::kLogFileName;
+    name2index_[std::string(POSTGRES_PORT_OPTION_NAME)] = GlobalOptionIndex::kPostgresPort;
+    name2index_[std::string(HTTP_PORT_OPTION_NAME)] = GlobalOptionIndex::kHTTPPort;
+    name2index_[std::string(CLIENT_PORT_OPTION_NAME)] = GlobalOptionIndex::kClientPort;
+    name2index_[std::string(CONNECTION_POOL_SIZE_OPTION_NAME)] = GlobalOptionIndex::kConnectionPoolSize;
+    name2index_[std::string(PEER_SERVER_CONNECTION_POOL_SIZE_OPTION_NAME)] = GlobalOptionIndex::kPeerServerConnectionPoolSize;
+    name2index_[std::string(LOG_FILENAME_OPTION_NAME)] = GlobalOptionIndex::kLogFileName;
 
-    name2index_[String(LOG_DIR_OPTION_NAME)] = GlobalOptionIndex::kLogDir;
-    name2index_[String(LOG_TO_STDOUT_OPTION_NAME)] = GlobalOptionIndex::kLogToStdout;
-    name2index_[String(LOG_FILE_MAX_SIZE_OPTION_NAME)] = GlobalOptionIndex::kLogFileMaxSize;
-    name2index_[String(LOG_FILE_ROTATE_COUNT_OPTION_NAME)] = GlobalOptionIndex::kLogFileRotateCount;
-    name2index_[String(LOG_LEVEL_OPTION_NAME)] = GlobalOptionIndex::kLogLevel;
+    name2index_[std::string(LOG_DIR_OPTION_NAME)] = GlobalOptionIndex::kLogDir;
+    name2index_[std::string(LOG_TO_STDOUT_OPTION_NAME)] = GlobalOptionIndex::kLogToStdout;
+    name2index_[std::string(LOG_FILE_MAX_SIZE_OPTION_NAME)] = GlobalOptionIndex::kLogFileMaxSize;
+    name2index_[std::string(LOG_FILE_ROTATE_COUNT_OPTION_NAME)] = GlobalOptionIndex::kLogFileRotateCount;
+    name2index_[std::string(LOG_LEVEL_OPTION_NAME)] = GlobalOptionIndex::kLogLevel;
 
-    name2index_[String(DATA_DIR_OPTION_NAME)] = GlobalOptionIndex::kDataDir;
-    name2index_[String(CATALOG_DIR_OPTION_NAME)] = GlobalOptionIndex::kCatalogDir;
-    name2index_[String(SNAPSHOT_DIR_OPTION_NAME)] = GlobalOptionIndex::kSnapshotDir;
-    name2index_[String(CLEANUP_INTERVAL_OPTION_NAME)] = GlobalOptionIndex::kCleanupInterval;
-    name2index_[String(COMPACT_INTERVAL_OPTION_NAME)] = GlobalOptionIndex::kCompactInterval;
-    name2index_[String(OPTIMIZE_INTERVAL_OPTION_NAME)] = GlobalOptionIndex::kOptimizeIndexInterval;
-    name2index_[String(MEM_INDEX_CAPACITY_OPTION_NAME)] = GlobalOptionIndex::kMemIndexCapacity;
+    name2index_[std::string(DATA_DIR_OPTION_NAME)] = GlobalOptionIndex::kDataDir;
+    name2index_[std::string(CATALOG_DIR_OPTION_NAME)] = GlobalOptionIndex::kCatalogDir;
+    name2index_[std::string(SNAPSHOT_DIR_OPTION_NAME)] = GlobalOptionIndex::kSnapshotDir;
+    name2index_[std::string(CLEANUP_INTERVAL_OPTION_NAME)] = GlobalOptionIndex::kCleanupInterval;
+    name2index_[std::string(COMPACT_INTERVAL_OPTION_NAME)] = GlobalOptionIndex::kCompactInterval;
+    name2index_[std::string(OPTIMIZE_INTERVAL_OPTION_NAME)] = GlobalOptionIndex::kOptimizeIndexInterval;
+    name2index_[std::string(MEM_INDEX_CAPACITY_OPTION_NAME)] = GlobalOptionIndex::kMemIndexCapacity;
 
-    name2index_[String(PERSISTENCE_DIR_OPTION_NAME)] = GlobalOptionIndex::kPersistenceDir;
-    name2index_[String(PERSISTENCE_OBJECT_SIZE_LIMIT_OPTION_NAME)] = GlobalOptionIndex::kPersistenceObjectSizeLimit;
+    name2index_[std::string(PERSISTENCE_DIR_OPTION_NAME)] = GlobalOptionIndex::kPersistenceDir;
+    name2index_[std::string(PERSISTENCE_OBJECT_SIZE_LIMIT_OPTION_NAME)] = GlobalOptionIndex::kPersistenceObjectSizeLimit;
 
-    name2index_[String(STORAGE_TYPE_OPTION_NAME)] = GlobalOptionIndex::kStorageType;
-    name2index_[String(OBJECT_STORAGE_OPTION_NAME)] = GlobalOptionIndex::kObjectStorage;
-    name2index_[String(OBJECT_STORAGE_URL_OPTION_NAME)] = GlobalOptionIndex::kObjectStorageUrl;
-    name2index_[String(OBJECT_STORAGE_BUCKET_OPTION_NAME)] = GlobalOptionIndex::kObjectStorageBucket;
-    name2index_[String(OBJECT_STORAGE_ACCESS_KEY_OPTION_NAME)] = GlobalOptionIndex::kObjectStorageAccessKey;
-    name2index_[String(OBJECT_STORAGE_SECRET_KEY_OPTION_NAME)] = GlobalOptionIndex::kObjectStorageSecretKey;
-    name2index_[String(OBJECT_STORAGE_ENABLE_HTTPS_OPTION_NAME)] = GlobalOptionIndex::kObjectStorageHttps;
+    name2index_[std::string(STORAGE_TYPE_OPTION_NAME)] = GlobalOptionIndex::kStorageType;
+    name2index_[std::string(OBJECT_STORAGE_OPTION_NAME)] = GlobalOptionIndex::kObjectStorage;
+    name2index_[std::string(OBJECT_STORAGE_URL_OPTION_NAME)] = GlobalOptionIndex::kObjectStorageUrl;
+    name2index_[std::string(OBJECT_STORAGE_BUCKET_OPTION_NAME)] = GlobalOptionIndex::kObjectStorageBucket;
+    name2index_[std::string(OBJECT_STORAGE_ACCESS_KEY_OPTION_NAME)] = GlobalOptionIndex::kObjectStorageAccessKey;
+    name2index_[std::string(OBJECT_STORAGE_SECRET_KEY_OPTION_NAME)] = GlobalOptionIndex::kObjectStorageSecretKey;
+    name2index_[std::string(OBJECT_STORAGE_ENABLE_HTTPS_OPTION_NAME)] = GlobalOptionIndex::kObjectStorageHttps;
 
-    name2index_[String(BUFFER_MANAGER_SIZE_OPTION_NAME)] = GlobalOptionIndex::kBufferManagerSize;
-    name2index_[String(LRU_NUM_OPTION_NAME)] = GlobalOptionIndex::kLRUNum;
-    name2index_[String(TEMP_DIR_OPTION_NAME)] = GlobalOptionIndex::kTempDir;
-    name2index_[String(MEMINDEX_MEMORY_QUOTA_OPTION_NAME)] = GlobalOptionIndex::kMemIndexMemoryQuota;
+    name2index_[std::string(BUFFER_MANAGER_SIZE_OPTION_NAME)] = GlobalOptionIndex::kBufferManagerSize;
+    name2index_[std::string(LRU_NUM_OPTION_NAME)] = GlobalOptionIndex::kLRUNum;
+    name2index_[std::string(TEMP_DIR_OPTION_NAME)] = GlobalOptionIndex::kTempDir;
+    name2index_[std::string(MEMINDEX_MEMORY_QUOTA_OPTION_NAME)] = GlobalOptionIndex::kMemIndexMemoryQuota;
 
-    name2index_[String(DENSE_INDEX_BUILDING_WORKER_OPTION_NAME)] = GlobalOptionIndex::kDenseIndexBuildingWorker;
-    name2index_[String(SPARSE_INDEX_BUILDING_WORKER_OPTION_NAME)] = GlobalOptionIndex::kSparseIndexBuildingWorker;
-    name2index_[String(FULLTEXT_INDEX_BUILDING_WORKER_OPTION_NAME)] = GlobalOptionIndex::kFulltextIndexBuildingWorker;
-    name2index_[String(BOTTOM_EXECUTOR_WORKER_OPTION_NAME)] = GlobalOptionIndex::kBottomExecutorWorker;
+    name2index_[std::string(DENSE_INDEX_BUILDING_WORKER_OPTION_NAME)] = GlobalOptionIndex::kDenseIndexBuildingWorker;
+    name2index_[std::string(SPARSE_INDEX_BUILDING_WORKER_OPTION_NAME)] = GlobalOptionIndex::kSparseIndexBuildingWorker;
+    name2index_[std::string(FULLTEXT_INDEX_BUILDING_WORKER_OPTION_NAME)] = GlobalOptionIndex::kFulltextIndexBuildingWorker;
+    name2index_[std::string(BOTTOM_EXECUTOR_WORKER_OPTION_NAME)] = GlobalOptionIndex::kBottomExecutorWorker;
 
-    name2index_[String(RESULT_CACHE_OPTION_NAME)] = GlobalOptionIndex::kResultCache;
-    name2index_[String(CACHE_RESULT_CAPACITY_OPTION_NAME)] = GlobalOptionIndex::kCacheResultCapacity;
+    name2index_[std::string(RESULT_CACHE_OPTION_NAME)] = GlobalOptionIndex::kResultCache;
+    name2index_[std::string(CACHE_RESULT_CAPACITY_OPTION_NAME)] = GlobalOptionIndex::kCacheResultCapacity;
 
-    name2index_[String(WAL_DIR_OPTION_NAME)] = GlobalOptionIndex::kWALDir;
-    name2index_[String(WAL_COMPACT_THRESHOLD_OPTION_NAME)] = GlobalOptionIndex::kWALCompactThreshold;
-    name2index_[String(CHECKPOINT_INTERVAL_OPTION_NAME)] = GlobalOptionIndex::kCheckpointInterval;
+    name2index_[std::string(WAL_DIR_OPTION_NAME)] = GlobalOptionIndex::kWALDir;
+    name2index_[std::string(WAL_COMPACT_THRESHOLD_OPTION_NAME)] = GlobalOptionIndex::kWALCompactThreshold;
+    name2index_[std::string(CHECKPOINT_INTERVAL_OPTION_NAME)] = GlobalOptionIndex::kCheckpointInterval;
 
-    name2index_[String(WAL_FLUSH_OPTION_NAME)] = GlobalOptionIndex::kFlushMethodAtCommit;
-    name2index_[String(RESOURCE_DIR_OPTION_NAME)] = GlobalOptionIndex::kResourcePath;
-    name2index_[String(SNAPSHOT_DIR_OPTION_NAME)] = GlobalOptionIndex::kSnapshotDir;
+    name2index_[std::string(WAL_FLUSH_OPTION_NAME)] = GlobalOptionIndex::kFlushMethodAtCommit;
+    name2index_[std::string(RESOURCE_DIR_OPTION_NAME)] = GlobalOptionIndex::kResourcePath;
+    name2index_[std::string(SNAPSHOT_DIR_OPTION_NAME)] = GlobalOptionIndex::kSnapshotDir;
 
-    name2index_[String(RECORD_RUNNING_QUERY_OPTION_NAME)] = GlobalOptionIndex::kRecordRunningQuery;
-    name2index_[String(REPLAY_WAL_OPTION_NAME)] = GlobalOptionIndex::kReplayWal;
+    name2index_[std::string(RECORD_RUNNING_QUERY_OPTION_NAME)] = GlobalOptionIndex::kRecordRunningQuery;
+    name2index_[std::string(REPLAY_WAL_OPTION_NAME)] = GlobalOptionIndex::kReplayWal;
 }
 
-Status GlobalOptions::AddOption(UniquePtr<BaseOption> option) {
+Status GlobalOptions::AddOption(std::unique_ptr<BaseOption> option) {
     GlobalOptionIndex global_option_index = GetOptionIndex(option->name_);
     if (global_option_index == GlobalOptionIndex::kInvalid) {
         return Status::InvalidConfig(fmt::format("Attempt to insert option: {}, which isn't supported", option->name_));
     }
 
-    SizeT option_index = static_cast<SizeT>(global_option_index);
+    size_t option_index = static_cast<size_t>(global_option_index);
     if (option_index >= options_.size()) {
         return Status::InvalidConfig(
             fmt::format("Attempt to insert option: {} with index {} at index: {}", option->name_, option_index, options_.size()));
@@ -119,7 +119,7 @@ Status GlobalOptions::AddOption(UniquePtr<BaseOption> option) {
     return Status::OK();
 }
 
-GlobalOptionIndex GlobalOptions::GetOptionIndex(const String &option_name) const {
+GlobalOptionIndex GlobalOptions::GetOptionIndex(const std::string &option_name) const {
     auto iter = name2index_.find(option_name);
     if (iter == name2index_.end()) {
         return GlobalOptionIndex::kInvalid;
@@ -127,22 +127,22 @@ GlobalOptionIndex GlobalOptions::GetOptionIndex(const String &option_name) const
     return iter->second;
 }
 
-Tuple<BaseOption *, Status> GlobalOptions::GetOptionByName(const String &option_name) {
+std::tuple<BaseOption *, Status> GlobalOptions::GetOptionByName(const std::string &option_name) {
     auto iter = name2index_.find(option_name);
     if (iter == name2index_.end()) {
         return {nullptr, Status::InvalidConfig(fmt::format("Attempt to get option: {} which doesn't exist.", option_name))};
     }
 
-    SizeT option_index = static_cast<SizeT>(iter->second);
+    size_t option_index = static_cast<size_t>(iter->second);
     return {options_[option_index].get(), Status::OK()};
 }
 
 BaseOption *GlobalOptions::GetOptionByIndex(GlobalOptionIndex global_option_index) {
-    SizeT option_index = static_cast<SizeT>(global_option_index);
+    size_t option_index = static_cast<size_t>(global_option_index);
     return options_[option_index].get();
 }
 
-String GlobalOptions::GetStringValue(GlobalOptionIndex option_index) {
+std::string GlobalOptions::GetStringValue(GlobalOptionIndex option_index) {
     BaseOption *base_option = GetOptionByIndex(option_index);
     if (base_option->data_type_ != BaseOptionDataType::kString) {
         UnrecoverableError("Attempt to fetch string value from non-string data type option");

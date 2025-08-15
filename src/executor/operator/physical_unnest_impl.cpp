@@ -47,15 +47,15 @@ void PhysicalUnnest::Init(QueryContext* query_context) {}
 
 namespace {
 
-void AppendScaleToColumnVector(const ColumnVector &input_col, SizeT write_size, SizeT written, ColumnVector &cur_col) {
-    for (SizeT i = 0; i < write_size; ++i) {
+void AppendScaleToColumnVector(const ColumnVector &input_col, size_t write_size, size_t written, ColumnVector &cur_col) {
+    for (size_t i = 0; i < write_size; ++i) {
         cur_col.AppendWith(input_col, written, 1);
     }
 }
 
-Vector<UniquePtr<DataBlock>> MakeDataBlocks(const Vector<Vector<SharedPtr<ColumnVector>>> &output_datas) {
+std::vector<std::unique_ptr<DataBlock>> MakeDataBlocks(const std::vector<std::vector<std::shared_ptr<ColumnVector>>> &output_datas) {
     int block_count = -1;
-    for (SizeT col_idx = 0; col_idx < output_datas.size(); ++col_idx) {
+    for (size_t col_idx = 0; col_idx < output_datas.size(); ++col_idx) {
         const auto &output_column_vector = output_datas[col_idx];
         if (block_count == -1) {
             block_count = output_column_vector.size();
@@ -63,13 +63,13 @@ Vector<UniquePtr<DataBlock>> MakeDataBlocks(const Vector<Vector<SharedPtr<Column
             UnrecoverableError("Column count mismatch.");
         }
     }
-    Vector<UniquePtr<DataBlock>> data_blocks;
+    std::vector<std::unique_ptr<DataBlock>> data_blocks;
     data_blocks.reserve(block_count);
-    for (SizeT block_i = 0; block_i < SizeT(block_count); ++block_i) {
+    for (size_t block_i = 0; block_i < size_t(block_count); ++block_i) {
         data_blocks.emplace_back(DataBlock::MakeUniquePtr());
         DataBlock *output_ptr = data_blocks.back().get();
-        for (SizeT col_idx = 0; col_idx < output_datas.size(); ++col_idx) {
-            SharedPtr<ColumnVector> vec = output_datas[col_idx][block_i];
+        for (size_t col_idx = 0; col_idx < output_datas.size(); ++col_idx) {
+            std::shared_ptr<ColumnVector> vec = output_datas[col_idx][block_i];
             output_ptr->InsertVector(vec, col_idx);
         }
         output_ptr->Finalize();
@@ -95,15 +95,15 @@ bool PhysicalUnnest::Execute(QueryContext *, OperatorState *operator_state) {
         return true;
     }
 
-    Vector<SharedPtr<DataType>> output_types = *this->GetOutputTypes();
-    Vector<SharedPtr<DataType>> input_types = input_data_blocks[0]->types();
+    std::vector<std::shared_ptr<DataType>> output_types = *this->GetOutputTypes();
+    std::vector<std::shared_ptr<DataType>> input_types = input_data_blocks[0]->types();
 
-    SizeT unnest_idx = GetUnnestIdx();
+    size_t unnest_idx = GetUnnestIdx();
 
-    Vector<Vector<SharedPtr<ColumnVector>>> output_datas(output_types.size());
+    std::vector<std::vector<std::shared_ptr<ColumnVector>>> output_datas(output_types.size());
     for (const auto &input_data_block : input_data_blocks) {
         u16 row_count = input_data_block->row_count();
-        Vector<SizeT> array_lengths;
+        std::vector<size_t> array_lengths;
         {
             const auto &unnest_col = input_data_block->column_vectors[unnest_idx];
             auto &output_cols = output_datas[unnest_idx];
@@ -115,7 +115,7 @@ bool PhysicalUnnest::Execute(QueryContext *, OperatorState *operator_state) {
             ColumnVector *cur_col = output_cols.back().get();
 
             for (u16 row_idx = 0; row_idx < row_count; ++row_idx) {
-                SizeT written = 0;
+                size_t written = 0;
                 while (true) {
                     bool complete = cur_col->AppendUnnestArray(*unnest_col, row_idx, written);
                     if (complete) {
@@ -132,7 +132,7 @@ bool PhysicalUnnest::Execute(QueryContext *, OperatorState *operator_state) {
                 }
             }
         }
-        for (SizeT col_idx = 0; col_idx < output_types.size(); ++col_idx) {
+        for (size_t col_idx = 0; col_idx < output_types.size(); ++col_idx) {
             if (col_idx == unnest_idx) {
                 continue;
             }
@@ -144,11 +144,11 @@ bool PhysicalUnnest::Execute(QueryContext *, OperatorState *operator_state) {
                 output_cols.push_back(std::move(col));
             }
             ColumnVector *cur_col = output_cols.back().get();
-            SizeT input_offset = 0;
-            for (SizeT array_length : array_lengths) {
-                SizeT written = 0;
+            size_t input_offset = 0;
+            for (size_t array_length : array_lengths) {
+                size_t written = 0;
                 while (written < array_length) {
-                    SizeT write_size = std::min(array_length - written, cur_col->capacity() - cur_col->Size());
+                    size_t write_size = std::min(array_length - written, cur_col->capacity() - cur_col->Size());
                     AppendScaleToColumnVector(*input_col, write_size, input_offset, *cur_col);
                     written += write_size;
 
@@ -179,19 +179,19 @@ bool PhysicalUnnest::Execute(QueryContext *, OperatorState *operator_state) {
     return true;
 }
 
-SharedPtr<Vector<String>> PhysicalUnnest::GetOutputNames() const {
+std::shared_ptr<std::vector<std::string>> PhysicalUnnest::GetOutputNames() const {
     auto ret = PhysicalCommonFunctionUsingLoadMeta::GetOutputNames(*this);
     return ret;
 }
 
-SharedPtr<Vector<SharedPtr<DataType>>> PhysicalUnnest::GetOutputTypes() const {
-    SharedPtr<Vector<SharedPtr<DataType>>> result = PhysicalCommonFunctionUsingLoadMeta::GetOutputTypes(*this);
-    SizeT unnest_idx = GetUnnestIdx();
-    (*result)[unnest_idx] = MakeShared<DataType>(static_cast<ArrayInfo *>((*result)[unnest_idx]->type_info().get())->ElemType());
+std::shared_ptr<std::vector<std::shared_ptr<DataType>>> PhysicalUnnest::GetOutputTypes() const {
+    std::shared_ptr<std::vector<std::shared_ptr<DataType>>> result = PhysicalCommonFunctionUsingLoadMeta::GetOutputTypes(*this);
+    size_t unnest_idx = GetUnnestIdx();
+    (*result)[unnest_idx] = std::make_shared<DataType>(static_cast<ArrayInfo *>((*result)[unnest_idx]->type_info().get())->ElemType());
     return result;
 }
 
-SizeT PhysicalUnnest::GetUnnestIdx() const {
+size_t PhysicalUnnest::GetUnnestIdx() const {
     if (expression_list_.size() != 1) {
         RecoverableError(Status::SyntaxError(fmt::format("UNNEST only supports one expression, but got {}", expression_list_.size())));
     }
@@ -200,7 +200,7 @@ SizeT PhysicalUnnest::GetUnnestIdx() const {
         UnrecoverableError("UNNEST only supports one column reference.");
     }
     auto *unnest_ref_expr = static_cast<ReferenceExpression *>(unnest_expr->arguments()[0].get());
-    SizeT unnest_idx = unnest_ref_expr->column_index();
+    size_t unnest_idx = unnest_ref_expr->column_index();
     return unnest_idx;
 }
 

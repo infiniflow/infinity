@@ -89,29 +89,29 @@ public:
     void SetUp() override {
         BaseTestParamStr::SetUp();
         NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
-        SharedPtr<String> db_name = std::make_shared<String>("db1");
+        std::shared_ptr<String> db_name = std::make_shared<String>("db1");
         auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kVarchar), "col1", std::set<ConstraintType>());
         auto table_name = std::make_shared<std::string>("tb1");
-        auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1});
+        auto table_def = TableDef::Make(db_name, table_name, std::make_shared<String>(), {column_def1});
         auto index_name = std::make_shared<String>("idx1");
         Vector<InitParameter *> index_param_list;
-        auto index_base = IndexFullText::Make(index_name, MakeShared<String>(), "file_name", {column_def1->name()}, index_param_list);
+        auto index_base = IndexFullText::Make(index_name, std::make_shared<String>(), "file_name", {column_def1->name()}, index_param_list);
         {
-            auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
-            Status status = txn->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
+            auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("create db"), TransactionType::kNormal);
+            Status status = txn->CreateDatabase(*db_name, ConflictType::kError, std::make_shared<String>());
             EXPECT_TRUE(status.ok());
             status = new_txn_mgr->CommitTxn(txn);
             EXPECT_TRUE(status.ok());
         }
         {
-            auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+            auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("create table"), TransactionType::kNormal);
             Status status = txn->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
             EXPECT_TRUE(status.ok());
             status = new_txn_mgr->CommitTxn(txn);
             EXPECT_TRUE(status.ok());
         }
         {
-            auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create index"), TransactionType::kNormal);
+            auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("create index"), TransactionType::kNormal);
             Status status = txn->CreateIndex(*db_name, *table_name, index_base, ConflictType::kIgnore);
             EXPECT_TRUE(status.ok());
             status = new_txn_mgr->CommitTxn(txn);
@@ -130,11 +130,11 @@ public:
         expected_postings_ = {{"fst", {0, 1, 2}, {4, 2, 2}}, {"automaton", {0, 3}, {2, 5}}, {"transducer", {0, 4}, {1, 4}}};
     }
 
-    SharedPtr<ColumnVector> MakeColumnVector(const Vector<String> &paragraphs, SizeT repeats = 1) {
+    std::shared_ptr<ColumnVector> MakeColumnVector(const Vector<String> &paragraphs, size_t repeats = 1) {
         auto col_vec = ColumnVector::Make(std::make_shared<DataType>(LogicalType::kVarchar));
         col_vec->Initialize();
-        for (SizeT i = 0; i < repeats; i++) {
-            for (SizeT j = 0; j < paragraphs.size(); ++j) {
+        for (size_t i = 0; i < repeats; i++) {
+            for (size_t j = 0; j < paragraphs.size(); ++j) {
                 Value value = Value::MakeVarchar(paragraphs[j]);
                 col_vec->AppendValue(value);
             }
@@ -142,7 +142,7 @@ public:
         return col_vec;
     }
 
-    SharedPtr<DataBlock> MakeInputBlock(const Vector<String> &paragraphs, SizeT repeats = 1) {
+    std::shared_ptr<DataBlock> MakeInputBlock(const Vector<String> &paragraphs, size_t repeats = 1) {
         auto data_block = DataBlock::Make();
         auto col_vec = MakeColumnVector(paragraphs, repeats);
         data_block->InsertVector(col_vec, 0);
@@ -155,7 +155,7 @@ public:
             String table_key;
             String index_key;
             NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
-            auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("dummy"), TransactionType::kNormal);
+            auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("dummy"), TransactionType::kNormal);
             Status status = txn->GetTableIndexMeta("db1", "tb1", "idx1", db_meta_, table_meta_, index_meta_, &table_key, &index_key);
             EXPECT_TRUE(status.ok());
         }
@@ -164,15 +164,15 @@ public:
         // Pair<u64, float> res = reader.GetTotalDfAndAvgColumnLength();
         // ASSERT_GT(res.first, 0);     // row count
         // ASSERT_GT(res.second, 0.0f); // avg column length
-        for (SizeT i = 0; i < expected_postings_.size(); ++i) {
+        for (size_t i = 0; i < expected_postings_.size(); ++i) {
             const ExpectedPosting &expected = expected_postings_[i];
             const String &term = expected.term;
 
-            UniquePtr<PostingIterator> post_iter(reader.Lookup(term));
+            std::unique_ptr<PostingIterator> post_iter(reader.Lookup(term));
             ASSERT_TRUE(post_iter != nullptr);
 
             RowID doc_id = INVALID_ROWID;
-            for (SizeT j = 0; j < expected.doc_ids.size(); ++j) {
+            for (size_t j = 0; j < expected.doc_ids.size(); ++j) {
                 doc_id = post_iter->SeekDoc(expected.doc_ids[j]);
                 ASSERT_EQ(doc_id, expected.doc_ids[j]);
                 u32 tf = post_iter->GetCurrentTF();
@@ -198,11 +198,11 @@ INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
 
 TEST_P(MemoryIndexerTest, Chunk) {
     NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
-    SharedPtr<String> db_name = std::make_shared<String>("db1");
-    SharedPtr<String> table_name = std::make_shared<std::string>("tb1");
-    Vector<SharedPtr<DataBlock>> blocks = {MakeInputBlock(wiki_paragraphs_)};
+    std::shared_ptr<String> db_name = std::make_shared<String>("db1");
+    std::shared_ptr<String> table_name = std::make_shared<std::string>("tb1");
+    Vector<std::shared_ptr<DataBlock>> blocks = {MakeInputBlock(wiki_paragraphs_)};
 
-    auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("import"), TransactionType::kNormal);
+    auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("import"), TransactionType::kNormal);
     Status status = txn->Import(*db_name, *table_name, blocks);
     EXPECT_TRUE(status.ok());
     status = new_txn_mgr->CommitTxn(txn);
@@ -212,15 +212,15 @@ TEST_P(MemoryIndexerTest, Chunk) {
 
 TEST_P(MemoryIndexerTest, DISABLED_Memory) {
     NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
-    SharedPtr<String> db_name = std::make_shared<String>("db1");
-    SharedPtr<String> table_name = std::make_shared<std::string>("tb1");
+    std::shared_ptr<String> db_name = std::make_shared<String>("db1");
+    std::shared_ptr<String> table_name = std::make_shared<std::string>("tb1");
     auto index_name = std::make_shared<String>("idx1");
     Vector<String> paragraphs1(wiki_paragraphs_.begin(), wiki_paragraphs_.begin() + 4); // 4 rows
     Vector<String> paragraphs2(wiki_paragraphs_.begin() + 4, wiki_paragraphs_.end());   // 1 rows
-    Vector<SharedPtr<DataBlock>> blocks = {MakeInputBlock(paragraphs1), MakeInputBlock(paragraphs2)};
+    Vector<std::shared_ptr<DataBlock>> blocks = {MakeInputBlock(paragraphs1), MakeInputBlock(paragraphs2)};
 
-    for (SizeT i = 0; i < blocks.size(); ++i) {
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+    for (size_t i = 0; i < blocks.size(); ++i) {
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("append"), TransactionType::kNormal);
         Status status = txn->Append(*db_name, *table_name, blocks[i]);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
@@ -231,33 +231,33 @@ TEST_P(MemoryIndexerTest, DISABLED_Memory) {
 }
 
 TEST_P(MemoryIndexerTest, SpillLoadTest) {
-    auto indexer1 = MakeUnique<MemoryIndexer>(GetFullDataDir(), "chunk1", RowID(0U, 0U), flag_, "standard");
-    SharedPtr<ColumnVector> column_vector = MakeColumnVector(wiki_paragraphs_);
+    auto indexer1 = std::make_unique<MemoryIndexer>(GetFullDataDir(), "chunk1", RowID(0U, 0U), flag_, "standard");
+    std::shared_ptr<ColumnVector> column_vector = MakeColumnVector(wiki_paragraphs_);
     indexer1->Insert(column_vector, 0, 2);
     indexer1->Insert(column_vector, 2, 2);
     indexer1->Insert(column_vector, 4, 1);
     indexer1->Dump(false, true);
-    UniquePtr<MemoryIndexer> loaded_indexer = MakeUnique<MemoryIndexer>(GetFullDataDir(), "chunk1", RowID(0U, 0U), flag_, "standard");
+    std::unique_ptr<MemoryIndexer> loaded_indexer = std::make_unique<MemoryIndexer>(GetFullDataDir(), "chunk1", RowID(0U, 0U), flag_, "standard");
 
     loaded_indexer->Load();
     SegmentID segment_id = 0;
-    SharedPtr<InMemIndexSegmentReader> segment_reader = MakeShared<InMemIndexSegmentReader>(segment_id, loaded_indexer.get());
-    for (SizeT i = 0; i < expected_postings_.size(); ++i) {
+    std::shared_ptr<InMemIndexSegmentReader> segment_reader = std::make_shared<InMemIndexSegmentReader>(segment_id, loaded_indexer.get());
+    for (size_t i = 0; i < expected_postings_.size(); ++i) {
         const ExpectedPosting &expected = expected_postings_[i];
         const String &term = expected.term;
         SegmentPosting seg_posting;
-        SharedPtr<Vector<SegmentPosting>> seg_postings = MakeShared<Vector<SegmentPosting>>();
+        std::shared_ptr<Vector<SegmentPosting>> seg_postings = std::make_shared<Vector<SegmentPosting>>();
 
         auto ret = segment_reader->GetSegmentPosting(term, seg_posting);
         if (ret) {
             seg_postings->push_back(seg_posting);
         }
 
-        auto posting_iter = MakeUnique<PostingIterator>(flag_);
+        auto posting_iter = std::make_unique<PostingIterator>(flag_);
         u32 state_pool_size = 0;
         posting_iter->Init(seg_postings, state_pool_size);
         RowID doc_id = INVALID_ROWID;
-        for (SizeT j = 0; j < expected.doc_ids.size(); ++j) {
+        for (size_t j = 0; j < expected.doc_ids.size(); ++j) {
             doc_id = posting_iter->SeekDoc(expected.doc_ids[j]);
             ASSERT_EQ(doc_id, expected.doc_ids[j]);
             u32 tf = posting_iter->GetCurrentTF();
@@ -269,10 +269,10 @@ TEST_P(MemoryIndexerTest, SpillLoadTest) {
 TEST_P(MemoryIndexerTest, DISABLED_SeekPosition) {
     // "A B C" repeats 7 times
     String paragraph(R"#(A B C A B C A B C A B C A B C A B C A B C)#");
-    auto column = ColumnVector::Make(MakeShared<DataType>(LogicalType::kVarchar));
+    auto column = ColumnVector::Make(std::make_shared<DataType>(LogicalType::kVarchar));
     column->Initialize();
     Value v = Value::MakeVarchar(paragraph);
-    for (SizeT i = 0; i < 8192; i++) {
+    for (size_t i = 0; i < 8192; i++) {
         column->AppendValue(v);
     }
 
@@ -284,21 +284,21 @@ TEST_P(MemoryIndexerTest, DISABLED_SeekPosition) {
     }
 
     SegmentID segment_id = 0;
-    SharedPtr<InMemIndexSegmentReader> segment_reader = MakeShared<InMemIndexSegmentReader>(segment_id, &indexer1);
+    std::shared_ptr<InMemIndexSegmentReader> segment_reader = std::make_shared<InMemIndexSegmentReader>(segment_id, &indexer1);
     const String term("a");
     SegmentPosting seg_posting;
-    SharedPtr<Vector<SegmentPosting>> seg_postings = MakeShared<Vector<SegmentPosting>>();
+    std::shared_ptr<Vector<SegmentPosting>> seg_postings = std::make_shared<Vector<SegmentPosting>>();
     auto ret = segment_reader->GetSegmentPosting(term, seg_posting);
     if (ret) {
         seg_postings->push_back(seg_posting);
     }
 
-    auto posting_iter = MakeUnique<PostingIterator>(flag_);
+    auto posting_iter = std::make_unique<PostingIterator>(flag_);
     u32 state_pool_size = 0;
     posting_iter->Init(seg_postings, state_pool_size);
     RowID doc_id = INVALID_ROWID;
-    Vector<SizeT> doc_ids = {0, 1, 2, 5, 127, 128, 512, 1024, 2048, 4096, 8191};
-    for (SizeT i = 0; i < doc_ids.size(); ++i) {
+    Vector<size_t> doc_ids = {0, 1, 2, 5, 127, 128, 512, 1024, 2048, 4096, 8191};
+    for (size_t i = 0; i < doc_ids.size(); ++i) {
         doc_id = RowID::FromUint64(doc_ids[i]);
         doc_id = posting_iter->SeekDoc(doc_id);
         ASSERT_EQ(doc_id, doc_ids[i]);
@@ -306,7 +306,7 @@ TEST_P(MemoryIndexerTest, DISABLED_SeekPosition) {
         ASSERT_EQ(tf, 7);
         pos_t target_pos = 0;
         pos_t act_pos = 0;
-        for (SizeT j = 0; j < 7; ++j) {
+        for (size_t j = 0; j < 7; ++j) {
             posting_iter->SeekPosition(target_pos, act_pos);
             ASSERT_EQ(act_pos, 3 * j);
             target_pos = act_pos + 1;

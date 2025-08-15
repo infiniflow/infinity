@@ -32,11 +32,11 @@ namespace infinity {
 
 export class PhysicalDropCollection : public PhysicalOperator {
 public:
-    explicit PhysicalDropCollection(SharedPtr<String> schema_name,
-                                    SharedPtr<String> collection_name,
+    explicit PhysicalDropCollection(std::shared_ptr<std::string> schema_name,
+                                    std::shared_ptr<std::string> collection_name,
                                     ConflictType conflict_type,
                                     u64 id,
-                                    SharedPtr<Vector<LoadMeta>> load_metas)
+                                    std::shared_ptr<std::vector<LoadMeta>> load_metas)
         : PhysicalOperator(PhysicalOperatorType::kDropCollection, nullptr, nullptr, id, load_metas), schema_name_(std::move(schema_name)),
           collection_name_(std::move(collection_name)), conflict_type_(conflict_type) {}
 
@@ -46,23 +46,23 @@ public:
 
     bool Execute(QueryContext *query_context, OperatorState *operator_state) final;
 
-    inline SharedPtr<Vector<String>> GetOutputNames() const final { return output_names_; }
+    inline std::shared_ptr<std::vector<std::string>> GetOutputNames() const final { return output_names_; }
 
-    inline SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const final { return output_types_; }
+    inline std::shared_ptr<std::vector<std::shared_ptr<DataType>>> GetOutputTypes() const final { return output_types_; }
 
-    inline SharedPtr<String> schema_name() const { return schema_name_; }
+    inline std::shared_ptr<std::string> schema_name() const { return schema_name_; }
 
-    inline SharedPtr<String> collection_name() const { return collection_name_; }
+    inline std::shared_ptr<std::string> collection_name() const { return collection_name_; }
 
     inline ConflictType conflict_type() const { return conflict_type_; }
 
 private:
-    SharedPtr<String> schema_name_{};
-    SharedPtr<String> collection_name_{};
+    std::shared_ptr<std::string> schema_name_{};
+    std::shared_ptr<std::string> collection_name_{};
     ConflictType conflict_type_{ConflictType::kInvalid};
 
-    SharedPtr<Vector<String>> output_names_{};
-    SharedPtr<Vector<SharedPtr<DataType>>> output_types_{};
+    std::shared_ptr<std::vector<std::string>> output_names_{};
+    std::shared_ptr<std::vector<std::shared_ptr<DataType>>> output_types_{};
 };
 
 } // namespace infinity

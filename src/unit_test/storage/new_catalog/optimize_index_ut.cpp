@@ -88,10 +88,10 @@ protected:
         column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
         column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
         table_name = std::make_shared<std::string>("tb1");
-        table_def = TableDef::Make(db_name_, table_name, MakeShared<String>(), {column_def1, column_def2});
+        table_def = TableDef::Make(db_name_, table_name, std::make_shared<String>(), {column_def1, column_def2});
 
         index_name1 = std::make_shared<std::string>("index1");
-        index_def1 = IndexSecondary::Make(index_name1, MakeShared<String>(), "file_name", {column_def1->name()});
+        index_def1 = IndexSecondary::Make(index_name1, std::make_shared<String>(), "file_name", {column_def1->name()});
 
         segment_id = 0;
     }
@@ -101,10 +101,10 @@ protected:
         BaseTestParamStr::TearDown();
     }
 
-    auto MakeInputBlock(const Value &v1, const Value &v2) -> SharedPtr<DataBlock> {
+    auto MakeInputBlock(const Value &v1, const Value &v2) -> std::shared_ptr<DataBlock> {
         u32 block_row_cnt = 8192;
 
-        auto input_block = MakeShared<DataBlock>();
+        auto input_block = std::make_shared<DataBlock>();
         auto append_to_col = [&](ColumnVector &col, const Value &v) {
             for (u32 i = 0; i < block_row_cnt; ++i) {
                 col.AppendValue(v);
@@ -129,21 +129,21 @@ protected:
 
     void PrepareForOptimizeIndex() {
         {
-            auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
-            Status status = txn->CreateDatabase(*db_name_, ConflictType::kError, MakeShared<String>());
+            auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("create db"), TransactionType::kNormal);
+            Status status = txn->CreateDatabase(*db_name_, ConflictType::kError, std::make_shared<String>());
             EXPECT_TRUE(status.ok());
             status = new_txn_mgr->CommitTxn(txn);
             EXPECT_TRUE(status.ok());
         }
         {
-            auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+            auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("create table"), TransactionType::kNormal);
             Status status = txn->CreateTable(*db_name_, std::move(table_def), ConflictType::kIgnore);
             EXPECT_TRUE(status.ok());
             status = new_txn_mgr->CommitTxn(txn);
             EXPECT_TRUE(status.ok());
         }
         {
-            auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create index"), TransactionType::kNormal);
+            auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("create index"), TransactionType::kNormal);
             Status status = txn->CreateIndex(*db_name_, *table_name, index_def1, ConflictType::kError);
             EXPECT_TRUE(status.ok());
             status = new_txn_mgr->CommitTxn(txn);
@@ -151,15 +151,15 @@ protected:
         }
         for (int i = 0; i < 2; ++i) {
             {
-                auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>(fmt::format("append {}", i)), TransactionType::kNormal);
-                SharedPtr<DataBlock> input_block = MakeInputBlock(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
+                auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>(fmt::format("append {}", i)), TransactionType::kNormal);
+                std::shared_ptr<DataBlock> input_block = MakeInputBlock(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
                 Status status = txn->Append(*db_name_, *table_name, input_block);
                 EXPECT_TRUE(status.ok());
                 status = new_txn_mgr->CommitTxn(txn);
                 EXPECT_TRUE(status.ok());
             }
             {
-                auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>(fmt::format("dump index {}", i)), TransactionType::kNormal);
+                auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>(fmt::format("dump index {}", i)), TransactionType::kNormal);
                 Status status = txn->DumpMemIndex(*db_name_, *table_name, *index_name1, segment_id);
                 EXPECT_TRUE(status.ok());
                 status = new_txn_mgr->CommitTxn(txn);
@@ -170,7 +170,7 @@ protected:
 
     void DropDB() {
         // drop database
-        auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
+        auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<String>("drop db"), TransactionType::kNormal);
         Status status = txn5->DropDatabase("db1", ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn5);
@@ -180,14 +180,14 @@ protected:
 protected:
     NewTxnManager *new_txn_mgr = nullptr;
 
-    SharedPtr<String> db_name_;
-    SharedPtr<ColumnDef> column_def1;
-    SharedPtr<ColumnDef> column_def2;
-    SharedPtr<String> table_name;
-    SharedPtr<TableDef> table_def;
+    std::shared_ptr<String> db_name_;
+    std::shared_ptr<ColumnDef> column_def1;
+    std::shared_ptr<ColumnDef> column_def2;
+    std::shared_ptr<String> table_name;
+    std::shared_ptr<TableDef> table_def;
 
-    SharedPtr<String> index_name1;
-    SharedPtr<IndexBase> index_def1;
+    std::shared_ptr<String> index_name1;
+    std::shared_ptr<IndexBase> index_def1;
 
     SegmentID segment_id = 0;
 };
@@ -200,7 +200,7 @@ TEST_P(TestTxnOptimizeIndex, optimize_index_rollback) {
     Status status;
     {
         auto check_opt_index = [this](const Vector<ChunkID> &my_chunk_ids) { // check optimize index
-            auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check"), TransactionType::kNormal);
+            auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("check"), TransactionType::kNormal);
             Optional<DBMeeta> db_meta;
             Optional<TableMeeta> table_meta;
             Optional<TableIndexMeeta> table_index_meta;
@@ -235,7 +235,7 @@ TEST_P(TestTxnOptimizeIndex, optimize_index_rollback) {
 
         PrepareForOptimizeIndex();
 
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("optimize index"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("optimize index"), TransactionType::kNormal);
         status = txn->OptimizeIndex(*db_name_, *table_name, *index_name1, segment_id);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->RollBackTxn(txn);
@@ -243,7 +243,7 @@ TEST_P(TestTxnOptimizeIndex, optimize_index_rollback) {
 
         check_opt_index(Vector<ChunkID>{0, 1});
 
-        auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("optimize index"), TransactionType::kNormal);
+        auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<String>("optimize index"), TransactionType::kNormal);
         status = txn1->OptimizeIndex(*db_name_, *table_name, *index_name1, segment_id);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn1);
@@ -251,7 +251,7 @@ TEST_P(TestTxnOptimizeIndex, optimize_index_rollback) {
 
         check_opt_index(Vector<ChunkID>{2});
 
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<String>("drop db"), TransactionType::kNormal);
         status = txn2->DropDatabase(*db_name_, ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn2);
@@ -269,13 +269,13 @@ TEST_P(TestTxnOptimizeIndex, optimize_index_and_drop_db) {
         //                                     |------------------|----------|
         //                                    t2                drop db    commit
 
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("optimize index"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("optimize index"), TransactionType::kNormal);
         status = txn->OptimizeIndex(*db_name_, *table_name, *index_name1, segment_id);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
 
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<String>("drop db"), TransactionType::kNormal);
         status = txn2->DropDatabase(*db_name_, ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn2);
@@ -289,11 +289,11 @@ TEST_P(TestTxnOptimizeIndex, optimize_index_and_drop_db) {
         //                         |------------------|----------|
         //                        t2                drop db    commit
 
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("optimize index"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("optimize index"), TransactionType::kNormal);
         status = txn->OptimizeIndex(*db_name_, *table_name, *index_name1, segment_id);
         EXPECT_TRUE(status.ok());
 
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<String>("drop db"), TransactionType::kNormal);
 
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
@@ -311,9 +311,9 @@ TEST_P(TestTxnOptimizeIndex, optimize_index_and_drop_db) {
         //         |------------------|----------|
         //        t2                drop db    commit
 
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("optimize index"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("optimize index"), TransactionType::kNormal);
 
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<String>("drop db"), TransactionType::kNormal);
 
         status = txn->OptimizeIndex(*db_name_, *table_name, *index_name1, segment_id);
         EXPECT_TRUE(status.ok());
@@ -335,9 +335,9 @@ TEST_P(TestTxnOptimizeIndex, optimize_index_and_drop_db) {
         //         |-----|----------|
         //        t2   drop db    commit
 
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("optimize index"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("optimize index"), TransactionType::kNormal);
 
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<String>("drop db"), TransactionType::kNormal);
         status = txn2->DropDatabase(*db_name_, ConflictType::kError);
         EXPECT_TRUE(status.ok());
 
@@ -358,11 +358,11 @@ TEST_P(TestTxnOptimizeIndex, optimize_index_and_drop_db) {
         //         |-----|----------|
         //        t2   drop db    commit
 
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<String>("drop db"), TransactionType::kNormal);
         status = txn2->DropDatabase(*db_name_, ConflictType::kError);
         EXPECT_TRUE(status.ok());
 
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("optimize index"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("optimize index"), TransactionType::kNormal);
 
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());
@@ -381,13 +381,13 @@ TEST_P(TestTxnOptimizeIndex, optimize_index_and_drop_db) {
         //         |-----|----------|
         //        t2   drop db    commit
 
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<String>("drop db"), TransactionType::kNormal);
         status = txn2->DropDatabase(*db_name_, ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());
 
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("optimize index"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("optimize index"), TransactionType::kNormal);
         status = txn->OptimizeIndex(*db_name_, *table_name, *index_name1, segment_id);
         EXPECT_FALSE(status.ok());
         status = new_txn_mgr->RollBackTxn(txn);
@@ -405,13 +405,13 @@ TEST_P(TestTxnOptimizeIndex, optimize_index_and_drop_table) {
         //                                     |------------------|----------|
         //                                    t2                drop table   commit
 
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("optimize index"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("optimize index"), TransactionType::kNormal);
         status = txn->OptimizeIndex(*db_name_, *table_name, *index_name1, segment_id);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
 
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop table"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<String>("drop table"), TransactionType::kNormal);
         status = txn2->DropTable(*db_name_, *table_name, ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn2);
@@ -427,11 +427,11 @@ TEST_P(TestTxnOptimizeIndex, optimize_index_and_drop_table) {
         //                         |------------------|----------|
         //                        t2                drop table   commit
 
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("optimize index"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("optimize index"), TransactionType::kNormal);
         status = txn->OptimizeIndex(*db_name_, *table_name, *index_name1, segment_id);
         EXPECT_TRUE(status.ok());
 
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop table"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<String>("drop table"), TransactionType::kNormal);
 
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
@@ -451,9 +451,9 @@ TEST_P(TestTxnOptimizeIndex, optimize_index_and_drop_table) {
         //         |------------------|----------|
         //        t2                drop table   commit
 
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("optimize index"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("optimize index"), TransactionType::kNormal);
 
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop table"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<String>("drop table"), TransactionType::kNormal);
 
         status = txn->OptimizeIndex(*db_name_, *table_name, *index_name1, segment_id);
         EXPECT_TRUE(status.ok());
@@ -478,9 +478,9 @@ TEST_P(TestTxnOptimizeIndex, optimize_index_and_drop_table) {
         //         |-----|----------|
         //        t2   drop table   commit
 
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("optimize index"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("optimize index"), TransactionType::kNormal);
 
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop table"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<String>("drop table"), TransactionType::kNormal);
         status = txn2->DropTable(*db_name_, *table_name, ConflictType::kError);
         EXPECT_TRUE(status.ok());
 
@@ -503,11 +503,11 @@ TEST_P(TestTxnOptimizeIndex, optimize_index_and_drop_table) {
         //         |-----|----------|
         //        t2   drop table   commit
 
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop table"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<String>("drop table"), TransactionType::kNormal);
         status = txn2->DropTable(*db_name_, *table_name, ConflictType::kError);
         EXPECT_TRUE(status.ok());
 
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("optimize index"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("optimize index"), TransactionType::kNormal);
 
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());
@@ -527,13 +527,13 @@ TEST_P(TestTxnOptimizeIndex, optimize_index_and_drop_table) {
         //         |-----|----------|
         //        t2   drop table   commit
 
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop table"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<String>("drop table"), TransactionType::kNormal);
         status = txn2->DropTable(*db_name_, *table_name, ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());
 
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("optimize index"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("optimize index"), TransactionType::kNormal);
         status = txn->OptimizeIndex(*db_name_, *table_name, *index_name1, segment_id);
         EXPECT_FALSE(status.ok());
         status = new_txn_mgr->RollBackTxn(txn);
@@ -553,13 +553,13 @@ TEST_P(TestTxnOptimizeIndex, optimize_index_and_drop_index) {
         //                                     |------------------|----------|
         //                                    t2                drop index   commit
 
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("optimize index"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("optimize index"), TransactionType::kNormal);
         status = txn->OptimizeIndex(*db_name_, *table_name, *index_name1, segment_id);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
 
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop index"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<String>("drop index"), TransactionType::kNormal);
         status = txn2->DropIndexByName(*db_name_, *table_name, *index_name1, ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn2);
@@ -575,11 +575,11 @@ TEST_P(TestTxnOptimizeIndex, optimize_index_and_drop_index) {
         //                         |------------------|----------|
         //                        t2                drop index   commit (success)
 
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("optimize index"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("optimize index"), TransactionType::kNormal);
         status = txn->OptimizeIndex(*db_name_, *table_name, *index_name1, segment_id);
         EXPECT_TRUE(status.ok());
 
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop index"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<String>("drop index"), TransactionType::kNormal);
 
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
@@ -599,9 +599,9 @@ TEST_P(TestTxnOptimizeIndex, optimize_index_and_drop_index) {
         //         |------------------|----------|
         //        t2                drop index   commit (success)
 
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("optimize index"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("optimize index"), TransactionType::kNormal);
 
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop index"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<String>("drop index"), TransactionType::kNormal);
 
         status = txn->OptimizeIndex(*db_name_, *table_name, *index_name1, segment_id);
         EXPECT_TRUE(status.ok());
@@ -625,9 +625,9 @@ TEST_P(TestTxnOptimizeIndex, optimize_index_and_drop_index) {
         //         |-----|----------|
         //        t2   drop index   commit
 
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("optimize index"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("optimize index"), TransactionType::kNormal);
 
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop index"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<String>("drop index"), TransactionType::kNormal);
         status = txn2->DropIndexByName(*db_name_, *table_name, *index_name1, ConflictType::kError);
         EXPECT_TRUE(status.ok());
 
@@ -650,11 +650,11 @@ TEST_P(TestTxnOptimizeIndex, optimize_index_and_drop_index) {
         //         |-----|----------|
         //        t2   drop index   commit
 
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop index"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<String>("drop index"), TransactionType::kNormal);
         status = txn2->DropIndexByName(*db_name_, *table_name, *index_name1, ConflictType::kError);
         EXPECT_TRUE(status.ok());
 
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("optimize index"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("optimize index"), TransactionType::kNormal);
 
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());
@@ -674,13 +674,13 @@ TEST_P(TestTxnOptimizeIndex, optimize_index_and_drop_index) {
         //         |-----|----------|
         //        t2   drop index   commit
 
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop index"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<String>("drop index"), TransactionType::kNormal);
         status = txn2->DropIndexByName(*db_name_, *table_name, *index_name1, ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());
 
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("optimize index"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("optimize index"), TransactionType::kNormal);
         status = txn->OptimizeIndex(*db_name_, *table_name, *index_name1, segment_id);
         EXPECT_FALSE(status.ok());
         status = new_txn_mgr->RollBackTxn(txn);
@@ -692,7 +692,7 @@ TEST_P(TestTxnOptimizeIndex, optimize_index_and_drop_index) {
 
 TEST_P(TestTxnOptimizeIndex, DISABLED_optimize_index_and_optimize_index) {
     auto CheckTable = [&] {
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check table"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("check table"), TransactionType::kNormal);
 
         Optional<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
@@ -703,7 +703,7 @@ TEST_P(TestTxnOptimizeIndex, DISABLED_optimize_index_and_optimize_index) {
         status = txn->GetTableIndexMeta(*index_name1, *table_meta, table_index_meta);
         EXPECT_TRUE(status.ok());
 
-        SharedPtr<IndexBase> index_base;
+        std::shared_ptr<IndexBase> index_base;
         std::tie(index_base, status) = table_index_meta->GetIndexBase();
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(*index_base->index_name_, *index_name1);
@@ -729,13 +729,13 @@ TEST_P(TestTxnOptimizeIndex, DISABLED_optimize_index_and_optimize_index) {
         //                                     |------------------|------------------|
         //                                    t2                optimize          commit
 
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("optimize index 1"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("optimize index 1"), TransactionType::kNormal);
         status = txn->OptimizeIndex(*db_name_, *table_name, *index_name1, segment_id);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
 
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("optimize index 2"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<String>("optimize index 2"), TransactionType::kNormal);
         status = txn2->OptimizeIndex(*db_name_, *table_name, *index_name1, segment_id);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn2);
@@ -752,11 +752,11 @@ TEST_P(TestTxnOptimizeIndex, DISABLED_optimize_index_and_optimize_index) {
         //                         |------------------|------------------|
         //                        t2                optimize (fail)    rollback
 
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("optimize index 1"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("optimize index 1"), TransactionType::kNormal);
         status = txn->OptimizeIndex(*db_name_, *table_name, *index_name1, segment_id);
         EXPECT_TRUE(status.ok());
 
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("optimize index 2"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<String>("optimize index 2"), TransactionType::kNormal);
 
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
@@ -777,9 +777,9 @@ TEST_P(TestTxnOptimizeIndex, DISABLED_optimize_index_and_optimize_index) {
         //         |------------------|------------------|
         //        t2                optimize (fail)       rollback
 
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("optimize index 1"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("optimize index 1"), TransactionType::kNormal);
 
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("optimize index 2"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<String>("optimize index 2"), TransactionType::kNormal);
 
         status = txn->OptimizeIndex(*db_name_, *table_name, *index_name1, segment_id);
         EXPECT_TRUE(status.ok());
@@ -804,9 +804,9 @@ TEST_P(TestTxnOptimizeIndex, DISABLED_optimize_index_and_optimize_index) {
         //         |------------------|------------------|
         //        t2                optimize (fail)      rollback
 
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("optimize index 1"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("optimize index 1"), TransactionType::kNormal);
 
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("optimize index 2"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<String>("optimize index 2"), TransactionType::kNormal);
 
         status = txn->OptimizeIndex(*db_name_, *table_name, *index_name1, segment_id);
         EXPECT_TRUE(status.ok());
@@ -828,8 +828,8 @@ TEST_P(TestTxnOptimizeIndex, DISABLED_optimize_index_and_dump_index) {
     auto PrepareForOptimizeAndDumpIndex = [&] {
         PrepareForOptimizeIndex();
         {
-            auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
-            SharedPtr<DataBlock> input_block = MakeInputBlock(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
+            auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("append"), TransactionType::kNormal);
+            std::shared_ptr<DataBlock> input_block = MakeInputBlock(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
             Status status = txn->Append(*db_name_, *table_name, input_block);
             EXPECT_TRUE(status.ok());
             status = new_txn_mgr->CommitTxn(txn);
@@ -846,13 +846,13 @@ TEST_P(TestTxnOptimizeIndex, DISABLED_optimize_index_and_dump_index) {
         //                                     |------------------|----------|
         //                                    t2                dump index   commit
 
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("optimize index"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("optimize index"), TransactionType::kNormal);
         status = txn->OptimizeIndex(*db_name_, *table_name, *index_name1, segment_id);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
 
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("dump index"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<String>("dump index"), TransactionType::kNormal);
         status = txn2->DumpMemIndex(*db_name_, *table_name, *index_name1, segment_id);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn2);
@@ -868,11 +868,11 @@ TEST_P(TestTxnOptimizeIndex, DISABLED_optimize_index_and_dump_index) {
         //                         |------------------|----------|
         //                        t2         dump index(fail)  rollback
 
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("optimize index"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("optimize index"), TransactionType::kNormal);
         status = txn->OptimizeIndex(*db_name_, *table_name, *index_name1, segment_id);
         EXPECT_TRUE(status.ok());
 
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("dump index"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<String>("dump index"), TransactionType::kNormal);
 
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
@@ -892,9 +892,9 @@ TEST_P(TestTxnOptimizeIndex, DISABLED_optimize_index_and_dump_index) {
         //         |------------------|-------------|
         //        t2            dump index(fail)  rollback
 
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("optimize index"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("optimize index"), TransactionType::kNormal);
 
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("dump index"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<String>("dump index"), TransactionType::kNormal);
 
         status = txn->OptimizeIndex(*db_name_, *table_name, *index_name1, segment_id);
         EXPECT_TRUE(status.ok());
@@ -918,9 +918,9 @@ TEST_P(TestTxnOptimizeIndex, DISABLED_optimize_index_and_dump_index) {
         //         |-----|----------|
         //        t2  dump index  commit
 
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("optimize index"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("optimize index"), TransactionType::kNormal);
 
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("dump index"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<String>("dump index"), TransactionType::kNormal);
         status = txn2->DumpMemIndex(*db_name_, *table_name, *index_name1, segment_id);
         EXPECT_TRUE(status.ok());
 
@@ -943,11 +943,11 @@ TEST_P(TestTxnOptimizeIndex, DISABLED_optimize_index_and_dump_index) {
         //         |-----|----------|
         //        t2  dump index  commit
 
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("dump index"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<String>("dump index"), TransactionType::kNormal);
         status = txn2->DumpMemIndex(*db_name_, *table_name, *index_name1, segment_id);
         EXPECT_TRUE(status.ok());
 
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("optimize index"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("optimize index"), TransactionType::kNormal);
 
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());
@@ -968,13 +968,13 @@ TEST_P(TestTxnOptimizeIndex, DISABLED_optimize_index_and_dump_index) {
         //         |-----|----------|
         //        t2  dump index  commit
 
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("dump index"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<String>("dump index"), TransactionType::kNormal);
         status = txn2->DumpMemIndex(*db_name_, *table_name, *index_name1, segment_id);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());
 
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("optimize index"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("optimize index"), TransactionType::kNormal);
         status = txn->OptimizeIndex(*db_name_, *table_name, *index_name1, segment_id);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
@@ -988,8 +988,8 @@ TEST_P(TestTxnOptimizeIndex, optimize_index_and_add_column) {
     auto PrepareForOptimizeAndDumpIndex = [&] {
         PrepareForOptimizeIndex();
         {
-            auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
-            SharedPtr<DataBlock> input_block = MakeInputBlock(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
+            auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("append"), TransactionType::kNormal);
+            std::shared_ptr<DataBlock> input_block = MakeInputBlock(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
             Status status = txn->Append(*db_name_, *table_name, input_block);
             EXPECT_TRUE(status.ok());
             status = new_txn_mgr->CommitTxn(txn);
@@ -1009,17 +1009,17 @@ TEST_P(TestTxnOptimizeIndex, optimize_index_and_add_column) {
         //                                     |------------------|----------|
         //                                    t2                add column  commit
 
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("optimize index"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("optimize index"), TransactionType::kNormal);
         status = txn->OptimizeIndex(*db_name_, *table_name, *index_name1, segment_id);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
 
         // add column
-        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("add column"), TransactionType::kNormal);
+        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<String>("add column"), TransactionType::kNormal);
         auto column_def3 =
             std::make_shared<ColumnDef>(2, std::make_shared<DataType>(LogicalType::kVarchar), "col3", std::set<ConstraintType>(), default_varchar);
-        Vector<SharedPtr<ColumnDef>> columns3;
+        Vector<std::shared_ptr<ColumnDef>> columns3;
         columns3.emplace_back(column_def3);
         status = txn4->AddColumns(*db_name_, *table_name, columns3);
         EXPECT_TRUE(status.ok());
@@ -1036,19 +1036,19 @@ TEST_P(TestTxnOptimizeIndex, optimize_index_and_add_column) {
         //                         |------------------|----------|
         //                        t2         add column       commit
 
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("optimize index"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("optimize index"), TransactionType::kNormal);
         status = txn->OptimizeIndex(*db_name_, *table_name, *index_name1, segment_id);
         EXPECT_TRUE(status.ok());
 
         // add column
-        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("add column"), TransactionType::kNormal);
+        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<String>("add column"), TransactionType::kNormal);
 
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
 
         auto column_def3 =
             std::make_shared<ColumnDef>(2, std::make_shared<DataType>(LogicalType::kVarchar), "col3", std::set<ConstraintType>(), default_varchar);
-        Vector<SharedPtr<ColumnDef>> columns3;
+        Vector<std::shared_ptr<ColumnDef>> columns3;
         columns3.emplace_back(column_def3);
         status = txn4->AddColumns(*db_name_, *table_name, columns3);
         EXPECT_TRUE(status.ok());
@@ -1065,17 +1065,17 @@ TEST_P(TestTxnOptimizeIndex, optimize_index_and_add_column) {
         //         |------------------|-------------|
         //        t2            add column      commit (success)
 
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("optimize index"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("optimize index"), TransactionType::kNormal);
 
         // add column
-        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("add column"), TransactionType::kNormal);
+        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<String>("add column"), TransactionType::kNormal);
 
         status = txn->OptimizeIndex(*db_name_, *table_name, *index_name1, segment_id);
         EXPECT_TRUE(status.ok());
 
         auto column_def3 =
             std::make_shared<ColumnDef>(2, std::make_shared<DataType>(LogicalType::kVarchar), "col3", std::set<ConstraintType>(), default_varchar);
-        Vector<SharedPtr<ColumnDef>> columns3;
+        Vector<std::shared_ptr<ColumnDef>> columns3;
         columns3.emplace_back(column_def3);
         status = txn4->AddColumns(*db_name_, *table_name, columns3);
         EXPECT_TRUE(status.ok());
@@ -1096,14 +1096,14 @@ TEST_P(TestTxnOptimizeIndex, optimize_index_and_add_column) {
         //         |-----|----------|
         //        t2   add column   commit (success)
 
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("optimize index"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("optimize index"), TransactionType::kNormal);
 
         // add column
-        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("add column"), TransactionType::kNormal);
+        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<String>("add column"), TransactionType::kNormal);
 
         auto column_def3 =
             std::make_shared<ColumnDef>(2, std::make_shared<DataType>(LogicalType::kVarchar), "col3", std::set<ConstraintType>(), default_varchar);
-        Vector<SharedPtr<ColumnDef>> columns3;
+        Vector<std::shared_ptr<ColumnDef>> columns3;
         columns3.emplace_back(column_def3);
         status = txn4->AddColumns(*db_name_, *table_name, columns3);
         EXPECT_TRUE(status.ok());
@@ -1128,13 +1128,13 @@ TEST_P(TestTxnOptimizeIndex, optimize_index_and_add_column) {
         //        t2   add column   commit (success)
 
         // add column
-        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("add column"), TransactionType::kNormal);
+        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<String>("add column"), TransactionType::kNormal);
 
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("optimize index"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("optimize index"), TransactionType::kNormal);
 
         auto column_def3 =
             std::make_shared<ColumnDef>(2, std::make_shared<DataType>(LogicalType::kVarchar), "col3", std::set<ConstraintType>(), default_varchar);
-        Vector<SharedPtr<ColumnDef>> columns3;
+        Vector<std::shared_ptr<ColumnDef>> columns3;
         columns3.emplace_back(column_def3);
         status = txn4->AddColumns(*db_name_, *table_name, columns3);
         EXPECT_TRUE(status.ok());
@@ -1159,15 +1159,15 @@ TEST_P(TestTxnOptimizeIndex, optimize_index_and_add_column) {
         //        t2  add column  commit
 
         // add column
-        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("add column"), TransactionType::kNormal);
+        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<String>("add column"), TransactionType::kNormal);
         auto column_def3 =
             std::make_shared<ColumnDef>(2, std::make_shared<DataType>(LogicalType::kVarchar), "col3", std::set<ConstraintType>(), default_varchar);
-        Vector<SharedPtr<ColumnDef>> columns3;
+        Vector<std::shared_ptr<ColumnDef>> columns3;
         columns3.emplace_back(column_def3);
         status = txn4->AddColumns(*db_name_, *table_name, columns3);
         EXPECT_TRUE(status.ok());
 
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("optimize index"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("optimize index"), TransactionType::kNormal);
 
         status = new_txn_mgr->CommitTxn(txn4);
         EXPECT_TRUE(status.ok());
@@ -1189,17 +1189,17 @@ TEST_P(TestTxnOptimizeIndex, optimize_index_and_add_column) {
         //        t2  add column  commit
 
         // add column
-        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("add column"), TransactionType::kNormal);
+        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<String>("add column"), TransactionType::kNormal);
         auto column_def3 =
             std::make_shared<ColumnDef>(2, std::make_shared<DataType>(LogicalType::kVarchar), "col3", std::set<ConstraintType>(), default_varchar);
-        Vector<SharedPtr<ColumnDef>> columns3;
+        Vector<std::shared_ptr<ColumnDef>> columns3;
         columns3.emplace_back(column_def3);
         status = txn4->AddColumns(*db_name_, *table_name, columns3);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn4);
         EXPECT_TRUE(status.ok());
 
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("optimize index"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("optimize index"), TransactionType::kNormal);
         status = txn->OptimizeIndex(*db_name_, *table_name, *index_name1, segment_id);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
@@ -1213,8 +1213,8 @@ TEST_P(TestTxnOptimizeIndex, optimize_index_and_drop_column) {
     auto PrepareForOptimizeAndDumpIndex = [&] {
         PrepareForOptimizeIndex();
         {
-            auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
-            SharedPtr<DataBlock> input_block = MakeInputBlock(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
+            auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("append"), TransactionType::kNormal);
+            std::shared_ptr<DataBlock> input_block = MakeInputBlock(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
             Status status = txn->Append(*db_name_, *table_name, input_block);
             EXPECT_TRUE(status.ok());
             status = new_txn_mgr->CommitTxn(txn);
@@ -1234,14 +1234,14 @@ TEST_P(TestTxnOptimizeIndex, optimize_index_and_drop_column) {
         //                                     |------------------|----------|
         //                                    t2                drop column  commit
 
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("optimize index"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("optimize index"), TransactionType::kNormal);
         status = txn->OptimizeIndex(*db_name_, *table_name, *index_name1, segment_id);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
 
         // drop column
-        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop column"), TransactionType::kNormal);
+        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<String>("drop column"), TransactionType::kNormal);
         Vector<String> column_names;
         column_names.push_back("col2");
         status = txn4->DropColumns(*db_name_, *table_name, column_names);
@@ -1259,12 +1259,12 @@ TEST_P(TestTxnOptimizeIndex, optimize_index_and_drop_column) {
         //                         |------------------|----------|
         //                        t2         drop column       commit
 
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("optimize index"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("optimize index"), TransactionType::kNormal);
         status = txn->OptimizeIndex(*db_name_, *table_name, *index_name1, segment_id);
         EXPECT_TRUE(status.ok());
 
         // drop column
-        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop column"), TransactionType::kNormal);
+        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<String>("drop column"), TransactionType::kNormal);
 
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
@@ -1286,10 +1286,10 @@ TEST_P(TestTxnOptimizeIndex, optimize_index_and_drop_column) {
         //         |------------------|-------------|
         //        t2            drop column      commit (success)
 
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("optimize index"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("optimize index"), TransactionType::kNormal);
 
         // drop column
-        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop column"), TransactionType::kNormal);
+        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<String>("drop column"), TransactionType::kNormal);
 
         status = txn->OptimizeIndex(*db_name_, *table_name, *index_name1, segment_id);
         EXPECT_TRUE(status.ok());
@@ -1315,10 +1315,10 @@ TEST_P(TestTxnOptimizeIndex, optimize_index_and_drop_column) {
         //         |-----|----------|
         //        t2   drop column   commit (success)
 
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("optimize index"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("optimize index"), TransactionType::kNormal);
 
         // drop column
-        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop column"), TransactionType::kNormal);
+        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<String>("drop column"), TransactionType::kNormal);
 
         Vector<String> column_names;
         column_names.push_back("col2");
@@ -1345,9 +1345,9 @@ TEST_P(TestTxnOptimizeIndex, optimize_index_and_drop_column) {
         //        t2   drop column   commit (success)
 
         // drop column
-        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop column"), TransactionType::kNormal);
+        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<String>("drop column"), TransactionType::kNormal);
 
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("optimize index"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("optimize index"), TransactionType::kNormal);
 
         Vector<String> column_names;
         column_names.push_back("col2");
@@ -1374,13 +1374,13 @@ TEST_P(TestTxnOptimizeIndex, optimize_index_and_drop_column) {
         //        t2  drop column  commit
 
         // drop column
-        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop column"), TransactionType::kNormal);
+        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<String>("drop column"), TransactionType::kNormal);
         Vector<String> column_names;
         column_names.push_back("col2");
         status = txn4->DropColumns(*db_name_, *table_name, column_names);
         EXPECT_TRUE(status.ok());
 
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("optimize index"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("optimize index"), TransactionType::kNormal);
 
         status = new_txn_mgr->CommitTxn(txn4);
         EXPECT_TRUE(status.ok());
@@ -1401,7 +1401,7 @@ TEST_P(TestTxnOptimizeIndex, optimize_index_and_drop_column) {
         //        t2  drop column  commit
 
         // drop column
-        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop column"), TransactionType::kNormal);
+        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<String>("drop column"), TransactionType::kNormal);
         Vector<String> column_names;
         column_names.push_back("col2");
         status = txn4->DropColumns(*db_name_, *table_name, column_names);
@@ -1409,7 +1409,7 @@ TEST_P(TestTxnOptimizeIndex, optimize_index_and_drop_column) {
         status = new_txn_mgr->CommitTxn(txn4);
         EXPECT_TRUE(status.ok());
 
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("optimize index"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("optimize index"), TransactionType::kNormal);
         status = txn->OptimizeIndex(*db_name_, *table_name, *index_name1, segment_id);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
@@ -1423,8 +1423,8 @@ TEST_P(TestTxnOptimizeIndex, optimize_index_and_rename_table) {
     auto PrepareForOptimizeAndDumpIndex = [&] {
         PrepareForOptimizeIndex();
         {
-            auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
-            SharedPtr<DataBlock> input_block = MakeInputBlock(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
+            auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("append"), TransactionType::kNormal);
+            std::shared_ptr<DataBlock> input_block = MakeInputBlock(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
             Status status = txn->Append(*db_name_, *table_name, input_block);
             EXPECT_TRUE(status.ok());
             status = new_txn_mgr->CommitTxn(txn);
@@ -1444,14 +1444,14 @@ TEST_P(TestTxnOptimizeIndex, optimize_index_and_rename_table) {
         //                                     |------------------|----------|
         //                                    t2                rename  commit
 
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("optimize index"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("optimize index"), TransactionType::kNormal);
         status = txn->OptimizeIndex(*db_name_, *table_name, *index_name1, segment_id);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
 
         // rename
-        auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("rename table"), TransactionType::kNormal);
+        auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<String>("rename table"), TransactionType::kNormal);
         status = txn5->RenameTable(*db_name_, *table_name, "table2");
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn5);
@@ -1467,12 +1467,12 @@ TEST_P(TestTxnOptimizeIndex, optimize_index_and_rename_table) {
         //                         |------------------|----------|
         //                        t2               rename       commit
 
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("optimize index"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("optimize index"), TransactionType::kNormal);
         status = txn->OptimizeIndex(*db_name_, *table_name, *index_name1, segment_id);
         EXPECT_TRUE(status.ok());
 
         // rename
-        auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("rename table"), TransactionType::kNormal);
+        auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<String>("rename table"), TransactionType::kNormal);
 
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
@@ -1492,12 +1492,12 @@ TEST_P(TestTxnOptimizeIndex, optimize_index_and_rename_table) {
         //         |------------------|-------------|
         //        t2            rename         rollback
 
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("optimize index"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("optimize index"), TransactionType::kNormal);
         status = txn->OptimizeIndex(*db_name_, *table_name, *index_name1, segment_id);
         EXPECT_TRUE(status.ok());
 
         // rename
-        auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("rename table"), TransactionType::kNormal);
+        auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<String>("rename table"), TransactionType::kNormal);
         status = txn5->RenameTable(*db_name_, *table_name, "table2");
         EXPECT_TRUE(status.ok());
 
@@ -1517,10 +1517,10 @@ TEST_P(TestTxnOptimizeIndex, optimize_index_and_rename_table) {
         //         |-----|----------|
         //        t2   rename   commit
 
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("optimize index"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("optimize index"), TransactionType::kNormal);
 
         // rename
-        auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("rename table"), TransactionType::kNormal);
+        auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<String>("rename table"), TransactionType::kNormal);
         status = txn5->RenameTable(*db_name_, *table_name, "table2");
         EXPECT_TRUE(status.ok());
 
@@ -1544,9 +1544,9 @@ TEST_P(TestTxnOptimizeIndex, optimize_index_and_rename_table) {
         //        t2   rename   commit
 
         // rename
-        auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("rename table"), TransactionType::kNormal);
+        auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<String>("rename table"), TransactionType::kNormal);
 
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("optimize index"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("optimize index"), TransactionType::kNormal);
 
         status = txn5->RenameTable(*db_name_, *table_name, "table2");
         EXPECT_TRUE(status.ok());
@@ -1571,11 +1571,11 @@ TEST_P(TestTxnOptimizeIndex, optimize_index_and_rename_table) {
         //        t2    rename  commit
 
         // rename
-        auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("rename table"), TransactionType::kNormal);
+        auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<String>("rename table"), TransactionType::kNormal);
         status = txn5->RenameTable(*db_name_, *table_name, "table2");
         EXPECT_TRUE(status.ok());
 
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("optimize index"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("optimize index"), TransactionType::kNormal);
         status = txn->OptimizeIndex(*db_name_, *table_name, *index_name1, segment_id);
         EXPECT_TRUE(status.ok());
 
@@ -1597,13 +1597,13 @@ TEST_P(TestTxnOptimizeIndex, optimize_index_and_rename_table) {
         //        t2  drop column  commit
 
         // rename
-        auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("rename table"), TransactionType::kNormal);
+        auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<String>("rename table"), TransactionType::kNormal);
         status = txn5->RenameTable(*db_name_, *table_name, "table2");
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn5);
         EXPECT_TRUE(status.ok());
 
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("optimize index"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("optimize index"), TransactionType::kNormal);
         status = txn->OptimizeIndex(*db_name_, *table_name, *index_name1, segment_id);
         EXPECT_FALSE(status.ok());
         status = new_txn_mgr->RollBackTxn(txn);
@@ -1616,21 +1616,21 @@ TEST_P(TestTxnOptimizeIndex, optimize_index_and_rename_table) {
 TEST_P(TestTxnOptimizeIndex, optimize_index_and_compact_table) {
     auto PrepareForCompactAndOptimize = [&] {
         {
-            auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
-            Status status = txn->CreateDatabase(*db_name_, ConflictType::kError, MakeShared<String>());
+            auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("create db"), TransactionType::kNormal);
+            Status status = txn->CreateDatabase(*db_name_, ConflictType::kError, std::make_shared<String>());
             EXPECT_TRUE(status.ok());
             status = new_txn_mgr->CommitTxn(txn);
             EXPECT_TRUE(status.ok());
         }
         {
-            auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+            auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("create table"), TransactionType::kNormal);
             Status status = txn->CreateTable(*db_name_, std::move(table_def), ConflictType::kIgnore);
             EXPECT_TRUE(status.ok());
             status = new_txn_mgr->CommitTxn(txn);
             EXPECT_TRUE(status.ok());
         }
         {
-            auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create index"), TransactionType::kNormal);
+            auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("create index"), TransactionType::kNormal);
             Status status = txn->CreateIndex(*db_name_, *table_name, index_def1, ConflictType::kError);
             EXPECT_TRUE(status.ok());
             status = new_txn_mgr->CommitTxn(txn);
@@ -1638,7 +1638,7 @@ TEST_P(TestTxnOptimizeIndex, optimize_index_and_compact_table) {
         }
         u32 block_row_cnt = 8192;
         auto make_input_block = [&](const Value &v1, const Value &v2) {
-            auto input_block = MakeShared<DataBlock>();
+            auto input_block = std::make_shared<DataBlock>();
             auto append_to_col = [&](ColumnVector &col, const Value &v) {
                 for (u32 i = 0; i < block_row_cnt; ++i) {
                     col.AppendValue(v);
@@ -1663,8 +1663,8 @@ TEST_P(TestTxnOptimizeIndex, optimize_index_and_compact_table) {
 
         // For compact
         for (int i = 0; i < 2; ++i) {
-            auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>(fmt::format("import {}", i)), TransactionType::kNormal);
-            Vector<SharedPtr<DataBlock>> input_blocks = {make_input_block(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"))};
+            auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>(fmt::format("import {}", i)), TransactionType::kNormal);
+            Vector<std::shared_ptr<DataBlock>> input_blocks = {make_input_block(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"))};
             Status status = txn->Import(*db_name_, *table_name, input_blocks);
             EXPECT_TRUE(status.ok());
             status = new_txn_mgr->CommitTxn(txn);
@@ -1675,8 +1675,8 @@ TEST_P(TestTxnOptimizeIndex, optimize_index_and_compact_table) {
         // For optimize
         for (int i = 0; i < 2; ++i) {
             {
-                auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>(fmt::format("append {}", i)), TransactionType::kNormal);
-                SharedPtr<DataBlock> input_block = MakeInputBlock(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
+                auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>(fmt::format("append {}", i)), TransactionType::kNormal);
+                std::shared_ptr<DataBlock> input_block = MakeInputBlock(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
                 Status status = txn->Append(*db_name_, *table_name, input_block);
                 EXPECT_TRUE(status.ok());
                 status = new_txn_mgr->CommitTxn(txn);
@@ -1685,7 +1685,7 @@ TEST_P(TestTxnOptimizeIndex, optimize_index_and_compact_table) {
 
             //            new_txn_mgr->PrintAllKeyValue();
             {
-                auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>(fmt::format("dump index {}", i)), TransactionType::kNormal);
+                auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>(fmt::format("dump index {}", i)), TransactionType::kNormal);
                 Status status = txn->DumpMemIndex(*db_name_, *table_name, *index_name1, 2);
                 EXPECT_TRUE(status.ok());
                 status = new_txn_mgr->CommitTxn(txn);
@@ -1694,8 +1694,8 @@ TEST_P(TestTxnOptimizeIndex, optimize_index_and_compact_table) {
         }
 
         {
-            auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
-            SharedPtr<DataBlock> input_block = MakeInputBlock(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
+            auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("append"), TransactionType::kNormal);
+            std::shared_ptr<DataBlock> input_block = MakeInputBlock(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
             Status status = txn->Append(*db_name_, *table_name, input_block);
             EXPECT_TRUE(status.ok());
             status = new_txn_mgr->CommitTxn(txn);
@@ -1704,7 +1704,7 @@ TEST_P(TestTxnOptimizeIndex, optimize_index_and_compact_table) {
     };
 
     auto CheckTable = [&](Vector<ColumnID> column_idxes) {
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check table"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("check table"), TransactionType::kNormal);
 
         Optional<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
@@ -1734,14 +1734,14 @@ TEST_P(TestTxnOptimizeIndex, optimize_index_and_compact_table) {
         //                                     |------------------|----------|
         //                                    t2                compact  commit
 
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("optimize index"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("optimize index"), TransactionType::kNormal);
         status = txn->OptimizeIndex(*db_name_, *table_name, *index_name1, 2);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
 
         // compact
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<String>("compact"), TransactionType::kNormal);
         status = txn2->Compact(*db_name_, *table_name, {0, 1});
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn2);
@@ -1761,12 +1761,12 @@ TEST_P(TestTxnOptimizeIndex, optimize_index_and_compact_table) {
 
         new_txn_mgr->PrintAllKeyValue();
 
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("optimize index"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("optimize index"), TransactionType::kNormal);
         status = txn->OptimizeIndex(*db_name_, *table_name, *index_name1, 2);
         EXPECT_TRUE(status.ok());
 
         // compact
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<String>("compact"), TransactionType::kNormal);
 
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
@@ -1788,10 +1788,10 @@ TEST_P(TestTxnOptimizeIndex, optimize_index_and_compact_table) {
         //         |------------------|-------------|
         //        t2            compact         commit(fail)
 
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("optimize index"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("optimize index"), TransactionType::kNormal);
 
         // compact
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<String>("compact"), TransactionType::kNormal);
 
         status = txn->OptimizeIndex(*db_name_, *table_name, *index_name1, 2);
         EXPECT_TRUE(status.ok());
@@ -1817,10 +1817,10 @@ TEST_P(TestTxnOptimizeIndex, optimize_index_and_compact_table) {
         //         |-----|----------|
         //        t2   compact   commit (success)
 
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("optimize index"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("optimize index"), TransactionType::kNormal);
 
         // compact
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<String>("compact"), TransactionType::kNormal);
 
         status = txn2->Compact(*db_name_, *table_name, {0, 1});
         EXPECT_TRUE(status.ok());
@@ -1847,9 +1847,9 @@ TEST_P(TestTxnOptimizeIndex, optimize_index_and_compact_table) {
         //        t2   compact   commit (success)
 
         // compact
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<String>("compact"), TransactionType::kNormal);
 
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("optimize index"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("optimize index"), TransactionType::kNormal);
 
         status = txn2->Compact(*db_name_, *table_name, {0, 1});
         EXPECT_TRUE(status.ok());
@@ -1876,12 +1876,12 @@ TEST_P(TestTxnOptimizeIndex, optimize_index_and_compact_table) {
         //        t2    compact  commit (success)
 
         // compact
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<String>("compact"), TransactionType::kNormal);
 
         status = txn2->Compact(*db_name_, *table_name, {0, 1});
         EXPECT_TRUE(status.ok());
 
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("optimize index"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("optimize index"), TransactionType::kNormal);
 
         status = txn->OptimizeIndex(*db_name_, *table_name, *index_name1, 2);
         EXPECT_TRUE(status.ok());
@@ -1905,13 +1905,13 @@ TEST_P(TestTxnOptimizeIndex, optimize_index_and_compact_table) {
         //                             t2                  optimize index      commit (success)
 
         // compact
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<String>("compact"), TransactionType::kNormal);
         status = txn2->Compact(*db_name_, *table_name, {0, 1});
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());
 
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("optimize index"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("optimize index"), TransactionType::kNormal);
         status = txn->OptimizeIndex(*db_name_, *table_name, *index_name1, 2);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);

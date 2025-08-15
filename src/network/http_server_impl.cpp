@@ -66,7 +66,7 @@ namespace {
 
 using namespace infinity;
 
-std::pair<std::shared_ptr<DataType>, infinity::Status> ParseColumnType(const Span<const std::string> tokens, std::string_view json_sv) {
+std::pair<std::shared_ptr<DataType>, infinity::Status> ParseColumnType(const std::span<const std::string> tokens, std::string_view json_sv) {
     simdjson::padded_string json_pad(json_sv);
     simdjson::parser parser;
     simdjson::document doc = parser.iterate(json_pad);
@@ -161,7 +161,7 @@ std::pair<std::shared_ptr<DataType>, infinity::Status> ParseColumnType(const Spa
     return std::make_pair(std::move(column_type), infinity::Status::OK());
 }
 
-infinity::Status ParseColumnDefs(std::string_view json_sv, Vector<ColumnDef *> &column_definitions) {
+infinity::Status ParseColumnDefs(std::string_view json_sv, std::vector<ColumnDef *> &column_definitions) {
     simdjson::padded_string json_pad(json_sv);
     simdjson::parser parser;
     simdjson::document doc = parser.iterate(json_pad);
@@ -458,8 +458,8 @@ public:
             return ResponseFactory::createResponse(http_status, json_response.dump());
         }
 
-        Vector<ColumnDef *> column_definitions;
-        Vector<TableConstraint *> table_constraint;
+        std::vector<ColumnDef *> column_definitions;
+        std::vector<TableConstraint *> table_constraint;
         DeferFn defer_fn_column_def([&]() {
             for (auto &column_def : column_definitions) {
                 delete column_def;
@@ -708,7 +708,7 @@ public:
                 }
             }
             std::string file_path = doc["file_path"].get<std::string>();
-            Vector<ParsedExpr *> *export_columns{nullptr};
+            std::vector<ParsedExpr *> *export_columns{nullptr};
             DeferFn defer_fn([&]() {
                 if (export_columns != nullptr) {
                     for (auto &column_expr : *export_columns) {
@@ -721,7 +721,7 @@ public:
             });
 
             if (simdjson::value val; doc["columns"].get(val) == simdjson::SUCCESS) {
-                export_columns = new Vector<ParsedExpr *>();
+                export_columns = new std::vector<ParsedExpr *>();
 
                 for (auto column : val.get_array()) {
                     if (column.is_string()) {
@@ -901,7 +901,7 @@ public:
                 json_response["error_code"] = ErrorCode::kInvalidJsonFormat;
                 json_response["error_message"] = fmt::format("Invalid json format: {}", data_body);
             }
-            auto *insert_rows = new Vector<InsertRowExpr *>();
+            auto *insert_rows = new std::vector<InsertRowExpr *>();
             DeferFn free_insert_rows([&]() {
                 if (insert_rows != nullptr) {
                     for (auto *insert_row : *insert_rows) {
@@ -978,12 +978,12 @@ public:
                                 return ResponseFactory::createResponse(http_status, json_response.dump());
                             }
 
-                            UniquePtr<ConstantExpr> const_expr = {};
+                            std::unique_ptr<ConstantExpr> const_expr = {};
                             for (auto sub_value : value.get_array()) {
                                 switch (sub_value.type()) {
                                     case simdjson::json_type::array: {
                                         if (const_expr == nullptr) {
-                                            const_expr = MakeUnique<ConstantExpr>(LiteralType::kSubArrayArray);
+                                            const_expr = std::make_unique<ConstantExpr>(LiteralType::kSubArrayArray);
                                         }
                                         size_t subdimension = sub_value.count_elements();
                                         if (subdimension == 0) {
@@ -993,12 +993,12 @@ public:
                                             return ResponseFactory::createResponse(http_status, json_response.dump());
                                         }
 
-                                        UniquePtr<ConstantExpr> const_expr_2 = {};
+                                        std::unique_ptr<ConstantExpr> const_expr_2 = {};
                                         for (auto sub_sub_value : sub_value.get_array()) {
                                             switch (sub_sub_value.type()) {
                                                 case simdjson::json_type::array: {
                                                     if (const_expr_2 == nullptr) {
-                                                        const_expr_2 = MakeUnique<ConstantExpr>(LiteralType::kSubArrayArray);
+                                                        const_expr_2 = std::make_unique<ConstantExpr>(LiteralType::kSubArrayArray);
                                                     }
                                                     size_t subsubdimension = sub_sub_value.count_elements();
                                                     if (subsubdimension == 0) {
@@ -1009,7 +1009,7 @@ public:
                                                         return ResponseFactory::createResponse(http_status, json_response.dump());
                                                     }
 
-                                                    UniquePtr<ConstantExpr> const_expr_3 = {};
+                                                    std::unique_ptr<ConstantExpr> const_expr_3 = {};
                                                     for (auto sub_sub_sub_value : sub_sub_value.get_array()) {
                                                         if (sub_sub_sub_value.type() != simdjson::json_type::number) {
                                                             json_response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
@@ -1055,21 +1055,21 @@ public:
                                                     switch (sub_sub_value.get_number_type()) {
                                                         case simdjson::number_type::signed_integer: {
                                                             if (const_expr_2 == nullptr) {
-                                                                const_expr_2 = MakeUnique<ConstantExpr>(LiteralType::kIntegerArray);
+                                                                const_expr_2 = std::make_unique<ConstantExpr>(LiteralType::kIntegerArray);
                                                             }
                                                             const_expr_2->long_array_.emplace_back(sub_sub_value.get<i64>());
                                                             break;
                                                         }
                                                         case simdjson::number_type::unsigned_integer: {
                                                             if (const_expr_2 == nullptr) {
-                                                                const_expr_2 = MakeUnique<ConstantExpr>(LiteralType::kIntegerArray);
+                                                                const_expr_2 = std::make_unique<ConstantExpr>(LiteralType::kIntegerArray);
                                                             }
                                                             const_expr_2->long_array_.emplace_back(sub_sub_value.get<u64>());
                                                             break;
                                                         }
                                                         case simdjson::number_type::floating_point_number: {
                                                             if (const_expr_2 == nullptr) {
-                                                                const_expr_2 = MakeUnique<ConstantExpr>(LiteralType::kDoubleArray);
+                                                                const_expr_2 = std::make_unique<ConstantExpr>(LiteralType::kDoubleArray);
                                                             }
                                                             const_expr_2->double_array_.emplace_back(sub_sub_value.get<double>());
                                                             break;
@@ -1159,13 +1159,13 @@ public:
                                 insert_one_row->values_.emplace_back(std::move(const_expr));
                                 break;
                             }
-                            UniquePtr<ConstantExpr> const_sparse_expr = {};
+                            std::unique_ptr<ConstantExpr> const_sparse_expr = {};
                             if (value_obj.count_fields() == 0) {
                                 json_response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
                                 json_response["error_message"] = "Empty sparse vector, cannot decide type";
                                 return ResponseFactory::createResponse(http_status, json_response.dump());
                             }
-                            for (HashSet<i64> key_set; auto sparse_it : value_obj) {
+                            for (std::unordered_set<i64> key_set; auto sparse_it : value_obj) {
                                 const std::string sparse_k = std::string((std::string_view)sparse_it.unescaped_key());
                                 auto sparse_v = sparse_it.value();
                                 i64 key_val = std::stoll(sparse_k);
@@ -1279,7 +1279,7 @@ public:
             simdjson::document doc = parser.iterate(json_pad);
             const std::string filter_string = doc["filter"].get<std::string>();
             if (filter_string != "") {
-                UniquePtr<ExpressionParserResult> expr_parsed_result = MakeUnique<ExpressionParserResult>();
+                std::unique_ptr<ExpressionParserResult> expr_parsed_result = std::make_unique<ExpressionParserResult>();
                 ExprParser expr_parser;
                 expr_parser.Parse(filter_string, expr_parsed_result.get());
                 if (expr_parsed_result->IsError() || expr_parsed_result->exprs_ptr_->size() != 1) {
@@ -1352,7 +1352,7 @@ public:
             simdjson::document doc = parser.iterate(json_pad);
             auto update_clause = doc["update"];
 
-            Vector<UpdateExpr *> *update_expr_array = new Vector<UpdateExpr *>();
+            std::vector<UpdateExpr *> *update_expr_array = new std::vector<UpdateExpr *>();
             DeferFn defer_free_update_expr_array([&]() {
                 if (update_expr_array != nullptr) {
                     for (auto &expr : *update_expr_array) {
@@ -1487,7 +1487,7 @@ public:
 
             std::string where_clause = doc["filter"].get<std::string>();
 
-            UniquePtr<ExpressionParserResult> expr_parsed_result = MakeUnique<ExpressionParserResult>();
+            std::unique_ptr<ExpressionParserResult> expr_parsed_result = std::make_unique<ExpressionParserResult>();
             ExprParser expr_parser;
             expr_parser.Parse(where_clause, expr_parsed_result.get());
             if (expr_parsed_result->IsError() || expr_parsed_result->exprs_ptr_->size() != 1) {
@@ -1849,7 +1849,7 @@ public:
         {
             index_info->column_name_ = doc["fields"].get_array().at(0).get<std::string>();
             ToLower(index_info->column_name_);
-            auto index_param_list = new Vector<InitParameter *>();
+            auto index_param_list = new std::vector<InitParameter *>();
             DeferFn release_index_param_list([&]() {
                 if (index_param_list != nullptr) {
                     for (auto &index_param_ptr : *index_param_list) {
@@ -1976,7 +1976,7 @@ public:
         HTTPStatus http_status;
         http_status = HTTPStatus::CODE_200;
 
-        Vector<ColumnDef *> column_def_ptrs;
+        std::vector<ColumnDef *> column_def_ptrs;
         DeferFn defer_free_column_def_ptrs([&]() {
             for (auto &column_def_ptr : column_def_ptrs) {
                 delete column_def_ptr;
@@ -1988,7 +1988,7 @@ public:
             http_status = HTTPStatus::CODE_500;
             return ResponseFactory::createResponse(http_status, json_response.dump());
         }
-        Vector<std::shared_ptr<ColumnDef>> column_defs;
+        std::vector<std::shared_ptr<ColumnDef>> column_defs;
         for (auto &column_def_ptr : column_def_ptrs) {
             column_defs.emplace_back(column_def_ptr);
         }
@@ -2026,7 +2026,7 @@ public:
         HTTPStatus http_status;
         http_status = HTTPStatus::CODE_200;
 
-        Vector<std::string> column_names;
+        std::vector<std::string> column_names;
         for (auto column : doc["column_names"].get_array()) {
             column_names.emplace_back(column.get<std::string>());
         }
@@ -4023,7 +4023,7 @@ namespace infinity {
 // oatpp example
 // https://github.com/oatpp/example-server-stop/blob/master/src/App_StopSimple.cpp
 
-Thread HTTPServer::Start(const std::string &ip_address, u16 port) {
+std::thread HTTPServer::Start(const std::string &ip_address, u16 port) {
     {
         auto expected = HTTPServerStatus::kStopped;
         if (!status_.compare_exchange_strong(expected, HTTPServerStatus::kStarting)) {
@@ -4035,123 +4035,123 @@ Thread HTTPServer::Start(const std::string &ip_address, u16 port) {
     std::shared_ptr<HttpRouter> router = HttpRouter::createShared();
 
     // database
-    router->route("GET", "/databases", MakeShared<ListDatabaseHandler>());
-    router->route("POST", "/databases/{database_name}", MakeShared<CreateDatabaseHandler>());
-    router->route("DELETE", "/databases/{database_name}", MakeShared<DropDatabaseHandler>());
-    router->route("GET", "/databases/{database_name}", MakeShared<ShowDatabaseHandler>());
+    router->route("GET", "/databases", std::make_shared<ListDatabaseHandler>());
+    router->route("POST", "/databases/{database_name}", std::make_shared<CreateDatabaseHandler>());
+    router->route("DELETE", "/databases/{database_name}", std::make_shared<DropDatabaseHandler>());
+    router->route("GET", "/databases/{database_name}", std::make_shared<ShowDatabaseHandler>());
 
     // table
-    router->route("GET", "/databases/{database_name}/tables", MakeShared<ListTableHandler>());
-    router->route("POST", "/databases/{database_name}/tables/{table_name}", MakeShared<CreateTableHandler>());
-    router->route("DELETE", "/databases/{database_name}/tables/{table_name}", MakeShared<DropTableHandler>());
-    router->route("GET", "/databases/{database_name}/tables/{table_name}", MakeShared<ShowTableHandler>());
-    router->route("GET", "/databases/{database_name}/table/{table_name}", MakeShared<ExportTableHandler>()); // Export table
-    router->route("GET", "/databases/{database_name}/tables/{table_name}/columns", MakeShared<ShowTableColumnsHandler>());
+    router->route("GET", "/databases/{database_name}/tables", std::make_shared<ListTableHandler>());
+    router->route("POST", "/databases/{database_name}/tables/{table_name}", std::make_shared<CreateTableHandler>());
+    router->route("DELETE", "/databases/{database_name}/tables/{table_name}", std::make_shared<DropTableHandler>());
+    router->route("GET", "/databases/{database_name}/tables/{table_name}", std::make_shared<ShowTableHandler>());
+    router->route("GET", "/databases/{database_name}/table/{table_name}", std::make_shared<ExportTableHandler>()); // Export table
+    router->route("GET", "/databases/{database_name}/tables/{table_name}/columns", std::make_shared<ShowTableColumnsHandler>());
 
     // DML
-    router->route("PUT", "/databases/{database_name}/tables/{table_name}", MakeShared<ImportHandler>());
-    router->route("POST", "/databases/{database_name}/tables/{table_name}/docs", MakeShared<InsertHandler>());
-    router->route("DELETE", "/databases/{database_name}/tables/{table_name}/docs", MakeShared<DeleteHandler>());
-    router->route("PUT", "/databases/{database_name}/tables/{table_name}/docs", MakeShared<UpdateHandler>());
-    router->route("PUT", "/databases/{database_name}/tables/{table_name}/compact", MakeShared<CompactTableHandler>());
+    router->route("PUT", "/databases/{database_name}/tables/{table_name}", std::make_shared<ImportHandler>());
+    router->route("POST", "/databases/{database_name}/tables/{table_name}/docs", std::make_shared<InsertHandler>());
+    router->route("DELETE", "/databases/{database_name}/tables/{table_name}/docs", std::make_shared<DeleteHandler>());
+    router->route("PUT", "/databases/{database_name}/tables/{table_name}/docs", std::make_shared<UpdateHandler>());
+    router->route("PUT", "/databases/{database_name}/tables/{table_name}/compact", std::make_shared<CompactTableHandler>());
 
     // DQL
-    router->route("GET", "/databases/{database_name}/tables/{table_name}/docs", MakeShared<SelectHandler>());
-    router->route("GET", "/databases/{database_name}/tables/{table_name}/meta", MakeShared<ExplainHandler>());
+    router->route("GET", "/databases/{database_name}/tables/{table_name}/docs", std::make_shared<SelectHandler>());
+    router->route("GET", "/databases/{database_name}/tables/{table_name}/meta", std::make_shared<ExplainHandler>());
 
     // index
-    router->route("GET", "/databases/{database_name}/tables/{table_name}/indexes", MakeShared<ListTableIndexesHandler>());
-    router->route("GET", "/databases/{database_name}/tables/{table_name}/indexes/{index_name}", MakeShared<ShowTableIndexDetailHandler>());
+    router->route("GET", "/databases/{database_name}/tables/{table_name}/indexes", std::make_shared<ListTableIndexesHandler>());
+    router->route("GET", "/databases/{database_name}/tables/{table_name}/indexes/{index_name}", std::make_shared<ShowTableIndexDetailHandler>());
     router->route("GET",
                   "/databases/{database_name}/tables/{table_name}/indexes/{index_name}/segment/{segment_id}",
-                  MakeShared<ShowTableIndexSegmentHandler>());
+                  std::make_shared<ShowTableIndexSegmentHandler>());
     router->route("GET",
                   "/databases/{database_name}/tables/{table_name}/indexes/{index_name}/segment/{segment_id}/chunk/{chunk_id}",
-                  MakeShared<ShowTableIndexChunkHandler>());
-    router->route("DELETE", "/databases/{database_name}/tables/{table_name}/indexes/{index_name}", MakeShared<DropIndexHandler>());
-    router->route("POST", "/databases/{database_name}/tables/{table_name}/indexes/{index_name}", MakeShared<CreateIndexHandler>());
-    router->route("PUT", "/databases/{database_name}/tables/{table_name}/indexes/{index_name}", MakeShared<OptimizeIndexHandler>());
+                  std::make_shared<ShowTableIndexChunkHandler>());
+    router->route("DELETE", "/databases/{database_name}/tables/{table_name}/indexes/{index_name}", std::make_shared<DropIndexHandler>());
+    router->route("POST", "/databases/{database_name}/tables/{table_name}/indexes/{index_name}", std::make_shared<CreateIndexHandler>());
+    router->route("PUT", "/databases/{database_name}/tables/{table_name}/indexes/{index_name}", std::make_shared<OptimizeIndexHandler>());
 
     // alter
-    router->route("POST", "/databases/{database_name}/tables/{table_name}/columns", MakeShared<AddColumnsHandler>());
-    router->route("DELETE", "/databases/{database_name}/tables/{table_name}/columns", MakeShared<DropColumnsHandler>());
+    router->route("POST", "/databases/{database_name}/tables/{table_name}/columns", std::make_shared<AddColumnsHandler>());
+    router->route("DELETE", "/databases/{database_name}/tables/{table_name}/columns", std::make_shared<DropColumnsHandler>());
 
     // snapshot
-    router->route("POST", "/snapshots", MakeShared<CreateTableSnapshotHandler>());
-    router->route("POST", "/snapshots/restore", MakeShared<RestoreTableSnapshotHandler>());
-    router->route("DELETE", "/snapshots/{snapshot_name}", MakeShared<DropSnapshotHandler>());
-    router->route("GET", "/snapshots", MakeShared<ListSnapshotsHandler>());
-    router->route("GET", "/snapshots/{snapshot_name}", MakeShared<ShowSnapshotHandler>());
-    router->route("POST", "/snapshots/system", MakeShared<CreateSystemSnapshotHandler>());
-    router->route("POST", "/snapshots/system/restore", MakeShared<RestoreSystemSnapshotHandler>());
-    router->route("POST", "/snapshots/database", MakeShared<CreateDatabaseSnapshotHandler>());
-    router->route("POST", "/snapshots/database/restore", MakeShared<RestoreDatabaseSnapshotHandler>());
+    router->route("POST", "/snapshots", std::make_shared<CreateTableSnapshotHandler>());
+    router->route("POST", "/snapshots/restore", std::make_shared<RestoreTableSnapshotHandler>());
+    router->route("DELETE", "/snapshots/{snapshot_name}", std::make_shared<DropSnapshotHandler>());
+    router->route("GET", "/snapshots", std::make_shared<ListSnapshotsHandler>());
+    router->route("GET", "/snapshots/{snapshot_name}", std::make_shared<ShowSnapshotHandler>());
+    router->route("POST", "/snapshots/system", std::make_shared<CreateSystemSnapshotHandler>());
+    router->route("POST", "/snapshots/system/restore", std::make_shared<RestoreSystemSnapshotHandler>());
+    router->route("POST", "/snapshots/database", std::make_shared<CreateDatabaseSnapshotHandler>());
+    router->route("POST", "/snapshots/database/restore", std::make_shared<RestoreDatabaseSnapshotHandler>());
 
     // segment
-    router->route("GET", "/databases/{database_name}/tables/{table_name}/segments/{segment_id}", MakeShared<ShowSegmentDetailHandler>());
-    router->route("GET", "/databases/{database_name}/tables/{table_name}/segments", MakeShared<ShowSegmentsListHandler>());
+    router->route("GET", "/databases/{database_name}/tables/{table_name}/segments/{segment_id}", std::make_shared<ShowSegmentDetailHandler>());
+    router->route("GET", "/databases/{database_name}/tables/{table_name}/segments", std::make_shared<ShowSegmentsListHandler>());
 
     // block
-    router->route("GET", "/databases/{database_name}/tables/{table_name}/segments/{segment_id}/blocks", MakeShared<ShowBlocksListHandler>());
+    router->route("GET", "/databases/{database_name}/tables/{table_name}/segments/{segment_id}/blocks", std::make_shared<ShowBlocksListHandler>());
     router->route("GET",
                   "/databases/{database_name}/tables/{table_name}/segments/{segment_id}/blocks/{block_id}",
-                  MakeShared<ShowBlockDetailHandler>());
+                  std::make_shared<ShowBlockDetailHandler>());
     router->route("GET",
                   "/databases/{database_name}/tables/{table_name}/segments/{segment_id}/blocks/{block_id}/{column_id}",
-                  MakeShared<ShowBlockColumnHandler>());
+                  std::make_shared<ShowBlockColumnHandler>());
 
     // config
-    router->route("GET", "/configs", MakeShared<ShowConfigsHandler>());
-    router->route("GET", "/configs/{config_name}", MakeShared<ShowConfigHandler>());
+    router->route("GET", "/configs", std::make_shared<ShowConfigsHandler>());
+    router->route("GET", "/configs/{config_name}", std::make_shared<ShowConfigHandler>());
 
-    router->route("POST", "/configs", MakeShared<SetConfigHandler>());
+    router->route("POST", "/configs", std::make_shared<SetConfigHandler>());
 
     // metrics
-    router->route("GET", "/instance/buffer", MakeShared<ShowBufferHandler>());
-    router->route("GET", "/instance/profiles", MakeShared<ShowProfilesHandler>());
-    router->route("GET", "/instance/memindex", MakeShared<ShowMemIndexHandler>());
-    router->route("GET", "/instance/queries", MakeShared<ShowQueriesHandler>());
-    router->route("GET", "/instance/logs", MakeShared<ShowLogsHandler>());
-    router->route("GET", "/instance/queries/{query_id}", MakeShared<ShowQueryHandler>());
-    router->route("GET", "/instance/transactions", MakeShared<ShowTransactionsHandler>());
-    router->route("GET", "/instance/transactions/{transaction_id}", MakeShared<ShowTransactionHandler>());
-    router->route("GET", "/instance/objects", MakeShared<ShowObjectsHandler>());
-    router->route("GET", "/instance/objects/{object_name}", MakeShared<ShowObjectHandler>());
-    router->route("GET", "/instance/files", MakeShared<ShowFilesHandler>());
-    router->route("GET", "/instance/memory", MakeShared<ShowMemoryHandler>());
-    router->route("GET", "/instance/memory/objects", MakeShared<ShowMemoryObjectsHandler>());
-    router->route("GET", "/instance/memory/allocations", MakeShared<ShowMemoryAllocationsHandler>());
-    router->route("POST", "/instance/flush", MakeShared<ForceGlobalCheckpointHandler>());
+    router->route("GET", "/instance/buffer", std::make_shared<ShowBufferHandler>());
+    router->route("GET", "/instance/profiles", std::make_shared<ShowProfilesHandler>());
+    router->route("GET", "/instance/memindex", std::make_shared<ShowMemIndexHandler>());
+    router->route("GET", "/instance/queries", std::make_shared<ShowQueriesHandler>());
+    router->route("GET", "/instance/logs", std::make_shared<ShowLogsHandler>());
+    router->route("GET", "/instance/queries/{query_id}", std::make_shared<ShowQueryHandler>());
+    router->route("GET", "/instance/transactions", std::make_shared<ShowTransactionsHandler>());
+    router->route("GET", "/instance/transactions/{transaction_id}", std::make_shared<ShowTransactionHandler>());
+    router->route("GET", "/instance/objects", std::make_shared<ShowObjectsHandler>());
+    router->route("GET", "/instance/objects/{object_name}", std::make_shared<ShowObjectHandler>());
+    router->route("GET", "/instance/files", std::make_shared<ShowFilesHandler>());
+    router->route("GET", "/instance/memory", std::make_shared<ShowMemoryHandler>());
+    router->route("GET", "/instance/memory/objects", std::make_shared<ShowMemoryObjectsHandler>());
+    router->route("GET", "/instance/memory/allocations", std::make_shared<ShowMemoryAllocationsHandler>());
+    router->route("POST", "/instance/flush", std::make_shared<ForceGlobalCheckpointHandler>());
 
     // variable
-    router->route("GET", "/variables/global", MakeShared<ShowGlobalVariablesHandler>());
-    router->route("GET", "/variables/global/{variable_name}", MakeShared<ShowGlobalVariableHandler>());
-    router->route("SET", "/variables/global", MakeShared<SetGlobalVariableHandler>());
-    router->route("GET", "/variables/session", MakeShared<ShowSessionVariablesHandler>());
-    router->route("GET", "/variables/session/{variable_name}", MakeShared<ShowSessionVariableHandler>());
-    router->route("SET", "/variables/session", MakeShared<SetSessionVariableHandler>());
+    router->route("GET", "/variables/global", std::make_shared<ShowGlobalVariablesHandler>());
+    router->route("GET", "/variables/global/{variable_name}", std::make_shared<ShowGlobalVariableHandler>());
+    router->route("SET", "/variables/global", std::make_shared<SetGlobalVariableHandler>());
+    router->route("GET", "/variables/session", std::make_shared<ShowSessionVariablesHandler>());
+    router->route("GET", "/variables/session/{variable_name}", std::make_shared<ShowSessionVariableHandler>());
+    router->route("SET", "/variables/session", std::make_shared<SetSessionVariableHandler>());
 
     // admin
-    router->route("POST", "/admin/node/current", MakeShared<AdminSetNodeRoleHandler>());
-    router->route("GET", "/admin/variables", MakeShared<AdminShowNodeVariablesHandler>());
-    router->route("GET", "/admin/configs", MakeShared<AdminShowNodeConfigsHandler>());
-    router->route("GET", "/admin/variables/{variable_name}", MakeShared<AdminShowNodeVariableHandler>());
-    router->route("GET", "/admin/logs", MakeShared<AdminShowLogsHandler>());
-    router->route("GET", "/admin/node/current", MakeShared<AdminShowCurrentNodeHandler>());
-    router->route("GET", "/admin/node/{node_name}", MakeShared<AdminShowNodeByNameHandler>());
-    router->route("GET", "/admin/nodes", MakeShared<AdminListAllNodesHandler>());
-    router->route("DELETE", "/admin/node/{node_name}", MakeShared<AdminRemoveNodeHandler>());
+    router->route("POST", "/admin/node/current", std::make_shared<AdminSetNodeRoleHandler>());
+    router->route("GET", "/admin/variables", std::make_shared<AdminShowNodeVariablesHandler>());
+    router->route("GET", "/admin/configs", std::make_shared<AdminShowNodeConfigsHandler>());
+    router->route("GET", "/admin/variables/{variable_name}", std::make_shared<AdminShowNodeVariableHandler>());
+    router->route("GET", "/admin/logs", std::make_shared<AdminShowLogsHandler>());
+    router->route("GET", "/admin/node/current", std::make_shared<AdminShowCurrentNodeHandler>());
+    router->route("GET", "/admin/node/{node_name}", std::make_shared<AdminShowNodeByNameHandler>());
+    router->route("GET", "/admin/nodes", std::make_shared<AdminListAllNodesHandler>());
+    router->route("DELETE", "/admin/node/{node_name}", std::make_shared<AdminRemoveNodeHandler>());
 
     connection_provider_ = HttpConnectionProvider::createShared({ip_address, port, WebAddress::IP_4});
     connection_handler_ = HttpConnectionHandler::createShared(router);
 
-    server_ = MakeShared<WebServer>(connection_provider_, connection_handler_);
+    server_ = std::make_shared<WebServer>(connection_provider_, connection_handler_);
 
     fmt::print("HTTP server listen on {}: {}\n", ip_address, port);
 
     status_.store(HTTPServerStatus::kRunning);
 
-    return Thread([this] {
+    return std::thread([this] {
         server_->run();
 
         status_.store(HTTPServerStatus::kStopped);

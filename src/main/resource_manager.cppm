@@ -12,12 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:resource_manager;
 
-import :stl;
 import :singleton;
+import :infinity_type;
+
+import std;
 
 import global_resource_usage;
 
@@ -26,7 +26,7 @@ namespace infinity {
 export class ResourceManager : public Singleton<ResourceManager> {
 public:
     explicit ResourceManager(u64 total_cpu_count, u64 total_memory)
-        : total_cpu_count_(total_cpu_count), total_memory_(total_memory), hardware_concurrency_(Thread::hardware_concurrency()) {
+        : total_cpu_count_(total_cpu_count), total_memory_(total_memory), hardware_concurrency_(std::thread::hardware_concurrency()) {
 #ifdef INFINITY_DEBUG
         GlobalResourceUsage::IncrObjectCount("ResourceManager");
 #endif
@@ -57,8 +57,8 @@ public:
     }
 
 private:
-    atomic_u64 total_cpu_count_;
-    atomic_u64 total_memory_;
+    std::atomic_uint64_t total_cpu_count_;
+    std::atomic_uint64_t total_memory_;
     u64 hardware_concurrency_;
 };
 

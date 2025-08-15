@@ -1,5 +1,3 @@
-module;
-
 export module infinity_core:infinity_type;
 
 import std.compat;

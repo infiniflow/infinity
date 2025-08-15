@@ -30,8 +30,8 @@ struct RtrimFunction {
 template <>
 inline void RtrimFunction::Run(VarcharT &left, VarcharT &result, ColumnVector *left_ptr, ColumnVector *result_ptr) {
     const char *input = nullptr;
-    SizeT input_len = 0;
-    Span<const char> left_v = left_ptr->GetVarcharInner(left);
+    size_t input_len = 0;
+    std::span<const char> left_v = left_ptr->GetVarcharInner(left);
     input = left_v.data();
     input_len = left_v.size();
     long pos = input_len - 1;
@@ -39,14 +39,14 @@ inline void RtrimFunction::Run(VarcharT &left, VarcharT &result, ColumnVector *l
         pos--;
     }
 
-    Span<const char> res_span = Span<const char>(input, pos + 1);
+    std::span<const char> res_span = std::span<const char>(input, pos + 1);
     result_ptr->AppendVarcharInner(res_span, result);
 }
 
 void RegisterRtrimFunction(NewCatalog *catalog_ptr) {
-    String func_name = "rtrim";
+    std::string func_name = "rtrim";
 
-    SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
+    std::shared_ptr<ScalarFunctionSet> function_set_ptr = std::make_shared<ScalarFunctionSet>(func_name);
 
     ScalarFunction rtrim_function(func_name,
                                   {DataType(LogicalType::kVarchar)},

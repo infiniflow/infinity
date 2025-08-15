@@ -1,9 +1,8 @@
-module;
-
 export module infinity_core:s3_client;
 
-import :stl;
 import :status;
+
+import std;
 
 import third_party;
 
@@ -11,7 +10,10 @@ namespace infinity {
 
 export class S3Client {
 public:
-    S3Client(String _url = "http://localhost:9000", bool _https = false, String _access_key = "minioadmin", String _secret_key = "minioadmin")
+    S3Client(std::string _url = "http://localhost:9000",
+             bool _https = false,
+             std::string _access_key = "minioadmin",
+             std::string _secret_key = "minioadmin")
         : url(_url), https(_https), access_key(_access_key), secret_key(_secret_key) {}
 
     virtual ~S3Client() = default;
@@ -19,22 +21,24 @@ public:
     virtual Status Init() = 0;
     virtual Status UnInit() = 0;
 
-    virtual Status DownloadObject(const String &bucket_name, const String &object_name, const String &file_path) = 0;
+    virtual Status DownloadObject(const std::string &bucket_name, const std::string &object_name, const std::string &file_path) = 0;
 
-    virtual Status UploadObject(const String &bucket_name, const String &object_name, const String &file_path) = 0;
+    virtual Status UploadObject(const std::string &bucket_name, const std::string &object_name, const std::string &file_path) = 0;
 
-    virtual Status RemoveObject(const String &bucket_name, const String &object_name) = 0;
+    virtual Status RemoveObject(const std::string &bucket_name, const std::string &object_name) = 0;
 
-    virtual Status
-    CopyObject(const String &src_bucket_name, const String &src_object_name, const String &dst_bucket_name, const String &dst_object_name) = 0;
+    virtual Status CopyObject(const std::string &src_bucket_name,
+                              const std::string &src_object_name,
+                              const std::string &dst_bucket_name,
+                              const std::string &dst_object_name) = 0;
 
-    virtual Status BucketExists(const String &bucket_name) = 0;
-    virtual Status MakeBucket(const String &bucket_name) = 0;
+    virtual Status BucketExists(const std::string &bucket_name) = 0;
+    virtual Status MakeBucket(const std::string &bucket_name) = 0;
 
 protected:
-    String url;
+    std::string url;
     bool https;
-    String access_key;
-    String secret_key;
+    std::string access_key;
+    std::string secret_key;
 };
 } // namespace infinity

@@ -52,9 +52,9 @@ public:
 
     u32 read_value_u32();
 
-    String read_string(const size_t string_length, NullTerminator null_terminator = NullTerminator::kYes);
+    std::string read_string(const size_t string_length, NullTerminator null_terminator = NullTerminator::kYes);
 
-    String read_string();
+    std::string read_string();
 
 private:
     void receive_more(size_t more_bytes = 1);

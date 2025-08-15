@@ -33,40 +33,40 @@ namespace infinity {
 
 export class MatchSparseExpression final : public BaseExpression {
 public:
-    MatchSparseExpression(Vector<SharedPtr<BaseExpression>> search_column,
-                          SharedPtr<BaseExpression> query_sparse_expr,
+    MatchSparseExpression(std::vector<std::shared_ptr<BaseExpression>> search_column,
+                          std::shared_ptr<BaseExpression> query_sparse_expr,
                           SparseMetricType metric_type,
-                          SizeT query_n,
-                          SizeT topn,
-                          Vector<UniquePtr<InitParameter>> opt_params,
-                          SharedPtr<BaseExpression> optional_filter,
-                          String index_name,
+                          size_t query_n,
+                          size_t topn,
+                          std::vector<std::unique_ptr<InitParameter>> opt_params,
+                          std::shared_ptr<BaseExpression> optional_filter,
+                          std::string index_name,
                           bool ignore_index);
 
     DataType Type() const override;
 
-    String ToString() const override;
+    std::string ToString() const override;
 
     u64 Hash() const override;
 
     bool Eq(const BaseExpression &other) const override;
 
 private:
-    void MakeQuery(SharedPtr<BaseExpression> query_sparse_expr);
+    void MakeQuery(std::shared_ptr<BaseExpression> query_sparse_expr);
 
 public:
     const ColumnExpression *column_expr_;
-    SharedPtr<BaseExpression> query_sparse_expr_;
+    std::shared_ptr<BaseExpression> query_sparse_expr_;
 
     SparseMetricType metric_type_;
-    SizeT query_n_;
-    SizeT topn_;
+    size_t query_n_;
+    size_t topn_;
 
-    Vector<UniquePtr<InitParameter>> opt_params_;
+    std::vector<std::unique_ptr<InitParameter>> opt_params_;
 
-    SharedPtr<BaseExpression> optional_filter_;
+    std::shared_ptr<BaseExpression> optional_filter_;
 
-    const String index_name_;
+    const std::string index_name_;
     bool ignore_index_;
 };
 

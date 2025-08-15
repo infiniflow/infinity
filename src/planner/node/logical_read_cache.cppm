@@ -33,27 +33,27 @@ export class LogicalReadCache : public LogicalNode {
 public:
     LogicalReadCache(u64 node_id,
                      LogicalNodeType origin_type,
-                     SharedPtr<BaseTableRef> base_table_ref,
-                     SharedPtr<CacheContent> cache_content,
-                     Vector<SizeT> column_map,
+                     std::shared_ptr<BaseTableRef> base_table_ref,
+                     std::shared_ptr<CacheContent> cache_content,
+                     std::vector<size_t> column_map,
                      bool is_min_heap);
 
 public:
-    virtual Vector<ColumnBinding> GetColumnBindings() const;
+    virtual std::vector<ColumnBinding> GetColumnBindings() const;
 
-    virtual SharedPtr<Vector<String>> GetOutputNames() const;
+    virtual std::shared_ptr<std::vector<std::string>> GetOutputNames() const;
 
-    virtual SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const;
+    virtual std::shared_ptr<std::vector<std::shared_ptr<DataType>>> GetOutputTypes() const;
 
-    virtual String ToString(i64 &space) const;
+    virtual std::string ToString(i64 &space) const;
 
-    virtual String name() { return "LogicalReadCache"; }
+    virtual std::string name() { return "LogicalReadCache"; }
 
 public:
     LogicalNodeType origin_type_;
-    SharedPtr<BaseTableRef> base_table_ref_;
-    SharedPtr<CacheContent> cache_content_;
-    Vector<SizeT> column_map_; // result column id -> cache column id
+    std::shared_ptr<BaseTableRef> base_table_ref_;
+    std::shared_ptr<CacheContent> cache_content_;
+    std::vector<size_t> column_map_; // result column id -> cache column id
     bool is_min_heap_;
 };
 

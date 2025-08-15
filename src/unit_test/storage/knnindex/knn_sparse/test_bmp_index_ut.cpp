@@ -140,7 +140,7 @@ protected:
         }
         {
             unsigned char *data_ptr = nullptr;
-            SizeT file_size = VirtualStore::GetFileSize(save2_path);
+            size_t file_size = VirtualStore::GetFileSize(save2_path);
             int ret = VirtualStore::MmapFile(save2_path, data_ptr, file_size);
             if (ret < 0) {
                 UnrecoverableError("mmap failed");
@@ -151,7 +151,7 @@ protected:
             VirtualStore::MunmapFile(save2_path);
         }
         {
-            SizeT file_size = VirtualStore::GetFileSize(save2_path);
+            size_t file_size = VirtualStore::GetFileSize(save2_path);
             auto [file_handle, status] = VirtualStore::Open(save2_path, FileAccessMode::kRead);
             if (!status.ok()) {
                 UnrecoverableError(fmt::format("Failed to open file: {}", save_path));

@@ -26,19 +26,19 @@ class SkipListWriterTest : public BaseTest {
 public:
     SkipListWriterTest() {}
     ~SkipListWriterTest() {}
-    void SetUp() override { skiplist_writer_ = MakeShared<SkipListWriter>(); }
+    void SetUp() override { skiplist_writer_ = std::make_shared<SkipListWriter>(); }
 
     void TearDown() override { skiplist_writer_.reset(); }
 
 protected:
-    SharedPtr<FileWriter> CreateFileWriter(String file_name);
+    std::shared_ptr<FileWriter> CreateFileWriter(String file_name);
 
 protected:
-    SharedPtr<SkipListWriter> skiplist_writer_ = nullptr;
-    static constexpr SizeT BUFFER_SIZE_ = 1024;
+    std::shared_ptr<SkipListWriter> skiplist_writer_ = nullptr;
+    static constexpr size_t BUFFER_SIZE_ = 1024;
 };
 
-SharedPtr<FileWriter> SkipListWriterTest::CreateFileWriter(infinity::String file_path) { return MakeShared<FileWriter>(file_path, BUFFER_SIZE_); }
+std::shared_ptr<FileWriter> SkipListWriterTest::CreateFileWriter(infinity::String file_path) { return std::make_shared<FileWriter>(file_path, BUFFER_SIZE_); }
 
 TEST_F(SkipListWriterTest, test1) {
     using namespace infinity;
@@ -64,11 +64,11 @@ TEST_F(SkipListWriterTest, test1) {
 
     skiplist_writer_->Dump(file_writer);
 
-    auto reader = MakeShared<PostingByteSliceReader>();
+    auto reader = std::make_shared<PostingByteSliceReader>();
     reader->Open(skiplist_writer_.get());
 
     u32 val_buffer[BUFFER_SIZE_];
-    SizeT decode_len;
+    size_t decode_len;
     ASSERT_TRUE(reader->Decode<u32>(val_buffer, SKIP_LIST_BUFFER_SIZE, decode_len));
     ASSERT_TRUE(reader->Decode<u32>(val_buffer + SKIP_LIST_BUFFER_SIZE, 2, decode_len));
 
@@ -128,12 +128,12 @@ TEST_F(SkipListWriterTest, test2) {
 
     skiplist_writer_->Dump(file_writer);
 
-    auto reader = MakeShared<PostingByteSliceReader>();
+    auto reader = std::make_shared<PostingByteSliceReader>();
     reader->Open(skiplist_writer_.get());
 
     u32 key_buffer[BUFFER_SIZE_];
     u32 val_buffer[BUFFER_SIZE_];
-    SizeT decode_len;
+    size_t decode_len;
 
     ASSERT_TRUE(reader->Decode(key_buffer, SKIP_LIST_BUFFER_SIZE, decode_len));
     ASSERT_TRUE(reader->Decode(val_buffer, SKIP_LIST_BUFFER_SIZE, decode_len));
@@ -214,13 +214,13 @@ TEST_F(SkipListWriterTest, test3) {
 
     skiplist_writer_->Dump(file_writer);
 
-    auto reader = MakeShared<PostingByteSliceReader>();
+    auto reader = std::make_shared<PostingByteSliceReader>();
     reader->Open(skiplist_writer_.get());
 
     u32 key_buffer[BUFFER_SIZE_];
     u32 val1_buffer[BUFFER_SIZE_];
     u32 val2_buffer[BUFFER_SIZE_];
-    SizeT decode_len;
+    size_t decode_len;
 
     ASSERT_TRUE(reader->Decode(key_buffer, SKIP_LIST_BUFFER_SIZE, decode_len));
     ASSERT_TRUE(reader->Decode(val1_buffer, SKIP_LIST_BUFFER_SIZE, decode_len));

@@ -12,33 +12,31 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:mlas_matrix_multiply;
 
-import :stl;
+import std.compat;
 
 namespace infinity {
 
 export void
-matrixA_multiply_matrixB_output_to_C(const float *x, const float *y, SizeT x_row_num, SizeT y_col_num, SizeT common_dimension, float *output);
+matrixA_multiply_matrixB_output_to_C(const float *x, const float *y, size_t x_row_num, size_t y_col_num, size_t common_dimension, float *output);
 
 export void transpose_matrixA_multiply_matrixB_output_to_C(const float *x,
                                                            const float *y,
-                                                           SizeT x_col_num,
-                                                           SizeT y_col_num,
-                                                           SizeT common_dimension,
+                                                           size_t x_col_num,
+                                                           size_t y_col_num,
+                                                           size_t common_dimension,
                                                            float *output);
 
-export void matrixA_multiply_transpose_matrixB_output_to_C(const float *x, const float *y, SizeT nx, SizeT ny, SizeT dimension, float *output);
+export void matrixA_multiply_transpose_matrixB_output_to_C(const float *x, const float *y, size_t nx, size_t ny, size_t dimension, float *output);
 
 export void transpose_matrixA_multiply_transpose_matrixB_output_to_C(const float *x,
                                                                      const float *y,
-                                                                     SizeT x_col_num,
-                                                                     SizeT y_row_num,
-                                                                     SizeT common_dimension,
+                                                                     size_t x_col_num,
+                                                                     size_t y_row_num,
+                                                                     size_t common_dimension,
                                                                      float *output);
 
-export void TransposeMatrix(const float *input, float *output, SizeT input_row_count, SizeT input_column_count);
+export void TransposeMatrix(const float *input, float *output, size_t input_row_count, size_t input_column_count);
 
 } // namespace infinity

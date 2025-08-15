@@ -90,33 +90,33 @@ INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
                          ::testing::Values(TestTxnCheckpointInternalTest::NEW_CONFIG_PATH, TestTxnCheckpointInternalTest::NEW_VFS_OFF_CONFIG_PATH));
 
 TEST_P(TestTxnCheckpointInternalTest, test_checkpoint0) {
-    SharedPtr<String> db_name = std::make_shared<String>("db1");
+    std::shared_ptr<String> db_name = std::make_shared<String>("db1");
     auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
     auto column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
     auto table_name = std::make_shared<std::string>("tb1");
-    auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def2});
+    auto table_def = TableDef::Make(db_name, table_name, std::make_shared<String>(), {column_def1, column_def2});
 
     {
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
-        Status status = txn->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("create db"), TransactionType::kNormal);
+        Status status = txn->CreateDatabase(*db_name, ConflictType::kError, std::make_shared<String>());
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
     }
     {
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("create table"), TransactionType::kNormal);
         Status status = txn->CreateTable(*db_name, std::move(table_def), ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
     }
-    SizeT block_row_cnt = 8192;
+    size_t block_row_cnt = 8192;
     auto make_input_block = [&](const Value &v1, const Value &v2) {
-        auto input_block = MakeShared<DataBlock>();
+        auto input_block = std::make_shared<DataBlock>();
         auto make_column = [&](const Value &v) {
-            auto col = ColumnVector::Make(MakeShared<DataType>(v.type()));
+            auto col = ColumnVector::Make(std::make_shared<DataType>(v.type()));
             col->Initialize();
-            for (SizeT i = 0; i < block_row_cnt; ++i) {
+            for (size_t i = 0; i < block_row_cnt; ++i) {
                 col->AppendValue(v);
             }
             return col;
@@ -133,7 +133,7 @@ TEST_P(TestTxnCheckpointInternalTest, test_checkpoint0) {
         return input_block;
     };
     auto append = [&] {
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("append"), TransactionType::kNormal);
         Status status = txn->Append(*db_name, *table_name, make_input_block(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz")));
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
@@ -145,7 +145,7 @@ TEST_P(TestTxnCheckpointInternalTest, test_checkpoint0) {
     append();
 
     auto checkpoint = [&] {
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("checkpoint"), TransactionType::kNewCheckpoint);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("checkpoint"), TransactionType::kNewCheckpoint);
         Status status = txn->Checkpoint(wal_manager_->LastCheckpointTS());
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
@@ -158,7 +158,7 @@ TEST_P(TestTxnCheckpointInternalTest, test_checkpoint0) {
     RestartTxnMgr();
 
     auto check_table = [&] {
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("scan"), TransactionType::kNormal);
         Status status;
 
         Optional<DBMeeta> db_meta;
@@ -170,7 +170,7 @@ TEST_P(TestTxnCheckpointInternalTest, test_checkpoint0) {
             Value v1 = Value::MakeInt(1);
             Value v2 = Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz");
 
-            SizeT row_count = 0;
+            size_t row_count = 0;
             // std::tie(row_count, status) = block_meta.GetRowCnt();
             std::tie(row_count, status) = block_meta.GetRowCnt1();
             EXPECT_TRUE(status.ok());
@@ -219,27 +219,27 @@ TEST_P(TestTxnCheckpointInternalTest, test_checkpoint0) {
 }
 
 TEST_P(TestTxnCheckpointInternalTest, DISABLED_test_checkpoint1) {
-    SharedPtr<String> db_name = std::make_shared<String>("db1");
+    std::shared_ptr<String> db_name = std::make_shared<String>("db1");
     auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
     auto column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
     auto table_name = std::make_shared<std::string>("tb1");
-    auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def2});
+    auto table_def = TableDef::Make(db_name, table_name, std::make_shared<String>(), {column_def1, column_def2});
 
     auto checkpoint = [&] {
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("checkpoint"), TransactionType::kNewCheckpoint);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("checkpoint"), TransactionType::kNewCheckpoint);
         Status status = txn->Checkpoint(wal_manager_->LastCheckpointTS());
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
     };
 
-    SizeT block_row_cnt = 8192;
+    size_t block_row_cnt = 8192;
     auto make_input_block = [&](const Value &v1, const Value &v2) {
-        auto input_block = MakeShared<DataBlock>();
+        auto input_block = std::make_shared<DataBlock>();
         auto make_column = [&](const Value &v) {
-            auto col = ColumnVector::Make(MakeShared<DataType>(v.type()));
+            auto col = ColumnVector::Make(std::make_shared<DataType>(v.type()));
             col->Initialize();
-            for (SizeT i = 0; i < block_row_cnt; ++i) {
+            for (size_t i = 0; i < block_row_cnt; ++i) {
                 col->AppendValue(v);
             }
             return col;
@@ -257,7 +257,7 @@ TEST_P(TestTxnCheckpointInternalTest, DISABLED_test_checkpoint1) {
     };
 
     auto append = [&] {
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("append"), TransactionType::kNormal);
         Status status = txn->Append(*db_name, *table_name, make_input_block(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz")));
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
@@ -265,15 +265,15 @@ TEST_P(TestTxnCheckpointInternalTest, DISABLED_test_checkpoint1) {
     };
 
     {
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
-        Status status = txn->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("create db"), TransactionType::kNormal);
+        Status status = txn->CreateDatabase(*db_name, ConflictType::kError, std::make_shared<String>());
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
     }
 
     {
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("create table"), TransactionType::kNormal);
         Status status = txn->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
@@ -287,11 +287,11 @@ TEST_P(TestTxnCheckpointInternalTest, DISABLED_test_checkpoint1) {
     RestartTxnMgr();
 
     {
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("import"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("import"), TransactionType::kNormal);
         Status status =
             txn->Import(*db_name,
                         *table_name,
-                        Vector<SharedPtr<DataBlock>>{make_input_block(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"))});
+                        Vector<std::shared_ptr<DataBlock>>{make_input_block(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"))});
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
@@ -303,7 +303,7 @@ TEST_P(TestTxnCheckpointInternalTest, DISABLED_test_checkpoint1) {
     RestartTxnMgr();
 
     auto check_db = [&] {
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("scan"), TransactionType::kNormal);
         Status status;
 
         Optional<DBMeeta> db_meta;
@@ -316,7 +316,7 @@ TEST_P(TestTxnCheckpointInternalTest, DISABLED_test_checkpoint1) {
     check_db();
 
     {
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("drop column"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("drop column"), TransactionType::kNormal);
         Status status = txn->DropColumns(*db_name, *table_name, Vector<String>{"col2"});
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
@@ -326,7 +326,7 @@ TEST_P(TestTxnCheckpointInternalTest, DISABLED_test_checkpoint1) {
     checkpoint();
     RestartTxnMgr();
     {
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("add column"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("add column"), TransactionType::kNormal);
         auto default_value1 = std::make_shared<ConstantExpr>(LiteralType::kInteger);
         {
             int64_t num = 1;
@@ -344,7 +344,7 @@ TEST_P(TestTxnCheckpointInternalTest, DISABLED_test_checkpoint1) {
             std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>(), "", default_value2);
         auto column_def22 =
             std::make_shared<ColumnDef>(2, std::make_shared<DataType>(LogicalType::kInteger), "col3", std::set<ConstraintType>(), "", default_value1);
-        Vector<SharedPtr<ColumnDef>> columns;
+        Vector<std::shared_ptr<ColumnDef>> columns;
         columns.emplace_back(column_def11);
         columns.emplace_back(column_def22);
         Status status = txn->AddColumns(*db_name, *table_name, columns);
@@ -358,7 +358,7 @@ TEST_P(TestTxnCheckpointInternalTest, DISABLED_test_checkpoint1) {
     RestartTxnMgr();
 
     auto renametable = [&](const String &new_table_name) {
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("renametable"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("renametable"), TransactionType::kNormal);
         Status status = txn->RenameTable(*db_name, *table_name, new_table_name);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
@@ -372,7 +372,7 @@ TEST_P(TestTxnCheckpointInternalTest, DISABLED_test_checkpoint1) {
         Status status;
         Optional<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("scan"), TransactionType::kNormal);
         TxnTimeStamp db_create_ts;
         status = txn->GetDBMeta(*db_name, db_meta, db_create_ts);
         status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
@@ -389,19 +389,19 @@ TEST_P(TestTxnCheckpointInternalTest, DISABLED_test_checkpoint1) {
     }
 
     {
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create index"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("create index"), TransactionType::kNormal);
         ConflictType conflict_type_{ConflictType::kError};
-        SharedPtr<String> index_name_ptr = MakeShared<String>("index_name");
-        SharedPtr<String> index_comment_ptr = MakeShared<String>("index_comment");
+        std::shared_ptr<String> index_name_ptr = std::make_shared<String>("index_name");
+        std::shared_ptr<String> index_comment_ptr = std::make_shared<String>("index_comment");
         const String file_name = "";
         Vector<String> column_names{"col1", "col2"};
-        SharedPtr<IndexBase> index_base = IndexSecondary::Make(index_name_ptr, index_comment_ptr, file_name, column_names);
+        std::shared_ptr<IndexBase> index_base = IndexSecondary::Make(index_name_ptr, index_comment_ptr, file_name, column_names);
         checkpoint();
         checkpoint();
         Status status = txn->CreateIndex(*db_name, "renametable", index_base, conflict_type_);
         EXPECT_TRUE(status.ok());
 
-        txn = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
+        txn = new_txn_mgr->BeginTxn(std::make_unique<String>("scan"), TransactionType::kNormal);
         Optional<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         TxnTimeStamp db_create_ts;
@@ -419,7 +419,7 @@ TEST_P(TestTxnCheckpointInternalTest, DISABLED_test_checkpoint1) {
         checkpoint();
         RestartTxnMgr();
 
-        txn = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
+        txn = new_txn_mgr->BeginTxn(std::make_unique<String>("scan"), TransactionType::kNormal);
         Optional<DBMeeta> db_meta1;
         Optional<TableMeeta> table_meta1;
         TxnTimeStamp db_create_ts1;
@@ -430,7 +430,7 @@ TEST_P(TestTxnCheckpointInternalTest, DISABLED_test_checkpoint1) {
         Optional<TableIndexMeeta> table_index_meta1;
         String table_key1;
         String index_key1;
-        txn = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
+        txn = new_txn_mgr->BeginTxn(std::make_unique<String>("scan"), TransactionType::kNormal);
         txn->GetTableIndexMeta(*db_name, "renametable", "index_name", db_meta1, table_meta1, table_index_meta1, &table_key1, &index_key1);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
@@ -439,27 +439,27 @@ TEST_P(TestTxnCheckpointInternalTest, DISABLED_test_checkpoint1) {
 }
 
 TEST_P(TestTxnCheckpointInternalTest, test_checkpoint2) {
-    SharedPtr<String> db_name = std::make_shared<String>("db1");
+    std::shared_ptr<String> db_name = std::make_shared<String>("db1");
     auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
     auto column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
     auto table_name = std::make_shared<std::string>("tb1");
-    auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def2});
+    auto table_def = TableDef::Make(db_name, table_name, std::make_shared<String>(), {column_def1, column_def2});
 
     auto checkpoint = [&] {
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("checkpoint"), TransactionType::kNewCheckpoint);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("checkpoint"), TransactionType::kNewCheckpoint);
         Status status = txn->Checkpoint(wal_manager_->LastCheckpointTS());
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
     };
 
-    SizeT block_row_cnt = 8192;
+    size_t block_row_cnt = 8192;
     auto make_input_block = [&](const Value &v1, const Value &v2) {
-        auto input_block = MakeShared<DataBlock>();
+        auto input_block = std::make_shared<DataBlock>();
         auto make_column = [&](const Value &v) {
-            auto col = ColumnVector::Make(MakeShared<DataType>(v.type()));
+            auto col = ColumnVector::Make(std::make_shared<DataType>(v.type()));
             col->Initialize();
-            for (SizeT i = 0; i < block_row_cnt; ++i) {
+            for (size_t i = 0; i < block_row_cnt; ++i) {
                 col->AppendValue(v);
             }
             return col;
@@ -477,7 +477,7 @@ TEST_P(TestTxnCheckpointInternalTest, test_checkpoint2) {
     };
 
     auto append = [&] {
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("append"), TransactionType::kNormal);
         Status status = txn->Append(*db_name, *table_name, make_input_block(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz")));
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
@@ -485,15 +485,15 @@ TEST_P(TestTxnCheckpointInternalTest, test_checkpoint2) {
     };
 
     {
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
-        Status status = txn->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("create db"), TransactionType::kNormal);
+        Status status = txn->CreateDatabase(*db_name, ConflictType::kError, std::make_shared<String>());
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
     }
 
     {
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("create table"), TransactionType::kNormal);
         Status status = txn->CreateTable(*db_name, std::move(table_def), ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
@@ -504,7 +504,7 @@ TEST_P(TestTxnCheckpointInternalTest, test_checkpoint2) {
         append();
 
     {
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("drop column"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("drop column"), TransactionType::kNormal);
         Status status = txn->DropColumns(*db_name, *table_name, Vector<String>{"col2"});
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
@@ -512,7 +512,7 @@ TEST_P(TestTxnCheckpointInternalTest, test_checkpoint2) {
     }
 
     {
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("add column"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("add column"), TransactionType::kNormal);
         auto default_value1 = std::make_shared<ConstantExpr>(LiteralType::kInteger);
         {
             int64_t num = 1;
@@ -538,7 +538,7 @@ TEST_P(TestTxnCheckpointInternalTest, test_checkpoint2) {
                                                         std::set<ConstraintType>(),
                                                         "",
                                                         default_value1);
-        Vector<SharedPtr<ColumnDef>> columns;
+        Vector<std::shared_ptr<ColumnDef>> columns;
         columns.emplace_back(column_def11);
         columns.emplace_back(column_def22);
         Status status = txn->AddColumns(*db_name, *table_name, columns);
@@ -552,15 +552,15 @@ TEST_P(TestTxnCheckpointInternalTest, test_checkpoint2) {
 }
 
 TEST_P(TestTxnCheckpointInternalTest, DISABLED_test_checkpoint3) {
-    SharedPtr<String> db_name = std::make_shared<String>("db1");
+    std::shared_ptr<String> db_name = std::make_shared<String>("db1");
     auto column_def1 = std::make_shared<ColumnDef>(999, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
     auto column_def2 = std::make_shared<ColumnDef>(9999, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
     auto column_def3 = std::make_shared<ColumnDef>(99999, std::make_shared<DataType>(LogicalType::kVarchar), "col3", std::set<ConstraintType>());
     auto table_name = std::make_shared<std::string>("tb1");
-    auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def2, column_def3});
+    auto table_def = TableDef::Make(db_name, table_name, std::make_shared<String>(), {column_def1, column_def2, column_def3});
 
     auto checkpoint = [&] {
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("checkpoint"), TransactionType::kNewCheckpoint);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("checkpoint"), TransactionType::kNewCheckpoint);
         Status status = txn->Checkpoint(wal_manager_->LastCheckpointTS());
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
@@ -572,8 +572,8 @@ TEST_P(TestTxnCheckpointInternalTest, DISABLED_test_checkpoint3) {
     RestartTxnMgr();
 
     {
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
-        Status status = txn->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("create db"), TransactionType::kNormal);
+        Status status = txn->CreateDatabase(*db_name, ConflictType::kError, std::make_shared<String>());
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
@@ -584,7 +584,7 @@ TEST_P(TestTxnCheckpointInternalTest, DISABLED_test_checkpoint3) {
     checkpoint();
 
     {
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("create table"), TransactionType::kNormal);
         Status status = txn->CreateTable(*db_name, std::move(table_def), ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
@@ -596,13 +596,13 @@ TEST_P(TestTxnCheckpointInternalTest, DISABLED_test_checkpoint3) {
     RestartTxnMgr();
 
     {
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create index"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("create index"), TransactionType::kNormal);
         ConflictType conflict_type_{ConflictType::kError};
-        SharedPtr<String> index_name_ptr = MakeShared<String>("index_name");
-        SharedPtr<String> index_comment_ptr = MakeShared<String>("index_comment");
+        std::shared_ptr<String> index_name_ptr = std::make_shared<String>("index_name");
+        std::shared_ptr<String> index_comment_ptr = std::make_shared<String>("index_comment");
         const String file_name = "";
         Vector<String> column_names{"col2"};
-        SharedPtr<IndexBase> index_base = IndexSecondary::Make(index_name_ptr, index_comment_ptr, file_name, column_names);
+        std::shared_ptr<IndexBase> index_base = IndexSecondary::Make(index_name_ptr, index_comment_ptr, file_name, column_names);
         Status status = txn->CreateIndex(*db_name, *table_name, index_base, conflict_type_);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
@@ -614,7 +614,7 @@ TEST_P(TestTxnCheckpointInternalTest, DISABLED_test_checkpoint3) {
     checkpoint();
 
     {
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("dump index"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("dump index"), TransactionType::kNormal);
         Status status = txn->DumpMemIndex(*db_name, *table_name, "index_name");
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
@@ -626,7 +626,7 @@ TEST_P(TestTxnCheckpointInternalTest, DISABLED_test_checkpoint3) {
     RestartTxnMgr();
 
     {
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("drop column"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("drop column"), TransactionType::kNormal);
         Status status = txn->DropColumns(*db_name, *table_name, Vector<String>{"col2"});
         EXPECT_TRUE(!status.ok());
         status = new_txn_mgr->CommitTxn(txn);
@@ -638,7 +638,7 @@ TEST_P(TestTxnCheckpointInternalTest, DISABLED_test_checkpoint3) {
     checkpoint();
 
     {
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("drop column"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("drop column"), TransactionType::kNormal);
         Status status = txn->DropColumns(*db_name, *table_name, Vector<String>{"col1"});
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
@@ -650,7 +650,7 @@ TEST_P(TestTxnCheckpointInternalTest, DISABLED_test_checkpoint3) {
     RestartTxnMgr();
 
     {
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("optimize indexes"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("optimize indexes"), TransactionType::kNormal);
         Status status = txn->OptimizeAllIndexes();
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
@@ -662,7 +662,7 @@ TEST_P(TestTxnCheckpointInternalTest, DISABLED_test_checkpoint3) {
     checkpoint();
 
     {
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("drop index"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("drop index"), TransactionType::kNormal);
         Status status = txn->DropIndexByName(*db_name, *table_name, "index_name", ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
@@ -674,7 +674,7 @@ TEST_P(TestTxnCheckpointInternalTest, DISABLED_test_checkpoint3) {
     checkpoint();
 
     {
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("drop column"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("drop column"), TransactionType::kNormal);
         Status status = txn->DropColumns(*db_name, *table_name, Vector<String>{"col2"});
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
@@ -686,7 +686,7 @@ TEST_P(TestTxnCheckpointInternalTest, DISABLED_test_checkpoint3) {
     RestartTxnMgr();
 
     {
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("optimize indexes"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("optimize indexes"), TransactionType::kNormal);
         Status status = txn->OptimizeAllIndexes();
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
@@ -699,33 +699,33 @@ TEST_P(TestTxnCheckpointInternalTest, DISABLED_test_checkpoint3) {
 }
 
 TEST_P(TestTxnCheckpointInternalTest, DISABLED_test_checkpoint4) {
-    SharedPtr<String> db_name = std::make_shared<String>("db1");
+    std::shared_ptr<String> db_name = std::make_shared<String>("db1");
     auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
     auto column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
     auto table_name = std::make_shared<std::string>("tb1");
-    auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def2});
+    auto table_def = TableDef::Make(db_name, table_name, std::make_shared<String>(), {column_def1, column_def2});
 
     {
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
-        Status status = txn->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("create db"), TransactionType::kNormal);
+        Status status = txn->CreateDatabase(*db_name, ConflictType::kError, std::make_shared<String>());
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
     }
     {
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("create table"), TransactionType::kNormal);
         Status status = txn->CreateTable(*db_name, std::move(table_def), ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
     }
-    SizeT block_row_cnt = 8192;
+    size_t block_row_cnt = 8192;
     auto make_input_block = [&](const Value &v1, const Value &v2) {
-        auto input_block = MakeShared<DataBlock>();
+        auto input_block = std::make_shared<DataBlock>();
         auto make_column = [&](const Value &v) {
-            auto col = ColumnVector::Make(MakeShared<DataType>(v.type()));
+            auto col = ColumnVector::Make(std::make_shared<DataType>(v.type()));
             col->Initialize();
-            for (SizeT i = 0; i < block_row_cnt; ++i) {
+            for (size_t i = 0; i < block_row_cnt; ++i) {
                 col->AppendValue(v);
             }
             return col;
@@ -742,7 +742,7 @@ TEST_P(TestTxnCheckpointInternalTest, DISABLED_test_checkpoint4) {
         return input_block;
     };
     auto append = [&] {
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("append"), TransactionType::kNormal);
         Status status = txn->Append(*db_name, *table_name, make_input_block(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz")));
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
@@ -750,7 +750,7 @@ TEST_P(TestTxnCheckpointInternalTest, DISABLED_test_checkpoint4) {
     };
 
     auto checkpoint = [&] {
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("checkpoint"), TransactionType::kNewCheckpoint);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("checkpoint"), TransactionType::kNewCheckpoint);
         Status status = txn->Checkpoint(wal_manager_->LastCheckpointTS());
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
@@ -768,7 +768,7 @@ TEST_P(TestTxnCheckpointInternalTest, DISABLED_test_checkpoint4) {
     RestartTxnMgr();
 
     {
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("compact"), TransactionType::kNormal);
         {
             Status status;
             Optional<DBMeeta> db_meta;
@@ -792,19 +792,19 @@ TEST_P(TestTxnCheckpointInternalTest, DISABLED_test_checkpoint4) {
 }
 
 TEST_P(TestTxnCheckpointInternalTest, test_checkpoint5) {
-    SharedPtr<String> db_name = std::make_shared<String>("db1");
+    std::shared_ptr<String> db_name = std::make_shared<String>("db1");
 
     {
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
-        Status status = txn->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("create db"), TransactionType::kNormal);
+        Status status = txn->CreateDatabase(*db_name, ConflictType::kError, std::make_shared<String>());
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
     }
 
     {
-        auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("checkpoint"), TransactionType::kNewCheckpoint);
+        auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<String>("drop db"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("checkpoint"), TransactionType::kNewCheckpoint);
 
         Status status = txn1->DropDatabase(*db_name, ConflictType::kError);
         EXPECT_TRUE(status.ok());
@@ -818,7 +818,7 @@ TEST_P(TestTxnCheckpointInternalTest, test_checkpoint5) {
     }
 
     {
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("clean"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("clean"), TransactionType::kNormal);
         Status status = txn->Cleanup();
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
@@ -826,7 +826,7 @@ TEST_P(TestTxnCheckpointInternalTest, test_checkpoint5) {
     }
 
     {
-        auto txn = new_txn_mgr->BeginTxn(MakeUnique<String>("get db"), TransactionType::kRead);
+        auto txn = new_txn_mgr->BeginTxn(std::make_unique<String>("get db"), TransactionType::kRead);
         Optional<DBMeeta> db_meta;
         TxnTimeStamp db_creat_ts;
         Status status = txn->GetDBMeta(*db_name, db_meta, db_creat_ts);

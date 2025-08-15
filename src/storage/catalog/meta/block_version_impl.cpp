@@ -60,18 +60,18 @@ bool BlockVersion::operator==(const BlockVersion &rhs) const {
     std::shared_lock<std::shared_mutex> lock_created(rw_mutex_);
     if (this->created_.size() != rhs.created_.size() || this->deleted_.size() != rhs.deleted_.size())
         return false;
-    for (SizeT i = 0; i < this->created_.size(); i++) {
+    for (size_t i = 0; i < this->created_.size(); i++) {
         if (this->created_[i] != rhs.created_[i])
             return false;
     }
-    for (SizeT i = 0; i < this->deleted_.size(); i++) {
+    for (size_t i = 0; i < this->deleted_.size(); i++) {
         if (this->deleted_[i] != rhs.deleted_[i])
             return false;
     }
     return true;
 }
 
-Pair<BlockOffset, i32> BlockVersion::GetCommitRowCount(TxnTimeStamp commit_ts) const {
+std::pair<BlockOffset, i32> BlockVersion::GetCommitRowCount(TxnTimeStamp commit_ts) const {
     if (commit_ts == MAX_TIMESTAMP) {
         return {};
     }
@@ -106,7 +106,7 @@ i64 BlockVersion::GetRowCount() const {
     return row_count;
 }
 
-Tuple<i32, Status> BlockVersion::GetRowCountForUpdate(TxnTimeStamp begin_ts) const {
+std::tuple<i32, Status> BlockVersion::GetRowCountForUpdate(TxnTimeStamp begin_ts) const {
     // check read-write conflict
     std::shared_lock<std::shared_mutex> lock(rw_mutex_);
     if (!created_.empty() && created_.back().create_ts_ >= begin_ts) {
@@ -126,7 +126,7 @@ bool BlockVersion::SaveToFile(TxnTimeStamp checkpoint_ts, LocalFileHandle &file_
     }
 
     file_handle.Append(&create_size, sizeof(create_size));
-    for (SizeT j = 0; j < create_size; ++j) {
+    for (size_t j = 0; j < create_size; ++j) {
         created_[j].SaveToFile(&file_handle);
     }
 
@@ -173,8 +173,8 @@ void BlockVersion::SpillToFile(LocalFileHandle *file_handle) const {
     }
 }
 
-UniquePtr<BlockVersion> BlockVersion::LoadFromFile(LocalFileHandle *file_handle) {
-    auto block_version = MakeUnique<BlockVersion>();
+std::unique_ptr<BlockVersion> BlockVersion::LoadFromFile(LocalFileHandle *file_handle) {
+    auto block_version = std::make_unique<BlockVersion>();
 
     BlockOffset create_size;
     file_handle->Read(&create_size, sizeof(create_size));
@@ -192,13 +192,13 @@ UniquePtr<BlockVersion> BlockVersion::LoadFromFile(LocalFileHandle *file_handle)
     return block_version;
 }
 
-void BlockVersion::GetCreateTS(SizeT offset, SizeT size, ColumnVector &res) const {
+void BlockVersion::GetCreateTS(size_t offset, size_t size, ColumnVector &res) const {
     // find the first create_field that has row_count_ >= offset
     std::shared_lock<std::shared_mutex> lock(rw_mutex_);
     auto iter = std::lower_bound(created_.begin(), created_.end(), static_cast<i64>(offset), [](const CreateField &field, const i64 offset_cp) {
         return field.row_count_ < offset_cp;
     });
-    SizeT i = 0;
+    size_t i = 0;
     for (; i < size; ++i) {
         if (iter == created_.end()) {
             break;
@@ -214,9 +214,9 @@ void BlockVersion::GetCreateTS(SizeT offset, SizeT size, ColumnVector &res) cons
     }
 }
 
-void BlockVersion::GetDeleteTS(SizeT offset, SizeT size, ColumnVector &res) const {
+void BlockVersion::GetDeleteTS(size_t offset, size_t size, ColumnVector &res) const {
     std::shared_lock<std::shared_mutex> lock(rw_mutex_);
-    for (SizeT i = offset; i < offset + size; ++i) {
+    for (size_t i = offset; i < offset + size; ++i) {
         res.AppendByPtr(reinterpret_cast<const char *>(&deleted_[i]));
     }
 }
@@ -254,7 +254,7 @@ void BlockVersion::RollbackDelete(i32 offset) {
 
 bool BlockVersion::CheckDelete(i32 offset, TxnTimeStamp check_ts) const {
     std::shared_lock<std::shared_mutex> lock(rw_mutex_);
-    if (static_cast<SizeT>(offset) >= deleted_.size()) {
+    if (static_cast<size_t>(offset) >= deleted_.size()) {
         return false;
     }
     return deleted_[offset] != 0 && deleted_[offset] <= check_ts;

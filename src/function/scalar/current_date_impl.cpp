@@ -55,9 +55,9 @@ inline void CurrentDateFunction::Run(DateT &result) {
 }
 
 void RegisterCurrentDateFunction(NewCatalog *catalog_ptr) {
-    String func_name = "current_date";
+    std::string func_name = "current_date";
 
-    SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
+    std::shared_ptr<ScalarFunctionSet> function_set_ptr = std::make_shared<ScalarFunctionSet>(func_name);
 
     ScalarFunction current_date_function(func_name, {}, DataType(LogicalType::kDate), &ScalarFunction::NullaryFunction<DateT, CurrentDateFunction>);
     function_set_ptr->AddFunction(current_date_function);

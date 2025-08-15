@@ -23,7 +23,7 @@ import :session;
 namespace infinity {
 
 export struct QueryInfo {
-    QueryInfo(u64 query_id, String query_kind, String query_text, BaseProfiler profiler)
+    QueryInfo(u64 query_id, std::string query_kind, std::string query_text, BaseProfiler profiler)
         : query_id_(query_id), query_kind_(std::move(query_kind)), query_text_(std::move(query_text)), profiler_(std::move(profiler)) {
 #ifdef INFINITY_DEBUG
         GlobalResourceUsage::IncrObjectCount("QueryInfo");
@@ -37,8 +37,8 @@ export struct QueryInfo {
     }
 
     u64 query_id_;
-    String query_kind_;
-    String query_text_;
+    std::string query_kind_;
+    std::string query_text_;
     BaseProfiler profiler_;
 };
 
@@ -57,9 +57,9 @@ public:
 #endif
     }
 
-    SharedPtr<RemoteSession> CreateRemoteSession() {
+    std::shared_ptr<RemoteSession> CreateRemoteSession() {
         u64 session_id = ++session_id_generator_;
-        SharedPtr<RemoteSession> remote_session = MakeShared<RemoteSession>(session_id);
+        std::shared_ptr<RemoteSession> remote_session = std::make_shared<RemoteSession>(session_id);
         {
             std::unique_lock<std::shared_mutex> w_locker(rw_locker_);
             sessions_.emplace(session_id, remote_session.get());
@@ -67,9 +67,9 @@ public:
         return remote_session;
     }
 
-    SharedPtr<LocalSession> CreateLocalSession() {
+    std::shared_ptr<LocalSession> CreateLocalSession() {
         u64 session_id = ++session_id_generator_;
-        SharedPtr<LocalSession> local_session = MakeShared<LocalSession>(session_id);
+        std::shared_ptr<LocalSession> local_session = std::make_shared<LocalSession>(session_id);
         {
             std::unique_lock<std::shared_mutex> w_locker(rw_locker_);
             sessions_.emplace(session_id, local_session.get());
@@ -92,7 +92,7 @@ public:
         sessions_.erase(session_id);
     }
 
-    SizeT GetSessionCount() {
+    size_t GetSessionCount() {
         std::shared_lock<std::shared_mutex> r_locker(rw_locker_);
         return sessions_.size();
     }
@@ -101,9 +101,9 @@ public:
 
     u64 total_query_count() const { return total_query_count_; }
 
-    void AddQueryRecord(u64 session_id, u64 query_id, const String &query_kind, const String &query_text) {
+    void AddQueryRecord(u64 session_id, u64 query_id, const std::string &query_kind, const std::string &query_text) {
         std::unique_lock<std::mutex> lock(query_record_locker_);
-        SharedPtr<QueryInfo> query_info = MakeShared<QueryInfo>(query_id, query_kind, query_text, BaseProfiler());
+        std::shared_ptr<QueryInfo> query_info = std::make_shared<QueryInfo>(query_id, query_kind, query_text, BaseProfiler());
         query_info->profiler_.Begin();
         query_record_container_.emplace(session_id, std::move(query_info));
     }
@@ -113,7 +113,7 @@ public:
         query_record_container_.erase(session_id);
     }
 
-    Map<u64, SharedPtr<QueryInfo>> QueryRecords() {
+    std::map<u64, std::shared_ptr<QueryInfo>> QueryRecords() {
         std::unique_lock<std::mutex> lock(query_record_locker_);
         return query_record_container_;
     }
@@ -134,16 +134,16 @@ public:
 
 private:
     std::shared_mutex rw_locker_{};
-    HashMap<u64, BaseSession *> sessions_;
+    std::unordered_map<u64, BaseSession *> sessions_;
 
     // First session is ONE;
     atomic_u64 session_id_generator_{};
 
-    Atomic<u64> total_query_count_{0};
+    std::atomic<u64> total_query_count_{0};
 
     // session id -> query info
     std::mutex query_record_locker_{};
-    Map<u64, SharedPtr<QueryInfo>> query_record_container_;
+    std::map<u64, std::shared_ptr<QueryInfo>> query_record_container_;
 };
 
 } // namespace infinity

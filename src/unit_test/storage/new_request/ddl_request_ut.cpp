@@ -45,13 +45,13 @@ INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
 TEST_P(TestDDLRequest, test_create_db) {
     String create_db_sql = "create database db1";
     {
-        UniquePtr<QueryContext> query_context = MakeQueryContext();
+        std::unique_ptr<QueryContext> query_context = MakeQueryContext();
         QueryResult query_result = query_context->Query(create_db_sql);
         bool ok = HandleQueryResult(query_result);
         EXPECT_TRUE(ok);
     }
     {
-        UniquePtr<QueryContext> query_context = MakeQueryContext();
+        std::unique_ptr<QueryContext> query_context = MakeQueryContext();
         QueryResult query_result = query_context->Query(create_db_sql);
         bool ok = HandleQueryResult(query_result);
         EXPECT_FALSE(ok);
@@ -61,20 +61,20 @@ TEST_P(TestDDLRequest, test_create_db) {
 TEST_P(TestDDLRequest, test_drop_db) {
     {
         String create_db_sql = "create database db1";
-        UniquePtr<QueryContext> query_context = MakeQueryContext();
+        std::unique_ptr<QueryContext> query_context = MakeQueryContext();
         QueryResult query_result = query_context->Query(create_db_sql);
         bool ok = HandleQueryResult(query_result);
         EXPECT_TRUE(ok);
     }
     String drop_db_sql = "drop database db1";
     {
-        UniquePtr<QueryContext> query_context = MakeQueryContext();
+        std::unique_ptr<QueryContext> query_context = MakeQueryContext();
         QueryResult query_result = query_context->Query(drop_db_sql);
         bool ok = HandleQueryResult(query_result);
         EXPECT_TRUE(ok);
     }
     {
-        UniquePtr<QueryContext> query_context = MakeQueryContext();
+        std::unique_ptr<QueryContext> query_context = MakeQueryContext();
         QueryResult query_result = query_context->Query(drop_db_sql);
         bool ok = HandleQueryResult(query_result);
         EXPECT_FALSE(ok);
@@ -84,13 +84,13 @@ TEST_P(TestDDLRequest, test_drop_db) {
 TEST_P(TestDDLRequest, test_create_table) {
     String create_table_sql = "create table t1(c1 int, c2 varchar)";
     {
-        UniquePtr<QueryContext> query_context = MakeQueryContext();
+        std::unique_ptr<QueryContext> query_context = MakeQueryContext();
         QueryResult query_result = query_context->Query(create_table_sql);
         bool ok = HandleQueryResult(query_result);
         EXPECT_TRUE(ok);
     }
     { // create table with same name
-        UniquePtr<QueryContext> query_context = MakeQueryContext();
+        std::unique_ptr<QueryContext> query_context = MakeQueryContext();
         QueryResult query_result = query_context->Query(create_table_sql);
         bool ok = HandleQueryResult(query_result);
         EXPECT_FALSE(ok);
@@ -100,20 +100,20 @@ TEST_P(TestDDLRequest, test_create_table) {
 TEST_P(TestDDLRequest, test_drop_table) {
     {
         String create_table_sql = "create table t1(c1 int, c2 varchar)";
-        UniquePtr<QueryContext> query_context = MakeQueryContext();
+        std::unique_ptr<QueryContext> query_context = MakeQueryContext();
         QueryResult query_result = query_context->Query(create_table_sql);
         bool ok = HandleQueryResult(query_result);
         EXPECT_TRUE(ok);
     }
     String drop_table_sql = "drop table t1";
     {
-        UniquePtr<QueryContext> query_context = MakeQueryContext();
+        std::unique_ptr<QueryContext> query_context = MakeQueryContext();
         QueryResult query_result = query_context->Query(drop_table_sql);
         bool ok = HandleQueryResult(query_result);
         EXPECT_TRUE(ok);
     }
     { // create table with same name
-        UniquePtr<QueryContext> query_context = MakeQueryContext();
+        std::unique_ptr<QueryContext> query_context = MakeQueryContext();
         QueryResult query_result = query_context->Query(drop_table_sql);
         bool ok = HandleQueryResult(query_result);
         EXPECT_FALSE(ok);
@@ -123,20 +123,20 @@ TEST_P(TestDDLRequest, test_drop_table) {
 TEST_P(TestDDLRequest, test_create_index) {
     {
         String create_table_sql = "create table t1(c1 int, c2 varchar)";
-        UniquePtr<QueryContext> query_context = MakeQueryContext();
+        std::unique_ptr<QueryContext> query_context = MakeQueryContext();
         QueryResult query_result = query_context->Query(create_table_sql);
         bool ok = HandleQueryResult(query_result);
         EXPECT_TRUE(ok);
     }
     String create_index_sql = "create index idx1 on t1 (c1)";
     {
-        UniquePtr<QueryContext> query_context = MakeQueryContext();
+        std::unique_ptr<QueryContext> query_context = MakeQueryContext();
         QueryResult query_result = query_context->Query(create_index_sql);
         bool ok = HandleQueryResult(query_result);
         EXPECT_TRUE(ok);
     }
     {
-        UniquePtr<QueryContext> query_context = MakeQueryContext();
+        std::unique_ptr<QueryContext> query_context = MakeQueryContext();
         QueryResult query_result = query_context->Query(create_index_sql);
         bool ok = HandleQueryResult(query_result);
         EXPECT_FALSE(ok);
@@ -146,27 +146,27 @@ TEST_P(TestDDLRequest, test_create_index) {
 TEST_P(TestDDLRequest, test_drop_index) {
     {
         String create_table_sql = "create table t1(c1 int, c2 varchar)";
-        UniquePtr<QueryContext> query_context = MakeQueryContext();
+        std::unique_ptr<QueryContext> query_context = MakeQueryContext();
         QueryResult query_result = query_context->Query(create_table_sql);
         bool ok = HandleQueryResult(query_result);
         EXPECT_TRUE(ok);
     }
     {
         String create_index_sql = "create index idx1 on t1 (c1)";
-        UniquePtr<QueryContext> query_context = MakeQueryContext();
+        std::unique_ptr<QueryContext> query_context = MakeQueryContext();
         QueryResult query_result = query_context->Query(create_index_sql);
         bool ok = HandleQueryResult(query_result);
         EXPECT_TRUE(ok);
     }
     String drop_index_sql = "drop index idx1 on t1";
     {
-        UniquePtr<QueryContext> query_context = MakeQueryContext();
+        std::unique_ptr<QueryContext> query_context = MakeQueryContext();
         QueryResult query_result = query_context->Query(drop_index_sql);
         bool ok = HandleQueryResult(query_result);
         EXPECT_TRUE(ok);
     }
     {
-        UniquePtr<QueryContext> query_context = MakeQueryContext();
+        std::unique_ptr<QueryContext> query_context = MakeQueryContext();
         QueryResult query_result = query_context->Query(drop_index_sql);
         bool ok = HandleQueryResult(query_result);
         EXPECT_FALSE(ok);
@@ -176,20 +176,20 @@ TEST_P(TestDDLRequest, test_drop_index) {
 TEST_P(TestDDLRequest, test_add_column) {
     {
         String create_table_sql = "create table t1(c1 int, c2 varchar)";
-        UniquePtr<QueryContext> query_context = MakeQueryContext();
+        std::unique_ptr<QueryContext> query_context = MakeQueryContext();
         QueryResult query_result = query_context->Query(create_table_sql);
         bool ok = HandleQueryResult(query_result);
         EXPECT_TRUE(ok);
     }
     String add_column_sql = "alter table t1 add column (c3 int default 0)";
     {
-        UniquePtr<QueryContext> query_context = MakeQueryContext();
+        std::unique_ptr<QueryContext> query_context = MakeQueryContext();
         QueryResult query_result = query_context->Query(add_column_sql);
         bool ok = HandleQueryResult(query_result);
         EXPECT_TRUE(ok);
     }
     {
-        UniquePtr<QueryContext> query_context = MakeQueryContext();
+        std::unique_ptr<QueryContext> query_context = MakeQueryContext();
         QueryResult query_result = query_context->Query(add_column_sql);
         bool ok = HandleQueryResult(query_result);
         EXPECT_FALSE(ok);
@@ -199,20 +199,20 @@ TEST_P(TestDDLRequest, test_add_column) {
 TEST_P(TestDDLRequest, test_drop_column) {
     {
         String create_table_sql = "create table t1(c1 int, c2 varchar)";
-        UniquePtr<QueryContext> query_context = MakeQueryContext();
+        std::unique_ptr<QueryContext> query_context = MakeQueryContext();
         QueryResult query_result = query_context->Query(create_table_sql);
         bool ok = HandleQueryResult(query_result);
         EXPECT_TRUE(ok);
     }
     String drop_column_sql = "alter table t1 drop column (c1)";
     {
-        UniquePtr<QueryContext> query_context = MakeQueryContext();
+        std::unique_ptr<QueryContext> query_context = MakeQueryContext();
         QueryResult query_result = query_context->Query(drop_column_sql);
         bool ok = HandleQueryResult(query_result);
         EXPECT_TRUE(ok);
     }
     {
-        UniquePtr<QueryContext> query_context = MakeQueryContext();
+        std::unique_ptr<QueryContext> query_context = MakeQueryContext();
         QueryResult query_result = query_context->Query(drop_column_sql);
         bool ok = HandleQueryResult(query_result);
         EXPECT_FALSE(ok);
@@ -222,21 +222,21 @@ TEST_P(TestDDLRequest, test_drop_column) {
 TEST_P(TestDDLRequest, test_use_schema) {
     {
         String create_db_sql = "create database db1";
-        UniquePtr<QueryContext> query_context = MakeQueryContext();
+        std::unique_ptr<QueryContext> query_context = MakeQueryContext();
         QueryResult query_result = query_context->Query(create_db_sql);
         bool ok = HandleQueryResult(query_result);
         EXPECT_TRUE(ok);
     }
     {
         String use_db_sql = "use db1";
-        UniquePtr<QueryContext> query_context = MakeQueryContext();
+        std::unique_ptr<QueryContext> query_context = MakeQueryContext();
         QueryResult query_result = query_context->Query(use_db_sql);
         bool ok = HandleQueryResult(query_result);
         EXPECT_TRUE(ok);
     }
     {
         String use_db_sql = "use db2";
-        UniquePtr<QueryContext> query_context = MakeQueryContext();
+        std::unique_ptr<QueryContext> query_context = MakeQueryContext();
         QueryResult query_result = query_context->Query(use_db_sql);
         bool ok = HandleQueryResult(query_result);
         EXPECT_FALSE(ok);

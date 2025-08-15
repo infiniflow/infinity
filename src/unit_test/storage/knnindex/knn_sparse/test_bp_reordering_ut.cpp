@@ -59,7 +59,7 @@ protected:
     i64 cost_func(i32 data_n, i32 query_n, const Vector<Vector<i32>> &fwd, const Vector<i32> &permu) {
         Vector<i32> last_doc_id(query_n, -1);
         i64 cost = 0;
-        for (SizeT i = 0; i < permu.size(); ++i) {
+        for (size_t i = 0; i < permu.size(); ++i) {
             for (const auto &term_id : fwd[permu[i]]) {
                 if (last_doc_id[term_id] != -1) {
                     i64 r = std::log2(i - last_doc_id[term_id]);
@@ -71,7 +71,7 @@ protected:
         return cost;
     }
 
-    Vector<i32> GetRandom(SizeT n, i32 min, i32 max) {
+    Vector<i32> GetRandom(size_t n, i32 min, i32 max) {
         Vector<i32> res;
         while (res.size() < n) {
             res.push_back(rand() % (max - min) + min);
@@ -79,7 +79,7 @@ protected:
         return res;
     }
 
-    Vector<i32> GetRandomNoRepeat(SizeT n, i32 min, i32 max) {
+    Vector<i32> GetRandomNoRepeat(size_t n, i32 min, i32 max) {
         if (n < 0 || max < min || max - min < i32(n)) {
             UnrecoverableError("max - min < n");
         }

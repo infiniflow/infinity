@@ -18,7 +18,6 @@ module;
 
 module infinity_core:common_analyzer.impl;
 
-import :stl;
 import :term;
 import :stemmer;
 import :analyzer;
@@ -26,12 +25,13 @@ import :tokenizer;
 import :common_analyzer;
 import :default_values;
 
+import std;
 import std.compat;
 
 namespace infinity {
 
 CommonLanguageAnalyzer::CommonLanguageAnalyzer()
-    : Analyzer(), lowercase_string_buffer_(term_string_buffer_limit_), stemmer_(MakeUnique<Stemmer>()), case_sensitive_(false), contain_lower_(false),
+    : Analyzer(), lowercase_string_buffer_(term_string_buffer_limit_), stemmer_(std::make_unique<Stemmer>()), case_sensitive_(false), contain_lower_(false),
       extract_eng_stem_(true), extract_synonym_(false), cjk_(false), remove_stopwords_(false) {}
 
 CommonLanguageAnalyzer::~CommonLanguageAnalyzer() {}
@@ -69,8 +69,8 @@ int CommonLanguageAnalyzer::AnalyzeImpl(const Term &input, void *data, HookType 
             if (IsAlpha()) {
                 char *lowercase_term = lowercase_string_buffer_.data();
                 ToLower(token_, len_, lowercase_term, term_string_buffer_limit_);
-                SizeT stemming_term_str_size = 0;
-                String stem_term;
+                size_t stemming_term_str_size = 0;
+                std::string stem_term;
                 if (extract_eng_stem_) {
                     stemmer_->Stem(lowercase_term, stem_term);
                     if (strcmp(stem_term.c_str(), lowercase_term)) {

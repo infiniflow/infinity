@@ -38,124 +38,124 @@ public:
 #endif
     }
 
-    [[nodiscard]] UniquePtr<PhysicalOperator> BuildPhysicalOperator(const SharedPtr<LogicalNode> &logical_operator) const;
+    [[nodiscard]] std::unique_ptr<PhysicalOperator> BuildPhysicalOperator(const std::shared_ptr<LogicalNode> &logical_operator) const;
 
 private:
     QueryContext *query_context_ptr_;
 
     // Create operator
-    [[nodiscard]] UniquePtr<PhysicalOperator> BuildCreateTable(const SharedPtr<LogicalNode> &logical_operator) const;
+    [[nodiscard]] std::unique_ptr<PhysicalOperator> BuildCreateTable(const std::shared_ptr<LogicalNode> &logical_operator) const;
 
-    [[nodiscard]] UniquePtr<PhysicalOperator> BuildCreateIndex(const SharedPtr<LogicalNode> &logical_operator) const;
+    [[nodiscard]] std::unique_ptr<PhysicalOperator> BuildCreateIndex(const std::shared_ptr<LogicalNode> &logical_operator) const;
 
-    [[nodiscard]] UniquePtr<PhysicalOperator> BuildCreateCollection(const SharedPtr<LogicalNode> &logical_operator) const;
+    [[nodiscard]] std::unique_ptr<PhysicalOperator> BuildCreateCollection(const std::shared_ptr<LogicalNode> &logical_operator) const;
 
-    [[nodiscard]] UniquePtr<PhysicalOperator> BuildCreateDatabase(const SharedPtr<LogicalNode> &logical_operator) const;
+    [[nodiscard]] std::unique_ptr<PhysicalOperator> BuildCreateDatabase(const std::shared_ptr<LogicalNode> &logical_operator) const;
 
-    [[nodiscard]] UniquePtr<PhysicalOperator> BuildPreparedPlan(const SharedPtr<LogicalNode> &logical_operator) const;
+    [[nodiscard]] std::unique_ptr<PhysicalOperator> BuildPreparedPlan(const std::shared_ptr<LogicalNode> &logical_operator) const;
 
-    [[nodiscard]] UniquePtr<PhysicalOperator> BuildCreateView(const SharedPtr<LogicalNode> &logical_operator) const;
+    [[nodiscard]] std::unique_ptr<PhysicalOperator> BuildCreateView(const std::shared_ptr<LogicalNode> &logical_operator) const;
 
     // Drop operator
-    [[nodiscard]] UniquePtr<PhysicalOperator> BuildDropTable(const SharedPtr<LogicalNode> &logical_operator) const;
+    [[nodiscard]] std::unique_ptr<PhysicalOperator> BuildDropTable(const std::shared_ptr<LogicalNode> &logical_operator) const;
 
-    [[nodiscard]] UniquePtr<PhysicalOperator> BuildDropIndex(const SharedPtr<LogicalNode> &logical_operator) const;
+    [[nodiscard]] std::unique_ptr<PhysicalOperator> BuildDropIndex(const std::shared_ptr<LogicalNode> &logical_operator) const;
 
-    [[nodiscard]] UniquePtr<PhysicalOperator> BuildDropCollection(const SharedPtr<LogicalNode> &logical_operator) const;
+    [[nodiscard]] std::unique_ptr<PhysicalOperator> BuildDropCollection(const std::shared_ptr<LogicalNode> &logical_operator) const;
 
-    [[nodiscard]] UniquePtr<PhysicalOperator> BuildDropSchema(const SharedPtr<LogicalNode> &logical_operator) const;
+    [[nodiscard]] std::unique_ptr<PhysicalOperator> BuildDropSchema(const std::shared_ptr<LogicalNode> &logical_operator) const;
 
-    [[nodiscard]] UniquePtr<PhysicalOperator> BuildDropView(const SharedPtr<LogicalNode> &logical_operator) const;
+    [[nodiscard]] std::unique_ptr<PhysicalOperator> BuildDropView(const std::shared_ptr<LogicalNode> &logical_operator) const;
 
     // Insert operator
-    [[nodiscard]] UniquePtr<PhysicalOperator> BuildInsert(const SharedPtr<LogicalNode> &logical_operator) const;
+    [[nodiscard]] std::unique_ptr<PhysicalOperator> BuildInsert(const std::shared_ptr<LogicalNode> &logical_operator) const;
 
     // Delete operator
-    [[nodiscard]] UniquePtr<PhysicalOperator> BuildDelete(const SharedPtr<LogicalNode> &logical_operator) const;
+    [[nodiscard]] std::unique_ptr<PhysicalOperator> BuildDelete(const std::shared_ptr<LogicalNode> &logical_operator) const;
 
     // Update operator
-    [[nodiscard]] UniquePtr<PhysicalOperator> BuildUpdate(const SharedPtr<LogicalNode> &logical_operator) const;
+    [[nodiscard]] std::unique_ptr<PhysicalOperator> BuildUpdate(const std::shared_ptr<LogicalNode> &logical_operator) const;
 
     // Import operator
-    [[nodiscard]] UniquePtr<PhysicalOperator> BuildImport(const SharedPtr<LogicalNode> &logical_operator) const;
+    [[nodiscard]] std::unique_ptr<PhysicalOperator> BuildImport(const std::shared_ptr<LogicalNode> &logical_operator) const;
 
     // Export operator
-    [[nodiscard]] UniquePtr<PhysicalOperator> BuildExport(const SharedPtr<LogicalNode> &logical_operator) const;
+    [[nodiscard]] std::unique_ptr<PhysicalOperator> BuildExport(const std::shared_ptr<LogicalNode> &logical_operator) const;
 
     // Alter operator
-    [[nodiscard]] UniquePtr<PhysicalOperator> BuildAlter(const SharedPtr<LogicalNode> &logical_operator) const;
+    [[nodiscard]] std::unique_ptr<PhysicalOperator> BuildAlter(const std::shared_ptr<LogicalNode> &logical_operator) const;
 
     // Select operator
-    [[nodiscard]] UniquePtr<PhysicalOperator> BuildAggregate(const SharedPtr<LogicalNode> &logical_operator) const;
+    [[nodiscard]] std::unique_ptr<PhysicalOperator> BuildAggregate(const std::shared_ptr<LogicalNode> &logical_operator) const;
 
     // Operator
-    [[nodiscard]] UniquePtr<PhysicalOperator> BuildJoin(const SharedPtr<LogicalNode> &logical_operator) const;
+    [[nodiscard]] std::unique_ptr<PhysicalOperator> BuildJoin(const std::shared_ptr<LogicalNode> &logical_operator) const;
 
-    [[nodiscard]] UniquePtr<PhysicalOperator> BuildCrossProduct(const SharedPtr<LogicalNode> &logical_operator) const;
+    [[nodiscard]] std::unique_ptr<PhysicalOperator> BuildCrossProduct(const std::shared_ptr<LogicalNode> &logical_operator) const;
 
-    [[nodiscard]] UniquePtr<PhysicalOperator> BuildSort(const SharedPtr<LogicalNode> &logical_operator) const;
+    [[nodiscard]] std::unique_ptr<PhysicalOperator> BuildSort(const std::shared_ptr<LogicalNode> &logical_operator) const;
 
-    [[nodiscard]] UniquePtr<PhysicalOperator> BuildLimit(const SharedPtr<LogicalNode> &logical_operator) const;
+    [[nodiscard]] std::unique_ptr<PhysicalOperator> BuildLimit(const std::shared_ptr<LogicalNode> &logical_operator) const;
 
-    [[nodiscard]] UniquePtr<PhysicalOperator> BuildTop(const SharedPtr<LogicalNode> &logical_operator) const;
+    [[nodiscard]] std::unique_ptr<PhysicalOperator> BuildTop(const std::shared_ptr<LogicalNode> &logical_operator) const;
 
-    [[nodiscard]] UniquePtr<PhysicalOperator> BuildProjection(const SharedPtr<LogicalNode> &logical_operator) const;
+    [[nodiscard]] std::unique_ptr<PhysicalOperator> BuildProjection(const std::shared_ptr<LogicalNode> &logical_operator) const;
 
-    [[nodiscard]] UniquePtr<PhysicalOperator> BuildFilter(const SharedPtr<LogicalNode> &logical_operator) const;
+    [[nodiscard]] std::unique_ptr<PhysicalOperator> BuildFilter(const std::shared_ptr<LogicalNode> &logical_operator) const;
 
-    [[nodiscard]] UniquePtr<PhysicalOperator> BuildIntersect(const SharedPtr<LogicalNode> &logical_operator) const;
+    [[nodiscard]] std::unique_ptr<PhysicalOperator> BuildIntersect(const std::shared_ptr<LogicalNode> &logical_operator) const;
 
-    [[nodiscard]] UniquePtr<PhysicalOperator> BuildUnion(const SharedPtr<LogicalNode> &logical_operator) const;
+    [[nodiscard]] std::unique_ptr<PhysicalOperator> BuildUnion(const std::shared_ptr<LogicalNode> &logical_operator) const;
 
-    [[nodiscard]] UniquePtr<PhysicalOperator> BuildExcept(const SharedPtr<LogicalNode> &logical_operator) const;
+    [[nodiscard]] std::unique_ptr<PhysicalOperator> BuildExcept(const std::shared_ptr<LogicalNode> &logical_operator) const;
 
     // Scan
-    [[nodiscard]] UniquePtr<PhysicalOperator> BuildShow(const SharedPtr<LogicalNode> &logical_operator) const;
+    [[nodiscard]] std::unique_ptr<PhysicalOperator> BuildShow(const std::shared_ptr<LogicalNode> &logical_operator) const;
 
-    [[nodiscard]] UniquePtr<PhysicalOperator> BuildTableScan(const SharedPtr<LogicalNode> &logical_operator) const;
+    [[nodiscard]] std::unique_ptr<PhysicalOperator> BuildTableScan(const std::shared_ptr<LogicalNode> &logical_operator) const;
 
-    [[nodiscard]] UniquePtr<PhysicalOperator> BuildIndexScan(const SharedPtr<LogicalNode> &logical_operator) const;
+    [[nodiscard]] std::unique_ptr<PhysicalOperator> BuildIndexScan(const std::shared_ptr<LogicalNode> &logical_operator) const;
 
-    [[nodiscard]] UniquePtr<PhysicalOperator> BuildViewScan(const SharedPtr<LogicalNode> &logical_operator) const;
+    [[nodiscard]] std::unique_ptr<PhysicalOperator> BuildViewScan(const std::shared_ptr<LogicalNode> &logical_operator) const;
 
-    [[nodiscard]] UniquePtr<PhysicalOperator> BuildDummyScan(const SharedPtr<LogicalNode> &logical_operator) const;
+    [[nodiscard]] std::unique_ptr<PhysicalOperator> BuildDummyScan(const std::shared_ptr<LogicalNode> &logical_operator) const;
 
     // Flush
-    [[nodiscard]] UniquePtr<PhysicalOperator> BuildFlush(const SharedPtr<LogicalNode> &logical_operator) const;
+    [[nodiscard]] std::unique_ptr<PhysicalOperator> BuildFlush(const std::shared_ptr<LogicalNode> &logical_operator) const;
 
     // Optimize
-    [[nodiscard]] UniquePtr<PhysicalOperator> BuildOptimize(const SharedPtr<LogicalNode> &logical_operator) const;
+    [[nodiscard]] std::unique_ptr<PhysicalOperator> BuildOptimize(const std::shared_ptr<LogicalNode> &logical_operator) const;
 
     // Knn
-    [[nodiscard]] UniquePtr<PhysicalOperator> BuildKnn(const SharedPtr<LogicalNode> &logical_operator) const;
-    [[nodiscard]] UniquePtr<PhysicalOperator> BuildMatchTensorScan(const SharedPtr<LogicalNode> &logical_operator) const;
-    [[nodiscard]] UniquePtr<PhysicalOperator> BuildMatchSparseScan(const SharedPtr<LogicalNode> &logical_operator) const;
-    [[nodiscard]] UniquePtr<PhysicalOperator> BuildMatch(const SharedPtr<LogicalNode> &logical_operator) const;
-    [[nodiscard]] UniquePtr<PhysicalOperator> BuildFusion(const SharedPtr<LogicalNode> &logical_operator) const;
+    [[nodiscard]] std::unique_ptr<PhysicalOperator> BuildKnn(const std::shared_ptr<LogicalNode> &logical_operator) const;
+    [[nodiscard]] std::unique_ptr<PhysicalOperator> BuildMatchTensorScan(const std::shared_ptr<LogicalNode> &logical_operator) const;
+    [[nodiscard]] std::unique_ptr<PhysicalOperator> BuildMatchSparseScan(const std::shared_ptr<LogicalNode> &logical_operator) const;
+    [[nodiscard]] std::unique_ptr<PhysicalOperator> BuildMatch(const std::shared_ptr<LogicalNode> &logical_operator) const;
+    [[nodiscard]] std::unique_ptr<PhysicalOperator> BuildFusion(const std::shared_ptr<LogicalNode> &logical_operator) const;
 
     // Command
-    [[nodiscard]] UniquePtr<PhysicalOperator> BuildCommand(const SharedPtr<LogicalNode> &logical_operator) const;
+    [[nodiscard]] std::unique_ptr<PhysicalOperator> BuildCommand(const std::shared_ptr<LogicalNode> &logical_operator) const;
 
     // Compact
-    [[nodiscard]] UniquePtr<PhysicalOperator> BuildCompact(const SharedPtr<LogicalNode> &logical_operator) const;
+    [[nodiscard]] std::unique_ptr<PhysicalOperator> BuildCompact(const std::shared_ptr<LogicalNode> &logical_operator) const;
 
-    [[nodiscard]] UniquePtr<PhysicalOperator> BuildCompactIndex(const SharedPtr<LogicalNode> &logical_operator) const;
+    [[nodiscard]] std::unique_ptr<PhysicalOperator> BuildCompactIndex(const std::shared_ptr<LogicalNode> &logical_operator) const;
 
-    [[nodiscard]] UniquePtr<PhysicalOperator> BuildCompactFinish(const SharedPtr<LogicalNode> &logical_operator) const;
+    [[nodiscard]] std::unique_ptr<PhysicalOperator> BuildCompactFinish(const std::shared_ptr<LogicalNode> &logical_operator) const;
 
     // Read cache
-    [[nodiscard]] UniquePtr<PhysicalOperator> BuildReadCache(const SharedPtr<LogicalNode> &logical_operator) const;
+    [[nodiscard]] std::unique_ptr<PhysicalOperator> BuildReadCache(const std::shared_ptr<LogicalNode> &logical_operator) const;
 
     // Unnest
-    [[nodiscard]] UniquePtr<PhysicalOperator> BuildUnnest(const SharedPtr<LogicalNode> &logical_operator) const;
+    [[nodiscard]] std::unique_ptr<PhysicalOperator> BuildUnnest(const std::shared_ptr<LogicalNode> &logical_operator) const;
 
-    [[nodiscard]] UniquePtr<PhysicalOperator> BuildUnnestAggregate(const SharedPtr<LogicalNode> &logical_operator) const;
+    [[nodiscard]] std::unique_ptr<PhysicalOperator> BuildUnnestAggregate(const std::shared_ptr<LogicalNode> &logical_operator) const;
 
     // Explain
-    [[nodiscard]] UniquePtr<PhysicalOperator> BuildExplain(const SharedPtr<LogicalNode> &logical_operator) const;
+    [[nodiscard]] std::unique_ptr<PhysicalOperator> BuildExplain(const std::shared_ptr<LogicalNode> &logical_operator) const;
 
     // Check
-    [[nodiscard]] UniquePtr<PhysicalOperator> BuildCheck(const SharedPtr<LogicalNode> &logical_operator) const;
+    [[nodiscard]] std::unique_ptr<PhysicalOperator> BuildCheck(const std::shared_ptr<LogicalNode> &logical_operator) const;
 };
 
 } // namespace infinity

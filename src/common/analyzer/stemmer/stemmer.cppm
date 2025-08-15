@@ -51,7 +51,7 @@ public:
 
     void DeInit();
 
-    bool Stem(const String &term, String &resultWord);
+    bool Stem(const std::string &term, std::string &resultWord);
 
 private:
     // int stemLang_; ///< language for stemming

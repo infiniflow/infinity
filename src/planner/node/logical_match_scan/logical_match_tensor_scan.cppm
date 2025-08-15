@@ -52,10 +52,10 @@ export struct MatchTensorScanIndexOptions {
 
 export class LogicalMatchTensorScan final : public LogicalMatchScanBase {
 public:
-    explicit LogicalMatchTensorScan(u64 node_id, SharedPtr<BaseTableRef> base_table_ref, SharedPtr<MatchTensorExpression> match_tensor_expr)
+    explicit LogicalMatchTensorScan(u64 node_id, std::shared_ptr<BaseTableRef> base_table_ref, std::shared_ptr<MatchTensorExpression> match_tensor_expr)
         : LogicalMatchScanBase(node_id, LogicalNodeType::kMatchTensorScan, base_table_ref, match_tensor_expr) {}
 
-    String name() override { return "LogicalMatchTensorScan"; }
+    std::string name() override { return "LogicalMatchTensorScan"; }
 
     void InitExtraOptions();
 
@@ -63,8 +63,8 @@ public:
     // extra options
     // will be parsed in InitExtraOptions()
     u32 topn_ = 0;
-    Optional<f32> knn_threshold_;
-    SharedPtr<MatchTensorScanIndexOptions> index_options_;
+    std::optional<f32> knn_threshold_;
+    std::shared_ptr<MatchTensorScanIndexOptions> index_options_;
 };
 
 } // namespace infinity

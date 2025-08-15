@@ -32,7 +32,7 @@ public:
 protected:
     int AnalyzeImpl(const Term &input, void *data, HookType func) override;
 
-    bool NextInString(const char *data, SizeT length, SizeT *__restrict pos, SizeT *__restrict token_start, SizeT *__restrict token_length);
+    bool NextInString(const char *data, size_t length, size_t *__restrict pos, size_t *__restrict token_start, size_t *__restrict token_length);
 
 private:
     u32 ngram_;

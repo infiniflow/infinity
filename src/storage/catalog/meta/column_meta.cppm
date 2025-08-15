@@ -32,17 +32,17 @@ class BufferObj;
 
 export class ColumnMeta {
 public:
-    ColumnMeta(SizeT column_idx, BlockMeta &block_meta);
+    ColumnMeta(size_t column_idx, BlockMeta &block_meta);
 
     KVInstance &kv_instance() const { return kv_instance_; }
 
     BlockMeta &block_meta() const { return block_meta_; }
 
-    SizeT column_idx() const { return column_idx_; }
+    size_t column_idx() const { return column_idx_; }
 
-    Status GetChunkOffset(SizeT &chunk_offset);
+    Status GetChunkOffset(size_t &chunk_offset);
 
-    Status SetChunkOffset(SizeT chunk_offset);
+    Status SetChunkOffset(size_t chunk_offset);
 
     Status InitSet();
 
@@ -54,13 +54,13 @@ public:
 
     Status GetColumnBuffer(BufferObj *&column_buffer, BufferObj *&outline_buffer);
 
-    Tuple<SharedPtr<ColumnDef>, Status> GetColumnDef() const;
+    std::tuple<std::shared_ptr<ColumnDef>, Status> GetColumnDef() const;
 
-    Tuple<SizeT, Status> GetColumnSize(SizeT row_cnt) const;
+    std::tuple<size_t, Status> GetColumnSize(size_t row_cnt) const;
 
-    Status FilePaths(Vector<String> &paths);
+    Status FilePaths(std::vector<std::string> &paths);
 
-    Tuple<SharedPtr<BlockColumnSnapshotInfo>, Status> MapMetaToSnapShotInfo();
+    std::tuple<std::shared_ptr<BlockColumnSnapshotInfo>, Status> MapMetaToSnapShotInfo();
 
     Status RestoreFromSnapshot(ColumnID column_id);
 
@@ -71,14 +71,14 @@ private:
 
     Status LoadColumnBuffer(const ColumnDef *col_def);
 
-    String GetColumnTag(const String &tag) const;
+    std::string GetColumnTag(const std::string &tag) const;
 
 private:
     KVInstance &kv_instance_;
     BlockMeta &block_meta_;
-    SizeT column_idx_;
+    size_t column_idx_;
 
-    Optional<SizeT> chunk_offset_;
+    std::optional<size_t> chunk_offset_;
 
     BufferObj *column_buffer_ = nullptr;
     BufferObj *outline_buffer_ = nullptr;

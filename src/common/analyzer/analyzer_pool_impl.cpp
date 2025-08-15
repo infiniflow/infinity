@@ -17,7 +17,6 @@ module;
 module infinity_core:analyzer_pool.impl;
 
 import :analyzer_pool;
-import :stl;
 import :config;
 import :infinity_context;
 import :analyzer;
@@ -68,13 +67,13 @@ constexpr std::string_view SPANISH = "-spanish";
 constexpr std::string_view SWEDISH = "-swedish";
 constexpr std::string_view TURKISH = "-turkish";
 
-Tuple<UniquePtr<Analyzer>, Status> AnalyzerPool::GetAnalyzer(const std::string_view &name) {
+std::tuple<std::unique_ptr<Analyzer>, Status> AnalyzerPool::GetAnalyzer(const std::string_view &name) {
     switch (Str2Int(name.data())) {
         case Str2Int(CHINESE.data()): {
             // chinese-{coarse|fine}
             Analyzer *prototype = cache_[CHINESE].get();
             if (prototype == nullptr) {
-                String path;
+                std::string path;
                 Config *config = InfinityContext::instance().config();
                 if (config == nullptr) {
                     // InfinityContext has not been initialized.
@@ -83,7 +82,7 @@ Tuple<UniquePtr<Analyzer>, Status> AnalyzerPool::GetAnalyzer(const std::string_v
                 } else {
                     path = config->ResourcePath();
                 }
-                UniquePtr<ChineseAnalyzer> analyzer = MakeUnique<ChineseAnalyzer>(std::move(path));
+                std::unique_ptr<ChineseAnalyzer> analyzer = std::make_unique<ChineseAnalyzer>(std::move(path));
                 Status load_status = analyzer->Load();
                 if (!load_status.ok()) {
                     return {nullptr, load_status};
@@ -99,7 +98,7 @@ Tuple<UniquePtr<Analyzer>, Status> AnalyzerPool::GetAnalyzer(const std::string_v
             if (strcmp(str, "-fine") == 0) {
                 cut_grain = CutGrain::kFine;
             }
-            UniquePtr<ChineseAnalyzer> analyzer = MakeUnique<ChineseAnalyzer>(*reinterpret_cast<ChineseAnalyzer *>(prototype));
+            std::unique_ptr<ChineseAnalyzer> analyzer = std::make_unique<ChineseAnalyzer>(*reinterpret_cast<ChineseAnalyzer *>(prototype));
             analyzer->SetCutGrain(cut_grain);
             return {std::move(analyzer), Status::OK()};
         }
@@ -107,7 +106,7 @@ Tuple<UniquePtr<Analyzer>, Status> AnalyzerPool::GetAnalyzer(const std::string_v
             // chinese-{coarse|fine}
             Analyzer *prototype = cache_[TRADITIONALCHINESE].get();
             if (prototype == nullptr) {
-                String path;
+                std::string path;
                 Config *config = InfinityContext::instance().config();
                 if (config == nullptr) {
                     // InfinityContext has not been initialized.
@@ -116,7 +115,7 @@ Tuple<UniquePtr<Analyzer>, Status> AnalyzerPool::GetAnalyzer(const std::string_v
                 } else {
                     path = config->ResourcePath();
                 }
-                UniquePtr<TraditionalChineseAnalyzer> analyzer = MakeUnique<TraditionalChineseAnalyzer>(std::move(path));
+                std::unique_ptr<TraditionalChineseAnalyzer> analyzer = std::make_unique<TraditionalChineseAnalyzer>(std::move(path));
                 if (auto load_status = analyzer->Load(); !load_status.ok()) {
                     return {nullptr, load_status};
                 }
@@ -131,8 +130,8 @@ Tuple<UniquePtr<Analyzer>, Status> AnalyzerPool::GetAnalyzer(const std::string_v
             if (strcmp(str, "-fine") == 0) {
                 cut_grain = CutGrain::kFine;
             }
-            UniquePtr<TraditionalChineseAnalyzer> analyzer =
-                MakeUnique<TraditionalChineseAnalyzer>(*reinterpret_cast<TraditionalChineseAnalyzer *>(prototype));
+            std::unique_ptr<TraditionalChineseAnalyzer> analyzer =
+                std::make_unique<TraditionalChineseAnalyzer>(*reinterpret_cast<TraditionalChineseAnalyzer *>(prototype));
             analyzer->SetCutGrain(cut_grain);
             return {std::move(analyzer), Status::OK()};
         }
@@ -140,7 +139,7 @@ Tuple<UniquePtr<Analyzer>, Status> AnalyzerPool::GetAnalyzer(const std::string_v
             // rag-{coarse|fine}
             Analyzer *prototype = cache_[RAG].get();
             if (prototype == nullptr) {
-                String path;
+                std::string path;
                 Config *config = InfinityContext::instance().config();
                 if (config == nullptr) {
                     // InfinityContext has not been initialized.
@@ -149,7 +148,7 @@ Tuple<UniquePtr<Analyzer>, Status> AnalyzerPool::GetAnalyzer(const std::string_v
                 } else {
                     path = config->ResourcePath();
                 }
-                UniquePtr<RAGAnalyzer> analyzer = MakeUnique<RAGAnalyzer>(std::move(path));
+                std::unique_ptr<RAGAnalyzer> analyzer = std::make_unique<RAGAnalyzer>(std::move(path));
                 if (auto load_status = analyzer->Load(); !load_status.ok()) {
                     return {nullptr, load_status};
                 }
@@ -164,7 +163,7 @@ Tuple<UniquePtr<Analyzer>, Status> AnalyzerPool::GetAnalyzer(const std::string_v
             if (strcmp(str, "-fine") == 0) {
                 fine_grained = true;
             }
-            UniquePtr<RAGAnalyzer> analyzer = MakeUnique<RAGAnalyzer>(*reinterpret_cast<RAGAnalyzer *>(prototype));
+            std::unique_ptr<RAGAnalyzer> analyzer = std::make_unique<RAGAnalyzer>(*reinterpret_cast<RAGAnalyzer *>(prototype));
             analyzer->SetFineGrained(fine_grained);
             return {std::move(analyzer), Status::OK()};
         }
@@ -172,7 +171,7 @@ Tuple<UniquePtr<Analyzer>, Status> AnalyzerPool::GetAnalyzer(const std::string_v
             //
             Analyzer *prototype = cache_[IK].get();
             if (prototype == nullptr) {
-                String path;
+                std::string path;
                 Config *config = InfinityContext::instance().config();
                 if (config == nullptr) {
                     // InfinityContext has not been initialized.
@@ -181,7 +180,7 @@ Tuple<UniquePtr<Analyzer>, Status> AnalyzerPool::GetAnalyzer(const std::string_v
                 } else {
                     path = config->ResourcePath();
                 }
-                UniquePtr<IKAnalyzer> analyzer = MakeUnique<IKAnalyzer>(std::move(path));
+                std::unique_ptr<IKAnalyzer> analyzer = std::make_unique<IKAnalyzer>(std::move(path));
                 Status load_status = analyzer->Load();
                 if (!load_status.ok()) {
                     return {nullptr, load_status};
@@ -197,14 +196,14 @@ Tuple<UniquePtr<Analyzer>, Status> AnalyzerPool::GetAnalyzer(const std::string_v
             if (strcmp(str, "-fine") == 0) {
                 fine_grained = true;
             }
-            UniquePtr<IKAnalyzer> analyzer = MakeUnique<IKAnalyzer>(*reinterpret_cast<IKAnalyzer *>(prototype));
+            std::unique_ptr<IKAnalyzer> analyzer = std::make_unique<IKAnalyzer>(*reinterpret_cast<IKAnalyzer *>(prototype));
             analyzer->SetFineGrained(fine_grained);
             return {std::move(analyzer), Status::OK()};
         }
         case Str2Int(JAPANESE.data()): {
             Analyzer *prototype = cache_[JAPANESE].get();
             if (prototype == nullptr) {
-                String path;
+                std::string path;
                 Config *config = InfinityContext::instance().config();
                 if (config == nullptr) {
                     // InfinityContext has not been initialized.
@@ -213,7 +212,7 @@ Tuple<UniquePtr<Analyzer>, Status> AnalyzerPool::GetAnalyzer(const std::string_v
                 } else {
                     path = config->ResourcePath();
                 }
-                UniquePtr<JapaneseAnalyzer> analyzer = MakeUnique<JapaneseAnalyzer>(std::move(path));
+                std::unique_ptr<JapaneseAnalyzer> analyzer = std::make_unique<JapaneseAnalyzer>(std::move(path));
                 Status load_status = analyzer->Load();
                 if (!load_status.ok()) {
                     return {nullptr, load_status};
@@ -221,12 +220,12 @@ Tuple<UniquePtr<Analyzer>, Status> AnalyzerPool::GetAnalyzer(const std::string_v
                 prototype = analyzer.get();
                 cache_[JAPANESE] = std::move(analyzer);
             }
-            return {MakeUnique<JapaneseAnalyzer>(*reinterpret_cast<JapaneseAnalyzer *>(prototype)), Status::OK()};
+            return {std::make_unique<JapaneseAnalyzer>(*reinterpret_cast<JapaneseAnalyzer *>(prototype)), Status::OK()};
         }
         case Str2Int(KOREAN.data()): {
             Analyzer *prototype = cache_[KOREAN].get();
             if (prototype == nullptr) {
-                String path;
+                std::string path;
                 if (auto *config = InfinityContext::instance().config(); config == nullptr) {
                     // InfinityContext has not been initialized.
                     // For unit test only
@@ -234,7 +233,7 @@ Tuple<UniquePtr<Analyzer>, Status> AnalyzerPool::GetAnalyzer(const std::string_v
                 } else {
                     path = config->ResourcePath();
                 }
-                UniquePtr<KoreanAnalyzer> analyzer = MakeUnique<KoreanAnalyzer>(std::move(path));
+                std::unique_ptr<KoreanAnalyzer> analyzer = std::make_unique<KoreanAnalyzer>(std::move(path));
                 Status load_status = analyzer->Load();
                 if (!load_status.ok()) {
                     return {nullptr, load_status};
@@ -242,15 +241,15 @@ Tuple<UniquePtr<Analyzer>, Status> AnalyzerPool::GetAnalyzer(const std::string_v
                 prototype = analyzer.get();
                 cache_[KOREAN] = std::move(analyzer);
             }
-            return {MakeUnique<KoreanAnalyzer>(*reinterpret_cast<KoreanAnalyzer *>(prototype)), Status::OK()};
+            return {std::make_unique<KoreanAnalyzer>(*reinterpret_cast<KoreanAnalyzer *>(prototype)), Status::OK()};
         }
         case Str2Int(STANDARD.data()): {
-            UniquePtr<StandardAnalyzer> analyzer = MakeUnique<StandardAnalyzer>();
+            std::unique_ptr<StandardAnalyzer> analyzer = std::make_unique<StandardAnalyzer>();
 
             TokenizeConfig token_config;
-            // String allow_str("-");
-            String divide_str("@#$");
-            String unite_str("/");
+            // std::string allow_str("-");
+            std::string divide_str("@#$");
+            std::string unite_str("/");
             // Allow("-"): 2012-02-14 => 2012-02-14
             // Divide: delimiters
             // Unite: 2012/02/14 => 20120214
@@ -317,18 +316,18 @@ Tuple<UniquePtr<Analyzer>, Status> AnalyzerPool::GetAnalyzer(const std::string_v
             if (ngram <= 0) {
                 return {nullptr, Status::InvalidAnalyzerName(fmt::format("NGRAM-number, number > 0, but it is {}.", name))};
             }
-            return {MakeUnique<NGramAnalyzer>(ngram), Status::OK()};
+            return {std::make_unique<NGramAnalyzer>(ngram), Status::OK()};
         }
         case Str2Int(KEYWORD.data()):
         case Str2Int(WHITESPACE.data()): {
             const auto suffix_pos = name.find_first_of('-');
             if (suffix_pos == std::string_view::npos || suffix_pos + 1 == name.size()) {
-                return {MakeUnique<WhitespaceAnalyzer>(), Status::OK()};
+                return {std::make_unique<WhitespaceAnalyzer>(), Status::OK()};
             }
-            return {MakeUnique<WhitespaceAnalyzer>(name.substr(suffix_pos + 1)), Status::OK()};
+            return {std::make_unique<WhitespaceAnalyzer>(name.substr(suffix_pos + 1)), Status::OK()};
         }
         case Str2Int(RANKFEATURES.data()): {
-            return {MakeUnique<RankFeaturesAnalyzer>(), Status::OK()};
+            return {std::make_unique<RankFeaturesAnalyzer>(), Status::OK()};
         }
         default: {
             if (std::filesystem::is_regular_file(name)) {

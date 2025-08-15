@@ -30,22 +30,22 @@ import internal_types;
 
 namespace infinity {
 
-void FilterIterator::PrintTree(std::ostream &os, const String &prefix, const bool is_final) const {
+void FilterIterator::PrintTree(std::ostream &os, const std::string &prefix, const bool is_final) const {
     os << prefix;
     os << (is_final ? "└──" : "├──");
     os << "FilterIterator (fake_doc_freq: " << common_query_filter_->filter_result_count_ << ") (filter expression: ";
-    String filter_str;
+    std::string filter_str;
     if (common_query_filter_->original_filter_.get()) {
         ExplainLogicalPlan::Explain(common_query_filter_->original_filter_.get(), filter_str);
     } else {
         filter_str = "None";
     }
     os << filter_str << ")\n";
-    const String next_prefix = prefix + (is_final ? "    " : "│   ");
+    const std::string next_prefix = prefix + (is_final ? "    " : "│   ");
     query_iterator_->PrintTree(os, next_prefix, true);
 }
 
-UniquePtr<DocIterator> FilterQueryNode::CreateSearch(const CreateSearchParams params, const bool is_top_level) const {
+std::unique_ptr<DocIterator> FilterQueryNode::CreateSearch(const CreateSearchParams params, const bool is_top_level) const {
     // assert(is_top_level);
     assert(common_query_filter_ != nullptr);
     if (!common_query_filter_->AlwaysTrue() && common_query_filter_->filter_result_count_ == 0)
@@ -57,14 +57,14 @@ UniquePtr<DocIterator> FilterQueryNode::CreateSearch(const CreateSearchParams pa
     if (common_query_filter_->AlwaysTrue()) {
         return search_iter;
     }
-    return MakeUnique<FilterIterator>(common_query_filter_, std::move(search_iter));
+    return std::make_unique<FilterIterator>(common_query_filter_, std::move(search_iter));
 }
 
-void FilterQueryNode::PrintTree(std::ostream &os, const String &prefix, const bool is_final) const {
+void FilterQueryNode::PrintTree(std::ostream &os, const std::string &prefix, const bool is_final) const {
     os << prefix;
     os << (is_final ? "└──" : "├──");
     os << "Filter (expression: ";
-    String filter_str;
+    std::string filter_str;
     if (filter_expression) {
         ExplainLogicalPlan::Explain(filter_expression, filter_str);
     } else {

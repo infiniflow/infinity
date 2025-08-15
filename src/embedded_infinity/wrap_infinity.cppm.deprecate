@@ -81,7 +81,7 @@ export struct WrapDataType {
     LogicalType logical_type;
     WrapEmbeddingType embedding_type;
     WrapSparseType sparse_type;
-    SharedPtr<WrapDataType> array_type;
+    std::shared_ptr<WrapDataType> array_type;
 };
 
 export struct WrapConstantExpr {
@@ -97,7 +97,7 @@ export struct WrapConstantExpr {
     Vector<Vector<Vector<i64>>> i64_tensor_array_value;
     Vector<Vector<Vector<f64>>> f64_tensor_array_value;
     Vector<i64> i64_array_idx;
-    Vector<SharedPtr<WrapConstantExpr>> curly_brackets_array;
+    Vector<std::shared_ptr<WrapConstantExpr>> curly_brackets_array;
 
     ParsedExpr *GetParsedExpr(Status &status);
 };
@@ -170,8 +170,8 @@ export struct WrapColumnExpr {
 
 export struct WrapInExpr {
     WrapInExpr() = default;
-    SharedPtr<WrapParsedExpr> left;
-    Vector<SharedPtr<WrapParsedExpr>> arguments;
+    std::shared_ptr<WrapParsedExpr> left;
+    Vector<std::shared_ptr<WrapParsedExpr>> arguments;
     bool in{true};
 
     ParsedExpr *GetParsedExpr(Status &status);
@@ -180,16 +180,16 @@ export struct WrapInExpr {
 export struct WrapFunctionExpr {
     WrapFunctionExpr() = default;
     String func_name{};
-    Vector<SharedPtr<WrapParsedExpr>> arguments;
+    Vector<std::shared_ptr<WrapParsedExpr>> arguments;
     bool distinct{false};
 
     ParsedExpr *GetParsedExpr(Status &status);
 };
 
 export struct WrapBetweenExpr {
-    SharedPtr<WrapParsedExpr> value{nullptr};
-    SharedPtr<WrapParsedExpr> upper_bound{nullptr};
-    SharedPtr<WrapParsedExpr> lower_bound{nullptr};
+    std::shared_ptr<WrapParsedExpr> value{nullptr};
+    std::shared_ptr<WrapParsedExpr> upper_bound{nullptr};
+    std::shared_ptr<WrapParsedExpr> lower_bound{nullptr};
     ParsedExpr *GetParsedExpr(Status &status);
 };
 
@@ -213,7 +213,7 @@ export struct WrapKnnExpr {
     KnnDistanceType distance_type{KnnDistanceType::kInvalid};
     i64 topn{};
     Vector<InitParameter> opt_params{};
-    SharedPtr<WrapParsedExpr> filter_expr{};
+    std::shared_ptr<WrapParsedExpr> filter_expr{};
 
     ParsedExpr *GetParsedExpr(Status &status);
 };
@@ -222,7 +222,7 @@ export struct WrapMatchExpr {
     String fields;
     String matching_text;
     String options_text;
-    SharedPtr<WrapParsedExpr> filter_expr{};
+    std::shared_ptr<WrapParsedExpr> filter_expr{};
 
     ParsedExpr *GetParsedExpr(Status &status);
 };
@@ -234,7 +234,7 @@ export struct WrapMatchTensorExpr {
     EmbeddingData embedding_data;
     EmbeddingDataType embedding_data_type;
     String options_text;
-    SharedPtr<WrapParsedExpr> filter_expr{};
+    std::shared_ptr<WrapParsedExpr> filter_expr{};
 
     ParsedExpr *GetParsedExpr(Status &status);
 };
@@ -255,7 +255,7 @@ export struct WrapMatchSparseExpr {
     String metric_type;
     i64 topn;
     Vector<InitParameter> opt_params{};
-    SharedPtr<WrapParsedExpr> filter_expr{};
+    std::shared_ptr<WrapParsedExpr> filter_expr{};
     ParsedExpr *GetParsedExpr(Status &status);
 };
 
@@ -392,7 +392,7 @@ export WrapQueryResult WrapShowBlockColumn(Infinity &instance,
                                            const String &table_name,
                                            const SegmentID &segment_id,
                                            const BlockID &block_id,
-                                           const SizeT &column_id);
+                                           const size_t &column_id);
 
 export WrapQueryResult WrapShowCurrentNode(Infinity &instance);
 

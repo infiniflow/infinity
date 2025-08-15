@@ -12,11 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:node_info;
 
-import :stl;
+import :infinity_type;
+
+import std;
 
 import admin_statement;
 
@@ -24,14 +24,14 @@ namespace infinity {
 
 export enum class NodeStatus { kAlive, kTimeout, kLostConnection, kRemoved, kInvalid };
 
-export String ToString(NodeStatus);
+export std::string ToString(NodeStatus);
 
 export class NodeInfo {
 public:
-    NodeInfo(NodeRole role, NodeStatus status, const String &name, const String &ip_addr, i64 port, i64 txn_ts, u64 update_ts, u64 heartbeat_count);
-    NodeInfo(NodeRole role, NodeStatus status, const String &name, const String &ip_addr, i64 port, i64 txn_ts, u64 update_ts);
-    NodeInfo(NodeRole role, NodeStatus status, const String &name, const String &ip_addr, i64 port, u64 update_ts);
-    NodeInfo(NodeRole role, const String &ip_addr, i64 port);
+    NodeInfo(NodeRole role, NodeStatus status, const std::string &name, const std::string &ip_addr, i64 port, i64 txn_ts, u64 update_ts, u64 heartbeat_count);
+    NodeInfo(NodeRole role, NodeStatus status, const std::string &name, const std::string &ip_addr, i64 port, i64 txn_ts, u64 update_ts);
+    NodeInfo(NodeRole role, NodeStatus status, const std::string &name, const std::string &ip_addr, i64 port, u64 update_ts);
+    NodeInfo(NodeRole role, const std::string &ip_addr, i64 port);
 
     void set_heartbeat_interval(i64 heartbeat_interval) { heartbeat_interval_ = heartbeat_interval; }
     i64 heartbeat_interval() const { return heartbeat_interval_; }
@@ -45,11 +45,11 @@ public:
     void set_node_role(NodeRole new_node_role) { node_role_ = new_node_role; }
     NodeRole node_role() const { return node_role_; }
 
-    void set_node_name(const String &new_node_name);
-    String node_name() const;
+    void set_node_name(const std::string &new_node_name);
+    std::string node_name() const;
 
-    void set_node_ip(const String &new_node_ip);
-    String node_ip() const;
+    void set_node_ip(const std::string &new_node_ip);
+    std::string node_ip() const;
 
     void set_node_port(i64 new_port) { port_ = new_port; }
     i64 node_port() const { return port_; }
@@ -67,18 +67,18 @@ public:
 
 private:
     mutable std::mutex node_mutex_{};
-    Atomic<NodeRole> node_role_{NodeRole::kUnInitialized};
-    Atomic<NodeStatus> node_status_{NodeStatus::kInvalid};
-    String node_name_{};
-    String ip_address_{};
-    Atomic<i64> port_{};
+    std::atomic<NodeRole> node_role_{NodeRole::kUnInitialized};
+    std::atomic<NodeStatus> node_status_{NodeStatus::kInvalid};
+    std::string node_name_{};
+    std::string ip_address_{};
+    std::atomic<i64> port_{};
     i64 txn_ts_{};
-    Atomic<u64> update_ts_{};
-    Atomic<i64> leader_term_{};
-    Atomic<i64> heartbeat_interval_{}; // provide by leader and used by follower and learner;
-    Atomic<u64> heartbeat_count_{};    // given by leader to calculate how many heartbeat received on this node.
+    std::atomic<u64> update_ts_{};
+    std::atomic<i64> leader_term_{};
+    std::atomic<i64> heartbeat_interval_{}; // provide by leader and used by follower and learner;
+    std::atomic<u64> heartbeat_count_{};    // given by leader to calculate how many heartbeat received on this node.
     // u64 update_interval_{}; // seconds
-    // String from_{}; // Which node the information comes from.
+    // std::string from_{}; // Which node the information comes from.
 };
 
 } // namespace infinity

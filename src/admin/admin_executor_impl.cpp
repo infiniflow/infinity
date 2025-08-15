@@ -19,7 +19,6 @@ module infinity_core:admin_executor.impl;
 import :admin_executor;
 import :query_context;
 import :query_result;
-import :stl;
 import :status;
 import :log_file;
 import :table_def;
@@ -165,29 +164,29 @@ QueryResult AdminExecutor::Execute(QueryContext *query_context, const AdminState
 QueryResult AdminExecutor::ListLogFiles(QueryContext *query_context, const AdminStatement *admin_statement) {
     QueryResult query_result;
 
-    auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
-    auto bigint_type = MakeShared<DataType>(LogicalType::kBigInt);
+    auto varchar_type = std::make_shared<DataType>(LogicalType::kVarchar);
+    auto bigint_type = std::make_shared<DataType>(LogicalType::kBigInt);
 
-    Vector<SharedPtr<ColumnDef>> column_defs = {
-        MakeShared<ColumnDef>(0, bigint_type, "index", std::set<ConstraintType>()),
-        MakeShared<ColumnDef>(1, varchar_type, "file_name", std::set<ConstraintType>()),
-        MakeShared<ColumnDef>(2, varchar_type, "type", std::set<ConstraintType>()),
+    std::vector<std::shared_ptr<ColumnDef>> column_defs = {
+        std::make_shared<ColumnDef>(0, bigint_type, "index", std::set<ConstraintType>()),
+        std::make_shared<ColumnDef>(1, varchar_type, "file_name", std::set<ConstraintType>()),
+        std::make_shared<ColumnDef>(2, varchar_type, "type", std::set<ConstraintType>()),
     };
 
-    SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("show_logs"), nullptr, column_defs);
-    query_result.result_table_ = MakeShared<DataTable>(table_def, TableType::kDataTable);
+    std::shared_ptr<TableDef> table_def = TableDef::Make(std::make_shared<std::string>("default_db"), std::make_shared<std::string>("show_logs"), nullptr, column_defs);
+    query_result.result_table_ = std::make_shared<DataTable>(table_def, TableType::kDataTable);
 
-    Vector<SharedPtr<DataType>> column_types{
+    std::vector<std::shared_ptr<DataType>> column_types{
         bigint_type,
         varchar_type,
         varchar_type,
     };
 
-    UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
+    std::unique_ptr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
     output_block_ptr->Init(column_types);
-    SizeT row_count = 0;
+    size_t row_count = 0;
 
-    String wal_dir = query_context->storage()->wal_manager()->wal_dir();
+    std::string wal_dir = query_context->storage()->wal_manager()->wal_dir();
     auto [temp_wal_info, wal_infos] = WalFile::ParseWalFilenames(wal_dir);
 
     {
@@ -257,42 +256,42 @@ QueryResult AdminExecutor::ShowLogFile(QueryContext *query_context, const AdminS
 
     QueryResult query_result;
 
-    auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
-    auto bigint_type = MakeShared<DataType>(LogicalType::kBigInt);
+    auto varchar_type = std::make_shared<DataType>(LogicalType::kVarchar);
+    auto bigint_type = std::make_shared<DataType>(LogicalType::kBigInt);
 
-    Vector<SharedPtr<ColumnDef>> column_defs = {
-        MakeShared<ColumnDef>(0, varchar_type, "name", std::set<ConstraintType>()),
-        MakeShared<ColumnDef>(1, varchar_type, "value", std::set<ConstraintType>()),
+    std::vector<std::shared_ptr<ColumnDef>> column_defs = {
+        std::make_shared<ColumnDef>(0, varchar_type, "name", std::set<ConstraintType>()),
+        std::make_shared<ColumnDef>(1, varchar_type, "value", std::set<ConstraintType>()),
     };
 
-    SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("show_log"), nullptr, column_defs);
-    query_result.result_table_ = MakeShared<DataTable>(table_def, TableType::kDataTable);
+    std::shared_ptr<TableDef> table_def = TableDef::Make(std::make_shared<std::string>("default_db"), std::make_shared<std::string>("show_log"), nullptr, column_defs);
+    query_result.result_table_ = std::make_shared<DataTable>(table_def, TableType::kDataTable);
 
-    Vector<SharedPtr<DataType>> column_types{
+    std::vector<std::shared_ptr<DataType>> column_types{
         varchar_type,
         varchar_type,
     };
 
-    UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
+    std::unique_ptr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
     output_block_ptr->Init(column_types);
 
-    String wal_dir = query_context->storage()->wal_manager()->wal_dir();
+    std::string wal_dir = query_context->storage()->wal_manager()->wal_dir();
     auto [temp_wal_info, wal_infos] = WalFile::ParseWalFilenames(wal_dir);
 
     i64 file_index = admin_statement->log_file_index_.value();
-    String file_path;
+    std::string file_path;
     if (file_index == 0) {
         file_path = temp_wal_info->path_;
     } else {
         file_path = wal_infos[file_index - 1].path_;
     }
 
-    SizeT file_size = VirtualStore::GetFileSize(file_path);
-    UniquePtr<WalEntryIterator> wal_iterator = WalEntryIterator::Make(file_path, false);
-    Vector<SharedPtr<WalEntry>> wal_entries = wal_iterator->GetAllEntries();
+    size_t file_size = VirtualStore::GetFileSize(file_path);
+    std::unique_ptr<WalEntryIterator> wal_iterator = WalEntryIterator::Make(file_path, false);
+    std::vector<std::shared_ptr<WalEntry>> wal_entries = wal_iterator->GetAllEntries();
     bool is_wal_good = wal_iterator->IsGood();
     {
-        SizeT column_id = 0;
+        size_t column_id = 0;
         {
             Value value = Value::MakeVarchar("index");
             ValueExpression value_expr(value);
@@ -308,7 +307,7 @@ QueryResult AdminExecutor::ShowLogFile(QueryContext *query_context, const AdminS
     }
 
     {
-        SizeT column_id = 0;
+        size_t column_id = 0;
         {
             Value value = Value::MakeVarchar("path");
             ValueExpression value_expr(value);
@@ -324,7 +323,7 @@ QueryResult AdminExecutor::ShowLogFile(QueryContext *query_context, const AdminS
     }
 
     {
-        SizeT column_id = 0;
+        size_t column_id = 0;
         {
             Value value = Value::MakeVarchar("file_size");
             ValueExpression value_expr(value);
@@ -340,7 +339,7 @@ QueryResult AdminExecutor::ShowLogFile(QueryContext *query_context, const AdminS
     }
 
     {
-        SizeT column_id = 0;
+        size_t column_id = 0;
         {
             Value value = Value::MakeVarchar("status");
             ValueExpression value_expr(value);
@@ -356,7 +355,7 @@ QueryResult AdminExecutor::ShowLogFile(QueryContext *query_context, const AdminS
     }
 
     {
-        SizeT column_id = 0;
+        size_t column_id = 0;
         {
             Value value = Value::MakeVarchar("entry_count");
             ValueExpression value_expr(value);
@@ -377,37 +376,37 @@ QueryResult AdminExecutor::ShowLogFile(QueryContext *query_context, const AdminS
 }
 
 QueryResult AdminExecutor::ListLogIndexes(QueryContext *query_context, const AdminStatement *admin_statement) {
-    String wal_dir = query_context->storage()->wal_manager()->wal_dir();
+    std::string wal_dir = query_context->storage()->wal_manager()->wal_dir();
     auto [temp_wal_info, wal_infos] = WalFile::ParseWalFilenames(wal_dir);
 
     i64 file_index = admin_statement->log_file_index_.value();
-    String file_path;
+    std::string file_path;
     if (file_index == 0) {
         file_path = temp_wal_info->path_;
     } else {
         file_path = wal_infos[file_index - 1].path_;
     }
 
-    UniquePtr<WalEntryIterator> wal_iterator = WalEntryIterator::Make(file_path, false);
-    Vector<SharedPtr<WalEntry>> wal_entries = wal_iterator->GetAllEntries();
+    std::unique_ptr<WalEntryIterator> wal_iterator = WalEntryIterator::Make(file_path, false);
+    std::vector<std::shared_ptr<WalEntry>> wal_entries = wal_iterator->GetAllEntries();
 
     QueryResult query_result;
-    auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
-    auto bigint_type = MakeShared<DataType>(LogicalType::kBigInt);
+    auto varchar_type = std::make_shared<DataType>(LogicalType::kVarchar);
+    auto bigint_type = std::make_shared<DataType>(LogicalType::kBigInt);
 
-    Vector<SharedPtr<ColumnDef>> column_defs = {
-        MakeShared<ColumnDef>(0, bigint_type, "index", std::set<ConstraintType>()),
-        MakeShared<ColumnDef>(1, bigint_type, "size", std::set<ConstraintType>()),
-        MakeShared<ColumnDef>(2, bigint_type, "txn_id", std::set<ConstraintType>()),
-        MakeShared<ColumnDef>(3, bigint_type, "commit_ts", std::set<ConstraintType>()),
-        MakeShared<ColumnDef>(4, bigint_type, "command_count", std::set<ConstraintType>()),
-        MakeShared<ColumnDef>(5, varchar_type, "commands", std::set<ConstraintType>()),
+    std::vector<std::shared_ptr<ColumnDef>> column_defs = {
+        std::make_shared<ColumnDef>(0, bigint_type, "index", std::set<ConstraintType>()),
+        std::make_shared<ColumnDef>(1, bigint_type, "size", std::set<ConstraintType>()),
+        std::make_shared<ColumnDef>(2, bigint_type, "txn_id", std::set<ConstraintType>()),
+        std::make_shared<ColumnDef>(3, bigint_type, "commit_ts", std::set<ConstraintType>()),
+        std::make_shared<ColumnDef>(4, bigint_type, "command_count", std::set<ConstraintType>()),
+        std::make_shared<ColumnDef>(5, varchar_type, "commands", std::set<ConstraintType>()),
     };
 
-    SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("show_logs"), nullptr, column_defs);
-    query_result.result_table_ = MakeShared<DataTable>(table_def, TableType::kDataTable);
+    std::shared_ptr<TableDef> table_def = TableDef::Make(std::make_shared<std::string>("default_db"), std::make_shared<std::string>("show_logs"), nullptr, column_defs);
+    query_result.result_table_ = std::make_shared<DataTable>(table_def, TableType::kDataTable);
 
-    Vector<SharedPtr<DataType>> column_types{
+    std::vector<std::shared_ptr<DataType>> column_types{
         bigint_type,
         bigint_type,
         bigint_type,
@@ -416,9 +415,9 @@ QueryResult AdminExecutor::ListLogIndexes(QueryContext *query_context, const Adm
         varchar_type,
     };
 
-    UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
+    std::unique_ptr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
     output_block_ptr->Init(column_types);
-    SizeT row_count = 0;
+    size_t row_count = 0;
     for (const auto &wal_entry : wal_entries) {
         if (output_block_ptr.get() == nullptr) {
             output_block_ptr = DataBlock::MakeUniquePtr();
@@ -483,43 +482,43 @@ QueryResult AdminExecutor::ListLogIndexes(QueryContext *query_context, const Adm
 QueryResult AdminExecutor::ShowLogIndex(QueryContext *query_context, const AdminStatement *admin_statement) {
     QueryResult query_result;
 
-    auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
-    auto bigint_type = MakeShared<DataType>(LogicalType::kBigInt);
+    auto varchar_type = std::make_shared<DataType>(LogicalType::kVarchar);
+    auto bigint_type = std::make_shared<DataType>(LogicalType::kBigInt);
 
-    Vector<SharedPtr<ColumnDef>> column_defs = {
-        MakeShared<ColumnDef>(0, bigint_type, "index", std::set<ConstraintType>()),
-        MakeShared<ColumnDef>(1, varchar_type, "type", std::set<ConstraintType>()),
-        MakeShared<ColumnDef>(2, varchar_type, "command", std::set<ConstraintType>()),
+    std::vector<std::shared_ptr<ColumnDef>> column_defs = {
+        std::make_shared<ColumnDef>(0, bigint_type, "index", std::set<ConstraintType>()),
+        std::make_shared<ColumnDef>(1, varchar_type, "type", std::set<ConstraintType>()),
+        std::make_shared<ColumnDef>(2, varchar_type, "command", std::set<ConstraintType>()),
     };
 
-    SharedPtr<TableDef> table_def =
-        TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("show_log_entry_command"), nullptr, column_defs);
-    query_result.result_table_ = MakeShared<DataTable>(table_def, TableType::kDataTable);
+    std::shared_ptr<TableDef> table_def =
+        TableDef::Make(std::make_shared<std::string>("default_db"), std::make_shared<std::string>("show_log_entry_command"), nullptr, column_defs);
+    query_result.result_table_ = std::make_shared<DataTable>(table_def, TableType::kDataTable);
 
-    Vector<SharedPtr<DataType>> column_types{
+    std::vector<std::shared_ptr<DataType>> column_types{
         bigint_type,
         varchar_type,
         varchar_type,
     };
 
-    UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
+    std::unique_ptr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
     output_block_ptr->Init(column_types);
-    SizeT row_count = 0;
+    size_t row_count = 0;
 
-    String wal_dir = query_context->storage()->wal_manager()->wal_dir();
+    std::string wal_dir = query_context->storage()->wal_manager()->wal_dir();
     auto [temp_wal_info, wal_infos] = WalFile::ParseWalFilenames(wal_dir);
 
     i64 file_index = admin_statement->log_file_index_.value();
-    String file_path;
+    std::string file_path;
     if (file_index == 0) {
         file_path = temp_wal_info->path_;
     } else {
         file_path = wal_infos[file_index - 1].path_;
     }
 
-    UniquePtr<WalEntryIterator> wal_iterator = WalEntryIterator::Make(file_path, false);
+    std::unique_ptr<WalEntryIterator> wal_iterator = WalEntryIterator::Make(file_path, false);
     i64 log_index_in_file = admin_statement->log_index_in_file_.value();
-    SharedPtr<WalEntry> wal_entry = wal_iterator->GetEntryByIndex(log_index_in_file);
+    std::shared_ptr<WalEntry> wal_entry = wal_iterator->GetEntryByIndex(log_index_in_file);
     if (wal_entry == nullptr) {
         query_result.result_table_ = nullptr;
         query_result.status_ = Status::NoWALEntryFound(file_path, log_index_in_file);
@@ -568,28 +567,28 @@ QueryResult AdminExecutor::ShowLogIndex(QueryContext *query_context, const Admin
 
 QueryResult AdminExecutor::ListDatabases(QueryContext *query_context, const AdminStatement *admin_statement) {
     //
-    //    auto bool_type = MakeShared<DataType>(LogicalType::kBoolean);
-    //    auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
-    //    auto bigint_type = MakeShared<DataType>(LogicalType::kBigInt);
+    //    auto bool_type = std::make_shared<DataType>(LogicalType::kBoolean);
+    //    auto varchar_type = std::make_shared<DataType>(LogicalType::kVarchar);
+    //    auto bigint_type = std::make_shared<DataType>(LogicalType::kBigInt);
     //
-    //    Vector<SharedPtr<ColumnDef>> column_defs = {
-    //        MakeShared<ColumnDef>(0, bigint_type, "index", std::set<ConstraintType>()),
-    //        MakeShared<ColumnDef>(1, varchar_type, "name", std::set<ConstraintType>()),
-    //        MakeShared<ColumnDef>(2, varchar_type, "dir", std::set<ConstraintType>()),
+    //    std::vector<std::shared_ptr<ColumnDef>> column_defs = {
+    //        std::make_shared<ColumnDef>(0, bigint_type, "index", std::set<ConstraintType>()),
+    //        std::make_shared<ColumnDef>(1, varchar_type, "name", std::set<ConstraintType>()),
+    //        std::make_shared<ColumnDef>(2, varchar_type, "dir", std::set<ConstraintType>()),
     //    };
     //
-    //    SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("show_catalog"), nullptr, column_defs);
-    //    query_result.result_table_ = MakeShared<DataTable>(table_def, TableType::kDataTable);
+    //    std::shared_ptr<TableDef> table_def = TableDef::Make(std::make_shared<std::string>("default_db"), std::make_shared<std::string>("show_catalog"), nullptr, column_defs);
+    //    query_result.result_table_ = std::make_shared<DataTable>(table_def, TableType::kDataTable);
     //
-    //    Vector<SharedPtr<DataType>> column_types{
+    //    std::vector<std::shared_ptr<DataType>> column_types{
     //        bigint_type,
     //        varchar_type,
     //    };
     //
-    //    UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
+    //    std::unique_ptr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
     //    output_block_ptr->Init(column_types);
     //
-    //    Vector<SharedPtr<WalEntry>> checkpoint_entries = GetAllCheckpointEntries(query_context, admin_statement);
+    //    std::vector<std::shared_ptr<WalEntry>> checkpoint_entries = GetAllCheckpointEntries(query_context, admin_statement);
     //    if (checkpoint_entries.empty()) {
     //        return query_result;
     //    }
@@ -600,7 +599,7 @@ QueryResult AdminExecutor::ListDatabases(QueryContext *query_context, const Admi
     //        return query_result;
     //    }
     //
-    //    SizeT row_count = 0;
+    //    size_t row_count = 0;
     //    auto [_, meta_ptrs, meta_lock] = catalog->db_meta_map_.GetAllMetaGuard();
     //    for (auto &meta_ptr : meta_ptrs) {
     //        DBMeta *db_meta = static_cast<DBMeta *>(meta_ptr);
@@ -641,31 +640,31 @@ QueryResult AdminExecutor::ListDatabases(QueryContext *query_context, const Admi
 
 QueryResult AdminExecutor::ShowDatabase(QueryContext *query_context, const AdminStatement *admin_statement) {
 
-    //    auto bool_type = MakeShared<DataType>(LogicalType::kBoolean);
-    //    auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
-    //    auto bigint_type = MakeShared<DataType>(LogicalType::kBigInt);
+    //    auto bool_type = std::make_shared<DataType>(LogicalType::kBoolean);
+    //    auto varchar_type = std::make_shared<DataType>(LogicalType::kVarchar);
+    //    auto bigint_type = std::make_shared<DataType>(LogicalType::kBigInt);
     //
-    //    Vector<SharedPtr<ColumnDef>> column_defs = {
-    //        MakeShared<ColumnDef>(0, bigint_type, "index", std::set<ConstraintType>()),
-    //        MakeShared<ColumnDef>(1, varchar_type, "name", std::set<ConstraintType>()),
-    //        MakeShared<ColumnDef>(2, varchar_type, "dir", std::set<ConstraintType>()),
-    //        MakeShared<ColumnDef>(3, bigint_type, "transaction", std::set<ConstraintType>()),
-    //        MakeShared<ColumnDef>(4, bigint_type, "begin_ts", std::set<ConstraintType>()),
-    //        MakeShared<ColumnDef>(5, bigint_type, "commit_ts", std::set<ConstraintType>()),
-    //        MakeShared<ColumnDef>(6, bool_type, "deleted", std::set<ConstraintType>()),
-    //        MakeShared<ColumnDef>(7, varchar_type, "encode", std::set<ConstraintType>()),
+    //    std::vector<std::shared_ptr<ColumnDef>> column_defs = {
+    //        std::make_shared<ColumnDef>(0, bigint_type, "index", std::set<ConstraintType>()),
+    //        std::make_shared<ColumnDef>(1, varchar_type, "name", std::set<ConstraintType>()),
+    //        std::make_shared<ColumnDef>(2, varchar_type, "dir", std::set<ConstraintType>()),
+    //        std::make_shared<ColumnDef>(3, bigint_type, "transaction", std::set<ConstraintType>()),
+    //        std::make_shared<ColumnDef>(4, bigint_type, "begin_ts", std::set<ConstraintType>()),
+    //        std::make_shared<ColumnDef>(5, bigint_type, "commit_ts", std::set<ConstraintType>()),
+    //        std::make_shared<ColumnDef>(6, bool_type, "deleted", std::set<ConstraintType>()),
+    //        std::make_shared<ColumnDef>(7, varchar_type, "encode", std::set<ConstraintType>()),
     //    };
     //
-    //    SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("show_catalog"), nullptr, column_defs);
-    //    query_result.result_table_ = MakeShared<DataTable>(table_def, TableType::kDataTable);
+    //    std::shared_ptr<TableDef> table_def = TableDef::Make(std::make_shared<std::string>("default_db"), std::make_shared<std::string>("show_catalog"), nullptr, column_defs);
+    //    query_result.result_table_ = std::make_shared<DataTable>(table_def, TableType::kDataTable);
     //
-    //    Vector<SharedPtr<DataType>> column_types{bigint_type, varchar_type, varchar_type, bigint_type, bigint_type, bigint_type, bool_type,
+    //    std::vector<std::shared_ptr<DataType>> column_types{bigint_type, varchar_type, varchar_type, bigint_type, bigint_type, bigint_type, bool_type,
     //    varchar_type};
     //
-    //    UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
+    //    std::unique_ptr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
     //    output_block_ptr->Init(column_types);
     //
-    //    Vector<SharedPtr<WalEntry>> checkpoint_entries = GetAllCheckpointEntries(query_context, admin_statement);
+    //    std::vector<std::shared_ptr<WalEntry>> checkpoint_entries = GetAllCheckpointEntries(query_context, admin_statement);
     //    if (checkpoint_entries.empty()) {
     //        return query_result;
     //    }
@@ -677,7 +676,7 @@ QueryResult AdminExecutor::ShowDatabase(QueryContext *query_context, const Admin
     //        return query_result;
     //    }
     //
-    //    SizeT row_count = 0;
+    //    size_t row_count = 0;
     //    auto [_, meta_ptrs, meta_lock] = catalog->db_meta_map_.GetAllMetaGuard();
     //
     //    u64 database_meta_index = admin_statement->database_meta_index_.value();
@@ -687,8 +686,8 @@ QueryResult AdminExecutor::ShowDatabase(QueryContext *query_context, const Admin
     //        return query_result;
     //    }
     //    DBMeta *db_meta = meta_ptrs[database_meta_index];
-    //    List<SharedPtr<DBEntry>> entry_list = db_meta->GetAllEntries();
-    //    for (const SharedPtr<DBEntry> &db_entry : entry_list) {
+    //    List<std::shared_ptr<DBEntry>> entry_list = db_meta->GetAllEntries();
+    //    for (const std::shared_ptr<DBEntry> &db_entry : entry_list) {
     //        if (output_block_ptr.get() == nullptr) {
     //            output_block_ptr = DataBlock::MakeUniquePtr();
     //            output_block_ptr->Init(column_types);
@@ -710,7 +709,7 @@ QueryResult AdminExecutor::ShowDatabase(QueryContext *query_context, const Admin
     //
     //        {
     //            // dir
-    //            String dir_str = db_entry->db_entry_dir() == nullptr ? "" : *db_entry->db_entry_dir();
+    //            std::string dir_str = db_entry->db_entry_dir() == nullptr ? "" : *db_entry->db_entry_dir();
     //            Value value = Value::MakeVarchar(dir_str);
     //            ValueExpression value_expr(value);
     //            value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
@@ -769,29 +768,29 @@ QueryResult AdminExecutor::ShowDatabase(QueryContext *query_context, const Admin
 
 QueryResult AdminExecutor::ListTables(QueryContext *query_context, const AdminStatement *admin_statement) {
 
-    //    auto bool_type = MakeShared<DataType>(LogicalType::kBoolean);
-    //    auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
-    //    auto bigint_type = MakeShared<DataType>(LogicalType::kBigInt);
+    //    auto bool_type = std::make_shared<DataType>(LogicalType::kBoolean);
+    //    auto varchar_type = std::make_shared<DataType>(LogicalType::kVarchar);
+    //    auto bigint_type = std::make_shared<DataType>(LogicalType::kBigInt);
     //
-    //    Vector<SharedPtr<ColumnDef>> column_defs = {
-    //        MakeShared<ColumnDef>(0, bigint_type, "index", std::set<ConstraintType>()),
-    //        MakeShared<ColumnDef>(1, varchar_type, "name", std::set<ConstraintType>()),
-    //        MakeShared<ColumnDef>(2, varchar_type, "db_entry_dir", std::set<ConstraintType>()),
+    //    std::vector<std::shared_ptr<ColumnDef>> column_defs = {
+    //        std::make_shared<ColumnDef>(0, bigint_type, "index", std::set<ConstraintType>()),
+    //        std::make_shared<ColumnDef>(1, varchar_type, "name", std::set<ConstraintType>()),
+    //        std::make_shared<ColumnDef>(2, varchar_type, "db_entry_dir", std::set<ConstraintType>()),
     //    };
     //
-    //    SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("list_tables"), nullptr, column_defs);
-    //    query_result.result_table_ = MakeShared<DataTable>(table_def, TableType::kDataTable);
+    //    std::shared_ptr<TableDef> table_def = TableDef::Make(std::make_shared<std::string>("default_db"), std::make_shared<std::string>("list_tables"), nullptr, column_defs);
+    //    query_result.result_table_ = std::make_shared<DataTable>(table_def, TableType::kDataTable);
     //
-    //    Vector<SharedPtr<DataType>> column_types{
+    //    std::vector<std::shared_ptr<DataType>> column_types{
     //        bigint_type,
     //        varchar_type,
     //        varchar_type,
     //    };
     //
-    //    UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
+    //    std::unique_ptr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
     //    output_block_ptr->Init(column_types);
     //
-    //    Vector<SharedPtr<WalEntry>> checkpoint_entries = GetAllCheckpointEntries(query_context, admin_statement);
+    //    std::vector<std::shared_ptr<WalEntry>> checkpoint_entries = GetAllCheckpointEntries(query_context, admin_statement);
     //    if (checkpoint_entries.empty()) {
     //        return query_result;
     //    }
@@ -812,7 +811,7 @@ QueryResult AdminExecutor::ListTables(QueryContext *query_context, const AdminSt
     //        return query_result;
     //    }
     //    DBMeta *db_meta = db_meta_ptrs[database_meta_index];
-    //    List<SharedPtr<DBEntry>> entry_list = db_meta->GetAllEntries();
+    //    List<std::shared_ptr<DBEntry>> entry_list = db_meta->GetAllEntries();
     //
     //    u64 database_entry_index = admin_statement->database_entry_index_.value();
     //    if (database_entry_index >= entry_list.size()) {
@@ -821,9 +820,9 @@ QueryResult AdminExecutor::ListTables(QueryContext *query_context, const AdminSt
     //        return query_result;
     //    }
     //
-    //    SizeT row_count = 0;
+    //    size_t row_count = 0;
     //    DBEntry *current_db_entry = nullptr;
-    //    for (const SharedPtr<DBEntry> &db_entry : entry_list) {
+    //    for (const std::shared_ptr<DBEntry> &db_entry : entry_list) {
     //        if (row_count == database_entry_index) {
     //            current_db_entry = db_entry.get();
     //        }
@@ -877,30 +876,30 @@ QueryResult AdminExecutor::ListTables(QueryContext *query_context, const AdminSt
 
 QueryResult AdminExecutor::ShowTable(QueryContext *query_context, const AdminStatement *admin_statement) {
 
-    //    auto bool_type = MakeShared<DataType>(LogicalType::kBoolean);
-    //    auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
-    //    auto bigint_type = MakeShared<DataType>(LogicalType::kBigInt);
+    //    auto bool_type = std::make_shared<DataType>(LogicalType::kBoolean);
+    //    auto varchar_type = std::make_shared<DataType>(LogicalType::kVarchar);
+    //    auto bigint_type = std::make_shared<DataType>(LogicalType::kBigInt);
     //
-    //    Vector<SharedPtr<ColumnDef>> column_defs = {
-    //        MakeShared<ColumnDef>(0, bigint_type, "index", std::set<ConstraintType>()),
-    //        MakeShared<ColumnDef>(1, varchar_type, "name", std::set<ConstraintType>()),
-    //        MakeShared<ColumnDef>(2, varchar_type, "dir", std::set<ConstraintType>()),
-    //        MakeShared<ColumnDef>(3, bigint_type, "transaction", std::set<ConstraintType>()),
-    //        MakeShared<ColumnDef>(4, bigint_type, "begin_ts", std::set<ConstraintType>()),
-    //        MakeShared<ColumnDef>(5, bigint_type, "commit_ts", std::set<ConstraintType>()),
-    //        MakeShared<ColumnDef>(6, bool_type, "deleted", std::set<ConstraintType>()),
-    //        MakeShared<ColumnDef>(7, varchar_type, "encode", std::set<ConstraintType>()),
-    //        MakeShared<ColumnDef>(8, bigint_type, "column_count", std::set<ConstraintType>()),
-    //        MakeShared<ColumnDef>(9, bigint_type, "row_count", std::set<ConstraintType>()),
-    //        MakeShared<ColumnDef>(10, bigint_type, "segment_count", std::set<ConstraintType>()),
-    //        MakeShared<ColumnDef>(11, bigint_type, "unsealed_segment", std::set<ConstraintType>()),
-    //        MakeShared<ColumnDef>(12, bigint_type, "next_segment", std::set<ConstraintType>()),
+    //    std::vector<std::shared_ptr<ColumnDef>> column_defs = {
+    //        std::make_shared<ColumnDef>(0, bigint_type, "index", std::set<ConstraintType>()),
+    //        std::make_shared<ColumnDef>(1, varchar_type, "name", std::set<ConstraintType>()),
+    //        std::make_shared<ColumnDef>(2, varchar_type, "dir", std::set<ConstraintType>()),
+    //        std::make_shared<ColumnDef>(3, bigint_type, "transaction", std::set<ConstraintType>()),
+    //        std::make_shared<ColumnDef>(4, bigint_type, "begin_ts", std::set<ConstraintType>()),
+    //        std::make_shared<ColumnDef>(5, bigint_type, "commit_ts", std::set<ConstraintType>()),
+    //        std::make_shared<ColumnDef>(6, bool_type, "deleted", std::set<ConstraintType>()),
+    //        std::make_shared<ColumnDef>(7, varchar_type, "encode", std::set<ConstraintType>()),
+    //        std::make_shared<ColumnDef>(8, bigint_type, "column_count", std::set<ConstraintType>()),
+    //        std::make_shared<ColumnDef>(9, bigint_type, "row_count", std::set<ConstraintType>()),
+    //        std::make_shared<ColumnDef>(10, bigint_type, "segment_count", std::set<ConstraintType>()),
+    //        std::make_shared<ColumnDef>(11, bigint_type, "unsealed_segment", std::set<ConstraintType>()),
+    //        std::make_shared<ColumnDef>(12, bigint_type, "next_segment", std::set<ConstraintType>()),
     //    };
     //
-    //    SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("list_tables"), nullptr, column_defs);
-    //    query_result.result_table_ = MakeShared<DataTable>(table_def, TableType::kDataTable);
+    //    std::shared_ptr<TableDef> table_def = TableDef::Make(std::make_shared<std::string>("default_db"), std::make_shared<std::string>("list_tables"), nullptr, column_defs);
+    //    query_result.result_table_ = std::make_shared<DataTable>(table_def, TableType::kDataTable);
     //
-    //    Vector<SharedPtr<DataType>> column_types{
+    //    std::vector<std::shared_ptr<DataType>> column_types{
     //        bigint_type,
     //        varchar_type,
     //        varchar_type,
@@ -916,10 +915,10 @@ QueryResult AdminExecutor::ShowTable(QueryContext *query_context, const AdminSta
     //        bigint_type,
     //    };
     //
-    //    UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
+    //    std::unique_ptr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
     //    output_block_ptr->Init(column_types);
     //
-    //    Vector<SharedPtr<WalEntry>> checkpoint_entries = GetAllCheckpointEntries(query_context, admin_statement);
+    //    std::vector<std::shared_ptr<WalEntry>> checkpoint_entries = GetAllCheckpointEntries(query_context, admin_statement);
     //    if (checkpoint_entries.empty()) {
     //        return query_result;
     //    }
@@ -940,7 +939,7 @@ QueryResult AdminExecutor::ShowTable(QueryContext *query_context, const AdminSta
     //        return query_result;
     //    }
     //    DBMeta *db_meta = db_meta_ptrs[database_meta_index];
-    //    List<SharedPtr<DBEntry>> entry_list = db_meta->GetAllEntries();
+    //    List<std::shared_ptr<DBEntry>> entry_list = db_meta->GetAllEntries();
     //
     //    u64 database_entry_index = admin_statement->database_entry_index_.value();
     //    if (database_entry_index >= entry_list.size()) {
@@ -949,9 +948,9 @@ QueryResult AdminExecutor::ShowTable(QueryContext *query_context, const AdminSta
     //        return query_result;
     //    }
     //
-    //    SizeT row_count = 0;
+    //    size_t row_count = 0;
     //    DBEntry *current_db_entry = nullptr;
-    //    for (const SharedPtr<DBEntry> &db_entry : entry_list) {
+    //    for (const std::shared_ptr<DBEntry> &db_entry : entry_list) {
     //        if (row_count == database_entry_index) {
     //            current_db_entry = db_entry.get();
     //        }
@@ -969,8 +968,8 @@ QueryResult AdminExecutor::ShowTable(QueryContext *query_context, const AdminSta
     //    }
     //
     //    TableMeta *table_meta = table_meta_ptrs[table_meta_index];
-    //    List<SharedPtr<TableEntry>> table_entry_list = table_meta->GetAllEntries();
-    //    for (const SharedPtr<TableEntry> &table_entry : table_entry_list) {
+    //    List<std::shared_ptr<TableEntry>> table_entry_list = table_meta->GetAllEntries();
+    //    for (const std::shared_ptr<TableEntry> &table_entry : table_entry_list) {
     //        if (output_block_ptr.get() == nullptr) {
     //            output_block_ptr = DataBlock::MakeUniquePtr();
     //            output_block_ptr->Init(column_types);
@@ -992,7 +991,7 @@ QueryResult AdminExecutor::ShowTable(QueryContext *query_context, const AdminSta
     //
     //        {
     //            // dir
-    //            String dir_str = table_entry->TableEntryDir() == nullptr ? "" : *table_entry->TableEntryDir();
+    //            std::string dir_str = table_entry->TableEntryDir() == nullptr ? "" : *table_entry->TableEntryDir();
     //            Value value = Value::MakeVarchar(dir_str);
     //            ValueExpression value_expr(value);
     //            value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
@@ -1085,35 +1084,35 @@ QueryResult AdminExecutor::ShowTable(QueryContext *query_context, const AdminSta
 }
 
 QueryResult AdminExecutor::ListSegments(QueryContext *query_context, const AdminStatement *admin_statement) {
-    //    auto bool_type = MakeShared<DataType>(LogicalType::kBoolean);
-    //    auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
-    //    auto bigint_type = MakeShared<DataType>(LogicalType::kBigInt);
+    //    auto bool_type = std::make_shared<DataType>(LogicalType::kBoolean);
+    //    auto varchar_type = std::make_shared<DataType>(LogicalType::kVarchar);
+    //    auto bigint_type = std::make_shared<DataType>(LogicalType::kBigInt);
     //
-    //    Vector<SharedPtr<ColumnDef>> column_defs = {
-    //        MakeShared<ColumnDef>(0, bigint_type, "segment_id", std::set<ConstraintType>()),
-    //        MakeShared<ColumnDef>(1, varchar_type, "dir", std::set<ConstraintType>()),
-    //        MakeShared<ColumnDef>(2, bigint_type, "transaction", std::set<ConstraintType>()),
-    //        MakeShared<ColumnDef>(3, bigint_type, "begin_ts", std::set<ConstraintType>()),
-    //        MakeShared<ColumnDef>(4, bigint_type, "commit_ts", std::set<ConstraintType>()),
-    //        MakeShared<ColumnDef>(5, bool_type, "deleted", std::set<ConstraintType>()),
-    //        MakeShared<ColumnDef>(6, varchar_type, "encode", std::set<ConstraintType>()),
-    //        MakeShared<ColumnDef>(7, bigint_type, "row_count", std::set<ConstraintType>()),
-    //        MakeShared<ColumnDef>(8, bigint_type, "row_capacity", std::set<ConstraintType>()),
-    //        MakeShared<ColumnDef>(9, bigint_type, "column_count", std::set<ConstraintType>()),
-    //        MakeShared<ColumnDef>(10, bigint_type, "actual_row_count", std::set<ConstraintType>()),
-    //        MakeShared<ColumnDef>(11, bigint_type, "checkpoint_row_count", std::set<ConstraintType>()),
-    //        MakeShared<ColumnDef>(12, bigint_type, "min_row_ts", std::set<ConstraintType>()),
-    //        MakeShared<ColumnDef>(13, bigint_type, "max_row_ts", std::set<ConstraintType>()),
-    //        MakeShared<ColumnDef>(14, bigint_type, "first_delete_ts", std::set<ConstraintType>()),
-    //        MakeShared<ColumnDef>(15, bigint_type, "deprecate_ts", std::set<ConstraintType>()),
-    //        MakeShared<ColumnDef>(16, bigint_type, "block_count", std::set<ConstraintType>()),
-    //        MakeShared<ColumnDef>(17, varchar_type, "status", std::set<ConstraintType>()),
+    //    std::vector<std::shared_ptr<ColumnDef>> column_defs = {
+    //        std::make_shared<ColumnDef>(0, bigint_type, "segment_id", std::set<ConstraintType>()),
+    //        std::make_shared<ColumnDef>(1, varchar_type, "dir", std::set<ConstraintType>()),
+    //        std::make_shared<ColumnDef>(2, bigint_type, "transaction", std::set<ConstraintType>()),
+    //        std::make_shared<ColumnDef>(3, bigint_type, "begin_ts", std::set<ConstraintType>()),
+    //        std::make_shared<ColumnDef>(4, bigint_type, "commit_ts", std::set<ConstraintType>()),
+    //        std::make_shared<ColumnDef>(5, bool_type, "deleted", std::set<ConstraintType>()),
+    //        std::make_shared<ColumnDef>(6, varchar_type, "encode", std::set<ConstraintType>()),
+    //        std::make_shared<ColumnDef>(7, bigint_type, "row_count", std::set<ConstraintType>()),
+    //        std::make_shared<ColumnDef>(8, bigint_type, "row_capacity", std::set<ConstraintType>()),
+    //        std::make_shared<ColumnDef>(9, bigint_type, "column_count", std::set<ConstraintType>()),
+    //        std::make_shared<ColumnDef>(10, bigint_type, "actual_row_count", std::set<ConstraintType>()),
+    //        std::make_shared<ColumnDef>(11, bigint_type, "checkpoint_row_count", std::set<ConstraintType>()),
+    //        std::make_shared<ColumnDef>(12, bigint_type, "min_row_ts", std::set<ConstraintType>()),
+    //        std::make_shared<ColumnDef>(13, bigint_type, "max_row_ts", std::set<ConstraintType>()),
+    //        std::make_shared<ColumnDef>(14, bigint_type, "first_delete_ts", std::set<ConstraintType>()),
+    //        std::make_shared<ColumnDef>(15, bigint_type, "deprecate_ts", std::set<ConstraintType>()),
+    //        std::make_shared<ColumnDef>(16, bigint_type, "block_count", std::set<ConstraintType>()),
+    //        std::make_shared<ColumnDef>(17, varchar_type, "status", std::set<ConstraintType>()),
     //    };
     //
-    //    SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("list_tables"), nullptr, column_defs);
-    //    query_result.result_table_ = MakeShared<DataTable>(table_def, TableType::kDataTable);
+    //    std::shared_ptr<TableDef> table_def = TableDef::Make(std::make_shared<std::string>("default_db"), std::make_shared<std::string>("list_tables"), nullptr, column_defs);
+    //    query_result.result_table_ = std::make_shared<DataTable>(table_def, TableType::kDataTable);
     //
-    //    Vector<SharedPtr<DataType>> column_types{
+    //    std::vector<std::shared_ptr<DataType>> column_types{
     //        bigint_type,
     //        varchar_type,
     //        bigint_type,
@@ -1134,10 +1133,10 @@ QueryResult AdminExecutor::ListSegments(QueryContext *query_context, const Admin
     //        varchar_type,
     //    };
     //
-    //    UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
+    //    std::unique_ptr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
     //    output_block_ptr->Init(column_types);
     //
-    //    Vector<SharedPtr<WalEntry>> checkpoint_entries = GetAllCheckpointEntries(query_context, admin_statement);
+    //    std::vector<std::shared_ptr<WalEntry>> checkpoint_entries = GetAllCheckpointEntries(query_context, admin_statement);
     //    if (checkpoint_entries.empty()) {
     //        return query_result;
     //    }
@@ -1158,7 +1157,7 @@ QueryResult AdminExecutor::ListSegments(QueryContext *query_context, const Admin
     //        return query_result;
     //    }
     //    DBMeta *db_meta = db_meta_ptrs[database_meta_index];
-    //    List<SharedPtr<DBEntry>> entry_list = db_meta->GetAllEntries();
+    //    List<std::shared_ptr<DBEntry>> entry_list = db_meta->GetAllEntries();
     //
     //    u64 database_entry_index = admin_statement->database_entry_index_.value();
     //    if (database_entry_index >= entry_list.size()) {
@@ -1167,9 +1166,9 @@ QueryResult AdminExecutor::ListSegments(QueryContext *query_context, const Admin
     //        return query_result;
     //    }
     //
-    //    SizeT row_count = 0;
+    //    size_t row_count = 0;
     //    DBEntry *current_db_entry = nullptr;
-    //    for (const SharedPtr<DBEntry> &db_entry : entry_list) {
+    //    for (const std::shared_ptr<DBEntry> &db_entry : entry_list) {
     //        if (row_count == database_entry_index) {
     //            current_db_entry = db_entry.get();
     //        }
@@ -1186,7 +1185,7 @@ QueryResult AdminExecutor::ListSegments(QueryContext *query_context, const Admin
     //    }
     //
     //    TableMeta *table_meta = table_meta_ptrs[table_meta_index];
-    //    List<SharedPtr<TableEntry>> table_entry_list = table_meta->GetAllEntries();
+    //    List<std::shared_ptr<TableEntry>> table_entry_list = table_meta->GetAllEntries();
     //
     //    u64 table_entry_index = admin_statement->table_entry_index_.value();
     //    if (table_entry_index >= table_entry_list.size()) {
@@ -1197,7 +1196,7 @@ QueryResult AdminExecutor::ListSegments(QueryContext *query_context, const Admin
     //
     //    row_count = 0;
     //    TableEntry *current_table_entry = nullptr;
-    //    for (const SharedPtr<TableEntry> &table_entry : table_entry_list) {
+    //    for (const std::shared_ptr<TableEntry> &table_entry : table_entry_list) {
     //        if (row_count == table_entry_index) {
     //            current_table_entry = table_entry.get();
     //        }
@@ -1205,7 +1204,7 @@ QueryResult AdminExecutor::ListSegments(QueryContext *query_context, const Admin
     //    }
     //
     //    row_count = 0;
-    //    Map<SegmentID, SharedPtr<SegmentEntry>> &segment_map = current_table_entry->segment_map();
+    //    std::map<SegmentID, std::shared_ptr<SegmentEntry>> &segment_map = current_table_entry->segment_map();
     //    for (auto &[segment_id, segment_entry] : segment_map) {
     //        if (output_block_ptr.get() == nullptr) {
     //            output_block_ptr = DataBlock::MakeUniquePtr();
@@ -1221,7 +1220,7 @@ QueryResult AdminExecutor::ListSegments(QueryContext *query_context, const Admin
     //
     //        {
     //            // dir
-    //            String dir_str = segment_entry->segment_dir() == nullptr ? "" : *segment_entry->segment_dir();
+    //            std::string dir_str = segment_entry->segment_dir() == nullptr ? "" : *segment_entry->segment_dir();
     //            Value value = Value::MakeVarchar(dir_str);
     //            ValueExpression value_expr(value);
     //            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
@@ -1365,30 +1364,30 @@ QueryResult AdminExecutor::ShowSegment(QueryContext *query_context, const AdminS
 QueryResult AdminExecutor::ListBlocks(QueryContext *query_context, const AdminStatement *admin_statement) {
     //    QueryResult query_result;
     //
-    //    auto bool_type = MakeShared<DataType>(LogicalType::kBoolean);
-    //    auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
-    //    auto bigint_type = MakeShared<DataType>(LogicalType::kBigInt);
+    //    auto bool_type = std::make_shared<DataType>(LogicalType::kBoolean);
+    //    auto varchar_type = std::make_shared<DataType>(LogicalType::kVarchar);
+    //    auto bigint_type = std::make_shared<DataType>(LogicalType::kBigInt);
     //
-    //    Vector<SharedPtr<ColumnDef>> column_defs = {
-    //        MakeShared<ColumnDef>(0, bigint_type, "block_id", std::set<ConstraintType>()),
-    //        MakeShared<ColumnDef>(1, varchar_type, "dir", std::set<ConstraintType>()),
-    //        MakeShared<ColumnDef>(2, bigint_type, "transaction", std::set<ConstraintType>()),
-    //        MakeShared<ColumnDef>(3, bigint_type, "begin_ts", std::set<ConstraintType>()),
-    //        MakeShared<ColumnDef>(4, bigint_type, "commit_ts", std::set<ConstraintType>()),
-    //        MakeShared<ColumnDef>(5, bool_type, "deleted", std::set<ConstraintType>()),
-    //        MakeShared<ColumnDef>(6, varchar_type, "encode", std::set<ConstraintType>()),
-    //        MakeShared<ColumnDef>(7, bigint_type, "row_count", std::set<ConstraintType>()),
-    //        MakeShared<ColumnDef>(8, bigint_type, "row_capacity", std::set<ConstraintType>()),
-    //        MakeShared<ColumnDef>(9, bigint_type, "checkpoint_row_count", std::set<ConstraintType>()),
-    //        MakeShared<ColumnDef>(10, bigint_type, "min_row_ts", std::set<ConstraintType>()),
-    //        MakeShared<ColumnDef>(11, bigint_type, "max_row_ts", std::set<ConstraintType>()),
-    //        MakeShared<ColumnDef>(12, bigint_type, "checkpoint_ts", std::set<ConstraintType>()),
+    //    std::vector<std::shared_ptr<ColumnDef>> column_defs = {
+    //        std::make_shared<ColumnDef>(0, bigint_type, "block_id", std::set<ConstraintType>()),
+    //        std::make_shared<ColumnDef>(1, varchar_type, "dir", std::set<ConstraintType>()),
+    //        std::make_shared<ColumnDef>(2, bigint_type, "transaction", std::set<ConstraintType>()),
+    //        std::make_shared<ColumnDef>(3, bigint_type, "begin_ts", std::set<ConstraintType>()),
+    //        std::make_shared<ColumnDef>(4, bigint_type, "commit_ts", std::set<ConstraintType>()),
+    //        std::make_shared<ColumnDef>(5, bool_type, "deleted", std::set<ConstraintType>()),
+    //        std::make_shared<ColumnDef>(6, varchar_type, "encode", std::set<ConstraintType>()),
+    //        std::make_shared<ColumnDef>(7, bigint_type, "row_count", std::set<ConstraintType>()),
+    //        std::make_shared<ColumnDef>(8, bigint_type, "row_capacity", std::set<ConstraintType>()),
+    //        std::make_shared<ColumnDef>(9, bigint_type, "checkpoint_row_count", std::set<ConstraintType>()),
+    //        std::make_shared<ColumnDef>(10, bigint_type, "min_row_ts", std::set<ConstraintType>()),
+    //        std::make_shared<ColumnDef>(11, bigint_type, "max_row_ts", std::set<ConstraintType>()),
+    //        std::make_shared<ColumnDef>(12, bigint_type, "checkpoint_ts", std::set<ConstraintType>()),
     //    };
     //
-    //    SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("list_tables"), nullptr, column_defs);
-    //    query_result.result_table_ = MakeShared<DataTable>(table_def, TableType::kDataTable);
+    //    std::shared_ptr<TableDef> table_def = TableDef::Make(std::make_shared<std::string>("default_db"), std::make_shared<std::string>("list_tables"), nullptr, column_defs);
+    //    query_result.result_table_ = std::make_shared<DataTable>(table_def, TableType::kDataTable);
     //
-    //    Vector<SharedPtr<DataType>> column_types{
+    //    std::vector<std::shared_ptr<DataType>> column_types{
     //        bigint_type,
     //        varchar_type,
     //        bigint_type,
@@ -1404,10 +1403,10 @@ QueryResult AdminExecutor::ListBlocks(QueryContext *query_context, const AdminSt
     //        bigint_type,
     //    };
     //
-    //    UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
+    //    std::unique_ptr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
     //    output_block_ptr->Init(column_types);
     //
-    //    Vector<SharedPtr<WalEntry>> checkpoint_entries = GetAllCheckpointEntries(query_context, admin_statement);
+    //    std::vector<std::shared_ptr<WalEntry>> checkpoint_entries = GetAllCheckpointEntries(query_context, admin_statement);
     //    if (checkpoint_entries.empty()) {
     //        return query_result;
     //    }
@@ -1428,7 +1427,7 @@ QueryResult AdminExecutor::ListBlocks(QueryContext *query_context, const AdminSt
     //        return query_result;
     //    }
     //    DBMeta *db_meta = db_meta_ptrs[database_meta_index];
-    //    List<SharedPtr<DBEntry>> entry_list = db_meta->GetAllEntries();
+    //    List<std::shared_ptr<DBEntry>> entry_list = db_meta->GetAllEntries();
     //
     //    u64 database_entry_index = admin_statement->database_entry_index_.value();
     //    if (database_entry_index >= entry_list.size()) {
@@ -1437,9 +1436,9 @@ QueryResult AdminExecutor::ListBlocks(QueryContext *query_context, const AdminSt
     //        return query_result;
     //    }
     //
-    //    SizeT row_count = 0;
+    //    size_t row_count = 0;
     //    DBEntry *current_db_entry = nullptr;
-    //    for (const SharedPtr<DBEntry> &db_entry : entry_list) {
+    //    for (const std::shared_ptr<DBEntry> &db_entry : entry_list) {
     //        if (row_count == database_entry_index) {
     //            current_db_entry = db_entry.get();
     //        }
@@ -1456,7 +1455,7 @@ QueryResult AdminExecutor::ListBlocks(QueryContext *query_context, const AdminSt
     //    }
     //
     //    TableMeta *table_meta = table_meta_ptrs[table_meta_index];
-    //    List<SharedPtr<TableEntry>> table_entry_list = table_meta->GetAllEntries();
+    //    List<std::shared_ptr<TableEntry>> table_entry_list = table_meta->GetAllEntries();
     //
     //    u64 table_entry_index = admin_statement->table_entry_index_.value();
     //    if (table_entry_index >= table_entry_list.size()) {
@@ -1467,14 +1466,14 @@ QueryResult AdminExecutor::ListBlocks(QueryContext *query_context, const AdminSt
     //
     //    row_count = 0;
     //    TableEntry *current_table_entry = nullptr;
-    //    for (const SharedPtr<TableEntry> &table_entry : table_entry_list) {
+    //    for (const std::shared_ptr<TableEntry> &table_entry : table_entry_list) {
     //        if (row_count == table_entry_index) {
     //            current_table_entry = table_entry.get();
     //        }
     //        ++row_count;
     //    }
     //
-    //    Map<SegmentID, SharedPtr<SegmentEntry>> &segment_map = current_table_entry->segment_map();
+    //    std::map<SegmentID, std::shared_ptr<SegmentEntry>> &segment_map = current_table_entry->segment_map();
     //
     //    SegmentID segment_id = admin_statement->segment_index_.value();
     //    auto segment_it = segment_map.find(segment_id);
@@ -1485,7 +1484,7 @@ QueryResult AdminExecutor::ListBlocks(QueryContext *query_context, const AdminSt
     //    }
     //
     //    SegmentEntry *segment_entry = segment_it->second.get();
-    //    Vector<SharedPtr<BlockEntry>> &block_entries = segment_entry->block_entries();
+    //    std::vector<std::shared_ptr<BlockEntry>> &block_entries = segment_entry->block_entries();
     //
     //    row_count = 0;
     //    for (const auto &block_entry : block_entries) {
@@ -1503,7 +1502,7 @@ QueryResult AdminExecutor::ListBlocks(QueryContext *query_context, const AdminSt
     //
     //        {
     //            // block dir
-    //            String dir_str = block_entry->block_dir() == nullptr ? "" : *block_entry->block_dir();
+    //            std::string dir_str = block_entry->block_dir() == nullptr ? "" : *block_entry->block_dir();
     //            Value value = Value::MakeVarchar(dir_str);
     //            ValueExpression value_expr(value);
     //            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
@@ -1613,24 +1612,24 @@ QueryResult AdminExecutor::ShowBlock(QueryContext *query_context, const AdminSta
 QueryResult AdminExecutor::ListColumns(QueryContext *query_context, const AdminStatement *admin_statement) {
     //    QueryResult query_result;
     //
-    //    auto bool_type = MakeShared<DataType>(LogicalType::kBoolean);
-    //    auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
-    //    auto bigint_type = MakeShared<DataType>(LogicalType::kBigInt);
+    //    auto bool_type = std::make_shared<DataType>(LogicalType::kBoolean);
+    //    auto varchar_type = std::make_shared<DataType>(LogicalType::kVarchar);
+    //    auto bigint_type = std::make_shared<DataType>(LogicalType::kBigInt);
     //
-    //    Vector<SharedPtr<ColumnDef>> column_defs = {
-    //        MakeShared<ColumnDef>(0, bigint_type, "column_id", std::set<ConstraintType>()),
-    //        MakeShared<ColumnDef>(1, bigint_type, "transaction", std::set<ConstraintType>()),
-    //        MakeShared<ColumnDef>(2, bigint_type, "begin_ts", std::set<ConstraintType>()),
-    //        MakeShared<ColumnDef>(3, bigint_type, "commit_ts", std::set<ConstraintType>()),
-    //        MakeShared<ColumnDef>(4, varchar_type, "file_name", std::set<ConstraintType>()),
-    //        MakeShared<ColumnDef>(5, varchar_type, "encode", std::set<ConstraintType>()),
-    //        MakeShared<ColumnDef>(6, bigint_type, "outline_count", std::set<ConstraintType>()),
+    //    std::vector<std::shared_ptr<ColumnDef>> column_defs = {
+    //        std::make_shared<ColumnDef>(0, bigint_type, "column_id", std::set<ConstraintType>()),
+    //        std::make_shared<ColumnDef>(1, bigint_type, "transaction", std::set<ConstraintType>()),
+    //        std::make_shared<ColumnDef>(2, bigint_type, "begin_ts", std::set<ConstraintType>()),
+    //        std::make_shared<ColumnDef>(3, bigint_type, "commit_ts", std::set<ConstraintType>()),
+    //        std::make_shared<ColumnDef>(4, varchar_type, "file_name", std::set<ConstraintType>()),
+    //        std::make_shared<ColumnDef>(5, varchar_type, "encode", std::set<ConstraintType>()),
+    //        std::make_shared<ColumnDef>(6, bigint_type, "outline_count", std::set<ConstraintType>()),
     //    };
     //
-    //    SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("list_tables"), nullptr, column_defs);
-    //    query_result.result_table_ = MakeShared<DataTable>(table_def, TableType::kDataTable);
+    //    std::shared_ptr<TableDef> table_def = TableDef::Make(std::make_shared<std::string>("default_db"), std::make_shared<std::string>("list_tables"), nullptr, column_defs);
+    //    query_result.result_table_ = std::make_shared<DataTable>(table_def, TableType::kDataTable);
     //
-    //    Vector<SharedPtr<DataType>> column_types{
+    //    std::vector<std::shared_ptr<DataType>> column_types{
     //        bigint_type,
     //        bigint_type,
     //        bigint_type,
@@ -1640,10 +1639,10 @@ QueryResult AdminExecutor::ListColumns(QueryContext *query_context, const AdminS
     //        bigint_type,
     //    };
     //
-    //    UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
+    //    std::unique_ptr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
     //    output_block_ptr->Init(column_types);
     //
-    //    Vector<SharedPtr<WalEntry>> checkpoint_entries = GetAllCheckpointEntries(query_context, admin_statement);
+    //    std::vector<std::shared_ptr<WalEntry>> checkpoint_entries = GetAllCheckpointEntries(query_context, admin_statement);
     //    if (checkpoint_entries.empty()) {
     //        return query_result;
     //    }
@@ -1664,7 +1663,7 @@ QueryResult AdminExecutor::ListColumns(QueryContext *query_context, const AdminS
     //        return query_result;
     //    }
     //    DBMeta *db_meta = db_meta_ptrs[database_meta_index];
-    //    List<SharedPtr<DBEntry>> entry_list = db_meta->GetAllEntries();
+    //    List<std::shared_ptr<DBEntry>> entry_list = db_meta->GetAllEntries();
     //
     //    u64 database_entry_index = admin_statement->database_entry_index_.value();
     //    if (database_entry_index >= entry_list.size()) {
@@ -1673,9 +1672,9 @@ QueryResult AdminExecutor::ListColumns(QueryContext *query_context, const AdminS
     //        return query_result;
     //    }
     //
-    //    SizeT row_count = 0;
+    //    size_t row_count = 0;
     //    DBEntry *current_db_entry = nullptr;
-    //    for (const SharedPtr<DBEntry> &db_entry : entry_list) {
+    //    for (const std::shared_ptr<DBEntry> &db_entry : entry_list) {
     //        if (row_count == database_entry_index) {
     //            current_db_entry = db_entry.get();
     //        }
@@ -1692,7 +1691,7 @@ QueryResult AdminExecutor::ListColumns(QueryContext *query_context, const AdminS
     //    }
     //
     //    TableMeta *table_meta = table_meta_ptrs[table_meta_index];
-    //    List<SharedPtr<TableEntry>> table_entry_list = table_meta->GetAllEntries();
+    //    List<std::shared_ptr<TableEntry>> table_entry_list = table_meta->GetAllEntries();
     //
     //    u64 table_entry_index = admin_statement->table_entry_index_.value();
     //    if (table_entry_index >= table_entry_list.size()) {
@@ -1703,14 +1702,14 @@ QueryResult AdminExecutor::ListColumns(QueryContext *query_context, const AdminS
     //
     //    row_count = 0;
     //    TableEntry *current_table_entry = nullptr;
-    //    for (const SharedPtr<TableEntry> &table_entry : table_entry_list) {
+    //    for (const std::shared_ptr<TableEntry> &table_entry : table_entry_list) {
     //        if (row_count == table_entry_index) {
     //            current_table_entry = table_entry.get();
     //        }
     //        ++row_count;
     //    }
     //
-    //    Map<SegmentID, SharedPtr<SegmentEntry>> &segment_map = current_table_entry->segment_map();
+    //    std::map<SegmentID, std::shared_ptr<SegmentEntry>> &segment_map = current_table_entry->segment_map();
     //
     //    SegmentID segment_id = admin_statement->segment_index_.value();
     //    auto segment_it = segment_map.find(segment_id);
@@ -1721,7 +1720,7 @@ QueryResult AdminExecutor::ListColumns(QueryContext *query_context, const AdminS
     //    }
     //
     //    SegmentEntry *segment_entry = segment_it->second.get();
-    //    Vector<SharedPtr<BlockEntry>> &block_entries = segment_entry->block_entries();
+    //    std::vector<std::shared_ptr<BlockEntry>> &block_entries = segment_entry->block_entries();
     //
     //    BlockID block_id = admin_statement->block_index_.value();
     //    row_count = 0;
@@ -1809,31 +1808,31 @@ QueryResult AdminExecutor::ListColumns(QueryContext *query_context, const AdminS
 QueryResult AdminExecutor::ShowColumn(QueryContext *query_context, const AdminStatement *admin_statement) {
     //    QueryResult query_result;
     //
-    //    auto bool_type = MakeShared<DataType>(LogicalType::kBoolean);
-    //    auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
-    //    auto bigint_type = MakeShared<DataType>(LogicalType::kBigInt);
+    //    auto bool_type = std::make_shared<DataType>(LogicalType::kBoolean);
+    //    auto varchar_type = std::make_shared<DataType>(LogicalType::kVarchar);
+    //    auto bigint_type = std::make_shared<DataType>(LogicalType::kBigInt);
     //
-    //    Vector<SharedPtr<ColumnDef>> column_defs = {
-    //        MakeShared<ColumnDef>(0, bigint_type, "id", std::set<ConstraintType>()),
-    //        MakeShared<ColumnDef>(1, varchar_type, "name", std::set<ConstraintType>()),
-    //        MakeShared<ColumnDef>(2, varchar_type, "type", std::set<ConstraintType>()),
-    //        MakeShared<ColumnDef>(3, varchar_type, "constraints", std::set<ConstraintType>()),
+    //    std::vector<std::shared_ptr<ColumnDef>> column_defs = {
+    //        std::make_shared<ColumnDef>(0, bigint_type, "id", std::set<ConstraintType>()),
+    //        std::make_shared<ColumnDef>(1, varchar_type, "name", std::set<ConstraintType>()),
+    //        std::make_shared<ColumnDef>(2, varchar_type, "type", std::set<ConstraintType>()),
+    //        std::make_shared<ColumnDef>(3, varchar_type, "constraints", std::set<ConstraintType>()),
     //    };
     //
-    //    SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("list_tables"), nullptr, column_defs);
-    //    query_result.result_table_ = MakeShared<DataTable>(table_def, TableType::kDataTable);
+    //    std::shared_ptr<TableDef> table_def = TableDef::Make(std::make_shared<std::string>("default_db"), std::make_shared<std::string>("list_tables"), nullptr, column_defs);
+    //    query_result.result_table_ = std::make_shared<DataTable>(table_def, TableType::kDataTable);
     //
-    //    Vector<SharedPtr<DataType>> column_types{
+    //    std::vector<std::shared_ptr<DataType>> column_types{
     //        bigint_type,
     //        varchar_type,
     //        varchar_type,
     //        varchar_type,
     //    };
     //
-    //    UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
+    //    std::unique_ptr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
     //    output_block_ptr->Init(column_types);
     //
-    //    Vector<SharedPtr<WalEntry>> checkpoint_entries = GetAllCheckpointEntries(query_context, admin_statement);
+    //    std::vector<std::shared_ptr<WalEntry>> checkpoint_entries = GetAllCheckpointEntries(query_context, admin_statement);
     //    if (checkpoint_entries.empty()) {
     //        return query_result;
     //    }
@@ -1854,7 +1853,7 @@ QueryResult AdminExecutor::ShowColumn(QueryContext *query_context, const AdminSt
     //        return query_result;
     //    }
     //    DBMeta *db_meta = db_meta_ptrs[database_meta_index];
-    //    List<SharedPtr<DBEntry>> entry_list = db_meta->GetAllEntries();
+    //    List<std::shared_ptr<DBEntry>> entry_list = db_meta->GetAllEntries();
     //
     //    u64 database_entry_index = admin_statement->database_entry_index_.value();
     //    if (database_entry_index >= entry_list.size()) {
@@ -1863,9 +1862,9 @@ QueryResult AdminExecutor::ShowColumn(QueryContext *query_context, const AdminSt
     //        return query_result;
     //    }
     //
-    //    SizeT row_count = 0;
+    //    size_t row_count = 0;
     //    DBEntry *current_db_entry = nullptr;
-    //    for (const SharedPtr<DBEntry> &db_entry : entry_list) {
+    //    for (const std::shared_ptr<DBEntry> &db_entry : entry_list) {
     //        if (row_count == database_entry_index) {
     //            current_db_entry = db_entry.get();
     //        }
@@ -1882,7 +1881,7 @@ QueryResult AdminExecutor::ShowColumn(QueryContext *query_context, const AdminSt
     //    }
     //
     //    TableMeta *table_meta = table_meta_ptrs[table_meta_index];
-    //    List<SharedPtr<TableEntry>> table_entry_list = table_meta->GetAllEntries();
+    //    List<std::shared_ptr<TableEntry>> table_entry_list = table_meta->GetAllEntries();
     //
     //    u64 table_entry_index = admin_statement->table_entry_index_.value();
     //    if (table_entry_index >= table_entry_list.size()) {
@@ -1893,7 +1892,7 @@ QueryResult AdminExecutor::ShowColumn(QueryContext *query_context, const AdminSt
     //
     //    row_count = 0;
     //    TableEntry *current_table_entry = nullptr;
-    //    for (const SharedPtr<TableEntry> &table_entry : table_entry_list) {
+    //    for (const std::shared_ptr<TableEntry> &table_entry : table_entry_list) {
     //        if (row_count == table_entry_index) {
     //            current_table_entry = table_entry.get();
     //        }
@@ -1901,8 +1900,8 @@ QueryResult AdminExecutor::ShowColumn(QueryContext *query_context, const AdminSt
     //    }
     //
     //    row_count = 0;
-    //    const Vector<SharedPtr<ColumnDef>> &table_column_defs = current_table_entry->column_defs();
-    //    for (const SharedPtr<ColumnDef> &column_def : table_column_defs) {
+    //    const std::vector<std::shared_ptr<ColumnDef>> &table_column_defs = current_table_entry->column_defs();
+    //    for (const std::shared_ptr<ColumnDef> &column_def : table_column_defs) {
     //        if (output_block_ptr.get() == nullptr) {
     //            output_block_ptr = DataBlock::MakeUniquePtr();
     //            output_block_ptr->Init(column_types);
@@ -1961,29 +1960,29 @@ QueryResult AdminExecutor::ShowColumn(QueryContext *query_context, const AdminSt
 QueryResult AdminExecutor::ListIndexes(QueryContext *query_context, const AdminStatement *admin_statement) {
     //    QueryResult query_result;
     //
-    //    auto bool_type = MakeShared<DataType>(LogicalType::kBoolean);
-    //    auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
-    //    auto bigint_type = MakeShared<DataType>(LogicalType::kBigInt);
+    //    auto bool_type = std::make_shared<DataType>(LogicalType::kBoolean);
+    //    auto varchar_type = std::make_shared<DataType>(LogicalType::kVarchar);
+    //    auto bigint_type = std::make_shared<DataType>(LogicalType::kBigInt);
     //
-    //    Vector<SharedPtr<ColumnDef>> column_defs = {
-    //        MakeShared<ColumnDef>(0, bigint_type, "index", std::set<ConstraintType>()),
-    //        MakeShared<ColumnDef>(1, varchar_type, "name", std::set<ConstraintType>()),
-    //        MakeShared<ColumnDef>(2, bigint_type, "count", std::set<ConstraintType>()),
+    //    std::vector<std::shared_ptr<ColumnDef>> column_defs = {
+    //        std::make_shared<ColumnDef>(0, bigint_type, "index", std::set<ConstraintType>()),
+    //        std::make_shared<ColumnDef>(1, varchar_type, "name", std::set<ConstraintType>()),
+    //        std::make_shared<ColumnDef>(2, bigint_type, "count", std::set<ConstraintType>()),
     //    };
     //
-    //    SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("list_tables"), nullptr, column_defs);
-    //    query_result.result_table_ = MakeShared<DataTable>(table_def, TableType::kDataTable);
+    //    std::shared_ptr<TableDef> table_def = TableDef::Make(std::make_shared<std::string>("default_db"), std::make_shared<std::string>("list_tables"), nullptr, column_defs);
+    //    query_result.result_table_ = std::make_shared<DataTable>(table_def, TableType::kDataTable);
     //
-    //    Vector<SharedPtr<DataType>> column_types{
+    //    std::vector<std::shared_ptr<DataType>> column_types{
     //        bigint_type,
     //        varchar_type,
     //        bigint_type,
     //    };
     //
-    //    UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
+    //    std::unique_ptr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
     //    output_block_ptr->Init(column_types);
     //
-    //    Vector<SharedPtr<WalEntry>> checkpoint_entries = GetAllCheckpointEntries(query_context, admin_statement);
+    //    std::vector<std::shared_ptr<WalEntry>> checkpoint_entries = GetAllCheckpointEntries(query_context, admin_statement);
     //    if (checkpoint_entries.empty()) {
     //        return query_result;
     //    }
@@ -2004,7 +2003,7 @@ QueryResult AdminExecutor::ListIndexes(QueryContext *query_context, const AdminS
     //        return query_result;
     //    }
     //    DBMeta *db_meta = db_meta_ptrs[database_meta_index];
-    //    List<SharedPtr<DBEntry>> entry_list = db_meta->GetAllEntries();
+    //    List<std::shared_ptr<DBEntry>> entry_list = db_meta->GetAllEntries();
     //
     //    u64 database_entry_index = admin_statement->database_entry_index_.value();
     //    if (database_entry_index >= entry_list.size()) {
@@ -2013,9 +2012,9 @@ QueryResult AdminExecutor::ListIndexes(QueryContext *query_context, const AdminS
     //        return query_result;
     //    }
     //
-    //    SizeT row_count = 0;
+    //    size_t row_count = 0;
     //    DBEntry *current_db_entry = nullptr;
-    //    for (const SharedPtr<DBEntry> &db_entry : entry_list) {
+    //    for (const std::shared_ptr<DBEntry> &db_entry : entry_list) {
     //        if (row_count == database_entry_index) {
     //            current_db_entry = db_entry.get();
     //        }
@@ -2032,7 +2031,7 @@ QueryResult AdminExecutor::ListIndexes(QueryContext *query_context, const AdminS
     //    }
     //
     //    TableMeta *table_meta = table_meta_ptrs[table_meta_index];
-    //    List<SharedPtr<TableEntry>> table_entry_list = table_meta->GetAllEntries();
+    //    List<std::shared_ptr<TableEntry>> table_entry_list = table_meta->GetAllEntries();
     //
     //    u64 table_entry_index = admin_statement->table_entry_index_.value();
     //    if (table_entry_index >= table_entry_list.size()) {
@@ -2043,7 +2042,7 @@ QueryResult AdminExecutor::ListIndexes(QueryContext *query_context, const AdminS
     //
     //    row_count = 0;
     //    TableEntry *current_table_entry = nullptr;
-    //    for (const SharedPtr<TableEntry> &table_entry : table_entry_list) {
+    //    for (const std::shared_ptr<TableEntry> &table_entry : table_entry_list) {
     //        if (row_count == table_entry_index) {
     //            current_table_entry = table_entry.get();
     //        }
@@ -2101,27 +2100,27 @@ QueryResult AdminExecutor::ListIndexes(QueryContext *query_context, const AdminS
 QueryResult AdminExecutor::ShowIndex(QueryContext *query_context, const AdminStatement *admin_statement) {
     //    QueryResult query_result;
     //
-    //    auto bool_type = MakeShared<DataType>(LogicalType::kBoolean);
-    //    auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
-    //    auto bigint_type = MakeShared<DataType>(LogicalType::kBigInt);
+    //    auto bool_type = std::make_shared<DataType>(LogicalType::kBoolean);
+    //    auto varchar_type = std::make_shared<DataType>(LogicalType::kVarchar);
+    //    auto bigint_type = std::make_shared<DataType>(LogicalType::kBigInt);
     //
-    //    Vector<SharedPtr<ColumnDef>> column_defs = {
-    //        MakeShared<ColumnDef>(0, bigint_type, "index", std::set<ConstraintType>()),
-    //        MakeShared<ColumnDef>(1, varchar_type, "index_dir", std::set<ConstraintType>()),
-    //        MakeShared<ColumnDef>(2, bigint_type, "transaction", std::set<ConstraintType>()),
-    //        MakeShared<ColumnDef>(3, bigint_type, "begin_ts", std::set<ConstraintType>()),
-    //        MakeShared<ColumnDef>(4, bigint_type, "commit_ts", std::set<ConstraintType>()),
-    //        MakeShared<ColumnDef>(5, bool_type, "deleted", std::set<ConstraintType>()),
-    //        MakeShared<ColumnDef>(6, varchar_type, "encode", std::set<ConstraintType>()),
-    //        MakeShared<ColumnDef>(7, bigint_type, "segment_update_ts", std::set<ConstraintType>()),
-    //        MakeShared<ColumnDef>(8, varchar_type, "index_info", std::set<ConstraintType>()),
-    //        MakeShared<ColumnDef>(9, bigint_type, "segment_count", std::set<ConstraintType>()),
+    //    std::vector<std::shared_ptr<ColumnDef>> column_defs = {
+    //        std::make_shared<ColumnDef>(0, bigint_type, "index", std::set<ConstraintType>()),
+    //        std::make_shared<ColumnDef>(1, varchar_type, "index_dir", std::set<ConstraintType>()),
+    //        std::make_shared<ColumnDef>(2, bigint_type, "transaction", std::set<ConstraintType>()),
+    //        std::make_shared<ColumnDef>(3, bigint_type, "begin_ts", std::set<ConstraintType>()),
+    //        std::make_shared<ColumnDef>(4, bigint_type, "commit_ts", std::set<ConstraintType>()),
+    //        std::make_shared<ColumnDef>(5, bool_type, "deleted", std::set<ConstraintType>()),
+    //        std::make_shared<ColumnDef>(6, varchar_type, "encode", std::set<ConstraintType>()),
+    //        std::make_shared<ColumnDef>(7, bigint_type, "segment_update_ts", std::set<ConstraintType>()),
+    //        std::make_shared<ColumnDef>(8, varchar_type, "index_info", std::set<ConstraintType>()),
+    //        std::make_shared<ColumnDef>(9, bigint_type, "segment_count", std::set<ConstraintType>()),
     //    };
     //
-    //    SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("list_tables"), nullptr, column_defs);
-    //    query_result.result_table_ = MakeShared<DataTable>(table_def, TableType::kDataTable);
+    //    std::shared_ptr<TableDef> table_def = TableDef::Make(std::make_shared<std::string>("default_db"), std::make_shared<std::string>("list_tables"), nullptr, column_defs);
+    //    query_result.result_table_ = std::make_shared<DataTable>(table_def, TableType::kDataTable);
     //
-    //    Vector<SharedPtr<DataType>> column_types{
+    //    std::vector<std::shared_ptr<DataType>> column_types{
     //        bigint_type,
     //        varchar_type,
     //        bigint_type,
@@ -2134,10 +2133,10 @@ QueryResult AdminExecutor::ShowIndex(QueryContext *query_context, const AdminSta
     //        bigint_type,
     //    };
     //
-    //    UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
+    //    std::unique_ptr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
     //    output_block_ptr->Init(column_types);
     //
-    //    Vector<SharedPtr<WalEntry>> checkpoint_entries = GetAllCheckpointEntries(query_context, admin_statement);
+    //    std::vector<std::shared_ptr<WalEntry>> checkpoint_entries = GetAllCheckpointEntries(query_context, admin_statement);
     //    if (checkpoint_entries.empty()) {
     //        return query_result;
     //    }
@@ -2158,7 +2157,7 @@ QueryResult AdminExecutor::ShowIndex(QueryContext *query_context, const AdminSta
     //        return query_result;
     //    }
     //    DBMeta *db_meta = db_meta_ptrs[database_meta_index];
-    //    List<SharedPtr<DBEntry>> entry_list = db_meta->GetAllEntries();
+    //    List<std::shared_ptr<DBEntry>> entry_list = db_meta->GetAllEntries();
     //
     //    u64 database_entry_index = admin_statement->database_entry_index_.value();
     //    if (database_entry_index >= entry_list.size()) {
@@ -2167,9 +2166,9 @@ QueryResult AdminExecutor::ShowIndex(QueryContext *query_context, const AdminSta
     //        return query_result;
     //    }
     //
-    //    SizeT row_count = 0;
+    //    size_t row_count = 0;
     //    DBEntry *current_db_entry = nullptr;
-    //    for (const SharedPtr<DBEntry> &db_entry : entry_list) {
+    //    for (const std::shared_ptr<DBEntry> &db_entry : entry_list) {
     //        if (row_count == database_entry_index) {
     //            current_db_entry = db_entry.get();
     //        }
@@ -2186,7 +2185,7 @@ QueryResult AdminExecutor::ShowIndex(QueryContext *query_context, const AdminSta
     //    }
     //
     //    TableMeta *table_meta = table_meta_ptrs[table_meta_index];
-    //    List<SharedPtr<TableEntry>> table_entry_list = table_meta->GetAllEntries();
+    //    List<std::shared_ptr<TableEntry>> table_entry_list = table_meta->GetAllEntries();
     //
     //    u64 table_entry_index = admin_statement->table_entry_index_.value();
     //    if (table_entry_index >= table_entry_list.size()) {
@@ -2197,7 +2196,7 @@ QueryResult AdminExecutor::ShowIndex(QueryContext *query_context, const AdminSta
     //
     //    row_count = 0;
     //    TableEntry *current_table_entry = nullptr;
-    //    for (const SharedPtr<TableEntry> &table_entry : table_entry_list) {
+    //    for (const std::shared_ptr<TableEntry> &table_entry : table_entry_list) {
     //        if (row_count == table_entry_index) {
     //            current_table_entry = table_entry.get();
     //        }
@@ -2222,8 +2221,8 @@ QueryResult AdminExecutor::ShowIndex(QueryContext *query_context, const AdminSta
     //    }
     //
     //    row_count = 0;
-    //    List<SharedPtr<TableIndexEntry>> table_index_entry_list = table_index_meta->GetAllEntries();
-    //    for (const SharedPtr<TableIndexEntry> &table_index_entry : table_index_entry_list) {
+    //    List<std::shared_ptr<TableIndexEntry>> table_index_entry_list = table_index_meta->GetAllEntries();
+    //    for (const std::shared_ptr<TableIndexEntry> &table_index_entry : table_index_entry_list) {
     //        if (output_block_ptr.get() == nullptr) {
     //            output_block_ptr = DataBlock::MakeUniquePtr();
     //            output_block_ptr->Init(column_types);
@@ -2319,25 +2318,25 @@ QueryResult AdminExecutor::ShowIndex(QueryContext *query_context, const AdminSta
 QueryResult AdminExecutor::ListIndexSegments(QueryContext *query_context, const AdminStatement *admin_statement) {
     //    QueryResult query_result;
     //
-    //    auto bool_type = MakeShared<DataType>(LogicalType::kBoolean);
-    //    auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
-    //    auto bigint_type = MakeShared<DataType>(LogicalType::kBigInt);
+    //    auto bool_type = std::make_shared<DataType>(LogicalType::kBoolean);
+    //    auto varchar_type = std::make_shared<DataType>(LogicalType::kVarchar);
+    //    auto bigint_type = std::make_shared<DataType>(LogicalType::kBigInt);
     //
-    //    Vector<SharedPtr<ColumnDef>> column_defs = {
-    //        MakeShared<ColumnDef>(0, bigint_type, "segment_id", std::set<ConstraintType>()),
-    //        MakeShared<ColumnDef>(1, varchar_type, "index_dir", std::set<ConstraintType>()),
-    //        MakeShared<ColumnDef>(2, bigint_type, "transaction", std::set<ConstraintType>()),
-    //        MakeShared<ColumnDef>(3, bigint_type, "begin_ts", std::set<ConstraintType>()),
-    //        MakeShared<ColumnDef>(4, bigint_type, "commit_ts", std::set<ConstraintType>()),
-    //        MakeShared<ColumnDef>(5, varchar_type, "encode", std::set<ConstraintType>()),
-    //        MakeShared<ColumnDef>(6, bigint_type, "next_chunk_id", std::set<ConstraintType>()),
-    //        MakeShared<ColumnDef>(7, bigint_type, "chunk_count", std::set<ConstraintType>()),
+    //    std::vector<std::shared_ptr<ColumnDef>> column_defs = {
+    //        std::make_shared<ColumnDef>(0, bigint_type, "segment_id", std::set<ConstraintType>()),
+    //        std::make_shared<ColumnDef>(1, varchar_type, "index_dir", std::set<ConstraintType>()),
+    //        std::make_shared<ColumnDef>(2, bigint_type, "transaction", std::set<ConstraintType>()),
+    //        std::make_shared<ColumnDef>(3, bigint_type, "begin_ts", std::set<ConstraintType>()),
+    //        std::make_shared<ColumnDef>(4, bigint_type, "commit_ts", std::set<ConstraintType>()),
+    //        std::make_shared<ColumnDef>(5, varchar_type, "encode", std::set<ConstraintType>()),
+    //        std::make_shared<ColumnDef>(6, bigint_type, "next_chunk_id", std::set<ConstraintType>()),
+    //        std::make_shared<ColumnDef>(7, bigint_type, "chunk_count", std::set<ConstraintType>()),
     //    };
     //
-    //    SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("list_tables"), nullptr, column_defs);
-    //    query_result.result_table_ = MakeShared<DataTable>(table_def, TableType::kDataTable);
+    //    std::shared_ptr<TableDef> table_def = TableDef::Make(std::make_shared<std::string>("default_db"), std::make_shared<std::string>("list_tables"), nullptr, column_defs);
+    //    query_result.result_table_ = std::make_shared<DataTable>(table_def, TableType::kDataTable);
     //
-    //    Vector<SharedPtr<DataType>> column_types{
+    //    std::vector<std::shared_ptr<DataType>> column_types{
     //        bigint_type,
     //        varchar_type,
     //        bigint_type,
@@ -2348,10 +2347,10 @@ QueryResult AdminExecutor::ListIndexSegments(QueryContext *query_context, const 
     //        bigint_type,
     //    };
     //
-    //    UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
+    //    std::unique_ptr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
     //    output_block_ptr->Init(column_types);
     //
-    //    Vector<SharedPtr<WalEntry>> checkpoint_entries = GetAllCheckpointEntries(query_context, admin_statement);
+    //    std::vector<std::shared_ptr<WalEntry>> checkpoint_entries = GetAllCheckpointEntries(query_context, admin_statement);
     //    if (checkpoint_entries.empty()) {
     //        return query_result;
     //    }
@@ -2372,7 +2371,7 @@ QueryResult AdminExecutor::ListIndexSegments(QueryContext *query_context, const 
     //        return query_result;
     //    }
     //    DBMeta *db_meta = db_meta_ptrs[database_meta_index];
-    //    List<SharedPtr<DBEntry>> entry_list = db_meta->GetAllEntries();
+    //    List<std::shared_ptr<DBEntry>> entry_list = db_meta->GetAllEntries();
     //
     //    u64 database_entry_index = admin_statement->database_entry_index_.value();
     //    if (database_entry_index >= entry_list.size()) {
@@ -2381,9 +2380,9 @@ QueryResult AdminExecutor::ListIndexSegments(QueryContext *query_context, const 
     //        return query_result;
     //    }
     //
-    //    SizeT row_count = 0;
+    //    size_t row_count = 0;
     //    DBEntry *current_db_entry = nullptr;
-    //    for (const SharedPtr<DBEntry> &db_entry : entry_list) {
+    //    for (const std::shared_ptr<DBEntry> &db_entry : entry_list) {
     //        if (row_count == database_entry_index) {
     //            current_db_entry = db_entry.get();
     //        }
@@ -2400,7 +2399,7 @@ QueryResult AdminExecutor::ListIndexSegments(QueryContext *query_context, const 
     //    }
     //
     //    TableMeta *table_meta = table_meta_ptrs[table_meta_index];
-    //    List<SharedPtr<TableEntry>> table_entry_list = table_meta->GetAllEntries();
+    //    List<std::shared_ptr<TableEntry>> table_entry_list = table_meta->GetAllEntries();
     //
     //    u64 table_entry_index = admin_statement->table_entry_index_.value();
     //    if (table_entry_index >= table_entry_list.size()) {
@@ -2411,7 +2410,7 @@ QueryResult AdminExecutor::ListIndexSegments(QueryContext *query_context, const 
     //
     //    row_count = 0;
     //    TableEntry *current_table_entry = nullptr;
-    //    for (const SharedPtr<TableEntry> &table_entry : table_entry_list) {
+    //    for (const std::shared_ptr<TableEntry> &table_entry : table_entry_list) {
     //        if (row_count == table_entry_index) {
     //            current_table_entry = table_entry.get();
     //        }
@@ -2436,7 +2435,7 @@ QueryResult AdminExecutor::ListIndexSegments(QueryContext *query_context, const 
     //    }
     //
     //    u64 table_index_entry_index = admin_statement->index_entry_index_.value();
-    //    List<SharedPtr<TableIndexEntry>> table_index_entry_list = table_index_meta->GetAllEntries();
+    //    List<std::shared_ptr<TableIndexEntry>> table_index_entry_list = table_index_meta->GetAllEntries();
     //    if (table_index_entry_index >= table_index_entry_list.size()) {
     //        query_result.result_table_ = nullptr;
     //        query_result.status_ = Status::InvalidTableIndex(table_index_meta_index, index_meta_map.size());
@@ -2444,14 +2443,14 @@ QueryResult AdminExecutor::ListIndexSegments(QueryContext *query_context, const 
     //    }
     //    row_count = 0;
     //    TableIndexEntry *table_index_entry = nullptr;
-    //    for (const SharedPtr<TableIndexEntry> &table_index_entry_elem : table_index_entry_list) {
+    //    for (const std::shared_ptr<TableIndexEntry> &table_index_entry_elem : table_index_entry_list) {
     //        if (row_count == table_index_entry_index) {
     //            table_index_entry = table_index_entry_elem.get();
     //        }
     //        ++row_count;
     //    }
     //
-    //    Map<SegmentID, SharedPtr<SegmentIndexEntry>> &segment_indexes = table_index_entry->index_by_segment();
+    //    std::map<SegmentID, std::shared_ptr<SegmentIndexEntry>> &segment_indexes = table_index_entry->index_by_segment();
     //    for (auto &segment_index_pair : segment_indexes) {
     //        if (output_block_ptr.get() == nullptr) {
     //            output_block_ptr = DataBlock::MakeUniquePtr();
@@ -2509,8 +2508,8 @@ QueryResult AdminExecutor::ListIndexSegments(QueryContext *query_context, const 
     //
     //        {
     //            // chunk index count
-    //            Vector<SharedPtr<ChunkIndexEntry>> chunk_index_entries;
-    //            SharedPtr<MemoryIndexer> memory_indexer;
+    //            std::vector<std::shared_ptr<ChunkIndexEntry>> chunk_index_entries;
+    //            std::shared_ptr<MemoryIndexer> memory_indexer;
     //            segment_index_ptr->GetChunkIndexEntries(chunk_index_entries, memory_indexer, query_context->GetTxn());
     //            Value value = Value::MakeBigInt(chunk_index_entries.size());
     //            ValueExpression value_expr(value);
@@ -2542,22 +2541,22 @@ QueryResult AdminExecutor::ShowIndexSegment(QueryContext *query_context, const A
 }
 
 QueryResult AdminExecutor::ListConfigs(QueryContext *query_context, const AdminStatement *admin_statement) {
-    //    auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
+    //    auto varchar_type = std::make_shared<DataType>(LogicalType::kVarchar);
     //
-    //    Vector<SharedPtr<ColumnDef>> column_defs = {
-    //        MakeShared<ColumnDef>(0, varchar_type, "config_name", std::set<ConstraintType>()),
-    //        MakeShared<ColumnDef>(1, varchar_type, "value", std::set<ConstraintType>()),
-    //        MakeShared<ColumnDef>(2, varchar_type, "description", std::set<ConstraintType>()),
+    //    std::vector<std::shared_ptr<ColumnDef>> column_defs = {
+    //        std::make_shared<ColumnDef>(0, varchar_type, "config_name", std::set<ConstraintType>()),
+    //        std::make_shared<ColumnDef>(1, varchar_type, "value", std::set<ConstraintType>()),
+    //        std::make_shared<ColumnDef>(2, varchar_type, "description", std::set<ConstraintType>()),
     //    };
     //
     //    Config *global_config = query_context->global_config();
     //    QueryResult query_result;
-    //    SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("list_configs"), nullptr, column_defs);
-    //    query_result.result_table_ = MakeShared<DataTable>(table_def, TableType::kDataTable);
+    //    std::shared_ptr<TableDef> table_def = TableDef::Make(std::make_shared<std::string>("default_db"), std::make_shared<std::string>("list_configs"), nullptr, column_defs);
+    //    query_result.result_table_ = std::make_shared<DataTable>(table_def, TableType::kDataTable);
     //
     //    // create data block for output state
-    //    UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
-    //    Vector<SharedPtr<DataType>> column_types{
+    //    std::unique_ptr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
+    //    std::vector<std::shared_ptr<DataType>> column_types{
     //        varchar_type,
     //        varchar_type,
     //        varchar_type,
@@ -3298,21 +3297,21 @@ QueryResult AdminExecutor::ListConfigs(QueryContext *query_context, const AdminS
 }
 
 QueryResult AdminExecutor::ListVariables(QueryContext *query_context, const AdminStatement *admin_statement) {
-    //    auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
+    //    auto varchar_type = std::make_shared<DataType>(LogicalType::kVarchar);
     //
-    //    Vector<SharedPtr<ColumnDef>> column_defs = {
-    //        MakeShared<ColumnDef>(0, varchar_type, "name", std::set<ConstraintType>()),
-    //        MakeShared<ColumnDef>(1, varchar_type, "value", std::set<ConstraintType>()),
-    //        MakeShared<ColumnDef>(2, varchar_type, "description", std::set<ConstraintType>()),
+    //    std::vector<std::shared_ptr<ColumnDef>> column_defs = {
+    //        std::make_shared<ColumnDef>(0, varchar_type, "name", std::set<ConstraintType>()),
+    //        std::make_shared<ColumnDef>(1, varchar_type, "value", std::set<ConstraintType>()),
+    //        std::make_shared<ColumnDef>(2, varchar_type, "description", std::set<ConstraintType>()),
     //    };
     //
     //    QueryResult query_result;
-    //    SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("list_configs"), nullptr, column_defs);
-    //    query_result.result_table_ = MakeShared<DataTable>(table_def, TableType::kDataTable);
+    //    std::shared_ptr<TableDef> table_def = TableDef::Make(std::make_shared<std::string>("default_db"), std::make_shared<std::string>("list_configs"), nullptr, column_defs);
+    //    query_result.result_table_ = std::make_shared<DataTable>(table_def, TableType::kDataTable);
     //
     //    // create data block for output state
-    //    UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
-    //    Vector<SharedPtr<DataType>> column_types{
+    //    std::unique_ptr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
+    //    std::vector<std::shared_ptr<DataType>> column_types{
     //        varchar_type,
     //        varchar_type,
     //        varchar_type,
@@ -3351,26 +3350,26 @@ QueryResult AdminExecutor::ListVariables(QueryContext *query_context, const Admi
 }
 
 QueryResult AdminExecutor::ShowVariable(QueryContext *query_context, const AdminStatement *admin_statement) {
-    //    SharedPtr<DataType> varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
-    //    //    SharedPtr<DataType> integer_type = MakeShared<DataType>(LogicalType::kBigInt);
-    //    //    SharedPtr<DataType> double_type = MakeShared<DataType>(LogicalType::kDouble);
-    //    //    SharedPtr<DataType> bool_type = MakeShared<DataType>(LogicalType::kBoolean);
-    //    UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
+    //    std::shared_ptr<DataType> varchar_type = std::make_shared<DataType>(LogicalType::kVarchar);
+    //    //    std::shared_ptr<DataType> integer_type = std::make_shared<DataType>(LogicalType::kBigInt);
+    //    //    std::shared_ptr<DataType> double_type = std::make_shared<DataType>(LogicalType::kDouble);
+    //    //    std::shared_ptr<DataType> bool_type = std::make_shared<DataType>(LogicalType::kBoolean);
+    //    std::unique_ptr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
     //
-    //    Vector<SharedPtr<ColumnDef>> column_defs = {
-    //        MakeShared<ColumnDef>(0, varchar_type, "value", std::set<ConstraintType>()),
+    //    std::vector<std::shared_ptr<ColumnDef>> column_defs = {
+    //        std::make_shared<ColumnDef>(0, varchar_type, "value", std::set<ConstraintType>()),
     //    };
     //
-    //    SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("variables"), nullptr, column_defs);
+    //    std::shared_ptr<TableDef> table_def = TableDef::Make(std::make_shared<std::string>("default_db"), std::make_shared<std::string>("variables"), nullptr, column_defs);
     //
     //    QueryResult query_result;
-    //    query_result.result_table_ = MakeShared<DataTable>(table_def, TableType::kResult);
+    //    query_result.result_table_ = std::make_shared<DataTable>(table_def, TableType::kResult);
     //
-    //    Vector<SharedPtr<DataType>> output_column_types{
+    //    std::vector<std::shared_ptr<DataType>> output_column_types{
     //        varchar_type,
     //    };
     //
-    //    String variable_name = admin_statement->variable_name_.value();
+    //    std::string variable_name = admin_statement->variable_name_.value();
     //    ToLower(variable_name);
     //
     //    if (variable_name == "role") {
@@ -3402,28 +3401,28 @@ QueryResult AdminExecutor::ListNodes(QueryContext *query_context, const AdminSta
     //        return query_result;
     //    }
     //
-    //    auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
-    //    auto bigint_type = MakeShared<DataType>(LogicalType::kBigInt);
+    //    auto varchar_type = std::make_shared<DataType>(LogicalType::kVarchar);
+    //    auto bigint_type = std::make_shared<DataType>(LogicalType::kBigInt);
     //
-    //    Vector<SharedPtr<ColumnDef>> column_defs = {
-    //        MakeShared<ColumnDef>(0, varchar_type, "name", std::set<ConstraintType>()),
-    //        MakeShared<ColumnDef>(1, varchar_type, "role", std::set<ConstraintType>()),
-    //        MakeShared<ColumnDef>(2, varchar_type, "status", std::set<ConstraintType>()),
-    //        MakeShared<ColumnDef>(3, varchar_type, "address", std::set<ConstraintType>()),
-    //        MakeShared<ColumnDef>(4, varchar_type, "last_update", std::set<ConstraintType>()),
-    //        MakeShared<ColumnDef>(5, bigint_type, "heartbeat", std::set<ConstraintType>()),
+    //    std::vector<std::shared_ptr<ColumnDef>> column_defs = {
+    //        std::make_shared<ColumnDef>(0, varchar_type, "name", std::set<ConstraintType>()),
+    //        std::make_shared<ColumnDef>(1, varchar_type, "role", std::set<ConstraintType>()),
+    //        std::make_shared<ColumnDef>(2, varchar_type, "status", std::set<ConstraintType>()),
+    //        std::make_shared<ColumnDef>(3, varchar_type, "address", std::set<ConstraintType>()),
+    //        std::make_shared<ColumnDef>(4, varchar_type, "last_update", std::set<ConstraintType>()),
+    //        std::make_shared<ColumnDef>(5, bigint_type, "heartbeat", std::set<ConstraintType>()),
     //    };
     //
-    //    SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("list_nodes"), nullptr, column_defs);
-    //    query_result.result_table_ = MakeShared<DataTable>(table_def, TableType::kDataTable);
+    //    std::shared_ptr<TableDef> table_def = TableDef::Make(std::make_shared<std::string>("default_db"), std::make_shared<std::string>("list_nodes"), nullptr, column_defs);
+    //    query_result.result_table_ = std::make_shared<DataTable>(table_def, TableType::kDataTable);
     //
-    //    Vector<SharedPtr<DataType>> column_types{varchar_type, varchar_type, varchar_type, varchar_type, varchar_type, bigint_type};
+    //    std::vector<std::shared_ptr<DataType>> column_types{varchar_type, varchar_type, varchar_type, varchar_type, varchar_type, bigint_type};
     //
-    //    UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
+    //    std::unique_ptr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
     //    output_block_ptr->Init(column_types);
-    //    SizeT row_count = 0;
+    //    size_t row_count = 0;
     //
-    //    Vector<SharedPtr<NodeInfo>> server_nodes = InfinityContext::instance().cluster_manager()->ListNodes();
+    //    std::vector<std::shared_ptr<NodeInfo>> server_nodes = InfinityContext::instance().cluster_manager()->ListNodes();
     //    for (const auto &server_node : server_nodes) {
     //        if (output_block_ptr.get() == nullptr) {
     //            output_block_ptr = DataBlock::MakeUniquePtr();
@@ -3504,26 +3503,26 @@ QueryResult AdminExecutor::ShowNode(QueryContext *query_context, const AdminStat
     //        return query_result;
     //    }
     //
-    //    auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
-    //    auto bigint_type = MakeShared<DataType>(LogicalType::kBigInt);
+    //    auto varchar_type = std::make_shared<DataType>(LogicalType::kVarchar);
+    //    auto bigint_type = std::make_shared<DataType>(LogicalType::kBigInt);
     //
-    //    Vector<SharedPtr<ColumnDef>> column_defs = {
-    //        MakeShared<ColumnDef>(0, varchar_type, "name", std::set<ConstraintType>()),
-    //        MakeShared<ColumnDef>(1, varchar_type, "value", std::set<ConstraintType>()),
+    //    std::vector<std::shared_ptr<ColumnDef>> column_defs = {
+    //        std::make_shared<ColumnDef>(0, varchar_type, "name", std::set<ConstraintType>()),
+    //        std::make_shared<ColumnDef>(1, varchar_type, "value", std::set<ConstraintType>()),
     //    };
     //
-    //    SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("show_node"), nullptr, column_defs);
-    //    query_result.result_table_ = MakeShared<DataTable>(table_def, TableType::kDataTable);
+    //    std::shared_ptr<TableDef> table_def = TableDef::Make(std::make_shared<std::string>("default_db"), std::make_shared<std::string>("show_node"), nullptr, column_defs);
+    //    query_result.result_table_ = std::make_shared<DataTable>(table_def, TableType::kDataTable);
     //
-    //    Vector<SharedPtr<DataType>> column_types{
+    //    std::vector<std::shared_ptr<DataType>> column_types{
     //        varchar_type,
     //        varchar_type,
     //    };
     //
-    //    UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
+    //    std::unique_ptr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
     //    output_block_ptr->Init(column_types);
     //
-    //    String node_name = admin_statement->node_name_.value();
+    //    std::string node_name = admin_statement->node_name_.value();
     //    auto [status, server_node] = InfinityContext::instance().cluster_manager()->GetNodeInfoByName(node_name);
     //    if (!status.ok()) {
     //        query_result.result_table_ = nullptr;
@@ -3532,7 +3531,7 @@ QueryResult AdminExecutor::ShowNode(QueryContext *query_context, const AdminStat
     //    }
     //
     //    {
-    //        SizeT column_id = 0;
+    //        size_t column_id = 0;
     //        {
     //            Value value = Value::MakeVarchar("name");
     //            ValueExpression value_expr(value);
@@ -3548,7 +3547,7 @@ QueryResult AdminExecutor::ShowNode(QueryContext *query_context, const AdminStat
     //    }
     //
     //    {
-    //        SizeT column_id = 0;
+    //        size_t column_id = 0;
     //        {
     //            Value value = Value::MakeVarchar("role");
     //            ValueExpression value_expr(value);
@@ -3564,7 +3563,7 @@ QueryResult AdminExecutor::ShowNode(QueryContext *query_context, const AdminStat
     //    }
     //
     //    {
-    //        SizeT column_id = 0;
+    //        size_t column_id = 0;
     //        {
     //            Value value = Value::MakeVarchar("status");
     //            ValueExpression value_expr(value);
@@ -3580,7 +3579,7 @@ QueryResult AdminExecutor::ShowNode(QueryContext *query_context, const AdminStat
     //    }
     //
     //    {
-    //        SizeT column_id = 0;
+    //        size_t column_id = 0;
     //        {
     //            Value value = Value::MakeVarchar("address");
     //            ValueExpression value_expr(value);
@@ -3596,7 +3595,7 @@ QueryResult AdminExecutor::ShowNode(QueryContext *query_context, const AdminStat
     //    }
     //
     //    {
-    //        SizeT column_id = 0;
+    //        size_t column_id = 0;
     //        {
     //            Value value = Value::MakeVarchar("entry_count");
     //            ValueExpression value_expr(value);
@@ -3623,17 +3622,17 @@ QueryResult AdminExecutor::ShowNode(QueryContext *query_context, const AdminStat
 }
 
 QueryResult AdminExecutor::RemoveNode(QueryContext *query_context, const AdminStatement *admin_statement) {
-    //    Vector<SharedPtr<ColumnDef>> column_defs = {
-    //        MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", std::set<ConstraintType>())};
+    //    std::vector<std::shared_ptr<ColumnDef>> column_defs = {
+    //        std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "OK", std::set<ConstraintType>())};
     //
-    //    String node_name = admin_statement->node_name_.value();
+    //    std::string node_name = admin_statement->node_name_.value();
     //    QueryResult query_result;
     //
     //    Status status = InfinityContext::instance().cluster_manager()->RemoveNodeInfo(node_name);
     //
     //    if (status.ok()) {
-    //        auto result_table_def_ptr = MakeShared<TableDef>(MakeShared<String>("default_db"), MakeShared<String>("Tables"), nullptr, column_defs);
-    //        query_result.result_table_ = MakeShared<DataTable>(result_table_def_ptr, TableType::kDataTable);
+    //        auto result_table_def_ptr = std::make_shared<TableDef>(std::make_shared<std::string>("default_db"), std::make_shared<std::string>("Tables"), nullptr, column_defs);
+    //        query_result.result_table_ = std::make_shared<DataTable>(result_table_def_ptr, TableType::kDataTable);
     //    } else {
     //        query_result.status_ = status;
     //    }
@@ -3647,31 +3646,31 @@ QueryResult AdminExecutor::RemoveNode(QueryContext *query_context, const AdminSt
 
 QueryResult AdminExecutor::ShowCurrentNode(QueryContext *query_context, const AdminStatement *admin_statement) {
 
-    auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
-    auto bigint_type = MakeShared<DataType>(LogicalType::kBigInt);
+    auto varchar_type = std::make_shared<DataType>(LogicalType::kVarchar);
+    auto bigint_type = std::make_shared<DataType>(LogicalType::kBigInt);
 
-    Vector<SharedPtr<ColumnDef>> column_defs = {
-        MakeShared<ColumnDef>(0, varchar_type, "name", std::set<ConstraintType>()),
-        MakeShared<ColumnDef>(1, varchar_type, "value", std::set<ConstraintType>()),
+    std::vector<std::shared_ptr<ColumnDef>> column_defs = {
+        std::make_shared<ColumnDef>(0, varchar_type, "name", std::set<ConstraintType>()),
+        std::make_shared<ColumnDef>(1, varchar_type, "value", std::set<ConstraintType>()),
     };
 
-    SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("show_current_node"), nullptr, column_defs);
+    std::shared_ptr<TableDef> table_def = TableDef::Make(std::make_shared<std::string>("default_db"), std::make_shared<std::string>("show_current_node"), nullptr, column_defs);
 
     QueryResult query_result;
-    query_result.result_table_ = MakeShared<DataTable>(table_def, TableType::kDataTable);
+    query_result.result_table_ = std::make_shared<DataTable>(table_def, TableType::kDataTable);
 
-    Vector<SharedPtr<DataType>> column_types{
+    std::vector<std::shared_ptr<DataType>> column_types{
         varchar_type,
         varchar_type,
     };
 
-    UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
+    std::unique_ptr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
     output_block_ptr->Init(column_types);
 
     if (InfinityContext::instance().IsClusterRole()) {
-        SharedPtr<NodeInfo> server_node = InfinityContext::instance().cluster_manager()->ThisNode();
+        std::shared_ptr<NodeInfo> server_node = InfinityContext::instance().cluster_manager()->ThisNode();
         {
-            SizeT column_id = 0;
+            size_t column_id = 0;
             {
                 Value value = Value::MakeVarchar("name");
                 ValueExpression value_expr(value);
@@ -3687,7 +3686,7 @@ QueryResult AdminExecutor::ShowCurrentNode(QueryContext *query_context, const Ad
         }
 
         {
-            SizeT column_id = 0;
+            size_t column_id = 0;
             {
                 Value value = Value::MakeVarchar("role");
                 ValueExpression value_expr(value);
@@ -3703,7 +3702,7 @@ QueryResult AdminExecutor::ShowCurrentNode(QueryContext *query_context, const Ad
         }
 
         {
-            SizeT column_id = 0;
+            size_t column_id = 0;
             {
                 Value value = Value::MakeVarchar("status");
                 ValueExpression value_expr(value);
@@ -3719,7 +3718,7 @@ QueryResult AdminExecutor::ShowCurrentNode(QueryContext *query_context, const Ad
         }
 
         {
-            SizeT column_id = 0;
+            size_t column_id = 0;
             {
                 Value value = Value::MakeVarchar("address");
                 ValueExpression value_expr(value);
@@ -3735,7 +3734,7 @@ QueryResult AdminExecutor::ShowCurrentNode(QueryContext *query_context, const Ad
         }
 
         {
-            SizeT column_id = 0;
+            size_t column_id = 0;
             {
                 Value value = Value::MakeVarchar("update_time");
                 ValueExpression value_expr(value);
@@ -3754,7 +3753,7 @@ QueryResult AdminExecutor::ShowCurrentNode(QueryContext *query_context, const Ad
     } else {
         NodeRole server_role = InfinityContext::instance().GetServerRole();
         {
-            SizeT column_id = 0;
+            size_t column_id = 0;
             {
                 Value value = Value::MakeVarchar("role");
                 ValueExpression value_expr(value);
@@ -3770,7 +3769,7 @@ QueryResult AdminExecutor::ShowCurrentNode(QueryContext *query_context, const Ad
         }
 
         {
-            SizeT column_id = 0;
+            size_t column_id = 0;
             {
                 Value value = Value::MakeVarchar("status");
                 ValueExpression value_expr(value);
@@ -3780,7 +3779,7 @@ QueryResult AdminExecutor::ShowCurrentNode(QueryContext *query_context, const Ad
             ++column_id;
             {
                 bool infinity_started = InfinityContext::instance().InfinityContextStarted();
-                String infinity_status("started");
+                std::string infinity_status("started");
                 if (!infinity_started && server_role != NodeRole::kAdmin) {
                     infinity_status = "starting";
                 }
@@ -3798,16 +3797,16 @@ QueryResult AdminExecutor::ShowCurrentNode(QueryContext *query_context, const Ad
 
 QueryResult AdminExecutor::SetRole(QueryContext *query_context, const AdminStatement *admin_statement) {
     // TODO: check if current role is same as the target role.
-    //    Vector<SharedPtr<ColumnDef>> column_defs = {
-    //        MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", std::set<ConstraintType>())};
+    //    std::vector<std::shared_ptr<ColumnDef>> column_defs = {
+    //        std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "OK", std::set<ConstraintType>())};
     //
     //    NodeRole target_node_role = admin_statement->node_role_.value();
     //    QueryResult query_result;
     //    NodeRole current_node_role = InfinityContext::instance().GetServerRole();
     //    if (current_node_role == target_node_role) {
     //        LOG_INFO(fmt::format("Infinity is already the role of {}", ToString(current_node_role)));
-    //        auto result_table_def_ptr = MakeShared<TableDef>(MakeShared<String>("default_db"), MakeShared<String>("Tables"), nullptr, column_defs);
-    //        query_result.result_table_ = MakeShared<DataTable>(result_table_def_ptr, TableType::kDataTable);
+    //        auto result_table_def_ptr = std::make_shared<TableDef>(std::make_shared<std::string>("default_db"), std::make_shared<std::string>("Tables"), nullptr, column_defs);
+    //        query_result.result_table_ = std::make_shared<DataTable>(result_table_def_ptr, TableType::kDataTable);
     //        query_result.status_ = Status::OK();
     //        return query_result;
     //    }
@@ -3824,7 +3823,7 @@ QueryResult AdminExecutor::SetRole(QueryContext *query_context, const AdminState
     //            break;
     //        }
     //        case NodeRole::kLeader: {
-    //            String node_name = admin_statement->node_name_.value();
+    //            std::string node_name = admin_statement->node_name_.value();
     //            switch (IdentifierValidation(node_name)) {
     //                case IdentifierValidationStatus::kOk:
     //                    break;
@@ -3863,7 +3862,7 @@ QueryResult AdminExecutor::SetRole(QueryContext *query_context, const AdminState
     //            break;
     //        }
     //        case NodeRole::kFollower: {
-    //            String node_name = admin_statement->node_name_.value();
+    //            std::string node_name = admin_statement->node_name_.value();
     //            switch (IdentifierValidation(node_name)) {
     //                case IdentifierValidationStatus::kOk:
     //                    break;
@@ -3885,8 +3884,8 @@ QueryResult AdminExecutor::SetRole(QueryContext *query_context, const AdminState
     //                return query_result;
     //            }
     //
-    //            String leader_address = admin_statement->leader_address_.value();
-    //            String leader_ip;
+    //            std::string leader_address = admin_statement->leader_address_.value();
+    //            std::string leader_ip;
     //            i64 leader_port;
     //            if (!ParseIPPort(leader_address, leader_ip, leader_port)) {
     //                query_result.status_ = Status::InvalidServerAddress(leader_address);
@@ -3908,7 +3907,7 @@ QueryResult AdminExecutor::SetRole(QueryContext *query_context, const AdminState
     //            break;
     //        }
     //        case NodeRole::kLearner: {
-    //            String node_name = admin_statement->node_name_.value();
+    //            std::string node_name = admin_statement->node_name_.value();
     //            switch (IdentifierValidation(node_name)) {
     //                case IdentifierValidationStatus::kOk:
     //                    break;
@@ -3930,8 +3929,8 @@ QueryResult AdminExecutor::SetRole(QueryContext *query_context, const AdminState
     //                return query_result;
     //            }
     //
-    //            String leader_address = admin_statement->leader_address_.value();
-    //            String leader_ip;
+    //            std::string leader_address = admin_statement->leader_address_.value();
+    //            std::string leader_ip;
     //            i64 leader_port;
     //            if (!ParseIPPort(leader_address, leader_ip, leader_port)) {
     //                query_result.status_ = Status::InvalidServerAddress(leader_address);
@@ -3958,8 +3957,8 @@ QueryResult AdminExecutor::SetRole(QueryContext *query_context, const AdminState
     //    }
     //
     //    if (status.ok()) {
-    //        auto result_table_def_ptr = MakeShared<TableDef>(MakeShared<String>("default_db"), MakeShared<String>("Tables"), nullptr, column_defs);
-    //        query_result.result_table_ = MakeShared<DataTable>(result_table_def_ptr, TableType::kDataTable);
+    //        auto result_table_def_ptr = std::make_shared<TableDef>(std::make_shared<std::string>("default_db"), std::make_shared<std::string>("Tables"), nullptr, column_defs);
+    //        query_result.result_table_ = std::make_shared<DataTable>(result_table_def_ptr, TableType::kDataTable);
     //    } else {
     //        query_result.status_ = status;
     //    }

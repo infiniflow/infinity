@@ -43,14 +43,14 @@ namespace {
 
 using namespace infinity;
 
-void ConvertAvgToSumDivideCount(FunctionExpr &func_expression, const Vector<String> &column_names) {
+void ConvertAvgToSumDivideCount(FunctionExpr &func_expression, const std::vector<std::string> &column_names) {
     func_expression.func_name_ = "/";
     func_expression.arguments_->clear();
-    auto createFunctionWithColumnArg = [&column_names](const String &func_name) {
-        auto function_expression = MakeUnique<FunctionExpr>();
+    auto createFunctionWithColumnArg = [&column_names](const std::string &func_name) {
+        auto function_expression = std::make_unique<FunctionExpr>();
         function_expression->func_name_ = func_name;
-        function_expression->arguments_ = new Vector<ParsedExpr *>();
-        auto column_expr = MakeUnique<ColumnExpr>();
+        function_expression->arguments_ = new std::vector<ParsedExpr *>();
+        auto column_expr = std::make_unique<ColumnExpr>();
         column_expr->names_.push_back(column_names[0]);
         function_expression->arguments_->push_back(column_expr.release());
         return function_expression.release();
@@ -63,8 +63,8 @@ void ConvertAvgToSumDivideCount(FunctionExpr &func_expression, const Vector<Stri
 
 namespace infinity {
 
-SharedPtr<BaseExpression> ProjectBinder::BuildExpression(const ParsedExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root) {
-    String expr_name = expr.GetName();
+std::shared_ptr<BaseExpression> ProjectBinder::BuildExpression(const ParsedExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root) {
+    std::string expr_name = expr.GetName();
 
     // Covert avg function expr to (sum / count) function expr
     if (expr.type_ == ParsedExprType::kFunction) {
@@ -78,10 +78,10 @@ SharedPtr<BaseExpression> ProjectBinder::BuildExpression(const ParsedExpr &expr,
         }
         auto function_set_ptr = FunctionSet::GetFunctionSet(query_context_->storage()->new_catalog(), function_expression);
 
-        if (IsEqual(function_set_ptr->name(), String("AVG")) && function_expression.arguments_->size() == 1 &&
+        if (IsEqual(function_set_ptr->name(), std::string("AVG")) && function_expression.arguments_->size() == 1 &&
             (*function_expression.arguments_)[0]->type_ == ParsedExprType::kColumn) {
             auto column_expr = (ColumnExpr *)(*function_expression.arguments_)[0];
-            Vector<String> column_names(std::move(column_expr->names_));
+            std::vector<std::string> column_names(std::move(column_expr->names_));
             delete column_expr;
             ConvertAvgToSumDivideCount(function_expression, column_names);
             return ExpressionBinder::BuildExpression(expr, bind_context_ptr, depth, root);
@@ -90,9 +90,9 @@ SharedPtr<BaseExpression> ProjectBinder::BuildExpression(const ParsedExpr &expr,
     // If the expr isn't from aggregate function and coming from group by lists.
     if (!this->binding_agg_func_ && bind_context_ptr->group_index_by_name_.contains(expr_name)) {
         i64 groupby_index = bind_context_ptr->group_index_by_name_[expr_name];
-        const SharedPtr<BaseExpression> &group_expr = bind_context_ptr->group_exprs_[groupby_index];
+        const std::shared_ptr<BaseExpression> &group_expr = bind_context_ptr->group_exprs_[groupby_index];
 
-        SharedPtr<ColumnExpression> result = ColumnExpression::Make(group_expr->Type(),
+        std::shared_ptr<ColumnExpression> result = ColumnExpression::Make(group_expr->Type(),
                                                                     bind_context_ptr->group_by_table_name_,
                                                                     bind_context_ptr->group_by_table_index_,
                                                                     expr_name,
@@ -106,9 +106,9 @@ SharedPtr<BaseExpression> ProjectBinder::BuildExpression(const ParsedExpr &expr,
     // If the expr is coming from aggregate function list
     if (bind_context_ptr->aggregate_index_by_name_.contains(expr_name)) {
         i64 aggregate_index = bind_context_ptr->aggregate_index_by_name_[expr_name];
-        const SharedPtr<BaseExpression> &aggregate_expr = bind_context_ptr->aggregate_exprs_[aggregate_index];
+        const std::shared_ptr<BaseExpression> &aggregate_expr = bind_context_ptr->aggregate_exprs_[aggregate_index];
 
-        SharedPtr<ColumnExpression> result = ColumnExpression::Make(aggregate_expr->Type(),
+        std::shared_ptr<ColumnExpression> result = ColumnExpression::Make(aggregate_expr->Type(),
                                                                     bind_context_ptr->aggregate_table_name_,
                                                                     bind_context_ptr->aggregate_table_index_,
                                                                     expr_name,
@@ -123,9 +123,9 @@ SharedPtr<BaseExpression> ProjectBinder::BuildExpression(const ParsedExpr &expr,
         expr_name = expr.ToString();
         if (bind_context_ptr->aggregate_index_by_name_.contains(expr_name)) {
             i64 aggregate_index = bind_context_ptr->aggregate_index_by_name_[expr_name];
-            const SharedPtr<BaseExpression> &aggregate_expr = bind_context_ptr->aggregate_exprs_[aggregate_index];
+            const std::shared_ptr<BaseExpression> &aggregate_expr = bind_context_ptr->aggregate_exprs_[aggregate_index];
 
-            SharedPtr<ColumnExpression> result = ColumnExpression::Make(aggregate_expr->Type(),
+            std::shared_ptr<ColumnExpression> result = ColumnExpression::Make(aggregate_expr->Type(),
                                                                         bind_context_ptr->aggregate_table_name_,
                                                                         bind_context_ptr->aggregate_table_index_,
                                                                         expr_name,
@@ -140,13 +140,13 @@ SharedPtr<BaseExpression> ProjectBinder::BuildExpression(const ParsedExpr &expr,
     return ExpressionBinder::BuildExpression(expr, bind_context_ptr, depth, root);
 }
 
-SharedPtr<BaseExpression> ProjectBinder::BuildFuncExpr(const FunctionExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root) {
+std::shared_ptr<BaseExpression> ProjectBinder::BuildFuncExpr(const FunctionExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root) {
     auto special_function = TryBuildSpecialFuncExpr(expr, bind_context_ptr, depth);
     if (special_function.has_value()) {
         return special_function.value();
     }
 
-    SharedPtr<FunctionSet> function_set_ptr = FunctionSet::GetFunctionSet(query_context_->storage()->new_catalog(), expr);
+    std::shared_ptr<FunctionSet> function_set_ptr = FunctionSet::GetFunctionSet(query_context_->storage()->new_catalog(), expr);
     if (function_set_ptr->type_ == FunctionType::kAggregate) {
         if (this->binding_agg_func_) {
             UnrecoverableError(fmt::format("Aggregate function {} is called in another aggregate function.", function_set_ptr->name()));
@@ -157,12 +157,12 @@ SharedPtr<BaseExpression> ProjectBinder::BuildFuncExpr(const FunctionExpr &expr,
     auto func_expr_ptr = ExpressionBinder::BuildFuncExpr(expr, bind_context_ptr, depth, root);
 
     if (function_set_ptr->type_ == FunctionType::kAggregate) {
-        String expr_name = expr.GetName();
+        std::string expr_name = expr.GetName();
         i64 aggregate_index = bind_context_ptr->aggregate_exprs_.size();
         bind_context_ptr->aggregate_exprs_.emplace_back(func_expr_ptr);
         bind_context_ptr->aggregate_index_by_name_[expr_name] = aggregate_index;
 
-        SharedPtr<ColumnExpression> column_expr_ptr = ColumnExpression::Make(func_expr_ptr->Type(),
+        std::shared_ptr<ColumnExpression> column_expr_ptr = ColumnExpression::Make(func_expr_ptr->Type(),
                                                                              bind_context_ptr->aggregate_table_name_,
                                                                              bind_context_ptr->aggregate_table_index_,
                                                                              expr_name,
@@ -178,7 +178,7 @@ SharedPtr<BaseExpression> ProjectBinder::BuildFuncExpr(const FunctionExpr &expr,
     return func_expr_ptr;
 }
 
-SharedPtr<BaseExpression> ProjectBinder::BuildColExpr(const ColumnExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root) {
+std::shared_ptr<BaseExpression> ProjectBinder::BuildColExpr(const ColumnExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root) {
     auto bound_column_expr = ExpressionBinder::BuildColExpr(expr, bind_context_ptr, depth, root);
     if (bound_column_expr.get() != nullptr && bound_column_name_.empty() && !binding_agg_func_) {
         // Not binding Aggregate function argument.
@@ -187,7 +187,7 @@ SharedPtr<BaseExpression> ProjectBinder::BuildColExpr(const ColumnExpr &expr, Bi
     return bound_column_expr;
 }
 
-SharedPtr<BaseExpression> ProjectBinder::BuildUnnestExpr(const FunctionExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root) {
+std::shared_ptr<BaseExpression> ProjectBinder::BuildUnnestExpr(const FunctionExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root) {
     auto col_expr = ExpressionBinder::BuildUnnestExpr(expr, bind_context_ptr, depth, root);
 
     bound_select_statement_->unnest_expressions_.push_back(col_expr);

@@ -37,7 +37,7 @@ TableScanOperatorState::~TableScanOperatorState() = default;
 KnnScanOperatorState::KnnScanOperatorState() : OperatorState(PhysicalOperatorType::kKnnScan) {}
 KnnScanOperatorState::~KnnScanOperatorState() = default;
 
-CompactOperatorState::CompactOperatorState(SharedPtr<CompactStateData> compact_state_data)
+CompactOperatorState::CompactOperatorState(std::shared_ptr<CompactStateData> compact_state_data)
     : OperatorState(PhysicalOperatorType::kCompact), compact_state_data_(compact_state_data) {}
 
 CompactOperatorState::~CompactOperatorState() = default;
@@ -59,7 +59,7 @@ void QueueSourceState::MarkCompletedTask(u64 fragment_id) {
 // A false return value indicate there are more data need to read from source.
 // True or false doesn't mean the source data is error or not.
 bool QueueSourceState::GetData() {
-    SharedPtr<FragmentDataBase> fragment_data_base = nullptr;
+    std::shared_ptr<FragmentDataBase> fragment_data_base = nullptr;
     if (!source_queue_.TryDequeue(fragment_data_base)) {
         UnrecoverableError("This task should not be scheduled if the source queue is empty");
     }

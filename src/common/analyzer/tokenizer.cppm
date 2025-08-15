@@ -24,12 +24,12 @@ constexpr unsigned BYTE_MAX = 255;
 
 export class TokenizeConfig {
 public:
-    void AddAllows(String astr) { allows_ += astr; }
-    void AddDivides(String dstr) { divides_ += dstr; }
-    void AddUnites(String ustr) { unites_ += ustr; }
-    String allows_;
-    String divides_;
-    String unites_;
+    void AddAllows(std::string astr) { allows_ += astr; }
+    void AddDivides(std::string dstr) { divides_ += dstr; }
+    void AddUnites(std::string ustr) { unites_ += ustr; }
+    std::string allows_;
+    std::string divides_;
+    std::string unites_;
 };
 
 export typedef unsigned char CharType;
@@ -60,7 +60,7 @@ public:
 
 export class Tokenizer {
 public:
-    Tokenizer(bool use_def_delim = true) : table_(use_def_delim) { output_buffer_ = MakeUnique<char[]>(output_buffer_size_); }
+    Tokenizer(bool use_def_delim = true) : table_(use_def_delim) { output_buffer_ = std::make_unique<char[]>(output_buffer_size_); }
 
     ~Tokenizer() {}
 
@@ -70,27 +70,27 @@ public:
 
     /// \brief tokenize the input text, call nextToken(), getToken(), getLength() to get the result.
     /// \param input input text string
-    void Tokenize(const String &input);
+    void Tokenize(const std::string &input);
 
     bool NextToken();
 
     inline const char *GetToken() { return output_buffer_.get(); }
 
-    inline SizeT GetLength() { return output_buffer_cursor_; }
+    inline size_t GetLength() { return output_buffer_cursor_; }
 
     inline bool IsDelimiter() { return is_delimiter_; }
 
-    inline SizeT GetTokenStartCursor() const { return token_start_cursor_; }
+    inline size_t GetTokenStartCursor() const { return token_start_cursor_; }
 
-    inline SizeT GetInputCursor() const { return input_cursor_; }
+    inline size_t GetInputCursor() const { return input_cursor_; }
 
-    bool Tokenize(const String &input_string, TermList &special_terms, TermList &prim_terms);
+    bool Tokenize(const std::string &input_string, TermList &special_terms, TermList &prim_terms);
 
     /// \brief tokenize the input text, remove the space chars, output raw term list
-    bool TokenizeWhite(const String &input_string, TermList &raw_terms);
+    bool TokenizeWhite(const std::string &input_string, TermList &raw_terms);
 
     /// \brief tokenize the input text, output two term lists: raw term list and primary term list
-    bool Tokenize(const String &input_string, TermList &prim_terms);
+    bool Tokenize(const std::string &input_string, TermList &prim_terms);
 
 private:
     bool GrowOutputBuffer();
@@ -98,17 +98,17 @@ private:
 private:
     CharTypeTable table_;
 
-    String *input_{nullptr};
+    std::string *input_{nullptr};
 
-    SizeT token_start_cursor_{0};
+    size_t token_start_cursor_{0};
 
-    SizeT input_cursor_{0};
+    size_t input_cursor_{0};
 
-    SizeT output_buffer_size_{4096};
+    size_t output_buffer_size_{4096};
 
-    UniquePtr<char[]> output_buffer_;
+    std::unique_ptr<char[]> output_buffer_;
 
-    SizeT output_buffer_cursor_{0};
+    size_t output_buffer_cursor_{0};
 
     bool is_delimiter_{false};
 };

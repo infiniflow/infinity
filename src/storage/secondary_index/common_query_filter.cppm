@@ -33,38 +33,38 @@ class NewTxn;
 
 export struct CommonQueryFilter {
     NewTxn *new_txn_ptr_ = nullptr;
-    SharedPtr<BaseExpression> original_filter_;
-    SharedPtr<BaseTableRef> base_table_ref_;
+    std::shared_ptr<BaseExpression> original_filter_;
+    std::shared_ptr<BaseTableRef> base_table_ref_;
     // input filter
     // 1. minmax and bloom filter
     bool finish_build_fast_rough_filter_ = false;
-    UniquePtr<FastRoughFilterEvaluator> fast_rough_filter_evaluator_;
+    std::unique_ptr<FastRoughFilterEvaluator> fast_rough_filter_evaluator_;
 
     // 2. filter for datablocks
-    SharedPtr<BaseExpression> leftover_filter_;
+    std::shared_ptr<BaseExpression> leftover_filter_;
 
     // 3. index filter, including:
     // 3.1. secondary index (evaluated once for one segment)
     // 3.2. fulltext index (can perform forward iterate)
     bool finish_build_index_filter_ = false;
-    SharedPtr<BaseExpression> index_filter_;
-    UniquePtr<IndexFilterEvaluator> index_filter_evaluator_;
+    std::shared_ptr<BaseExpression> index_filter_;
+    std::unique_ptr<IndexFilterEvaluator> index_filter_evaluator_;
 
     // result will not be populated if always_true_ be true
     std::atomic_flag finish_build_;
     std::mutex result_mutex_;
-    Map<SegmentID, Bitmask> filter_result_;
-    SizeT filter_result_count_ = 0;
+    std::map<SegmentID, Bitmask> filter_result_;
+    size_t filter_result_count_ = 0;
 
     // task info
-    Vector<SegmentID> tasks_;
+    std::vector<SegmentID> tasks_;
     u32 total_task_num_ = 0;
     std::mutex task_mutex_;
     u32 begin_task_num_ = 0;
     atomic_u32 end_task_num_ = 0;
 
 public:
-    CommonQueryFilter(SharedPtr<BaseExpression> original_filter, SharedPtr<BaseTableRef> base_table_ref, NewTxn* new_txn);
+    CommonQueryFilter(std::shared_ptr<BaseExpression> original_filter, std::shared_ptr<BaseTableRef> base_table_ref, NewTxn* new_txn);
 
     // 1. try to finish building the filter
     // 2. return true if the filter is available for query
@@ -113,7 +113,7 @@ private:
     // for PassFilter
     SegmentID current_segment_id_ = INVALID_SEGMENT_ID;
     const Bitmask *doc_id_bitmask_ = nullptr;
-    UniquePtr<RoaringForwardIterator> current_roaring_iterator_;
+    std::unique_ptr<RoaringForwardIterator> current_roaring_iterator_;
     bool always_true_ = false;
 };
 

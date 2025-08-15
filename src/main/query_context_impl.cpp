@@ -76,18 +76,18 @@ void QueryContext::Init(Config *global_config_ptr,
     cpu_number_limit_ = resource_manager_ptr->GetCpuResource();
     memory_size_limit_ = resource_manager_ptr->GetMemoryResource();
 
-    parser_ = MakeUnique<SQLParser>();
-    logical_planner_ = MakeUnique<LogicalPlanner>(this);
-    optimizer_ = MakeUnique<Optimizer>(this);
-    physical_planner_ = MakeUnique<PhysicalPlanner>(this);
-    fragment_builder_ = MakeUnique<FragmentBuilder>(this);
+    parser_ = std::make_unique<SQLParser>();
+    logical_planner_ = std::make_unique<LogicalPlanner>(this);
+    optimizer_ = std::make_unique<Optimizer>(this);
+    physical_planner_ = std::make_unique<PhysicalPlanner>(this);
+    fragment_builder_ = std::make_unique<FragmentBuilder>(this);
 }
 
-QueryResult QueryContext::Query(const String &query) {
+QueryResult QueryContext::Query(const std::string &query) {
     CreateQueryProfiler();
 
     StartProfile(QueryPhase::kParser);
-    UniquePtr<ParserResult> parsed_result = MakeUnique<ParserResult>();
+    std::unique_ptr<ParserResult> parsed_result = std::make_unique<ParserResult>();
     parser_->Parse(query, parsed_result.get());
 
     if (parsed_result->IsError()) {
@@ -140,7 +140,7 @@ QueryResult QueryContext::QueryStatementInternal(const BaseStatement *base_state
 
             switch (admin_statement->admin_type_) {
                 case AdminStmtType::kShowVariable: {
-                    String var_name = admin_statement->variable_name_.value();
+                    std::string var_name = admin_statement->variable_name_.value();
                     ToLower(var_name);
                     if (var_name == "server_role") {
                         return HandleAdminStatement(admin_statement);
@@ -171,10 +171,10 @@ QueryResult QueryContext::QueryStatementInternal(const BaseStatement *base_state
         }
     }
 
-    Vector<SharedPtr<LogicalNode>> logical_plans{};
-    Vector<UniquePtr<PhysicalOperator>> physical_plans{};
-    SharedPtr<PlanFragment> plan_fragment{};
-    UniquePtr<Notifier> notifier{};
+    std::vector<std::shared_ptr<LogicalNode>> logical_plans{};
+    std::vector<std::unique_ptr<PhysicalOperator>> physical_plans{};
+    std::shared_ptr<PlanFragment> plan_fragment{};
+    std::unique_ptr<Notifier> notifier{};
 
     query_id_ = session_ptr_->query_count();
     //    ProfilerStart("Query");
@@ -212,7 +212,7 @@ QueryResult QueryContext::QueryStatementInternal(const BaseStatement *base_state
 
         // Build unoptimized logical plan for each SQL base_statement.
         StartProfile(QueryPhase::kLogicalPlan);
-        SharedPtr<BindContext> bind_context;
+        std::shared_ptr<BindContext> bind_context;
         auto status = logical_planner_->Build(base_statement, bind_context);
         // FIXME
         if (!status.ok()) {
@@ -241,7 +241,7 @@ QueryResult QueryContext::QueryStatementInternal(const BaseStatement *base_state
         StartProfile(QueryPhase::kPipelineBuild);
         // Fragment Builder, only for test now.
         {
-            Vector<PhysicalOperator *> physical_plan_ptrs;
+            std::vector<PhysicalOperator *> physical_plan_ptrs;
             for (auto &physical_plan : physical_plans) {
                 physical_plan_ptrs.push_back(physical_plan.get());
             }
@@ -250,7 +250,7 @@ QueryResult QueryContext::QueryStatementInternal(const BaseStatement *base_state
         StopProfile(QueryPhase::kPipelineBuild);
 
         StartProfile(QueryPhase::kTaskBuild);
-        notifier = MakeUnique<Notifier>();
+        notifier = std::make_unique<Notifier>();
         FragmentContext::BuildTask(this, nullptr, plan_fragment.get(), notifier.get());
         StopProfile(QueryPhase::kTaskBuild);
         //        LOG_WARN(fmt::format("Before execution cost: {}", profiler.ElapsedToString()));
@@ -328,7 +328,7 @@ void QueryContext::CreateQueryProfiler() {
 
     if (query_profiler_flag or explain_analyze_) {
         if (query_profiler_ == nullptr) {
-            query_profiler_ = MakeShared<QueryProfiler>(query_profiler_flag);
+            query_profiler_ = std::make_shared<QueryProfiler>(query_profiler_flag);
         }
     }
 }
@@ -361,7 +361,7 @@ void QueryContext::StopProfile() {
 bool QueryContext::ExecuteBGStatement(BaseStatement *base_statement, BGQueryState &state) {
     QueryResult query_result;
     try {
-        SharedPtr<BindContext> bind_context;
+        std::shared_ptr<BindContext> bind_context;
         auto status = logical_planner_->Build(base_statement, bind_context);
         if (!status.ok()) {
             RecoverableError(status);
@@ -375,14 +375,14 @@ bool QueryContext::ExecuteBGStatement(BaseStatement *base_statement, BGQueryStat
         }
 
         {
-            Vector<PhysicalOperator *> physical_plan_ptrs;
+            std::vector<PhysicalOperator *> physical_plan_ptrs;
             for (auto &physical_plan : state.physical_plans) {
                 physical_plan_ptrs.push_back(physical_plan.get());
             }
             state.plan_fragment = fragment_builder_->BuildFragment(physical_plan_ptrs);
         }
 
-        state.notifier = MakeUnique<Notifier>();
+        state.notifier = std::make_unique<Notifier>();
         FragmentContext::BuildTask(this, nullptr, state.plan_fragment.get(), state.notifier.get());
 
         scheduler_->Schedule(state.plan_fragment.get(), base_statement);
@@ -426,16 +426,16 @@ QueryResult QueryContext::HandleAdminStatement(const AdminStatement *admin_state
 
 void QueryContext::BeginTxn(const BaseStatement *base_statement) {
     NewTxnManager *txn_manager = storage_->new_txn_manager();
-    UniquePtr<String> txn_text = MakeUnique<String>(base_statement ? base_statement->ToString() : "");
+    std::unique_ptr<std::string> txn_text = std::make_unique<std::string>(base_statement ? base_statement->ToString() : "");
 
-    SharedPtr<NewTxn> new_txn{};
+    std::shared_ptr<NewTxn> new_txn{};
     if (base_statement->type_ == StatementType::kFlush) {
-        new_txn = txn_manager->BeginTxnShared(MakeUnique<String>(base_statement->ToString()), TransactionType::kNewCheckpoint);
+        new_txn = txn_manager->BeginTxnShared(std::make_unique<std::string>(base_statement->ToString()), TransactionType::kNewCheckpoint);
         if (new_txn == nullptr) {
             RecoverableError(Status::FailToStartTxn("System is checkpointing"));
         }
     } else {
-        new_txn = txn_manager->BeginTxnShared(MakeUnique<String>(base_statement->ToString()), TransactionType::kNormal);
+        new_txn = txn_manager->BeginTxnShared(std::make_unique<std::string>(base_statement->ToString()), TransactionType::kNormal);
     }
 
     if (new_txn == nullptr) {

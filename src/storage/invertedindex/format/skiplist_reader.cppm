@@ -32,11 +32,11 @@ public:
     explicit SkipListReader(const DocListFormatOption &doc_list_format_option)
         : has_tf_list_(doc_list_format_option.HasTfList()), has_block_max_(doc_list_format_option.HasBlockMax()) {
         if (has_tf_list_) {
-            ttf_buffer_ = MakeUnique<u32[]>(SKIP_LIST_BUFFER_SIZE);
+            ttf_buffer_ = std::make_unique<u32[]>(SKIP_LIST_BUFFER_SIZE);
         }
         if (has_block_max_) {
-            block_max_tf_buffer_ = MakeUnique<u32[]>(SKIP_LIST_BUFFER_SIZE);
-            block_max_tf_percentage_buffer_ = MakeUnique<u16[]>(SKIP_LIST_BUFFER_SIZE);
+            block_max_tf_buffer_ = std::make_unique<u32[]>(SKIP_LIST_BUFFER_SIZE);
+            block_max_tf_percentage_buffer_ = std::make_unique<u16[]>(SKIP_LIST_BUFFER_SIZE);
         }
     }
 
@@ -68,10 +68,10 @@ public:
 
     // u32: block max tf
     // u16: block max (ceil(tf / doc length) * numeric_limits<u16>::max())
-    Pair<u32, u16> GetBlockMaxInfo() const { return {current_block_max_tf_, current_block_max_tf_percentage_}; }
+    std::pair<u32, u16> GetBlockMaxInfo() const { return {current_block_max_tf_, current_block_max_tf_percentage_}; }
 
 protected:
-    virtual Pair<int, bool> LoadBuffer() = 0;
+    virtual std::pair<int, bool> LoadBuffer() = 0;
 
     const bool has_tf_list_ = false;
     const bool has_block_max_ = false;
@@ -88,9 +88,9 @@ protected:
     u32 num_in_buffer_ = 0;
     u32 doc_id_buffer_[SKIP_LIST_BUFFER_SIZE] = {};
     u32 offset_buffer_[SKIP_LIST_BUFFER_SIZE] = {};
-    UniquePtr<u32[]> ttf_buffer_;
-    UniquePtr<u32[]> block_max_tf_buffer_;
-    UniquePtr<u16[]> block_max_tf_percentage_buffer_;
+    std::unique_ptr<u32[]> ttf_buffer_;
+    std::unique_ptr<u32[]> block_max_tf_buffer_;
+    std::unique_ptr<u16[]> block_max_tf_percentage_buffer_;
 };
 
 export class SkipListReaderByteSlice final : public SkipListReader {
@@ -112,7 +112,7 @@ public:
     u32 GetEnd() const { return end_; }
 
 protected:
-    Pair<int, bool> LoadBuffer() override;
+    std::pair<int, bool> LoadBuffer() override;
 
     ByteSliceReader byte_slice_reader_;
     u32 start_ = 0;
@@ -130,7 +130,7 @@ public:
     void Load(const PostingByteSlice *posting_buffer);
 
 protected:
-    Pair<int, bool> LoadBuffer() override;
+    std::pair<int, bool> LoadBuffer() override;
 
 private:
     PostingByteSlice *skiplist_buffer_ = nullptr;

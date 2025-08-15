@@ -33,28 +33,28 @@ export enum class DiskAnnEncodeType {
     kInvalid,
 };
 
-export String DiskAnnEncodeTypeToString(DiskAnnEncodeType encode_type);
+export std::string DiskAnnEncodeTypeToString(DiskAnnEncodeType encode_type);
 
-export DiskAnnEncodeType StringToDiskAnnEncodeType(const String &str);
+export DiskAnnEncodeType StringToDiskAnnEncodeType(const std::string &str);
 
 export class IndexDiskAnn final : public IndexBase {
 public:
-    static SharedPtr<IndexBase> Make(SharedPtr<String> index_name,
-                                     SharedPtr<String> index_comment,
-                                     const String &file_name,
-                                     Vector<String> column_names,
-                                     const Vector<InitParameter *> &index_param_list);
+    static std::shared_ptr<IndexBase> Make(std::shared_ptr<std::string> index_name,
+                                     std::shared_ptr<std::string> index_comment,
+                                     const std::string &file_name,
+                                     std::vector<std::string> column_names,
+                                     const std::vector<InitParameter *> &index_param_list);
 
-    IndexDiskAnn(SharedPtr<String> index_name,
-                 SharedPtr<String> index_comment,
-                 const String &file_name,
-                 Vector<String> column_names,
+    IndexDiskAnn(std::shared_ptr<std::string> index_name,
+                 std::shared_ptr<std::string> index_comment,
+                 const std::string &file_name,
+                 std::vector<std::string> column_names,
                  MetricType metric_type,
                  DiskAnnEncodeType encode_type,
-                 SizeT R,
-                 SizeT L,
-                 SizeT num_pq_chunks,
-                 SizeT num_parts)
+                 size_t R,
+                 size_t L,
+                 size_t num_pq_chunks,
+                 size_t num_parts)
         : IndexBase(IndexType::kDiskAnn, index_name, index_comment, file_name, std::move(column_names)), metric_type_(metric_type),
           encode_type_(encode_type), R_(R), L_(L), num_pq_chunks_(num_pq_chunks), num_parts_(num_parts) {}
 
@@ -69,22 +69,22 @@ public:
 
     virtual void WriteAdv(char *&ptr) const override;
 
-    virtual String ToString() const override;
+    virtual std::string ToString() const override;
 
-    virtual String BuildOtherParamsString() const override;
+    virtual std::string BuildOtherParamsString() const override;
 
     virtual nlohmann::json Serialize() const override;
 
 public:
-    static void ValidateColumnDataType(const SharedPtr<BaseTableRef> &base_table_ref, const String &column_name);
+    static void ValidateColumnDataType(const std::shared_ptr<BaseTableRef> &base_table_ref, const std::string &column_name);
 
 public:
     const MetricType metric_type_{MetricType::kInvalid};
     DiskAnnEncodeType encode_type_{DiskAnnEncodeType::kInvalid};
-    const SizeT R_{};             // degree of the graph
-    const SizeT L_{};             // length of the candidates list
-    const SizeT num_pq_chunks_{}; // dimension cut blocks by pq
-    const SizeT num_parts_{};     // Number of dataset slices when building the Vamana index
+    const size_t R_{};             // degree of the graph
+    const size_t L_{};             // length of the candidates list
+    const size_t num_pq_chunks_{}; // dimension cut blocks by pq
+    const size_t num_parts_{};     // Number of dataset slices when building the Vamana index
 };
 
 } // namespace infinity

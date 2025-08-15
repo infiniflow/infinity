@@ -12,11 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:data_access_state;
 
-import :stl;
 import :data_block;
 import :column_vector;
 
@@ -25,13 +22,13 @@ import internal_types;
 namespace infinity {
 
 export struct DeleteState {
-    //    HashMap<u64, Vector<RowID>> rows_; // key is pair<segment_id, block_id>
-    // HashMap<<segment, block_id>, block_offset>
-    HashMap<SegmentID, HashMap<BlockID, Vector<BlockOffset>>> rows_; // use segment id, as the first level key, block id as the second level key
+    //    std::unordered_map<u64, std::vector<RowID>> rows_; // key is pair<segment_id, block_id>
+    // std::unordered_map<<segment, block_id>, block_offset>
+    std::unordered_map<SegmentID, std::unordered_map<BlockID, std::vector<BlockOffset>>> rows_; // use segment id, as the first level key, block id as the second level key
 };
 
 export struct AccessState {
-    HashMap<SegmentID, HashMap<BlockID, Vector<BlockOffset>>> rows_;
+    std::unordered_map<SegmentID, std::unordered_map<BlockID, std::vector<BlockOffset>>> rows_;
 };
 
 export enum class ScanStateType {

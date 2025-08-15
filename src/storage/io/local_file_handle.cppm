@@ -12,13 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:local_file_handle;
 
-import :stl;
 import :status;
 
+import std;
+import std.compat;
 import global_resource_usage;
 
 namespace infinity {
@@ -27,7 +26,7 @@ export enum class FileAccessMode { kWrite, kRead, kMmapRead, kInvalid };
 
 export class LocalFileHandle {
 public:
-    LocalFileHandle(i32 fd, const String &path, FileAccessMode file_access_mode) : fd_(fd), path_(path), access_mode_(file_access_mode) {
+    LocalFileHandle(i32 fd, const std::string &path, FileAccessMode file_access_mode) : fd_(fd), path_(path), access_mode_(file_access_mode) {
 #ifdef INFINITY_DEBUG
         GlobalResourceUsage::IncrObjectCount("LocalFileHandle");
 #endif
@@ -35,26 +34,26 @@ public:
     ~LocalFileHandle();
 
     Status Append(const void *buffer, u64 nbytes);
-    Status Append(const String &buffer, u64 nbytes);
-    Tuple<SizeT, Status> Read(void *buffer, u64 nbytes);
-    Tuple<SizeT, Status> Read(String &buffer, u64 nbytes);
+    Status Append(const std::string &buffer, u64 nbytes);
+    std::tuple<size_t, Status> Read(void *buffer, u64 nbytes);
+    std::tuple<size_t, Status> Read(std::string &buffer, u64 nbytes);
     Status Seek(u64 nbytes);
     i64 FileSize();
-    Tuple<char *, SizeT, Status> MmapRead(const String &name);
-    Status Unmmap(const String &name);
+    std::tuple<char *, size_t, Status> MmapRead(const std::string &name);
+    Status Unmmap(const std::string &name);
     Status Sync();
 
 public:
     i32 FileDescriptor() const { return fd_; }
 
-    String Path() const { return path_; }
+    std::string Path() const { return path_; }
 
 private:
     Status Close();
 
 private:
     i32 fd_{-1};
-    String path_{};
+    std::string path_{};
     FileAccessMode access_mode_{FileAccessMode::kInvalid};
 };
 

@@ -35,72 +35,72 @@ class MemIndex;
 
 export struct MemIndexTracerInfo {
 public:
-    MemIndexTracerInfo(SharedPtr<String> index_name, SharedPtr<String> table_name, SharedPtr<String> db_name, SizeT mem_used, SizeT row_count)
+    MemIndexTracerInfo(std::shared_ptr<std::string> index_name, std::shared_ptr<std::string> table_name, std::shared_ptr<std::string> db_name, size_t mem_used, size_t row_count)
         : index_name_(std::move(index_name)), table_name_(std::move(table_name)), db_name_(std::move(db_name)), mem_used_(mem_used),
           row_count_(row_count) {}
-    SharedPtr<String> index_name_;
-    SharedPtr<String> table_name_;
-    SharedPtr<String> db_name_;
-    SizeT mem_used_;
-    SizeT row_count_;
+    std::shared_ptr<std::string> index_name_;
+    std::shared_ptr<std::string> table_name_;
+    std::shared_ptr<std::string> db_name_;
+    size_t mem_used_;
+    size_t row_count_;
 };
 
 export struct MemIndexDetail {
-    SharedPtr<MemIndex> mem_index_;
-    String db_name_{};
-    String table_name_{};
-    String index_name_{};
+    std::shared_ptr<MemIndex> mem_index_;
+    std::string db_name_{};
+    std::string table_name_{};
+    std::string index_name_{};
     SegmentID segment_id_{};
     RowID begin_row_id_{};
-    SizeT mem_used_{};
-    SizeT row_count_{};
+    size_t mem_used_{};
+    size_t row_count_{};
     bool is_emvb_index_{};
 };
 
 export class MemIndexTracer {
 public:
-    MemIndexTracer(SizeT index_memory_limit) : index_memory_limit_(index_memory_limit) {}
+    MemIndexTracer(size_t index_memory_limit) : index_memory_limit_(index_memory_limit) {}
 
     virtual ~MemIndexTracer() = default;
 
     // Need call only once after construction.
     void InitMemUsed();
 
-    void DecreaseMemUsed(SizeT mem_dec);
+    void DecreaseMemUsed(size_t mem_dec);
 
-    void IncreaseMemoryUsage(SizeT mem_inc);
+    void IncreaseMemoryUsage(size_t mem_inc);
 
 private:
     bool TryTriggerDump();
 
 public:
-    void DumpDone(SharedPtr<MemIndex> mem_index);
+    void DumpDone(std::shared_ptr<MemIndex> mem_index);
 
-    Vector<MemIndexTracerInfo> GetMemIndexTracerInfo(NewTxn *txn);
+    std::vector<MemIndexTracerInfo> GetMemIndexTracerInfo(NewTxn *txn);
 
-    virtual void TriggerDump(SharedPtr<DumpMemIndexTask> task) = 0;
+    virtual void TriggerDump(std::shared_ptr<DumpMemIndexTask> task) = 0;
 
 protected:
     virtual NewTxn *GetTxn() = 0;
 
-    virtual Vector<SharedPtr<MemIndexDetail>> GetAllMemIndexes(NewTxn *new_txn) = 0;
+    virtual std::vector<std::shared_ptr<MemIndexDetail>> GetAllMemIndexes(NewTxn *new_txn) = 0;
 
-    using MemIndexMapIter = HashSet<BaseMemIndex *>::iterator;
+    using MemIndexMapIter = std::unordered_set<BaseMemIndex *>::iterator;
 
-    Vector<SharedPtr<DumpMemIndexTask>> MakeDumpTask();
+    std::vector<std::shared_ptr<DumpMemIndexTask>> MakeDumpTask();
 
-    static SizeT ChooseDump(const Vector<BaseMemIndex *> &mem_indexes);
+    static size_t ChooseDump(const std::vector<BaseMemIndex *> &mem_indexes);
 
 protected:
-    const SizeT index_memory_limit_;
+    const size_t index_memory_limit_;
 
     mutable std::mutex mtx_; // protect cur_index_memory_, proposed_dump_ and proposed_dump_size_
-    SizeT cur_index_memory_ = 0;
-    HashMap<SharedPtr<MemIndex>, SizeT> proposed_dump_{};
-    SizeT proposed_dump_size_ = 0;
+    size_t cur_index_memory_ = 0;
+    std::unordered_map<std::shared_ptr<MemIndex>, size_t> proposed_dump_{};
+    size_t proposed_dump_size_ = 0;
 };
 
-inline void MemIndexTracer::IncreaseMemoryUsage(SizeT mem_inc) {
+inline void MemIndexTracer::IncreaseMemoryUsage(size_t mem_inc) {
     bool need_trigger_dump = false;
     {
         std::lock_guard lck(mtx_);
@@ -127,16 +127,16 @@ inline void MemIndexTracer::IncreaseMemoryUsage(SizeT mem_inc) {
 
 export class BGMemIndexTracer : public MemIndexTracer {
 public:
-    BGMemIndexTracer(SizeT index_memory_limit, NewTxnManager *txn_mgr);
+    BGMemIndexTracer(size_t index_memory_limit, NewTxnManager *txn_mgr);
 
     ~BGMemIndexTracer() override;
 
-    void TriggerDump(SharedPtr<DumpMemIndexTask> task) override;
+    void TriggerDump(std::shared_ptr<DumpMemIndexTask> task) override;
 
 protected:
     NewTxn *GetTxn() override;
 
-    Vector<SharedPtr<MemIndexDetail>> GetAllMemIndexes(NewTxn *new_txn) override;
+    std::vector<std::shared_ptr<MemIndexDetail>> GetAllMemIndexes(NewTxn *new_txn) override;
 
 private:
     NewTxnManager *txn_mgr_;

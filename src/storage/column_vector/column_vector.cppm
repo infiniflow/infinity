@@ -12,15 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
-#include <compare>
-#include <concepts>
-#include <vector>
-
 export module infinity_core:column_vector;
 
-import :stl;
 import :vector_buffer;
 import :roaring_bitmap;
 import :selection;
@@ -31,7 +24,7 @@ import :infinity_exception;
 import :var_buffer;
 import :sparse_util;
 
-// import std;
+import std;
 import third_party;
 
 import internal_types;
@@ -71,39 +64,39 @@ export enum class ColumnVectorType : i8 {
 // Basic unit of column data vector
 export struct ColumnVector {
 public:
-    static SharedPtr<ColumnVector> Make(SharedPtr<DataType> data_type);
+    static std::shared_ptr<ColumnVector> Make(std::shared_ptr<DataType> data_type);
 
 public:
-    SizeT data_type_size_{0};
+    size_t data_type_size_{0};
 
     // this buffer is holding the data
-    SharedPtr<VectorBuffer> buffer_{nullptr};
+    std::shared_ptr<VectorBuffer> buffer_{nullptr};
 
     // A bitmap to indicate the null information
     // true: row is not null
     // false: row is null
     // initial state: all true
-    SharedPtr<Bitmask> nulls_ptr_{nullptr};
+    std::shared_ptr<Bitmask> nulls_ptr_{nullptr};
 
     bool initialized{false};
 
 private:
     ColumnVectorType vector_type_{ColumnVectorType::kInvalid};
 
-    SharedPtr<DataType> data_type_{};
+    std::shared_ptr<DataType> data_type_{};
 
     // Only a pointer to the real data in vector buffer
-    ptr_t data_ptr_{nullptr};
+    char *data_ptr_{nullptr};
 
-    SizeT capacity_{0};
+    size_t capacity_{0};
 
-    Atomic<SizeT> tail_index_{0};
+    std::atomic<size_t> tail_index_{0};
 
 public:
     ColumnVector();
 
     // Construct a column vector without initialization;
-    explicit ColumnVector(SharedPtr<DataType> data_type);
+    explicit ColumnVector(std::shared_ptr<DataType> data_type);
 
     // used in BatchInvertTask::BatchInvertTask, keep ObjectCount correct
     ColumnVector(const ColumnVector &right);
@@ -115,7 +108,7 @@ public:
 
     ~ColumnVector();
 
-    String ToString() const;
+    std::string ToString() const;
 
     void AppendWith(const ColumnVector &other);
 
@@ -126,51 +119,51 @@ public:
     static VectorBufferType GetVectorBufferType(const DataType &data_type);
 
 private:
-    VectorBufferType InitializeHelper(ColumnVectorType vector_type, SizeT capacity);
+    VectorBufferType InitializeHelper(ColumnVectorType vector_type, size_t capacity);
 
 public:
-    void Initialize(ColumnVectorType vector_type = ColumnVectorType::kFlat, SizeT capacity = DEFAULT_VECTOR_SIZE);
+    void Initialize(ColumnVectorType vector_type = ColumnVectorType::kFlat, size_t capacity = DEFAULT_VECTOR_SIZE);
 
     void Initialize(BufferObj *buffer_obj,
                     BufferObj *outline_buffer_obj,
-                    SizeT current_row_count,
+                    size_t current_row_count,
                     ColumnVectorMode vector_tipe = ColumnVectorMode::kReadWrite,
                     ColumnVectorType vector_type = ColumnVectorType::kFlat,
-                    SizeT capacity = DEFAULT_VECTOR_SIZE);
+                    size_t capacity = DEFAULT_VECTOR_SIZE);
 
     void SetToCatalog(BufferObj *buffer_obj, BufferObj *outline_buffer_obj, ColumnVectorMode vector_tipe);
 
     void Initialize(const ColumnVector &other, const Selection &input_select);
 
-    void Initialize(ColumnVectorType vector_type, const ColumnVector &other, SizeT start_idx, SizeT end_idx);
+    void Initialize(ColumnVectorType vector_type, const ColumnVector &other, size_t start_idx, size_t end_idx);
 
-    void Initialize(const ColumnVector &other, SizeT start_idx, SizeT end_idx) { Initialize(other.vector_type_, other, start_idx, end_idx); }
+    void Initialize(const ColumnVector &other, size_t start_idx, size_t end_idx) { Initialize(other.vector_type_, other, start_idx, end_idx); }
 
-    String ToString(SizeT row_index) const;
+    std::string ToString(size_t row_index) const;
 
     // Return the <index> of the vector
     // Since it will construct a new Value object, this function shouldn't be used in vectorized computation.
     // Directly uses data_ptr in vectorized computation.
-    Value GetValueByIndex(SizeT index) const;
+    Value GetValueByIndex(size_t index) const;
 
     // Set the <index> element of the vector to the specified value.
-    void SetValueByIndex(SizeT index, const Value &value);
+    void SetValueByIndex(size_t index, const Value &value);
 
-    void Finalize(SizeT index);
+    void Finalize(size_t index);
 
-    void AppendByPtr(const_ptr_t value_ptr);
+    void AppendByPtr(const char *value_ptr);
 
     void AppendByStringView(std::string_view sv);
 
     void AppendByConstantExpr(const ConstantExpr *const_expr);
 
-    void AppendWith(const ColumnVector &other, SizeT start_row, SizeT count);
+    void AppendWith(const ColumnVector &other, size_t start_row, size_t count);
 
     // input parameter:
     // from - start RowID
     // count - total row count to be copied. These rows shall be in the same BlockEntry.
     // return value: appended rows actually
-    SizeT AppendWith(RowID from, SizeT count);
+    size_t AppendWith(RowID from, size_t count);
 
     void ShallowCopy(const ColumnVector &other);
 
@@ -186,43 +179,44 @@ public:
     void WriteAdv(char *&ptr) const;
 
     // Read from a serialized version
-    static SharedPtr<ColumnVector> ReadAdv(const char *&ptr, i32 maxbytes);
+    static std::shared_ptr<ColumnVector> ReadAdv(const char *&ptr, i32 maxbytes);
 
 public:
-    static void SetMultiVector(MultiVectorT &dest_multi_vec, VectorBuffer *dest_buffer, Span<const char> data, const EmbeddingInfo *embedding_info);
+    static void
+    SetMultiVector(MultiVectorT &dest_multi_vec, VectorBuffer *dest_buffer, std::span<const char> data, const EmbeddingInfo *embedding_info);
 
-    static Pair<Span<const char>, SizeT>
+    static std::pair<std::span<const char>, size_t>
     GetMultiVector(const MultiVectorT &multi_vec, const VectorBuffer *buffer, const EmbeddingInfo *embedding_info);
 
-    static void SetTensor(TensorT &dest_tensor, VectorBuffer *dest_buffer, Span<const char> data, const EmbeddingInfo *embedding_info);
+    static void SetTensor(TensorT &dest_tensor, VectorBuffer *dest_buffer, std::span<const char> data, const EmbeddingInfo *embedding_info);
 
-    static Pair<Span<const char>, SizeT> GetTensor(const TensorT &tensor, const VectorBuffer *buffer, const EmbeddingInfo *embedding_info);
+    static std::pair<std::span<const char>, size_t> GetTensor(const TensorT &tensor, const VectorBuffer *buffer, const EmbeddingInfo *embedding_info);
 
-    static void SetTensorArrayMeta(TensorArrayT &dest_tensor_array, VectorBuffer *dest_buffer, Span<const TensorT> tensors);
+    static void SetTensorArrayMeta(TensorArrayT &dest_tensor_array, VectorBuffer *dest_buffer, std::span<const TensorT> tensors);
 
-    static Vector<TensorT> GetTensorArrayMeta(const TensorArrayT &src_tensor_array, const VectorBuffer *src_buffer);
+    static std::vector<TensorT> GetTensorArrayMeta(const TensorArrayT &src_tensor_array, const VectorBuffer *src_buffer);
 
     static void SetTensorArray(TensorArrayT &dest_tensor_array,
                                VectorBuffer *dest_buffer,
-                               const Vector<Span<const char>> &data,
+                               const std::vector<std::span<const char>> &data,
                                const EmbeddingInfo *embedding_info);
 
-    static Vector<Pair<Span<const char>, SizeT>>
+    static std::vector<std::pair<std::span<const char>, size_t>>
     GetTensorArray(const TensorArrayT &src_tensor_array, const VectorBuffer *src_buffer, const EmbeddingInfo *embedding_info);
 
-    static Pair<Span<const char>, SizeT> GetArray(const ArrayT &src_array, const VectorBuffer *src_buffer, const ArrayInfo *array_info);
+    static std::pair<std::span<const char>, size_t> GetArray(const ArrayT &src_array, const VectorBuffer *src_buffer, const ArrayInfo *array_info);
 
-    Pair<Span<const char>, SizeT> GetMultiVectorRaw(SizeT idx) const;
+    std::pair<std::span<const char>, size_t> GetMultiVectorRaw(size_t idx) const;
 
-    Pair<Span<const char>, SizeT> GetTensorRaw(SizeT idx) const;
+    std::pair<std::span<const char>, size_t> GetTensorRaw(size_t idx) const;
 
-    Vector<Pair<Span<const char>, SizeT>> GetTensorArrayRaw(SizeT idx) const;
+    std::vector<std::pair<std::span<const char>, size_t>> GetTensorArrayRaw(size_t idx) const;
 
     Value GetArrayValue(const ArrayT &source) const;
 
     void SetArrayValue(ArrayT &target, const Value &value);
 
-    bool AppendUnnestArray(const ColumnVector &other, SizeT offset, SizeT &array_offset);
+    bool AppendUnnestArray(const ColumnVector &other, size_t offset, size_t &array_offset);
 
 private:
     Value GetArrayValueRecursively(const DataType &data_type, const char *data_ptr) const;
@@ -230,105 +224,105 @@ private:
     void SetArrayValueRecursively(const Value &value, char *dst_ptr);
 
     template <typename T>
-    static void CopyValue(ColumnVector &dst, const ColumnVector &src, SizeT from, SizeT count);
+    static void CopyValue(ColumnVector &dst, const ColumnVector &src, size_t from, size_t count);
 
     template <typename T>
-    void AppendEmbedding(const Vector<std::string_view> &ele_str_views, SizeT dst_off);
+    void AppendEmbedding(const std::vector<std::string_view> &ele_str_views, size_t dst_off);
 
     template <typename T>
-    void AppendMultiVector(const Vector<std::string_view> &ele_str_views, SizeT dst_off, const EmbeddingInfo *embedding_info);
+    void AppendMultiVector(const std::vector<std::string_view> &ele_str_views, size_t dst_off, const EmbeddingInfo *embedding_info);
 
     template <typename T>
-    void AppendTensor(const Vector<std::string_view> &ele_str_views, SizeT dst_off, const EmbeddingInfo *embedding_info);
+    void AppendTensor(const std::vector<std::string_view> &ele_str_views, size_t dst_off, const EmbeddingInfo *embedding_info);
 
     template <typename T>
-    void AppendTensorArray(const Vector<Vector<std::string_view>> &ele_str_views, SizeT dst_off, const EmbeddingInfo *embedding_info);
+    void AppendTensorArray(const std::vector<std::vector<std::string_view>> &ele_str_views, size_t dst_off, const EmbeddingInfo *embedding_info);
 
     template <typename T>
-    void AppendSparse(const Vector<std::string_view> &ele_str_views, SizeT dst_off);
+    void AppendSparse(const std::vector<std::string_view> &ele_str_views, size_t dst_off);
 
     template <typename DataT, typename IdxT>
-    void AppendSparse(const Vector<std::string_view> &ele_str_views, SizeT dst_off);
+    void AppendSparse(const std::vector<std::string_view> &ele_str_views, size_t dst_off);
 
 public:
     template <typename DataT, typename IdxT>
-    void AppendSparseInner(SizeT nnz, const DataT *data, const IdxT *index, SparseT &sparse);
+    void AppendSparseInner(size_t nnz, const DataT *data, const IdxT *index, SparseT &sparse);
 
     template <typename DataT, typename IdxT>
-    void AppendSparseInner(SizeT nnz, const DataT *data, const IdxT *index, SizeT dst_off) {
+    void AppendSparseInner(size_t nnz, const DataT *data, const IdxT *index, size_t dst_off) {
         auto &sparse = reinterpret_cast<SparseT *>(data_ptr_)[dst_off];
         AppendSparseInner(nnz, data, index, sparse);
     }
 
     template <typename DataT, typename IdxT>
-    void AppendSparse(SizeT nnz, const DataT *data, const IdxT *index) {
-        SizeT dst_off = tail_index_.fetch_add(1);
+    void AppendSparse(size_t nnz, const DataT *data, const IdxT *index) {
+        size_t dst_off = tail_index_.fetch_add(1);
         AppendSparseInner(nnz, data, index, dst_off);
     }
 
-    void AppendSparseRaw(const char *raw_data_ptr, const char *raw_index_ptr, SizeT nnz, SizeT dst_off);
+    void AppendSparseRaw(const char *raw_data_ptr, const char *raw_index_ptr, size_t nnz, size_t dst_off);
 
-    Tuple<Span<const char>, Span<const char>, SizeT> GetSparseRaw(SizeT index) const;
+    std::tuple<std::span<const char>, std::span<const char>, size_t> GetSparseRaw(size_t index) const;
 
 public:
-    void AppendVarcharInner(Span<const char> data, VarcharT &varchar);
+    void AppendVarcharInner(std::span<const char> data, VarcharT &varchar);
 
-    void AppendVarcharInner(Span<const char> data, SizeT dst_off);
+    void AppendVarcharInner(std::span<const char> data, size_t dst_off);
 
-    void AppendVarchar(Span<const char> data);
+    void AppendVarchar(std::span<const char> data);
 
-    Span<const char> GetVarcharInner(const VarcharT &varchar) const;
+    std::span<const char> GetVarcharInner(const VarcharT &varchar) const;
 
-    Span<const char> GetVarchar(SizeT index) const;
+    std::span<const char> GetVarchar(size_t index) const;
 
-    ptr_t GetRawPtr(SizeT index);
+    char *GetRawPtr(size_t index);
 
 private:
     // Used by Append by Ptr
-    void SetByRawPtr(SizeT index, const_ptr_t raw_ptr);
+    void SetByRawPtr(size_t index, const char *raw_ptr);
 
-    void CopyRow(const ColumnVector &other, SizeT dst_idx, SizeT src_idx);
+    void CopyRow(const ColumnVector &other, size_t dst_idx, size_t src_idx);
 
     template <typename DataT>
-    inline void CopyFrom(const VectorBuffer *__restrict src_buf, VectorBuffer *__restrict dst_buf, SizeT count, const Selection &input_select);
+    inline void CopyFrom(const VectorBuffer *__restrict src_buf, VectorBuffer *__restrict dst_buf, size_t count, const Selection &input_select);
 
     template <typename DataT>
     inline void
-    CopyFrom(const VectorBuffer *__restrict src_buf, VectorBuffer *__restrict dst_buf, SizeT source_start_idx, SizeT dest_start_idx, SizeT count);
+    CopyFrom(const VectorBuffer *__restrict src_buf, VectorBuffer *__restrict dst_buf, size_t source_start_idx, size_t dest_start_idx, size_t count);
 
     template <typename DataT>
-    inline void CopyRowFrom(const VectorBuffer *__restrict src_buf, SizeT src_idx, VectorBuffer *__restrict dst_buf, SizeT dst_idx);
+    inline void CopyRowFrom(const VectorBuffer *__restrict src_buf, size_t src_idx, VectorBuffer *__restrict dst_buf, size_t dst_idx);
 
 public:
     [[nodiscard]] const inline ColumnVectorType &vector_type() const { return vector_type_; }
 
-    [[nodiscard]] const inline SharedPtr<DataType> data_type() const { return data_type_; }
+    [[nodiscard]] const inline std::shared_ptr<DataType> data_type() const { return data_type_; }
 
-    [[nodiscard]] inline ptr_t data() const { return data_ptr_; }
+    [[nodiscard]] inline char *data() const { return data_ptr_; }
 
-    [[nodiscard]] inline SizeT capacity() const { return capacity_; }
+    [[nodiscard]] inline size_t capacity() const { return capacity_; }
 
-    [[nodiscard]] inline SizeT Size() const { return tail_index_.load(); }
+    [[nodiscard]] inline size_t Size() const { return tail_index_.load(); }
 };
 
 template <typename T>
-void ColumnVector::CopyValue(ColumnVector &dst, const ColumnVector &src, SizeT from, SizeT count) {
+void ColumnVector::CopyValue(ColumnVector &dst, const ColumnVector &src, size_t from, size_t count) {
     auto *src_ptr = (T *)(src.data_ptr_);
     T *dst_ptr = &((T *)(dst.data_ptr_))[dst.tail_index_.load()];
     if (src.vector_type() == ColumnVectorType::kConstant && src.tail_index_.load() == 1) {
-        for (SizeT idx = 0; idx < count; ++idx) {
+        for (size_t idx = 0; idx < count; ++idx) {
             dst_ptr[idx] = src_ptr[from];
         }
     } else {
-        for (SizeT idx = 0; idx < count; ++idx) {
+        for (size_t idx = 0; idx < count; ++idx) {
             dst_ptr[idx] = src_ptr[from + idx];
         }
     }
 }
 
 template <typename T>
-void ColumnVector::AppendEmbedding(const Vector<std::string_view> &ele_str_views, SizeT dst_off) {
-    for (SizeT i = 0; auto &ele_str_view : ele_str_views) {
+void ColumnVector::AppendEmbedding(const std::vector<std::string_view> &ele_str_views, size_t dst_off) {
+    for (size_t i = 0; auto &ele_str_view : ele_str_views) {
         T value = DataType::StringToValue<T>(ele_str_view);
         ((T *)(data_ptr_ + dst_off))[i] = value;
         ++i;
@@ -336,11 +330,11 @@ void ColumnVector::AppendEmbedding(const Vector<std::string_view> &ele_str_views
 }
 
 template <>
-void ColumnVector::AppendEmbedding<BooleanT>(const Vector<std::string_view> &ele_str_views, SizeT dst_off) {
+void ColumnVector::AppendEmbedding<BooleanT>(const std::vector<std::string_view> &ele_str_views, size_t dst_off) {
     const auto bit_bytes = (ele_str_views.size() + 7) / 8;
     auto data_ptr = reinterpret_cast<u8 *>(data_ptr_ + dst_off);
     std::fill_n(data_ptr, bit_bytes, 0);
-    for (SizeT i = 0; auto &ele_str_view : ele_str_views) {
+    for (size_t i = 0; auto &ele_str_view : ele_str_views) {
         if (const auto value = DataType::StringToValue<float>(ele_str_view); value) {
             data_ptr[i / 8] |= (1u << (i % 8));
         }
@@ -349,11 +343,11 @@ void ColumnVector::AppendEmbedding<BooleanT>(const Vector<std::string_view> &ele
 }
 
 template <typename T>
-Pair<UniquePtr<char[]>, SizeT> StrToTensor(const Vector<std::string_view> &ele_str_views, const EmbeddingInfo *embedding_info) {
-    SizeT total_element_count = ele_str_views.size();
-    auto tmp_data = MakeUniqueForOverwrite<char[]>(total_element_count * sizeof(T));
+std::pair<std::unique_ptr<char[]>, size_t> StrToTensor(const std::vector<std::string_view> &ele_str_views, const EmbeddingInfo *embedding_info) {
+    size_t total_element_count = ele_str_views.size();
+    auto tmp_data = std::make_unique_for_overwrite<char[]>(total_element_count * sizeof(T));
     auto *ptr = reinterpret_cast<T *>(tmp_data.get());
-    for (SizeT i = 0; auto &ele_str_view : ele_str_views) {
+    for (size_t i = 0; auto &ele_str_view : ele_str_views) {
         ptr[i] = DataType::StringToValue<T>(ele_str_view);
         ++i;
     }
@@ -361,11 +355,12 @@ Pair<UniquePtr<char[]>, SizeT> StrToTensor(const Vector<std::string_view> &ele_s
 }
 
 template <>
-Pair<UniquePtr<char[]>, SizeT> StrToTensor<bool>(const Vector<std::string_view> &ele_str_views, const EmbeddingInfo *embedding_info) {
-    SizeT total_element_count = ele_str_views.size();
-    SizeT bit_bytes = (total_element_count + 7) / 8;
-    auto tmp_data = MakeUnique<char[]>(bit_bytes);
-    for (SizeT i = 0; auto &ele_str_view : ele_str_views) {
+std::pair<std::unique_ptr<char[]>, size_t> StrToTensor<bool>(const std::vector<std::string_view> &ele_str_views,
+                                                             const EmbeddingInfo *embedding_info) {
+    size_t total_element_count = ele_str_views.size();
+    size_t bit_bytes = (total_element_count + 7) / 8;
+    auto tmp_data = std::make_unique<char[]>(bit_bytes);
+    for (size_t i = 0; auto &ele_str_view : ele_str_views) {
         if (const auto value = DataType::StringToValue<float>(ele_str_view); value) {
             tmp_data[i / 8] |= (1u << (i % 8));
         }
@@ -375,37 +370,39 @@ Pair<UniquePtr<char[]>, SizeT> StrToTensor<bool>(const Vector<std::string_view> 
 }
 
 template <typename T>
-void ColumnVector::AppendMultiVector(const Vector<std::string_view> &ele_str_views, SizeT dst_off, const EmbeddingInfo *embedding_info) {
+void ColumnVector::AppendMultiVector(const std::vector<std::string_view> &ele_str_views, size_t dst_off, const EmbeddingInfo *embedding_info) {
     MultiVectorT &target_multivector = reinterpret_cast<MultiVectorT *>(data_ptr_)[dst_off];
     auto [data, data_bytes] = StrToTensor<T>(ele_str_views, embedding_info);
-    Span<const char> data_span(data.get(), data_bytes);
+    std::span<const char> data_span(data.get(), data_bytes);
     ColumnVector::SetMultiVector(target_multivector, buffer_.get(), data_span, embedding_info);
 }
 
 template <typename T>
-void ColumnVector::AppendTensor(const Vector<std::string_view> &ele_str_views, SizeT dst_off, const EmbeddingInfo *embedding_info) {
+void ColumnVector::AppendTensor(const std::vector<std::string_view> &ele_str_views, size_t dst_off, const EmbeddingInfo *embedding_info) {
     TensorT &target_tensor = reinterpret_cast<TensorT *>(data_ptr_)[dst_off];
     auto [data, data_bytes] = StrToTensor<T>(ele_str_views, embedding_info);
-    Span<const char> data_span(data.get(), data_bytes);
+    std::span<const char> data_span(data.get(), data_bytes);
     ColumnVector::SetTensor(target_tensor, buffer_.get(), data_span, embedding_info);
 }
 
 template <typename T>
-void ColumnVector::AppendTensorArray(const Vector<Vector<std::string_view>> &ele_str_views, SizeT dst_off, const EmbeddingInfo *embedding_info) {
+void ColumnVector::AppendTensorArray(const std::vector<std::vector<std::string_view>> &ele_str_views,
+                                     size_t dst_off,
+                                     const EmbeddingInfo *embedding_info) {
     TensorArrayT &target_tensor_array = reinterpret_cast<TensorArrayT *>(data_ptr_)[dst_off];
-    SizeT total_tensor_count = ele_str_views.size();
-    Vector<UniquePtr<char[]>> tensors(total_tensor_count);
-    Vector<Span<const char>> tensor_spans(total_tensor_count);
-    for (SizeT i = 0; i < total_tensor_count; ++i) {
+    size_t total_tensor_count = ele_str_views.size();
+    std::vector<std::unique_ptr<char[]>> tensors(total_tensor_count);
+    std::vector<std::span<const char>> tensor_spans(total_tensor_count);
+    for (size_t i = 0; i < total_tensor_count; ++i) {
         auto [data, data_bytes] = StrToTensor<T>(ele_str_views[i], embedding_info);
         tensors[i] = std::move(data);
-        tensor_spans[i] = Span<const char>(tensors[i].get(), data_bytes);
+        tensor_spans[i] = std::span<const char>(tensors[i].get(), data_bytes);
     }
     ColumnVector::SetTensorArray(target_tensor_array, buffer_.get(), tensor_spans, embedding_info);
 }
 
 template <typename T>
-void ColumnVector::AppendSparse(const Vector<std::string_view> &ele_str_views, SizeT dst_off) {
+void ColumnVector::AppendSparse(const std::vector<std::string_view> &ele_str_views, size_t dst_off) {
     const auto *sparse_info = static_cast<const SparseInfo *>(data_type_->type_info().get());
     switch (sparse_info->IndexType()) {
         case EmbeddingDataType::kElemInt8: {
@@ -431,9 +428,9 @@ void ColumnVector::AppendSparse(const Vector<std::string_view> &ele_str_views, S
 }
 
 template <typename DataT, typename IdxT>
-void ColumnVector::AppendSparse(const Vector<std::string_view> &ele_str_views, SizeT dst_off) {
-    SizeT total_element_count = ele_str_views.size();
-    Vector<IdxT> index_vec;
+void ColumnVector::AppendSparse(const std::vector<std::string_view> &ele_str_views, size_t dst_off) {
+    size_t total_element_count = ele_str_views.size();
+    std::vector<IdxT> index_vec;
     index_vec.reserve(total_element_count);
     if constexpr (std::is_same_v<DataT, BooleanT>) {
         for (u32 i = 0; i < total_element_count; ++i) {
@@ -445,7 +442,7 @@ void ColumnVector::AppendSparse(const Vector<std::string_view> &ele_str_views, S
         }
         AppendSparseInner(total_element_count, static_cast<DataT *>(nullptr), index_vec.data(), dst_off);
     } else {
-        Vector<DataT> data_vec;
+        std::vector<DataT> data_vec;
         data_vec.reserve(total_element_count);
         for (u32 i = 0; i < total_element_count; ++i) {
             auto [index, value] = DataType::StringToSparseValue<DataT, IdxT>(ele_str_views[i]);
@@ -460,7 +457,7 @@ void ColumnVector::AppendSparse(const Vector<std::string_view> &ele_str_views, S
 }
 
 template <typename DataT, typename IdxT>
-void ColumnVector::AppendSparseInner(SizeT nnz, const DataT *data, const IdxT *index, SparseT &target_sparse) {
+void ColumnVector::AppendSparseInner(size_t nnz, const DataT *data, const IdxT *index, SparseT &target_sparse) {
     target_sparse.nnz_ = nnz;
     if (nnz == 0) {
         target_sparse.file_offset_ = -1;
@@ -477,9 +474,9 @@ void ColumnVector::AppendSparseInner(SizeT nnz, const DataT *data, const IdxT *i
             RecoverableError(Status::InvalidDataType());
             return;
         }
-        UniquePtr<IdxT[]> tmp_index;
+        std::unique_ptr<IdxT[]> tmp_index;
         if (to_sort) {
-            tmp_index = MakeUniqueForOverwrite<IdxT[]>(nnz);
+            tmp_index = std::make_unique_for_overwrite<IdxT[]>(nnz);
             std::copy(index, index + nnz, tmp_index.get());
             std::sort(tmp_index.get(), tmp_index.get() + nnz);
             auto *index_end = std::unique(tmp_index.get(), tmp_index.get() + nnz);
@@ -492,12 +489,12 @@ void ColumnVector::AppendSparseInner(SizeT nnz, const DataT *data, const IdxT *i
         SparseVecRef<DataT, IdxT> sparse_vec_ref(nnz, index, nullptr);
         target_sparse.file_offset_ = buffer_->AppendSparse(sparse_vec_ref);
     } else {
-        UniquePtr<IdxT[]> tmp_index;
-        UniquePtr<DataT[]> tmp_data;
+        std::unique_ptr<IdxT[]> tmp_index;
+        std::unique_ptr<DataT[]> tmp_data;
         if (to_sort) {
-            tmp_index = MakeUniqueForOverwrite<IdxT[]>(nnz);
-            tmp_data = MakeUniqueForOverwrite<DataT[]>(nnz);
-            Vector<Pair<IdxT, DataT>> index_value_pairs(nnz);
+            tmp_index = std::make_unique_for_overwrite<IdxT[]>(nnz);
+            tmp_data = std::make_unique_for_overwrite<DataT[]>(nnz);
+            std::vector<std::pair<IdxT, DataT>> index_value_pairs(nnz);
             for (u32 i = 0; i < nnz; ++i) {
                 index_value_pairs[i] = {index[i], data[i]};
             }
@@ -552,17 +549,17 @@ void CopyArray(ArrayT &dst_array,
                const ArrayInfo *array_info);
 
 template <>
-void ColumnVector::CopyValue<BooleanT>(ColumnVector &dst, const ColumnVector &src, SizeT from, SizeT count) {
+void ColumnVector::CopyValue<BooleanT>(ColumnVector &dst, const ColumnVector &src, size_t from, size_t count) {
     auto dst_tail = dst.tail_index_.load();
     const VectorBuffer *src_buffer = src.buffer_.get();
     auto dst_buffer = dst.buffer_.get();
     if (dst_tail % 8 == 0 && from % 8 == 0) {
-        SizeT dst_byte_offset = dst_tail / 8;
-        SizeT src_byte_offset = from / 8;
-        SizeT byte_count = (count + 7) / 8; // copy to tail
+        size_t dst_byte_offset = dst_tail / 8;
+        size_t src_byte_offset = from / 8;
+        size_t byte_count = (count + 7) / 8; // copy to tail
         std::memcpy(dst_buffer->GetDataMut() + dst_byte_offset, src_buffer->GetData() + src_byte_offset, byte_count);
     } else {
-        for (SizeT idx = 0; idx < count; ++idx) {
+        for (size_t idx = 0; idx < count; ++idx) {
             dst_buffer->SetCompactBit(dst_tail + idx, src_buffer->GetCompactBit(from + idx));
         }
     }
@@ -570,11 +567,11 @@ void ColumnVector::CopyValue<BooleanT>(ColumnVector &dst, const ColumnVector &sr
 
 template <typename DataT>
 inline void
-ColumnVector::CopyFrom(const VectorBuffer *__restrict src_buf, VectorBuffer *__restrict dst_buf, SizeT count, const Selection &input_select) {
-    const_ptr_t src = src_buf->GetData();
-    ptr_t dst = dst_buf->GetDataMut();
-    for (SizeT idx = 0; idx < count; ++idx) {
-        SizeT row_id = input_select[idx];
+ColumnVector::CopyFrom(const VectorBuffer *__restrict src_buf, VectorBuffer *__restrict dst_buf, size_t count, const Selection &input_select) {
+    const char *src = src_buf->GetData();
+    char *dst = dst_buf->GetDataMut();
+    for (size_t idx = 0; idx < count; ++idx) {
+        size_t row_id = input_select[idx];
         ((DataT *)(dst))[idx] = ((const DataT *)(src))[row_id];
     }
 }
@@ -582,10 +579,10 @@ ColumnVector::CopyFrom(const VectorBuffer *__restrict src_buf, VectorBuffer *__r
 template <>
 inline void ColumnVector::CopyFrom<BooleanT>(const VectorBuffer *__restrict src_buf,
                                              VectorBuffer *__restrict dst_buf,
-                                             SizeT count,
+                                             size_t count,
                                              const Selection &input_select) {
-    for (SizeT idx = 0; idx < count; ++idx) {
-        SizeT row_id = input_select[idx];
+    for (size_t idx = 0; idx < count; ++idx) {
+        size_t row_id = input_select[idx];
         dst_buf->SetCompactBit(idx, src_buf->GetCompactBit(row_id));
     }
 }
@@ -593,12 +590,12 @@ inline void ColumnVector::CopyFrom<BooleanT>(const VectorBuffer *__restrict src_
 template <>
 inline void ColumnVector::CopyFrom<VarcharT>(const VectorBuffer *__restrict src_buf,
                                              VectorBuffer *__restrict dst_buf,
-                                             SizeT count,
+                                             size_t count,
                                              const Selection &input_select) {
-    const_ptr_t src = src_buf->GetData();
-    ptr_t dst = dst_buf->GetDataMut();
-    for (SizeT idx = 0; idx < count; ++idx) {
-        SizeT row_id = input_select[idx];
+    const char *src = src_buf->GetData();
+    char *dst = dst_buf->GetDataMut();
+    for (size_t idx = 0; idx < count; ++idx) {
+        size_t row_id = input_select[idx];
         VarcharT *dst_ptr = &(((VarcharT *)dst)[idx]);
         const VarcharT *src_ptr = &(((const VarcharT *)src)[row_id]);
         CopyVarchar(*dst_ptr, dst_buf, *src_ptr, src_buf);
@@ -608,13 +605,13 @@ inline void ColumnVector::CopyFrom<VarcharT>(const VectorBuffer *__restrict src_
 template <>
 inline void ColumnVector::CopyFrom<MultiVectorT>(const VectorBuffer *__restrict src_buf,
                                                  VectorBuffer *__restrict dst_buf,
-                                                 SizeT count,
+                                                 size_t count,
                                                  const Selection &input_select) {
-    const_ptr_t src = src_buf->GetData();
-    ptr_t dst = dst_buf->GetDataMut();
+    const char *src = src_buf->GetData();
+    char *dst = dst_buf->GetDataMut();
     const auto *embedding_info = static_cast<const EmbeddingInfo *>(data_type_->type_info().get());
-    for (SizeT idx = 0; idx < count; ++idx) {
-        SizeT row_id = input_select[idx];
+    for (size_t idx = 0; idx < count; ++idx) {
+        size_t row_id = input_select[idx];
         MultiVectorT *dst_ptr = &(((MultiVectorT *)dst)[idx]);
         const MultiVectorT *src_ptr = &(((const MultiVectorT *)src)[row_id]);
         CopyMultiVector(*dst_ptr, dst_buf, *src_ptr, src_buf, embedding_info);
@@ -624,13 +621,13 @@ inline void ColumnVector::CopyFrom<MultiVectorT>(const VectorBuffer *__restrict 
 template <>
 inline void ColumnVector::CopyFrom<TensorT>(const VectorBuffer *__restrict src_buf,
                                             VectorBuffer *__restrict dst_buf,
-                                            SizeT count,
+                                            size_t count,
                                             const Selection &input_select) {
-    const_ptr_t src = src_buf->GetData();
-    ptr_t dst = dst_buf->GetDataMut();
+    const char *src = src_buf->GetData();
+    char *dst = dst_buf->GetDataMut();
     const auto *embedding_info = static_cast<const EmbeddingInfo *>(data_type_->type_info().get());
-    for (SizeT idx = 0; idx < count; ++idx) {
-        SizeT row_id = input_select[idx];
+    for (size_t idx = 0; idx < count; ++idx) {
+        size_t row_id = input_select[idx];
         TensorT *dst_ptr = &(((TensorT *)dst)[idx]);
         const TensorT *src_ptr = &(((const TensorT *)src)[row_id]);
         CopyTensor(*dst_ptr, dst_buf, *src_ptr, src_buf, embedding_info);
@@ -640,13 +637,13 @@ inline void ColumnVector::CopyFrom<TensorT>(const VectorBuffer *__restrict src_b
 template <>
 inline void ColumnVector::CopyFrom<TensorArrayT>(const VectorBuffer *__restrict src_buf,
                                                  VectorBuffer *__restrict dst_buf,
-                                                 SizeT count,
+                                                 size_t count,
                                                  const Selection &input_select) {
-    const_ptr_t src = src_buf->GetData();
-    ptr_t dst = dst_buf->GetDataMut();
+    const char *src = src_buf->GetData();
+    char *dst = dst_buf->GetDataMut();
     const auto *embedding_info = static_cast<const EmbeddingInfo *>(data_type_->type_info().get());
-    for (SizeT idx = 0; idx < count; ++idx) {
-        SizeT row_id = input_select[idx];
+    for (size_t idx = 0; idx < count; ++idx) {
+        size_t row_id = input_select[idx];
         TensorArrayT *dst_ptr = &(((TensorArrayT *)dst)[idx]);
         const TensorArrayT *src_ptr = &(((const TensorArrayT *)src)[row_id]);
         CopyTensorArray(*dst_ptr, dst_buf, *src_ptr, src_buf, embedding_info);
@@ -656,14 +653,14 @@ inline void ColumnVector::CopyFrom<TensorArrayT>(const VectorBuffer *__restrict 
 template <>
 inline void ColumnVector::CopyFrom<SparseT>(const VectorBuffer *__restrict src_buf,
                                             VectorBuffer *__restrict dst_buf,
-                                            SizeT count,
+                                            size_t count,
                                             const Selection &input_select) {
-    const_ptr_t src = src_buf->GetData();
-    ptr_t dst = dst_buf->GetDataMut();
+    const char *src = src_buf->GetData();
+    char *dst = dst_buf->GetDataMut();
     const auto *sparse_info = static_cast<const SparseInfo *>(data_type_->type_info().get());
 
-    for (SizeT idx = 0; idx < count; ++idx) {
-        SizeT dest_idx = input_select[idx];
+    for (size_t idx = 0; idx < count; ++idx) {
+        size_t dest_idx = input_select[idx];
 
         auto *dst_sparse = reinterpret_cast<SparseT *>(dst) + dest_idx;
         const auto *src_sparse = reinterpret_cast<const SparseT *>(src) + idx;
@@ -673,13 +670,15 @@ inline void ColumnVector::CopyFrom<SparseT>(const VectorBuffer *__restrict src_b
 }
 
 template <>
-inline void
-ColumnVector::CopyFrom<ArrayT>(const VectorBuffer *__restrict src_buf, VectorBuffer *__restrict dst_buf, SizeT count, const Selection &input_select) {
-    const_ptr_t src = src_buf->GetData();
-    ptr_t dst = dst_buf->GetDataMut();
+inline void ColumnVector::CopyFrom<ArrayT>(const VectorBuffer *__restrict src_buf,
+                                           VectorBuffer *__restrict dst_buf,
+                                           size_t count,
+                                           const Selection &input_select) {
+    const char *src = src_buf->GetData();
+    char *dst = dst_buf->GetDataMut();
     const auto *array_info = static_cast<const ArrayInfo *>(data_type_->type_info().get());
-    for (SizeT idx = 0; idx < count; ++idx) {
-        SizeT dest_idx = input_select[idx];
+    for (size_t idx = 0; idx < count; ++idx) {
+        size_t dest_idx = input_select[idx];
         auto *dst_array = reinterpret_cast<ArrayT *>(dst) + dest_idx;
         const auto *src_array = reinterpret_cast<const ArrayT *>(src) + idx;
         CopyArray(*dst_array, dst_buf, *src_array, src_buf, array_info);
@@ -689,16 +688,16 @@ ColumnVector::CopyFrom<ArrayT>(const VectorBuffer *__restrict src_buf, VectorBuf
 template <>
 inline void ColumnVector::CopyFrom<EmbeddingT>(const VectorBuffer *__restrict src_buf,
                                                VectorBuffer *__restrict dst_buf,
-                                               SizeT count,
+                                               size_t count,
                                                const Selection &input_select) {
-    const_ptr_t src = src_buf->GetData();
-    ptr_t dst = dst_buf->GetDataMut();
+    const char *src = src_buf->GetData();
+    char *dst = dst_buf->GetDataMut();
 
-    for (SizeT idx = 0; idx < count; ++idx) {
-        SizeT row_id = input_select[idx];
+    for (size_t idx = 0; idx < count; ++idx) {
+        size_t row_id = input_select[idx];
 
-        const_ptr_t src_ptr = src + row_id * data_type_size_;
-        ptr_t dst_ptr = dst + idx * data_type_size_;
+        const char *src_ptr = src + row_id * data_type_size_;
+        char *dst_ptr = dst + idx * data_type_size_;
         std::memcpy(dst_ptr, src_ptr, data_type_size_);
     }
 }
@@ -706,23 +705,23 @@ inline void ColumnVector::CopyFrom<EmbeddingT>(const VectorBuffer *__restrict sr
 template <typename DataT>
 inline void ColumnVector::CopyFrom(const VectorBuffer *__restrict src_buf,
                                    VectorBuffer *__restrict dst_buf,
-                                   SizeT source_start_idx,
-                                   SizeT dest_start_idx,
-                                   SizeT count) {
-    const_ptr_t src = src_buf->GetData();
-    ptr_t dst = dst_buf->GetDataMut();
+                                   size_t source_start_idx,
+                                   size_t dest_start_idx,
+                                   size_t count) {
+    const char *src = src_buf->GetData();
+    char *dst = dst_buf->GetDataMut();
 
-    SizeT source_end_idx = source_start_idx + count;
+    size_t source_end_idx = source_start_idx + count;
 
-    Copy(((const DataT *)(src)) + source_start_idx, ((const DataT *)(src)) + source_end_idx, ((DataT *)(dst)) + dest_start_idx);
+    std::copy(((const DataT *)(src)) + source_start_idx, ((const DataT *)(src)) + source_end_idx, ((DataT *)(dst)) + dest_start_idx);
 }
 
 template <>
 inline void ColumnVector::CopyFrom<BooleanT>(const VectorBuffer *__restrict src_buf,
                                              VectorBuffer *__restrict dst_buf,
-                                             SizeT source_start_idx,
-                                             SizeT dest_start_idx,
-                                             SizeT count) {
+                                             size_t source_start_idx,
+                                             size_t dest_start_idx,
+                                             size_t count) {
     VectorBuffer::CopyCompactBits(reinterpret_cast<u8 *>(dst_buf->GetDataMut()),
                                   reinterpret_cast<const u8 *>(src_buf->GetData()),
                                   dest_start_idx,
@@ -733,14 +732,14 @@ inline void ColumnVector::CopyFrom<BooleanT>(const VectorBuffer *__restrict src_
 template <>
 inline void ColumnVector::CopyFrom<VarcharT>(const VectorBuffer *__restrict src_buf,
                                              VectorBuffer *__restrict dst_buf,
-                                             SizeT source_start_idx,
-                                             SizeT dest_start_idx,
-                                             SizeT count) {
-    const_ptr_t src = src_buf->GetData();
-    ptr_t dst = dst_buf->GetDataMut();
+                                             size_t source_start_idx,
+                                             size_t dest_start_idx,
+                                             size_t count) {
+    const char *src = src_buf->GetData();
+    char *dst = dst_buf->GetDataMut();
 
-    SizeT source_end_idx = source_start_idx + count;
-    for (SizeT idx = source_start_idx; idx < source_end_idx; ++idx) {
+    size_t source_end_idx = source_start_idx + count;
+    for (size_t idx = source_start_idx; idx < source_end_idx; ++idx) {
         VarcharT *dst_ptr = &(((VarcharT *)dst)[dest_start_idx]);
         const VarcharT *src_ptr = &(((const VarcharT *)src)[idx]);
         CopyVarchar(*dst_ptr, dst_buf, *src_ptr, src_buf);
@@ -751,14 +750,14 @@ inline void ColumnVector::CopyFrom<VarcharT>(const VectorBuffer *__restrict src_
 template <>
 inline void ColumnVector::CopyFrom<MultiVectorT>(const VectorBuffer *__restrict src_buf,
                                                  VectorBuffer *__restrict dst_buf,
-                                                 SizeT source_start_idx,
-                                                 SizeT dest_start_idx,
-                                                 SizeT count) {
-    const_ptr_t src = src_buf->GetData();
-    ptr_t dst = dst_buf->GetDataMut();
-    SizeT source_end_idx = source_start_idx + count;
+                                                 size_t source_start_idx,
+                                                 size_t dest_start_idx,
+                                                 size_t count) {
+    const char *src = src_buf->GetData();
+    char *dst = dst_buf->GetDataMut();
+    size_t source_end_idx = source_start_idx + count;
     const auto *embedding_info = static_cast<const EmbeddingInfo *>(data_type_->type_info().get());
-    for (SizeT idx = source_start_idx; idx < source_end_idx; ++idx) {
+    for (size_t idx = source_start_idx; idx < source_end_idx; ++idx) {
         const MultiVectorT &src_multivector = ((const MultiVectorT *)src)[idx];
         MultiVectorT &dst_multivector = ((MultiVectorT *)dst)[dest_start_idx];
         CopyMultiVector(dst_multivector, dst_buf, src_multivector, src_buf, embedding_info);
@@ -769,14 +768,14 @@ inline void ColumnVector::CopyFrom<MultiVectorT>(const VectorBuffer *__restrict 
 template <>
 inline void ColumnVector::CopyFrom<TensorT>(const VectorBuffer *__restrict src_buf,
                                             VectorBuffer *__restrict dst_buf,
-                                            SizeT source_start_idx,
-                                            SizeT dest_start_idx,
-                                            SizeT count) {
-    const_ptr_t src = src_buf->GetData();
-    ptr_t dst = dst_buf->GetDataMut();
-    SizeT source_end_idx = source_start_idx + count;
+                                            size_t source_start_idx,
+                                            size_t dest_start_idx,
+                                            size_t count) {
+    const char *src = src_buf->GetData();
+    char *dst = dst_buf->GetDataMut();
+    size_t source_end_idx = source_start_idx + count;
     const auto *embedding_info = static_cast<const EmbeddingInfo *>(data_type_->type_info().get());
-    for (SizeT idx = source_start_idx; idx < source_end_idx; ++idx) {
+    for (size_t idx = source_start_idx; idx < source_end_idx; ++idx) {
         const TensorT &src_tensor = ((const TensorT *)src)[idx];
         TensorT &dst_tensor = ((TensorT *)dst)[dest_start_idx];
         CopyTensor(dst_tensor, dst_buf, src_tensor, src_buf, embedding_info);
@@ -787,14 +786,14 @@ inline void ColumnVector::CopyFrom<TensorT>(const VectorBuffer *__restrict src_b
 template <>
 inline void ColumnVector::CopyFrom<TensorArrayT>(const VectorBuffer *__restrict src_buf,
                                                  VectorBuffer *__restrict dst_buf,
-                                                 SizeT source_start_idx,
-                                                 SizeT dest_start_idx,
-                                                 SizeT count) {
-    const_ptr_t src = src_buf->GetData();
-    ptr_t dst = dst_buf->GetDataMut();
-    SizeT source_end_idx = source_start_idx + count;
+                                                 size_t source_start_idx,
+                                                 size_t dest_start_idx,
+                                                 size_t count) {
+    const char *src = src_buf->GetData();
+    char *dst = dst_buf->GetDataMut();
+    size_t source_end_idx = source_start_idx + count;
     const auto *embedding_info = static_cast<const EmbeddingInfo *>(data_type_->type_info().get());
-    for (SizeT idx = source_start_idx; idx < source_end_idx; ++idx) {
+    for (size_t idx = source_start_idx; idx < source_end_idx; ++idx) {
         const TensorArrayT &src_ref = ((const TensorArrayT *)src)[idx];
         TensorArrayT &dst_ref = ((TensorArrayT *)dst)[dest_start_idx];
         CopyTensorArray(dst_ref, dst_buf, src_ref, src_buf, embedding_info);
@@ -805,15 +804,15 @@ inline void ColumnVector::CopyFrom<TensorArrayT>(const VectorBuffer *__restrict 
 template <>
 inline void ColumnVector::CopyFrom<SparseT>(const VectorBuffer *__restrict src_buf,
                                             VectorBuffer *__restrict dst_buf,
-                                            SizeT source_start_idx,
-                                            SizeT dest_start_idx,
-                                            SizeT count) {
-    const_ptr_t src = src_buf->GetData();
-    ptr_t dst = dst_buf->GetDataMut();
+                                            size_t source_start_idx,
+                                            size_t dest_start_idx,
+                                            size_t count) {
+    const char *src = src_buf->GetData();
+    char *dst = dst_buf->GetDataMut();
     const auto *sparse_info = static_cast<const SparseInfo *>(data_type_->type_info().get());
 
-    SizeT source_end_idx = source_start_idx + count;
-    for (SizeT idx = source_start_idx, dst_idx = dest_start_idx; idx < source_end_idx; ++idx, ++dst_idx) {
+    size_t source_end_idx = source_start_idx + count;
+    for (size_t idx = source_start_idx, dst_idx = dest_start_idx; idx < source_end_idx; ++idx, ++dst_idx) {
         const auto *src_sparse = reinterpret_cast<const SparseT *>(src) + idx;
         auto *dst_sparse = reinterpret_cast<SparseT *>(dst) + dst_idx;
 
@@ -824,14 +823,14 @@ inline void ColumnVector::CopyFrom<SparseT>(const VectorBuffer *__restrict src_b
 template <>
 inline void ColumnVector::CopyFrom<ArrayT>(const VectorBuffer *__restrict src_buf,
                                            VectorBuffer *__restrict dst_buf,
-                                           SizeT source_start_idx,
-                                           SizeT dest_start_idx,
-                                           SizeT count) {
-    const_ptr_t src = src_buf->GetData();
-    ptr_t dst = dst_buf->GetDataMut();
+                                           size_t source_start_idx,
+                                           size_t dest_start_idx,
+                                           size_t count) {
+    const char *src = src_buf->GetData();
+    char *dst = dst_buf->GetDataMut();
     const auto *array_info = static_cast<const ArrayInfo *>(data_type_->type_info().get());
-    SizeT source_end_idx = source_start_idx + count;
-    for (SizeT idx = source_start_idx, dst_idx = dest_start_idx; idx < source_end_idx; ++idx, ++dst_idx) {
+    size_t source_end_idx = source_start_idx + count;
+    for (size_t idx = source_start_idx, dst_idx = dest_start_idx; idx < source_end_idx; ++idx, ++dst_idx) {
         const auto *src_array = reinterpret_cast<const ArrayT *>(src) + idx;
         auto *dst_array = reinterpret_cast<ArrayT *>(dst) + dst_idx;
         CopyArray(*dst_array, dst_buf, *src_array, src_buf, array_info);
@@ -841,17 +840,17 @@ inline void ColumnVector::CopyFrom<ArrayT>(const VectorBuffer *__restrict src_bu
 template <>
 inline void ColumnVector::CopyFrom<EmbeddingT>(const VectorBuffer *__restrict src_buf,
                                                VectorBuffer *__restrict dst_buf,
-                                               SizeT source_start_idx,
-                                               SizeT dest_start_idx,
-                                               SizeT count) {
-    const_ptr_t src = src_buf->GetData();
-    ptr_t dst = dst_buf->GetDataMut();
+                                               size_t source_start_idx,
+                                               size_t dest_start_idx,
+                                               size_t count) {
+    const char *src = src_buf->GetData();
+    char *dst = dst_buf->GetDataMut();
 
-    SizeT source_end_idx = source_start_idx + count;
-    for (SizeT idx = source_start_idx; idx < source_end_idx; ++idx) {
+    size_t source_end_idx = source_start_idx + count;
+    for (size_t idx = source_start_idx; idx < source_end_idx; ++idx) {
 
-        const_ptr_t src_ptr = src + idx * data_type_size_;
-        ptr_t dst_ptr = dst + dest_start_idx * data_type_size_;
+        const char *src_ptr = src + idx * data_type_size_;
+        char *dst_ptr = dst + dest_start_idx * data_type_size_;
         std::memcpy(dst_ptr, src_ptr, data_type_size_);
 
         ++dest_start_idx;
@@ -859,24 +858,24 @@ inline void ColumnVector::CopyFrom<EmbeddingT>(const VectorBuffer *__restrict sr
 }
 
 template <typename DataT>
-inline void ColumnVector::CopyRowFrom(const VectorBuffer *__restrict src_buf, SizeT src_idx, VectorBuffer *__restrict dst_buf, SizeT dst_idx) {
-    const_ptr_t src = src_buf->GetData();
-    ptr_t dst = dst_buf->GetDataMut();
+inline void ColumnVector::CopyRowFrom(const VectorBuffer *__restrict src_buf, size_t src_idx, VectorBuffer *__restrict dst_buf, size_t dst_idx) {
+    const char *src = src_buf->GetData();
+    char *dst = dst_buf->GetDataMut();
 
     ((DataT *)(dst))[dst_idx] = ((const DataT *)(src))[src_idx];
 }
 
 template <>
 inline void
-ColumnVector::CopyRowFrom<BooleanT>(const VectorBuffer *__restrict src_buf, SizeT src_idx, VectorBuffer *__restrict dst_buf, SizeT dst_idx) {
+ColumnVector::CopyRowFrom<BooleanT>(const VectorBuffer *__restrict src_buf, size_t src_idx, VectorBuffer *__restrict dst_buf, size_t dst_idx) {
     dst_buf->SetCompactBit(dst_idx, src_buf->GetCompactBit(src_idx));
 }
 
 template <>
 inline void
-ColumnVector::CopyRowFrom<VarcharT>(const VectorBuffer *__restrict src_buf, SizeT src_idx, VectorBuffer *__restrict dst_buf, SizeT dst_idx) {
-    const_ptr_t src = src_buf->GetData();
-    ptr_t dst = dst_buf->GetDataMut();
+ColumnVector::CopyRowFrom<VarcharT>(const VectorBuffer *__restrict src_buf, size_t src_idx, VectorBuffer *__restrict dst_buf, size_t dst_idx) {
+    const char *src = src_buf->GetData();
+    char *dst = dst_buf->GetDataMut();
     VarcharT *dst_ptr = &(((VarcharT *)dst)[dst_idx]);
     const VarcharT *src_ptr = &(((const VarcharT *)src)[src_idx]);
     CopyVarchar(*dst_ptr, dst_buf, *src_ptr, src_buf);
@@ -884,9 +883,9 @@ ColumnVector::CopyRowFrom<VarcharT>(const VectorBuffer *__restrict src_buf, Size
 
 template <>
 inline void
-ColumnVector::CopyRowFrom<MultiVectorT>(const VectorBuffer *__restrict src_buf, SizeT src_idx, VectorBuffer *__restrict dst_buf, SizeT dst_idx) {
-    const_ptr_t src = src_buf->GetData();
-    ptr_t dst = dst_buf->GetDataMut();
+ColumnVector::CopyRowFrom<MultiVectorT>(const VectorBuffer *__restrict src_buf, size_t src_idx, VectorBuffer *__restrict dst_buf, size_t dst_idx) {
+    const char *src = src_buf->GetData();
+    char *dst = dst_buf->GetDataMut();
     const MultiVectorT &src_multivector = ((const MultiVectorT *)src)[src_idx];
     MultiVectorT &dst_multivector = ((MultiVectorT *)dst)[dst_idx];
     const auto *embedding_info = static_cast<const EmbeddingInfo *>(data_type_->type_info().get());
@@ -895,9 +894,9 @@ ColumnVector::CopyRowFrom<MultiVectorT>(const VectorBuffer *__restrict src_buf, 
 
 template <>
 inline void
-ColumnVector::CopyRowFrom<TensorT>(const VectorBuffer *__restrict src_buf, SizeT src_idx, VectorBuffer *__restrict dst_buf, SizeT dst_idx) {
-    const_ptr_t src = src_buf->GetData();
-    ptr_t dst = dst_buf->GetDataMut();
+ColumnVector::CopyRowFrom<TensorT>(const VectorBuffer *__restrict src_buf, size_t src_idx, VectorBuffer *__restrict dst_buf, size_t dst_idx) {
+    const char *src = src_buf->GetData();
+    char *dst = dst_buf->GetDataMut();
     const TensorT &src_tensor = ((const TensorT *)src)[src_idx];
     TensorT &dst_tensor = ((TensorT *)dst)[dst_idx];
     const auto *embedding_info = static_cast<const EmbeddingInfo *>(data_type_->type_info().get());
@@ -906,9 +905,9 @@ ColumnVector::CopyRowFrom<TensorT>(const VectorBuffer *__restrict src_buf, SizeT
 
 template <>
 inline void
-ColumnVector::CopyRowFrom<TensorArrayT>(const VectorBuffer *__restrict src_buf, SizeT src_idx, VectorBuffer *__restrict dst_buf, SizeT dst_idx) {
-    const_ptr_t src = src_buf->GetData();
-    ptr_t dst = dst_buf->GetDataMut();
+ColumnVector::CopyRowFrom<TensorArrayT>(const VectorBuffer *__restrict src_buf, size_t src_idx, VectorBuffer *__restrict dst_buf, size_t dst_idx) {
+    const char *src = src_buf->GetData();
+    char *dst = dst_buf->GetDataMut();
     const TensorArrayT &src_ref = ((const TensorArrayT *)src)[src_idx];
     TensorArrayT &dst_ref = ((TensorArrayT *)dst)[dst_idx];
     const auto *embedding_info = static_cast<const EmbeddingInfo *>(data_type_->type_info().get());
@@ -917,9 +916,9 @@ ColumnVector::CopyRowFrom<TensorArrayT>(const VectorBuffer *__restrict src_buf, 
 
 template <>
 inline void
-ColumnVector::CopyRowFrom<SparseT>(const VectorBuffer *__restrict src_buf, SizeT src_idx, VectorBuffer *__restrict dst_buf, SizeT dst_idx) {
-    const_ptr_t src = src_buf->GetData();
-    ptr_t dst = dst_buf->GetDataMut();
+ColumnVector::CopyRowFrom<SparseT>(const VectorBuffer *__restrict src_buf, size_t src_idx, VectorBuffer *__restrict dst_buf, size_t dst_idx) {
+    const char *src = src_buf->GetData();
+    char *dst = dst_buf->GetDataMut();
     const auto *sparse_info = static_cast<const SparseInfo *>(data_type_->type_info().get());
 
     const auto *src_sparse = reinterpret_cast<const SparseT *>(src) + src_idx;
@@ -930,9 +929,9 @@ ColumnVector::CopyRowFrom<SparseT>(const VectorBuffer *__restrict src_buf, SizeT
 
 template <>
 inline void
-ColumnVector::CopyRowFrom<ArrayT>(const VectorBuffer *__restrict src_buf, SizeT src_idx, VectorBuffer *__restrict dst_buf, SizeT dst_idx) {
-    const_ptr_t src = src_buf->GetData();
-    ptr_t dst = dst_buf->GetDataMut();
+ColumnVector::CopyRowFrom<ArrayT>(const VectorBuffer *__restrict src_buf, size_t src_idx, VectorBuffer *__restrict dst_buf, size_t dst_idx) {
+    const char *src = src_buf->GetData();
+    char *dst = dst_buf->GetDataMut();
     const auto *array_info = static_cast<const ArrayInfo *>(data_type_->type_info().get());
     const auto *src_array = reinterpret_cast<const ArrayT *>(src) + src_idx;
     auto *dst_array = reinterpret_cast<ArrayT *>(dst) + dst_idx;
@@ -941,11 +940,11 @@ ColumnVector::CopyRowFrom<ArrayT>(const VectorBuffer *__restrict src_buf, SizeT 
 
 template <>
 inline void
-ColumnVector::CopyRowFrom<EmbeddingT>(const VectorBuffer *__restrict src_buf, SizeT src_idx, VectorBuffer *__restrict dst_buf, SizeT dst_idx) {
-    const_ptr_t src = src_buf->GetData();
-    ptr_t dst = dst_buf->GetDataMut();
-    const_ptr_t src_ptr = src + src_idx * data_type_size_;
-    ptr_t dst_ptr = dst + dst_idx * data_type_size_;
+ColumnVector::CopyRowFrom<EmbeddingT>(const VectorBuffer *__restrict src_buf, size_t src_idx, VectorBuffer *__restrict dst_buf, size_t dst_idx) {
+    const char *src = src_buf->GetData();
+    char *dst = dst_buf->GetDataMut();
+    const char *src_ptr = src + src_idx * data_type_size_;
+    char *dst_ptr = dst + dst_idx * data_type_size_;
     std::memcpy(dst_ptr, src_ptr, data_type_size_);
 }
 
@@ -987,7 +986,7 @@ class ColumnVectorPtrAndIdx {
 template <PODValueType FlatType>
 class ColumnVectorPtrAndIdx<FlatType> {
 public:
-    explicit ColumnVectorPtrAndIdx(const SharedPtr<ColumnVector> &col) : data_ptr_(reinterpret_cast<const FlatType *>(col->data())) {}
+    explicit ColumnVectorPtrAndIdx(const std::shared_ptr<ColumnVector> &col) : data_ptr_(reinterpret_cast<const FlatType *>(col->data())) {}
     // Don't return reference
     // keep compatibility with "Run(TA left, TB right, TC &result)"
     FlatType operator[](u32 index) { return data_ptr_[index]; }
@@ -1004,7 +1003,7 @@ class ColumnVectorPtrAndIdx<BooleanT> {
     using IteratorType = ColumnVectorPtrAndIdx<BooleanT>;
 
 public:
-    explicit ColumnVectorPtrAndIdx(const SharedPtr<ColumnVector> &col) : buffer_(col->buffer_.get()) {}
+    explicit ColumnVectorPtrAndIdx(const std::shared_ptr<ColumnVector> &col) : buffer_(col->buffer_.get()) {}
     auto &SetIndex(u32 index) {
         idx_ = index;
         return *this;
@@ -1032,7 +1031,8 @@ class ColumnVectorPtrAndIdx<VarcharT> {
     using IteratorType = ColumnVectorPtrAndIdx<VarcharT>;
 
 public:
-    explicit ColumnVectorPtrAndIdx(const SharedPtr<ColumnVector> &col) : data_ptr_(reinterpret_cast<const VarcharT *>(col->data())), col_(col) {}
+    explicit ColumnVectorPtrAndIdx(const std::shared_ptr<ColumnVector> &col)
+        : data_ptr_(reinterpret_cast<const VarcharT *>(col->data())), col_(col) {}
     auto &SetIndex(u32 index) {
         idx_ = index;
         return *this;
@@ -1040,31 +1040,31 @@ public:
     auto &operator[](u32 index) { return SetIndex(index); }
     // Does not check type.
     friend std::strong_ordering ThreeWayCompareReaderValue(const IteratorType &left, const IteratorType &right) {
-        Span<const char> left_v = left.col_->GetVarchar(left.idx_);
-        Span<const char> right_v = right.col_->GetVarchar(right.idx_);
+        std::span<const char> left_v = left.col_->GetVarchar(left.idx_);
+        std::span<const char> right_v = right.col_->GetVarchar(right.idx_);
         return CompareCharArray(left_v.data(), left_v.size(), right_v.data(), right_v.size());
     }
     friend bool CheckReaderValueEquality(const IteratorType &left, const IteratorType &right) {
-        Span<const char> left_v = left.col_->GetVarchar(left.idx_);
-        Span<const char> right_v = right.col_->GetVarchar(right.idx_);
+        std::span<const char> left_v = left.col_->GetVarchar(left.idx_);
+        std::span<const char> right_v = right.col_->GetVarchar(right.idx_);
         return left_v.size() == right_v.size() && std::strncmp(left_v.data(), right_v.data(), left_v.size()) == 0;
     }
 
-    friend void GetReaderValue(const IteratorType &left, const char *&dst, SizeT &dst_len) {
-        Span<const char> left_v = left.col_->GetVarchar(left.idx_);
+    friend void GetReaderValue(const IteratorType &left, const char *&dst, size_t &dst_len) {
+        std::span<const char> left_v = left.col_->GetVarchar(left.idx_);
         dst = left_v.data();
         dst_len = left_v.size();
     }
 
     friend void SetReaderValue(IteratorType &left, const char *dst, int dst_len) {
-        Span<const char> span(dst, dst_len);
+        std::span<const char> span(dst, dst_len);
         left.col_->AppendVarchar(span);
     }
 
 private:
     const VarcharT *data_ptr_ = nullptr;
     // VectorBuffer *vec_buffer_ = nullptr;
-    SharedPtr<ColumnVector> col_;
+    std::shared_ptr<ColumnVector> col_;
     u32 idx_ = {};
 
     static std::strong_ordering CompareCharArray(const char *left_data, u32 left_len, const char *right_data, u32 right_len) {

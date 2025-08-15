@@ -41,7 +41,7 @@ PostingIterator::~PostingIterator() {
     }
 }
 
-bool PostingIterator::Init(SharedPtr<Vector<SegmentPosting>> seg_postings, const u32) {
+bool PostingIterator::Init(std::shared_ptr<std::vector<SegmentPosting>> seg_postings, const u32) {
     segment_postings_ = std::move(seg_postings);
     for (auto &seg_posting : *segment_postings_) {
         doc_freq_ += seg_posting.GetTermMeta().GetDocFreq();
@@ -65,7 +65,7 @@ bool PostingIterator::SkipTo(RowID doc_id) {
 
 // u32: block max tf
 // u16: block max (ceil(tf / doc length) * numeric_limits<u16>::max())
-Pair<u32, u16> PostingIterator::GetBlockMaxInfo() const { return posting_decoder_->GetBlockMaxInfo(); }
+std::pair<u32, u16> PostingIterator::GetBlockMaxInfo() const { return posting_decoder_->GetBlockMaxInfo(); }
 
 RowID PostingIterator::SeekDoc(RowID row_id) {
     if (segment_postings_.get() == nullptr || segment_postings_->empty()) [[unlikely]] {
@@ -97,7 +97,7 @@ RowID PostingIterator::SeekDoc(RowID row_id) {
     return current_row_id;
 }
 
-Pair<bool, RowID> PostingIterator::PeekInBlockRange(RowID doc_id, RowID doc_id_no_beyond) {
+std::pair<bool, RowID> PostingIterator::PeekInBlockRange(RowID doc_id, RowID doc_id_no_beyond) {
     if (!finish_decode_docid_) {
         posting_decoder_->DecodeCurrentDocIDBuffer(doc_buffer_);
         current_row_id_ = last_doc_id_in_prev_block_ + doc_buffer_[0];

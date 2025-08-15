@@ -37,7 +37,7 @@ import data_type;
 
 namespace infinity {
 
-String ToString(SinkType sink_type) {
+std::string ToString(SinkType sink_type) {
     switch (sink_type) {
         case SinkType::kInvalid: {
             return "Invalid";
@@ -252,7 +252,7 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(ResultSinkState *result_si
                 result_sink_state->status_ = std::move(output_state->status_);
             } else {
                 result_sink_state->result_def_ = {
-                    MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", std::set<ConstraintType>())};
+                    std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "OK", std::set<ConstraintType>())};
             }
             break;
         }
@@ -262,7 +262,7 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(ResultSinkState *result_si
                 result_sink_state->status_ = std::move(output_state->status_);
             } else {
                 result_sink_state->result_def_ = {
-                    MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", std::set<ConstraintType>())};
+                    std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "OK", std::set<ConstraintType>())};
             }
             break;
         }
@@ -272,7 +272,7 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(ResultSinkState *result_si
                 result_sink_state->status_ = std::move(output_state->status_);
             } else {
                 result_sink_state->result_def_ = {
-                    MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", std::set<ConstraintType>())};
+                    std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "OK", std::set<ConstraintType>())};
             }
             break;
         }
@@ -282,7 +282,7 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(ResultSinkState *result_si
                 result_sink_state->status_ = std::move(output_state->status_);
             } else {
                 result_sink_state->result_def_ = {
-                    MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", std::set<ConstraintType>())};
+                    std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "OK", std::set<ConstraintType>())};
             }
             break;
         }
@@ -292,7 +292,7 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(ResultSinkState *result_si
                 result_sink_state->status_ = std::move(output_state->status_);
             } else {
                 result_sink_state->result_def_ = {
-                    MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", std::set<ConstraintType>())};
+                    std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "OK", std::set<ConstraintType>())};
             }
             break;
         }
@@ -302,7 +302,7 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(ResultSinkState *result_si
                 result_sink_state->status_ = std::move(output_state->status_);
             } else {
                 result_sink_state->result_def_ = {
-                    MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", std::set<ConstraintType>())};
+                    std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "OK", std::set<ConstraintType>())};
             }
             break;
         }
@@ -312,7 +312,7 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(ResultSinkState *result_si
                 result_sink_state->status_ = std::move(output_state->status_);
             } else {
                 result_sink_state->result_def_ = {
-                    MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", std::set<ConstraintType>()),
+                    std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "OK", std::set<ConstraintType>()),
                 };
             }
             break;
@@ -323,7 +323,7 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(ResultSinkState *result_si
                 result_sink_state->status_ = std::move(output_state->status_);
             } else {
                 result_sink_state->result_def_ = {
-                    MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", std::set<ConstraintType>())};
+                    std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "OK", std::set<ConstraintType>())};
             }
             break;
         }
@@ -333,7 +333,7 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(ResultSinkState *result_si
                 result_sink_state->status_ = std::move(output_state->status_);
             } else {
                 result_sink_state->result_def_ = {
-                    MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", std::set<ConstraintType>())};
+                    std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "OK", std::set<ConstraintType>())};
             }
             break;
         }
@@ -343,7 +343,7 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(ResultSinkState *result_si
                 result_sink_state->status_ = std::move(output_state->status_);
             } else {
                 result_sink_state->result_def_ = {
-                    MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", std::set<ConstraintType>())};
+                    std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "OK", std::set<ConstraintType>())};
             }
             break;
         }
@@ -353,7 +353,7 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(ResultSinkState *result_si
                 result_sink_state->status_ = std::move(output_state->status_);
             } else {
                 result_sink_state->result_def_ = {
-                    MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", std::set<ConstraintType>())};
+                    std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "OK", std::set<ConstraintType>())};
             }
             break;
         }
@@ -363,7 +363,7 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(ResultSinkState *result_si
                 result_sink_state->status_ = std::move(output_state->status_);
             } else {
                 result_sink_state->result_def_ = {
-                    MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", std::set<ConstraintType>())};
+                    std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "OK", std::set<ConstraintType>())};
             }
             break;
         }
@@ -373,7 +373,7 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(ResultSinkState *result_si
                 result_sink_state->status_ = std::move(output_state->status_);
             } else {
                 result_sink_state->result_def_ = {
-                    MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", std::set<ConstraintType>())};
+                    std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "OK", std::set<ConstraintType>())};
             }
             break;
         }
@@ -384,7 +384,7 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(ResultSinkState *result_si
                 break;
             }
             result_sink_state->result_def_ = {
-                MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", std::set<ConstraintType>()),
+                std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "OK", std::set<ConstraintType>()),
             };
             break;
         }
@@ -438,7 +438,7 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(FragmentContext *fragment_
     // }
     if (queue_sink_state->Error()) {
         LOG_TRACE(fmt::format("Error: {} is sent to notify next fragment", *queue_sink_state->status_.msg_));
-        auto fragment_error = MakeShared<FragmentError>(queue_sink_state->fragment_id_, queue_sink_state->status_.clone());
+        auto fragment_error = std::make_shared<FragmentError>(queue_sink_state->fragment_id_, queue_sink_state->status_.clone());
         for (const auto &next_fragment_queue : queue_sink_state->fragment_data_queues_) {
             next_fragment_queue->Enqueue(fragment_error);
         }
@@ -449,9 +449,9 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(FragmentContext *fragment_
         LOG_TRACE("Task not completed");
         return;
     }
-    SizeT output_data_block_count = task_operator_state->data_block_array_.size();
+    size_t output_data_block_count = task_operator_state->data_block_array_.size();
     if (output_data_block_count == 0) {
-        auto fragment_data = MakeShared<FragmentData>(queue_sink_state->fragment_id_,
+        auto fragment_data = std::make_shared<FragmentData>(queue_sink_state->fragment_id_,
                                                       nullptr,
                                                       queue_sink_state->task_id_,
                                                       0,
@@ -460,7 +460,7 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(FragmentContext *fragment_
                                                       task_operator_state->total_hits_count_flag_,
                                                       task_operator_state->total_hits_count_);
         if (task_operator_state->Complete() && !fragment_context->IsMaterialize()) {
-            fragment_data->data_idx_ = None;
+            fragment_data->data_idx_ = std::nullopt;
         }
         for (const auto &next_fragment_queue : queue_sink_state->fragment_data_queues_) {
             // when the Enqueue returns false,
@@ -476,8 +476,8 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(FragmentContext *fragment_
         std::lock_guard<std::mutex> lock(queue_sink_state->sent_data_mutex_);
         queue_sink_state->sent_data_ = true;
     }
-    for (SizeT idx = 0; idx < output_data_block_count; ++idx) {
-        auto fragment_data = MakeShared<FragmentData>(queue_sink_state->fragment_id_,
+    for (size_t idx = 0; idx < output_data_block_count; ++idx) {
+        auto fragment_data = std::make_shared<FragmentData>(queue_sink_state->fragment_id_,
                                                       std::move(task_operator_state->data_block_array_[idx]),
                                                       queue_sink_state->task_id_,
                                                       idx,
@@ -486,7 +486,7 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(FragmentContext *fragment_
                                                       task_operator_state->total_hits_count_flag_,
                                                       task_operator_state->total_hits_count_);
         if (task_operator_state->Complete() && !fragment_context->IsMaterialize()) {
-            fragment_data->data_idx_ = None;
+            fragment_data->data_idx_ = std::nullopt;
         }
         for (const auto &next_fragment_queue : queue_sink_state->fragment_data_queues_) {
             // when the Enqueue returns false,

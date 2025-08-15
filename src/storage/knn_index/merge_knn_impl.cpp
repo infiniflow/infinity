@@ -33,7 +33,7 @@ namespace infinity {
 namespace {
 
 template <typename QueryDataType, typename DistDataType>
-UniquePtr<MergeKnnBase> InitMergeKnn(KnnScanSharedData *knn_scan_shared_data) {
+std::unique_ptr<MergeKnnBase> InitMergeKnn(KnnScanSharedData *knn_scan_shared_data) {
     switch (knn_scan_shared_data->knn_distance_type_) {
         case KnnDistanceType::kInvalid: {
             UnrecoverableError("Invalid Knn distance type");
@@ -42,7 +42,7 @@ UniquePtr<MergeKnnBase> InitMergeKnn(KnnScanSharedData *knn_scan_shared_data) {
         case KnnDistanceType::kL2:
         case KnnDistanceType::kHamming: {
             const auto knn_threshold = GetKnnThreshold(knn_scan_shared_data->opt_params_);
-            auto ret = MakeUnique<MergeKnn<QueryDataType, CompareMax, DistDataType>>(knn_scan_shared_data->query_count_,
+            auto ret = std::make_unique<MergeKnn<QueryDataType, CompareMax, DistDataType>>(knn_scan_shared_data->query_count_,
                                                                                      knn_scan_shared_data->topk_,
                                                                                      knn_threshold);
             ret->Begin();
@@ -51,7 +51,7 @@ UniquePtr<MergeKnnBase> InitMergeKnn(KnnScanSharedData *knn_scan_shared_data) {
         case KnnDistanceType::kCosine:
         case KnnDistanceType::kInnerProduct: {
             const auto knn_threshold = GetKnnThreshold(knn_scan_shared_data->opt_params_);
-            auto ret = MakeUnique<MergeKnn<QueryDataType, CompareMin, DistDataType>>(knn_scan_shared_data->query_count_,
+            auto ret = std::make_unique<MergeKnn<QueryDataType, CompareMin, DistDataType>>(knn_scan_shared_data->query_count_,
                                                                                      knn_scan_shared_data->topk_,
                                                                                      knn_threshold);
             ret->Begin();
@@ -62,7 +62,7 @@ UniquePtr<MergeKnnBase> InitMergeKnn(KnnScanSharedData *knn_scan_shared_data) {
 
 } // namespace
 
-UniquePtr<MergeKnnBase> MergeKnnBase::Make(KnnScanSharedData *knn_scan_shared_data) {
+std::unique_ptr<MergeKnnBase> MergeKnnBase::Make(KnnScanSharedData *knn_scan_shared_data) {
     switch (knn_scan_shared_data->query_elem_type_) {
         case EmbeddingDataType::kElemFloat:
             return InitMergeKnn<f32, f32>(knn_scan_shared_data);
@@ -80,8 +80,8 @@ UniquePtr<MergeKnnBase> MergeKnnBase::Make(KnnScanSharedData *knn_scan_shared_da
     }
 }
 
-Optional<f32> GetKnnThreshold(const Vector<InitParameter> &opt_params) {
-    Optional<f32> knn_threshold;
+std::optional<f32> GetKnnThreshold(const std::vector<InitParameter> &opt_params) {
+    std::optional<f32> knn_threshold;
     for (const auto &opt_param : opt_params) {
         if (opt_param.param_name_ == "threshold") {
             knn_threshold = std::stof(opt_param.param_value_);
@@ -90,8 +90,8 @@ Optional<f32> GetKnnThreshold(const Vector<InitParameter> &opt_params) {
     return knn_threshold;
 }
 
-Optional<f32> GetKnnThreshold(const Vector<UniquePtr<InitParameter>> &opt_params) {
-    Optional<f32> knn_threshold;
+std::optional<f32> GetKnnThreshold(const std::vector<std::unique_ptr<InitParameter>> &opt_params) {
+    std::optional<f32> knn_threshold;
     for (const auto &opt_param : opt_params) {
         if (opt_param->param_name_ == "threshold") {
             knn_threshold = std::stof(opt_param->param_value_);

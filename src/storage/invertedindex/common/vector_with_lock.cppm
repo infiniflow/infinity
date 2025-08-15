@@ -12,11 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:vector_with_lock;
 
-import :stl;
+import std;
+import std.compat;
 
 namespace infinity {
 
@@ -24,21 +23,21 @@ export template <typename ValueType>
 class VectorWithLock {
 private:
     std::shared_mutex mutex_;
-    Vector<ValueType> vec_;
+    std::vector<ValueType> vec_;
 
 public:
     VectorWithLock() = default;
-    VectorWithLock(SizeT count) : vec_(count) {}
-    VectorWithLock(SizeT count, const ValueType &value) : vec_(count, value) {}
+    VectorWithLock(size_t count) : vec_(count) {}
+    VectorWithLock(size_t count, const ValueType &value) : vec_(count, value) {}
 
     ~VectorWithLock() = default;
 
-    void Resize(SizeT new_size) {
+    void Resize(size_t new_size) {
         std::unique_lock<std::shared_mutex> lock(mutex_);
         vec_.resize(new_size);
     }
 
-    ValueType Get(SizeT i) {
+    ValueType Get(size_t i) {
         std::shared_lock<std::shared_mutex> lock(mutex_);
         if (i >= vec_.size())
             return std::numeric_limits<ValueType>::max();
@@ -48,26 +47,26 @@ public:
     ValueType Sum() {
         ValueType sum = 0;
         std::shared_lock<std::shared_mutex> lock(mutex_);
-        for (SizeT i = 0; i < vec_.size(); ++i)
+        for (size_t i = 0; i < vec_.size(); ++i)
             sum += vec_[i];
         return sum;
     }
 
-    void Set(SizeT i, const ValueType &value) {
+    void Set(size_t i, const ValueType &value) {
         std::unique_lock<std::shared_mutex> lock(mutex_);
         vec_[i] = value;
     }
 
-    void SetBatch(SizeT begin_idx, const Vector<ValueType> &values) {
-        SizeT required_size = begin_idx + values.size();
+    void SetBatch(size_t begin_idx, const std::vector<ValueType> &values) {
+        size_t required_size = begin_idx + values.size();
         std::unique_lock<std::shared_mutex> lock(mutex_);
         if (vec_.size() < required_size)
             vec_.resize(required_size);
-        for (SizeT i = 0; i < values.size(); ++i)
+        for (size_t i = 0; i < values.size(); ++i)
             vec_[begin_idx + i] = values[i];
     }
 
-    Vector<ValueType> &UnsafeVec() { return vec_; }
+    std::vector<ValueType> &UnsafeVec() { return vec_; }
 
     void Clear() {
         std::unique_lock<std::shared_mutex> lock(mutex_);

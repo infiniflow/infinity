@@ -89,9 +89,9 @@ TEST_F(BoolCastTest, bool_cast0) {
 TEST_F(BoolCastTest, bool_cast1) {
     using namespace infinity;
 
-    SharedPtr<DataType> bool_type = MakeShared<DataType>(LogicalType::kBoolean);
+    std::shared_ptr<DataType> bool_type = std::make_shared<DataType>(LogicalType::kBoolean);
 
-    SharedPtr<ColumnVector> col_bool = MakeShared<ColumnVector>(bool_type);
+    std::shared_ptr<ColumnVector> col_bool = std::make_shared<ColumnVector>(bool_type);
     col_bool->Initialize();
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
@@ -107,11 +107,11 @@ TEST_F(BoolCastTest, bool_cast1) {
 
     // cast bool column vector to varchar column vector
     //    {
-    //        SharedPtr<DataType> varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
+    //        std::shared_ptr<DataType> varchar_type = std::make_shared<DataType>(LogicalType::kVarchar);
     //        auto bool2varchar_ptr = BindBoolCast(*bool_type, *varchar_type);
     //        EXPECT_NE(bool2varchar_ptr.function, nullptr);
     //
-    //        SharedPtr<ColumnVector> col_varchar_ptr = MakeShared<ColumnVector>(varchar_type);
+    //        std::shared_ptr<ColumnVector> col_varchar_ptr = std::make_shared<ColumnVector>(varchar_type);
     //        col_varchar_ptr->Initialize();
     //
     //        CastParameters cast_parameters;

@@ -57,28 +57,28 @@ DumpIndexProcessor::~DumpIndexProcessor() {
 
 void DumpIndexProcessor::Start() {
     LOG_INFO("Dump index processor is started.");
-    processor_thread_ = Thread([this] { Process(); });
+    processor_thread_ = std::thread([this] { Process(); });
 }
 
 void DumpIndexProcessor::Stop() {
     LOG_INFO("Dump index processor is stopping.");
-    SharedPtr<StopProcessorTask> stop_task = MakeShared<StopProcessorTask>();
+    std::shared_ptr<StopProcessorTask> stop_task = std::make_shared<StopProcessorTask>();
     this->Submit(stop_task);
     stop_task->Wait();
     processor_thread_.join();
     LOG_INFO("Dump index processor is stopped.");
 }
 
-void DumpIndexProcessor::Submit(SharedPtr<BGTask> bg_task) {
+void DumpIndexProcessor::Submit(std::shared_ptr<BGTask> bg_task) {
     task_queue_.Enqueue(std::move(bg_task));
     ++task_count_;
 }
 
 void DumpIndexProcessor::DoDump(DumpMemIndexTask *dump_task) {
     auto *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
-    String db_name = dump_task->db_name_;
-    String table_name = dump_task->table_name_;
-    String index_name = dump_task->index_name_;
+    std::string db_name = dump_task->db_name_;
+    std::string table_name = dump_task->table_name_;
+    std::string index_name = dump_task->index_name_;
     SegmentID segment_id = dump_task->segment_id_;
     RowID begin_row_id = dump_task->begin_row_id_;
 
@@ -87,8 +87,8 @@ void DumpIndexProcessor::DoDump(DumpMemIndexTask *dump_task) {
     i64 dump_count = 0;
     do {
         dump_count++;
-        SharedPtr<BGTaskInfo> bg_task_info = MakeShared<BGTaskInfo>(BGTaskType::kDumpMemIndex);
-        SharedPtr<NewTxn> new_txn_shared = new_txn_mgr->BeginTxnShared(MakeUnique<String>("Dump index"), TransactionType::kNormal);
+        std::shared_ptr<BGTaskInfo> bg_task_info = std::make_shared<BGTaskInfo>(BGTaskType::kDumpMemIndex);
+        std::shared_ptr<NewTxn> new_txn_shared = new_txn_mgr->BeginTxnShared(std::make_unique<std::string>("Dump index"), TransactionType::kNormal);
 
         Status status = new_txn_shared->DumpMemIndex(db_name, table_name, index_name, segment_id, begin_row_id);
         if (status.ok()) {
@@ -104,7 +104,7 @@ void DumpIndexProcessor::DoDump(DumpMemIndexTask *dump_task) {
 
             DumpMemIndexTxnStore *dump_index_txn_store = static_cast<DumpMemIndexTxnStore *>(new_txn_shared->GetTxnStore());
             if (dump_index_txn_store != nullptr) {
-                String task_text = fmt::format("Txn: {}, commit: {}, dump mem index: {}.{}.{} in segment: {} into chunk:{}",
+                std::string task_text = fmt::format("Txn: {}, commit: {}, dump mem index: {}.{}.{} in segment: {} into chunk:{}",
                                                new_txn_shared->TxnID(),
                                                new_txn_shared->CommitTS(),
                                                db_name,
@@ -127,7 +127,7 @@ void DumpIndexProcessor::DoDump(DumpMemIndexTask *dump_task) {
                 UnrecoverableError(rollback_status.message());
             }
 
-            String task_text = fmt::format("Dump mem index: {}.{}.{} in segment: {}", db_name, table_name, index_name, segment_id);
+            std::string task_text = fmt::format("Dump mem index: {}.{}.{} in segment: {}", db_name, table_name, index_name, segment_id);
             bg_task_info->task_info_list_.emplace_back(task_text);
             bg_task_info->status_list_.emplace_back(status.message());
         }
@@ -141,7 +141,7 @@ void DumpIndexProcessor::DoDump(DumpMemIndexTask *dump_task) {
 void DumpIndexProcessor::Process() {
     bool running = true;
     while (running) {
-        Deque<SharedPtr<BGTask>> tasks;
+        std::deque<std::shared_ptr<BGTask>> tasks;
         task_queue_.DequeueBulk(tasks);
 
         for (const auto &bg_task : tasks) {

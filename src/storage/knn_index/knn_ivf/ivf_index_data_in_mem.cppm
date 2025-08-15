@@ -64,16 +64,16 @@ public:
     virtual u32 GetRowCount() const = 0;
 
     virtual void InsertBlockData(const SegmentOffset block_offset, const ColumnVector &col, BlockOffset row_offset, BlockOffset row_cnt) = 0;
-    virtual void Dump(BufferObj *buffer_obj, SizeT *p_dump_size = nullptr) = 0;
+    virtual void Dump(BufferObj *buffer_obj, size_t *p_dump_size = nullptr) = 0;
     void SearchIndex(const KnnDistanceBase1 *knn_distance,
                      const void *query_ptr,
                      EmbeddingDataType query_element_type,
                      u32 nprobe,
                      const std::function<bool(SegmentOffset)> &satisfy_filter_func,
                      const std::function<void(f32, SegmentOffset)> &add_result_func) const;
-    static SharedPtr<IVFIndexInMem> NewIVFIndexInMem(const ColumnDef *column_def, const IndexBase *index_base, RowID begin_row_id);
+    static std::shared_ptr<IVFIndexInMem> NewIVFIndexInMem(const ColumnDef *column_def, const IndexBase *index_base, RowID begin_row_id);
 
-    virtual SizeT MemoryUsed() const = 0;
+    virtual size_t MemoryUsed() const = 0;
 
     const ChunkIndexMetaInfo GetChunkIndexMetaInfo() const override;
 

@@ -26,7 +26,7 @@ import std.compat;
 
 namespace infinity {
 
-POSTable::POSTable(const String &file_name) : file_(file_name) {}
+POSTable::POSTable(const std::string &file_name) : file_(file_name) {}
 
 Status POSTable::Load() {
     std::ifstream from(file_);
@@ -34,7 +34,7 @@ Status POSTable::Load() {
         return Status::InvalidAnalyzerFile(file_);
     }
 
-    String line;
+    std::string line;
     i32 index = 0;
 
     while (getline(from, line)) {
@@ -59,22 +59,22 @@ const char *POSTable::GetPOS(i32 index) const {
     return pos_vec_[index].c_str();
 }
 
-i32 POSTable::GetPOSIndex(const String &tag) const {
-    Map<String, i32>::const_iterator it = pos_map_.find(tag);
+i32 POSTable::GetPOSIndex(const std::string &tag) const {
+    std::map<std::string, i32>::const_iterator it = pos_map_.find(tag);
     if (it != pos_map_.end())
         return it->second;
     return -1;
 }
 
-DartsTrie::DartsTrie() : darts_{MakeUnique<DartsCore>()} {}
+DartsTrie::DartsTrie() : darts_{std::make_unique<DartsCore>()} {}
 
-void DartsTrie::Add(const String &key, const int &value) { buffer_.push_back(DartsTuple(key, value)); }
+void DartsTrie::Add(const std::string &key, const int &value) { buffer_.push_back(DartsTuple(key, value)); }
 
 void DartsTrie::Build() {
     std::sort(buffer_.begin(), buffer_.end(), [](const DartsTuple &l, const DartsTuple &r) { return l.key_ < r.key_; });
-    Vector<const char *> keys;
-    Vector<std::size_t> lengths;
-    Vector<int> values;
+    std::vector<const char *> keys;
+    std::vector<std::size_t> lengths;
+    std::vector<int> values;
     for (auto &o : buffer_) {
         keys.push_back(o.key_.c_str());
         lengths.push_back(o.key_.size());
@@ -84,9 +84,9 @@ void DartsTrie::Build() {
     buffer_.clear();
 }
 
-void DartsTrie::Load(const String &file_name) { darts_->open(file_name.c_str()); }
+void DartsTrie::Load(const std::string &file_name) { darts_->open(file_name.c_str()); }
 
-void DartsTrie::Save(const String &file_name) { darts_->save(file_name.c_str()); }
+void DartsTrie::Save(const std::string &file_name) { darts_->save(file_name.c_str()); }
 
 // string literal "" is null-terminated
 constexpr std::string_view empty_null_terminated_sv = "";

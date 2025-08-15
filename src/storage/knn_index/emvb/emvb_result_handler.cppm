@@ -66,7 +66,7 @@ inline DistType median3(DistType a, DistType b, DistType c) {
 template <typename Compare, typename DistType>
 inline void count_lt_and_eq(const DistType *vals, const u32 n, DistType thresh, u32 &n_lt, u32 &n_eq) {
     n_lt = n_eq = 0;
-    for (SizeT i = 0; i < n; ++i) {
+    for (size_t i = 0; i < n; ++i) {
         auto v = *(vals++);
         if (Compare::Compare(thresh, v)) {
             n_lt++;
@@ -95,7 +95,7 @@ inline DistType sample_threshold_median3(const DistType *vals, const u32 n, Dist
     if (vi != 0) {
         return val3[0];
     }
-    for (SizeT i = 0; i < n; i++) {
+    for (size_t i = 0; i < n; i++) {
         if (const DistType v = vals[i]; Compare::Compare(v, thresh_inf) && Compare::Compare(thresh_sup, v)) {
             return v;
         }
@@ -179,16 +179,16 @@ class EMVBReservoirResultHandlerT {
     u32 capacity_;
     u32 size_;
     DistType threshold_;
-    UniquePtr<DistType[]> reservoir_distance_ptr_;
-    UniquePtr<ID[]> reservoir_id_ptr_;
+    std::unique_ptr<DistType[]> reservoir_distance_ptr_;
+    std::unique_ptr<ID[]> reservoir_id_ptr_;
 
 public:
     explicit EMVBReservoirResultHandlerT(const u32 top_k) : top_k_{top_k}, capacity_{2 * top_k}, size_{0}, threshold_{Compare::InitialValue()} {
         if (capacity_ < 8) {
             capacity_ = 8;
         }
-        reservoir_distance_ptr_ = MakeUniqueForOverwrite<DistType[]>(capacity_);
-        reservoir_id_ptr_ = MakeUniqueForOverwrite<ID[]>(capacity_);
+        reservoir_distance_ptr_ = std::make_unique_for_overwrite<DistType[]>(capacity_);
+        reservoir_id_ptr_ = std::make_unique_for_overwrite<ID[]>(capacity_);
     }
 
     [[nodiscard]] auto GetThreshold() const { return threshold_; }

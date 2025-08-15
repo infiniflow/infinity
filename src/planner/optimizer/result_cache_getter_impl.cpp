@@ -39,18 +39,18 @@ import third_party;
 
 namespace infinity {
 
-void ResultCacheGetter::ApplyToPlan(QueryContext *query_context_ptr, SharedPtr<LogicalNode> &logical_plan) {
+void ResultCacheGetter::ApplyToPlan(QueryContext *query_context_ptr, std::shared_ptr<LogicalNode> &logical_plan) {
     ResultCacheManager *cache_mgr = query_context_ptr->storage()->result_cache_manager();
     if (cache_mgr == nullptr) {
         return;
     }
     TxnTimeStamp begin_ts = query_context_ptr->GetNewTxn()->BeginTS();
-    std::function<void(SharedPtr<LogicalNode> &)> visit_node = [&](SharedPtr<LogicalNode> &op) {
+    std::function<void(std::shared_ptr<LogicalNode> &)> visit_node = [&](std::shared_ptr<LogicalNode> &op) {
         if (!op) {
             return;
         }
-        Optional<CacheOutput> cache_output;
-        SharedPtr<BaseTableRef> base_table_ref;
+        std::optional<CacheOutput> cache_output;
+        std::shared_ptr<BaseTableRef> base_table_ref;
         bool is_min_heap = false;
         switch (op->operator_type()) {
             case LogicalNodeType::kMatch: {
@@ -105,7 +105,7 @@ void ResultCacheGetter::ApplyToPlan(QueryContext *query_context_ptr, SharedPtr<L
             LOG_INFO(fmt::format("No cache found for match node {}", op->node_id()));
         } else {
             LOG_INFO(fmt::format("Cache found for match node {}", op->node_id()));
-            auto logical_read_cache = MakeShared<LogicalReadCache>(op->node_id(),
+            auto logical_read_cache = std::make_shared<LogicalReadCache>(op->node_id(),
                                                                    op->operator_type(),
                                                                    base_table_ref,
                                                                    std::move(cache_output->cache_content_),

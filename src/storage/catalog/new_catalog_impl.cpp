@@ -73,7 +73,7 @@ NewCatalog::~NewCatalog() = default;
 
 Status NewCatalog::Init(KVStore *kv_store) {
     auto kv_instance = kv_store->GetInstance();
-    String db_string_id;
+    std::string db_string_id;
     Status status = kv_instance->Get(NEXT_DATABASE_ID.data(), db_string_id);
     if (!status.ok()) {
         kv_instance->Put(NEXT_DATABASE_ID.data(), "0");
@@ -85,12 +85,12 @@ Status NewCatalog::Init(KVStore *kv_store) {
     return Status::OK();
 }
 
-Status NewCatalog::AddBlockLock(String block_key) {
+Status NewCatalog::AddBlockLock(std::string block_key) {
     bool insert_success = false;
-    HashMap<String, SharedPtr<BlockLock>>::iterator iter;
+    std::unordered_map<std::string, std::shared_ptr<BlockLock>>::iterator iter;
     {
         std::unique_lock lock(block_lock_mtx_);
-        std::tie(iter, insert_success) = block_lock_map_.emplace(std::move(block_key), MakeShared<BlockLock>());
+        std::tie(iter, insert_success) = block_lock_map_.emplace(std::move(block_key), std::make_shared<BlockLock>());
     }
     if (!insert_success) {
         return Status::CatalogError(fmt::format("Block key: {} already exists", iter->first));
@@ -98,12 +98,12 @@ Status NewCatalog::AddBlockLock(String block_key) {
     return Status::OK();
 }
 
-Status NewCatalog::AddBlockLock(String block_key, TxnTimeStamp checkpoint_ts) {
+Status NewCatalog::AddBlockLock(std::string block_key, TxnTimeStamp checkpoint_ts) {
     bool insert_success = false;
-    HashMap<String, SharedPtr<BlockLock>>::iterator iter;
+    std::unordered_map<std::string, std::shared_ptr<BlockLock>>::iterator iter;
     {
         std::unique_lock lock(block_lock_mtx_);
-        std::tie(iter, insert_success) = block_lock_map_.emplace(std::move(block_key), MakeShared<BlockLock>(checkpoint_ts));
+        std::tie(iter, insert_success) = block_lock_map_.emplace(std::move(block_key), std::make_shared<BlockLock>(checkpoint_ts));
     }
     if (!insert_success) {
         return Status::CatalogError(fmt::format("Block key: {} already exists", iter->first));
@@ -111,7 +111,7 @@ Status NewCatalog::AddBlockLock(String block_key, TxnTimeStamp checkpoint_ts) {
     return Status::OK();
 }
 
-Status NewCatalog::GetBlockLock(const String &block_key, SharedPtr<BlockLock> &block_lock) {
+Status NewCatalog::GetBlockLock(const std::string &block_key, std::shared_ptr<BlockLock> &block_lock) {
     block_lock = nullptr;
     {
         std::shared_lock<std::shared_mutex> lck(block_lock_mtx_);
@@ -125,7 +125,7 @@ Status NewCatalog::GetBlockLock(const String &block_key, SharedPtr<BlockLock> &b
     return Status::OK();
 }
 
-Status NewCatalog::DropBlockLockByBlockKey(const String &block_key) {
+Status NewCatalog::DropBlockLockByBlockKey(const std::string &block_key) {
     bool delete_success = false;
     {
         std::unique_lock lock(block_lock_mtx_);
@@ -137,27 +137,27 @@ Status NewCatalog::DropBlockLockByBlockKey(const String &block_key) {
     return Status::OK();
 }
 
-SharedPtr<MemIndex> NewCatalog::GetMemIndex(const String &mem_index_key) {
+std::shared_ptr<MemIndex> NewCatalog::GetMemIndex(const std::string &mem_index_key) {
     std::unique_lock<std::shared_mutex> lck(mem_index_mtx_);
     if (auto iter = mem_index_map_.find(mem_index_key); iter != mem_index_map_.end()) {
         return iter->second;
     }
-    SharedPtr<MemIndex> mem_index = MakeShared<MemIndex>();
+    std::shared_ptr<MemIndex> mem_index = std::make_shared<MemIndex>();
     mem_index_map_.emplace(mem_index_key, mem_index);
     return mem_index;
 }
 
-SharedPtr<MemIndex> NewCatalog::PopMemIndex(const String &mem_index_key) {
+std::shared_ptr<MemIndex> NewCatalog::PopMemIndex(const std::string &mem_index_key) {
     std::unique_lock<std::shared_mutex> lck(mem_index_mtx_);
     if (auto iter = mem_index_map_.find(mem_index_key); iter != mem_index_map_.end()) {
-        SharedPtr<MemIndex> mem_index = iter->second;
+        std::shared_ptr<MemIndex> mem_index = iter->second;
         mem_index_map_.erase(iter);
         return mem_index;
     }
     return nullptr;
 }
 
-bool NewCatalog::HasMemIndex(const String &mem_index_key) {
+bool NewCatalog::HasMemIndex(const std::string &mem_index_key) {
     std::unique_lock<std::shared_mutex> lck(mem_index_mtx_);
     if (auto iter = mem_index_map_.find(mem_index_key); iter != mem_index_map_.end()) {
         return true;
@@ -165,7 +165,7 @@ bool NewCatalog::HasMemIndex(const String &mem_index_key) {
     return false;
 }
 
-Status NewCatalog::DropMemIndexByMemIndexKey(const String &mem_index_key) {
+Status NewCatalog::DropMemIndexByMemIndexKey(const std::string &mem_index_key) {
     bool delete_success = false;
     {
         std::unique_lock lock(mem_index_mtx_);
@@ -177,8 +177,8 @@ Status NewCatalog::DropMemIndexByMemIndexKey(const String &mem_index_key) {
     return Status::OK();
 }
 
-Vector<Pair<String, String>> NewCatalog::GetAllMemIndexInfo() {
-    Vector<Pair<String, String>> result;
+std::vector<std::pair<std::string, std::string>> NewCatalog::GetAllMemIndexInfo() {
+    std::vector<std::pair<std::string, std::string>> result;
     {
         std::unique_lock lock(mem_index_mtx_);
         for (const auto &mem_index_pair : mem_index_map_) {
@@ -213,9 +213,9 @@ Vector<Pair<String, String>> NewCatalog::GetAllMemIndexInfo() {
     return result;
 }
 
-Status NewCatalog::AddFtIndexCache(String ft_index_cache_key, SharedPtr<TableIndexReaderCache> ft_index_cache) {
+Status NewCatalog::AddFtIndexCache(std::string ft_index_cache_key, std::shared_ptr<TableIndexReaderCache> ft_index_cache) {
     bool insert_success = false;
-    HashMap<String, SharedPtr<TableIndexReaderCache>>::iterator iter;
+    std::unordered_map<std::string, std::shared_ptr<TableIndexReaderCache>>::iterator iter;
     {
         std::unique_lock lock(ft_index_cache_mtx_);
         std::tie(iter, insert_success) = ft_index_cache_map_.emplace(std::move(ft_index_cache_key), std::move(ft_index_cache));
@@ -226,7 +226,7 @@ Status NewCatalog::AddFtIndexCache(String ft_index_cache_key, SharedPtr<TableInd
     return Status::OK();
 }
 
-Status NewCatalog::GetFtIndexCache(const String &ft_index_cache_key, SharedPtr<TableIndexReaderCache> &ft_index_cache) {
+Status NewCatalog::GetFtIndexCache(const std::string &ft_index_cache_key, std::shared_ptr<TableIndexReaderCache> &ft_index_cache) {
     std::unique_lock<std::shared_mutex> lck(ft_index_cache_mtx_);
     if (auto iter = ft_index_cache_map_.find(ft_index_cache_key); iter != ft_index_cache_map_.end()) {
         ft_index_cache = iter->second;
@@ -236,7 +236,7 @@ Status NewCatalog::GetFtIndexCache(const String &ft_index_cache_key, SharedPtr<T
     return Status::OK();
 }
 
-Status NewCatalog::DropFtIndexCacheByFtIndexCacheKey(const String &ft_index_cache_key) {
+Status NewCatalog::DropFtIndexCacheByFtIndexCacheKey(const std::string &ft_index_cache_key) {
     bool delete_success = false;
     {
         std::unique_lock lock(ft_index_cache_mtx_);
@@ -248,9 +248,9 @@ Status NewCatalog::DropFtIndexCacheByFtIndexCacheKey(const String &ft_index_cach
     return Status::OK();
 }
 
-Status NewCatalog::AddSegmentUpdateTS(String segment_update_ts_key, SharedPtr<SegmentUpdateTS> segment_update_ts) {
+Status NewCatalog::AddSegmentUpdateTS(std::string segment_update_ts_key, std::shared_ptr<SegmentUpdateTS> segment_update_ts) {
     bool insert_success = false;
-    HashMap<String, SharedPtr<SegmentUpdateTS>>::iterator iter;
+    std::unordered_map<std::string, std::shared_ptr<SegmentUpdateTS>>::iterator iter;
     {
         std::unique_lock lock(segment_update_ts_mtx_);
         std::tie(iter, insert_success) = segment_update_ts_map_.emplace(std::move(segment_update_ts_key), std::move(segment_update_ts));
@@ -261,7 +261,7 @@ Status NewCatalog::AddSegmentUpdateTS(String segment_update_ts_key, SharedPtr<Se
     return Status::OK();
 }
 
-Status NewCatalog::GetSegmentUpdateTS(const String &segment_update_ts_key, SharedPtr<SegmentUpdateTS> &segment_update_ts) {
+Status NewCatalog::GetSegmentUpdateTS(const std::string &segment_update_ts_key, std::shared_ptr<SegmentUpdateTS> &segment_update_ts) {
     segment_update_ts = nullptr;
     {
         std::shared_lock<std::shared_mutex> lck(segment_update_ts_mtx_);
@@ -275,56 +275,56 @@ Status NewCatalog::GetSegmentUpdateTS(const String &segment_update_ts_key, Share
     return Status::OK();
 }
 
-void NewCatalog::DropSegmentUpdateTSByKey(const String &segment_update_ts_key) {
+void NewCatalog::DropSegmentUpdateTSByKey(const std::string &segment_update_ts_key) {
     std::unique_lock lock(segment_update_ts_mtx_);
     segment_update_ts_map_.erase(segment_update_ts_key);
 }
 
-Status NewCatalog::GetCleanedMeta(TxnTimeStamp ts, KVInstance *kv_instance, Vector<UniquePtr<MetaKey>> &metas, Vector<String> &drop_keys) const {
-    auto GetCleanedMetaImpl = [&](const Vector<String> &keys) {
-        const String &type_str = keys[1];
-        const String &meta_str = keys[2];
+Status NewCatalog::GetCleanedMeta(TxnTimeStamp ts, KVInstance *kv_instance, std::vector<std::unique_ptr<MetaKey>> &metas, std::vector<std::string> &drop_keys) const {
+    auto GetCleanedMetaImpl = [&](const std::vector<std::string> &keys) {
+        const std::string &type_str = keys[1];
+        const std::string &meta_str = keys[2];
         auto meta_infos = infinity::Partition(meta_str, '/');
         if (type_str == "db") {
-            metas.emplace_back(MakeUnique<DBMetaKey>(std::move(meta_infos[2]), std::move(meta_infos[0]), std::stoull(meta_infos[1])));
+            metas.emplace_back(std::make_unique<DBMetaKey>(std::move(meta_infos[2]), std::move(meta_infos[0]), std::stoull(meta_infos[1])));
         } else if (type_str == "tbl") {
-            UniquePtr<TableMetaKey> table_meta_key =
-                MakeUnique<TableMetaKey>(std::move(meta_infos[0]), std::move(meta_infos[3]), std::move(meta_infos[1]));
+            std::unique_ptr<TableMetaKey> table_meta_key =
+                std::make_unique<TableMetaKey>(std::move(meta_infos[0]), std::move(meta_infos[3]), std::move(meta_infos[1]));
             table_meta_key->commit_ts_ = std::stoull(meta_infos[2]);
             metas.emplace_back(std::move(table_meta_key));
         } else if (type_str == "tbl_name") {
-            UniquePtr<TableNameMetaKey> table_name_meta_key =
-                MakeUnique<TableNameMetaKey>(std::move(meta_infos[0]), std::move(meta_infos[3]), std::move(meta_infos[1]));
+            std::unique_ptr<TableNameMetaKey> table_name_meta_key =
+                std::make_unique<TableNameMetaKey>(std::move(meta_infos[0]), std::move(meta_infos[3]), std::move(meta_infos[1]));
             table_name_meta_key->commit_ts_ = std::stoull(meta_infos[2]);
             metas.emplace_back(std::move(table_name_meta_key));
         } else if (type_str == "seg") {
-            metas.emplace_back(MakeUnique<SegmentMetaKey>(std::move(meta_infos[0]), std::move(meta_infos[1]), std::stoull(meta_infos[2])));
+            metas.emplace_back(std::make_unique<SegmentMetaKey>(std::move(meta_infos[0]), std::move(meta_infos[1]), std::stoull(meta_infos[2])));
         } else if (type_str == "blk") {
             metas.emplace_back(
-                MakeUnique<BlockMetaKey>(std::move(meta_infos[0]), std::move(meta_infos[1]), std::stoull(meta_infos[2]), std::stoull(meta_infos[3])));
+                std::make_unique<BlockMetaKey>(std::move(meta_infos[0]), std::move(meta_infos[1]), std::stoull(meta_infos[2]), std::stoull(meta_infos[3])));
         } else if (type_str == "tbl_col") {
-            UniquePtr<TableColumnMetaKey> table_column_meta_key =
-                MakeUnique<TableColumnMetaKey>(std::move(meta_infos[0]), std::move(meta_infos[1]), std::move(meta_infos[2]));
+            std::unique_ptr<TableColumnMetaKey> table_column_meta_key =
+                std::make_unique<TableColumnMetaKey>(std::move(meta_infos[0]), std::move(meta_infos[1]), std::move(meta_infos[2]));
             table_column_meta_key->commit_ts_ = std::stoull(meta_infos[3]);
             metas.emplace_back(std::move(table_column_meta_key));
         } else if (type_str == "blk_col") {
-            metas.emplace_back(MakeUnique<ColumnMetaKey>(std::move(meta_infos[0]),
+            metas.emplace_back(std::make_unique<ColumnMetaKey>(std::move(meta_infos[0]),
                                                          std::move(meta_infos[1]),
                                                          std::stoull(meta_infos[2]),
                                                          std::stoull(meta_infos[3]),
                                                          ColumnDef::FromJson(meta_infos[4])));
         } else if (type_str == "idx") {
-            UniquePtr<TableIndexMetaKey> table_index_meta_key =
-                MakeUnique<TableIndexMetaKey>(std::move(meta_infos[0]), std::move(meta_infos[1]), std::move(meta_infos[4]), std::move(meta_infos[2]));
+            std::unique_ptr<TableIndexMetaKey> table_index_meta_key =
+                std::make_unique<TableIndexMetaKey>(std::move(meta_infos[0]), std::move(meta_infos[1]), std::move(meta_infos[4]), std::move(meta_infos[2]));
             table_index_meta_key->commit_ts_ = std::stoull(meta_infos[3]);
             metas.emplace_back(std::move(table_index_meta_key));
         } else if (type_str == "idx_seg") {
-            metas.emplace_back(MakeUnique<SegmentIndexMetaKey>(std::move(meta_infos[0]),
+            metas.emplace_back(std::make_unique<SegmentIndexMetaKey>(std::move(meta_infos[0]),
                                                                std::move(meta_infos[1]),
                                                                std::move(meta_infos[2]),
                                                                std::stoull(meta_infos[3])));
         } else if (type_str == "idx_chunk") {
-            metas.emplace_back(MakeUnique<ChunkIndexMetaKey>(std::move(meta_infos[0]),
+            metas.emplace_back(std::make_unique<ChunkIndexMetaKey>(std::move(meta_infos[0]),
                                                              std::move(meta_infos[1]),
                                                              std::move(meta_infos[2]),
                                                              std::stoull(meta_infos[3]),
@@ -337,7 +337,7 @@ Status NewCatalog::GetCleanedMeta(TxnTimeStamp ts, KVInstance *kv_instance, Vect
     static constexpr std::string drop_prefix = "drop";
     auto iter = kv_instance->GetIterator();
     iter->Seek(drop_prefix);
-    String drop_key, commit_ts_str;
+    std::string drop_key, commit_ts_str;
     TxnTimeStamp drop_ts;
 
     while (iter->Valid() && iter->Key().starts_with(drop_prefix)) {
@@ -345,8 +345,8 @@ Status NewCatalog::GetCleanedMeta(TxnTimeStamp ts, KVInstance *kv_instance, Vect
         commit_ts_str = iter->Value().ToString();
 
         auto keys = infinity::Partition(drop_key, '|');
-        const String &type_str = keys[1];
-        const String &meta_str = keys[2];
+        const std::string &type_str = keys[1];
+        const std::string &meta_str = keys[2];
         auto meta_infos = infinity::Partition(meta_str, '/');
         if (type_str == "db") {
             drop_ts = std::stoull(meta_infos[1]);
@@ -372,8 +372,8 @@ Status NewCatalog::GetCleanedMeta(TxnTimeStamp ts, KVInstance *kv_instance, Vect
         GetCleanedMetaImpl(keys);
     }
     // Delete entities at lower hierarchy level first to avoid missing them when removing higher-level entities.
-    std::sort(metas.begin(), metas.end(), [&](const UniquePtr<MetaKey> &lhs, const UniquePtr<MetaKey> &rhs) {
-        return static_cast<SizeT>(lhs->type_) > static_cast<SizeT>(rhs->type_);
+    std::sort(metas.begin(), metas.end(), [&](const std::unique_ptr<MetaKey> &lhs, const std::unique_ptr<MetaKey> &rhs) {
+        return static_cast<size_t>(lhs->type_) > static_cast<size_t>(rhs->type_);
     });
     return Status::OK();
 }
@@ -382,22 +382,22 @@ void NewCatalog::SetLastCleanupTS(TxnTimeStamp cleanup_ts) { last_cleanup_ts_ = 
 
 TxnTimeStamp NewCatalog::GetLastCleanupTS() const { return last_cleanup_ts_; }
 
-SharedPtr<MetaTree> NewCatalog::MakeMetaTree() const {
+std::shared_ptr<MetaTree> NewCatalog::MakeMetaTree() const {
     auto entries = this->MakeMetaKeys();
     auto meta_tree_ptr = MetaTree::MakeMetaTree(entries);
     return meta_tree_ptr;
 }
 
-Vector<SharedPtr<MetaKey>> NewCatalog::MakeMetaKeys() const {
+std::vector<std::shared_ptr<MetaKey>> NewCatalog::MakeMetaKeys() const {
     auto kv_instance_ptr = kv_store_->GetInstance();
     auto all_key_values = kv_instance_ptr->GetAllKeyValue();
     auto meta_count = all_key_values.size();
 
-    Vector<SharedPtr<MetaKey>> meta_keys;
+    std::vector<std::shared_ptr<MetaKey>> meta_keys;
     meta_keys.reserve(meta_count);
 
-    Vector<String> dropped_keys;
-    Vector<UniquePtr<MetaKey>> metas;
+    std::vector<std::string> dropped_keys;
+    std::vector<std::unique_ptr<MetaKey>> metas;
     Status status = GetCleanedMeta(MAX_TIMESTAMP, kv_instance_ptr.get(), metas, dropped_keys);
     if (!status.ok()) {
         LOG_ERROR((fmt::format("GetCleanedMeta failed: {}", status.message())));
@@ -405,16 +405,16 @@ Vector<SharedPtr<MetaKey>> NewCatalog::MakeMetaKeys() const {
     }
 
     // Get encode keys for dropped metas.
-    Vector<String> keys_encode = GetEncodeKeys(metas);
+    std::vector<std::string> keys_encode = GetEncodeKeys(metas);
 
-    for (SizeT idx = 0; idx < meta_count; ++idx) {
+    for (size_t idx = 0; idx < meta_count; ++idx) {
         const auto &pair = all_key_values[idx];
         // Skip dropped metas.
         if (!keys_encode.empty() && std::find(keys_encode.begin(), keys_encode.end(), pair.first) != keys_encode.end()) {
             continue;
         }
 
-        SharedPtr<MetaKey> meta_key = MetaParse(pair.first, pair.second);
+        std::shared_ptr<MetaKey> meta_key = MetaParse(pair.first, pair.second);
         if (meta_key == nullptr) {
             LOG_ERROR(fmt::format("Can't parse {}: {}: {}", idx, pair.first, pair.second));
         } else {
@@ -438,20 +438,20 @@ Vector<SharedPtr<MetaKey>> NewCatalog::MakeMetaKeys() const {
     return meta_keys;
 }
 
-UniquePtr<SystemCache> NewCatalog::RestoreCatalogCache(Storage *storage_ptr) {
+std::unique_ptr<SystemCache> NewCatalog::RestoreCatalogCache(Storage *storage_ptr) {
     LOG_INFO("Restore catalog cache");
 
     auto meta_tree = this->MakeMetaTree();
-    // Vector<> = meta_tree->Check();
-    // String meta_tree_str = meta_tree->ToJson().dump(4);
+    // std::vector<> = meta_tree->Check();
+    // std::string meta_tree_str = meta_tree->ToJson().dump(4);
     // LOG_INFO(meta_tree_str);
 
-    UniquePtr<SystemCache> system_cache = meta_tree->RestoreSystemCache(storage_ptr);
-    // Vector<MetaTableObject *> table_ptrs = meta_tree->ListTables();
+    std::unique_ptr<SystemCache> system_cache = meta_tree->RestoreSystemCache(storage_ptr);
+    // std::vector<MetaTableObject *> table_ptrs = meta_tree->ListTables();
     // for (const auto &table_ptr : table_ptrs) {
     //     SegmentID unsealed_segment_id = table_ptr->GetUnsealedSegmentID();
     //     SegmentID next_segment_id = table_ptr->GetNextSegmentID();
-    //     SizeT current_segment_row_count = table_ptr->GetCurrentSegmentRowCount(storage_ptr);
+    //     size_t current_segment_row_count = table_ptr->GetCurrentSegmentRowCount(storage_ptr);
     //     LOG_INFO(fmt::format("Table: {}, unsealed_segment_id: {}, next_segment_id: {}, current_segment_row_count: {}",
     //                          table_ptr->GetTableName(),
     //                          unsealed_segment_id,
@@ -464,8 +464,8 @@ UniquePtr<SystemCache> NewCatalog::RestoreCatalogCache(Storage *storage_ptr) {
 
 KVStore *NewCatalog::kv_store() const { return kv_store_; }
 
-Vector<String> NewCatalog::GetEncodeKeys(Vector<UniquePtr<MetaKey>> &metas) const {
-    Vector<String> keys_encode;
+std::vector<std::string> NewCatalog::GetEncodeKeys(std::vector<std::unique_ptr<MetaKey>> &metas) const {
+    std::vector<std::string> keys_encode;
     keys_encode.reserve(metas.size());
     for (auto &meta : metas) {
         switch (meta->type_) {

@@ -36,7 +36,7 @@ public:
 
     void Stop();
 
-    void Submit(SharedPtr<BGTask> bg_task);
+    void Submit(std::shared_ptr<BGTask> bg_task);
 
     u64 RunningTaskCount() const { return task_count_; }
 
@@ -44,11 +44,11 @@ private:
     void Process();
 
 private:
-    BlockingQueue<SharedPtr<BGTask>> task_queue_{"MemIndexAppender"};
+    BlockingQueue<std::shared_ptr<BGTask>> task_queue_{"MemIndexAppender"};
 
-    Thread processor_thread_{};
+    std::thread processor_thread_{};
 
-    Atomic<u64> task_count_{};
+    std::atomic<u64> task_count_{};
 };
 
 } // namespace infinity

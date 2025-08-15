@@ -33,7 +33,7 @@ public:
     void InitStemmer(Language language) { CommonLanguageAnalyzer::InitStemmer(language); }
 
 protected:
-    inline void Parse(const String &input) override {
+    inline void Parse(const std::string &input) override {
         tokenizer_.Tokenize(input);
         local_offset_ = 0;
         ResetToken();

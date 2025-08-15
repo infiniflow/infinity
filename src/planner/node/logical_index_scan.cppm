@@ -34,34 +34,34 @@ namespace infinity {
 export class LogicalIndexScan : public LogicalNode {
 public:
     explicit LogicalIndexScan(u64 node_id,
-                              SharedPtr<BaseTableRef> &&base_table_ref,
-                              SharedPtr<BaseExpression> &&index_filter,
-                              UniquePtr<IndexFilterEvaluator> &&index_filter_evaluator,
-                              UniquePtr<FastRoughFilterEvaluator> &&fast_rough_filter_evaluator,
+                              std::shared_ptr<BaseTableRef> &&base_table_ref,
+                              std::shared_ptr<BaseExpression> &&index_filter,
+                              std::unique_ptr<IndexFilterEvaluator> &&index_filter_evaluator,
+                              std::unique_ptr<FastRoughFilterEvaluator> &&fast_rough_filter_evaluator,
                               bool add_row_id = true);
 
-    [[nodiscard]] Vector<ColumnBinding> GetColumnBindings() const final;
+    [[nodiscard]] std::vector<ColumnBinding> GetColumnBindings() const final;
 
-    [[nodiscard]] SharedPtr<Vector<String>> GetOutputNames() const final;
+    [[nodiscard]] std::shared_ptr<std::vector<std::string>> GetOutputNames() const final;
 
-    [[nodiscard]] SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const final;
+    [[nodiscard]] std::shared_ptr<std::vector<std::shared_ptr<DataType>>> GetOutputTypes() const final;
 
     [[nodiscard]] TableInfo *table_info() const;
 
-    [[nodiscard]] String TableAlias() const;
+    [[nodiscard]] std::string TableAlias() const;
 
     [[nodiscard]] u64 TableIndex() const;
 
-    String ToString(i64 &space) const final;
+    std::string ToString(i64 &space) const final;
 
-    inline String name() final { return "LogicalIndexScan"; }
+    inline std::string name() final { return "LogicalIndexScan"; }
 
-    SharedPtr<BaseTableRef> base_table_ref_{};
+    std::shared_ptr<BaseTableRef> base_table_ref_{};
 
-    SharedPtr<BaseExpression> index_filter_;
-    UniquePtr<IndexFilterEvaluator> index_filter_evaluator_;
+    std::shared_ptr<BaseExpression> index_filter_;
+    std::unique_ptr<IndexFilterEvaluator> index_filter_evaluator_;
 
-    UniquePtr<FastRoughFilterEvaluator> fast_rough_filter_evaluator_;
+    std::unique_ptr<FastRoughFilterEvaluator> fast_rough_filter_evaluator_;
 
     bool add_row_id_;
 };

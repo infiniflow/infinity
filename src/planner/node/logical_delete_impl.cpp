@@ -33,28 +33,28 @@ import data_type;
 
 namespace infinity {
 
-Vector<ColumnBinding> LogicalDelete::GetColumnBindings() const { return {}; }
+std::vector<ColumnBinding> LogicalDelete::GetColumnBindings() const { return {}; }
 
-SharedPtr<Vector<String>> LogicalDelete::GetOutputNames() const {
-    SharedPtr<Vector<String>> result = MakeShared<Vector<String>>();
+std::shared_ptr<std::vector<std::string>> LogicalDelete::GetOutputNames() const {
+    std::shared_ptr<std::vector<std::string>> result = std::make_shared<std::vector<std::string>>();
     result->emplace_back("OK");
     return result;
 }
 
-SharedPtr<Vector<SharedPtr<DataType>>> LogicalDelete::GetOutputTypes() const {
-    SharedPtr<Vector<SharedPtr<DataType>>> result_type = MakeShared<Vector<SharedPtr<DataType>>>();
-    result_type->emplace_back(MakeShared<DataType>(LogicalType::kInteger));
+std::shared_ptr<std::vector<std::shared_ptr<DataType>>> LogicalDelete::GetOutputTypes() const {
+    std::shared_ptr<std::vector<std::shared_ptr<DataType>>> result_type = std::make_shared<std::vector<std::shared_ptr<DataType>>>();
+    result_type->emplace_back(std::make_shared<DataType>(LogicalType::kInteger));
     return result_type;
 }
 
-String LogicalDelete::ToString(i64 &space) const {
+std::string LogicalDelete::ToString(i64 &space) const {
     std::stringstream ss;
-    String arrow_str;
+    std::string arrow_str;
     if (space > 3) {
         space -= 4;
         arrow_str = "->  ";
     }
-    ss << String(space, ' ') << arrow_str << "DELETE FROM ";
+    ss << std::string(space, ' ') << arrow_str << "DELETE FROM ";
     ss << *table_info_->db_name_ << "." << *table_info_->table_name_;
     space += arrow_str.size();
 

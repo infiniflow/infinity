@@ -12,11 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:rocksdb_merge_operator;
 
-import :stl;
+import :infinity_type;
+
+import std;
 
 import third_party;
 
@@ -24,7 +24,7 @@ namespace infinity {
 
 export class String2UInt64AddOperator : public rocksdb::AssociativeMergeOperator {
 public:
-    static SharedPtr<String2UInt64AddOperator> Create() { return MakeShared<String2UInt64AddOperator>(); }
+    static std::shared_ptr<String2UInt64AddOperator> Create() { return std::make_shared<String2UInt64AddOperator>(); }
 
     static const char *kClassName() { return "String2UInt64AddOperator"; }
     static const char *kNickName() { return "string2uint64add"; }

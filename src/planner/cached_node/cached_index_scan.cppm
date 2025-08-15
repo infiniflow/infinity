@@ -36,7 +36,7 @@ public:
     bool Eq(const CachedNodeBase &other) const override;
 
 private:
-    SharedPtr<BaseExpression> filter_expression_;
+    std::shared_ptr<BaseExpression> filter_expression_;
 };
 
 } // namespace infinity

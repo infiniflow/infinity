@@ -37,10 +37,10 @@ import internal_types;
 
 namespace infinity {
 
-RankFeaturesDocIterator::RankFeaturesDocIterator(Vector<UniquePtr<DocIterator>> &&iterators) : MultiDocIterator(std::move(iterators)) {
+RankFeaturesDocIterator::RankFeaturesDocIterator(std::vector<std::unique_ptr<DocIterator>> &&iterators) : MultiDocIterator(std::move(iterators)) {
     estimate_iterate_cost_ = {};
-    const SizeT num_iterators = children_.size();
-    for (SizeT i = 0; i < num_iterators; i++) {
+    const size_t num_iterators = children_.size();
+    for (size_t i = 0; i < num_iterators; i++) {
         auto it = dynamic_cast<const RankFeatureDocIterator *>(children_[i].get());
         if (it == nullptr) {
             UnrecoverableError("RankFeaturesDocIterator only supports RankFeatureDocIterator");

@@ -33,7 +33,7 @@ PeriodicTriggerThread::~PeriodicTriggerThread() {
 void PeriodicTriggerThread::Start() {
     LOG_INFO("Periodic trigger start ...");
     running_ = true;
-    thread_ = Thread([this] { Run(); });
+    thread_ = std::thread([this] { Run(); });
 }
 
 void PeriodicTriggerThread::Stop() {

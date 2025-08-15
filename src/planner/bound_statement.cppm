@@ -27,10 +27,10 @@ class QueryContext;
 
 export struct BoundStatement {
 public:
-    SharedPtr<Vector<String>> names_ptr_{};
-    SharedPtr<Vector<SharedPtr<DataType>>> types_ptr_{};
+    std::shared_ptr<std::vector<std::string>> names_ptr_{};
+    std::shared_ptr<std::vector<std::shared_ptr<DataType>>> types_ptr_{};
 
-    virtual SharedPtr<LogicalNode> BuildPlan(QueryContext *query_context) = 0;
+    virtual std::shared_ptr<LogicalNode> BuildPlan(QueryContext *query_context) = 0;
     virtual ~BoundStatement() = default;
 };
 

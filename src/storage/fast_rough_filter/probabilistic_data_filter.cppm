@@ -35,7 +35,7 @@ export u64 ConvertValueToU64(const Value &value);
 export class ProbabilisticDataFilter {
 private:
     // should always be resized and initialized when minmax filter is built
-    Vector<UniquePtr<BinaryFuse>> binary_fuse_filters_;
+    std::vector<std::unique_ptr<BinaryFuse>> binary_fuse_filters_;
 
 public:
     constexpr static std::string_view JsonTag = "probabilistic_data_filter";
@@ -45,7 +45,7 @@ public:
     explicit ProbabilisticDataFilter(u32 column_count) : binary_fuse_filters_(column_count) {
         // fill the vector with valid objects
         for (u32 i = 0; i < binary_fuse_filters_.size(); ++i) {
-            binary_fuse_filters_[i] = MakeUnique<BinaryFuse>();
+            binary_fuse_filters_[i] = std::make_unique<BinaryFuse>();
         }
     }
 
@@ -127,8 +127,8 @@ u64 ConvertValueToU64<TimestampT>(const TimestampT &value) {
 }
 
 template <>
-u64 ConvertValueToU64<String>(const String &value) {
-    return std::hash<String>{}(value);
+u64 ConvertValueToU64<std::string>(const std::string &value) {
+    return std::hash<std::string>{}(value);
 }
 
 } // namespace infinity

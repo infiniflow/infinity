@@ -33,7 +33,7 @@ import data_type;
 
 namespace infinity {
 
-static String TableTypeToString(TableType type) {
+static std::string TableTypeToString(TableType type) {
     switch (type) {
         case TableType::kInvalid: {
             UnrecoverableError("Unexpected table type: Invalid");
@@ -59,13 +59,13 @@ static String TableTypeToString(TableType type) {
     return "";
 }
 
-String DataTable::ToString() const {
+std::string DataTable::ToString() const {
     std::stringstream ss;
     ss << definition_ptr_->ToString();
     ss << "Table type: " << TableTypeToString(type_) << " Row count: " << row_count_ << std::endl;
 
-    SizeT block_count = data_blocks_.size();
-    for (SizeT idx = 0; idx < block_count; ++idx) {
+    size_t block_count = data_blocks_.size();
+    for (size_t idx = 0; idx < block_count; ++idx) {
         ss << "Block " << idx << std::endl;
         ss << data_blocks_[idx]->ToString();
     }
@@ -73,62 +73,62 @@ String DataTable::ToString() const {
     return ss.str();
 }
 
-SharedPtr<Vector<RowID>> DataTable::GetRowIDVector() const {
-    SizeT block_count = data_blocks_.size();
-    SharedPtr<Vector<RowID>> result = MakeShared<Vector<RowID>>();
+std::shared_ptr<std::vector<RowID>> DataTable::GetRowIDVector() const {
+    size_t block_count = data_blocks_.size();
+    std::shared_ptr<std::vector<RowID>> result = std::make_shared<std::vector<RowID>>();
     result->reserve(row_count_);
-    for (SizeT idx = 0; idx < block_count; ++idx) {
+    for (size_t idx = 0; idx < block_count; ++idx) {
         data_blocks_[idx]->FillRowIDVector(result, idx);
     }
     return result;
 }
 
-void DataTable::UnionWith(const SharedPtr<DataTable> &other) {
+void DataTable::UnionWith(const std::shared_ptr<DataTable> &other) {
     if (this->row_count_ != other->row_count_) {
         UnrecoverableError(fmt::format("Can't union two table with different row count {}:{}.", this->row_count_, other->row_count_));
     }
     if (this->data_blocks_.size() != other->data_blocks_.size()) {
         UnrecoverableError(fmt::format("Can't union two table with different block count {}:{}.", this->data_blocks_.size(), other->data_blocks_.size()));
     }
-    SizeT block_count = this->data_blocks_.size();
-    for (SizeT idx = 0; idx < block_count; ++idx) {
+    size_t block_count = this->data_blocks_.size();
+    for (size_t idx = 0; idx < block_count; ++idx) {
         this->data_blocks_[idx]->UnionWith(other->data_blocks_[idx]);
     }
 
     this->definition_ptr_->UnionWith(other->definition_ptr_);
 }
 
-void DataTable::Append(const SharedPtr<DataBlock> &data_block) {
+void DataTable::Append(const std::shared_ptr<DataBlock> &data_block) {
     data_blocks_.emplace_back(data_block);
     UpdateRowCount(data_block->row_count());
 }
 
-SharedPtr<DataTable> DataTable::Make(SharedPtr<TableDef> table_def_ptr, TableType type) {
-    return MakeShared<DataTable>(std::move(table_def_ptr), type);
+std::shared_ptr<DataTable> DataTable::Make(std::shared_ptr<TableDef> table_def_ptr, TableType type) {
+    return std::make_shared<DataTable>(std::move(table_def_ptr), type);
 }
 
-SharedPtr<DataTable> DataTable::MakeResultTable(const Vector<SharedPtr<ColumnDef>> &column_defs) {
-    SharedPtr<TableDef> result_table_def_ptr = TableDef::Make(nullptr, nullptr, nullptr, column_defs);
+std::shared_ptr<DataTable> DataTable::MakeResultTable(const std::vector<std::shared_ptr<ColumnDef>> &column_defs) {
+    std::shared_ptr<TableDef> result_table_def_ptr = TableDef::Make(nullptr, nullptr, nullptr, column_defs);
     return Make(result_table_def_ptr, TableType::kResult);
 }
 
-SharedPtr<DataTable> DataTable::MakeEmptyResultTable() {
-    SharedPtr<TableDef> result_table_def_ptr = TableDef::Make(nullptr, nullptr, nullptr, Vector<SharedPtr<ColumnDef>>());
+std::shared_ptr<DataTable> DataTable::MakeEmptyResultTable() {
+    std::shared_ptr<TableDef> result_table_def_ptr = TableDef::Make(nullptr, nullptr, nullptr, std::vector<std::shared_ptr<ColumnDef>>());
     return Make(result_table_def_ptr, TableType::kResult);
 }
 
-SharedPtr<DataTable> DataTable::MakeSummaryResultTable(u64 count, u64 sum) {
-    Vector<SharedPtr<ColumnDef>> column_defs;
+std::shared_ptr<DataTable> DataTable::MakeSummaryResultTable(u64 count, u64 sum) {
+    std::vector<std::shared_ptr<ColumnDef>> column_defs;
     column_defs.emplace_back(
-        MakeShared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kBigInt, nullptr), "count", std::set<ConstraintType>()));
-    column_defs.emplace_back(MakeShared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kBigInt, nullptr), "sum", std::set<ConstraintType>()));
-    SharedPtr<TableDef> result_table_def_ptr = TableDef::Make(nullptr, nullptr, nullptr, column_defs);
-    SharedPtr<DataTable> result_table = Make(result_table_def_ptr, TableType::kResult);
+        std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kBigInt, nullptr), "count", std::set<ConstraintType>()));
+    column_defs.emplace_back(std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kBigInt, nullptr), "sum", std::set<ConstraintType>()));
+    std::shared_ptr<TableDef> result_table_def_ptr = TableDef::Make(nullptr, nullptr, nullptr, column_defs);
+    std::shared_ptr<DataTable> result_table = Make(result_table_def_ptr, TableType::kResult);
 
-    SharedPtr<DataBlock> data_block = DataBlock::Make();
-    Vector<SharedPtr<DataType>> column_types;
-    column_types.emplace_back(MakeShared<DataType>(LogicalType::kBigInt));
-    column_types.emplace_back(MakeShared<DataType>(LogicalType::kBigInt));
+    std::shared_ptr<DataBlock> data_block = DataBlock::Make();
+    std::vector<std::shared_ptr<DataType>> column_types;
+    column_types.emplace_back(std::make_shared<DataType>(LogicalType::kBigInt));
+    column_types.emplace_back(std::make_shared<DataType>(LogicalType::kBigInt));
     data_block->Init(column_types);
     data_block->AppendValue(0, Value::MakeBigInt(count));
     data_block->AppendValue(1, Value::MakeBigInt(sum));
@@ -137,36 +137,36 @@ SharedPtr<DataTable> DataTable::MakeSummaryResultTable(u64 count, u64 sum) {
     return result_table;
 }
 
-DataTable::DataTable(SharedPtr<TableDef> table_def_ptr, TableType type)
+DataTable::DataTable(std::shared_ptr<TableDef> table_def_ptr, TableType type)
     : BaseTable(table_def_ptr->schema_name(), table_def_ptr->table_name()), definition_ptr_(std::move(table_def_ptr)), row_count_(0), type_(type) {}
 
-SizeT DataTable::ColumnCount() const { return definition_ptr_->column_count(); }
+size_t DataTable::ColumnCount() const { return definition_ptr_->column_count(); }
 
-SharedPtr<String> DataTable::TableName() const { return definition_ptr_->table_name(); }
+std::shared_ptr<std::string> DataTable::TableName() const { return definition_ptr_->table_name(); }
 
-const SharedPtr<String> &DataTable::SchemaName() const { return definition_ptr_->schema_name(); }
+const std::shared_ptr<std::string> &DataTable::SchemaName() const { return definition_ptr_->schema_name(); }
 
-SizeT DataTable::GetColumnIdByName(const String &column_name) { return definition_ptr_->GetColIdByName(column_name); }
+size_t DataTable::GetColumnIdByName(const std::string &column_name) { return definition_ptr_->GetColIdByName(column_name); }
 
-const String &DataTable::GetColumnNameById(SizeT idx) const { return definition_ptr_->columns()[idx]->name(); }
+const std::string &DataTable::GetColumnNameById(size_t idx) const { return definition_ptr_->columns()[idx]->name(); }
 
-SharedPtr<DataType> DataTable::GetColumnTypeById(SizeT idx) const { return definition_ptr_->columns()[idx]->type(); }
+std::shared_ptr<DataType> DataTable::GetColumnTypeById(size_t idx) const { return definition_ptr_->columns()[idx]->type(); }
 
-void DataTable::ShrinkBlocks(SizeT block_capacity) {
+void DataTable::ShrinkBlocks(size_t block_capacity) {
     if (data_blocks_.empty()) {
         return;
     }
     auto types = data_blocks_[0]->types();
-    Vector<SharedPtr<DataBlock>> data_blocks = std::move(data_blocks_);
+    std::vector<std::shared_ptr<DataBlock>> data_blocks = std::move(data_blocks_);
 
     data_blocks_.emplace_back(DataBlock::MakeUniquePtr());
     auto *data_block = data_blocks_.back().get();
     data_block->Init(types, block_capacity);
-    for (SizeT block_i = 0; block_i < data_blocks.size(); ++block_i) {
-        SizeT block_offset = 0;
+    for (size_t block_i = 0; block_i < data_blocks.size(); ++block_i) {
+        size_t block_offset = 0;
         auto *input_block = data_blocks[block_i].get();
         while (block_offset < input_block->row_count()) {
-            SizeT append_count = std::min(data_block->available_capacity(), input_block->row_count() - block_offset);
+            size_t append_count = std::min(data_block->available_capacity(), input_block->row_count() - block_offset);
             if (append_count) {
                 data_block->AppendWith(input_block, block_offset, append_count);
             }

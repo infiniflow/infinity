@@ -38,14 +38,14 @@ protected:
         BaseTestParamStr::SetUp();
 
         SessionManager *session_manager = InfinityContext::instance().session_manager();
-        SharedPtr<RemoteSession> remote_session = session_manager->CreateRemoteSession();
+        std::shared_ptr<RemoteSession> remote_session = session_manager->CreateRemoteSession();
         if (remote_session == nullptr) {
             throw std::runtime_error("remote session is null");
         }
 
         session_ = std::move(remote_session);
 
-        SharedPtr<RemoteSession> remote_session2 = session_manager->CreateRemoteSession();
+        std::shared_ptr<RemoteSession> remote_session2 = session_manager->CreateRemoteSession();
         if (remote_session2 == nullptr) {
             throw std::runtime_error("remote session is null");
         }
@@ -64,8 +64,8 @@ protected:
         BaseTestParamStr::TearDown();
     }
 
-    UniquePtr<QueryContext> MakeQueryContext() {
-        UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>(session_.get());
+    std::unique_ptr<QueryContext> MakeQueryContext() {
+        std::unique_ptr<QueryContext> query_context_ptr = std::make_unique<QueryContext>(session_.get());
         query_context_ptr->Init(InfinityContext::instance().config(),
                                 InfinityContext::instance().task_scheduler(),
                                 InfinityContext::instance().storage(),
@@ -75,8 +75,8 @@ protected:
         return query_context_ptr;
     }
 
-    UniquePtr<QueryContext> MakeQueryContext2() {
-        UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>(session2_.get());
+    std::unique_ptr<QueryContext> MakeQueryContext2() {
+        std::unique_ptr<QueryContext> query_context_ptr = std::make_unique<QueryContext>(session2_.get());
         query_context_ptr->Init(InfinityContext::instance().config(),
                                 InfinityContext::instance().task_scheduler(),
                                 InfinityContext::instance().storage(),
@@ -99,6 +99,6 @@ protected:
     }
 
 protected:
-    SharedPtr<RemoteSession> session_{};
-    SharedPtr<RemoteSession> session2_{};
+    std::shared_ptr<RemoteSession> session_{};
+    std::shared_ptr<RemoteSession> session2_{};
 };

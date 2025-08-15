@@ -44,14 +44,14 @@ struct MinusFunction {
 
 template <>
 inline bool MinusFunction::Run(HugeIntT, HugeIntT &) {
-    String error_message = "Not implement: MinusFunction::Run";
+    std::string error_message = "Not implement: MinusFunction::Run";
     UnrecoverableError(error_message);
     return false;
 }
 
 template <>
 inline bool MinusFunction::Run(DecimalT, DecimalT &) {
-    String error_message = "Not implement: MinusFunction::Run";
+    std::string error_message = "Not implement: MinusFunction::Run";
     UnrecoverableError(error_message);
     return false;
 }
@@ -112,10 +112,10 @@ inline bool MinusFunction::Run(MixedT value, MixedT &result) {
     return false;
 }
 
-SharedPtr<ScalarFunctionSet> GetMinusFunctionSet() {
-    String func_name = "-";
+std::shared_ptr<ScalarFunctionSet> GetMinusFunctionSet() {
+    std::string func_name = "-";
 
-    SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
+    std::shared_ptr<ScalarFunctionSet> function_set_ptr = std::make_shared<ScalarFunctionSet>(func_name);
 
     // Minus operator
     ScalarFunction minus_int8(func_name,

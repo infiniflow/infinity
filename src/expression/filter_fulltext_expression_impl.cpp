@@ -34,13 +34,13 @@ import logical_type;
 
 namespace infinity {
 
-FilterFulltextExpression::FilterFulltextExpression(String fields, String matching_text, String options_text)
-    : BaseExpression(ExpressionType::kFilterFullText, Vector<SharedPtr<BaseExpression>>()), fields_(std::move(fields)),
+FilterFulltextExpression::FilterFulltextExpression(std::string fields, std::string matching_text, std::string options_text)
+    : BaseExpression(ExpressionType::kFilterFullText, std::vector<std::shared_ptr<BaseExpression>>()), fields_(std::move(fields)),
       matching_text_(std::move(matching_text)), options_text_(std::move(options_text)) {}
 
 FilterFulltextExpression::~FilterFulltextExpression() = default;
 
-String FilterFulltextExpression::ToString() const {
+std::string FilterFulltextExpression::ToString() const {
     if (!alias_.empty()) {
         return alias_;
     }
@@ -49,11 +49,11 @@ String FilterFulltextExpression::ToString() const {
 
 DataType FilterFulltextExpression::Type() const { return DataType{LogicalType::kBoolean}; }
 
-SharedPtr<FilterFulltextExpression> FilterFulltextExpression::BuildFilterFulltextExpression(const FunctionExpr &expr) {
+std::shared_ptr<FilterFulltextExpression> FilterFulltextExpression::BuildFilterFulltextExpression(const FunctionExpr &expr) {
     if (!expr.arguments_ || expr.arguments_->size() < 2 || expr.arguments_->size() > 3) {
         RecoverableError(Status::SyntaxError("FILTER_FULLTEXT() requires 2 or 3 arguments"));
     }
-    auto get_str_from_expr = [](const ParsedExpr *pared_expr) -> String {
+    auto get_str_from_expr = [](const ParsedExpr *pared_expr) -> std::string {
         if (pared_expr->type_ != ParsedExprType::kConstant) {
             RecoverableError(Status::SyntaxError("FILTER_FULLTEXT() arguments must be constant strings"));
         }
@@ -66,14 +66,14 @@ SharedPtr<FilterFulltextExpression> FilterFulltextExpression::BuildFilterFulltex
     auto fields = get_str_from_expr((*expr.arguments_)[0]);
     auto matching_text = get_str_from_expr((*expr.arguments_)[1]);
     auto options_text = expr.arguments_->size() < 3 ? "" : get_str_from_expr((*expr.arguments_)[2]);
-    return MakeShared<FilterFulltextExpression>(std::move(fields), std::move(matching_text), std::move(options_text));
+    return std::make_shared<FilterFulltextExpression>(std::move(fields), std::move(matching_text), std::move(options_text));
 }
 
 u64 FilterFulltextExpression::Hash() const {
     u64 h = 0;
-    h ^= std::hash<String>()(fields_);
-    h ^= std::hash<String>()(matching_text_);
-    h ^= std::hash<String>()(options_text_);
+    h ^= std::hash<std::string>()(fields_);
+    h ^= std::hash<std::string>()(matching_text_);
+    h ^= std::hash<std::string>()(options_text_);
     return h;
 }
 

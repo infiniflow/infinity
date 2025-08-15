@@ -32,23 +32,23 @@ import data_type;
 namespace infinity {
 
 // consider load_meta
-Vector<ColumnBinding> LogicalSort::GetColumnBindings() const { return LogicalCommonFunctionUsingLoadMeta::GetColumnBindings(*this); }
+std::vector<ColumnBinding> LogicalSort::GetColumnBindings() const { return LogicalCommonFunctionUsingLoadMeta::GetColumnBindings(*this); }
 
-SharedPtr<Vector<String>> LogicalSort::GetOutputNames() const { return LogicalCommonFunctionUsingLoadMeta::GetOutputNames(*this); }
+std::shared_ptr<std::vector<std::string>> LogicalSort::GetOutputNames() const { return LogicalCommonFunctionUsingLoadMeta::GetOutputNames(*this); }
 
-SharedPtr<Vector<SharedPtr<DataType>>> LogicalSort::GetOutputTypes() const { return LogicalCommonFunctionUsingLoadMeta::GetOutputTypes(*this); }
+std::shared_ptr<std::vector<std::shared_ptr<DataType>>> LogicalSort::GetOutputTypes() const { return LogicalCommonFunctionUsingLoadMeta::GetOutputTypes(*this); }
 
-String LogicalSort::ToString(i64 &space) const {
+std::string LogicalSort::ToString(i64 &space) const {
 
     std::stringstream ss;
-    String arrow_str;
+    std::string arrow_str;
     if (space > 3) {
         space -= 4;
         arrow_str = "->  ";
     }
-    ss << String(space, ' ') << arrow_str << "Order by: ";
-    SizeT expression_count = expressions_.size();
-    for (SizeT i = 0; i < expression_count - 1; ++i) {
+    ss << std::string(space, ' ') << arrow_str << "Order by: ";
+    size_t expression_count = expressions_.size();
+    for (size_t i = 0; i < expression_count - 1; ++i) {
         ss << expressions_[i]->Name() << " " << SelectStatement::ToString(order_by_types_[i]) << ", ";
     }
     ss << expressions_.back()->Name() << " " << SelectStatement::ToString(order_by_types_.back());

@@ -87,41 +87,41 @@ std::string BaseProfiler::EndTime() {
     return ss.str();
 }
 
-NanoSeconds BaseProfiler::ElapsedInternal() const {
+std::chrono::nanoseconds BaseProfiler::ElapsedInternal() const {
     auto now = finished_ ? end_ts_ : std::chrono::system_clock::now();
 
     return now - begin_ts_;
 }
 
-String BaseProfiler::ElapsedToString(NanoSeconds duration, i64 scale) {
-    String result;
+std::string BaseProfiler::ElapsedToString(std::chrono::nanoseconds duration, i64 scale) {
+    std::string result;
     if (duration.count() <= 1000 * scale) {
         result.append(fmt::format("{}ns", duration.count()));
     } else if (duration.count() <= 1000 * 1000 * scale) {
-        result.append(fmt::format("{}us", ChronoCast<MicroSeconds>(duration).count()));
+        result.append(fmt::format("{}us", ChronoCast<std::chrono::microseconds>(duration).count()));
     } else if (duration.count() <= 1000 * 1000 * 1000 * scale) {
-        result.append(fmt::format("{}ms", ChronoCast<MilliSeconds>(duration).count()));
+        result.append(fmt::format("{}ms", ChronoCast<std::chrono::milliseconds>(duration).count()));
     } else {
         result.append(fmt::format("{}s", ChronoCast<Seconds>(duration).count()));
     }
     return result;
 }
 
-String BaseProfiler::ElapsedToString(i64 scale) const { return ElapsedToString(this->ElapsedInternal(), scale); }
+std::string BaseProfiler::ElapsedToString(i64 scale) const { return ElapsedToString(this->ElapsedInternal(), scale); }
 
-void OptimizerProfiler::StartRule(const String &rule_name) {
+void OptimizerProfiler::StartRule(const std::string &rule_name) {
     profilers_.emplace_back(rule_name);
     profilers_.back().Begin();
 }
 
 void OptimizerProfiler::StopRule() { profilers_.back().End(); }
 
-String OptimizerProfiler::ToString(SizeT intent) const {
-    String result;
-    String space(intent, ' ');
+std::string OptimizerProfiler::ToString(size_t intent) const {
+    std::string result;
+    std::string space(intent, ' ');
 
-    SizeT profiler_count = profilers_.size();
-    for (SizeT idx = 0; idx < profiler_count; ++idx) {
+    size_t profiler_count = profilers_.size();
+    for (size_t idx = 0; idx < profiler_count; ++idx) {
         const auto &profiler = profilers_[idx];
         result.append(fmt::format("{}{}: {}", space, profiler.name(), profiler.ElapsedToString()));
     }
@@ -150,8 +150,8 @@ void TaskProfiler::StopOperator(const OperatorState *operator_state) {
 
     uint64_t input_rows{};
     if (operator_state->prev_op_state_ != nullptr) {
-        SizeT input_data_block_count = operator_state->prev_op_state_->data_block_array_.size();
-        for (SizeT block_id = 0; block_id < input_data_block_count; ++block_id) {
+        size_t input_data_block_count = operator_state->prev_op_state_->data_block_array_.size();
+        for (size_t block_id = 0; block_id < input_data_block_count; ++block_id) {
             DataBlock *input_data_block = operator_state->prev_op_state_->data_block_array_[block_id].get();
             input_rows += input_data_block->Finalized() ? input_data_block->row_count() : 0;
         }
@@ -159,8 +159,8 @@ void TaskProfiler::StopOperator(const OperatorState *operator_state) {
 
     uint64_t output_rows{};
     uint64_t output_data_size{};
-    SizeT output_data_block_count = operator_state->data_block_array_.size();
-    for (SizeT block_id = 0; block_id < output_data_block_count; ++block_id) {
+    size_t output_data_block_count = operator_state->data_block_array_.size();
+    for (size_t block_id = 0; block_id < output_data_block_count; ++block_id) {
         DataBlock *output_data_block = operator_state->data_block_array_[block_id].get();
         output_data_size += output_data_block->Finalized() ? output_data_block->GetSizeInBytes() : 0;
         output_rows += output_data_block->Finalized() ? output_data_block->row_count() : 0;
@@ -175,7 +175,7 @@ void TaskProfiler::StopOperator(const OperatorState *operator_state) {
     active_operator_ = nullptr;
 }
 
-String QueryProfiler::QueryPhaseToString(QueryPhase phase) {
+std::string QueryProfiler::QueryPhaseToString(QueryPhase phase) {
     switch (phase) {
         case QueryPhase::kParser: {
             return "Parser";
@@ -215,7 +215,7 @@ void QueryProfiler::StartPhase(QueryPhase phase) {
     if (!enable_) {
         return;
     }
-    SizeT phase_idx = static_cast<magic_enum::underlying_type_t<QueryPhase>>(phase);
+    size_t phase_idx = static_cast<magic_enum::underlying_type_t<QueryPhase>>(phase);
 
     // Validate current query phase.
     if (current_phase_ == QueryPhase::kInvalid) {
@@ -269,7 +269,7 @@ void QueryProfiler::ExecuteRender(std::stringstream &ss) const {
         ss << "Fragment #" << fragment.first << std::endl;
         for (const auto &task : fragment.second) {
             ss << "|- Task #" << task.first << std::endl;
-            SizeT times = 0;
+            size_t times = 0;
             for (const auto &operators : task.second) {
                 ss << "  |- Times: " << times << std::endl;
                 for (const auto &op : operators.timings_) {
@@ -283,12 +283,12 @@ void QueryProfiler::ExecuteRender(std::stringstream &ss) const {
     }
 }
 
-String QueryProfiler::ToString() const {
+std::string QueryProfiler::ToString() const {
     std::stringstream ss;
-    constexpr SizeT profilers_count = magic_enum::enum_integer(QueryPhase::kInvalid);
+    constexpr size_t profilers_count = magic_enum::enum_integer(QueryPhase::kInvalid);
 
     double cost_sum = 0;
-    for (SizeT idx = 0; idx < profilers_count; ++idx) {
+    for (size_t idx = 0; idx < profilers_count; ++idx) {
         const BaseProfiler &profiler = profilers_[idx];
         cost_sum += static_cast<double>(profiler.Elapsed());
     }
@@ -296,7 +296,7 @@ String QueryProfiler::ToString() const {
     ss.setf(std::ios_base::fixed, std::ios_base::floatfield);
     ss.setf(std::ios_base::showpoint);
     ss.precision(2);
-    for (SizeT idx = 0; idx < profilers_count; ++idx) {
+    for (size_t idx = 0; idx < profilers_count; ++idx) {
         const BaseProfiler &profiler = profilers_[idx];
         ss << profiler.name() << ": " << profiler.ElapsedToString() << "(" << static_cast<double>(profiler.Elapsed() * 100) / cost_sum << "%)"
            << std::endl;
@@ -323,7 +323,7 @@ nlohmann::json QueryProfiler::Serialize(const QueryProfiler *profiler) {
         i64 fragment_end = 0;
         for (const auto &task : fragment.second) {
             nlohmann::json json_tasks;
-            SizeT times = 0;
+            size_t times = 0;
             json_tasks["task_id"] = task.first;
 
             i64 task_start = std::numeric_limits<i64>::max();
@@ -374,9 +374,9 @@ nlohmann::json QueryProfiler::Serialize(const QueryProfiler *profiler) {
     return json;
 }
 
-Vector<TaskProfiler> &QueryProfiler::GetTaskProfile(u64 fragment_id, i64 task_id) { return records_[fragment_id][task_id]; }
+std::vector<TaskProfiler> &QueryProfiler::GetTaskProfile(u64 fragment_id, i64 task_id) { return records_[fragment_id][task_id]; }
 
-void ProfileHistory::Resize(SizeT new_size) {
+void ProfileHistory::Resize(size_t new_size) {
     std::unique_lock<std::mutex> lk(lock_);
     if (new_size == 0) {
         deque_.clear();
@@ -388,8 +388,8 @@ void ProfileHistory::Resize(SizeT new_size) {
     }
 
     if (new_size < deque_.size()) {
-        SizeT diff = max_size_ - new_size;
-        for (SizeT i = 0; i < diff; ++i) {
+        size_t diff = max_size_ - new_size;
+        for (size_t i = 0; i < diff; ++i) {
             deque_.pop_back();
         }
     }
@@ -397,7 +397,7 @@ void ProfileHistory::Resize(SizeT new_size) {
     max_size_ = new_size;
 }
 
-QueryProfiler *ProfileHistory::GetElement(SizeT index) {
+QueryProfiler *ProfileHistory::GetElement(size_t index) {
     std::unique_lock<std::mutex> lk(lock_);
     if (index < 0 || index > max_size_) {
         return nullptr;
@@ -406,12 +406,12 @@ QueryProfiler *ProfileHistory::GetElement(SizeT index) {
     return deque_[index].get();
 }
 
-Vector<SharedPtr<QueryProfiler>> ProfileHistory::GetElements() {
-    Vector<SharedPtr<QueryProfiler>> elements;
+std::vector<std::shared_ptr<QueryProfiler>> ProfileHistory::GetElements() {
+    std::vector<std::shared_ptr<QueryProfiler>> elements;
     elements.reserve(max_size_);
 
     std::unique_lock<std::mutex> lk(lock_);
-    for (SizeT i = 0; i < deque_.size(); ++i) {
+    for (size_t i = 0; i < deque_.size(); ++i) {
         if (deque_[i].get() != nullptr) {
             elements.push_back(deque_[i]);
         }

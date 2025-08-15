@@ -42,12 +42,12 @@ import extra_ddl_info;
 
 namespace infinity {
 PhysicalCreateIndexPrepare::PhysicalCreateIndexPrepare(u64 id,
-                                                       SharedPtr<BaseTableRef> base_table_ref,
-                                                       SharedPtr<IndexBase> index_definition,
+                                                       std::shared_ptr<BaseTableRef> base_table_ref,
+                                                       std::shared_ptr<IndexBase> index_definition,
                                                        ConflictType conflict_type,
-                                                       SharedPtr<Vector<String>> output_names,
-                                                       SharedPtr<Vector<SharedPtr<DataType>>> output_types,
-                                                       SharedPtr<Vector<LoadMeta>> load_metas,
+                                                       std::shared_ptr<std::vector<std::string>> output_names,
+                                                       std::shared_ptr<std::vector<std::shared_ptr<DataType>>> output_types,
+                                                       std::shared_ptr<std::vector<LoadMeta>> load_metas,
                                                        bool prepare)
     : PhysicalOperator(PhysicalOperatorType::kCreateIndexPrepare, nullptr, nullptr, id, load_metas), base_table_ref_(base_table_ref),
       index_def_ptr_(index_definition), conflict_type_(conflict_type), output_names_(output_names), output_types_(output_types), prepare_(prepare) {}

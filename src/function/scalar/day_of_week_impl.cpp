@@ -82,9 +82,9 @@ inline bool DayOfWeekFunction::Run(TimestampT left, BigIntT &result) {
 }
 
 void RegisterDayOfWeekFunction(NewCatalog *catalog_ptr) {
-    String func_name = "dayofweek";
+    std::string func_name = "dayofweek";
 
-    SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
+    std::shared_ptr<ScalarFunctionSet> function_set_ptr = std::make_shared<ScalarFunctionSet>(func_name);
 
     ScalarFunction day_of_week_date_function(func_name,
                                   {DataType(LogicalType::kDate)},

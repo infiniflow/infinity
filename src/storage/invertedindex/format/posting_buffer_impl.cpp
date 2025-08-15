@@ -24,7 +24,7 @@ bool PostingBuffer::Reallocate() {
     if (new_capacity == old_capacity) {
         return false;
     }
-    SizeT doc_item_size = new_capacity * posting_fields_->GetTotalSize();
+    size_t doc_item_size = new_capacity * posting_fields_->GetTotalSize();
     u8 *new_buffer = (u8 *)malloc(doc_item_size);
 
     BufferMemoryCopy(new_buffer, new_capacity, (u8 *)buffer_, capacity_, posting_fields_, size_);
@@ -59,7 +59,7 @@ void PostingBuffer::BufferMemoryCopy(u8 *dst, u8 dst_col_count, u8 *src, u8 src_
     }
 }
 
-void PostingBuffer::Dump(const SharedPtr<FileWriter> &file) {
+void PostingBuffer::Dump(const std::shared_ptr<FileWriter> &file) {
     file->WriteVInt(size_);
     file->WriteVInt(capacity_);
     if (size_ > 0) {
@@ -71,7 +71,7 @@ void PostingBuffer::Dump(const SharedPtr<FileWriter> &file) {
     }
 }
 
-void PostingBuffer::Load(const SharedPtr<FileReader> &file) {
+void PostingBuffer::Load(const std::shared_ptr<FileReader> &file) {
     size_ = file->ReadVInt();
     capacity_ = file->ReadVInt();
     if (size_ > 0) {
@@ -125,7 +125,7 @@ void PostingBuffer::Reserve(u8 capacity) {
         return;
     }
 
-    SizeT doc_item_size = capacity * posting_fields_->GetTotalSize();
+    size_t doc_item_size = capacity * posting_fields_->GetTotalSize();
 
     u8 *new_buffer = (u8 *)malloc(doc_item_size);
 

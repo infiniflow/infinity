@@ -36,7 +36,7 @@ void UpdateSegmentBloomFilterTask::CreateAndSubmitTask() {
     //        return;
     //    }
     //    LOG_TRACE(fmt::format("UpdateSegmentBloomFilterTask: create task for segment: {}", segment_entry->segment_id()));
-    //    auto update_bloom_filter_task = MakeShared<UpdateSegmentBloomFilterTask>(segment_entry, table_entry, txn_mgr);
+    //    auto update_bloom_filter_task = std::make_shared<UpdateSegmentBloomFilterTask>(segment_entry, table_entry, txn_mgr);
     //    BGTaskProcessor *bg_processor = InfinityContext::instance().storage()->bg_processor();
     //    bg_processor->Submit(std::move(update_bloom_filter_task));
 }
@@ -64,15 +64,15 @@ void UpdateSegmentBloomFilterTask::ExecuteInner() {
     // // TODO: check segment visibility?
     // BuildFastRoughFilterTask::ExecuteUpdateSegmentBloomFilter(segment, buffer_mgr, begin_ts);
     // // serialize filter
-    // String segment_filter_binary_data = segment->GetFastRoughFilter()->SerializeToString();
-    // Vector<Pair<BlockID, String>> block_filter_binary_data = segment->GetBlockFilterBinaryDataVector();
+    // std::string segment_filter_binary_data = segment->GetFastRoughFilter()->SerializeToString();
+    // std::vector<std::pair<BlockID, std::string>> block_filter_binary_data = segment->GetBlockFilterBinaryDataVector();
     // // build WalCmd
     // {
     //     auto table_entry = segment->GetTableEntry();
-    //     String db_name = *table_entry->GetDBName();
-    //     String table_name = *table_entry->GetTableName();
+    //     std::string db_name = *table_entry->GetDBName();
+    //     std::string table_name = *table_entry->GetTableName();
     //     SegmentID segment_id = segment->segment_id();
-    //     auto wal_cmd = MakeShared<WalCmdUpdateSegmentBloomFilterData>(std::move(db_name),
+    //     auto wal_cmd = std::make_shared<WalCmdUpdateSegmentBloomFilterData>(std::move(db_name),
     //                                                                   std::move(table_name),
     //                                                                   segment_id,
     //                                                                   segment_filter_binary_data,
@@ -82,7 +82,7 @@ void UpdateSegmentBloomFilterTask::ExecuteInner() {
     // // build CatalogDeltaOperation
     // {
     //     auto catalog_delta_op =
-    //         MakeUnique<UpdateSegmentBloomFilterDataOp>(segment, std::move(segment_filter_binary_data), std::move(block_filter_binary_data));
+    //         std::make_unique<UpdateSegmentBloomFilterDataOp>(segment, std::move(segment_filter_binary_data), std::move(block_filter_binary_data));
     //     update_bloom_filter_txn->AddCatalogDeltaOperation(std::move(catalog_delta_op));
     // }
     // // segment status will be changed in SetSegmentStatusSealedOp::SaveSate(), in CommitBottom()

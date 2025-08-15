@@ -58,10 +58,10 @@ TEST_F(UserDefinedTermWeightTest, test1) {
 TEST_F(UserDefinedTermWeightTest, test2) {
     PythonInstance::Init();
 
-    SizeT thread_count = 4;
+    size_t thread_count = 4;
     std::vector<std::thread> threads;
     threads.reserve(thread_count);
-    for (SizeT i = 0; i < thread_count; ++i) {
+    for (size_t i = 0; i < thread_count; ++i) {
         threads.push_back(std::thread([&] {
             UserDefinedTermWeight term_weight(std::string(test_data_path()) + "/scripts/uda5.py");
             Vector<String> vec_str;
@@ -76,7 +76,7 @@ TEST_F(UserDefinedTermWeightTest, test2) {
         }));
     }
 
-    for (SizeT i = 0; i < thread_count; ++i) {
+    for (size_t i = 0; i < thread_count; ++i) {
         threads[i].join();
     }
 

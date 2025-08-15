@@ -25,11 +25,11 @@ class QueryContext;
 
 export class Snapshot {
 public:
-    static Status CreateTableSnapshot(QueryContext *query_context, const String &snapshot_name, const String& table_name);
-    static Status RestoreTableSnapshot(QueryContext *query_context, const String &snapshot_name);
-    static Status CreateDatabaseSnapshot(QueryContext *query_context, const String &snapshot_name, const String& db_name);
-    static Status RestoreDatabaseSnapshot(QueryContext *query_context, const String &snapshot_name);
-    static Status DropSnapshot(QueryContext *query_context, const String &snapshot_name);
+    static Status CreateTableSnapshot(QueryContext *query_context, const std::string &snapshot_name, const std::string& table_name);
+    static Status RestoreTableSnapshot(QueryContext *query_context, const std::string &snapshot_name);
+    static Status CreateDatabaseSnapshot(QueryContext *query_context, const std::string &snapshot_name, const std::string& db_name);
+    static Status RestoreDatabaseSnapshot(QueryContext *query_context, const std::string &snapshot_name);
+    static Status DropSnapshot(QueryContext *query_context, const std::string &snapshot_name);
 };
 
 } // namespace infinity

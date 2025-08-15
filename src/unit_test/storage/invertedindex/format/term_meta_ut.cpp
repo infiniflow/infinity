@@ -49,7 +49,7 @@ public:
     }
 
     void DoTest1() {
-        SharedPtr<FileWriter> file_writer = MakeShared<FileWriter>(file_name_, 128);
+        std::shared_ptr<FileWriter> file_writer = std::make_shared<FileWriter>(file_name_, 128);
         TermMeta term_meta(1, 2, 3);
         optionflag_t option_flag = OPTION_FLAG_ALL;
         PostingFormatOption format_option(option_flag);
@@ -57,7 +57,7 @@ public:
         term_dumper.Dump(file_writer, term_meta);
         file_writer->Sync();
 
-        SharedPtr<FileReader> file_reader = MakeShared<FileReader>(file_name_, 128);
+        std::shared_ptr<FileReader> file_reader = std::make_shared<FileReader>(file_name_, 128);
 
         TermMeta new_term_meta;
         TermMetaLoader term_loader(format_option);

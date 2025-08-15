@@ -56,7 +56,7 @@ TEST_F(InfinityTest, test1) {
     RemoveDbDirs();
     Infinity::LocalInit(path);
 
-    SharedPtr<Infinity> infinity = Infinity::LocalConnect();
+    std::shared_ptr<Infinity> infinity = Infinity::LocalConnect();
 
     {
         QueryResult result = infinity->ListDatabases();
@@ -64,7 +64,7 @@ TEST_F(InfinityTest, test1) {
         EXPECT_EQ(result.result_table_->ColumnCount(), 3u);
         EXPECT_EQ(result.result_table_->GetColumnNameById(0), "database");
         EXPECT_EQ(result.result_table_->DataBlockCount(), 1u);
-        SharedPtr<DataBlock> data_block = result.result_table_->GetDataBlockById(0);
+        std::shared_ptr<DataBlock> data_block = result.result_table_->GetDataBlockById(0);
         EXPECT_EQ(data_block->row_count(), 1u);
         Value value = data_block->GetValue(0, 0);
         const String &s2 = value.GetVarchar();
@@ -75,7 +75,7 @@ TEST_F(InfinityTest, test1) {
         CreateDatabaseOptions create_db_opts;
         infinity->CreateDatabase("db1", create_db_opts, "");
         QueryResult result = infinity->ListDatabases();
-        SharedPtr<DataBlock> data_block = result.result_table_->GetDataBlockById(0);
+        std::shared_ptr<DataBlock> data_block = result.result_table_->GetDataBlockById(0);
         EXPECT_EQ(data_block->row_count(), 2);
         Value value = data_block->GetValue(0, 0);
         const String &s2 = value.GetVarchar();
@@ -117,17 +117,17 @@ TEST_F(InfinityTest, test1) {
 
         CreateTableOptions create_table_opts;
 
-        SizeT column_count = 2;
-        //        Vector<SharedPtr<ColumnDef>> columns;
+        size_t column_count = 2;
+        //        Vector<std::shared_ptr<ColumnDef>> columns;
         Vector<ColumnDef *> column_defs;
         column_defs.reserve(column_count);
 
-        SharedPtr<DataType> col_type = MakeShared<DataType>(LogicalType::kBoolean);
+        std::shared_ptr<DataType> col_type = std::make_shared<DataType>(LogicalType::kBoolean);
         String col_name = "col1";
         auto col_def = new ColumnDef(0, col_type, col_name, std::set<ConstraintType>());
         column_defs.emplace_back(col_def);
 
-        col_type = MakeShared<DataType>(LogicalType::kBigInt);
+        col_type = std::make_shared<DataType>(LogicalType::kBigInt);
         col_name = "col2";
         col_def = new ColumnDef(1, col_type, col_name, std::set<ConstraintType>());
         column_defs.emplace_back(col_def);
@@ -136,7 +136,7 @@ TEST_F(InfinityTest, test1) {
         EXPECT_TRUE(result.IsOk());
 
         result = infinity->ListTables("default_db");
-        SharedPtr<DataBlock> data_block = result.result_table_->GetDataBlockById(0);
+        std::shared_ptr<DataBlock> data_block = result.result_table_->GetDataBlockById(0);
         EXPECT_EQ(data_block->row_count(), 1);
         Value value = data_block->GetValue(1, 0);
         const String &s2 = value.GetVarchar();
@@ -162,16 +162,16 @@ TEST_F(InfinityTest, test1) {
 
         CreateTableOptions create_table_opts;
 
-        SizeT column_count = 1;
+        size_t column_count = 1;
         Vector<ColumnDef *> column_defs;
         column_defs.reserve(column_count);
 
-        SharedPtr<DataType> col_type = MakeShared<DataType>(LogicalType::kBigInt);
+        std::shared_ptr<DataType> col_type = std::make_shared<DataType>(LogicalType::kBigInt);
         String col1_name = "col1";
         auto col_def = new ColumnDef(0, col_type, col1_name, std::set<ConstraintType>());
         column_defs.emplace_back(col_def);
 
-        col_type = MakeShared<DataType>(LogicalType::kSmallInt);
+        col_type = std::make_shared<DataType>(LogicalType::kSmallInt);
         String col2_name = "col2";
         col_def = new ColumnDef(1, col_type, col2_name, std::set<ConstraintType>());
         column_defs.emplace_back(col_def);
@@ -185,11 +185,11 @@ TEST_F(InfinityTest, test1) {
         //        Vector<String> *columns, Vector<Vector<ParsedExpr *> *> *values
 
         Vector<String> columns = {col1_name, col2_name};
-        Vector<UniquePtr<ParsedExpr>> values{};
-        auto value1 = MakeUnique<ConstantExpr>(LiteralType::kInteger);
+        Vector<std::unique_ptr<ParsedExpr>> values{};
+        auto value1 = std::make_unique<ConstantExpr>(LiteralType::kInteger);
         value1->integer_value_ = 11;
         values.emplace_back(std::move(value1));
-        auto value2 = MakeUnique<ConstantExpr>(LiteralType::kInteger);
+        auto value2 = std::make_unique<ConstantExpr>(LiteralType::kInteger);
         value2->integer_value_ = 22;
         values.emplace_back(std::move(value2));
         auto insert_row = new InsertRowExpr();
@@ -220,7 +220,7 @@ TEST_F(InfinityTest, test1) {
         result =
             infinity
                 ->Search("default_db", "table1", search_expr, nullptr, nullptr, nullptr, output_columns, nullptr, nullptr, nullptr, nullptr, false);
-        SharedPtr<DataBlock> data_block = result.result_table_->GetDataBlockById(0);
+        std::shared_ptr<DataBlock> data_block = result.result_table_->GetDataBlockById(0);
         EXPECT_EQ(data_block->row_count(), 1);
         Value value = data_block->GetValue(0, 0);
         EXPECT_EQ(value.type().type(), LogicalType::kBigInt);
@@ -238,7 +238,7 @@ TEST_F(InfinityTest, test1) {
     {
         infinity->Query("create database db1;");
         QueryResult result = infinity->Query("show databases;");
-        SharedPtr<DataBlock> data_block = result.result_table_->GetDataBlockById(0);
+        std::shared_ptr<DataBlock> data_block = result.result_table_->GetDataBlockById(0);
         EXPECT_EQ(data_block->row_count(), 2);
         Value value = data_block->GetValue(0, 0);
         const String &s2 = value.GetVarchar();
@@ -273,7 +273,7 @@ TEST_F(InfinityTest, test2) {
     RemoveDbDirs();
     Infinity::LocalInit(path);
 
-    SharedPtr<Infinity> infinity = Infinity::LocalConnect();
+    std::shared_ptr<Infinity> infinity = Infinity::LocalConnect();
 
     {
         QueryResult result = infinity->ShowVariable("total_commit_count", SetScope::kGlobal);

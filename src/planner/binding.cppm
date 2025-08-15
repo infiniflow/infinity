@@ -34,25 +34,25 @@ public:
 
     virtual ~Binding();
 
-    static SharedPtr<Binding> MakeBinding(BindingType binding_type,
-                                          const String &name,
+    static std::shared_ptr<Binding> MakeBinding(BindingType binding_type,
+                                          const std::string &name,
                                           u64 table_index,
-                                          SharedPtr<Vector<SharedPtr<DataType>>> column_types,
-                                          SharedPtr<Vector<String>> column_names);
+                                          std::shared_ptr<std::vector<std::shared_ptr<DataType>>> column_types,
+                                          std::shared_ptr<std::vector<std::string>> column_names);
 
-    static SharedPtr<Binding> MakeBinding(BindingType binding_type,
-                                          const String &name,
+    static std::shared_ptr<Binding> MakeBinding(BindingType binding_type,
+                                          const std::string &name,
                                           u64 table_index,
-                                          SharedPtr<TableInfo> table_info,
-                                          SharedPtr<Vector<SharedPtr<DataType>>> column_types,
-                                          SharedPtr<Vector<String>> column_names,
-                                          SharedPtr<BlockIndex> block_index);
+                                          std::shared_ptr<TableInfo> table_info,
+                                          std::shared_ptr<std::vector<std::shared_ptr<DataType>>> column_types,
+                                          std::shared_ptr<std::vector<std::string>> column_names,
+                                          std::shared_ptr<BlockIndex> block_index);
 
     // Binding type
     BindingType binding_type_{BindingType::kInvalid};
 
     // Binding table alias or name
-    String table_name_{};
+    std::string table_name_{};
 
     u64 table_index_{};
 
@@ -60,21 +60,21 @@ public:
     //    i64 logical_node_id_{-1};
 
     // ptr to the corresponding logical node.
-    //    SharedPtr<LogicalNode> logical_node_ptr_{nullptr};
+    //    std::shared_ptr<LogicalNode> logical_node_ptr_{nullptr};
 
     // if the binding is table, this is the table_ptr
-    SharedPtr<TableInfo> table_info_{nullptr};
+    std::shared_ptr<TableInfo> table_info_{nullptr};
 
-    SharedPtr<BlockIndex> block_index_{};
+    std::shared_ptr<BlockIndex> block_index_{};
 
     // Column types of the binding
-    SharedPtr<Vector<SharedPtr<DataType>>> column_types_{};
+    std::shared_ptr<std::vector<std::shared_ptr<DataType>>> column_types_{};
 
     // Column names of the binding
-    SharedPtr<Vector<String>> column_names_{};
+    std::shared_ptr<std::vector<std::string>> column_names_{};
 
     // Column name -> column index mapping
-    HashMap<String, i64> name2index_{};
+    std::unordered_map<std::string, i64> name2index_{};
 };
 
 // class TableBinding: public GenericBinding {

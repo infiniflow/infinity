@@ -18,7 +18,7 @@ namespace infinity {
 
 export class PhraseDocIterator final : public BlockMaxLeafIterator {
 public:
-    PhraseDocIterator(Vector<UniquePtr<PostingIterator>> &&iters, float weight, u32 slop, FulltextSimilarity ft_similarity);
+    PhraseDocIterator(std::vector<std::unique_ptr<PostingIterator>> &&iters, float weight, u32 slop, FulltextSimilarity ft_similarity);
 
     inline u32 GetDocFreq() const { return doc_freq_; }
 
@@ -28,10 +28,10 @@ public:
 
     float GetPhraseFreq() const { return phrase_freq_; }
 
-    void InitBM25Info(UniquePtr<FullTextColumnLengthReader> &&column_length_reader, float delta, float k1, float b) override;
+    void InitBM25Info(std::unique_ptr<FullTextColumnLengthReader> &&column_length_reader, float delta, float k1, float b) override;
 
     DocIteratorType GetType() const override { return DocIteratorType::kPhraseIterator; }
-    String Name() const override { return "PhraseDocIterator"; }
+    std::string Name() const override { return "PhraseDocIterator"; }
 
     bool Next(RowID doc_id) override;
 
@@ -69,11 +69,11 @@ public:
 
     u32 MatchCount() const override { return DocID() != INVALID_ROWID; }
 
-    void PrintTree(std::ostream &os, const String &prefix, bool is_final) const override;
+    void PrintTree(std::ostream &os, const std::string &prefix, bool is_final) const override;
 
     // debug info
-    const Vector<String> *terms_ptr_ = nullptr;
-    const String *column_name_ptr_ = nullptr;
+    const std::vector<std::string> *terms_ptr_ = nullptr;
+    const std::string *column_name_ptr_ = nullptr;
 
 private:
     bool GetPhraseMatchData() {
@@ -88,7 +88,7 @@ private:
 
     u32 doc_freq_ = 0;
 
-    Vector<UniquePtr<PostingIterator>> pos_iters_;
+    std::vector<std::unique_ptr<PostingIterator>> pos_iters_;
     float weight_;
     u32 slop_{};
     const FulltextSimilarity ft_similarity_ = FulltextSimilarity::kBM25;
@@ -101,18 +101,18 @@ private:
     float f3 = 0.0f;
     float f4 = 0.0f;
     float bm25_common_score_ = 0.0f;
-    UniquePtr<FullTextColumnLengthReader> column_length_reader_ = nullptr;
+    std::unique_ptr<FullTextColumnLengthReader> column_length_reader_ = nullptr;
     float block_max_bm25_score_cache_ = 0.0f;
     RowID block_max_bm25_score_cache_end_id_ = INVALID_ROWID;
-    Vector<RowID> block_max_bm25_score_cache_part_info_end_ids_;
-    Vector<float> block_max_bm25_score_cache_part_info_vals_;
+    std::vector<RowID> block_max_bm25_score_cache_part_info_end_ids_;
+    std::vector<float> block_max_bm25_score_cache_part_info_vals_;
     RowID block_min_possible_doc_id_ = INVALID_ROWID;
     RowID block_last_doc_id_ = INVALID_ROWID;
 
     float tf_ = 0.0f;          // current doc_id_'s tf
     u32 estimate_doc_freq_{0}; // estimated at the beginning
     float phrase_freq_{0.0f};  // increase during search
-    Vector<float> all_tf_;     // increase during search
+    std::vector<float> all_tf_;     // increase during search
 
     // debug statistics
     u32 calc_score_cnt_ = 0;

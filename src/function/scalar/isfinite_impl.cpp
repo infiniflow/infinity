@@ -47,9 +47,9 @@ inline void IsfiniteFunction::Run(BFloat16T &left, BooleanT &result) {
 }
 
 void RegisterIsfiniteFunction(NewCatalog *catalog_ptr) {
-    String func_name = "isfinite";
+    std::string func_name = "isfinite";
 
-    SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
+    std::shared_ptr<ScalarFunctionSet> function_set_ptr = std::make_shared<ScalarFunctionSet>(func_name);
 
     ScalarFunction isfinite_function_float(func_name,
                                            {DataType(LogicalType::kFloat)},

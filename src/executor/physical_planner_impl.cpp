@@ -149,9 +149,9 @@ import alter_statement;
 
 namespace infinity {
 
-UniquePtr<PhysicalOperator> PhysicalPlanner::BuildPhysicalOperator(const SharedPtr<LogicalNode> &logical_operator) const {
+std::unique_ptr<PhysicalOperator> PhysicalPlanner::BuildPhysicalOperator(const std::shared_ptr<LogicalNode> &logical_operator) const {
 
-    UniquePtr<PhysicalOperator> result{nullptr};
+    std::unique_ptr<PhysicalOperator> result{nullptr};
     switch (logical_operator->operator_type()) {
         // DDL
         case LogicalNodeType::kCreateTable: {
@@ -345,7 +345,7 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildPhysicalOperator(const SharedP
         }
         default: {
             UnrecoverableError(fmt::format("Unknown logical node type: {}", logical_operator->name()));
-            //            result = MakeShared<PhysicalDummyOperator>(numeric_limits<uint64_t>::max());
+            //            result = std::make_shared<PhysicalDummyOperator>(numeric_limits<uint64_t>::max());
         }
     }
 
@@ -358,9 +358,9 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildPhysicalOperator(const SharedP
     return result;
 }
 
-UniquePtr<PhysicalOperator> PhysicalPlanner::BuildCreateTable(const SharedPtr<LogicalNode> &logical_operator) const {
-    SharedPtr<LogicalCreateTable> logical_create_table = static_pointer_cast<LogicalCreateTable>(logical_operator);
-    return MakeUnique<PhysicalCreateTable>(logical_create_table->schema_name(),
+std::unique_ptr<PhysicalOperator> PhysicalPlanner::BuildCreateTable(const std::shared_ptr<LogicalNode> &logical_operator) const {
+    std::shared_ptr<LogicalCreateTable> logical_create_table = static_pointer_cast<LogicalCreateTable>(logical_operator);
+    return std::make_unique<PhysicalCreateTable>(logical_create_table->schema_name(),
                                            logical_create_table->table_definitions(),
                                            logical_create_table->GetOutputNames(),
                                            logical_create_table->GetOutputTypes(),
@@ -370,10 +370,10 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildCreateTable(const SharedPtr<Lo
                                            logical_operator->load_metas());
 }
 
-UniquePtr<PhysicalOperator> PhysicalPlanner::BuildCreateIndex(const SharedPtr<LogicalNode> &logical_operator) const {
+std::unique_ptr<PhysicalOperator> PhysicalPlanner::BuildCreateIndex(const std::shared_ptr<LogicalNode> &logical_operator) const {
     auto logical_create_index = static_pointer_cast<LogicalCreateIndex>(logical_operator);
-    SharedPtr<String> schema_name = logical_create_index->base_table_ref()->table_info_->db_name_;
-    SharedPtr<String> table_name = logical_create_index->base_table_ref()->table_info_->table_name_;
+    std::shared_ptr<std::string> schema_name = logical_create_index->base_table_ref()->table_info_->db_name_;
+    std::shared_ptr<std::string> table_name = logical_create_index->base_table_ref()->table_info_->table_name_;
     const auto &index_def_ptr = logical_create_index->index_definition();
 
     bool parallel = false;
@@ -381,7 +381,7 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildCreateIndex(const SharedPtr<Lo
         parallel = true;
     }
 
-    return MakeUnique<PhysicalCreateIndexPrepare>(logical_create_index->node_id(),
+    return std::make_unique<PhysicalCreateIndexPrepare>(logical_create_index->node_id(),
                                                   logical_create_index->base_table_ref(),
                                                   logical_create_index->index_definition(),
                                                   logical_create_index->conflict_type(),
@@ -391,9 +391,9 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildCreateIndex(const SharedPtr<Lo
                                                   parallel);
 }
 
-UniquePtr<PhysicalOperator> PhysicalPlanner::BuildCreateCollection(const SharedPtr<LogicalNode> &logical_operator) const {
-    SharedPtr<LogicalCreateCollection> logical_create_collection = static_pointer_cast<LogicalCreateCollection>(logical_operator);
-    return MakeUnique<PhysicalCreateCollection>(logical_create_collection->schema_name(),
+std::unique_ptr<PhysicalOperator> PhysicalPlanner::BuildCreateCollection(const std::shared_ptr<LogicalNode> &logical_operator) const {
+    std::shared_ptr<LogicalCreateCollection> logical_create_collection = static_pointer_cast<LogicalCreateCollection>(logical_operator);
+    return std::make_unique<PhysicalCreateCollection>(logical_create_collection->schema_name(),
                                                 logical_create_collection->collection_name(),
                                                 logical_create_collection->conflict_type(),
                                                 logical_create_collection->GetOutputNames(),
@@ -403,9 +403,9 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildCreateCollection(const SharedP
                                                 logical_operator->load_metas());
 }
 
-UniquePtr<PhysicalOperator> PhysicalPlanner::BuildCreateDatabase(const SharedPtr<LogicalNode> &logical_operator) const {
-    SharedPtr<LogicalCreateSchema> logical_create_schema = static_pointer_cast<LogicalCreateSchema>(logical_operator);
-    return MakeUnique<PhysicalCreateSchema>(logical_create_schema->schema_name(),
+std::unique_ptr<PhysicalOperator> PhysicalPlanner::BuildCreateDatabase(const std::shared_ptr<LogicalNode> &logical_operator) const {
+    std::shared_ptr<LogicalCreateSchema> logical_create_schema = static_pointer_cast<LogicalCreateSchema>(logical_operator);
+    return std::make_unique<PhysicalCreateSchema>(logical_create_schema->schema_name(),
                                             logical_create_schema->conflict_type(),
                                             logical_create_schema->comment(),
                                             logical_create_schema->GetOutputNames(),
@@ -414,23 +414,23 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildCreateDatabase(const SharedPtr
                                             logical_operator->load_metas());
 }
 
-UniquePtr<PhysicalOperator> PhysicalPlanner::BuildPreparedPlan(const SharedPtr<LogicalNode> &logical_operator) const {
-    return MakeUnique<PhysicalPreparedPlan>(logical_operator->node_id(), logical_operator->load_metas());
+std::unique_ptr<PhysicalOperator> PhysicalPlanner::BuildPreparedPlan(const std::shared_ptr<LogicalNode> &logical_operator) const {
+    return std::make_unique<PhysicalPreparedPlan>(logical_operator->node_id(), logical_operator->load_metas());
 }
 
-UniquePtr<PhysicalOperator> PhysicalPlanner::BuildCreateView(const SharedPtr<LogicalNode> &logical_operator) const {
-    SharedPtr<LogicalCreateView> logical_create_view = static_pointer_cast<LogicalCreateView>(logical_operator);
-    return MakeUnique<PhysicalCreateView>(logical_operator->node_id(),
+std::unique_ptr<PhysicalOperator> PhysicalPlanner::BuildCreateView(const std::shared_ptr<LogicalNode> &logical_operator) const {
+    std::shared_ptr<LogicalCreateView> logical_create_view = static_pointer_cast<LogicalCreateView>(logical_operator);
+    return std::make_unique<PhysicalCreateView>(logical_operator->node_id(),
                                           logical_create_view->names_ptr(),
                                           logical_create_view->types_ptr(),
                                           logical_create_view->create_view_info(),
                                           logical_operator->load_metas());
 }
 
-UniquePtr<PhysicalOperator> PhysicalPlanner::BuildDropTable(const SharedPtr<LogicalNode> &logical_operator) const {
-    SharedPtr<LogicalDropTable> logical_drop_table = static_pointer_cast<LogicalDropTable>(logical_operator);
+std::unique_ptr<PhysicalOperator> PhysicalPlanner::BuildDropTable(const std::shared_ptr<LogicalNode> &logical_operator) const {
+    std::shared_ptr<LogicalDropTable> logical_drop_table = static_pointer_cast<LogicalDropTable>(logical_operator);
 
-    return MakeUnique<PhysicalDropTable>(logical_drop_table->schema_name(),
+    return std::make_unique<PhysicalDropTable>(logical_drop_table->schema_name(),
                                          logical_drop_table->table_name(),
                                          logical_drop_table->conflict_type(),
                                          logical_drop_table->GetOutputNames(),
@@ -439,9 +439,9 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildDropTable(const SharedPtr<Logi
                                          logical_operator->load_metas());
 }
 
-UniquePtr<PhysicalOperator> PhysicalPlanner::BuildDropIndex(const SharedPtr<LogicalNode> &logical_operator) const {
-    SharedPtr<LogicalDropIndex> logical_drop_index = static_pointer_cast<LogicalDropIndex>(logical_operator);
-    return MakeUnique<PhysicalDropIndex>(logical_drop_index->schema_name(),
+std::unique_ptr<PhysicalOperator> PhysicalPlanner::BuildDropIndex(const std::shared_ptr<LogicalNode> &logical_operator) const {
+    std::shared_ptr<LogicalDropIndex> logical_drop_index = static_pointer_cast<LogicalDropIndex>(logical_operator);
+    return std::make_unique<PhysicalDropIndex>(logical_drop_index->schema_name(),
                                          logical_drop_index->table_name(),
                                          logical_drop_index->index_name(),
                                          logical_drop_index->conflict_type(),
@@ -451,18 +451,18 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildDropIndex(const SharedPtr<Logi
                                          logical_operator->load_metas());
 }
 
-UniquePtr<PhysicalOperator> PhysicalPlanner::BuildDropCollection(const SharedPtr<LogicalNode> &logical_operator) const {
-    SharedPtr<LogicalDropCollection> logical_drop_collection = static_pointer_cast<LogicalDropCollection>(logical_operator);
-    return MakeUnique<PhysicalDropCollection>(logical_drop_collection->schema_name(),
+std::unique_ptr<PhysicalOperator> PhysicalPlanner::BuildDropCollection(const std::shared_ptr<LogicalNode> &logical_operator) const {
+    std::shared_ptr<LogicalDropCollection> logical_drop_collection = static_pointer_cast<LogicalDropCollection>(logical_operator);
+    return std::make_unique<PhysicalDropCollection>(logical_drop_collection->schema_name(),
                                               logical_drop_collection->collection_name(),
                                               logical_drop_collection->conflict_type(),
                                               logical_drop_collection->node_id(),
                                               logical_operator->load_metas());
 }
 
-UniquePtr<PhysicalOperator> PhysicalPlanner::BuildDropSchema(const SharedPtr<LogicalNode> &logical_operator) const {
-    SharedPtr<LogicalDropSchema> logical_drop_schema = static_pointer_cast<LogicalDropSchema>(logical_operator);
-    return MakeUnique<PhysicalDropSchema>(logical_drop_schema->schema_name(),
+std::unique_ptr<PhysicalOperator> PhysicalPlanner::BuildDropSchema(const std::shared_ptr<LogicalNode> &logical_operator) const {
+    std::shared_ptr<LogicalDropSchema> logical_drop_schema = static_pointer_cast<LogicalDropSchema>(logical_operator);
+    return std::make_unique<PhysicalDropSchema>(logical_drop_schema->schema_name(),
                                           logical_drop_schema->conflict_type(),
                                           logical_drop_schema->GetOutputNames(),
                                           logical_drop_schema->GetOutputTypes(),
@@ -470,9 +470,9 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildDropSchema(const SharedPtr<Log
                                           logical_operator->load_metas());
 }
 
-UniquePtr<PhysicalOperator> PhysicalPlanner::BuildDropView(const SharedPtr<LogicalNode> &logical_operator) const {
-    SharedPtr<LogicalDropView> logical_drop_view = static_pointer_cast<LogicalDropView>(logical_operator);
-    return MakeUnique<PhysicalDropView>(logical_drop_view->schema_name(),
+std::unique_ptr<PhysicalOperator> PhysicalPlanner::BuildDropView(const std::shared_ptr<LogicalNode> &logical_operator) const {
+    std::shared_ptr<LogicalDropView> logical_drop_view = static_pointer_cast<LogicalDropView>(logical_operator);
+    return std::make_unique<PhysicalDropView>(logical_drop_view->schema_name(),
                                         logical_drop_view->view_name(),
                                         logical_drop_view->conflict_type(),
                                         logical_drop_view->GetOutputNames(),
@@ -481,20 +481,20 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildDropView(const SharedPtr<Logic
                                         logical_operator->load_metas());
 }
 
-UniquePtr<PhysicalOperator> PhysicalPlanner::BuildInsert(const SharedPtr<LogicalNode> &logical_operator) const {
+std::unique_ptr<PhysicalOperator> PhysicalPlanner::BuildInsert(const std::shared_ptr<LogicalNode> &logical_operator) const {
 
-    SharedPtr<LogicalInsert> logical_insert_ptr = dynamic_pointer_cast<LogicalInsert>(logical_operator);
+    std::shared_ptr<LogicalInsert> logical_insert_ptr = dynamic_pointer_cast<LogicalInsert>(logical_operator);
 
     // Check if this is INSERT SELECT (has a child) or INSERT VALUES (no child)
     auto input_logical_node = logical_operator->left_node();
-    UniquePtr<PhysicalOperator> input_physical_operator = nullptr;
+    std::unique_ptr<PhysicalOperator> input_physical_operator = nullptr;
 
     if (input_logical_node.get() != nullptr) {
         // INSERT SELECT case: build the child operator (SELECT)
         input_physical_operator = BuildPhysicalOperator(input_logical_node);
     }
 
-    return MakeUnique<PhysicalInsert>(logical_operator->node_id(),
+    return std::make_unique<PhysicalInsert>(logical_operator->node_id(),
                                       logical_insert_ptr->table_info(),
                                       logical_insert_ptr->table_index(),
                                       logical_insert_ptr->value_list(),
@@ -502,34 +502,34 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildInsert(const SharedPtr<Logical
                                       logical_operator->load_metas());
 }
 
-UniquePtr<PhysicalOperator> PhysicalPlanner::BuildDelete(const SharedPtr<LogicalNode> &logical_operator) const {
+std::unique_ptr<PhysicalOperator> PhysicalPlanner::BuildDelete(const std::shared_ptr<LogicalNode> &logical_operator) const {
     if (logical_operator->left_node().get() == nullptr) {
         UnrecoverableError("Logical delete node has no input node.");
     }
     if (logical_operator->right_node().get() != nullptr) {
         UnrecoverableError("Logical delete node shouldn't have right child.");
     }
-    SharedPtr<LogicalDelete> logical_delete = dynamic_pointer_cast<LogicalDelete>(logical_operator);
+    std::shared_ptr<LogicalDelete> logical_delete = dynamic_pointer_cast<LogicalDelete>(logical_operator);
     auto input_logical_node = logical_operator->left_node();
     auto input_physical_operator = BuildPhysicalOperator(input_logical_node);
-    auto physical_delete = MakeUnique<PhysicalDelete>(logical_operator->node_id(),
+    auto physical_delete = std::make_unique<PhysicalDelete>(logical_operator->node_id(),
                                                       std::move(input_physical_operator),
                                                       logical_delete->table_info_,
                                                       logical_operator->load_metas());
     return physical_delete;
 }
 
-UniquePtr<PhysicalOperator> PhysicalPlanner::BuildUpdate(const SharedPtr<LogicalNode> &logical_operator) const {
+std::unique_ptr<PhysicalOperator> PhysicalPlanner::BuildUpdate(const std::shared_ptr<LogicalNode> &logical_operator) const {
     if (logical_operator->left_node().get() == nullptr) {
         UnrecoverableError("Logical update node has no input node.");
     }
     if (logical_operator->right_node().get() != nullptr) {
         UnrecoverableError("Logical update node shouldn't have right child.");
     }
-    SharedPtr<LogicalUpdate> logical_update = dynamic_pointer_cast<LogicalUpdate>(logical_operator);
+    std::shared_ptr<LogicalUpdate> logical_update = dynamic_pointer_cast<LogicalUpdate>(logical_operator);
     auto input_logical_node = logical_operator->left_node();
     auto input_physical_operator = BuildPhysicalOperator(input_logical_node);
-    auto physical_update = MakeUnique<PhysicalUpdate>(logical_operator->node_id(),
+    auto physical_update = std::make_unique<PhysicalUpdate>(logical_operator->node_id(),
                                                       std::move(input_physical_operator),
                                                       logical_update->table_info_,
                                                       logical_update->update_columns_,
@@ -539,9 +539,9 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildUpdate(const SharedPtr<Logical
     return physical_update;
 }
 
-UniquePtr<PhysicalOperator> PhysicalPlanner::BuildImport(const SharedPtr<LogicalNode> &logical_operator) const {
+std::unique_ptr<PhysicalOperator> PhysicalPlanner::BuildImport(const std::shared_ptr<LogicalNode> &logical_operator) const {
     LogicalImport *logical_import = (LogicalImport *)(logical_operator.get());
-    return MakeUnique<PhysicalImport>(logical_operator->node_id(),
+    return std::make_unique<PhysicalImport>(logical_operator->node_id(),
                                       logical_import->table_info(),
                                       logical_import->file_path(),
                                       logical_import->header(),
@@ -550,9 +550,9 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildImport(const SharedPtr<Logical
                                       logical_operator->load_metas());
 }
 
-UniquePtr<PhysicalOperator> PhysicalPlanner::BuildExport(const SharedPtr<LogicalNode> &logical_operator) const {
+std::unique_ptr<PhysicalOperator> PhysicalPlanner::BuildExport(const std::shared_ptr<LogicalNode> &logical_operator) const {
     LogicalExport *logical_export = (LogicalExport *)(logical_operator.get());
-    return MakeUnique<PhysicalExport>(logical_export->node_id(),
+    return std::make_unique<PhysicalExport>(logical_export->node_id(),
                                       logical_export->table_info(),
                                       logical_export->schema_name(),
                                       logical_export->table_name(),
@@ -568,12 +568,12 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildExport(const SharedPtr<Logical
                                       logical_operator->load_metas());
 }
 
-UniquePtr<PhysicalOperator> PhysicalPlanner::BuildAlter(const SharedPtr<LogicalNode> &logical_operator) const {
+std::unique_ptr<PhysicalOperator> PhysicalPlanner::BuildAlter(const std::shared_ptr<LogicalNode> &logical_operator) const {
     auto *logical_alter = const_cast<LogicalAlter *>(static_cast<const LogicalAlter *>(logical_operator.get()));
     switch (logical_alter->type_) {
         case AlterStatementType::kRenameTable: {
             auto *logical_rename_table = static_cast<LogicalRenameTable *>(logical_alter);
-            return MakeUnique<PhysicalRenameTable>(logical_rename_table->table_info_,
+            return std::make_unique<PhysicalRenameTable>(logical_rename_table->table_info_,
                                                    std::move(logical_rename_table->new_table_name_),
                                                    logical_operator->GetOutputNames(),
                                                    logical_operator->GetOutputTypes(),
@@ -582,7 +582,7 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildAlter(const SharedPtr<LogicalN
         }
         case AlterStatementType::kAddColumns: {
             auto *logical_add_columns = static_cast<LogicalAddColumns *>(logical_alter);
-            return MakeUnique<PhysicalAddColumns>(logical_add_columns->table_info_,
+            return std::make_unique<PhysicalAddColumns>(logical_add_columns->table_info_,
                                                   logical_add_columns->column_defs_,
                                                   logical_operator->GetOutputNames(),
                                                   logical_operator->GetOutputTypes(),
@@ -591,7 +591,7 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildAlter(const SharedPtr<LogicalN
         }
         case AlterStatementType::kDropColumns: {
             auto *logical_drop_columns = static_cast<LogicalDropColumns *>(logical_alter);
-            return MakeUnique<PhysicalDropColumns>(logical_drop_columns->table_info_,
+            return std::make_unique<PhysicalDropColumns>(logical_drop_columns->table_info_,
                                                    logical_drop_columns->column_names_,
                                                    logical_operator->GetOutputNames(),
                                                    logical_operator->GetOutputTypes(),
@@ -605,20 +605,20 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildAlter(const SharedPtr<LogicalN
     return {};
 }
 
-UniquePtr<PhysicalOperator> PhysicalPlanner::BuildAggregate(const SharedPtr<LogicalNode> &logical_operator) const {
+std::unique_ptr<PhysicalOperator> PhysicalPlanner::BuildAggregate(const std::shared_ptr<LogicalNode> &logical_operator) const {
     auto input_logical_node = logical_operator->left_node();
     if (logical_operator->right_node().get() != nullptr) {
         UnrecoverableError("Aggregate project node shouldn't have right child.");
     }
-    SharedPtr<LogicalAggregate> logical_aggregate = static_pointer_cast<LogicalAggregate>(logical_operator);
-    UniquePtr<PhysicalOperator> input_physical_operator{};
+    std::shared_ptr<LogicalAggregate> logical_aggregate = static_pointer_cast<LogicalAggregate>(logical_operator);
+    std::unique_ptr<PhysicalOperator> input_physical_operator{};
     if (input_logical_node.get() != nullptr) {
         input_physical_operator = BuildPhysicalOperator(input_logical_node);
     }
 
-    SizeT tasklet_count = input_physical_operator->TaskletCount();
+    size_t tasklet_count = input_physical_operator->TaskletCount();
 
-    auto physical_agg_op = MakeUnique<PhysicalAggregate>(logical_aggregate->node_id(),
+    auto physical_agg_op = std::make_unique<PhysicalAggregate>(logical_aggregate->node_id(),
                                                          std::move(input_physical_operator),
                                                          logical_aggregate->groups_,
                                                          logical_aggregate->groupby_index_,
@@ -629,16 +629,16 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildAggregate(const SharedPtr<Logi
     if (tasklet_count <= 1) {
         return physical_agg_op;
     } else {
-        return MakeUnique<PhysicalMergeAggregate>(query_context_ptr_->GetNextNodeID(),
+        return std::make_unique<PhysicalMergeAggregate>(query_context_ptr_->GetNextNodeID(),
                                                   logical_aggregate->base_table_ref_,
                                                   std::move(physical_agg_op),
                                                   logical_aggregate->GetOutputNames(),
                                                   logical_aggregate->GetOutputTypes(),
-                                                  MakeShared<Vector<LoadMeta>>());
+                                                  std::make_shared<std::vector<LoadMeta>>());
     }
 }
 
-UniquePtr<PhysicalOperator> PhysicalPlanner::BuildJoin(const SharedPtr<LogicalNode> &logical_operator) const {
+std::unique_ptr<PhysicalOperator> PhysicalPlanner::BuildJoin(const std::shared_ptr<LogicalNode> &logical_operator) const {
 
     auto left_node = logical_operator->left_node();
     auto right_node = logical_operator->right_node();
@@ -650,15 +650,15 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildJoin(const SharedPtr<LogicalNo
         UnrecoverableError("Join node has no right child.");
     }
 
-    SharedPtr<LogicalJoin> logical_join = static_pointer_cast<LogicalJoin>(logical_operator);
+    std::shared_ptr<LogicalJoin> logical_join = static_pointer_cast<LogicalJoin>(logical_operator);
 
-    UniquePtr<PhysicalOperator> left_physical_operator{};
-    UniquePtr<PhysicalOperator> right_physical_operator{};
+    std::unique_ptr<PhysicalOperator> left_physical_operator{};
+    std::unique_ptr<PhysicalOperator> right_physical_operator{};
 
     left_physical_operator = BuildPhysicalOperator(left_node);
     right_physical_operator = BuildPhysicalOperator(right_node);
 
-    return MakeUnique<PhysicalNestedLoopJoin>(logical_operator->node_id(),
+    return std::make_unique<PhysicalNestedLoopJoin>(logical_operator->node_id(),
                                               logical_join->join_type_,
                                               logical_join->conditions_,
                                               std::move(left_physical_operator),
@@ -666,7 +666,7 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildJoin(const SharedPtr<LogicalNo
                                               logical_operator->load_metas());
 }
 
-UniquePtr<PhysicalOperator> PhysicalPlanner::BuildCrossProduct(const SharedPtr<LogicalNode> &logical_operator) const {
+std::unique_ptr<PhysicalOperator> PhysicalPlanner::BuildCrossProduct(const std::shared_ptr<LogicalNode> &logical_operator) const {
 
     auto left_node = logical_operator->left_node();
     auto right_node = logical_operator->right_node();
@@ -678,21 +678,21 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildCrossProduct(const SharedPtr<L
         UnrecoverableError("Cross product node has no right child.");
     }
 
-    SharedPtr<LogicalCrossProduct> logical_cross_product = static_pointer_cast<LogicalCrossProduct>(logical_operator);
+    std::shared_ptr<LogicalCrossProduct> logical_cross_product = static_pointer_cast<LogicalCrossProduct>(logical_operator);
 
-    UniquePtr<PhysicalOperator> left_physical_operator{};
-    UniquePtr<PhysicalOperator> right_physical_operator{};
+    std::unique_ptr<PhysicalOperator> left_physical_operator{};
+    std::unique_ptr<PhysicalOperator> right_physical_operator{};
 
     left_physical_operator = BuildPhysicalOperator(left_node);
     right_physical_operator = BuildPhysicalOperator(right_node);
 
-    return MakeUnique<PhysicalCrossProduct>(logical_operator->node_id(),
+    return std::make_unique<PhysicalCrossProduct>(logical_operator->node_id(),
                                             std::move(left_physical_operator),
                                             std::move(right_physical_operator),
                                             logical_operator->load_metas());
 }
 
-UniquePtr<PhysicalOperator> PhysicalPlanner::BuildSort(const SharedPtr<LogicalNode> &logical_operator) const {
+std::unique_ptr<PhysicalOperator> PhysicalPlanner::BuildSort(const std::shared_ptr<LogicalNode> &logical_operator) const {
     auto input_logical_node = logical_operator->left_node();
 
     if (input_logical_node.get() == nullptr) {
@@ -704,16 +704,16 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildSort(const SharedPtr<LogicalNo
 
     auto input_physical_operator = BuildPhysicalOperator(input_logical_node);
 
-    SharedPtr<LogicalSort> logical_sort = static_pointer_cast<LogicalSort>(logical_operator);
+    std::shared_ptr<LogicalSort> logical_sort = static_pointer_cast<LogicalSort>(logical_operator);
 
-    return MakeUnique<PhysicalSort>(logical_operator->node_id(),
+    return std::make_unique<PhysicalSort>(logical_operator->node_id(),
                                     std::move(input_physical_operator),
                                     logical_sort->expressions_,
                                     logical_sort->order_by_types_,
                                     logical_operator->load_metas());
 }
 
-UniquePtr<PhysicalOperator> PhysicalPlanner::BuildLimit(const SharedPtr<LogicalNode> &logical_operator) const {
+std::unique_ptr<PhysicalOperator> PhysicalPlanner::BuildLimit(const std::shared_ptr<LogicalNode> &logical_operator) const {
     auto input_logical_node = logical_operator->left_node();
 
     if (input_logical_node.get() == nullptr) {
@@ -723,8 +723,8 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildLimit(const SharedPtr<LogicalN
         UnrecoverableError("Limit node shouldn't have right child.");
     }
 
-    SharedPtr<LogicalLimit> logical_limit = static_pointer_cast<LogicalLimit>(logical_operator);
-    UniquePtr<PhysicalOperator> input_physical_operator = BuildPhysicalOperator(input_logical_node);
+    std::shared_ptr<LogicalLimit> logical_limit = static_pointer_cast<LogicalLimit>(logical_operator);
+    std::unique_ptr<PhysicalOperator> input_physical_operator = BuildPhysicalOperator(input_logical_node);
 
     i64 offset = 0;
     if (logical_limit->offset_expression_.get() != nullptr) {
@@ -732,29 +732,29 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildLimit(const SharedPtr<LogicalN
     }
 
     if (input_physical_operator->TaskletCount() <= 1 or offset != 0) {
-        return MakeUnique<PhysicalLimit>(logical_operator->node_id(),
+        return std::make_unique<PhysicalLimit>(logical_operator->node_id(),
                                          std::move(input_physical_operator),
                                          logical_limit->limit_expression_,
                                          logical_limit->offset_expression_,
                                          logical_operator->load_metas(),
                                          logical_limit->total_hits_count_flag_);
     } else {
-        auto child_limit_op = MakeUnique<PhysicalLimit>(logical_operator->node_id(),
+        auto child_limit_op = std::make_unique<PhysicalLimit>(logical_operator->node_id(),
                                                         std::move(input_physical_operator),
                                                         logical_limit->limit_expression_,
                                                         nullptr,
                                                         logical_operator->load_metas(),
                                                         logical_limit->total_hits_count_flag_);
-        return MakeUnique<PhysicalMergeLimit>(query_context_ptr_->GetNextNodeID(),
+        return std::make_unique<PhysicalMergeLimit>(query_context_ptr_->GetNextNodeID(),
                                               std::move(child_limit_op),
                                               logical_limit->base_table_ref_,
                                               logical_limit->limit_expression_,
                                               nullptr,
-                                              MakeShared<Vector<LoadMeta>>());
+                                              std::make_shared<std::vector<LoadMeta>>());
     }
 }
 
-UniquePtr<PhysicalOperator> PhysicalPlanner::BuildTop(const SharedPtr<LogicalNode> &logical_operator) const {
+std::unique_ptr<PhysicalOperator> PhysicalPlanner::BuildTop(const std::shared_ptr<LogicalNode> &logical_operator) const {
     auto logical_operator_top = static_cast<LogicalTop *>(logical_operator.get());
     if (logical_operator_top->right_node()) {
         UnrecoverableError("Top node shouldn't have right child.");
@@ -784,7 +784,7 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildTop(const SharedPtr<LogicalNod
     }
     if (input_physical_operator->TaskletCount() <= 1) {
         // only Top
-        return MakeUnique<PhysicalTop>(logical_operator_top->node_id(),
+        return std::make_unique<PhysicalTop>(logical_operator_top->node_id(),
                                        std::move(input_physical_operator),
                                        merge_limit,
                                        merge_offset, // start from offset
@@ -794,7 +794,7 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildTop(const SharedPtr<LogicalNod
                                        logical_operator_top->total_hits_count_flag_);
     } else {
         // need MergeTop
-        auto child_top_op = MakeUnique<PhysicalTop>(logical_operator_top->node_id(),
+        auto child_top_op = std::make_unique<PhysicalTop>(logical_operator_top->node_id(),
                                                     std::move(input_physical_operator),
                                                     merge_limit,
                                                     u32{}, // start from 0
@@ -802,28 +802,28 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildTop(const SharedPtr<LogicalNod
                                                     logical_operator_top->order_by_types_,
                                                     logical_operator_top->load_metas(),
                                                     logical_operator_top->total_hits_count_flag_);
-        return MakeUnique<PhysicalMergeTop>(query_context_ptr_->GetNextNodeID(),
+        return std::make_unique<PhysicalMergeTop>(query_context_ptr_->GetNextNodeID(),
                                             logical_operator_top->base_table_ref_,
                                             std::move(child_top_op),
                                             merge_limit,
                                             merge_offset, // start from offset
                                             logical_operator_top->sort_expressions_,
                                             logical_operator_top->order_by_types_,
-                                            MakeShared<Vector<LoadMeta>>());
+                                            std::make_shared<std::vector<LoadMeta>>());
     }
 }
 
-UniquePtr<PhysicalOperator> PhysicalPlanner::BuildProjection(const SharedPtr<LogicalNode> &logical_operator) const {
+std::unique_ptr<PhysicalOperator> PhysicalPlanner::BuildProjection(const std::shared_ptr<LogicalNode> &logical_operator) const {
     auto input_logical_node = logical_operator->left_node();
     if (logical_operator->right_node().get() != nullptr) {
         UnrecoverableError("Logical project node shouldn't have right child.");
     }
-    SharedPtr<LogicalProject> logical_project = static_pointer_cast<LogicalProject>(logical_operator);
-    UniquePtr<PhysicalOperator> input_physical_operator{};
+    std::shared_ptr<LogicalProject> logical_project = static_pointer_cast<LogicalProject>(logical_operator);
+    std::unique_ptr<PhysicalOperator> input_physical_operator{};
     if (input_logical_node.get() != nullptr) {
         input_physical_operator = BuildPhysicalOperator(input_logical_node);
     }
-    return MakeUnique<PhysicalProject>(logical_operator->node_id(),
+    return std::make_unique<PhysicalProject>(logical_operator->node_id(),
                                        logical_project->table_index_,
                                        std::move(input_physical_operator),
                                        logical_project->expressions_,
@@ -831,7 +831,7 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildProjection(const SharedPtr<Log
                                        std::move(logical_project->highlight_columns_));
 }
 
-UniquePtr<PhysicalOperator> PhysicalPlanner::BuildFilter(const SharedPtr<LogicalNode> &logical_operator) const {
+std::unique_ptr<PhysicalOperator> PhysicalPlanner::BuildFilter(const std::shared_ptr<LogicalNode> &logical_operator) const {
     auto input_logical_node = logical_operator->left_node();
     if (input_logical_node.get() == nullptr) {
         UnrecoverableError("Logical filter node has no input node.");
@@ -842,29 +842,29 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildFilter(const SharedPtr<Logical
 
     auto input_physical_operator = BuildPhysicalOperator(input_logical_node);
 
-    SharedPtr<LogicalFilter> logical_filter = static_pointer_cast<LogicalFilter>(logical_operator);
+    std::shared_ptr<LogicalFilter> logical_filter = static_pointer_cast<LogicalFilter>(logical_operator);
 
-    return MakeUnique<PhysicalFilter>(logical_operator->node_id(),
+    return std::make_unique<PhysicalFilter>(logical_operator->node_id(),
                                       std::move(input_physical_operator),
                                       logical_filter->expression(),
                                       logical_operator->load_metas());
 }
 
-UniquePtr<PhysicalOperator> PhysicalPlanner::BuildIntersect(const SharedPtr<LogicalNode> &logical_operator) const {
-    return MakeUnique<PhysicalHashJoin>(logical_operator->node_id(), logical_operator->load_metas());
+std::unique_ptr<PhysicalOperator> PhysicalPlanner::BuildIntersect(const std::shared_ptr<LogicalNode> &logical_operator) const {
+    return std::make_unique<PhysicalHashJoin>(logical_operator->node_id(), logical_operator->load_metas());
 }
 
-UniquePtr<PhysicalOperator> PhysicalPlanner::BuildUnion(const SharedPtr<LogicalNode> &logical_operator) const {
-    return MakeUnique<PhysicalUnionAll>(logical_operator->node_id(), logical_operator->load_metas());
+std::unique_ptr<PhysicalOperator> PhysicalPlanner::BuildUnion(const std::shared_ptr<LogicalNode> &logical_operator) const {
+    return std::make_unique<PhysicalUnionAll>(logical_operator->node_id(), logical_operator->load_metas());
 }
 
-UniquePtr<PhysicalOperator> PhysicalPlanner::BuildExcept(const SharedPtr<LogicalNode> &logical_operator) const {
-    return MakeUnique<PhysicalHashJoin>(logical_operator->node_id(), logical_operator->load_metas());
+std::unique_ptr<PhysicalOperator> PhysicalPlanner::BuildExcept(const std::shared_ptr<LogicalNode> &logical_operator) const {
+    return std::make_unique<PhysicalHashJoin>(logical_operator->node_id(), logical_operator->load_metas());
 }
 
-UniquePtr<PhysicalOperator> PhysicalPlanner::BuildShow(const SharedPtr<LogicalNode> &logical_operator) const {
-    SharedPtr<LogicalShow> logical_show = static_pointer_cast<LogicalShow>(logical_operator);
-    return MakeUnique<PhysicalShow>(logical_show->node_id(),
+std::unique_ptr<PhysicalOperator> PhysicalPlanner::BuildShow(const std::shared_ptr<LogicalNode> &logical_operator) const {
+    std::shared_ptr<LogicalShow> logical_show = static_pointer_cast<LogicalShow>(logical_operator);
+    return std::make_unique<PhysicalShow>(logical_show->node_id(),
                                     logical_show->show_type(),
                                     logical_show->schema_name(),
                                     logical_show->object_name(),
@@ -881,18 +881,18 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildShow(const SharedPtr<LogicalNo
                                     logical_operator->load_metas());
 }
 
-UniquePtr<PhysicalOperator> PhysicalPlanner::BuildTableScan(const SharedPtr<LogicalNode> &logical_operator) const {
-    SharedPtr<LogicalTableScan> logical_table_scan = static_pointer_cast<LogicalTableScan>(logical_operator);
-    return MakeUnique<PhysicalTableScan>(logical_operator->node_id(),
+std::unique_ptr<PhysicalOperator> PhysicalPlanner::BuildTableScan(const std::shared_ptr<LogicalNode> &logical_operator) const {
+    std::shared_ptr<LogicalTableScan> logical_table_scan = static_pointer_cast<LogicalTableScan>(logical_operator);
+    return std::make_unique<PhysicalTableScan>(logical_operator->node_id(),
                                          logical_table_scan->base_table_ref_,
                                          std::move(logical_table_scan->fast_rough_filter_evaluator_),
                                          logical_operator->load_metas(),
                                          logical_table_scan->add_row_id_);
 }
 
-UniquePtr<PhysicalOperator> PhysicalPlanner::BuildIndexScan(const SharedPtr<LogicalNode> &logical_operator) const {
-    SharedPtr<LogicalIndexScan> logical_index_scan = static_pointer_cast<LogicalIndexScan>(logical_operator);
-    return MakeUnique<PhysicalIndexScan>(logical_operator->node_id(),
+std::unique_ptr<PhysicalOperator> PhysicalPlanner::BuildIndexScan(const std::shared_ptr<LogicalNode> &logical_operator) const {
+    std::shared_ptr<LogicalIndexScan> logical_index_scan = static_pointer_cast<LogicalIndexScan>(logical_operator);
+    return std::make_unique<PhysicalIndexScan>(logical_operator->node_id(),
                                          logical_index_scan->base_table_ref_,
                                          logical_index_scan->index_filter_,
                                          std::move(logical_index_scan->index_filter_evaluator_),
@@ -904,25 +904,25 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildIndexScan(const SharedPtr<Logi
                                          true);
 }
 
-UniquePtr<PhysicalOperator> PhysicalPlanner::BuildViewScan(const SharedPtr<LogicalNode> &logical_operator) const {
+std::unique_ptr<PhysicalOperator> PhysicalPlanner::BuildViewScan(const std::shared_ptr<LogicalNode> &logical_operator) const {
     Status status = Status::NotSupport("BuildViewScan");
     RecoverableError(status);
     return nullptr;
 }
 
-UniquePtr<PhysicalOperator> PhysicalPlanner::BuildDummyScan(const SharedPtr<LogicalNode> &logical_operator) const {
-    SharedPtr<LogicalDummyScan> logical_show = static_pointer_cast<LogicalDummyScan>(logical_operator);
-    return MakeUnique<PhysicalDummyScan>(logical_show->node_id(), logical_operator->load_metas());
+std::unique_ptr<PhysicalOperator> PhysicalPlanner::BuildDummyScan(const std::shared_ptr<LogicalNode> &logical_operator) const {
+    std::shared_ptr<LogicalDummyScan> logical_show = static_pointer_cast<LogicalDummyScan>(logical_operator);
+    return std::make_unique<PhysicalDummyScan>(logical_show->node_id(), logical_operator->load_metas());
 }
 
-UniquePtr<PhysicalOperator> PhysicalPlanner::BuildFlush(const SharedPtr<LogicalNode> &logical_operator) const {
+std::unique_ptr<PhysicalOperator> PhysicalPlanner::BuildFlush(const std::shared_ptr<LogicalNode> &logical_operator) const {
     LogicalFlush *logical_flush = (LogicalFlush *)(logical_operator.get());
-    return MakeUnique<PhysicalFlush>(logical_flush->flush_type(), logical_flush->node_id(), logical_operator->load_metas());
+    return std::make_unique<PhysicalFlush>(logical_flush->flush_type(), logical_flush->node_id(), logical_operator->load_metas());
 }
 
-UniquePtr<PhysicalOperator> PhysicalPlanner::BuildOptimize(const SharedPtr<LogicalNode> &logical_operator) const {
-    SharedPtr<LogicalOptimize> logical_optimize = static_pointer_cast<LogicalOptimize>(logical_operator);
-    return MakeUnique<PhysicalOptimize>(logical_optimize->node_id(),
+std::unique_ptr<PhysicalOperator> PhysicalPlanner::BuildOptimize(const std::shared_ptr<LogicalNode> &logical_operator) const {
+    std::shared_ptr<LogicalOptimize> logical_optimize = static_pointer_cast<LogicalOptimize>(logical_operator);
+    return std::make_unique<PhysicalOptimize>(logical_optimize->node_id(),
                                         logical_optimize->schema_name(),
                                         logical_optimize->object_name(),
                                         logical_optimize->index_name_,
@@ -930,9 +930,9 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildOptimize(const SharedPtr<Logic
                                         logical_operator->load_metas());
 }
 
-UniquePtr<PhysicalOperator> PhysicalPlanner::BuildMatch(const SharedPtr<LogicalNode> &logical_operator) const {
-    SharedPtr<LogicalMatch> logical_match = static_pointer_cast<LogicalMatch>(logical_operator);
-    return MakeUnique<PhysicalMatch>(logical_match->node_id(),
+std::unique_ptr<PhysicalOperator> PhysicalPlanner::BuildMatch(const std::shared_ptr<LogicalNode> &logical_operator) const {
+    std::shared_ptr<LogicalMatch> logical_match = static_pointer_cast<LogicalMatch>(logical_operator);
+    return std::make_unique<PhysicalMatch>(logical_match->node_id(),
                                      logical_match->base_table_ref_,
                                      logical_match->match_expr_,
                                      logical_match->index_reader_,
@@ -951,10 +951,10 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildMatch(const SharedPtr<LogicalN
                                      true /*cache_result*/);
 }
 
-UniquePtr<PhysicalOperator> PhysicalPlanner::BuildMatchTensorScan(const SharedPtr<LogicalNode> &logical_operator) const {
+std::unique_ptr<PhysicalOperator> PhysicalPlanner::BuildMatchTensorScan(const std::shared_ptr<LogicalNode> &logical_operator) const {
     const auto logical_match_tensor = static_pointer_cast<LogicalMatchTensorScan>(logical_operator);
     auto match_tensor_scan_op =
-        MakeUnique<PhysicalMatchTensorScan>(logical_match_tensor->node_id(),
+        std::make_unique<PhysicalMatchTensorScan>(logical_match_tensor->node_id(),
                                             logical_match_tensor->TableIndex(),
                                             logical_match_tensor->base_table_ref_,
                                             std::static_pointer_cast<MatchTensorExpression>(logical_match_tensor->query_expression_),
@@ -969,7 +969,7 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildMatchTensorScan(const SharedPt
         match_tensor_scan_op->SetCacheResult(true);
         return match_tensor_scan_op;
     } else {
-        return MakeUnique<PhysicalMergeMatchTensor>(query_context_ptr_->GetNextNodeID(),
+        return std::make_unique<PhysicalMergeMatchTensor>(query_context_ptr_->GetNextNodeID(),
                                                     std::move(match_tensor_scan_op),
                                                     logical_match_tensor->TableIndex(),
                                                     logical_match_tensor->base_table_ref_,
@@ -977,15 +977,15 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildMatchTensorScan(const SharedPt
                                                     logical_match_tensor->common_query_filter_->original_filter_,
                                                     logical_match_tensor->topn_,
                                                     logical_match_tensor->index_options_,
-                                                    MakeShared<Vector<LoadMeta>>(),
+                                                    std::make_shared<std::vector<LoadMeta>>(),
                                                     true);
     }
 }
 
-UniquePtr<PhysicalOperator> PhysicalPlanner::BuildMatchSparseScan(const SharedPtr<LogicalNode> &logical_operator) const {
+std::unique_ptr<PhysicalOperator> PhysicalPlanner::BuildMatchSparseScan(const std::shared_ptr<LogicalNode> &logical_operator) const {
     const auto logical_match_sparse = std::static_pointer_cast<LogicalMatchSparseScan>(logical_operator);
     auto match_sparse_scan_op =
-        MakeUnique<PhysicalMatchSparseScan>(logical_match_sparse->node_id(),
+        std::make_unique<PhysicalMatchSparseScan>(logical_match_sparse->node_id(),
                                             logical_match_sparse->TableIndex(),
                                             logical_match_sparse->base_table_ref_,
                                             std::static_pointer_cast<MatchSparseExpression>(logical_match_sparse->query_expression_),
@@ -997,33 +997,33 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildMatchSparseScan(const SharedPt
         return match_sparse_scan_op;
     }
     auto merge_match_sparse_op =
-        MakeUnique<PhysicalMergeMatchSparse>(query_context_ptr_->GetNextNodeID(),
+        std::make_unique<PhysicalMergeMatchSparse>(query_context_ptr_->GetNextNodeID(),
                                              std::move(match_sparse_scan_op),
                                              logical_match_sparse->TableIndex(),
                                              logical_match_sparse->base_table_ref_,
                                              std::static_pointer_cast<MatchSparseExpression>(logical_match_sparse->query_expression_),
                                              logical_match_sparse->common_query_filter_->original_filter_,
-                                             MakeShared<Vector<LoadMeta>>(),
+                                             std::make_shared<std::vector<LoadMeta>>(),
                                              true);
     return merge_match_sparse_op;
 }
 
-UniquePtr<PhysicalOperator> PhysicalPlanner::BuildFusion(const SharedPtr<LogicalNode> &logical_operator) const {
+std::unique_ptr<PhysicalOperator> PhysicalPlanner::BuildFusion(const std::shared_ptr<LogicalNode> &logical_operator) const {
     const auto logical_fusion = static_pointer_cast<LogicalFusion>(logical_operator);
-    UniquePtr<PhysicalOperator> left_phy = nullptr, right_phy = nullptr;
-    Vector<UniquePtr<PhysicalOperator>> other_children;
+    std::unique_ptr<PhysicalOperator> left_phy = nullptr, right_phy = nullptr;
+    std::vector<std::unique_ptr<PhysicalOperator>> other_children;
     if (const auto &left_logical_node = logical_operator->left_node(); left_logical_node.get() != nullptr) {
         left_phy = BuildPhysicalOperator(left_logical_node);
     }
     if (const auto right_logical_node = logical_operator->right_node(); right_logical_node.get() != nullptr) {
         right_phy = BuildPhysicalOperator(right_logical_node);
     }
-    SizeT num_other_children = logical_fusion->other_children_.size();
-    for (SizeT i = 0; i < num_other_children; i++) {
-        UniquePtr<PhysicalOperator> child_phy = BuildPhysicalOperator(logical_fusion->other_children_[i]);
+    size_t num_other_children = logical_fusion->other_children_.size();
+    for (size_t i = 0; i < num_other_children; i++) {
+        std::unique_ptr<PhysicalOperator> child_phy = BuildPhysicalOperator(logical_fusion->other_children_[i]);
         other_children.push_back(std::move(child_phy));
     }
-    return MakeUnique<PhysicalFusion>(logical_fusion->node_id(),
+    return std::make_unique<PhysicalFusion>(logical_fusion->node_id(),
                                       logical_fusion->base_table_ref_,
                                       std::move(left_phy),
                                       std::move(right_phy),
@@ -1032,9 +1032,9 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildFusion(const SharedPtr<Logical
                                       logical_operator->load_metas());
 }
 
-UniquePtr<PhysicalOperator> PhysicalPlanner::BuildKnn(const SharedPtr<LogicalNode> &logical_operator) const {
+std::unique_ptr<PhysicalOperator> PhysicalPlanner::BuildKnn(const std::shared_ptr<LogicalNode> &logical_operator) const {
     auto *logical_knn_scan = (LogicalKnnScan *)(logical_operator.get());
-    UniquePtr<PhysicalKnnScan> knn_scan_op = MakeUnique<PhysicalKnnScan>(logical_knn_scan->node_id(),
+    std::unique_ptr<PhysicalKnnScan> knn_scan_op = std::make_unique<PhysicalKnnScan>(logical_knn_scan->node_id(),
                                                                          logical_knn_scan->base_table_ref_,
                                                                          logical_knn_scan->knn_expression(),
                                                                          logical_knn_scan->common_query_filter_,
@@ -1048,7 +1048,7 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildKnn(const SharedPtr<LogicalNod
         knn_scan_op->SetCacheResult(true);
         return knn_scan_op;
     } else {
-        return MakeUnique<PhysicalMergeKnn>(query_context_ptr_->GetNextNodeID(),
+        return std::make_unique<PhysicalMergeKnn>(query_context_ptr_->GetNextNodeID(),
                                             logical_knn_scan->base_table_ref_,
                                             std::move(knn_scan_op),
                                             logical_knn_scan->GetOutputNames(),
@@ -1056,27 +1056,27 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildKnn(const SharedPtr<LogicalNod
                                             logical_knn_scan->knn_expression(),
                                             logical_knn_scan->common_query_filter_->original_filter_,
                                             logical_knn_scan->knn_table_index_,
-                                            MakeShared<Vector<LoadMeta>>(),
+                                            std::make_shared<std::vector<LoadMeta>>(),
                                             true);
     }
 }
 
-UniquePtr<PhysicalOperator> PhysicalPlanner::BuildCommand(const SharedPtr<LogicalNode> &logical_operator) const {
+std::unique_ptr<PhysicalOperator> PhysicalPlanner::BuildCommand(const std::shared_ptr<LogicalNode> &logical_operator) const {
     auto *logical_command = (LogicalCommand *)(logical_operator.get());
     auto command_info = logical_command->command_info();
-    return MakeUnique<PhysicalCommand>(logical_command->node_id(),
+    return std::make_unique<PhysicalCommand>(logical_command->node_id(),
                                        command_info,
                                        logical_command->GetOutputNames(),
                                        logical_command->GetOutputTypes(),
                                        logical_operator->load_metas());
 }
 
-UniquePtr<PhysicalOperator> PhysicalPlanner::BuildCompact(const SharedPtr<LogicalNode> &logical_operator) const {
+std::unique_ptr<PhysicalOperator> PhysicalPlanner::BuildCompact(const std::shared_ptr<LogicalNode> &logical_operator) const {
     const auto *logical_compact = static_cast<const LogicalCompact *>(logical_operator.get());
     if (logical_compact->left_node().get() != nullptr || logical_compact->right_node().get() != nullptr) {
         UnrecoverableError("Compact node shouldn't have child.");
     }
-    return MakeUnique<PhysicalCompact>(logical_compact->node_id(),
+    return std::make_unique<PhysicalCompact>(logical_compact->node_id(),
                                        logical_compact->base_table_ref_,
                                        logical_compact->compact_type_,
                                        logical_compact->GetOutputNames(),
@@ -1084,9 +1084,9 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildCompact(const SharedPtr<Logica
                                        logical_operator->load_metas());
 }
 
-UniquePtr<PhysicalOperator> PhysicalPlanner::BuildReadCache(const SharedPtr<LogicalNode> &logical_operator) const {
+std::unique_ptr<PhysicalOperator> PhysicalPlanner::BuildReadCache(const std::shared_ptr<LogicalNode> &logical_operator) const {
     const auto *logical_read_cache = static_cast<LogicalReadCache *>(logical_operator.get());
-    return MakeUnique<PhysicalReadCache>(logical_read_cache->node_id(),
+    return std::make_unique<PhysicalReadCache>(logical_read_cache->node_id(),
                                          logical_read_cache->origin_type_,
                                          logical_read_cache->base_table_ref_,
                                          logical_read_cache->cache_content_,
@@ -1095,7 +1095,7 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildReadCache(const SharedPtr<Logi
                                          logical_read_cache->is_min_heap_);
 }
 
-UniquePtr<PhysicalOperator> PhysicalPlanner::BuildUnnest(const SharedPtr<LogicalNode> &logical_operator) const {
+std::unique_ptr<PhysicalOperator> PhysicalPlanner::BuildUnnest(const std::shared_ptr<LogicalNode> &logical_operator) const {
     auto input_logical_node = logical_operator->left_node();
     if (input_logical_node.get() == nullptr) {
         UnrecoverableError("Logical filter node has no input node.");
@@ -1107,13 +1107,13 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildUnnest(const SharedPtr<Logical
     auto input_physical_operator = BuildPhysicalOperator(input_logical_node);
 
     auto *logical_unnest = static_cast<LogicalUnnest *>(logical_operator.get());
-    return MakeUnique<PhysicalUnnest>(logical_unnest->node_id(),
+    return std::make_unique<PhysicalUnnest>(logical_unnest->node_id(),
                                       std::move(input_physical_operator),
                                       logical_unnest->expression_list(),
                                       logical_unnest->load_metas());
 }
 
-UniquePtr<PhysicalOperator> PhysicalPlanner::BuildUnnestAggregate(const SharedPtr<LogicalNode> &logical_operator) const {
+std::unique_ptr<PhysicalOperator> PhysicalPlanner::BuildUnnestAggregate(const std::shared_ptr<LogicalNode> &logical_operator) const {
     auto input_logical_node = logical_operator->left_node();
     if (input_logical_node.get() == nullptr) {
         UnrecoverableError("Logical filter node has no input node.");
@@ -1125,7 +1125,7 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildUnnestAggregate(const SharedPt
     auto input_physical_operator = BuildPhysicalOperator(input_logical_node);
 
     auto *logical_unnest_aggregate = static_cast<LogicalUnnestAggregate *>(logical_operator.get());
-    return MakeUnique<PhysicalUnnestAggregate>(logical_unnest_aggregate->node_id(),
+    return std::make_unique<PhysicalUnnestAggregate>(logical_unnest_aggregate->node_id(),
                                                std::move(input_physical_operator),
                                                logical_unnest_aggregate->groups(),
                                                logical_unnest_aggregate->group_by_index(),
@@ -1135,22 +1135,22 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildUnnestAggregate(const SharedPt
                                                logical_unnest_aggregate->load_metas());
 }
 
-UniquePtr<PhysicalOperator> PhysicalPlanner::BuildExplain(const SharedPtr<LogicalNode> &logical_operator) const {
+std::unique_ptr<PhysicalOperator> PhysicalPlanner::BuildExplain(const std::shared_ptr<LogicalNode> &logical_operator) const {
 
     auto input_logical_node = logical_operator->left_node();
-    UniquePtr<PhysicalOperator> input_physical_operator{nullptr};
+    std::unique_ptr<PhysicalOperator> input_physical_operator{nullptr};
     if (input_logical_node.get() != nullptr) {
         input_physical_operator = BuildPhysicalOperator(input_logical_node);
     }
 
-    SharedPtr<LogicalExplain> logical_explain = static_pointer_cast<LogicalExplain>(logical_operator);
+    std::shared_ptr<LogicalExplain> logical_explain = static_pointer_cast<LogicalExplain>(logical_operator);
 
-    UniquePtr<PhysicalExplain> explain_node{nullptr};
+    std::unique_ptr<PhysicalExplain> explain_node{nullptr};
     switch (logical_explain->explain_type()) {
         case ExplainType::kAst:
         case ExplainType::kUnOpt:
         case ExplainType::kOpt: {
-            explain_node = MakeUnique<PhysicalExplain>(logical_explain->node_id(),
+            explain_node = std::make_unique<PhysicalExplain>(logical_explain->node_id(),
                                                        logical_explain->explain_type(),
                                                        logical_explain->TextArray(),
                                                        nullptr,
@@ -1158,9 +1158,9 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildExplain(const SharedPtr<Logica
             break;
         }
         case ExplainType::kPhysical: {
-            SharedPtr<Vector<SharedPtr<String>>> texts_ptr = MakeShared<Vector<SharedPtr<String>>>();
+            std::shared_ptr<std::vector<std::shared_ptr<std::string>>> texts_ptr = std::make_shared<std::vector<std::shared_ptr<std::string>>>();
             ExplainPhysicalPlan::Explain(input_physical_operator.get(), texts_ptr);
-            explain_node = MakeUnique<PhysicalExplain>(logical_explain->node_id(),
+            explain_node = std::make_unique<PhysicalExplain>(logical_explain->node_id(),
                                                        logical_explain->explain_type(),
                                                        texts_ptr,
                                                        nullptr,
@@ -1170,7 +1170,7 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildExplain(const SharedPtr<Logica
         case ExplainType::kAnalyze:
         case ExplainType::kFragment:
         case ExplainType::kPipeline: {
-            explain_node = MakeUnique<PhysicalExplain>(logical_explain->node_id(),
+            explain_node = std::make_unique<PhysicalExplain>(logical_explain->node_id(),
                                                        logical_explain->explain_type(),
                                                        nullptr,
                                                        std::move(input_physical_operator),
@@ -1186,9 +1186,9 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildExplain(const SharedPtr<Logica
     return explain_node;
 }
 
-UniquePtr<PhysicalOperator> PhysicalPlanner::BuildCheck(const SharedPtr<LogicalNode> &logical_operator) const {
-    SharedPtr<LogicalCheck> logical_check = static_pointer_cast<LogicalCheck>(logical_operator);
-    return MakeUnique<PhysicalCheck>(logical_check->node_id(),
+std::unique_ptr<PhysicalOperator> PhysicalPlanner::BuildCheck(const std::shared_ptr<LogicalNode> &logical_operator) const {
+    std::shared_ptr<LogicalCheck> logical_check = static_pointer_cast<LogicalCheck>(logical_operator);
+    return std::make_unique<PhysicalCheck>(logical_check->node_id(),
                                      logical_check->check_type(),
                                      logical_check->schema_name(),
                                      logical_check->table_name(),

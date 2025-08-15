@@ -149,7 +149,7 @@ class SecondaryIndexDataBase {
 protected:
     u32 chunk_row_count_ = 0;
     // pgm index
-    UniquePtr<SecondaryPGMIndex> pgm_index_;
+    std::unique_ptr<SecondaryPGMIndex> pgm_index_;
     // k-v data
     void *key_ptr_ = nullptr;
     SegmentOffset *offset_ptr_ = nullptr;
@@ -159,7 +159,7 @@ public:
 
     virtual ~SecondaryIndexDataBase() = default;
 
-    [[nodiscard]] Pair<const void *, const SegmentOffset *> GetKeyOffsetPointer() const { return {key_ptr_, offset_ptr_}; }
+    [[nodiscard]] std::pair<const void *, const SegmentOffset *> GetKeyOffsetPointer() const { return {key_ptr_, offset_ptr_}; }
 
     [[nodiscard]] inline auto SearchPGM(const void *val_ptr) const {
         if (!pgm_index_) {
@@ -176,7 +176,7 @@ public:
 
     virtual void InsertData(const void *ptr) = 0;
 
-    virtual void InsertMergeData(const Vector<Pair<u32, BufferObj *>> &old_chunks) = 0;
+    virtual void InsertMergeData(const std::vector<std::pair<u32, BufferObj *>> &old_chunks) = 0;
 
     // Virtual methods for low cardinality access (default implementations for high cardinality)
     virtual u32 GetUniqueKeyCount() const { return 0; }
@@ -187,15 +187,15 @@ public:
 // Type aliases for backward compatibility
 export using SecondaryIndexData = SecondaryIndexDataBase<HighCardinalityTag>;
 
-export SecondaryIndexDataBase<HighCardinalityTag> *GetSecondaryIndexData(const SharedPtr<DataType> &data_type, u32 chunk_row_count, bool allocate);
+export SecondaryIndexDataBase<HighCardinalityTag> *GetSecondaryIndexData(const std::shared_ptr<DataType> &data_type, u32 chunk_row_count, bool allocate);
 
 // New factory function that can create both cardinality variants
 export template <typename CardinalityTag>
 SecondaryIndexDataBase<CardinalityTag> *
-GetSecondaryIndexDataWithCardinality(const SharedPtr<DataType> &data_type, u32 chunk_row_count, bool allocate);
+GetSecondaryIndexDataWithCardinality(const std::shared_ptr<DataType> &data_type, u32 chunk_row_count, bool allocate);
 
 // Factory function that determines cardinality from TableIndexMeeta
 export void *
-GetSecondaryIndexDataWithMeeta(const SharedPtr<DataType> &data_type, u32 chunk_row_count, bool allocate, TableIndexMeeta *table_index_meeta);
+GetSecondaryIndexDataWithMeeta(const std::shared_ptr<DataType> &data_type, u32 chunk_row_count, bool allocate, TableIndexMeeta *table_index_meeta);
 
 } // namespace infinity

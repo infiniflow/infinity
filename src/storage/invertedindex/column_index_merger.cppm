@@ -19,19 +19,19 @@ import internal_types;
 namespace infinity {
 export class ColumnIndexMerger {
 public:
-    ColumnIndexMerger(const String &index_dir, optionflag_t flag);
+    ColumnIndexMerger(const std::string &index_dir, optionflag_t flag);
     ~ColumnIndexMerger();
 
-    void Merge(const Vector<String> &base_names, const Vector<RowID> &base_rowids, const String &dst_base_name);
+    void Merge(const std::vector<std::string> &base_names, const std::vector<RowID> &base_rowids, const std::string &dst_base_name);
 
 private:
-    SharedPtr<PostingMerger> CreatePostingMerger();
+    std::shared_ptr<PostingMerger> CreatePostingMerger();
 
-    void MergeTerm(const String &term, TermMeta &term_meta, const Vector<SegmentTermPosting *> &merging_term_postings, const RowID &merge_base_rowid);
+    void MergeTerm(const std::string &term, TermMeta &term_meta, const std::vector<SegmentTermPosting *> &merging_term_postings, const RowID &merge_base_rowid);
 
-    String index_dir_;
+    std::string index_dir_;
     optionflag_t flag_;
-    SharedPtr<FileWriter> posting_file_writer_;
+    std::shared_ptr<FileWriter> posting_file_writer_;
 
     // for column length info
     VectorWithLock<u32> column_lengths_;

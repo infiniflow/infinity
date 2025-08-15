@@ -44,7 +44,7 @@ import logical_type;
 
 namespace infinity {
 
-SharedPtr<ExpressionState> ExpressionState::CreateState(const SharedPtr<BaseExpression> &expression, char *agg_state) {
+std::shared_ptr<ExpressionState> ExpressionState::CreateState(const std::shared_ptr<BaseExpression> &expression, char *agg_state) {
 
     switch (expression->type()) {
         case ExpressionType::kAggregate:
@@ -74,30 +74,30 @@ SharedPtr<ExpressionState> ExpressionState::CreateState(const SharedPtr<BaseExpr
     return nullptr;
 }
 
-SharedPtr<ExpressionState>
-ExpressionState::CreateState(const SharedPtr<AggregateExpression> &agg_expr, char *agg_state, const AggregateFlag agg_flag) {
+std::shared_ptr<ExpressionState>
+ExpressionState::CreateState(const std::shared_ptr<AggregateExpression> &agg_expr, char *agg_state, const AggregateFlag agg_flag) {
     if (agg_expr->arguments().size() != 1) {
         Status status = Status::FunctionArgsError(agg_expr->ToString());
         RecoverableError(status);
     }
 
-    SharedPtr<ExpressionState> result = MakeShared<ExpressionState>();
+    std::shared_ptr<ExpressionState> result = std::make_shared<ExpressionState>();
     result->agg_state_ = agg_state;
     result->agg_flag_ = agg_flag;
     result->AddChild(agg_expr->arguments()[0]);
 
     // Aggregate function will only have one output value.
-    result->column_vector_ = MakeShared<ColumnVector>(MakeShared<DataType>(agg_expr->Type()));
+    result->column_vector_ = std::make_shared<ColumnVector>(std::make_shared<DataType>(agg_expr->Type()));
     result->column_vector_->Initialize(ColumnVectorType::kFlat, DEFAULT_VECTOR_SIZE);
     //    result->output_data_block_.Init({agg_expr->Type()});
     return result;
 }
 
-SharedPtr<ExpressionState> ExpressionState::CreateState(const SharedPtr<CaseExpression> &case_expr) {
+std::shared_ptr<ExpressionState> ExpressionState::CreateState(const std::shared_ptr<CaseExpression> &case_expr) {
 
-    SharedPtr<ExpressionState> result = MakeShared<ExpressionState>();
+    std::shared_ptr<ExpressionState> result = std::make_shared<ExpressionState>();
 
-    Vector<CaseCheck> &case_checks = case_expr->CaseExpr();
+    std::vector<CaseCheck> &case_checks = case_expr->CaseExpr();
     for (auto &case_check : case_checks) {
         result->AddChild(case_check.when_expr_);
         result->AddChild(case_check.then_expr_);
@@ -105,26 +105,26 @@ SharedPtr<ExpressionState> ExpressionState::CreateState(const SharedPtr<CaseExpr
     result->AddChild(case_expr->ElseExpr());
 
     ColumnVectorType result_column_vector_type = ColumnVectorType::kConstant;
-    for (SizeT idx = 0; idx < result->Children().size(); ++idx) {
+    for (size_t idx = 0; idx < result->Children().size(); ++idx) {
         if (result->Children()[idx]->OutputColumnVector()->vector_type() != ColumnVectorType::kConstant) {
             result_column_vector_type = ColumnVectorType::kFlat;
             break;
         }
     }
 
-    result->column_vector_ = MakeShared<ColumnVector>(MakeShared<DataType>(case_expr->Type()));
+    result->column_vector_ = std::make_shared<ColumnVector>(std::make_shared<DataType>(case_expr->Type()));
     result->column_vector_->Initialize(result_column_vector_type, DEFAULT_VECTOR_SIZE);
 
     return result;
 }
 
-SharedPtr<ExpressionState> ExpressionState::CreateState(const SharedPtr<CastExpression> &cast_expr) {
+std::shared_ptr<ExpressionState> ExpressionState::CreateState(const std::shared_ptr<CastExpression> &cast_expr) {
     if (cast_expr->arguments().size() != 1) {
         Status status = Status::FunctionArgsError(cast_expr->ToString());
         RecoverableError(status);
     }
 
-    SharedPtr<ExpressionState> result = MakeShared<ExpressionState>();
+    std::shared_ptr<ExpressionState> result = std::make_shared<ExpressionState>();
     result->AddChild(cast_expr->arguments()[0]);
 
     ColumnVectorType result_column_vector_type = ColumnVectorType::kFlat;
@@ -132,21 +132,21 @@ SharedPtr<ExpressionState> ExpressionState::CreateState(const SharedPtr<CastExpr
         result_column_vector_type = result->Children()[0]->OutputColumnVector()->vector_type();
     }
 
-    result->column_vector_ = MakeShared<ColumnVector>(MakeShared<DataType>(cast_expr->Type()));
+    result->column_vector_ = std::make_shared<ColumnVector>(std::make_shared<DataType>(cast_expr->Type()));
     result->column_vector_->Initialize(result_column_vector_type, DEFAULT_VECTOR_SIZE);
 
     //    result->output_data_block_.Init({cast_expr->Type()});
     return result;
 }
 
-SharedPtr<ExpressionState> ExpressionState::CreateState(const SharedPtr<ReferenceExpression> &) {
-    SharedPtr<ExpressionState> result = MakeShared<ExpressionState>();
+std::shared_ptr<ExpressionState> ExpressionState::CreateState(const std::shared_ptr<ReferenceExpression> &) {
+    std::shared_ptr<ExpressionState> result = std::make_shared<ExpressionState>();
     return result;
 }
 
-SharedPtr<ExpressionState> ExpressionState::CreateState(const SharedPtr<FunctionExpression> &function_expr) {
-    SharedPtr<ExpressionState> result = MakeShared<ExpressionState>();
-    SharedPtr<DataType> function_expr_data_type = MakeShared<DataType>(function_expr->Type());
+std::shared_ptr<ExpressionState> ExpressionState::CreateState(const std::shared_ptr<FunctionExpression> &function_expr) {
+    std::shared_ptr<ExpressionState> result = std::make_shared<ExpressionState>();
+    std::shared_ptr<DataType> function_expr_data_type = std::make_shared<DataType>(function_expr->Type());
 
     for (auto &arg : function_expr->arguments()) {
         result->AddChild(arg);
@@ -160,7 +160,7 @@ SharedPtr<ExpressionState> ExpressionState::CreateState(const SharedPtr<Function
         }
     }
 
-    result->column_vector_ = MakeShared<ColumnVector>(function_expr_data_type);
+    result->column_vector_ = std::make_shared<ColumnVector>(function_expr_data_type);
     if (result_is_constant) {
         result->column_vector_->Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
     } else {
@@ -170,20 +170,20 @@ SharedPtr<ExpressionState> ExpressionState::CreateState(const SharedPtr<Function
     return result;
 }
 
-SharedPtr<ExpressionState> ExpressionState::CreateState(const SharedPtr<ValueExpression> &value_expr) {
-    SharedPtr<ExpressionState> result = MakeShared<ExpressionState>();
-    SharedPtr<DataType> value_data_type = MakeShared<DataType>(value_expr->Type());
+std::shared_ptr<ExpressionState> ExpressionState::CreateState(const std::shared_ptr<ValueExpression> &value_expr) {
+    std::shared_ptr<ExpressionState> result = std::make_shared<ExpressionState>();
+    std::shared_ptr<DataType> value_data_type = std::make_shared<DataType>(value_expr->Type());
 
-    result->column_vector_ = MakeShared<ColumnVector>(value_data_type);
+    result->column_vector_ = std::make_shared<ColumnVector>(value_data_type);
     result->column_vector_->Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
     value_expr->AppendToChunk(result->column_vector_);
 
     return result;
 }
 
-SharedPtr<ExpressionState> ExpressionState::CreateState(const SharedPtr<InExpression> &in_expr) {
-    SharedPtr<ExpressionState> result = MakeShared<ExpressionState>();
-    SharedPtr<DataType> in_expr_data_type = MakeShared<DataType>(in_expr->Type());
+std::shared_ptr<ExpressionState> ExpressionState::CreateState(const std::shared_ptr<InExpression> &in_expr) {
+    std::shared_ptr<ExpressionState> result = std::make_shared<ExpressionState>();
+    std::shared_ptr<DataType> in_expr_data_type = std::make_shared<DataType>(in_expr->Type());
 
     result->AddChild(in_expr->left_operand());
 
@@ -192,19 +192,19 @@ SharedPtr<ExpressionState> ExpressionState::CreateState(const SharedPtr<InExpres
         result_column_vector_type = ColumnVectorType::kFlat;
     }
 
-    result->column_vector_ = MakeShared<ColumnVector>(in_expr_data_type);
+    result->column_vector_ = std::make_shared<ColumnVector>(in_expr_data_type);
     result->column_vector_->Initialize(result_column_vector_type, DEFAULT_VECTOR_SIZE);
 
     return result;
 }
 
-SharedPtr<ExpressionState> ExpressionState::CreateState(const SharedPtr<FilterFulltextExpression> &filter_fulltext_expr) {
-    auto result = MakeShared<ExpressionState>();
-    result->column_vector_ = MakeShared<ColumnVector>(MakeShared<DataType>(filter_fulltext_expr->Type()));
+std::shared_ptr<ExpressionState> ExpressionState::CreateState(const std::shared_ptr<FilterFulltextExpression> &filter_fulltext_expr) {
+    auto result = std::make_shared<ExpressionState>();
+    result->column_vector_ = std::make_shared<ColumnVector>(std::make_shared<DataType>(filter_fulltext_expr->Type()));
     result->column_vector_->Initialize();
     return result;
 }
 
-void ExpressionState::AddChild(const SharedPtr<BaseExpression> &expression) { children_.emplace_back(CreateState(expression)); }
+void ExpressionState::AddChild(const std::shared_ptr<BaseExpression> &expression) { children_.emplace_back(CreateState(expression)); }
 
 } // namespace infinity

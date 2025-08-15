@@ -12,11 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:allocator;
 
-import :stl;
+import std.compat;
 
 import global_resource_usage;
 
@@ -24,14 +22,14 @@ namespace infinity {
 
 export class Allocator {
 public:
-    static ptr_t allocate(SizeT bytes) {
+    static char * allocate(size_t bytes) {
 #ifdef INFINITY_DEBUG
         GlobalResourceUsage::IncrRawMemCount("Allocator");
 #endif
         return new char[bytes];
     }
 
-    static void deallocate(ptr_t ptr) {
+    static void deallocate(char * ptr) {
         delete[] ptr;
 #ifdef INFINITY_DEBUG
         GlobalResourceUsage::DecrRawMemCount("Allocator");

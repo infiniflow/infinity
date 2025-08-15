@@ -37,14 +37,14 @@ public:
 #endif
     }
 
-    void AddRule(UniquePtr<OptimizerRule> rule);
+    void AddRule(std::unique_ptr<OptimizerRule> rule);
 
-    void optimize(SharedPtr<LogicalNode> &unoptimized_plan, StatementType statement_type);
+    void optimize(std::shared_ptr<LogicalNode> &unoptimized_plan, StatementType statement_type);
 
 public:
     QueryContext *query_context_ptr_{};
 
-    Vector<UniquePtr<OptimizerRule>> rules_{};
+    std::vector<std::unique_ptr<OptimizerRule>> rules_{};
 };
 
 } // namespace infinity

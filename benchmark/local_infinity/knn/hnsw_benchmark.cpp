@@ -79,7 +79,7 @@ struct BenchmarkOption {
 public:
     BenchmarkOption() : app_("hnsw_benchmark") {}
 
-    static String IndexName(const BenchmarkType &benchmark_type, const BuildType &build_type, SizeT M, SizeT ef_construction) {
+    static String IndexName(const BenchmarkType &benchmark_type, const BuildType &build_type, size_t M, size_t ef_construction) {
         return fmt::format("hnsw_{}_{}_{}_{}", BenchmarkTypeToString(benchmark_type), BuildTypeToString(build_type), M, ef_construction);
     }
 
@@ -144,18 +144,18 @@ public:
     ModeType mode_type_;
     BenchmarkType benchmark_type_;
     BuildType build_type_;
-    SizeT thread_n_ = std::thread::hardware_concurrency();
+    size_t thread_n_ = std::thread::hardware_concurrency();
 
-    SizeT chunk_size_ = 8192;
-    SizeT max_chunk_num_ = 1024;
-    SizeT M_ = 16;
-    SizeT ef_construction_ = 200;
+    size_t chunk_size_ = 8192;
+    size_t max_chunk_num_ = 1024;
+    size_t M_ = 16;
+    size_t ef_construction_ = 200;
 
-    SizeT ef_ = 0;
-    SizeT test_n_ = 1;
+    size_t ef_ = 0;
+    size_t test_n_ = 1;
 
-    SizeT lsg_k_ = 10;
-    SizeT query_topk_ = 0;
+    size_t lsg_k_ = 10;
+    size_t query_topk_ = 0;
 
 public:
     Path data_path_;
@@ -174,41 +174,41 @@ using HnswLSG = KnnHnsw<PlainL2VecStoreType<float, true>, LabelT>;
 using HnswLVQ = KnnHnsw<LVQL2VecStoreType<float, i8>, LabelT>;
 using HnswLVQLSG = KnnHnsw<LVQL2VecStoreType<float, i8, true>, LabelT>;
 
-// SharedPtr<String> index_name = MakeShared<String>("index_name");
+// std::shared_ptr<String> index_name = std::make_shared<String>("index_name");
 // String filename = "filename";
 // Vector<String> column_names = {"col_name"};
 
-// UniquePtr<IndexHnsw> MakeLSGIndexHnsw(const BenchmarkOption &option) {
+// std::unique_ptr<IndexHnsw> MakeLSGIndexHnsw(const BenchmarkOption &option) {
 //     MetricType metric_type = MetricType::kMetricL2;
 //     HnswEncodeType encode_type = HnswEncodeType::kPlain;
 //     HnswBuildType build_type = HnswBuildType::kLSG;
-//     SizeT M = option.M_;
-//     SizeT ef_construction = option.ef_construction_;
-//     SizeT block_size = option.chunk_size_;
-//     return MakeUnique<IndexHnsw>(index_name, nullptr, filename, column_names, metric_type, encode_type, build_type, M, ef_construction, block_size);
+//     size_t M = option.M_;
+//     size_t ef_construction = option.ef_construction_;
+//     size_t block_size = option.chunk_size_;
+//     return std::make_unique<IndexHnsw>(index_name, nullptr, filename, column_names, metric_type, encode_type, build_type, M, ef_construction, block_size);
 // }
 
-// UniquePtr<ColumnDef> MakeColumnDef(SizeT dim) {
-//     auto embeddingInfo = MakeShared<EmbeddingInfo>(EmbeddingDataType::kElemFloat, dim);
-//     auto data_type = MakeShared<DataType>(LogicalType::kEmbedding, embeddingInfo);
-//     return MakeUnique<ColumnDef>(0, data_type, column_names[0], std::set<ConstraintType>());
+// std::unique_ptr<ColumnDef> MakeColumnDef(size_t dim) {
+//     auto embeddingInfo = std::make_shared<EmbeddingInfo>(EmbeddingDataType::kElemFloat, dim);
+//     auto data_type = std::make_shared<DataType>(LogicalType::kEmbedding, embeddingInfo);
+//     return std::make_unique<ColumnDef>(0, data_type, column_names[0], std::set<ConstraintType>());
 // }
 
-UniquePtr<float[]> GetAvgBF(SizeT vec_num, SizeT dim, const float *data, SizeT ls_k, SizeT sample_num) {
-    auto avg = MakeUnique<float[]>(vec_num);
-    Vector<SizeT> sample_idx(sample_num);
-    for (SizeT i = 0; i < sample_num; ++i) {
+std::unique_ptr<float[]> GetAvgBF(size_t vec_num, size_t dim, const float *data, size_t ls_k, size_t sample_num) {
+    auto avg = std::make_unique<float[]>(vec_num);
+    Vector<size_t> sample_idx(sample_num);
+    for (size_t i = 0; i < sample_num; ++i) {
         sample_idx[i] = rand() % vec_num;
     }
-    auto task = [&](SizeT start_i, SizeT end_i) {
+    auto task = [&](size_t start_i, size_t end_i) {
         Vector<float> distances(sample_num);
-        for (SizeT i = start_i; i < end_i; ++i) {
+        for (size_t i = start_i; i < end_i; ++i) {
             const float *v = data + i * dim;
-            for (SizeT j = 0; j < sample_num; ++j) {
+            for (size_t j = 0; j < sample_num; ++j) {
                 const float *v2 = data + sample_idx[j] * dim;
 
                 float distance = 0;
-                for (SizeT k = 0; k < dim; ++k) {
+                for (size_t k = 0; k < dim; ++k) {
                     float diff = v[k] - v2[k];
                     distance += diff * diff;
                 }
@@ -216,19 +216,19 @@ UniquePtr<float[]> GetAvgBF(SizeT vec_num, SizeT dim, const float *data, SizeT l
             }
             std::sort(distances.begin(), distances.end());
             avg[i] = 0;
-            for (SizeT j = 0; j < ls_k; ++j) {
+            for (size_t j = 0; j < ls_k; ++j) {
                 avg[i] += distances[j];
             }
             avg[i] /= ls_k;
         }
     };
     Vector<std::thread> threads;
-    SizeT thread_num = 16;
-    SizeT task_size = (vec_num - 1) / thread_num + 1;
+    size_t thread_num = 16;
+    size_t task_size = (vec_num - 1) / thread_num + 1;
 
-    for (SizeT i = 0; i < thread_num; ++i) {
-        SizeT start_i = i * task_size;
-        SizeT end_i = std::min(start_i + task_size, vec_num);
+    for (size_t i = 0; i < thread_num; ++i) {
+        size_t start_i = i * task_size;
+        size_t end_i = std::min(start_i + task_size, vec_num);
         threads.emplace_back(task, start_i, end_i);
     }
     for (auto &thread : threads) {
@@ -254,10 +254,10 @@ void Build(const BenchmarkOption &option) {
         // lsg_config.ls_k_ = 10;
         // HnswLSGBuilder lsg_builder(index_hnsw.get(), std::move(column_def), lsg_config);
         // DenseVectorIter<float, LabelT> iter(data.get(), dim, vec_num);
-        // UniquePtr<float[]> avg = lsg_builder.GetLSAvg<decltype(iter), float, float>(std::move(iter), vec_num, RowID(0, 0));
+        // std::unique_ptr<float[]> avg = lsg_builder.GetLSAvg<decltype(iter), float, float>(std::move(iter), vec_num, RowID(0, 0));
 
-        SizeT sample_num = 10000;
-        SizeT ls_k = 10;
+        size_t sample_num = 10000;
+        size_t ls_k = 10;
         auto avg = GetAvgBF(vec_num, dim, data.get(), ls_k, sample_num);
 
         float alpha = 1.0;
@@ -269,16 +269,16 @@ void Build(const BenchmarkOption &option) {
     data.reset();
 
     Vector<std::thread> build_threads;
-    const SizeT kBuildBucketSize = 1024;
-    SizeT bucket_size = std::max(kBuildBucketSize, vec_num / option.thread_n_);
-    SizeT bucket_num = (vec_num - 1) / bucket_size + 1;
+    const size_t kBuildBucketSize = 1024;
+    size_t bucket_size = std::max(kBuildBucketSize, vec_num / option.thread_n_);
+    size_t bucket_num = (vec_num - 1) / bucket_size + 1;
     assert(bucket_num <= option.thread_n_);
 
-    for (SizeT i = 0; i < bucket_num; ++i) {
-        SizeT i1 = i * bucket_size;
-        SizeT i2 = std::min(i1 + bucket_size, vec_num);
+    for (size_t i = 0; i < bucket_num; ++i) {
+        size_t i1 = i * bucket_size;
+        size_t i2 = std::min(i1 + bucket_size, vec_num);
         build_threads.emplace_back([&, i1, i2] {
-            for (SizeT j = i1; j < i2; ++j) {
+            for (size_t j = i1; j < i2; ++j) {
                 if (j % 10000 == 0) {
                     std::cout << fmt::format("Build {} / {}", j, vec_num) << std::endl;
                 }
@@ -322,7 +322,7 @@ void Query(const BenchmarkOption &option) {
 
     auto [query_num, query_dim, query_data] = benchmark::DecodeFvecsDataset<float>(option.query_path_);
     auto [gt_num, topk, gt_data] = benchmark::DecodeFvecsDataset<i32>(option.groundtruth_path_);
-    SizeT query_topk = topk;
+    size_t query_topk = topk;
     if (option.query_topk_ != 0) {
         query_topk = option.query_topk_;
     }
@@ -331,21 +331,21 @@ void Query(const BenchmarkOption &option) {
     }
     Vector<Vector<LabelT>> results(query_num, Vector<LabelT>(query_topk));
 
-    auto test = [&](SizeT i, const KnnSearchOption &search_option) {
+    auto test = [&](size_t i, const KnnSearchOption &search_option) {
         profiler.Begin();
         Vector<std::thread> query_threads;
-        Atomic<i32> cur_i = 0;
+        std::atomic<i32> cur_i = 0;
 
-        for (SizeT i = 0; i < option.thread_n_; ++i) {
+        for (size_t i = 0; i < option.thread_n_; ++i) {
             query_threads.emplace_back([&] {
-                SizeT i;
+                size_t i;
                 while ((i = cur_i.fetch_add(1)) < query_num) {
                     const float *query = query_data.get() + i * query_dim;
                     Vector<Pair<float, LabelT>> pairs = hnsw->KnnSearchSorted(query, query_topk, search_option);
-                    if (pairs.size() < SizeT(query_topk)) {
+                    if (pairs.size() < size_t(query_topk)) {
                         UnrecoverableError("result_n != topk");
                     }
-                    for (SizeT j = 0; j < query_topk; ++j) {
+                    for (size_t j = 0; j < query_topk; ++j) {
                         results[i][j] = pairs[j].second;
                     }
                 }
@@ -360,9 +360,9 @@ void Query(const BenchmarkOption &option) {
     };
     auto cal_recall = [&](const KnnSearchOption &search_option) {
         i32 correct = 0;
-        for (SizeT i = 0; i < query_num; ++i) {
+        for (size_t i = 0; i < query_num; ++i) {
             HashSet<LabelT> gt_set(gt_data.get() + i * topk, gt_data.get() + i * topk + query_topk);
-            for (SizeT j = 0; j < query_topk; ++j) {
+            for (size_t j = 0; j < query_topk; ++j) {
                 if (gt_set.contains(results[i][j])) {
                     correct++;
                 }
@@ -372,15 +372,15 @@ void Query(const BenchmarkOption &option) {
         std::cout << fmt::format("ef: {}, recall: {}", search_option.ef_, recall) << std::endl;
     };
     if (option.ef_ == 0) {
-        for (SizeT ef = 100; ef <= 1000; ef += 100) {
+        for (size_t ef = 100; ef <= 1000; ef += 100) {
             KnnSearchOption search_option{.ef_ = ef};
-            for (SizeT i = 0; i < option.test_n_; ++i) {
+            for (size_t i = 0; i < option.test_n_; ++i) {
                 test(i, search_option);
             }
             cal_recall(search_option);
         }
     } else {
-        for (SizeT i = 0; i < option.test_n_; ++i) {
+        for (size_t i = 0; i < option.test_n_; ++i) {
             KnnSearchOption search_option{.ef_ = option.ef_};
             test(i, search_option);
             cal_recall(search_option);
@@ -498,7 +498,7 @@ int main(int argc, char *argv[]) {
 //     BenchmarkOption option;
 //     option.mode_type_ = ModeType::BUILD;
 //     option.benchmark_type_ = BenchmarkType::GIST;
-//     for (SizeT ef_construction = 200; ef_construction <= 1000; ef_construction += 200) {
+//     for (size_t ef_construction = 200; ef_construction <= 1000; ef_construction += 200) {
 //         option.ef_construction_ = ef_construction;
 //         {
 //             option.build_type_ = BuildType::PLAIN;

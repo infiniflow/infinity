@@ -24,7 +24,7 @@ import :logger;
 import :physical_operator_type;
 
 namespace infinity {
-String PhysicalOperatorToString(PhysicalOperatorType type) {
+std::string PhysicalOperatorToString(PhysicalOperatorType type) {
     switch (type) {
 
         case PhysicalOperatorType::kInvalid:

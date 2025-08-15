@@ -30,18 +30,18 @@ struct TrimFunction {
 template <>
 inline void TrimFunction::Run(VarcharT &left, VarcharT &result, ColumnVector *left_ptr, ColumnVector *result_ptr) {
     const char *input = nullptr;
-    SizeT input_len = 0;
-    Span<const char> left_v = left_ptr->GetVarcharInner(left);
+    size_t input_len = 0;
+    std::span<const char> left_v = left_ptr->GetVarcharInner(left);
     input = left_v.data();
     input_len = left_v.size();
-    SizeT lpos = 0;
+    size_t lpos = 0;
     while (lpos < input_len && std::isspace(static_cast<unsigned char>(input[lpos]))) {
         lpos++;
     }
 
     if (lpos == input_len) {
         // Construct empty varchar value;
-        Span<const char> substr_span = Span<const char>(input, 0);
+        std::span<const char> substr_span = std::span<const char>(input, 0);
         result_ptr->AppendVarcharInner(substr_span, result);
         return;
     }
@@ -51,14 +51,14 @@ inline void TrimFunction::Run(VarcharT &left, VarcharT &result, ColumnVector *le
         rpos--;
     }
 
-    Span<const char> res_span = Span<const char>(&input[lpos], rpos - lpos + 1);
+    std::span<const char> res_span = std::span<const char>(&input[lpos], rpos - lpos + 1);
     result_ptr->AppendVarcharInner(res_span, result);
 }
 
 void RegisterTrimFunction(NewCatalog *catalog_ptr) {
-    String func_name = "trim";
+    std::string func_name = "trim";
 
-    SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
+    std::shared_ptr<ScalarFunctionSet> function_set_ptr = std::make_shared<ScalarFunctionSet>(func_name);
 
     ScalarFunction trim_function(func_name,
                                  {DataType(LogicalType::kVarchar)},

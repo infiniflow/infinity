@@ -29,33 +29,33 @@ public:
     virtual ~HashTableBase() = default;
     bool Initialized() const { return !types_.empty(); }
 
-    void Init(Vector<SharedPtr<DataType>> types);
+    void Init(std::vector<std::shared_ptr<DataType>> types);
 
-    void GetHashKey(const Vector<SharedPtr<ColumnVector>> &columns, SizeT row_id, String &hash_key) const;
+    void GetHashKey(const std::vector<std::shared_ptr<ColumnVector>> &columns, size_t row_id, std::string &hash_key) const;
 
 public:
-    Vector<SharedPtr<DataType>> types_{};
-    SizeT key_size_{};
+    std::vector<std::shared_ptr<DataType>> types_{};
+    size_t key_size_{};
 };
 
 export class HashTable : public HashTableBase {
 public:
-    void Append(const Vector<SharedPtr<ColumnVector>> &columns, SizeT block_id, SizeT row_count);
+    void Append(const std::vector<std::shared_ptr<ColumnVector>> &columns, size_t block_id, size_t row_count);
 
 public:
     // Key -> (block id -> row array)
-    HashMap<String, HashMap<SizeT, Vector<SizeT>>> hash_table_{};
+    std::unordered_map<std::string, std::unordered_map<size_t, std::vector<size_t>>> hash_table_{};
 };
 
 export class MergeHashTable : public HashTableBase {
 public:
-    void Append(const Vector<SharedPtr<ColumnVector>> &columns, SizeT block_id, SizeT row_count);
+    void Append(const std::vector<std::shared_ptr<ColumnVector>> &columns, size_t block_id, size_t row_count);
 
-    bool GetOrInsert(const Vector<SharedPtr<ColumnVector>> &columns, SizeT row_id, Pair<SizeT, SizeT> &block_row_id);
+    bool GetOrInsert(const std::vector<std::shared_ptr<ColumnVector>> &columns, size_t row_id, std::pair<size_t, size_t> &block_row_id);
 
 public:
     // Key -> (block id, row id)
-    HashMap<String, Pair<SizeT, SizeT>> hash_table_{};
+    std::unordered_map<std::string, std::pair<size_t, size_t>> hash_table_{};
 };
 
 } // namespace infinity

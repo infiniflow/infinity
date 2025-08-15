@@ -35,9 +35,9 @@ import std;
 namespace fs = std::filesystem;
 
 namespace infinity {
-static const String KNOWLEDGE_PATH = "mecab/ko-dic";
+static const std::string KNOWLEDGE_PATH = "mecab/ko-dic";
 
-KoreanAnalyzer::KoreanAnalyzer(const String &base_path) {
+KoreanAnalyzer::KoreanAnalyzer(const std::string &base_path) {
     cjk_ = true;
     own_mecab_ = true;
     fs::path root(base_path);

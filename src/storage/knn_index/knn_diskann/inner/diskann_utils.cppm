@@ -70,7 +70,7 @@ export class AlignedFileReader {
 
 private:
     u64 file_sz_;
-    UniquePtr<LocalFileHandle> file_desc_;
+    std::unique_ptr<LocalFileHandle> file_desc_;
 
 public:
     AlignedFileReader() : file_sz_(0), file_desc_(nullptr) {}
@@ -79,7 +79,7 @@ public:
 
     ~AlignedFileReader() = default;
 
-    static UniquePtr<This> Make() { return MakeUnique<This>(); }
+    static std::unique_ptr<This> Make() { return std::make_unique<This>(); }
 
     void Read(std::vector<AlignedRead> &read_reqs, bool async = false) {
         if (async) {
@@ -87,7 +87,7 @@ public:
             RecoverableError(status);
         }
 
-        for (SizeT reqs = 0; reqs < read_reqs.size(); reqs++) {
+        for (size_t reqs = 0; reqs < read_reqs.size(); reqs++) {
             file_desc_->Seek(read_reqs[reqs].offset);
             file_desc_->Read(read_reqs[reqs].buf, read_reqs[reqs].len);
         }
@@ -104,7 +104,7 @@ public:
     void Close() { file_desc_.reset(); }
 };
 
-export inline void AllocAligned(void **ptr, SizeT size, SizeT align) {
+export inline void AllocAligned(void **ptr, size_t size, size_t align) {
     *ptr = nullptr;
     if ((u64)size % (u64)align != 0) {
         UnrecoverableError(fmt::format("AllocAligned(): size {} is not aligned to {}", size, align));
@@ -124,14 +124,14 @@ export inline void AlignedFree(void *ptr) {
 }
 
 export struct Neighbor {
-    SizeT id;
+    size_t id;
     f32 distance;
     bool expanded;
 
     Neighbor() : id(-1), distance(std::numeric_limits<f32>::max()), expanded(false) {};
     // Neighbor() = default;
 
-    Neighbor(SizeT id, f32 distance) : id(id), distance(distance), expanded(false) {}
+    Neighbor(size_t id, f32 distance) : id(id), distance(distance), expanded(false) {}
 
     inline bool operator<(const Neighbor &other) const { return distance < other.distance || (distance == other.distance && id < other.id); }
 
@@ -142,7 +142,7 @@ export class NeighborPriorityQueue {
 public:
     NeighborPriorityQueue() : size_(0), capacity_(0), cur_(0) {}
 
-    NeighborPriorityQueue(SizeT capacity) : size_(0), capacity_(capacity), cur_(0), data_(capacity + 1) {}
+    NeighborPriorityQueue(size_t capacity) : size_(0), capacity_(capacity), cur_(0), data_(capacity + 1) {}
 
     void Insert(const Neighbor &nbr) {
         if (size_ == capacity_ && data_[size_ - 1] < nbr)
@@ -153,7 +153,7 @@ public:
         //     return;
         // }
 
-        SizeT lo = it - data_.begin();
+        size_t lo = it - data_.begin();
         if (lo < capacity_) {
             std::memmove(&data_[lo + 1], &data_[lo], (size_ - lo) * sizeof(Neighbor));
         }
@@ -167,7 +167,7 @@ public:
 
     Neighbor ClosestUnexpanded() {
         data_[cur_].expanded = true;
-        SizeT pre = cur_;
+        size_t pre = cur_;
         while (cur_ < size_ && data_[cur_].expanded) { // find the second-closest unexpanded neighbor
             cur_++;
         }
@@ -176,20 +176,20 @@ public:
 
     bool HasUnexpandedNode() const { return cur_ < size_; }
 
-    SizeT Size() const { return size_; }
+    size_t Size() const { return size_; }
 
-    SizeT Capacity() const { return capacity_; }
+    size_t Capacity() const { return capacity_; }
 
-    void Reserve(SizeT capacity) {
+    void Reserve(size_t capacity) {
         if (capacity + 1 > data_.size()) {
             data_.resize(capacity + 1);
         }
         capacity_ = capacity;
     }
 
-    Neighbor &operator[](SizeT i) { return data_[i]; }
+    Neighbor &operator[](size_t i) { return data_[i]; }
 
-    const Neighbor operator[](SizeT i) const { return data_[i]; }
+    const Neighbor operator[](size_t i) const { return data_[i]; }
 
     void Clear() {
         size_ = 0;
@@ -197,10 +197,10 @@ public:
     }
 
 private:
-    SizeT size_;
-    SizeT capacity_;
-    SizeT cur_; // closest unexpanded neighbor
-    Vector<Neighbor> data_;
+    size_t size_;
+    size_t capacity_;
+    size_t cur_; // closest unexpanded neighbor
+    std::vector<Neighbor> data_;
 };
 
 export template <typename DataType>
@@ -212,7 +212,7 @@ public:
     f32 *rotated_query_ = nullptr;
     f32 *aligned_query_float_ = nullptr;
 
-    PQScratch(SizeT graph_degree, SizeT aligned_dim) {
+    PQScratch(size_t graph_degree, size_t aligned_dim) {
         AllocAligned((void **)&aligned_pq_coord_scratch_, graph_degree * DISKANN_MAX_PQ_CHUNKS * sizeof(u8), 256);
         AllocAligned((void **)&aligned_pqtable_dist_scratch_, 256 * DISKANN_MAX_PQ_CHUNKS * sizeof(float), 256);
         AllocAligned((void **)&aligned_dist_scratch_, graph_degree * sizeof(f32), 256);
@@ -222,8 +222,8 @@ public:
         memset(aligned_query_float_, 0, aligned_dim * sizeof(f32));
         memset(rotated_query_, 0, aligned_dim * sizeof(f32));
     }
-    void Initialize(SizeT dim, const DataType *query, const f32 norm = 1.0f) {
-        for (SizeT d = 0; d < dim; ++d) {
+    void Initialize(size_t dim, const DataType *query, const f32 norm = 1.0f) {
+        for (size_t d = 0; d < dim; ++d) {
             if (norm != 1.0f)
                 rotated_query_[d] = aligned_query_float_[d] = static_cast<float>(query[d]) / norm;
             else
@@ -265,9 +265,9 @@ public:
                       u32 indexing_l,
                       u32 r,
                       u32 maxc,
-                      SizeT dim,
-                      SizeT aligned_dim,
-                      SizeT alignment_factor,
+                      size_t dim,
+                      size_t aligned_dim,
+                      size_t alignment_factor,
                       bool init_pq_scratch = false)
         : L_(0), R_(r), maxc_(maxc) {
         if (search_l == 0 || indexing_l == 0 || r == 0 || dim == 0) {
@@ -284,8 +284,8 @@ public:
 
         occlude_factor_.reserve(maxc);
         inserted_into_pool_bs_ = new boost::dynamic_bitset<>();
-        id_scratch_.reserve((SizeT)std::ceil(1.5 * DISKANN_GRAPH_SLACK_FACTOR * R_));
-        dist_scratch_.reserve((SizeT)std::ceil(1.5 * DISKANN_GRAPH_SLACK_FACTOR * R_));
+        id_scratch_.reserve((size_t)std::ceil(1.5 * DISKANN_GRAPH_SLACK_FACTOR * R_));
+        dist_scratch_.reserve((size_t)std::ceil(1.5 * DISKANN_GRAPH_SLACK_FACTOR * R_));
 
         ResizeForNewL(std::max(search_l, indexing_l));
     }
@@ -330,34 +330,34 @@ public:
     inline u32 GetMaxc() { return maxc_; }
     inline DataType *AlignedQuery() { return this->aligned_query_T_; }
     inline PQScratch<DataType> *PqScratch() { return this->pq_scratch_; }
-    inline Vector<Neighbor> &Pool() { return this->pool_; }
+    inline std::vector<Neighbor> &Pool() { return this->pool_; }
     inline NeighborPriorityQueue &BestLNodes() { return this->best_l_nodes_; }
-    inline Vector<f32> &OccludeFactor() { return this->occlude_factor_; }
+    inline std::vector<f32> &OccludeFactor() { return this->occlude_factor_; }
     inline std::unordered_set<u32> &InsertedIntoPoolRs() { return this->inserted_into_pool_rs_; }
     inline boost::dynamic_bitset<> &InsertedIntoPoolBs() { return *this->inserted_into_pool_bs_; }
-    inline Vector<SizeT> &IdScratch() { return this->id_scratch_; }
-    inline Vector<f32> &DistScratch() { return this->dist_scratch_; }
+    inline std::vector<size_t> &IdScratch() { return this->id_scratch_; }
+    inline std::vector<f32> &DistScratch() { return this->dist_scratch_; }
     inline std::unordered_set<u32> &ExpandedNodesSet() { return this->expanded_nodes_set_; }
-    inline Vector<Neighbor> &ExpandedNghrsVec() { return this->expanded_nghrs_vec_; }
-    inline Vector<u32> &OccludeListOutput() { return this->occlude_list_output_; }
+    inline std::vector<Neighbor> &ExpandedNghrsVec() { return this->expanded_nghrs_vec_; }
+    inline std::vector<u32> &OccludeListOutput() { return this->occlude_list_output_; }
 
 private:
     u32 L_;
     u32 R_;
     u32 maxc_;
 
-    Vector<Neighbor> pool_;              // store all neighbors explored from best_l_nodes_
+    std::vector<Neighbor> pool_;              // store all neighbors explored from best_l_nodes_
     NeighborPriorityQueue best_l_nodes_; // store best L nodes
-    Vector<f32> occlude_factor_;         // used in OccludeList()
+    std::vector<f32> occlude_factor_;         // used in OccludeList()
     std::unordered_set<u32> inserted_into_pool_rs_;
     boost::dynamic_bitset<> *inserted_into_pool_bs_;
 
-    Vector<SizeT> id_scratch_;
-    Vector<f32> dist_scratch_;
+    std::vector<size_t> id_scratch_;
+    std::vector<f32> dist_scratch_;
 
     std::unordered_set<u32> expanded_nodes_set_;
-    Vector<Neighbor> expanded_nghrs_vec_;
-    Vector<u32> occlude_list_output_;
+    std::vector<Neighbor> expanded_nghrs_vec_;
+    std::vector<u32> occlude_list_output_;
 };
 
 export template <typename DataType>
@@ -366,15 +366,15 @@ public:
     DataType *coord_scratch_ = nullptr; // at least [sizeof(DataType) * data_dim]
 
     char *sector_scratch_ = nullptr; // at least [MAX_N_SECTOR_READS * SECTOR_LEN]
-    SizeT sector_idx_ = 0;           // index of the next [SECTOR_LEN] scratch to use
+    size_t sector_idx_ = 0;           // index of the next [SECTOR_LEN] scratch to use
 
-    std::unordered_set<SizeT> visited_;
+    std::unordered_set<size_t> visited_;
     NeighborPriorityQueue retset_;
-    Vector<Neighbor> full_retset_;
+    std::vector<Neighbor> full_retset_;
 
 public:
-    SsdQueryScratch(SizeT aligned_dim, SizeT visited_reserve) {
-        SizeT coord_alloc_size = RoundUp(sizeof(DataType) * aligned_dim, 256);
+    SsdQueryScratch(size_t aligned_dim, size_t visited_reserve) {
+        size_t coord_alloc_size = RoundUp(sizeof(DataType) * aligned_dim, 256);
 
         AllocAligned((void **)&coord_scratch_, coord_alloc_size, 256);
         AllocAligned((void **)&sector_scratch_, DISKANN_MAX_N_SECTOR_READS * DISKANN_SECTOR_LEN, 256);

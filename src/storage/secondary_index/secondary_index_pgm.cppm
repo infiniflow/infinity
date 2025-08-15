@@ -25,9 +25,9 @@ import third_party;
 namespace infinity {
 
 struct SecondaryIndexApproxPos {
-    SizeT pos_{};         ///< The approximate position of the key.
-    SizeT lower_bound_{}; ///< The lower bound of the range.
-    SizeT upper_bound_{}; ///< The upper bound of the range.
+    size_t pos_{};         ///< The approximate position of the key.
+    size_t lower_bound_{}; ///< The lower bound of the range.
+    size_t upper_bound_{}; ///< The upper bound of the range.
 };
 
 template <typename T>
@@ -132,14 +132,14 @@ public:
 
     virtual void LoadIndex(LocalFileHandle &file_handle) = 0;
 
-    virtual void BuildIndex(SizeT data_cnt, const void *data_ptr) = 0;
+    virtual void BuildIndex(size_t data_cnt, const void *data_ptr) = 0;
 
     virtual SecondaryIndexApproxPos SearchIndex(const void *val_ptr) const = 0;
 };
 
 template <typename IndexValueType>
 class SecondaryPGMIndexTemplate final : public SecondaryPGMIndex {
-    UniquePtr<PGMWithExtraFunction<IndexValueType>> pgm_index_;
+    std::unique_ptr<PGMWithExtraFunction<IndexValueType>> pgm_index_;
     bool initialized_{false};
 
 public:
@@ -158,17 +158,17 @@ public:
         if (initialized_) {
             UnrecoverableError("Already initialized.");
         }
-        pgm_index_ = MakeUnique<PGMWithExtraFunction<IndexValueType>>();
+        pgm_index_ = std::make_unique<PGMWithExtraFunction<IndexValueType>>();
         pgm_index_->Load(file_handle);
         initialized_ = true;
     }
 
-    void BuildIndex(SizeT data_cnt, const void *data_ptr) override {
+    void BuildIndex(size_t data_cnt, const void *data_ptr) override {
         if (initialized_) {
             UnrecoverableError("Already initialized.");
         }
         auto typed_data_ptr = static_cast<const IndexValueType *>(data_ptr);
-        pgm_index_ = MakeUnique<PGMWithExtraFunction<IndexValueType>>(typed_data_ptr, typed_data_ptr + data_cnt);
+        pgm_index_ = std::make_unique<PGMWithExtraFunction<IndexValueType>>(typed_data_ptr, typed_data_ptr + data_cnt);
         initialized_ = true;
     }
 
@@ -183,8 +183,8 @@ public:
 };
 
 export template <typename IndexValueType>
-inline UniquePtr<SecondaryPGMIndex> GenerateSecondaryPGMIndex() {
-    return MakeUnique<SecondaryPGMIndexTemplate<IndexValueType>>();
+inline std::unique_ptr<SecondaryPGMIndex> GenerateSecondaryPGMIndex() {
+    return std::make_unique<SecondaryPGMIndexTemplate<IndexValueType>>();
 }
 
 } // namespace infinity

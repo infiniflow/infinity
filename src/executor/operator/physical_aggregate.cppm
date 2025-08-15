@@ -42,12 +42,12 @@ export struct HashRange {
 export class PhysicalAggregate final : public PhysicalOperator {
 public:
     explicit PhysicalAggregate(u64 id,
-                               UniquePtr<PhysicalOperator> left,
-                               Vector<SharedPtr<BaseExpression>> groups,
+                               std::unique_ptr<PhysicalOperator> left,
+                               std::vector<std::shared_ptr<BaseExpression>> groups,
                                u64 groupby_index,
-                               Vector<SharedPtr<BaseExpression>> aggregates,
+                               std::vector<std::shared_ptr<BaseExpression>> aggregates,
                                u64 aggregate_index,
-                               SharedPtr<Vector<LoadMeta>> load_metas)
+                               std::shared_ptr<std::vector<LoadMeta>> load_metas)
         : PhysicalOperator(PhysicalOperatorType::kAggregate, std::move(left), nullptr, id, load_metas), groups_(std::move(groups)),
           aggregates_(std::move(aggregates)), groupby_index_(groupby_index), aggregate_index_(aggregate_index) {}
 
@@ -57,29 +57,29 @@ public:
 
     bool Execute(QueryContext *query_context, OperatorState *operator_state) final;
 
-    void GroupByInputTable(const Vector<UniquePtr<DataBlock>> &input_blocks, Vector<UniquePtr<DataBlock>> &output_blocks, HashTable &hash_table);
+    void GroupByInputTable(const std::vector<std::unique_ptr<DataBlock>> &input_blocks, std::vector<std::unique_ptr<DataBlock>> &output_blocks, HashTable &hash_table);
 
-    void GenerateGroupByResult(const SharedPtr<DataTable> &input_table, SharedPtr<DataTable> &output_table, HashTable &hash_table);
+    void GenerateGroupByResult(const std::shared_ptr<DataTable> &input_table, std::shared_ptr<DataTable> &output_table, HashTable &hash_table);
 
-    Vector<SharedPtr<BaseExpression>> groups_{};
-    Vector<SharedPtr<BaseExpression>> aggregates_{};
+    std::vector<std::shared_ptr<BaseExpression>> groups_{};
+    std::vector<std::shared_ptr<BaseExpression>> aggregates_{};
 
-    bool SimpleAggregateExecute(const Vector<UniquePtr<DataBlock>> &input_blocks,
-                                Vector<UniquePtr<DataBlock>> &output_blocks,
-                                Vector<UniquePtr<char[]>> &states,
+    bool SimpleAggregateExecute(const std::vector<std::unique_ptr<DataBlock>> &input_blocks,
+                                std::vector<std::unique_ptr<DataBlock>> &output_blocks,
+                                std::vector<std::unique_ptr<char[]>> &states,
                                 bool task_completed);
 
     inline u64 GroupTableIndex() const { return groupby_index_; }
 
     inline u64 AggregateTableIndex() const { return aggregate_index_; }
 
-    SharedPtr<Vector<String>> GetOutputNames() const final;
+    std::shared_ptr<std::vector<std::string>> GetOutputNames() const final;
 
-    SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const final;
+    std::shared_ptr<std::vector<std::shared_ptr<DataType>>> GetOutputTypes() const final;
 
     bool IsSink() const override { return true; }
 
-    Vector<HashRange> GetHashRanges(i64 parallel_count) const;
+    std::vector<HashRange> GetHashRanges(i64 parallel_count) const;
 
 private:
     u64 groupby_index_{};

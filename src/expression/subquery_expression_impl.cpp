@@ -29,10 +29,10 @@ import data_type;
 
 namespace infinity {
 
-SubqueryExpression::SubqueryExpression(UniquePtr<BoundSelectStatement> bound_select_statement, SubqueryType subquery_type)
+SubqueryExpression::SubqueryExpression(std::unique_ptr<BoundSelectStatement> bound_select_statement, SubqueryType subquery_type)
     : BaseExpression(ExpressionType::kSubQuery, {}), bound_select_statement_ptr_(std::move(bound_select_statement)), subquery_type_(subquery_type) {}
 
-String SubqueryExpression::ToString() const {
+std::string SubqueryExpression::ToString() const {
     std::stringstream ss;
     ss << "Subquery: " << std::endl;
     return ss.str();

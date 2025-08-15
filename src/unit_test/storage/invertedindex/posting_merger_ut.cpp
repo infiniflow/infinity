@@ -61,7 +61,7 @@ protected:
 
 protected:
     optionflag_t flag_{OPTION_FLAG_ALL};
-    static constexpr SizeT BUFFER_SIZE_ = 1024;
+    static constexpr size_t BUFFER_SIZE_ = 1024;
     String config_path_{};
 };
 
@@ -75,11 +75,11 @@ void PostingMergerTest::CreateIndex() {
         R"#(A)#",
         R"#(A A)#",
     };
-    const SizeT num_paragraph = sizeof(paragraphs) / sizeof(char *);
+    const size_t num_paragraph = sizeof(paragraphs) / sizeof(char *);
 
-    SharedPtr<ColumnVector> column = ColumnVector::Make(MakeShared<DataType>(LogicalType::kVarchar));
+    std::shared_ptr<ColumnVector> column = ColumnVector::Make(std::make_shared<DataType>(LogicalType::kVarchar));
     column->Initialize();
-    for (SizeT i = 0; i < num_paragraph; ++i) {
+    for (size_t i = 0; i < num_paragraph; ++i) {
         Value v = Value::MakeVarchar(String(paragraphs[i]));
         column->AppendValue(v);
     }
@@ -118,7 +118,7 @@ TEST_P(PostingMergerTest, Basic) {
         auto row_id = row_ids[i];
         {
             String expected_term("a");
-            auto segment_term_posting1 = MakeUnique<SegmentTermPosting>(index_dir, base_name, row_id, flag_);
+            auto segment_term_posting1 = std::make_unique<SegmentTermPosting>(index_dir, base_name, row_id, flag_);
             auto column_index_iterator = segment_term_posting1->column_index_iterator_;
             PostingDecoder *decoder;
             String term_str;
@@ -174,7 +174,7 @@ TEST_P(PostingMergerTest, Basic) {
             u32 file_read_array_len = file_size / sizeof(u32);
             unsafe_column_length_array.resize(id_offset + file_read_array_len);
             auto [read_count, _] = file_handle->Read(unsafe_column_length_array.data() + id_offset, file_size);
-            if (read_count != (SizeT)file_size) {
+            if (read_count != (size_t)file_size) {
                 String error_message = "ColumnIndexMerger: when loading column length file, read_count != file_size";
                 UnrecoverableError(error_message);
             }
@@ -185,7 +185,7 @@ TEST_P(PostingMergerTest, Basic) {
         }
     }
 
-    auto posting_merger = MakeShared<PostingMerger>(flag_, column_length_array);
+    auto posting_merger = std::make_shared<PostingMerger>(flag_, column_length_array);
 
     posting_merger->Merge(segment_term_postings, merge_base_rowid);
     EXPECT_EQ(posting_merger->GetDF(), static_cast<u32>(2));

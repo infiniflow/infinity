@@ -12,11 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:selection;
 
-import :stl;
 import :infinity_exception;
 import :default_values;
 
@@ -25,11 +22,11 @@ import global_resource_usage;
 namespace infinity {
 
 struct SelectionData {
-    explicit SelectionData(SizeT count) : capacity_(count) {
+    explicit SelectionData(size_t count) : capacity_(count) {
         if (count > std::numeric_limits<u16>::max()) {
             UnrecoverableError("Too large size for selection data.");
         }
-        data_ = MakeUnique<u16[]>(count);
+        data_ = std::make_unique<u16[]>(count);
 #ifdef INFINITY_DEBUG
         GlobalResourceUsage::IncrObjectCount("SelectionData");
 #endif
@@ -41,8 +38,8 @@ struct SelectionData {
 #endif
     }
 
-    UniquePtr<u16[]> data_{};
-    SizeT capacity_{};
+    std::unique_ptr<u16[]> data_{};
+    size_t capacity_{};
 };
 
 export class Selection {
@@ -59,12 +56,12 @@ public:
 #endif
     }
 
-    void Initialize(SizeT count = DEFAULT_VECTOR_SIZE) {
-        storage_ = MakeShared<SelectionData>(count);
+    void Initialize(size_t count = DEFAULT_VECTOR_SIZE) {
+        storage_ = std::make_shared<SelectionData>(count);
         selection_vector = storage_->data_.get();
     }
 
-    inline void Set(SizeT selection_idx, SizeT row_idx) {
+    inline void Set(size_t selection_idx, size_t row_idx) {
         if (selection_vector == nullptr) {
             UnrecoverableError("Selection container isn't initialized");
         }
@@ -74,12 +71,12 @@ public:
         selection_vector[selection_idx] = row_idx;
     }
 
-    inline void Append(SizeT row_idx) {
+    inline void Append(size_t row_idx) {
         Set(latest_selection_idx_, row_idx);
         ++latest_selection_idx_;
     }
 
-    inline SizeT Get(SizeT idx) const {
+    inline size_t Get(size_t idx) const {
         if (selection_vector == nullptr) {
             return idx;
         }
@@ -89,21 +86,21 @@ public:
         return selection_vector[idx];
     }
 
-    inline u16 &operator[](SizeT idx) const {
+    inline u16 &operator[](size_t idx) const {
         if (idx >= latest_selection_idx_) {
             UnrecoverableError("Exceed the last row of the selection vector.");
         }
         return selection_vector[idx];
     }
 
-    inline SizeT Capacity() const {
+    inline size_t Capacity() const {
         if (selection_vector == nullptr) {
             UnrecoverableError("Selection container isn't initialized");
         }
         return storage_->capacity_;
     }
 
-    inline SizeT Size() const {
+    inline size_t Size() const {
         if (selection_vector == nullptr) {
             UnrecoverableError("Selection container isn't initialized");
         }
@@ -117,9 +114,9 @@ public:
     }
 
 private:
-    SizeT latest_selection_idx_{};
+    size_t latest_selection_idx_{};
     u16 *selection_vector{};
-    SharedPtr<SelectionData> storage_{};
+    std::shared_ptr<SelectionData> storage_{};
 };
 
 } // namespace infinity

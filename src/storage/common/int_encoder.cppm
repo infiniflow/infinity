@@ -6,7 +6,6 @@ export module infinity_core:int_encoder;
 
 import :byte_slice_reader;
 import :byte_slice_writer;
-import :stl;
 import :infinity_exception;
 import :fastpfor;
 
@@ -83,7 +82,7 @@ private:
 template <FastPForCodec Codec>
 inline u32 IntEncoder<u32, FastPForWrapper<Codec>>::Encode(ByteSliceWriter &slice_writer, const u32 *src, u32 src_len) const {
     u8 buffer[ENCODER_BUFFER_BYTE_SIZE];
-    SizeT encode_len = ENCODER_BUFFER_SIZE;
+    size_t encode_len = ENCODER_BUFFER_SIZE;
     compressor_.Compress(src, src_len, (u32 *)buffer, encode_len);
     slice_writer.Write((const u8 *)&encode_len, sizeof(u8));
     slice_writer.Write((const u8 *)buffer, encode_len * sizeof(u32));
@@ -100,7 +99,7 @@ inline u32 IntEncoder<u32, FastPForWrapper<Codec>>::Decode(u32 *dest, u32 dest_l
     if (len != comp_len) {
         UnrecoverableError("Decode posting FAILEDF");
     }
-    SizeT destlen = dest_len;
+    size_t destlen = dest_len;
     u32 count = comp_len / sizeof(u32);
     compressor_.Decompress((const u32 *)buf_ptr, count, dest, destlen);
     return destlen;

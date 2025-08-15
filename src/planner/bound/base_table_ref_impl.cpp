@@ -12,12 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:base_table_ref.impl;
 
 import :base_table_ref;
-import :stl;
 import :table_ref;
 import :table_function;
 import :infinity_exception;
@@ -31,22 +28,22 @@ import internal_types;
 
 namespace infinity {
 
-BaseTableRef::BaseTableRef(SharedPtr<TableInfo> table_info,
-                           Vector<SizeT> column_ids,
-                           SharedPtr<BlockIndex> block_index,
-                           const String &alias,
+BaseTableRef::BaseTableRef(std::shared_ptr<TableInfo> table_info,
+                           std::vector<size_t> column_ids,
+                           std::shared_ptr<BlockIndex> block_index,
+                           const std::string &alias,
                            u64 table_index,
-                           SharedPtr<Vector<String>> column_names,
-                           SharedPtr<Vector<SharedPtr<DataType>>> column_types)
+                           std::shared_ptr<std::vector<std::string>> column_names,
+                           std::shared_ptr<std::vector<std::shared_ptr<DataType>>> column_types)
     : TableRef(TableRefType::kTable, alias), table_info_(std::move(table_info)), column_ids_(std::move(column_ids)),
       block_index_(std::move(block_index)), column_names_(std::move(column_names)), column_types_(std::move(column_types)),
       table_index_(table_index) {}
 
-BaseTableRef::BaseTableRef(SharedPtr<TableInfo> table_info, SharedPtr<BlockIndex> block_index)
+BaseTableRef::BaseTableRef(std::shared_ptr<TableInfo> table_info, std::shared_ptr<BlockIndex> block_index)
     : TableRef(TableRefType::kTable, ""), table_info_(std::move(table_info)), block_index_(block_index), index_index_(nullptr) {}
 
 // only use some fields
-BaseTableRef::BaseTableRef(SharedPtr<TableInfo> table_info, SharedPtr<BlockIndex> block_index, SharedPtr<IndexIndex> index_index)
+BaseTableRef::BaseTableRef(std::shared_ptr<TableInfo> table_info, std::shared_ptr<BlockIndex> block_index, std::shared_ptr<IndexIndex> index_index)
     : TableRef(TableRefType::kTable, ""), table_info_(std::move(table_info)), block_index_(block_index), index_index_(index_index) {}
 
 BaseTableRef::~BaseTableRef() = default;

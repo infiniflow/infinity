@@ -29,7 +29,7 @@ using namespace infinity;
 
 class MockCachedNode : public CachedNodeBase {
 public:
-    MockCachedNode(String key, SharedPtr<Vector<String>> output_names) : CachedNodeBase(LogicalNodeType::kMock, output_names), key_(std::move(key)) {}
+    MockCachedNode(String key, std::shared_ptr<Vector<String>> output_names) : CachedNodeBase(LogicalNodeType::kMock, output_names), key_(std::move(key)) {}
 
     u64 Hash() const override {
         u64 h = CachedNodeBase::Hash();
@@ -53,45 +53,45 @@ TEST(ResultCacheManagerTest, test1) {
     ResultCacheManager cache_manager(100);
 
     String key1 = "key1";
-    auto output_names1 = MakeShared<Vector<String>>(Vector<String>{"col1", "col2"});
-    auto output_types1 = Vector<SharedPtr<DataType>>{MakeUnique<DataType>(LogicalType::kInteger), MakeUnique<DataType>(LogicalType::kFloat)};
-    auto block1 = MakeUnique<DataBlock>();
+    auto output_names1 = std::make_shared<Vector<String>>(Vector<String>{"col1", "col2"});
+    auto output_types1 = Vector<std::shared_ptr<DataType>>{std::make_unique<DataType>(LogicalType::kInteger), std::make_unique<DataType>(LogicalType::kFloat)};
+    auto block1 = std::make_unique<DataBlock>();
     block1->Init(output_types1, 1);
     block1->Finalize();
-    Vector<UniquePtr<DataBlock>> blocks1;
+    Vector<std::unique_ptr<DataBlock>> blocks1;
     blocks1.push_back(std::move(block1));
-    auto cached_node1 = MakeUnique<MockCachedNode>(key1, output_names1);
+    auto cached_node1 = std::make_unique<MockCachedNode>(key1, output_names1);
 
     String key2 = key1;
-    auto output_names2 = MakeShared<Vector<String>>(Vector<String>{"col2"});
-    auto output_types2 = Vector<SharedPtr<DataType>>{MakeUnique<DataType>(LogicalType::kFloat)};
-    auto block2 = MakeUnique<DataBlock>();
+    auto output_names2 = std::make_shared<Vector<String>>(Vector<String>{"col2"});
+    auto output_types2 = Vector<std::shared_ptr<DataType>>{std::make_unique<DataType>(LogicalType::kFloat)};
+    auto block2 = std::make_unique<DataBlock>();
     block2->Init(output_types2, 1);
     block2->Finalize();
-    Vector<UniquePtr<DataBlock>> blocks2;
+    Vector<std::unique_ptr<DataBlock>> blocks2;
     blocks2.push_back(std::move(block2));
-    auto cached_node2 = MakeUnique<MockCachedNode>(key2, output_names2);
+    auto cached_node2 = std::make_unique<MockCachedNode>(key2, output_names2);
 
     String key3 = key1;
-    auto output_names3 = MakeShared<Vector<String>>(Vector<String>{"col1", "col2", "col3"});
-    auto output_types3 = Vector<SharedPtr<DataType>>{MakeUnique<DataType>(LogicalType::kInteger),
-                                                     MakeUnique<DataType>(LogicalType::kFloat),
-                                                     MakeUnique<DataType>(LogicalType::kFloat)};
-    auto block3 = MakeUnique<DataBlock>();
+    auto output_names3 = std::make_shared<Vector<String>>(Vector<String>{"col1", "col2", "col3"});
+    auto output_types3 = Vector<std::shared_ptr<DataType>>{std::make_unique<DataType>(LogicalType::kInteger),
+                                                     std::make_unique<DataType>(LogicalType::kFloat),
+                                                     std::make_unique<DataType>(LogicalType::kFloat)};
+    auto block3 = std::make_unique<DataBlock>();
     block3->Init(output_types3, 1);
     block3->Finalize();
-    Vector<UniquePtr<DataBlock>> blocks3;
+    Vector<std::unique_ptr<DataBlock>> blocks3;
     blocks3.push_back(std::move(block3));
-    auto cached_node3 = MakeUnique<MockCachedNode>(key3, output_names3);
+    auto cached_node3 = std::make_unique<MockCachedNode>(key3, output_names3);
 
     String key4 = key1;
-    auto output_names4 = MakeShared<Vector<String>>(Vector<String>{"col3"});
-    auto cached_node4 = MakeUnique<MockCachedNode>(key4, output_names4);
+    auto output_names4 = std::make_shared<Vector<String>>(Vector<String>{"col3"});
+    auto cached_node4 = std::make_unique<MockCachedNode>(key4, output_names4);
 
     auto res1 = cache_manager.GetCache(*cached_node1);
     EXPECT_FALSE(res1.has_value());
 
-    auto cached_node11 = MakeUnique<MockCachedNode>(key1, output_names1);
+    auto cached_node11 = std::make_unique<MockCachedNode>(key1, output_names1);
     bool success = cache_manager.AddCache(std::move(cached_node1), std::move(blocks1));
     EXPECT_TRUE(success);
     auto res11 = cache_manager.GetCache(*cached_node11);
@@ -118,22 +118,22 @@ TEST(ResultCacheManagerTest, test1) {
 TEST(ResultCacheManagerTest, test2) {
     ResultCacheManager cache_manager(2);
     String key1 = "key1";
-    auto output_names1 = MakeShared<Vector<String>>(Vector<String>{"col1"});
-    auto cached_node1 = MakeUnique<MockCachedNode>(key1, output_names1);
+    auto output_names1 = std::make_shared<Vector<String>>(Vector<String>{"col1"});
+    auto cached_node1 = std::make_unique<MockCachedNode>(key1, output_names1);
 
     String key2 = "key2";
-    auto output_names2 = MakeShared<Vector<String>>(Vector<String>{"col2"});
-    auto cached_node2 = MakeUnique<MockCachedNode>(key2, output_names2);
+    auto output_names2 = std::make_shared<Vector<String>>(Vector<String>{"col2"});
+    auto cached_node2 = std::make_unique<MockCachedNode>(key2, output_names2);
 
     String key3 = "key3";
-    auto output_names3 = MakeShared<Vector<String>>(Vector<String>{"col1", "col2", "col3"});
-    auto cached_node3 = MakeUnique<MockCachedNode>(key3, output_names3);
+    auto output_names3 = std::make_shared<Vector<String>>(Vector<String>{"col1", "col2", "col3"});
+    auto cached_node3 = std::make_unique<MockCachedNode>(key3, output_names3);
 
-    auto cached_node11 = MakeUnique<MockCachedNode>(key1, output_names1);
+    auto cached_node11 = std::make_unique<MockCachedNode>(key1, output_names1);
     bool success = cache_manager.AddCache(std::move(cached_node1), {});
     EXPECT_TRUE(success);
 
-    auto cached_node21 = MakeUnique<MockCachedNode>(key2, output_names2);
+    auto cached_node21 = std::make_unique<MockCachedNode>(key2, output_names2);
     bool success2 = cache_manager.AddCache(std::move(cached_node2), {});
     EXPECT_TRUE(success2);
 

@@ -83,9 +83,9 @@ inline bool WeekOfYearFunction::Run(TimestampT left, BigIntT &result) {
 }
 
 void RegisterWeekOfYearFunction(NewCatalog *catalog_ptr) {
-    String func_name = "weekofyear";
+    std::string func_name = "weekofyear";
 
-    SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
+    std::shared_ptr<ScalarFunctionSet> function_set_ptr = std::make_shared<ScalarFunctionSet>(func_name);
 
     ScalarFunction week_of_year_date_function(func_name,
                                   {DataType(LogicalType::kDate)},

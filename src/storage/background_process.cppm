@@ -33,9 +33,9 @@ public:
     void Stop();
 
 public:
-    void Submit(SharedPtr<BGTask> bg_task);
+    void Submit(std::shared_ptr<BGTask> bg_task);
     u64 RunningTaskCount() const { return task_count_; }
-    String RunningTaskText() const {
+    std::string RunningTaskText() const {
         std::unique_lock<std::mutex> locker(task_mutex_);
         return task_text_;
     }
@@ -44,14 +44,14 @@ private:
     void Process();
 
 private:
-    BlockingQueue<SharedPtr<BGTask>> task_queue_{"BGTaskProcessor"};
+    BlockingQueue<std::shared_ptr<BGTask>> task_queue_{"BGTaskProcessor"};
 
-    Thread processor_thread_{};
+    std::thread processor_thread_{};
 
-    Atomic<u64> task_count_{};
+    std::atomic<u64> task_count_{};
 
     mutable std::mutex task_mutex_;
-    String task_text_;
+    std::string task_text_;
 
 public:
     TxnTimeStamp last_cleanup_ts() {

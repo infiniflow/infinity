@@ -41,7 +41,7 @@ bool IndexIVF::operator==(const IndexIVF &other) const {
 bool IndexIVF::operator!=(const IndexIVF &other) const { return !(*this == other); }
 
 i32 IndexIVF::GetSizeInBytes() const {
-    SizeT size = IndexBase::GetSizeInBytes();
+    size_t size = IndexBase::GetSizeInBytes();
     size += sizeof(ivf_option_);
     return size;
 }
@@ -51,16 +51,16 @@ void IndexIVF::WriteAdv(char *&ptr) const {
     WriteBufAdv(ptr, ivf_option_);
 }
 
-String IndexIVF::ToString() const {
+std::string IndexIVF::ToString() const {
     std::stringstream ss;
     ss << IndexBase::ToString() << ", " << BuildOtherParamsString();
     return std::move(ss).str();
 }
 
-IndexIVF::IndexIVF(SharedPtr<String> index_name,
-                   SharedPtr<String> index_comment,
-                   const String &file_name,
-                   Vector<String> column_names,
+IndexIVF::IndexIVF(std::shared_ptr<std::string> index_name,
+                   std::shared_ptr<std::string> index_comment,
+                   const std::string &file_name,
+                   std::vector<std::string> column_names,
                    const IndexIVFOption &ivf_option)
     : IndexBase(IndexType::kIVF, std::move(index_name), index_comment, file_name, std::move(column_names)), ivf_option_(ivf_option) {}
 
@@ -74,22 +74,22 @@ T GetIntegerFromNodeHandler(const auto &nh) {
     return val;
 }
 
-auto GetMandatoryParamNodeHandler(Map<String, String> &params_map, std::string_view param_name) {
-    auto nh = params_map.extract(String{param_name});
+auto GetMandatoryParamNodeHandler(std::map<std::string, std::string> &params_map, std::string_view param_name) {
+    auto nh = params_map.extract(std::string{param_name});
     if (!nh) {
         RecoverableError(Status::InvalidIndexDefinition(std::format("Missing parameter '{}'.", param_name)));
     }
     return nh;
 }
 
-SharedPtr<IndexIVF> IndexIVF::Make(SharedPtr<String> index_name,
-                                   SharedPtr<String> index_comment,
-                                   const String &file_name,
-                                   Vector<String> column_names,
-                                   const Vector<InitParameter *> &index_param_list) {
-    Map<String, String> params_map;
+std::shared_ptr<IndexIVF> IndexIVF::Make(std::shared_ptr<std::string> index_name,
+                                   std::shared_ptr<std::string> index_comment,
+                                   const std::string &file_name,
+                                   std::vector<std::string> column_names,
+                                   const std::vector<InitParameter *> &index_param_list) {
+    std::map<std::string, std::string> params_map;
     for (const auto *para : index_param_list) {
-        String param_name = para->param_name_;
+        std::string param_name = para->param_name_;
         const auto &param_v = para->param_value_;
         ToLower(param_name);
         if (const auto [_, success] = params_map.emplace(std::move(param_name), param_v); !success) {
@@ -161,7 +161,7 @@ SharedPtr<IndexIVF> IndexIVF::Make(SharedPtr<String> index_name,
         oss << '.';
         RecoverableError(Status::InvalidIndexDefinition(std::move(oss).str()));
     }
-    return MakeShared<IndexIVF>(std::move(index_name), index_comment, file_name, std::move(column_names), ivf_option);
+    return std::make_shared<IndexIVF>(std::move(index_name), index_comment, file_name, std::move(column_names), ivf_option);
 }
 
 void CheckIndexIVFStorageOption(IndexIVFStorageOption &storage_option, const DataType *column_data_type) {
@@ -314,7 +314,7 @@ void CheckIndexIVFCentroidOption(const IndexIVFCentroidOption &centroid_option) 
     }
 }
 
-void IndexIVF::ValidateColumnDataType(const SharedPtr<BaseTableRef> &base_table_ref, const String &column_name) {
+void IndexIVF::ValidateColumnDataType(const std::shared_ptr<BaseTableRef> &base_table_ref, const std::string &column_name) {
     const auto &column_names_vector = *(base_table_ref->column_names_);
     const auto &column_types_vector = *(base_table_ref->column_types_);
     const auto name_it = std::find(column_names_vector.begin(), column_names_vector.end(), column_name);
@@ -427,16 +427,16 @@ IndexIVFOption IndexIVF::DeserializeIndexIVFOption(std::string_view ivf_option_s
     return doc.get<IndexIVFOption>();
 }
 
-String BuildIndexIVFStorageOptionStr();
+std::string BuildIndexIVFStorageOptionStr();
 
-String IndexIVFCentroidOption::ToString() const {
+std::string IndexIVFCentroidOption::ToString() const {
     return std::format("IndexIVFCentroidOption: [centroids_num_ratio: {}, min_points_per_centroid: {}, max_points_per_centroid: {}]",
                        centroids_num_ratio_,
                        min_points_per_centroid_,
                        max_points_per_centroid_);
 }
 
-String IndexIVFStorageOption::ToString() const {
+std::string IndexIVFStorageOption::ToString() const {
     std::ostringstream oss;
     oss << "IndexIVFStorageOption: [";
     switch (type_) {
@@ -459,7 +459,7 @@ String IndexIVFStorageOption::ToString() const {
     return std::move(oss).str();
 }
 
-String IndexIVF::BuildOtherParamsString() const {
+std::string IndexIVF::BuildOtherParamsString() const {
     return std::format("metric: {}, {}, {}",
                        MetricTypeToString(ivf_option_.metric_),
                        ivf_option_.centroid_option_.ToString(),

@@ -89,9 +89,9 @@ inline bool CenturyFunction::Run(TimestampT left, BigIntT &result) {
 }
 
 void RegisterCenturyFunction(NewCatalog *catalog_ptr) {
-    String func_name = "century";
+    std::string func_name = "century";
 
-    SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
+    std::shared_ptr<ScalarFunctionSet> function_set_ptr = std::make_shared<ScalarFunctionSet>(func_name);
 
     ScalarFunction century_date_function(func_name,
                                          {DataType(LogicalType::kDate)},

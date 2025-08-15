@@ -34,13 +34,13 @@ public:
     void Run();
 
 public:
-    SharedPtr<NewCleanupPeriodicTrigger> new_cleanup_trigger_;
-    SharedPtr<CheckpointPeriodicTrigger> checkpoint_trigger_;
-    SharedPtr<CompactSegmentPeriodicTrigger> compact_segment_trigger_;
-    SharedPtr<OptimizeIndexPeriodicTrigger> optimize_index_trigger_;
+    std::shared_ptr<NewCleanupPeriodicTrigger> new_cleanup_trigger_;
+    std::shared_ptr<CheckpointPeriodicTrigger> checkpoint_trigger_;
+    std::shared_ptr<CompactSegmentPeriodicTrigger> compact_segment_trigger_;
+    std::shared_ptr<OptimizeIndexPeriodicTrigger> optimize_index_trigger_;
 
 private:
-    Thread thread_{};
+    std::thread thread_{};
     std::mutex mtx_{};
     std::condition_variable cv_{};
     bool running_{false};

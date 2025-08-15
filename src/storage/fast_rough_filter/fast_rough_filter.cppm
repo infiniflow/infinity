@@ -47,9 +47,9 @@ private:
     mutable std::mutex mutex_check_task_start_;
     TxnTimeStamp build_time_{UNCOMMIT_TS};          // for minmax filter
     std::atomic_flag finished_build_minmax_filter_{}; // for minmax filter
-    UniquePtr<MinMaxDataFilter> min_max_data_filter_{};
+    std::unique_ptr<MinMaxDataFilter> min_max_data_filter_{};
 
-    UniquePtr<ProbabilisticDataFilter> probabilistic_data_filter_{};
+    std::unique_ptr<ProbabilisticDataFilter> probabilistic_data_filter_{};
 
 public:
     // bloom filter test
@@ -62,9 +62,9 @@ public:
         return min_max_data_filter_->MayInRange(column_id, value, compare_type);
     }
 
-    String SerializeToString() const;
+    std::string SerializeToString() const;
 
-    void DeserializeFromString(const String &str);
+    void DeserializeFromString(const std::string &str);
 
     bool IsValid() const;
 
@@ -92,8 +92,8 @@ private:
     }
 
     void BeginBuildMinMaxFilterTask(u32 column_count) {
-        probabilistic_data_filter_ = MakeUnique<ProbabilisticDataFilter>(column_count);
-        min_max_data_filter_ = MakeUnique<MinMaxDataFilter>(column_count);
+        probabilistic_data_filter_ = std::make_unique<ProbabilisticDataFilter>(column_count);
+        min_max_data_filter_ = std::make_unique<MinMaxDataFilter>(column_count);
     }
 
     void FinishBuildMinMaxFilterTask() { finished_build_minmax_filter_.test_and_set(std::memory_order_release); }

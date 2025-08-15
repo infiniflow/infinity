@@ -28,9 +28,9 @@ import internal_types;
 
 namespace infinity {
 
-CorrelatedColumnExpression::CorrelatedColumnExpression(DataType data_type, String column_name)
+CorrelatedColumnExpression::CorrelatedColumnExpression(DataType data_type, std::string column_name)
     : BaseExpression(ExpressionType::kCorrelatedColumn, {}), data_type_(std::move(data_type)), column_name_(std::move(column_name)) {}
 
-String CorrelatedColumnExpression::ToString() const { return {}; }
+std::string CorrelatedColumnExpression::ToString() const { return {}; }
 
 } // namespace infinity

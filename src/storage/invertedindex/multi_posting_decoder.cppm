@@ -23,7 +23,7 @@ public:
 
     ~MultiPostingDecoder();
 
-    void Init(SharedPtr<Vector<SegmentPosting>> &seg_postings);
+    void Init(std::shared_ptr<std::vector<SegmentPosting>> &seg_postings);
 
     inline void MoveToCurrentDocPosition(ttf_t current_ttf) { in_doc_state_keeper_.MoveToDoc(current_ttf); }
 
@@ -31,7 +31,7 @@ public:
 
     // u32: block max tf
     // u16: block max (ceil(tf / doc length) * numeric_limits<u16>::max())
-    Pair<u32, u16> GetBlockMaxInfo() const;
+    std::pair<u32, u16> GetBlockMaxInfo() const;
 
     bool DecodeCurrentDocIDBuffer(docid_t *doc_buffer);
 
@@ -72,7 +72,7 @@ private:
 
     bool MoveToSegment(RowID start_row_id);
 
-    bool MemSegMoveToSegment(const SharedPtr<PostingWriter> &posting_writer);
+    bool MemSegMoveToSegment(const std::shared_ptr<PostingWriter> &posting_writer);
 
     bool DiskSegMoveToSegment(SegmentPosting &cur_segment_posting);
 
@@ -88,7 +88,7 @@ private:
     u32 segment_cursor_ = 0;
     u32 segment_count_ = 0;
 
-    SharedPtr<Vector<SegmentPosting>> seg_postings_;
+    std::shared_ptr<std::vector<SegmentPosting>> seg_postings_;
     ByteSliceReader doc_list_reader_;
     InDocPositionIterator *in_doc_pos_iterator_ = nullptr;
     InDocStateKeeper in_doc_state_keeper_;

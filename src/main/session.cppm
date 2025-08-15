@@ -12,11 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:session;
 
-import :stl;
+import :infinity_type;
+
+import std;
 
 import global_resource_usage;
 
@@ -37,12 +37,12 @@ public:
 
     virtual ~BaseSession() = default;
 
-    inline void set_current_schema(const String &current_database) { current_database_ = current_database; }
-    [[nodiscard]] inline String &current_database() { return current_database_; }
+    inline void set_current_schema(const std::string &current_database) { current_database_ = current_database; }
+    [[nodiscard]] inline std::string &current_database() { return current_database_; }
     [[nodiscard]] inline u64 session_id() const { return session_id_; }
 
     [[nodiscard]] inline NewTxn *GetNewTxn() const { return new_txn_.get(); }
-    inline void SetNewTxn(const SharedPtr<NewTxn> &new_txn) { new_txn_ = new_txn; }
+    inline void SetNewTxn(const std::shared_ptr<NewTxn> &new_txn) { new_txn_ = new_txn; }
     inline void ResetNewTxn() { new_txn_ = nullptr; }
 
     void IncreaseQueryCount() { ++query_count_; }
@@ -57,16 +57,16 @@ public:
 
     u64 rollbacked_txn_count() const { return rollbacked_txn_count_; }
 
-    String ConnectedTimeToStr() const { return std::asctime(std::localtime(&connected_time_)); }
+    std::string ConnectedTimeToStr() const { return std::asctime(std::localtime(&connected_time_)); }
 
 protected:
     std::time_t connected_time_;
 
     // Current schema
-    String current_database_{};
+    std::string current_database_{};
 
     // Txn is session level.
-    SharedPtr<NewTxn> new_txn_{};
+    std::shared_ptr<NewTxn> new_txn_{};
 
     SessionType session_type_{SessionType::kRemote};
 
@@ -109,28 +109,28 @@ public:
 #endif
     }
 
-    [[nodiscard]] inline const String &user_name() const { return user_name_; }
+    [[nodiscard]] inline const std::string &user_name() const { return user_name_; }
 
     [[nodiscard]] inline u64 user_id() const { return user_id_; }
 
-    inline void SetClientInfo(const String &ip_address, u16 port) {
+    inline void SetClientInfo(const std::string &ip_address, u16 port) {
         client_address_ = ip_address;
         client_port_ = port;
     }
 
-    inline void GetClientInfo(String &ip_address, u16 &port) {
+    inline void GetClientInfo(std::string &ip_address, u16 &port) {
         ip_address = client_address_;
         port = client_port_;
     }
 
 private:
     // User / Tenant information
-    String tenant_name_{};
-    String user_name_{};
+    std::string tenant_name_{};
+    std::string user_name_{};
 
     u64 user_id_{0};
 
-    String client_address_{};
+    std::string client_address_{};
     u16 client_port_{};
 };
 

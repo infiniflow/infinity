@@ -57,55 +57,55 @@ class AbsFunctionsTest : public BaseTest {};
 TEST_F(AbsFunctionsTest, abs_func) {
     using namespace infinity;
 
-    UniquePtr<Config> config_ptr = MakeUnique<Config>();
+    std::unique_ptr<Config> config_ptr = std::make_unique<Config>();
     Status status = config_ptr->Init(nullptr, nullptr);
     EXPECT_TRUE(status.ok());
-    UniquePtr<KVStore> kv_store_ptr = MakeUnique<KVStore>();
+    std::unique_ptr<KVStore> kv_store_ptr = std::make_unique<KVStore>();
     status = kv_store_ptr->Init(config_ptr->CatalogDir());
     EXPECT_TRUE(status.ok());
-    UniquePtr<NewCatalog> catalog_ptr = MakeUnique<NewCatalog>(kv_store_ptr.get());
+    std::unique_ptr<NewCatalog> catalog_ptr = std::make_unique<NewCatalog>(kv_store_ptr.get());
 
     RegisterAbsFunction(catalog_ptr.get());
 
     String op = "abs";
-    SharedPtr<FunctionSet> function_set = NewCatalog::GetFunctionSetByName(catalog_ptr.get(), op);
+    std::shared_ptr<FunctionSet> function_set = NewCatalog::GetFunctionSetByName(catalog_ptr.get(), op);
     EXPECT_EQ(function_set->type_, FunctionType::kScalar);
-    SharedPtr<ScalarFunctionSet> scalar_function_set = std::static_pointer_cast<ScalarFunctionSet>(function_set);
+    std::shared_ptr<ScalarFunctionSet> scalar_function_set = std::static_pointer_cast<ScalarFunctionSet>(function_set);
 
     {
-        Vector<SharedPtr<BaseExpression>> inputs;
+        Vector<std::shared_ptr<BaseExpression>> inputs;
 
-        SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kTinyInt);
-        SharedPtr<ColumnExpression> col_expr_ptr = MakeShared<ColumnExpression>(*data_type, "t1", 1, "c1", 0, 0);
+        std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kTinyInt);
+        std::shared_ptr<ColumnExpression> col_expr_ptr = std::make_shared<ColumnExpression>(*data_type, "t1", 1, "c1", 0, 0);
 
         inputs.emplace_back(col_expr_ptr);
         ScalarFunction func = scalar_function_set->GetMostMatchFunction(inputs);
         EXPECT_STREQ("ABS(TinyInt)->TinyInt", func.ToString().c_str());
 
-        Vector<SharedPtr<DataType>> column_types;
+        Vector<std::shared_ptr<DataType>> column_types;
         column_types.emplace_back(data_type);
 
-        SizeT row_count = DEFAULT_VECTOR_SIZE;
+        size_t row_count = DEFAULT_VECTOR_SIZE;
 
         DataBlock data_block;
         data_block.Init(column_types);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for (size_t i = 0; i < row_count; ++i) {
             data_block.AppendValue(0, Value::MakeTinyInt(static_cast<i8>(i)));
         }
         data_block.Finalize();
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for (size_t i = 0; i < row_count; ++i) {
             Value v = data_block.GetValue(0, i);
             EXPECT_EQ(v.type_.type(), LogicalType::kTinyInt);
             EXPECT_EQ(v.value_.tiny_int, static_cast<i8>(i));
         }
 
-        SharedPtr<ColumnVector> result = MakeShared<ColumnVector>(data_type);
+        std::shared_ptr<ColumnVector> result = std::make_shared<ColumnVector>(data_type);
         result->Initialize();
         func.function_(data_block, result);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for (size_t i = 0; i < row_count; ++i) {
             Value v = result->GetValueByIndex(i);
             EXPECT_EQ(v.type_.type(), LogicalType::kTinyInt);
             i8 res = static_cast<i8>(i);
@@ -119,39 +119,39 @@ TEST_F(AbsFunctionsTest, abs_func) {
     }
 
     {
-        Vector<SharedPtr<BaseExpression>> inputs;
+        Vector<std::shared_ptr<BaseExpression>> inputs;
 
-        SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kSmallInt);
-        SharedPtr<ColumnExpression> col_expr_ptr = MakeShared<ColumnExpression>(*data_type, "t1", 1, "c1", 0, 0);
+        std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kSmallInt);
+        std::shared_ptr<ColumnExpression> col_expr_ptr = std::make_shared<ColumnExpression>(*data_type, "t1", 1, "c1", 0, 0);
 
         inputs.emplace_back(col_expr_ptr);
         ScalarFunction func = scalar_function_set->GetMostMatchFunction(inputs);
         EXPECT_STREQ("ABS(SmallInt)->SmallInt", func.ToString().c_str());
 
-        Vector<SharedPtr<DataType>> column_types;
+        Vector<std::shared_ptr<DataType>> column_types;
         column_types.emplace_back(data_type);
 
-        SizeT row_count = DEFAULT_VECTOR_SIZE;
+        size_t row_count = DEFAULT_VECTOR_SIZE;
 
         DataBlock data_block;
         data_block.Init(column_types);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for (size_t i = 0; i < row_count; ++i) {
             data_block.AppendValue(0, Value::MakeSmallInt(static_cast<i16>(-i)));
         }
         data_block.Finalize();
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for (size_t i = 0; i < row_count; ++i) {
             Value v = data_block.GetValue(0, i);
             EXPECT_EQ(v.type_.type(), LogicalType::kSmallInt);
             EXPECT_EQ(v.value_.small_int, -static_cast<i16>(i));
         }
 
-        SharedPtr<ColumnVector> result = MakeShared<ColumnVector>(data_type);
+        std::shared_ptr<ColumnVector> result = std::make_shared<ColumnVector>(data_type);
         result->Initialize();
         func.function_(data_block, result);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for (size_t i = 0; i < row_count; ++i) {
             Value v = result->GetValueByIndex(i);
             EXPECT_EQ(v.type_.type(), LogicalType::kSmallInt);
             i16 res = static_cast<i16>(i);
@@ -161,39 +161,39 @@ TEST_F(AbsFunctionsTest, abs_func) {
     }
 
     {
-        Vector<SharedPtr<BaseExpression>> inputs;
+        Vector<std::shared_ptr<BaseExpression>> inputs;
 
-        SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kInteger);
-        SharedPtr<ColumnExpression> col_expr_ptr = MakeShared<ColumnExpression>(*data_type, "t1", 1, "c1", 0, 0);
+        std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kInteger);
+        std::shared_ptr<ColumnExpression> col_expr_ptr = std::make_shared<ColumnExpression>(*data_type, "t1", 1, "c1", 0, 0);
 
         inputs.emplace_back(col_expr_ptr);
         ScalarFunction func = scalar_function_set->GetMostMatchFunction(inputs);
         EXPECT_STREQ("ABS(Integer)->Integer", func.ToString().c_str());
 
-        Vector<SharedPtr<DataType>> column_types;
+        Vector<std::shared_ptr<DataType>> column_types;
         column_types.emplace_back(data_type);
 
-        SizeT row_count = DEFAULT_VECTOR_SIZE;
+        size_t row_count = DEFAULT_VECTOR_SIZE;
 
         DataBlock data_block;
         data_block.Init(column_types);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for (size_t i = 0; i < row_count; ++i) {
             data_block.AppendValue(0, Value::MakeInt(static_cast<i32>(-i)));
         }
         data_block.Finalize();
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for (size_t i = 0; i < row_count; ++i) {
             Value v = data_block.GetValue(0, i);
             EXPECT_EQ(v.type_.type(), LogicalType::kInteger);
             EXPECT_EQ(v.value_.integer, -static_cast<i32>(i));
         }
 
-        SharedPtr<ColumnVector> result = MakeShared<ColumnVector>(data_type);
+        std::shared_ptr<ColumnVector> result = std::make_shared<ColumnVector>(data_type);
         result->Initialize();
         func.function_(data_block, result);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for (size_t i = 0; i < row_count; ++i) {
             Value v = result->GetValueByIndex(i);
             EXPECT_EQ(v.type_.type(), LogicalType::kInteger);
             i32 res = static_cast<i32>(i);
@@ -203,39 +203,39 @@ TEST_F(AbsFunctionsTest, abs_func) {
     }
 
     {
-        Vector<SharedPtr<BaseExpression>> inputs;
+        Vector<std::shared_ptr<BaseExpression>> inputs;
 
-        SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kBigInt);
-        SharedPtr<ColumnExpression> col_expr_ptr = MakeShared<ColumnExpression>(*data_type, "t1", 1, "c1", 0, 0);
+        std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kBigInt);
+        std::shared_ptr<ColumnExpression> col_expr_ptr = std::make_shared<ColumnExpression>(*data_type, "t1", 1, "c1", 0, 0);
 
         inputs.emplace_back(col_expr_ptr);
         ScalarFunction func = scalar_function_set->GetMostMatchFunction(inputs);
         EXPECT_STREQ("ABS(BigInt)->BigInt", func.ToString().c_str());
 
-        Vector<SharedPtr<DataType>> column_types;
+        Vector<std::shared_ptr<DataType>> column_types;
         column_types.emplace_back(data_type);
 
-        SizeT row_count = DEFAULT_VECTOR_SIZE;
+        size_t row_count = DEFAULT_VECTOR_SIZE;
 
         DataBlock data_block;
         data_block.Init(column_types);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for (size_t i = 0; i < row_count; ++i) {
             data_block.AppendValue(0, Value::MakeBigInt(static_cast<i64>(-i)));
         }
         data_block.Finalize();
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for (size_t i = 0; i < row_count; ++i) {
             Value v = data_block.GetValue(0, i);
             EXPECT_EQ(v.type_.type(), LogicalType::kBigInt);
             EXPECT_EQ(v.value_.big_int, -static_cast<i64>(i));
         }
 
-        SharedPtr<ColumnVector> result = MakeShared<ColumnVector>(data_type);
+        std::shared_ptr<ColumnVector> result = std::make_shared<ColumnVector>(data_type);
         result->Initialize();
         func.function_(data_block, result);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for (size_t i = 0; i < row_count; ++i) {
             Value v = result->GetValueByIndex(i);
             EXPECT_EQ(v.type_.type(), LogicalType::kBigInt);
             i64 res = static_cast<i64>(i);
@@ -245,16 +245,16 @@ TEST_F(AbsFunctionsTest, abs_func) {
     }
 
     {
-        Vector<SharedPtr<BaseExpression>> inputs;
+        Vector<std::shared_ptr<BaseExpression>> inputs;
 
-        SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kFloat);
-        SharedPtr<ColumnExpression> col_expr_ptr = MakeShared<ColumnExpression>(*data_type, "t1", 1, "c1", 0, 0);
+        std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kFloat);
+        std::shared_ptr<ColumnExpression> col_expr_ptr = std::make_shared<ColumnExpression>(*data_type, "t1", 1, "c1", 0, 0);
 
         inputs.emplace_back(col_expr_ptr);
         ScalarFunction func = scalar_function_set->GetMostMatchFunction(inputs);
         EXPECT_STREQ("ABS(Float)->Float", func.ToString().c_str());
 
-        Vector<SharedPtr<DataType>> column_types;
+        Vector<std::shared_ptr<DataType>> column_types;
         column_types.emplace_back(data_type);
 
         i64 row_count = DEFAULT_VECTOR_SIZE;
@@ -278,7 +278,7 @@ TEST_F(AbsFunctionsTest, abs_func) {
             EXPECT_FLOAT_EQ(v.value_.float32, input);
         }
 
-        SharedPtr<ColumnVector> result = MakeShared<ColumnVector>(data_type);
+        std::shared_ptr<ColumnVector> result = std::make_shared<ColumnVector>(data_type);
         result->Initialize();
         func.function_(data_block, result);
 
@@ -293,16 +293,16 @@ TEST_F(AbsFunctionsTest, abs_func) {
     }
 
     {
-        Vector<SharedPtr<BaseExpression>> inputs;
+        Vector<std::shared_ptr<BaseExpression>> inputs;
 
-        SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kDouble);
-        SharedPtr<ColumnExpression> col_expr_ptr = MakeShared<ColumnExpression>(*data_type, "t1", 1, "c1", 0, 0);
+        std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kDouble);
+        std::shared_ptr<ColumnExpression> col_expr_ptr = std::make_shared<ColumnExpression>(*data_type, "t1", 1, "c1", 0, 0);
 
         inputs.emplace_back(col_expr_ptr);
         ScalarFunction func = scalar_function_set->GetMostMatchFunction(inputs);
         EXPECT_STREQ("ABS(Double)->Double", func.ToString().c_str());
 
-        Vector<SharedPtr<DataType>> column_types;
+        Vector<std::shared_ptr<DataType>> column_types;
         column_types.emplace_back(data_type);
 
         i64 row_count = DEFAULT_VECTOR_SIZE;
@@ -326,7 +326,7 @@ TEST_F(AbsFunctionsTest, abs_func) {
             EXPECT_FLOAT_EQ(v.value_.float64, input);
         }
 
-        SharedPtr<ColumnVector> result = MakeShared<ColumnVector>(data_type);
+        std::shared_ptr<ColumnVector> result = std::make_shared<ColumnVector>(data_type);
         result->Initialize();
         func.function_(data_block, result);
 
@@ -341,10 +341,10 @@ TEST_F(AbsFunctionsTest, abs_func) {
     }
 
     {
-        Vector<SharedPtr<BaseExpression>> inputs;
+        Vector<std::shared_ptr<BaseExpression>> inputs;
 
         DataType data_type(LogicalType::kHugeInt);
-        SharedPtr<ColumnExpression> col_expr_ptr = MakeShared<ColumnExpression>(data_type, "t1", 1, "c1", 0, 0);
+        std::shared_ptr<ColumnExpression> col_expr_ptr = std::make_shared<ColumnExpression>(data_type, "t1", 1, "c1", 0, 0);
 
         inputs.emplace_back(col_expr_ptr);
         ScalarFunction func = scalar_function_set->GetMostMatchFunction(inputs);

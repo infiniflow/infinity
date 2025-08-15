@@ -31,15 +31,15 @@ namespace infinity {
 
 export struct BoundCompactStatement final {
 public:
-    BoundCompactStatement(SharedPtr<BindContext> bind_context, SharedPtr<BaseTableRef> base_table_ref, CompactStatementType compact_type)
+    BoundCompactStatement(std::shared_ptr<BindContext> bind_context, std::shared_ptr<BaseTableRef> base_table_ref, CompactStatementType compact_type)
         : bind_context_(std::move(bind_context)), base_table_ref_(base_table_ref), compact_type_(compact_type) {}
 
-    Vector<SharedPtr<LogicalNode>> BuildPlans(QueryContext *query_context);
+    std::vector<std::shared_ptr<LogicalNode>> BuildPlans(QueryContext *query_context);
 
 private:
-    SharedPtr<BindContext> bind_context_{};
+    std::shared_ptr<BindContext> bind_context_{};
 
-    SharedPtr<BaseTableRef> base_table_ref_{};
+    std::shared_ptr<BaseTableRef> base_table_ref_{};
     CompactStatementType compact_type_;
 };
 

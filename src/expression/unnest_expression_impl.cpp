@@ -31,7 +31,7 @@ import data_type;
 
 namespace infinity {
 
-UnnestExpression::UnnestExpression(SharedPtr<BaseExpression> column_expression) : BaseExpression(ExpressionType::kUnnest, {column_expression}) {}
+UnnestExpression::UnnestExpression(std::shared_ptr<BaseExpression> column_expression) : BaseExpression(ExpressionType::kUnnest, {column_expression}) {}
 
 DataType UnnestExpression::Type() const {
     const auto &expr = arguments_[0];
@@ -43,7 +43,7 @@ DataType UnnestExpression::Type() const {
     return array_info->ElemType();
 }
 
-String UnnestExpression::ToString() const {
+std::string UnnestExpression::ToString() const {
     const auto &expr = arguments_[0];
     std::stringstream ss;
     ss << "Unnest(" << expr->ToString() << ")";

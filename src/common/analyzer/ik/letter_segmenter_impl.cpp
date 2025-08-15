@@ -13,8 +13,8 @@ import std;
 
 namespace infinity {
 const std::wstring LetterSegmenter::SEGMENTER_NAME = L"LETTER_SEGMENTER";
-Vector<wchar_t> LetterSegmenter::Letter_Connector = {L'#', L'&', L'+', L'-', L'.', L'@', L'_'};
-Vector<wchar_t> LetterSegmenter::Num_Connector = {L',', L'.'};
+std::vector<wchar_t> LetterSegmenter::Letter_Connector = {L'#', L'&', L'+', L'-', L'.', L'@', L'_'};
+std::vector<wchar_t> LetterSegmenter::Num_Connector = {L',', L'.'};
 
 LetterSegmenter::LetterSegmenter() {
     std::sort(Letter_Connector.begin(), Letter_Connector.end());

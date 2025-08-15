@@ -30,10 +30,10 @@ class PlanFragment;
 using FragmentTaskBlockQueue = BlockingQueue<FragmentTask *>;
 
 struct Worker {
-    Worker(u64 cpu_id, UniquePtr<FragmentTaskBlockQueue> queue, UniquePtr<Thread> thread);
+    Worker(u64 cpu_id, std::unique_ptr<FragmentTaskBlockQueue> queue, std::unique_ptr<std::thread> thread);
     u64 cpu_id_{0};
-    UniquePtr<FragmentTaskBlockQueue> queue_{};
-    UniquePtr<Thread> thread_{};
+    std::unique_ptr<FragmentTaskBlockQueue> queue_{};
+    std::unique_ptr<std::thread> thread_{};
 };
 
 export class TaskScheduler {
@@ -66,8 +66,8 @@ private:
 private:
     bool initialized_{false};
 
-    Vector<Worker> worker_array_{};
-    Deque<Atomic<u64>> worker_workloads_{};
+    std::vector<Worker> worker_array_{};
+    std::deque<std::atomic<u64>> worker_workloads_{};
 
     u64 worker_count_{0};
 };

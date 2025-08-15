@@ -88,11 +88,11 @@ import create_index_info;
 namespace infinity {
 
 void PhysicalShow::Init(QueryContext *query_context) {
-    auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
-    auto bigint_type = MakeShared<DataType>(LogicalType::kBigInt);
+    auto varchar_type = std::make_shared<DataType>(LogicalType::kVarchar);
+    auto bigint_type = std::make_shared<DataType>(LogicalType::kBigInt);
 
-    output_names_ = MakeShared<Vector<String>>();
-    output_types_ = MakeShared<Vector<SharedPtr<DataType>>>();
+    output_names_ = std::make_shared<std::vector<std::string>>();
+    output_types_ = std::make_shared<std::vector<std::shared_ptr<DataType>>>();
 
     switch (show_type_) {
         case ShowStmtType::kDatabase: {
@@ -783,10 +783,10 @@ bool PhysicalShow::Execute(QueryContext *query_context, OperatorState *operator_
 
 void PhysicalShow::ExecuteShowDatabase(QueryContext *query_context, ShowOperatorState *show_operator_state) {
     // Define output database detailed info
-    auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
+    auto varchar_type = std::make_shared<DataType>(LogicalType::kVarchar);
 
     // Get tables from catalog
-    SharedPtr<DatabaseInfo> database_info;
+    std::shared_ptr<DatabaseInfo> database_info;
     Status status;
     NewTxn *txn = query_context->GetNewTxn();
     std::tie(database_info, status) = txn->GetDatabaseInfo(db_name_);
@@ -798,13 +798,13 @@ void PhysicalShow::ExecuteShowDatabase(QueryContext *query_context, ShowOperator
     }
 
     // Prepare the output data block
-    UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
-    Vector<SharedPtr<DataType>> column_types{varchar_type, varchar_type};
+    std::unique_ptr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
+    std::vector<std::shared_ptr<DataType>> column_types{varchar_type, varchar_type};
 
     output_block_ptr->Init(*output_types_);
 
     {
-        SizeT column_id = 0;
+        size_t column_id = 0;
         {
             Value value = Value::MakeVarchar("database_name");
             ValueExpression value_expr(value);
@@ -814,7 +814,7 @@ void PhysicalShow::ExecuteShowDatabase(QueryContext *query_context, ShowOperator
         ++column_id;
         {
             // Append database name to the 1 column
-            const String *table_name = database_info->db_name_.get();
+            const std::string *table_name = database_info->db_name_.get();
             Value value = Value::MakeVarchar(*table_name);
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
@@ -822,7 +822,7 @@ void PhysicalShow::ExecuteShowDatabase(QueryContext *query_context, ShowOperator
     }
 
     {
-        SizeT column_id = 0;
+        size_t column_id = 0;
         {
             Value value = Value::MakeVarchar("storage_directory");
             ValueExpression value_expr(value);
@@ -839,7 +839,7 @@ void PhysicalShow::ExecuteShowDatabase(QueryContext *query_context, ShowOperator
     }
 
     {
-        SizeT column_id = 0;
+        size_t column_id = 0;
         {
             Value value = Value::MakeVarchar("table_count");
             ValueExpression value_expr(value);
@@ -856,7 +856,7 @@ void PhysicalShow::ExecuteShowDatabase(QueryContext *query_context, ShowOperator
     }
 
     {
-        SizeT column_id = 0;
+        size_t column_id = 0;
         {
             Value value = Value::MakeVarchar("comment");
             ValueExpression value_expr(value);
@@ -877,10 +877,10 @@ void PhysicalShow::ExecuteShowDatabase(QueryContext *query_context, ShowOperator
 
 void PhysicalShow::ExecuteShowTable(QueryContext *query_context, ShowOperatorState *show_operator_state) {
     // Define output table detailed info
-    auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
+    auto varchar_type = std::make_shared<DataType>(LogicalType::kVarchar);
 
     // Get tables from catalog
-    SharedPtr<TableInfo> table_info;
+    std::shared_ptr<TableInfo> table_info;
     Status status;
     NewTxn *txn = query_context->GetNewTxn();
     std::tie(table_info, status) = txn->GetTableInfo(db_name_, *object_name_);
@@ -890,13 +890,13 @@ void PhysicalShow::ExecuteShowTable(QueryContext *query_context, ShowOperatorSta
     }
 
     // Prepare the output data block
-    UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
-    Vector<SharedPtr<DataType>> column_types{varchar_type, varchar_type};
+    std::unique_ptr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
+    std::vector<std::shared_ptr<DataType>> column_types{varchar_type, varchar_type};
 
     output_block_ptr->Init(*output_types_);
 
     {
-        SizeT column_id = 0;
+        size_t column_id = 0;
         {
             Value value = Value::MakeVarchar("database_name");
             ValueExpression value_expr(value);
@@ -912,7 +912,7 @@ void PhysicalShow::ExecuteShowTable(QueryContext *query_context, ShowOperatorSta
     }
 
     {
-        SizeT column_id = 0;
+        size_t column_id = 0;
         {
             Value value = Value::MakeVarchar("table_name");
             ValueExpression value_expr(value);
@@ -921,7 +921,7 @@ void PhysicalShow::ExecuteShowTable(QueryContext *query_context, ShowOperatorSta
 
         ++column_id;
         {
-            const String *table_name = table_info->table_name_.get();
+            const std::string *table_name = table_info->table_name_.get();
             Value value = Value::MakeVarchar(*table_name);
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
@@ -929,7 +929,7 @@ void PhysicalShow::ExecuteShowTable(QueryContext *query_context, ShowOperatorSta
     }
 
     {
-        SizeT column_id = 0;
+        size_t column_id = 0;
         {
             Value value = Value::MakeVarchar("table_comment");
             ValueExpression value_expr(value);
@@ -945,7 +945,7 @@ void PhysicalShow::ExecuteShowTable(QueryContext *query_context, ShowOperatorSta
     }
 
     {
-        SizeT column_id = 0;
+        size_t column_id = 0;
         {
             Value value = Value::MakeVarchar("storage_directory");
             ValueExpression value_expr(value);
@@ -961,7 +961,7 @@ void PhysicalShow::ExecuteShowTable(QueryContext *query_context, ShowOperatorSta
     }
 
     {
-        SizeT column_id = 0;
+        size_t column_id = 0;
         {
             Value value = Value::MakeVarchar("column_count");
             ValueExpression value_expr(value);
@@ -977,7 +977,7 @@ void PhysicalShow::ExecuteShowTable(QueryContext *query_context, ShowOperatorSta
     }
 
     {
-        SizeT column_id = 0;
+        size_t column_id = 0;
         {
             Value value = Value::MakeVarchar("segment_count");
             ValueExpression value_expr(value);
@@ -993,7 +993,7 @@ void PhysicalShow::ExecuteShowTable(QueryContext *query_context, ShowOperatorSta
     }
 
     {
-        SizeT column_id = 0;
+        size_t column_id = 0;
         {
             Value value = Value::MakeVarchar("row_count");
             ValueExpression value_expr(value);
@@ -1014,10 +1014,10 @@ void PhysicalShow::ExecuteShowTable(QueryContext *query_context, ShowOperatorSta
 
 void PhysicalShow::ExecuteShowIndex(QueryContext *query_context, ShowOperatorState *show_operator_state) {
     // Define output table detailed info
-    auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
+    auto varchar_type = std::make_shared<DataType>(LogicalType::kVarchar);
 
     // Get tables from catalog
-    SharedPtr<TableIndexInfo> table_index_info;
+    std::shared_ptr<TableIndexInfo> table_index_info;
     Status status;
     NewTxn *txn = query_context->GetNewTxn();
     std::tie(table_index_info, status) = txn->GetTableIndexInfo(db_name_, *object_name_, index_name_.value());
@@ -1028,13 +1028,13 @@ void PhysicalShow::ExecuteShowIndex(QueryContext *query_context, ShowOperatorSta
     }
 
     // Prepare the output data block
-    UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
-    Vector<SharedPtr<DataType>> column_types{varchar_type, varchar_type};
+    std::unique_ptr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
+    std::vector<std::shared_ptr<DataType>> column_types{varchar_type, varchar_type};
 
     output_block_ptr->Init(*output_types_);
 
     {
-        SizeT column_id = 0;
+        size_t column_id = 0;
         {
             Value value = Value::MakeVarchar("database_name");
             ValueExpression value_expr(value);
@@ -1050,7 +1050,7 @@ void PhysicalShow::ExecuteShowIndex(QueryContext *query_context, ShowOperatorSta
     }
 
     {
-        SizeT column_id = 0;
+        size_t column_id = 0;
         {
             Value value = Value::MakeVarchar("table_name");
             ValueExpression value_expr(value);
@@ -1066,7 +1066,7 @@ void PhysicalShow::ExecuteShowIndex(QueryContext *query_context, ShowOperatorSta
     }
 
     {
-        SizeT column_id = 0;
+        size_t column_id = 0;
         {
             Value value = Value::MakeVarchar("index_name");
             ValueExpression value_expr(value);
@@ -1081,7 +1081,7 @@ void PhysicalShow::ExecuteShowIndex(QueryContext *query_context, ShowOperatorSta
         }
     }
     {
-        SizeT column_id = 0;
+        size_t column_id = 0;
         {
             Value value = Value::MakeVarchar("index_comment");
             ValueExpression value_expr(value);
@@ -1096,7 +1096,7 @@ void PhysicalShow::ExecuteShowIndex(QueryContext *query_context, ShowOperatorSta
         }
     }
     {
-        SizeT column_id = 0;
+        size_t column_id = 0;
         {
             Value value = Value::MakeVarchar("index_type");
             ValueExpression value_expr(value);
@@ -1112,7 +1112,7 @@ void PhysicalShow::ExecuteShowIndex(QueryContext *query_context, ShowOperatorSta
     }
 
     {
-        SizeT column_id = 0;
+        size_t column_id = 0;
         {
             Value value = Value::MakeVarchar("index_column_names");
             ValueExpression value_expr(value);
@@ -1128,7 +1128,7 @@ void PhysicalShow::ExecuteShowIndex(QueryContext *query_context, ShowOperatorSta
     }
 
     {
-        SizeT column_id = 0;
+        size_t column_id = 0;
         {
             Value value = Value::MakeVarchar("index_column_ids");
             ValueExpression value_expr(value);
@@ -1144,7 +1144,7 @@ void PhysicalShow::ExecuteShowIndex(QueryContext *query_context, ShowOperatorSta
     }
 
     {
-        SizeT column_id = 0;
+        size_t column_id = 0;
         {
             Value value = Value::MakeVarchar("other_parameters");
             ValueExpression value_expr(value);
@@ -1159,7 +1159,7 @@ void PhysicalShow::ExecuteShowIndex(QueryContext *query_context, ShowOperatorSta
         }
     }
     {
-        SizeT column_id = 0;
+        size_t column_id = 0;
         {
             Value value = Value::MakeVarchar("storage_directory");
             ValueExpression value_expr(value);
@@ -1168,14 +1168,14 @@ void PhysicalShow::ExecuteShowIndex(QueryContext *query_context, ShowOperatorSta
 
         ++column_id;
         {
-            const String *table_dir = table_index_info->index_entry_dir_.get();
+            const std::string *table_dir = table_index_info->index_entry_dir_.get();
             Value value = Value::MakeVarchar(*table_dir);
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
         }
     }
     //    {
-    //        SizeT column_id = 0;
+    //        size_t column_id = 0;
     //        {
     //            Value value = Value::MakeVarchar("storage_size");
     //            ValueExpression value_expr(value);
@@ -1184,14 +1184,14 @@ void PhysicalShow::ExecuteShowIndex(QueryContext *query_context, ShowOperatorSta
     //
     //        ++column_id;
     //        {
-    //            const String table_dir = fmt::format("{}/{}", InfinityContext::instance().config()->DataDir(), *table_index_info->index_entry_dir_);
-    //            String index_size_str;
+    //            const std::string table_dir = fmt::format("{}/{}", InfinityContext::instance().config()->DataDir(), *table_index_info->index_entry_dir_);
+    //            std::string index_size_str;
     //            if (query_context->persistence_manager() == nullptr) {
     //                index_size_str = Utility::FormatByteSize(VirtualStore::GetDirectorySize(table_dir));
     //            } else {
-    //                const Vector<String> &paths = table_index_info->files_;
-    //                SizeT index_size = 0;
-    //                for (const String &path : paths) {
+    //                const std::vector<std::string> &paths = table_index_info->files_;
+    //                size_t index_size = 0;
+    //                for (const std::string &path : paths) {
     //                    auto [file_size, status] = query_context->persistence_manager()->GetFileSize(path);
     //                    if (!status.ok()) {
     //                        RecoverableError(status);
@@ -1207,7 +1207,7 @@ void PhysicalShow::ExecuteShowIndex(QueryContext *query_context, ShowOperatorSta
     //    }
 
     {
-        SizeT column_id = 0;
+        size_t column_id = 0;
         {
             Value value = Value::MakeVarchar("segment_index_count");
             ValueExpression value_expr(value);
@@ -1228,10 +1228,10 @@ void PhysicalShow::ExecuteShowIndex(QueryContext *query_context, ShowOperatorSta
 
 void PhysicalShow::ExecuteShowIndexSegment(QueryContext *query_context, ShowOperatorState *show_operator_state) {
     // Define output table detailed info
-    auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
+    auto varchar_type = std::make_shared<DataType>(LogicalType::kVarchar);
 
     // Get tables from catalog
-    SharedPtr<SegmentIndexInfo> segment_index_info;
+    std::shared_ptr<SegmentIndexInfo> segment_index_info;
     Status status;
     NewTxn *txn = query_context->GetNewTxn();
     std::tie(segment_index_info, status) = txn->GetSegmentIndexInfo(db_name_, *object_name_, index_name_.value(), segment_id_.value());
@@ -1242,13 +1242,13 @@ void PhysicalShow::ExecuteShowIndexSegment(QueryContext *query_context, ShowOper
     }
 
     // Prepare the output data block
-    UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
-    Vector<SharedPtr<DataType>> column_types{varchar_type, varchar_type};
+    std::unique_ptr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
+    std::vector<std::shared_ptr<DataType>> column_types{varchar_type, varchar_type};
 
     output_block_ptr->Init(*output_types_);
 
     {
-        SizeT column_id = 0;
+        size_t column_id = 0;
         {
             Value value = Value::MakeVarchar("segment_id");
             ValueExpression value_expr(value);
@@ -1263,9 +1263,9 @@ void PhysicalShow::ExecuteShowIndexSegment(QueryContext *query_context, ShowOper
         }
     }
 
-    String full_segment_index_dir = Path(InfinityContext::instance().config()->DataDir()) / *segment_index_info->index_dir_;
+    std::string full_segment_index_dir = Path(InfinityContext::instance().config()->DataDir()) / *segment_index_info->index_dir_;
     {
-        SizeT column_id = 0;
+        size_t column_id = 0;
         {
             Value value = Value::MakeVarchar("storage_path");
             ValueExpression value_expr(value);
@@ -1281,7 +1281,7 @@ void PhysicalShow::ExecuteShowIndexSegment(QueryContext *query_context, ShowOper
     }
 
     {
-        SizeT column_id = 0;
+        size_t column_id = 0;
         {
             Value value = Value::MakeVarchar("index_segment_size");
             ValueExpression value_expr(value);
@@ -1290,13 +1290,13 @@ void PhysicalShow::ExecuteShowIndexSegment(QueryContext *query_context, ShowOper
 
         ++column_id;
         {
-            String index_size_str;
+            std::string index_size_str;
             if (query_context->persistence_manager() == nullptr) {
                 index_size_str = Utility::FormatByteSize(VirtualStore::GetDirectorySize(full_segment_index_dir));
             } else {
-                Vector<String> &paths = segment_index_info->files_;
-                SizeT index_segment_size = 0;
-                for (const String &path : paths) {
+                std::vector<std::string> &paths = segment_index_info->files_;
+                size_t index_segment_size = 0;
+                for (const std::string &path : paths) {
                     auto [file_size, status] = query_context->persistence_manager()->GetFileSize(path);
                     if (!status.ok()) {
                         RecoverableError(status);
@@ -1313,7 +1313,7 @@ void PhysicalShow::ExecuteShowIndexSegment(QueryContext *query_context, ShowOper
     }
 
     {
-        SizeT column_id = 0;
+        size_t column_id = 0;
         {
             Value value = Value::MakeVarchar("chunk_count");
             ValueExpression value_expr(value);
@@ -1334,10 +1334,10 @@ void PhysicalShow::ExecuteShowIndexSegment(QueryContext *query_context, ShowOper
 
 void PhysicalShow::ExecuteShowIndexChunk(QueryContext *query_context, ShowOperatorState *show_operator_state) {
     // Define output table detailed info
-    auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
-    String base_name;
+    auto varchar_type = std::make_shared<DataType>(LogicalType::kVarchar);
+    std::string base_name;
     RowID base_row_id;
-    SizeT row_cnt = 0;
+    size_t row_cnt = 0;
     TxnTimeStamp deprecate_ts = 0;
 
     // Get tables from catalog
@@ -1353,13 +1353,13 @@ void PhysicalShow::ExecuteShowIndexChunk(QueryContext *query_context, ShowOperat
     row_cnt = chunk_index_info->row_cnt_;
 
     // Prepare the output data block
-    UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
-    Vector<SharedPtr<DataType>> column_types{varchar_type, varchar_type};
+    std::unique_ptr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
+    std::vector<std::shared_ptr<DataType>> column_types{varchar_type, varchar_type};
 
     output_block_ptr->Init(*output_types_);
 
     {
-        SizeT column_id = 0;
+        size_t column_id = 0;
         {
             Value value = Value::MakeVarchar("file_name");
             ValueExpression value_expr(value);
@@ -1375,7 +1375,7 @@ void PhysicalShow::ExecuteShowIndexChunk(QueryContext *query_context, ShowOperat
     }
 
     {
-        SizeT column_id = 0;
+        size_t column_id = 0;
         {
             Value value = Value::MakeVarchar("start_row");
             ValueExpression value_expr(value);
@@ -1391,7 +1391,7 @@ void PhysicalShow::ExecuteShowIndexChunk(QueryContext *query_context, ShowOperat
     }
 
     {
-        SizeT column_id = 0;
+        size_t column_id = 0;
         {
             Value value = Value::MakeVarchar("row_count");
             ValueExpression value_expr(value);
@@ -1407,7 +1407,7 @@ void PhysicalShow::ExecuteShowIndexChunk(QueryContext *query_context, ShowOperat
     }
 
     {
-        SizeT column_id = 0;
+        size_t column_id = 0;
         {
             Value value = Value::MakeVarchar("deprecate_timestamp");
             ValueExpression value_expr(value);
@@ -1434,12 +1434,12 @@ void PhysicalShow::ExecuteShowIndexChunk(QueryContext *query_context, ShowOperat
  */
 void PhysicalShow::ExecuteShowDatabases(QueryContext *query_context, ShowOperatorState *show_operator_state) {
     // Define output table schema
-    auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
+    auto varchar_type = std::make_shared<DataType>(LogicalType::kVarchar);
 
     // Get tables from catalog
-    Vector<DatabaseDetail> databases_detail;
+    std::vector<DatabaseDetail> databases_detail;
     NewTxn *txn = query_context->GetNewTxn();
-    Vector<String> db_names;
+    std::vector<std::string> db_names;
     Status status = txn->ListDatabase(db_names);
     if (!status.ok()) {
         RecoverableError(status);
@@ -1452,16 +1452,16 @@ void PhysicalShow::ExecuteShowDatabases(QueryContext *query_context, ShowOperato
             return;
         }
         databases_detail.emplace_back(DatabaseDetail{
-            .db_name_ = MakeShared<String>(db_name),
+            .db_name_ = std::make_shared<std::string>(db_name),
             .db_entry_dir_ = std::move(database_info->db_entry_dir_),
             .db_comment_ = std::move(database_info->db_comment_),
         });
     }
 
     // Prepare the output data block
-    UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
-    Vector<SharedPtr<DataType>> column_types{varchar_type, varchar_type, varchar_type};
-    SizeT row_count = 0;
+    std::unique_ptr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
+    std::vector<std::shared_ptr<DataType>> column_types{varchar_type, varchar_type, varchar_type};
+    size_t row_count = 0;
     output_block_ptr->Init(*output_types_);
 
     for (auto &database_detail : databases_detail) {
@@ -1470,10 +1470,10 @@ void PhysicalShow::ExecuteShowDatabases(QueryContext *query_context, ShowOperato
             output_block_ptr->Init(*output_types_);
         }
 
-        SizeT column_id = 0;
+        size_t column_id = 0;
         {
             // Append schema name to the 0 column
-            const String *db_name = database_detail.db_name_.get();
+            const std::string *db_name = database_detail.db_name_.get();
             Value value = Value::MakeVarchar(*db_name);
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
@@ -1482,7 +1482,7 @@ void PhysicalShow::ExecuteShowDatabases(QueryContext *query_context, ShowOperato
         ++column_id;
         {
             // Append entry dir to the 1 column
-            const String *db_entry_dir = database_detail.db_entry_dir_.get();
+            const std::string *db_entry_dir = database_detail.db_entry_dir_.get();
             Value value = Value::MakeVarchar(*db_entry_dir);
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
@@ -1491,7 +1491,7 @@ void PhysicalShow::ExecuteShowDatabases(QueryContext *query_context, ShowOperato
         ++column_id;
         {
             // Append comment to the 2 column
-            const String *db_comment = database_detail.db_comment_.get();
+            const std::string *db_comment = database_detail.db_comment_.get();
             Value value = Value::MakeVarchar(*db_comment);
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
@@ -1519,11 +1519,11 @@ void PhysicalShow::ExecuteShowDatabases(QueryContext *query_context, ShowOperato
  */
 void PhysicalShow::ExecuteShowTables(QueryContext *query_context, ShowOperatorState *show_operator_state) {
     // Define output table schema
-    auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
-    auto bigint_type = MakeShared<DataType>(LogicalType::kBigInt);
+    auto varchar_type = std::make_shared<DataType>(LogicalType::kVarchar);
+    auto bigint_type = std::make_shared<DataType>(LogicalType::kBigInt);
 
     // Get tables from catalog
-    Vector<SharedPtr<TableDetail>> tables_detail;
+    std::vector<std::shared_ptr<TableDetail>> tables_detail;
     Status status;
     NewTxn *txn = query_context->GetNewTxn();
     status = txn->GetTables(db_name_, tables_detail);
@@ -1533,8 +1533,8 @@ void PhysicalShow::ExecuteShowTables(QueryContext *query_context, ShowOperatorSt
     }
 
     // Prepare the output data block
-    UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
-    SizeT row_count = 0;
+    std::unique_ptr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
+    size_t row_count = 0;
     output_block_ptr->Init(*output_types_);
 
     for (auto &table_detail_ptr : tables_detail) {
@@ -1544,10 +1544,10 @@ void PhysicalShow::ExecuteShowTables(QueryContext *query_context, ShowOperatorSt
             output_block_ptr->Init(*output_types_);
         }
 
-        SizeT column_id = 0;
+        size_t column_id = 0;
         {
             // Append schema name to the 0 column
-            const String *db_name = table_detail_ptr->db_name_.get();
+            const std::string *db_name = table_detail_ptr->db_name_.get();
             Value value = Value::MakeVarchar(*db_name);
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
@@ -1556,7 +1556,7 @@ void PhysicalShow::ExecuteShowTables(QueryContext *query_context, ShowOperatorSt
         ++column_id;
         {
             // Append table name to the 1 column
-            const String *table_name = table_detail_ptr->table_name_.get();
+            const std::string *table_name = table_detail_ptr->table_name_.get();
             Value value = Value::MakeVarchar(*table_name);
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
@@ -1597,7 +1597,7 @@ void PhysicalShow::ExecuteShowTables(QueryContext *query_context, ShowOperatorSt
         ++column_id;
         {
             // Append segment capacity the 7 column
-            SizeT default_row_size = table_detail_ptr->segment_capacity_;
+            size_t default_row_size = table_detail_ptr->segment_capacity_;
             Value value = Value::MakeBigInt(default_row_size);
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
@@ -1627,22 +1627,22 @@ void PhysicalShow::ExecuteShowTables(QueryContext *query_context, ShowOperatorSt
 
 void PhysicalShow::ExecuteShowTasks(QueryContext *query_context, ShowOperatorState *show_operator_state) {
     NewTxnManager *txn_mgr = query_context->storage()->new_txn_manager();
-    Vector<SharedPtr<BGTaskInfo>> bg_task_info_list = txn_mgr->GetTaskInfoList();
+    std::vector<std::shared_ptr<BGTaskInfo>> bg_task_info_list = txn_mgr->GetTaskInfoList();
     // create data block for output state
-    UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
+    std::unique_ptr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
     output_block_ptr->Init(*output_types_);
-    SizeT row_count = 0;
+    size_t row_count = 0;
 
-    for (SizeT i = 0; i < bg_task_info_list.size(); ++i) {
+    for (size_t i = 0; i < bg_task_info_list.size(); ++i) {
         BGTaskInfo *bg_task_info_ptr = bg_task_info_list[i].get();
-        SizeT task_count_ = bg_task_info_ptr->task_info_list_.size();
-        for (SizeT j = 0; j < task_count_; ++j) {
+        size_t task_count_ = bg_task_info_ptr->task_info_list_.size();
+        for (size_t j = 0; j < task_count_; ++j) {
             if (!output_block_ptr) {
                 output_block_ptr = DataBlock::MakeUniquePtr();
                 output_block_ptr->Init(*output_types_);
             }
 
-            SizeT column_id = 0;
+            size_t column_id = 0;
             {
                 std::time_t task_time_t = std::chrono::system_clock::to_time_t(bg_task_info_ptr->task_time_);
                 std::tm *task_tm = std::localtime(&task_time_t);
@@ -1669,7 +1669,7 @@ void PhysicalShow::ExecuteShowTasks(QueryContext *query_context, ShowOperatorSta
 
             ++column_id;
             {
-                String task_text = bg_task_info_ptr->task_info_list_[j];
+                std::string task_text = bg_task_info_ptr->task_info_list_[j];
                 Value value = Value::MakeVarchar(task_text);
                 ValueExpression value_expr(value);
                 value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
@@ -1691,12 +1691,12 @@ void PhysicalShow::ExecuteShowTasks(QueryContext *query_context, ShowOperatorSta
 }
 
 void PhysicalShow::ExecuteShowProfiles(QueryContext *query_context, ShowOperatorState *show_operator_state) {
-    auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
+    auto varchar_type = std::make_shared<DataType>(LogicalType::kVarchar);
     auto catalog = query_context->storage()->new_catalog();
 
     // create data block for output state
-    UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
-    Vector<SharedPtr<DataType>> column_types{varchar_type,
+    std::unique_ptr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
+    std::vector<std::shared_ptr<DataType>> column_types{varchar_type,
                                              varchar_type,
                                              varchar_type,
                                              varchar_type,
@@ -1707,11 +1707,11 @@ void PhysicalShow::ExecuteShowProfiles(QueryContext *query_context, ShowOperator
                                              varchar_type,
                                              varchar_type,
                                              varchar_type};
-    SizeT row_count = 0;
+    size_t row_count = 0;
     output_block_ptr->Init(*output_types_);
 
     auto records = catalog->GetProfileRecords();
-    for (SizeT i = 0; i < records.size(); ++i) {
+    for (size_t i = 0; i < records.size(); ++i) {
         if (!output_block_ptr) {
             output_block_ptr = DataBlock::MakeUniquePtr();
             output_block_ptr->Init(*output_types_);
@@ -1723,18 +1723,18 @@ void PhysicalShow::ExecuteShowProfiles(QueryContext *query_context, ShowOperator
 
         // Output each query phase
         i64 total_cost{};
-        SizeT column_count = column_types.size();
-        for (SizeT j = 0; j < column_count - 2; ++j) {
+        size_t column_count = column_types.size();
+        for (size_t j = 0; j < column_count - 2; ++j) {
             i64 this_time = records[i]->ElapsedAt(j);
             total_cost += this_time;
 
-            NanoSeconds duration(this_time);
+            std::chrono::nanoseconds duration(this_time);
             ValueExpression phase_cost_expr(Value::MakeVarchar(BaseProfiler::ElapsedToString(duration)));
             phase_cost_expr.AppendToChunk(output_block_ptr->column_vectors[j + 1]);
         }
 
         // Output total query duration
-        NanoSeconds total_duration(total_cost);
+        std::chrono::nanoseconds total_duration(total_cost);
         ValueExpression phase_cost_expr(Value::MakeVarchar(BaseProfiler::ElapsedToString(total_duration)));
         phase_cost_expr.AppendToChunk(output_block_ptr->column_vectors.back());
 
@@ -1759,7 +1759,7 @@ void PhysicalShow::ExecuteShowProfiles(QueryContext *query_context, ShowOperator
  * @param output_state
  */
 void PhysicalShow::ExecuteShowColumns(QueryContext *query_context, ShowOperatorState *show_operator_state) {
-    SharedPtr<TableInfo> table_info;
+    std::shared_ptr<TableInfo> table_info;
     Status status;
     NewTxn *txn = query_context->GetNewTxn();
     std::tie(table_info, status) = txn->GetTableInfo(db_name_, *object_name_);
@@ -1769,21 +1769,21 @@ void PhysicalShow::ExecuteShowColumns(QueryContext *query_context, ShowOperatorS
         return;
     }
 
-    auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
+    auto varchar_type = std::make_shared<DataType>(LogicalType::kVarchar);
 
     // create data block for output state
-    UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
-    Vector<SharedPtr<DataType>> column_types{
+    std::unique_ptr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
+    std::vector<std::shared_ptr<DataType>> column_types{
         varchar_type,
         varchar_type,
         varchar_type,
         varchar_type,
     };
-    SizeT row_count = 0;
+    size_t row_count = 0;
     output_block_ptr->Init(*output_types_);
 
-    SizeT column_count = table_info->column_count_;
-    for (SizeT input_column_id = 0; input_column_id < column_count; ++input_column_id) {
+    size_t column_count = table_info->column_count_;
+    for (size_t input_column_id = 0; input_column_id < column_count; ++input_column_id) {
         if (!output_block_ptr) {
             output_block_ptr = DataBlock::MakeUniquePtr();
             output_block_ptr->Init(*output_types_);
@@ -1791,7 +1791,7 @@ void PhysicalShow::ExecuteShowColumns(QueryContext *query_context, ShowOperatorS
 
         const ColumnDef *column = table_info->GetColumnDefByIdx(input_column_id);
 
-        SizeT output_column_idx = 0;
+        size_t output_column_idx = 0;
         {
             // Append column name to the 1st column
             Value value = Value::MakeVarchar(column->name());
@@ -1802,7 +1802,7 @@ void PhysicalShow::ExecuteShowColumns(QueryContext *query_context, ShowOperatorS
         ++output_column_idx;
         {
             // Append column type to the 2nd column, if the column type is embedded type, append the embedded type
-            String column_type = column->type()->ToString();
+            std::string column_type = column->type()->ToString();
             Value value = Value::MakeVarchar(column_type);
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[output_column_idx]);
@@ -1811,7 +1811,7 @@ void PhysicalShow::ExecuteShowColumns(QueryContext *query_context, ShowOperatorS
         ++output_column_idx;
         {
             // Append column default value to the 3rd column
-            String column_default = column->default_expr_->ToString();
+            std::string column_default = column->default_expr_->ToString();
             Value value = Value::MakeVarchar(column_default);
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[output_column_idx]);
@@ -1840,7 +1840,7 @@ void PhysicalShow::ExecuteShowColumns(QueryContext *query_context, ShowOperatorS
 }
 
 void PhysicalShow::ExecuteShowSegments(QueryContext *query_context, ShowOperatorState *show_operator_state) {
-    Vector<SharedPtr<SegmentInfo>> segment_info_list;
+    std::vector<std::shared_ptr<SegmentInfo>> segment_info_list;
     Status status;
     NewTxn *txn = query_context->GetNewTxn();
     std::tie(segment_info_list, status) = txn->GetSegmentsInfo(db_name_, *object_name_);
@@ -1850,15 +1850,15 @@ void PhysicalShow::ExecuteShowSegments(QueryContext *query_context, ShowOperator
         return;
     }
 
-    auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
-    auto bigint_type = MakeShared<DataType>(LogicalType::kBigInt);
-    UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
-    Vector<SharedPtr<DataType>> column_types{
+    auto varchar_type = std::make_shared<DataType>(LogicalType::kVarchar);
+    auto bigint_type = std::make_shared<DataType>(LogicalType::kBigInt);
+    std::unique_ptr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
+    std::vector<std::shared_ptr<DataType>> column_types{
         bigint_type,
         varchar_type,
         varchar_type,
     };
-    SizeT row_count = 0;
+    size_t row_count = 0;
     output_block_ptr->Init(*output_types_);
 
     for (auto &segment_info : segment_info_list) {
@@ -1867,7 +1867,7 @@ void PhysicalShow::ExecuteShowSegments(QueryContext *query_context, ShowOperator
             output_block_ptr->Init(*output_types_);
         }
 
-        SizeT column_id = 0;
+        size_t column_id = 0;
         {
             Value value = Value::MakeBigInt(segment_info->segment_id_);
             ValueExpression value_expr(value);
@@ -1884,15 +1884,15 @@ void PhysicalShow::ExecuteShowSegments(QueryContext *query_context, ShowOperator
 
         ++column_id;
         {
-            String segment_size_str = "TODO";
-            //            String full_segment_dir = fmt::format("{}/seg_{}")
-            //            String full_segment_dir = Path(InfinityContext::instance().config()->DataDir()) / *segment_info->segment_dir_;
+            std::string segment_size_str = "TODO";
+            //            std::string full_segment_dir = fmt::format("{}/seg_{}")
+            //            std::string full_segment_dir = Path(InfinityContext::instance().config()->DataDir()) / *segment_info->segment_dir_;
             //            if (query_context->persistence_manager() == nullptr) {
             //                segment_size_str = Utility::FormatByteSize(VirtualStore::GetDirectorySize(full_segment_dir));
             //            } else {
-            //                const Vector<String> &paths = segment_info->files_;
-            //                SizeT segment_size = 0;
-            //                for (const String &path : paths) {
+            //                const std::vector<std::string> &paths = segment_info->files_;
+            //                size_t segment_size = 0;
+            //                for (const std::string &path : paths) {
             //                    auto [file_size, status] = query_context->persistence_manager()->GetFileSize(path);
             //                    if (!status.ok()) {
             //                        RecoverableError(status);
@@ -1921,7 +1921,7 @@ void PhysicalShow::ExecuteShowSegments(QueryContext *query_context, ShowOperator
 }
 
 void PhysicalShow::ExecuteShowSegmentDetail(QueryContext *query_context, ShowOperatorState *show_operator_state) {
-    SharedPtr<SegmentInfo> segment_info;
+    std::shared_ptr<SegmentInfo> segment_info;
     Status status;
     NewTxn *txn = query_context->GetNewTxn();
     std::tie(segment_info, status) = txn->GetSegmentInfo(db_name_, *object_name_, *segment_id_);
@@ -1930,13 +1930,13 @@ void PhysicalShow::ExecuteShowSegmentDetail(QueryContext *query_context, ShowOpe
         return;
     }
 
-    auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
-    UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
-    Vector<SharedPtr<DataType>> column_types{varchar_type, varchar_type};
+    auto varchar_type = std::make_shared<DataType>(LogicalType::kVarchar);
+    std::unique_ptr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
+    std::vector<std::shared_ptr<DataType>> column_types{varchar_type, varchar_type};
     output_block_ptr->Init(*output_types_);
 
     {
-        SizeT column_id = 0;
+        size_t column_id = 0;
         {
             Value value = Value::MakeVarchar("id");
             ValueExpression value_expr(value);
@@ -1952,7 +1952,7 @@ void PhysicalShow::ExecuteShowSegmentDetail(QueryContext *query_context, ShowOpe
     }
 
     {
-        SizeT column_id = 0;
+        size_t column_id = 0;
         {
             Value value = Value::MakeVarchar("status");
             ValueExpression value_expr(value);
@@ -1969,7 +1969,7 @@ void PhysicalShow::ExecuteShowSegmentDetail(QueryContext *query_context, ShowOpe
     }
 
     {
-        SizeT column_id = 0;
+        size_t column_id = 0;
         {
             Value value = Value::MakeVarchar("path");
             ValueExpression value_expr(value);
@@ -1986,7 +1986,7 @@ void PhysicalShow::ExecuteShowSegmentDetail(QueryContext *query_context, ShowOpe
     }
 
     {
-        SizeT column_id = 0;
+        size_t column_id = 0;
         {
             Value value = Value::MakeVarchar("storage_size");
             ValueExpression value_expr(value);
@@ -1995,7 +1995,7 @@ void PhysicalShow::ExecuteShowSegmentDetail(QueryContext *query_context, ShowOpe
 
         ++column_id;
         {
-            String segment_size_str;
+            std::string segment_size_str;
             segment_size_str = Utility::FormatByteSize(segment_info->storage_size_);
             Value value = Value::MakeVarchar(segment_size_str);
             ValueExpression value_expr(value);
@@ -2004,7 +2004,7 @@ void PhysicalShow::ExecuteShowSegmentDetail(QueryContext *query_context, ShowOpe
     }
 
     {
-        SizeT column_id = 0;
+        size_t column_id = 0;
         {
             Value value = Value::MakeVarchar("block_count");
             ValueExpression value_expr(value);
@@ -2020,7 +2020,7 @@ void PhysicalShow::ExecuteShowSegmentDetail(QueryContext *query_context, ShowOpe
     }
 
     {
-        SizeT column_id = 0;
+        size_t column_id = 0;
         {
             Value value = Value::MakeVarchar("row_capacity");
             ValueExpression value_expr(value);
@@ -2036,7 +2036,7 @@ void PhysicalShow::ExecuteShowSegmentDetail(QueryContext *query_context, ShowOpe
     }
 
     {
-        SizeT column_id = 0;
+        size_t column_id = 0;
         {
             Value value = Value::MakeVarchar("row_count");
             ValueExpression value_expr(value);
@@ -2052,7 +2052,7 @@ void PhysicalShow::ExecuteShowSegmentDetail(QueryContext *query_context, ShowOpe
     }
 
     {
-        SizeT column_id = 0;
+        size_t column_id = 0;
         {
             Value value = Value::MakeVarchar("actual_row_count");
             ValueExpression value_expr(value);
@@ -2068,7 +2068,7 @@ void PhysicalShow::ExecuteShowSegmentDetail(QueryContext *query_context, ShowOpe
     }
 
     {
-        SizeT column_id = 0;
+        size_t column_id = 0;
         {
             Value value = Value::MakeVarchar("room");
             ValueExpression value_expr(value);
@@ -2084,7 +2084,7 @@ void PhysicalShow::ExecuteShowSegmentDetail(QueryContext *query_context, ShowOpe
     }
 
     {
-        SizeT column_id = 0;
+        size_t column_id = 0;
         {
             Value value = Value::MakeVarchar("column_count");
             ValueExpression value_expr(value);
@@ -2104,7 +2104,7 @@ void PhysicalShow::ExecuteShowSegmentDetail(QueryContext *query_context, ShowOpe
 }
 
 void PhysicalShow::ExecuteShowBlocks(QueryContext *query_context, ShowOperatorState *show_operator_state) {
-    Vector<SharedPtr<BlockInfo>> block_info_array;
+    std::vector<std::shared_ptr<BlockInfo>> block_info_array;
     Status status;
     NewTxn *txn = query_context->GetNewTxn();
     std::tie(block_info_array, status) = txn->GetBlocksInfo(db_name_, *object_name_, *segment_id_);
@@ -2114,15 +2114,15 @@ void PhysicalShow::ExecuteShowBlocks(QueryContext *query_context, ShowOperatorSt
         return;
     }
 
-    auto bigint_type = MakeShared<DataType>(LogicalType::kBigInt);
-    auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
-    UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
-    Vector<SharedPtr<DataType>> column_types{
+    auto bigint_type = std::make_shared<DataType>(LogicalType::kBigInt);
+    auto varchar_type = std::make_shared<DataType>(LogicalType::kVarchar);
+    std::unique_ptr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
+    std::vector<std::shared_ptr<DataType>> column_types{
         bigint_type,
         varchar_type,
         bigint_type,
     };
-    SizeT row_count = 0;
+    size_t row_count = 0;
     output_block_ptr->Init(*output_types_);
 
     for (const auto &block_info : block_info_array) {
@@ -2131,7 +2131,7 @@ void PhysicalShow::ExecuteShowBlocks(QueryContext *query_context, ShowOperatorSt
             output_block_ptr->Init(*output_types_);
         }
 
-        SizeT column_id = 0;
+        size_t column_id = 0;
         {
             Value value = Value::MakeBigInt(block_info->block_id_);
             ValueExpression value_expr(value);
@@ -2139,14 +2139,14 @@ void PhysicalShow::ExecuteShowBlocks(QueryContext *query_context, ShowOperatorSt
         }
         ++column_id;
         {
-            String block_size_str;
+            std::string block_size_str;
             if (query_context->persistence_manager() == nullptr) {
-                String full_block_dir = Path(InfinityContext::instance().config()->DataDir()) / *block_info->block_dir_;
+                std::string full_block_dir = Path(InfinityContext::instance().config()->DataDir()) / *block_info->block_dir_;
                 block_size_str = Utility::FormatByteSize(VirtualStore::GetDirectorySize(full_block_dir));
             } else {
-                Vector<String> &paths = block_info->files_;
-                SizeT block_size = 0;
-                for (const String &path : paths) {
+                std::vector<std::string> &paths = block_info->files_;
+                size_t block_size = 0;
+                for (const std::string &path : paths) {
                     auto [file_size, status] = query_context->persistence_manager()->GetFileSize(path);
                     if (!status.ok()) {
                         RecoverableError(status);
@@ -2182,7 +2182,7 @@ void PhysicalShow::ExecuteShowBlocks(QueryContext *query_context, ShowOperatorSt
 }
 
 void PhysicalShow::ExecuteShowBlockDetail(QueryContext *query_context, ShowOperatorState *show_operator_state) {
-    SharedPtr<BlockInfo> block_info;
+    std::shared_ptr<BlockInfo> block_info;
     Status status;
     NewTxn *txn = query_context->GetNewTxn();
     std::tie(block_info, status) = txn->GetBlockInfo(db_name_, *object_name_, *segment_id_, *block_id_);
@@ -2192,13 +2192,13 @@ void PhysicalShow::ExecuteShowBlockDetail(QueryContext *query_context, ShowOpera
         return;
     }
 
-    auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
-    UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
-    Vector<SharedPtr<DataType>> column_types{varchar_type, varchar_type};
+    auto varchar_type = std::make_shared<DataType>(LogicalType::kVarchar);
+    std::unique_ptr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
+    std::vector<std::shared_ptr<DataType>> column_types{varchar_type, varchar_type};
     output_block_ptr->Init(*output_types_);
 
     {
-        SizeT column_id = 0;
+        size_t column_id = 0;
         {
             Value value = Value::MakeVarchar("id");
             ValueExpression value_expr(value);
@@ -2214,7 +2214,7 @@ void PhysicalShow::ExecuteShowBlockDetail(QueryContext *query_context, ShowOpera
     }
 
     {
-        SizeT column_id = 0;
+        size_t column_id = 0;
         {
             Value value = Value::MakeVarchar("path");
             ValueExpression value_expr(value);
@@ -2223,7 +2223,7 @@ void PhysicalShow::ExecuteShowBlockDetail(QueryContext *query_context, ShowOpera
 
         ++column_id;
         {
-            String full_block_dir = Path(InfinityContext::instance().config()->DataDir()) / *block_info->block_dir_;
+            std::string full_block_dir = Path(InfinityContext::instance().config()->DataDir()) / *block_info->block_dir_;
             Value value = Value::MakeVarchar(full_block_dir);
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
@@ -2231,7 +2231,7 @@ void PhysicalShow::ExecuteShowBlockDetail(QueryContext *query_context, ShowOpera
     }
 
     {
-        SizeT column_id = 0;
+        size_t column_id = 0;
         {
             Value value = Value::MakeVarchar("storage_size");
             ValueExpression value_expr(value);
@@ -2240,8 +2240,8 @@ void PhysicalShow::ExecuteShowBlockDetail(QueryContext *query_context, ShowOpera
 
         ++column_id;
         {
-            SizeT block_storage_size = block_info->storage_size_;
-            String block_storage_size_str = Utility::FormatByteSize(block_storage_size);
+            size_t block_storage_size = block_info->storage_size_;
+            std::string block_storage_size_str = Utility::FormatByteSize(block_storage_size);
             Value value = Value::MakeVarchar(block_storage_size_str);
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
@@ -2249,7 +2249,7 @@ void PhysicalShow::ExecuteShowBlockDetail(QueryContext *query_context, ShowOpera
     }
 
     {
-        SizeT column_id = 0;
+        size_t column_id = 0;
         {
             Value value = Value::MakeVarchar("row_capacity");
             ValueExpression value_expr(value);
@@ -2258,7 +2258,7 @@ void PhysicalShow::ExecuteShowBlockDetail(QueryContext *query_context, ShowOpera
 
         ++column_id;
         {
-            SizeT row_capacity = block_info->row_capacity_;
+            size_t row_capacity = block_info->row_capacity_;
             Value value = Value::MakeVarchar(std::to_string(row_capacity));
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
@@ -2266,7 +2266,7 @@ void PhysicalShow::ExecuteShowBlockDetail(QueryContext *query_context, ShowOpera
     }
 
     {
-        SizeT column_id = 0;
+        size_t column_id = 0;
         {
             Value value = Value::MakeVarchar("row_count");
             ValueExpression value_expr(value);
@@ -2275,7 +2275,7 @@ void PhysicalShow::ExecuteShowBlockDetail(QueryContext *query_context, ShowOpera
 
         ++column_id;
         {
-            SizeT row_count = block_info->row_count_;
+            size_t row_count = block_info->row_count_;
             Value value = Value::MakeVarchar(std::to_string(row_count));
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
@@ -2283,7 +2283,7 @@ void PhysicalShow::ExecuteShowBlockDetail(QueryContext *query_context, ShowOpera
     }
 
     {
-        SizeT column_id = 0;
+        size_t column_id = 0;
         {
             Value value = Value::MakeVarchar("checkpoint_row_count");
             ValueExpression value_expr(value);
@@ -2292,7 +2292,7 @@ void PhysicalShow::ExecuteShowBlockDetail(QueryContext *query_context, ShowOpera
 
         ++column_id;
         {
-            SizeT checkpoint_row_count = block_info->checkpoint_row_count_;
+            size_t checkpoint_row_count = block_info->checkpoint_row_count_;
             Value value = Value::MakeVarchar(std::to_string(checkpoint_row_count));
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
@@ -2300,7 +2300,7 @@ void PhysicalShow::ExecuteShowBlockDetail(QueryContext *query_context, ShowOpera
     }
 
     {
-        SizeT column_id = 0;
+        size_t column_id = 0;
         {
             Value value = Value::MakeVarchar("column_count");
             ValueExpression value_expr(value);
@@ -2309,7 +2309,7 @@ void PhysicalShow::ExecuteShowBlockDetail(QueryContext *query_context, ShowOpera
 
         ++column_id;
         {
-            SizeT column_count = block_info->column_count_;
+            size_t column_count = block_info->column_count_;
             Value value = Value::MakeVarchar(std::to_string(column_count));
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
@@ -2317,7 +2317,7 @@ void PhysicalShow::ExecuteShowBlockDetail(QueryContext *query_context, ShowOpera
     }
 
     {
-        SizeT column_id = 0;
+        size_t column_id = 0;
         {
             Value value = Value::MakeVarchar("checkpoint_ts");
             ValueExpression value_expr(value);
@@ -2326,7 +2326,7 @@ void PhysicalShow::ExecuteShowBlockDetail(QueryContext *query_context, ShowOpera
 
         ++column_id;
         {
-            SizeT checkpoint_ts = block_info->checkpoint_ts_;
+            size_t checkpoint_ts = block_info->checkpoint_ts_;
             Value value = Value::MakeVarchar(std::to_string(checkpoint_ts));
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
@@ -2338,7 +2338,7 @@ void PhysicalShow::ExecuteShowBlockDetail(QueryContext *query_context, ShowOpera
 }
 
 void PhysicalShow::ExecuteShowBlockColumn(QueryContext *query_context, ShowOperatorState *show_operator_state) {
-    SharedPtr<BlockColumnInfo> block_column_info;
+    std::shared_ptr<BlockColumnInfo> block_column_info;
     Status status;
     NewTxn *txn = query_context->GetNewTxn();
     std::tie(block_column_info, status) = txn->GetBlockColumnInfo(db_name_, *object_name_, *segment_id_, *block_id_, *column_id_);
@@ -2348,16 +2348,16 @@ void PhysicalShow::ExecuteShowBlockColumn(QueryContext *query_context, ShowOpera
         return;
     }
 
-    auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
-    UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
-    Vector<SharedPtr<DataType>> column_types{
+    auto varchar_type = std::make_shared<DataType>(LogicalType::kVarchar);
+    std::unique_ptr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
+    std::vector<std::shared_ptr<DataType>> column_types{
         varchar_type,
         varchar_type,
     };
     output_block_ptr->Init(*output_types_);
 
     {
-        SizeT column_id = 0;
+        size_t column_id = 0;
         {
             Value value = Value::MakeVarchar("column_id");
             ValueExpression value_expr(value);
@@ -2373,7 +2373,7 @@ void PhysicalShow::ExecuteShowBlockColumn(QueryContext *query_context, ShowOpera
     }
 
     {
-        SizeT column_id = 0;
+        size_t column_id = 0;
         {
             Value value = Value::MakeVarchar("data_type");
             ValueExpression value_expr(value);
@@ -2389,7 +2389,7 @@ void PhysicalShow::ExecuteShowBlockColumn(QueryContext *query_context, ShowOpera
     }
 
     {
-        SizeT column_id = 0;
+        size_t column_id = 0;
         {
             Value value = Value::MakeVarchar("storage_path");
             ValueExpression value_expr(value);
@@ -2406,7 +2406,7 @@ void PhysicalShow::ExecuteShowBlockColumn(QueryContext *query_context, ShowOpera
     }
 
     {
-        SizeT column_id = 0;
+        size_t column_id = 0;
         {
             Value value = Value::MakeVarchar("extra_file_count");
             ValueExpression value_expr(value);
@@ -2422,7 +2422,7 @@ void PhysicalShow::ExecuteShowBlockColumn(QueryContext *query_context, ShowOpera
     }
 
     {
-        SizeT column_id = 0;
+        size_t column_id = 0;
         {
             Value value = Value::MakeVarchar("storage_size");
             ValueExpression value_expr(value);
@@ -2431,7 +2431,7 @@ void PhysicalShow::ExecuteShowBlockColumn(QueryContext *query_context, ShowOpera
 
         ++column_id;
         {
-            String storage_size_str = Utility::FormatByteSize(block_column_info->storage_size_);
+            std::string storage_size_str = Utility::FormatByteSize(block_column_info->storage_size_);
             Value value = Value::MakeVarchar(storage_size_str);
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
@@ -2439,7 +2439,7 @@ void PhysicalShow::ExecuteShowBlockColumn(QueryContext *query_context, ShowOpera
     }
 
     {
-        SizeT column_id = 0;
+        size_t column_id = 0;
         {
             Value value = Value::MakeVarchar("extra_file_name");
             ValueExpression value_expr(value);
@@ -2448,8 +2448,8 @@ void PhysicalShow::ExecuteShowBlockColumn(QueryContext *query_context, ShowOpera
 
         ++column_id;
         {
-            String outline_storage;
-            for (SizeT idx = 0; idx < block_column_info->extra_file_count_; ++idx) {
+            std::string outline_storage;
+            for (size_t idx = 0; idx < block_column_info->extra_file_count_; ++idx) {
                 outline_storage += *block_column_info->extra_file_names_[idx];
                 outline_storage += ";";
             }
@@ -2466,12 +2466,12 @@ void PhysicalShow::ExecuteShowBlockColumn(QueryContext *query_context, ShowOpera
 
 // Execute show system table
 void PhysicalShow::ExecuteShowConfigs(QueryContext *query_context, ShowOperatorState *show_operator_state) {
-    auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
+    auto varchar_type = std::make_shared<DataType>(LogicalType::kVarchar);
     Config *global_config = query_context->global_config();
 
     // create data block for output state
-    UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
-    Vector<SharedPtr<DataType>> column_types{
+    std::unique_ptr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
+    std::vector<std::shared_ptr<DataType>> column_types{
         varchar_type,
         varchar_type,
         varchar_type,
@@ -3393,10 +3393,10 @@ void PhysicalShow::ExecuteShowConfigs(QueryContext *query_context, ShowOperatorS
 }
 
 void PhysicalShow::ExecuteShowIndexes(QueryContext *query_context, ShowOperatorState *show_operator_state) {
-    Vector<SharedPtr<TableIndexInfo>> table_index_info_list;
+    std::vector<std::shared_ptr<TableIndexInfo>> table_index_info_list;
     Status status;
     NewTxn *txn = query_context->GetNewTxn();
-    Vector<String> index_names;
+    std::vector<std::string> index_names;
     status = txn->ListIndex(db_name_, *object_name_, index_names);
     if (!status.ok()) {
         show_operator_state->status_ = status.clone();
@@ -3411,13 +3411,13 @@ void PhysicalShow::ExecuteShowIndexes(QueryContext *query_context, ShowOperatorS
         table_index_info_list.push_back(table_index_info);
     }
 
-    auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
-    auto bigint_type = MakeShared<DataType>(LogicalType::kBigInt);
+    auto varchar_type = std::make_shared<DataType>(LogicalType::kVarchar);
+    auto bigint_type = std::make_shared<DataType>(LogicalType::kBigInt);
 
-    UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
-    Vector<SharedPtr<DataType>>
+    std::unique_ptr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
+    std::vector<std::shared_ptr<DataType>>
         column_types{varchar_type, varchar_type, varchar_type, varchar_type, varchar_type, varchar_type, varchar_type, varchar_type};
-    SizeT row_count = 0;
+    size_t row_count = 0;
     output_block_ptr->Init(*output_types_);
 
     {
@@ -3427,7 +3427,7 @@ void PhysicalShow::ExecuteShowIndexes(QueryContext *query_context, ShowOperatorS
                 output_block_ptr->Init(*output_types_);
             }
 
-            SizeT column_id = 0;
+            size_t column_id = 0;
             {
                 // Append index name to the first column
                 Value value = Value::MakeVarchar(*table_index_info->index_name_);
@@ -3437,7 +3437,7 @@ void PhysicalShow::ExecuteShowIndexes(QueryContext *query_context, ShowOperatorS
             ++column_id;
             {
                 // Append index_comment to output
-                String comment = *table_index_info->index_comment_;
+                std::string comment = *table_index_info->index_comment_;
                 Value value = Value::MakeVarchar(comment);
                 ValueExpression value_expr(value);
                 value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
@@ -3473,8 +3473,8 @@ void PhysicalShow::ExecuteShowIndexes(QueryContext *query_context, ShowOperatorS
             ++column_id;
             {
                 // Append Index segment
-                SizeT segment_index_count = table_index_info->segment_index_count_;
-                String result_value = fmt::format("{}", segment_index_count);
+                size_t segment_index_count = table_index_info->segment_index_count_;
+                std::string result_value = fmt::format("{}", segment_index_count);
                 Value value = Value::MakeVarchar(result_value);
                 ValueExpression value_expr(value);
                 value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
@@ -3503,28 +3503,28 @@ void PhysicalShow::ExecuteShowIndexes(QueryContext *query_context, ShowOperatorS
 }
 
 void PhysicalShow::ExecuteShowViewDetail(QueryContext *query_context,
-                                         const SharedPtr<Vector<SharedPtr<DataType>>> &view_column_types,
-                                         const SharedPtr<Vector<String>> &view_column_names) {
-    SharedPtr<DataType> varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
-    Vector<SharedPtr<ColumnDef>> output_column_defs = {
-        MakeShared<ColumnDef>(0, varchar_type, "column_name", std::set<ConstraintType>()),
-        MakeShared<ColumnDef>(1, varchar_type, "column_type", std::set<ConstraintType>()),
+                                         const std::shared_ptr<std::vector<std::shared_ptr<DataType>>> &view_column_types,
+                                         const std::shared_ptr<std::vector<std::string>> &view_column_names) {
+    std::shared_ptr<DataType> varchar_type = std::make_shared<DataType>(LogicalType::kVarchar);
+    std::vector<std::shared_ptr<ColumnDef>> output_column_defs = {
+        std::make_shared<ColumnDef>(0, varchar_type, "column_name", std::set<ConstraintType>()),
+        std::make_shared<ColumnDef>(1, varchar_type, "column_type", std::set<ConstraintType>()),
     };
 
-    SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("Views"), nullptr, output_column_defs);
-    output_ = MakeShared<DataTable>(table_def, TableType::kResult);
+    std::shared_ptr<TableDef> table_def = TableDef::Make(std::make_shared<std::string>("default_db"), std::make_shared<std::string>("Views"), nullptr, output_column_defs);
+    output_ = std::make_shared<DataTable>(table_def, TableType::kResult);
 
-    SharedPtr<DataBlock> output_block_ptr = DataBlock::Make();
-    Vector<SharedPtr<DataType>> output_column_types{
+    std::shared_ptr<DataBlock> output_block_ptr = DataBlock::Make();
+    std::vector<std::shared_ptr<DataType>> output_column_types{
         varchar_type,
         varchar_type,
     };
 
     output_block_ptr->Init(output_column_types);
 
-    SizeT column_count = view_column_types->size();
-    for (SizeT idx = 0; idx < column_count; ++idx) {
-        SizeT column_id = 0;
+    size_t column_count = view_column_types->size();
+    for (size_t idx = 0; idx < column_count; ++idx) {
+        size_t column_id = 0;
         {
             // Append column name to the first column
             Value value = Value::MakeVarchar(view_column_names->at(idx));
@@ -3535,7 +3535,7 @@ void PhysicalShow::ExecuteShowViewDetail(QueryContext *query_context,
         ++column_id;
         {
             // Append column type to the second column
-            String column_type = view_column_types->at(idx)->ToString();
+            std::string column_type = view_column_types->at(idx)->ToString();
             Value value = Value::MakeVarchar(column_type);
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
@@ -3547,24 +3547,24 @@ void PhysicalShow::ExecuteShowViewDetail(QueryContext *query_context,
 }
 
 void PhysicalShow::ExecuteShowSessionVariable(QueryContext *query_context, ShowOperatorState *operator_state) {
-    SharedPtr<DataType> varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
-    SharedPtr<DataType> integer_type = MakeShared<DataType>(LogicalType::kBigInt);
-    SharedPtr<DataType> bool_type = MakeShared<DataType>(LogicalType::kBoolean);
-    UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
+    std::shared_ptr<DataType> varchar_type = std::make_shared<DataType>(LogicalType::kVarchar);
+    std::shared_ptr<DataType> integer_type = std::make_shared<DataType>(LogicalType::kBigInt);
+    std::shared_ptr<DataType> bool_type = std::make_shared<DataType>(LogicalType::kBoolean);
+    std::unique_ptr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
 
     SessionVariable session_var = VarUtil::GetSessionVarByName(*object_name_);
     BaseSession *session_ptr = query_context->current_session();
     switch (session_var) {
         case SessionVariable::kQueryCount: {
-            Vector<SharedPtr<ColumnDef>> output_column_defs = {
-                MakeShared<ColumnDef>(0, integer_type, "value", std::set<ConstraintType>()),
+            std::vector<std::shared_ptr<ColumnDef>> output_column_defs = {
+                std::make_shared<ColumnDef>(0, integer_type, "value", std::set<ConstraintType>()),
             };
 
-            SharedPtr<TableDef> table_def =
-                TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("variables"), nullptr, output_column_defs);
-            output_ = MakeShared<DataTable>(table_def, TableType::kResult);
+            std::shared_ptr<TableDef> table_def =
+                TableDef::Make(std::make_shared<std::string>("default_db"), std::make_shared<std::string>("variables"), nullptr, output_column_defs);
+            output_ = std::make_shared<DataTable>(table_def, TableType::kResult);
 
-            Vector<SharedPtr<DataType>> output_column_types{
+            std::vector<std::shared_ptr<DataType>> output_column_types{
                 integer_type,
             };
 
@@ -3576,15 +3576,15 @@ void PhysicalShow::ExecuteShowSessionVariable(QueryContext *query_context, ShowO
             break;
         }
         case SessionVariable::kTotalCommitCount: {
-            Vector<SharedPtr<ColumnDef>> output_column_defs = {
-                MakeShared<ColumnDef>(0, integer_type, "value", std::set<ConstraintType>()),
+            std::vector<std::shared_ptr<ColumnDef>> output_column_defs = {
+                std::make_shared<ColumnDef>(0, integer_type, "value", std::set<ConstraintType>()),
             };
 
-            SharedPtr<TableDef> table_def =
-                TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("variables"), nullptr, output_column_defs);
-            output_ = MakeShared<DataTable>(table_def, TableType::kResult);
+            std::shared_ptr<TableDef> table_def =
+                TableDef::Make(std::make_shared<std::string>("default_db"), std::make_shared<std::string>("variables"), nullptr, output_column_defs);
+            output_ = std::make_shared<DataTable>(table_def, TableType::kResult);
 
-            Vector<SharedPtr<DataType>> output_column_types{
+            std::vector<std::shared_ptr<DataType>> output_column_types{
                 integer_type,
             };
 
@@ -3596,15 +3596,15 @@ void PhysicalShow::ExecuteShowSessionVariable(QueryContext *query_context, ShowO
             break;
         }
         case SessionVariable::kTotalRollbackCount: {
-            Vector<SharedPtr<ColumnDef>> output_column_defs = {
-                MakeShared<ColumnDef>(0, integer_type, "value", std::set<ConstraintType>()),
+            std::vector<std::shared_ptr<ColumnDef>> output_column_defs = {
+                std::make_shared<ColumnDef>(0, integer_type, "value", std::set<ConstraintType>()),
             };
 
-            SharedPtr<TableDef> table_def =
-                TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("variables"), nullptr, output_column_defs);
-            output_ = MakeShared<DataTable>(table_def, TableType::kResult);
+            std::shared_ptr<TableDef> table_def =
+                TableDef::Make(std::make_shared<std::string>("default_db"), std::make_shared<std::string>("variables"), nullptr, output_column_defs);
+            output_ = std::make_shared<DataTable>(table_def, TableType::kResult);
 
-            Vector<SharedPtr<DataType>> output_column_types{
+            std::vector<std::shared_ptr<DataType>> output_column_types{
                 integer_type,
             };
 
@@ -3616,15 +3616,15 @@ void PhysicalShow::ExecuteShowSessionVariable(QueryContext *query_context, ShowO
             break;
         }
         case SessionVariable::kConnectedTime: {
-            Vector<SharedPtr<ColumnDef>> output_column_defs = {
-                MakeShared<ColumnDef>(0, varchar_type, "value", std::set<ConstraintType>()),
+            std::vector<std::shared_ptr<ColumnDef>> output_column_defs = {
+                std::make_shared<ColumnDef>(0, varchar_type, "value", std::set<ConstraintType>()),
             };
 
-            SharedPtr<TableDef> table_def =
-                TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("variables"), nullptr, output_column_defs);
-            output_ = MakeShared<DataTable>(table_def, TableType::kResult);
+            std::shared_ptr<TableDef> table_def =
+                TableDef::Make(std::make_shared<std::string>("default_db"), std::make_shared<std::string>("variables"), nullptr, output_column_defs);
+            output_ = std::make_shared<DataTable>(table_def, TableType::kResult);
 
-            Vector<SharedPtr<DataType>> output_column_types{
+            std::vector<std::shared_ptr<DataType>> output_column_types{
                 varchar_type,
             };
 
@@ -3647,11 +3647,11 @@ void PhysicalShow::ExecuteShowSessionVariable(QueryContext *query_context, ShowO
 }
 
 void PhysicalShow::ExecuteShowSessionVariables(QueryContext *query_context, ShowOperatorState *operator_state) {
-    auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
+    auto varchar_type = std::make_shared<DataType>(LogicalType::kVarchar);
 
     // create data block for output state
-    UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
-    Vector<SharedPtr<DataType>> column_types{
+    std::unique_ptr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
+    std::vector<std::shared_ptr<DataType>> column_types{
         varchar_type,
         varchar_type,
         varchar_type,
@@ -3661,7 +3661,7 @@ void PhysicalShow::ExecuteShowSessionVariables(QueryContext *query_context, Show
 
     BaseSession *session_ptr = query_context->current_session();
     for (auto &session_var_pair : VarUtil::session_name_map_) {
-        const String &var_name = session_var_pair.first;
+        const std::string &var_name = session_var_pair.first;
         SessionVariable session_var = session_var_pair.second;
 
         switch (session_var) {
@@ -3762,26 +3762,26 @@ void PhysicalShow::ExecuteShowSessionVariables(QueryContext *query_context, Show
 }
 
 void PhysicalShow::ExecuteShowGlobalVariable(QueryContext *query_context, ShowOperatorState *operator_state) {
-    SharedPtr<DataType> varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
-    SharedPtr<DataType> integer_type = MakeShared<DataType>(LogicalType::kBigInt);
-    SharedPtr<DataType> double_type = MakeShared<DataType>(LogicalType::kDouble);
-    SharedPtr<DataType> bool_type = MakeShared<DataType>(LogicalType::kBoolean);
-    UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
+    std::shared_ptr<DataType> varchar_type = std::make_shared<DataType>(LogicalType::kVarchar);
+    std::shared_ptr<DataType> integer_type = std::make_shared<DataType>(LogicalType::kBigInt);
+    std::shared_ptr<DataType> double_type = std::make_shared<DataType>(LogicalType::kDouble);
+    std::shared_ptr<DataType> bool_type = std::make_shared<DataType>(LogicalType::kBoolean);
+    std::unique_ptr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
 
     GlobalVariable global_var = VarUtil::GetGlobalVarByName(*object_name_);
     Config *config = query_context->global_config();
 
     switch (global_var) {
         case GlobalVariable::kResultCache: {
-            Vector<SharedPtr<ColumnDef>> output_column_defs = {
-                MakeShared<ColumnDef>(0, varchar_type, "value", std::set<ConstraintType>()),
+            std::vector<std::shared_ptr<ColumnDef>> output_column_defs = {
+                std::make_shared<ColumnDef>(0, varchar_type, "value", std::set<ConstraintType>()),
             };
 
-            SharedPtr<TableDef> table_def =
-                TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("variables"), nullptr, output_column_defs);
-            output_ = MakeShared<DataTable>(table_def, TableType::kResult);
+            std::shared_ptr<TableDef> table_def =
+                TableDef::Make(std::make_shared<std::string>("default_db"), std::make_shared<std::string>("variables"), nullptr, output_column_defs);
+            output_ = std::make_shared<DataTable>(table_def, TableType::kResult);
 
-            Vector<SharedPtr<DataType>> output_column_types{
+            std::vector<std::shared_ptr<DataType>> output_column_types{
                 varchar_type,
             };
 
@@ -3792,22 +3792,22 @@ void PhysicalShow::ExecuteShowGlobalVariable(QueryContext *query_context, ShowOp
             break;
         }
         case GlobalVariable::kCacheResultCapacity: {
-            const String &result_cache_status = config->ResultCache();
+            const std::string &result_cache_status = config->ResultCache();
             if (result_cache_status == "off") {
                 operator_state->status_ = Status::NotSupport(fmt::format("Result cache is off"));
                 RecoverableError(operator_state->status_);
             }
             ResultCacheManager *cache_mgr = query_context->storage()->GetResultCacheManagerPtr();
 
-            Vector<SharedPtr<ColumnDef>> output_column_defs = {
-                MakeShared<ColumnDef>(0, integer_type, "value", std::set<ConstraintType>()),
+            std::vector<std::shared_ptr<ColumnDef>> output_column_defs = {
+                std::make_shared<ColumnDef>(0, integer_type, "value", std::set<ConstraintType>()),
             };
 
-            SharedPtr<TableDef> table_def =
-                TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("variables"), nullptr, output_column_defs);
-            output_ = MakeShared<DataTable>(table_def, TableType::kResult);
+            std::shared_ptr<TableDef> table_def =
+                TableDef::Make(std::make_shared<std::string>("default_db"), std::make_shared<std::string>("variables"), nullptr, output_column_defs);
+            output_ = std::make_shared<DataTable>(table_def, TableType::kResult);
 
-            Vector<SharedPtr<DataType>> output_column_types{
+            std::vector<std::shared_ptr<DataType>> output_column_types{
                 integer_type,
             };
 
@@ -3818,22 +3818,22 @@ void PhysicalShow::ExecuteShowGlobalVariable(QueryContext *query_context, ShowOp
             break;
         }
         case GlobalVariable::kCacheResultNum: {
-            const String &result_cache_status = config->ResultCache();
+            const std::string &result_cache_status = config->ResultCache();
             if (result_cache_status == "off") {
                 operator_state->status_ = Status::NotSupport(fmt::format("Result cache is off"));
                 RecoverableError(operator_state->status_);
             }
             ResultCacheManager *cache_mgr = query_context->storage()->GetResultCacheManagerPtr();
 
-            Vector<SharedPtr<ColumnDef>> output_column_defs = {
-                MakeShared<ColumnDef>(0, integer_type, "value", std::set<ConstraintType>()),
+            std::vector<std::shared_ptr<ColumnDef>> output_column_defs = {
+                std::make_shared<ColumnDef>(0, integer_type, "value", std::set<ConstraintType>()),
             };
 
-            SharedPtr<TableDef> table_def =
-                TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("variables"), nullptr, output_column_defs);
-            output_ = MakeShared<DataTable>(table_def, TableType::kResult);
+            std::shared_ptr<TableDef> table_def =
+                TableDef::Make(std::make_shared<std::string>("default_db"), std::make_shared<std::string>("variables"), nullptr, output_column_defs);
+            output_ = std::make_shared<DataTable>(table_def, TableType::kResult);
 
-            Vector<SharedPtr<DataType>> output_column_types{
+            std::vector<std::shared_ptr<DataType>> output_column_types{
                 integer_type,
             };
 
@@ -3844,15 +3844,15 @@ void PhysicalShow::ExecuteShowGlobalVariable(QueryContext *query_context, ShowOp
             break;
         }
         case GlobalVariable::kMemoryCacheMiss: {
-            Vector<SharedPtr<ColumnDef>> output_column_defs = {
-                MakeShared<ColumnDef>(0, varchar_type, "value", std::set<ConstraintType>()),
+            std::vector<std::shared_ptr<ColumnDef>> output_column_defs = {
+                std::make_shared<ColumnDef>(0, varchar_type, "value", std::set<ConstraintType>()),
             };
 
-            SharedPtr<TableDef> table_def =
-                TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("variables"), nullptr, output_column_defs);
-            output_ = MakeShared<DataTable>(table_def, TableType::kResult);
+            std::shared_ptr<TableDef> table_def =
+                TableDef::Make(std::make_shared<std::string>("default_db"), std::make_shared<std::string>("variables"), nullptr, output_column_defs);
+            output_ = std::make_shared<DataTable>(table_def, TableType::kResult);
 
-            Vector<SharedPtr<DataType>> output_column_types{
+            std::vector<std::shared_ptr<DataType>> output_column_types{
                 varchar_type,
             };
 
@@ -3867,15 +3867,15 @@ void PhysicalShow::ExecuteShowGlobalVariable(QueryContext *query_context, ShowOp
             break;
         }
         case GlobalVariable::kDiskCacheMiss: {
-            Vector<SharedPtr<ColumnDef>> output_column_defs = {
-                MakeShared<ColumnDef>(0, varchar_type, "value", std::set<ConstraintType>()),
+            std::vector<std::shared_ptr<ColumnDef>> output_column_defs = {
+                std::make_shared<ColumnDef>(0, varchar_type, "value", std::set<ConstraintType>()),
             };
 
-            SharedPtr<TableDef> table_def =
-                TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("variables"), nullptr, output_column_defs);
-            output_ = MakeShared<DataTable>(table_def, TableType::kResult);
+            std::shared_ptr<TableDef> table_def =
+                TableDef::Make(std::make_shared<std::string>("default_db"), std::make_shared<std::string>("variables"), nullptr, output_column_defs);
+            output_ = std::make_shared<DataTable>(table_def, TableType::kResult);
 
-            Vector<SharedPtr<DataType>> output_column_types{
+            std::vector<std::shared_ptr<DataType>> output_column_types{
                 varchar_type,
             };
 
@@ -3886,15 +3886,15 @@ void PhysicalShow::ExecuteShowGlobalVariable(QueryContext *query_context, ShowOp
             break;
         }
         case GlobalVariable::kQueryCount: {
-            Vector<SharedPtr<ColumnDef>> output_column_defs = {
-                MakeShared<ColumnDef>(0, integer_type, "value", std::set<ConstraintType>()),
+            std::vector<std::shared_ptr<ColumnDef>> output_column_defs = {
+                std::make_shared<ColumnDef>(0, integer_type, "value", std::set<ConstraintType>()),
             };
 
-            SharedPtr<TableDef> table_def =
-                TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("variables"), nullptr, output_column_defs);
-            output_ = MakeShared<DataTable>(table_def, TableType::kResult);
+            std::shared_ptr<TableDef> table_def =
+                TableDef::Make(std::make_shared<std::string>("default_db"), std::make_shared<std::string>("variables"), nullptr, output_column_defs);
+            output_ = std::make_shared<DataTable>(table_def, TableType::kResult);
 
-            Vector<SharedPtr<DataType>> output_column_types{
+            std::vector<std::shared_ptr<DataType>> output_column_types{
                 integer_type,
             };
 
@@ -3905,15 +3905,15 @@ void PhysicalShow::ExecuteShowGlobalVariable(QueryContext *query_context, ShowOp
             break;
         }
         case GlobalVariable::kSessionCount: {
-            Vector<SharedPtr<ColumnDef>> output_column_defs = {
-                MakeShared<ColumnDef>(0, integer_type, "value", std::set<ConstraintType>()),
+            std::vector<std::shared_ptr<ColumnDef>> output_column_defs = {
+                std::make_shared<ColumnDef>(0, integer_type, "value", std::set<ConstraintType>()),
             };
 
-            SharedPtr<TableDef> table_def =
-                TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("variables"), nullptr, output_column_defs);
-            output_ = MakeShared<DataTable>(table_def, TableType::kResult);
+            std::shared_ptr<TableDef> table_def =
+                TableDef::Make(std::make_shared<std::string>("default_db"), std::make_shared<std::string>("variables"), nullptr, output_column_defs);
+            output_ = std::make_shared<DataTable>(table_def, TableType::kResult);
 
-            Vector<SharedPtr<DataType>> output_column_types{
+            std::vector<std::shared_ptr<DataType>> output_column_types{
                 integer_type,
             };
 
@@ -3927,15 +3927,15 @@ void PhysicalShow::ExecuteShowGlobalVariable(QueryContext *query_context, ShowOp
             break;
         }
         case GlobalVariable::kBufferPoolUsage: {
-            Vector<SharedPtr<ColumnDef>> output_column_defs = {
-                MakeShared<ColumnDef>(0, varchar_type, "value", std::set<ConstraintType>()),
+            std::vector<std::shared_ptr<ColumnDef>> output_column_defs = {
+                std::make_shared<ColumnDef>(0, varchar_type, "value", std::set<ConstraintType>()),
             };
 
-            SharedPtr<TableDef> table_def =
-                TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("variables"), nullptr, output_column_defs);
-            output_ = MakeShared<DataTable>(table_def, TableType::kResult);
+            std::shared_ptr<TableDef> table_def =
+                TableDef::Make(std::make_shared<std::string>("default_db"), std::make_shared<std::string>("variables"), nullptr, output_column_defs);
+            output_ = std::make_shared<DataTable>(table_def, TableType::kResult);
 
-            Vector<SharedPtr<DataType>> output_column_types{
+            std::vector<std::shared_ptr<DataType>> output_column_types{
                 varchar_type,
             };
 
@@ -3950,15 +3950,15 @@ void PhysicalShow::ExecuteShowGlobalVariable(QueryContext *query_context, ShowOp
             break;
         }
         case GlobalVariable::kSchedulePolicy: {
-            Vector<SharedPtr<ColumnDef>> output_column_defs = {
-                MakeShared<ColumnDef>(0, varchar_type, "value", std::set<ConstraintType>()),
+            std::vector<std::shared_ptr<ColumnDef>> output_column_defs = {
+                std::make_shared<ColumnDef>(0, varchar_type, "value", std::set<ConstraintType>()),
             };
 
-            SharedPtr<TableDef> table_def =
-                TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("variables"), nullptr, output_column_defs);
-            output_ = MakeShared<DataTable>(table_def, TableType::kResult);
+            std::shared_ptr<TableDef> table_def =
+                TableDef::Make(std::make_shared<std::string>("default_db"), std::make_shared<std::string>("variables"), nullptr, output_column_defs);
+            output_ = std::make_shared<DataTable>(table_def, TableType::kResult);
 
-            Vector<SharedPtr<DataType>> output_column_types{
+            std::vector<std::shared_ptr<DataType>> output_column_types{
                 varchar_type,
             };
 
@@ -3970,15 +3970,15 @@ void PhysicalShow::ExecuteShowGlobalVariable(QueryContext *query_context, ShowOp
             break;
         }
         case GlobalVariable::kNextTxnID: {
-            Vector<SharedPtr<ColumnDef>> output_column_defs = {
-                MakeShared<ColumnDef>(0, integer_type, "value", std::set<ConstraintType>()),
+            std::vector<std::shared_ptr<ColumnDef>> output_column_defs = {
+                std::make_shared<ColumnDef>(0, integer_type, "value", std::set<ConstraintType>()),
             };
 
-            SharedPtr<TableDef> table_def =
-                TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("variables"), nullptr, output_column_defs);
-            output_ = MakeShared<DataTable>(table_def, TableType::kResult);
+            std::shared_ptr<TableDef> table_def =
+                TableDef::Make(std::make_shared<std::string>("default_db"), std::make_shared<std::string>("variables"), nullptr, output_column_defs);
+            output_ = std::make_shared<DataTable>(table_def, TableType::kResult);
 
-            Vector<SharedPtr<DataType>> output_column_types{
+            std::vector<std::shared_ptr<DataType>> output_column_types{
                 integer_type,
             };
 
@@ -3991,15 +3991,15 @@ void PhysicalShow::ExecuteShowGlobalVariable(QueryContext *query_context, ShowOp
             break;
         }
         case GlobalVariable::kBufferedObjectCount: {
-            Vector<SharedPtr<ColumnDef>> output_column_defs = {
-                MakeShared<ColumnDef>(0, integer_type, "value", std::set<ConstraintType>()),
+            std::vector<std::shared_ptr<ColumnDef>> output_column_defs = {
+                std::make_shared<ColumnDef>(0, integer_type, "value", std::set<ConstraintType>()),
             };
 
-            SharedPtr<TableDef> table_def =
-                TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("variables"), nullptr, output_column_defs);
-            output_ = MakeShared<DataTable>(table_def, TableType::kResult);
+            std::shared_ptr<TableDef> table_def =
+                TableDef::Make(std::make_shared<std::string>("default_db"), std::make_shared<std::string>("variables"), nullptr, output_column_defs);
+            output_ = std::make_shared<DataTable>(table_def, TableType::kResult);
 
-            Vector<SharedPtr<DataType>> output_column_types{
+            std::vector<std::shared_ptr<DataType>> output_column_types{
                 integer_type,
             };
 
@@ -4012,44 +4012,44 @@ void PhysicalShow::ExecuteShowGlobalVariable(QueryContext *query_context, ShowOp
             break;
         }
         case GlobalVariable::kUnusedBufferObjectCount: {
-            Vector<SharedPtr<ColumnDef>> output_column_defs = {
-                MakeShared<ColumnDef>(0, integer_type, "value", std::set<ConstraintType>()),
+            std::vector<std::shared_ptr<ColumnDef>> output_column_defs = {
+                std::make_shared<ColumnDef>(0, integer_type, "value", std::set<ConstraintType>()),
             };
 
-            SharedPtr<TableDef> table_def =
-                TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("variables"), nullptr, output_column_defs);
-            output_ = MakeShared<DataTable>(table_def, TableType::kResult);
+            std::shared_ptr<TableDef> table_def =
+                TableDef::Make(std::make_shared<std::string>("default_db"), std::make_shared<std::string>("variables"), nullptr, output_column_defs);
+            output_ = std::make_shared<DataTable>(table_def, TableType::kResult);
 
-            Vector<SharedPtr<DataType>> output_column_types{
+            std::vector<std::shared_ptr<DataType>> output_column_types{
                 integer_type,
             };
 
             output_block_ptr->Init(output_column_types);
 
             BufferManager *buffer_manager = query_context->storage()->buffer_manager();
-            Vector<SizeT> size_list = buffer_manager->WaitingGCObjectCount();
-            SizeT total_size = std::accumulate(size_list.begin(), size_list.end(), 0);
+            std::vector<size_t> size_list = buffer_manager->WaitingGCObjectCount();
+            size_t total_size = std::accumulate(size_list.begin(), size_list.end(), 0);
             Value value = Value::MakeBigInt(total_size);
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
             break;
         }
         case GlobalVariable::kActiveTxnCount: {
-            Vector<SharedPtr<ColumnDef>> output_column_defs = {
-                MakeShared<ColumnDef>(0, integer_type, "value", std::set<ConstraintType>()),
+            std::vector<std::shared_ptr<ColumnDef>> output_column_defs = {
+                std::make_shared<ColumnDef>(0, integer_type, "value", std::set<ConstraintType>()),
             };
 
-            SharedPtr<TableDef> table_def =
-                TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("variables"), nullptr, output_column_defs);
-            output_ = MakeShared<DataTable>(table_def, TableType::kResult);
+            std::shared_ptr<TableDef> table_def =
+                TableDef::Make(std::make_shared<std::string>("default_db"), std::make_shared<std::string>("variables"), nullptr, output_column_defs);
+            output_ = std::make_shared<DataTable>(table_def, TableType::kResult);
 
-            Vector<SharedPtr<DataType>> output_column_types{
+            std::vector<std::shared_ptr<DataType>> output_column_types{
                 integer_type,
             };
 
             output_block_ptr->Init(output_column_types);
 
-            SizeT active_txn_count = 0;
+            size_t active_txn_count = 0;
             NewTxnManager *new_txn_mgr = query_context->storage()->new_txn_manager();
             active_txn_count = new_txn_mgr->ActiveTxnCount();
 
@@ -4059,15 +4059,15 @@ void PhysicalShow::ExecuteShowGlobalVariable(QueryContext *query_context, ShowOp
             break;
         }
         case GlobalVariable::kCurrentTs: {
-            Vector<SharedPtr<ColumnDef>> output_column_defs = {
-                MakeShared<ColumnDef>(0, integer_type, "value", std::set<ConstraintType>()),
+            std::vector<std::shared_ptr<ColumnDef>> output_column_defs = {
+                std::make_shared<ColumnDef>(0, integer_type, "value", std::set<ConstraintType>()),
             };
 
-            SharedPtr<TableDef> table_def =
-                TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("variables"), nullptr, output_column_defs);
-            output_ = MakeShared<DataTable>(table_def, TableType::kResult);
+            std::shared_ptr<TableDef> table_def =
+                TableDef::Make(std::make_shared<std::string>("default_db"), std::make_shared<std::string>("variables"), nullptr, output_column_defs);
+            output_ = std::make_shared<DataTable>(table_def, TableType::kResult);
 
-            Vector<SharedPtr<DataType>> output_column_types{
+            std::vector<std::shared_ptr<DataType>> output_column_types{
                 integer_type,
             };
 
@@ -4083,15 +4083,15 @@ void PhysicalShow::ExecuteShowGlobalVariable(QueryContext *query_context, ShowOp
             break;
         }
         case GlobalVariable::kTotalCommitCount: {
-            Vector<SharedPtr<ColumnDef>> output_column_defs = {
-                MakeShared<ColumnDef>(0, integer_type, "value", std::set<ConstraintType>()),
+            std::vector<std::shared_ptr<ColumnDef>> output_column_defs = {
+                std::make_shared<ColumnDef>(0, integer_type, "value", std::set<ConstraintType>()),
             };
 
-            SharedPtr<TableDef> table_def =
-                TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("variables"), nullptr, output_column_defs);
-            output_ = MakeShared<DataTable>(table_def, TableType::kResult);
+            std::shared_ptr<TableDef> table_def =
+                TableDef::Make(std::make_shared<std::string>("default_db"), std::make_shared<std::string>("variables"), nullptr, output_column_defs);
+            output_ = std::make_shared<DataTable>(table_def, TableType::kResult);
 
-            Vector<SharedPtr<DataType>> output_column_types{
+            std::vector<std::shared_ptr<DataType>> output_column_types{
                 integer_type,
             };
 
@@ -4107,15 +4107,15 @@ void PhysicalShow::ExecuteShowGlobalVariable(QueryContext *query_context, ShowOp
             break;
         }
         case GlobalVariable::kTotalRollbackCount: {
-            Vector<SharedPtr<ColumnDef>> output_column_defs = {
-                MakeShared<ColumnDef>(0, integer_type, "value", std::set<ConstraintType>()),
+            std::vector<std::shared_ptr<ColumnDef>> output_column_defs = {
+                std::make_shared<ColumnDef>(0, integer_type, "value", std::set<ConstraintType>()),
             };
 
-            SharedPtr<TableDef> table_def =
-                TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("variables"), nullptr, output_column_defs);
-            output_ = MakeShared<DataTable>(table_def, TableType::kResult);
+            std::shared_ptr<TableDef> table_def =
+                TableDef::Make(std::make_shared<std::string>("default_db"), std::make_shared<std::string>("variables"), nullptr, output_column_defs);
+            output_ = std::make_shared<DataTable>(table_def, TableType::kResult);
 
-            Vector<SharedPtr<DataType>> output_column_types{
+            std::vector<std::shared_ptr<DataType>> output_column_types{
                 integer_type,
             };
 
@@ -4131,15 +4131,15 @@ void PhysicalShow::ExecuteShowGlobalVariable(QueryContext *query_context, ShowOp
             break;
         }
         case GlobalVariable::kActiveWALFilename: {
-            Vector<SharedPtr<ColumnDef>> output_column_defs = {
-                MakeShared<ColumnDef>(0, varchar_type, "value", std::set<ConstraintType>()),
+            std::vector<std::shared_ptr<ColumnDef>> output_column_defs = {
+                std::make_shared<ColumnDef>(0, varchar_type, "value", std::set<ConstraintType>()),
             };
 
-            SharedPtr<TableDef> table_def =
-                TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("variables"), nullptr, output_column_defs);
-            output_ = MakeShared<DataTable>(table_def, TableType::kResult);
+            std::shared_ptr<TableDef> table_def =
+                TableDef::Make(std::make_shared<std::string>("default_db"), std::make_shared<std::string>("variables"), nullptr, output_column_defs);
+            output_ = std::make_shared<DataTable>(table_def, TableType::kResult);
 
-            Vector<SharedPtr<DataType>> output_column_types{
+            std::vector<std::shared_ptr<DataType>> output_column_types{
                 varchar_type,
             };
 
@@ -4152,15 +4152,15 @@ void PhysicalShow::ExecuteShowGlobalVariable(QueryContext *query_context, ShowOp
             break;
         }
         case GlobalVariable::kProfileRecordCapacity: {
-            Vector<SharedPtr<ColumnDef>> output_column_defs = {
-                MakeShared<ColumnDef>(0, integer_type, "value", std::set<ConstraintType>()),
+            std::vector<std::shared_ptr<ColumnDef>> output_column_defs = {
+                std::make_shared<ColumnDef>(0, integer_type, "value", std::set<ConstraintType>()),
             };
 
-            SharedPtr<TableDef> table_def =
-                TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("variables"), nullptr, output_column_defs);
-            output_ = MakeShared<DataTable>(table_def, TableType::kResult);
+            std::shared_ptr<TableDef> table_def =
+                TableDef::Make(std::make_shared<std::string>("default_db"), std::make_shared<std::string>("variables"), nullptr, output_column_defs);
+            output_ = std::make_shared<DataTable>(table_def, TableType::kResult);
 
-            Vector<SharedPtr<DataType>> output_column_types{
+            std::vector<std::shared_ptr<DataType>> output_column_types{
                 integer_type,
             };
 
@@ -4173,37 +4173,37 @@ void PhysicalShow::ExecuteShowGlobalVariable(QueryContext *query_context, ShowOp
             break;
         }
         case GlobalVariable::kBackgroundTaskCount: {
-            Vector<SharedPtr<ColumnDef>> output_column_defs = {
-                MakeShared<ColumnDef>(0, integer_type, "value", std::set<ConstraintType>()),
+            std::vector<std::shared_ptr<ColumnDef>> output_column_defs = {
+                std::make_shared<ColumnDef>(0, integer_type, "value", std::set<ConstraintType>()),
             };
 
-            SharedPtr<TableDef> table_def =
-                TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("variables"), nullptr, output_column_defs);
-            output_ = MakeShared<DataTable>(table_def, TableType::kResult);
+            std::shared_ptr<TableDef> table_def =
+                TableDef::Make(std::make_shared<std::string>("default_db"), std::make_shared<std::string>("variables"), nullptr, output_column_defs);
+            output_ = std::make_shared<DataTable>(table_def, TableType::kResult);
 
-            Vector<SharedPtr<DataType>> output_column_types{
+            std::vector<std::shared_ptr<DataType>> output_column_types{
                 integer_type,
             };
 
             output_block_ptr->Init(output_column_types);
 
             BGTaskProcessor *bg_processor = query_context->storage()->bg_processor();
-            SizeT running_task_count = bg_processor->RunningTaskCount();
+            size_t running_task_count = bg_processor->RunningTaskCount();
             Value value = Value::MakeBigInt(running_task_count);
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
             break;
         }
         case GlobalVariable::kRunningBGTask: {
-            Vector<SharedPtr<ColumnDef>> output_column_defs = {
-                MakeShared<ColumnDef>(0, varchar_type, "value", std::set<ConstraintType>()),
+            std::vector<std::shared_ptr<ColumnDef>> output_column_defs = {
+                std::make_shared<ColumnDef>(0, varchar_type, "value", std::set<ConstraintType>()),
             };
 
-            SharedPtr<TableDef> table_def =
-                TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("variables"), nullptr, output_column_defs);
-            output_ = MakeShared<DataTable>(table_def, TableType::kResult);
+            std::shared_ptr<TableDef> table_def =
+                TableDef::Make(std::make_shared<std::string>("default_db"), std::make_shared<std::string>("variables"), nullptr, output_column_defs);
+            output_ = std::make_shared<DataTable>(table_def, TableType::kResult);
 
-            Vector<SharedPtr<DataType>> output_column_types{
+            std::vector<std::shared_ptr<DataType>> output_column_types{
                 varchar_type,
             };
 
@@ -4216,15 +4216,15 @@ void PhysicalShow::ExecuteShowGlobalVariable(QueryContext *query_context, ShowOp
             break;
         }
         case GlobalVariable::kRunningCompactTask: {
-            Vector<SharedPtr<ColumnDef>> output_column_defs = {
-                MakeShared<ColumnDef>(0, integer_type, "value", std::set<ConstraintType>()),
+            std::vector<std::shared_ptr<ColumnDef>> output_column_defs = {
+                std::make_shared<ColumnDef>(0, integer_type, "value", std::set<ConstraintType>()),
             };
 
-            SharedPtr<TableDef> table_def =
-                TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("variables"), nullptr, output_column_defs);
-            output_ = MakeShared<DataTable>(table_def, TableType::kResult);
+            std::shared_ptr<TableDef> table_def =
+                TableDef::Make(std::make_shared<std::string>("default_db"), std::make_shared<std::string>("variables"), nullptr, output_column_defs);
+            output_ = std::make_shared<DataTable>(table_def, TableType::kResult);
 
-            Vector<SharedPtr<DataType>> output_column_types{
+            std::vector<std::shared_ptr<DataType>> output_column_types{
                 integer_type,
             };
 
@@ -4237,15 +4237,15 @@ void PhysicalShow::ExecuteShowGlobalVariable(QueryContext *query_context, ShowOp
             break;
         }
         case GlobalVariable::kSystemMemoryUsage: {
-            Vector<SharedPtr<ColumnDef>> output_column_defs = {
-                MakeShared<ColumnDef>(0, integer_type, "value", std::set<ConstraintType>()),
+            std::vector<std::shared_ptr<ColumnDef>> output_column_defs = {
+                std::make_shared<ColumnDef>(0, integer_type, "value", std::set<ConstraintType>()),
             };
 
-            SharedPtr<TableDef> table_def =
-                TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("variables"), nullptr, output_column_defs);
-            output_ = MakeShared<DataTable>(table_def, TableType::kResult);
+            std::shared_ptr<TableDef> table_def =
+                TableDef::Make(std::make_shared<std::string>("default_db"), std::make_shared<std::string>("variables"), nullptr, output_column_defs);
+            output_ = std::make_shared<DataTable>(table_def, TableType::kResult);
 
-            Vector<SharedPtr<DataType>> output_column_types{
+            std::vector<std::shared_ptr<DataType>> output_column_types{
                 integer_type,
             };
 
@@ -4258,15 +4258,15 @@ void PhysicalShow::ExecuteShowGlobalVariable(QueryContext *query_context, ShowOp
             break;
         }
         case GlobalVariable::kOpenFileCount: {
-            Vector<SharedPtr<ColumnDef>> output_column_defs = {
-                MakeShared<ColumnDef>(0, integer_type, "value", std::set<ConstraintType>()),
+            std::vector<std::shared_ptr<ColumnDef>> output_column_defs = {
+                std::make_shared<ColumnDef>(0, integer_type, "value", std::set<ConstraintType>()),
             };
 
-            SharedPtr<TableDef> table_def =
-                TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("variables"), nullptr, output_column_defs);
-            output_ = MakeShared<DataTable>(table_def, TableType::kResult);
+            std::shared_ptr<TableDef> table_def =
+                TableDef::Make(std::make_shared<std::string>("default_db"), std::make_shared<std::string>("variables"), nullptr, output_column_defs);
+            output_ = std::make_shared<DataTable>(table_def, TableType::kResult);
 
-            Vector<SharedPtr<DataType>> output_column_types{
+            std::vector<std::shared_ptr<DataType>> output_column_types{
                 integer_type,
             };
 
@@ -4279,15 +4279,15 @@ void PhysicalShow::ExecuteShowGlobalVariable(QueryContext *query_context, ShowOp
             break;
         }
         case GlobalVariable::kCPUUsage: {
-            Vector<SharedPtr<ColumnDef>> output_column_defs = {
-                MakeShared<ColumnDef>(0, double_type, "value", std::set<ConstraintType>()),
+            std::vector<std::shared_ptr<ColumnDef>> output_column_defs = {
+                std::make_shared<ColumnDef>(0, double_type, "value", std::set<ConstraintType>()),
             };
 
-            SharedPtr<TableDef> table_def =
-                TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("variables"), nullptr, output_column_defs);
-            output_ = MakeShared<DataTable>(table_def, TableType::kResult);
+            std::shared_ptr<TableDef> table_def =
+                TableDef::Make(std::make_shared<std::string>("default_db"), std::make_shared<std::string>("variables"), nullptr, output_column_defs);
+            output_ = std::make_shared<DataTable>(table_def, TableType::kResult);
 
-            Vector<SharedPtr<DataType>> output_column_types{
+            std::vector<std::shared_ptr<DataType>> output_column_types{
                 double_type,
             };
 
@@ -4301,7 +4301,7 @@ void PhysicalShow::ExecuteShowGlobalVariable(QueryContext *query_context, ShowOp
         }
         case GlobalVariable::kJeProf: {
 
-            Vector<SharedPtr<DataType>> output_column_types{
+            std::vector<std::shared_ptr<DataType>> output_column_types{
                 varchar_type,
             };
 
@@ -4317,17 +4317,17 @@ void PhysicalShow::ExecuteShowGlobalVariable(QueryContext *query_context, ShowOp
             break;
         }
         case GlobalVariable::kFollowerNum: {
-            SharedPtr<NodeInfo> this_node = InfinityContext::instance().cluster_manager()->ThisNode();
+            std::shared_ptr<NodeInfo> this_node = InfinityContext::instance().cluster_manager()->ThisNode();
             if (this_node->node_role() == NodeRole::kLeader) {
-                Vector<SharedPtr<ColumnDef>> output_column_defs = {
-                    MakeShared<ColumnDef>(0, integer_type, "value", std::set<ConstraintType>()),
+                std::vector<std::shared_ptr<ColumnDef>> output_column_defs = {
+                    std::make_shared<ColumnDef>(0, integer_type, "value", std::set<ConstraintType>()),
                 };
 
-                SharedPtr<TableDef> table_def =
-                    TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("variables"), nullptr, output_column_defs);
-                output_ = MakeShared<DataTable>(table_def, TableType::kResult);
+                std::shared_ptr<TableDef> table_def =
+                    TableDef::Make(std::make_shared<std::string>("default_db"), std::make_shared<std::string>("variables"), nullptr, output_column_defs);
+                output_ = std::make_shared<DataTable>(table_def, TableType::kResult);
 
-                Vector<SharedPtr<DataType>> output_column_types{
+                std::vector<std::shared_ptr<DataType>> output_column_types{
                     integer_type,
                 };
 
@@ -4344,15 +4344,15 @@ void PhysicalShow::ExecuteShowGlobalVariable(QueryContext *query_context, ShowOp
             break;
         }
         case GlobalVariable::kEnableProfile: {
-            Vector<SharedPtr<ColumnDef>> output_column_defs = {
-                MakeShared<ColumnDef>(0, integer_type, "value", std::set<ConstraintType>()),
+            std::vector<std::shared_ptr<ColumnDef>> output_column_defs = {
+                std::make_shared<ColumnDef>(0, integer_type, "value", std::set<ConstraintType>()),
             };
 
-            SharedPtr<TableDef> table_def =
-                TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("variables"), nullptr, output_column_defs);
-            output_ = MakeShared<DataTable>(table_def, TableType::kResult);
+            std::shared_ptr<TableDef> table_def =
+                TableDef::Make(std::make_shared<std::string>("default_db"), std::make_shared<std::string>("variables"), nullptr, output_column_defs);
+            output_ = std::make_shared<DataTable>(table_def, TableType::kResult);
 
-            Vector<SharedPtr<DataType>> output_column_types{
+            std::vector<std::shared_ptr<DataType>> output_column_types{
                 bool_type,
             };
 
@@ -4375,11 +4375,11 @@ void PhysicalShow::ExecuteShowGlobalVariable(QueryContext *query_context, ShowOp
 }
 
 void PhysicalShow::ExecuteShowGlobalVariables(QueryContext *query_context, ShowOperatorState *operator_state) {
-    auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
+    auto varchar_type = std::make_shared<DataType>(LogicalType::kVarchar);
 
     // create data block for output state
-    UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
-    Vector<SharedPtr<DataType>> column_types{
+    std::unique_ptr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
+    std::vector<std::shared_ptr<DataType>> column_types{
         varchar_type,
         varchar_type,
         varchar_type,
@@ -4388,12 +4388,12 @@ void PhysicalShow::ExecuteShowGlobalVariables(QueryContext *query_context, ShowO
     output_block_ptr->Init(*output_types_);
 
     for (auto &global_var_pair : VarUtil::global_name_map_) {
-        const String &var_name = global_var_pair.first;
+        const std::string &var_name = global_var_pair.first;
         GlobalVariable global_var_enum = global_var_pair.second;
         Config *config = query_context->global_config();
         switch (global_var_enum) {
             case GlobalVariable::kResultCache: {
-                const String &result_cache_status = config->ResultCache();
+                const std::string &result_cache_status = config->ResultCache();
                 {
                     // option name
                     Value value = Value::MakeVarchar(var_name);
@@ -4415,12 +4415,12 @@ void PhysicalShow::ExecuteShowGlobalVariables(QueryContext *query_context, ShowO
                 break;
             }
             case GlobalVariable::kCacheResultCapacity: {
-                const String &result_cache_status = config->ResultCache();
+                const std::string &result_cache_status = config->ResultCache();
                 if (result_cache_status == "off") {
                     break;
                 }
                 ResultCacheManager *cache_mgr = query_context->storage()->GetResultCacheManagerPtr();
-                SizeT cache_num_capacity = cache_mgr->cache_num_capacity();
+                size_t cache_num_capacity = cache_mgr->cache_num_capacity();
                 {
                     // option name
                     Value value = Value::MakeVarchar(var_name);
@@ -4442,12 +4442,12 @@ void PhysicalShow::ExecuteShowGlobalVariables(QueryContext *query_context, ShowO
                 break;
             }
             case GlobalVariable::kCacheResultNum: {
-                const String &result_cache_status = config->ResultCache();
+                const std::string &result_cache_status = config->ResultCache();
                 if (result_cache_status == "off") {
                     break;
                 }
                 ResultCacheManager *cache_mgr = query_context->storage()->GetResultCacheManagerPtr();
-                SizeT cache_num_used = cache_mgr->cache_num_used();
+                size_t cache_num_used = cache_mgr->cache_num_used();
                 {
                     // option name
                     Value value = Value::MakeVarchar(var_name);
@@ -4657,8 +4657,8 @@ void PhysicalShow::ExecuteShowGlobalVariables(QueryContext *query_context, ShowO
                 {
                     // option value
                     BufferManager *buffer_manager = query_context->storage()->buffer_manager();
-                    Vector<SizeT> size_list = buffer_manager->WaitingGCObjectCount();
-                    SizeT total_size = std::accumulate(size_list.begin(), size_list.end(), 0);
+                    std::vector<size_t> size_list = buffer_manager->WaitingGCObjectCount();
+                    size_t total_size = std::accumulate(size_list.begin(), size_list.end(), 0);
                     Value value = Value::MakeVarchar(std::to_string(total_size));
                     ValueExpression value_expr(value);
                     value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
@@ -4680,7 +4680,7 @@ void PhysicalShow::ExecuteShowGlobalVariables(QueryContext *query_context, ShowO
                 }
                 {
                     // option value
-                    SizeT active_txn_count = 0;
+                    size_t active_txn_count = 0;
                     NewTxnManager *new_txn_mgr = query_context->storage()->new_txn_manager();
                     active_txn_count = new_txn_mgr->ActiveTxnCount();
 
@@ -4825,7 +4825,7 @@ void PhysicalShow::ExecuteShowGlobalVariables(QueryContext *query_context, ShowO
                 {
                     // option value
                     BGTaskProcessor *bg_processor = query_context->storage()->bg_processor();
-                    SizeT running_task_count = bg_processor->RunningTaskCount();
+                    size_t running_task_count = bg_processor->RunningTaskCount();
                     Value value = Value::MakeVarchar(std::to_string(running_task_count));
                     ValueExpression value_expr(value);
                     value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
@@ -4869,7 +4869,7 @@ void PhysicalShow::ExecuteShowGlobalVariables(QueryContext *query_context, ShowO
                 }
                 {
                     // option value
-                    String task_count = "N/A";
+                    std::string task_count = "N/A";
                     if (query_context->storage()->GetStorageMode() == StorageMode::kWritable) {
                         CompactionProcessor *compaction_processor = query_context->storage()->compaction_processor();
                         task_count = std::to_string(compaction_processor->RunningTaskCount());
@@ -4979,7 +4979,7 @@ void PhysicalShow::ExecuteShowGlobalVariables(QueryContext *query_context, ShowO
             }
             case GlobalVariable::kFollowerNum: {
                 if (InfinityContext::instance().IsClusterRole()) {
-                    SharedPtr<NodeInfo> this_node = InfinityContext::instance().cluster_manager()->ThisNode();
+                    std::shared_ptr<NodeInfo> this_node = InfinityContext::instance().cluster_manager()->ThisNode();
                     if (this_node->node_role() == NodeRole::kLeader) {
                         {
                             // option name
@@ -4989,7 +4989,7 @@ void PhysicalShow::ExecuteShowGlobalVariables(QueryContext *query_context, ShowO
                         }
                         {
                             // option value
-                            SizeT follower_count = InfinityContext::instance().cluster_manager()->GetFollowerLimit();
+                            size_t follower_count = InfinityContext::instance().cluster_manager()->GetFollowerLimit();
                             Value value = Value::MakeVarchar(std::to_string(follower_count));
                             ValueExpression value_expr(value);
                             value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
@@ -5014,7 +5014,7 @@ void PhysicalShow::ExecuteShowGlobalVariables(QueryContext *query_context, ShowO
                 {
                     // option value
                     bool enable_profile = query_context->storage()->new_catalog()->GetProfile();
-                    String enable_profile_condition = enable_profile ? "true" : "false";
+                    std::string enable_profile_condition = enable_profile ? "true" : "false";
                     Value value = Value::MakeVarchar(enable_profile_condition);
                     ValueExpression value_expr(value);
                     value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
@@ -5051,15 +5051,15 @@ void PhysicalShow::ExecuteShowConfig(QueryContext *query_context, ShowOperatorSt
         return;
     }
 
-    UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
-    auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
-    auto bigint_type = MakeShared<DataType>(LogicalType::kBigInt);
-    auto double_type = MakeShared<DataType>(LogicalType::kDouble);
-    auto bool_type = MakeShared<DataType>(LogicalType::kBoolean);
+    std::unique_ptr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
+    auto varchar_type = std::make_shared<DataType>(LogicalType::kVarchar);
+    auto bigint_type = std::make_shared<DataType>(LogicalType::kBigInt);
+    auto double_type = std::make_shared<DataType>(LogicalType::kDouble);
+    auto bool_type = std::make_shared<DataType>(LogicalType::kBoolean);
 
     switch (base_option->data_type_) {
         case BaseOptionDataType::kInteger: {
-            Vector<SharedPtr<DataType>> output_column_types{
+            std::vector<std::shared_ptr<DataType>> output_column_types{
                 bigint_type,
             };
             output_block_ptr->Init(output_column_types);
@@ -5071,7 +5071,7 @@ void PhysicalShow::ExecuteShowConfig(QueryContext *query_context, ShowOperatorSt
             break;
         }
         case BaseOptionDataType::kFloat: {
-            Vector<SharedPtr<DataType>> output_column_types{
+            std::vector<std::shared_ptr<DataType>> output_column_types{
                 double_type,
             };
             output_block_ptr->Init(output_column_types);
@@ -5083,13 +5083,13 @@ void PhysicalShow::ExecuteShowConfig(QueryContext *query_context, ShowOperatorSt
             break;
         }
         case BaseOptionDataType::kString: {
-            Vector<SharedPtr<DataType>> output_column_types{
+            std::vector<std::shared_ptr<DataType>> output_column_types{
                 varchar_type,
             };
             output_block_ptr->Init(output_column_types);
 
             StringOption *string_option = static_cast<StringOption *>(base_option);
-            String value_str;
+            std::string value_str;
             if (*object_name_ == "time_zone") {
                 auto [time_zone_bias, _] = global_config->GetConfigByName("time_zone_bias");
 
@@ -5108,7 +5108,7 @@ void PhysicalShow::ExecuteShowConfig(QueryContext *query_context, ShowOperatorSt
             break;
         }
         case BaseOptionDataType::kBoolean: {
-            Vector<SharedPtr<DataType>> output_column_types{
+            std::vector<std::shared_ptr<DataType>> output_column_types{
                 bool_type,
             };
             output_block_ptr->Init(output_column_types);
@@ -5120,7 +5120,7 @@ void PhysicalShow::ExecuteShowConfig(QueryContext *query_context, ShowOperatorSt
             break;
         }
         case BaseOptionDataType::kLogLevel: {
-            Vector<SharedPtr<DataType>> output_column_types{
+            std::vector<std::shared_ptr<DataType>> output_column_types{
                 varchar_type,
             };
             output_block_ptr->Init(output_column_types);
@@ -5132,7 +5132,7 @@ void PhysicalShow::ExecuteShowConfig(QueryContext *query_context, ShowOperatorSt
             break;
         }
         case BaseOptionDataType::kFlush: {
-            Vector<SharedPtr<DataType>> output_column_types{
+            std::vector<std::shared_ptr<DataType>> output_column_types{
                 varchar_type,
             };
             output_block_ptr->Init(output_column_types);
@@ -5154,11 +5154,11 @@ void PhysicalShow::ExecuteShowConfig(QueryContext *query_context, ShowOperatorSt
 }
 
 void PhysicalShow::ExecuteShowBuffer(QueryContext *query_context, ShowOperatorState *operator_state) {
-    auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
-    auto bigint_type = MakeShared<DataType>(LogicalType::kBigInt);
+    auto varchar_type = std::make_shared<DataType>(LogicalType::kVarchar);
+    auto bigint_type = std::make_shared<DataType>(LogicalType::kBigInt);
 
     // create data block for output state
-    Vector<SharedPtr<DataType>> column_types{
+    std::vector<std::shared_ptr<DataType>> column_types{
         varchar_type,
         varchar_type,
         bigint_type,
@@ -5166,12 +5166,12 @@ void PhysicalShow::ExecuteShowBuffer(QueryContext *query_context, ShowOperatorSt
         varchar_type,
     };
 
-    UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
+    std::unique_ptr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
     output_block_ptr->Init(*output_types_);
-    SizeT row_count = 0;
+    size_t row_count = 0;
 
     BufferManager *buffer_manager = query_context->storage()->buffer_manager();
-    Vector<BufferObjectInfo> buffer_object_info_array = buffer_manager->GetBufferObjectsInfo();
+    std::vector<BufferObjectInfo> buffer_object_info_array = buffer_manager->GetBufferObjectsInfo();
     for (const auto &buffer_object_info : buffer_object_info_array) {
 
         if (output_block_ptr.get() == nullptr) {
@@ -5230,24 +5230,24 @@ void PhysicalShow::ExecuteShowMemIndex(QueryContext *query_context, ShowOperator
     Status status = Status::NotSupport("Show memindex is not supported in new catalog since BGMemIndexTracer has not yet been ported.");
     RecoverableError(status);
 
-    //    auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
-    //    auto bigint_type = MakeShared<DataType>(LogicalType::kBigInt);
+    //    auto varchar_type = std::make_shared<DataType>(LogicalType::kVarchar);
+    //    auto bigint_type = std::make_shared<DataType>(LogicalType::kBigInt);
     //
-    //    Vector<SharedPtr<DataType>> column_types{
+    //    std::vector<std::shared_ptr<DataType>> column_types{
     //        varchar_type,
     //        varchar_type,
     //        varchar_type,
     //        bigint_type,
     //        bigint_type,
     //    };
-    //    UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
+    //    std::unique_ptr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
     //    output_block_ptr->Init(*output_types_);
-    //    SizeT row_count = 0;
+    //    size_t row_count = 0;
 
     //
     //    BGMemIndexTracer *mem_index_tracer = query_context->storage()->memindex_tracer();
     //    Txn *txn = query_context->GetTxn();
-    //    Vector<MemIndexTracerInfo> mem_index_tracer_info_array = mem_index_tracer->GetMemIndexTracerInfo(txn);
+    //    std::vector<MemIndexTracerInfo> mem_index_tracer_info_array = mem_index_tracer->GetMemIndexTracerInfo(txn);
     //    for (const auto &memindex_tracer_info : mem_index_tracer_info_array) {
     //        if (output_block_ptr.get() == nullptr) {
     //            output_block_ptr = DataBlock::MakeUniquePtr();
@@ -5299,11 +5299,11 @@ void PhysicalShow::ExecuteShowMemIndex(QueryContext *query_context, ShowOperator
 }
 
 void PhysicalShow::ExecuteShowQueries(QueryContext *query_context, ShowOperatorState *operator_state) {
-    auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
-    auto bigint_type = MakeShared<DataType>(LogicalType::kBigInt);
+    auto varchar_type = std::make_shared<DataType>(LogicalType::kVarchar);
+    auto bigint_type = std::make_shared<DataType>(LogicalType::kBigInt);
 
     // create data block for output state
-    Vector<SharedPtr<DataType>> column_types{
+    std::vector<std::shared_ptr<DataType>> column_types{
         bigint_type,
         bigint_type,
         varchar_type,
@@ -5311,12 +5311,12 @@ void PhysicalShow::ExecuteShowQueries(QueryContext *query_context, ShowOperatorS
         varchar_type,
     };
 
-    UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
+    std::unique_ptr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
     output_block_ptr->Init(*output_types_);
-    SizeT row_count = 0;
+    size_t row_count = 0;
 
     SessionManager *session_manager = query_context->session_manager();
-    Map<u64, SharedPtr<QueryInfo>> query_map = session_manager->QueryRecords();
+    std::map<u64, std::shared_ptr<QueryInfo>> query_map = session_manager->QueryRecords();
     for (auto &query_pair : query_map) {
         u64 session_id = query_pair.first;
         QueryInfo &query_info = *query_pair.second;
@@ -5379,9 +5379,9 @@ void PhysicalShow::ExecuteShowQuery(QueryContext *query_context, ShowOperatorSta
         RecoverableError(status);
     }
 
-    auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
-    UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
-    Vector<SharedPtr<DataType>> column_types{
+    auto varchar_type = std::make_shared<DataType>(LogicalType::kVarchar);
+    std::unique_ptr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
+    std::vector<std::shared_ptr<DataType>> column_types{
         varchar_type,
         varchar_type,
     };
@@ -5389,7 +5389,7 @@ void PhysicalShow::ExecuteShowQuery(QueryContext *query_context, ShowOperatorSta
     output_block_ptr->Init(*output_types_);
 
     {
-        SizeT column_id = 0;
+        size_t column_id = 0;
         {
             Value value = Value::MakeVarchar("session_id");
             ValueExpression value_expr(value);
@@ -5405,7 +5405,7 @@ void PhysicalShow::ExecuteShowQuery(QueryContext *query_context, ShowOperatorSta
     }
 
     {
-        SizeT column_id = 0;
+        size_t column_id = 0;
         {
             Value value = Value::MakeVarchar("query_id");
             ValueExpression value_expr(value);
@@ -5421,7 +5421,7 @@ void PhysicalShow::ExecuteShowQuery(QueryContext *query_context, ShowOperatorSta
     }
 
     {
-        SizeT column_id = 0;
+        size_t column_id = 0;
         {
             Value value = Value::MakeVarchar("start_time");
             ValueExpression value_expr(value);
@@ -5437,7 +5437,7 @@ void PhysicalShow::ExecuteShowQuery(QueryContext *query_context, ShowOperatorSta
     }
 
     {
-        SizeT column_id = 0;
+        size_t column_id = 0;
         {
             Value value = Value::MakeVarchar("time_consumption");
             ValueExpression value_expr(value);
@@ -5453,7 +5453,7 @@ void PhysicalShow::ExecuteShowQuery(QueryContext *query_context, ShowOperatorSta
     }
 
     {
-        SizeT column_id = 0;
+        size_t column_id = 0;
         {
             Value value = Value::MakeVarchar("query_text");
             ValueExpression value_expr(value);
@@ -5474,20 +5474,20 @@ void PhysicalShow::ExecuteShowQuery(QueryContext *query_context, ShowOperatorSta
 }
 
 void PhysicalShow::ExecuteShowTransactions(QueryContext *query_context, ShowOperatorState *operator_state) {
-    auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
-    auto bigint_type = MakeShared<DataType>(LogicalType::kBigInt);
+    auto varchar_type = std::make_shared<DataType>(LogicalType::kVarchar);
+    auto bigint_type = std::make_shared<DataType>(LogicalType::kBigInt);
 
     // create data block for output state
-    Vector<SharedPtr<DataType>> column_types{
+    std::vector<std::shared_ptr<DataType>> column_types{
         bigint_type,
         varchar_type,
     };
 
-    UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
+    std::unique_ptr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
     output_block_ptr->Init(*output_types_);
-    SizeT row_count = 0;
+    size_t row_count = 0;
 
-    Vector<TxnInfo> txn_info_array;
+    std::vector<TxnInfo> txn_info_array;
     NewTxnManager *new_txn_manager = query_context->storage()->new_txn_manager();
     txn_info_array = new_txn_manager->GetTxnInfoArray();
 
@@ -5505,7 +5505,7 @@ void PhysicalShow::ExecuteShowTransactions(QueryContext *query_context, ShowOper
         }
         {
             // txn_text
-            String txn_string;
+            std::string txn_string;
             if (txn_info.txn_text_.get() != nullptr) {
                 txn_string = *txn_info.txn_text_;
             }
@@ -5529,7 +5529,7 @@ void PhysicalShow::ExecuteShowTransactions(QueryContext *query_context, ShowOper
 }
 
 void PhysicalShow::ExecuteShowTransaction(QueryContext *query_context, ShowOperatorState *operator_state) {
-    UniquePtr<TxnInfo> txn_info = nullptr;
+    std::unique_ptr<TxnInfo> txn_info = nullptr;
     NewTxnManager *new_txn_manager = query_context->storage()->new_txn_manager();
     txn_info = new_txn_manager->GetTxnInfoByID(*txn_id_);
 
@@ -5538,9 +5538,9 @@ void PhysicalShow::ExecuteShowTransaction(QueryContext *query_context, ShowOpera
         RecoverableError(status);
     }
 
-    auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
-    UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
-    Vector<SharedPtr<DataType>> column_types{
+    auto varchar_type = std::make_shared<DataType>(LogicalType::kVarchar);
+    std::unique_ptr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
+    std::vector<std::shared_ptr<DataType>> column_types{
         varchar_type,
         varchar_type,
     };
@@ -5548,7 +5548,7 @@ void PhysicalShow::ExecuteShowTransaction(QueryContext *query_context, ShowOpera
     output_block_ptr->Init(*output_types_);
 
     {
-        SizeT column_id = 0;
+        size_t column_id = 0;
         {
             Value value = Value::MakeVarchar("transaction_id");
             ValueExpression value_expr(value);
@@ -5564,7 +5564,7 @@ void PhysicalShow::ExecuteShowTransaction(QueryContext *query_context, ShowOpera
     }
 
     {
-        SizeT column_id = 0;
+        size_t column_id = 0;
         {
             Value value = Value::MakeVarchar("session_id");
             ValueExpression value_expr(value);
@@ -5580,7 +5580,7 @@ void PhysicalShow::ExecuteShowTransaction(QueryContext *query_context, ShowOpera
     }
 
     {
-        SizeT column_id = 0;
+        size_t column_id = 0;
         {
             Value value = Value::MakeVarchar("transaction_text");
             ValueExpression value_expr(value);
@@ -5589,7 +5589,7 @@ void PhysicalShow::ExecuteShowTransaction(QueryContext *query_context, ShowOpera
 
         ++column_id;
         {
-            String txn_string;
+            std::string txn_string;
             if (txn_info->txn_text_.get() != nullptr) {
                 txn_string = *txn_info->txn_text_;
             }
@@ -5605,17 +5605,17 @@ void PhysicalShow::ExecuteShowTransaction(QueryContext *query_context, ShowOpera
 }
 
 void PhysicalShow::ExecuteShowTransactionHistory(QueryContext *query_context, ShowOperatorState *operator_state) {
-    Vector<SharedPtr<TxnContext>> txn_context_histories;
+    std::vector<std::shared_ptr<TxnContext>> txn_context_histories;
     TransactionID this_txn_id;
     NewTxnManager *new_txn_manager = query_context->storage()->new_txn_manager();
     txn_context_histories = new_txn_manager->GetTxnContextHistories();
     NewTxn *txn = query_context->GetNewTxn();
     this_txn_id = txn->TxnID();
 
-    auto bigint_type = MakeShared<DataType>(LogicalType::kBigInt);
-    auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
-    UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
-    Vector<SharedPtr<DataType>> column_types{
+    auto bigint_type = std::make_shared<DataType>(LogicalType::kBigInt);
+    auto varchar_type = std::make_shared<DataType>(LogicalType::kVarchar);
+    std::unique_ptr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
+    std::vector<std::shared_ptr<DataType>> column_types{
         varchar_type,
         varchar_type,
         bigint_type,
@@ -5625,7 +5625,7 @@ void PhysicalShow::ExecuteShowTransactionHistory(QueryContext *query_context, Sh
         varchar_type,
     };
     output_block_ptr->Init(*output_types_);
-    SizeT row_count = 0;
+    size_t row_count = 0;
 
     for (const auto &txn_context : txn_context_histories) {
         if (output_block_ptr.get() == nullptr) {
@@ -5635,7 +5635,7 @@ void PhysicalShow::ExecuteShowTransactionHistory(QueryContext *query_context, Sh
 
         {
             // txn id
-            String txn_id_str;
+            std::string txn_id_str;
             if (this_txn_id == txn_context->txn_id_) {
                 txn_id_str = fmt::format("{}(this txn)", this_txn_id);
             } else {
@@ -5648,7 +5648,7 @@ void PhysicalShow::ExecuteShowTransactionHistory(QueryContext *query_context, Sh
 
         {
             // txn id
-            String txn_text;
+            std::string txn_text;
             if (txn_context->text_.get() != nullptr) {
                 txn_text = *txn_context->text_;
             }
@@ -5680,7 +5680,7 @@ void PhysicalShow::ExecuteShowTransactionHistory(QueryContext *query_context, Sh
 
         {
             // txn type
-            String transaction_type_str = "read";
+            std::string transaction_type_str = "read";
             if (txn_context->is_write_transaction_) {
                 transaction_type_str = "write";
             }
@@ -5692,7 +5692,7 @@ void PhysicalShow::ExecuteShowTransactionHistory(QueryContext *query_context, Sh
         {
             // txn operations
             std::stringstream ss;
-            Vector<SharedPtr<String>> operations;
+            std::vector<std::shared_ptr<std::string>> operations;
             for (const auto &ops : txn_context->operations_) {
                 ss << *ops << std::endl;
             }
@@ -5717,23 +5717,23 @@ void PhysicalShow::ExecuteShowTransactionHistory(QueryContext *query_context, Sh
 
 void PhysicalShow::ExecuteShowLogs(QueryContext *query_context, ShowOperatorState *operator_state) {
 
-    auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
-    auto bigint_type = MakeShared<DataType>(LogicalType::kBigInt);
+    auto varchar_type = std::make_shared<DataType>(LogicalType::kVarchar);
+    auto bigint_type = std::make_shared<DataType>(LogicalType::kBigInt);
 
     // create data block for output state
-    Vector<SharedPtr<DataType>> column_types{
+    std::vector<std::shared_ptr<DataType>> column_types{
         bigint_type,
         bigint_type,
         varchar_type,
         varchar_type,
     };
 
-    UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
+    std::unique_ptr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
     output_block_ptr->Init(*output_types_);
-    SizeT row_count = 0;
+    size_t row_count = 0;
 
     WalManager *wal_manager = query_context->storage()->wal_manager();
-    Vector<SharedPtr<WalEntry>> wal_entries = wal_manager->CollectWalEntries();
+    std::vector<std::shared_ptr<WalEntry>> wal_entries = wal_manager->CollectWalEntries();
     LOG_TRACE(fmt::format("WAL Entries count: {}", wal_entries.size()));
 
     for (const auto &wal_entry_ref : wal_entries) {
@@ -5759,7 +5759,7 @@ void PhysicalShow::ExecuteShowLogs(QueryContext *query_context, ShowOperatorStat
 
             {
                 // command_type
-                String command_type = WalCmd::WalCommandTypeToString(cmd_ref->GetType());
+                std::string command_type = WalCmd::WalCommandTypeToString(cmd_ref->GetType());
                 Value value = Value::MakeVarchar(command_type);
                 ValueExpression value_expr(value);
                 value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
@@ -5767,7 +5767,7 @@ void PhysicalShow::ExecuteShowLogs(QueryContext *query_context, ShowOperatorStat
 
             {
                 // command_text
-                String command_text = cmd_ref->ToString();
+                std::string command_text = cmd_ref->ToString();
                 Value value = Value::MakeVarchar(command_text);
                 ValueExpression value_expr(value);
                 value_expr.AppendToChunk(output_block_ptr->column_vectors[3]);
@@ -5789,7 +5789,7 @@ void PhysicalShow::ExecuteShowLogs(QueryContext *query_context, ShowOperatorStat
 }
 
 void PhysicalShow::ExecuteShowCatalog(QueryContext *query_context, ShowOperatorState *operator_state) {
-    auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
+    auto varchar_type = std::make_shared<DataType>(LogicalType::kVarchar);
 
     auto *new_catalog = query_context->storage()->new_catalog();
     auto meta_tree_ptr = new_catalog->MakeMetaTree();
@@ -5799,9 +5799,9 @@ void PhysicalShow::ExecuteShowCatalog(QueryContext *query_context, ShowOperatorS
     auto meta_str = meta_json.dump(json_intent);
 
     // create data block for output state
-    Vector<SharedPtr<DataType>> column_types{varchar_type};
+    std::vector<std::shared_ptr<DataType>> column_types{varchar_type};
 
-    UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
+    std::unique_ptr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
     output_block_ptr->Init(*output_types_);
     {
         Value value = Value::MakeVarchar(meta_str);
@@ -5813,9 +5813,9 @@ void PhysicalShow::ExecuteShowCatalog(QueryContext *query_context, ShowOperatorS
 }
 
 void PhysicalShow::ExecuteShowCatalogToFile(QueryContext *query_context, ShowOperatorState *operator_state) {
-    auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
+    auto varchar_type = std::make_shared<DataType>(LogicalType::kVarchar);
 
-    String status_message;
+    std::string status_message;
     if (std::filesystem::exists(*file_path_)) {
         status_message = fmt::format("'{}' already exists", *file_path_);
     } else {
@@ -5837,9 +5837,9 @@ void PhysicalShow::ExecuteShowCatalogToFile(QueryContext *query_context, ShowOpe
     }
 
     // create data block for output state
-    Vector<SharedPtr<DataType>> column_types{varchar_type};
+    std::vector<std::shared_ptr<DataType>> column_types{varchar_type};
 
-    UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
+    std::unique_ptr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
     output_block_ptr->Init(*output_types_);
     {
         Value value = Value::MakeVarchar(status_message);
@@ -5851,27 +5851,27 @@ void PhysicalShow::ExecuteShowCatalogToFile(QueryContext *query_context, ShowOpe
 }
 
 void PhysicalShow::ExecuteShowPersistenceFiles(QueryContext *query_context, ShowOperatorState *operator_state) {
-    auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
-    auto bigint_type = MakeShared<DataType>(LogicalType::kBigInt);
+    auto varchar_type = std::make_shared<DataType>(LogicalType::kVarchar);
+    auto bigint_type = std::make_shared<DataType>(LogicalType::kBigInt);
 
     // create data block for output state
-    Vector<SharedPtr<DataType>> column_types{
+    std::vector<std::shared_ptr<DataType>> column_types{
         varchar_type,
         varchar_type,
         bigint_type,
         bigint_type,
     };
 
-    UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
+    std::unique_ptr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
     output_block_ptr->Init(*output_types_);
-    SizeT row_count = 0;
+    size_t row_count = 0;
 
     PersistenceManager *persistence_manager = query_context->persistence_manager();
     if (persistence_manager == nullptr) {
         Status status = Status::FunctionIsDisable("Persistence");
         RecoverableError(status);
     }
-    HashMap<String, ObjAddr> file_map = persistence_manager->GetAllFiles();
+    std::unordered_map<std::string, ObjAddr> file_map = persistence_manager->GetAllFiles();
 
     for (const auto &file_pair : file_map) {
         if (output_block_ptr.get() == nullptr) {
@@ -5919,11 +5919,11 @@ void PhysicalShow::ExecuteShowPersistenceFiles(QueryContext *query_context, Show
 }
 
 void PhysicalShow::ExecuteShowPersistenceObjects(QueryContext *query_context, ShowOperatorState *operator_state) {
-    auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
-    auto bigint_type = MakeShared<DataType>(LogicalType::kBigInt);
+    auto varchar_type = std::make_shared<DataType>(LogicalType::kVarchar);
+    auto bigint_type = std::make_shared<DataType>(LogicalType::kBigInt);
 
     // create data block for output state
-    Vector<SharedPtr<DataType>> column_types{
+    std::vector<std::shared_ptr<DataType>> column_types{
         varchar_type,
         bigint_type,
         bigint_type,
@@ -5931,9 +5931,9 @@ void PhysicalShow::ExecuteShowPersistenceObjects(QueryContext *query_context, Sh
         varchar_type,
     };
 
-    UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
+    std::unique_ptr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
     output_block_ptr->Init(*output_types_);
-    SizeT row_count = 0;
+    size_t row_count = 0;
 
     PersistenceManager *persistence_manager = query_context->persistence_manager();
     if (persistence_manager == nullptr) {
@@ -5941,7 +5941,7 @@ void PhysicalShow::ExecuteShowPersistenceObjects(QueryContext *query_context, Sh
         RecoverableError(status);
     }
 
-    HashMap<String, ObjStat> object_map = persistence_manager->GetAllObjects();
+    std::unordered_map<std::string, ObjStat> object_map = persistence_manager->GetAllObjects();
     for (const auto &object_pair : object_map) {
         if (output_block_ptr.get() == nullptr) {
             output_block_ptr = DataBlock::MakeUniquePtr();
@@ -5978,7 +5978,7 @@ void PhysicalShow::ExecuteShowPersistenceObjects(QueryContext *query_context, Sh
             for (const auto &range : object_pair.second.deleted_ranges_) {
                 oss << fmt::format("[{}, {}) ", range.start_, range.end_);
             }
-            String deleted_ranges = oss.str();
+            std::string deleted_ranges = oss.str();
             Value value = Value::MakeVarchar(deleted_ranges);
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[4]);
@@ -5999,18 +5999,18 @@ void PhysicalShow::ExecuteShowPersistenceObjects(QueryContext *query_context, Sh
 }
 
 void PhysicalShow::ExecuteShowPersistenceObject(QueryContext *query_context, ShowOperatorState *operator_state) {
-    auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
-    auto bigint_type = MakeShared<DataType>(LogicalType::kBigInt);
+    auto varchar_type = std::make_shared<DataType>(LogicalType::kVarchar);
+    auto bigint_type = std::make_shared<DataType>(LogicalType::kBigInt);
 
     // create data block for output state
-    Vector<SharedPtr<DataType>> column_types{
+    std::vector<std::shared_ptr<DataType>> column_types{
         bigint_type,
         bigint_type,
     };
 
-    UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
+    std::unique_ptr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
     output_block_ptr->Init(*output_types_);
-    SizeT row_count = 0;
+    size_t row_count = 0;
 
     PersistenceManager *persistence_manager = query_context->persistence_manager();
     if (persistence_manager == nullptr) {
@@ -6018,7 +6018,7 @@ void PhysicalShow::ExecuteShowPersistenceObject(QueryContext *query_context, Sho
         RecoverableError(status);
     }
 
-    HashMap<String, ObjStat> object_map = persistence_manager->GetAllObjects();
+    std::unordered_map<std::string, ObjStat> object_map = persistence_manager->GetAllObjects();
     auto iter = object_map.find(*object_name_);
     if (iter == object_map.end()) {
         Status status = Status::FileNotFound(*object_name_);
@@ -6060,9 +6060,9 @@ void PhysicalShow::ExecuteShowPersistenceObject(QueryContext *query_context, Sho
 
 void PhysicalShow::ExecuteShowMemory(QueryContext *query_context, ShowOperatorState *operator_state) {
 
-    auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
-    UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
-    Vector<SharedPtr<DataType>> column_types{
+    auto varchar_type = std::make_shared<DataType>(LogicalType::kVarchar);
+    std::unique_ptr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
+    std::vector<std::shared_ptr<DataType>> column_types{
         varchar_type,
         varchar_type,
     };
@@ -6070,7 +6070,7 @@ void PhysicalShow::ExecuteShowMemory(QueryContext *query_context, ShowOperatorSt
     output_block_ptr->Init(*output_types_);
 
     {
-        SizeT column_id = 0;
+        size_t column_id = 0;
         {
             Value value = Value::MakeVarchar("memory_objects");
             ValueExpression value_expr(value);
@@ -6086,7 +6086,7 @@ void PhysicalShow::ExecuteShowMemory(QueryContext *query_context, ShowOperatorSt
     }
 
     {
-        SizeT column_id = 0;
+        size_t column_id = 0;
         {
             Value value = Value::MakeVarchar("memory_allocation");
             ValueExpression value_expr(value);
@@ -6107,20 +6107,20 @@ void PhysicalShow::ExecuteShowMemory(QueryContext *query_context, ShowOperatorSt
 }
 
 void PhysicalShow::ExecuteShowMemoryObjects(QueryContext *query_context, ShowOperatorState *operator_state) {
-    auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
-    auto bigint_type = MakeShared<DataType>(LogicalType::kBigInt);
+    auto varchar_type = std::make_shared<DataType>(LogicalType::kVarchar);
+    auto bigint_type = std::make_shared<DataType>(LogicalType::kBigInt);
 
     // create data block for output state
-    Vector<SharedPtr<DataType>> column_types{
+    std::vector<std::shared_ptr<DataType>> column_types{
         varchar_type,
         bigint_type,
     };
 
-    UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
+    std::unique_ptr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
     output_block_ptr->Init(*output_types_);
 
-    std::unordered_map<String, i64> object_map = GlobalResourceUsage::GetObjectClones();
-    SizeT row_count = 0;
+    std::unordered_map<std::string, i64> object_map = GlobalResourceUsage::GetObjectClones();
+    size_t row_count = 0;
 
     for (auto &object_pair : object_map) {
         if (output_block_ptr.get() == nullptr) {
@@ -6158,20 +6158,20 @@ void PhysicalShow::ExecuteShowMemoryObjects(QueryContext *query_context, ShowOpe
 }
 
 void PhysicalShow::ExecuteShowMemoryAllocation(QueryContext *query_context, ShowOperatorState *operator_state) {
-    auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
-    auto bigint_type = MakeShared<DataType>(LogicalType::kBigInt);
+    auto varchar_type = std::make_shared<DataType>(LogicalType::kVarchar);
+    auto bigint_type = std::make_shared<DataType>(LogicalType::kBigInt);
 
     // create data block for output state
-    Vector<SharedPtr<DataType>> column_types{
+    std::vector<std::shared_ptr<DataType>> column_types{
         varchar_type,
         bigint_type,
     };
 
-    UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
+    std::unique_ptr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
     output_block_ptr->Init(*output_types_);
 
-    std::unordered_map<String, i64> raw_memory_map = GlobalResourceUsage::GetRawMemoryClone();
-    SizeT row_count = 0;
+    std::unordered_map<std::string, i64> raw_memory_map = GlobalResourceUsage::GetRawMemoryClone();
+    size_t row_count = 0;
 
     for (auto &raw_memory_pair : raw_memory_map) {
         if (output_block_ptr.get() == nullptr) {
@@ -6209,21 +6209,21 @@ void PhysicalShow::ExecuteShowMemoryAllocation(QueryContext *query_context, Show
 
 void PhysicalShow::ExecuteShowFunction(QueryContext *query_context, ShowOperatorState *operator_state) {
 
-    auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
+    auto varchar_type = std::make_shared<DataType>(LogicalType::kVarchar);
 
     // create data block for output state
-    Vector<SharedPtr<DataType>> column_types{
+    std::vector<std::shared_ptr<DataType>> column_types{
         varchar_type,
     };
 
-    UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
+    std::unique_ptr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
     output_block_ptr->Init(*output_types_);
 
-    String function_name = *function_name_;
+    std::string function_name = *function_name_;
     ToLower(function_name);
     if (function_name == "server_version") {
 
-        String version_info =
+        std::string version_info =
             fmt::format("{}.{}.{} {} {} {}", version_major(), version_minor(), version_patch(), system_build_time(), build_type(), git_commit_id());
         {
             // name
@@ -6251,18 +6251,18 @@ void PhysicalShow::ExecuteShowFunction(QueryContext *query_context, ShowOperator
 }
 
 void PhysicalShow::ExecuteListSnapshots(QueryContext *query_context, ShowOperatorState *operator_state) {
-    auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
-    auto bigint_type = MakeShared<DataType>(LogicalType::kBigInt);
-    UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
+    auto varchar_type = std::make_shared<DataType>(LogicalType::kVarchar);
+    auto bigint_type = std::make_shared<DataType>(LogicalType::kBigInt);
+    std::unique_ptr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
 
-    Vector<SharedPtr<DataType>> column_types{varchar_type, varchar_type, varchar_type, bigint_type, varchar_type};
+    std::vector<std::shared_ptr<DataType>> column_types{varchar_type, varchar_type, varchar_type, bigint_type, varchar_type};
 
     output_block_ptr->Init(*output_types_);
 
-    String snapshot_dir = query_context->global_config()->SnapshotDir();
-    Vector<SnapshotBrief> snapshot_list = SnapshotBrief::GetSnapshots(snapshot_dir);
+    std::string snapshot_dir = query_context->global_config()->SnapshotDir();
+    std::vector<SnapshotBrief> snapshot_list = SnapshotBrief::GetSnapshots(snapshot_dir);
 
-    SizeT row_count = 0;
+    size_t row_count = 0;
     for (auto &snapshot_brief : snapshot_list) {
         if (output_block_ptr.get() == nullptr) {
             output_block_ptr = DataBlock::MakeUniquePtr();
@@ -6278,7 +6278,7 @@ void PhysicalShow::ExecuteListSnapshots(QueryContext *query_context, ShowOperato
 
         {
             // scope
-            String scope_str;
+            std::string scope_str;
             switch (snapshot_brief.scope_) {
                 case SnapshotScope::kTable: {
                     scope_str = "Table";
@@ -6322,7 +6322,7 @@ void PhysicalShow::ExecuteListSnapshots(QueryContext *query_context, ShowOperato
 
         {
             // snapshot size
-            String snapshot_size_str = Utility::FormatByteSize(snapshot_brief.size_);
+            std::string snapshot_size_str = Utility::FormatByteSize(snapshot_brief.size_);
             Value value = Value::MakeVarchar(snapshot_size_str);
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[4]);
@@ -6343,17 +6343,17 @@ void PhysicalShow::ExecuteListSnapshots(QueryContext *query_context, ShowOperato
 }
 
 void PhysicalShow::ExecuteShowSnapshot(QueryContext *query_context, ShowOperatorState *operator_state) {
-    auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
-    UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
-    Vector<SharedPtr<DataType>> column_types{
+    auto varchar_type = std::make_shared<DataType>(LogicalType::kVarchar);
+    std::unique_ptr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
+    std::vector<std::shared_ptr<DataType>> column_types{
         varchar_type,
         varchar_type,
     };
 
     output_block_ptr->Init(*output_types_);
 
-    String snapshot_dir = query_context->global_config()->SnapshotDir();
-    Vector<SnapshotBrief> snapshot_list = SnapshotBrief::GetSnapshots(snapshot_dir);
+    std::string snapshot_dir = query_context->global_config()->SnapshotDir();
+    std::vector<SnapshotBrief> snapshot_list = SnapshotBrief::GetSnapshots(snapshot_dir);
 
     SnapshotBrief snapshot_brief;
     for (const auto &ss_brief : snapshot_list) {
@@ -6368,7 +6368,7 @@ void PhysicalShow::ExecuteShowSnapshot(QueryContext *query_context, ShowOperator
     }
 
     {
-        SizeT column_id = 0;
+        size_t column_id = 0;
         {
             Value value = Value::MakeVarchar("snapshot_name");
             ValueExpression value_expr(value);
@@ -6384,7 +6384,7 @@ void PhysicalShow::ExecuteShowSnapshot(QueryContext *query_context, ShowOperator
     }
 
     {
-        SizeT column_id = 0;
+        size_t column_id = 0;
         {
             Value value = Value::MakeVarchar("snapshot_scope");
             ValueExpression value_expr(value);
@@ -6393,7 +6393,7 @@ void PhysicalShow::ExecuteShowSnapshot(QueryContext *query_context, ShowOperator
 
         ++column_id;
         {
-            String scope_str;
+            std::string scope_str;
             switch (snapshot_brief.scope_) {
                 case SnapshotScope::kTable: {
                     scope_str = "Table";
@@ -6424,7 +6424,7 @@ void PhysicalShow::ExecuteShowSnapshot(QueryContext *query_context, ShowOperator
     }
 
     {
-        SizeT column_id = 0;
+        size_t column_id = 0;
         {
             Value value = Value::MakeVarchar("create_time");
             ValueExpression value_expr(value);
@@ -6440,7 +6440,7 @@ void PhysicalShow::ExecuteShowSnapshot(QueryContext *query_context, ShowOperator
     }
 
     {
-        SizeT column_id = 0;
+        size_t column_id = 0;
         {
             Value value = Value::MakeVarchar("commit_timestamp");
             ValueExpression value_expr(value);
@@ -6456,7 +6456,7 @@ void PhysicalShow::ExecuteShowSnapshot(QueryContext *query_context, ShowOperator
     }
 
     {
-        SizeT column_id = 0;
+        size_t column_id = 0;
         {
             Value value = Value::MakeVarchar("snapshot_size");
             ValueExpression value_expr(value);
@@ -6465,7 +6465,7 @@ void PhysicalShow::ExecuteShowSnapshot(QueryContext *query_context, ShowOperator
 
         ++column_id;
         {
-            String snapshot_size_str = Utility::FormatByteSize(snapshot_brief.size_);
+            std::string snapshot_size_str = Utility::FormatByteSize(snapshot_brief.size_);
             Value value = Value::MakeVarchar(snapshot_size_str);
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);

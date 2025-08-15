@@ -73,10 +73,10 @@ void FragmentTask::OnExecute() {
     Status operator_status{};
     if (source_state_->status_.ok()) {
         // No source error
-        Vector<PhysicalOperator *> &operator_refs = fragment_context->GetOperators();
+        std::vector<PhysicalOperator *> &operator_refs = fragment_context->GetOperators();
 
         TaskProfiler profiler(TaskBinding(), explain_analyze, operator_count_);
-        HashMap<SizeT, SharedPtr<BaseTableRef>> table_refs;
+        std::unordered_map<size_t, std::shared_ptr<BaseTableRef>> table_refs;
         profiler.Begin();
         try {
             for (i64 op_idx = operator_count_ - 1; op_idx >= 0; --op_idx) {
@@ -171,7 +171,7 @@ bool FragmentTask::CompleteTask() {
         if (status_ == FragmentTaskStatus::kRunning) {
             status_ = FragmentTaskStatus::kFinished;
         } else if (status_ != FragmentTaskStatus::kError) {
-            String error_message = "Status should be an error status";
+            std::string error_message = "Status should be an error status";
             UnrecoverableError(error_message);
         }
     }
@@ -180,10 +180,10 @@ bool FragmentTask::CompleteTask() {
     return fragment_context->TryFinishFragment();
 }
 
-String FragmentTask::PhysOpsToString() {
+std::string FragmentTask::PhysOpsToString() {
     std::stringstream ss;
 
-    for (const UniquePtr<OperatorState> &op : operator_states_) {
+    for (const std::unique_ptr<OperatorState> &op : operator_states_) {
         ss << PhysicalOperatorToString(op->operator_type_) << " ";
     }
     return ss.str();

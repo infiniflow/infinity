@@ -83,9 +83,9 @@ import logical_type;
 
 namespace infinity {
 
-UniquePtr<BoundSelectStatement> QueryBinder::BindSelect(const SelectStatement &statement) {
+std::unique_ptr<BoundSelectStatement> QueryBinder::BindSelect(const SelectStatement &statement) {
 
-    UniquePtr<BoundSelectStatement> bound_select_statement = BoundSelectStatement::Make(bind_context_ptr_);
+    std::unique_ptr<BoundSelectStatement> bound_select_statement = BoundSelectStatement::Make(bind_context_ptr_);
 
     if (statement.select_list_ == nullptr) {
         UnrecoverableError("SELECT list is needed");
@@ -98,15 +98,15 @@ UniquePtr<BoundSelectStatement> QueryBinder::BindSelect(const SelectStatement &s
     if (statement.with_exprs_ != nullptr) {
 
         // Prepare to store the with statement
-        SizeT with_stmt_count = statement.with_exprs_->size();
+        size_t with_stmt_count = statement.with_exprs_->size();
         bind_context_ptr_->CTE_map_.reserve(with_stmt_count);
 
         // Hash set to restrict the with statement name visibility
-        HashSet<String> masked_name_set;
+        std::unordered_set<std::string> masked_name_set;
 
         for (i64 i = with_stmt_count - 1; i >= 0; --i) {
             WithExpr *with_expr = (*statement.with_exprs_)[i];
-            String name = with_expr->alias_;
+            std::string name = with_expr->alias_;
             if (bind_context_ptr_->CTE_map_.contains(name)) {
                 Status status = Status::SyntaxError(fmt::format("WITH query table_name: {} occurs more than once.", name));
                 RecoverableError(status);
@@ -118,8 +118,8 @@ UniquePtr<BoundSelectStatement> QueryBinder::BindSelect(const SelectStatement &s
             }
 
             masked_name_set.insert(name);
-            SharedPtr<CommonTableExpressionInfo> cte_info_ptr =
-                MakeShared<CommonTableExpressionInfo>(name, (SelectStatement *)(with_expr->select_), masked_name_set);
+            std::shared_ptr<CommonTableExpressionInfo> cte_info_ptr =
+                std::make_shared<CommonTableExpressionInfo>(name, (SelectStatement *)(with_expr->select_), masked_name_set);
 
             bind_context_ptr_->CTE_map_[name] = cte_info_ptr;
         }
@@ -141,8 +141,8 @@ UniquePtr<BoundSelectStatement> QueryBinder::BindSelect(const SelectStatement &s
     // Star expression will be unfolded and bound as column expressions.
     UnfoldStarExpression(query_context_ptr_, *statement.select_list_, bind_context_ptr_->select_expression_);
 
-    SizeT select_column_count = bind_context_ptr_->select_expression_.size();
-    for (SizeT column_index = 0; column_index < select_column_count; ++column_index) {
+    size_t select_column_count = bind_context_ptr_->select_expression_.size();
+    for (size_t column_index = 0; column_index < select_column_count; ++column_index) {
         const ParsedExpr *select_expr = bind_context_ptr_->select_expression_[column_index];
 
         // Check if select expression has alias.
@@ -166,7 +166,7 @@ UniquePtr<BoundSelectStatement> QueryBinder::BindSelect(const SelectStatement &s
                 RecoverableError(status);
             }
 
-            String select_expr_name = select_expr->ToString();
+            std::string select_expr_name = select_expr->ToString();
             if ((not bind_context_ptr_->select_expr_name2index_.contains(select_expr_name)) and
                 bind_context_ptr_->binding_names_by_column_.contains(select_expr_name)) {
                 select_expr_name = fmt::format("{}.{}", bind_context_ptr_->binding_names_by_column_[select_expr_name][0], select_expr_name);
@@ -182,21 +182,21 @@ UniquePtr<BoundSelectStatement> QueryBinder::BindSelect(const SelectStatement &s
         }
     }
 
-    SharedPtr<BindAliasProxy> bind_alias_proxy = MakeShared<BindAliasProxy>();
+    std::shared_ptr<BindAliasProxy> bind_alias_proxy = std::make_shared<BindAliasProxy>();
 
     // 6.1 SEARCH
     if (statement.search_expr_ != nullptr) {
         bind_context_ptr_->BoundSearch(statement.search_expr_);
 
-        auto where_binder = MakeShared<WhereBinder>(query_context_ptr_, bind_alias_proxy);
-        SharedPtr<BaseExpression> search_expr = where_binder->Bind(*statement.search_expr_, this->bind_context_ptr_.get(), 0, true);
+        auto where_binder = std::make_shared<WhereBinder>(query_context_ptr_, bind_alias_proxy);
+        std::shared_ptr<BaseExpression> search_expr = where_binder->Bind(*statement.search_expr_, this->bind_context_ptr_.get(), 0, true);
         bound_select_statement->search_expr_ = static_pointer_cast<SearchExpression>(search_expr);
     }
 
     // 6.2 WHERE
     if (statement.where_expr_) {
-        auto where_binder = MakeShared<WhereBinder>(query_context_ptr_, bind_alias_proxy);
-        SharedPtr<BaseExpression> where_expr = where_binder->Bind(*statement.where_expr_, this->bind_context_ptr_.get(), 0, true);
+        auto where_binder = std::make_shared<WhereBinder>(query_context_ptr_, bind_alias_proxy);
+        std::shared_ptr<BaseExpression> where_expr = where_binder->Bind(*statement.where_expr_, this->bind_context_ptr_.get(), 0, true);
         if (where_expr->Type().type() != LogicalType::kBoolean) {
             Status status = Status::InvalidFilterExpression(where_expr->Type().ToString());
             RecoverableError(status);
@@ -227,13 +227,13 @@ UniquePtr<BoundSelectStatement> QueryBinder::BindSelect(const SelectStatement &s
     // 12. highlight list
     if (statement.highlight_list_ != nullptr) {
         for (auto *highlight_expr : *statement.highlight_list_) {
-            const String &column_name = highlight_expr->GetName();
+            const std::string &column_name = highlight_expr->GetName();
             if (!(bind_context_ptr_->project_index_by_name_.contains(column_name))) {
                 Status status = Status::InvalidColumnName(fmt::format("Highlight column: {} not found in select list", column_name));
                 RecoverableError(status);
             }
-            SizeT column_id = bind_context_ptr_->project_index_by_name_[column_name];
-            bound_select_statement->highlight_columns_.emplace(column_id, MakeShared<HighlightInfo>());
+            size_t column_id = bind_context_ptr_->project_index_by_name_[column_name];
+            bound_select_statement->highlight_columns_.emplace(column_id, std::make_shared<HighlightInfo>());
         }
     }
 
@@ -269,9 +269,9 @@ UniquePtr<BoundSelectStatement> QueryBinder::BindSelect(const SelectStatement &s
     return bound_select_statement;
 }
 
-SharedPtr<TableRef> QueryBinder::BuildFromClause(QueryContext *query_context, const BaseTableReference *table_ref) {
+std::shared_ptr<TableRef> QueryBinder::BuildFromClause(QueryContext *query_context, const BaseTableReference *table_ref) {
 
-    SharedPtr<TableRef> result = nullptr;
+    std::shared_ptr<TableRef> result = nullptr;
     switch (table_ref->type_) {
         case TableRefType::kTable: {
             // Only one table: select * from t1;
@@ -308,9 +308,9 @@ SharedPtr<TableRef> QueryBinder::BuildFromClause(QueryContext *query_context, co
     return result;
 }
 
-SharedPtr<TableRef> QueryBinder::BuildDummyTable(QueryContext *) { return nullptr; }
+std::shared_ptr<TableRef> QueryBinder::BuildDummyTable(QueryContext *) { return nullptr; }
 
-SharedPtr<TableRef> QueryBinder::BuildTable(QueryContext *query_context, const TableReference *from_table) {
+std::shared_ptr<TableRef> QueryBinder::BuildTable(QueryContext *query_context, const TableReference *from_table) {
     // There are five cases here:
     // CTE*, which is subquery (may include correlated expression).
     // Recursive CTE (not supported by parser.)
@@ -324,21 +324,21 @@ SharedPtr<TableRef> QueryBinder::BuildTable(QueryContext *query_context, const T
     // If schema is null, it may from CTE
     // else the table will be checked in catalog
 
-    String schema_name{};
+    std::string schema_name{};
     if (from_table->db_name_.empty()) {
         // Before find the table meta from catalog, Attempt to get CTE info from bind context which saved CTE info into before.
-        if (SharedPtr<TableRef> cte_ref = BuildCTE(query_context, from_table->table_name_); cte_ref.get() != nullptr) {
+        if (std::shared_ptr<TableRef> cte_ref = BuildCTE(query_context, from_table->table_name_); cte_ref.get() != nullptr) {
             return cte_ref;
         }
     }
 
     // Base Table
-    if (SharedPtr<TableRef> base_table_ref = BuildBaseTable(query_context, from_table); base_table_ref.get() != nullptr) {
+    if (std::shared_ptr<TableRef> base_table_ref = BuildBaseTable(query_context, from_table); base_table_ref.get() != nullptr) {
         return base_table_ref;
     }
 
     // View
-    if (SharedPtr<TableRef> view_ref = BuildView(query_context, from_table); view_ref.get() != nullptr) {
+    if (std::shared_ptr<TableRef> view_ref = BuildView(query_context, from_table); view_ref.get() != nullptr) {
         return view_ref;
     }
 
@@ -347,26 +347,26 @@ SharedPtr<TableRef> QueryBinder::BuildTable(QueryContext *query_context, const T
     return nullptr;
 }
 
-SharedPtr<TableRef> QueryBinder::BuildSubquery(QueryContext *, const SubqueryReference *subquery_ref) {
+std::shared_ptr<TableRef> QueryBinder::BuildSubquery(QueryContext *, const SubqueryReference *subquery_ref) {
     // Create new bind context and add into context array;
-    SharedPtr<BindContext> subquery_bind_context_ptr = BindContext::Make(this->bind_context_ptr_);
+    std::shared_ptr<BindContext> subquery_bind_context_ptr = BindContext::Make(this->bind_context_ptr_);
 
     // Create bound select node and subquery table reference
     QueryBinder subquery_binder(this->query_context_ptr_, subquery_bind_context_ptr);
-    UniquePtr<BoundSelectStatement> bound_statement_ptr = subquery_binder.BindSelect(*subquery_ref->select_statement_);
+    std::unique_ptr<BoundSelectStatement> bound_statement_ptr = subquery_binder.BindSelect(*subquery_ref->select_statement_);
 
     // Get the subquery result table index as the new from table index
     u64 subquery_table_index = bound_statement_ptr->result_index_;
 
-    String binding_name;
+    std::string binding_name;
     if (subquery_ref->alias_ == nullptr) {
         binding_name = "subquery" + std::to_string(subquery_table_index);
     } else {
         binding_name = subquery_ref->alias_->alias_;
         if (subquery_ref->alias_->column_alias_array_ != nullptr) {
             // Column alias
-            SizeT column_count = subquery_ref->alias_->column_alias_array_->size();
-            for (SizeT idx = 0; idx < column_count; ++idx) {
+            size_t column_count = subquery_ref->alias_->column_alias_array_->size();
+            for (size_t idx = 0; idx < column_count; ++idx) {
                 bound_statement_ptr->names_ptr_->at(idx) = subquery_ref->alias_->column_alias_array_->at(idx);
             }
         }
@@ -376,15 +376,15 @@ SharedPtr<TableRef> QueryBinder::BuildSubquery(QueryContext *, const SubqueryRef
     this->bind_context_ptr_->AddSubqueryBinding(binding_name, subquery_table_index, bound_statement_ptr->types_ptr_, bound_statement_ptr->names_ptr_);
 
     // Use binding name as the subquery table reference name
-    auto subquery_table_ref_ptr = MakeShared<SubqueryTableRef>(std::move(bound_statement_ptr), subquery_table_index, binding_name);
+    auto subquery_table_ref_ptr = std::make_shared<SubqueryTableRef>(std::move(bound_statement_ptr), subquery_table_index, binding_name);
 
     // TODO: Not care about the correlated expression
 
     return subquery_table_ref_ptr;
 }
 
-SharedPtr<TableRef> QueryBinder::BuildCTE(QueryContext *, const String &name) {
-    SharedPtr<CommonTableExpressionInfo> cte = this->bind_context_ptr_->GetCTE(name);
+std::shared_ptr<TableRef> QueryBinder::BuildCTE(QueryContext *, const std::string &name) {
+    std::shared_ptr<CommonTableExpressionInfo> cte = this->bind_context_ptr_->GetCTE(name);
     if (cte.get() == nullptr) {
         return nullptr;
     }
@@ -401,65 +401,65 @@ SharedPtr<TableRef> QueryBinder::BuildCTE(QueryContext *, const String &name) {
     this->bind_context_ptr_->BoundCTE(cte);
 
     // Create new bind context and add into context array;
-    SharedPtr<BindContext> subquery_bind_context_ptr = BindContext::Make(this->bind_context_ptr_);
+    std::shared_ptr<BindContext> subquery_bind_context_ptr = BindContext::Make(this->bind_context_ptr_);
 
     // Create bound select node and subquery table reference
     QueryBinder subquery_binder(this->query_context_ptr_, subquery_bind_context_ptr);
-    UniquePtr<BoundSelectStatement> bound_statement_ptr = subquery_binder.BindSelect(*cte->select_statement_);
+    std::unique_ptr<BoundSelectStatement> bound_statement_ptr = subquery_binder.BindSelect(*cte->select_statement_);
 
     u64 cte_table_index = bound_statement_ptr->result_index_;
     // Add binding into bind context
     this->bind_context_ptr_->AddCTEBinding(name, cte_table_index, bound_statement_ptr->types_ptr_, bound_statement_ptr->names_ptr_);
 
     // Use CTE name as the subquery table reference name
-    auto cte_table_ref_ptr = MakeShared<SubqueryTableRef>(std::move(bound_statement_ptr), cte_table_index, name);
+    auto cte_table_ref_ptr = std::make_shared<SubqueryTableRef>(std::move(bound_statement_ptr), cte_table_index, name);
 
     // TODO: Not care about the correlated expression
 
     return cte_table_ref_ptr;
 }
 
-SharedPtr<BaseTableRef> QueryBinder::BuildBaseTable(QueryContext *query_context, const TableReference *from_table, bool update) {
-    String db_name;
+std::shared_ptr<BaseTableRef> QueryBinder::BuildBaseTable(QueryContext *query_context, const TableReference *from_table, bool update) {
+    std::string db_name;
     if (from_table->db_name_.empty()) {
         db_name = query_context->schema_name();
     } else {
         db_name = from_table->db_name_;
     }
-    const String &table_name = from_table->table_name_;
+    const std::string &table_name = from_table->table_name_;
 
-    SharedPtr<TableInfo> table_info;
+    std::shared_ptr<TableInfo> table_info;
     Status status;
     NewTxn *new_txn = query_context->GetNewTxn();
-    Optional<DBMeeta> db_meta;
-    Optional<TableMeeta> tmp_table_meta;
+    std::optional<DBMeeta> db_meta;
+    std::optional<TableMeeta> tmp_table_meta;
     status = new_txn->GetTableMeta(db_name, table_name, db_meta, tmp_table_meta);
     if (!status.ok()) {
         RecoverableError(status);
     }
-    auto table_meta = MakeUnique<TableMeeta>(tmp_table_meta->db_id_str(),
+    auto table_meta = std::make_unique<TableMeeta>(tmp_table_meta->db_id_str(),
                                              tmp_table_meta->table_id_str(),
                                              tmp_table_meta->kv_instance(),
                                              tmp_table_meta->begin_ts(),
                                              tmp_table_meta->commit_ts());
-    table_info = MakeShared<TableInfo>();
+    table_info = std::make_shared<TableInfo>();
     status = table_meta->GetTableInfo(*table_info);
     if (!status.ok()) {
         RecoverableError(status);
     }
-    table_info->db_name_ = MakeShared<String>(db_name);
-    table_info->table_name_ = MakeShared<String>(table_name);
+    table_info->db_name_ = std::make_shared<std::string>(db_name);
+    table_info->table_name_ = std::make_shared<std::string>(table_name);
 
-    String alias = from_table->GetTableName();
-    SharedPtr<Vector<SharedPtr<DataType>>> types_ptr = MakeShared<Vector<SharedPtr<DataType>>>();
-    SharedPtr<Vector<String>> names_ptr = MakeShared<Vector<String>>();
-    Vector<SizeT> columns;
+    std::string alias = from_table->GetTableName();
+    std::shared_ptr<std::vector<std::shared_ptr<DataType>>> types_ptr = std::make_shared<std::vector<std::shared_ptr<DataType>>>();
+    std::shared_ptr<std::vector<std::string>> names_ptr = std::make_shared<std::vector<std::string>>();
+    std::vector<size_t> columns;
 
-    SizeT column_count = table_info->column_count_;
+    size_t column_count = table_info->column_count_;
     types_ptr->reserve(column_count);
     names_ptr->reserve(column_count);
     columns.reserve(column_count);
-    for (SizeT idx = 0; idx < column_count; ++idx) {
+    for (size_t idx = 0; idx < column_count; ++idx) {
         const ColumnDef *column_def = table_info->column_defs_[idx].get();
         types_ptr->emplace_back(column_def->column_type_);
         names_ptr->emplace_back(column_def->name_);
@@ -474,12 +474,12 @@ SharedPtr<BaseTableRef> QueryBinder::BuildBaseTable(QueryContext *query_context,
         }
     }
 
-    SharedPtr<BlockIndex> block_index;
-    block_index = MakeShared<BlockIndex>();
+    std::shared_ptr<BlockIndex> block_index;
+    block_index = std::make_shared<BlockIndex>();
     block_index->NewInit(std::move(table_meta));
 
     u64 table_index = bind_context_ptr_->GenerateTableIndex();
-    auto table_ref = MakeShared<BaseTableRef>(table_info, std::move(columns), block_index, alias, table_index, names_ptr, types_ptr);
+    auto table_ref = std::make_shared<BaseTableRef>(table_info, std::move(columns), block_index, alias, table_index, names_ptr, types_ptr);
 
     // Insert the table in the binding context
     this->bind_context_ptr_->AddTableBinding(alias, table_index, table_info, std::move(types_ptr), std::move(names_ptr), std::move(block_index));
@@ -487,7 +487,7 @@ SharedPtr<BaseTableRef> QueryBinder::BuildBaseTable(QueryContext *query_context,
     return table_ref;
 }
 
-SharedPtr<TableRef> QueryBinder::BuildView(QueryContext *query_context, const TableReference *from_table) {
+std::shared_ptr<TableRef> QueryBinder::BuildView(QueryContext *query_context, const TableReference *from_table) {
     //    BaseEntry *base_view_entry{nullptr};
     //    ViewEntry *view_entry = static_cast<ViewEntry *>(base_view_entry);
     //
@@ -501,11 +501,11 @@ SharedPtr<TableRef> QueryBinder::BuildView(QueryContext *query_context, const Ta
     //    const SelectStatement *select_stmt_ptr = view_entry->GetSQLStatement();
     //
     //    // Create new bind context and add into context array;
-    //    SharedPtr<BindContext> view_bind_context_ptr = BindContext::Make(this->bind_context_ptr_);
+    //    std::shared_ptr<BindContext> view_bind_context_ptr = BindContext::Make(this->bind_context_ptr_);
     //
     //    // Create bound select node and subquery table reference
     //    QueryBinder subquery_binder(this->query_context_ptr_, view_bind_context_ptr);
-    //    UniquePtr<BoundSelectStatement> bound_statement_ptr = subquery_binder.BindSelect(*select_stmt_ptr);
+    //    std::unique_ptr<BoundSelectStatement> bound_statement_ptr = subquery_binder.BindSelect(*select_stmt_ptr);
     //
     //    // View table index is the output index of view.
     //    u64 view_index = bound_statement_ptr->result_index_;
@@ -515,7 +515,7 @@ SharedPtr<TableRef> QueryBinder::BuildView(QueryContext *query_context, const Ta
     //
     //    // Use view name as the subquery table reference name
     //    auto subquery_table_ref_ptr =
-    //        MakeShared<SubqueryTableRef>(std::move(bound_statement_ptr), bind_context_ptr_->GenerateTableIndex(), from_table->table_name_);
+    //        std::make_shared<SubqueryTableRef>(std::move(bound_statement_ptr), bind_context_ptr_->GenerateTableIndex(), from_table->table_name_);
     //
     //    // TODO: Not care about the correlated expression
     //
@@ -524,17 +524,17 @@ SharedPtr<TableRef> QueryBinder::BuildView(QueryContext *query_context, const Ta
     return nullptr;
 }
 
-SharedPtr<TableRef> QueryBinder::BuildCrossProduct(QueryContext *query_context, const CrossProductReference *from_table) {
-    const Vector<BaseTableReference *> &tables = from_table->tables_;
+std::shared_ptr<TableRef> QueryBinder::BuildCrossProduct(QueryContext *query_context, const CrossProductReference *from_table) {
+    const std::vector<BaseTableReference *> &tables = from_table->tables_;
 
-    Vector<SharedPtr<BindContext>> bind_contexts;
+    std::vector<std::shared_ptr<BindContext>> bind_contexts;
     {
-        SharedPtr<BindContext> current_bind_context = this->bind_context_ptr_;
-        SizeT table_count = tables.size();
+        std::shared_ptr<BindContext> current_bind_context = this->bind_context_ptr_;
+        size_t table_count = tables.size();
         bind_contexts.reserve(table_count * 2);
-        for (SizeT i = 0; i < table_count - 1; ++i) {
-            SharedPtr<BindContext> right_bind_context = BindContext::Make(current_bind_context);
-            SharedPtr<BindContext> left_bind_context = BindContext::Make(current_bind_context);
+        for (size_t i = 0; i < table_count - 1; ++i) {
+            std::shared_ptr<BindContext> right_bind_context = BindContext::Make(current_bind_context);
+            std::shared_ptr<BindContext> left_bind_context = BindContext::Make(current_bind_context);
             bind_contexts.emplace_back(right_bind_context);
             bind_contexts.emplace_back(left_bind_context);
 
@@ -542,31 +542,31 @@ SharedPtr<TableRef> QueryBinder::BuildCrossProduct(QueryContext *query_context, 
         }
     }
 
-    SizeT bind_context_idx = bind_contexts.size() - 1;
+    size_t bind_context_idx = bind_contexts.size() - 1;
 
-    SharedPtr<CrossProductTableRef> cross_product_table_ref{};
+    std::shared_ptr<CrossProductTableRef> cross_product_table_ref{};
 
-    SharedPtr<BindContext> left_bind_context = bind_contexts[bind_context_idx--];
-    UniquePtr<QueryBinder> left_query_binder = MakeUnique<QueryBinder>(query_context, left_bind_context);
-    SharedPtr<TableRef> left_table_ref = left_query_binder->BuildFromClause(query_context, tables[0]);
+    std::shared_ptr<BindContext> left_bind_context = bind_contexts[bind_context_idx--];
+    std::unique_ptr<QueryBinder> left_query_binder = std::make_unique<QueryBinder>(query_context, left_bind_context);
+    std::shared_ptr<TableRef> left_table_ref = left_query_binder->BuildFromClause(query_context, tables[0]);
 
-    SharedPtr<BindContext> right_bind_context{};
-    UniquePtr<QueryBinder> right_query_binder{};
-    SharedPtr<TableRef> right_table_ref{};
+    std::shared_ptr<BindContext> right_bind_context{};
+    std::unique_ptr<QueryBinder> right_query_binder{};
+    std::shared_ptr<TableRef> right_table_ref{};
 
-    SizeT table_count = tables.size();
-    for (SizeT i = 1; i < table_count - 1; ++i) {
+    size_t table_count = tables.size();
+    for (size_t i = 1; i < table_count - 1; ++i) {
         right_bind_context = bind_contexts[bind_context_idx--];
-        right_query_binder = MakeUnique<QueryBinder>(query_context, right_bind_context);
+        right_query_binder = std::make_unique<QueryBinder>(query_context, right_bind_context);
         right_table_ref = right_query_binder->BuildFromClause(query_context, tables[i]);
 
-        SharedPtr<BindContext> cross_product_bind_context = bind_contexts[bind_context_idx--];
+        std::shared_ptr<BindContext> cross_product_bind_context = bind_contexts[bind_context_idx--];
         cross_product_bind_context->AddLeftChild(left_bind_context);
         cross_product_bind_context->AddRightChild(right_bind_context);
 
-        UniquePtr<QueryBinder> cross_product_query_binder = MakeUnique<QueryBinder>(query_context, cross_product_bind_context);
+        std::unique_ptr<QueryBinder> cross_product_query_binder = std::make_unique<QueryBinder>(query_context, cross_product_bind_context);
 
-        cross_product_table_ref = MakeShared<CrossProductTableRef>("cross product");
+        cross_product_table_ref = std::make_shared<CrossProductTableRef>("cross product");
         cross_product_table_ref->left_table_ref_ = left_table_ref;
         cross_product_table_ref->right_table_ref_ = right_table_ref;
 
@@ -580,40 +580,40 @@ SharedPtr<TableRef> QueryBinder::BuildCrossProduct(QueryContext *query_context, 
         Status status = Status::SyntaxError("Mismatched bind context count.");
         RecoverableError(status);
     }
-    right_query_binder = MakeUnique<QueryBinder>(query_context, right_bind_context);
+    right_query_binder = std::make_unique<QueryBinder>(query_context, right_bind_context);
     right_table_ref = right_query_binder->BuildFromClause(query_context, tables[table_count - 1]);
 
     this->bind_context_ptr_->AddLeftChild(left_bind_context);
     this->bind_context_ptr_->AddRightChild(right_bind_context);
 
-    cross_product_table_ref = MakeShared<CrossProductTableRef>("cross product");
+    cross_product_table_ref = std::make_shared<CrossProductTableRef>("cross product");
     cross_product_table_ref->left_table_ref_ = left_table_ref;
     cross_product_table_ref->right_table_ref_ = right_table_ref;
 
-    SharedPtr<TableRef> result = cross_product_table_ref;
+    std::shared_ptr<TableRef> result = cross_product_table_ref;
     return result;
 }
 
-SharedPtr<TableRef> QueryBinder::BuildJoin(QueryContext *query_context, const JoinReference *from_table) {
-    String alias{};
+std::shared_ptr<TableRef> QueryBinder::BuildJoin(QueryContext *query_context, const JoinReference *from_table) {
+    std::string alias{};
 
     if (from_table->alias_ != nullptr && from_table->alias_->alias_ != nullptr) {
         alias = from_table->alias_->alias_;
     }
 
-    auto result = MakeShared<JoinTableRef>(alias);
+    auto result = std::make_shared<JoinTableRef>(alias);
 
     result->join_type_ = from_table->join_type_;
 
     // Build left child
     auto left_bind_context_ptr = BindContext::Make(this->bind_context_ptr_);
-    UniquePtr<QueryBinder> left_query_binder = MakeUnique<QueryBinder>(query_context, left_bind_context_ptr);
+    std::unique_ptr<QueryBinder> left_query_binder = std::make_unique<QueryBinder>(query_context, left_bind_context_ptr);
     auto left_bound_table_ref = left_query_binder->BuildFromClause(query_context, from_table->left_);
     this->bind_context_ptr_->AddLeftChild(left_query_binder->bind_context_ptr_);
 
     // Build right child
     auto right_bind_context_ptr = BindContext::Make(this->bind_context_ptr_);
-    UniquePtr<QueryBinder> right_query_binder = MakeUnique<QueryBinder>(query_context, right_bind_context_ptr);
+    std::unique_ptr<QueryBinder> right_query_binder = std::make_unique<QueryBinder>(query_context, right_bind_context_ptr);
     auto right_bound_table_ref = right_query_binder->BuildFromClause(query_context, from_table->right_);
     this->bind_context_ptr_->AddRightChild(right_query_binder->bind_context_ptr_);
 
@@ -625,7 +625,7 @@ SharedPtr<TableRef> QueryBinder::BuildJoin(QueryContext *query_context, const Jo
 
     // Current parser doesn't support On using column syntax, so only consider the case of natural join.
     if (result->join_type_ == JoinType::kNatural) {
-        HashSet<String> left_binding_column_names;
+        std::unordered_set<std::string> left_binding_column_names;
         // TODO: Is there any way to get all_column_names size ? Collect all left binding columns numbers at very beginning?
         for (auto &left_binding_pair : result->left_bind_context_->binding_by_name_) {
             for (auto &left_column_name : *left_binding_pair.second->column_names_) {
@@ -633,7 +633,7 @@ SharedPtr<TableRef> QueryBinder::BuildJoin(QueryContext *query_context, const Jo
             }
         }
 
-        Vector<String> using_column_names;
+        std::vector<std::string> using_column_names;
         // TODO: column count of left binding tables and right binding tables is using_column_names size
         for (auto &right_binding_pair : result->right_bind_context_->binding_by_name_) {
             for (auto &right_column_name : *right_binding_pair.second->column_names_) {
@@ -645,8 +645,8 @@ SharedPtr<TableRef> QueryBinder::BuildJoin(QueryContext *query_context, const Jo
 
         if (using_column_names.empty()) {
             // It is cross product, but not a natural join with dummy name
-            String cross_product_table_name = "cross_product";
-            auto cross_product_table_ref = MakeShared<CrossProductTableRef>(cross_product_table_name);
+            std::string cross_product_table_name = "cross_product";
+            auto cross_product_table_ref = std::make_shared<CrossProductTableRef>(cross_product_table_name);
             //            cross_product_table_ref->left_bind_context_ = result->left_bind_context_;
             cross_product_table_ref->left_table_ref_ = left_bound_table_ref;
 
@@ -680,7 +680,7 @@ SharedPtr<TableRef> QueryBinder::BuildJoin(QueryContext *query_context, const Jo
                 auto left_column_index = left_binding_ptr->name2index_[column_name];
                 auto left_column_type = left_binding_ptr->column_types_->at(left_column_index);
 
-                SharedPtr<ColumnExpression> left_column_expression_ptr = MakeShared<ColumnExpression>(*left_column_type,
+                std::shared_ptr<ColumnExpression> left_column_expression_ptr = std::make_shared<ColumnExpression>(*left_column_type,
                                                                                                       left_binding_ptr->table_name_,
                                                                                                       left_binding_ptr->table_index_,
                                                                                                       column_name,
@@ -708,14 +708,14 @@ SharedPtr<TableRef> QueryBinder::BuildJoin(QueryContext *query_context, const Jo
                 auto right_column_index = right_binding_ptr->name2index_[column_name];
                 auto right_column_type = right_binding_ptr->column_types_->at(right_column_index);
 
-                SharedPtr<ColumnExpression> right_column_expression_ptr = MakeShared<ColumnExpression>(*right_column_type,
+                std::shared_ptr<ColumnExpression> right_column_expression_ptr = std::make_shared<ColumnExpression>(*right_column_type,
                                                                                                        right_binding_ptr->table_name_,
                                                                                                        right_binding_ptr->table_index_,
                                                                                                        column_name,
                                                                                                        right_column_index,
                                                                                                        0);
 
-                auto condition = MakeShared<ConjunctionExpression>(ConjunctionType::kAnd, left_column_expression_ptr, right_column_expression_ptr);
+                auto condition = std::make_shared<ConjunctionExpression>(ConjunctionType::kAnd, left_column_expression_ptr, right_column_expression_ptr);
                 result->on_conditions_.emplace_back(condition);
 
                 // For natural join, we can return now.
@@ -724,10 +724,10 @@ SharedPtr<TableRef> QueryBinder::BuildJoin(QueryContext *query_context, const Jo
         }
     }
 
-    // SharedPtr<JoinBinder> join_binder
-    auto join_binder = MakeShared<JoinBinder>(query_context);
+    // std::shared_ptr<JoinBinder> join_binder
+    auto join_binder = std::make_shared<JoinBinder>(query_context);
 
-    // SharedPtr<BaseExpression> on_condition_ptr
+    // std::shared_ptr<BaseExpression> on_condition_ptr
     auto on_condition_ptr = join_binder->BuildExpression(*from_table->condition_, this->bind_context_ptr_.get(), 0, true);
 
     result->on_conditions_ = SplitExpressionByDelimiter(on_condition_ptr, ConjunctionType::kAnd);
@@ -735,7 +735,7 @@ SharedPtr<TableRef> QueryBinder::BuildJoin(QueryContext *query_context, const Jo
     return result;
 }
 
-void QueryBinder::UnfoldStarExpression(QueryContext *, const Vector<ParsedExpr *> &input_select_list, Vector<ParsedExpr *> &output_select_list) {
+void QueryBinder::UnfoldStarExpression(QueryContext *, const std::vector<ParsedExpr *> &input_select_list, std::vector<ParsedExpr *> &output_select_list) {
     output_select_list.reserve(input_select_list.size());
     for (auto *select_expr : input_select_list) {
         if (select_expr->type_ == ParsedExprType::kColumn) {
@@ -750,7 +750,7 @@ void QueryBinder::UnfoldStarExpression(QueryContext *, const Vector<ParsedExpr *
 
                     // select * from t1, t2; means select t1.*, t2.* from t1, t2;
                     for (const auto &table_name : this->bind_context_ptr_->table_names_) {
-                        SharedPtr<Binding> binding = this->bind_context_ptr_->binding_by_name_[table_name];
+                        std::shared_ptr<Binding> binding = this->bind_context_ptr_->binding_by_name_[table_name];
                         if (binding.get() == nullptr) {
                             Status status = Status::SyntaxError(fmt::format("Table: {} wasn't bound before.", table_name));
                             RecoverableError(status);
@@ -758,8 +758,8 @@ void QueryBinder::UnfoldStarExpression(QueryContext *, const Vector<ParsedExpr *
                         GenerateColumns(binding, table_name, output_select_list);
                     }
                 } else {
-                    String table_name = column_expr->names_[0];
-                    SharedPtr<Binding> binding = this->bind_context_ptr_->binding_by_name_[table_name];
+                    std::string table_name = column_expr->names_[0];
+                    std::shared_ptr<Binding> binding = this->bind_context_ptr_->binding_by_name_[table_name];
                     if (binding.get() == nullptr) {
                         Status status = Status::SyntaxError(fmt::format("Table: {} wasn't bound before.", table_name));
                         RecoverableError(status);
@@ -774,7 +774,7 @@ void QueryBinder::UnfoldStarExpression(QueryContext *, const Vector<ParsedExpr *
     }
 }
 
-void QueryBinder::GenerateColumns(const SharedPtr<Binding> &binding, const String &table_name, Vector<ParsedExpr *> &output_select_list) {
+void QueryBinder::GenerateColumns(const std::shared_ptr<Binding> &binding, const std::string &table_name, std::vector<ParsedExpr *> &output_select_list) {
     switch (binding->binding_type_) {
 
         case BindingType::kInvalid: {
@@ -782,14 +782,14 @@ void QueryBinder::GenerateColumns(const SharedPtr<Binding> &binding, const Strin
             break;
         }
         case BindingType::kTable: {
-            SizeT column_count = binding->table_info_->column_count_;
+            size_t column_count = binding->table_info_->column_count_;
 
             // Reserve more data in select list
             output_select_list.reserve(output_select_list.size() + column_count);
 
             // Build select list
-            for (SizeT idx = 0; idx < column_count; ++idx) {
-                String column_name = binding->table_info_->GetColumnDefByIdx(idx)->name_;
+            for (size_t idx = 0; idx < column_count; ++idx) {
+                std::string column_name = binding->table_info_->GetColumnDefByIdx(idx)->name_;
                 auto *column_expr = new ColumnExpr();
                 column_expr->names_.emplace_back(table_name);
                 column_expr->names_.emplace_back(column_name);
@@ -800,14 +800,14 @@ void QueryBinder::GenerateColumns(const SharedPtr<Binding> &binding, const Strin
         }
         case BindingType::kSubquery:
         case BindingType::kCTE: {
-            SizeT column_count = binding->column_names_->size();
+            size_t column_count = binding->column_names_->size();
 
             // Reserve more data in select list
             output_select_list.reserve(output_select_list.size() + column_count);
 
             // Build select list
-            for (SizeT idx = 0; idx < column_count; ++idx) {
-                String column_name = binding->column_names_->at(idx);
+            for (size_t idx = 0; idx < column_count; ++idx) {
+                std::string column_name = binding->column_names_->at(idx);
                 auto *column_expr = new ColumnExpr();
                 column_expr->names_.emplace_back(table_name);
                 column_expr->names_.emplace_back(column_name);
@@ -826,8 +826,8 @@ void QueryBinder::GenerateColumns(const SharedPtr<Binding> &binding, const Strin
 
 void QueryBinder::BuildGroupBy(QueryContext *query_context,
                                const SelectStatement &select,
-                               const SharedPtr<BindAliasProxy> &bind_alias_proxy,
-                               UniquePtr<BoundSelectStatement> &select_statement) {
+                               const std::shared_ptr<BindAliasProxy> &bind_alias_proxy,
+                               std::unique_ptr<BoundSelectStatement> &select_statement) {
     u64 table_index = bind_context_ptr_->GenerateTableIndex();
     bind_context_ptr_->group_by_table_index_ = table_index;
     bind_context_ptr_->group_by_table_name_ = "groupby" + std::to_string(table_index);
@@ -835,18 +835,18 @@ void QueryBinder::BuildGroupBy(QueryContext *query_context,
     if (select.group_by_list_ != nullptr) {
         // Start to bind GROUP BY clause
         // Set group binder
-        auto group_binder = MakeShared<GroupBinder>(query_context, bind_alias_proxy);
+        auto group_binder = std::make_shared<GroupBinder>(query_context, bind_alias_proxy);
 
         // Reserve the group names used in GroupBinder::BuildExpression
-        SizeT group_count = select.group_by_list_->size();
+        size_t group_count = select.group_by_list_->size();
         bind_context_ptr_->group_exprs_.reserve(group_count);
-        for (SizeT idx = 0; idx < group_count; ++idx) {
+        for (size_t idx = 0; idx < group_count; ++idx) {
             // set group-by expression index
             group_binder->group_by_expr_index = idx;
             const ParsedExpr &expr = *(*select.group_by_list_)[idx];
 
             // Call GroupBinder BuildExpression
-            SharedPtr<BaseExpression> group_by_expr = group_binder->Bind(expr, this->bind_context_ptr_.get(), 0, true);
+            std::shared_ptr<BaseExpression> group_by_expr = group_binder->Bind(expr, this->bind_context_ptr_.get(), 0, true);
         }
 
         select_statement->group_by_expressions_ = bind_context_ptr_->group_exprs_;
@@ -855,8 +855,8 @@ void QueryBinder::BuildGroupBy(QueryContext *query_context,
 
 void QueryBinder::BuildHaving(QueryContext *query_context,
                               const SelectStatement &select,
-                              const SharedPtr<BindAliasProxy> &bind_alias_proxy,
-                              UniquePtr<BoundSelectStatement> &select_statement) {
+                              const std::shared_ptr<BindAliasProxy> &bind_alias_proxy,
+                              std::unique_ptr<BoundSelectStatement> &select_statement) {
     u64 table_index = bind_context_ptr_->GenerateTableIndex();
     bind_context_ptr_->aggregate_table_index_ = table_index;
     bind_context_ptr_->aggregate_table_name_ = "aggregate" + std::to_string(table_index);
@@ -865,8 +865,8 @@ void QueryBinder::BuildHaving(QueryContext *query_context,
     if (select.group_by_list_ != nullptr && select.having_expr_ != nullptr) {
         // Start to bind Having clause
         // Set having binder
-        auto having_binder = MakeShared<HavingBinder>(query_context, bind_alias_proxy);
-        SharedPtr<BaseExpression> having_expr = having_binder->Bind(*(select.having_expr_), bind_context_ptr_.get(), 0, true);
+        auto having_binder = std::make_shared<HavingBinder>(query_context, bind_alias_proxy);
+        std::shared_ptr<BaseExpression> having_expr = having_binder->Bind(*(select.having_expr_), bind_context_ptr_.get(), 0, true);
         select_statement->having_expressions_ = SplitExpressionByDelimiter(having_expr, ConjunctionType::kAnd);
     }
 }
@@ -881,25 +881,25 @@ void QueryBinder::PushOrderByToProject(QueryContext *, const SelectStatement &st
     }
 }
 
-void QueryBinder::BuildSelectList(QueryContext *, UniquePtr<BoundSelectStatement> &bound_select_statement) {
+void QueryBinder::BuildSelectList(QueryContext *, std::unique_ptr<BoundSelectStatement> &bound_select_statement) {
     u64 table_index = bind_context_ptr_->GenerateTableIndex();
     bind_context_ptr_->project_table_index_ = table_index;
     bind_context_ptr_->project_table_name_ = "project" + std::to_string(table_index);
 
-    auto project_binder = MakeShared<ProjectBinder>(query_context_ptr_, bound_select_statement.get());
+    auto project_binder = std::make_shared<ProjectBinder>(query_context_ptr_, bound_select_statement.get());
 
-    SizeT column_count = bind_context_ptr_->select_expression_.size();
-    bound_select_statement->names_ptr_ = MakeShared<Vector<String>>();
+    size_t column_count = bind_context_ptr_->select_expression_.size();
+    bound_select_statement->names_ptr_ = std::make_shared<std::vector<std::string>>();
     bound_select_statement->names_ptr_->reserve(column_count);
 
-    bound_select_statement->types_ptr_ = MakeShared<Vector<SharedPtr<DataType>>>();
+    bound_select_statement->types_ptr_ = std::make_shared<std::vector<std::shared_ptr<DataType>>>();
     bound_select_statement->types_ptr_->reserve(column_count);
     bind_context_ptr_->project_exprs_.reserve(column_count);
     bound_select_statement->projection_expressions_.reserve(column_count);
-    for (SizeT column_id = 0; column_id < column_count; ++column_id) {
+    for (size_t column_id = 0; column_id < column_count; ++column_id) {
         const ParsedExpr *select_expr = bind_context_ptr_->select_expression_[column_id];
-        SharedPtr<BaseExpression> bound_expr = project_binder->Bind(*select_expr, this->bind_context_ptr_.get(), 0, true);
-        String expr_name = bound_expr->Name();
+        std::shared_ptr<BaseExpression> bound_expr = project_binder->Bind(*select_expr, this->bind_context_ptr_.get(), 0, true);
+        std::string expr_name = bound_expr->Name();
         if (!(bind_context_ptr_->project_index_by_name_.contains(expr_name))) {
             bind_context_ptr_->project_index_by_name_[expr_name] = column_id;
         }
@@ -909,7 +909,7 @@ void QueryBinder::BuildSelectList(QueryContext *, UniquePtr<BoundSelectStatement
         bound_select_statement->projection_expressions_.emplace_back(bound_expr);
 
         bound_select_statement->names_ptr_->emplace_back(expr_name);
-        bound_select_statement->types_ptr_->emplace_back(MakeShared<DataType>(bound_expr->Type()));
+        bound_select_statement->types_ptr_->emplace_back(std::make_shared<DataType>(bound_expr->Type()));
     }
 
     if (!bound_select_statement->having_expressions_.empty() || !bound_select_statement->group_by_expressions_.empty() ||
@@ -924,9 +924,9 @@ void QueryBinder::BuildSelectList(QueryContext *, UniquePtr<BoundSelectStatement
 
 void QueryBinder::BuildOrderBy(QueryContext *query_context,
                                const SelectStatement &statement,
-                               UniquePtr<BoundSelectStatement> &bound_statement) const {
-    auto order_binder = MakeShared<OrderBinder>(query_context);
-    SizeT order_by_count = statement.order_by_list_->size();
+                               std::unique_ptr<BoundSelectStatement> &bound_statement) const {
+    auto order_binder = std::make_shared<OrderBinder>(query_context);
+    size_t order_by_count = statement.order_by_list_->size();
     bound_statement->order_by_expressions_.reserve(order_by_count);
     bound_statement->order_by_types_.reserve(order_by_count);
     for (const OrderByExpr *order_expr : *statement.order_by_list_) {
@@ -936,8 +936,8 @@ void QueryBinder::BuildOrderBy(QueryContext *query_context,
     }
 }
 
-void QueryBinder::BuildLimit(QueryContext *query_context, const SelectStatement &statement, UniquePtr<BoundSelectStatement> &bound_statement) const {
-    auto limit_binder = MakeShared<LimitBinder>(query_context);
+void QueryBinder::BuildLimit(QueryContext *query_context, const SelectStatement &statement, std::unique_ptr<BoundSelectStatement> &bound_statement) const {
+    auto limit_binder = std::make_shared<LimitBinder>(query_context);
     bound_statement->limit_expression_ = limit_binder->Bind(*statement.limit_expr_, this->bind_context_ptr_.get(), 0, true);
 
     if (statement.offset_expr_ != nullptr) {
@@ -945,16 +945,16 @@ void QueryBinder::BuildLimit(QueryContext *query_context, const SelectStatement 
     }
 }
 
-void QueryBinder::PruneOutput(QueryContext *, i64 select_column_count, UniquePtr<BoundSelectStatement> &bound_statement) {
-    Vector<SharedPtr<BaseExpression>> &pruned_expressions = bound_statement->pruned_expression_;
-    Vector<SharedPtr<BaseExpression>> &projection_expressions = bound_statement->projection_expressions_;
-    Vector<String> &output_names = *bound_statement->names_ptr_;
+void QueryBinder::PruneOutput(QueryContext *, i64 select_column_count, std::unique_ptr<BoundSelectStatement> &bound_statement) {
+    std::vector<std::shared_ptr<BaseExpression>> &pruned_expressions = bound_statement->pruned_expression_;
+    std::vector<std::shared_ptr<BaseExpression>> &projection_expressions = bound_statement->projection_expressions_;
+    std::vector<std::string> &output_names = *bound_statement->names_ptr_;
 
     pruned_expressions.reserve(select_column_count);
 
     for (i64 column_id = 0; column_id < select_column_count; ++column_id) {
-        const SharedPtr<BaseExpression> &expr = projection_expressions[column_id];
-        SharedPtr<ColumnExpression> result = ColumnExpression::Make(expr->Type(),
+        const std::shared_ptr<BaseExpression> &expr = projection_expressions[column_id];
+        std::shared_ptr<ColumnExpression> result = ColumnExpression::Make(expr->Type(),
                                                                     bind_context_ptr_->project_table_name_,
                                                                     bind_context_ptr_->project_table_index_,
                                                                     output_names[column_id],
@@ -989,17 +989,17 @@ void QueryBinder::CheckKnnAndOrderBy(KnnDistanceType distance_type, OrderType or
     }
 }
 
-SharedPtr<BaseTableRef> QueryBinder::GetTableRef(const String &db_name, const String &table_name, bool update) {
+std::shared_ptr<BaseTableRef> QueryBinder::GetTableRef(const std::string &db_name, const std::string &table_name, bool update) {
     TableReference from_table;
     from_table.db_name_ = db_name;
     from_table.table_name_ = table_name;
     return BuildBaseTable(this->query_context_ptr_, &from_table, update);
 }
 
-UniquePtr<BoundDeleteStatement> QueryBinder::BindDelete(const DeleteStatement &statement) {
+std::unique_ptr<BoundDeleteStatement> QueryBinder::BindDelete(const DeleteStatement &statement) {
     // refers to QueryBinder::BindSelect
-    UniquePtr<BoundDeleteStatement> bound_delete_statement = BoundDeleteStatement::Make(bind_context_ptr_);
-    SharedPtr<BaseTableRef> base_table_ref = GetTableRef(statement.schema_name_, statement.table_name_);
+    std::unique_ptr<BoundDeleteStatement> bound_delete_statement = BoundDeleteStatement::Make(bind_context_ptr_);
+    std::shared_ptr<BaseTableRef> base_table_ref = GetTableRef(statement.schema_name_, statement.table_name_);
     if (base_table_ref.get() == nullptr) {
         Status status = Status::SyntaxError(fmt::format("Cannot bind {}.{} to a table", statement.schema_name_, statement.table_name_));
         RecoverableError(status);
@@ -1007,10 +1007,10 @@ UniquePtr<BoundDeleteStatement> QueryBinder::BindDelete(const DeleteStatement &s
 
     bound_delete_statement->table_ref_ptr_ = base_table_ref;
 
-    SharedPtr<BindAliasProxy> bind_alias_proxy = MakeShared<BindAliasProxy>();
+    std::shared_ptr<BindAliasProxy> bind_alias_proxy = std::make_shared<BindAliasProxy>();
     if (statement.where_expr_ != nullptr) {
-        auto where_binder = MakeShared<WhereBinder>(this->query_context_ptr_, bind_alias_proxy);
-        SharedPtr<BaseExpression> where_expr = where_binder->Bind(*statement.where_expr_, this->bind_context_ptr_.get(), 0, true);
+        auto where_binder = std::make_shared<WhereBinder>(this->query_context_ptr_, bind_alias_proxy);
+        std::shared_ptr<BaseExpression> where_expr = where_binder->Bind(*statement.where_expr_, this->bind_context_ptr_.get(), 0, true);
         if (where_expr->Type().type() != LogicalType::kBoolean) {
             Status status = Status::InvalidFilterExpression(where_expr->Type().ToString());
             RecoverableError(status);
@@ -1020,20 +1020,20 @@ UniquePtr<BoundDeleteStatement> QueryBinder::BindDelete(const DeleteStatement &s
     return bound_delete_statement;
 }
 
-UniquePtr<BoundUpdateStatement> QueryBinder::BindUpdate(const UpdateStatement &statement) {
+std::unique_ptr<BoundUpdateStatement> QueryBinder::BindUpdate(const UpdateStatement &statement) {
     // refers to QueryBinder::BindSelect
-    UniquePtr<BoundUpdateStatement> bound_update_statement = BoundUpdateStatement::Make(bind_context_ptr_);
-    SharedPtr<BaseTableRef> base_table_ref = GetTableRef(statement.schema_name_, statement.table_name_, true);
+    std::unique_ptr<BoundUpdateStatement> bound_update_statement = BoundUpdateStatement::Make(bind_context_ptr_);
+    std::shared_ptr<BaseTableRef> base_table_ref = GetTableRef(statement.schema_name_, statement.table_name_, true);
     bound_update_statement->table_ref_ptr_ = base_table_ref;
     if (base_table_ref.get() == nullptr) {
         Status status = Status::SyntaxError(fmt::format("Cannot bind {}.{} to a table", statement.schema_name_, statement.table_name_));
         RecoverableError(status);
     }
 
-    SharedPtr<BindAliasProxy> bind_alias_proxy = MakeShared<BindAliasProxy>();
+    std::shared_ptr<BindAliasProxy> bind_alias_proxy = std::make_shared<BindAliasProxy>();
     if (statement.where_expr_ != nullptr) {
-        auto where_binder = MakeShared<WhereBinder>(this->query_context_ptr_, bind_alias_proxy);
-        SharedPtr<BaseExpression> where_expr = where_binder->Bind(*statement.where_expr_, this->bind_context_ptr_.get(), 0, true);
+        auto where_binder = std::make_shared<WhereBinder>(this->query_context_ptr_, bind_alias_proxy);
+        std::shared_ptr<BaseExpression> where_expr = where_binder->Bind(*statement.where_expr_, this->bind_context_ptr_.get(), 0, true);
         if (where_expr->Type().type() != LogicalType::kBoolean) {
             Status status = Status::InvalidFilterExpression(where_expr->Type().ToString());
             RecoverableError(status);
@@ -1044,15 +1044,15 @@ UniquePtr<BoundUpdateStatement> QueryBinder::BindUpdate(const UpdateStatement &s
         Status status = Status::SyntaxError(fmt::format("Update expr array is empty"));
         RecoverableError(status);
     }
-    const Vector<String> &column_names = *base_table_ref->column_names_;
-    const Vector<SharedPtr<DataType>> &column_types = *base_table_ref->column_types_;
+    const std::vector<std::string> &column_names = *base_table_ref->column_names_;
+    const std::vector<std::shared_ptr<DataType>> &column_types = *base_table_ref->column_types_;
     // add all columns in table to all_columns_in_table_
     {
         ExpressionBinder expression_binder(query_context_ptr_);
-        const auto fake_star = MakeUnique<ColumnExpr>();
+        const auto fake_star = std::make_unique<ColumnExpr>();
         fake_star->star_ = true;
-        const Vector<ParsedExpr *> fake_input = {fake_star.get()};
-        Vector<ParsedExpr *> all_columns;
+        const std::vector<ParsedExpr *> fake_input = {fake_star.get()};
+        std::vector<ParsedExpr *> all_columns;
         DeferFn defer([&all_columns] {
             for (auto &expr : all_columns) {
                 delete expr;
@@ -1070,7 +1070,7 @@ UniquePtr<BoundUpdateStatement> QueryBinder::BindUpdate(const UpdateStatement &s
                 Status::SyntaxError(fmt::format("Column count mismatch, failed to bind table {}.{}", statement.schema_name_, statement.table_name_)));
         }
     }
-    auto project_binder = MakeShared<ProjectBinder>(query_context_ptr_);
+    auto project_binder = std::make_shared<ProjectBinder>(query_context_ptr_);
     for (UpdateExpr *upd_expr : *statement.update_expr_array_) {
         std::string &column_name = upd_expr->column_name;
         ParsedExpr *expr = upd_expr->value;
@@ -1080,14 +1080,14 @@ UniquePtr<BoundUpdateStatement> QueryBinder::BindUpdate(const UpdateStatement &s
                 fmt::format("Column {} doesn't exist in table {}.{}", column_name, statement.schema_name_, statement.table_name_));
             RecoverableError(status);
         }
-        SizeT column_id = std::distance(column_names.begin(), it);
-        SharedPtr<BaseExpression> update_expr = project_binder->Bind(*expr, this->bind_context_ptr_.get(), 0, true);
+        size_t column_id = std::distance(column_names.begin(), it);
+        std::shared_ptr<BaseExpression> update_expr = project_binder->Bind(*expr, this->bind_context_ptr_.get(), 0, true);
         update_expr = CastExpression::AddCastToType(update_expr, *column_types[column_id]);
         bound_update_statement->update_columns_.emplace_back(column_id, update_expr);
     }
     std::sort(bound_update_statement->update_columns_.begin(), bound_update_statement->update_columns_.end());
     // check duplicate in update_columns_
-    for (SizeT i = 1; i < bound_update_statement->update_columns_.size(); i++) {
+    for (size_t i = 1; i < bound_update_statement->update_columns_.size(); i++) {
         if (bound_update_statement->update_columns_[i].first == bound_update_statement->update_columns_[i - 1].first) {
             RecoverableError(Status::SyntaxError("Duplicate column in update statement"));
         }
@@ -1096,7 +1096,7 @@ UniquePtr<BoundUpdateStatement> QueryBinder::BindUpdate(const UpdateStatement &s
         // generate final_result_columns_
         bound_update_statement->final_result_columns_.reserve(column_names.size());
         auto update_iter = bound_update_statement->update_columns_.begin();
-        for (SizeT i = 0; i < column_names.size(); ++i) {
+        for (size_t i = 0; i < column_names.size(); ++i) {
             if (update_iter != bound_update_statement->update_columns_.end() && update_iter->first == i) {
                 bound_update_statement->final_result_columns_.push_back(update_iter->second);
                 ++update_iter;
@@ -1108,11 +1108,11 @@ UniquePtr<BoundUpdateStatement> QueryBinder::BindUpdate(const UpdateStatement &s
     return bound_update_statement;
 }
 
-UniquePtr<BoundInsertStatement> QueryBinder::BindInsert(const InsertStatement &statement) {
-    UniquePtr<BoundInsertStatement> bound_insert_statement = BoundInsertStatement::Make(bind_context_ptr_);
+std::unique_ptr<BoundInsertStatement> QueryBinder::BindInsert(const InsertStatement &statement) {
+    std::unique_ptr<BoundInsertStatement> bound_insert_statement = BoundInsertStatement::Make(bind_context_ptr_);
 
     // Get the target table reference
-    SharedPtr<BaseTableRef> base_table_ref = GetTableRef(statement.schema_name_, statement.table_name_);
+    std::shared_ptr<BaseTableRef> base_table_ref = GetTableRef(statement.schema_name_, statement.table_name_);
     if (base_table_ref.get() == nullptr) {
         Status status = Status::SyntaxError(fmt::format("Cannot bind {}.{} to a table", statement.schema_name_, statement.table_name_));
         RecoverableError(status);
@@ -1127,11 +1127,11 @@ UniquePtr<BoundInsertStatement> QueryBinder::BindInsert(const InsertStatement &s
     return bound_insert_statement;
 }
 
-UniquePtr<BoundCompactStatement> QueryBinder::BindCompact(const CompactStatement &statement) {
-    SharedPtr<BaseTableRef> base_table_ref = nullptr;
+std::unique_ptr<BoundCompactStatement> QueryBinder::BindCompact(const CompactStatement &statement) {
+    std::shared_ptr<BaseTableRef> base_table_ref = nullptr;
     const auto &compact_statement = static_cast<const ManualCompactStatement &>(statement);
     base_table_ref = GetTableRef(compact_statement.db_name_, compact_statement.table_name_);
-    return MakeUnique<BoundCompactStatement>(bind_context_ptr_, base_table_ref, statement.compact_type_);
+    return std::make_unique<BoundCompactStatement>(bind_context_ptr_, base_table_ref, statement.compact_type_);
 }
 
 } // namespace infinity

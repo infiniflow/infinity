@@ -39,11 +39,11 @@ namespace infinity {
 // aligned_buffer_: tf * child_num, doc_len * child_num, match_cnt, bm25_score_sum
 // vector of f1, f2, bm25_common_score
 
-BatchOrIterator::BatchOrIterator(Vector<UniquePtr<DocIterator>> &&iterators) : MultiDocIterator(std::move(iterators)) {
+BatchOrIterator::BatchOrIterator(std::vector<std::unique_ptr<DocIterator>> &&iterators) : MultiDocIterator(std::move(iterators)) {
     bm25_score_upper_bound_ = 0.0f;
     estimate_iterate_cost_ = {};
-    const SizeT num_iterators = children_.size();
-    for (SizeT i = 0; i < num_iterators; i++) {
+    const size_t num_iterators = children_.size();
+    for (size_t i = 0; i < num_iterators; i++) {
         auto tdi = dynamic_cast<const TermDocIterator *>(children_[i].get());
         if (tdi == nullptr) {
             UnrecoverableError("BatchOrIterator only supports TermDocIterator");

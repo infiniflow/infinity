@@ -74,14 +74,14 @@ TEST_P(TestTxnAlter, add_column0) {
 
     NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
 
-    SharedPtr<String> db_name = std::make_shared<String>("default_db");
+    std::shared_ptr<String> db_name = std::make_shared<String>("default_db");
     auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
     auto column_def2 =
         std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>(), default_varchar);
     auto table_name = std::make_shared<std::string>("tb1");
-    auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1});
+    auto table_def = TableDef::Make(db_name, table_name, std::make_shared<String>(), {column_def1});
     {
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("create table"), TransactionType::kNormal);
         Status status = txn->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
@@ -90,7 +90,7 @@ TEST_P(TestTxnAlter, add_column0) {
 
     u32 block_row_cnt = 8192;
     auto make_input_block = [&] {
-        auto input_block = MakeShared<DataBlock>();
+        auto input_block = std::make_shared<DataBlock>();
         auto append_to_col = [&](ColumnVector &col, Value v) {
             for (u32 i = 0; i < block_row_cnt; ++i) {
                 col.AppendValue(v);
@@ -107,16 +107,16 @@ TEST_P(TestTxnAlter, add_column0) {
         return input_block;
     };
 
-    for (SizeT i = 0; i < 2; ++i) {
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+    for (size_t i = 0; i < 2; ++i) {
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("append"), TransactionType::kNormal);
         Status status = txn->Append(*db_name, *table_name, make_input_block());
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
     }
     {
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("add column"), TransactionType::kNormal);
-        auto column_defs = Vector<SharedPtr<ColumnDef>>({column_def2});
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("add column"), TransactionType::kNormal);
+        auto column_defs = Vector<std::shared_ptr<ColumnDef>>({column_def2});
         Status status = txn->AddColumns(*db_name, *table_name, column_defs);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
@@ -125,7 +125,7 @@ TEST_P(TestTxnAlter, add_column0) {
     {
         new_txn_mgr->PrintAllKeyValue();
 
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("scan"), TransactionType::kNormal);
         TxnTimeStamp begin_ts = txn->BeginTS();
         TxnTimeStamp commit_ts = txn->CommitTS();
 
@@ -134,13 +134,13 @@ TEST_P(TestTxnAlter, add_column0) {
         Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
 
-        auto check_column = [&](ColumnMeta &column_meta, const Value &v, SizeT row_count) {
+        auto check_column = [&](ColumnMeta &column_meta, const Value &v, size_t row_count) {
             ColumnVector col;
 
             Status status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorMode::kReadOnly, col);
             EXPECT_TRUE(status.ok());
 
-            for (SizeT i = 0; i < row_count; ++i) {
+            for (size_t i = 0; i < row_count; ++i) {
                 EXPECT_EQ(col.GetValueByIndex(i), v);
             }
         };
@@ -160,14 +160,14 @@ TEST_P(TestTxnAlter, add_column0) {
             next = state.Next(offset, range);
             EXPECT_FALSE(next);
 
-            SizeT row_count = state.block_offset_end();
+            size_t row_count = state.block_offset_end();
             {
-                SizeT column_idx = 0;
+                size_t column_idx = 0;
                 ColumnMeta column_meta(column_idx, block_meta);
                 check_column(column_meta, Value::MakeInt(1), row_count);
             }
             {
-                SizeT column_idx = 1;
+                size_t column_idx = 1;
                 ColumnMeta column_meta(column_idx, block_meta);
                 check_column(column_meta, Value::MakeVarchar(""), row_count);
             }
@@ -200,13 +200,13 @@ TEST_P(TestTxnAlter, drop_column0) {
 
     NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
 
-    SharedPtr<String> db_name = std::make_shared<String>("default_db");
+    std::shared_ptr<String> db_name = std::make_shared<String>("default_db");
     auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
     auto column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
     auto table_name = std::make_shared<std::string>("tb1");
-    auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def2});
+    auto table_def = TableDef::Make(db_name, table_name, std::make_shared<String>(), {column_def1, column_def2});
     {
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("create table"), TransactionType::kNormal);
         Status status = txn->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
@@ -215,7 +215,7 @@ TEST_P(TestTxnAlter, drop_column0) {
 
     u32 block_row_cnt = 8192;
     auto make_input_block = [&] {
-        auto input_block = MakeShared<DataBlock>();
+        auto input_block = std::make_shared<DataBlock>();
         auto append_to_col = [&](ColumnVector &col, Value v) {
             for (u32 i = 0; i < block_row_cnt; ++i) {
                 col.AppendValue(v);
@@ -238,15 +238,15 @@ TEST_P(TestTxnAlter, drop_column0) {
         return input_block;
     };
 
-    for (SizeT i = 0; i < 2; ++i) {
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+    for (size_t i = 0; i < 2; ++i) {
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("append"), TransactionType::kNormal);
         Status status = txn->Append(*db_name, *table_name, make_input_block());
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
     }
     {
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("drop column"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("drop column"), TransactionType::kNormal);
         Vector<String> column_names = {column_def2->name_};
         Status status = txn->DropColumns(*db_name, *table_name, column_names);
         EXPECT_TRUE(status.ok());
@@ -254,7 +254,7 @@ TEST_P(TestTxnAlter, drop_column0) {
         EXPECT_TRUE(status.ok());
     }
     {
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("scan"), TransactionType::kNormal);
         TxnTimeStamp begin_ts = txn->BeginTS();
         TxnTimeStamp commit_ts = txn->CommitTS();
 
@@ -263,13 +263,13 @@ TEST_P(TestTxnAlter, drop_column0) {
         Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
 
-        auto check_column = [&](ColumnMeta &column_meta, const Value &v, SizeT row_count) {
+        auto check_column = [&](ColumnMeta &column_meta, const Value &v, size_t row_count) {
             ColumnVector col;
 
             Status status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorMode::kReadOnly, col);
             EXPECT_TRUE(status.ok());
 
-            for (SizeT i = 0; i < row_count; ++i) {
+            for (size_t i = 0; i < row_count; ++i) {
                 EXPECT_EQ(col.GetValueByIndex(i), v);
             }
         };
@@ -289,9 +289,9 @@ TEST_P(TestTxnAlter, drop_column0) {
             next = state.Next(offset, range);
             EXPECT_FALSE(next);
 
-            SizeT row_count = state.block_offset_end();
+            size_t row_count = state.block_offset_end();
             {
-                SizeT column_idx = 0;
+                size_t column_idx = 0;
                 ColumnMeta column_meta(column_idx, block_meta);
                 check_column(column_meta, Value::MakeInt(1), row_count);
             }

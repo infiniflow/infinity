@@ -29,20 +29,20 @@ import data_type;
 
 namespace infinity {
 
-Vector<ColumnBinding> LogicalViewScan::GetColumnBindings() const { return left_node_->GetColumnBindings(); }
+std::vector<ColumnBinding> LogicalViewScan::GetColumnBindings() const { return left_node_->GetColumnBindings(); }
 
-SharedPtr<Vector<String>> LogicalViewScan::GetOutputNames() const { return left_node_->GetOutputNames(); }
+std::shared_ptr<std::vector<std::string>> LogicalViewScan::GetOutputNames() const { return left_node_->GetOutputNames(); }
 
-SharedPtr<Vector<SharedPtr<DataType>>> LogicalViewScan::GetOutputTypes() const { return left_node_->GetOutputTypes(); }
+std::shared_ptr<std::vector<std::shared_ptr<DataType>>> LogicalViewScan::GetOutputTypes() const { return left_node_->GetOutputTypes(); }
 
-String LogicalViewScan::ToString(i64 &space) const {
+std::string LogicalViewScan::ToString(i64 &space) const {
     std::stringstream ss;
-    String arrow_str;
+    std::string arrow_str;
     if (space > 3) {
         space -= 4;
         arrow_str = "->  ";
     }
-    ss << String(space, ' ') << arrow_str << "ViewScan: " << view_ptr_->view_name();
+    ss << std::string(space, ' ') << arrow_str << "ViewScan: " << view_ptr_->view_name();
     space += arrow_str.size();
 
     return ss.str();

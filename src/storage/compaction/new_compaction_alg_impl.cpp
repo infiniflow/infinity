@@ -27,30 +27,30 @@ namespace infinity {
 
 class DBTConfig {
 public:
-    DBTConfig(SizeT m, SizeT c, SizeT s) : m_(m), c_(c), s_(s) {
+    DBTConfig(size_t m, size_t c, size_t s) : m_(m), c_(c), s_(s) {
         if (m <= 0 || c < m || s <= 0) {
             UnrecoverableError("Invalid compaction parameters");
         }
     }
 
-    int CalculateLayer(SizeT row_cnt) const { return std::max(0, static_cast<int>(std::log(row_cnt / s_) / std::log(c_))); }
+    int CalculateLayer(size_t row_cnt) const { return std::max(0, static_cast<int>(std::log(row_cnt / s_) / std::log(c_))); }
 
-    SizeT Upperbound(int layer) const { return s_ * std::pow(c_, layer) - 1; }
+    size_t Upperbound(int layer) const { return s_ * std::pow(c_, layer) - 1; }
 
-    // SizeT LowerBound(int layer) const { return layer >= 1 ? s_ * std::pow(c_, layer - 1) : 0; }
+    // size_t LowerBound(int layer) const { return layer >= 1 ? s_ * std::pow(c_, layer - 1) : 0; }
 
-    const SizeT m_; // the max node cnt in one layer
+    const size_t m_; // the max node cnt in one layer
 private:
-    const SizeT c_; // the exponent of capacity in one layer
-    const SizeT s_; // the size of the first layer
+    const size_t c_; // the exponent of capacity in one layer
+    const size_t s_; // the size of the first layer
     // layer i has capacity: c^i * s, (i >= 0)
 };
 
 class DBTCompactionAlg : public NewCompactionAlg {
 public:
-    DBTCompactionAlg(int m, int c, int s, SizeT segment_capacity) : config_(m, c, s), segment_capacity_(segment_capacity) {}
+    DBTCompactionAlg(int m, int c, int s, size_t segment_capacity) : config_(m, c, s), segment_capacity_(segment_capacity) {}
 
-    void AddSegment(SegmentID segment_id, SizeT segment_row_cnt) override {
+    void AddSegment(SegmentID segment_id, size_t segment_row_cnt) override {
         int layer = config_.CalculateLayer(segment_row_cnt);
         if (layer >= static_cast<int>(segment_layers_.size())) {
             segment_layers_.resize(layer + 1);
@@ -58,7 +58,7 @@ public:
         segment_layers_[layer].emplace_back(segment_id, segment_row_cnt);
     }
 
-    Vector<SegmentID> GetCompactableSegments() override {
+    std::vector<SegmentID> GetCompactableSegments() override {
         int cur_layer_n = segment_layers_.size();
         for (int layer = 0; layer < cur_layer_n; ++layer) {
             auto &segment_layer = segment_layers_[layer];
@@ -66,9 +66,9 @@ public:
                 continue;
             }
 
-            Vector<SegmentID> ret;
-            SizeT total_row_cnt = 0;
-            for (SizeT i = 0; i < config_.m_; ++i) {
+            std::vector<SegmentID> ret;
+            size_t total_row_cnt = 0;
+            for (size_t i = 0; i < config_.m_; ++i) {
                 ret.push_back(segment_layer[i].first);
                 total_row_cnt += segment_layer[i].second;
             }
@@ -84,13 +84,13 @@ public:
 
 private:
     DBTConfig config_;
-    SizeT segment_capacity_ = 0;
+    size_t segment_capacity_ = 0;
 
-    std::vector<std::vector<std::pair<SegmentID, SizeT>>> segment_layers_;
+    std::vector<std::vector<std::pair<SegmentID, size_t>>> segment_layers_;
 };
 
-UniquePtr<NewCompactionAlg> NewCompactionAlg::GetInstance() {
-    return MakeUnique<DBTCompactionAlg>(DBT_COMPACTION_M, DBT_COMPACTION_C, DBT_COMPACTION_S, DEFAULT_SEGMENT_CAPACITY);
+std::unique_ptr<NewCompactionAlg> NewCompactionAlg::GetInstance() {
+    return std::make_unique<DBTCompactionAlg>(DBT_COMPACTION_M, DBT_COMPACTION_C, DBT_COMPACTION_S, DEFAULT_SEGMENT_CAPACITY);
 }
 
 } // namespace infinity

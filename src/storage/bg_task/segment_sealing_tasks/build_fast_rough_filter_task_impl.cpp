@@ -52,35 +52,33 @@ template <>
 class std::numeric_limits<infinity::HugeIntT> {
 public:
     static constexpr infinity::HugeIntT lowest() {
-        return infinity::HugeIntT(std::numeric_limits<infinity::i64>::lowest(), std::numeric_limits<infinity::i64>::lowest());
+        return infinity::HugeIntT(std::numeric_limits<i64>::lowest(), std::numeric_limits<i64>::lowest());
     };
-    static constexpr infinity::HugeIntT max() {
-        return infinity::HugeIntT(std::numeric_limits<infinity::i64>::max(), std::numeric_limits<infinity::i64>::max());
-    }
+    static constexpr infinity::HugeIntT max() { return infinity::HugeIntT(std::numeric_limits<i64>::max(), std::numeric_limits<i64>::max()); }
 };
 
 template <>
 class std::numeric_limits<infinity::DateT> {
 public:
-    static constexpr infinity::DateT lowest() { return infinity::DateT(std::numeric_limits<infinity::i32>::lowest()); };
-    static constexpr infinity::DateT max() { return infinity::DateT(std::numeric_limits<infinity::i32>::max()); }
+    static constexpr infinity::DateT lowest() { return infinity::DateT(std::numeric_limits<i32>::lowest()); };
+    static constexpr infinity::DateT max() { return infinity::DateT(std::numeric_limits<i32>::max()); }
 };
 
 template <>
 class std::numeric_limits<infinity::TimeT> {
 public:
-    static constexpr infinity::TimeT lowest() { return infinity::TimeT(std::numeric_limits<infinity::i32>::lowest()); };
-    static constexpr infinity::TimeT max() { return infinity::TimeT(std::numeric_limits<infinity::i32>::max()); }
+    static constexpr infinity::TimeT lowest() { return infinity::TimeT(std::numeric_limits<i32>::lowest()); };
+    static constexpr infinity::TimeT max() { return infinity::TimeT(std::numeric_limits<i32>::max()); }
 };
 
 template <>
 class std::numeric_limits<infinity::DateTimeT> {
 public:
     static constexpr infinity::DateTimeT lowest() {
-        return infinity::DateTimeT(std::numeric_limits<infinity::i32>::lowest(), std::numeric_limits<infinity::i32>::lowest());
+        return infinity::DateTimeT(std::numeric_limits<i32>::lowest(), std::numeric_limits<i32>::lowest());
     };
     static constexpr infinity::DateTimeT max() {
-        return infinity::DateTimeT(std::numeric_limits<infinity::i32>::max(), std::numeric_limits<infinity::i32>::max());
+        return infinity::DateTimeT(std::numeric_limits<i32>::max(), std::numeric_limits<i32>::max());
     }
 };
 
@@ -88,10 +86,10 @@ template <>
 class std::numeric_limits<infinity::TimestampT> {
 public:
     static constexpr infinity::TimestampT lowest() {
-        return infinity::TimestampT(std::numeric_limits<infinity::i32>::lowest(), std::numeric_limits<infinity::i32>::lowest());
+        return infinity::TimestampT(std::numeric_limits<i32>::lowest(), std::numeric_limits<i32>::lowest());
     };
     static constexpr infinity::TimestampT max() {
-        return infinity::TimestampT(std::numeric_limits<infinity::i32>::max(), std::numeric_limits<infinity::i32>::max());
+        return infinity::TimestampT(std::numeric_limits<i32>::max(), std::numeric_limits<i32>::max());
     }
 };
 
@@ -118,14 +116,14 @@ void UpdateMax(InnerValueType &max, const InnerValueType &value) {
     }
 }
 
-void UpdateMin(InnerMinMaxDataFilterVarcharType &min, const String &input_str) {
+void UpdateMin(InnerMinMaxDataFilterVarcharType &min, const std::string &input_str) {
     if (std::string_view input_str_view(input_str.begin(), input_str.end()); input_str_view < min.GetStringView()) {
         // update min, truncate if necessary
         min.SetToTruncate(input_str_view);
     }
 }
 
-void UpdateMax(InnerMinMaxDataFilterVarcharType &max, const String &input_str) {
+void UpdateMax(InnerMinMaxDataFilterVarcharType &max, const std::string &input_str) {
     std::string_view input_str_view(input_str.begin(), input_str.end());
     if (input_str_view > max.GetStringView()) {
         // update max, truncate if necessary
@@ -145,11 +143,11 @@ std::unique_ptr<BuildingSegmentFastFilters> BuildingSegmentFastFilters::Make(Seg
         UnrecoverableError(status.message());
     }
 
-    auto segment_filters = MakeUnique<BuildingSegmentFastFilters>();
+    auto segment_filters = std::make_unique<BuildingSegmentFastFilters>();
     segment_filters->segment_meta_ = segment_meta;
-    segment_filters->segment_filter_ = MakeShared<FastRoughFilter>();
+    segment_filters->segment_filter_ = std::make_shared<FastRoughFilter>();
     for (BlockID block_id : *block_ids_ptr) {
-        segment_filters->block_filters_.emplace(block_id, MakeShared<FastRoughFilter>());
+        segment_filters->block_filters_.emplace(block_id, std::make_shared<FastRoughFilter>());
     }
     return segment_filters;
 }
@@ -208,11 +206,11 @@ void BuildFastRoughFilterTask::BuildOnlyBloomFilter(NewBuildFastRoughFilterArg &
         UnrecoverableError(status.message());
     }
     if (!arg.distinct_keys_) {
-        SizeT total_row_count_in_segment = block_ids_ptr->size() * DEFAULT_BLOCK_CAPACITY;
-        arg.distinct_keys_ = MakeUniqueForOverwrite<u64[]>(total_row_count_in_segment);
-        arg.distinct_keys_backup_ = MakeUniqueForOverwrite<u64[]>(total_row_count_in_segment);
+        size_t total_row_count_in_segment = block_ids_ptr->size() * DEFAULT_BLOCK_CAPACITY;
+        arg.distinct_keys_ = std::make_unique_for_overwrite<u64[]>(total_row_count_in_segment);
+        arg.distinct_keys_backup_ = std::make_unique_for_overwrite<u64[]>(total_row_count_in_segment);
     }
-    Vector<u64> input_data; // for reuse
+    std::vector<u64> input_data; // for reuse
     for (BlockID block_id : *block_ids_ptr) {
         BlockMeta block_meta(block_id, *arg.segment_meta_);
         // check row count
@@ -267,10 +265,10 @@ void BuildFastRoughFilterTask::BuildOnlyBloomFilter(NewBuildFastRoughFilterArg &
                 input_data.push_back(ConvertValueToU64(true_val));
             }
         } else {
-            for (SizeT block_off = 0; block_off < block_row_cnt; ++block_off) {
+            for (size_t block_off = 0; block_off < block_row_cnt; ++block_off) {
                 if constexpr (std::is_same_v<ValueType, VarcharT>) {
                     Value val = column_vector.GetValueByIndex(block_off);
-                    const String &str = val.GetVarchar();
+                    const std::string &str = val.GetVarchar();
                     input_data.push_back(ConvertValueToU64(str));
                 } else {
                     const auto &val = *reinterpret_cast<const ValueType *>(column_vector.GetRawPtr(block_off));
@@ -343,7 +341,7 @@ void BuildFastRoughFilterTask::BuildOnlyMinMaxFilter(NewBuildFastRoughFilterArg 
             BlockOffset block_off = *block_off_opt;
             if constexpr (std::is_same_v<ValueType, VarcharT>) {
                 Value val = column_vector.GetValueByIndex(block_off);
-                const String &str = val.GetVarchar();
+                const std::string &str = val.GetVarchar();
                 UpdateMin(block_min_value, str);
                 UpdateMax(block_max_value, str);
             } else {
@@ -379,11 +377,11 @@ void BuildFastRoughFilterTask::BuildMinMaxAndBloomFilter(NewBuildFastRoughFilter
         UnrecoverableError(status.message());
     }
     if (!arg.distinct_keys_) {
-        SizeT total_row_count_in_segment = block_ids_ptr->size() * DEFAULT_BLOCK_CAPACITY;
-        arg.distinct_keys_ = MakeUniqueForOverwrite<u64[]>(total_row_count_in_segment);
-        arg.distinct_keys_backup_ = MakeUniqueForOverwrite<u64[]>(total_row_count_in_segment);
+        size_t total_row_count_in_segment = block_ids_ptr->size() * DEFAULT_BLOCK_CAPACITY;
+        arg.distinct_keys_ = std::make_unique_for_overwrite<u64[]>(total_row_count_in_segment);
+        arg.distinct_keys_backup_ = std::make_unique_for_overwrite<u64[]>(total_row_count_in_segment);
     }
-    Vector<u64> input_data; // for reuse
+    std::vector<u64> input_data; // for reuse
     for (BlockID block_id : *block_ids_ptr) {
         BlockMeta block_meta(block_id, *arg.segment_meta_);
         // check row count
@@ -419,7 +417,7 @@ void BuildFastRoughFilterTask::BuildMinMaxAndBloomFilter(NewBuildFastRoughFilter
             BlockOffset block_off = *block_off_opt;
             Value val = column_vector.GetValueByIndex(block_off);
             if constexpr (std::is_same_v<ValueType, VarcharT>) {
-                const String &str = val.GetVarchar();
+                const std::string &str = val.GetVarchar();
                 UpdateMin(block_min_value, str);
                 UpdateMax(block_max_value, str);
             } else {
@@ -487,7 +485,7 @@ void BuildFastRoughFilterTask::ExecuteInner(SegmentMeta *segment_meta, BuildingS
         UnrecoverableError(status.message());
     }
 
-    for (SizeT column_idx = 0; column_idx < column_defs->size(); ++column_idx) {
+    for (size_t column_idx = 0; column_idx < column_defs->size(); ++column_idx) {
         // step 2.1. check data type
         auto *column_def = (*column_defs)[column_idx].get();
         // ColumnID column_id = column_def->id();

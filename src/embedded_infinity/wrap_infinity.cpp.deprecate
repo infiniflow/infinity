@@ -54,7 +54,7 @@ namespace infinity {
 ParsedExpr *WrapConstantExpr::GetParsedExpr(Status &status) {
     status.code_ = ErrorCode::kOk;
 
-    auto constant_expr = MakeUnique<ConstantExpr>(literal_type);
+    auto constant_expr = std::make_unique<ConstantExpr>(literal_type);
     switch (literal_type) {
         case LiteralType::kBoolean: {
             constant_expr->bool_value_ = bool_value;
@@ -86,7 +86,7 @@ ParsedExpr *WrapConstantExpr::GetParsedExpr(Status &status) {
         case LiteralType::kLongSparseArray: {
             constant_expr->long_sparse_array_.first.reserve(i64_array_idx.size());
             constant_expr->long_sparse_array_.second.reserve(i64_array_value.size());
-            for (SizeT i = 0; i < i64_array_idx.size(); ++i) {
+            for (size_t i = 0; i < i64_array_idx.size(); ++i) {
                 constant_expr->long_sparse_array_.first.emplace_back(i64_array_idx[i]);
                 constant_expr->long_sparse_array_.second.emplace_back(i64_array_value[i]);
             }
@@ -95,7 +95,7 @@ ParsedExpr *WrapConstantExpr::GetParsedExpr(Status &status) {
         case LiteralType::kDoubleSparseArray: {
             constant_expr->double_sparse_array_.first.reserve(i64_array_idx.size());
             constant_expr->double_sparse_array_.second.reserve(f64_array_value.size());
-            for (SizeT i = 0; i < i64_array_idx.size(); ++i) {
+            for (size_t i = 0; i < i64_array_idx.size(); ++i) {
                 constant_expr->double_sparse_array_.first.emplace_back(i64_array_idx[i]);
                 constant_expr->double_sparse_array_.second.emplace_back(f64_array_value[i]);
             }
@@ -119,7 +119,7 @@ ParsedExpr *WrapConstantExpr::GetParsedExpr(Status &status) {
                 }();
                 output_constant_expr->sub_array_array_.reserve(vv.size());
                 for (const auto &value_2 : vv) {
-                    auto parsed_expr_2 = MakeShared<ConstantExpr>(basic_type);
+                    auto parsed_expr_2 = std::make_shared<ConstantExpr>(basic_type);
                     if constexpr (std::is_same_v<T, int64_t>) {
                         parsed_expr_2->long_array_ = value_2;
                     } else if constexpr (std::is_same_v<T, double>) {
@@ -133,7 +133,7 @@ ParsedExpr *WrapConstantExpr::GetParsedExpr(Status &status) {
             auto create_vvv = [&constant_expr, &create_vv](const auto &vvv) {
                 constant_expr->sub_array_array_.reserve(vvv.size());
                 for (const auto &value_1 : vvv) {
-                    auto parsed_expr_1 = MakeShared<ConstantExpr>(LiteralType::kSubArrayArray);
+                    auto parsed_expr_1 = std::make_shared<ConstantExpr>(LiteralType::kSubArrayArray);
                     create_vv(value_1, parsed_expr_1.get());
                     constant_expr->sub_array_array_.emplace_back(std::move(parsed_expr_1));
                 }
@@ -176,8 +176,8 @@ ParsedExpr *WrapConstantExpr::GetParsedExpr(Status &status) {
             break;
         }
         case LiteralType::kCurlyBracketsArray: {
-            for (SizeT i = 0; i < curly_brackets_array.size(); ++i) {
-                UniquePtr<ParsedExpr> element_expr{curly_brackets_array[i]->GetParsedExpr(status)};
+            for (size_t i = 0; i < curly_brackets_array.size(); ++i) {
+                std::unique_ptr<ParsedExpr> element_expr{curly_brackets_array[i]->GetParsedExpr(status)};
                 if (!status.ok()) {
                     return nullptr;
                 }
@@ -203,7 +203,7 @@ ParsedExpr *WrapColumnExpr::GetParsedExpr(Status &status) {
     status.code_ = ErrorCode::kOk;
     auto column_expr = new ColumnExpr();
     column_expr->names_.reserve(names.size());
-    for (SizeT i = 0; i < names.size(); ++i) {
+    for (size_t i = 0; i < names.size(); ++i) {
         column_expr->names_.emplace_back(names[i]);
     }
     column_expr->star_ = star;
@@ -221,7 +221,7 @@ ParsedExpr *WrapFunctionExpr::GetParsedExpr(Status &status) {
     func_arguments->reserve(arguments.size());
     function_expr->arguments_ = func_arguments;
 
-    for (SizeT i = 0; i < arguments.size(); ++i) {
+    for (size_t i = 0; i < arguments.size(); ++i) {
         func_arguments->emplace_back(arguments[i]->GetParsedExpr(status));
         if (status.code_ != ErrorCode::kOk) {
             delete function_expr;
@@ -311,7 +311,7 @@ Tuple<void *, i64> GetEmbeddingDataTypeDataPtrFromProto(const EmbeddingData &emb
 ParsedExpr *WrapKnnExpr::GetParsedExpr(Status &status) {
     status.code_ = ErrorCode::kOk;
 
-    auto knn_expr = MakeUnique<KnnExpr>(false);
+    auto knn_expr = std::make_unique<KnnExpr>(false);
 
     knn_expr->distance_type_ = distance_type;
     if (knn_expr->distance_type_ == KnnDistanceType::kInvalid) {
@@ -354,7 +354,7 @@ ParsedExpr *WrapKnnExpr::GetParsedExpr(Status &status) {
             knn_expr->ignore_index_ = true;
         }
 
-        auto init_parameter = MakeUnique<InitParameter>();
+        auto init_parameter = std::make_unique<InitParameter>();
         init_parameter->param_name_ = param.param_name_;
         init_parameter->param_value_ = param.param_value_;
         knn_expr->opt_params_->emplace_back(init_parameter.release());
@@ -373,7 +373,7 @@ ParsedExpr *WrapKnnExpr::GetParsedExpr(Status &status) {
 ParsedExpr *WrapMatchExpr::GetParsedExpr(Status &status) {
     status.code_ = ErrorCode::kOk;
 
-    auto match_expr = MakeUnique<MatchExpr>();
+    auto match_expr = std::make_unique<MatchExpr>();
     match_expr->fields_ = fields;
     match_expr->matching_text_ = matching_text;
     match_expr->options_text_ = options_text;
@@ -393,9 +393,9 @@ ParsedExpr *WrapMatchExpr::GetParsedExpr(Status &status) {
 ParsedExpr *WrapFusionExpr::GetParsedExpr(Status &status) {
     status.code_ = ErrorCode::kOk;
 
-    auto fusion_expr = MakeUnique<FusionExpr>();
+    auto fusion_expr = std::make_unique<FusionExpr>();
     fusion_expr->method_ = method;
-    fusion_expr->options_ = MakeShared<SearchOptions>(options_text);
+    fusion_expr->options_ = std::make_shared<SearchOptions>(options_text);
     if (has_match_tensor_expr) {
         fusion_expr->match_tensor_expr_.reset(dynamic_cast<MatchTensorExpr *>(match_tensor_expr.GetParsedExpr(status)));
     } else {
@@ -408,7 +408,7 @@ ParsedExpr *WrapFusionExpr::GetParsedExpr(Status &status) {
 ParsedExpr *WrapMatchTensorExpr::GetParsedExpr(Status &status) {
     status.code_ = ErrorCode::kOk;
 
-    auto match_tensor_expr = MakeUnique<MatchTensorExpr>(own_memory);
+    auto match_tensor_expr = std::make_unique<MatchTensorExpr>(own_memory);
     match_tensor_expr->SetSearchMethodStr(search_method);
     match_tensor_expr->column_expr_.reset(column_expr.GetParsedExpr(status));
     match_tensor_expr->options_text_ = options_text;
@@ -428,7 +428,7 @@ ParsedExpr *WrapMatchTensorExpr::GetParsedExpr(Status &status) {
     }
     match_tensor_expr->dimension_ = dimension;
     const auto copy_bytes = EmbeddingT::EmbeddingSize(match_tensor_expr->embedding_data_type_, match_tensor_expr->dimension_);
-    match_tensor_expr->query_tensor_data_ptr_ = MakeUniqueForOverwrite<char[]>(copy_bytes);
+    match_tensor_expr->query_tensor_data_ptr_ = std::make_unique_for_overwrite<char[]>(copy_bytes);
     std::memcpy(match_tensor_expr->query_tensor_data_ptr_.get(), embedding_data_ptr, copy_bytes);
 
     if (filter_expr) {
@@ -443,7 +443,7 @@ ParsedExpr *WrapMatchTensorExpr::GetParsedExpr(Status &status) {
 ParsedExpr *WrapMatchSparseExpr::GetParsedExpr(Status &status) {
     status.code_ = ErrorCode::kOk;
 
-    auto match_sparse_expr = MakeUnique<MatchSparseExpr>(own_memory);
+    auto match_sparse_expr = std::make_unique<MatchSparseExpr>(own_memory);
 
     auto *column_expr_ptr = column_expr.GetParsedExpr(status);
     if (status.code_ != ErrorCode::kOk) {
@@ -469,7 +469,7 @@ ParsedExpr *WrapMatchSparseExpr::GetParsedExpr(Status &status) {
             match_sparse_expr->ignore_index_ = true;
             continue;
         }
-        auto init_parameter = MakeUnique<InitParameter>();
+        auto init_parameter = std::make_unique<InitParameter>();
         init_parameter->param_name_ = param.param_name_;
         init_parameter->param_value_ = param.param_value_;
         opt_params_ptr->emplace_back(init_parameter.release());
@@ -490,7 +490,7 @@ ParsedExpr *WrapSearchExpr::GetParsedExpr(Status &status) {
 
     auto search_expr = new SearchExpr();
     search_expr->match_exprs_.reserve(match_exprs.size());
-    for (SizeT i = 0; i < match_exprs.size(); ++i) {
+    for (size_t i = 0; i < match_exprs.size(); ++i) {
         search_expr->match_exprs_.emplace_back(match_exprs[i].GetParsedExpr(status));
         if (status.code_ != ErrorCode::kOk) {
             delete search_expr;
@@ -499,7 +499,7 @@ ParsedExpr *WrapSearchExpr::GetParsedExpr(Status &status) {
         }
     }
     search_expr->fusion_exprs_.reserve(fusion_exprs.size());
-    for (SizeT i = 0; i < fusion_exprs.size(); ++i) {
+    for (size_t i = 0; i < fusion_exprs.size(); ++i) {
         search_expr->fusion_exprs_.emplace_back(dynamic_cast<FusionExpr *>(fusion_exprs[i].GetParsedExpr(status)));
         if (status.code_ != ErrorCode::kOk) {
             delete search_expr;
@@ -512,10 +512,10 @@ ParsedExpr *WrapSearchExpr::GetParsedExpr(Status &status) {
 
 ParsedExpr *WrapInExpr::GetParsedExpr(Status &status) {
     status.code_ = ErrorCode::kOk;
-    auto in_expr = MakeUnique<InExpr>();
+    auto in_expr = std::make_unique<InExpr>();
     in_expr->arguments_ = new Vector<ParsedExpr *>();
     in_expr->arguments_->reserve(arguments.size());
-    for (SizeT i = 0; i < arguments.size(); ++i) {
+    for (size_t i = 0; i < arguments.size(); ++i) {
         in_expr->arguments_->emplace_back(arguments[i]->GetParsedExpr(status));
         if (status.code_ != ErrorCode::kOk) {
             return nullptr;
@@ -600,7 +600,7 @@ InsertRowExpr *WrapInsertRowExpr::GetInsertRowExpr(Status &status) {
     insert_row_expr->columns_ = std::move(columns);
     insert_row_expr->values_.reserve(values.size());
     for (auto &value : values) {
-        auto parsed_value_expr = UniquePtr<ParsedExpr>(value.GetParsedExpr(status));
+        auto parsed_value_expr = std::unique_ptr<ParsedExpr>(value.GetParsedExpr(status));
         if (status.code_ != ErrorCode::kOk) {
             return nullptr;
         }
@@ -625,10 +625,10 @@ WrapQueryResult WrapListDatabases(Infinity &instance) {
     auto query_result = instance.ListDatabases();
     WrapQueryResult result(query_result.ErrorCode(), query_result.ErrorMsg());
 
-    SharedPtr<DataBlock> data_block = query_result.result_table_->GetDataBlockById(0);
+    std::shared_ptr<DataBlock> data_block = query_result.result_table_->GetDataBlockById(0);
     auto &names = result.names;
     names.resize(data_block->row_count());
-    for (SizeT i = 0; i < names.size(); ++i) {
+    for (size_t i = 0; i < names.size(); ++i) {
         Value value = data_block->GetValue(0, i);
         names[i] = value.GetVarchar();
     }
@@ -645,7 +645,7 @@ WrapQueryResult WrapShowDatabase(Infinity &instance, const String &db_name) {
     auto query_result = instance.ShowDatabase(db_name);
     WrapQueryResult result(query_result.ErrorCode(), query_result.ErrorMsg());
     if (query_result.IsOk()) {
-        SharedPtr<DataBlock> data_block = query_result.result_table_->GetDataBlockById(0);
+        std::shared_ptr<DataBlock> data_block = query_result.result_table_->GetDataBlockById(0);
         auto row_count = data_block->row_count();
         if (row_count != 4) {
             String error_message = "ShowDatabase: query result is invalid.";
@@ -729,14 +729,14 @@ WrapQueryResult WrapQuery(Infinity &instance, const String &query_text) {
 namespace {
 
 DataType GetDataTypeFromWrapDataType(const WrapDataType &warp_data_type) {
-    SharedPtr<TypeInfo> type_info_ptr = nullptr;
+    std::shared_ptr<TypeInfo> type_info_ptr = nullptr;
     switch (warp_data_type.logical_type) {
         case LogicalType::kEmbedding:
         case LogicalType::kMultiVector:
         case LogicalType::kTensor:
         case LogicalType::kTensorArray: {
             auto &embedding_type = warp_data_type.embedding_type;
-            type_info_ptr = MakeShared<EmbeddingInfo>(embedding_type.element_type, embedding_type.dimension);
+            type_info_ptr = std::make_shared<EmbeddingInfo>(embedding_type.element_type, embedding_type.dimension);
             break;
         }
         case LogicalType::kSparse: {
@@ -759,13 +759,13 @@ DataType GetDataTypeFromWrapDataType(const WrapDataType &warp_data_type) {
 }
 
 Optional<WrapQueryResult> UnwrapColumnDefs(Vector<WrapColumnDef> &column_defs, Vector<ColumnDef *> &column_defs_ptr) {
-    for (SizeT i = 0; i < column_defs.size(); ++i) {
+    for (size_t i = 0; i < column_defs.size(); ++i) {
         auto &wrap_column_def = column_defs[i];
-        auto column_type = MakeShared<DataType>(GetDataTypeFromWrapDataType(wrap_column_def.column_type));
+        auto column_type = std::make_shared<DataType>(GetDataTypeFromWrapDataType(wrap_column_def.column_type));
         Status status;
-        SharedPtr<ParsedExpr> default_expr(wrap_column_def.constant_expr.GetParsedExpr(status));
+        std::shared_ptr<ParsedExpr> default_expr(wrap_column_def.constant_expr.GetParsedExpr(status));
         if (status.code_ != ErrorCode::kOk) {
-            for (SizeT j = 0; j < i; ++j) {
+            for (size_t j = 0; j < i; ++j) {
                 if (column_defs_ptr[j] != nullptr) {
                     delete column_defs_ptr[j];
                     column_defs_ptr[j] = nullptr;
@@ -816,10 +816,10 @@ WrapQueryResult WrapListTables(Infinity &instance, const String &db_name) {
 
     WrapQueryResult result(query_result.ErrorCode(), query_result.ErrorMsg());
 
-    SharedPtr<DataBlock> data_block = query_result.result_table_->GetDataBlockById(0);
+    std::shared_ptr<DataBlock> data_block = query_result.result_table_->GetDataBlockById(0);
     auto &names = result.names;
     names.resize(data_block->row_count());
-    for (SizeT i = 0; i < names.size(); ++i) {
+    for (size_t i = 0; i < names.size(); ++i) {
         Value value = data_block->GetValue(1, i);
         names[i] = value.GetVarchar();
     }
@@ -835,10 +835,10 @@ WrapQueryResult WrapListTableIndexes(Infinity &instance, const String &db_name, 
     auto query_result = instance.ListTableIndexes(db_name, table_name);
     WrapQueryResult result(query_result.ErrorCode(), query_result.ErrorMsg());
 
-    SharedPtr<DataBlock> data_block = query_result.result_table_->GetDataBlockById(0);
+    std::shared_ptr<DataBlock> data_block = query_result.result_table_->GetDataBlockById(0);
     auto &names = result.names;
     names.resize(data_block->row_count());
-    for (SizeT i = 0; i < names.size(); ++i) {
+    for (size_t i = 0; i < names.size(); ++i) {
         Value value = data_block->GetValue(0, i);
         names[i] = value.GetVarchar();
     }
@@ -862,7 +862,7 @@ WrapQueryResult WrapCreateIndex(Infinity &instance,
     index_info->column_name_ = wrap_index_info.column_name;
     {
         auto index_param_list = new Vector<InitParameter *>();
-        for (SizeT j = 0; j < wrap_index_info.index_param_list.size(); ++j) {
+        for (size_t j = 0; j < wrap_index_info.index_param_list.size(); ++j) {
             auto &wrap_init_param = wrap_index_info.index_param_list[j];
             index_param_list->emplace_back(new InitParameter(wrap_init_param.param_name_, wrap_init_param.param_value_));
         }
@@ -885,7 +885,7 @@ WrapQueryResult WrapShowIndex(Infinity &instance, const String &db_name, const S
     auto query_result = instance.ShowIndex(db_name, table_name, index_name);
     WrapQueryResult result(query_result.ErrorCode(), query_result.ErrorMsg());
     if (query_result.IsOk()) {
-        SharedPtr<DataBlock> data_block = query_result.result_table_->GetDataBlockById(0);
+        std::shared_ptr<DataBlock> data_block = query_result.result_table_->GetDataBlockById(0);
         auto row_count = data_block->row_count();
         if (row_count != 10) {
             String error_message = "ShowDatabase: query result is invalid.";
@@ -941,7 +941,7 @@ WrapQueryResult WrapShowBlockColumn(Infinity &instance,
                                     const String &table_name,
                                     const SegmentID &segment_id,
                                     const BlockID &block_id,
-                                    const SizeT &column_id) {
+                                    const size_t &column_id) {
     auto query_result = instance.ShowBlockColumn(db_name, table_name, segment_id, block_id, column_id);
     return WrapQueryResult(query_result.ErrorCode(), query_result.ErrorMsg());
 }
@@ -968,7 +968,7 @@ WrapQueryResult WrapInsert(Infinity &instance, const String &db_name, const Stri
     insert_rows_ptr->reserve(insert_rows.size());
     for (auto &row_expr : insert_rows) {
         Status status;
-        auto row_expr_ptr = UniquePtr<InsertRowExpr>(row_expr.GetInsertRowExpr(status));
+        auto row_expr_ptr = std::unique_ptr<InsertRowExpr>(row_expr.GetInsertRowExpr(status));
         if (status.code_ != ErrorCode::kOk) {
             return WrapQueryResult(status.code_, status.msg_->c_str());
         }
@@ -993,7 +993,7 @@ WrapQueryResult WrapExport(Infinity &instance,
     Vector<ParsedExpr *> *export_columns = new Vector<ParsedExpr *>();
     export_columns->reserve(columns.size());
 
-    for (SizeT i = 0; i < columns.size(); ++i) {
+    for (size_t i = 0; i < columns.size(); ++i) {
         auto &column_name = columns[i];
         ToLower(column_name);
         if (column_name == "_row_id") {
@@ -1035,7 +1035,7 @@ WrapQueryResult WrapDelete(Infinity &instance, const String &db_name, const Stri
     auto query_result = instance.Delete(db_name, table_name, filter);
     i64 deleted_rows = 0;
     if (query_result.IsOk()) {
-        SharedPtr<DataBlock> data_block = query_result.result_table_->GetDataBlockById(0);
+        std::shared_ptr<DataBlock> data_block = query_result.result_table_->GetDataBlockById(0);
         auto row_count = data_block->row_count();
         if (row_count != 1) {
             String error_message = "Delete: query result is invalid.";
@@ -1074,13 +1074,13 @@ WrapQueryResult WrapUpdate(Infinity &instance,
     Vector<UpdateExpr *> *update_list = nullptr;
     if (wrap_update_list != nullptr) {
         update_list = new Vector<UpdateExpr *>(wrap_update_list->size());
-        for (SizeT i = 0; i < wrap_update_list->size(); ++i) {
+        for (size_t i = 0; i < wrap_update_list->size(); ++i) {
             auto &wrap_update_expr = (*wrap_update_list)[i];
             Status status;
             UpdateExpr *update_expr = wrap_update_expr.GetUpdateExpr(status);
             (*update_list)[i] = update_expr;
             if (status.code_ != ErrorCode::kOk) {
-                for (SizeT j = 0; j <= i; ++j) {
+                for (size_t j = 0; j <= i; ++j) {
                     if ((*update_list)[j] != nullptr) {
                         delete (*update_list)[j];
                         (*update_list)[j] = nullptr;
@@ -1099,32 +1099,32 @@ WrapQueryResult WrapUpdate(Infinity &instance,
 }
 
 // WrapSearch related function
-void HandleBoolType(ColumnField &output_column_field, SizeT row_count, const SharedPtr<ColumnVector> &column_vector) {
+void HandleBoolType(ColumnField &output_column_field, size_t row_count, const std::shared_ptr<ColumnVector> &column_vector) {
     String dst;
     dst.reserve(row_count);
-    for (SizeT index = 0; index < row_count; ++index) {
+    for (size_t index = 0; index < row_count; ++index) {
         const char c = column_vector->buffer_->GetCompactBit(index) ? 1 : 0;
         dst.push_back(c);
     }
     output_column_field.column_vectors.emplace_back(dst.c_str(), dst.size());
 }
 
-void HandlePodType(ColumnField &output_column_field, SizeT row_count, const SharedPtr<ColumnVector> &column_vector) {
+void HandlePodType(ColumnField &output_column_field, size_t row_count, const std::shared_ptr<ColumnVector> &column_vector) {
     auto size = column_vector->data_type()->Size() * row_count;
     output_column_field.column_vectors.emplace_back(column_vector->data(), size);
 }
 
-void HandleVarcharType(ColumnField &output_column_field, SizeT row_count, const SharedPtr<ColumnVector> &column_vector) {
-    SizeT all_size = 0;
-    Vector<Pair<const char *, SizeT>> raw_data;
-    for (SizeT index = 0; index < row_count; ++index) {
+void HandleVarcharType(ColumnField &output_column_field, size_t row_count, const std::shared_ptr<ColumnVector> &column_vector) {
+    size_t all_size = 0;
+    Vector<Pair<const char *, size_t>> raw_data;
+    for (size_t index = 0; index < row_count; ++index) {
         Span<const char> data = column_vector->GetVarchar(index);
         all_size += sizeof(i32) + data.size();
         raw_data.emplace_back(data.data(), data.size());
     }
     String dst;
     dst.resize(all_size);
-    SizeT current_offset = 0;
+    size_t current_offset = 0;
     for (const auto [data_ptr, data_size] : raw_data) {
         i32 length = data_size;
         std::memcpy(dst.data() + current_offset, &length, sizeof(i32));
@@ -1136,16 +1136,16 @@ void HandleVarcharType(ColumnField &output_column_field, SizeT row_count, const 
     output_column_field.column_type = column_vector->data_type()->type();
 }
 
-void HandleEmbeddingType(ColumnField &output_column_field, SizeT row_count, const SharedPtr<ColumnVector> &column_vector) {
+void HandleEmbeddingType(ColumnField &output_column_field, size_t row_count, const std::shared_ptr<ColumnVector> &column_vector) {
     auto size = column_vector->data_type()->Size() * row_count;
     output_column_field.column_vectors.emplace_back(column_vector->data(), size);
     output_column_field.column_type = column_vector->data_type()->type();
 }
 
-void HandleMultiVectorType(ColumnField &output_column_field, SizeT row_count, const SharedPtr<ColumnVector> &column_vector) {
-    SizeT all_size = 0;
-    Vector<Pair<const char *, SizeT>> multi_vector_data(row_count);
-    for (SizeT index = 0; index < row_count; ++index) {
+void HandleMultiVectorType(ColumnField &output_column_field, size_t row_count, const std::shared_ptr<ColumnVector> &column_vector) {
+    size_t all_size = 0;
+    Vector<Pair<const char *, size_t>> multi_vector_data(row_count);
+    for (size_t index = 0; index < row_count; ++index) {
         Span<const char> raw_data = column_vector->GetMultiVectorRaw(index).first;
         all_size += sizeof(i32) + raw_data.size();
         multi_vector_data[index] = {raw_data.data(), raw_data.size()};
@@ -1154,7 +1154,7 @@ void HandleMultiVectorType(ColumnField &output_column_field, SizeT row_count, co
     dst.resize(all_size);
 
     i32 current_offset = 0;
-    for (SizeT index = 0; index < row_count; ++index) {
+    for (size_t index = 0; index < row_count; ++index) {
         const auto &[data, length] = multi_vector_data[index];
         std::memcpy(dst.data() + current_offset, &length, sizeof(i32));
         std::memcpy(dst.data() + current_offset + sizeof(i32), data, length);
@@ -1165,10 +1165,10 @@ void HandleMultiVectorType(ColumnField &output_column_field, SizeT row_count, co
     output_column_field.column_type = column_vector->data_type()->type();
 }
 
-void HandleTensorType(ColumnField &output_column_field, SizeT row_count, const SharedPtr<ColumnVector> &column_vector) {
-    SizeT all_size = 0;
-    Vector<Pair<const char *, SizeT>> tensor_data(row_count);
-    for (SizeT index = 0; index < row_count; ++index) {
+void HandleTensorType(ColumnField &output_column_field, size_t row_count, const std::shared_ptr<ColumnVector> &column_vector) {
+    size_t all_size = 0;
+    Vector<Pair<const char *, size_t>> tensor_data(row_count);
+    for (size_t index = 0; index < row_count; ++index) {
         Span<const char> raw_data = column_vector->GetTensorRaw(index).first;
         all_size += sizeof(i32) + raw_data.size();
         tensor_data[index] = {raw_data.data(), raw_data.size()};
@@ -1177,7 +1177,7 @@ void HandleTensorType(ColumnField &output_column_field, SizeT row_count, const S
     dst.resize(all_size);
 
     i32 current_offset = 0;
-    for (SizeT index = 0; index < row_count; ++index) {
+    for (size_t index = 0; index < row_count; ++index) {
         const auto &[data, length] = tensor_data[index];
         std::memcpy(dst.data() + current_offset, &length, sizeof(i32));
         std::memcpy(dst.data() + current_offset + sizeof(i32), data, length);
@@ -1188,13 +1188,13 @@ void HandleTensorType(ColumnField &output_column_field, SizeT row_count, const S
     output_column_field.column_type = column_vector->data_type()->type();
 }
 
-void HandleTensorArrayType(ColumnField &output_column_field, SizeT row_count, const SharedPtr<ColumnVector> &column_vector) {
-    SizeT all_size = 0;
-    Vector<Vector<Pair<const char *, SizeT>>> tensor_array_data;
-    for (SizeT index = 0; index < row_count; ++index) {
+void HandleTensorArrayType(ColumnField &output_column_field, size_t row_count, const std::shared_ptr<ColumnVector> &column_vector) {
+    size_t all_size = 0;
+    Vector<Vector<Pair<const char *, size_t>>> tensor_array_data;
+    for (size_t index = 0; index < row_count; ++index) {
         all_size += sizeof(i32);
-        Vector<Pair<const char *, SizeT>> tensor_data;
-        Vector<Pair<Span<const char>, SizeT>> array_data = column_vector->GetTensorArrayRaw(index);
+        Vector<Pair<const char *, size_t>> tensor_data;
+        Vector<Pair<Span<const char>, size_t>> array_data = column_vector->GetTensorArrayRaw(index);
         for (const auto [raw_data, embedding_num] : array_data) {
             all_size += sizeof(i32) + raw_data.size();
             tensor_data.emplace_back(raw_data.data(), raw_data.size());
@@ -1220,17 +1220,17 @@ void HandleTensorArrayType(ColumnField &output_column_field, SizeT row_count, co
     output_column_field.column_type = column_vector->data_type()->type();
 }
 
-void HandleSparseType(ColumnField &output_column_field, SizeT row_count, const SharedPtr<ColumnVector> &column_vector) {
-    SizeT all_size = 0;
-    Vector<Tuple<Span<const char>, Span<const char>, SizeT>> raw_data;
-    for (SizeT index = 0; index < row_count; ++index) {
+void HandleSparseType(ColumnField &output_column_field, size_t row_count, const std::shared_ptr<ColumnVector> &column_vector) {
+    size_t all_size = 0;
+    Vector<Tuple<Span<const char>, Span<const char>, size_t>> raw_data;
+    for (size_t index = 0; index < row_count; ++index) {
         auto [data_span, index_span, nnz_size_t] = column_vector->GetSparseRaw(index);
         all_size += sizeof(i32) + data_span.size() + index_span.size();
         raw_data.emplace_back(data_span, index_span, nnz_size_t);
     }
     String dst;
     dst.resize(all_size);
-    SizeT current_offset = 0;
+    size_t current_offset = 0;
     for (const auto [data_span, index_span, nnz_size_t] : raw_data) {
         i32 nnz = nnz_size_t;
         std::memcpy(dst.data() + current_offset, &nnz, sizeof(i32));
@@ -1245,13 +1245,13 @@ void HandleSparseType(ColumnField &output_column_field, SizeT row_count, const S
     output_column_field.column_type = column_vector->data_type()->type();
 }
 
-void HandleRowIDType(ColumnField &output_column_field, SizeT row_count, const SharedPtr<ColumnVector> &column_vector) {
+void HandleRowIDType(ColumnField &output_column_field, size_t row_count, const std::shared_ptr<ColumnVector> &column_vector) {
     auto size = column_vector->data_type()->Size() * row_count;
     output_column_field.column_vectors.emplace_back(column_vector->data(), size);
     output_column_field.column_type = column_vector->data_type()->type();
 }
 
-void HandleTimeRelatedTypes(ColumnField &output_column_field, SizeT row_count, const SharedPtr<ColumnVector> &column_vector) {
+void HandleTimeRelatedTypes(ColumnField &output_column_field, size_t row_count, const std::shared_ptr<ColumnVector> &column_vector) {
     auto size = column_vector->data_type()->Size() * row_count;
     String dst;
     dst.resize(size);
@@ -1259,23 +1259,23 @@ void HandleTimeRelatedTypes(ColumnField &output_column_field, SizeT row_count, c
     output_column_field.column_vectors.emplace_back(dst.c_str(), dst.size());
 }
 
-extern template void InfinityThriftService::HandleArrayTypeRecursively<ArrayT>(String &output_str, const DataType &data_type, const ArrayT &data_value, const SharedPtr<ColumnVector> &column_vector);
+extern template void InfinityThriftService::HandleArrayTypeRecursively<ArrayT>(String &output_str, const DataType &data_type, const ArrayT &data_value, const std::shared_ptr<ColumnVector> &column_vector);
 
-void HandleArrayType(ColumnField &output_column_field, SizeT row_count, const SharedPtr<ColumnVector> &column_vector) {
+void HandleArrayType(ColumnField &output_column_field, size_t row_count, const std::shared_ptr<ColumnVector> &column_vector) {
     const auto &column_data_type = *column_vector->data_type();
     if (column_data_type.type() != LogicalType::kArray) {
         UnrecoverableError(fmt::format("{}: Unexpected data type: {}, expect Array!", __func__, column_vector->data_type()->ToString()));
     }
     auto *array_data_ptr = reinterpret_cast<const ArrayT *>(column_vector->data());
     String dst;
-    for (SizeT index = 0; index < row_count; ++index) {
+    for (size_t index = 0; index < row_count; ++index) {
         InfinityThriftService::HandleArrayTypeRecursively(dst, column_data_type, array_data_ptr[index], column_vector);
     }
     output_column_field.column_vectors.emplace_back(dst.c_str(), dst.size());
     output_column_field.column_type = column_vector->data_type()->type();
 }
 
-void ProcessColumnFieldType(ColumnField &output_column_field, SizeT row_count, const SharedPtr<ColumnVector> &column_vector) {
+void ProcessColumnFieldType(ColumnField &output_column_field, size_t row_count, const std::shared_ptr<ColumnVector> &column_vector) {
     switch (column_vector->data_type()->type()) {
         case LogicalType::kBoolean: {
             HandleBoolType(output_column_field, row_count, column_vector);
@@ -1339,9 +1339,9 @@ void ProcessColumnFieldType(ColumnField &output_column_field, SizeT row_count, c
     }
 }
 
-void ProcessColumns(const SharedPtr<DataBlock> &data_block, SizeT column_count, Vector<ColumnField> &columns) {
+void ProcessColumns(const std::shared_ptr<DataBlock> &data_block, size_t column_count, Vector<ColumnField> &columns) {
     auto row_count = data_block->row_count();
-    for (SizeT col_index = 0; col_index < column_count; ++col_index) {
+    for (size_t col_index = 0; col_index < column_count; ++col_index) {
         auto &result_column_vector = data_block->column_vectors[col_index];
         ColumnField &output_column_field = columns[col_index];
         output_column_field.column_type = result_column_vector->data_type()->type();
@@ -1396,7 +1396,7 @@ void DataTypeToWrapDataType(WrapDataType &proto_data_type, const DataType &data_
         }
         case LogicalType::kArray: {
             proto_data_type.logical_type = data_type.type();
-            proto_data_type.array_type = MakeShared<WrapDataType>();
+            proto_data_type.array_type = std::make_shared<WrapDataType>();
             const auto array_info = static_cast<const ArrayInfo *>(data_type.type_info().get());
             const auto &element_data_type = array_info->ElemType();
             DataTypeToWrapDataType(*proto_data_type.array_type, element_data_type);
@@ -1409,10 +1409,10 @@ void DataTypeToWrapDataType(WrapDataType &proto_data_type, const DataType &data_
     }
 }
 
-void HandleColumnDef(WrapQueryResult &wrap_query_result, SizeT column_count, SharedPtr<TableDef> table_def, Vector<ColumnField> &all_column_vectors) {
+void HandleColumnDef(WrapQueryResult &wrap_query_result, size_t column_count, std::shared_ptr<TableDef> table_def, Vector<ColumnField> &all_column_vectors) {
     assert(column_count == all_column_vectors.size());
 
-    for (SizeT col_index = 0; col_index < column_count; ++col_index) {
+    for (size_t col_index = 0; col_index < column_count; ++col_index) {
         auto column_def = table_def->columns()[col_index];
         WrapColumnDef proto_column_def;
         proto_column_def.id = column_def->id();
@@ -1427,8 +1427,8 @@ void HandleColumnDef(WrapQueryResult &wrap_query_result, SizeT column_count, Sha
 }
 
 void ProcessDataBlocks(QueryResult &query_result, WrapQueryResult &wrap_query_result, Vector<ColumnField> &columns) {
-    SizeT blocks_count = query_result.result_table_->DataBlockCount();
-    for (SizeT block_idx = 0; block_idx < blocks_count; ++block_idx) {
+    size_t blocks_count = query_result.result_table_->DataBlockCount();
+    for (size_t block_idx = 0; block_idx < blocks_count; ++block_idx) {
         auto data_block = query_result.result_table_->GetDataBlockById(block_idx);
         ProcessColumns(data_block, query_result.result_table_->ColumnCount(), columns);
     }
@@ -1487,8 +1487,8 @@ WrapQueryResult WrapSearch(Infinity &instance,
     Vector<ParsedExpr *> *output_columns = nullptr;
     DeferFn defer_fn3([&]() {
         if (output_columns != nullptr) {
-            SizeT output_column_len = output_columns->size();
-            for (SizeT i = 0; i < output_column_len; ++i) {
+            size_t output_column_len = output_columns->size();
+            for (size_t i = 0; i < output_column_len; ++i) {
                 if ((*output_columns)[i] != nullptr) {
                     delete (*output_columns)[i];
                     (*output_columns)[i] = nullptr;
@@ -1501,7 +1501,7 @@ WrapQueryResult WrapSearch(Infinity &instance,
     } else {
         output_columns = new Vector<ParsedExpr *>();
         output_columns->reserve(select_list.size());
-        for (SizeT i = 0; i < select_list.size(); ++i) {
+        for (size_t i = 0; i < select_list.size(); ++i) {
             Status status;
             output_columns->emplace_back(select_list.at(i).GetParsedExpr(status));
             if (status.code_ != ErrorCode::kOk) {
@@ -1513,8 +1513,8 @@ WrapQueryResult WrapSearch(Infinity &instance,
     Vector<ParsedExpr *> *highlight = nullptr;
     DeferFn defer_fn7([&]() {
         if (highlight != nullptr) {
-            SizeT highlight_column_len = highlight->size();
-            for (SizeT i = 0; i < highlight_column_len; ++i) {
+            size_t highlight_column_len = highlight->size();
+            for (size_t i = 0; i < highlight_column_len; ++i) {
                 if ((*highlight)[i] != nullptr) {
                     delete (*highlight)[i];
                     (*highlight)[i] = nullptr;
@@ -1525,7 +1525,7 @@ WrapQueryResult WrapSearch(Infinity &instance,
     if (!highlight_list.empty()) {
         highlight = new Vector<ParsedExpr *>();
         highlight->reserve(highlight_list.size());
-        for (SizeT i = 0; i < highlight_list.size(); ++i) {
+        for (size_t i = 0; i < highlight_list.size(); ++i) {
             Status status;
             highlight->emplace_back(highlight_list.at(i).GetParsedExpr(status));
             if (status.code_ != ErrorCode::kOk) {
@@ -1567,8 +1567,8 @@ WrapQueryResult WrapSearch(Infinity &instance,
     Vector<ParsedExpr *> *group_by_exprs = nullptr;
     DeferFn defer_fn8([&]() {
         if (group_by_exprs != nullptr) {
-            SizeT group_by_column_len = group_by_exprs->size();
-            for (SizeT i = 0; i < group_by_column_len; ++i) {
+            size_t group_by_column_len = group_by_exprs->size();
+            for (size_t i = 0; i < group_by_column_len; ++i) {
                 if ((*group_by_exprs)[i] != nullptr) {
                     delete (*group_by_exprs)[i];
                     (*group_by_exprs)[i] = nullptr;
@@ -1579,7 +1579,7 @@ WrapQueryResult WrapSearch(Infinity &instance,
     if (!group_by_list.empty()) {
         group_by_exprs = new Vector<ParsedExpr *>();
         group_by_exprs->reserve(group_by_list.size());
-        for (SizeT i = 0; i < group_by_list.size(); ++i) {
+        for (size_t i = 0; i < group_by_list.size(); ++i) {
             Status status;
             group_by_exprs->emplace_back(group_by_list.at(i).GetParsedExpr(status));
             if (status.code_ != ErrorCode::kOk) {
@@ -1606,8 +1606,8 @@ WrapQueryResult WrapSearch(Infinity &instance,
     Vector<OrderByExpr *> *order_by_exprs = nullptr;
     DeferFn defer_fn6([&]() {
         if (order_by_exprs != nullptr) {
-            SizeT order_by_expr_len = order_by_exprs->size();
-            for (SizeT i = 0; i < order_by_expr_len; ++i) {
+            size_t order_by_expr_len = order_by_exprs->size();
+            for (size_t i = 0; i < order_by_expr_len; ++i) {
                 if ((*order_by_exprs)[i] != nullptr) {
                     delete (*order_by_exprs)[i];
                     (*order_by_exprs)[i] = nullptr;
@@ -1620,7 +1620,7 @@ WrapQueryResult WrapSearch(Infinity &instance,
     if (!order_by_list.empty()) {
         order_by_exprs = new Vector<OrderByExpr *>();
         order_by_exprs->reserve(order_by_list.size());
-        for (SizeT i = 0; i < order_by_list.size(); ++i) {
+        for (size_t i = 0; i < order_by_list.size(); ++i) {
             Status status;
             order_by_exprs->emplace_back(order_by_list.at(i).GetOrderByExpr(status));
             if (status.code_ != ErrorCode::kOk) {
@@ -1705,8 +1705,8 @@ WrapQueryResult WrapExplain(Infinity &instance,
     Vector<ParsedExpr *> *output_columns = nullptr;
     DeferFn defer_fn3([&]() {
         if (output_columns != nullptr) {
-            SizeT output_column_len = output_columns->size();
-            for (SizeT i = 0; i < output_column_len; ++i) {
+            size_t output_column_len = output_columns->size();
+            for (size_t i = 0; i < output_column_len; ++i) {
                 if ((*output_columns)[i] != nullptr) {
                     delete (*output_columns)[i];
                     (*output_columns)[i] = nullptr;
@@ -1719,7 +1719,7 @@ WrapQueryResult WrapExplain(Infinity &instance,
     } else {
         output_columns = new Vector<ParsedExpr *>();
         output_columns->reserve(select_list.size());
-        for (SizeT i = 0; i < select_list.size(); ++i) {
+        for (size_t i = 0; i < select_list.size(); ++i) {
             Status status;
             output_columns->emplace_back(select_list[i].GetParsedExpr(status));
             if (status.code_ != ErrorCode::kOk) {
@@ -1731,8 +1731,8 @@ WrapQueryResult WrapExplain(Infinity &instance,
     Vector<ParsedExpr *> *highlight = nullptr;
     DeferFn defer_fn11([&]() {
         if (highlight != nullptr) {
-            SizeT highlight_column_len = highlight->size();
-            for (SizeT i = 0; i < highlight_column_len; ++i) {
+            size_t highlight_column_len = highlight->size();
+            for (size_t i = 0; i < highlight_column_len; ++i) {
                 if ((*highlight)[i] != nullptr) {
                     delete (*highlight)[i];
                     (*highlight)[i] = nullptr;
@@ -1743,7 +1743,7 @@ WrapQueryResult WrapExplain(Infinity &instance,
     if (!highlight_list.empty()) {
         highlight = new Vector<ParsedExpr *>();
         highlight->reserve(highlight_list.size());
-        for (SizeT i = 0; i < highlight_list.size(); ++i) {
+        for (size_t i = 0; i < highlight_list.size(); ++i) {
             Status status;
             highlight->emplace_back(highlight_list.at(i).GetParsedExpr(status));
             if (status.code_ != ErrorCode::kOk) {
@@ -1785,8 +1785,8 @@ WrapQueryResult WrapExplain(Infinity &instance,
     Vector<ParsedExpr *> *group_by_exprs = nullptr;
     DeferFn defer_fn8([&]() {
         if (group_by_exprs != nullptr) {
-            SizeT group_by_column_len = group_by_exprs->size();
-            for (SizeT i = 0; i < group_by_column_len; ++i) {
+            size_t group_by_column_len = group_by_exprs->size();
+            for (size_t i = 0; i < group_by_column_len; ++i) {
                 if ((*group_by_exprs)[i] != nullptr) {
                     delete (*group_by_exprs)[i];
                     (*group_by_exprs)[i] = nullptr;
@@ -1797,7 +1797,7 @@ WrapQueryResult WrapExplain(Infinity &instance,
     if (!group_by_list.empty()) {
         group_by_exprs = new Vector<ParsedExpr *>();
         group_by_exprs->reserve(group_by_list.size());
-        for (SizeT i = 0; i < group_by_list.size(); ++i) {
+        for (size_t i = 0; i < group_by_list.size(); ++i) {
             Status status;
             group_by_exprs->emplace_back(group_by_list.at(i).GetParsedExpr(status));
             if (status.code_ != ErrorCode::kOk) {
@@ -1824,8 +1824,8 @@ WrapQueryResult WrapExplain(Infinity &instance,
     Vector<OrderByExpr *> *order_by_exprs = nullptr;
     DeferFn defer_fn6([&]() {
         if (order_by_exprs != nullptr) {
-            SizeT order_by_expr_len = order_by_exprs->size();
-            for (SizeT i = 0; i < order_by_expr_len; ++i) {
+            size_t order_by_expr_len = order_by_exprs->size();
+            for (size_t i = 0; i < order_by_expr_len; ++i) {
                 if ((*order_by_exprs)[i] != nullptr) {
                     delete (*order_by_exprs)[i];
                     (*order_by_exprs)[i] = nullptr;
@@ -1838,7 +1838,7 @@ WrapQueryResult WrapExplain(Infinity &instance,
     if (!order_by_list.empty()) {
         order_by_exprs = new Vector<OrderByExpr *>();
         order_by_exprs->reserve(order_by_list.size());
-        for (SizeT i = 0; i < order_by_list.size(); ++i) {
+        for (size_t i = 0; i < order_by_list.size(); ++i) {
             Status status;
             order_by_exprs->emplace_back(order_by_list.at(i).GetOrderByExpr(status));
             if (status.code_ != ErrorCode::kOk) {
@@ -1918,9 +1918,9 @@ WrapQueryResult WrapAddColumns(Infinity &instance, const String &db_name, const 
     if (res.has_value()) {
         return res.value();
     }
-    Vector<SharedPtr<ColumnDef>> column_defs(column_defs_ptr.size());
+    Vector<std::shared_ptr<ColumnDef>> column_defs(column_defs_ptr.size());
     std::transform(column_defs_ptr.begin(), column_defs_ptr.end(), column_defs.begin(), [](ColumnDef *column_def) {
-        return SharedPtr<ColumnDef>(column_def);
+        return std::shared_ptr<ColumnDef>(column_def);
     });
     auto query_result = instance.AddColumns(db_name, table_name, std::move(column_defs));
     return WrapQueryResult(query_result.ErrorCode(), query_result.ErrorMsg());

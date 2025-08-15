@@ -66,7 +66,7 @@ protected:
                 const auto &block_data2 = postings2.data();
                 if constexpr (CompressType == BMPCompressType::kCompressed) {
                     EXPECT_EQ(block_data1.block_num(), block_data2.block_num());
-                    for (SizeT i = 0; i < block_data1.block_num(); ++i) {
+                    for (size_t i = 0; i < block_data1.block_num(); ++i) {
                         EXPECT_EQ(block_data1.block_ids()[i], block_data2.block_ids()[i]);
                         EXPECT_EQ(block_data1.max_scores()[i], block_data2.max_scores()[i]);
                     }
@@ -79,18 +79,18 @@ protected:
             }
         };
 
-        SizeT filesize1 = 0;
-        SizeT filesize2 = 0;
+        size_t filesize1 = 0;
+        size_t filesize2 = 0;
         BMPBlockID block_id = 0;
         {
-            SizeT mem_used;
+            size_t mem_used;
             BMPIvt1 ivt1(ncol);
-            auto tail_fwd = MakeUnique<TailFwd<DataType, IdxType>>(block_size);
+            auto tail_fwd = std::make_unique<TailFwd<DataType, IdxType>>(block_size);
             for (SparseMatrixIter iter(dataset); iter.HasNext(); iter.Next()) {
                 SparseVecRef vec = iter.val();
-                SizeT tail_size = tail_fwd->AddDoc(vec);
+                size_t tail_size = tail_fwd->AddDoc(vec);
                 if (tail_size >= block_size) {
-                    auto tail_fwd1 = MakeUnique<TailFwd<DataType, IdxType>>(block_size);
+                    auto tail_fwd1 = std::make_unique<TailFwd<DataType, IdxType>>(block_size);
                     std::swap(tail_fwd1, tail_fwd);
                     const auto &tail_terms = tail_fwd1->GetTailTerms();
                     ivt1.AddBlock(block_id, tail_terms, mem_used);
@@ -99,7 +99,7 @@ protected:
             }
 
             filesize1 = ivt1.GetSizeInBytes();
-            auto buffer = MakeUnique<char[]>(filesize1);
+            auto buffer = std::make_unique<char[]>(filesize1);
             char *p = buffer.get();
             ivt1.WriteAdv(p);
             EXPECT_EQ(p - buffer.get(), filesize1);
@@ -110,19 +110,19 @@ protected:
             }
             file_handle->Append(buffer.get(), filesize1);
         }
-        UniquePtr<BMPIvt1> ivt1;
+        std::unique_ptr<BMPIvt1> ivt1;
         {
             auto [file_handle, status] = VirtualStore::Open(save_path, FileAccessMode::kRead);
             if (!status.ok()) {
                 UnrecoverableError(fmt::format("Failed to open file: {}", save_path));
             }
-            auto buffer = MakeUnique<char[]>(filesize1);
+            auto buffer = std::make_unique<char[]>(filesize1);
             file_handle->Read(buffer.get(), filesize1);
             const char *p = buffer.get();
-            ivt1 = MakeUnique<BMPIvt1>(BMPIvt1::ReadAdv(p));
+            ivt1 = std::make_unique<BMPIvt1>(BMPIvt1::ReadAdv(p));
             EXPECT_EQ(p - buffer.get(), filesize1);
         }
-        UniquePtr<char[]> buffer2;
+        std::unique_ptr<char[]> buffer2;
         {
             {
                 char *p0 = nullptr;
@@ -130,23 +130,23 @@ protected:
                 char *p1 = nullptr;
                 filesize2 = p0 - p1;
             }
-            buffer2 = MakeUnique<char[]>(filesize2);
+            buffer2 = std::make_unique<char[]>(filesize2);
             char *p2 = buffer2.get();
             ivt1->WriteToPtr(p2);
             EXPECT_EQ(p2 - buffer2.get(), filesize2);
         }
-        UniquePtr<BMPIvt2> ivt2;
+        std::unique_ptr<BMPIvt2> ivt2;
         {
             const char *p2 = buffer2.get();
 
-            ivt2 = MakeUnique<BMPIvt2>(BMPIvt2::ReadFromPtr(p2));
+            ivt2 = std::make_unique<BMPIvt2>(BMPIvt2::ReadFromPtr(p2));
             EXPECT_EQ(p2 - buffer2.get(), filesize2);
 
             check(*ivt1, *ivt2, block_id);
         }
         {
             const char *p = buffer2.get();
-            ivt1 = MakeUnique<BMPIvt1>(BMPIvt1::ReadFromPtr(p));
+            ivt1 = std::make_unique<BMPIvt1>(BMPIvt1::ReadFromPtr(p));
             EXPECT_EQ(p - buffer2.get(), filesize2);
 
             check(*ivt1, *ivt2, block_id);

@@ -23,9 +23,9 @@ public:
 
     ~PostingMerger();
 
-    void Merge(const Vector<SegmentTermPosting *> &segment_term_postings, const RowID &merge_base_rowid);
+    void Merge(const std::vector<SegmentTermPosting *> &segment_term_postings, const RowID &merge_base_rowid);
 
-    void Dump(const SharedPtr<FileWriter> &file_writer, TermMeta &term_meta);
+    void Dump(const std::shared_ptr<FileWriter> &file_writer, TermMeta &term_meta);
 
     u32 GetDF();
 
@@ -33,7 +33,7 @@ public:
 
 private:
     PostingFormat posting_format_;
-    SharedPtr<PostingDumper> posting_dumper_;
+    std::shared_ptr<PostingDumper> posting_dumper_;
     df_t df_;
     ttf_t ttf_;
     // for column length info

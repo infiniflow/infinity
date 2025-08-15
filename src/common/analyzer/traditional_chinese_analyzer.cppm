@@ -26,7 +26,7 @@ namespace infinity {
 
 export class TraditionalChineseAnalyzer : public ChineseAnalyzer {
 public:
-    TraditionalChineseAnalyzer(const String &path);
+    TraditionalChineseAnalyzer(const std::string &path);
 
     TraditionalChineseAnalyzer(const TraditionalChineseAnalyzer &other);
 
@@ -35,7 +35,7 @@ public:
     Status Load();
 
 protected:
-    void Parse(const String &input) override;
+    void Parse(const std::string &input) override;
 
 private:
     OpenCC *opencc_{nullptr};

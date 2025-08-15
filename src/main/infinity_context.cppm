@@ -54,11 +54,11 @@ public:
 
     NodeRole GetServerRole() const;
 
-    void InitPhase1(const SharedPtr<String> &config_path, DefaultConfig *default_config = nullptr);
+    void InitPhase1(const std::shared_ptr<std::string> &config_path, DefaultConfig *default_config = nullptr);
     void InitPhase2(bool admin_flag = false);
-    //    void InitAdminMode(const SharedPtr<String> &config_path, bool m_flag = false, DefaultConfig *default_config = nullptr);
+    //    void InitAdminMode(const std::shared_ptr<std::string> &config_path, bool m_flag = false, DefaultConfig *default_config = nullptr);
     Status
-    ChangeServerRole(NodeRole target_role, bool from_leader = false, const String &node_name = {}, String leader_ip = {}, u16 leader_port = {});
+    ChangeServerRole(NodeRole target_role, bool from_leader = false, const std::string &node_name = {}, std::string leader_ip = {}, u16 leader_port = {});
     bool IsAdminRole() const { return GetServerRole() == NodeRole::kAdmin; }
     bool IsClusterRole() const;
 
@@ -75,19 +75,19 @@ public:
     bool InfinityContextInited() const { return infinity_context_inited_; }
 
     // Only used by UT
-    void SetConfig(UniquePtr<Config> &&config);
+    void SetConfig(std::unique_ptr<Config> &&config);
 private:
     friend class Singleton;
 
     InfinityContext();
     virtual ~InfinityContext();
 
-    UniquePtr<Config> config_{};
-    UniquePtr<ResourceManager> resource_manager_{};
-    UniquePtr<TaskScheduler> task_scheduler_{};
-    UniquePtr<Storage> storage_{};
-    UniquePtr<SessionManager> session_mgr_{};
-    UniquePtr<ClusterManager> cluster_manager_{};
+    std::unique_ptr<Config> config_{};
+    std::unique_ptr<ResourceManager> resource_manager_{};
+    std::unique_ptr<TaskScheduler> task_scheduler_{};
+    std::unique_ptr<Storage> storage_{};
+    std::unique_ptr<SessionManager> session_mgr_{};
+    std::unique_ptr<ClusterManager> cluster_manager_{};
     atomic_bool infinity_context_started_{false};
     atomic_bool infinity_context_inited_{false};
 

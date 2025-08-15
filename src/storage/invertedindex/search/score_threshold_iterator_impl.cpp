@@ -43,11 +43,11 @@ bool ScoreThresholdIterator::Next(RowID doc_id) {
     }
 }
 
-void ScoreThresholdIterator::PrintTree(std::ostream &os, const String &prefix, const bool is_final) const {
+void ScoreThresholdIterator::PrintTree(std::ostream &os, const std::string &prefix, const bool is_final) const {
     os << prefix;
     os << (is_final ? "└──" : "├──");
     os << "ScoreThresholdIterator (score_threshold: " << score_threshold_ << ")\n";
-    const String next_prefix = prefix + (is_final ? "    " : "│   ");
+    const std::string next_prefix = prefix + (is_final ? "    " : "│   ");
     query_iterator_->PrintTree(os, next_prefix, true);
 }
 

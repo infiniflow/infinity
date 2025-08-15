@@ -57,11 +57,11 @@ struct SparseTryCastToSparse {
 
 template <typename SourceValueType, typename SourceIndiceType>
 SparseVec<SourceValueType, SourceIndiceType> SortSourceSparse(SparseVecRef<SourceValueType, SourceIndiceType> old_sparse_ref) {
-    Vector<SizeT> idx(old_sparse_ref.nnz_);
+    std::vector<size_t> idx(old_sparse_ref.nnz_);
     std::iota(idx.begin(), idx.end(), 0);
-    std::sort(idx.begin(), idx.end(), [&old_sparse_ref](SizeT i, SizeT j) { return old_sparse_ref.indices_[i] < old_sparse_ref.indices_[j]; });
-    auto new_data = MakeUniqueForOverwrite<SourceValueType[]>(old_sparse_ref.nnz_);
-    auto new_indices = MakeUniqueForOverwrite<SourceIndiceType[]>(old_sparse_ref.nnz_);
+    std::sort(idx.begin(), idx.end(), [&old_sparse_ref](size_t i, size_t j) { return old_sparse_ref.indices_[i] < old_sparse_ref.indices_[j]; });
+    auto new_data = std::make_unique_for_overwrite<SourceValueType[]>(old_sparse_ref.nnz_);
+    auto new_indices = std::make_unique_for_overwrite<SourceIndiceType[]>(old_sparse_ref.nnz_);
     for (i32 i = 0; i < old_sparse_ref.nnz_; ++i) {
         new_data[i] = old_sparse_ref.data_[idx[i]];
         new_indices[i] = old_sparse_ref.indices_[idx[i]];
@@ -94,9 +94,9 @@ void SparseTryCastToSparseFunInner(const SparseInfo *source_info,
         if constexpr (std::is_same_v<TargetIndiceType, SourceIndiceType>) {
             target.file_offset_ = tgt_vec_buffer->AppendSparse(source_sparse_ref);
         } else {
-            auto target_indice_tmp_ptr = MakeUniqueForOverwrite<TargetIndiceType[]>(source_nnz);
+            auto target_indice_tmp_ptr = std::make_unique_for_overwrite<TargetIndiceType[]>(source_nnz);
             if (!EmbeddingTryCastToFixlen::Run(source_sparse_ref.indices_, target_indice_tmp_ptr.get(), source_nnz)) {
-                String error_message = fmt::format("Fail to case from sparse with idx {} to sparse with idx {}",
+                std::string error_message = fmt::format("Fail to case from sparse with idx {} to sparse with idx {}",
                                                    DataType::TypeToString<SourceIndiceType>(),
                                                    DataType::TypeToString<TargetIndiceType>());
                 UnrecoverableError(error_message);
@@ -107,11 +107,11 @@ void SparseTryCastToSparseFunInner(const SparseInfo *source_info,
             target.file_offset_ = tgt_vec_buffer->AppendSparse(target_sparse_ref);
         }
     } else {
-        UniquePtr<TargetValueType[]> target_value_tmp_ptr = nullptr;
+        std::unique_ptr<TargetValueType[]> target_value_tmp_ptr = nullptr;
         if constexpr (!std::is_same_v<TargetValueType, BooleanT>) {
-            target_value_tmp_ptr = MakeUniqueForOverwrite<TargetValueType[]>(source_nnz);
+            target_value_tmp_ptr = std::make_unique_for_overwrite<TargetValueType[]>(source_nnz);
             if (!EmbeddingTryCastToFixlen::Run(source_sparse_ref.data_, target_value_tmp_ptr.get(), source_nnz)) {
-                String error_message = fmt::format("Fail to case from sparse with idx {} to sparse with idx {}",
+                std::string error_message = fmt::format("Fail to case from sparse with idx {} to sparse with idx {}",
                                                    DataType::TypeToString<SourceIndiceType>(),
                                                    DataType::TypeToString<TargetIndiceType>());
                 UnrecoverableError(error_message);
@@ -123,9 +123,9 @@ void SparseTryCastToSparseFunInner(const SparseInfo *source_info,
                                                                               target_value_tmp_ptr.get()};
             target.file_offset_ = tgt_vec_buffer->AppendSparse(target_sparse_ref);
         } else {
-            auto target_indice_tmp_ptr = MakeUniqueForOverwrite<TargetIndiceType[]>(source_nnz);
+            auto target_indice_tmp_ptr = std::make_unique_for_overwrite<TargetIndiceType[]>(source_nnz);
             if (!EmbeddingTryCastToFixlen::Run(source_sparse_ref.indices_, target_indice_tmp_ptr.get(), source_nnz)) {
-                String error_message = fmt::format("Fail to case from sparse with idx {} to sparse with idx {}",
+                std::string error_message = fmt::format("Fail to case from sparse with idx {} to sparse with idx {}",
                                                    DataType::TypeToString<SourceIndiceType>(),
                                                    DataType::TypeToString<TargetIndiceType>());
                 UnrecoverableError(error_message);
@@ -393,8 +393,8 @@ bool SparseTryCastToSparse::Run(const SparseT &source,
                                 ColumnVector *target_vector_ptr) {
     const auto *source_info = static_cast<const SparseInfo *>(source_type.type_info().get());
     const auto *target_info = static_cast<const SparseInfo *>(target_type.type_info().get());
-    SizeT source_dim = source_info->Dimension();
-    SizeT target_dim = target_info->Dimension();
+    size_t source_dim = source_info->Dimension();
+    size_t target_dim = target_info->Dimension();
     if (source_dim > target_dim) {
         RecoverableError(Status::DataTypeMismatch(source_type.ToString(), target_type.ToString()));
     }

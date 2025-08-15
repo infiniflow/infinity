@@ -27,22 +27,22 @@ struct ColumnVector;
 
 export class ExpressionSelector {
 public:
-    SizeT Select(const SharedPtr<BaseExpression> &expr,
-                 SharedPtr<ExpressionState> &state,
+    size_t Select(const std::shared_ptr<BaseExpression> &expr,
+                 std::shared_ptr<ExpressionState> &state,
                  const DataBlock *input_data_block,
                  DataBlock *output_data_block,
-                 SizeT count);
+                 size_t count);
 
-    void Select(const SharedPtr<BaseExpression> &expr,
-                SharedPtr<ExpressionState> &state,
-                SizeT count,
-                const SharedPtr<Selection> &input_select,
-                SharedPtr<Selection> &output_true_select,
-                SharedPtr<Selection> &output_false_select);
+    void Select(const std::shared_ptr<BaseExpression> &expr,
+                std::shared_ptr<ExpressionState> &state,
+                size_t count,
+                const std::shared_ptr<Selection> &input_select,
+                std::shared_ptr<Selection> &output_true_select,
+                std::shared_ptr<Selection> &output_false_select);
 
-    void Select(const SharedPtr<BaseExpression> &expr, SharedPtr<ExpressionState> &state, SizeT count, SharedPtr<Selection> &output_true_select);
+    void Select(const std::shared_ptr<BaseExpression> &expr, std::shared_ptr<ExpressionState> &state, size_t count, std::shared_ptr<Selection> &output_true_select);
 
-    static void Select(const SharedPtr<ColumnVector> &bool_column, SizeT count, SharedPtr<Selection> &output_true_select, bool nullable);
+    static void Select(const std::shared_ptr<ColumnVector> &bool_column, size_t count, std::shared_ptr<Selection> &output_true_select, bool nullable);
 
 private:
     const DataBlock *input_data_{nullptr};

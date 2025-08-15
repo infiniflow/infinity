@@ -23,7 +23,6 @@ module;
 module infinity_core:chinese_analyzer.impl;
 
 import :chinese_analyzer;
-import :stl;
 import :term;
 import :analyzer;
 import :common_analyzer;
@@ -33,15 +32,15 @@ import std;
 namespace fs = std::filesystem;
 
 namespace infinity {
-static const String DICT_PATH = "jieba/dict/jieba.dict.utf8";
-static const String HMM_PATH = "jieba/dict/hmm_model.utf8";
-static const String USER_DICT_PATH = "jieba/dict/user.dict.utf8";
-static const String IDF_PATH = "jieba/dict/idf.utf8";
-static const String STOP_WORD_PATH = "jieba/dict/stop_words.utf8";
+static const std::string DICT_PATH = "jieba/dict/jieba.dict.utf8";
+static const std::string HMM_PATH = "jieba/dict/hmm_model.utf8";
+static const std::string USER_DICT_PATH = "jieba/dict/user.dict.utf8";
+static const std::string IDF_PATH = "jieba/dict/idf.utf8";
+static const std::string STOP_WORD_PATH = "jieba/dict/stop_words.utf8";
 
 namespace fs = std::filesystem;
 
-ChineseAnalyzer::ChineseAnalyzer(const String &path) : dict_path_(path) { cjk_ = true; }
+ChineseAnalyzer::ChineseAnalyzer(const std::string &path) : dict_path_(path) { cjk_ = true; }
 
 ChineseAnalyzer::ChineseAnalyzer(const ChineseAnalyzer &other) {
     cjk_ = true;
@@ -94,16 +93,16 @@ Status ChineseAnalyzer::Load() {
     return Status::OK();
 }
 
-void ChineseAnalyzer::LoadStopwordsDict(const String &stopwords_path) {
+void ChineseAnalyzer::LoadStopwordsDict(const std::string &stopwords_path) {
     std::ifstream ifs(stopwords_path);
-    String line;
-    stopwords_ = MakeShared<FlatHashSet<String>>();
+    std::string line;
+    stopwords_ = std::make_shared<FlatHashSet<std::string>>();
     while (getline(ifs, line)) {
         stopwords_->insert(line);
     }
 }
 
-void ChineseAnalyzer::Parse(const String &input) {
+void ChineseAnalyzer::Parse(const std::string &input) {
     if (cut_grain_ == CutGrain::kCoarse)
         jieba_->Cut(input, cut_words_, true);
     else

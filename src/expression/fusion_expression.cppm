@@ -29,16 +29,16 @@ namespace infinity {
 
 export class FusionExpression : public BaseExpression {
 public:
-    FusionExpression(const String &method, SharedPtr<SearchOptions> options);
+    FusionExpression(const std::string &method, std::shared_ptr<SearchOptions> options);
 
     [[nodiscard]] inline DataType Type() const override { return DataType(LogicalType::kFloat); }
 
-    String ToString() const override;
+    std::string ToString() const override;
 
 public:
-    String method_{};
-    SharedPtr<SearchOptions> options_{};
-    SharedPtr<MatchTensorExpression> match_tensor_expr_;
+    std::string method_{};
+    std::shared_ptr<SearchOptions> options_{};
+    std::shared_ptr<MatchTensorExpression> match_tensor_expr_;
 };
 
 } // namespace infinity

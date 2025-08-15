@@ -34,7 +34,7 @@ namespace infinity {
 
 MemIndex::~MemIndex() = default;
 
-SizeT MemIndex::GetMemUsed() const {
+size_t MemIndex::GetMemUsed() const {
     const BaseMemIndex *base_mem_index = GetBaseMemIndex();
     if (base_mem_index == nullptr) {
         return 0;
@@ -47,19 +47,19 @@ RowID MemIndex::GetBeginRowID() {
     if (base_mem_index != nullptr) {
         return base_mem_index->GetBeginRowID();
     }
-    SharedPtr<EMVBIndexInMem> emvb_index = GetEMVBIndex();
+    std::shared_ptr<EMVBIndexInMem> emvb_index = GetEMVBIndex();
     if (emvb_index != nullptr) {
         return emvb_index->GetBeginRowID();
     }
     return RowID();
 }
 
-SizeT MemIndex::GetRowCount() {
+size_t MemIndex::GetRowCount() {
     const BaseMemIndex *base_mem_index = GetBaseMemIndex();
     if (base_mem_index != nullptr) {
         return base_mem_index->GetRowCount();
     }
-    SharedPtr<EMVBIndexInMem> emvb_index = GetEMVBIndex();
+    std::shared_ptr<EMVBIndexInMem> emvb_index = GetEMVBIndex();
     if (emvb_index != nullptr) {
         return emvb_index->GetRowCount();
     }
@@ -131,7 +131,7 @@ const BaseMemIndex *MemIndex::GetBaseMemIndex() const {
     return res;
 }
 
-void MemIndex::SetBaseMemIndexInfo(const String &db_name, const String &table_name, const String &index_name, const SegmentID &segment_id) {
+void MemIndex::SetBaseMemIndexInfo(const std::string &db_name, const std::string &table_name, const std::string &index_name, const SegmentID &segment_id) {
     BaseMemIndex *res = nullptr;
     if (memory_hnsw_index_.get() != nullptr) {
         res = static_cast<BaseMemIndex *>(memory_hnsw_index_.get());
@@ -154,7 +154,7 @@ void MemIndex::SetBaseMemIndexInfo(const String &db_name, const String &table_na
     res->segment_id_ = segment_id;
 }
 
-void MemIndex::SetEMVBMemIndexInfo(const String &db_name, const String &table_name, const String &index_name, const SegmentID &segment_id) {
+void MemIndex::SetEMVBMemIndexInfo(const std::string &db_name, const std::string &table_name, const std::string &index_name, const SegmentID &segment_id) {
     EMVBIndexInMem *res = memory_emvb_index_.get();
     if (res != nullptr) {
         res->db_name_ = db_name;
@@ -175,72 +175,72 @@ EMVBIndexInMem *MemIndex::GetEMVBMemIndex(const MemIndexID &mem_index_id) {
     return res;
 }
 
-SharedPtr<HnswIndexInMem> MemIndex::GetHnswIndex() {
+std::shared_ptr<HnswIndexInMem> MemIndex::GetHnswIndex() {
     std::unique_lock<std::mutex> lock(mtx_);
     return memory_hnsw_index_;
 }
 
-void MemIndex::SetHnswIndex(SharedPtr<HnswIndexInMem> hnsw_index) {
+void MemIndex::SetHnswIndex(std::shared_ptr<HnswIndexInMem> hnsw_index) {
     std::unique_lock<std::mutex> lock(mtx_);
     memory_hnsw_index_ = hnsw_index;
 }
 
-SharedPtr<IVFIndexInMem> MemIndex::GetIVFIndex() {
+std::shared_ptr<IVFIndexInMem> MemIndex::GetIVFIndex() {
     std::unique_lock<std::mutex> lock(mtx_);
     return memory_ivf_index_;
 }
 
-void MemIndex::SetIVFIndex(SharedPtr<IVFIndexInMem> ivf_index) {
+void MemIndex::SetIVFIndex(std::shared_ptr<IVFIndexInMem> ivf_index) {
     std::unique_lock<std::mutex> lock(mtx_);
     memory_ivf_index_ = ivf_index;
 }
 
-SharedPtr<MemoryIndexer> MemIndex::GetFulltextIndex() {
+std::shared_ptr<MemoryIndexer> MemIndex::GetFulltextIndex() {
     std::unique_lock<std::mutex> lock(mtx_);
     return memory_indexer_;
 }
 
-void MemIndex::SetFulltextIndex(SharedPtr<MemoryIndexer> indexer) {
+void MemIndex::SetFulltextIndex(std::shared_ptr<MemoryIndexer> indexer) {
     std::unique_lock<std::mutex> lock(mtx_);
     memory_indexer_ = indexer;
 }
 
-SharedPtr<SecondaryIndexInMem> MemIndex::GetSecondaryIndex() {
+std::shared_ptr<SecondaryIndexInMem> MemIndex::GetSecondaryIndex() {
     std::unique_lock<std::mutex> lock(mtx_);
     return memory_secondary_index_;
 }
 
-void MemIndex::SetSecondaryIndex(SharedPtr<SecondaryIndexInMem> secondary_index) {
+void MemIndex::SetSecondaryIndex(std::shared_ptr<SecondaryIndexInMem> secondary_index) {
     std::unique_lock<std::mutex> lock(mtx_);
     memory_secondary_index_ = secondary_index;
 }
 
-SharedPtr<EMVBIndexInMem> MemIndex::GetEMVBIndex() {
+std::shared_ptr<EMVBIndexInMem> MemIndex::GetEMVBIndex() {
     std::unique_lock<std::mutex> lock(mtx_);
     return memory_emvb_index_;
 }
 
-void MemIndex::SetEMVBIndex(SharedPtr<EMVBIndexInMem> emvb_index) {
+void MemIndex::SetEMVBIndex(std::shared_ptr<EMVBIndexInMem> emvb_index) {
     std::unique_lock<std::mutex> lock(mtx_);
     memory_emvb_index_ = emvb_index;
 }
 
-SharedPtr<BMPIndexInMem> MemIndex::GetBMPIndex() {
+std::shared_ptr<BMPIndexInMem> MemIndex::GetBMPIndex() {
     std::unique_lock<std::mutex> lock(mtx_);
     return memory_bmp_index_;
 }
 
-void MemIndex::SetBMPIndex(SharedPtr<BMPIndexInMem> bmp_index) {
+void MemIndex::SetBMPIndex(std::shared_ptr<BMPIndexInMem> bmp_index) {
     std::unique_lock<std::mutex> lock(mtx_);
     memory_bmp_index_ = bmp_index;
 }
 
-SharedPtr<DummyIndexInMem> MemIndex::GetDummyIndex() {
+std::shared_ptr<DummyIndexInMem> MemIndex::GetDummyIndex() {
     std::unique_lock<std::mutex> lock(mtx_);
     return memory_dummy_index_;
 }
 
-void MemIndex::SetDummyIndex(SharedPtr<DummyIndexInMem> dummy_index) {
+void MemIndex::SetDummyIndex(std::shared_ptr<DummyIndexInMem> dummy_index) {
     std::unique_lock<std::mutex> lock(mtx_);
     memory_dummy_index_ = dummy_index;
 }

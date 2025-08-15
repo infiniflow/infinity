@@ -26,10 +26,10 @@ class PlanFragment;
 class Notifier;
 
 export struct BGQueryState {
-    Vector<SharedPtr<LogicalNode>> logical_plans{};
-    Vector<UniquePtr<PhysicalOperator>> physical_plans{};
-    SharedPtr<PlanFragment> plan_fragment{};
-    UniquePtr<Notifier> notifier{};
+    std::vector<std::shared_ptr<LogicalNode>> logical_plans{};
+    std::vector<std::unique_ptr<PhysicalOperator>> physical_plans{};
+    std::shared_ptr<PlanFragment> plan_fragment{};
+    std::unique_ptr<Notifier> notifier{};
 };
 
 } // namespace infinity

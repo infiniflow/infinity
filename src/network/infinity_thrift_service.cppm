@@ -237,7 +237,7 @@ private:
 
     static infinity_thrift_rpc::ColumnType::type DataTypeToProtoColumnType(const std::shared_ptr<DataType> &data_type);
 
-    UniquePtr<infinity_thrift_rpc::DataType> DataTypeToProtoDataType(const std::shared_ptr<DataType> &data_type);
+    std::unique_ptr<infinity_thrift_rpc::DataType> DataTypeToProtoDataType(const std::shared_ptr<DataType> &data_type);
 
     infinity_thrift_rpc::ElementType::type EmbeddingDataTypeToProtoElementType(const EmbeddingDataType &embedding_data_type);
 

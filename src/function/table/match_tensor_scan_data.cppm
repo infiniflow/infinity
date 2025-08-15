@@ -33,11 +33,11 @@ export class MatchTensorScanFunctionData final : public TableFunctionData {
 public:
     using TensorResultHandler = MergeKnnResultHandler<float>;
 
-    explicit MatchTensorScanFunctionData(const u32 topn, const Optional<f32> knn_threshold) : topn_(topn), knn_threshold_(knn_threshold) { Init(); }
+    explicit MatchTensorScanFunctionData(const u32 topn, const std::optional<f32> knn_threshold) : topn_(topn), knn_threshold_(knn_threshold) { Init(); }
 
     void Init() {
-        score_result_ = MakeUniqueForOverwrite<float[]>(topn_);
-        row_id_result_ = MakeUniqueForOverwrite<RowID[]>(topn_);
+        score_result_ = std::make_unique_for_overwrite<float[]>(topn_);
+        row_id_result_ = std::make_unique_for_overwrite<RowID[]>(topn_);
         result_handler_ =
             GetMergeKnnResultHandler<ReservoirResultHandler, CompareMin, float>(1, topn_, score_result_.get(), row_id_result_.get(), knn_threshold_);
         result_handler_->Begin();
@@ -55,10 +55,10 @@ public:
 
     bool finished_ = false;
     const u32 topn_ = 0;
-    const Optional<f32> knn_threshold_;
-    UniquePtr<float[]> score_result_;
-    UniquePtr<RowID[]> row_id_result_;
-    UniquePtr<TensorResultHandler> result_handler_;
+    const std::optional<f32> knn_threshold_;
+    std::unique_ptr<float[]> score_result_;
+    std::unique_ptr<RowID[]> row_id_result_;
+    std::unique_ptr<TensorResultHandler> result_handler_;
 };
 
 } // namespace infinity

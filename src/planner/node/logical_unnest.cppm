@@ -29,29 +29,29 @@ namespace infinity {
 
 export class LogicalUnnest : public LogicalNode {
 public:
-    explicit LogicalUnnest(u64 node_id, Vector<SharedPtr<BaseExpression>> expressions, u64 unnest_idx)
+    explicit LogicalUnnest(u64 node_id, std::vector<std::shared_ptr<BaseExpression>> expressions, u64 unnest_idx)
         : LogicalNode(node_id, LogicalNodeType::kUnnest), expression_list_(std::move(expressions)), unnest_idx_(unnest_idx) {}
 
-    [[nodiscard]] Vector<ColumnBinding> GetColumnBindings() const;
+    [[nodiscard]] std::vector<ColumnBinding> GetColumnBindings() const;
 
-    [[nodiscard]] Vector<ColumnBinding> RemoveColumnBindings() const;
+    [[nodiscard]] std::vector<ColumnBinding> RemoveColumnBindings() const;
 
-    [[nodiscard]] SharedPtr<Vector<String>> GetOutputNames() const;
+    [[nodiscard]] std::shared_ptr<std::vector<std::string>> GetOutputNames() const;
 
-    [[nodiscard]] SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const;
+    [[nodiscard]] std::shared_ptr<std::vector<std::shared_ptr<DataType>>> GetOutputTypes() const;
 
-    String ToString(i64 &space) const final;
+    std::string ToString(i64 &space) const final;
 
-    inline String name() final { return "LogicalUnnest"; }
+    inline std::string name() final { return "LogicalUnnest"; }
 
 public:
     // getter
-    Vector<SharedPtr<BaseExpression>> &expression_list() { return expression_list_; }
-    const Vector<SharedPtr<BaseExpression>> &expression_list() const { return expression_list_; }
+    std::vector<std::shared_ptr<BaseExpression>> &expression_list() { return expression_list_; }
+    const std::vector<std::shared_ptr<BaseExpression>> &expression_list() const { return expression_list_; }
     u64 unnest_idx() const { return unnest_idx_; }
 
 private:
-    Vector<SharedPtr<BaseExpression>> expression_list_{};
+    std::vector<std::shared_ptr<BaseExpression>> expression_list_{};
     u64 unnest_idx_{};
 };
 

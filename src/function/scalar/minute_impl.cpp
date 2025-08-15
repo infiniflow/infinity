@@ -60,9 +60,9 @@ inline bool MinuteFunction::Run(TimestampT left, BigIntT &result) {
 }
 
 void RegisterMinuteFunction(NewCatalog *catalog_ptr) {
-    String func_name = "minute";
+    std::string func_name = "minute";
 
-    SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
+    std::shared_ptr<ScalarFunctionSet> function_set_ptr = std::make_shared<ScalarFunctionSet>(func_name);
 
     ScalarFunction minute_datetime_function(func_name,
                                   {DataType(LogicalType::kDateTime)},

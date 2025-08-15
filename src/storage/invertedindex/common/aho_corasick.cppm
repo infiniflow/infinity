@@ -1,10 +1,9 @@
-module;
-
 export module infinity_core:aho_corasick;
 
-import :stl;
 import :darts;
+import :infinity_type;
 
+import std;
 import std.compat;
 
 namespace infinity {
@@ -22,13 +21,13 @@ public:
 
     struct ResultType {
         value_type value;
-        std::size_t length;
-        std::size_t position;
+        size_t length;
+        size_t position;
     };
 
-    int Build(const Vector<String> &patterns);
+    int Build(const std::vector<std::string> &patterns);
 
-    u32 Find(const String &text, ResultType *results, u32 max_num_results) const;
+    u32 Find(const std::string &text, ResultType *results, u32 max_num_results) const;
 
     void Clear() {
         DoubleArrayImpl<void, void, int, void>::clear();

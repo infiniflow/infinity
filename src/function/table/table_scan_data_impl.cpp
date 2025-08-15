@@ -24,8 +24,8 @@ import :block_index;
 namespace infinity {
 
 TableScanFunctionData::TableScanFunctionData(const BlockIndex *block_index,
-                                             const SharedPtr<Vector<GlobalBlockID>> &global_block_ids,
-                                             const Vector<SizeT> &column_ids)
+                                             const std::shared_ptr<std::vector<GlobalBlockID>> &global_block_ids,
+                                             const std::vector<size_t> &column_ids)
     : block_index_(block_index), global_block_ids_(global_block_ids), column_ids_(column_ids) {}
 
 } // namespace infinity

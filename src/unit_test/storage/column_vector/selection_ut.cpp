@@ -51,7 +51,7 @@ TEST_F(SelectionTest, test1) {
 
     EXPECT_THROW_WITHOUT_STACKTRACE(s1.Initialize(std::numeric_limits<u16>::max() + 1), UnrecoverableException);
 
-    for (SizeT i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
+    for (size_t i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         EXPECT_EQ(s1.Get(i), i);
     }
 
@@ -61,24 +61,24 @@ TEST_F(SelectionTest, test1) {
     EXPECT_THROW_WITHOUT_STACKTRACE(s1.Get(DEFAULT_VECTOR_SIZE), UnrecoverableException);
     EXPECT_THROW_WITHOUT_STACKTRACE(s1.Get(0), UnrecoverableException);
 
-    for (SizeT i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
+    for (size_t i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         s1.Append(i * 2);
     }
-    for (SizeT i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
+    for (size_t i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         EXPECT_EQ(s1.Get(i), 2 * i);
     }
     EXPECT_EQ(s1.Size(), (u64)DEFAULT_VECTOR_SIZE);
-    for (SizeT i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
+    for (size_t i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         s1[i] = 3 * i;
     }
-    for (SizeT i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
+    for (size_t i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         EXPECT_EQ(s1.Get(i), 3 * i);
     }
     EXPECT_THROW_WITHOUT_STACKTRACE(s1.Get(DEFAULT_VECTOR_SIZE), UnrecoverableException);
-    for (SizeT i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
+    for (size_t i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         s1.Set(i, 4 * i);
     }
-    for (SizeT i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
+    for (size_t i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         EXPECT_EQ(s1.Get(i), 4 * i);
     }
 }

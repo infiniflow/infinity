@@ -47,8 +47,8 @@ TEST_F(KnnFlatIpTest, test1) {
     i64 dimension = 4;
     i64 top_k = 4;
     i64 base_embedding_count = 4;
-    UniquePtr<f32[]> base_embedding = MakeUnique<f32[]>(sizeof(f32) * dimension * base_embedding_count);
-    UniquePtr<f32[]> query_embedding = MakeUnique<f32[]>(sizeof(f32) * dimension);
+    std::unique_ptr<f32[]> base_embedding = std::make_unique<f32[]>(sizeof(f32) * dimension * base_embedding_count);
+    std::unique_ptr<f32[]> query_embedding = std::make_unique<f32[]>(sizeof(f32) * dimension);
 
     {
         base_embedding[0] = 0.1;

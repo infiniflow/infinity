@@ -46,17 +46,17 @@ namespace infinity {
 namespace {
 
 template <typename QueryDataType, typename DistDataType>
-UniquePtr<KnnDistanceBase1> InitDistanceBase(KnnDistanceType distance_type) {
-    return MakeUnique<KnnDistance1<QueryDataType, DistDataType>>(distance_type);
+std::unique_ptr<KnnDistanceBase1> InitDistanceBase(KnnDistanceType distance_type) {
+    return std::make_unique<KnnDistance1<QueryDataType, DistDataType>>(distance_type);
 }
 
 } // namespace
 
-KnnScanSharedData::KnnScanSharedData(SharedPtr<BaseTableRef> table_ref,
-                                     UniquePtr<Vector<BlockMeta *>> block_metas,
-                                     SharedPtr<TableIndexMeeta> table_index_meta,
-                                     UniquePtr<Vector<SharedPtr<SegmentIndexMeta>>> segment_index_metas,
-                                     Vector<InitParameter> opt_params,
+KnnScanSharedData::KnnScanSharedData(std::shared_ptr<BaseTableRef> table_ref,
+                                     std::unique_ptr<std::vector<BlockMeta *>> block_metas,
+                                     std::shared_ptr<TableIndexMeeta> table_index_meta,
+                                     std::unique_ptr<std::vector<std::shared_ptr<SegmentIndexMeta>>> segment_index_metas,
+                                     std::vector<InitParameter> opt_params,
                                      i64 topk,
                                      i64 dimension,
                                      i64 query_embedding_count,
@@ -69,7 +69,7 @@ KnnScanSharedData::KnnScanSharedData(SharedPtr<BaseTableRef> table_ref,
 
 KnnScanSharedData::~KnnScanSharedData() = default;
 
-UniquePtr<KnnDistanceBase1> KnnDistanceBase1::Make(EmbeddingDataType embedding_type, KnnDistanceType distance_type) {
+std::unique_ptr<KnnDistanceBase1> KnnDistanceBase1::Make(EmbeddingDataType embedding_type, KnnDistanceType distance_type) {
     switch (embedding_type) {
         case EmbeddingDataType::kElemFloat:
             return InitDistanceBase<f32, f32>(distance_type);
@@ -128,8 +128,8 @@ void KnnDistance1<u8, i32>::InitKnnDistance1(KnnDistanceType dist_type) {
     }
 }
 
-f32 hnsw_u8l2_f32_wrapper(const u8 *v1, const u8 *v2, SizeT dim) { return static_cast<f32>(GetSIMD_FUNCTIONS().HNSW_U8L2_ptr_(v1, v2, dim)); }
-f32 hnsw_u8ip_f32_wrapper(const u8 *v1, const u8 *v2, SizeT dim) { return static_cast<f32>(GetSIMD_FUNCTIONS().HNSW_U8IP_ptr_(v1, v2, dim)); }
+f32 hnsw_u8l2_f32_wrapper(const u8 *v1, const u8 *v2, size_t dim) { return static_cast<f32>(GetSIMD_FUNCTIONS().HNSW_U8L2_ptr_(v1, v2, dim)); }
+f32 hnsw_u8ip_f32_wrapper(const u8 *v1, const u8 *v2, size_t dim) { return static_cast<f32>(GetSIMD_FUNCTIONS().HNSW_U8IP_ptr_(v1, v2, dim)); }
 
 template <>
 void KnnDistance1<u8, f32>::InitKnnDistance1(KnnDistanceType dist_type) {
@@ -175,8 +175,8 @@ void KnnDistance1<i8, i32>::InitKnnDistance1(KnnDistanceType dist_type) {
     }
 }
 
-f32 hnsw_i8l2_f32_wrapper(const i8 *v1, const i8 *v2, SizeT dim) { return static_cast<f32>(GetSIMD_FUNCTIONS().HNSW_I8L2_ptr_(v1, v2, dim)); }
-f32 hnsw_i8ip_f32_wrapper(const i8 *v1, const i8 *v2, SizeT dim) { return static_cast<f32>(GetSIMD_FUNCTIONS().HNSW_I8IP_ptr_(v1, v2, dim)); }
+f32 hnsw_i8l2_f32_wrapper(const i8 *v1, const i8 *v2, size_t dim) { return static_cast<f32>(GetSIMD_FUNCTIONS().HNSW_I8L2_ptr_(v1, v2, dim)); }
+f32 hnsw_i8ip_f32_wrapper(const i8 *v1, const i8 *v2, size_t dim) { return static_cast<f32>(GetSIMD_FUNCTIONS().HNSW_I8IP_ptr_(v1, v2, dim)); }
 
 template <>
 void KnnDistance1<i8, f32>::InitKnnDistance1(KnnDistanceType dist_type) {

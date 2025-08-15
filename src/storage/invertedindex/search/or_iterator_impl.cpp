@@ -31,19 +31,19 @@ import internal_types;
 namespace infinity {
 
 void DocIteratorHeap::BuildHeap() {
-    for (SizeT i = (1 + iterator_heap_.size()) / 2; i > 0; --i) {
+    for (size_t i = (1 + iterator_heap_.size()) / 2; i > 0; --i) {
         AdjustDown(i);
     }
 }
 
-void DocIteratorHeap::AdjustDown(SizeT idx) {
+void DocIteratorHeap::AdjustDown(size_t idx) {
     assert(idx >= 1 && idx < iterator_heap_.size());
-    SizeT min = idx;
-    SizeT end = iterator_heap_.size();
+    size_t min = idx;
+    size_t end = iterator_heap_.size();
     do {
         idx = min;
-        SizeT left = idx << 1;
-        SizeT right = left + 1;
+        size_t left = idx << 1;
+        size_t right = left + 1;
         if (left < end && iterator_heap_[left].doc_id_ < iterator_heap_[min].doc_id_) {
             min = left;
         }
@@ -56,7 +56,7 @@ void DocIteratorHeap::AdjustDown(SizeT idx) {
     } while (min != idx);
 }
 
-OrIterator::OrIterator(Vector<UniquePtr<DocIterator>> iterators) : MultiDocIterator(std::move(iterators)) {
+OrIterator::OrIterator(std::vector<std::unique_ptr<DocIterator>> iterators) : MultiDocIterator(std::move(iterators)) {
     bm25_score_upper_bound_ = 0.0f;
     estimate_iterate_cost_ = {};
     for (const auto &child : children_) {

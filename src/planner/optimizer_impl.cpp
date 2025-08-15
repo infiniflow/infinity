@@ -40,13 +40,13 @@ namespace infinity {
 
 Optimizer::Optimizer(QueryContext *query_context_ptr) : query_context_ptr_(query_context_ptr) {
     // TODO: need an equivalent expression optimizer
-    AddRule(MakeUnique<ApplyFastRoughFilter>()); // put it before SecondaryIndexScanBuilder
-    AddRule(MakeUnique<IndexScanBuilder>());     // put it before ColumnPruner, necessary for filter_fulltext and index_scan
-    AddRule(MakeUnique<ColumnPruner>());
-    AddRule(MakeUnique<LazyLoad>());
-    AddRule(MakeUnique<ColumnRemapper>());
+    AddRule(std::make_unique<ApplyFastRoughFilter>()); // put it before SecondaryIndexScanBuilder
+    AddRule(std::make_unique<IndexScanBuilder>());     // put it before ColumnPruner, necessary for filter_fulltext and index_scan
+    AddRule(std::make_unique<ColumnPruner>());
+    AddRule(std::make_unique<LazyLoad>());
+    AddRule(std::make_unique<ColumnRemapper>());
     if (query_context_ptr->storage()->result_cache_manager()) {
-        AddRule(MakeUnique<ResultCacheGetter>()); // put after column pruner, column remapper
+        AddRule(std::make_unique<ResultCacheGetter>()); // put after column pruner, column remapper
     }
 
 #ifdef INFINITY_DEBUG
@@ -54,9 +54,9 @@ Optimizer::Optimizer(QueryContext *query_context_ptr) : query_context_ptr_(query
 #endif
 }
 
-void Optimizer::AddRule(UniquePtr<OptimizerRule> rule) { rules_.emplace_back(std::move(rule)); }
+void Optimizer::AddRule(std::unique_ptr<OptimizerRule> rule) { rules_.emplace_back(std::move(rule)); }
 
-void Optimizer::optimize(SharedPtr<LogicalNode> &unoptimized_plan, StatementType statement_type) {
+void Optimizer::optimize(std::shared_ptr<LogicalNode> &unoptimized_plan, StatementType statement_type) {
     // Expression folding should be done in logical planner before optimizer
     // Non-select plan, the root node won't be project.
     switch (statement_type) {
@@ -73,8 +73,8 @@ void Optimizer::optimize(SharedPtr<LogicalNode> &unoptimized_plan, StatementType
     }
 
     // Only work for select
-    SizeT rule_count = rules_.size();
-    for (SizeT idx = 0; idx < rule_count; ++idx) {
+    size_t rule_count = rules_.size();
+    for (size_t idx = 0; idx < rule_count; ++idx) {
         const auto &rule = rules_[idx];
         rule->ApplyToPlan(query_context_ptr_, unoptimized_plan);
     }
@@ -82,7 +82,7 @@ void Optimizer::optimize(SharedPtr<LogicalNode> &unoptimized_plan, StatementType
     if (unoptimized_plan->operator_type() == LogicalNodeType::kExplain) {
         LogicalExplain *explain_node = (LogicalExplain *)(unoptimized_plan.get());
         if (explain_node->explain_type() == ExplainType::kOpt) {
-            SharedPtr<Vector<SharedPtr<String>>> texts_ptr = MakeShared<Vector<SharedPtr<String>>>();
+            std::shared_ptr<std::vector<std::shared_ptr<std::string>>> texts_ptr = std::make_shared<std::vector<std::shared_ptr<std::string>>>();
             ExplainLogicalPlan::Explain(explain_node->left_node().get(), texts_ptr);
             explain_node->SetText(texts_ptr);
         }

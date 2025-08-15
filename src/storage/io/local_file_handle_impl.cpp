@@ -92,12 +92,12 @@ Status LocalFileHandle::Append(const void *buffer, u64 nbytes) {
     return Status::OK();
 }
 
-Status LocalFileHandle::Append(const String &buffer, u64 nbytes) { return Append(buffer.data(), nbytes); }
+Status LocalFileHandle::Append(const std::string &buffer, u64 nbytes) { return Append(buffer.data(), nbytes); }
 
-Tuple<SizeT, Status> LocalFileHandle::Read(void *buffer, u64 nbytes) {
+std::tuple<size_t, Status> LocalFileHandle::Read(void *buffer, u64 nbytes) {
     i64 read_n = 0;
     while (read_n < (i64)nbytes) {
-        SizeT a = nbytes - read_n;
+        size_t a = nbytes - read_n;
         i64 read_count = read(fd_, (char *)buffer + read_n, a);
         if (read_count == 0) {
             break;
@@ -110,10 +110,10 @@ Tuple<SizeT, Status> LocalFileHandle::Read(void *buffer, u64 nbytes) {
     return {read_n, Status::OK()};
 }
 
-Tuple<SizeT, Status> LocalFileHandle::Read(String &buffer, u64 nbytes) {
+std::tuple<size_t, Status> LocalFileHandle::Read(std::string &buffer, u64 nbytes) {
     i64 read_n = 0;
     while (read_n < (i64)nbytes) {
-        SizeT a = nbytes - read_n;
+        size_t a = nbytes - read_n;
         i64 read_count = read(fd_, buffer.data() + read_n, a);
         if (read_count == 0) {
             break;
@@ -141,9 +141,9 @@ i64 LocalFileHandle::FileSize() {
     return s.st_size;
 }
 
-Tuple<char *, SizeT, Status> LocalFileHandle::MmapRead(const String &name) { return {nullptr, 0, Status::OK()}; }
+std::tuple<char *, size_t, Status> LocalFileHandle::MmapRead(const std::string &name) { return {nullptr, 0, Status::OK()}; }
 
-Status LocalFileHandle::Unmmap(const String &name) { return Status::OK(); }
+Status LocalFileHandle::Unmmap(const std::string &name) { return Status::OK(); }
 
 Status LocalFileHandle::Sync() {
     if (access_mode_ != FileAccessMode::kWrite) {

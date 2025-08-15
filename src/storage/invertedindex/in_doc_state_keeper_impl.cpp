@@ -19,7 +19,7 @@ namespace infinity {
 InDocStateKeeper::InDocStateKeeper(InDocPositionState *state) : state_(state) {}
 
 InDocStateKeeper::~InDocStateKeeper() {
-    for (SizeT i = 0; i < pos_decoders_.size(); ++i) {
+    for (size_t i = 0; i < pos_decoders_.size(); ++i) {
         delete pos_decoders_[i];
     }
 }

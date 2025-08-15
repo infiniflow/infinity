@@ -27,18 +27,18 @@ struct LowerFunction {
 
 template <>
 inline void LowerFunction::Run(VarcharT &left, VarcharT &result, ColumnVector *left_ptr, ColumnVector *result_ptr) {
-    Span<const char> left_v = left_ptr->GetVarcharInner(left);
+    std::span<const char> left_v = left_ptr->GetVarcharInner(left);
     const char *input = left_v.data();
-    SizeT input_len = left_v.size();
-    String lower_str(input, input_len);
+    size_t input_len = left_v.size();
+    std::string lower_str(input, input_len);
     ToLower(lower_str);
     result_ptr->AppendVarcharInner(lower_str, result);
 }
 
 void RegisterLowerFunction(NewCatalog *catalog_ptr) {
-    String func_name = "lower";
+    std::string func_name = "lower";
 
-    SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
+    std::shared_ptr<ScalarFunctionSet> function_set_ptr = std::make_shared<ScalarFunctionSet>(func_name);
 
     ScalarFunction lower_function(func_name,
                                   {DataType(LogicalType::kVarchar)},

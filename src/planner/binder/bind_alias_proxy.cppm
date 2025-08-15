@@ -27,7 +27,7 @@ namespace infinity {
 
 export class BindAliasProxy {
 public:
-    SharedPtr<BaseExpression>
+    std::shared_ptr<BaseExpression>
     BindAlias(ExpressionBinder &expression_binder, const ParsedExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root);
 
 private:

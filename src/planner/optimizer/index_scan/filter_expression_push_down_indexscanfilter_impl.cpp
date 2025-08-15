@@ -89,33 +89,33 @@ struct ExpressionIndexScanInfo {
 
     // for index scan
     TableMeeta *table_meta_ = nullptr;
-    HashMap<ColumnID, SharedPtr<TableIndexMeeta>> new_candidate_column_index_map_;
+    std::unordered_map<ColumnID, std::shared_ptr<TableIndexMeeta>> new_candidate_column_index_map_;
 
     inline void NewInitColumnIndexEntries(TableInfo *table_info, NewTxn *new_txn, BaseTableRef *base_table_ref) {
         Status status;
         if (!base_table_ref->block_index_->table_meta_) {
-            base_table_ref->block_index_->table_meta_ = MakeUnique<TableMeeta>(table_info->db_id_, table_info->table_id_, new_txn);
+            base_table_ref->block_index_->table_meta_ = std::make_unique<TableMeeta>(table_info->db_id_, table_info->table_id_, new_txn);
         }
         table_meta_ = base_table_ref->block_index_->table_meta_.get();
         auto &table_index_meta_map = base_table_ref->block_index_->table_index_meta_map_;
 
-        Vector<String> *index_id_strs_ptr = nullptr;
+        std::vector<std::string> *index_id_strs_ptr = nullptr;
         status = table_meta_->GetIndexIDs(index_id_strs_ptr);
         if (!status.ok()) {
             RecoverableError(status);
         }
         if (!base_table_ref->index_index_) {
-            base_table_ref->index_index_ = MakeShared<IndexIndex>();
+            base_table_ref->index_index_ = std::make_shared<IndexIndex>();
         }
-        for (SizeT i = 0; i < index_id_strs_ptr->size(); ++i) {
-            const String &index_id_str = (*index_id_strs_ptr)[i];
+        for (size_t i = 0; i < index_id_strs_ptr->size(); ++i) {
+            const std::string &index_id_str = (*index_id_strs_ptr)[i];
             if (table_index_meta_map.size() <= i) {
-                auto table_index_meta = MakeShared<TableIndexMeeta>(index_id_str, *table_meta_);
+                auto table_index_meta = std::make_shared<TableIndexMeeta>(index_id_str, *table_meta_);
                 table_index_meta_map.emplace_back(std::move(table_index_meta));
             }
-            SharedPtr<TableIndexMeeta> &it = table_index_meta_map[i];
+            std::shared_ptr<TableIndexMeeta> &it = table_index_meta_map[i];
 
-            SharedPtr<IndexBase> index_base;
+            std::shared_ptr<IndexBase> index_base;
             std::tie(index_base, status) = it->GetIndexBase();
             if (!status.ok()) {
                 RecoverableError(status);
@@ -137,7 +137,7 @@ struct ExpressionIndexScanInfo {
         }
     }
 
-    ExpressionInfoTree<ExpressionIndexScanInfo> BuildTree(const SharedPtr<BaseExpression> &expression, const u32 depth = 0) const {
+    ExpressionInfoTree<ExpressionIndexScanInfo> BuildTree(const std::shared_ptr<BaseExpression> &expression, const u32 depth = 0) const {
         ExpressionInfoTree<ExpressionIndexScanInfo> tree;
         tree.src_ptr = &expression;
         switch (expression->type()) {
@@ -276,7 +276,7 @@ public:
         }
     }
 
-    IndexScanFilterExpressionPushDownResult SolveForIndexScan(const SharedPtr<BaseExpression> &expression) const {
+    IndexScanFilterExpressionPushDownResult SolveForIndexScan(const std::shared_ptr<BaseExpression> &expression) const {
         IndexScanFilterExpressionPushDownResult result;
         if (expression) {
             // build info tree
@@ -295,7 +295,7 @@ public:
             // optimize fulltext nodes
             OptimizeFulltextTree(result.index_filter_evaluator_.get());
         } else {
-            result.index_filter_evaluator_ = MakeUnique<IndexFilterEvaluatorAllTrue>();
+            result.index_filter_evaluator_ = std::make_unique<IndexFilterEvaluatorAllTrue>();
         }
         if (result.leftover_filter_) {
             // build IndexFilterEvaluator for FilterFulltextExpression
@@ -304,7 +304,7 @@ public:
         return result;
     }
 
-    inline void BuildIndexFilterEvaluatorForLeftoverFilterFulltextExpression(const SharedPtr<BaseExpression> &leftover_filter) const {
+    inline void BuildIndexFilterEvaluatorForLeftoverFilterFulltextExpression(const std::shared_ptr<BaseExpression> &leftover_filter) const {
         if (!leftover_filter) {
             return;
         }
@@ -330,8 +330,8 @@ public:
 
 private:
     //                    index_filter               leftover_filter
-    inline Pair<SharedPtr<BaseExpression>, SharedPtr<BaseExpression>> GetIndexFilterAndLeftoverFilterFromTreeNode(const TreeT &tree_node) const {
-        Pair<SharedPtr<BaseExpression>, SharedPtr<BaseExpression>> result;
+    inline std::pair<std::shared_ptr<BaseExpression>, std::shared_ptr<BaseExpression>> GetIndexFilterAndLeftoverFilterFromTreeNode(const TreeT &tree_node) const {
+        std::pair<std::shared_ptr<BaseExpression>, std::shared_ptr<BaseExpression>> result;
         switch (tree_node.info) {
             case Enum::kVarcharSecondaryIndexColumnExprOrAfterCast:
             case Enum::kSecondaryIndexColumnExprOrAfterCast:
@@ -350,8 +350,8 @@ private:
                 if (tree_node.children.size() != 2) {
                     UnrecoverableError("Wrong number of children");
                 }
-                Vector<SharedPtr<BaseExpression>> index_filter_expressions;
-                Vector<SharedPtr<BaseExpression>> leftover_filter_expressions;
+                std::vector<std::shared_ptr<BaseExpression>> index_filter_expressions;
+                std::vector<std::shared_ptr<BaseExpression>> leftover_filter_expressions;
                 for (const auto &child : tree_node.children) {
                     auto [child_index, child_leftover] = GetIndexFilterAndLeftoverFilterFromTreeNode(child);
                     if (child_index) {
@@ -361,7 +361,7 @@ private:
                         leftover_filter_expressions.push_back(std::move(child_leftover));
                     }
                 }
-                auto GetAndExpr = [&](Vector<SharedPtr<BaseExpression>> expressions) -> SharedPtr<BaseExpression> {
+                auto GetAndExpr = [&](std::vector<std::shared_ptr<BaseExpression>> expressions) -> std::shared_ptr<BaseExpression> {
                     if (expressions.empty()) {
                         return {};
                     }
@@ -373,7 +373,7 @@ private:
                     }
                     // build "and" function
                     ScalarFunction and_func = and_scalar_function_set_ptr_->GetMostMatchFunction(expressions);
-                    return MakeShared<FunctionExpression>(std::move(and_func), std::move(expressions));
+                    return std::make_shared<FunctionExpression>(std::move(and_func), std::move(expressions));
                 };
                 result.first = GetAndExpr(std::move(index_filter_expressions));
                 result.second = GetAndExpr(std::move(leftover_filter_expressions));
@@ -401,7 +401,7 @@ private:
         return result;
     }
 
-    inline UniquePtr<IndexFilterEvaluator> BuildIndexFilterEvaluator(const TreeT &index_filter_tree_node) const {
+    inline std::unique_ptr<IndexFilterEvaluator> BuildIndexFilterEvaluator(const TreeT &index_filter_tree_node) const {
         switch (index_filter_tree_node.info) {
             case Enum::kVarcharSecondaryIndexColumnExprOrAfterCast:
             case Enum::kSecondaryIndexColumnExprOrAfterCast:
@@ -416,10 +416,10 @@ private:
                 }
                 if (val.GetValue<BooleanT>()) {
                     // all true
-                    return MakeUnique<IndexFilterEvaluatorAllTrue>();
+                    return std::make_unique<IndexFilterEvaluatorAllTrue>();
                 }
                 // all false
-                return MakeUnique<IndexFilterEvaluatorAllFalse>();
+                return std::make_unique<IndexFilterEvaluatorAllFalse>();
             }
             case Enum::kValueSecondaryIndexCompareExpr:
             case Enum::kSecondaryIndexValueCompareExpr: {
@@ -440,9 +440,9 @@ private:
                 if (it == PossibleFunctionNames.end()) {
                     UnrecoverableError("Function name not found");
                 }
-                auto SolveForColVal = [&](SharedPtr<BaseExpression> &col_expr,
-                                          SharedPtr<BaseExpression> &val_expr,
-                                          FilterCompareType initial_compare_type) -> UniquePtr<IndexFilterEvaluator> {
+                auto SolveForColVal = [&](std::shared_ptr<BaseExpression> &col_expr,
+                                          std::shared_ptr<BaseExpression> &val_expr,
+                                          FilterCompareType initial_compare_type) -> std::unique_ptr<IndexFilterEvaluator> {
                     auto val_right = FilterExpressionPushDownHelper::CalcValueResult(val_expr);
                     auto [column_id, value, compare_type] =
                         FilterExpressionPushDownHelper::UnwindCast(col_expr, std::move(val_right), initial_compare_type);
@@ -450,14 +450,14 @@ private:
                         case FilterCompareType::kEqual:
                         case FilterCompareType::kLessEqual:
                         case FilterCompareType::kGreaterEqual: {
-                            SharedPtr<TableIndexMeeta> secondary_index = tree_info_.new_candidate_column_index_map_.at(column_id);
+                            std::shared_ptr<TableIndexMeeta> secondary_index = tree_info_.new_candidate_column_index_map_.at(column_id);
                             return IndexFilterEvaluatorSecondary::Make(function_expression, column_id, secondary_index, compare_type, value);
                         }
                         case FilterCompareType::kAlwaysTrue: {
-                            return MakeUnique<IndexFilterEvaluatorAllTrue>();
+                            return std::make_unique<IndexFilterEvaluatorAllTrue>();
                         }
                         case FilterCompareType::kAlwaysFalse: {
-                            return MakeUnique<IndexFilterEvaluatorAllFalse>();
+                            return std::make_unique<IndexFilterEvaluatorAllFalse>();
                         }
                         default: {
                             // error
@@ -485,7 +485,7 @@ private:
             }
             case Enum::kFilterFulltextExpr: {
                 auto *filter_fulltext_expr = static_cast<const FilterFulltextExpression *>(index_filter_tree_node.src_ptr->get());
-                SharedPtr<IndexReader> index_reader;
+                std::shared_ptr<IndexReader> index_reader;
                 NewTxn *new_txn = query_context_->GetNewTxn();
                 Status status = new_txn->GetFullTextIndexReader(*table_info_->db_name_, *table_info_->table_name_, index_reader);
                 if (!status.ok()) {
@@ -493,18 +493,18 @@ private:
                 }
 
                 EarlyTermAlgo early_term_algo = EarlyTermAlgo::kAuto;
-                UniquePtr<QueryNode> query_tree;
+                std::unique_ptr<QueryNode> query_tree;
                 MinimumShouldMatchOption minimum_should_match_option;
                 f32 score_threshold = {};
                 FulltextSimilarity ft_similarity = FulltextSimilarity::kBM25;
                 BM25Params bm25_params;
-                Vector<String> index_names;
+                std::vector<std::string> index_names;
                 {
                     SearchOptions search_ops(filter_fulltext_expr->options_text_);
 
                     // option: default field
                     auto iter = search_ops.options_.find("default_field");
-                    String default_field;
+                    std::string default_field;
                     if (iter != search_ops.options_.end()) {
                         default_field = iter->second;
                     }
@@ -555,7 +555,7 @@ private:
 
                     // option: similarity
                     if (iter = search_ops.options_.find("similarity"); iter != search_ops.options_.end()) {
-                        String ft_sim = iter->second;
+                        std::string ft_sim = iter->second;
                         ToLower(ft_sim);
                         if (ft_sim == "bm25") {
                             ft_similarity = FulltextSimilarity::kBM25;
@@ -605,13 +605,13 @@ private:
 
                     // option: indexes
                     if (iter = search_ops.options_.find("indexes"); iter != search_ops.options_.end()) {
-                        String indexes_text = iter->second;
+                        std::string indexes_text = iter->second;
                         ToLower(indexes_text);
-                        SizeT begin_idx = 0;
-                        SizeT len = indexes_text.length();
+                        size_t begin_idx = 0;
+                        size_t len = indexes_text.length();
                         while (begin_idx < len) {
-                            SizeT comma_idx = indexes_text.find_first_of(',', begin_idx);
-                            if (comma_idx == String::npos) {
+                            size_t comma_idx = indexes_text.find_first_of(',', begin_idx);
+                            if (comma_idx == std::string::npos) {
                                 auto index_name = indexes_text.substr(begin_idx);
                                 index_names.emplace_back(index_name);
                                 break;
@@ -623,14 +623,14 @@ private:
                         }
                     }
 
-                    Map<String, String> column2analyzer = index_reader->GetColumn2Analyzer(index_names);
+                    std::map<std::string, std::string> column2analyzer = index_reader->GetColumn2Analyzer(index_names);
                     SearchDriver search_driver(column2analyzer, default_field, query_operator_option);
                     query_tree = search_driver.ParseSingleWithFields(filter_fulltext_expr->fields_, filter_fulltext_expr->matching_text_);
                     if (!query_tree) {
                         RecoverableError(Status::ParseMatchExprFailed(filter_fulltext_expr->fields_, filter_fulltext_expr->matching_text_));
                     }
                 }
-                return MakeUnique<IndexFilterEvaluatorFulltext>(filter_fulltext_expr,
+                return std::make_unique<IndexFilterEvaluatorFulltext>(filter_fulltext_expr,
                                                                 table_info_,
                                                                 early_term_algo,
                                                                 std::move(index_reader),
@@ -642,7 +642,7 @@ private:
                                                                 std::move(index_names));
             }
             case Enum::kAndExpr: {
-                Vector<UniquePtr<IndexFilterEvaluator>> candidates;
+                std::vector<std::unique_ptr<IndexFilterEvaluator>> candidates;
                 for (const auto &child : index_filter_tree_node.children) {
                     switch (auto res = BuildIndexFilterEvaluator(child); res->type()) {
                         case IndexFilterEvaluator::Type::kInvalid: {
@@ -650,7 +650,7 @@ private:
                             break;
                         }
                         case IndexFilterEvaluator::Type::kAllFalse: {
-                            return MakeUnique<IndexFilterEvaluatorAllFalse>();
+                            return std::make_unique<IndexFilterEvaluatorAllFalse>();
                         }
                         case IndexFilterEvaluator::Type::kAllTrue: {
                             // no-op
@@ -667,7 +667,7 @@ private:
                 }
                 if (candidates.empty()) {
                     // all true
-                    return MakeUnique<IndexFilterEvaluatorAllTrue>();
+                    return std::make_unique<IndexFilterEvaluatorAllTrue>();
                 }
                 if (candidates.size() == 1) {
                     return std::move(candidates[0]);
@@ -679,7 +679,7 @@ private:
                 return IndexFilterEvaluatorBuildFromAnd(std::move(candidates));
             }
             case Enum::kOrExpr: {
-                Vector<UniquePtr<IndexFilterEvaluator>> candidates;
+                std::vector<std::unique_ptr<IndexFilterEvaluator>> candidates;
                 for (const auto &child : index_filter_tree_node.children) {
                     switch (auto res = BuildIndexFilterEvaluator(child); res->type()) {
                         case IndexFilterEvaluator::Type::kInvalid: {
@@ -691,7 +691,7 @@ private:
                             break;
                         }
                         case IndexFilterEvaluator::Type::kAllTrue: {
-                            return MakeUnique<IndexFilterEvaluatorAllTrue>();
+                            return std::make_unique<IndexFilterEvaluatorAllTrue>();
                         }
                         case IndexFilterEvaluator::Type::kAnd:
                         case IndexFilterEvaluator::Type::kOr:
@@ -704,7 +704,7 @@ private:
                 }
                 if (candidates.empty()) {
                     // all false
-                    return MakeUnique<IndexFilterEvaluatorAllFalse>();
+                    return std::make_unique<IndexFilterEvaluatorAllFalse>();
                 }
                 if (candidates.size() == 1) {
                     return std::move(candidates[0]);
@@ -754,7 +754,7 @@ private:
 
 IndexScanFilterExpressionPushDownResult FilterExpressionPushDown::PushDownToIndexScan(QueryContext *query_context,
                                                                                       const BaseTableRef *base_table_ref_ptr,
-                                                                                      const SharedPtr<BaseExpression> &expression) {
+                                                                                      const std::shared_ptr<BaseExpression> &expression) {
     IndexScanFilterExpressionPushDownMethod filter_expression_push_down_method(query_context, base_table_ref_ptr);
     filter_expression_push_down_method.Init();
     return filter_expression_push_down_method.SolveForIndexScan(expression);
@@ -762,7 +762,7 @@ IndexScanFilterExpressionPushDownResult FilterExpressionPushDown::PushDownToInde
 
 void FilterExpressionPushDown::BuildFilterFulltextExpression(QueryContext *query_context,
                                                              const BaseTableRef *base_table_ref_ptr,
-                                                             const Vector<SharedPtr<BaseExpression>> &expressions) {
+                                                             const std::vector<std::shared_ptr<BaseExpression>> &expressions) {
     IndexScanFilterExpressionPushDownMethod filter_expression_push_down_method(query_context, base_table_ref_ptr);
     filter_expression_push_down_method.Init();
     for (const auto &expr : expressions) {

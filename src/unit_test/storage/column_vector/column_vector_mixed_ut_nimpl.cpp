@@ -48,7 +48,7 @@ class ColumnVectorMixedTest : public BaseTest {};
 TEST_F(ColumnVectorMixedTest, mixed_integer_a) {
     using namespace infinity;
 
-    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kMixed);
+    std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kMixed);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
@@ -156,7 +156,7 @@ TEST_F(ColumnVectorMixedTest, mixed_integer_a) {
 TEST_F(ColumnVectorMixedTest, mixed_integer_column_vector_select) {
     using namespace infinity;
 
-    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kMixed);
+    std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kMixed);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
@@ -178,7 +178,7 @@ TEST_F(ColumnVectorMixedTest, mixed_integer_column_vector_select) {
 
     Selection input_select;
     input_select.Initialize(DEFAULT_VECTOR_SIZE / 2);
-    for (SizeT idx = 0; idx < DEFAULT_VECTOR_SIZE / 2; ++idx) {
+    for (size_t idx = 0; idx < DEFAULT_VECTOR_SIZE / 2; ++idx) {
         input_select.Append(idx * 2);
     }
 
@@ -198,7 +198,7 @@ TEST_F(ColumnVectorMixedTest, mixed_integer_column_vector_select) {
 TEST_F(ColumnVectorMixedTest, mixed_integer_column_slice_init) {
     using namespace infinity;
 
-    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kMixed);
+    std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kMixed);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
@@ -239,7 +239,7 @@ TEST_F(ColumnVectorMixedTest, mixed_integer_column_slice_init) {
 TEST_F(ColumnVectorMixedTest, mixed_float_a) {
     using namespace infinity;
 
-    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kMixed);
+    std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kMixed);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
@@ -347,7 +347,7 @@ TEST_F(ColumnVectorMixedTest, mixed_float_a) {
 TEST_F(ColumnVectorMixedTest, mixed_float_column_vector_select) {
     using namespace infinity;
 
-    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kMixed);
+    std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kMixed);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
@@ -369,7 +369,7 @@ TEST_F(ColumnVectorMixedTest, mixed_float_column_vector_select) {
 
     Selection input_select;
     input_select.Initialize(DEFAULT_VECTOR_SIZE / 2);
-    for (SizeT idx = 0; idx < DEFAULT_VECTOR_SIZE / 2; ++idx) {
+    for (size_t idx = 0; idx < DEFAULT_VECTOR_SIZE / 2; ++idx) {
         input_select.Append(idx * 2);
     }
 
@@ -389,7 +389,7 @@ TEST_F(ColumnVectorMixedTest, mixed_float_column_vector_select) {
 TEST_F(ColumnVectorMixedTest, mixed_float_column_slice_init) {
     using namespace infinity;
 
-    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kMixed);
+    std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kMixed);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
@@ -430,7 +430,7 @@ TEST_F(ColumnVectorMixedTest, mixed_float_column_slice_init) {
 TEST_F(ColumnVectorMixedTest, mixed_short_str_a) {
     using namespace infinity;
 
-    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kMixed);
+    std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kMixed);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
@@ -547,7 +547,7 @@ TEST_F(ColumnVectorMixedTest, mixed_short_str_a) {
 TEST_F(ColumnVectorMixedTest, mixed_short_str_column_vector_select) {
     using namespace infinity;
 
-    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kMixed);
+    std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kMixed);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
@@ -572,7 +572,7 @@ TEST_F(ColumnVectorMixedTest, mixed_short_str_column_vector_select) {
 
     Selection input_select;
     input_select.Initialize(DEFAULT_VECTOR_SIZE / 2);
-    for (SizeT idx = 0; idx < DEFAULT_VECTOR_SIZE / 2; ++idx) {
+    for (size_t idx = 0; idx < DEFAULT_VECTOR_SIZE / 2; ++idx) {
         input_select.Append(idx * 2);
     }
 
@@ -594,7 +594,7 @@ TEST_F(ColumnVectorMixedTest, mixed_short_str_column_vector_select) {
 TEST_F(ColumnVectorMixedTest, mixed_short_str_column_slice_init) {
     using namespace infinity;
 
-    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kMixed);
+    std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kMixed);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
@@ -640,7 +640,7 @@ TEST_F(ColumnVectorMixedTest, mixed_short_str_column_slice_init) {
 TEST_F(ColumnVectorMixedTest, mixed_long_str_a) {
     using namespace infinity;
 
-    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kMixed);
+    std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kMixed);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
@@ -784,7 +784,7 @@ TEST_F(ColumnVectorMixedTest, mixed_long_str_a) {
 TEST_F(ColumnVectorMixedTest, mixed_long_str_column_vector_select) {
     using namespace infinity;
 
-    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kMixed);
+    std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kMixed);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
@@ -816,7 +816,7 @@ TEST_F(ColumnVectorMixedTest, mixed_long_str_column_vector_select) {
 
     Selection input_select;
     input_select.Initialize(DEFAULT_VECTOR_SIZE / 2);
-    for (SizeT idx = 0; idx < DEFAULT_VECTOR_SIZE / 2; ++idx) {
+    for (size_t idx = 0; idx < DEFAULT_VECTOR_SIZE / 2; ++idx) {
         input_select.Append(idx * 2);
     }
 
@@ -844,7 +844,7 @@ TEST_F(ColumnVectorMixedTest, mixed_long_str_column_vector_select) {
 TEST_F(ColumnVectorMixedTest, mixed_long_str_column_slice_init) {
     using namespace infinity;
 
-    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kMixed);
+    std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kMixed);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
@@ -903,7 +903,7 @@ TEST_F(ColumnVectorMixedTest, mixed_long_str_column_slice_init) {
 TEST_F(ColumnVectorMixedTest, mixed_null_a) {
     using namespace infinity;
 
-    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kMixed);
+    std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kMixed);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
@@ -1006,7 +1006,7 @@ TEST_F(ColumnVectorMixedTest, mixed_null_a) {
 TEST_F(ColumnVectorMixedTest, mixed_null_column_vector_select) {
     using namespace infinity;
 
-    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kMixed);
+    std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kMixed);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
@@ -1026,7 +1026,7 @@ TEST_F(ColumnVectorMixedTest, mixed_null_column_vector_select) {
 
     Selection input_select;
     input_select.Initialize(DEFAULT_VECTOR_SIZE / 2);
-    for (SizeT idx = 0; idx < DEFAULT_VECTOR_SIZE / 2; ++idx) {
+    for (size_t idx = 0; idx < DEFAULT_VECTOR_SIZE / 2; ++idx) {
         input_select.Append(idx * 2);
     }
 
@@ -1044,7 +1044,7 @@ TEST_F(ColumnVectorMixedTest, mixed_null_column_vector_select) {
 TEST_F(ColumnVectorMixedTest, mixed_null_column_slice_init) {
     using namespace infinity;
 
-    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kMixed);
+    std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kMixed);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
@@ -1081,7 +1081,7 @@ TEST_F(ColumnVectorMixedTest, mixed_null_column_slice_init) {
 TEST_F(ColumnVectorMixedTest, mixed_missing_a) {
     using namespace infinity;
 
-    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kMixed);
+    std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kMixed);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
@@ -1184,7 +1184,7 @@ TEST_F(ColumnVectorMixedTest, mixed_missing_a) {
 TEST_F(ColumnVectorMixedTest, mixed_missing_column_vector_select) {
     using namespace infinity;
 
-    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kMixed);
+    std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kMixed);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
@@ -1204,7 +1204,7 @@ TEST_F(ColumnVectorMixedTest, mixed_missing_column_vector_select) {
 
     Selection input_select;
     input_select.Initialize(DEFAULT_VECTOR_SIZE / 2);
-    for (SizeT idx = 0; idx < DEFAULT_VECTOR_SIZE / 2; ++idx) {
+    for (size_t idx = 0; idx < DEFAULT_VECTOR_SIZE / 2; ++idx) {
         input_select.Append(idx * 2);
     }
 
@@ -1222,7 +1222,7 @@ TEST_F(ColumnVectorMixedTest, mixed_missing_column_vector_select) {
 TEST_F(ColumnVectorMixedTest, mixed_missing_column_slice_init) {
     using namespace infinity;
 
-    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kMixed);
+    std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kMixed);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
@@ -1259,7 +1259,7 @@ TEST_F(ColumnVectorMixedTest, mixed_missing_column_slice_init) {
 TEST_F(ColumnVectorMixedTest, mixed_tuple_a) {
     using namespace infinity;
 
-    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kMixed);
+    std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kMixed);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
@@ -1990,7 +1990,7 @@ TEST_F(ColumnVectorMixedTest, mixed_tuple_a) {
 TEST_F(ColumnVectorMixedTest, mixed_tuple_column_vector_select) {
     using namespace infinity;
 
-    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kMixed);
+    std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kMixed);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
@@ -2179,7 +2179,7 @@ TEST_F(ColumnVectorMixedTest, mixed_tuple_column_vector_select) {
 
     Selection input_select;
     input_select.Initialize(DEFAULT_VECTOR_SIZE / 2);
-    for (SizeT idx = 0; idx < DEFAULT_VECTOR_SIZE / 2; ++idx) {
+    for (size_t idx = 0; idx < DEFAULT_VECTOR_SIZE / 2; ++idx) {
         input_select.Append(idx * 2);
     }
 
@@ -2322,7 +2322,7 @@ TEST_F(ColumnVectorMixedTest, mixed_tuple_column_vector_select) {
 TEST_F(ColumnVectorMixedTest, mixed_tuple_column_slice_init) {
     using namespace infinity;
 
-    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kMixed);
+    std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kMixed);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
@@ -2653,7 +2653,7 @@ TEST_F(ColumnVectorMixedTest, mixed_tuple_column_slice_init) {
 TEST_F(ColumnVectorMixedTest, mixed_array_a) {
     using namespace infinity;
 
-    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kMixed);
+    std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kMixed);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
@@ -3489,7 +3489,7 @@ TEST_F(ColumnVectorMixedTest, mixed_array_a) {
 TEST_F(ColumnVectorMixedTest, mixed_array_column_vector_select) {
     using namespace infinity;
 
-    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kMixed);
+    std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kMixed);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
@@ -3706,7 +3706,7 @@ TEST_F(ColumnVectorMixedTest, mixed_array_column_vector_select) {
 
     Selection input_select;
     input_select.Initialize(DEFAULT_VECTOR_SIZE / 2);
-    for (SizeT idx = 0; idx < DEFAULT_VECTOR_SIZE / 2; ++idx) {
+    for (size_t idx = 0; idx < DEFAULT_VECTOR_SIZE / 2; ++idx) {
         input_select.Append(idx * 2);
     }
 
@@ -3872,7 +3872,7 @@ TEST_F(ColumnVectorMixedTest, mixed_array_column_vector_select) {
 TEST_F(ColumnVectorMixedTest, mixed_array_column_slice_init) {
     using namespace infinity;
 
-    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kMixed);
+    std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kMixed);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 

@@ -63,12 +63,12 @@ bool PhysicalUpdate::Execute(QueryContext *query_context, OperatorState *operato
     new_txn->SetTxnType(TransactionType::kUpdate);
 
     OperatorState *prev_op_state = operator_state->prev_op_state_;
-    SizeT input_data_block_count = prev_op_state->data_block_array_.size();
+    size_t input_data_block_count = prev_op_state->data_block_array_.size();
 
-    for (SizeT block_idx = 0; block_idx < input_data_block_count; ++block_idx) {
+    for (size_t block_idx = 0; block_idx < input_data_block_count; ++block_idx) {
         DataBlock *input_data_block_ptr = prev_op_state->data_block_array_[block_idx].get();
-        Vector<RowID> row_ids;
-        for (SizeT i = 0; i < input_data_block_ptr->column_count(); i++) {
+        std::vector<RowID> row_ids;
+        for (size_t i = 0; i < input_data_block_ptr->column_count(); i++) {
             if (auto &column_vector = input_data_block_ptr->column_vectors[i]; column_vector->data_type()->type() == LogicalType::kRowID) {
                 row_ids.resize(column_vector->Size());
                 std::memcpy(row_ids.data(), column_vector->data(), column_vector->Size() * sizeof(RowID));
@@ -76,17 +76,17 @@ bool PhysicalUpdate::Execute(QueryContext *query_context, OperatorState *operato
             }
         }
         if (!row_ids.empty()) {
-            Vector<SharedPtr<ColumnVector>> output_column_vectors(final_result_columns_.size());
+            std::vector<std::shared_ptr<ColumnVector>> output_column_vectors(final_result_columns_.size());
             ExpressionEvaluator evaluator;
             evaluator.Init(input_data_block_ptr);
-            for (SizeT i = 0; i < final_result_columns_.size(); ++i) {
+            for (size_t i = 0; i < final_result_columns_.size(); ++i) {
                 auto &output_column_vector = output_column_vectors[i];
                 const auto &expr = final_result_columns_[i];
-                SharedPtr<ExpressionState> expr_state = ExpressionState::CreateState(expr);
+                std::shared_ptr<ExpressionState> expr_state = ExpressionState::CreateState(expr);
                 if (expr->type() == ExpressionType::kReference) {
                     evaluator.Execute(expr, expr_state, output_column_vector);
                 } else {
-                    output_column_vector = ColumnVector::Make(MakeShared<DataType>(expr->Type()));
+                    output_column_vector = ColumnVector::Make(std::make_shared<DataType>(expr->Type()));
                     output_column_vector->Initialize();
                     evaluator.Execute(expr, expr_state, output_column_vector);
                     if (output_column_vector->Size() != input_data_block_ptr->row_count()) {
@@ -96,17 +96,17 @@ bool PhysicalUpdate::Execute(QueryContext *query_context, OperatorState *operato
                             return false;
                         }
                         Value value = output_column_vector->GetValueByIndex(0);
-                        SizeT row_count = input_data_block_ptr->row_count();
-                        output_column_vector = ColumnVector::Make(MakeShared<DataType>(expr->Type()));
+                        size_t row_count = input_data_block_ptr->row_count();
+                        output_column_vector = ColumnVector::Make(std::make_shared<DataType>(expr->Type()));
                         output_column_vector->Initialize();
-                        for (SizeT row_idx = 0; row_idx < row_count; ++row_idx) {
+                        for (size_t row_idx = 0; row_idx < row_count; ++row_idx) {
                             output_column_vector->AppendValue(value);
                         }
                         output_column_vector->Finalize(row_count);
                     }
                 }
             }
-            SharedPtr<DataBlock> output_data_block = DataBlock::Make();
+            std::shared_ptr<DataBlock> output_data_block = DataBlock::Make();
             output_data_block->Init(output_column_vectors);
 
             Status status = new_txn->Update(*table_info_->db_name_, *table_info_->table_name_, output_data_block, row_ids);

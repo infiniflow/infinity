@@ -29,7 +29,7 @@ import third_party;
 
 namespace infinity {
 
-Thread PGServer::Run() {
+std::thread PGServer::Run() {
     {
         auto expected = PGServerStatus::kStopped;
         if (!status_.compare_exchange_strong(expected, PGServerStatus::kStarting)) {
@@ -37,7 +37,7 @@ Thread PGServer::Run() {
         }
     }
     u16 pg_port = InfinityContext::instance().config()->PostgresPort();
-    const String &pg_listen_addr = InfinityContext::instance().config()->ServerAddress();
+    const std::string &pg_listen_addr = InfinityContext::instance().config()->ServerAddress();
 
     boost::system::error_code error;
     boost::asio::ip::address address = boost::asio::ip::make_address(pg_listen_addr, error);
@@ -47,13 +47,13 @@ Thread PGServer::Run() {
     }
 
     running_connection_count_ = 0;
-    io_context_ptr_ = MakeUnique<boost::asio::io_context>();
-    acceptor_ptr_ = MakeUnique<boost::asio::ip::tcp::acceptor>(*io_context_ptr_, boost::asio::ip::tcp::endpoint(address, pg_port));
+    io_context_ptr_ = std::make_unique<boost::asio::io_context>();
+    acceptor_ptr_ = std::make_unique<boost::asio::ip::tcp::acceptor>(*io_context_ptr_, boost::asio::ip::tcp::endpoint(address, pg_port));
     CreateConnection();
 
     fmt::print("Run 'psql -h {} -p {}' to connect to the server (SQL is only for test).\n", pg_listen_addr, pg_port);
     status_.store(PGServerStatus::kRunning);
-    return Thread([this] {
+    return std::thread([this] {
         io_context_ptr_->run();
 
         status_.store(PGServerStatus::kStopped);
@@ -84,19 +84,19 @@ void PGServer::Shutdown() {
 }
 
 void PGServer::CreateConnection() {
-    SharedPtr<Connection> connection_ptr = MakeShared<Connection>(*io_context_ptr_);
+    std::shared_ptr<Connection> connection_ptr = std::make_shared<Connection>(*io_context_ptr_);
     acceptor_ptr_->async_accept(*(connection_ptr->socket()), boost::bind(&PGServer::StartConnection, this, connection_ptr));
 }
 
-void PGServer::StartConnection(SharedPtr<Connection> &connection) {
+void PGServer::StartConnection(std::shared_ptr<Connection> &connection) {
     bool started = status_ == PGServerStatus::kRunning;
     if (started) {
-        Thread connection_thread([connection = connection, &num_running_connections = this->running_connection_count_]() mutable {
+        std::thread connection_thread([connection = connection, &num_running_connections = this->running_connection_count_]() mutable {
             ++num_running_connections;
             try {
                 connection->Run();
             } catch (...) {
-                String ip_address;
+                std::string ip_address;
                 u16 port;
                 connection->GetClientInfo(ip_address, port);
                 LOG_ERROR(fmt::format("closed connection with {}:{} due to exception", ip_address, port));

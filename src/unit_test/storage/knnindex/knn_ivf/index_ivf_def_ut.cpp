@@ -50,14 +50,14 @@ using namespace infinity;
 class IndexIVFTest : public BaseTest {};
 
 const auto base_table_ref =
-    MakeShared<BaseTableRef>(nullptr,
-                             Vector<SizeT>{0},
+    std::make_shared<BaseTableRef>(nullptr,
+                             Vector<size_t>{0},
                              nullptr,
                              "",
                              0,
-                             MakeShared<Vector<String>>(Vector<String>{"col_ivf"}),
-                             MakeShared<Vector<SharedPtr<DataType>>>(std::vector{
-                                 MakeShared<DataType>(LogicalType::kEmbedding, MakeShared<EmbeddingInfo>(EmbeddingDataType::kElemBFloat16, 128))}));
+                             std::make_shared<Vector<String>>(Vector<String>{"col_ivf"}),
+                             std::make_shared<Vector<std::shared_ptr<DataType>>>(std::vector{
+                                 std::make_shared<DataType>(LogicalType::kEmbedding, std::make_shared<EmbeddingInfo>(EmbeddingDataType::kElemBFloat16, 128))}));
 
 struct InitParameterHelper {
     Vector<InitParameter *> index_param_list;
@@ -82,8 +82,8 @@ TEST_F(IndexIVFTest, testplain) {
     Map<String, String> args_map{{"meTric", "cos"}, {"plain_storage_data_type", "f32"}};
     InitParameterHelper h;
     {
-        auto ivf_index = IndexIVF::Make(MakeShared<String>("tmp_index_name"),
-                                        MakeShared<String>("test comment"),
+        auto ivf_index = IndexIVF::Make(std::make_shared<String>("tmp_index_name"),
+                                        std::make_shared<String>("test comment"),
                                         "tmp_file_name",
                                         Vector<String>{"col_ivf"},
                                         h.build_ipl(args_map));
@@ -93,8 +93,8 @@ TEST_F(IndexIVFTest, testplain) {
     }
     {
         args_map["plain_storage_data_type"] = "bf16";
-        auto ivf_index = IndexIVF::Make(MakeShared<String>("tmp_index_name"),
-                                        MakeShared<String>("test comment"),
+        auto ivf_index = IndexIVF::Make(std::make_shared<String>("tmp_index_name"),
+                                        std::make_shared<String>("test comment"),
                                         "tmp_file_name",
                                         Vector<String>{"col_ivf"},
                                         h.build_ipl(args_map));
@@ -104,8 +104,8 @@ TEST_F(IndexIVFTest, testplain) {
     }
     {
         args_map["plain_storage_data_type"] = "i8";
-        auto ivf_index = IndexIVF::Make(MakeShared<String>("tmp_index_name"),
-                                        MakeShared<String>("test comment"),
+        auto ivf_index = IndexIVF::Make(std::make_shared<String>("tmp_index_name"),
+                                        std::make_shared<String>("test comment"),
                                         "tmp_file_name",
                                         Vector<String>{"col_ivf"},
                                         h.build_ipl(args_map));
@@ -113,8 +113,8 @@ TEST_F(IndexIVFTest, testplain) {
     }
     {
         args_map["unused_param"] = "xxx";
-        EXPECT_THROW_WITHOUT_STACKTRACE(IndexIVF::Make(MakeShared<String>("tmp_index_name"),
-                                    MakeShared<String>("test comment"),
+        EXPECT_THROW_WITHOUT_STACKTRACE(IndexIVF::Make(std::make_shared<String>("tmp_index_name"),
+                                    std::make_shared<String>("test comment"),
                                     "tmp_file_name",
                                     Vector<String>{"col_ivf"},
                                     h.build_ipl(args_map)),
@@ -130,8 +130,8 @@ TEST_F(IndexIVFTest, testsq) {
                                  {"scalar_quantization_bits", "4"}};
     InitParameterHelper h;
     {
-        auto ivf_index = IndexIVF::Make(MakeShared<String>("tmp_index_name"),
-                                        MakeShared<String>("test comment"),
+        auto ivf_index = IndexIVF::Make(std::make_shared<String>("tmp_index_name"),
+                                        std::make_shared<String>("test comment"),
                                         "tmp_file_name",
                                         Vector<String>{"col_ivf"},
                                         h.build_ipl(args_map));
@@ -141,8 +141,8 @@ TEST_F(IndexIVFTest, testsq) {
     }
     {
         args_map["centroids_num_ratio"] = "-0.33";
-        auto ivf_index = IndexIVF::Make(MakeShared<String>("tmp_index_name"),
-                                        MakeShared<String>("test comment"),
+        auto ivf_index = IndexIVF::Make(std::make_shared<String>("tmp_index_name"),
+                                        std::make_shared<String>("test comment"),
                                         "tmp_file_name",
                                         Vector<String>{"col_ivf"},
                                         h.build_ipl(args_map));
@@ -151,8 +151,8 @@ TEST_F(IndexIVFTest, testsq) {
     {
         args_map["centroids_num_ratio"] = "0.33";
         args_map["Centroids_num_ratio"] = "0.33";
-        EXPECT_THROW_WITHOUT_STACKTRACE(IndexIVF::Make(MakeShared<String>("tmp_index_name"),
-                                    MakeShared<String>("test comment"),
+        EXPECT_THROW_WITHOUT_STACKTRACE(IndexIVF::Make(std::make_shared<String>("tmp_index_name"),
+                                    std::make_shared<String>("test comment"),
                                     "tmp_file_name",
                                     Vector<String>{"col_ivf"},
                                     h.build_ipl(args_map)),
@@ -168,8 +168,8 @@ TEST_F(IndexIVFTest, testpq) {
                                  {"product_quanTization_subspace_bits", "12"}};
     InitParameterHelper h;
     {
-        auto ivf_index = IndexIVF::Make(MakeShared<String>("tmp_index_name"),
-                                        MakeShared<String>("test comment"),
+        auto ivf_index = IndexIVF::Make(std::make_shared<String>("tmp_index_name"),
+                                        std::make_shared<String>("test comment"),
                                         "tmp_file_name",
                                         Vector<String>{"col_ivf"},
                                         h.build_ipl(args_map));
@@ -179,8 +179,8 @@ TEST_F(IndexIVFTest, testpq) {
     }
     {
         args_map.erase("Metric");
-        EXPECT_THROW_WITHOUT_STACKTRACE(IndexIVF::Make(MakeShared<String>("tmp_index_name"),
-                                    MakeShared<String>("test comment"),
+        EXPECT_THROW_WITHOUT_STACKTRACE(IndexIVF::Make(std::make_shared<String>("tmp_index_name"),
+                                    std::make_shared<String>("test comment"),
                                     "tmp_file_name",
                                     Vector<String>{"col_ivf"},
                                     h.build_ipl(args_map)),

@@ -35,7 +35,7 @@ MultiPostingDecoder::~MultiPostingDecoder() {
     }
 }
 
-void MultiPostingDecoder::Init(SharedPtr<Vector<SegmentPosting>> &seg_postings) {
+void MultiPostingDecoder::Init(std::shared_ptr<std::vector<SegmentPosting>> &seg_postings) {
     seg_postings_ = seg_postings;
     segment_count_ = (u32)seg_postings_->size();
     MoveToSegment(0UL);
@@ -59,7 +59,7 @@ bool MultiPostingDecoder::SkipTo(RowID start_row_id, RowID &prev_last_doc_id, Ro
 
 // u32: block max tf
 // u16: block max (ceil(tf / doc length) * numeric_limits<u16>::max())
-Pair<u32, u16> MultiPostingDecoder::GetBlockMaxInfo() const { return index_decoder_->GetBlockMaxInfo(); }
+std::pair<u32, u16> MultiPostingDecoder::GetBlockMaxInfo() const { return index_decoder_->GetBlockMaxInfo(); }
 
 bool MultiPostingDecoder::DecodeCurrentDocIDBuffer(docid_t *doc_buffer) {
     if (need_decode_doc_id_) {
@@ -125,7 +125,7 @@ bool MultiPostingDecoder::MoveToSegment(RowID start_row_id) {
     segment_cursor_ = locate_seg_cursor;
     SegmentPosting &cur_segment_posting = (*seg_postings_)[segment_cursor_];
     base_row_id_ = cur_segment_posting.GetBeginRowID();
-    const SharedPtr<PostingWriter> &posting_writer = cur_segment_posting.GetInMemPostingWriter();
+    const std::shared_ptr<PostingWriter> &posting_writer = cur_segment_posting.GetInMemPostingWriter();
     if (posting_writer) {
         return MemSegMoveToSegment(posting_writer);
     } else {
@@ -133,7 +133,7 @@ bool MultiPostingDecoder::MoveToSegment(RowID start_row_id) {
     }
 }
 
-bool MultiPostingDecoder::MemSegMoveToSegment(const SharedPtr<PostingWriter> &posting_writer) {
+bool MultiPostingDecoder::MemSegMoveToSegment(const std::shared_ptr<PostingWriter> &posting_writer) {
     InMemPostingDecoder *posting_decoder = posting_writer->CreateInMemPostingDecoder();
     if (index_decoder_) {
         delete index_decoder_;

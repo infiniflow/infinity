@@ -55,7 +55,7 @@ struct ColumnValueReaderTypeLessFunction {
 
 template <>
 inline void LessFunction::Run(MixedT, BigIntT, bool &) {
-    String error_message = "Not implement: LessFunction::Run";
+    std::string error_message = "Not implement: LessFunction::Run";
     UnrecoverableError(error_message);
 }
 
@@ -66,7 +66,7 @@ inline void LessFunction::Run(BigIntT left, MixedT right, bool &result) {
 
 template <>
 inline void LessFunction::Run(MixedT, DoubleT, bool &) {
-    String error_message = "Not implement: LessFunction::Run";
+    std::string error_message = "Not implement: LessFunction::Run";
     UnrecoverableError(error_message);
 }
 
@@ -77,7 +77,7 @@ inline void LessFunction::Run(DoubleT left, MixedT right, bool &result) {
 
 template <>
 inline void LessFunction::Run(MixedT, VarcharT, bool &) {
-    String error_message = "Not implement: LessFunction::Run";
+    std::string error_message = "Not implement: LessFunction::Run";
     UnrecoverableError(error_message);
 }
 
@@ -87,8 +87,8 @@ inline void LessFunction::Run(VarcharT left, MixedT right, bool &result) {
 }
 
 template <typename CompareType, typename LessFunction>
-static void GenerateLessFunction(SharedPtr<ScalarFunctionSet> &function_set_ptr, DataType data_type) {
-    String func_name = "<";
+static void GenerateLessFunction(std::shared_ptr<ScalarFunctionSet> &function_set_ptr, DataType data_type) {
+    std::string func_name = "<";
 
     ScalarFunction less_function(func_name,
                                  {data_type, data_type},
@@ -98,9 +98,9 @@ static void GenerateLessFunction(SharedPtr<ScalarFunctionSet> &function_set_ptr,
 }
 
 void RegisterLessFunction(NewCatalog *catalog_ptr) {
-    String func_name = "<";
+    std::string func_name = "<";
 
-    SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
+    std::shared_ptr<ScalarFunctionSet> function_set_ptr = std::make_shared<ScalarFunctionSet>(func_name);
 
     GenerateLessFunction<TinyIntT, PODTypeLessFunction>(function_set_ptr, DataType(LogicalType::kTinyInt));
     GenerateLessFunction<SmallIntT, PODTypeLessFunction>(function_set_ptr, DataType(LogicalType::kSmallInt));

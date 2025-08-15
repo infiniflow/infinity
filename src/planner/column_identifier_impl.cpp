@@ -34,10 +34,10 @@ ColumnIdentifier ColumnIdentifier::MakeColumnIdentifier(QueryContext *, const Co
         RecoverableError(status);
     }
 
-    SharedPtr<String> db_name_ptr = nullptr;
-    SharedPtr<String> schema_name_ptr = nullptr;
-    SharedPtr<String> table_name_ptr = nullptr;
-    SharedPtr<String> column_name_ptr = nullptr;
+    std::shared_ptr<std::string> db_name_ptr = nullptr;
+    std::shared_ptr<std::string> schema_name_ptr = nullptr;
+    std::shared_ptr<std::string> table_name_ptr = nullptr;
+    std::shared_ptr<std::string> column_name_ptr = nullptr;
 
     i64 name_count = expr.names_.size();
     if (name_count > 4 || name_count <= 0) {
@@ -45,36 +45,36 @@ ColumnIdentifier ColumnIdentifier::MakeColumnIdentifier(QueryContext *, const Co
         RecoverableError(status);
     }
     --name_count;
-    column_name_ptr = MakeShared<String>(expr.names_[name_count]);
+    column_name_ptr = std::make_shared<std::string>(expr.names_[name_count]);
     --name_count;
     if (name_count >= 0) {
-        table_name_ptr = MakeShared<String>(expr.names_[name_count]);
+        table_name_ptr = std::make_shared<std::string>(expr.names_[name_count]);
         --name_count;
         if (name_count >= 0) {
-            schema_name_ptr = MakeShared<String>(expr.names_[name_count]);
+            schema_name_ptr = std::make_shared<std::string>(expr.names_[name_count]);
             --name_count;
             if (name_count >= 0) {
-                db_name_ptr = MakeShared<String>(expr.names_[name_count]);
+                db_name_ptr = std::make_shared<std::string>(expr.names_[name_count]);
             }
         }
     }
 
-    SharedPtr<String> alias_name_ptr = nullptr;
+    std::shared_ptr<std::string> alias_name_ptr = nullptr;
     if (!expr.alias_.empty()) {
-        alias_name_ptr = MakeShared<String>(expr.alias_);
+        alias_name_ptr = std::make_shared<std::string>(expr.alias_);
     }
     return ColumnIdentifier(db_name_ptr, schema_name_ptr, table_name_ptr, column_name_ptr, alias_name_ptr);
 }
 
-ColumnIdentifier::ColumnIdentifier(SharedPtr<String> db_name,
-                                   SharedPtr<String> schema_name,
-                                   SharedPtr<String> table_name,
-                                   SharedPtr<String> column_name,
-                                   SharedPtr<String> alias_name)
+ColumnIdentifier::ColumnIdentifier(std::shared_ptr<std::string> db_name,
+                                   std::shared_ptr<std::string> schema_name,
+                                   std::shared_ptr<std::string> table_name,
+                                   std::shared_ptr<std::string> column_name,
+                                   std::shared_ptr<std::string> alias_name)
     : db_name_ptr_(std::move(db_name)), schema_name_ptr_(std::move(schema_name)), column_name_ptr_(std::move(column_name)),
       table_name_ptr_(std::move(table_name)), alias_name_ptr_(std::move(alias_name)) {}
 
-String ColumnIdentifier::ToString() const {
+std::string ColumnIdentifier::ToString() const {
     if (table_name_ptr_.get() != nullptr)
         return fmt::format("{}.{}", *table_name_ptr_, *column_name_ptr_);
     else

@@ -38,8 +38,8 @@ public:
     }
 
 protected:
-    SharedPtr<PostingByteSlice> posting_byte_slice_;
-    SharedPtr<DocListFormat> doc_list_format_;
+    std::shared_ptr<PostingByteSlice> posting_byte_slice_;
+    std::shared_ptr<DocListFormat> doc_list_format_;
 };
 
 TEST_F(PostingByteSliceTest, test1) {
@@ -62,7 +62,7 @@ TEST_F(PostingByteSliceTest, test1) {
     PostingByteSliceReader reader;
     reader.Open(posting_byte_slice_.get());
 
-    SizeT decode_len;
+    size_t decode_len;
     reader.Decode(doc_id_buffer, MAX_DOC_PER_RECORD, decode_len);
     ASSERT_EQ((uint32_t)1, doc_id_buffer[0]);
     ASSERT_EQ((uint32_t)2, doc_id_buffer[1]);
@@ -114,7 +114,7 @@ TEST_F(PostingByteSliceTest, test3) {
 
     uint32_t buffer[count * 2];
     uint16_t doc_payload_buffer[count * 2];
-    SizeT actual_decode_len;
+    size_t actual_decode_len;
     reader.Decode(buffer, decode_len, actual_decode_len);
     reader.Decode(doc_payload_buffer, decode_len, actual_decode_len);
     reader.Decode(buffer + decode_len, decode_len, actual_decode_len);

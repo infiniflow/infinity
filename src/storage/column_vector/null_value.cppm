@@ -155,14 +155,14 @@ inline BoxT NullValue() {
 // template <>
 // inline PathT NullValue() {
 //     PathT path(std::numeric_limits<u32>::infinity(), std::numeric_limits<i32>::infinity());
-//     path.ptr = std::numeric_limits<ptr_t>::infinity();
+//     path.ptr = std::numeric_limits<char *>::infinity();
 //     return path;
 // }
 //
 // template <>
 // inline PolygonT NullValue() {
 //     PolygonT polygon;
-//     polygon.ptr = std::numeric_limits<ptr_t>::infinity();
+//     polygon.ptr = std::numeric_limits<char *>::infinity();
 //     polygon.point_count = u64_inf;
 //     PointT null_point = PointT(std::numeric_limits<f64>::infinity(), std::numeric_limits<f64>::infinity());
 //     polygon.bounding_box.upper_left.x = std::numeric_limits<f64>::infinity();
@@ -195,13 +195,13 @@ inline UuidT NullValue() {
 // inline BlobT NullValue() {
 //     BlobT blob;
 //     blob.size = u64_inf;
-//     blob.ptr = std::numeric_limits<ptr_t>::infinity();
+//     blob.ptr = std::numeric_limits<char *>::infinity();
 //     return blob;
 // }
 
 template <>
 inline EmbeddingT NullValue() {
-    ptr_t ptr = std::numeric_limits<ptr_t>::infinity();
+    char * ptr = std::numeric_limits<char *>::infinity();
     EmbeddingT embedding(std::move(ptr), false);
     return embedding;
 }
@@ -221,8 +221,8 @@ inline MixedT NullValue() {
 }
 
 template <typename ElemType>
-inline void SetEmbeddingNullValue(ElemType *ptr, SizeT dim) {
-    for (SizeT i = 0; i < dim; ++i) {
+inline void SetEmbeddingNullValue(ElemType *ptr, size_t dim) {
+    for (size_t i = 0; i < dim; ++i) {
         ptr[i] = NullValue<ElemType>();
     }
 }

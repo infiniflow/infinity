@@ -33,7 +33,7 @@ public:
 
 public:
     SparseIPDist() = default;
-    SparseIPDist(SizeT dim) {}
+    SparseIPDist(size_t dim) {}
 
     template <typename DataStore>
     DistanceType operator()(VertexType v1_i, VertexType v2_i, const DataStore &data_store) const {

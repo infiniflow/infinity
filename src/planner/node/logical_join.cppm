@@ -32,28 +32,28 @@ export class LogicalJoin : public LogicalNode {
 public:
     explicit LogicalJoin(u64 node_id,
                          JoinType join_type,
-                         String alias,
-                         Vector<SharedPtr<BaseExpression>> conditions,
-                         const SharedPtr<LogicalNode> &left,
-                         const SharedPtr<LogicalNode> &right);
+                         std::string alias,
+                         std::vector<std::shared_ptr<BaseExpression>> conditions,
+                         const std::shared_ptr<LogicalNode> &left,
+                         const std::shared_ptr<LogicalNode> &right);
 
-    [[nodiscard]] Vector<ColumnBinding> GetColumnBindings() const final;
+    [[nodiscard]] std::vector<ColumnBinding> GetColumnBindings() const final;
 
-    [[nodiscard]] SharedPtr<Vector<String>> GetOutputNames() const final;
+    [[nodiscard]] std::shared_ptr<std::vector<std::string>> GetOutputNames() const final;
 
-    [[nodiscard]] SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const final;
+    [[nodiscard]] std::shared_ptr<std::vector<std::shared_ptr<DataType>>> GetOutputTypes() const final;
 
-    String ToString(i64 &space) const final;
+    std::string ToString(i64 &space) const final;
 
-    inline String name() final { return "LogicalJoin"; }
+    inline std::string name() final { return "LogicalJoin"; }
 
-    String alias_{};
+    std::string alias_{};
 
     u64 mark_index_{}; // Only for mark join
 
 public:
     JoinType join_type_{JoinType::kInner};
-    Vector<SharedPtr<BaseExpression>> conditions_{};
+    std::vector<std::shared_ptr<BaseExpression>> conditions_{};
 };
 
 } // namespace infinity

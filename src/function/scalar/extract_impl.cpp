@@ -170,8 +170,8 @@ inline void ExtractSecondFunction::Run(TimeT left, BigIntT &result) {
 
 void RegisterExtractFunction(NewCatalog *catalog_ptr) {
     {
-        String func_name = "extract_year";
-        SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
+        std::string func_name = "extract_year";
+        std::shared_ptr<ScalarFunctionSet> function_set_ptr = std::make_shared<ScalarFunctionSet>(func_name);
         ScalarFunction extract_year_from_date(func_name,
                                               {DataType(LogicalType::kDate)},
                                               DataType(LogicalType::kBigInt),
@@ -191,8 +191,8 @@ void RegisterExtractFunction(NewCatalog *catalog_ptr) {
     }
 
     {
-        String func_name = "extract_month";
-        SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
+        std::string func_name = "extract_month";
+        std::shared_ptr<ScalarFunctionSet> function_set_ptr = std::make_shared<ScalarFunctionSet>(func_name);
         ScalarFunction extract_month_from_date(func_name,
                                                {DataType(LogicalType::kDate)},
                                                DataType(LogicalType::kBigInt),
@@ -212,8 +212,8 @@ void RegisterExtractFunction(NewCatalog *catalog_ptr) {
     }
 
     {
-        String func_name = "extract_day";
-        SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
+        std::string func_name = "extract_day";
+        std::shared_ptr<ScalarFunctionSet> function_set_ptr = std::make_shared<ScalarFunctionSet>(func_name);
         ScalarFunction extract_day_from_date(func_name,
                                              {DataType(LogicalType::kDate)},
                                              DataType(LogicalType::kBigInt),
@@ -233,8 +233,8 @@ void RegisterExtractFunction(NewCatalog *catalog_ptr) {
     }
 
     {
-        String func_name = "extract_hour";
-        SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
+        std::string func_name = "extract_hour";
+        std::shared_ptr<ScalarFunctionSet> function_set_ptr = std::make_shared<ScalarFunctionSet>(func_name);
         ScalarFunction extract_hour_from_datetime(func_name,
                                                   {DataType(LogicalType::kDateTime)},
                                                   DataType(LogicalType::kBigInt),
@@ -254,8 +254,8 @@ void RegisterExtractFunction(NewCatalog *catalog_ptr) {
     }
 
     {
-        String func_name = "extract_minute";
-        SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
+        std::string func_name = "extract_minute";
+        std::shared_ptr<ScalarFunctionSet> function_set_ptr = std::make_shared<ScalarFunctionSet>(func_name);
         ScalarFunction extract_minute_from_datetime(func_name,
                                                     {DataType(LogicalType::kDateTime)},
                                                     DataType(LogicalType::kBigInt),
@@ -275,8 +275,8 @@ void RegisterExtractFunction(NewCatalog *catalog_ptr) {
     }
 
     {
-        String func_name = "extract_second";
-        SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
+        std::string func_name = "extract_second";
+        std::shared_ptr<ScalarFunctionSet> function_set_ptr = std::make_shared<ScalarFunctionSet>(func_name);
         ScalarFunction extract_second_from_datetime(func_name,
                                                     {DataType(LogicalType::kDateTime)},
                                                     DataType(LogicalType::kBigInt),

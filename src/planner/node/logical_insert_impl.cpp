@@ -28,23 +28,23 @@ import data_type;
 
 namespace infinity {
 
-Vector<ColumnBinding> LogicalInsert::GetColumnBindings() const { return {}; }
+std::vector<ColumnBinding> LogicalInsert::GetColumnBindings() const { return {}; }
 
-SharedPtr<Vector<String>> LogicalInsert::GetOutputNames() const { return MakeShared<Vector<String>>(); }
+std::shared_ptr<std::vector<std::string>> LogicalInsert::GetOutputNames() const { return std::make_shared<std::vector<std::string>>(); }
 
-SharedPtr<Vector<SharedPtr<DataType>>> LogicalInsert::GetOutputTypes() const { return MakeShared<Vector<SharedPtr<DataType>>>(); }
+std::shared_ptr<std::vector<std::shared_ptr<DataType>>> LogicalInsert::GetOutputTypes() const { return std::make_shared<std::vector<std::shared_ptr<DataType>>>(); }
 
-String LogicalInsert::ToString(i64 &space) const {
+std::string LogicalInsert::ToString(i64 &space) const {
     std::stringstream ss;
-    String arrow_str;
+    std::string arrow_str;
     if (space > 3) {
         space -= 4;
         arrow_str = "->  ";
     }
     if (has_select_source()) {
-        ss << String(space, ' ') << arrow_str << "Insert Table: " << *table_info_->table_name_ << " (from SELECT)";
+        ss << std::string(space, ' ') << arrow_str << "Insert Table: " << *table_info_->table_name_ << " (from SELECT)";
     } else {
-        ss << String(space, ' ') << arrow_str << "Insert Table: " << *table_info_->table_name_ << " (from VALUES)";
+        ss << std::string(space, ' ') << arrow_str << "Insert Table: " << *table_info_->table_name_ << " (from VALUES)";
     }
     space += arrow_str.size();
 

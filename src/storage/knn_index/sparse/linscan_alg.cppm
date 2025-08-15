@@ -46,13 +46,13 @@ struct Posting {
         return res;
     }
 
-    static SizeT GetSizeInBytes() { return sizeof(doc_id_) + sizeof(val_); }
+    static size_t GetSizeInBytes() { return sizeof(doc_id_) + sizeof(val_); }
 };
 
 export template <typename DataType, typename IdxType>
 class LinScan {
 public:
-    LinScan(SizeT max_col) : inverted_idx_(max_col) {}
+    LinScan(size_t max_col) : inverted_idx_(max_col) {}
 
     void Insert(const SparseVecRef<DataType, IdxType> &vec, u32 doc_id) {
         for (i32 i = 0; i < vec.nnz_; ++i) {
@@ -67,22 +67,22 @@ public:
         ++row_num_;
     }
 
-    Pair<Vector<u32>, Vector<DataType>> SearchBF(const SparseVecRef<DataType, IdxType> &query, u32 top_k) const {
+    std::pair<std::vector<u32>, std::vector<DataType>> SearchBF(const SparseVecRef<DataType, IdxType> &query, u32 top_k) const {
         u32 result_n = std::min(top_k, row_num_);
 
-        HashMap<u32, DataType> scores;
+        std::unordered_map<u32, DataType> scores;
         for (i32 i = 0; i < query.nnz_; ++i) {
             u32 indice = query.indices_[i];
             DataType val = query.data_[i];
 
-            const Vector<Posting<DataType>> &posting_list = inverted_idx_[indice];
+            const std::vector<Posting<DataType>> &posting_list = inverted_idx_[indice];
             for (const auto &posting : posting_list) {
                 scores[posting.doc_id_] += val * posting.val_;
             }
         }
 
-        Vector<u32> res(result_n);
-        Vector<DataType> res_score(result_n);
+        std::vector<u32> res(result_n);
+        std::vector<DataType> res_score(result_n);
         HeapResultHandler<CompareMin<DataType, u32>> result_handler(1 /*query_n*/, result_n, res_score.data(), res.data());
         for (const auto &[row_id, score] : scores) {
             if (score < 0) {
@@ -94,33 +94,33 @@ public:
         return {res, res_score};
     }
 
-    Tuple<Vector<u32>, Vector<DataType>, i32> SearchKnn(const SparseVecRef<DataType, IdxType> &query, u32 top_k, i32 budget) const {
+    std::tuple<std::vector<u32>, std::vector<DataType>, i32> SearchKnn(const SparseVecRef<DataType, IdxType> &query, u32 top_k, i32 budget) const {
         if (budget <= 0) {
             return {};
         }
         u32 result_n = std::min(top_k, row_num_);
 
-        Vector<u32> query_vec_idx(query.nnz_);
+        std::vector<u32> query_vec_idx(query.nnz_);
         std::iota(query_vec_idx.begin(), query_vec_idx.end(), 0);
         std::sort(query_vec_idx.begin(), query_vec_idx.end(), [&query](u32 i1, u32 i2) {
             return std::abs(query.data_[i1]) > std::abs(query.data_[i2]);
         });
 
-        HashMap<u32, DataType> scores;
+        std::unordered_map<u32, DataType> scores;
         i32 cur_budget = 0;
         for (i32 budget_i = 0; cur_budget < budget && budget_i < query.nnz_; ++budget_i) {
             u32 indice = query.indices_[query_vec_idx[budget_i]];
             DataType val = query.data_[query_vec_idx[budget_i]];
 
-            const Vector<Posting<DataType>> &posting_list = inverted_idx_[indice];
+            const std::vector<Posting<DataType>> &posting_list = inverted_idx_[indice];
             cur_budget += posting_list.size();
             for (const auto &posting : posting_list) {
                 scores[posting.doc_id_] += val * posting.val_;
             }
         }
 
-        Vector<u32> result(result_n);
-        Vector<DataType> result_score(result_n);
+        std::vector<u32> result(result_n);
+        std::vector<DataType> result_score(result_n);
         HeapResultHandler<CompareMin<DataType, u32>> result_handler(1 /*query_n*/, result_n, result_score.data(), result.data());
         for (const auto &[row_id, score] : scores) {
             if (score < 0) {
@@ -135,18 +135,18 @@ public:
     u32 row_num() const { return row_num_; }
 
     void Save(LocalFileHandle &file_handle) const {
-        SizeT bytes = GetSizeInBytes();
-        auto buffer = MakeUnique<char[]>(sizeof(bytes) + bytes);
+        size_t bytes = GetSizeInBytes();
+        auto buffer = std::make_unique<char[]>(sizeof(bytes) + bytes);
         char *p = buffer.get();
-        WriteBufAdv<SizeT>(p, bytes);
+        WriteBufAdv<size_t>(p, bytes);
         WriteAdv(p);
         file_handle.Append(buffer.get(), sizeof(bytes) + bytes);
     }
 
     static LinScan Load(LocalFileHandle &file_handle) {
-        SizeT bytes;
+        size_t bytes;
         file_handle.Read(&bytes, sizeof(bytes));
-        auto buffer = MakeUnique<char[]>(bytes);
+        auto buffer = std::make_unique<char[]>(bytes);
         file_handle.Read(buffer.get(), bytes);
         const char *buffer_ptr = buffer.get();
         return ReadAdv(buffer_ptr);
@@ -155,13 +155,13 @@ public:
 private:
     void WriteAdv(char *&p) const {
         WriteBufAdv<u32>(p, row_num_);
-        SizeT inverted_idx_size = inverted_idx_.size();
-        WriteBufAdv<SizeT>(p, inverted_idx_size);
-        for (SizeT indice = 0; indice < inverted_idx_size; ++indice) {
+        size_t inverted_idx_size = inverted_idx_.size();
+        WriteBufAdv<size_t>(p, inverted_idx_size);
+        for (size_t indice = 0; indice < inverted_idx_size; ++indice) {
             const auto &posting_list = inverted_idx_[indice];
             WriteBufAdv<u32>(p, indice);
-            SizeT posting_size = posting_list.size();
-            WriteBufAdv<SizeT>(p, posting_size);
+            size_t posting_size = posting_list.size();
+            WriteBufAdv<size_t>(p, posting_size);
             for (const auto &posting : posting_list) {
                 posting.WriteAdv(p);
             }
@@ -169,15 +169,15 @@ private:
     }
 
     static LinScan ReadAdv(const char *&p) {
-        SizeT row_num = ReadBufAdv<u32>(p);
-        SizeT inverted_idx_size = ReadBufAdv<SizeT>(p);
+        size_t row_num = ReadBufAdv<u32>(p);
+        size_t inverted_idx_size = ReadBufAdv<size_t>(p);
         LinScan res(inverted_idx_size);
         res.row_num_ = row_num;
-        for (SizeT i = 0; i < inverted_idx_size; ++i) {
+        for (size_t i = 0; i < inverted_idx_size; ++i) {
             u32 indice = ReadBufAdv<u32>(p);
-            SizeT posting_size = ReadBufAdv<SizeT>(p);
-            Vector<Posting<DataType>> posting_list(posting_size);
-            for (SizeT j = 0; j < posting_size; ++j) {
+            size_t posting_size = ReadBufAdv<size_t>(p);
+            std::vector<Posting<DataType>> posting_list(posting_size);
+            for (size_t j = 0; j < posting_size; ++j) {
                 posting_list[j] = Posting<DataType>::ReadAdv(p);
                 if (j > 0 && posting_list[j].doc_id_ <= posting_list[j - 1].doc_id_) {
                     UnrecoverableError("Duplicate doc_id in posting list");
@@ -191,19 +191,19 @@ private:
         return res;
     }
 
-    SizeT GetSizeInBytes() const {
-        SizeT bytes = 0;
+    size_t GetSizeInBytes() const {
+        size_t bytes = 0;
         bytes += sizeof(row_num_);
-        bytes += sizeof(SizeT);
+        bytes += sizeof(size_t);
         for (const auto &posting_list : inverted_idx_) {
-            bytes += sizeof(SizeT);
+            bytes += sizeof(size_t);
             bytes += posting_list.size() * Posting<DataType>::GetSizeInBytes();
         }
         return bytes;
     }
 
 private:
-    Vector<Vector<Posting<DataType>>> inverted_idx_;
+    std::vector<std::vector<Posting<DataType>>> inverted_idx_;
     u32 row_num_{};
 };
 

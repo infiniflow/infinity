@@ -32,7 +32,7 @@ namespace infinity {
 
 export class PhysicalHashJoin : public PhysicalOperator {
 public:
-    explicit PhysicalHashJoin(u64 id, SharedPtr<Vector<LoadMeta>> load_metas)
+    explicit PhysicalHashJoin(u64 id, std::shared_ptr<std::vector<LoadMeta>> load_metas)
         : PhysicalOperator(PhysicalOperatorType::kJoinHash, nullptr, nullptr, id, load_metas) {}
 
     ~PhysicalHashJoin() override = default;
@@ -41,9 +41,9 @@ public:
 
     bool Execute(QueryContext *query_context, OperatorState *operator_state) final;
 
-    SharedPtr<Vector<String>> GetOutputNames() const final;
+    std::shared_ptr<std::vector<std::string>> GetOutputNames() const final;
 
-    SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const final;
+    std::shared_ptr<std::vector<std::shared_ptr<DataType>>> GetOutputTypes() const final;
 };
 
 } // namespace infinity

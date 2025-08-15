@@ -36,15 +36,15 @@ import data_type;
 
 namespace infinity {
 
-MatchTensorExpression::MatchTensorExpression(Vector<SharedPtr<BaseExpression>> search_column,
+MatchTensorExpression::MatchTensorExpression(std::vector<std::shared_ptr<BaseExpression>> search_column,
                                              const MatchTensorSearchMethod search_method,
                                              const EmbeddingDataType embedding_data_type,
                                              const u32 dimension,
                                              EmbeddingT query_embedding,
                                              const u32 tensor_basic_embedding_dimension,
-                                             const String &options_text,
-                                             SharedPtr<BaseExpression> optional_filter,
-                                             String index_name,
+                                             const std::string &options_text,
+                                             std::shared_ptr<BaseExpression> optional_filter,
+                                             std::string index_name,
                                              bool ignore_index)
     : BaseExpression(ExpressionType::kMatchTensor, std::move(search_column)), search_method_(search_method),
       embedding_data_type_(embedding_data_type), dimension_(dimension), query_embedding_(std::move(query_embedding)),
@@ -55,9 +55,9 @@ MatchTensorExpression::MatchTensorExpression(Vector<SharedPtr<BaseExpression>> s
 
 DataType MatchTensorExpression::Type() const { return DataType(LogicalType::kFloat); }
 
-String MatchTensorExpression::MethodToString(const MatchTensorSearchMethod method) { return MatchTensorExpr::SearchMethodToString(method); }
+std::string MatchTensorExpression::MethodToString(const MatchTensorSearchMethod method) { return MatchTensorExpr::SearchMethodToString(method); }
 
-String MatchTensorExpression::ToString() const {
+std::string MatchTensorExpression::ToString() const {
     if (!alias_.empty()) {
         return alias_;
     }
@@ -78,8 +78,8 @@ u64 MatchTensorExpression::Hash() const {
     h ^= std::hash<EmbeddingDataType>()(embedding_data_type_);
     h ^= std::hash<u32>()(dimension_);
     h ^= std::hash<u32>()(tensor_basic_embedding_dimension_);
-    h ^= std::hash<String>()(options_text_);
-    h ^= std::hash<String>()(index_name_);
+    h ^= std::hash<std::string>()(options_text_);
+    h ^= std::hash<std::string>()(index_name_);
     return h;
 }
 
@@ -91,7 +91,7 @@ bool MatchTensorExpression::Eq(const BaseExpression &other_base) const {
     if (arguments_.size() != other.arguments_.size()) {
         return false;
     }
-    for (SizeT i = 0; i < arguments_.size(); ++i) {
+    for (size_t i = 0; i < arguments_.size(); ++i) {
         if (!arguments_[i]->Eq(*other.arguments_[i])) {
             return false;
         }

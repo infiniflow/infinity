@@ -93,9 +93,9 @@ inline void TruncFunction::Run(FloatT left, BigIntT right, VarcharT &result, Col
 
 
 void RegisterTruncFunction(NewCatalog *catalog_ptr) {
-    String func_name = "trunc";
+    std::string func_name = "trunc";
 
-    SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
+    std::shared_ptr<ScalarFunctionSet> function_set_ptr = std::make_shared<ScalarFunctionSet>(func_name);
 
     ScalarFunction truncate_double_bigint(func_name,
                               {DataType(LogicalType::kDouble), DataType(LogicalType::kBigInt)},

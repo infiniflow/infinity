@@ -31,12 +31,12 @@ namespace infinity {
 // TODO:now only suppor f32
 export class EMVBIndexFileWorker final : public IndexFileWorker {
 public:
-    explicit EMVBIndexFileWorker(SharedPtr<String> data_dir,
-                                 SharedPtr<String> temp_dir,
-                                 SharedPtr<String> file_dir,
-                                 SharedPtr<String> file_name,
-                                 SharedPtr<IndexBase> index_base,
-                                 SharedPtr<ColumnDef> column_def,
+    explicit EMVBIndexFileWorker(std::shared_ptr<std::string> data_dir,
+                                 std::shared_ptr<std::string> temp_dir,
+                                 std::shared_ptr<std::string> file_dir,
+                                 std::shared_ptr<std::string> file_name,
+                                 std::shared_ptr<IndexBase> index_base,
+                                 std::shared_ptr<ColumnDef> column_def,
                                  const u32 start_segment_offset,
                                  PersistenceManager *persistence_manager)
         : IndexFileWorker(std::move(data_dir),
@@ -60,7 +60,7 @@ public:
 protected:
     bool WriteToFileImpl(bool to_spill, bool &prepare_success, const FileWorkerSaveCtx &ctx) override;
 
-    void ReadFromFileImpl(SizeT file_size, bool from_spill) override;
+    void ReadFromFileImpl(size_t file_size, bool from_spill) override;
 
 private:
     const EmbeddingInfo *GetEmbeddingInfo() const;

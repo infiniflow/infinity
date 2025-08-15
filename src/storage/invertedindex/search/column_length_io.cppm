@@ -57,10 +57,10 @@ public:
 
 private:
     u32 SeekFile(RowID row_id);
-    const String &index_dir_;
-    Vector<ColumnReaderChunkInfo> chunk_index_meta_infos_{}; // must in ascending order
+    const std::string &index_dir_;
+    std::vector<ColumnReaderChunkInfo> chunk_index_meta_infos_{}; // must in ascending order
 
-    SharedPtr<MemoryIndexer> memory_indexer_{};
+    std::shared_ptr<MemoryIndexer> memory_indexer_{};
     u64 total_df_{};
     float avg_column_len_{};
     const u32 *column_lengths_{nullptr};

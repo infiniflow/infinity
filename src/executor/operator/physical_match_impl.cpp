@@ -73,11 +73,11 @@ import data_type;
 namespace infinity {
 
 struct QueryIterators {
-    UniquePtr<DocIterator> query_iter{};
+    std::unique_ptr<DocIterator> query_iter{};
     // for comparison
-    UniquePtr<DocIterator> bmw_iter{};
-    UniquePtr<DocIterator> batch_iter{};
-    UniquePtr<DocIterator> naive_iter{};
+    std::unique_ptr<DocIterator> bmw_iter{};
+    std::unique_ptr<DocIterator> batch_iter{};
+    std::unique_ptr<DocIterator> naive_iter{};
 };
 
 QueryIterators CreateQueryIterators(QueryBuilder &query_builder,
@@ -105,7 +105,7 @@ QueryIterators CreateQueryIterators(QueryBuilder &query_builder,
         if (iter) {
             iter->UpdateScoreThreshold(std::max(begin_threshold, score_threshold));
             if (score_threshold > 0.0f) {
-                auto new_iter = MakeUnique<ScoreThresholdIterator>(std::move(iter), score_threshold);
+                auto new_iter = std::make_unique<ScoreThresholdIterator>(std::move(iter), score_threshold);
                 iter = std::move(new_iter);
             }
         } else {
@@ -164,13 +164,13 @@ u32 ExecuteFTSearch(DocIterator *iter, FullTextScoreResultHeap &result_heap) {
 auto ExecuteFTSearch(const QueryIterators &query_iterators, const u32 topn) {
     struct FTSearchResultType {
         u32 result_count{};
-        UniquePtr<float[]> score_result{};
-        UniquePtr<RowID[]> row_id_result{};
+        std::unique_ptr<float[]> score_result{};
+        std::unique_ptr<RowID[]> row_id_result{};
     };
-    auto GetFTSearchResult = [topn](const UniquePtr<DocIterator> &iter) {
+    auto GetFTSearchResult = [topn](const std::unique_ptr<DocIterator> &iter) {
         FTSearchResultType result;
-        result.score_result = MakeUniqueForOverwrite<float[]>(topn);
-        result.row_id_result = MakeUniqueForOverwrite<RowID[]>(topn);
+        result.score_result = std::make_unique_for_overwrite<float[]>(topn);
+        result.row_id_result = std::make_unique_for_overwrite<RowID[]>(topn);
         FullTextScoreResultHeap result_heap(topn, result.score_result.get(), result.row_id_result.get());
         [[maybe_unused]] const auto loop_cnt = ExecuteFTSearch(iter.get(), result_heap);
         result_heap.Sort();
@@ -184,8 +184,8 @@ auto ExecuteFTSearch(const QueryIterators &query_iterators, const u32 topn) {
     auto bmw_result = GetFTSearchResult(query_iterators.bmw_iter);
     FTSearchResultType naive_result;
     {
-        naive_result.score_result = MakeUniqueForOverwrite<float[]>(topn);
-        naive_result.row_id_result = MakeUniqueForOverwrite<RowID[]>(topn);
+        naive_result.score_result = std::make_unique_for_overwrite<float[]>(topn);
+        naive_result.row_id_result = std::make_unique_for_overwrite<RowID[]>(topn);
         FullTextScoreResultHeap result_heap(topn, naive_result.score_result.get(), naive_result.row_id_result.get());
         if (query_iterators.batch_iter || query_iterators.naive_iter) {
             if (!query_iterators.batch_iter || !query_iterators.naive_iter) {
@@ -251,7 +251,7 @@ bool PhysicalMatch::ExecuteInner(QueryContext *query_context, OperatorState *ope
                                                  rank_features_option_,
                                                  top_n_,
                                                  match_expr_->index_names_);
-    full_text_query_context.query_tree_ = MakeUnique<FilterQueryNode>(common_query_filter_.get(), std::move(query_tree_));
+    full_text_query_context.query_tree_ = std::make_unique<FilterQueryNode>(common_query_filter_.get(), std::move(query_tree_));
     const auto query_iterators = CreateQueryIterators(query_builder, full_text_query_context, early_term_algo_, begin_threshold_, score_threshold_);
     const auto finish_query_builder_time = std::chrono::high_resolution_clock::now();
     LOG_DEBUG(fmt::format("PhysicalMatch Part 2: Build Query iterator time: {} ms",
@@ -268,7 +268,7 @@ bool PhysicalMatch::ExecuteInner(QueryContext *query_context, OperatorState *ope
     // 4.1 prepare first output_data_block
     auto &output_data_blocks = operator_state->data_block_array_;
     auto OutputTypesPtr = GetOutputTypes();
-    Vector<SharedPtr<DataType>> &OutputTypes = *OutputTypesPtr;
+    std::vector<std::shared_ptr<DataType>> &OutputTypes = *OutputTypesPtr;
     auto append_data_block = [&]() {
         auto data_block = DataBlock::MakeUniquePtr();
         data_block->Init(OutputTypes);
@@ -279,8 +279,8 @@ bool PhysicalMatch::ExecuteInner(QueryContext *query_context, OperatorState *ope
     {
         OutputToDataBlockHelper output_to_data_block_helper;
         u32 output_block_idx = output_data_blocks.size() - 1;
-        Vector<SizeT> &column_ids = base_table_ref_->column_ids_;
-        SizeT column_n = column_ids.size();
+        std::vector<size_t> &column_ids = base_table_ref_->column_ids_;
+        size_t column_n = column_ids.size();
         u32 block_capacity = DEFAULT_BLOCK_CAPACITY;
         u32 output_block_row_id = 0;
         DataBlock *output_block_ptr = output_data_blocks.back().get();
@@ -298,7 +298,7 @@ bool PhysicalMatch::ExecuteInner(QueryContext *query_context, OperatorState *ope
             u32 segment_offset = row_id.segment_offset_;
             u16 block_id = segment_offset / DEFAULT_BLOCK_CAPACITY;
             u16 block_offset = segment_offset % DEFAULT_BLOCK_CAPACITY;
-            SizeT column_id = 0;
+            size_t column_id = 0;
             for (; column_id < column_n; ++column_id) {
                 output_to_data_block_helper
                     .AddOutputJobInfo(segment_id, block_id, column_ids[column_id], block_offset, output_block_idx, column_id, output_block_row_id);
@@ -325,21 +325,21 @@ bool PhysicalMatch::ExecuteInner(QueryContext *query_context, OperatorState *ope
 }
 
 PhysicalMatch::PhysicalMatch(const u64 id,
-                             SharedPtr<BaseTableRef> base_table_ref,
-                             SharedPtr<MatchExpression> match_expr,
-                             SharedPtr<IndexReader> index_reader,
-                             UniquePtr<QueryNode> &&query_tree,
+                             std::shared_ptr<BaseTableRef> base_table_ref,
+                             std::shared_ptr<MatchExpression> match_expr,
+                             std::shared_ptr<IndexReader> index_reader,
+                             std::unique_ptr<QueryNode> &&query_tree,
                              const float begin_threshold,
                              const EarlyTermAlgo early_term_algo,
                              const u32 top_n,
-                             const SharedPtr<CommonQueryFilter> &common_query_filter,
+                             const std::shared_ptr<CommonQueryFilter> &common_query_filter,
                              MinimumShouldMatchOption &&minimum_should_match_option,
                              RankFeaturesOption &&rank_features_option,
                              const f32 score_threshold,
                              const FulltextSimilarity ft_similarity,
                              const BM25Params &bm25_params,
                              const u64 match_table_index,
-                             SharedPtr<Vector<LoadMeta>> load_metas,
+                             std::shared_ptr<std::vector<LoadMeta>> load_metas,
                              const bool cache_result)
     : PhysicalOperator(PhysicalOperatorType::kMatch, nullptr, nullptr, id, std::move(load_metas), cache_result), table_index_(match_table_index),
       base_table_ref_(std::move(base_table_ref)), match_expr_(std::move(match_expr)), index_reader_(std::move(index_reader)),
@@ -372,8 +372,8 @@ bool PhysicalMatch::Execute(QueryContext *query_context, OperatorState *operator
     return return_value;
 }
 
-SharedPtr<Vector<String>> PhysicalMatch::GetOutputNames() const {
-    SharedPtr<Vector<String>> result_names = MakeShared<Vector<String>>();
+std::shared_ptr<std::vector<std::string>> PhysicalMatch::GetOutputNames() const {
+    std::shared_ptr<std::vector<std::string>> result_names = std::make_shared<std::vector<std::string>>();
     result_names->reserve(base_table_ref_->column_names_->size() + 2);
     for (auto &name : *base_table_ref_->column_names_) {
         result_names->emplace_back(name);
@@ -383,40 +383,40 @@ SharedPtr<Vector<String>> PhysicalMatch::GetOutputNames() const {
     return result_names;
 }
 
-SharedPtr<Vector<SharedPtr<DataType>>> PhysicalMatch::GetOutputTypes() const {
-    SharedPtr<Vector<SharedPtr<DataType>>> result_types = MakeShared<Vector<SharedPtr<DataType>>>();
+std::shared_ptr<std::vector<std::shared_ptr<DataType>>> PhysicalMatch::GetOutputTypes() const {
+    std::shared_ptr<std::vector<std::shared_ptr<DataType>>> result_types = std::make_shared<std::vector<std::shared_ptr<DataType>>>();
     result_types->reserve(base_table_ref_->column_types_->size() + 2);
     for (auto &type : *base_table_ref_->column_types_) {
         result_types->emplace_back(type);
     }
-    result_types->emplace_back(MakeShared<DataType>(LogicalType::kFloat));
-    result_types->emplace_back(MakeShared<DataType>(LogicalType::kRowID));
+    result_types->emplace_back(std::make_shared<DataType>(LogicalType::kFloat));
+    result_types->emplace_back(std::make_shared<DataType>(LogicalType::kRowID));
     return result_types;
 }
 
-String PhysicalMatch::ToString(i64 &space) const {
-    String arrow_str;
+std::string PhysicalMatch::ToString(i64 &space) const {
+    std::string arrow_str;
     if (space != 0) {
-        arrow_str = String(space - 2, ' ');
+        arrow_str = std::string(space - 2, ' ');
         arrow_str += "-> PhysicalMatch ";
     } else {
         arrow_str = "PhysicalMatch ";
     }
-    String res = fmt::format("{} Table: {}, {}", arrow_str, *(base_table_ref_->table_info_->table_name_), match_expr_->ToString());
+    std::string res = fmt::format("{} Table: {}, {}", arrow_str, *(base_table_ref_->table_info_->table_name_), match_expr_->ToString());
     return res;
 }
 
-void PhysicalMatch::AddCache(QueryContext *query_context, ResultCacheManager *cache_mgr, const Vector<UniquePtr<DataBlock>> &output_data_blocks) {
+void PhysicalMatch::AddCache(QueryContext *query_context, ResultCacheManager *cache_mgr, const std::vector<std::unique_ptr<DataBlock>> &output_data_blocks) {
     NewTxn *new_txn = query_context->GetNewTxn();
     TxnTimeStamp begin_ts = new_txn->BeginTS();
 
     TableInfo *table_info = base_table_ref_->table_info_.get();
     TxnTimeStamp query_ts = std::min(begin_ts, table_info->max_commit_ts_);
-    Vector<UniquePtr<DataBlock>> data_blocks(output_data_blocks.size());
-    for (SizeT i = 0; i < output_data_blocks.size(); ++i) {
+    std::vector<std::unique_ptr<DataBlock>> data_blocks(output_data_blocks.size());
+    for (size_t i = 0; i < output_data_blocks.size(); ++i) {
         data_blocks[i] = output_data_blocks[i]->Clone();
     }
-    auto cached_node = MakeUnique<CachedMatch>(query_ts, this);
+    auto cached_node = std::make_unique<CachedMatch>(query_ts, this);
     bool success = cache_mgr->AddCache(std::move(cached_node), std::move(data_blocks));
     if (!success) {
         LOG_WARN(fmt::format("Add cache failed for query: {}", begin_ts));

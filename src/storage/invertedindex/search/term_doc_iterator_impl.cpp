@@ -31,7 +31,7 @@ import row_id;
 
 namespace infinity {
 
-TermDocIterator::TermDocIterator(UniquePtr<PostingIterator> &&iter, const u64 column_id, const float weight, const FulltextSimilarity ft_similarity)
+TermDocIterator::TermDocIterator(std::unique_ptr<PostingIterator> &&iter, const u64 column_id, const float weight, const FulltextSimilarity ft_similarity)
     : column_id_(column_id), iter_(std::move(iter)), weight_(weight), ft_similarity_(ft_similarity) {
     doc_freq_ = iter_->GetDocFreq();
     term_freq_ = 0;
@@ -52,7 +52,7 @@ TermDocIterator::~TermDocIterator() {
     }
 }
 
-void TermDocIterator::InitBM25Info(UniquePtr<FullTextColumnLengthReader> &&column_length_reader, const float delta, const float k1, const float b) {
+void TermDocIterator::InitBM25Info(std::unique_ptr<FullTextColumnLengthReader> &&column_length_reader, const float delta, const float k1, const float b) {
     column_length_reader_ = std::move(column_length_reader);
     avg_column_len_ = column_length_reader_->GetAvgColumnLength();
     if (avg_column_len_ <= 1e-6f) {
@@ -143,7 +143,7 @@ float TermDocIterator::BM25Score() {
     return bm25_score_cache_;
 }
 
-void TermDocIterator::PrintTree(std::ostream &os, const String &prefix, bool is_final) const {
+void TermDocIterator::PrintTree(std::ostream &os, const std::string &prefix, bool is_final) const {
     os << prefix;
     os << (is_final ? "└──" : "├──");
     os << "TermDocIterator";

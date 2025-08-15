@@ -49,7 +49,7 @@ bool PhysicalAggregate::Execute(QueryContext *query_context, OperatorState *oper
     OperatorState *prev_op_state = operator_state->prev_op_state_;
     auto *aggregate_operator_state = static_cast<AggregateOperatorState *>(operator_state);
 
-    SizeT group_count = groups_.size();
+    size_t group_count = groups_.size();
     bool task_completed = prev_op_state->Complete();
 
     if (group_count == 0) {
@@ -67,33 +67,33 @@ bool PhysicalAggregate::Execute(QueryContext *query_context, OperatorState *oper
     }
 
     // 1. Execute group-by expressions to generate unique key.
-    Vector<SharedPtr<ColumnDef>> groupby_columns;
+    std::vector<std::shared_ptr<ColumnDef>> groupby_columns;
     groupby_columns.reserve(group_count);
 
-    Vector<SharedPtr<DataType>> groupby_types;
+    std::vector<std::shared_ptr<DataType>> groupby_types;
     groupby_types.reserve(group_count);
 
     for (i64 idx = 0; auto &expr : groups_) {
-        SharedPtr<ColumnDef> col_def = MakeShared<ColumnDef>(idx, MakeShared<DataType>(expr->Type()), expr->Name(), std::set<ConstraintType>());
+        std::shared_ptr<ColumnDef> col_def = std::make_shared<ColumnDef>(idx, std::make_shared<DataType>(expr->Type()), expr->Name(), std::set<ConstraintType>());
         groupby_columns.emplace_back(col_def);
-        groupby_types.emplace_back(MakeShared<DataType>(expr->Type()));
+        groupby_types.emplace_back(std::make_shared<DataType>(expr->Type()));
         ++idx;
     }
 
-    SharedPtr<TableDef> groupby_tabledef =
-        TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("groupby"), MakeShared<String>(""), groupby_columns);
-    SharedPtr<DataTable> groupby_table = DataTable::Make(groupby_tabledef, TableType::kIntermediate);
+    std::shared_ptr<TableDef> groupby_tabledef =
+        TableDef::Make(std::make_shared<std::string>("default_db"), std::make_shared<std::string>("groupby"), std::make_shared<std::string>(""), groupby_columns);
+    std::shared_ptr<DataTable> groupby_table = DataTable::Make(groupby_tabledef, TableType::kIntermediate);
 
     // Prepare the expression states
-    Vector<SharedPtr<ExpressionState>> expr_states;
+    std::vector<std::shared_ptr<ExpressionState>> expr_states;
     expr_states.reserve(group_count);
     for (const auto &expr : groups_) {
         // expression state
         expr_states.emplace_back(ExpressionState::CreateState(expr));
     }
 
-    SizeT input_block_count = prev_op_state->data_block_array_.size();
-    for (SizeT block_idx = 0; block_idx < input_block_count; ++block_idx) {
+    size_t input_block_count = prev_op_state->data_block_array_.size();
+    for (size_t block_idx = 0; block_idx < input_block_count; ++block_idx) {
         DataBlock *input_data_block = prev_op_state->data_block_array_[block_idx].get();
 
         groupby_table->data_blocks_.emplace_back(DataBlock::MakeUniquePtr());
@@ -103,7 +103,7 @@ bool PhysicalAggregate::Execute(QueryContext *query_context, OperatorState *oper
         ExpressionEvaluator groupby_executor;
         groupby_executor.Init(input_data_block);
 
-        for (SizeT expr_idx = 0; expr_idx < group_count; ++expr_idx) {
+        for (size_t expr_idx = 0; expr_idx < group_count; ++expr_idx) {
             groupby_executor.Execute(groups_[expr_idx], expr_states[expr_idx], output_data_block->column_vectors[expr_idx]);
         }
         output_data_block->Finalize();
@@ -115,35 +115,35 @@ bool PhysicalAggregate::Execute(QueryContext *query_context, OperatorState *oper
         hash_table.Init(groupby_types);
     }
 
-    SizeT block_count = groupby_table->DataBlockCount();
-    for (SizeT block_id = 0; block_id < block_count; ++block_id) {
-        const SharedPtr<DataBlock> &block_ptr = groupby_table->GetDataBlockById(block_id);
+    size_t block_count = groupby_table->DataBlockCount();
+    for (size_t block_id = 0; block_id < block_count; ++block_id) {
+        const std::shared_ptr<DataBlock> &block_ptr = groupby_table->GetDataBlockById(block_id);
         hash_table.Append(block_ptr->column_vectors, block_id, block_ptr->row_count());
     }
 
     // 3. forlop each aggregates function on each group by bucket, to calculate the result according to the row list
-    SharedPtr<DataTable> output_groupby_table = DataTable::Make(groupby_tabledef, TableType::kIntermediate);
+    std::shared_ptr<DataTable> output_groupby_table = DataTable::Make(groupby_tabledef, TableType::kIntermediate);
     GenerateGroupByResult(groupby_table, output_groupby_table, hash_table);
 
     // input table after group by, each block belong to one group. This is the prerequisites to execute aggregate function.
-    Vector<UniquePtr<DataBlock>> grouped_input_datablocks;
+    std::vector<std::unique_ptr<DataBlock>> grouped_input_datablocks;
     GroupByInputTable(prev_op_state->data_block_array_, grouped_input_datablocks, hash_table);
 
     // generate output aggregate table
-    SizeT aggregates_count = aggregates_.size();
+    size_t aggregates_count = aggregates_.size();
     if (aggregates_count > 0) {
-        SharedPtr<DataTable> output_aggregate_table{};
+        std::shared_ptr<DataTable> output_aggregate_table{};
 
         // Prepare the output table columns
-        Vector<SharedPtr<ColumnDef>> aggregate_columns;
+        std::vector<std::shared_ptr<ColumnDef>> aggregate_columns;
         aggregate_columns.reserve(aggregates_count);
 
         // Prepare the expression states
-        Vector<SharedPtr<ExpressionState>> expr_states;
+        std::vector<std::shared_ptr<ExpressionState>> expr_states;
         expr_states.reserve(aggregates_.size());
 
         // Prepare the output block
-        Vector<SharedPtr<DataType>> output_types;
+        std::vector<std::shared_ptr<DataType>> output_types;
         output_types.reserve(aggregates_count);
         auto &agg_states = aggregate_operator_state->states_;
 
@@ -153,10 +153,10 @@ bool PhysicalAggregate::Execute(QueryContext *query_context, OperatorState *oper
         for (i64 idx = 0; auto &expr : aggregates_) {
             // expression state
             expr_states.emplace_back(ExpressionState::CreateState(std::static_pointer_cast<AggregateExpression>(expr), agg_states[idx].get(), flag));
-            SharedPtr<DataType> data_type = MakeShared<DataType>(expr->Type());
+            std::shared_ptr<DataType> data_type = std::make_shared<DataType>(expr->Type());
 
             // column definition
-            SharedPtr<ColumnDef> col_def = MakeShared<ColumnDef>(idx, data_type, expr->Name(), std::set<ConstraintType>());
+            std::shared_ptr<ColumnDef> col_def = std::make_shared<ColumnDef>(idx, data_type, expr->Name(), std::set<ConstraintType>());
             aggregate_columns.emplace_back(col_def);
 
             // for output block
@@ -166,21 +166,21 @@ bool PhysicalAggregate::Execute(QueryContext *query_context, OperatorState *oper
         }
 
         // output aggregate table definition
-        SharedPtr<TableDef> aggregate_tabledef =
-            TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("aggregate"), MakeShared<String>(""), aggregate_columns);
+        std::shared_ptr<TableDef> aggregate_tabledef =
+            TableDef::Make(std::make_shared<std::string>("default_db"), std::make_shared<std::string>("aggregate"), std::make_shared<std::string>(""), aggregate_columns);
         output_aggregate_table = DataTable::Make(aggregate_tabledef, TableType::kAggregate);
 
         // Loop blocks
-        SizeT input_data_block_count = grouped_input_datablocks.size();
-        for (SizeT block_idx = 0; block_idx < input_data_block_count; ++block_idx) {
-            SharedPtr<DataBlock> output_data_block = DataBlock::Make();
+        size_t input_data_block_count = grouped_input_datablocks.size();
+        for (size_t block_idx = 0; block_idx < input_data_block_count; ++block_idx) {
+            std::shared_ptr<DataBlock> output_data_block = DataBlock::Make();
             output_data_block->Init(output_types, 1);
             DataBlock *input_block = grouped_input_datablocks[block_idx].get();
             // Loop aggregate expression
             ExpressionEvaluator evaluator;
             evaluator.Init(input_block);
-            for (SizeT expr_idx = 0; expr_idx < aggregates_count; ++expr_idx) {
-                SharedPtr<ColumnVector> blocks_column = output_data_block->column_vectors[expr_idx];
+            for (size_t expr_idx = 0; expr_idx < aggregates_count; ++expr_idx) {
+                std::shared_ptr<ColumnVector> blocks_column = output_data_block->column_vectors[expr_idx];
                 evaluator.Execute(aggregates_[expr_idx], expr_states[expr_idx], blocks_column);
                 if (blocks_column.get() != output_data_block->column_vectors[expr_idx].get()) {
                     // column vector in blocks column might be changed to the column vector from column reference.
@@ -199,9 +199,9 @@ bool PhysicalAggregate::Execute(QueryContext *query_context, OperatorState *oper
 
     // 4. generate the result to output
     output_groupby_table->ShrinkBlocks();
-    for (SizeT block_idx = 0; block_idx < output_groupby_table->DataBlockCount(); ++block_idx) {
-        SharedPtr<DataBlock> output_data_block = output_groupby_table->GetDataBlockById(block_idx);
-        aggregate_operator_state->data_block_array_.push_back(MakeUnique<DataBlock>(std::move(*output_data_block)));
+    for (size_t block_idx = 0; block_idx < output_groupby_table->DataBlockCount(); ++block_idx) {
+        std::shared_ptr<DataBlock> output_data_block = output_groupby_table->GetDataBlockById(block_idx);
+        aggregate_operator_state->data_block_array_.push_back(std::make_unique<DataBlock>(std::move(*output_data_block)));
     }
 
     prev_op_state->data_block_array_.clear();
@@ -211,33 +211,33 @@ bool PhysicalAggregate::Execute(QueryContext *query_context, OperatorState *oper
     return true;
 }
 
-void PhysicalAggregate::GroupByInputTable(const Vector<UniquePtr<DataBlock>> &input_datablocks,
-                                          Vector<UniquePtr<DataBlock>> &output_datablocks,
+void PhysicalAggregate::GroupByInputTable(const std::vector<std::unique_ptr<DataBlock>> &input_datablocks,
+                                          std::vector<std::unique_ptr<DataBlock>> &output_datablocks,
                                           HashTable &hash_table) {
     // 1. Get output table column types.
-    Vector<SharedPtr<DataType>> types = input_datablocks.front()->types();
-    SizeT column_count = input_datablocks.front()->column_count();
+    std::vector<std::shared_ptr<DataType>> types = input_datablocks.front()->types();
+    size_t column_count = input_datablocks.front()->column_count();
 
     // 2. Generate data blocks and append it into output table according to the group by hash table.
-    // const Vector<SharedPtr<DataBlock>> &input_datablocks = input_table->data_blocks_;
+    // const std::vector<std::shared_ptr<DataBlock>> &input_datablocks = input_table->data_blocks_;
     for (const auto &item : hash_table.hash_table_) {
 
         // 2.1 Each hash bucket will be insert in to one data block
-        UniquePtr<DataBlock> output_datablock = DataBlock::MakeUniquePtr();
-        SizeT datablock_size = 0;
+        std::unique_ptr<DataBlock> output_datablock = DataBlock::MakeUniquePtr();
+        size_t datablock_size = 0;
         for (const auto &vec_pair : item.second) {
             datablock_size += vec_pair.second.size();
         }
-        SizeT datablock_capacity = Utility::NextPowerOfTwo(datablock_size);
+        size_t datablock_capacity = Utility::NextPowerOfTwo(datablock_size);
         output_datablock->Init(types, datablock_capacity);
 
         // Loop each block
-        SizeT output_data_num = 0;
+        size_t output_data_num = 0;
         for (const auto &vec_pair : item.second) {
-            SizeT input_block_id = vec_pair.first;
+            size_t input_block_id = vec_pair.first;
 
             // Forloop each column
-            for (SizeT column_id = 0; column_id < column_count; ++column_id) {
+            for (size_t column_id = 0; column_id < column_count; ++column_id) {
                 // Loop each row of same block
                 for (const auto input_offset : vec_pair.second) {
 
@@ -259,14 +259,14 @@ void PhysicalAggregate::GroupByInputTable(const Vector<UniquePtr<DataBlock>> &in
     }
 }
 
-void PhysicalAggregate::GenerateGroupByResult(const SharedPtr<DataTable> &input_table, SharedPtr<DataTable> &output_table, HashTable &hash_table) {
+void PhysicalAggregate::GenerateGroupByResult(const std::shared_ptr<DataTable> &input_table, std::shared_ptr<DataTable> &output_table, HashTable &hash_table) {
 
-    SizeT column_count = input_table->ColumnCount();
-    Vector<SharedPtr<DataType>> types;
+    size_t column_count = input_table->ColumnCount();
+    std::vector<std::shared_ptr<DataType>> types;
     types.reserve(column_count);
-    for (SizeT column_id = 0; column_id < column_count; ++column_id) {
-        SharedPtr<DataType> input_type = input_table->GetColumnTypeById(column_id);
-        SharedPtr<DataType> output_type = output_table->GetColumnTypeById(column_id);
+    for (size_t column_id = 0; column_id < column_count; ++column_id) {
+        std::shared_ptr<DataType> input_type = input_table->GetColumnTypeById(column_id);
+        std::shared_ptr<DataType> output_type = output_table->GetColumnTypeById(column_id);
         if (*input_type != *output_type) {
             Status status = Status::DataTypeMismatch(input_type->ToString(), output_type->ToString());
             RecoverableError(status);
@@ -274,19 +274,19 @@ void PhysicalAggregate::GenerateGroupByResult(const SharedPtr<DataTable> &input_
         types.emplace_back(input_type);
     }
 
-    SharedPtr<DataBlock> output_datablock = nullptr;
-    const Vector<SharedPtr<DataBlock>> &input_datablocks = input_table->data_blocks_;
+    std::shared_ptr<DataBlock> output_datablock = nullptr;
+    const std::vector<std::shared_ptr<DataBlock>> &input_datablocks = input_table->data_blocks_;
     for (const auto &item : hash_table.hash_table_) {
         // Each hash bucket will generate one data block.
         output_datablock = DataBlock::Make();
         output_datablock->Init(types, 1);
 
         // Only get the first row(block id and row offset of the block) of the bucket
-        SizeT input_block_id = item.second.begin()->first;
-        SizeT input_offset = item.second.begin()->second.front();
+        size_t input_block_id = item.second.begin()->first;
+        size_t input_offset = item.second.begin()->second.front();
 
         // Only the first position of the column vector has value.
-        for (SizeT column_id = 0; column_id < column_count; ++column_id) {
+        for (size_t column_id = 0; column_id < column_count; ++column_id) {
             output_datablock->column_vectors[column_id]->AppendWith(*input_datablocks[input_block_id]->column_vectors[column_id], input_offset, 1);
         }
 
@@ -295,16 +295,16 @@ void PhysicalAggregate::GenerateGroupByResult(const SharedPtr<DataTable> &input_
     }
 }
 
-bool PhysicalAggregate::SimpleAggregateExecute(const Vector<UniquePtr<DataBlock>> &input_blocks,
-                                               Vector<UniquePtr<DataBlock>> &output_blocks,
-                                               Vector<UniquePtr<char[]>> &states,
+bool PhysicalAggregate::SimpleAggregateExecute(const std::vector<std::unique_ptr<DataBlock>> &input_blocks,
+                                               std::vector<std::unique_ptr<DataBlock>> &output_blocks,
+                                               std::vector<std::unique_ptr<char[]>> &states,
                                                bool task_completed) {
-    SizeT aggregates_count = aggregates_.size();
+    size_t aggregates_count = aggregates_.size();
     if (aggregates_count <= 0) {
         UnrecoverableError("Simple Aggregate without aggregate expression.");
     }
 
-    SizeT input_block_count = input_blocks.size();
+    size_t input_block_count = input_blocks.size();
 
     if (input_block_count == 0) {
         // No input data
@@ -313,15 +313,15 @@ bool PhysicalAggregate::SimpleAggregateExecute(const Vector<UniquePtr<DataBlock>
     }
 
     // Prepare the output table columns
-    Vector<SharedPtr<ColumnDef>> aggregate_columns;
+    std::vector<std::shared_ptr<ColumnDef>> aggregate_columns;
     aggregate_columns.reserve(aggregates_count);
 
     // Prepare the expression states
-    Vector<SharedPtr<ExpressionState>> expr_states;
+    std::vector<std::shared_ptr<ExpressionState>> expr_states;
     expr_states.reserve(aggregates_.size());
 
     // Prepare the output block
-    Vector<SharedPtr<DataType>> output_types;
+    std::vector<std::shared_ptr<DataType>> output_types;
     output_types.reserve(aggregates_count);
 
     AggregateFlag flag = output_blocks.empty() ? (!task_completed ? AggregateFlag::kUninitialized : AggregateFlag::kRunAndFinish)
@@ -331,10 +331,10 @@ bool PhysicalAggregate::SimpleAggregateExecute(const Vector<UniquePtr<DataBlock>
         // expression state
         expr_states.emplace_back(ExpressionState::CreateState(std::static_pointer_cast<AggregateExpression>(expr), states[idx].get(), flag));
 
-        SharedPtr<DataType> output_type = MakeShared<DataType>(expr->Type());
+        std::shared_ptr<DataType> output_type = std::make_shared<DataType>(expr->Type());
 
         // column definition
-        SharedPtr<ColumnDef> col_def = MakeShared<ColumnDef>(idx, output_type, expr->Name(), std::set<ConstraintType>());
+        std::shared_ptr<ColumnDef> col_def = std::make_shared<ColumnDef>(idx, output_type, expr->Name(), std::set<ConstraintType>());
         aggregate_columns.emplace_back(col_def);
 
         // for output block
@@ -344,14 +344,14 @@ bool PhysicalAggregate::SimpleAggregateExecute(const Vector<UniquePtr<DataBlock>
     }
 
     if (output_blocks.empty()) {
-        for (SizeT block_idx = 0; block_idx < input_block_count; ++block_idx) {
+        for (size_t block_idx = 0; block_idx < input_block_count; ++block_idx) {
             output_blocks.emplace_back(DataBlock::MakeUniquePtr());
             auto out_put_block = output_blocks.back().get();
             out_put_block->Init(*GetOutputTypes());
         }
     }
 
-    for (SizeT block_idx = 0; block_idx < input_block_count; ++block_idx) {
+    for (size_t block_idx = 0; block_idx < input_block_count; ++block_idx) {
         DataBlock *input_data_block = input_blocks[block_idx].get();
 
         DataBlock *output_data_block = output_blocks[block_idx].get();
@@ -359,9 +359,9 @@ bool PhysicalAggregate::SimpleAggregateExecute(const Vector<UniquePtr<DataBlock>
         ExpressionEvaluator evaluator;
         evaluator.Init(input_data_block);
 
-        SizeT expression_count = aggregates_count;
+        size_t expression_count = aggregates_count;
         // calculate every columns value
-        for (SizeT expr_idx = 0; expr_idx < expression_count; ++expr_idx) {
+        for (size_t expr_idx = 0; expr_idx < expression_count; ++expr_idx) {
             LOG_TRACE("Physical aggregate Execute");
             evaluator.Execute(aggregates_[expr_idx], expr_states[expr_idx], output_data_block->column_vectors[expr_idx]);
         }
@@ -398,36 +398,36 @@ bool PhysicalAggregate::SimpleAggregateExecute(const Vector<UniquePtr<DataBlock>
     return true;
 }
 
-SharedPtr<Vector<String>> PhysicalAggregate::GetOutputNames() const {
-    SharedPtr<Vector<String>> result = MakeShared<Vector<String>>();
-    SizeT groups_count = groups_.size();
-    SizeT aggregates_count = aggregates_.size();
+std::shared_ptr<std::vector<std::string>> PhysicalAggregate::GetOutputNames() const {
+    std::shared_ptr<std::vector<std::string>> result = std::make_shared<std::vector<std::string>>();
+    size_t groups_count = groups_.size();
+    size_t aggregates_count = aggregates_.size();
     result->reserve(groups_count + aggregates_count);
-    for (SizeT i = 0; i < groups_count; ++i) {
+    for (size_t i = 0; i < groups_count; ++i) {
         result->emplace_back(groups_[i]->Name());
     }
-    for (SizeT i = 0; i < aggregates_count; ++i) {
+    for (size_t i = 0; i < aggregates_count; ++i) {
         result->emplace_back(aggregates_[i]->Name());
     }
     return result;
 }
 
-SharedPtr<Vector<SharedPtr<DataType>>> PhysicalAggregate::GetOutputTypes() const {
-    SharedPtr<Vector<SharedPtr<DataType>>> result = MakeShared<Vector<SharedPtr<DataType>>>();
-    SizeT groups_count = groups_.size();
-    SizeT aggregates_count = aggregates_.size();
+std::shared_ptr<std::vector<std::shared_ptr<DataType>>> PhysicalAggregate::GetOutputTypes() const {
+    std::shared_ptr<std::vector<std::shared_ptr<DataType>>> result = std::make_shared<std::vector<std::shared_ptr<DataType>>>();
+    size_t groups_count = groups_.size();
+    size_t aggregates_count = aggregates_.size();
     result->reserve(groups_count + aggregates_count);
-    for (SizeT i = 0; i < groups_count; ++i) {
-        result->emplace_back(MakeShared<DataType>(groups_[i]->Type()));
+    for (size_t i = 0; i < groups_count; ++i) {
+        result->emplace_back(std::make_shared<DataType>(groups_[i]->Type()));
     }
-    for (SizeT i = 0; i < aggregates_count; ++i) {
-        result->emplace_back(MakeShared<DataType>(aggregates_[i]->Type()));
+    for (size_t i = 0; i < aggregates_count; ++i) {
+        result->emplace_back(std::make_shared<DataType>(aggregates_[i]->Type()));
     }
     return result;
 }
 
-Vector<HashRange> PhysicalAggregate::GetHashRanges(i64 parallel_count) const {
-    Vector<HashRange> result;
+std::vector<HashRange> PhysicalAggregate::GetHashRanges(i64 parallel_count) const {
+    std::vector<HashRange> result;
     result.resize(parallel_count);
     return result;
 }

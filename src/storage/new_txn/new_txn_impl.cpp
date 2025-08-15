@@ -12,12 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:new_txn.impl;
 
 import :new_txn;
-import :stl;
 import :new_catalog;
 import :infinity_exception;
 import :new_txn_manager;
@@ -72,6 +69,7 @@ import :mem_index;
 import :catalog_cache;
 
 import std;
+import std.compat;
 import third_party;
 
 import extra_ddl_info;
@@ -89,10 +87,10 @@ NewTxn::NewTxn(NewTxnManager *txn_manager,
                TxnTimeStamp begin_ts,
                TxnTimeStamp last_kv_commit_ts,
                TxnTimeStamp last_commit_ts,
-               UniquePtr<KVInstance> kv_instance,
-               SharedPtr<String> txn_text,
+               std::unique_ptr<KVInstance> kv_instance,
+               std::shared_ptr<std::string> txn_text,
                TransactionType txn_type)
-    : txn_mgr_(txn_manager), buffer_mgr_(txn_mgr_->GetBufferMgr()), wal_entry_(MakeShared<WalEntry>()), kv_instance_(std::move(kv_instance)),
+    : txn_mgr_(txn_manager), buffer_mgr_(txn_mgr_->GetBufferMgr()), wal_entry_(std::make_shared<WalEntry>()), kv_instance_(std::move(kv_instance)),
       txn_text_(std::move(txn_text)) {
     new_catalog_ = InfinityContext::instance().storage()->new_catalog();
 #ifdef INFINITY_DEBUG
@@ -111,9 +109,9 @@ NewTxn::NewTxn(BufferManager *buffer_mgr,
                NewTxnManager *txn_mgr,
                TransactionID txn_id,
                TxnTimeStamp begin_ts,
-               UniquePtr<KVInstance> kv_instance,
+               std::unique_ptr<KVInstance> kv_instance,
                TransactionType txn_type)
-    : txn_mgr_(txn_mgr), buffer_mgr_(buffer_mgr), wal_entry_(MakeShared<WalEntry>()), kv_instance_(std::move(kv_instance)) {
+    : txn_mgr_(txn_mgr), buffer_mgr_(buffer_mgr), wal_entry_(std::make_shared<WalEntry>()), kv_instance_(std::move(kv_instance)) {
     new_catalog_ = InfinityContext::instance().storage()->new_catalog();
 #ifdef INFINITY_DEBUG
     GlobalResourceUsage::IncrObjectCount("NewTxn");
@@ -124,18 +122,18 @@ NewTxn::NewTxn(BufferManager *buffer_mgr,
     txn_context_ptr_->txn_type_ = txn_type;
 }
 
-UniquePtr<NewTxn>
-NewTxn::NewReplayTxn(NewTxnManager *txn_mgr, TransactionID txn_id, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts, UniquePtr<KVInstance> kv_instance) {
+std::unique_ptr<NewTxn>
+NewTxn::NewReplayTxn(NewTxnManager *txn_mgr, TransactionID txn_id, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts, std::unique_ptr<KVInstance> kv_instance) {
     TxnTimeStamp last_kv_commit_ts = commit_ts + 1; // The last kv commit ts is commit_ts + 1
-    auto txn = MakeUnique<NewTxn>(txn_mgr, txn_id, begin_ts, last_kv_commit_ts, commit_ts, std::move(kv_instance), nullptr, TransactionType::kReplay);
+    auto txn = std::make_unique<NewTxn>(txn_mgr, txn_id, begin_ts, last_kv_commit_ts, commit_ts, std::move(kv_instance), nullptr, TransactionType::kReplay);
     txn->txn_context_ptr_->commit_ts_ = commit_ts;
     return txn;
 }
 
-UniquePtr<NewTxn> NewTxn::NewRecoveryTxn(NewTxnManager *txn_mgr, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts) {
+std::unique_ptr<NewTxn> NewTxn::NewRecoveryTxn(NewTxnManager *txn_mgr, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts) {
     KVStore *kv_code = txn_mgr->kv_store();
-    UniquePtr<NewTxn> txn =
-        MakeUnique<NewTxn>(txn_mgr, 0, begin_ts, commit_ts + 1, commit_ts, kv_code->GetInstance(), nullptr, TransactionType::kRecovery);
+    std::unique_ptr<NewTxn> txn =
+        std::make_unique<NewTxn>(txn_mgr, 0, begin_ts, commit_ts + 1, commit_ts, kv_code->GetInstance(), nullptr, TransactionType::kRecovery);
     txn->txn_context_ptr_->commit_ts_ = commit_ts;
     return txn;
 }
@@ -148,8 +146,8 @@ NewTxn::~NewTxn() {
 
 TransactionID NewTxn::TxnID() const { return txn_context_ptr_->txn_id_; }
 
-void NewTxn::AddOperation(const SharedPtr<String> &operation_text) { txn_context_ptr_->AddOperation(operation_text); }
-Vector<SharedPtr<String>> NewTxn::GetOperations() const { return txn_context_ptr_->GetOperations(); }
+void NewTxn::AddOperation(const std::shared_ptr<std::string> &operation_text) { txn_context_ptr_->AddOperation(operation_text); }
+std::vector<std::shared_ptr<std::string>> NewTxn::GetOperations() const { return txn_context_ptr_->GetOperations(); }
 
 void NewTxn::CheckTxnStatus() {
     TxnState txn_state = this->GetTxnState();
@@ -158,18 +156,18 @@ void NewTxn::CheckTxnStatus() {
     }
 }
 
-void NewTxn::CheckTxn(const String &db_name) {
+void NewTxn::CheckTxn(const std::string &db_name) {
     this->CheckTxnStatus();
     if (db_name_.empty()) {
         db_name_ = db_name;
     } else if (!IsEqual(db_name_, db_name)) {
-        UniquePtr<String> err_msg = MakeUnique<String>(fmt::format("Attempt to get table from another database {}", db_name));
+        std::unique_ptr<std::string> err_msg = std::make_unique<std::string>(fmt::format("Attempt to get table from another database {}", db_name));
         RecoverableError(Status::InvalidIdentifierName(db_name));
     }
 }
 
 // Database OPs
-Status NewTxn::CreateDatabase(const String &db_name, ConflictType conflict_type, const SharedPtr<String> &comment) {
+Status NewTxn::CreateDatabase(const std::string &db_name, ConflictType conflict_type, const std::shared_ptr<std::string> &comment) {
     this->SetTxnType(TransactionType::kCreateDB);
 
     if (conflict_type == ConflictType::kReplace) {
@@ -182,14 +180,14 @@ Status NewTxn::CreateDatabase(const String &db_name, ConflictType conflict_type,
 
     this->CheckTxnStatus();
 
-    String db_id_str;
+    std::string db_id_str;
     Status status = IncrLatestID(db_id_str, NEXT_DATABASE_ID);
     LOG_TRACE(fmt::format("txn: {}, create db, apply db_id: {}", txn_context_ptr_->txn_id_, db_id_str));
     if (!status.ok()) {
-        return Status(status.code(), MakeUnique<String>(fmt::format("Fail to fetch next database id, {}", status.message())));
+        return Status(status.code(), std::make_unique<std::string>(fmt::format("Fail to fetch next database id, {}", status.message())));
     }
 
-    Optional<DBMeeta> db_meta;
+    std::optional<DBMeeta> db_meta;
     TxnTimeStamp db_create_ts;
     status = GetDBMeta(db_name, db_meta, db_create_ts);
     if (status.ok()) {
@@ -207,7 +205,7 @@ Status NewTxn::CreateDatabase(const String &db_name, ConflictType conflict_type,
         return Status::UnexpectedError("txn store is not null");
     }
 
-    base_txn_store_ = MakeShared<CreateDBTxnStore>();
+    base_txn_store_ = std::make_shared<CreateDBTxnStore>();
     CreateDBTxnStore *txn_store = static_cast<CreateDBTxnStore *>(base_txn_store_.get());
     txn_store->db_name_ = db_name;
     txn_store->comment_ptr_ = comment;
@@ -218,8 +216,8 @@ Status NewTxn::CreateDatabase(const String &db_name, ConflictType conflict_type,
 
 Status NewTxn::ReplayCreateDb(WalCmdCreateDatabaseV2 *create_db_cmd, TxnTimeStamp commit_ts, i64 txn_id) {
     // Check if the database already exists in kv store
-    String db_key = KeyEncode::CatalogDbKey(create_db_cmd->db_name_, commit_ts);
-    String db_id;
+    std::string db_key = KeyEncode::CatalogDbKey(create_db_cmd->db_name_, commit_ts);
+    std::string db_id;
     Status status = kv_instance_->Get(db_key, db_id);
     if (status.ok()) {
         if (db_id == create_db_cmd->db_id_) {
@@ -247,7 +245,7 @@ Status NewTxn::ReplayCreateDb(WalCmdCreateDatabaseV2 *create_db_cmd, TxnTimeStam
     }
 
     // Update next db id if necessary
-    String current_next_db_id_str;
+    std::string current_next_db_id_str;
     status = kv_instance_->Get(NEXT_DATABASE_ID.data(), current_next_db_id_str);
     if (!status.ok()) {
         return status;
@@ -257,7 +255,7 @@ Status NewTxn::ReplayCreateDb(WalCmdCreateDatabaseV2 *create_db_cmd, TxnTimeStam
     u64 this_db_id = std::stoull(create_db_cmd->db_id_);
     if (this_db_id + 1 > current_next_db_id) {
         // Update the next db id
-        String next_db_id_str = std::to_string(this_db_id + 1);
+        std::string next_db_id_str = std::to_string(this_db_id + 1);
         status = kv_instance_->Put(NEXT_DATABASE_ID.data(), next_db_id_str);
         if (!status.ok()) {
             return status;
@@ -268,7 +266,7 @@ Status NewTxn::ReplayCreateDb(WalCmdCreateDatabaseV2 *create_db_cmd, TxnTimeStam
     return Status::OK();
 }
 
-Status NewTxn::DropDatabase(const String &db_name, ConflictType conflict_type) {
+Status NewTxn::DropDatabase(const std::string &db_name, ConflictType conflict_type) {
     this->SetTxnType(TransactionType::kDropDB);
 
     if (conflict_type == ConflictType::kReplace) {
@@ -280,7 +278,7 @@ Status NewTxn::DropDatabase(const String &db_name, ConflictType conflict_type) {
 
     this->CheckTxnStatus();
 
-    Optional<DBMeeta> db_meta;
+    std::optional<DBMeeta> db_meta;
     TxnTimeStamp db_create_ts;
     Status status = GetDBMeta(db_name, db_meta, db_create_ts);
     if (!status.ok()) {
@@ -298,10 +296,10 @@ Status NewTxn::DropDatabase(const String &db_name, ConflictType conflict_type) {
         return Status::UnexpectedError("txn store is not null");
     }
 
-    base_txn_store_ = MakeShared<DropDBTxnStore>();
+    base_txn_store_ = std::make_shared<DropDBTxnStore>();
     DropDBTxnStore *txn_store = static_cast<DropDBTxnStore *>(base_txn_store_.get());
     txn_store->db_name_ = db_name;
-    String db_id_str = db_meta->db_id_str();
+    std::string db_id_str = db_meta->db_id_str();
     txn_store->db_id_str_ = db_id_str;
     txn_store->db_id_ = std::stoull(db_id_str);
     txn_store->create_ts_ = db_create_ts;
@@ -310,8 +308,8 @@ Status NewTxn::DropDatabase(const String &db_name, ConflictType conflict_type) {
 
 Status NewTxn::ReplayDropDb(WalCmdDropDatabaseV2 *drop_db_cmd, TxnTimeStamp commit_ts, i64 txn_id) {
     // Check if the database is already dropped in kv store
-    String drop_db_key = KeyEncode::DropDBKey(drop_db_cmd->db_name_, drop_db_cmd->create_ts_, drop_db_cmd->db_id_);
-    String drop_db_commit_ts_str;
+    std::string drop_db_key = KeyEncode::DropDBKey(drop_db_cmd->db_name_, drop_db_cmd->create_ts_, drop_db_cmd->db_id_);
+    std::string drop_db_commit_ts_str;
     Status status = kv_instance_->Get(drop_db_key, drop_db_commit_ts_str);
     if (status.ok()) {
         TxnTimeStamp db_commit_ts = std::stoull(drop_db_commit_ts_str);
@@ -346,10 +344,10 @@ Status NewTxn::ReplayDropDb(WalCmdDropDatabaseV2 *drop_db_cmd, TxnTimeStamp comm
     return Status::OK();
 }
 
-Tuple<SharedPtr<DatabaseInfo>, Status> NewTxn::GetDatabaseInfo(const String &db_name) {
+std::tuple<std::shared_ptr<DatabaseInfo>, Status> NewTxn::GetDatabaseInfo(const std::string &db_name) {
     this->CheckTxnStatus();
 
-    Optional<DBMeeta> db_meta;
+    std::optional<DBMeeta> db_meta;
     TxnTimeStamp db_create_ts;
     Status status = GetDBMeta(db_name, db_meta, db_create_ts);
     if (!status.ok()) {
@@ -360,14 +358,14 @@ Tuple<SharedPtr<DatabaseInfo>, Status> NewTxn::GetDatabaseInfo(const String &db_
     if (!info_status.ok()) {
         return {nullptr, info_status};
     }
-    db_info->db_name_ = MakeShared<String>(db_name);
+    db_info->db_name_ = std::make_shared<std::string>(db_name);
 
     return {std::move(db_info), Status::OK()};
 }
 
-Status NewTxn::ListDatabase(Vector<String> &db_names) {
-    Vector<String> *db_id_strs_ptr;
-    Vector<String> *db_names_ptr;
+Status NewTxn::ListDatabase(std::vector<std::string> &db_names) {
+    std::vector<std::string> *db_id_strs_ptr;
+    std::vector<std::string> *db_names_ptr;
 
     CatalogMeta catalog_meta(this);
     Status status = catalog_meta.GetDBIDs(db_id_strs_ptr, &db_names_ptr);
@@ -379,22 +377,22 @@ Status NewTxn::ListDatabase(Vector<String> &db_names) {
 }
 
 // Table and Collection OPs
-Status NewTxn::GetTables(const String &db_name, Vector<SharedPtr<TableDetail>> &output_table_array) {
+Status NewTxn::GetTables(const std::string &db_name, std::vector<std::shared_ptr<TableDetail>> &output_table_array) {
     this->CheckTxn(db_name);
 
-    Vector<String> table_names;
+    std::vector<std::string> table_names;
     Status status = this->ListTable(db_name, table_names);
     if (!status.ok()) {
         return status;
     }
-    for (const String &table_name : table_names) {
-        Optional<DBMeeta> db_meta;
-        Optional<TableMeeta> table_meta;
+    for (const std::string &table_name : table_names) {
+        std::optional<DBMeeta> db_meta;
+        std::optional<TableMeeta> table_meta;
         status = GetTableMeta(db_name, table_name, db_meta, table_meta);
         if (!status.ok()) {
             return status;
         }
-        output_table_array.push_back(MakeShared<TableDetail>());
+        output_table_array.push_back(std::make_shared<TableDetail>());
         table_meta->SetDBTableName(db_name, table_name);
         status = table_meta->GetTableDetail(*output_table_array.back());
         if (!status.ok()) {
@@ -404,7 +402,7 @@ Status NewTxn::GetTables(const String &db_name, Vector<SharedPtr<TableDetail>> &
     return Status::OK();
 }
 
-Status NewTxn::CreateTable(const String &db_name, const SharedPtr<TableDef> &table_def, ConflictType conflict_type) {
+Status NewTxn::CreateTable(const std::string &db_name, const std::shared_ptr<TableDef> &table_def, ConflictType conflict_type) {
     this->SetTxnType(TransactionType::kCreateTable);
 
     if (conflict_type == ConflictType::kReplace) {
@@ -417,14 +415,14 @@ Status NewTxn::CreateTable(const String &db_name, const SharedPtr<TableDef> &tab
 
     this->CheckTxn(db_name);
 
-    Optional<DBMeeta> db_meta;
+    std::optional<DBMeeta> db_meta;
     TxnTimeStamp db_create_ts;
     Status status = GetDBMeta(db_name, db_meta, db_create_ts);
     if (!status.ok()) {
         return status;
     }
-    String table_id_str;
-    String table_key;
+    std::string table_id_str;
+    std::string table_key;
     TxnTimeStamp create_table_ts;
     status = db_meta->GetTableID(*table_def->table_name(), table_key, table_id_str, create_table_ts);
 
@@ -448,7 +446,7 @@ Status NewTxn::CreateTable(const String &db_name, const SharedPtr<TableDef> &tab
         return Status::UnexpectedError("txn store is not null");
     }
 
-    base_txn_store_ = MakeShared<CreateTableTxnStore>();
+    base_txn_store_ = std::make_shared<CreateTableTxnStore>();
     CreateTableTxnStore *txn_store = static_cast<CreateTableTxnStore *>(base_txn_store_.get());
     txn_store->db_name_ = db_name;
     txn_store->db_id_str_ = db_meta->db_id_str();
@@ -459,9 +457,9 @@ Status NewTxn::CreateTable(const String &db_name, const SharedPtr<TableDef> &tab
     txn_store->table_def_ = table_def;
 
     // Add operation record with table_id for traceability
-    String operation_msg =
+    std::string operation_msg =
         fmt::format("CREATE TABLE {}.{} (db_id: {}, table_id: {})", db_name, *table_def->table_name(), db_meta->db_id_str(), table_id_str);
-    txn_context_ptr_->AddOperation(MakeShared<String>(operation_msg));
+    txn_context_ptr_->AddOperation(std::make_shared<std::string>(operation_msg));
 
     LOG_TRACE("NewTxn::CreateTable created table entry is inserted.");
     return Status::OK();
@@ -469,8 +467,8 @@ Status NewTxn::CreateTable(const String &db_name, const SharedPtr<TableDef> &tab
 
 Status NewTxn::ReplayCreateTable(WalCmdCreateTableV2 *create_table_cmd, TxnTimeStamp commit_ts, i64 txn_id) {
     // Check if the table already exists in kv store
-    String table_key = KeyEncode::CatalogTableKey(create_table_cmd->db_id_, *create_table_cmd->table_def_->table_name(), commit_ts);
-    String table_id;
+    std::string table_key = KeyEncode::CatalogTableKey(create_table_cmd->db_id_, *create_table_cmd->table_def_->table_name(), commit_ts);
+    std::string table_id;
     // auto new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
     // new_txn_mgr->PrintAllKeyValue();
     Status status = kv_instance_->Get(table_key, table_id);
@@ -500,13 +498,13 @@ Status NewTxn::ReplayCreateTable(WalCmdCreateTableV2 *create_table_cmd, TxnTimeS
     }
 
     // Get db meta to set next table id
-    Optional<DBMeeta> db_meta;
+    std::optional<DBMeeta> db_meta;
     TxnTimeStamp db_create_ts;
     status = GetDBMeta(create_table_cmd->db_name_, db_meta, db_create_ts);
 
     // Get next table id of the db
-    String next_table_id_key = KeyEncode::CatalogDbTagKey(create_table_cmd->db_id_, NEXT_TABLE_ID.data());
-    String next_table_id_str;
+    std::string next_table_id_key = KeyEncode::CatalogDbTagKey(create_table_cmd->db_id_, NEXT_TABLE_ID.data());
+    std::string next_table_id_str;
     status = kv_instance_->Get(next_table_id_key, next_table_id_str);
     if (!status.ok()) {
         return status;
@@ -515,7 +513,7 @@ Status NewTxn::ReplayCreateTable(WalCmdCreateTableV2 *create_table_cmd, TxnTimeS
     u64 this_table_id = std::stoull(create_table_cmd->table_id_);
     if (this_table_id + 1 > next_table_id) {
         // Update the next table id
-        String new_next_table_id_str = std::to_string(this_table_id + 1);
+        std::string new_next_table_id_str = std::to_string(this_table_id + 1);
         status = kv_instance_->Put(next_table_id_key, new_next_table_id_str);
         if (!status.ok()) {
             return status;
@@ -530,7 +528,7 @@ Status NewTxn::ReplayCreateTable(WalCmdCreateTableV2 *create_table_cmd, TxnTimeS
     return Status::OK();
 }
 
-Status NewTxn::DropTable(const String &db_name, const String &table_name, ConflictType conflict_type) {
+Status NewTxn::DropTable(const std::string &db_name, const std::string &table_name, ConflictType conflict_type) {
     this->SetTxnType(TransactionType::kDropTable);
 
     if (conflict_type == ConflictType::kReplace) {
@@ -542,14 +540,14 @@ Status NewTxn::DropTable(const String &db_name, const String &table_name, Confli
 
     this->CheckTxnStatus();
 
-    Optional<DBMeeta> db_meta;
+    std::optional<DBMeeta> db_meta;
     TxnTimeStamp db_create_ts;
     Status status = GetDBMeta(db_name, db_meta, db_create_ts);
     if (!status.ok()) {
         return status;
     }
-    String table_key;
-    String table_id_str;
+    std::string table_key;
+    std::string table_id_str;
     TxnTimeStamp table_create_ts;
     status = db_meta->GetTableID(table_name, table_key, table_id_str, table_create_ts);
     if (!status.ok()) {
@@ -567,7 +565,7 @@ Status NewTxn::DropTable(const String &db_name, const String &table_name, Confli
         return Status::UnexpectedError("txn store is not null");
     }
 
-    base_txn_store_ = MakeShared<DropTableTxnStore>();
+    base_txn_store_ = std::make_shared<DropTableTxnStore>();
     DropTableTxnStore *txn_store = static_cast<DropTableTxnStore *>(base_txn_store_.get());
     txn_store->db_name_ = db_name;
     txn_store->db_id_str_ = db_meta->db_id_str();
@@ -579,8 +577,8 @@ Status NewTxn::DropTable(const String &db_name, const String &table_name, Confli
     txn_store->table_key_ = table_key;
 
     // Add operation record with table_id for traceability
-    String operation_msg = fmt::format("DROP TABLE {}.{} (db_id: {}, table_id: {})", db_name, table_name, db_meta->db_id_str(), table_id_str);
-    txn_context_ptr_->AddOperation(MakeShared<String>(operation_msg));
+    std::string operation_msg = fmt::format("DROP TABLE {}.{} (db_id: {}, table_id: {})", db_name, table_name, db_meta->db_id_str(), table_id_str);
+    txn_context_ptr_->AddOperation(std::make_shared<std::string>(operation_msg));
 
     LOG_TRACE(fmt::format("NewTxn::DropTable dropped table: {}.{}", db_name, table_name));
     return Status::OK();
@@ -588,9 +586,9 @@ Status NewTxn::DropTable(const String &db_name, const String &table_name, Confli
 
 Status NewTxn::ReplayDropTable(WalCmdDropTableV2 *drop_table_cmd, TxnTimeStamp commit_ts, i64 txn_id) {
     // Check if the table is already dropped in kv store
-    String drop_table_key =
+    std::string drop_table_key =
         KeyEncode::DropTableKey(drop_table_cmd->db_id_, drop_table_cmd->table_name_, drop_table_cmd->table_id_, drop_table_cmd->create_ts_);
-    String drop_table_commit_ts_str;
+    std::string drop_table_commit_ts_str;
     Status status = kv_instance_->Get(drop_table_key, drop_table_commit_ts_str);
     if (status.ok()) {
         TxnTimeStamp table_commit_ts = std::stoull(drop_table_commit_ts_str);
@@ -629,13 +627,13 @@ Status NewTxn::ReplayDropTable(WalCmdDropTableV2 *drop_table_cmd, TxnTimeStamp c
     return Status::OK();
 }
 
-Status NewTxn::RenameTable(const String &db_name, const String &old_table_name, const String &new_table_name) {
+Status NewTxn::RenameTable(const std::string &db_name, const std::string &old_table_name, const std::string &new_table_name) {
     this->SetTxnType(TransactionType::kRenameTable);
 
     this->CheckTxnStatus();
     this->CheckTxn(db_name);
 
-    Optional<DBMeeta> db_meta;
+    std::optional<DBMeeta> db_meta;
     TxnTimeStamp db_create_ts;
     Status status = GetDBMeta(db_name, db_meta, db_create_ts);
     if (!status.ok()) {
@@ -643,8 +641,8 @@ Status NewTxn::RenameTable(const String &db_name, const String &old_table_name, 
     }
 
     {
-        String table_id;
-        String table_key;
+        std::string table_id;
+        std::string table_key;
         TxnTimeStamp create_table_ts;
         status = db_meta->GetTableID(new_table_name, table_key, table_id, create_table_ts);
 
@@ -655,8 +653,8 @@ Status NewTxn::RenameTable(const String &db_name, const String &old_table_name, 
         }
     }
 
-    String table_id_str;
-    String table_key;
+    std::string table_id_str;
+    std::string table_key;
     TxnTimeStamp create_table_ts;
     status = db_meta->GetTableID(old_table_name, table_key, table_id_str, create_table_ts);
     if (!status.ok()) {
@@ -668,7 +666,7 @@ Status NewTxn::RenameTable(const String &db_name, const String &old_table_name, 
         return Status::UnexpectedError("txn store is not null");
     }
 
-    base_txn_store_ = MakeShared<RenameTableTxnStore>();
+    base_txn_store_ = std::make_shared<RenameTableTxnStore>();
     RenameTableTxnStore *txn_store = static_cast<RenameTableTxnStore *>(base_txn_store_.get());
     txn_store->db_name_ = db_name;
     txn_store->db_id_str_ = db_meta->db_id_str();
@@ -682,14 +680,14 @@ Status NewTxn::RenameTable(const String &db_name, const String &old_table_name, 
 
 Status NewTxn::ReplayRenameTable(WalCmdRenameTableV2 *rename_table_cmd, TxnTimeStamp commit_ts, i64 txn_id) {
 
-    const String &db_id = rename_table_cmd->db_id_;
-    const String &old_table_name = rename_table_cmd->table_name_;
-    const String &old_table_key = rename_table_cmd->old_table_key_;
-    const String &table_id = rename_table_cmd->table_id_;
+    const std::string &db_id = rename_table_cmd->db_id_;
+    const std::string &old_table_name = rename_table_cmd->table_name_;
+    const std::string &old_table_key = rename_table_cmd->old_table_key_;
+    const std::string &table_id = rename_table_cmd->table_id_;
     const TxnTimeStamp create_ts = infinity::GetTimestampFromKey(old_table_key);
 
-    String rename_table_key = KeyEncode::RenameTableKey(db_id, old_table_name, table_id, create_ts);
-    String rename_table_commit_ts_str;
+    std::string rename_table_key = KeyEncode::RenameTableKey(db_id, old_table_name, table_id, create_ts);
+    std::string rename_table_commit_ts_str;
     // TODO: Check if the table is already renamed in kv store
     Status status = kv_instance_->Get(rename_table_key, rename_table_commit_ts_str);
     if (status.ok()) {
@@ -715,11 +713,11 @@ Status NewTxn::ReplayRenameTable(WalCmdRenameTableV2 *rename_table_cmd, TxnTimeS
         }
     }
 
-    String ts_str = std::to_string(commit_ts);
+    std::string ts_str = std::to_string(commit_ts);
     kv_instance_->Put(KeyEncode::RenameTableKey(db_id, old_table_name, table_id, create_ts), ts_str);
 
     // create new table key
-    String new_table_key = KeyEncode::CatalogTableKey(db_id, rename_table_cmd->new_table_name_, commit_ts);
+    std::string new_table_key = KeyEncode::CatalogTableKey(db_id, rename_table_cmd->new_table_name_, commit_ts);
     status = kv_instance_->Put(new_table_key, table_id);
     if (!status.ok()) {
         return status;
@@ -728,25 +726,25 @@ Status NewTxn::ReplayRenameTable(WalCmdRenameTableV2 *rename_table_cmd, TxnTimeS
     return Status::OK();
 }
 
-Status NewTxn::AddColumns(const String &db_name, const String &table_name, const Vector<SharedPtr<ColumnDef>> &column_defs) {
+Status NewTxn::AddColumns(const std::string &db_name, const std::string &table_name, const std::vector<std::shared_ptr<ColumnDef>> &column_defs) {
 
-    Optional<DBMeeta> db_meta;
-    Optional<TableMeeta> table_meta;
-    String table_key;
+    std::optional<DBMeeta> db_meta;
+    std::optional<TableMeeta> table_meta;
+    std::string table_key;
     Status status = GetTableMeta(db_name, table_name, db_meta, table_meta, &table_key);
     if (!status.ok()) {
         return status;
     }
 
     // Construct added columns name map
-    Set<SizeT> column_idx_set;
-    Set<String> column_name_set;
+    Set<size_t> column_idx_set;
+    Set<std::string> column_name_set;
     for (const auto &column_def : column_defs) {
         column_idx_set.insert(column_def->id());
         column_name_set.insert(column_def->name());
     }
 
-    SharedPtr<Vector<SharedPtr<ColumnDef>>> old_column_defs;
+    std::shared_ptr<std::vector<std::shared_ptr<ColumnDef>>> old_column_defs;
     std::tie(old_column_defs, status) = table_meta->GetColumnDefs();
     if (!status.ok()) {
         return status;
@@ -765,7 +763,7 @@ Status NewTxn::AddColumns(const String &db_name, const String &table_name, const
         return Status::UnexpectedError("txn store is not null");
     }
 
-    base_txn_store_ = MakeShared<AddColumnsTxnStore>();
+    base_txn_store_ = std::make_shared<AddColumnsTxnStore>();
     AddColumnsTxnStore *txn_store = static_cast<AddColumnsTxnStore *>(base_txn_store_.get());
     txn_store->db_name_ = db_name;
     txn_store->db_id_str_ = db_meta->db_id_str();
@@ -782,23 +780,23 @@ Status NewTxn::AddColumns(const String &db_name, const String &table_name, const
 Status NewTxn::ReplayAddColumns(WalCmdAddColumnsV2 *add_columns_cmd, TxnTimeStamp commit_ts, i64 txn_id) {
     // This implementation might have error, since not check the column id and create timestamp
 
-    Optional<DBMeeta> db_meta;
-    Optional<TableMeeta> table_meta;
-    String table_key;
+    std::optional<DBMeeta> db_meta;
+    std::optional<TableMeeta> table_meta;
+    std::string table_key;
     Status status = GetTableMeta(add_columns_cmd->db_name_, add_columns_cmd->table_name_, db_meta, table_meta, &table_key);
     if (!status.ok()) {
         return status;
     }
 
     // Construct added columns name map
-    Set<SizeT> column_idx_set;
-    Set<String> column_name_set;
+    Set<size_t> column_idx_set;
+    Set<std::string> column_name_set;
     for (const auto &column_def : add_columns_cmd->column_defs_) {
         column_idx_set.insert(column_def->id());
         column_name_set.insert(column_def->name());
     }
 
-    SharedPtr<Vector<SharedPtr<ColumnDef>>> old_column_defs;
+    std::shared_ptr<std::vector<std::shared_ptr<ColumnDef>>> old_column_defs;
     std::tie(old_column_defs, status) = table_meta->GetColumnDefs();
     if (!status.ok()) {
         return status;
@@ -828,14 +826,14 @@ Status NewTxn::ReplayAddColumns(WalCmdAddColumnsV2 *add_columns_cmd, TxnTimeStam
     return Status::OK();
 }
 
-Status NewTxn::DropColumns(const String &db_name, const String &table_name, const Vector<String> &column_names) {
+Status NewTxn::DropColumns(const std::string &db_name, const std::string &table_name, const std::vector<std::string> &column_names) {
 
     if (column_names.empty()) {
         return Status::NotSupport("DropColumns: column_names is empty");
     }
 
     {
-        Set<String> name_set;
+        Set<std::string> name_set;
         for (const auto &name : column_names) {
             if (!name_set.insert(name).second) {
                 return Status::DuplicateColumnName(name);
@@ -843,24 +841,24 @@ Status NewTxn::DropColumns(const String &db_name, const String &table_name, cons
         }
     }
 
-    Optional<DBMeeta> db_meta;
-    Optional<TableMeeta> table_meta;
-    String table_key;
+    std::optional<DBMeeta> db_meta;
+    std::optional<TableMeeta> table_meta;
+    std::string table_key;
     Status status = GetTableMeta(db_name, table_name, db_meta, table_meta, &table_key);
     if (!status.ok()) {
         return status;
     }
 
-    SharedPtr<Vector<SharedPtr<ColumnDef>>> old_column_defs;
+    std::shared_ptr<std::vector<std::shared_ptr<ColumnDef>>> old_column_defs;
     std::tie(old_column_defs, status) = table_meta->GetColumnDefs();
     if (!status.ok()) {
         return status;
     }
-    Map<String, ColumnID> column_name_set;
+    std::map<std::string, ColumnID> column_name_set;
     for (const auto &column_def : *old_column_defs) {
         column_name_set.emplace(column_def->name(), column_def->id());
     }
-    Vector<ColumnID> column_ids;
+    std::vector<ColumnID> column_ids;
     for (const auto &column_name : column_names) {
         if (auto iter = column_name_set.find(column_name); iter != column_name_set.end()) {
             column_ids.push_back(iter->second);
@@ -873,9 +871,9 @@ Status NewTxn::DropColumns(const String &db_name, const String &table_name, cons
         return Status::NotSupport("Cannot delete all the columns of a table");
     }
 
-    Vector<String> column_keys;
+    std::vector<std::string> column_keys;
     for (const auto &column_name : column_names) {
-        String column_key;
+        std::string column_key;
         std::tie(column_key, status) = table_meta->GetColumnKeyByColumnName(column_name);
         if (!status.ok()) {
             return status;
@@ -883,19 +881,19 @@ Status NewTxn::DropColumns(const String &db_name, const String &table_name, cons
         column_keys.emplace_back(column_key);
     }
 
-    Vector<String> *index_id_strs_ptr = nullptr;
+    std::vector<std::string> *index_id_strs_ptr = nullptr;
     status = table_meta->GetIndexIDs(index_id_strs_ptr);
     if (!status.ok()) {
         return status;
     }
 
-    for (const String &index_id : *index_id_strs_ptr) {
+    for (const std::string &index_id : *index_id_strs_ptr) {
         TableIndexMeeta table_index_meta(index_id, *table_meta);
         auto [index_base, index_status] = table_index_meta.GetIndexBase();
         if (!index_status.ok()) {
             return index_status;
         }
-        for (const String &column_name : column_names) {
+        for (const std::string &column_name : column_names) {
             if (IsEqual(index_base->column_name(), column_name)) {
                 return Status::IndexOnColumn(column_name);
             }
@@ -907,7 +905,7 @@ Status NewTxn::DropColumns(const String &db_name, const String &table_name, cons
         return Status::UnexpectedError("txn store is not null");
     }
 
-    base_txn_store_ = MakeShared<DropColumnsTxnStore>();
+    base_txn_store_ = std::make_shared<DropColumnsTxnStore>();
     auto *txn_store = static_cast<DropColumnsTxnStore *>(base_txn_store_.get());
     txn_store->db_name_ = db_name;
     txn_store->db_id_str_ = db_meta->db_id_str();
@@ -924,22 +922,22 @@ Status NewTxn::DropColumns(const String &db_name, const String &table_name, cons
 
 Status NewTxn::ReplayDropColumns(WalCmdDropColumnsV2 *drop_columns_cmd, TxnTimeStamp commit_ts, i64 txn_id) {
 
-    const String &db_name = drop_columns_cmd->db_name_;
-    const String &table_name = drop_columns_cmd->table_name_;
+    const std::string &db_name = drop_columns_cmd->db_name_;
+    const std::string &table_name = drop_columns_cmd->table_name_;
 
-    Optional<DBMeeta> db_meta;
-    Optional<TableMeeta> table_meta;
+    std::optional<DBMeeta> db_meta;
+    std::optional<TableMeeta> table_meta;
     Status status = GetTableMeta(db_name, table_name, db_meta, table_meta);
     if (!status.ok()) {
         return status;
     }
 
-    for (SizeT i = 0; i < drop_columns_cmd->column_names_.size(); ++i) {
-        const String &column_key = drop_columns_cmd->column_keys_[i];
+    for (size_t i = 0; i < drop_columns_cmd->column_names_.size(); ++i) {
+        const std::string &column_key = drop_columns_cmd->column_keys_[i];
         TxnTimeStamp create_ts = infinity::GetTimestampFromKey(column_key);
-        String drop_column_key =
+        std::string drop_column_key =
             KeyEncode::DropTableColumnKey(drop_columns_cmd->db_id_, drop_columns_cmd->table_id_, drop_columns_cmd->column_names_[i], create_ts);
-        String drop_column_commit_ts_str;
+        std::string drop_column_commit_ts_str;
         status = kv_instance_->Get(drop_column_key, drop_column_commit_ts_str);
         if (status.ok()) {
             TxnTimeStamp drop_column_commit_ts = std::stoull(drop_column_commit_ts_str);
@@ -973,8 +971,8 @@ Status NewTxn::ReplayDropColumns(WalCmdDropColumnsV2 *drop_columns_cmd, TxnTimeS
     }
 
     auto ts_str = std::to_string(commit_ts);
-    for (SizeT i = 0; i < drop_columns_cmd->column_names_.size(); ++i) {
-        const String &column_key = drop_columns_cmd->column_keys_[i];
+    for (size_t i = 0; i < drop_columns_cmd->column_names_.size(); ++i) {
+        const std::string &column_key = drop_columns_cmd->column_keys_[i];
         TxnTimeStamp create_ts = infinity::GetTimestampFromKey(column_key);
         kv_instance_->Put(
             KeyEncode::DropTableColumnKey(drop_columns_cmd->db_id_, drop_columns_cmd->table_id_, drop_columns_cmd->column_names_[i], create_ts),
@@ -983,15 +981,15 @@ Status NewTxn::ReplayDropColumns(WalCmdDropColumnsV2 *drop_columns_cmd, TxnTimeS
     return Status::OK();
 }
 
-Status NewTxn::ListTable(const String &db_name, Vector<String> &table_names) {
-    Optional<DBMeeta> db_meta;
+Status NewTxn::ListTable(const std::string &db_name, std::vector<std::string> &table_names) {
+    std::optional<DBMeeta> db_meta;
     TxnTimeStamp db_create_ts;
     Status status = GetDBMeta(db_name, db_meta, db_create_ts);
     if (!status.ok()) {
         return status;
     }
-    Vector<String> *table_id_strs_ptr = nullptr;
-    Vector<String> *table_names_ptr = nullptr;
+    std::vector<std::string> *table_id_strs_ptr = nullptr;
+    std::vector<std::string> *table_names_ptr = nullptr;
     status = db_meta->GetTableIDs(table_id_strs_ptr, &table_names_ptr);
     if (!status.ok()) {
         return status;
@@ -1001,7 +999,7 @@ Status NewTxn::ListTable(const String &db_name, Vector<String> &table_names) {
 }
 // Index OPs
 
-Status NewTxn::CreateIndex(const String &db_name, const String &table_name, const SharedPtr<IndexBase> &index_base, ConflictType conflict_type) {
+Status NewTxn::CreateIndex(const std::string &db_name, const std::string &table_name, const std::shared_ptr<IndexBase> &index_base, ConflictType conflict_type) {
     this->SetTxnType(TransactionType::kCreateIndex);
 
     if (conflict_type == ConflictType::kReplace) {
@@ -1013,16 +1011,16 @@ Status NewTxn::CreateIndex(const String &db_name, const String &table_name, cons
 
     this->CheckTxn(db_name);
 
-    Optional<DBMeeta> db_meta;
-    Optional<TableMeeta> table_meta;
-    String table_key;
+    std::optional<DBMeeta> db_meta;
+    std::optional<TableMeeta> table_meta;
+    std::string table_key;
     Status status = GetTableMeta(db_name, table_name, db_meta, table_meta, &table_key);
     if (!status.ok()) {
         return status;
     }
 
-    String index_key;
-    String index_id;
+    std::string index_key;
+    std::string index_id;
     TxnTimeStamp create_index_ts;
     status = table_meta->GetIndexID(*index_base->index_name_, index_key, index_id, create_index_ts);
     if (status.ok()) {
@@ -1030,13 +1028,13 @@ Status NewTxn::CreateIndex(const String &db_name, const String &table_name, cons
             return Status::OK();
         }
         LOG_ERROR(fmt::format("CreateIndex: index {} already exists, index_key: {}, index_id: {}", *index_base->index_name_, index_key, index_id));
-        return Status(ErrorCode::kDuplicateIndexName, MakeUnique<String>(fmt::format("Index: {} already exists", *index_base->index_name_)));
+        return Status(ErrorCode::kDuplicateIndexName, std::make_unique<std::string>(fmt::format("Index: {} already exists", *index_base->index_name_)));
     } else if (status.code() != ErrorCode::kIndexNotExist) {
         return status;
     }
 
     // Get the latest index id and lock the id
-    String index_id_str;
+    std::string index_id_str;
     std::tie(index_id_str, status) = table_meta->GetNextIndexID();
     if (!status.ok()) {
         return status;
@@ -1047,7 +1045,7 @@ Status NewTxn::CreateIndex(const String &db_name, const String &table_name, cons
         return Status::UnexpectedError("txn store is not null");
     }
 
-    base_txn_store_ = MakeShared<CreateIndexTxnStore>();
+    base_txn_store_ = std::make_shared<CreateIndexTxnStore>();
     CreateIndexTxnStore *txn_store = static_cast<CreateIndexTxnStore *>(base_txn_store_.get());
     txn_store->db_name_ = db_name;
     txn_store->db_id_str_ = db_meta->db_id_str();
@@ -1060,19 +1058,19 @@ Status NewTxn::CreateIndex(const String &db_name, const String &table_name, cons
     txn_store->table_key_ = table_key;
 
     auto wal_command =
-        MakeShared<WalCmdCreateIndexV2>(db_name, db_meta->db_id_str(), table_name, table_meta->table_id_str(), index_id_str, index_base, table_key);
+        std::make_shared<WalCmdCreateIndexV2>(db_name, db_meta->db_id_str(), table_name, table_meta->table_id_str(), index_id_str, index_base, table_key);
     wal_command->table_key_ = table_key;
     wal_entry_->cmds_.push_back(wal_command);
-    txn_context_ptr_->AddOperation(MakeShared<String>(wal_command->ToString()));
+    txn_context_ptr_->AddOperation(std::make_shared<std::string>(wal_command->ToString()));
     LOG_TRACE("NewTxn::CreateIndex created index entry is inserted.");
     return Status::OK();
 }
 
 Status NewTxn::ReplayCreateIndex(WalCmdCreateIndexV2 *create_index_cmd, TxnTimeStamp commit_ts, i64 txn_id) {
     // Check if the index already exists in kv store
-    String index_key =
+    std::string index_key =
         KeyEncode::CatalogIndexKey(create_index_cmd->db_id_, create_index_cmd->table_id_, *create_index_cmd->index_base_->index_name_, commit_ts);
-    String index_id;
+    std::string index_id;
     Status status = kv_instance_->Get(index_key, index_id);
     if (status.ok()) {
         if (index_id == create_index_cmd->index_id_) {
@@ -1101,15 +1099,15 @@ Status NewTxn::ReplayCreateIndex(WalCmdCreateIndexV2 *create_index_cmd, TxnTimeS
         return status;
     }
 
-    String next_index_id_key = KeyEncode::CatalogTableTagKey(create_index_cmd->db_id_, create_index_cmd->table_id_, NEXT_INDEX_ID.data());
-    String next_index_id_str;
+    std::string next_index_id_key = KeyEncode::CatalogTableTagKey(create_index_cmd->db_id_, create_index_cmd->table_id_, NEXT_INDEX_ID.data());
+    std::string next_index_id_str;
     status = kv_instance_->Get(next_index_id_key, next_index_id_str);
 
     u64 next_index_id = std::stoull(next_index_id_str);
     u64 this_index_id = std::stoull(create_index_cmd->index_id_);
     if (this_index_id + 1 > next_index_id) {
         // Update the next index id
-        String new_next_index_id_str = std::to_string(this_index_id + 1);
+        std::string new_next_index_id_str = std::to_string(this_index_id + 1);
         status = kv_instance_->Put(next_index_id_key, new_next_index_id_str);
         if (!status.ok()) {
             return status;
@@ -1127,7 +1125,7 @@ Status NewTxn::ReplayCreateIndex(WalCmdCreateIndexV2 *create_index_cmd, TxnTimeS
     return Status::OK();
 }
 
-Status NewTxn::DropIndexByName(const String &db_name, const String &table_name, const String &index_name, ConflictType conflict_type) {
+Status NewTxn::DropIndexByName(const std::string &db_name, const std::string &table_name, const std::string &index_name, ConflictType conflict_type) {
     if (conflict_type == ConflictType::kReplace) {
         return Status::NotSupport("ConflictType::kReplace");
     }
@@ -1137,16 +1135,16 @@ Status NewTxn::DropIndexByName(const String &db_name, const String &table_name, 
 
     this->CheckTxnStatus();
 
-    Optional<DBMeeta> db_meta;
-    Optional<TableMeeta> table_meta;
-    String table_key;
+    std::optional<DBMeeta> db_meta;
+    std::optional<TableMeeta> table_meta;
+    std::string table_key;
     Status status = GetTableMeta(db_name, table_name, db_meta, table_meta, &table_key);
     if (!status.ok()) {
         return status;
     }
 
-    String index_key;
-    String index_id;
+    std::string index_key;
+    std::string index_id;
     TxnTimeStamp create_index_ts;
     status = table_meta->GetIndexID(index_name, index_key, index_id, create_index_ts);
     if (!status.ok()) {
@@ -1162,7 +1160,7 @@ Status NewTxn::DropIndexByName(const String &db_name, const String &table_name, 
         return index_status;
     }
 
-    SharedPtr<Vector<SharedPtr<ColumnDef>>> column_defs;
+    std::shared_ptr<std::vector<std::shared_ptr<ColumnDef>>> column_defs;
     std::tie(column_defs, status) = table_meta->GetColumnDefs();
     if (!status.ok()) {
         return status;
@@ -1187,7 +1185,7 @@ Status NewTxn::DropIndexByName(const String &db_name, const String &table_name, 
         return Status::UnexpectedError("txn store is not null");
     }
 
-    base_txn_store_ = MakeShared<DropIndexTxnStore>();
+    base_txn_store_ = std::make_shared<DropIndexTxnStore>();
     DropIndexTxnStore *txn_store = static_cast<DropIndexTxnStore *>(base_txn_store_.get());
     txn_store->db_name_ = db_name;
     txn_store->db_id_str_ = db_meta->db_id_str();
@@ -1208,12 +1206,12 @@ Status NewTxn::DropIndexByName(const String &db_name, const String &table_name, 
 Status NewTxn::ReplayDropIndex(WalCmdDropIndexV2 *drop_index_cmd, TxnTimeStamp commit_ts, i64 txn_id) {
 
     // Check if the index is already dropped in kv store
-    String drop_index_key = KeyEncode::DropTableIndexKey(drop_index_cmd->db_id_,
+    std::string drop_index_key = KeyEncode::DropTableIndexKey(drop_index_cmd->db_id_,
                                                          drop_index_cmd->table_id_,
                                                          drop_index_cmd->index_name_,
                                                          drop_index_cmd->create_ts_,
                                                          drop_index_cmd->index_id_);
-    String drop_index_commit_ts_str;
+    std::string drop_index_commit_ts_str;
     Status status = kv_instance_->Get(drop_index_key, drop_index_commit_ts_str);
     if (status.ok()) {
         TxnTimeStamp index_commit_ts = std::stoull(drop_index_commit_ts_str);
@@ -1253,14 +1251,14 @@ Status NewTxn::ReplayDropIndex(WalCmdDropIndexV2 *drop_index_cmd, TxnTimeStamp c
     return Status::OK();
 }
 
-Tuple<SharedPtr<TableInfo>, Status> NewTxn::GetTableInfo(const String &db_name, const String &table_name) {
+std::tuple<std::shared_ptr<TableInfo>, Status> NewTxn::GetTableInfo(const std::string &db_name, const std::string &table_name) {
     this->CheckTxn(db_name);
-    SharedPtr<TableInfo> table_info = MakeShared<TableInfo>();
-    table_info->db_name_ = MakeShared<String>(db_name);
-    table_info->table_name_ = MakeShared<String>(table_name);
+    std::shared_ptr<TableInfo> table_info = std::make_shared<TableInfo>();
+    table_info->db_name_ = std::make_shared<std::string>(db_name);
+    table_info->table_name_ = std::make_shared<std::string>(table_name);
 
-    Optional<DBMeeta> db_meta;
-    Optional<TableMeeta> table_meta;
+    std::optional<DBMeeta> db_meta;
+    std::optional<TableMeeta> table_meta;
     Status status = GetTableMeta(db_name, table_name, db_meta, table_meta);
     if (!status.ok()) {
         return {nullptr, status};
@@ -1276,46 +1274,46 @@ Tuple<SharedPtr<TableInfo>, Status> NewTxn::GetTableInfo(const String &db_name, 
     return {std::move(table_info), Status::OK()};
 }
 
-Tuple<SharedPtr<TableIndexInfo>, Status> NewTxn::GetTableIndexInfo(const String &db_name, const String &table_name, const String &index_name) {
-    Optional<DBMeeta> db_meta;
-    Optional<TableMeeta> table_meta;
-    Optional<TableIndexMeeta> table_index_meta;
-    String table_key;
-    String index_key;
+std::tuple<std::shared_ptr<TableIndexInfo>, Status> NewTxn::GetTableIndexInfo(const std::string &db_name, const std::string &table_name, const std::string &index_name) {
+    std::optional<DBMeeta> db_meta;
+    std::optional<TableMeeta> table_meta;
+    std::optional<TableIndexMeeta> table_index_meta;
+    std::string table_key;
+    std::string index_key;
     Status status = GetTableIndexMeta(db_name, table_name, index_name, db_meta, table_meta, table_index_meta, &table_key, &index_key);
     if (!status.ok()) {
         return {nullptr, status};
     }
 
-    SharedPtr<TableIndexInfo> table_index_info = MakeShared<TableIndexInfo>();
+    std::shared_ptr<TableIndexInfo> table_index_info = std::make_shared<TableIndexInfo>();
     status = table_index_meta->GetTableIndexInfo(*table_index_info);
     return {std::move(table_index_info), Status::OK()};
 }
 
-Tuple<SharedPtr<SegmentIndexInfo>, Status>
-NewTxn::GetSegmentIndexInfo(const String &db_name, const String &table_name, const String &index_name, SegmentID segment_id) {
-    Optional<DBMeeta> db_meta;
-    Optional<TableMeeta> table_meta;
-    Optional<TableIndexMeeta> table_index_meta;
-    String table_key;
-    String index_key;
+std::tuple<std::shared_ptr<SegmentIndexInfo>, Status>
+NewTxn::GetSegmentIndexInfo(const std::string &db_name, const std::string &table_name, const std::string &index_name, SegmentID segment_id) {
+    std::optional<DBMeeta> db_meta;
+    std::optional<TableMeeta> table_meta;
+    std::optional<TableIndexMeeta> table_index_meta;
+    std::string table_key;
+    std::string index_key;
     Status status = GetTableIndexMeta(db_name, table_name, index_name, db_meta, table_meta, table_index_meta, &table_key, &index_key);
     if (!status.ok()) {
         return {nullptr, status};
     }
 
     SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta);
-    SharedPtr<SegmentIndexInfo> segment_index_info = segment_index_meta.GetSegmentIndexInfo();
+    std::shared_ptr<SegmentIndexInfo> segment_index_info = segment_index_meta.GetSegmentIndexInfo();
     return {std::move(segment_index_info), Status::OK()};
 }
 
-Tuple<SharedPtr<ChunkIndexMetaInfo>, Status>
-NewTxn::GetChunkIndexInfo(const String &db_name, const String &table_name, const String &index_name, SegmentID segment_id, ChunkID chunk_id) {
-    Optional<DBMeeta> db_meta;
-    Optional<TableMeeta> table_meta;
-    Optional<TableIndexMeeta> table_index_meta;
-    String table_key;
-    String index_key;
+std::tuple<std::shared_ptr<ChunkIndexMetaInfo>, Status>
+NewTxn::GetChunkIndexInfo(const std::string &db_name, const std::string &table_name, const std::string &index_name, SegmentID segment_id, ChunkID chunk_id) {
+    std::optional<DBMeeta> db_meta;
+    std::optional<TableMeeta> table_meta;
+    std::optional<TableIndexMeeta> table_index_meta;
+    std::string table_key;
+    std::string index_key;
     Status status = GetTableIndexMeta(db_name, table_name, index_name, db_meta, table_meta, table_index_meta, &table_key, &index_key);
     if (!status.ok()) {
         return {nullptr, status};
@@ -1323,12 +1321,12 @@ NewTxn::GetChunkIndexInfo(const String &db_name, const String &table_name, const
 
     SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta);
 
-    String chunk_id_key = KeyEncode::CatalogIdxChunkKey(table_meta->db_id_str(),
+    std::string chunk_id_key = KeyEncode::CatalogIdxChunkKey(table_meta->db_id_str(),
                                                         table_meta->table_id_str(),
                                                         table_index_meta->index_id_str(),
                                                         segment_index_meta.segment_id(),
                                                         chunk_id);
-    String commit_ts_str;
+    std::string commit_ts_str;
     status = kv_instance_->Get(chunk_id_key, commit_ts_str);
     if (!status.ok()) {
         return {nullptr, status};
@@ -1340,14 +1338,14 @@ NewTxn::GetChunkIndexInfo(const String &db_name, const String &table_name, const
     if (!status.ok()) {
         return {nullptr, status};
     }
-    SharedPtr<ChunkIndexMetaInfo> chunk_index_info = MakeShared<ChunkIndexMetaInfo>(*chunk_index_info_ptr);
+    std::shared_ptr<ChunkIndexMetaInfo> chunk_index_info = std::make_shared<ChunkIndexMetaInfo>(*chunk_index_info_ptr);
     return {std::move(chunk_index_info), status};
 }
 
-Tuple<SharedPtr<SegmentInfo>, Status> NewTxn::GetSegmentInfo(const String &db_name, const String &table_name, SegmentID segment_id) {
-    SharedPtr<SegmentInfo> segment_info = MakeShared<SegmentInfo>();
-    Optional<DBMeeta> db_meta;
-    Optional<TableMeeta> table_meta;
+std::tuple<std::shared_ptr<SegmentInfo>, Status> NewTxn::GetSegmentInfo(const std::string &db_name, const std::string &table_name, SegmentID segment_id) {
+    std::shared_ptr<SegmentInfo> segment_info = std::make_shared<SegmentInfo>();
+    std::optional<DBMeeta> db_meta;
+    std::optional<TableMeeta> table_meta;
     Status status = this->GetTableMeta(db_name, table_name, db_meta, table_meta);
     if (!status.ok()) {
         return {nullptr, status};
@@ -1364,11 +1362,11 @@ Tuple<SharedPtr<SegmentInfo>, Status> NewTxn::GetSegmentInfo(const String &db_na
     return {std::move(segment_info), Status::OK()};
 }
 
-Tuple<Vector<SharedPtr<SegmentInfo>>, Status> NewTxn::GetSegmentsInfo(const String &db_name, const String &table_name) {
-    Vector<SharedPtr<SegmentInfo>> segment_info_list;
-    Optional<DBMeeta> db_meta;
-    Optional<TableMeeta> table_meta;
-    Vector<SegmentID> *segment_ids_ptr = nullptr;
+std::tuple<std::vector<std::shared_ptr<SegmentInfo>>, Status> NewTxn::GetSegmentsInfo(const std::string &db_name, const std::string &table_name) {
+    std::vector<std::shared_ptr<SegmentInfo>> segment_info_list;
+    std::optional<DBMeeta> db_meta;
+    std::optional<TableMeeta> table_meta;
+    std::vector<SegmentID> *segment_ids_ptr = nullptr;
     Status status = this->GetTableMeta(db_name, table_name, db_meta, table_meta);
     if (!status.ok()) {
         return {segment_info_list, status};
@@ -1379,7 +1377,7 @@ Tuple<Vector<SharedPtr<SegmentInfo>>, Status> NewTxn::GetSegmentsInfo(const Stri
     }
     for (SegmentID segment_id : *segment_ids_ptr) {
         SegmentMeta segment_meta(segment_id, table_meta.value());
-        auto segment_info = MakeShared<SegmentInfo>();
+        auto segment_info = std::make_shared<SegmentInfo>();
         std::tie(segment_info, status) = segment_meta.GetSegmentInfo();
         if (!status.ok()) {
             return {segment_info_list, status};
@@ -1389,10 +1387,10 @@ Tuple<Vector<SharedPtr<SegmentInfo>>, Status> NewTxn::GetSegmentsInfo(const Stri
     return {std::move(segment_info_list), status};
 }
 
-Tuple<SharedPtr<BlockInfo>, Status> NewTxn::GetBlockInfo(const String &db_name, const String &table_name, SegmentID segment_id, BlockID block_id) {
-    SharedPtr<SegmentInfo> segment_info = MakeShared<SegmentInfo>();
-    Optional<DBMeeta> db_meta;
-    Optional<TableMeeta> table_meta;
+std::tuple<std::shared_ptr<BlockInfo>, Status> NewTxn::GetBlockInfo(const std::string &db_name, const std::string &table_name, SegmentID segment_id, BlockID block_id) {
+    std::shared_ptr<SegmentInfo> segment_info = std::make_shared<SegmentInfo>();
+    std::optional<DBMeeta> db_meta;
+    std::optional<TableMeeta> table_meta;
     Status status = this->GetTableMeta(db_name, table_name, db_meta, table_meta);
     if (!status.ok()) {
         return {nullptr, status};
@@ -1402,24 +1400,24 @@ Tuple<SharedPtr<BlockInfo>, Status> NewTxn::GetBlockInfo(const String &db_name, 
     return block_meta.GetBlockInfo();
 }
 
-Tuple<Vector<SharedPtr<BlockInfo>>, Status> NewTxn::GetBlocksInfo(const String &db_name, const String &table_name, SegmentID segment_id) {
-    Vector<SharedPtr<BlockInfo>> block_info_list;
-    SharedPtr<SegmentInfo> segment_info = MakeShared<SegmentInfo>();
-    Optional<DBMeeta> db_meta;
-    Optional<TableMeeta> table_meta;
+std::tuple<std::vector<std::shared_ptr<BlockInfo>>, Status> NewTxn::GetBlocksInfo(const std::string &db_name, const std::string &table_name, SegmentID segment_id) {
+    std::vector<std::shared_ptr<BlockInfo>> block_info_list;
+    std::shared_ptr<SegmentInfo> segment_info = std::make_shared<SegmentInfo>();
+    std::optional<DBMeeta> db_meta;
+    std::optional<TableMeeta> table_meta;
     Status status = this->GetTableMeta(db_name, table_name, db_meta, table_meta);
     if (!status.ok()) {
         return {block_info_list, status};
     }
     SegmentMeta segment_meta(segment_id, table_meta.value());
-    Vector<BlockID> *block_ids_ptr = nullptr;
+    std::vector<BlockID> *block_ids_ptr = nullptr;
     std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1();
     if (!status.ok()) {
         return {block_info_list, status};
     }
     for (BlockID block_id : *block_ids_ptr) {
         BlockMeta block_meta(block_id, segment_meta);
-        auto block_info = MakeShared<BlockInfo>();
+        auto block_info = std::make_shared<BlockInfo>();
         std::tie(block_info, status) = block_meta.GetBlockInfo();
         if (!status.ok()) {
             return {block_info_list, status};
@@ -1429,11 +1427,11 @@ Tuple<Vector<SharedPtr<BlockInfo>>, Status> NewTxn::GetBlocksInfo(const String &
     return {block_info_list, status};
 }
 
-Tuple<SharedPtr<BlockColumnInfo>, Status>
-NewTxn::GetBlockColumnInfo(const String &db_name, const String &table_name, SegmentID segment_id, BlockID block_id, ColumnID column_id) {
-    SharedPtr<SegmentInfo> segment_info = MakeShared<SegmentInfo>();
-    Optional<DBMeeta> db_meta;
-    Optional<TableMeeta> table_meta;
+std::tuple<std::shared_ptr<BlockColumnInfo>, Status>
+NewTxn::GetBlockColumnInfo(const std::string &db_name, const std::string &table_name, SegmentID segment_id, BlockID block_id, ColumnID column_id) {
+    std::shared_ptr<SegmentInfo> segment_info = std::make_shared<SegmentInfo>();
+    std::optional<DBMeeta> db_meta;
+    std::optional<TableMeeta> table_meta;
     Status status = this->GetTableMeta(db_name, table_name, db_meta, table_meta);
     if (!status.ok()) {
         return {nullptr, status};
@@ -1443,25 +1441,25 @@ NewTxn::GetBlockColumnInfo(const String &db_name, const String &table_name, Segm
     return block_meta.GetBlockColumnInfo(column_id);
 }
 
-Status NewTxn::CreateTableSnapshot(const String &db_name, const String &table_name, const String &snapshot_name) {
+Status NewTxn::CreateTableSnapshot(const std::string &db_name, const std::string &table_name, const std::string &snapshot_name) {
     // Check if the DB is valid
     this->SetTxnType(TransactionType::kCreateTableSnapshot);
     this->CheckTxn(db_name);
 
-    SharedPtr<TableSnapshotInfo> table_snapshot_info;
+    std::shared_ptr<TableSnapshotInfo> table_snapshot_info;
 
     // First, get the meta info of the table
-    Optional<DBMeeta> db_meta;
-    Optional<TableMeeta> table_meta_opt;
-    Optional<SegmentMeta> segment_meta_opt;
-    String table_key;
+    std::optional<DBMeeta> db_meta;
+    std::optional<TableMeeta> table_meta_opt;
+    std::optional<SegmentMeta> segment_meta_opt;
+    std::string table_key;
     Status status = GetTableMeta(db_name, table_name, db_meta, table_meta_opt, &table_key);
 
     if (!status.ok()) {
         return status;
     }
 
-    base_txn_store_ = MakeShared<CreateTableSnapshotTxnStore>();
+    base_txn_store_ = std::make_shared<CreateTableSnapshotTxnStore>();
     CreateTableSnapshotTxnStore *txn_store = static_cast<CreateTableSnapshotTxnStore *>(base_txn_store_.get());
     txn_store->db_name_ = db_name;
     txn_store->table_name_ = table_name;
@@ -1471,37 +1469,37 @@ Status NewTxn::CreateTableSnapshot(const String &db_name, const String &table_na
     return Status::OK(); // Success
 }
 
-Tuple<SharedPtr<DatabaseSnapshotInfo>, Status> NewTxn::GetDatabaseSnapshotInfo(const String &db_name) {
+std::tuple<std::shared_ptr<DatabaseSnapshotInfo>, Status> NewTxn::GetDatabaseSnapshotInfo(const std::string &db_name) {
     this->CheckTxn(db_name);
-    SharedPtr<DatabaseSnapshotInfo> database_snapshot_info;
-    Optional<DBMeeta> db_meta;
+    std::shared_ptr<DatabaseSnapshotInfo> database_snapshot_info;
+    std::optional<DBMeeta> db_meta;
     TxnTimeStamp db_create_ts;
     Status status = GetDBMeta(db_name, db_meta, db_create_ts);
     if (!status.ok()) {
         return {nullptr, status};
     }
-    database_snapshot_info = MakeShared<DatabaseSnapshotInfo>();
+    database_snapshot_info = std::make_shared<DatabaseSnapshotInfo>();
     database_snapshot_info->db_name_ = db_name;
     database_snapshot_info->db_id_str_ = db_meta->db_id_str();
 
-    Vector<String> *table_ids_ptr = nullptr;
-    Vector<String> *table_names_ptr = nullptr;
+    std::vector<std::string> *table_ids_ptr = nullptr;
+    std::vector<std::string> *table_names_ptr = nullptr;
     status = db_meta->GetTableIDs(table_ids_ptr, &table_names_ptr);
     if (!status.ok()) {
         return {nullptr, status};
     }
 
-    // String *db_comment = nullptr;
+    // std::string *db_comment = nullptr;
     // status = db_meta->GetComment(db_comment);
     // database_snapshot_info->db_comment_ = *db_comment;
     database_snapshot_info->db_next_table_id_str_ = std::to_string(std::stoull(table_ids_ptr->back()) + 1);
     for (size_t i = 0; i < table_ids_ptr->size(); i++) {
-        Optional<TableMeeta> table_meta;
+        std::optional<TableMeeta> table_meta;
         status = GetTableMeta(table_names_ptr->at(i), *db_meta, table_meta);
         if (!status.ok()) {
             return {nullptr, status};
         }
-        SharedPtr<TableSnapshotInfo> table_snapshot_info;
+        std::shared_ptr<TableSnapshotInfo> table_snapshot_info;
         std::tie(table_snapshot_info, status) = table_meta->MapMetaToSnapShotInfo(db_name, table_names_ptr->at(i));
         if (!status.ok()) {
             return {nullptr, status};
@@ -1511,20 +1509,20 @@ Tuple<SharedPtr<DatabaseSnapshotInfo>, Status> NewTxn::GetDatabaseSnapshotInfo(c
     return {std::move(database_snapshot_info), Status::OK()};
 }
 
-Status NewTxn::RestoreTableSnapshot(const String &db_name, const SharedPtr<TableSnapshotInfo> &table_snapshot_info) {
+Status NewTxn::RestoreTableSnapshot(const std::string &db_name, const std::shared_ptr<TableSnapshotInfo> &table_snapshot_info) {
     // Cleanup();
     this->SetTxnType(TransactionType::kRestoreTable);
-    const String &table_name = table_snapshot_info->table_name_;
+    const std::string &table_name = table_snapshot_info->table_name_;
     this->CheckTxn(db_name);
 
-    Optional<DBMeeta> db_meta;
+    std::optional<DBMeeta> db_meta;
     TxnTimeStamp db_create_ts;
     Status status = GetDBMeta(db_name, db_meta, db_create_ts);
     if (!status.ok()) {
         return status;
     }
-    String table_id_str;
-    String table_key;
+    std::string table_id_str;
+    std::string table_key;
     TxnTimeStamp table_create_ts;
     status = db_meta->GetTableID(table_name, table_key, table_id_str, table_create_ts);
 
@@ -1532,7 +1530,7 @@ Status NewTxn::RestoreTableSnapshot(const String &db_name, const SharedPtr<Table
         // if (conflict_type == ConflictType::kIgnore) {
         //     return Status::OK();
         // }
-        return Status(ErrorCode::kDuplicateTableName, MakeUnique<String>(fmt::format("Table: {} already exists", table_name)));
+        return Status(ErrorCode::kDuplicateTableName, std::make_unique<std::string>(fmt::format("Table: {} already exists", table_name)));
     } else if (status.code() != ErrorCode::kTableNotExist) {
         return status;
     }
@@ -1543,14 +1541,14 @@ Status NewTxn::RestoreTableSnapshot(const String &db_name, const SharedPtr<Table
         return status;
     }
 
-    SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>(db_name),
-                                                   MakeShared<String>(table_name),
-                                                   MakeShared<String>(table_snapshot_info->table_comment_),
+    std::shared_ptr<TableDef> table_def = TableDef::Make(std::make_shared<std::string>(db_name),
+                                                   std::make_shared<std::string>(table_name),
+                                                   std::make_shared<std::string>(table_snapshot_info->table_comment_),
                                                    table_snapshot_info->columns_);
     // copy files from snapshot to data dir
-    String snapshot_dir = InfinityContext::instance().config()->SnapshotDir();
-    String snapshot_name = table_snapshot_info->snapshot_name_;
-    Vector<String> restored_file_paths;
+    std::string snapshot_dir = InfinityContext::instance().config()->SnapshotDir();
+    std::string snapshot_name = table_snapshot_info->snapshot_name_;
+    std::vector<std::string> restored_file_paths;
 
     status = table_snapshot_info->RestoreSnapshotFiles(snapshot_dir,
                                                        snapshot_name,
@@ -1564,7 +1562,7 @@ Status NewTxn::RestoreTableSnapshot(const String &db_name, const SharedPtr<Table
         return status;
     }
 
-    base_txn_store_ = MakeShared<RestoreTableTxnStore>();
+    base_txn_store_ = std::make_shared<RestoreTableTxnStore>();
     RestoreTableTxnStore *txn_store = static_cast<RestoreTableTxnStore *>(base_txn_store_.get());
     txn_store->files_ = restored_file_paths;
 
@@ -1591,12 +1589,12 @@ Status NewTxn::RestoreTableSnapshot(const String &db_name, const SharedPtr<Table
     return Status::OK();
 }
 
-Status NewTxn::RestoreDatabaseSnapshot(const SharedPtr<DatabaseSnapshotInfo> &database_snapshot_info) {
+Status NewTxn::RestoreDatabaseSnapshot(const std::shared_ptr<DatabaseSnapshotInfo> &database_snapshot_info) {
     // Cleanup();
     this->SetTxnType(TransactionType::kRestoreDatabase);
-    const String &db_name = database_snapshot_info->db_name_;
+    const std::string &db_name = database_snapshot_info->db_name_;
 
-    Optional<DBMeeta> db_meta;
+    std::optional<DBMeeta> db_meta;
     TxnTimeStamp db_create_ts;
     Status status = GetDBMeta(db_name, db_meta, db_create_ts);
     if (status.ok()) {
@@ -1606,22 +1604,22 @@ Status NewTxn::RestoreDatabaseSnapshot(const SharedPtr<DatabaseSnapshotInfo> &da
         return status;
     }
 
-    String db_id_str;
+    std::string db_id_str;
     status = IncrLatestID(db_id_str, NEXT_DATABASE_ID);
     if (!status.ok()) {
         return status;
     }
 
-    base_txn_store_ = MakeShared<RestoreDatabaseTxnStore>();
+    base_txn_store_ = std::make_shared<RestoreDatabaseTxnStore>();
     RestoreDatabaseTxnStore *txn_store = static_cast<RestoreDatabaseTxnStore *>(base_txn_store_.get());
     txn_store->db_name_ = db_name;
     txn_store->db_id_str_ = db_id_str;
     txn_store->db_comment_ = database_snapshot_info->db_comment_;
     // Copy database snapshot files
-    String snapshot_dir = InfinityContext::instance().config()->SnapshotDir();
-    String snapshot_name = database_snapshot_info->snapshot_name_;
-    Vector<String> files_to_restore = database_snapshot_info->GetFiles();
-    Vector<String> restored_file_paths;
+    std::string snapshot_dir = InfinityContext::instance().config()->SnapshotDir();
+    std::string snapshot_name = database_snapshot_info->snapshot_name_;
+    std::vector<std::string> files_to_restore = database_snapshot_info->GetFiles();
+    std::vector<std::string> restored_file_paths;
     status =
         database_snapshot_info->RestoreSnapshotFiles(snapshot_dir, snapshot_name, files_to_restore, db_id_str, db_id_str, restored_file_paths, true);
     if (!status.ok()) {
@@ -1630,15 +1628,15 @@ Status NewTxn::RestoreDatabaseSnapshot(const SharedPtr<DatabaseSnapshotInfo> &da
 
     // Process each table snapshot within the database
     for (const auto &table_snapshot_info : database_snapshot_info->table_snapshots_) {
-        const String &table_name = table_snapshot_info->table_name_;
+        const std::string &table_name = table_snapshot_info->table_name_;
 
         // Create table definition
-        SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>(db_name),
-                                                       MakeShared<String>(table_name),
-                                                       MakeShared<String>(table_snapshot_info->table_comment_),
+        std::shared_ptr<TableDef> table_def = TableDef::Make(std::make_shared<std::string>(db_name),
+                                                       std::make_shared<std::string>(table_name),
+                                                       std::make_shared<std::string>(table_snapshot_info->table_comment_),
                                                        table_snapshot_info->columns_);
 
-        SharedPtr<RestoreTableTxnStore> tmp_txn_store_ = MakeShared<RestoreTableTxnStore>();
+        std::shared_ptr<RestoreTableTxnStore> tmp_txn_store_ = std::make_shared<RestoreTableTxnStore>();
 
         // Use the helper function to process snapshot restoration data
         status = ProcessSnapshotRestorationData(db_name,
@@ -1705,7 +1703,7 @@ Status NewTxn::Checkpoint(TxnTimeStamp last_ckp_ts) {
     }
     DeferFn defer([&] { wal_manager->UnsetCheckpoint(); });
 
-    Vector<String> *db_id_strs_ptr;
+    std::vector<std::string> *db_id_strs_ptr;
     CatalogMeta catalog_meta(this);
     status = catalog_meta.GetDBIDs(db_id_strs_ptr);
     if (!status.ok()) {
@@ -1717,9 +1715,9 @@ Status NewTxn::Checkpoint(TxnTimeStamp last_ckp_ts) {
     if (base_txn_store_ != nullptr) {
         return Status::UnexpectedError("txn store is not null");
     }
-    base_txn_store_ = MakeShared<CheckpointTxnStore>();
+    base_txn_store_ = std::make_shared<CheckpointTxnStore>();
     auto *txn_store = static_cast<CheckpointTxnStore *>(base_txn_store_.get());
-    for (const String &db_id_str : *db_id_strs_ptr) {
+    for (const std::string &db_id_str : *db_id_strs_ptr) {
         DBMeeta db_meta(db_id_str, this);
         status = this->CheckpointDB(db_meta, option, txn_store);
         if (!status.ok()) {
@@ -1747,14 +1745,14 @@ Status NewTxn::Checkpoint(TxnTimeStamp last_ckp_ts) {
 Status NewTxn::ReplayCheckpoint(WalCmdCheckpointV2 *optimize_cmd, TxnTimeStamp commit_ts, i64 txn_id) { return Status::OK(); }
 
 Status NewTxn::CheckpointDB(DBMeeta &db_meta, const CheckpointOption &option, CheckpointTxnStore *ckp_txn_store) {
-    Vector<String> *table_id_strs_ptr;
+    std::vector<std::string> *table_id_strs_ptr;
     Status status = db_meta.GetTableIDs(table_id_strs_ptr);
     if (!status.ok()) {
         return status;
     }
 
     LOG_DEBUG(fmt::format("checkpoint ts {}, db id {}, got {} tables.", option.checkpoint_ts_, db_meta.db_id_str(), table_id_strs_ptr->size()));
-    for (const String &table_id_str : *table_id_strs_ptr) {
+    for (const std::string &table_id_str : *table_id_strs_ptr) {
         TableMeeta table_meta(db_meta.db_id_str(), table_id_str, this);
         status = this->CheckpointTable(table_meta, option, ckp_txn_store);
         if (!status.ok()) {
@@ -1765,7 +1763,7 @@ Status NewTxn::CheckpointDB(DBMeeta &db_meta, const CheckpointOption &option, Ch
     return Status::OK();
 }
 
-void NewTxn::AddMetaKeyForCommit(const String &key) { keys_wait_for_commit_.push_back(key); }
+void NewTxn::AddMetaKeyForCommit(const std::string &key) { keys_wait_for_commit_.push_back(key); }
 
 TxnTimeStamp NewTxn::CommitTS() const {
     std::shared_lock<std::shared_mutex> r_locker(rw_locker_);
@@ -1952,7 +1950,7 @@ Status NewTxn::Commit() {
     this->SetTxnCommitting(commit_ts);
 
     Status status;
-    String conflict_reason;
+    std::string conflict_reason;
     bool retry_query = true;
     bool conflict = txn_mgr_->CheckConflict1(this, conflict_reason, retry_query);
     if (conflict) {
@@ -1971,7 +1969,7 @@ Status NewTxn::Commit() {
         switch (txn_state) {
             case TxnState::kCommitting: {
                 // LOG_INFO(fmt::format("To allocation task: {}, transaction: {}", *this->GetTxnText(), txn_context_ptr_->txn_id_));
-                SharedPtr<TxnAllocatorTask> txn_allocator_task = MakeShared<TxnAllocatorTask>(this);
+                std::shared_ptr<TxnAllocatorTask> txn_allocator_task = std::make_shared<TxnAllocatorTask>(this);
                 txn_mgr_->SubmitForAllocation(txn_allocator_task);
                 txn_allocator_task->Wait();
                 status = txn_allocator_task->status_;
@@ -2273,10 +2271,10 @@ Status NewTxn::PrepareCommit() {
     return Status::OK();
 }
 
-Status NewTxn::GetDBMeta(const String &db_name, Optional<DBMeeta> &db_meta, TxnTimeStamp &db_create_ts, String *db_key_ptr) {
+Status NewTxn::GetDBMeta(const std::string &db_name, std::optional<DBMeeta> &db_meta, TxnTimeStamp &db_create_ts, std::string *db_key_ptr) {
     CatalogMeta catalog_meta(this);
-    String db_key;
-    String db_id_str;
+    std::string db_key;
+    std::string db_id_str;
     Status status = catalog_meta.GetDBID(db_name, db_key, db_id_str, db_create_ts);
     if (!status.ok()) {
         return status;
@@ -2288,11 +2286,11 @@ Status NewTxn::GetDBMeta(const String &db_name, Optional<DBMeeta> &db_meta, TxnT
     return Status::OK();
 }
 
-Status NewTxn::GetTableMeta(const String &db_name,
-                            const String &table_name,
-                            Optional<DBMeeta> &db_meta,
-                            Optional<TableMeeta> &table_meta,
-                            String *table_key_ptr) {
+Status NewTxn::GetTableMeta(const std::string &db_name,
+                            const std::string &table_name,
+                            std::optional<DBMeeta> &db_meta,
+                            std::optional<TableMeeta> &table_meta,
+                            std::string *table_key_ptr) {
 
     Status status;
     TxnTimeStamp db_create_ts;
@@ -2307,9 +2305,9 @@ Status NewTxn::GetTableMeta(const String &db_name,
     return Status::OK();
 }
 
-Status NewTxn::GetTableMeta(const String &table_name, DBMeeta &db_meta, Optional<TableMeeta> &table_meta, String *table_key_ptr) {
-    String table_key;
-    String table_id_str;
+Status NewTxn::GetTableMeta(const std::string &table_name, DBMeeta &db_meta, std::optional<TableMeeta> &table_meta, std::string *table_key_ptr) {
+    std::string table_key;
+    std::string table_id_str;
     TxnTimeStamp create_table_ts;
     Status status = db_meta.GetTableID(table_name, table_key, table_id_str, create_table_ts);
     if (!status.ok()) {
@@ -2323,14 +2321,14 @@ Status NewTxn::GetTableMeta(const String &table_name, DBMeeta &db_meta, Optional
     return Status::OK();
 }
 
-Status NewTxn::GetTableIndexMeta(const String &db_name,
-                                 const String &table_name,
-                                 const String &index_name,
-                                 Optional<DBMeeta> &db_meta,
-                                 Optional<TableMeeta> &table_meta,
-                                 Optional<TableIndexMeeta> &table_index_meta,
-                                 String *table_key_ptr,
-                                 String *index_key_ptr) {
+Status NewTxn::GetTableIndexMeta(const std::string &db_name,
+                                 const std::string &table_name,
+                                 const std::string &index_name,
+                                 std::optional<DBMeeta> &db_meta,
+                                 std::optional<TableMeeta> &table_meta,
+                                 std::optional<TableIndexMeeta> &table_index_meta,
+                                 std::string *table_key_ptr,
+                                 std::string *index_key_ptr) {
     Status status;
     TxnTimeStamp db_create_ts;
     status = this->GetDBMeta(db_name, db_meta, db_create_ts);
@@ -2349,9 +2347,9 @@ Status NewTxn::GetTableIndexMeta(const String &db_name,
 }
 
 Status
-NewTxn::GetTableIndexMeta(const String &index_name, TableMeeta &table_meta, Optional<TableIndexMeeta> &table_index_meta, String *index_key_ptr) {
-    String index_key;
-    String index_id_str;
+NewTxn::GetTableIndexMeta(const std::string &index_name, TableMeeta &table_meta, std::optional<TableIndexMeeta> &table_index_meta, std::string *index_key_ptr) {
+    std::string index_key;
+    std::string index_id_str;
     TxnTimeStamp create_index_ts;
     Status status = table_meta.GetIndexID(index_name, index_key, index_id_str, create_index_ts);
     if (!status.ok()) {
@@ -2366,22 +2364,22 @@ NewTxn::GetTableIndexMeta(const String &index_name, TableMeeta &table_meta, Opti
 
 Status NewTxn::PrepareCommitCreateTableSnapshot(const WalCmdCreateTableSnapshot *create_table_snapshot_cmd) {
     // check if duplicate snapshot name
-    String snapshot_dir = InfinityContext::instance().config()->SnapshotDir();
-    String snapshot_name = create_table_snapshot_cmd->snapshot_name_;
-    String snapshot_path = snapshot_dir + "/" + snapshot_name;
+    std::string snapshot_dir = InfinityContext::instance().config()->SnapshotDir();
+    std::string snapshot_name = create_table_snapshot_cmd->snapshot_name_;
+    std::string snapshot_path = snapshot_dir + "/" + snapshot_name;
     if (std::filesystem::exists(snapshot_path)) {
         return Status::SnapshotAlreadyExists(snapshot_name);
     }
 
     // // dump indexes for snapshot
-    // Vector<SharedPtr<MemIndexDetail>> table_mem_indexes = GetTableMemIndexes(db_name, table_name);
+    // std::vector<std::shared_ptr<MemIndexDetail>> table_mem_indexes = GetTableMemIndexes(db_name, table_name);
 
     // // Submit all dump tasks in parallel
-    // Vector<SharedPtr<DumpMemIndexTask>> dump_tasks;
+    // std::vector<std::shared_ptr<DumpMemIndexTask>> dump_tasks;
     // auto *dump_index_processor = InfinityContext::instance().storage()->dump_index_processor();
 
     // for (const auto &mem_index_detail : table_mem_indexes) {
-    //     auto dump_index_task = MakeShared<DumpMemIndexTask>(mem_index_detail->db_name_, mem_index_detail->table_name_,
+    //     auto dump_index_task = std::make_shared<DumpMemIndexTask>(mem_index_detail->db_name_, mem_index_detail->table_name_,
     //     mem_index_detail->index_name_, mem_index_detail->segment_id_, mem_index_detail->begin_row_id_); dump_tasks.push_back(dump_index_task);
     //     dump_index_processor->Submit(std::move(dump_index_task));
     // }
@@ -2396,7 +2394,7 @@ Status NewTxn::PrepareCommitCreateTableSnapshot(const WalCmdCreateTableSnapshot 
     // }
     // After calling Checkpoint()
     TxnTimeStamp last_checkpoint_ts = InfinityContext::instance().storage()->wal_manager()->LastCheckpointTS();
-    SharedPtr<CheckpointTxnStore> ckp_txn_store = MakeShared<CheckpointTxnStore>();
+    std::shared_ptr<CheckpointTxnStore> ckp_txn_store = std::make_shared<CheckpointTxnStore>();
     Status status = this->CheckpointforSnapshot(last_checkpoint_ts, ckp_txn_store.get());
     if (!status.ok()) {
         return status;
@@ -2408,7 +2406,7 @@ Status NewTxn::PrepareCommitCreateTableSnapshot(const WalCmdCreateTableSnapshot 
             LOG_INFO(fmt::format("Checkpoint successful! {} blocks flushed", ckp_txn_store->entries_.size()));
 
             // Use the transaction store to generate WAL command
-            SharedPtr<WalEntry> wal_entry = ckp_txn_store->ToWalEntry(txn_context_ptr_->commit_ts_);
+            std::shared_ptr<WalEntry> wal_entry = ckp_txn_store->ToWalEntry(txn_context_ptr_->commit_ts_);
 
             // There's only ONE command - the checkpoint command
             if (!wal_entry->cmds_.empty()) {
@@ -2429,24 +2427,24 @@ Status NewTxn::PrepareCommitCreateTableSnapshot(const WalCmdCreateTableSnapshot 
 //    TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
 //
 //    CreateDBTxnStore *txn_store = static_cast<CreateDBTxnStore *>(base_txn_store_.get());
-//    String db_id_str = std::to_string(txn_store->db_id_);
-//    Optional<DBMeeta> db_meta;
+//    std::string db_id_str = std::to_string(txn_store->db_id_);
+//    std::optional<DBMeeta> db_meta;
 //    Status status = NewCatalog::AddNewDB(kv_instance_.get(), db_id_str, commit_ts, txn_store->db_name_, txn_store->comment_ptr_.get(), db_meta);
 //    if (!status.ok()) {
 //        UnrecoverableError(status.message());
 //    }
 //
-//    SharedPtr<WalCmd> wal_command = MakeShared<WalCmdCreateDatabaseV2>(txn_store->db_name_, db_id_str, *txn_store->comment_ptr_);
+//    std::shared_ptr<WalCmd> wal_command = std::make_shared<WalCmdCreateDatabaseV2>(txn_store->db_name_, db_id_str, *txn_store->comment_ptr_);
 //    wal_entry_->cmds_.push_back(wal_command);
-//    txn_context_ptr_->AddOperation(MakeShared<String>(wal_command->ToString()));
+//    txn_context_ptr_->AddOperation(std::make_shared<std::string>(wal_command->ToString()));
 //    return Status::OK();
 //}
 
 Status NewTxn::PrepareCommitCreateDB(const WalCmdCreateDatabaseV2 *create_db_cmd) {
     TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
 
-    Optional<DBMeeta> db_meta;
-    const String *db_comment = create_db_cmd->db_comment_.empty() ? nullptr : &create_db_cmd->db_comment_;
+    std::optional<DBMeeta> db_meta;
+    const std::string *db_comment = create_db_cmd->db_comment_.empty() ? nullptr : &create_db_cmd->db_comment_;
     Status status = NewCatalog::AddNewDB(this, create_db_cmd->db_id_, commit_ts, create_db_cmd->db_name_, db_comment, db_meta);
     if (!status.ok()) {
         return status;
@@ -2456,8 +2454,8 @@ Status NewTxn::PrepareCommitCreateDB(const WalCmdCreateDatabaseV2 *create_db_cmd
 }
 Status NewTxn::PrepareCommitDropDB(const WalCmdDropDatabaseV2 *drop_db_cmd) {
 
-    String db_key;
-    Optional<DBMeeta> db_meta;
+    std::string db_key;
+    std::optional<DBMeeta> db_meta;
     TxnTimeStamp create_db_ts;
     Status status = GetDBMeta(drop_db_cmd->db_name_, db_meta, create_db_ts, &db_key);
     if (!status.ok()) {
@@ -2466,7 +2464,7 @@ Status NewTxn::PrepareCommitDropDB(const WalCmdDropDatabaseV2 *drop_db_cmd) {
 
     LOG_TRACE(fmt::format("Drop database: {}", drop_db_cmd->db_name_));
 
-    String create_db_commit_ts = GetLastPartOfKey(db_key, '|');
+    std::string create_db_commit_ts = GetLastPartOfKey(db_key, '|');
     TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
     auto ts_str = std::to_string(commit_ts);
     kv_instance_->Put(KeyEncode::DropDBKey(drop_db_cmd->db_name_, std::stoull(create_db_commit_ts), db_meta->db_id_str()), ts_str);
@@ -2478,17 +2476,17 @@ Status NewTxn::PrepareCommitCreateTable(const WalCmdCreateTableV2 *create_table_
     TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
     TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
 
-    const String &db_name = create_table_cmd->db_name_;
+    const std::string &db_name = create_table_cmd->db_name_;
 
     // Get database ID
-    Optional<DBMeeta> db_meta;
+    std::optional<DBMeeta> db_meta;
     TxnTimeStamp db_create_ts;
     Status status = GetDBMeta(db_name, db_meta, db_create_ts);
     if (!status.ok()) {
         return status;
     }
 
-    Optional<TableMeeta> table_meta;
+    std::optional<TableMeeta> table_meta;
     status = NewCatalog::AddNewTable(*db_meta, create_table_cmd->table_id_, begin_ts, commit_ts, create_table_cmd->table_def_, table_meta);
     if (!status.ok()) {
         return status;
@@ -2500,9 +2498,9 @@ Status NewTxn::PrepareCommitCreateTable(const WalCmdCreateTableV2 *create_table_
 Status NewTxn::PrepareCommitDropTable(const WalCmdDropTableV2 *drop_table_cmd) {
     //    TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
 
-    const String &db_id_str = drop_table_cmd->db_id_;
-    const String &table_id_str = drop_table_cmd->table_id_;
-    const String &table_key = drop_table_cmd->table_key_;
+    const std::string &db_id_str = drop_table_cmd->db_id_;
+    const std::string &table_id_str = drop_table_cmd->table_id_;
+    const std::string &table_key = drop_table_cmd->table_key_;
     TxnTimeStamp create_ts = infinity::GetTimestampFromKey(table_key);
 
     auto ts_str = std::to_string(txn_context_ptr_->commit_ts_);
@@ -2513,17 +2511,17 @@ Status NewTxn::PrepareCommitDropTable(const WalCmdDropTableV2 *drop_table_cmd) {
 
 Status NewTxn::PrepareCommitRenameTable(const WalCmdRenameTableV2 *rename_table_cmd) {
     TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
-    const String &db_id = rename_table_cmd->db_id_;
-    const String &old_table_name = rename_table_cmd->table_name_;
-    const String &old_table_key = rename_table_cmd->old_table_key_;
-    const String &table_id = rename_table_cmd->table_id_;
+    const std::string &db_id = rename_table_cmd->db_id_;
+    const std::string &old_table_name = rename_table_cmd->table_name_;
+    const std::string &old_table_key = rename_table_cmd->old_table_key_;
+    const std::string &table_id = rename_table_cmd->table_id_;
     const TxnTimeStamp create_ts = infinity::GetTimestampFromKey(old_table_key);
 
-    String ts_str = std::to_string(commit_ts);
+    std::string ts_str = std::to_string(commit_ts);
     kv_instance_->Put(KeyEncode::RenameTableKey(db_id, old_table_name, table_id, create_ts), ts_str);
 
     // create new table key
-    String new_table_key = KeyEncode::CatalogTableKey(db_id, rename_table_cmd->new_table_name_, commit_ts);
+    std::string new_table_key = KeyEncode::CatalogTableKey(db_id, rename_table_cmd->new_table_name_, commit_ts);
     Status status = kv_instance_->Put(new_table_key, table_id);
     if (!status.ok()) {
         return status;
@@ -2533,11 +2531,11 @@ Status NewTxn::PrepareCommitRenameTable(const WalCmdRenameTableV2 *rename_table_
 }
 
 Status NewTxn::PrepareCommitAddColumns(const WalCmdAddColumnsV2 *add_columns_cmd) {
-    const String &db_name = add_columns_cmd->db_name_;
-    const String &table_name = add_columns_cmd->table_name_;
+    const std::string &db_name = add_columns_cmd->db_name_;
+    const std::string &table_name = add_columns_cmd->table_name_;
 
-    Optional<DBMeeta> db_meta;
-    Optional<TableMeeta> table_meta;
+    std::optional<DBMeeta> db_meta;
+    std::optional<TableMeeta> table_meta;
     Status status = GetTableMeta(db_name, table_name, db_meta, table_meta);
     if (!status.ok()) {
         return status;
@@ -2568,11 +2566,11 @@ Status NewTxn::PrepareCommitAddColumns(const WalCmdAddColumnsV2 *add_columns_cmd
 }
 
 Status NewTxn::PrepareCommitDropColumns(const WalCmdDropColumnsV2 *drop_columns_cmd) {
-    const String &db_name = drop_columns_cmd->db_name_;
-    const String &table_name = drop_columns_cmd->table_name_;
+    const std::string &db_name = drop_columns_cmd->db_name_;
+    const std::string &table_name = drop_columns_cmd->table_name_;
 
-    Optional<DBMeeta> db_meta;
-    Optional<TableMeeta> table_meta;
+    std::optional<DBMeeta> db_meta;
+    std::optional<TableMeeta> table_meta;
     Status status = GetTableMeta(db_name, table_name, db_meta, table_meta);
     if (!status.ok()) {
         return status;
@@ -2585,8 +2583,8 @@ Status NewTxn::PrepareCommitDropColumns(const WalCmdDropColumnsV2 *drop_columns_
 
     TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
     auto ts_str = std::to_string(commit_ts);
-    for (SizeT i = 0; i < drop_columns_cmd->column_names_.size(); ++i) {
-        const String &column_key = drop_columns_cmd->column_keys_[i];
+    for (size_t i = 0; i < drop_columns_cmd->column_names_.size(); ++i) {
+        const std::string &column_key = drop_columns_cmd->column_keys_[i];
         TxnTimeStamp create_ts = infinity::GetTimestampFromKey(column_key);
         kv_instance_->Put(
             KeyEncode::DropTableColumnKey(drop_columns_cmd->db_id_, drop_columns_cmd->table_id_, drop_columns_cmd->column_names_[i], create_ts),
@@ -2596,13 +2594,13 @@ Status NewTxn::PrepareCommitDropColumns(const WalCmdDropColumnsV2 *drop_columns_
 }
 
 Status NewTxn::PrepareCommitCheckpoint(const WalCmdCheckpointV2 *checkpoint_cmd) {
-    Vector<String> *db_id_strs_ptr;
+    std::vector<std::string> *db_id_strs_ptr;
     CatalogMeta catalog_meta(this);
     Status status = catalog_meta.GetDBIDs(db_id_strs_ptr);
     if (!status.ok()) {
         return status;
     }
-    for (const String &db_id_str : *db_id_strs_ptr) {
+    for (const std::string &db_id_str : *db_id_strs_ptr) {
         DBMeeta db_meta(db_id_str, this);
         status = this->CommitCheckpointDB(db_meta, checkpoint_cmd);
         if (!status.ok()) {
@@ -2613,12 +2611,12 @@ Status NewTxn::PrepareCommitCheckpoint(const WalCmdCheckpointV2 *checkpoint_cmd)
 }
 
 Status NewTxn::CommitCheckpointDB(DBMeeta &db_meta, const WalCmdCheckpointV2 *checkpoint_cmd) {
-    Vector<String> *table_id_strs_ptr;
+    std::vector<std::string> *table_id_strs_ptr;
     Status status = db_meta.GetTableIDs(table_id_strs_ptr);
     if (!status.ok()) {
         return status;
     }
-    for (const String &table_id_str : *table_id_strs_ptr) {
+    for (const std::string &table_id_str : *table_id_strs_ptr) {
         TableMeeta table_meta(db_meta.db_id_str(), table_id_str, this);
         status = this->CommitCheckpointTable(table_meta, checkpoint_cmd);
         if (!status.ok()) {
@@ -2630,10 +2628,10 @@ Status NewTxn::CommitCheckpointDB(DBMeeta &db_meta, const WalCmdCheckpointV2 *ch
 
 Status NewTxn::PrepareCommitRestoreTableSnapshot(const WalCmdRestoreTableSnapshot *restore_table_snapshot_cmd, bool is_link_files) {
 
-    const String &db_name = restore_table_snapshot_cmd->db_name_;
+    const std::string &db_name = restore_table_snapshot_cmd->db_name_;
 
     // Get database ID
-    Optional<DBMeeta> db_meta;
+    std::optional<DBMeeta> db_meta;
     TxnTimeStamp db_create_ts;
     Status status = GetDBMeta(db_name, db_meta, db_create_ts);
     if (!status.ok()) {
@@ -2652,7 +2650,7 @@ Status NewTxn::RestoreTableFromSnapshot(const WalCmdRestoreTableSnapshot *restor
     TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
     TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
     Status status;
-    Optional<TableMeeta> table_meta;
+    std::optional<TableMeeta> table_meta;
     if (!is_link_files) {
         status = NewCatalog::AddNewTable(db_meta,
                                          restore_table_snapshot_cmd->table_id_,
@@ -2692,8 +2690,8 @@ Status NewTxn::RestoreTableFromSnapshot(const WalCmdRestoreTableSnapshot *restor
 Status NewTxn::PrepareCommitRestoreDatabaseSnapshot(const WalCmdRestoreDatabaseSnapshot *restore_database_snapshot_cmd) {
     TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
 
-    Optional<DBMeeta> db_meta;
-    const String *db_comment = restore_database_snapshot_cmd->db_comment_.empty() ? nullptr : &restore_database_snapshot_cmd->db_comment_;
+    std::optional<DBMeeta> db_meta;
+    const std::string *db_comment = restore_database_snapshot_cmd->db_comment_.empty() ? nullptr : &restore_database_snapshot_cmd->db_comment_;
     Status status = NewCatalog::AddNewDB(this,
                                          restore_database_snapshot_cmd->db_id_str_,
                                          commit_ts,
@@ -2721,20 +2719,20 @@ Status NewTxn::CommitCheckpointTable(TableMeeta &table_meta, const WalCmdCheckpo
     return Status::OK();
 }
 
-Status NewTxn::IncrLatestID(String &id_str, std::string_view id_name) const {
-    String string_id;
+Status NewTxn::IncrLatestID(std::string &id_str, std::string_view id_name) const {
+    std::string string_id;
     Status status = kv_instance_->Get(id_name.data(), string_id);
     if (!status.ok()) {
         return status;
     }
-    SizeT id_num = std::stoull(string_id);
+    size_t id_num = std::stoull(string_id);
     ++id_num;
     id_str = fmt::format("{}", id_num);
     return kv_instance_->Put(id_name.data(), id_str);
     // return new_catalog_->IncrLatestID(id_str, id_name);
 }
 
-bool NewTxn::CheckConflictTxnStore(NewTxn *previous_txn, String &cause, bool &retry_query) {
+bool NewTxn::CheckConflictTxnStore(NewTxn *previous_txn, std::string &cause, bool &retry_query) {
     // FIXME: We will store information for more operations in the base_txn_store_ in the future.
     if (base_txn_store_ == nullptr || previous_txn->base_txn_store_ == nullptr) {
         return false;
@@ -2806,7 +2804,7 @@ bool NewTxn::CheckConflictTxnStore(NewTxn *previous_txn, String &cause, bool &re
     }
 }
 
-bool NewTxn::CheckConflictCmd(const WalCmd &cmd, NewTxn *previous_txn, String &cause, bool &retry_query) {
+bool NewTxn::CheckConflictCmd(const WalCmd &cmd, NewTxn *previous_txn, std::string &cause, bool &retry_query) {
     switch (cmd.GetType()) {
         case WalCommandType::CREATE_DATABASE_V2: {
             return CheckConflictCmd(static_cast<const WalCmdCreateDatabaseV2 &>(cmd), previous_txn, cause, retry_query);
@@ -2851,10 +2849,10 @@ bool NewTxn::CheckConflictCmd(const WalCmd &cmd, NewTxn *previous_txn, String &c
     return false;
 }
 
-bool NewTxn::CheckConflictCmd(const WalCmdCreateDatabaseV2 &cmd, NewTxn *previous_txn, String &cause, bool &retry_query) {
-    const String &db_name = cmd.db_name_;
-    const Vector<SharedPtr<WalCmd>> &wal_cmds = previous_txn->wal_entry_->cmds_;
-    for (const SharedPtr<WalCmd> &wal_cmd : wal_cmds) {
+bool NewTxn::CheckConflictCmd(const WalCmdCreateDatabaseV2 &cmd, NewTxn *previous_txn, std::string &cause, bool &retry_query) {
+    const std::string &db_name = cmd.db_name_;
+    const std::vector<std::shared_ptr<WalCmd>> &wal_cmds = previous_txn->wal_entry_->cmds_;
+    for (const std::shared_ptr<WalCmd> &wal_cmd : wal_cmds) {
         bool conflict = false;
         WalCommandType command_type = wal_cmd->GetType();
         switch (command_type) {
@@ -2892,10 +2890,10 @@ bool NewTxn::CheckConflictCmd(const WalCmdCreateDatabaseV2 &cmd, NewTxn *previou
     return false;
 }
 
-bool NewTxn::CheckConflictCmd(const WalCmdDropDatabaseV2 &cmd, NewTxn *previous_txn, String &cause, bool &retry_query) {
-    const String &db_name = cmd.db_name_;
-    const Vector<SharedPtr<WalCmd>> &wal_cmds = previous_txn->wal_entry_->cmds_;
-    for (const SharedPtr<WalCmd> &wal_cmd : wal_cmds) {
+bool NewTxn::CheckConflictCmd(const WalCmdDropDatabaseV2 &cmd, NewTxn *previous_txn, std::string &cause, bool &retry_query) {
+    const std::string &db_name = cmd.db_name_;
+    const std::vector<std::shared_ptr<WalCmd>> &wal_cmds = previous_txn->wal_entry_->cmds_;
+    for (const std::shared_ptr<WalCmd> &wal_cmd : wal_cmds) {
         bool conflict = false;
         WalCommandType command_type = wal_cmd->GetType();
         switch (command_type) {
@@ -2926,8 +2924,8 @@ bool NewTxn::CheckConflictCmd(const WalCmdDropDatabaseV2 &cmd, NewTxn *previous_
     return false;
 }
 
-bool NewTxn::CheckConflictTxnStore(const CreateDBTxnStore &txn_store, NewTxn *previous_txn, String &cause, bool &retry_query) {
-    const String &db_name = txn_store.db_name_;
+bool NewTxn::CheckConflictTxnStore(const CreateDBTxnStore &txn_store, NewTxn *previous_txn, std::string &cause, bool &retry_query) {
+    const std::string &db_name = txn_store.db_name_;
     bool conflict = false;
     switch (previous_txn->base_txn_store_->type_) {
         case TransactionType::kCreateDB: {
@@ -2962,8 +2960,8 @@ bool NewTxn::CheckConflictTxnStore(const CreateDBTxnStore &txn_store, NewTxn *pr
     return false;
 }
 
-bool NewTxn::CheckConflictTxnStore(const RestoreDatabaseTxnStore &txn_store, NewTxn *previous_txn, String &cause, bool &retry_query) {
-    const String &db_name = txn_store.db_name_;
+bool NewTxn::CheckConflictTxnStore(const RestoreDatabaseTxnStore &txn_store, NewTxn *previous_txn, std::string &cause, bool &retry_query) {
+    const std::string &db_name = txn_store.db_name_;
     bool conflict = false;
     switch (previous_txn->base_txn_store_->type_) {
         case TransactionType::kCreateDB: {
@@ -2998,8 +2996,8 @@ bool NewTxn::CheckConflictTxnStore(const RestoreDatabaseTxnStore &txn_store, New
     return false;
 }
 
-bool NewTxn::CheckConflictTxnStore(const DropDBTxnStore &txn_store, NewTxn *previous_txn, String &cause, bool &retry_query) {
-    const String &db_name = txn_store.db_name_;
+bool NewTxn::CheckConflictTxnStore(const DropDBTxnStore &txn_store, NewTxn *previous_txn, std::string &cause, bool &retry_query) {
+    const std::string &db_name = txn_store.db_name_;
     bool conflict = false;
     //    LOG_TRACE(fmt::format("Txn: {}, current cmd: {}, previous txn: {}, previous cmd: {}",
     //                         this->txn_context_ptr_->txn_id_,
@@ -3026,11 +3024,11 @@ bool NewTxn::CheckConflictTxnStore(const DropDBTxnStore &txn_store, NewTxn *prev
     return false;
 }
 
-bool NewTxn::CheckConflictCmd(const WalCmdCreateTableV2 &cmd, NewTxn *previous_txn, String &cause, bool &retry_query) {
-    const String &db_name = cmd.db_name_;
-    const SharedPtr<String> &table_name = cmd.table_def_->table_name();
-    const Vector<SharedPtr<WalCmd>> &wal_cmds = previous_txn->wal_entry_->cmds_;
-    for (const SharedPtr<WalCmd> &wal_cmd : wal_cmds) {
+bool NewTxn::CheckConflictCmd(const WalCmdCreateTableV2 &cmd, NewTxn *previous_txn, std::string &cause, bool &retry_query) {
+    const std::string &db_name = cmd.db_name_;
+    const std::shared_ptr<std::string> &table_name = cmd.table_def_->table_name();
+    const std::vector<std::shared_ptr<WalCmd>> &wal_cmds = previous_txn->wal_entry_->cmds_;
+    for (const std::shared_ptr<WalCmd> &wal_cmd : wal_cmds) {
         bool conflict = false;
         WalCommandType command_type = wal_cmd->GetType();
         switch (command_type) {
@@ -3043,7 +3041,7 @@ bool NewTxn::CheckConflictCmd(const WalCmdCreateTableV2 &cmd, NewTxn *previous_t
             }
             case WalCommandType::CREATE_TABLE_V2: {
                 auto *prev_cmd = static_cast<WalCmdCreateTableV2 *>(wal_cmd.get());
-                const SharedPtr<String> &prev_table_name = prev_cmd->table_def_->table_name();
+                const std::shared_ptr<std::string> &prev_table_name = prev_cmd->table_def_->table_name();
                 if (prev_cmd->db_name_ == db_name && *prev_table_name == *table_name) {
                     conflict = true;
                 }
@@ -3077,9 +3075,9 @@ bool NewTxn::CheckConflictCmd(const WalCmdCreateTableV2 &cmd, NewTxn *previous_t
     return false;
 }
 
-bool NewTxn::CheckConflictTxnStore(const CreateTableTxnStore &txn_store, NewTxn *previous_txn, String &cause, bool &retry_query) {
-    const String &db_name = txn_store.db_name_;
-    const String &table_name = txn_store.table_name_;
+bool NewTxn::CheckConflictTxnStore(const CreateTableTxnStore &txn_store, NewTxn *previous_txn, std::string &cause, bool &retry_query) {
+    const std::string &db_name = txn_store.db_name_;
+    const std::string &table_name = txn_store.table_name_;
     bool conflict = false;
     switch (previous_txn->base_txn_store_->type_) {
         case TransactionType::kCreateTable: {
@@ -3130,9 +3128,9 @@ bool NewTxn::CheckConflictTxnStore(const CreateTableTxnStore &txn_store, NewTxn 
     return false;
 }
 
-bool NewTxn::CheckConflictTxnStore(const RestoreTableTxnStore &txn_store, NewTxn *previous_txn, String &cause, bool &retry_query) {
-    const String &db_name = txn_store.db_name_;
-    const String &table_name = txn_store.table_name_;
+bool NewTxn::CheckConflictTxnStore(const RestoreTableTxnStore &txn_store, NewTxn *previous_txn, std::string &cause, bool &retry_query) {
+    const std::string &db_name = txn_store.db_name_;
+    const std::string &table_name = txn_store.table_name_;
     bool conflict = false;
     switch (previous_txn->base_txn_store_->type_) {
         case TransactionType::kCreateTable: {
@@ -3194,16 +3192,16 @@ bool NewTxn::CheckConflictTxnStore(const RestoreTableTxnStore &txn_store, NewTxn
     return false;
 }
 
-bool NewTxn::CheckConflictCmd(const WalCmdAppendV2 &cmd, NewTxn *previous_txn, String &cause, bool &retry_query) {
-    const String &db_name = cmd.db_name_;
-    const String &table_name = cmd.table_name_;
+bool NewTxn::CheckConflictCmd(const WalCmdAppendV2 &cmd, NewTxn *previous_txn, std::string &cause, bool &retry_query) {
+    const std::string &db_name = cmd.db_name_;
+    const std::string &table_name = cmd.table_name_;
     Set<SegmentID> segment_ids;
     for (const auto &row_range : cmd.row_ranges_) {
         RowID row_id = row_range.first;
         segment_ids.insert(row_id.segment_id_);
     }
-    const Vector<SharedPtr<WalCmd>> &wal_cmds = previous_txn->wal_entry_->cmds_;
-    for (const SharedPtr<WalCmd> &wal_cmd : wal_cmds) {
+    const std::vector<std::shared_ptr<WalCmd>> &wal_cmds = previous_txn->wal_entry_->cmds_;
+    for (const std::shared_ptr<WalCmd> &wal_cmd : wal_cmds) {
         bool conflict = false;
         WalCommandType command_type = wal_cmd->GetType();
         switch (command_type) {
@@ -3272,9 +3270,9 @@ bool NewTxn::CheckConflictCmd(const WalCmdAppendV2 &cmd, NewTxn *previous_txn, S
     return false;
 }
 
-bool NewTxn::CheckConflictTxnStore(const AppendTxnStore &txn_store, NewTxn *previous_txn, String &cause, bool &retry_query) {
-    const String &db_name = txn_store.db_name_;
-    const String &table_name = txn_store.table_name_;
+bool NewTxn::CheckConflictTxnStore(const AppendTxnStore &txn_store, NewTxn *previous_txn, std::string &cause, bool &retry_query) {
+    const std::string &db_name = txn_store.db_name_;
+    const std::string &table_name = txn_store.table_name_;
     bool conflict = false;
     switch (previous_txn->base_txn_store_->type_) {
         case TransactionType::kCreateIndex: {
@@ -3351,11 +3349,11 @@ bool NewTxn::CheckConflictTxnStore(const AppendTxnStore &txn_store, NewTxn *prev
     return false;
 }
 
-bool NewTxn::CheckConflictCmd(const WalCmdImportV2 &cmd, NewTxn *previous_txn, String &cause, bool &retry_query) {
-    const String &db_name = cmd.db_name_;
-    const String &table_name = cmd.table_name_;
-    const Vector<SharedPtr<WalCmd>> &wal_cmds = previous_txn->wal_entry_->cmds_;
-    for (const SharedPtr<WalCmd> &wal_cmd : wal_cmds) {
+bool NewTxn::CheckConflictCmd(const WalCmdImportV2 &cmd, NewTxn *previous_txn, std::string &cause, bool &retry_query) {
+    const std::string &db_name = cmd.db_name_;
+    const std::string &table_name = cmd.table_name_;
+    const std::vector<std::shared_ptr<WalCmd>> &wal_cmds = previous_txn->wal_entry_->cmds_;
+    for (const std::shared_ptr<WalCmd> &wal_cmd : wal_cmds) {
         bool conflict = false;
         WalCommandType command_type = wal_cmd->GetType();
         switch (command_type) {
@@ -3408,9 +3406,9 @@ bool NewTxn::CheckConflictCmd(const WalCmdImportV2 &cmd, NewTxn *previous_txn, S
     return false;
 }
 
-bool NewTxn::CheckConflictTxnStore(const ImportTxnStore &txn_store, NewTxn *previous_txn, String &cause, bool &retry_query) {
-    const String &db_name = txn_store.db_name_;
-    const String &table_name = txn_store.table_name_;
+bool NewTxn::CheckConflictTxnStore(const ImportTxnStore &txn_store, NewTxn *previous_txn, std::string &cause, bool &retry_query) {
+    const std::string &db_name = txn_store.db_name_;
+    const std::string &table_name = txn_store.table_name_;
     bool conflict = false;
     switch (previous_txn->base_txn_store_->type_) {
         case TransactionType::kCreateIndex: {
@@ -3479,11 +3477,11 @@ bool NewTxn::CheckConflictTxnStore(const ImportTxnStore &txn_store, NewTxn *prev
     return false;
 }
 
-bool NewTxn::CheckConflictCmd(const WalCmdAddColumnsV2 &cmd, NewTxn *previous_txn, String &cause, bool &retry_query) {
-    const String &db_name = cmd.db_name_;
-    const String &table_name = cmd.table_name_;
-    const Vector<SharedPtr<WalCmd>> &wal_cmds = previous_txn->wal_entry_->cmds_;
-    for (const SharedPtr<WalCmd> &wal_cmd : wal_cmds) {
+bool NewTxn::CheckConflictCmd(const WalCmdAddColumnsV2 &cmd, NewTxn *previous_txn, std::string &cause, bool &retry_query) {
+    const std::string &db_name = cmd.db_name_;
+    const std::string &table_name = cmd.table_name_;
+    const std::vector<std::shared_ptr<WalCmd>> &wal_cmds = previous_txn->wal_entry_->cmds_;
+    for (const std::shared_ptr<WalCmd> &wal_cmd : wal_cmds) {
         bool conflict = false;
         WalCommandType command_type = wal_cmd->GetType();
         switch (command_type) {
@@ -3536,9 +3534,9 @@ bool NewTxn::CheckConflictCmd(const WalCmdAddColumnsV2 &cmd, NewTxn *previous_tx
     return false;
 }
 
-bool NewTxn::CheckConflictTxnStore(const AddColumnsTxnStore &txn_store, NewTxn *previous_txn, String &cause, bool &retry_query) {
-    const String &db_name = txn_store.db_name_;
-    const String &table_name = txn_store.table_name_;
+bool NewTxn::CheckConflictTxnStore(const AddColumnsTxnStore &txn_store, NewTxn *previous_txn, std::string &cause, bool &retry_query) {
+    const std::string &db_name = txn_store.db_name_;
+    const std::string &table_name = txn_store.table_name_;
     bool conflict = false;
     switch (previous_txn->base_txn_store_->type_) {
         case TransactionType::kAppend: {
@@ -3612,11 +3610,11 @@ bool NewTxn::CheckConflictTxnStore(const AddColumnsTxnStore &txn_store, NewTxn *
     return false;
 }
 
-bool NewTxn::CheckConflictCmd(const WalCmdDropColumnsV2 &cmd, NewTxn *previous_txn, String &cause, bool &retry_query) {
-    const String &db_name = cmd.db_name_;
-    const String &table_name = cmd.table_name_;
-    const Vector<SharedPtr<WalCmd>> &wal_cmds = previous_txn->wal_entry_->cmds_;
-    for (const SharedPtr<WalCmd> &wal_cmd : wal_cmds) {
+bool NewTxn::CheckConflictCmd(const WalCmdDropColumnsV2 &cmd, NewTxn *previous_txn, std::string &cause, bool &retry_query) {
+    const std::string &db_name = cmd.db_name_;
+    const std::string &table_name = cmd.table_name_;
+    const std::vector<std::shared_ptr<WalCmd>> &wal_cmds = previous_txn->wal_entry_->cmds_;
+    for (const std::shared_ptr<WalCmd> &wal_cmd : wal_cmds) {
         bool conflict = false;
         WalCommandType command_type = wal_cmd->GetType();
         switch (command_type) {
@@ -3681,9 +3679,9 @@ bool NewTxn::CheckConflictCmd(const WalCmdDropColumnsV2 &cmd, NewTxn *previous_t
     return false;
 }
 
-bool NewTxn::CheckConflictTxnStore(const DropColumnsTxnStore &txn_store, NewTxn *previous_txn, String &cause, bool &retry_query) {
-    const String &db_name = txn_store.db_name_;
-    const String &table_name = txn_store.table_name_;
+bool NewTxn::CheckConflictTxnStore(const DropColumnsTxnStore &txn_store, NewTxn *previous_txn, std::string &cause, bool &retry_query) {
+    const std::string &db_name = txn_store.db_name_;
+    const std::string &table_name = txn_store.table_name_;
     bool conflict = false;
     switch (previous_txn->base_txn_store_->type_) {
         case TransactionType::kAppend: {
@@ -3774,9 +3772,9 @@ bool NewTxn::CheckConflictTxnStore(const DropColumnsTxnStore &txn_store, NewTxn 
     return false;
 }
 
-bool NewTxn::CheckConflictCmd(const WalCmdCompactV2 &cmd, NewTxn *previous_txn, String &cause, bool &retry_query) {
-    const String &db_name = cmd.db_name_;
-    const String &table_name = cmd.table_name_;
+bool NewTxn::CheckConflictCmd(const WalCmdCompactV2 &cmd, NewTxn *previous_txn, std::string &cause, bool &retry_query) {
+    const std::string &db_name = cmd.db_name_;
+    const std::string &table_name = cmd.table_name_;
     Set<SegmentID> segment_ids;
     for (const auto segment_id : cmd.deprecated_segment_ids_) {
         segment_ids.insert(segment_id);
@@ -3784,8 +3782,8 @@ bool NewTxn::CheckConflictCmd(const WalCmdCompactV2 &cmd, NewTxn *previous_txn, 
     for (const auto &new_segment_info : cmd.new_segment_infos_) {
         segment_ids.insert(new_segment_info.segment_id_);
     }
-    const Vector<SharedPtr<WalCmd>> &wal_cmds = previous_txn->wal_entry_->cmds_;
-    for (const SharedPtr<WalCmd> &wal_cmd : wal_cmds) {
+    const std::vector<std::shared_ptr<WalCmd>> &wal_cmds = previous_txn->wal_entry_->cmds_;
+    for (const std::shared_ptr<WalCmd> &wal_cmd : wal_cmds) {
         bool conflict = false;
         WalCommandType command_type = wal_cmd->GetType();
         switch (command_type) {
@@ -3861,10 +3859,10 @@ bool NewTxn::CheckConflictCmd(const WalCmdCompactV2 &cmd, NewTxn *previous_txn, 
     return false;
 }
 
-bool NewTxn::CheckConflictTxnStore(const CompactTxnStore &txn_store, NewTxn *previous_txn, String &cause, bool &retry_query) {
-    const String &db_name = txn_store.db_name_;
-    const String &table_name = txn_store.table_name_;
-    const Vector<SegmentID> &segment_ids = txn_store.deprecated_segment_ids_;
+bool NewTxn::CheckConflictTxnStore(const CompactTxnStore &txn_store, NewTxn *previous_txn, std::string &cause, bool &retry_query) {
+    const std::string &db_name = txn_store.db_name_;
+    const std::string &table_name = txn_store.table_name_;
+    const std::vector<SegmentID> &segment_ids = txn_store.deprecated_segment_ids_;
     bool conflict = false;
     switch (previous_txn->base_txn_store_->type_) {
         case TransactionType::kCompact: {
@@ -3965,11 +3963,11 @@ bool NewTxn::CheckConflictTxnStore(const CompactTxnStore &txn_store, NewTxn *pre
     return false;
 }
 
-bool NewTxn::CheckConflictCmd(const WalCmdCreateIndexV2 &cmd, NewTxn *previous_txn, String &cause, bool &retry_query) {
-    const String &db_name = cmd.db_name_;
-    const String &table_name = cmd.table_name_;
-    const String &index_name = *cmd.index_base_->index_name_;
-    for (SharedPtr<WalCmd> &wal_cmd : previous_txn->wal_entry_->cmds_) {
+bool NewTxn::CheckConflictCmd(const WalCmdCreateIndexV2 &cmd, NewTxn *previous_txn, std::string &cause, bool &retry_query) {
+    const std::string &db_name = cmd.db_name_;
+    const std::string &table_name = cmd.table_name_;
+    const std::string &index_name = *cmd.index_base_->index_name_;
+    for (std::shared_ptr<WalCmd> &wal_cmd : previous_txn->wal_entry_->cmds_) {
         bool conflict = false;
         WalCommandType command_type = wal_cmd->GetType();
         switch (command_type) {
@@ -4041,10 +4039,10 @@ bool NewTxn::CheckConflictCmd(const WalCmdCreateIndexV2 &cmd, NewTxn *previous_t
     return false;
 }
 
-bool NewTxn::CheckConflictTxnStore(const CreateIndexTxnStore &txn_store, NewTxn *previous_txn, String &cause, bool &retry_query) {
-    const String &db_name = txn_store.db_name_;
-    const String &table_name = txn_store.table_name_;
-    const String &index_name = *txn_store.index_base_->index_name_;
+bool NewTxn::CheckConflictTxnStore(const CreateIndexTxnStore &txn_store, NewTxn *previous_txn, std::string &cause, bool &retry_query) {
+    const std::string &db_name = txn_store.db_name_;
+    const std::string &table_name = txn_store.table_name_;
+    const std::string &index_name = *txn_store.index_base_->index_name_;
     bool conflict = false;
     switch (previous_txn->base_txn_store_->type_) {
         case TransactionType::kCreateIndex: {
@@ -4132,10 +4130,10 @@ bool NewTxn::CheckConflictTxnStore(const CreateIndexTxnStore &txn_store, NewTxn 
     return false;
 }
 
-bool NewTxn::CheckConflictTxnStore(const DropIndexTxnStore &txn_store, NewTxn *previous_txn, String &cause, bool &retry_query) {
-    const String &db_name = txn_store.db_name_;
-    const String &table_name = txn_store.table_name_;
-    const String &index_name = txn_store.index_name_;
+bool NewTxn::CheckConflictTxnStore(const DropIndexTxnStore &txn_store, NewTxn *previous_txn, std::string &cause, bool &retry_query) {
+    const std::string &db_name = txn_store.db_name_;
+    const std::string &table_name = txn_store.table_name_;
+    const std::string &index_name = txn_store.index_name_;
     bool conflict = false;
     switch (previous_txn->base_txn_store_->type_) {
         case TransactionType::kDropIndex: {
@@ -4183,12 +4181,12 @@ bool NewTxn::CheckConflictTxnStore(const DropIndexTxnStore &txn_store, NewTxn *p
     return false;
 }
 
-bool NewTxn::CheckConflictCmd(const WalCmdDumpIndexV2 &cmd, NewTxn *previous_txn, String &cause, bool &retry_query) {
-    const String &db_name = cmd.db_name_;
-    const String &table_name = cmd.table_name_;
+bool NewTxn::CheckConflictCmd(const WalCmdDumpIndexV2 &cmd, NewTxn *previous_txn, std::string &cause, bool &retry_query) {
+    const std::string &db_name = cmd.db_name_;
+    const std::string &table_name = cmd.table_name_;
     if (cmd.dump_cause_ != DumpIndexCause::kOptimizeIndex)
         return false;
-    for (SharedPtr<WalCmd> &wal_cmd : previous_txn->wal_entry_->cmds_) {
+    for (std::shared_ptr<WalCmd> &wal_cmd : previous_txn->wal_entry_->cmds_) {
         bool conflict = false;
         WalCommandType command_type = wal_cmd->GetType();
         switch (command_type) {
@@ -4228,10 +4226,10 @@ bool NewTxn::CheckConflictCmd(const WalCmdDumpIndexV2 &cmd, NewTxn *previous_txn
     return false;
 }
 
-bool NewTxn::CheckConflictCmd(const WalCmdDeleteV2 &cmd, NewTxn *previous_txn, String &cause, bool &retry_query) {
-    const String &db_name = cmd.db_name_;
-    const String &table_name = cmd.table_name_;
-    for (SharedPtr<WalCmd> &wal_cmd : previous_txn->wal_entry_->cmds_) {
+bool NewTxn::CheckConflictCmd(const WalCmdDeleteV2 &cmd, NewTxn *previous_txn, std::string &cause, bool &retry_query) {
+    const std::string &db_name = cmd.db_name_;
+    const std::string &table_name = cmd.table_name_;
+    for (std::shared_ptr<WalCmd> &wal_cmd : previous_txn->wal_entry_->cmds_) {
         bool conflict = false;
         WalCommandType command_type = wal_cmd->GetType();
         switch (command_type) {
@@ -4270,10 +4268,10 @@ bool NewTxn::CheckConflictCmd(const WalCmdDeleteV2 &cmd, NewTxn *previous_txn, S
     return false;
 }
 
-bool NewTxn::CheckConflictCmd(const WalCmdDropTableV2 &cmd, NewTxn *previous_txn, String &cause, bool &retry_query) {
-    const String &db_name = cmd.db_name_;
-    //    const String &table_name = cmd.table_name_;
-    for (SharedPtr<WalCmd> &wal_cmd : previous_txn->wal_entry_->cmds_) {
+bool NewTxn::CheckConflictCmd(const WalCmdDropTableV2 &cmd, NewTxn *previous_txn, std::string &cause, bool &retry_query) {
+    const std::string &db_name = cmd.db_name_;
+    //    const std::string &table_name = cmd.table_name_;
+    for (std::shared_ptr<WalCmd> &wal_cmd : previous_txn->wal_entry_->cmds_) {
         bool conflict = false;
         WalCommandType command_type = wal_cmd->GetType();
         switch (command_type) {
@@ -4296,9 +4294,9 @@ bool NewTxn::CheckConflictCmd(const WalCmdDropTableV2 &cmd, NewTxn *previous_txn
     return false;
 }
 
-bool NewTxn::CheckConflictTxnStore(const DropTableTxnStore &txn_store, NewTxn *previous_txn, String &cause, bool &retry_query) {
-    const String &db_name = txn_store.db_name_;
-    const String &table_name = txn_store.table_name_;
+bool NewTxn::CheckConflictTxnStore(const DropTableTxnStore &txn_store, NewTxn *previous_txn, std::string &cause, bool &retry_query) {
+    const std::string &db_name = txn_store.db_name_;
+    const std::string &table_name = txn_store.table_name_;
     bool conflict = false;
     switch (previous_txn->base_txn_store_->type_) {
         case TransactionType::kDropDB: {
@@ -4337,15 +4335,15 @@ bool NewTxn::CheckConflictTxnStore(const DropTableTxnStore &txn_store, NewTxn *p
     return false;
 }
 
-bool NewTxn::CheckConflictTxnStore(const OptimizeIndexTxnStore &txn_store, NewTxn *previous_txn, String &cause, bool &retry_query) {
-    const Vector<String> &db_names = txn_store.db_names_;
-    const Map<String, Vector<String>> &table_names_in_db = txn_store.table_names_in_db_;
+bool NewTxn::CheckConflictTxnStore(const OptimizeIndexTxnStore &txn_store, NewTxn *previous_txn, std::string &cause, bool &retry_query) {
+    const std::vector<std::string> &db_names = txn_store.db_names_;
+    const std::map<std::string, std::vector<std::string>> &table_names_in_db = txn_store.table_names_in_db_;
     bool conflict = false;
     switch (previous_txn->base_txn_store_->type_) {
         case TransactionType::kOptimizeIndex: {
             OptimizeIndexTxnStore *optimize_index_txn_store = static_cast<OptimizeIndexTxnStore *>(previous_txn->base_txn_store_.get());
-            const Vector<String> &prev_db_names = optimize_index_txn_store->db_names_;
-            const Map<String, Vector<String>> &prev_table_names_in_db = optimize_index_txn_store->table_names_in_db_;
+            const std::vector<std::string> &prev_db_names = optimize_index_txn_store->db_names_;
+            const std::map<std::string, std::vector<std::string>> &prev_table_names_in_db = optimize_index_txn_store->table_names_in_db_;
 
             // If there are multiple databases or multiple tables involved in index optimization, the optimization is processed for all indexes.
             if (db_names.size() > 1 || prev_db_names.size() > 1 || table_names_in_db.at(db_names[0]).size() > 1 ||
@@ -4371,8 +4369,8 @@ bool NewTxn::CheckConflictTxnStore(const OptimizeIndexTxnStore &txn_store, NewTx
         }
         case TransactionType::kAppend: {
             AppendTxnStore *append_txn_store = static_cast<AppendTxnStore *>(previous_txn->base_txn_store_.get());
-            const String &prev_db_name = append_txn_store->db_name_;
-            const String &prev_table_name = append_txn_store->table_name_;
+            const std::string &prev_db_name = append_txn_store->db_name_;
+            const std::string &prev_table_name = append_txn_store->table_name_;
             if (std::find(db_names.begin(), db_names.end(), prev_db_name) != db_names.end() &&
                 std::find(table_names_in_db.at(prev_db_name).begin(), table_names_in_db.at(prev_db_name).end(), prev_table_name) !=
                     table_names_in_db.at(prev_db_name).end()) {
@@ -4384,8 +4382,8 @@ bool NewTxn::CheckConflictTxnStore(const OptimizeIndexTxnStore &txn_store, NewTx
         // case TransactionType::kImport: {
         //     LOG_INFO("OptimizeIndexTxnStore vs. ImportTxnStore conflict");
         //     ImportTxnStore *import_txn_store = static_cast<ImportTxnStore *>(previous_txn->base_txn_store_.get());
-        //     const String &prev_db_name = import_txn_store->db_name_;
-        //     const String &prev_table_name = import_txn_store->table_name_;
+        //     const std::string &prev_db_name = import_txn_store->db_name_;
+        //     const std::string &prev_table_name = import_txn_store->table_name_;
         //     if (std::find(db_names.begin(), db_names.end(), prev_db_name) != db_names.end() &&
         //         std::find(table_names_in_db.at(prev_db_name).begin(), table_names_in_db.at(prev_db_name).end(), prev_table_name) !=
         //             table_names_in_db.at(prev_db_name).end()) {
@@ -4395,8 +4393,8 @@ bool NewTxn::CheckConflictTxnStore(const OptimizeIndexTxnStore &txn_store, NewTx
         // }
         case TransactionType::kCompact: {
             CompactTxnStore *compact_txn_store = static_cast<CompactTxnStore *>(previous_txn->base_txn_store_.get());
-            const String &prev_db_name = compact_txn_store->db_name_;
-            const String &prev_table_name = compact_txn_store->table_name_;
+            const std::string &prev_db_name = compact_txn_store->db_name_;
+            const std::string &prev_table_name = compact_txn_store->table_name_;
             for (const auto &store_entry : txn_store.entries_) {
                 if (store_entry.db_name_ == prev_db_name && store_entry.table_name_ == prev_table_name &&
                     std::find(compact_txn_store->deprecated_segment_ids_.begin(),
@@ -4410,8 +4408,8 @@ bool NewTxn::CheckConflictTxnStore(const OptimizeIndexTxnStore &txn_store, NewTx
         }
         case TransactionType::kUpdate: {
             UpdateTxnStore *update_txn_store = static_cast<UpdateTxnStore *>(previous_txn->base_txn_store_.get());
-            const String &prev_db_name = update_txn_store->db_name_;
-            const String &prev_table_name = update_txn_store->table_name_;
+            const std::string &prev_db_name = update_txn_store->db_name_;
+            const std::string &prev_table_name = update_txn_store->table_name_;
             if (std::find(db_names.begin(), db_names.end(), prev_db_name) != db_names.end() &&
                 std::find(table_names_in_db.at(prev_db_name).begin(), table_names_in_db.at(prev_db_name).end(), prev_table_name) !=
                     table_names_in_db.at(prev_db_name).end()) {
@@ -4421,9 +4419,9 @@ bool NewTxn::CheckConflictTxnStore(const OptimizeIndexTxnStore &txn_store, NewTx
         }
         case TransactionType::kDropIndex: {
             DropIndexTxnStore *drop_index_txn_store = static_cast<DropIndexTxnStore *>(previous_txn->base_txn_store_.get());
-            const String &prev_db_name = drop_index_txn_store->db_name_;
-            const String &prev_table_name = drop_index_txn_store->table_name_;
-            const String &prev_index_name = drop_index_txn_store->index_name_;
+            const std::string &prev_db_name = drop_index_txn_store->db_name_;
+            const std::string &prev_table_name = drop_index_txn_store->table_name_;
+            const std::string &prev_index_name = drop_index_txn_store->index_name_;
 
             // If there are multiple databases or multiple tables involved in index optimization, the optimization is processed for all indexes.
             if (db_names.size() > 1 || table_names_in_db.at(db_names[0]).size() > 1) {
@@ -4442,9 +4440,9 @@ bool NewTxn::CheckConflictTxnStore(const OptimizeIndexTxnStore &txn_store, NewTx
         }
         case TransactionType::kDumpMemIndex: {
             DumpMemIndexTxnStore *dump_index_txn_store = static_cast<DumpMemIndexTxnStore *>(previous_txn->base_txn_store_.get());
-            const String &prev_db_name = dump_index_txn_store->db_name_;
-            const String &prev_table_name = dump_index_txn_store->table_name_;
-            const String &prev_index_name = dump_index_txn_store->index_name_;
+            const std::string &prev_db_name = dump_index_txn_store->db_name_;
+            const std::string &prev_table_name = dump_index_txn_store->table_name_;
+            const std::string &prev_index_name = dump_index_txn_store->index_name_;
             for (const auto &current_store_entry : txn_store.entries_) {
                 if (prev_db_name == current_store_entry.db_name_ && prev_table_name == current_store_entry.table_name_ &&
                     prev_index_name == current_store_entry.index_name_) {
@@ -4464,8 +4462,8 @@ bool NewTxn::CheckConflictTxnStore(const OptimizeIndexTxnStore &txn_store, NewTx
         }
         case TransactionType::kDropTable: {
             DropTableTxnStore *drop_table_txn_store = static_cast<DropTableTxnStore *>(previous_txn->base_txn_store_.get());
-            const String &prev_db_name = drop_table_txn_store->db_name_;
-            const String &prev_table_name = drop_table_txn_store->table_name_;
+            const std::string &prev_db_name = drop_table_txn_store->db_name_;
+            const std::string &prev_table_name = drop_table_txn_store->table_name_;
             if (std::find(db_names.begin(), db_names.end(), prev_db_name) != db_names.end() &&
                 std::find(table_names_in_db.at(prev_db_name).begin(), table_names_in_db.at(prev_db_name).end(), prev_table_name) !=
                     table_names_in_db.at(prev_db_name).end()) {
@@ -4477,8 +4475,8 @@ bool NewTxn::CheckConflictTxnStore(const OptimizeIndexTxnStore &txn_store, NewTx
         case TransactionType::kCreateTableSnapshot: {
             auto *create_table_snapshot_txn_store =
                 static_cast<CreateTableSnapshotTxnStore *>(previous_txn->base_txn_store_.get());
-            const String &prev_db_name = create_table_snapshot_txn_store->db_name_;
-            const String &prev_table_name = create_table_snapshot_txn_store->table_name_;
+            const std::string &prev_db_name = create_table_snapshot_txn_store->db_name_;
+            const std::string &prev_table_name = create_table_snapshot_txn_store->table_name_;
             if (std::find(db_names.begin(), db_names.end(), prev_db_name) != db_names.end() &&
                 std::find(table_names_in_db.at(prev_db_name).begin(), table_names_in_db.at(prev_db_name).end(), prev_table_name) !=
                     table_names_in_db.at(prev_db_name).end()) {
@@ -4498,10 +4496,10 @@ bool NewTxn::CheckConflictTxnStore(const OptimizeIndexTxnStore &txn_store, NewTx
     return false;
 }
 
-bool NewTxn::CheckConflictTxnStore(const DumpMemIndexTxnStore &txn_store, NewTxn *previous_txn, String &cause, bool &retry_query) {
-    const String &db_name = txn_store.db_name_;
-    const String &table_name = txn_store.table_name_;
-    const String &index_name = txn_store.index_name_;
+bool NewTxn::CheckConflictTxnStore(const DumpMemIndexTxnStore &txn_store, NewTxn *previous_txn, std::string &cause, bool &retry_query) {
+    const std::string &db_name = txn_store.db_name_;
+    const std::string &table_name = txn_store.table_name_;
+    const std::string &index_name = txn_store.index_name_;
     bool conflict = false;
     switch (previous_txn->base_txn_store_->type_) {
         case TransactionType::kDumpMemIndex: {
@@ -4547,9 +4545,9 @@ bool NewTxn::CheckConflictTxnStore(const DumpMemIndexTxnStore &txn_store, NewTxn
     return false;
 }
 
-bool NewTxn::CheckConflictTxnStore(const DeleteTxnStore &txn_store, NewTxn *previous_txn, String &cause, bool &retry_query) {
-    const String &db_name = txn_store.db_name_;
-    const String &table_name = txn_store.table_name_;
+bool NewTxn::CheckConflictTxnStore(const DeleteTxnStore &txn_store, NewTxn *previous_txn, std::string &cause, bool &retry_query) {
+    const std::string &db_name = txn_store.db_name_;
+    const std::string &table_name = txn_store.table_name_;
     bool conflict = false;
     switch (previous_txn->base_txn_store_->type_) {
         case TransactionType::kCompact: {
@@ -4618,10 +4616,10 @@ bool NewTxn::CheckConflictTxnStore(const DeleteTxnStore &txn_store, NewTxn *prev
     return false;
 }
 
-bool NewTxn::CheckConflictTxnStore(const RenameTableTxnStore &txn_store, NewTxn *previous_txn, String &cause, bool &retry_query) {
-    const String &db_name = txn_store.db_name_;
-    const String &table_name = txn_store.old_table_name_;
-    const String &new_table_name = txn_store.new_table_name_;
+bool NewTxn::CheckConflictTxnStore(const RenameTableTxnStore &txn_store, NewTxn *previous_txn, std::string &cause, bool &retry_query) {
+    const std::string &db_name = txn_store.db_name_;
+    const std::string &table_name = txn_store.old_table_name_;
+    const std::string &new_table_name = txn_store.new_table_name_;
     bool conflict = false;
     switch (previous_txn->base_txn_store_->type_) {
         case TransactionType::kCreateTable: {
@@ -4683,9 +4681,9 @@ bool NewTxn::CheckConflictTxnStore(const RenameTableTxnStore &txn_store, NewTxn 
     return false;
 }
 
-bool NewTxn::CheckConflictTxnStore(const UpdateTxnStore &txn_store, NewTxn *previous_txn, String &cause, bool &retry_query) {
-    const String &db_name = txn_store.db_name_;
-    const String &table_name = txn_store.table_name_;
+bool NewTxn::CheckConflictTxnStore(const UpdateTxnStore &txn_store, NewTxn *previous_txn, std::string &cause, bool &retry_query) {
+    const std::string &db_name = txn_store.db_name_;
+    const std::string &table_name = txn_store.table_name_;
     Set<SegmentID> segment_ids;
     for (const auto &row_id : txn_store.row_ids_) {
         segment_ids.insert(row_id.segment_id_);
@@ -4792,7 +4790,7 @@ bool NewTxn::CheckConflictTxnStore(const UpdateTxnStore &txn_store, NewTxn *prev
     return false;
 }
 
-bool NewTxn::CheckConflictTxnStore(const CreateTableSnapshotTxnStore &txn_store, NewTxn *previous_txn, String &cause, bool &retry_query) {
+bool NewTxn::CheckConflictTxnStore(const CreateTableSnapshotTxnStore &txn_store, NewTxn *previous_txn, std::string &cause, bool &retry_query) {
     retry_query = true;
     bool conflict = true;
     if (conflict) {
@@ -4802,9 +4800,9 @@ bool NewTxn::CheckConflictTxnStore(const CreateTableSnapshotTxnStore &txn_store,
     return true;
 }
 
-bool NewTxn::CheckConflict1(SharedPtr<NewTxn> check_txn, String &conflict_reason, bool &retry_query) {
+bool NewTxn::CheckConflict1(std::shared_ptr<NewTxn> check_txn, std::string &conflict_reason, bool &retry_query) {
     // LOG_INFO(fmt::format("Txn {} check conflict with txn: {}.", *txn_text_, *check_txn->txn_text_));
-    for (SharedPtr<WalCmd> &wal_cmd : wal_entry_->cmds_) {
+    for (std::shared_ptr<WalCmd> &wal_cmd : wal_entry_->cmds_) {
         bool conflict = this->CheckConflictCmd(*wal_cmd, check_txn.get(), conflict_reason, retry_query);
         if (conflict) {
             // conflicted_txn_ = check_txn;
@@ -4814,7 +4812,7 @@ bool NewTxn::CheckConflict1(SharedPtr<NewTxn> check_txn, String &conflict_reason
     return false;
 }
 
-bool NewTxn::CheckConflictTxnStores(SharedPtr<NewTxn> check_txn, String &conflict_reason, bool &retry_query) {
+bool NewTxn::CheckConflictTxnStores(std::shared_ptr<NewTxn> check_txn, std::string &conflict_reason, bool &retry_query) {
     LOG_TRACE(fmt::format("CheckConflictTxnStores::Txn {} check conflict with txn: {}.", *txn_text_, *check_txn->txn_text_));
     bool conflict = this->CheckConflictTxnStore(check_txn.get(), conflict_reason, retry_query);
     if (conflict) {
@@ -4871,8 +4869,8 @@ void NewTxn::CommitBottom() {
     }
 
     TxnTimeStamp commit_ts = this->CommitTS();
-    String commit_ts_str = std::to_string(commit_ts);
-    for (const String &meta_key : keys_wait_for_commit_) {
+    std::string commit_ts_str = std::to_string(commit_ts);
+    for (const std::string &meta_key : keys_wait_for_commit_) {
         kv_instance_->Put(meta_key, commit_ts_str);
     }
     txn_mgr_->CommitBottom(this);
@@ -4899,7 +4897,7 @@ void NewTxn::PostCommit() {
 
     auto *wal_manager = InfinityContext::instance().storage()->wal_manager();
     //    auto *bg_processor = InfinityContext::instance().storage()->bg_processor();
-    for (const SharedPtr<WalCmd> &wal_cmd : wal_entry_->cmds_) {
+    for (const std::shared_ptr<WalCmd> &wal_cmd : wal_entry_->cmds_) {
         WalCommandType command_type = wal_cmd->GetType();
         switch (command_type) {
             case WalCommandType::APPEND_V2: {
@@ -5008,17 +5006,17 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
                 std::for_each(blocks.begin(), blocks.end(), [](auto &block) { block->UnInit(); });
             }
 
-            const Vector<SegmentID> &segment_ids = import_txn_store->segment_ids_;
-            Vector<UniquePtr<MetaKey>> metas;
+            const std::vector<SegmentID> &segment_ids = import_txn_store->segment_ids_;
+            std::vector<std::unique_ptr<MetaKey>> metas;
             auto &db_id_str = import_txn_store->db_id_str_;
             auto &table_id_str = import_txn_store->table_id_str_;
             auto index_names_size = import_txn_store->index_names_.size();
-            for (SizeT i = 0; i < index_names_size; ++i) {
+            for (size_t i = 0; i < index_names_size; ++i) {
                 // Restore memory index here
                 auto index_id_str = import_txn_store->index_ids_str_[i];
                 for (SegmentID segment_id : segment_ids) {
-                    metas.emplace_back(MakeUnique<SegmentMetaKey>(db_id_str, table_id_str, segment_id));
-                    metas.emplace_back(MakeUnique<SegmentIndexMetaKey>(db_id_str, table_id_str, index_id_str, segment_id));
+                    metas.emplace_back(std::make_unique<SegmentMetaKey>(db_id_str, table_id_str, segment_id));
+                    metas.emplace_back(std::make_unique<SegmentIndexMetaKey>(db_id_str, table_id_str, index_id_str, segment_id));
                 }
             }
 
@@ -5033,17 +5031,17 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
         }
         case TransactionType::kCompact: {
             CompactTxnStore *compact_txn_store = static_cast<CompactTxnStore *>(base_txn_store_.get());
-            Vector<UniquePtr<MetaKey>> metas;
+            std::vector<std::unique_ptr<MetaKey>> metas;
             auto &db_id_str = compact_txn_store->db_id_str_;
             auto &table_id_str = compact_txn_store->table_id_str_;
             auto index_names_size = compact_txn_store->index_names_.size();
-            for (SizeT i = 0; i < index_names_size; ++i) {
+            for (size_t i = 0; i < index_names_size; ++i) {
                 // Restore memory index here
                 auto index_id_str = compact_txn_store->index_ids_str_[i];
-                const Vector<SegmentID> &segment_ids_ = compact_txn_store->segment_ids_;
+                const std::vector<SegmentID> &segment_ids_ = compact_txn_store->segment_ids_;
                 for (SegmentID segment_id : segment_ids_) {
-                    metas.emplace_back(MakeUnique<SegmentMetaKey>(db_id_str, table_id_str, segment_id));
-                    metas.emplace_back(MakeUnique<SegmentIndexMetaKey>(db_id_str, table_id_str, index_id_str, segment_id));
+                    metas.emplace_back(std::make_unique<SegmentMetaKey>(db_id_str, table_id_str, segment_id));
+                    metas.emplace_back(std::make_unique<SegmentIndexMetaKey>(db_id_str, table_id_str, index_id_str, segment_id));
                 }
             }
 
@@ -5063,15 +5061,15 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
                                   kv_instance_.get(),
                                   abort_ts,
                                   MAX_TIMESTAMP);
-            Vector<String> *index_id_strs_ptr = nullptr;
+            std::vector<std::string> *index_id_strs_ptr = nullptr;
             Status status = table_meta.GetIndexIDs(index_id_strs_ptr);
             if (!status.ok()) {
                 RecoverableError(status);
             }
 
             if (std::find(index_id_strs_ptr->begin(), index_id_strs_ptr->end(), create_index_txn_store->index_id_str_) != index_id_strs_ptr->end()) {
-                Vector<UniquePtr<MetaKey>> metas;
-                metas.emplace_back(MakeUnique<TableIndexMetaKey>(create_index_txn_store->db_id_str_,
+                std::vector<std::unique_ptr<MetaKey>> metas;
+                metas.emplace_back(std::make_unique<TableIndexMetaKey>(create_index_txn_store->db_id_str_,
                                                                  create_index_txn_store->table_id_str_,
                                                                  create_index_txn_store->index_id_str_,
                                                                  *create_index_txn_store->index_base_->index_name_));
@@ -5089,11 +5087,11 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
         case TransactionType::kDumpMemIndex: {
             DumpMemIndexTxnStore *dump_index_txn_store = static_cast<DumpMemIndexTxnStore *>(base_txn_store_.get());
 
-            Optional<DBMeeta> db_meta;
-            Optional<TableMeeta> table_meta;
-            Optional<TableIndexMeeta> table_index_meta;
-            String table_key;
-            String index_key;
+            std::optional<DBMeeta> db_meta;
+            std::optional<TableMeeta> table_meta;
+            std::optional<TableIndexMeeta> table_index_meta;
+            std::string table_key;
+            std::string index_key;
             Status status = this->GetTableIndexMeta(dump_index_txn_store->db_name_,
                                                     dump_index_txn_store->table_name_,
                                                     dump_index_txn_store->index_name_,
@@ -5109,7 +5107,7 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
             for (SegmentID segment_id : dump_index_txn_store->segment_ids_) {
                 SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta);
 
-                SharedPtr<MemIndex> mem_index = segment_index_meta.GetMemIndex();
+                std::shared_ptr<MemIndex> mem_index = segment_index_meta.GetMemIndex();
                 if (mem_index != nullptr && mem_index->IsDumping()) {
                     mem_index->SetIsDumping(false);
                 }
@@ -5118,7 +5116,7 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
         }
         case TransactionType::kOptimizeIndex: {
             OptimizeIndexTxnStore *optimize_index_txn_store = static_cast<OptimizeIndexTxnStore *>(base_txn_store_.get());
-            Vector<UniquePtr<MetaKey>> metas;
+            std::vector<std::unique_ptr<MetaKey>> metas;
             auto &entries = optimize_index_txn_store->entries_;
 
             for (const auto &entry : entries) {
@@ -5129,7 +5127,7 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
                 auto &new_chunk_infos = entry.new_chunk_infos_;
                 for (const auto &new_chunk_info : new_chunk_infos) {
                     auto chunk_id = new_chunk_info.chunk_id_;
-                    metas.emplace_back(MakeUnique<ChunkIndexMetaKey>(db_id_str, table_id_str, index_id_str, segment_id, chunk_id));
+                    metas.emplace_back(std::make_unique<ChunkIndexMetaKey>(db_id_str, table_id_str, index_id_str, segment_id, chunk_id));
                 }
             }
 
@@ -5174,12 +5172,12 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
 
             // Clean up the copied files from snapshot
             Config *config = InfinityContext::instance().config();
-            String data_dir = config->DataDir();
+            std::string data_dir = config->DataDir();
 
             // Remove all the files that were copied during restore
             for (const auto &segment_info : restore_table_txn_store->segment_infos_) {
                 // Remove segment files
-                String segment_dir = fmt::format("{}/db_{}/tbl_{}/seg_{}",
+                std::string segment_dir = fmt::format("{}/db_{}/tbl_{}/seg_{}",
                                                  data_dir,
                                                  restore_table_txn_store->db_id_str_,
                                                  restore_table_txn_store->table_id_str_,
@@ -5195,7 +5193,7 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
 
             // Remove index files
             for (const auto &index_cmd : restore_table_txn_store->index_cmds_) {
-                String index_dir = fmt::format("{}/db_{}/tbl_{}/idx_{}",
+                std::string index_dir = fmt::format("{}/db_{}/tbl_{}/idx_{}",
                                                data_dir,
                                                restore_table_txn_store->db_id_str_,
                                                restore_table_txn_store->table_id_str_,
@@ -5210,7 +5208,7 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
             }
 
             // Remove the table directory if it's empty
-            String table_dir = fmt::format("{}/db_{}/tbl_{}", data_dir, restore_table_txn_store->db_id_str_, restore_table_txn_store->table_id_str_);
+            std::string table_dir = fmt::format("{}/db_{}/tbl_{}", data_dir, restore_table_txn_store->db_id_str_, restore_table_txn_store->table_id_str_);
 
             if (VirtualStore::Exists(table_dir)) {
                 Status remove_status = VirtualStore::RemoveDirectory(table_dir);
@@ -5220,18 +5218,18 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
             }
 
             // // Clean up metadata entries that were created
-            // Vector<UniquePtr<MetaKey>> metas;
+            // std::vector<std::unique_ptr<MetaKey>> metas;
             // for (const auto &segment_info : restore_table_txn_store->segment_infos_) {
-            //     metas.emplace_back(MakeUnique<SegmentMetaKey>(restore_table_txn_store->db_id_str_,
+            //     metas.emplace_back(std::make_unique<SegmentMetaKey>(restore_table_txn_store->db_id_str_,
             //                                                   restore_table_txn_store->table_id_str_,
             //                                                   segment_info.segment_id_));
             //     for (const auto &block_id : segment_info.block_ids_) {
-            //     metas.emplace_back(MakeUnique<BlockMetaKey>(restore_table_txn_store->db_id_str_,
+            //     metas.emplace_back(std::make_unique<BlockMetaKey>(restore_table_txn_store->db_id_str_,
             //                                                 restore_table_txn_store->table_id_str_,
             //                                                 segment_info.segment_id_,
             //                                                 block_id));
             //         for (const auto &column_def : restore_table_txn_store->table_def_->columns()) {
-            //             metas.emplace_back(MakeUnique<ColumnMetaKey>(restore_table_txn_store->db_id_str_,
+            //             metas.emplace_back(std::make_unique<ColumnMetaKey>(restore_table_txn_store->db_id_str_,
             //                                                         restore_table_txn_store->table_id_str_,
             //                                                         segment_info.segment_id_,
             //                                                         block_id,
@@ -5244,12 +5242,12 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
             // for (const auto &index_cmd : restore_table_txn_store->index_cmds_) {
 
             //     for (const auto &segment_index_info : index_cmd.segment_index_infos_) {
-            //         metas.emplace_back(MakeUnique<SegmentIndexMetaKey>(restore_table_txn_store->db_id_str_,
+            //         metas.emplace_back(std::make_unique<SegmentIndexMetaKey>(restore_table_txn_store->db_id_str_,
             //                                                            restore_table_txn_store->table_id_str_,
             //                                                            index_cmd.index_id_,
             //                                                            segment_index_info.segment_id_));
             //         for (const auto &chunk_info : segment_index_info.chunk_infos_) {
-            //         metas.emplace_back(MakeUnique<ChunkIndexMetaKey>(restore_table_txn_store->db_id_str_,
+            //         metas.emplace_back(std::make_unique<ChunkIndexMetaKey>(restore_table_txn_store->db_id_str_,
             //                                                             restore_table_txn_store->table_id_str_,
             //                                                             index_cmd.index_id_,
             //                                                             segment_index_info.segment_id_,
@@ -5267,10 +5265,10 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
         }
         case TransactionType::kRestoreDatabase: {
             Config *config = InfinityContext::instance().config();
-            String data_dir = config->DataDir();
+            std::string data_dir = config->DataDir();
             RestoreDatabaseTxnStore *restore_database_txn_store = static_cast<RestoreDatabaseTxnStore *>(base_txn_store_.get());
             // Remove the database directory
-            String db_dir = fmt::format("{}/db_{}", data_dir, restore_database_txn_store->db_id_str_);
+            std::string db_dir = fmt::format("{}/db_{}", data_dir, restore_database_txn_store->db_id_str_);
 
             if (VirtualStore::Exists(db_dir)) {
                 Status remove_status = VirtualStore::RemoveDirectory(db_dir);
@@ -5343,8 +5341,8 @@ Status NewTxn::Cleanup() {
 
     LOG_INFO(fmt::format("Cleaning ts < {} dropped entities...", visible_ts));
 
-    Vector<String> dropped_keys;
-    Vector<UniquePtr<MetaKey>> metas;
+    std::vector<std::string> dropped_keys;
+    std::vector<std::unique_ptr<MetaKey>> metas;
     Status status = new_catalog_->GetCleanedMeta(visible_ts, kv_instance, metas, dropped_keys);
     if (!status.ok()) {
         return status;
@@ -5376,7 +5374,7 @@ Status NewTxn::Cleanup() {
         return Status::UnexpectedError("txn store is not null");
     }
 
-    base_txn_store_ = MakeShared<CleanupTxnStore>();
+    base_txn_store_ = std::make_shared<CleanupTxnStore>();
     CleanupTxnStore *txn_store = static_cast<CleanupTxnStore *>(base_txn_store_.get());
     txn_store->timestamp_ = begin_ts;
 
@@ -5385,7 +5383,7 @@ Status NewTxn::Cleanup() {
 
 Status NewTxn::ReplayCleanup(WalCmdCleanup *cleanup_cmd, TxnTimeStamp commit_ts, i64 txn_id) { return Status::OK(); }
 
-Status NewTxn::CleanupInner(const Vector<UniquePtr<MetaKey>> &metas) {
+Status NewTxn::CleanupInner(const std::vector<std::unique_ptr<MetaKey>> &metas) {
     KVInstance *kv_instance = kv_instance_.get();
     TxnTimeStamp begin_ts = BeginTS();
     BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
@@ -5394,7 +5392,7 @@ Status NewTxn::CleanupInner(const Vector<UniquePtr<MetaKey>> &metas) {
         switch (meta->type_) {
             case MetaType::kDB: {
                 auto *db_meta_key = static_cast<DBMetaKey *>(meta.get());
-                String db_key = KeyEncode::CatalogDbKey(db_meta_key->db_name_, db_meta_key->commit_ts_);
+                std::string db_key = KeyEncode::CatalogDbKey(db_meta_key->db_name_, db_meta_key->commit_ts_);
                 Status status = kv_instance->Delete(db_key);
                 if (!status.ok()) {
                     return status;
@@ -5410,7 +5408,7 @@ Status NewTxn::CleanupInner(const Vector<UniquePtr<MetaKey>> &metas) {
             }
             case MetaType::kTable: {
                 auto *table_meta_key = static_cast<TableMetaKey *>(meta.get());
-                String table_key = KeyEncode::CatalogTableKey(table_meta_key->db_id_str_, table_meta_key->table_name_, table_meta_key->commit_ts_);
+                std::string table_key = KeyEncode::CatalogTableKey(table_meta_key->db_id_str_, table_meta_key->table_name_, table_meta_key->commit_ts_);
                 Status status = kv_instance->Delete(table_key);
                 if (!status.ok()) {
                     return status;
@@ -5425,7 +5423,7 @@ Status NewTxn::CleanupInner(const Vector<UniquePtr<MetaKey>> &metas) {
             }
             case MetaType::kTableName: {
                 auto *table_meta_key = static_cast<TableMetaKey *>(meta.get());
-                String table_key = KeyEncode::CatalogTableKey(table_meta_key->db_id_str_, table_meta_key->table_name_, table_meta_key->commit_ts_);
+                std::string table_key = KeyEncode::CatalogTableKey(table_meta_key->db_id_str_, table_meta_key->table_name_, table_meta_key->commit_ts_);
                 Status status = kv_instance->Delete(table_key);
                 if (!status.ok()) {
                     return status;
@@ -5460,7 +5458,7 @@ Status NewTxn::CleanupInner(const Vector<UniquePtr<MetaKey>> &metas) {
             }
             case MetaType::kTableColumn: {
                 auto *table_column_meta_key = static_cast<TableColumnMetaKey *>(meta.get());
-                String column_key = KeyEncode::TableColumnKey(table_column_meta_key->db_id_str_,
+                std::string column_key = KeyEncode::TableColumnKey(table_column_meta_key->db_id_str_,
                                                               table_column_meta_key->table_id_str_,
                                                               table_column_meta_key->column_name_,
                                                               table_column_meta_key->commit_ts_);
@@ -5484,7 +5482,7 @@ Status NewTxn::CleanupInner(const Vector<UniquePtr<MetaKey>> &metas) {
             }
             case MetaType::kTableIndex: {
                 auto *table_index_meta_key = static_cast<TableIndexMetaKey *>(meta.get());
-                String index_key = KeyEncode::CatalogIndexKey(table_index_meta_key->db_id_str_,
+                std::string index_key = KeyEncode::CatalogIndexKey(table_index_meta_key->db_id_str_,
                                                               table_index_meta_key->table_id_str_,
                                                               table_index_meta_key->index_name_,
                                                               table_index_meta_key->commit_ts_);
@@ -5549,7 +5547,7 @@ Status NewTxn::CleanupInner(const Vector<UniquePtr<MetaKey>> &metas) {
 
 bool NewTxn::IsReplay() const { return txn_context_ptr_->txn_type_ == TransactionType::kReplay; }
 
-Status NewTxn::ReplayWalCmd(const SharedPtr<WalCmd> &command, TxnTimeStamp commit_ts, i64 txn_id) {
+Status NewTxn::ReplayWalCmd(const std::shared_ptr<WalCmd> &command, TxnTimeStamp commit_ts, i64 txn_id) {
     WalCommandType command_type = command->GetType();
     switch (command_type) {
         case WalCommandType::DUMMY: {
@@ -5634,9 +5632,9 @@ Status NewTxn::ReplayWalCmd(const SharedPtr<WalCmd> &command, TxnTimeStamp commi
         case WalCommandType::APPEND_V2: {
             auto *append_cmd = static_cast<WalCmdAppendV2 *>(command.get());
 
-            Optional<DBMeeta> db_meta;
-            Optional<TableMeeta> table_meta;
-            String table_key;
+            std::optional<DBMeeta> db_meta;
+            std::optional<TableMeeta> table_meta;
+            std::string table_key;
             Status status = GetTableMeta(append_cmd->db_name_, append_cmd->table_name_, db_meta, table_meta, &table_key);
             if (!status.ok()) {
                 return status;
@@ -5720,8 +5718,8 @@ Status NewTxn::ReplayWalCmd(const SharedPtr<WalCmd> &command, TxnTimeStamp commi
     return Status::OK();
 }
 
-Status NewTxn::GetDBFilePaths(const String &db_name, Vector<String> &file_paths) {
-    Optional<DBMeeta> db_meta;
+Status NewTxn::GetDBFilePaths(const std::string &db_name, std::vector<std::string> &file_paths) {
+    std::optional<DBMeeta> db_meta;
     TxnTimeStamp db_create_ts;
     Status status = GetDBMeta(db_name, db_meta, db_create_ts);
     if (!status.ok()) {
@@ -5732,9 +5730,9 @@ Status NewTxn::GetDBFilePaths(const String &db_name, Vector<String> &file_paths)
     return NewCatalog::GetDBFilePaths(begin_ts, commit_ts, *db_meta, file_paths);
 }
 
-Status NewTxn::GetTableFilePaths(const String &db_name, const String &table_name, Vector<String> &file_paths) {
-    Optional<DBMeeta> db_meta;
-    Optional<TableMeeta> table_meta;
+Status NewTxn::GetTableFilePaths(const std::string &db_name, const std::string &table_name, std::vector<std::string> &file_paths) {
+    std::optional<DBMeeta> db_meta;
+    std::optional<TableMeeta> table_meta;
     Status status = this->GetTableMeta(db_name, table_name, db_meta, table_meta);
     if (!status.ok()) {
         return status;
@@ -5743,9 +5741,9 @@ Status NewTxn::GetTableFilePaths(const String &db_name, const String &table_name
     return NewCatalog::GetTableFilePaths(begin_ts, *table_meta, file_paths);
 }
 
-Status NewTxn::GetSegmentFilePaths(const String &db_name, const String &table_name, SegmentID segment_id, Vector<String> &file_paths) {
-    Optional<DBMeeta> db_meta;
-    Optional<TableMeeta> table_meta;
+Status NewTxn::GetSegmentFilePaths(const std::string &db_name, const std::string &table_name, SegmentID segment_id, std::vector<std::string> &file_paths) {
+    std::optional<DBMeeta> db_meta;
+    std::optional<TableMeeta> table_meta;
     Status status = this->GetTableMeta(db_name, table_name, db_meta, table_meta);
     if (!status.ok()) {
         return status;
@@ -5756,9 +5754,9 @@ Status NewTxn::GetSegmentFilePaths(const String &db_name, const String &table_na
 }
 
 Status
-NewTxn::GetBlockFilePaths(const String &db_name, const String &table_name, SegmentID segment_id, BlockID block_id, Vector<String> &file_paths) {
-    Optional<DBMeeta> db_meta;
-    Optional<TableMeeta> table_meta;
+NewTxn::GetBlockFilePaths(const std::string &db_name, const std::string &table_name, SegmentID segment_id, BlockID block_id, std::vector<std::string> &file_paths) {
+    std::optional<DBMeeta> db_meta;
+    std::optional<TableMeeta> table_meta;
     Status status = this->GetTableMeta(db_name, table_name, db_meta, table_meta);
     if (!status.ok()) {
         return status;
@@ -5768,14 +5766,14 @@ NewTxn::GetBlockFilePaths(const String &db_name, const String &table_name, Segme
     return NewCatalog::GetBlockFilePaths(block_meta, file_paths);
 }
 
-Status NewTxn::GetBlockColumnFilePaths(const String &db_name,
-                                       const String &table_name,
+Status NewTxn::GetBlockColumnFilePaths(const std::string &db_name,
+                                       const std::string &table_name,
                                        SegmentID segment_id,
                                        BlockID block_id,
                                        ColumnID column_id,
-                                       Vector<String> &file_paths) {
-    Optional<DBMeeta> db_meta;
-    Optional<TableMeeta> table_meta;
+                                       std::vector<std::string> &file_paths) {
+    std::optional<DBMeeta> db_meta;
+    std::optional<TableMeeta> table_meta;
     Status status = this->GetTableMeta(db_name, table_name, db_meta, table_meta);
     if (!status.ok()) {
         return status;
@@ -5786,14 +5784,14 @@ Status NewTxn::GetBlockColumnFilePaths(const String &db_name,
     return NewCatalog::GetBlockColumnFilePaths(column_meta, file_paths);
 }
 
-Status NewTxn::GetColumnFilePaths(const String &db_name, const String &table_name, const String &column_name, Vector<String> &file_paths) {
-    Optional<DBMeeta> db_meta;
-    Optional<TableMeeta> table_meta;
+Status NewTxn::GetColumnFilePaths(const std::string &db_name, const std::string &table_name, const std::string &column_name, std::vector<std::string> &file_paths) {
+    std::optional<DBMeeta> db_meta;
+    std::optional<TableMeeta> table_meta;
     Status status = this->GetTableMeta(db_name, table_name, db_meta, table_meta);
     if (!status.ok()) {
         return status;
     }
-    SharedPtr<ColumnDef> column_def;
+    std::shared_ptr<ColumnDef> column_def;
     {
         auto [column_defs, col_status] = table_meta->GetColumnDefs();
         if (!col_status.ok()) {
@@ -5813,12 +5811,12 @@ Status NewTxn::GetColumnFilePaths(const String &db_name, const String &table_nam
     return NewCatalog::GetColumnFilePaths(begin_ts, *table_meta, column_def, file_paths);
 }
 
-Status NewTxn::GetTableIndexFilePaths(const String &db_name, const String &table_name, const String &index_name, Vector<String> &file_paths) {
-    Optional<DBMeeta> db_meta;
-    Optional<TableMeeta> table_meta;
-    Optional<TableIndexMeeta> table_index_meta;
-    String table_key;
-    String index_key;
+Status NewTxn::GetTableIndexFilePaths(const std::string &db_name, const std::string &table_name, const std::string &index_name, std::vector<std::string> &file_paths) {
+    std::optional<DBMeeta> db_meta;
+    std::optional<TableMeeta> table_meta;
+    std::optional<TableIndexMeeta> table_index_meta;
+    std::string table_key;
+    std::string index_key;
     Status status = this->GetTableIndexMeta(db_name, table_name, index_name, db_meta, table_meta, table_index_meta, &table_key, &index_key);
     if (!status.ok()) {
         return status;
@@ -5826,16 +5824,16 @@ Status NewTxn::GetTableIndexFilePaths(const String &db_name, const String &table
     return NewCatalog::GetTableIndexFilePaths(*table_index_meta, file_paths);
 }
 
-Status NewTxn::GetSegmentIndexFilepaths(const String &db_name,
-                                        const String &table_name,
-                                        const String &index_name,
+Status NewTxn::GetSegmentIndexFilepaths(const std::string &db_name,
+                                        const std::string &table_name,
+                                        const std::string &index_name,
                                         SegmentID segment_id,
-                                        Vector<String> &file_paths) {
-    Optional<DBMeeta> db_meta;
-    Optional<TableMeeta> table_meta;
-    Optional<TableIndexMeeta> table_index_meta;
-    String table_key;
-    String index_key;
+                                        std::vector<std::string> &file_paths) {
+    std::optional<DBMeeta> db_meta;
+    std::optional<TableMeeta> table_meta;
+    std::optional<TableIndexMeeta> table_index_meta;
+    std::string table_key;
+    std::string index_key;
     Status status = this->GetTableIndexMeta(db_name, table_name, index_name, db_meta, table_meta, table_index_meta, &table_key, &index_key);
     if (!status.ok()) {
         return status;
@@ -5844,17 +5842,17 @@ Status NewTxn::GetSegmentIndexFilepaths(const String &db_name,
     return NewCatalog::GetSegmentIndexFilepaths(segment_index_meta, file_paths);
 }
 
-Status NewTxn::GetChunkIndexFilePaths(const String &db_name,
-                                      const String &table_name,
-                                      const String &index_name,
+Status NewTxn::GetChunkIndexFilePaths(const std::string &db_name,
+                                      const std::string &table_name,
+                                      const std::string &index_name,
                                       SegmentID segment_id,
                                       ChunkID chunk_id,
-                                      Vector<String> &file_paths) {
-    Optional<DBMeeta> db_meta;
-    Optional<TableMeeta> table_meta;
-    Optional<TableIndexMeeta> table_index_meta;
-    String table_key;
-    String index_key;
+                                      std::vector<std::string> &file_paths) {
+    std::optional<DBMeeta> db_meta;
+    std::optional<TableMeeta> table_meta;
+    std::optional<TableIndexMeeta> table_index_meta;
+    std::string table_key;
+    std::string index_key;
     Status status = this->GetTableIndexMeta(db_name, table_name, index_name, db_meta, table_meta, table_index_meta, &table_key, &index_key);
     if (!status.ok()) {
         return status;
@@ -5865,7 +5863,7 @@ Status NewTxn::GetChunkIndexFilePaths(const String &db_name,
 }
 
 Status NewTxn::Dummy() {
-    base_txn_store_ = MakeShared<DummyTxnStore>();
+    base_txn_store_ = std::make_shared<DummyTxnStore>();
     return Status::OK();
 }
 
@@ -5888,7 +5886,7 @@ void NewTxn::WaitForCompletion() {
     finished_cv_.wait(lock, [this] { return finished_; });
 }
 
-String NewTxn::GetTableIdStr() {
+std::string NewTxn::GetTableIdStr() {
     for (auto &command : wal_entry_->cmds_) {
         WalCommandType command_type = command->GetType();
         switch (command_type) {
@@ -5952,17 +5950,17 @@ String NewTxn::GetTableIdStr() {
     return "";
 }
 
-void NewTxn::AddSemaphore(UniquePtr<std::binary_semaphore> sema) { semas_.push_back(std::move(sema)); }
+void NewTxn::AddSemaphore(std::unique_ptr<std::binary_semaphore> sema) { semas_.push_back(std::move(sema)); }
 
-const Vector<UniquePtr<std::binary_semaphore>> &NewTxn::semas() const { return semas_; }
+const std::vector<std::unique_ptr<std::binary_semaphore>> &NewTxn::semas() const { return semas_; }
 
-Status NewTxn::ProcessSnapshotRestorationData(const String &db_name,
-                                              const String &db_id_str,
-                                              const String &table_name,
-                                              const String &table_id_str,
-                                              const SharedPtr<TableDef> &table_def,
-                                              const SharedPtr<TableSnapshotInfo> &table_snapshot_info,
-                                              const String &snapshot_name,
+Status NewTxn::ProcessSnapshotRestorationData(const std::string &db_name,
+                                              const std::string &db_id_str,
+                                              const std::string &table_name,
+                                              const std::string &table_id_str,
+                                              const std::shared_ptr<TableDef> &table_def,
+                                              const std::shared_ptr<TableSnapshotInfo> &table_snapshot_info,
+                                              const std::string &snapshot_name,
                                               RestoreTableTxnStore *txn_store) {
     // Set basic transaction store fields
     txn_store->db_name_ = db_name;
@@ -5986,7 +5984,7 @@ Status NewTxn::ProcessSnapshotRestorationData(const String &db_name,
 
     // Process index information
     for (const auto &index_snapshot : table_snapshot_info->table_index_snapshots_) {
-        String table_key = KeyEncode::CatalogTableKey(txn_store->db_id_str_, txn_store->table_name_, this->CommitTS());
+        std::string table_key = KeyEncode::CatalogTableKey(txn_store->db_id_str_, txn_store->table_name_, this->CommitTS());
         WalCmdCreateIndexV2 wal_index_cmd{txn_store->db_name_,
                                           txn_store->db_id_str_,
                                           txn_store->table_name_,
@@ -6014,11 +6012,11 @@ Status NewTxn::ProcessSnapshotRestorationData(const String &db_name,
 }
 
 Status NewTxn::ReplayRestoreTableSnapshot(WalCmdRestoreTableSnapshot *restore_table_cmd, TxnTimeStamp commit_ts, i64 txn_id) {
-    const String &db_name = restore_table_cmd->db_name_;
+    const std::string &db_name = restore_table_cmd->db_name_;
 
     // Check if the table already exists
-    String table_key = KeyEncode::CatalogTableKey(restore_table_cmd->db_id_, *restore_table_cmd->table_def_->table_name(), commit_ts);
-    String table_id;
+    std::string table_key = KeyEncode::CatalogTableKey(restore_table_cmd->db_id_, *restore_table_cmd->table_def_->table_name(), commit_ts);
+    std::string table_id;
     Status status = kv_instance_->Get(table_key, table_id);
     bool is_link_files = false;
     if (status.ok()) {
@@ -6045,17 +6043,17 @@ Status NewTxn::ReplayRestoreTableSnapshot(WalCmdRestoreTableSnapshot *restore_ta
     PersistenceManager *persistence_manager = InfinityContext::instance().persistence_manager();
     if (persistence_manager != nullptr) {
         restore_table_cmd->addr_serializer_.AddToPersistenceManager(persistence_manager);
-        HashMap<String, ObjAddr> all_files = persistence_manager->GetAllFiles();
+        std::unordered_map<std::string, ObjAddr> all_files = persistence_manager->GetAllFiles();
         LOG_DEBUG(fmt::format("Persistence manager has {} registered files during restore replay, commit ts: {}, txn: {}",
                               all_files.size(),
                               commit_ts,
                               txn_id));
 
         // Check if any files from this table are registered
-        String table_prefix = "db_" + restore_table_cmd->db_id_ + "/tbl_" + restore_table_cmd->table_id_;
-        SizeT table_file_count = 0;
+        std::string table_prefix = "db_" + restore_table_cmd->db_id_ + "/tbl_" + restore_table_cmd->table_id_;
+        size_t table_file_count = 0;
         for (const auto &[file_path, obj_addr] : all_files) {
-            if (file_path.find(table_prefix) != String::npos) {
+            if (file_path.find(table_prefix) != std::string::npos) {
                 table_file_count++;
                 LOG_DEBUG(fmt::format("Found registered table file: {} -> obj_addr: ({}, {}, {})",
                                       file_path,
@@ -6066,8 +6064,8 @@ Status NewTxn::ReplayRestoreTableSnapshot(WalCmdRestoreTableSnapshot *restore_ta
         }
         LOG_DEBUG(fmt::format("Table {} has {} files registered in persistence manager", restore_table_cmd->table_id_, table_file_count));
     } else { // check if the data still exist in the system
-        String data_dir = InfinityContext::instance().config()->DataDir();
-        String table_data_dir = VirtualStore::ConcatenatePath(VirtualStore::ConcatenatePath(data_dir, "db_" + restore_table_cmd->db_id_),
+        std::string data_dir = InfinityContext::instance().config()->DataDir();
+        std::string table_data_dir = VirtualStore::ConcatenatePath(VirtualStore::ConcatenatePath(data_dir, "db_" + restore_table_cmd->db_id_),
                                                               "tbl_" + restore_table_cmd->table_id_);
         if (!VirtualStore::Exists(table_data_dir)) {
             LOG_ERROR(fmt::format("Table data directory {} does not exist, commit ts: {}, txn: {}.", table_data_dir, commit_ts, txn_id));
@@ -6076,7 +6074,7 @@ Status NewTxn::ReplayRestoreTableSnapshot(WalCmdRestoreTableSnapshot *restore_ta
     }
 
     // if exist proceed
-    Optional<DBMeeta> db_meta;
+    std::optional<DBMeeta> db_meta;
     TxnTimeStamp db_create_ts;
     status = GetDBMeta(db_name, db_meta, db_create_ts);
     if (!status.ok()) {
@@ -6084,8 +6082,8 @@ Status NewTxn::ReplayRestoreTableSnapshot(WalCmdRestoreTableSnapshot *restore_ta
     }
 
     // Get next table id of the db
-    String next_table_id_key = KeyEncode::CatalogDbTagKey(restore_table_cmd->db_id_, NEXT_TABLE_ID.data());
-    String next_table_id_str;
+    std::string next_table_id_key = KeyEncode::CatalogDbTagKey(restore_table_cmd->db_id_, NEXT_TABLE_ID.data());
+    std::string next_table_id_str;
     status = kv_instance_->Get(next_table_id_key, next_table_id_str);
     if (!status.ok()) {
         return status;
@@ -6094,7 +6092,7 @@ Status NewTxn::ReplayRestoreTableSnapshot(WalCmdRestoreTableSnapshot *restore_ta
     u64 this_table_id = std::stoull(restore_table_cmd->table_id_);
     if (this_table_id + 1 > next_table_id) {
         // Update the next table id
-        String new_next_table_id_str = std::to_string(this_table_id + 1);
+        std::string new_next_table_id_str = std::to_string(this_table_id + 1);
         status = kv_instance_->Put(next_table_id_key, new_next_table_id_str);
         if (!status.ok()) {
             return status;
@@ -6108,15 +6106,15 @@ Status NewTxn::ReplayRestoreTableSnapshot(WalCmdRestoreTableSnapshot *restore_ta
         return status;
     }
 
-    // String snapshot_dir = InfinityContext::instance().config()->SnapshotDir();
-    // String snapshot_name = restore_table_cmd->snapshot_name_;
-    // SharedPtr<TableSnapshotInfo> table_snapshot;
+    // std::string snapshot_dir = InfinityContext::instance().config()->SnapshotDir();
+    // std::string snapshot_name = restore_table_cmd->snapshot_name_;
+    // std::shared_ptr<TableSnapshotInfo> table_snapshot;
     // std::tie(table_snapshot, status) = TableSnapshotInfo::Deserialize(snapshot_dir, snapshot_name);
     // if (!status.ok()) {
     //     return status;
     // }
 
-    // Vector<String> files_to_restore = table_snapshot->GetFiles();
+    // std::vector<std::string> files_to_restore = table_snapshot->GetFiles();
     // status = table_snapshot->RestoreSnapshotFiles(snapshot_dir, snapshot_name, files_to_restore, restore_table_cmd->table_id_);
     // if (!status.ok()) {
     //     return status;
@@ -6130,15 +6128,15 @@ Status NewTxn::CommitBottomCreateTableSnapshot(WalCmdCreateTableSnapshot *create
     ManualDumpIndex(create_table_snapshot_cmd->db_name_, create_table_snapshot_cmd->table_name_);
 
     // create a new snapshot
-    Optional<DBMeeta> db_meta;
-    Optional<TableMeeta> table_meta;
+    std::optional<DBMeeta> db_meta;
+    std::optional<TableMeeta> table_meta;
     Status status = GetTableMeta(create_table_snapshot_cmd->db_name_, create_table_snapshot_cmd->table_name_, db_meta, table_meta);
     if (!status.ok()) {
         return status;
     }
     table_meta->SetBeginTS(txn_context_ptr_->commit_ts_);
 
-    SharedPtr<TableSnapshotInfo> table_snapshot_info;
+    std::shared_ptr<TableSnapshotInfo> table_snapshot_info;
     std::tie(table_snapshot_info, status) =
         table_meta->MapMetaToSnapShotInfo(create_table_snapshot_cmd->db_name_, create_table_snapshot_cmd->table_name_);
     if (!status.ok()) {
@@ -6146,7 +6144,7 @@ Status NewTxn::CommitBottomCreateTableSnapshot(WalCmdCreateTableSnapshot *create
     }
     table_snapshot_info->snapshot_name_ = create_table_snapshot_cmd->snapshot_name_;
 
-    String snapshot_dir = InfinityContext::instance().config()->SnapshotDir();
+    std::string snapshot_dir = InfinityContext::instance().config()->SnapshotDir();
     status = table_snapshot_info->Serialize(snapshot_dir, this->TxnID());
     if (!status.ok()) {
         return status;
@@ -6185,14 +6183,14 @@ Status NewTxn::CheckpointforSnapshot(TxnTimeStamp last_ckp_ts, CheckpointTxnStor
     }
     DeferFn defer([&] { wal_manager->UnsetCheckpoint(); });
 
-    Vector<String> *db_id_strs_ptr;
+    std::vector<std::string> *db_id_strs_ptr;
     CatalogMeta catalog_meta(this);
     status = catalog_meta.GetDBIDs(db_id_strs_ptr);
     if (!status.ok()) {
         return status;
     }
 
-    for (const String &db_id_str : *db_id_strs_ptr) {
+    for (const std::string &db_id_str : *db_id_strs_ptr) {
         DBMeeta db_meta(db_id_str, this);
         status = this->CheckpointDB(db_meta, option, txn_store);
         if (!status.ok()) {

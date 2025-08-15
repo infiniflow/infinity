@@ -12,11 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:logical_explain;
 
-import :stl;
 import :logical_node_type;
 import :column_binding;
 import :logical_node;
@@ -31,25 +28,25 @@ export class LogicalExplain : public LogicalNode {
 public:
     explicit LogicalExplain(u64 node_id, ExplainType type) : LogicalNode(node_id, LogicalNodeType::kExplain), explain_type_(type) {}
 
-    [[nodiscard]] Vector<ColumnBinding> GetColumnBindings() const final;
+    [[nodiscard]] std::vector<ColumnBinding> GetColumnBindings() const final;
 
-    [[nodiscard]] SharedPtr<Vector<String>> GetOutputNames() const final;
+    [[nodiscard]] std::shared_ptr<std::vector<std::string>> GetOutputNames() const final;
 
-    [[nodiscard]] SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const final;
+    [[nodiscard]] std::shared_ptr<std::vector<std::shared_ptr<DataType>>> GetOutputTypes() const final;
 
-    String ToString(i64 &space) const final;
+    std::string ToString(i64 &space) const final;
 
-    inline String name() final { return "LogicalExplain"; }
+    inline std::string name() final { return "LogicalExplain"; }
 
     [[nodiscard]] inline ExplainType explain_type() const { return explain_type_; }
 
-    inline void SetText(const SharedPtr<Vector<SharedPtr<String>>> &texts) { texts_ = texts; }
+    inline void SetText(const std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &texts) { texts_ = texts; }
 
-    [[nodiscard]] inline const SharedPtr<Vector<SharedPtr<String>>> &TextArray() const { return texts_; }
+    [[nodiscard]] inline const std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &TextArray() const { return texts_; }
 
 private:
     ExplainType explain_type_{ExplainType::kPhysical};
-    SharedPtr<Vector<SharedPtr<String>>> texts_{nullptr};
+    std::shared_ptr<std::vector<std::shared_ptr<std::string>>> texts_{nullptr};
 };
 
 } // namespace infinity

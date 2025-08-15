@@ -25,11 +25,11 @@ import std;
 
 namespace infinity {
 
-InExpression::InExpression(InType in_type, SharedPtr<BaseExpression> left_operand, Vector<SharedPtr<BaseExpression>> arguments)
+InExpression::InExpression(InType in_type, std::shared_ptr<BaseExpression> left_operand, std::vector<std::shared_ptr<BaseExpression>> arguments)
     : BaseExpression(ExpressionType::kIn, arguments), left_operand_ptr_(std::move(left_operand)), in_type_(in_type),
       set_(left_operand_ptr_->Type().type()) {}
 
-String InExpression::ToString() const {
+std::string InExpression::ToString() const {
 
     std::stringstream op;
 
@@ -86,7 +86,7 @@ bool InExpression::Eq(const BaseExpression &other_base) const {
     if (arguments_.size() != other.arguments_.size()) {
         return false;
     }
-    for (SizeT i = 0; i < arguments_.size(); ++i) {
+    for (size_t i = 0; i < arguments_.size(); ++i) {
         if (!arguments_[i]->Eq(*other.arguments_[i])) {
             return false;
         }

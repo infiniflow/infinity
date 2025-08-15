@@ -75,7 +75,7 @@ inline BoundCastFunc BindDecimalCast(const DataType &source, DataType &target) {
 struct DecimalTryCastToFixlen {
     template <typename SourceType, typename TargetType>
     static inline bool Run(SourceType, TargetType &) {
-        String error_message =
+        std::string error_message =
             fmt::format("Not support to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>());
         UnrecoverableError(error_message);
         return false;
@@ -84,8 +84,8 @@ struct DecimalTryCastToFixlen {
 
 struct DecimalTryCastToVarlen {
     template <typename SourceType, typename TargetType>
-    static inline bool Run(SourceType, TargetType &, const SharedPtr<ColumnVector> &) {
-        String error_message =
+    static inline bool Run(SourceType, TargetType &, const std::shared_ptr<ColumnVector> &) {
+        std::string error_message =
             fmt::format("Not support to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>());
         UnrecoverableError(error_message);
         return false;
@@ -136,7 +136,7 @@ inline bool DecimalTryCastToFixlen::Run(DecimalT, DoubleT &) {
 }
 
 template <>
-inline bool DecimalTryCastToVarlen::Run(DecimalT, VarcharT &, const SharedPtr<ColumnVector> &) {
+inline bool DecimalTryCastToVarlen::Run(DecimalT, VarcharT &, const std::shared_ptr<ColumnVector> &) {
     UnrecoverableError("Not implement: DecimalTryCastToFixlen::Run");
     return false;
 }

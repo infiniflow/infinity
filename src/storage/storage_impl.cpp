@@ -82,7 +82,7 @@ Status Storage::InitToAdmin() {
             UnrecoverableError("WAL manager was initialized before.");
         }
 
-        wal_mgr_ = MakeUnique<WalManager>(this,
+        wal_mgr_ = std::make_unique<WalManager>(this,
                                           config_ptr_->WALDir(),
                                           config_ptr_->DataDir(),
                                           config_ptr_->WALCompactThreshold(),
@@ -113,7 +113,7 @@ Status Storage::InitToAdmin() {
                     object_storage_processor_->Stop();
                     object_storage_processor_.reset();
                 }
-                object_storage_processor_ = MakeUnique<ObjectStorageProcess>();
+                object_storage_processor_ = std::make_unique<ObjectStorageProcess>();
                 object_storage_processor_->Start();
                 break;
             }
@@ -122,13 +122,13 @@ Status Storage::InitToAdmin() {
             }
         }
         // Construct persistence store
-        String persistence_dir = config_ptr_->PersistenceDir();
+        std::string persistence_dir = config_ptr_->PersistenceDir();
         if (!persistence_dir.empty()) {
             if (persistence_manager_ != nullptr) {
                 persistence_manager_.reset();
             }
             i64 persistence_object_size_limit = config_ptr_->PersistenceObjectSizeLimit();
-            persistence_manager_ = MakeUnique<PersistenceManager>(persistence_dir, config_ptr_->DataDir(), (SizeT)persistence_object_size_limit);
+            persistence_manager_ = std::make_unique<PersistenceManager>(persistence_dir, config_ptr_->DataDir(), (size_t)persistence_object_size_limit);
         }
 
         current_storage_mode_ = StorageMode::kAdmin;
@@ -188,9 +188,9 @@ Status Storage::AdminToReader() {
     if (result_cache_manager_ != nullptr) {
         result_cache_manager_.reset();
     }
-    SizeT cache_result_num = config_ptr_->CacheResultNum();
+    size_t cache_result_num = config_ptr_->CacheResultNum();
     if (result_cache_manager_ == nullptr) {
-        result_cache_manager_ = MakeUnique<ResultCacheManager>(cache_result_num);
+        result_cache_manager_ = std::make_unique<ResultCacheManager>(cache_result_num);
     }
 
     // Construct buffer manager
@@ -198,9 +198,9 @@ Status Storage::AdminToReader() {
         buffer_mgr_->Stop();
         buffer_mgr_.reset();
     }
-    buffer_mgr_ = MakeUnique<BufferManager>(config_ptr_->BufferManagerSize(),
-                                            MakeShared<String>(config_ptr_->DataDir()),
-                                            MakeShared<String>(config_ptr_->TempDir()),
+    buffer_mgr_ = std::make_unique<BufferManager>(config_ptr_->BufferManagerSize(),
+                                            std::make_shared<std::string>(config_ptr_->DataDir()),
+                                            std::make_shared<std::string>(config_ptr_->TempDir()),
                                             persistence_manager_.get(),
                                             config_ptr_->LRUNum());
     buffer_mgr_->Start();
@@ -234,9 +234,9 @@ Status Storage::AdminToWriter() {
     if (result_cache_manager_ != nullptr) {
         result_cache_manager_.reset();
     }
-    SizeT cache_result_num = config_ptr_->CacheResultNum();
+    size_t cache_result_num = config_ptr_->CacheResultNum();
     if (result_cache_manager_ == nullptr) {
-        result_cache_manager_ = MakeUnique<ResultCacheManager>(cache_result_num);
+        result_cache_manager_ = std::make_unique<ResultCacheManager>(cache_result_num);
     }
 
     // Construct buffer manager
@@ -244,23 +244,23 @@ Status Storage::AdminToWriter() {
         buffer_mgr_->Stop();
         buffer_mgr_.reset();
     }
-    buffer_mgr_ = MakeUnique<BufferManager>(config_ptr_->BufferManagerSize(),
-                                            MakeShared<String>(config_ptr_->DataDir()),
-                                            MakeShared<String>(config_ptr_->TempDir()),
+    buffer_mgr_ = std::make_unique<BufferManager>(config_ptr_->BufferManagerSize(),
+                                            std::make_shared<std::string>(config_ptr_->DataDir()),
+                                            std::make_shared<std::string>(config_ptr_->TempDir()),
                                             persistence_manager_.get(),
                                             config_ptr_->LRUNum());
     buffer_mgr_->Start();
 
     // Must init catalog before txn manager.
     // Replay wal file wrap init catalog
-    kv_store_ = MakeUnique<KVStore>();
+    kv_store_ = std::make_unique<KVStore>();
     Status status = kv_store_->Init(config_ptr_->CatalogDir());
     if (!status.ok()) {
         return status;
     }
-    new_catalog_ = MakeUnique<NewCatalog>(kv_store_.get());
+    new_catalog_ = std::make_unique<NewCatalog>(kv_store_.get());
 
-    Vector<SharedPtr<WalEntry>> replay_entries;
+    std::vector<std::shared_ptr<WalEntry>> replay_entries;
     LOG_INFO("Read WAL files");
     auto [max_txn_id, system_start_ts, max_checkpoint_ts] = wal_mgr_->GetReplayEntries(StorageMode::kWritable, replay_entries);
     // Init database, need to create default_db
@@ -271,7 +271,7 @@ Status Storage::AdminToWriter() {
     if (new_txn_mgr_) {
         UnrecoverableError("New transaction manager was initialized before.");
     }
-    new_txn_mgr_ = MakeUnique<NewTxnManager>(this, kv_store_.get(), system_start_ts);
+    new_txn_mgr_ = std::make_unique<NewTxnManager>(this, kv_store_.get(), system_start_ts);
     new_txn_mgr_->Start();
 
     // start WalManager after TxnManager since it depends on TxnManager.
@@ -280,7 +280,7 @@ Status Storage::AdminToWriter() {
     if (mem_index_appender_ != nullptr) {
         UnrecoverableError("mem index appender was initialized before.");
     }
-    mem_index_appender_ = MakeUnique<MemIndexAppender>();
+    mem_index_appender_ = std::make_unique<MemIndexAppender>();
     mem_index_appender_->Start();
 
     // Replay wal
@@ -304,13 +304,13 @@ Status Storage::AdminToWriter() {
     if (memory_index_tracer_ != nullptr) {
         UnrecoverableError("Memory index tracer was initialized before.");
     }
-    memory_index_tracer_ = MakeUnique<BGMemIndexTracer>(config_ptr_->MemIndexMemoryQuota(), new_txn_mgr_.get());
+    memory_index_tracer_ = std::make_unique<BGMemIndexTracer>(config_ptr_->MemIndexMemoryQuota(), new_txn_mgr_.get());
     memory_index_tracer_->InitMemUsed();
 
     if (bg_processor_ != nullptr) {
         UnrecoverableError("Background processor was initialized before.");
     }
-    bg_processor_ = MakeUnique<BGTaskProcessor>();
+    bg_processor_ = std::make_unique<BGTaskProcessor>();
 
     i64 compact_interval = std::max(config_ptr_->CompactInterval(), {0});
     BuiltinFunctions builtin_functions(new_catalog_.get());
@@ -328,18 +328,18 @@ Status Storage::AdminToWriter() {
         UnrecoverableError("compact processor was initialized before.");
     }
 
-    compact_processor_ = MakeUnique<CompactionProcessor>();
+    compact_processor_ = std::make_unique<CompactionProcessor>();
     compact_processor_->Start();
 
     if (dump_index_processor_ != nullptr) {
         UnrecoverableError("dump index processor was initialized before.");
     }
-    dump_index_processor_ = MakeUnique<DumpIndexProcessor>();
+    dump_index_processor_ = std::make_unique<DumpIndexProcessor>();
     dump_index_processor_->Start();
 
     this->RecoverMemIndex();
 
-    auto *new_txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("checkpoint"), TransactionType::kNewCheckpoint);
+    auto *new_txn = new_txn_mgr_->BeginTxn(std::make_unique<std::string>("checkpoint"), TransactionType::kNewCheckpoint);
 
     status = new_txn->Checkpoint(wal_mgr_->LastCheckpointTS());
     if (!status.ok()) {
@@ -350,7 +350,7 @@ Status Storage::AdminToWriter() {
         UnrecoverableError("Failed to commit txn for checkpoint");
     }
 
-    UniquePtr<SystemCache> system_cache = new_catalog_->RestoreCatalogCache(this);
+    std::unique_ptr<SystemCache> system_cache = new_catalog_->RestoreCatalogCache(this);
     new_txn_mgr_->SetSystemCache(std::move(system_cache));
 
     if (system_start_ts == 0) {
@@ -360,18 +360,18 @@ Status Storage::AdminToWriter() {
     if (periodic_trigger_thread_ != nullptr) {
         UnrecoverableError("periodic trigger was initialized before.");
     }
-    periodic_trigger_thread_ = MakeUnique<PeriodicTriggerThread>();
+    periodic_trigger_thread_ = std::make_unique<PeriodicTriggerThread>();
 
     i64 cleanup_interval = config_ptr_->CleanupInterval() > 0 ? config_ptr_->CleanupInterval() : 0;
-    periodic_trigger_thread_->new_cleanup_trigger_ = MakeShared<NewCleanupPeriodicTrigger>(cleanup_interval);
+    periodic_trigger_thread_->new_cleanup_trigger_ = std::make_shared<NewCleanupPeriodicTrigger>(cleanup_interval);
 
     i64 optimize_interval = config_ptr_->OptimizeIndexInterval() > 0 ? config_ptr_->OptimizeIndexInterval() : 0;
-    periodic_trigger_thread_->optimize_index_trigger_ = MakeShared<OptimizeIndexPeriodicTrigger>(optimize_interval);
+    periodic_trigger_thread_->optimize_index_trigger_ = std::make_shared<OptimizeIndexPeriodicTrigger>(optimize_interval);
 
     i64 checkpoint_interval_sec = config_ptr_->CheckpointInterval() > 0 ? config_ptr_->CheckpointInterval() : 0;
-    periodic_trigger_thread_->checkpoint_trigger_ = MakeShared<CheckpointPeriodicTrigger>(checkpoint_interval_sec);
+    periodic_trigger_thread_->checkpoint_trigger_ = std::make_shared<CheckpointPeriodicTrigger>(checkpoint_interval_sec);
 
-    periodic_trigger_thread_->compact_segment_trigger_ = MakeShared<CompactSegmentPeriodicTrigger>(compact_interval);
+    periodic_trigger_thread_->compact_segment_trigger_ = std::make_shared<CompactSegmentPeriodicTrigger>(compact_interval);
 
     periodic_trigger_thread_->Start();
 
@@ -477,19 +477,19 @@ Status Storage::ReaderToWriter() {
         UnrecoverableError("compact processor was initialized before.");
     }
 
-    compact_processor_ = MakeUnique<CompactionProcessor>();
+    compact_processor_ = std::make_unique<CompactionProcessor>();
     compact_processor_->Start();
 
     if (dump_index_processor_ != nullptr) {
         UnrecoverableError("dump index processor was initialized before.");
     }
-    dump_index_processor_ = MakeUnique<DumpIndexProcessor>();
+    dump_index_processor_ = std::make_unique<DumpIndexProcessor>();
     dump_index_processor_->Start();
 
     if (mem_index_appender_ != nullptr) {
         UnrecoverableError("mem index appender was initialized before.");
     }
-    mem_index_appender_ = MakeUnique<MemIndexAppender>();
+    mem_index_appender_ = std::make_unique<MemIndexAppender>();
     mem_index_appender_->Start();
 
     periodic_trigger_thread_->Stop();
@@ -497,9 +497,9 @@ Status Storage::ReaderToWriter() {
     i64 optimize_interval = config_ptr_->OptimizeIndexInterval() > 0 ? config_ptr_->OptimizeIndexInterval() : 0;
     //                i64 cleanup_interval = config_ptr_->CleanupInterval() > 0 ? config_ptr_->CleanupInterval() : 0;
     i64 checkpoint_interval_sec = config_ptr_->CheckpointInterval() > 0 ? config_ptr_->CheckpointInterval() : 0;
-    periodic_trigger_thread_->checkpoint_trigger_ = MakeShared<CheckpointPeriodicTrigger>(checkpoint_interval_sec);
-    periodic_trigger_thread_->compact_segment_trigger_ = MakeShared<CompactSegmentPeriodicTrigger>(compact_interval, compact_processor_.get());
-    periodic_trigger_thread_->optimize_index_trigger_ = MakeShared<OptimizeIndexPeriodicTrigger>(optimize_interval, compact_processor_.get());
+    periodic_trigger_thread_->checkpoint_trigger_ = std::make_shared<CheckpointPeriodicTrigger>(checkpoint_interval_sec);
+    periodic_trigger_thread_->compact_segment_trigger_ = std::make_shared<CompactSegmentPeriodicTrigger>(compact_interval, compact_processor_.get());
+    periodic_trigger_thread_->optimize_index_trigger_ = std::make_shared<OptimizeIndexPeriodicTrigger>(optimize_interval, compact_processor_.get());
     periodic_trigger_thread_->Start();
 
     std::unique_lock<std::mutex> lock(mutex_);
@@ -558,7 +558,7 @@ Status Storage::WriterToAdmin() {
     }
 
     // wal_manager stop won't reset many member. We need to recreate the wal_manager object.
-    wal_mgr_ = MakeUnique<WalManager>(this,
+    wal_mgr_ = std::make_unique<WalManager>(this,
                                       config_ptr_->WALDir(),
                                       config_ptr_->DataDir(),
                                       config_ptr_->WALCompactThreshold(),
@@ -591,8 +591,8 @@ Status Storage::WriterToReader() {
 
     i64 cleanup_interval = config_ptr_->CleanupInterval() > 0 ? config_ptr_->CleanupInterval() : 0;
 
-    periodic_trigger_thread_ = MakeUnique<PeriodicTriggerThread>();
-    periodic_trigger_thread_->new_cleanup_trigger_ = MakeShared<NewCleanupPeriodicTrigger>(cleanup_interval);
+    periodic_trigger_thread_ = std::make_unique<PeriodicTriggerThread>();
+    periodic_trigger_thread_->new_cleanup_trigger_ = std::make_shared<NewCleanupPeriodicTrigger>(cleanup_interval);
 
     periodic_trigger_thread_->Start();
 
@@ -679,7 +679,7 @@ Status Storage::UnInitFromWriter() {
     return Status::OK();
 }
 
-UniquePtr<KVInstance> Storage::KVInstance() { return kv_store_->GetInstance(); }
+std::unique_ptr<KVInstance> Storage::KVInstance() { return kv_store_->GetInstance(); }
 
 ResultCacheManager *Storage::result_cache_manager() const noexcept {
     if (config_ptr_->ResultCache() != "on") {
@@ -782,10 +782,10 @@ Status Storage::AdminToReaderBottom(TxnTimeStamp system_start_ts) {
     if (bg_processor_ != nullptr) {
         UnrecoverableError("Background processor was initialized before.");
     }
-    bg_processor_ = MakeUnique<BGTaskProcessor>();
+    bg_processor_ = std::make_unique<BGTaskProcessor>();
 
     // TODO: new txn manager
-    new_txn_mgr_ = MakeUnique<NewTxnManager>(this, kv_store_.get(), system_start_ts);
+    new_txn_mgr_ = std::make_unique<NewTxnManager>(this, kv_store_.get(), system_start_ts);
     new_txn_mgr_->Start();
 
     // start WalManager after TxnManager since it depends on TxnManager.
@@ -794,7 +794,7 @@ Status Storage::AdminToReaderBottom(TxnTimeStamp system_start_ts) {
     if (memory_index_tracer_ != nullptr) {
         UnrecoverableError("Memory index tracer was initialized before.");
     }
-    memory_index_tracer_ = MakeUnique<BGMemIndexTracer>(config_ptr_->MemIndexMemoryQuota(), new_txn_mgr_.get());
+    memory_index_tracer_ = std::make_unique<BGMemIndexTracer>(config_ptr_->MemIndexMemoryQuota(), new_txn_mgr_.get());
     memory_index_tracer_->InitMemUsed();
 
     bg_processor_->Start();
@@ -802,10 +802,10 @@ Status Storage::AdminToReaderBottom(TxnTimeStamp system_start_ts) {
     if (periodic_trigger_thread_ != nullptr) {
         UnrecoverableError("periodic trigger was initialized before.");
     }
-    periodic_trigger_thread_ = MakeUnique<PeriodicTriggerThread>();
+    periodic_trigger_thread_ = std::make_unique<PeriodicTriggerThread>();
 
     i64 cleanup_interval = config_ptr_->CleanupInterval() > 0 ? config_ptr_->CleanupInterval() : 0;
-    periodic_trigger_thread_->new_cleanup_trigger_ = MakeShared<NewCleanupPeriodicTrigger>(cleanup_interval);
+    periodic_trigger_thread_->new_cleanup_trigger_ = std::make_shared<NewCleanupPeriodicTrigger>(cleanup_interval);
 
     periodic_trigger_thread_->Start();
     reader_init_phase_ = ReaderInitPhase::kPhase2;
@@ -833,7 +833,7 @@ void Storage::AttachCatalog(TxnTimeStamp checkpoint_ts) {
 }
 
 void Storage::RecoverMemIndex() {
-    //    NewTxn *txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("recover mem index"), TransactionType::kNormal);
+    //    NewTxn *txn = new_txn_mgr_->BeginTxn(std::make_unique<std::string>("recover mem index"), TransactionType::kNormal);
     //    txn->SetReplay(true);
     //    Status status = NewCatalog::MemIndexRecover(txn);
     //    if (!status.ok()) {
@@ -843,7 +843,7 @@ void Storage::RecoverMemIndex() {
     //    if (!status.ok()) {
     //        UnrecoverableError("Failed to commit mem index in new catalog");
     //    }
-    UniquePtr<NewTxn> recovery_txn = new_txn_mgr_->BeginRecoveryTxn();
+    std::unique_ptr<NewTxn> recovery_txn = new_txn_mgr_->BeginRecoveryTxn();
     Status status = NewCatalog::MemIndexRecover(recovery_txn.get());
     if (!status.ok()) {
         UnrecoverableError("Failed to recover mem index in new catalog");
@@ -855,8 +855,8 @@ void Storage::RecoverMemIndex() {
 }
 
 void Storage::CreateDefaultDB() {
-    NewTxn *txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("create default_db"), TransactionType::kNormal);
-    Status status = txn->CreateDatabase("default_db", ConflictType::kError, MakeShared<String>());
+    NewTxn *txn = new_txn_mgr_->BeginTxn(std::make_unique<std::string>("create default_db"), TransactionType::kNormal);
+    Status status = txn->CreateDatabase("default_db", ConflictType::kError, std::make_shared<std::string>());
     if (!status.ok()) {
         if (status.code_ == ErrorCode::kDuplicateDatabaseName) {
             // Only valid for unit test

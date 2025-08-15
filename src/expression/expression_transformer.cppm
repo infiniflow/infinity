@@ -25,14 +25,14 @@ namespace infinity {
 enum class VisitControlType { kInvalid, kVisit, kNotVisit };
 
 // Transform expr_a AND expr_b AND expr_c into expressions array: [expr_a, expr_b, expr_c].
-export Vector<SharedPtr<BaseExpression>> SplitExpressionByDelimiter(const SharedPtr<BaseExpression> &expression, ConjunctionType conjunction_type);
+export std::vector<std::shared_ptr<BaseExpression>> SplitExpressionByDelimiter(const std::shared_ptr<BaseExpression> &expression, ConjunctionType conjunction_type);
 
-export SharedPtr<BaseExpression> ComposeExpressionWithDelimiter(const Vector<SharedPtr<BaseExpression>> &expressions,
+export std::shared_ptr<BaseExpression> ComposeExpressionWithDelimiter(const std::vector<std::shared_ptr<BaseExpression>> &expressions,
                                                                 ConjunctionType conjunction_type);
 
 // Traverse the expression and it's child
-void VisitExpression(const SharedPtr<BaseExpression> &expression, const std::function<VisitControlType(SharedPtr<BaseExpression> &child)> &visitor);
+void VisitExpression(const std::shared_ptr<BaseExpression> &expression, const std::function<VisitControlType(std::shared_ptr<BaseExpression> &child)> &visitor);
 
-export void VisitExpression(const SharedPtr<BaseExpression> &expression, const std::function<void(SharedPtr<BaseExpression> &child)> &visitor);
+export void VisitExpression(const std::shared_ptr<BaseExpression> &expression, const std::function<void(std::shared_ptr<BaseExpression> &child)> &visitor);
 
 } // namespace infinity

@@ -31,6 +31,6 @@ public:
 
 private:
     InDocPositionState *state_ = nullptr;
-    Vector<PositionListDecoder *> pos_decoders_;
+    std::vector<PositionListDecoder *> pos_decoders_;
 };
 } // namespace infinity

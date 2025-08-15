@@ -31,27 +31,27 @@ namespace infinity {
 
 export class LogicalTableScan : public LogicalNode {
 public:
-    explicit LogicalTableScan(u64 node_id, SharedPtr<BaseTableRef> base_table_ref, bool add_row_id = true);
+    explicit LogicalTableScan(u64 node_id, std::shared_ptr<BaseTableRef> base_table_ref, bool add_row_id = true);
 
-    [[nodiscard]] Vector<ColumnBinding> GetColumnBindings() const final;
+    [[nodiscard]] std::vector<ColumnBinding> GetColumnBindings() const final;
 
-    [[nodiscard]] SharedPtr<Vector<String>> GetOutputNames() const final;
+    [[nodiscard]] std::shared_ptr<std::vector<std::string>> GetOutputNames() const final;
 
-    [[nodiscard]] SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const final;
+    [[nodiscard]] std::shared_ptr<std::vector<std::shared_ptr<DataType>>> GetOutputTypes() const final;
 
     [[nodiscard]] TableInfo *table_info() const;
 
-    [[nodiscard]] String TableAlias() const;
+    [[nodiscard]] std::string TableAlias() const;
 
     [[nodiscard]] u64 TableIndex() const;
 
-    String ToString(i64 &space) const final;
+    std::string ToString(i64 &space) const final;
 
-    inline String name() final { return "LogicalTableScan"; }
+    inline std::string name() final { return "LogicalTableScan"; }
 
-    SharedPtr<BaseTableRef> base_table_ref_{};
+    std::shared_ptr<BaseTableRef> base_table_ref_{};
 
-    UniquePtr<FastRoughFilterEvaluator> fast_rough_filter_evaluator_;
+    std::unique_ptr<FastRoughFilterEvaluator> fast_rough_filter_evaluator_;
 
     bool add_row_id_;
 };

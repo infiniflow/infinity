@@ -39,9 +39,9 @@ struct BlockIndex;
 export class PhysicalTableScan : public PhysicalScanBase {
 public:
     explicit PhysicalTableScan(u64 id,
-                               SharedPtr<BaseTableRef> base_table_ref,
-                               UniquePtr<FastRoughFilterEvaluator> &&fast_rough_filter_evaluator,
-                               SharedPtr<Vector<LoadMeta>> load_metas,
+                               std::shared_ptr<BaseTableRef> base_table_ref,
+                               std::unique_ptr<FastRoughFilterEvaluator> &&fast_rough_filter_evaluator,
+                               std::shared_ptr<std::vector<LoadMeta>> load_metas,
                                bool add_row_id = false)
         : PhysicalScanBase(id, PhysicalOperatorType::kTableScan, nullptr, nullptr, 0, base_table_ref, load_metas),
           fast_rough_filter_evaluator_(std::move(fast_rough_filter_evaluator)), add_row_id_(add_row_id) {}
@@ -52,17 +52,17 @@ public:
 
     bool Execute(QueryContext *query_context, OperatorState *operator_state) final;
 
-    SharedPtr<Vector<String>> GetOutputNames() const final;
+    std::shared_ptr<std::vector<std::string>> GetOutputNames() const final;
 
-    SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const final;
+    std::shared_ptr<std::vector<std::shared_ptr<DataType>>> GetOutputTypes() const final;
 
-    String table_alias() const;
+    std::string table_alias() const;
 
     u64 TableIndex() const;
 
-    SizeT BlockEntryCount() const;
+    size_t BlockEntryCount() const;
 
-    Vector<SizeT> &ColumnIDs() const;
+    std::vector<size_t> &ColumnIDs() const;
 
     bool ParallelExchange() const override { return true; }
 
@@ -72,10 +72,10 @@ private:
     void ExecuteInternal(QueryContext *query_context, TableScanOperatorState *table_scan_operator_state);
 
 private:
-    UniquePtr<FastRoughFilterEvaluator> fast_rough_filter_evaluator_{};
+    std::unique_ptr<FastRoughFilterEvaluator> fast_rough_filter_evaluator_{};
 
     bool add_row_id_;
-    mutable Vector<SizeT> column_ids_;
+    mutable std::vector<size_t> column_ids_;
 };
 
 } // namespace infinity

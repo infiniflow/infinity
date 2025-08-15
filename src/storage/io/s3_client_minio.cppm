@@ -12,12 +12,12 @@ namespace infinity {
 
 export class S3ClientMinio final : public S3Client {
 public:
-    S3ClientMinio(const String &url = "http://localhost:9000",
+    S3ClientMinio(const std::string &url = "http://localhost:9000",
                   bool https = false,
-                  const String &access_key = "minioadmin",
-                  const String &secret_key = "minioadmin")
+                  const std::string &access_key = "minioadmin",
+                  const std::string &secret_key = "minioadmin")
         : S3Client(url, https, access_key, secret_key), base_url(url, https), provider(access_key, secret_key) {
-        client_ = MakeUnique<minio::s3::Client>(base_url, &provider);
+        client_ = std::make_unique<minio::s3::Client>(base_url, &provider);
 
 #ifdef INFINITY_DEBUG
         GlobalResourceUsage::IncrObjectCount("S3ClientMinio");
@@ -33,17 +33,17 @@ public:
     Status Init() final;
     Status UnInit() final;
 
-    Status DownloadObject(const String &bucket_name, const String &object_name, const String &file_path) final;
-    Status UploadObject(const String &bucket_name, const String &object_name, const String &file_path) final;
-    Status RemoveObject(const String &bucket_name, const String &object_name) final;
+    Status DownloadObject(const std::string &bucket_name, const std::string &object_name, const std::string &file_path) final;
+    Status UploadObject(const std::string &bucket_name, const std::string &object_name, const std::string &file_path) final;
+    Status RemoveObject(const std::string &bucket_name, const std::string &object_name) final;
     Status
-    CopyObject(const String &src_bucket_name, const String &src_object_name, const String &dst_bucket_name, const String &dst_object_name) final;
-    Status BucketExists(const String &bucket_name) final;
-    Status MakeBucket(const String &bucket_name) final;
+    CopyObject(const std::string &src_bucket_name, const std::string &src_object_name, const std::string &dst_bucket_name, const std::string &dst_object_name) final;
+    Status BucketExists(const std::string &bucket_name) final;
+    Status MakeBucket(const std::string &bucket_name) final;
 
 private:
     minio::s3::BaseUrl base_url;
     minio::creds::StaticProvider provider;
-    UniquePtr<minio::s3::Client> client_{};
+    std::unique_ptr<minio::s3::Client> client_{};
 };
 } // namespace infinity

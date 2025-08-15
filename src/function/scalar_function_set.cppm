@@ -26,20 +26,20 @@ namespace infinity {
 
 export class ScalarFunctionSet final : public FunctionSet {
 public:
-    explicit ScalarFunctionSet(String name) : FunctionSet(std::move(name), FunctionType::kScalar) {}
+    explicit ScalarFunctionSet(std::string name) : FunctionSet(std::move(name), FunctionType::kScalar) {}
 
     ~ScalarFunctionSet() final;
 
     void AddFunction(const ScalarFunction &func);
 
-    ScalarFunction GetMostMatchFunction(const Vector<SharedPtr<BaseExpression>> &input_arguments);
+    ScalarFunction GetMostMatchFunction(const std::vector<std::shared_ptr<BaseExpression>> &input_arguments);
 
-    const Vector<ScalarFunction> &GetAllScalarFunctions() const { return functions_; }
+    const std::vector<ScalarFunction> &GetAllScalarFunctions() const { return functions_; }
 
 private:
-    static i64 MatchFunctionCost(const ScalarFunction &func, const Vector<SharedPtr<BaseExpression>> &arguments);
+    static i64 MatchFunctionCost(const ScalarFunction &func, const std::vector<std::shared_ptr<BaseExpression>> &arguments);
 
-    Vector<ScalarFunction> functions_;
+    std::vector<ScalarFunction> functions_;
 };
 
 } // namespace infinity

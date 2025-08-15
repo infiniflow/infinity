@@ -30,12 +30,12 @@ import knn_expr;
 
 namespace infinity {
 
-SharedPtr<BaseExpression> AggregateBinder::BuildExpression(const ParsedExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root) {
-    SharedPtr<BaseExpression> result = ExpressionBinder::BuildExpression(expr, bind_context_ptr, depth, root);
+std::shared_ptr<BaseExpression> AggregateBinder::BuildExpression(const ParsedExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root) {
+    std::shared_ptr<BaseExpression> result = ExpressionBinder::BuildExpression(expr, bind_context_ptr, depth, root);
     return result;
 }
 
-SharedPtr<BaseExpression> AggregateBinder::BuildKnnExpr(const KnnExpr &, BindContext *, i64, bool) {
+std::shared_ptr<BaseExpression> AggregateBinder::BuildKnnExpr(const KnnExpr &, BindContext *, i64, bool) {
     RecoverableError(Status::SyntaxError("KNN expression isn't supported in in aggregate function"));
     return nullptr;
 }

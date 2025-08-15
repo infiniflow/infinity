@@ -58,30 +58,30 @@ class DatePartFunctionsTest : public BaseTest {};
 TEST_F(DatePartFunctionsTest, datepart_func) {
     using namespace infinity;
 
-    UniquePtr<Config> config_ptr = MakeUnique<Config>();
+    std::unique_ptr<Config> config_ptr = std::make_unique<Config>();
     Status status = config_ptr->Init(nullptr, nullptr);
     EXPECT_TRUE(status.ok());
-    UniquePtr<KVStore> kv_store_ptr = MakeUnique<KVStore>();
+    std::unique_ptr<KVStore> kv_store_ptr = std::make_unique<KVStore>();
     status = kv_store_ptr->Init(config_ptr->CatalogDir());
     EXPECT_TRUE(status.ok());
-    UniquePtr<NewCatalog> catalog_ptr = MakeUnique<NewCatalog>(kv_store_ptr.get());
+    std::unique_ptr<NewCatalog> catalog_ptr = std::make_unique<NewCatalog>(kv_store_ptr.get());
 
     RegisterDatePartFunction(catalog_ptr.get());
 
     String op = "datepart";
 
-    SharedPtr<FunctionSet> function_set = NewCatalog::GetFunctionSetByName(catalog_ptr.get(), op);
+    std::shared_ptr<FunctionSet> function_set = NewCatalog::GetFunctionSetByName(catalog_ptr.get(), op);
     EXPECT_EQ(function_set->type_, FunctionType::kScalar);
-    SharedPtr<ScalarFunctionSet> scalar_function_set = std::static_pointer_cast<ScalarFunctionSet>(function_set);
+    std::shared_ptr<ScalarFunctionSet> scalar_function_set = std::static_pointer_cast<ScalarFunctionSet>(function_set);
 
     {
-        Vector<SharedPtr<BaseExpression>> inputs;
+        Vector<std::shared_ptr<BaseExpression>> inputs;
 
         DataType data_type1(LogicalType::kVarchar);
         DataType data_type2(LogicalType::kDate);
-        SharedPtr<DataType> result_type = MakeShared<DataType>(LogicalType::kBigInt);
-        SharedPtr<ColumnExpression> col1_expr_ptr = MakeShared<ColumnExpression>(data_type1, "t1", 1, "c1", 0, 0);
-        SharedPtr<ColumnExpression> col2_expr_ptr = MakeShared<ColumnExpression>(data_type2, "t1", 1, "c2", 1, 0);
+        std::shared_ptr<DataType> result_type = std::make_shared<DataType>(LogicalType::kBigInt);
+        std::shared_ptr<ColumnExpression> col1_expr_ptr = std::make_shared<ColumnExpression>(data_type1, "t1", 1, "c1", 0, 0);
+        std::shared_ptr<ColumnExpression> col2_expr_ptr = std::make_shared<ColumnExpression>(data_type2, "t1", 1, "c2", 1, 0);
 
         inputs.emplace_back(col1_expr_ptr);
         inputs.emplace_back(col2_expr_ptr);
@@ -89,46 +89,46 @@ TEST_F(DatePartFunctionsTest, datepart_func) {
         ScalarFunction func = scalar_function_set->GetMostMatchFunction(inputs);
         EXPECT_STREQ("datepart(Varchar, Date)->BigInt", func.ToString().c_str());
 
-        Vector<SharedPtr<DataType>> column_types;
-        column_types.emplace_back(MakeShared<DataType>(data_type1));
-        column_types.emplace_back(MakeShared<DataType>(data_type2));
+        Vector<std::shared_ptr<DataType>> column_types;
+        column_types.emplace_back(std::make_shared<DataType>(data_type1));
+        column_types.emplace_back(std::make_shared<DataType>(data_type2));
 
-        SizeT row_count = DEFAULT_VECTOR_SIZE;
+        size_t row_count = DEFAULT_VECTOR_SIZE;
 
         DataBlock data_block;
         data_block.Init(column_types);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for (size_t i = 0; i < row_count; ++i) {
             std::string str = "year";
             data_block.AppendValue(0, Value::MakeVarchar(str));
             data_block.AppendValue(1, Value::MakeDate(static_cast<DateT>(2 * i)));
         }
         data_block.Finalize();
-        for (SizeT i = 0; i < row_count; ++i) {
+        for (size_t i = 0; i < row_count; ++i) {
             Value v1 = data_block.GetValue(0, i);
             Value v2 = data_block.GetValue(1, i);
             EXPECT_EQ(v1.type_.type(), LogicalType::kVarchar);
             EXPECT_EQ(v2.type_.type(), LogicalType::kDate);
         }
 
-        SharedPtr<ColumnVector> result = MakeShared<ColumnVector>(result_type);
+        std::shared_ptr<ColumnVector> result = std::make_shared<ColumnVector>(result_type);
         result->Initialize();
         func.function_(data_block, result);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for (size_t i = 0; i < row_count; ++i) {
             Value v = result->GetValueByIndex(i);
             EXPECT_EQ(v.type_.type(), LogicalType::kBigInt);
         }
     }
 
     {
-        Vector<SharedPtr<BaseExpression>> inputs;
+        Vector<std::shared_ptr<BaseExpression>> inputs;
 
         DataType data_type1(LogicalType::kVarchar);
         DataType data_type2(LogicalType::kDateTime);
-        SharedPtr<DataType> result_type = MakeShared<DataType>(LogicalType::kBigInt);
-        SharedPtr<ColumnExpression> col1_expr_ptr = MakeShared<ColumnExpression>(data_type1, "t1", 1, "c1", 0, 0);
-        SharedPtr<ColumnExpression> col2_expr_ptr = MakeShared<ColumnExpression>(data_type2, "t1", 1, "c2", 1, 0);
+        std::shared_ptr<DataType> result_type = std::make_shared<DataType>(LogicalType::kBigInt);
+        std::shared_ptr<ColumnExpression> col1_expr_ptr = std::make_shared<ColumnExpression>(data_type1, "t1", 1, "c1", 0, 0);
+        std::shared_ptr<ColumnExpression> col2_expr_ptr = std::make_shared<ColumnExpression>(data_type2, "t1", 1, "c2", 1, 0);
 
         inputs.emplace_back(col1_expr_ptr);
         inputs.emplace_back(col2_expr_ptr);
@@ -136,47 +136,47 @@ TEST_F(DatePartFunctionsTest, datepart_func) {
         ScalarFunction func = scalar_function_set->GetMostMatchFunction(inputs);
         EXPECT_STREQ("datepart(Varchar, DateTime)->BigInt", func.ToString().c_str());
 
-        Vector<SharedPtr<DataType>> column_types;
-        column_types.emplace_back(MakeShared<DataType>(data_type1));
-        column_types.emplace_back(MakeShared<DataType>(data_type2));
+        Vector<std::shared_ptr<DataType>> column_types;
+        column_types.emplace_back(std::make_shared<DataType>(data_type1));
+        column_types.emplace_back(std::make_shared<DataType>(data_type2));
 
-        SizeT row_count = DEFAULT_VECTOR_SIZE;
+        size_t row_count = DEFAULT_VECTOR_SIZE;
 
         DataBlock data_block;
         data_block.Init(column_types);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for (size_t i = 0; i < row_count; ++i) {
             std::string str = "year";
             data_block.AppendValue(0, Value::MakeVarchar(str));
             data_block.AppendValue(1, Value::MakeDateTime(DateTimeT(i, i)));
         }
         data_block.Finalize();
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for (size_t i = 0; i < row_count; ++i) {
             Value v1 = data_block.GetValue(0, i);
             Value v2 = data_block.GetValue(1, i);
             EXPECT_EQ(v1.type_.type(), LogicalType::kVarchar);
             EXPECT_EQ(v2.type_.type(), LogicalType::kDateTime);
         }
 
-        SharedPtr<ColumnVector> result = MakeShared<ColumnVector>(result_type);
+        std::shared_ptr<ColumnVector> result = std::make_shared<ColumnVector>(result_type);
         result->Initialize();
         func.function_(data_block, result);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for (size_t i = 0; i < row_count; ++i) {
             Value v = result->GetValueByIndex(i);
             EXPECT_EQ(v.type_.type(), LogicalType::kBigInt);
         }
     }
 
     {
-        Vector<SharedPtr<BaseExpression>> inputs;
+        Vector<std::shared_ptr<BaseExpression>> inputs;
 
         DataType data_type1(LogicalType::kVarchar);
         DataType data_type2(LogicalType::kTimestamp);
-        SharedPtr<DataType> result_type = MakeShared<DataType>(LogicalType::kBigInt);
-        SharedPtr<ColumnExpression> col1_expr_ptr = MakeShared<ColumnExpression>(data_type1, "t1", 1, "c1", 0, 0);
-        SharedPtr<ColumnExpression> col2_expr_ptr = MakeShared<ColumnExpression>(data_type2, "t1", 1, "c2", 1, 0);
+        std::shared_ptr<DataType> result_type = std::make_shared<DataType>(LogicalType::kBigInt);
+        std::shared_ptr<ColumnExpression> col1_expr_ptr = std::make_shared<ColumnExpression>(data_type1, "t1", 1, "c1", 0, 0);
+        std::shared_ptr<ColumnExpression> col2_expr_ptr = std::make_shared<ColumnExpression>(data_type2, "t1", 1, "c2", 1, 0);
 
         inputs.emplace_back(col1_expr_ptr);
         inputs.emplace_back(col2_expr_ptr);
@@ -184,34 +184,34 @@ TEST_F(DatePartFunctionsTest, datepart_func) {
         ScalarFunction func = scalar_function_set->GetMostMatchFunction(inputs);
         EXPECT_STREQ("datepart(Varchar, Timestamp)->BigInt", func.ToString().c_str());
 
-        Vector<SharedPtr<DataType>> column_types;
-        column_types.emplace_back(MakeShared<DataType>(data_type1));
-        column_types.emplace_back(MakeShared<DataType>(data_type2));
+        Vector<std::shared_ptr<DataType>> column_types;
+        column_types.emplace_back(std::make_shared<DataType>(data_type1));
+        column_types.emplace_back(std::make_shared<DataType>(data_type2));
 
-        SizeT row_count = DEFAULT_VECTOR_SIZE;
+        size_t row_count = DEFAULT_VECTOR_SIZE;
 
         DataBlock data_block;
         data_block.Init(column_types);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for (size_t i = 0; i < row_count; ++i) {
             std::string str = "year";
             data_block.AppendValue(0, Value::MakeVarchar(str));
             data_block.AppendValue(1, Value::MakeTimestamp(TimestampT(i, i)));
         }
         data_block.Finalize();
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for (size_t i = 0; i < row_count; ++i) {
             Value v1 = data_block.GetValue(0, i);
             Value v2 = data_block.GetValue(1, i);
             EXPECT_EQ(v1.type_.type(), LogicalType::kVarchar);
             EXPECT_EQ(v2.type_.type(), LogicalType::kTimestamp);
         }
 
-        SharedPtr<ColumnVector> result = MakeShared<ColumnVector>(result_type);
+        std::shared_ptr<ColumnVector> result = std::make_shared<ColumnVector>(result_type);
         result->Initialize();
         func.function_(data_block, result);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for (size_t i = 0; i < row_count; ++i) {
             Value v = result->GetValueByIndex(i);
             EXPECT_EQ(v.type_.type(), LogicalType::kBigInt);
         }

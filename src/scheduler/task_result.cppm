@@ -30,12 +30,12 @@ export class TaskResult {
 public:
     explicit TaskResult(TaskResultType task_result_type) : task_result_type_(task_result_type) {}
 
-    void Init(const Vector<SharedPtr<DataType>> &types, SizeT capacity);
+    void Init(const std::vector<std::shared_ptr<DataType>> &types, size_t capacity);
 
     void Seal();
 
 private:
-    UniquePtr<DataBlock> data_{};
+    std::unique_ptr<DataBlock> data_{};
     TaskResultType task_result_type_{TaskResultType::kInvalid};
 };
 

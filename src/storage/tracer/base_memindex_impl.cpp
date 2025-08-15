@@ -24,7 +24,7 @@ import :storage;
 
 namespace infinity {
 
-void BaseMemIndex::IncreaseMemoryUsageBase(SizeT mem) {
+void BaseMemIndex::IncreaseMemoryUsageBase(size_t mem) {
     Storage *storage = InfinityContext::instance().storage();
     if (!storage) {
         return;
@@ -36,7 +36,7 @@ void BaseMemIndex::IncreaseMemoryUsageBase(SizeT mem) {
     memindex_tracer->IncreaseMemoryUsage(mem);
 }
 
-void BaseMemIndex::DecreaseMemoryUsageBase(SizeT mem) {
+void BaseMemIndex::DecreaseMemoryUsageBase(size_t mem) {
     Storage *storage = InfinityContext::instance().storage();
     if (!storage) {
         return;
@@ -48,8 +48,8 @@ void BaseMemIndex::DecreaseMemoryUsageBase(SizeT mem) {
     memindex_tracer->DecreaseMemUsed(mem);
 }
 
-SizeT BaseMemIndex::GetMemUsed() const { return GetInfo().mem_used_; }
+size_t BaseMemIndex::GetMemUsed() const { return GetInfo().mem_used_; }
 
-SizeT BaseMemIndex::GetRowCount() const { return GetInfo().row_count_; }
+size_t BaseMemIndex::GetRowCount() const { return GetInfo().row_count_; }
 
 } // namespace infinity

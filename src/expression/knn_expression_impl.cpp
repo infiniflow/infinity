@@ -32,7 +32,7 @@ import internal_types;
 
 namespace infinity {
 
-String KnnExpression::KnnDistanceType2Str(KnnDistanceType type) {
+std::string KnnExpression::KnnDistanceType2Str(KnnDistanceType type) {
     switch (type) {
         case KnnDistanceType::kInvalid: {
             UnrecoverableError("Invalid KNN distance type");
@@ -56,11 +56,11 @@ KnnExpression::KnnExpression(EmbeddingDataType embedding_data_type,
                              i64 dimension,
                              KnnDistanceType knn_distance_type,
                              EmbeddingT query_embedding,
-                             Vector<SharedPtr<BaseExpression>> arguments,
+                             std::vector<std::shared_ptr<BaseExpression>> arguments,
                              i64 topn,
-                             Vector<InitParameter *> *opt_params,
-                             SharedPtr<BaseExpression> optional_filter,
-                             String using_index,
+                             std::vector<InitParameter *> *opt_params,
+                             std::shared_ptr<BaseExpression> optional_filter,
+                             std::string using_index,
                              bool ignore_index)
     : BaseExpression(ExpressionType::kKnn, std::move(arguments)), dimension_(dimension), embedding_data_type_(embedding_data_type),
       distance_type_(knn_distance_type), query_embedding_(std::move(query_embedding)),
@@ -73,12 +73,12 @@ KnnExpression::KnnExpression(EmbeddingDataType embedding_data_type,
     }
 }
 
-String KnnExpression::ToString() const {
+std::string KnnExpression::ToString() const {
     if (!alias_.empty()) {
         return alias_;
     }
 
-    String expr_str = fmt::format("MATCH VECTOR ({}, {}, {}, {}, {}{})",
+    std::string expr_str = fmt::format("MATCH VECTOR ({}, {}, {}, {}, {}{})",
                                   arguments_.at(0)->Name(),
                                   EmbeddingT::Embedding2String(query_embedding_, embedding_data_type_, dimension_),
                                   EmbeddingT::EmbeddingDataType2String(embedding_data_type_),
@@ -95,7 +95,7 @@ u64 KnnExpression::Hash() const {
     h ^= std::hash<EmbeddingDataType>()(embedding_data_type_);
     h ^= std::hash<KnnDistanceType>()(distance_type_);
     h ^= std::hash<i32>()(topn_);
-    h ^= std::hash<String>()(using_index_);
+    h ^= std::hash<std::string>()(using_index_);
     if (optional_filter_) {
         h ^= optional_filter_->Hash();
     }

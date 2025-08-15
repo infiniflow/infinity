@@ -35,11 +35,11 @@ namespace infinity {
 export class PhysicalInsert : public PhysicalOperator {
 public:
     explicit PhysicalInsert(u64 id,
-                            SharedPtr<TableInfo> table_info,
+                            std::shared_ptr<TableInfo> table_info,
                             u64 table_index,
-                            Vector<Vector<SharedPtr<BaseExpression>>> value_list,
-                            UniquePtr<PhysicalOperator> left,
-                            SharedPtr<Vector<LoadMeta>> load_metas)
+                            std::vector<std::vector<std::shared_ptr<BaseExpression>>> value_list,
+                            std::unique_ptr<PhysicalOperator> left,
+                            std::shared_ptr<std::vector<LoadMeta>> load_metas)
         : PhysicalOperator(PhysicalOperatorType::kInsert, std::move(left), nullptr, id, load_metas), table_info_(table_info),
           table_index_(table_index), value_list_(std::move(value_list)) {}
 
@@ -49,22 +49,22 @@ public:
 
     bool Execute(QueryContext *query_context, OperatorState *operator_state) final;
 
-    inline SharedPtr<TableInfo>& table_info() { return table_info_; }
-    inline const SharedPtr<TableInfo>& table_info() const { return table_info_; }
+    inline std::shared_ptr<TableInfo>& table_info() { return table_info_; }
+    inline const std::shared_ptr<TableInfo>& table_info() const { return table_info_; }
 
-    inline const Vector<Vector<SharedPtr<BaseExpression>>> &value_list() const { return value_list_; }
+    inline const std::vector<std::vector<std::shared_ptr<BaseExpression>>> &value_list() const { return value_list_; }
 
-    inline SharedPtr<Vector<String>> GetOutputNames() const final { return output_names_; }
+    inline std::shared_ptr<std::vector<std::string>> GetOutputNames() const final { return output_names_; }
 
-    inline SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const final { return output_types_; }
+    inline std::shared_ptr<std::vector<std::shared_ptr<DataType>>> GetOutputTypes() const final { return output_types_; }
 
 private:
-    SharedPtr<TableInfo> table_info_{};
+    std::shared_ptr<TableInfo> table_info_{};
     u64 table_index_{};
-    Vector<Vector<SharedPtr<BaseExpression>>> value_list_{};
+    std::vector<std::vector<std::shared_ptr<BaseExpression>>> value_list_{};
 
-    SharedPtr<Vector<String>> output_names_{};
-    SharedPtr<Vector<SharedPtr<DataType>>> output_types_{};
+    std::shared_ptr<std::vector<std::string>> output_names_{};
+    std::shared_ptr<std::vector<std::shared_ptr<DataType>>> output_types_{};
 };
 
 } // namespace infinity

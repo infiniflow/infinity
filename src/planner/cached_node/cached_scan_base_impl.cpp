@@ -28,7 +28,7 @@ namespace infinity {
 CachedScanBase::CachedScanBase(LogicalNodeType type,
                                const BaseTableRef *base_table_ref,
                                TxnTimeStamp query_ts,
-                               SharedPtr<Vector<String>> output_names)
+                               std::shared_ptr<std::vector<std::string>> output_names)
     : CachedNodeBase(type, output_names), schema_name_(base_table_ref->db_name()), table_name_(base_table_ref->table_name()),
       column_ids_(base_table_ref->column_ids_), query_ts_(query_ts) {}
 
@@ -39,8 +39,8 @@ CachedScanBase::CachedScanBase(LogicalNodeType type, const PhysicalScanBase *phy
 
 u64 CachedScanBase::Hash() const {
     u64 h = CachedNodeBase::Hash();
-    h = h ^ std::hash<String>{}(*schema_name_);
-    h = h ^ std::hash<String>{}(*table_name_);
+    h = h ^ std::hash<std::string>{}(*schema_name_);
+    h = h ^ std::hash<std::string>{}(*table_name_);
     h = h ^ std::hash<TxnTimeStamp>{}(query_ts_);
     return h;
 }

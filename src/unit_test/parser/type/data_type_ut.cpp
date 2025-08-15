@@ -157,24 +157,24 @@ TEST_F(DataTypeTest, Serialize) {
 TEST_F(DataTypeTest, ReadWrite) {
     using namespace infinity;
 
-    SharedPtr<TypeInfo> type_info_bitmap = BitmapInfo::Make(1024);
-    SharedPtr<TypeInfo> type_info_decimal = DecimalInfo::Make(i64(38), i64(3));
-    SharedPtr<TypeInfo> type_info_embedding = EmbeddingInfo::Make(EmbeddingDataType::kElemFloat, 256);
+    std::shared_ptr<TypeInfo> type_info_bitmap = BitmapInfo::Make(1024);
+    std::shared_ptr<TypeInfo> type_info_decimal = DecimalInfo::Make(i64(38), i64(3));
+    std::shared_ptr<TypeInfo> type_info_embedding = EmbeddingInfo::Make(EmbeddingDataType::kElemFloat, 256);
     EXPECT_NE(type_info_bitmap, nullptr);
     EXPECT_NE(type_info_decimal, nullptr);
     EXPECT_NE(type_info_embedding, nullptr);
 
-    Vector<SharedPtr<DataType>> data_types = {
-        MakeShared<DataType>(LogicalType::kTinyInt),
-        MakeShared<DataType>(LogicalType::kFloat),
-        MakeShared<DataType>(LogicalType::kTuple),
-        //        MakeShared<DataType>(LogicalType::kBitmap, type_info_bitmap),
-        MakeShared<DataType>(LogicalType::kDecimal, type_info_decimal),
-        MakeShared<DataType>(LogicalType::kEmbedding, type_info_embedding),
+    Vector<std::shared_ptr<DataType>> data_types = {
+        std::make_shared<DataType>(LogicalType::kTinyInt),
+        std::make_shared<DataType>(LogicalType::kFloat),
+        std::make_shared<DataType>(LogicalType::kTuple),
+        //        std::make_shared<DataType>(LogicalType::kBitmap, type_info_bitmap),
+        std::make_shared<DataType>(LogicalType::kDecimal, type_info_decimal),
+        std::make_shared<DataType>(LogicalType::kEmbedding, type_info_embedding),
     };
 
-    for (SizeT i = 0; i < data_types.size(); i++) {
-        SharedPtr<DataType> &data_type = data_types[i];
+    for (size_t i = 0; i < data_types.size(); i++) {
+        std::shared_ptr<DataType> &data_type = data_types[i];
         int32_t exp_size = data_type->GetSizeInBytes();
         Vector<char> buf(exp_size);
         char *buf_beg = buf.data();
@@ -183,7 +183,7 @@ TEST_F(DataTypeTest, ReadWrite) {
         EXPECT_EQ(ptr - buf_beg, exp_size);
 
         const char *ptr_r = buf_beg;
-        SharedPtr<DataType> data_type2 = DataType::ReadAdv(ptr_r, exp_size);
+        std::shared_ptr<DataType> data_type2 = DataType::ReadAdv(ptr_r, exp_size);
         EXPECT_NE(data_type2, nullptr);
         EXPECT_EQ(*data_type2, *data_type);
         EXPECT_EQ(ptr_r - buf_beg, exp_size);

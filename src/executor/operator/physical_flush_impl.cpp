@@ -98,7 +98,7 @@ void PhysicalFlush::FlushData(QueryContext *query_context, OperatorState *operat
     i64 wal_size{};
     std::tie(max_commit_ts, wal_size) = wal_manager->GetCommitState();
     LOG_TRACE(fmt::format("Construct checkpoint task with WAL size: {}, max_commit_ts: {}", wal_size, max_commit_ts));
-    auto checkpoint_task = MakeShared<NewCheckpointTask>(wal_size);
+    auto checkpoint_task = std::make_shared<NewCheckpointTask>(wal_size);
     NewTxn *new_txn = query_context->GetNewTxn();
     checkpoint_task->new_txn_ = new_txn;
 

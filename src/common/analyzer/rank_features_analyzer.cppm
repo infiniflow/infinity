@@ -23,7 +23,7 @@ import :analyzer;
 namespace infinity {
 
 export class RankFeaturesAnalyzer : public Analyzer {
-    String delimiters_{};
+    std::string delimiters_{};
 
 public:
     RankFeaturesAnalyzer() = default;

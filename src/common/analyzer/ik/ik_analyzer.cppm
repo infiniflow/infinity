@@ -18,7 +18,7 @@ namespace infinity {
 
 export class IKAnalyzer : public Analyzer {
 public:
-    IKAnalyzer(const String &path);
+    IKAnalyzer(const std::string &path);
 
     IKAnalyzer(const IKAnalyzer &other);
 
@@ -41,7 +41,7 @@ private:
     int GetLastUselessCharNum();
 
 private:
-    String dict_path_;
+    std::string dict_path_;
 
     bool own_dict_{};
 
@@ -49,10 +49,10 @@ private:
 
     Dictionary *dict_{nullptr};
 
-    UniquePtr<AnalyzeContext> context_;
+    std::unique_ptr<AnalyzeContext> context_;
 
-    Vector<UniquePtr<Segmenter>> segmenters_;
+    std::vector<std::unique_ptr<Segmenter>> segmenters_;
 
-    UniquePtr<IKArbitrator> arbitrator_;
+    std::unique_ptr<IKArbitrator> arbitrator_;
 };
 } // namespace infinity

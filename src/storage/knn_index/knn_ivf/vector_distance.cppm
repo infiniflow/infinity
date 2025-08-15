@@ -25,7 +25,7 @@ namespace infinity {
 export template <typename DiffType, typename ElemType1, typename ElemType2, typename DimType = u32>
 DiffType L2Distance(const ElemType1 *vector1, const ElemType2 *vector2, const DimType dimension) {
     if constexpr (std::is_same_v<ElemType1, f32> && std::is_same_v<ElemType2, f32>) {
-        return GetSIMD_FUNCTIONS().L2Distance_func_ptr_(vector1, vector2, static_cast<SizeT>(dimension));
+        return GetSIMD_FUNCTIONS().L2Distance_func_ptr_(vector1, vector2, static_cast<size_t>(dimension));
     } else {
         DiffType distance{};
         for (u32 i = 0; i < dimension; ++i) {
@@ -39,7 +39,7 @@ DiffType L2Distance(const ElemType1 *vector1, const ElemType2 *vector2, const Di
 export template <typename DiffType, typename ElemType1, typename ElemType2, typename DimType = u32>
 DiffType CosineDistance(const ElemType1 *vector1, const ElemType2 *vector2, const DimType dimension) {
     if constexpr (std::is_same_v<ElemType1, f32> && std::is_same_v<ElemType2, f32>) {
-        return GetSIMD_FUNCTIONS().CosineDistance_func_ptr_(vector1, vector2, static_cast<SizeT>(dimension));
+        return GetSIMD_FUNCTIONS().CosineDistance_func_ptr_(vector1, vector2, static_cast<size_t>(dimension));
     } else {
         DiffType dot_product{};
         DiffType norm1{};
@@ -56,7 +56,7 @@ DiffType CosineDistance(const ElemType1 *vector1, const ElemType2 *vector2, cons
 export template <typename DiffType, typename ElemType1, typename ElemType2, typename DimType = u32>
 DiffType IPDistance(const ElemType1 *vector1, const ElemType2 *vector2, const DimType dimension) {
     if constexpr (std::is_same_v<ElemType1, f32> && std::is_same_v<ElemType2, f32>) {
-        return GetSIMD_FUNCTIONS().IPDistance_func_ptr_(vector1, vector2, static_cast<SizeT>(dimension));
+        return GetSIMD_FUNCTIONS().IPDistance_func_ptr_(vector1, vector2, static_cast<size_t>(dimension));
     } else {
         DiffType distance{};
         for (u32 i = 0; i < dimension; ++i) {

@@ -60,7 +60,7 @@ export class NewCleanupPeriodicTrigger final : public PeriodicTrigger {
 public:
     NewCleanupPeriodicTrigger(i64 interval) : PeriodicTrigger(interval) {}
 
-    SharedPtr<NewCleanupTask> CreateNewCleanupTask();
+    std::shared_ptr<NewCleanupTask> CreateNewCleanupTask();
 
     virtual void Trigger() override;
 

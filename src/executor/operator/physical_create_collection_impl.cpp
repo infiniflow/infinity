@@ -34,14 +34,14 @@ import data_type;
 
 namespace infinity {
 
-PhysicalCreateCollection::PhysicalCreateCollection(SharedPtr<String> schema_name,
-                                                   SharedPtr<String> collection_name,
+PhysicalCreateCollection::PhysicalCreateCollection(std::shared_ptr<std::string> schema_name,
+                                                   std::shared_ptr<std::string> collection_name,
                                                    ConflictType conflict_type,
-                                                   SharedPtr<Vector<String>> output_names,
-                                                   SharedPtr<Vector<SharedPtr<DataType>>> output_types,
+                                                   std::shared_ptr<std::vector<std::string>> output_names,
+                                                   std::shared_ptr<std::vector<std::shared_ptr<DataType>>> output_types,
                                                    u64 table_index,
                                                    u64 id,
-                                                   SharedPtr<Vector<LoadMeta>> load_metas)
+                                                   std::shared_ptr<std::vector<LoadMeta>> load_metas)
     : PhysicalOperator(PhysicalOperatorType::kCreateCollection, nullptr, nullptr, id, load_metas), schema_name_(std::move(schema_name)),
       collection_name_(std::move(collection_name)), conflict_type_(conflict_type), table_index_(table_index), output_names_(std::move(output_names)),
       output_types_(std::move(output_types)) {}

@@ -87,19 +87,19 @@ import logical_type;
 namespace infinity {
 
 using AlignedMatchTensorExprHolderT =
-    std::pair<std::unique_ptr<void, decltype([](void *ptr) { std::free(ptr); })>, UniquePtr<MatchTensorExpression>>;
+    std::pair<std::unique_ptr<void, decltype([](void *ptr) { std::free(ptr); })>, std::unique_ptr<MatchTensorExpression>>;
 
 AlignedMatchTensorExprHolderT GetMatchTensorExprForCalculation(MatchTensorExpression &src_match_tensor_expr, EmbeddingDataType column_embedding_type);
 
 PhysicalMatchTensorScan::PhysicalMatchTensorScan(const u64 id,
                                                  const u64 table_index,
-                                                 SharedPtr<BaseTableRef> base_table_ref,
-                                                 SharedPtr<MatchTensorExpression> match_tensor_expression,
-                                                 const SharedPtr<CommonQueryFilter> &common_query_filter,
+                                                 std::shared_ptr<BaseTableRef> base_table_ref,
+                                                 std::shared_ptr<MatchTensorExpression> match_tensor_expression,
+                                                 const std::shared_ptr<CommonQueryFilter> &common_query_filter,
                                                  const u32 topn,
-                                                 const Optional<f32> knn_threshold,
-                                                 const SharedPtr<MatchTensorScanIndexOptions> &index_options,
-                                                 SharedPtr<Vector<LoadMeta>> load_metas)
+                                                 const std::optional<f32> knn_threshold,
+                                                 const std::shared_ptr<MatchTensorScanIndexOptions> &index_options,
+                                                 std::shared_ptr<std::vector<LoadMeta>> load_metas)
     : PhysicalFilterScanBase(id,
                              PhysicalOperatorType::kMatchTensorScan,
                              nullptr,
@@ -116,8 +116,8 @@ PhysicalMatchTensorScan::~PhysicalMatchTensorScan() = default;
 
 void PhysicalMatchTensorScan::Init(QueryContext *query_context) {}
 
-SharedPtr<Vector<String>> PhysicalMatchTensorScan::GetOutputNames() const {
-    SharedPtr<Vector<String>> result_names = MakeShared<Vector<String>>();
+std::shared_ptr<std::vector<std::string>> PhysicalMatchTensorScan::GetOutputNames() const {
+    std::shared_ptr<std::vector<std::string>> result_names = std::make_shared<std::vector<std::string>>();
     result_names->reserve(base_table_ref_->column_names_->size() + 2);
     for (auto &name : *base_table_ref_->column_names_) {
         result_names->emplace_back(name);
@@ -127,14 +127,14 @@ SharedPtr<Vector<String>> PhysicalMatchTensorScan::GetOutputNames() const {
     return result_names;
 }
 
-SharedPtr<Vector<SharedPtr<DataType>>> PhysicalMatchTensorScan::GetOutputTypes() const {
-    SharedPtr<Vector<SharedPtr<DataType>>> result_types = MakeShared<Vector<SharedPtr<DataType>>>();
+std::shared_ptr<std::vector<std::shared_ptr<DataType>>> PhysicalMatchTensorScan::GetOutputTypes() const {
+    std::shared_ptr<std::vector<std::shared_ptr<DataType>>> result_types = std::make_shared<std::vector<std::shared_ptr<DataType>>>();
     result_types->reserve(base_table_ref_->column_types_->size() + 2);
     for (auto &type : *base_table_ref_->column_types_) {
         result_types->emplace_back(type);
     }
-    result_types->emplace_back(MakeShared<DataType>(src_match_tensor_expr_->Type()));
-    result_types->emplace_back(MakeShared<DataType>(LogicalType::kRowID));
+    result_types->emplace_back(std::make_shared<DataType>(src_match_tensor_expr_->Type()));
+    result_types->emplace_back(std::make_shared<DataType>(LogicalType::kRowID));
     return result_types;
 }
 
@@ -163,7 +163,7 @@ void PhysicalMatchTensorScan::CheckColumn() {
     // check column basic embedding data type and query embedding data type
     // apply necessary cast
     if (auto [new_search_ptr, new_search_expr] = GetMatchTensorExprForCalculation(*src_match_tensor_expr_, embedding_info->Type()); new_search_ptr) {
-        calc_match_tensor_aligned_holder_ = SharedPtr<void>(new_search_ptr.release(), std::free);
+        calc_match_tensor_aligned_holder_ = std::shared_ptr<void>(new_search_ptr.release(), std::free);
         calc_match_tensor_expr_holder_ = std::move(new_search_expr);
         calc_match_tensor_expr_ = calc_match_tensor_expr_holder_.get();
     } else {
@@ -173,19 +173,19 @@ void PhysicalMatchTensorScan::CheckColumn() {
 
 void PhysicalMatchTensorScan::PlanWithIndex(QueryContext *query_context) {
     Status status;
-    SizeT search_column_id = SearchColumnID();
+    size_t search_column_id = SearchColumnID();
     auto &search_column_name = base_table_ref_->table_info_->column_defs_[search_column_id]->name();
 
-    block_metas_ = MakeUnique<Vector<BlockMeta *>>();
-    segment_index_metas_ = MakeUnique<Vector<SharedPtr<SegmentIndexMeta>>>();
+    block_metas_ = std::make_unique<std::vector<BlockMeta *>>();
+    segment_index_metas_ = std::make_unique<std::vector<std::shared_ptr<SegmentIndexMeta>>>();
 
     TableMeeta *table_meta = base_table_ref_->block_index_->table_meta_.get();
 
     Set<SegmentID> index_entry_map;
 
     if (!src_match_tensor_expr_->ignore_index_) {
-        Vector<String> *index_id_strs_ptr = nullptr;
-        Vector<String> *index_names_ptr = nullptr;
+        std::vector<std::string> *index_id_strs_ptr = nullptr;
+        std::vector<std::string> *index_names_ptr = nullptr;
         status = table_meta->GetIndexIDs(index_id_strs_ptr, &index_names_ptr);
         if (!status.ok()) {
             RecoverableError(status);
@@ -193,11 +193,11 @@ void PhysicalMatchTensorScan::PlanWithIndex(QueryContext *query_context) {
 
         if (src_match_tensor_expr_->index_name_.empty()) {
             LOG_TRACE("Try to find an index to use");
-            for (SizeT i = 0; i < index_id_strs_ptr->size(); ++i) {
-                const String &index_id_str = (*index_id_strs_ptr)[i];
-                auto table_index_meta = MakeUnique<TableIndexMeeta>(index_id_str, *table_meta);
+            for (size_t i = 0; i < index_id_strs_ptr->size(); ++i) {
+                const std::string &index_id_str = (*index_id_strs_ptr)[i];
+                auto table_index_meta = std::make_unique<TableIndexMeeta>(index_id_str, *table_meta);
 
-                SharedPtr<IndexBase> index_base;
+                std::shared_ptr<IndexBase> index_base;
                 std::tie(index_base, status) = table_index_meta->GetIndexBase();
                 if (!status.ok()) {
                     RecoverableError(status);
@@ -222,10 +222,10 @@ void PhysicalMatchTensorScan::PlanWithIndex(QueryContext *query_context) {
                 Status status = Status::IndexNotExist(src_match_tensor_expr_->index_name_);
                 RecoverableError(std::move(status));
             }
-            const String &index_id_str = (*index_id_strs_ptr)[iter - index_names_ptr->begin()];
-            auto table_index_meta = MakeUnique<TableIndexMeeta>(index_id_str, *table_meta);
+            const std::string &index_id_str = (*index_id_strs_ptr)[iter - index_names_ptr->begin()];
+            auto table_index_meta = std::make_unique<TableIndexMeeta>(index_id_str, *table_meta);
 
-            SharedPtr<IndexBase> index_base;
+            std::shared_ptr<IndexBase> index_base;
             std::tie(index_base, status) = table_index_meta->GetIndexBase();
             if (!status.ok()) {
                 RecoverableError(status);
@@ -246,7 +246,7 @@ void PhysicalMatchTensorScan::PlanWithIndex(QueryContext *query_context) {
         }
         // Fill the segment with index
         if (table_index_meta_) {
-            Vector<SegmentID> *segment_ids_ptr = nullptr;
+            std::vector<SegmentID> *segment_ids_ptr = nullptr;
             std::tie(segment_ids_ptr, status) = table_index_meta_->GetSegmentIndexIDs1();
             if (!status.ok()) {
                 RecoverableError(status);
@@ -259,7 +259,7 @@ void PhysicalMatchTensorScan::PlanWithIndex(QueryContext *query_context) {
     BlockIndex *block_index = base_table_ref_->block_index_.get();
     for (const auto &[segment_id, segment_info] : block_index->new_segment_block_index_) {
         if (auto iter = index_entry_map.find(segment_id); iter != index_entry_map.end()) {
-            segment_index_metas_->push_back(MakeShared<SegmentIndexMeta>(segment_id, *table_index_meta_));
+            segment_index_metas_->push_back(std::make_shared<SegmentIndexMeta>(segment_id, *table_index_meta_));
         } else {
             const auto &block_map = segment_info.block_map();
             for (const auto &block_meta : block_map) {
@@ -272,13 +272,13 @@ void PhysicalMatchTensorScan::PlanWithIndex(QueryContext *query_context) {
     return;
 }
 
-Vector<SharedPtr<Vector<GlobalBlockID>>> PhysicalMatchTensorScan::PlanBlockEntries(i64 parallel_count) const {
+std::vector<std::shared_ptr<std::vector<GlobalBlockID>>> PhysicalMatchTensorScan::PlanBlockEntries(i64 parallel_count) const {
     UnrecoverableError("PhysicalMatchTensorScan:: use PlanWithIndex instead of PlanBlockEntries!");
     return {};
 }
 
 // TODO: how many threads for brute force scan?
-SizeT PhysicalMatchTensorScan::TaskletCount() {
+size_t PhysicalMatchTensorScan::TaskletCount() {
     return (block_metas_ ? block_metas_->size() : 0) + (segment_index_metas_ ? segment_index_metas_->size() : 0);
 }
 
@@ -360,8 +360,8 @@ void PhysicalMatchTensorScan::ExecuteInner(QueryContext *query_context, MatchTen
             if (!status.ok()) {
                 UnrecoverableError(status.message());
             }
-            SharedPtr<MemIndex> mem_index = segment_index_meta.GetMemIndex();
-            SharedPtr<EMVBIndexInMem> emvb_index_in_mem = mem_index == nullptr ? nullptr : mem_index->GetEMVBIndex();
+            std::shared_ptr<MemIndex> mem_index = segment_index_meta.GetMemIndex();
+            std::shared_ptr<EMVBIndexInMem> emvb_index_in_mem = mem_index == nullptr ? nullptr : mem_index->GetEMVBIndex();
             // 1. in mem index
             if (emvb_index_in_mem) {
                 // TODO: fix the parameters
@@ -376,13 +376,13 @@ void PhysicalMatchTensorScan::ExecuteInner(QueryContext *query_context, MatchTen
                                                                          index_options_->emvb_n_doc_to_score_,
                                                                          index_options_->emvb_n_doc_out_second_stage_,
                                                                          index_options_->emvb_threshold_final_);
-                std::visit(Overload{[segment_id, &function_data](const Tuple<u32, UniquePtr<f32[]>, UniquePtr<u32[]>> &index_result) {
+                std::visit(Overload{[segment_id, &function_data](const std::tuple<u32, std::unique_ptr<f32[]>, std::unique_ptr<u32[]>> &index_result) {
                                         const auto &[result_num, score_ptr, row_id_ptr] = index_result;
                                         for (u32 i = 0; i < result_num; ++i) {
                                             function_data.result_handler_->AddResult(0, score_ptr[i], RowID(segment_id, row_id_ptr[i]));
                                         }
                                     },
-                                    [this, begin_ts, commit_ts, segment_id, &function_data, &segment_meta](const Pair<u32, u32> &in_mem_result) {
+                                    [this, begin_ts, commit_ts, segment_id, &function_data, &segment_meta](const std::pair<u32, u32> &in_mem_result) {
                                         const auto &[start_offset, total_row_count] = in_mem_result;
                                         BlockID block_id = start_offset / DEFAULT_BLOCK_CAPACITY;
                                         BlockOffset block_offset = start_offset % DEFAULT_BLOCK_CAPACITY;
@@ -476,8 +476,8 @@ void PhysicalMatchTensorScan::ExecuteInner(QueryContext *query_context, MatchTen
         const u32 result_n = function_data.End();
         float *result_scores = function_data.score_result_.get();
         RowID *result_row_ids = function_data.row_id_result_.get();
-        SetOutput(Vector<char *>{reinterpret_cast<char *>(result_scores)},
-                  Vector<RowID *>{result_row_ids},
+        SetOutput(std::vector<char *>{reinterpret_cast<char *>(result_scores)},
+                  std::vector<RowID *>{result_row_ids},
                   sizeof(std::remove_pointer_t<decltype(result_scores)>),
                   result_n,
                   query_context,
@@ -702,7 +702,7 @@ struct MaxSimOp<float, float> {
                        const u32 query_embedding_num,
                        const u32 target_embedding_num,
                        const u32 basic_embedding_dimension) {
-        auto output_ptr = MakeUniqueForOverwrite<float[]>(query_embedding_num * target_embedding_num);
+        auto output_ptr = std::make_unique_for_overwrite<float[]>(query_embedding_num * target_embedding_num);
         matrixA_multiply_transpose_matrixB_output_to_C(reinterpret_cast<const float *>(query_tensor_ptr),
                                                        reinterpret_cast<const float *>(target_tensor_ptr),
                                                        query_embedding_num,
@@ -732,11 +732,11 @@ struct MaxSimOp<TensorElemT, float> {
                        const u32 target_embedding_num,
                        const u32 basic_embedding_dimension) {
         auto src_target_type_ptr = reinterpret_cast<const TensorElemT *>(src_target_tensor_ptr);
-        auto target_buffer = MakeUniqueForOverwrite<float[]>(basic_embedding_dimension * target_embedding_num);
+        auto target_buffer = std::make_unique_for_overwrite<float[]>(basic_embedding_dimension * target_embedding_num);
         for (u32 i = 0; i < basic_embedding_dimension * target_embedding_num; ++i) {
             target_buffer[i] = static_cast<float>(src_target_type_ptr[i]);
         }
-        auto output_ptr = MakeUniqueForOverwrite<float[]>(query_embedding_num * target_embedding_num);
+        auto output_ptr = std::make_unique_for_overwrite<float[]>(query_embedding_num * target_embedding_num);
         matrixA_multiply_transpose_matrixB_output_to_C(reinterpret_cast<const float *>(query_tensor_ptr),
                                                        target_buffer.get(),
                                                        query_embedding_num,
@@ -776,7 +776,7 @@ struct CalcutateScoreOfTensorArrayRow {
                          const u32 query_embedding_num,
                          const u32 basic_embedding_dimension) {
         float maxsim_score = std::numeric_limits<float>::lowest();
-        Vector<Pair<Span<const char>, SizeT>> tensor_array = column_vector.GetTensorArrayRaw(block_offset);
+        std::vector<std::pair<std::span<const char>, size_t>> tensor_array = column_vector.GetTensorArrayRaw(block_offset);
         for (const auto &[raw_data, embedding_num] : tensor_array) {
             const float tensor_score = Op::Score(query_tensor_ptr, raw_data.data(), query_embedding_num, embedding_num, basic_embedding_dimension);
             maxsim_score = std::max(maxsim_score, tensor_score);
@@ -936,13 +936,13 @@ void CalculateScoreOnColumnVector(ColumnVector &column_vector,
 }
 
 struct RerankerParameterPack {
-    Vector<MatchTensorRerankDoc> &rerank_docs_;
+    std::vector<MatchTensorRerankDoc> &rerank_docs_;
     BufferManager *buffer_mgr_;
     const DataType *column_data_type_;
     const ColumnID column_id_;
     const BlockIndex *block_index_;
     const MatchTensorExpression &match_tensor_expr_;
-    RerankerParameterPack(Vector<MatchTensorRerankDoc> &rerank_docs,
+    RerankerParameterPack(std::vector<MatchTensorRerankDoc> &rerank_docs,
                           BufferManager *buffer_mgr,
                           const DataType *column_data_type,
                           const ColumnID column_id,
@@ -953,7 +953,7 @@ struct RerankerParameterPack {
 };
 
 template <typename CalcutateScoreOfRowOp>
-void GetRerankerScore(Vector<MatchTensorRerankDoc> &rerank_docs,
+void GetRerankerScore(std::vector<MatchTensorRerankDoc> &rerank_docs,
                       BufferManager *buffer_mgr,
                       const ColumnID column_id,
                       const BlockIndex *block_index,
@@ -1022,7 +1022,7 @@ struct ExecuteMatchTensorRerankerTypes {
     }
 };
 
-void CalculateFusionMatchTensorRerankerScores(Vector<MatchTensorRerankDoc> &rerank_docs,
+void CalculateFusionMatchTensorRerankerScores(std::vector<MatchTensorRerankDoc> &rerank_docs,
                                               BufferManager *buffer_mgr,
                                               const DataType *column_data_type,
                                               const ColumnID column_id,
@@ -1037,8 +1037,8 @@ void CalculateFusionMatchTensorRerankerScores(Vector<MatchTensorRerankDoc> &rera
 }
 
 // For AVX512
-inline auto GetAVX512AlignedMemory(const SizeT bytes) {
-    const auto alloc_bytes = ((bytes + 63u) & (~static_cast<SizeT>(63))) + 128u; // need to be multiple of 64, with extra 128 bytes
+inline auto GetAVX512AlignedMemory(const size_t bytes) {
+    const auto alloc_bytes = ((bytes + 63u) & (~static_cast<size_t>(63))) + 128u; // need to be multiple of 64, with extra 128 bytes
     auto ptr = std::aligned_alloc(64, alloc_bytes);
     if (!ptr) {
         UnrecoverableError("Out of memory!");

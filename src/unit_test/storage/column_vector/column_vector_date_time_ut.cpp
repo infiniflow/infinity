@@ -65,7 +65,7 @@ class ColumnVectorDateTimeTest : public BaseTest {
 TEST_F(ColumnVectorDateTimeTest, flat_date) {
     using namespace infinity;
 
-    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kDate);
+    std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kDate);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
@@ -164,7 +164,7 @@ TEST_F(ColumnVectorDateTimeTest, contant_date) {
 
     using namespace infinity;
 
-    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kDate);
+    std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kDate);
     ColumnVector column_vector(data_type);
 
     column_vector.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
@@ -242,7 +242,7 @@ TEST_F(ColumnVectorDateTimeTest, contant_date) {
 TEST_F(ColumnVectorDateTimeTest, date_column_vector_select) {
     using namespace infinity;
 
-    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kDate);
+    std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kDate);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
@@ -260,7 +260,7 @@ TEST_F(ColumnVectorDateTimeTest, date_column_vector_select) {
 
     Selection input_select;
     input_select.Initialize(DEFAULT_VECTOR_SIZE / 2);
-    for (SizeT idx = 0; idx < DEFAULT_VECTOR_SIZE / 2; ++idx) {
+    for (size_t idx = 0; idx < DEFAULT_VECTOR_SIZE / 2; ++idx) {
         input_select.Append(idx * 2);
     }
 
@@ -278,7 +278,7 @@ TEST_F(ColumnVectorDateTimeTest, date_column_vector_select) {
 TEST_F(ColumnVectorDateTimeTest, date_column_slice_init) {
     using namespace infinity;
 
-    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kDate);
+    std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kDate);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
@@ -313,7 +313,7 @@ TEST_F(ColumnVectorDateTimeTest, date_column_slice_init) {
 TEST_F(ColumnVectorDateTimeTest, flat_time) {
     using namespace infinity;
 
-    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kTime);
+    std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kTime);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
@@ -411,7 +411,7 @@ TEST_F(ColumnVectorDateTimeTest, contant_time) {
 
     using namespace infinity;
 
-    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kTime);
+    std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kTime);
     ColumnVector column_vector(data_type);
 
     column_vector.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
@@ -489,7 +489,7 @@ TEST_F(ColumnVectorDateTimeTest, contant_time) {
 TEST_F(ColumnVectorDateTimeTest, time_column_vector_select) {
     using namespace infinity;
 
-    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kTime);
+    std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kTime);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
@@ -507,7 +507,7 @@ TEST_F(ColumnVectorDateTimeTest, time_column_vector_select) {
 
     Selection input_select;
     input_select.Initialize(DEFAULT_VECTOR_SIZE / 2);
-    for (SizeT idx = 0; idx < DEFAULT_VECTOR_SIZE / 2; ++idx) {
+    for (size_t idx = 0; idx < DEFAULT_VECTOR_SIZE / 2; ++idx) {
         input_select.Append(idx * 2);
     }
 
@@ -525,7 +525,7 @@ TEST_F(ColumnVectorDateTimeTest, time_column_vector_select) {
 TEST_F(ColumnVectorDateTimeTest, time_column_slice_init) {
     using namespace infinity;
 
-    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kTime);
+    std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kTime);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
@@ -560,7 +560,7 @@ TEST_F(ColumnVectorDateTimeTest, time_column_slice_init) {
 TEST_F(ColumnVectorDateTimeTest, flat_datetime) {
     using namespace infinity;
 
-    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kDateTime);
+    std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kDateTime);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
@@ -662,7 +662,7 @@ TEST_F(ColumnVectorDateTimeTest, contant_datetime) {
 
     using namespace infinity;
 
-    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kDateTime);
+    std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kDateTime);
     ColumnVector column_vector(data_type);
 
     column_vector.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
@@ -743,7 +743,7 @@ TEST_F(ColumnVectorDateTimeTest, contant_datetime) {
 TEST_F(ColumnVectorDateTimeTest, datetime_column_vector_select) {
     using namespace infinity;
 
-    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kDateTime);
+    std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kDateTime);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
@@ -762,7 +762,7 @@ TEST_F(ColumnVectorDateTimeTest, datetime_column_vector_select) {
 
     Selection input_select;
     input_select.Initialize(DEFAULT_VECTOR_SIZE / 2);
-    for (SizeT idx = 0; idx < DEFAULT_VECTOR_SIZE / 2; ++idx) {
+    for (size_t idx = 0; idx < DEFAULT_VECTOR_SIZE / 2; ++idx) {
         input_select.Append(idx * 2);
     }
 
@@ -781,7 +781,7 @@ TEST_F(ColumnVectorDateTimeTest, datetime_column_vector_select) {
 TEST_F(ColumnVectorDateTimeTest, datetime_column_slice_init) {
     using namespace infinity;
 
-    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kDateTime);
+    std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kDateTime);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
@@ -818,7 +818,7 @@ TEST_F(ColumnVectorDateTimeTest, datetime_column_slice_init) {
 TEST_F(ColumnVectorDateTimeTest, flat_timestamp) {
     using namespace infinity;
 
-    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kTimestamp);
+    std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kTimestamp);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
@@ -921,7 +921,7 @@ TEST_F(ColumnVectorDateTimeTest, contant_timestamp) {
 
     using namespace infinity;
 
-    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kTimestamp);
+    std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kTimestamp);
     ColumnVector column_vector(data_type);
 
     column_vector.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
@@ -1002,7 +1002,7 @@ TEST_F(ColumnVectorDateTimeTest, contant_timestamp) {
 TEST_F(ColumnVectorDateTimeTest, timestamp_column_vector_select) {
     using namespace infinity;
 
-    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kTimestamp);
+    std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kTimestamp);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
@@ -1021,7 +1021,7 @@ TEST_F(ColumnVectorDateTimeTest, timestamp_column_vector_select) {
 
     Selection input_select;
     input_select.Initialize(DEFAULT_VECTOR_SIZE / 2);
-    for (SizeT idx = 0; idx < DEFAULT_VECTOR_SIZE / 2; ++idx) {
+    for (size_t idx = 0; idx < DEFAULT_VECTOR_SIZE / 2; ++idx) {
         input_select.Append(idx * 2);
     }
 
@@ -1040,7 +1040,7 @@ TEST_F(ColumnVectorDateTimeTest, timestamp_column_vector_select) {
 TEST_F(ColumnVectorDateTimeTest, timestamp_column_slice_init) {
     using namespace infinity;
 
-    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kTimestamp);
+    std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kTimestamp);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
@@ -1077,7 +1077,7 @@ TEST_F(ColumnVectorDateTimeTest, timestamp_column_slice_init) {
 TEST_F(ColumnVectorDateTimeTest, flat_interval) {
     using namespace infinity;
 
-    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kInterval);
+    std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kInterval);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
@@ -1179,7 +1179,7 @@ TEST_F(ColumnVectorDateTimeTest, contant_flat) {
 
     using namespace infinity;
 
-    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kInterval);
+    std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kInterval);
     ColumnVector column_vector(data_type);
 
     column_vector.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
@@ -1259,7 +1259,7 @@ TEST_F(ColumnVectorDateTimeTest, contant_flat) {
 TEST_F(ColumnVectorDateTimeTest, interval_column_vector_select) {
     using namespace infinity;
 
-    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kInterval);
+    std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kInterval);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
@@ -1278,7 +1278,7 @@ TEST_F(ColumnVectorDateTimeTest, interval_column_vector_select) {
 
     Selection input_select;
     input_select.Initialize(DEFAULT_VECTOR_SIZE / 2);
-    for (SizeT idx = 0; idx < DEFAULT_VECTOR_SIZE / 2; ++idx) {
+    for (size_t idx = 0; idx < DEFAULT_VECTOR_SIZE / 2; ++idx) {
         input_select.Append(idx * 2);
     }
 
@@ -1296,7 +1296,7 @@ TEST_F(ColumnVectorDateTimeTest, interval_column_vector_select) {
 TEST_F(ColumnVectorDateTimeTest, interval_column_slice_init) {
     using namespace infinity;
 
-    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kInterval);
+    std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kInterval);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 

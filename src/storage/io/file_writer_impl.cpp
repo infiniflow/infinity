@@ -26,8 +26,8 @@ import std;
 
 namespace infinity {
 
-FileWriter::FileWriter(const String &path, SizeT buffer_size)
-    : path_(path), data_(MakeUnique<char_t[]>(buffer_size)), offset_(0), total_written_(0), buffer_size_(buffer_size) {
+FileWriter::FileWriter(const std::string &path, size_t buffer_size)
+    : path_(path), data_(std::make_unique<char_t[]>(buffer_size)), offset_(0), total_written_(0), buffer_size_(buffer_size) {
     // Fixme: Open file out of constructor
     auto [file_handle, status] = VirtualStore::Open(path, FileAccessMode::kWrite);
     if (!status.ok()) {
@@ -78,7 +78,7 @@ void FileWriter::WriteVLong(const i64 vi) {
     WriteByte((u8)i);
 }
 
-void FileWriter::Write(const char_t *buffer, SizeT bytes_count) {
+void FileWriter::Write(const char_t *buffer, size_t bytes_count) {
     char_t *start_pos = (char_t *)buffer;
     char_t *end_pos = start_pos + bytes_count;
     while (start_pos < end_pos) {
@@ -110,6 +110,6 @@ void FileWriter::Flush() {
 
 i64 FileWriter::GetFileSize() { return file_handle_->FileSize() + offset_; }
 
-SizeT FileWriter::TotalWrittenBytes() const { return total_written_ + offset_; }
+size_t FileWriter::TotalWrittenBytes() const { return total_written_ + offset_; }
 
 } // namespace infinity

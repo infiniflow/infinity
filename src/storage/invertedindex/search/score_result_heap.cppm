@@ -12,11 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:fulltext_score_result_heap;
 
-import :stl;
+import :infinity_type;
 
 import internal_types;
 

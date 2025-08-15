@@ -60,8 +60,8 @@ class SelectStatementParsingTest : public BaseTest {};
 
 TEST_F(SelectStatementParsingTest, good_test1) {
     using namespace infinity;
-    SharedPtr<SQLParser> parser = MakeShared<SQLParser>();
-    SharedPtr<ParserResult> result = MakeShared<ParserResult>();
+    std::shared_ptr<SQLParser> parser = std::make_shared<SQLParser>();
+    std::shared_ptr<ParserResult> result = std::make_shared<ParserResult>();
 
     {
         String input_sql = "select a from t1;";
@@ -98,8 +98,8 @@ TEST_F(SelectStatementParsingTest, good_test1) {
 
 TEST_F(SelectStatementParsingTest, good_test2) {
     using namespace infinity;
-    SharedPtr<SQLParser> parser = MakeShared<SQLParser>();
-    SharedPtr<ParserResult> result = MakeShared<ParserResult>();
+    std::shared_ptr<SQLParser> parser = std::make_shared<SQLParser>();
+    std::shared_ptr<ParserResult> result = std::make_shared<ParserResult>();
 
     {
         String input_sql = "select 1;";
@@ -994,8 +994,8 @@ TEST_F(SelectStatementParsingTest, good_test2) {
 
 TEST_F(SelectStatementParsingTest, good_test3) {
     using namespace infinity;
-    SharedPtr<SQLParser> parser = MakeShared<SQLParser>();
-    SharedPtr<ParserResult> result = MakeShared<ParserResult>();
+    std::shared_ptr<SQLParser> parser = std::make_shared<SQLParser>();
+    std::shared_ptr<ParserResult> result = std::make_shared<ParserResult>();
 
     {
         String input_sql = "SELECT * FROM t1; \
@@ -1272,8 +1272,8 @@ TEST_F(SelectStatementParsingTest, good_test3) {
 
 TEST_F(SelectStatementParsingTest, good_test4) {
     using namespace infinity;
-    SharedPtr<SQLParser> parser = MakeShared<SQLParser>();
-    SharedPtr<ParserResult> result = MakeShared<ParserResult>();
+    std::shared_ptr<SQLParser> parser = std::make_shared<SQLParser>();
+    std::shared_ptr<ParserResult> result = std::make_shared<ParserResult>();
 
     {
         String input_sql = "SELECT * FROM t where a = cast ('2023-01-01' as date) - INTERVAL 15 DAYS;";
@@ -1305,8 +1305,8 @@ TEST_F(SelectStatementParsingTest, good_test4) {
 TEST_F(SelectStatementParsingTest, bad_test1) {
 
     using namespace infinity;
-    SharedPtr<SQLParser> parser = MakeShared<SQLParser>();
-    SharedPtr<ParserResult> result = MakeShared<ParserResult>();
+    std::shared_ptr<SQLParser> parser = std::make_shared<SQLParser>();
+    std::shared_ptr<ParserResult> result = std::make_shared<ParserResult>();
 
     {
         // bad dimension type double not match hamming
@@ -1320,8 +1320,8 @@ TEST_F(SelectStatementParsingTest, bad_test1) {
 TEST_F(SelectStatementParsingTest, bad_knn_test) {
 
     using namespace infinity;
-    SharedPtr<SQLParser> parser = MakeShared<SQLParser>();
-    SharedPtr<ParserResult> result = MakeShared<ParserResult>();
+    std::shared_ptr<SQLParser> parser = std::make_shared<SQLParser>();
+    std::shared_ptr<ParserResult> result = std::make_shared<ParserResult>();
 
     {
         // bad dimension type double not match hamming
@@ -1352,8 +1352,8 @@ TEST_F(SelectStatementParsingTest, bad_knn_test) {
 TEST_F(SelectStatementParsingTest, bad_search_test) {
 
     using namespace infinity;
-    SharedPtr<SQLParser> parser = MakeShared<SQLParser>();
-    SharedPtr<ParserResult> result = MakeShared<ParserResult>();
+    std::shared_ptr<SQLParser> parser = std::make_shared<SQLParser>();
+    std::shared_ptr<ParserResult> result = std::make_shared<ParserResult>();
 
     {
         // bad dimension type double not match hamming
@@ -1384,8 +1384,8 @@ TEST_F(SelectStatementParsingTest, bad_search_test) {
 TEST_F(SelectStatementParsingTest, good_search_test) {
 
     using namespace infinity;
-    SharedPtr<SQLParser> parser = MakeShared<SQLParser>();
-    SharedPtr<ParserResult> result = MakeShared<ParserResult>();
+    std::shared_ptr<SQLParser> parser = std::make_shared<SQLParser>();
+    std::shared_ptr<ParserResult> result = std::make_shared<ParserResult>();
 
     // integer with l2
     String input_sql = R"##(

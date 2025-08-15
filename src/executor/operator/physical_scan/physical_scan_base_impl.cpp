@@ -54,14 +54,14 @@ import row_id;
 
 namespace infinity {
 
-Vector<SharedPtr<Vector<GlobalBlockID>>> PhysicalScanBase::PlanBlockEntries(i64 parallel_count) const {
+std::vector<std::shared_ptr<std::vector<GlobalBlockID>>> PhysicalScanBase::PlanBlockEntries(i64 parallel_count) const {
     BlockIndex *block_index = base_table_ref_->block_index_.get();
 
     u64 all_block_count = block_index->BlockCount();
     u64 block_per_task = all_block_count / parallel_count;
     u64 residual = all_block_count % parallel_count;
 
-    Vector<GlobalBlockID> global_blocks;
+    std::vector<GlobalBlockID> global_blocks;
     global_blocks.reserve(all_block_count);
     for (const auto &[segment_id, segment_info] : block_index->new_segment_block_index_) {
         for (auto &block_meta : segment_info.block_map()) {
@@ -69,9 +69,9 @@ Vector<SharedPtr<Vector<GlobalBlockID>>> PhysicalScanBase::PlanBlockEntries(i64 
         }
     }
 
-    Vector<SharedPtr<Vector<GlobalBlockID>>> result(parallel_count, nullptr);
-    for (SizeT task_id = 0, global_block_id = 0, residual_idx = 0; (i64)task_id < parallel_count; ++task_id) {
-        result[task_id] = MakeShared<Vector<GlobalBlockID>>();
+    std::vector<std::shared_ptr<std::vector<GlobalBlockID>>> result(parallel_count, nullptr);
+    for (size_t task_id = 0, global_block_id = 0, residual_idx = 0; (i64)task_id < parallel_count; ++task_id) {
+        result[task_id] = std::make_shared<std::vector<GlobalBlockID>>();
         auto &task_result = result[task_id];
         task_result->reserve(block_per_task);
 
@@ -86,25 +86,25 @@ Vector<SharedPtr<Vector<GlobalBlockID>>> PhysicalScanBase::PlanBlockEntries(i64 
     return result;
 }
 
-SizeT PhysicalScanBase::TaskletCount() { return base_table_ref_->block_index_->BlockCount(); }
+size_t PhysicalScanBase::TaskletCount() { return base_table_ref_->block_index_->BlockCount(); }
 
 BlockIndex *PhysicalScanBase::GetBlockIndex() const { return base_table_ref_->block_index_.get(); }
 
-void PhysicalScanBase::SetOutput(const Vector<char *> &raw_result_dists_list,
-                                 const Vector<RowID *> &row_ids_list,
-                                 SizeT result_size,
+void PhysicalScanBase::SetOutput(const std::vector<char *> &raw_result_dists_list,
+                                 const std::vector<RowID *> &row_ids_list,
+                                 size_t result_size,
                                  i64 result_n,
                                  QueryContext *query_context,
                                  OperatorState *operator_state) const {
     BlockIndex *block_index = base_table_ref_->block_index_.get();
-    SizeT query_n = raw_result_dists_list.size();
+    size_t query_n = raw_result_dists_list.size();
     if (query_n != 1u) {
         UnrecoverableError(fmt::format("{}: Unexpected: more than 1 query?", __func__));
     }
 
     {
-        SizeT total_data_row_count = query_n * result_n;
-        SizeT row_idx = 0;
+        size_t total_data_row_count = query_n * result_n;
+        size_t row_idx = 0;
         do {
             auto data_block = DataBlock::MakeUniquePtr();
             data_block->Init(*GetOutputTypes());
@@ -114,10 +114,10 @@ void PhysicalScanBase::SetOutput(const Vector<char *> &raw_result_dists_list,
     }
 
     OutputToDataBlockHelper output_to_data_block_helper;
-    SizeT output_block_row_id = 0;
-    SizeT output_block_idx = 0;
+    size_t output_block_row_id = 0;
+    size_t output_block_idx = 0;
     DataBlock *output_block_ptr = operator_state->data_block_array_[output_block_idx].get();
-    for (SizeT query_idx = 0; query_idx < query_n; ++query_idx) {
+    for (size_t query_idx = 0; query_idx < query_n; ++query_idx) {
         char *raw_result_dists = raw_result_dists_list[query_idx];
         RowID *row_ids = row_ids_list[query_idx];
         for (i64 top_idx = 0; top_idx < result_n; ++top_idx) {
@@ -134,14 +134,14 @@ void PhysicalScanBase::SetOutput(const Vector<char *> &raw_result_dists_list,
                 output_block_row_id = 0;
             }
 
-            SizeT column_n = base_table_ref_->column_ids_.size();
-            for (SizeT i = 0; i < column_n; ++i) {
-                SizeT column_id = base_table_ref_->column_ids_[i];
+            size_t column_n = base_table_ref_->column_ids_.size();
+            for (size_t i = 0; i < column_n; ++i) {
+                size_t column_id = base_table_ref_->column_ids_[i];
                 output_to_data_block_helper.AddOutputJobInfo(segment_id, block_id, column_id, block_offset, output_block_idx, i, output_block_row_id);
                 output_block_ptr->column_vectors[i]->Finalize(output_block_ptr->column_vectors[i]->Size() + 1);
             }
             output_block_ptr->AppendValueByPtr(column_n, raw_result_dists + top_idx * result_size);
-            output_block_ptr->AppendValueByPtr(column_n + 1, (ptr_t)&row_ids[top_idx]);
+            output_block_ptr->AppendValueByPtr(column_n + 1, (char *)&row_ids[top_idx]);
 
             ++output_block_row_id;
         }
@@ -156,44 +156,44 @@ void PhysicalScanBase::SetOutput(const Vector<char *> &raw_result_dists_list,
 
 void PhysicalScanBase::AddCache(QueryContext *query_context,
                                 ResultCacheManager *cache_mgr,
-                                const Vector<UniquePtr<DataBlock>> &output_data_blocks) const {
+                                const std::vector<std::unique_ptr<DataBlock>> &output_data_blocks) const {
     NewTxn *new_txn = query_context->GetNewTxn();
     TxnTimeStamp begin_ts = new_txn->BeginTS();
 
     auto *table_info = base_table_ref_->table_info_.get();
     TxnTimeStamp query_ts = std::min(begin_ts, table_info->max_commit_ts_);
-    Vector<UniquePtr<DataBlock>> data_blocks(output_data_blocks.size());
-    for (SizeT i = 0; i < output_data_blocks.size(); ++i) {
+    std::vector<std::unique_ptr<DataBlock>> data_blocks(output_data_blocks.size());
+    for (size_t i = 0; i < output_data_blocks.size(); ++i) {
         data_blocks[i] = output_data_blocks[i]->Clone();
         if (data_blocks[i].get() == nullptr) {
             data_blocks.resize(i);
             break;
         }
     }
-    UniquePtr<CachedNodeBase> cached_node;
+    std::unique_ptr<CachedNodeBase> cached_node;
     switch (operator_type_) {
         case PhysicalOperatorType::kKnnScan: {
-            cached_node = MakeUnique<CachedKnnScan>(query_ts, static_cast<const PhysicalKnnScan *>(this));
+            cached_node = std::make_unique<CachedKnnScan>(query_ts, static_cast<const PhysicalKnnScan *>(this));
             break;
         }
         case PhysicalOperatorType::kMergeKnn: {
-            cached_node = MakeUnique<CachedKnnScan>(query_ts, static_cast<const PhysicalMergeKnn *>(this));
+            cached_node = std::make_unique<CachedKnnScan>(query_ts, static_cast<const PhysicalMergeKnn *>(this));
             break;
         }
         case PhysicalOperatorType::kMatchSparseScan: {
-            cached_node = MakeUnique<CachedMatchSparseScan>(query_ts, static_cast<const PhysicalMatchSparseScan *>(this));
+            cached_node = std::make_unique<CachedMatchSparseScan>(query_ts, static_cast<const PhysicalMatchSparseScan *>(this));
             break;
         }
         case PhysicalOperatorType::kMergeMatchSparse: {
-            cached_node = MakeUnique<CachedMatchSparseScan>(query_ts, static_cast<const PhysicalMergeMatchSparse *>(this));
+            cached_node = std::make_unique<CachedMatchSparseScan>(query_ts, static_cast<const PhysicalMergeMatchSparse *>(this));
             break;
         }
         case PhysicalOperatorType::kMatchTensorScan: {
-            cached_node = MakeUnique<CachedMatchTensorScan>(query_ts, static_cast<const PhysicalMatchTensorScan *>(this));
+            cached_node = std::make_unique<CachedMatchTensorScan>(query_ts, static_cast<const PhysicalMatchTensorScan *>(this));
             break;
         }
         case PhysicalOperatorType::kIndexScan: {
-            cached_node = MakeUnique<CachedIndexScan>(query_ts, static_cast<const PhysicalIndexScan *>(this));
+            cached_node = std::make_unique<CachedIndexScan>(query_ts, static_cast<const PhysicalIndexScan *>(this));
             break;
         }
         default: {

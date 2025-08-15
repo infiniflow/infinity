@@ -131,7 +131,7 @@ u32 GetMinimumShouldMatchParameter(const MinimumShouldMatchOption &option_vec, c
                       match_option);
 }
 
-String Trim(const String &str) {
+std::string Trim(const std::string &str) {
     auto start = str.begin();
     auto end = str.end();
 
@@ -142,10 +142,10 @@ String Trim(const String &str) {
     while (end != start && std::isspace(static_cast<unsigned char>(*(end - 1)))) {
         --end;
     }
-    return String(start, end);
+    return std::string(start, end);
 }
 
-void Split(const std::string_view &input, const RE2 &pattern, Vector<String> &result, bool keep_delim = false) {
+void Split(const std::string_view &input, const RE2 &pattern, std::vector<std::string> &result, bool keep_delim = false) {
     std::string_view leftover(input.data());
     std::string_view last_end = leftover;
     std::string_view extracted_delim_token;
@@ -153,20 +153,20 @@ void Split(const std::string_view &input, const RE2 &pattern, Vector<String> &re
     while (re2::RE2::FindAndConsume(&leftover, pattern, &extracted_delim_token)) {
         std::string_view token(last_end.data(), extracted_delim_token.data() - last_end.data());
         if (!token.empty()) {
-            result.push_back(Trim(String(token.data(), token.size())));
+            result.push_back(Trim(std::string(token.data(), token.size())));
         }
         if (keep_delim)
-            result.push_back(Trim(String(extracted_delim_token.data(), extracted_delim_token.size())));
+            result.push_back(Trim(std::string(extracted_delim_token.data(), extracted_delim_token.size())));
         last_end = leftover;
     }
 
     if (!leftover.empty()) {
-        result.push_back(Trim(String(leftover.data(), leftover.size())));
+        result.push_back(Trim(std::string(leftover.data(), leftover.size())));
     }
 }
 
 void ParseRankFeatureOption(std::string_view input_str, RankFeatureOption &feature_option) {
-    Vector<String> feature_strs;
+    std::vector<std::string> feature_strs;
     RE2 split_pattern{"(\\^)"};
     Split(input_str, split_pattern, feature_strs);
 
@@ -192,7 +192,7 @@ void ParseRankFeatureOption(std::string_view input_str, RankFeatureOption &featu
 
 RankFeaturesOption ParseRankFeaturesOption(std::string_view input_str) {
     RankFeaturesOption result;
-    Vector<String> feature_strs;
+    std::vector<std::string> feature_strs;
     RE2 split_pattern{"(,)"};
     Split(input_str, split_pattern, feature_strs);
     for (auto &feature_str : feature_strs) {

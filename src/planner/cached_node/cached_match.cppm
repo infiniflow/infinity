@@ -40,8 +40,8 @@ public:
     bool Eq(const CachedNodeBase &other) const override;
 
 private:
-    SharedPtr<MatchExpression> match_expr_{};
-    SharedPtr<BaseExpression> filter_expression_{};
+    std::shared_ptr<MatchExpression> match_expr_{};
+    std::shared_ptr<BaseExpression> filter_expression_{};
     u32 topn_;
 };
 

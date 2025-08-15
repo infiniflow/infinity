@@ -27,7 +27,7 @@ class PhysicalScanBase;
 
 export class CachedScanBase : public CachedNodeBase {
 public:
-    CachedScanBase(LogicalNodeType type, const BaseTableRef *base_table_ref, TxnTimeStamp query_ts, SharedPtr<Vector<String>> output_names);
+    CachedScanBase(LogicalNodeType type, const BaseTableRef *base_table_ref, TxnTimeStamp query_ts, std::shared_ptr<std::vector<std::string>> output_names);
 
     CachedScanBase(LogicalNodeType type, const PhysicalScanBase *physical_scan_base, TxnTimeStamp query_ts);
 
@@ -35,13 +35,13 @@ public:
 
     bool Eq(const CachedNodeBase &other) const override;
 
-    const String &schema_name() const { return *schema_name_; }
-    const String &table_name() const { return *table_name_; }
+    const std::string &schema_name() const { return *schema_name_; }
+    const std::string &table_name() const { return *table_name_; }
 
 protected:
-    SharedPtr<String> schema_name_{};
-    SharedPtr<String> table_name_{};
-    Vector<ColumnID> column_ids_{};
+    std::shared_ptr<std::string> schema_name_{};
+    std::shared_ptr<std::string> table_name_{};
+    std::vector<ColumnID> column_ids_{};
     TxnTimeStamp query_ts_{};
 };
 

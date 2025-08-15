@@ -19,7 +19,6 @@ module;
 module infinity_core:highlighter.impl;
 
 import :highlighter;
-import :stl;
 import :aho_corasick;
 import :analyzer;
 import :term;
@@ -30,7 +29,7 @@ import std.compat;
 namespace infinity {
 
 Highlighter::Highlighter() {
-    Set<String> patterns;
+    std::set<std::string> patterns;
     patterns.insert(".");
     patterns.insert(",");
     patterns.insert("?");
@@ -42,15 +41,15 @@ Highlighter::Highlighter() {
     patterns.insert("？");
     patterns.insert("！");
     patterns.insert("；");
-    Vector<String> pattern_vector(patterns.begin(), patterns.end());
+    std::vector<std::string> pattern_vector(patterns.begin(), patterns.end());
     sentence_delimiter_.Build(pattern_vector);
 }
 
-void Highlighter::GetHighlightWithoutStemmer(const Vector<String> &query, const String &raw_text, String &output) {
+void Highlighter::GetHighlightWithoutStemmer(const std::vector<std::string> &query, const std::string &raw_text, std::string &output) {
     const u32 max_results = 1024;
-    Vector<AhoCorasick::ResultType> matches(max_results + 1);
+    std::vector<AhoCorasick::ResultType> matches(max_results + 1);
     auto num_results = sentence_delimiter_.Find(raw_text, matches.data(), max_results);
-    Vector<String> sentences;
+    std::vector<std::string> sentences;
     sentences.reserve(num_results);
     std::size_t last_position = 0;
     for (u32 i = 0; i < num_results; ++i) {
@@ -66,17 +65,17 @@ void Highlighter::GetHighlightWithoutStemmer(const Vector<String> &query, const 
             last_position = r.position + r.length;
         }
     }
-    Set<String> patterns;
+    std::set<std::string> patterns;
     for (auto &query_term : query) {
         patterns.insert(ToLowerString(query_term));
     }
-    Vector<String> pattern_vector(patterns.begin(), patterns.end());
+    std::vector<std::string> pattern_vector(patterns.begin(), patterns.end());
     AhoCorasick automaton;
     automaton.Build(pattern_vector);
     std::size_t last_sentence_pos = 0;
     for (unsigned i = 0; i < sentences.size(); ++i) {
-        String &sentence_raw = sentences[i];
-        String sentence = ToLowerString(sentence_raw);
+        std::string &sentence_raw = sentences[i];
+        std::string sentence = ToLowerString(sentence_raw);
 
         num_results = automaton.Find(sentence, matches.data(), max_results);
         if (num_results > 0) {
@@ -98,7 +97,7 @@ void Highlighter::GetHighlightWithoutStemmer(const Vector<String> &query, const 
     }
 }
 
-void Highlighter::GetHighlightWithStemmer(const Vector<String> &query, const String &raw_text, String &output, Analyzer *analyzer) {
+void Highlighter::GetHighlightWithStemmer(const std::vector<std::string> &query, const std::string &raw_text, std::string &output, Analyzer *analyzer) {
     analyzer->SetCharOffset(true);
     TermList term_list;
     analyzer->Analyze(raw_text, term_list);
@@ -119,9 +118,9 @@ void Highlighter::GetHighlightWithStemmer(const Vector<String> &query, const Str
     std::sort(hit_list.begin(), hit_list.end(), [](const Term &lhs, const Term &rhs) noexcept { return lhs.word_offset_ < rhs.word_offset_; });
 
     const u32 max_results = 1024;
-    Vector<AhoCorasick::ResultType> matches(max_results + 1);
+    std::vector<AhoCorasick::ResultType> matches(max_results + 1);
     auto num_results = sentence_delimiter_.Find(raw_text, matches.data(), max_results);
-    Vector<std::size_t> sentence_boundaries;
+    std::vector<std::size_t> sentence_boundaries;
     sentence_boundaries.reserve(num_results);
     std::size_t last_position = 0;
     for (u32 i = 0; i < num_results; ++i) {
@@ -142,7 +141,7 @@ void Highlighter::GetHighlightWithStemmer(const Vector<String> &query, const Str
 
     std::size_t last_sentence_pos = 0;
     std::size_t last_term_pos = 0;
-    Vector<std::size_t>::iterator last_sentence_iter = sentence_boundaries.end();
+    std::vector<std::size_t>::iterator last_sentence_iter = sentence_boundaries.end();
     for (auto &term : hit_list) {
         auto it = std::lower_bound(sentence_boundaries.begin(), sentence_boundaries.end(), term.word_offset_, [](auto element, auto value) {
             return element < value;

@@ -71,10 +71,10 @@ namespace infinity {
 
 PhysicalMatchSparseScan::PhysicalMatchSparseScan(u64 id,
                                                  u64 table_index,
-                                                 SharedPtr<BaseTableRef> base_table_ref,
-                                                 SharedPtr<MatchSparseExpression> match_sparse_expression,
-                                                 const SharedPtr<CommonQueryFilter> &common_query_filter,
-                                                 SharedPtr<Vector<LoadMeta>> load_metas)
+                                                 std::shared_ptr<BaseTableRef> base_table_ref,
+                                                 std::shared_ptr<MatchSparseExpression> match_sparse_expression,
+                                                 const std::shared_ptr<CommonQueryFilter> &common_query_filter,
+                                                 std::shared_ptr<std::vector<LoadMeta>> load_metas)
     : PhysicalFilterScanBase(id,
                              PhysicalOperatorType::kMatchSparseScan,
                              nullptr,
@@ -87,9 +87,9 @@ PhysicalMatchSparseScan::PhysicalMatchSparseScan(u64 id,
 
 void PhysicalMatchSparseScan::Init(QueryContext *query_context) { search_column_id_ = match_sparse_expr_->column_expr_->binding().column_idx; }
 
-SharedPtr<Vector<String>> PhysicalMatchSparseScan::GetOutputNames() const {
-    SharedPtr<Vector<String>> result_names = MakeShared<Vector<String>>();
-    const Vector<String> &column_names = *base_table_ref_->column_names_;
+std::shared_ptr<std::vector<std::string>> PhysicalMatchSparseScan::GetOutputNames() const {
+    std::shared_ptr<std::vector<std::string>> result_names = std::make_shared<std::vector<std::string>>();
+    const std::vector<std::string> &column_names = *base_table_ref_->column_names_;
     result_names->reserve(column_names.size() + 2);
     for (const auto &name : column_names) {
         result_names->emplace_back(name);
@@ -99,20 +99,20 @@ SharedPtr<Vector<String>> PhysicalMatchSparseScan::GetOutputNames() const {
     return result_names;
 }
 
-SharedPtr<Vector<SharedPtr<DataType>>> PhysicalMatchSparseScan::GetOutputTypes() const {
-    SharedPtr<Vector<SharedPtr<DataType>>> result_types = MakeShared<Vector<SharedPtr<DataType>>>();
-    const Vector<SharedPtr<DataType>> &column_types = *base_table_ref_->column_types_;
+std::shared_ptr<std::vector<std::shared_ptr<DataType>>> PhysicalMatchSparseScan::GetOutputTypes() const {
+    std::shared_ptr<std::vector<std::shared_ptr<DataType>>> result_types = std::make_shared<std::vector<std::shared_ptr<DataType>>>();
+    const std::vector<std::shared_ptr<DataType>> &column_types = *base_table_ref_->column_types_;
     result_types->reserve(column_types.size() + 2);
     for (const auto &type : column_types) {
         result_types->emplace_back(type);
     }
-    result_types->emplace_back(MakeShared<DataType>(match_sparse_expr_->Type()));
-    result_types->emplace_back(MakeShared<DataType>(LogicalType::kRowID));
+    result_types->emplace_back(std::make_shared<DataType>(match_sparse_expr_->Type()));
+    result_types->emplace_back(std::make_shared<DataType>(LogicalType::kRowID));
     return result_types;
 }
 
-SizeT PhysicalMatchSparseScan::TaskletCount() {
-    SizeT ret = base_table_ref_->block_index_->BlockCount();
+size_t PhysicalMatchSparseScan::TaskletCount() {
+    size_t ret = base_table_ref_->block_index_->BlockCount();
     if (base_table_ref_->index_index_.get() != nullptr) {
         const auto &index_snapshots = base_table_ref_->index_index_->new_index_snapshots_vec_;
         if (!index_snapshots.empty()) {
@@ -126,25 +126,25 @@ SizeT PhysicalMatchSparseScan::TaskletCount() {
 }
 
 void PhysicalMatchSparseScan::PlanWithIndex(QueryContext *query_context) {
-    SizeT search_column_id = match_sparse_expr_->column_expr_->binding().column_idx;
+    size_t search_column_id = match_sparse_expr_->column_expr_->binding().column_idx;
     auto &search_column_name = base_table_ref_->table_info_->column_defs_[search_column_id]->name();
 
     Status status;
     TableMeeta *table_meta = table_meta = base_table_ref_->block_index_->table_meta_.get();
 
-    Vector<String> *index_id_strs_ptr = nullptr;
-    Vector<String> *index_names_ptr = nullptr;
+    std::vector<std::string> *index_id_strs_ptr = nullptr;
+    std::vector<std::string> *index_names_ptr = nullptr;
     status = table_meta->GetIndexIDs(index_id_strs_ptr, &index_names_ptr);
     if (!status.ok()) {
         RecoverableError(status);
     }
     if (match_sparse_expr_->index_name_.empty()) {
-        for (SizeT i = 0; i < index_id_strs_ptr->size(); ++i) {
-            const String &index_id_str = (*index_id_strs_ptr)[i];
-            const String &index_name = (*index_names_ptr)[i];
-            auto table_index_meta = MakeShared<TableIndexMeeta>(index_id_str, *table_meta);
+        for (size_t i = 0; i < index_id_strs_ptr->size(); ++i) {
+            const std::string &index_id_str = (*index_id_strs_ptr)[i];
+            const std::string &index_name = (*index_names_ptr)[i];
+            auto table_index_meta = std::make_shared<TableIndexMeeta>(index_id_str, *table_meta);
 
-            SharedPtr<IndexBase> index_base;
+            std::shared_ptr<IndexBase> index_base;
             std::tie(index_base, status) = table_index_meta->GetIndexBase();
             if (!status.ok()) {
                 RecoverableError(status);
@@ -157,7 +157,7 @@ void PhysicalMatchSparseScan::PlanWithIndex(QueryContext *query_context) {
                 continue;
             }
             if (base_table_ref_->index_index_.get() == nullptr) {
-                base_table_ref_->index_index_ = MakeShared<IndexIndex>();
+                base_table_ref_->index_index_ = std::make_shared<IndexIndex>();
             }
             IndexIndex *index_index = base_table_ref_->index_index_.get();
             auto index_snapshot = index_index->Insert(index_name, table_index_meta);
@@ -169,11 +169,11 @@ void PhysicalMatchSparseScan::PlanWithIndex(QueryContext *query_context) {
             status = Status::IndexNotExist(match_sparse_expr_->index_name_);
             RecoverableError(std::move(status));
         }
-        const String &index_id_str = (*index_id_strs_ptr)[iter - index_names_ptr->begin()];
-        const String &index_name = match_sparse_expr_->index_name_;
-        auto table_index_meta = MakeShared<TableIndexMeeta>(index_id_str, *table_meta);
+        const std::string &index_id_str = (*index_id_strs_ptr)[iter - index_names_ptr->begin()];
+        const std::string &index_name = match_sparse_expr_->index_name_;
+        auto table_index_meta = std::make_shared<TableIndexMeeta>(index_id_str, *table_meta);
 
-        SharedPtr<IndexBase> index_base;
+        std::shared_ptr<IndexBase> index_base;
         std::tie(index_base, status) = table_index_meta->GetIndexBase();
         if (!status.ok()) {
             RecoverableError(status);
@@ -191,7 +191,7 @@ void PhysicalMatchSparseScan::PlanWithIndex(QueryContext *query_context) {
             RecoverableError(std::move(error_status));
         }
         if (base_table_ref_->index_index_.get() == nullptr) {
-            base_table_ref_->index_index_ = MakeShared<IndexIndex>();
+            base_table_ref_->index_index_ = std::make_shared<IndexIndex>();
         }
         IndexIndex *index_index = base_table_ref_->index_index_.get();
         auto index_snapshot = index_index->Insert(index_name, table_index_meta);
@@ -199,19 +199,19 @@ void PhysicalMatchSparseScan::PlanWithIndex(QueryContext *query_context) {
     return;
 }
 
-Vector<SharedPtr<Vector<SegmentID>>>
-PhysicalMatchSparseScan::PlanWithIndex(Vector<SharedPtr<Vector<GlobalBlockID>>> &block_groups, i64 parallel_count, QueryContext *query_context) {
-    Vector<SharedPtr<Vector<SegmentID>>> segment_groups(parallel_count);
+std::vector<std::shared_ptr<std::vector<SegmentID>>>
+PhysicalMatchSparseScan::PlanWithIndex(std::vector<std::shared_ptr<std::vector<GlobalBlockID>>> &block_groups, i64 parallel_count, QueryContext *query_context) {
+    std::vector<std::shared_ptr<std::vector<SegmentID>>> segment_groups(parallel_count);
     for (i64 i = 0; i < parallel_count; ++i) {
-        segment_groups[i] = MakeShared<Vector<SegmentID>>();
+        segment_groups[i] = std::make_shared<std::vector<SegmentID>>();
     }
     if (static_cast<i64>(block_groups.size()) != parallel_count) {
         UnrecoverableError("block_groups.size() != parallel_count");
     }
     IndexIndex *index_index = base_table_ref_->index_index_.get();
     if (index_index != nullptr && !index_index->new_index_snapshots_.empty()) {
-        block_groups.assign(parallel_count, MakeShared<Vector<GlobalBlockID>>());
-        SizeT group_idx = 0;
+        block_groups.assign(parallel_count, std::make_shared<std::vector<GlobalBlockID>>());
+        size_t group_idx = 0;
         for (const auto &[idx_name, index_snapshot] : index_index->new_index_snapshots_) {
             for (const auto &[segment_id, segment_index_meta] : index_snapshot->segment_index_metas_) {
                 segment_groups[group_idx]->push_back(segment_id);
@@ -227,18 +227,18 @@ PhysicalMatchSparseScan::PlanWithIndex(Vector<SharedPtr<Vector<GlobalBlockID>>> 
 bool PhysicalMatchSparseScan::Execute(QueryContext *query_context, OperatorState *operator_state) {
     auto *match_sparse_scan_state = static_cast<MatchSparseScanOperatorState *>(operator_state);
     MatchSparseScanFunctionData &function_data = match_sparse_scan_state->match_sparse_scan_function_data_;
-    SharedPtr<DataBlock> query_data = function_data.query_data_;
+    std::shared_ptr<DataBlock> query_data = function_data.query_data_;
 
     if (!function_data.evaluated_) {
         ExpressionEvaluator evaluator;
         evaluator.Init(nullptr);
 
-        SharedPtr<BaseExpression> query_expr = match_sparse_expr_->query_sparse_expr_;
+        std::shared_ptr<BaseExpression> query_expr = match_sparse_expr_->query_sparse_expr_;
 
-        Vector<SharedPtr<DataType>> output_types;
-        output_types.push_back(MakeShared<DataType>(query_expr->Type()));
+        std::vector<std::shared_ptr<DataType>> output_types;
+        output_types.push_back(std::make_shared<DataType>(query_expr->Type()));
         query_data->Init(output_types);
-        SharedPtr<ExpressionState> expr_state = ExpressionState::CreateState(query_expr);
+        std::shared_ptr<ExpressionState> expr_state = ExpressionState::CreateState(query_expr);
         evaluator.Execute(query_expr, expr_state, query_data->column_vectors[0]);
 
         function_data.evaluated_ = true;
@@ -308,7 +308,7 @@ void PhysicalMatchSparseScan::ExecuteInner(QueryContext *query_context,
             break;
         }
         default: {
-            String embedding_str = EmbeddingType::EmbeddingDataType2String(sparse_info->IndexType());
+            std::string embedding_str = EmbeddingType::EmbeddingDataType2String(sparse_info->IndexType());
             UnrecoverableError(fmt::format("Invalid index type: {}", embedding_str));
         }
     }
@@ -395,30 +395,30 @@ void PhysicalMatchSparseScan::ExecuteInnerT(DistFunc *dist_func,
         return;
     }
 
-    SizeT query_n = match_sparse_expr_->query_n_;
-    SizeT topn = match_sparse_expr_->topn_;
+    size_t query_n = match_sparse_expr_->query_n_;
+    size_t topn = match_sparse_expr_->topn_;
     MatchSparseScanFunctionData &function_data = match_sparse_scan_state->match_sparse_scan_function_data_;
 
     if (merge_heap == nullptr) {
         const auto knn_threshold = GetKnnThreshold(match_sparse_expr_->opt_params_);
-        auto merge_knn_ptr = MakeUnique<MergeHeap>(query_n, topn, knn_threshold);
+        auto merge_knn_ptr = std::make_unique<MergeHeap>(query_n, topn, knn_threshold);
         merge_heap = merge_knn_ptr.get();
         merge_knn_ptr->Begin();
         function_data.merge_knn_base_ = std::move(merge_knn_ptr);
 
-        auto dist_func_ptr = MakeUnique<DistFunc>(match_sparse_expr_->metric_type_);
+        auto dist_func_ptr = std::make_unique<DistFunc>(match_sparse_expr_->metric_type_);
         dist_func = dist_func_ptr.get();
         function_data.sparse_distance_ = std::move(dist_func_ptr);
     }
 
-    const Vector<GlobalBlockID> &block_ids = *function_data.global_block_ids_;
-    const Vector<SegmentID> &segment_ids = *function_data.segment_ids_;
+    const std::vector<GlobalBlockID> &block_ids = *function_data.global_block_ids_;
+    const std::vector<SegmentID> &segment_ids = *function_data.segment_ids_;
     auto &block_ids_idx = function_data.current_block_ids_idx_;
     auto &segment_ids_idx = function_data.current_segment_ids_idx_;
 
     const ColumnVector &query_vector = *function_data.query_data_->column_vectors[0];
 
-    auto get_ele = [](const ColumnVector &column_vector, SizeT idx) -> SparseVecRef<typename DistFunc::DataT, typename DistFunc::IndexT> {
+    auto get_ele = [](const ColumnVector &column_vector, size_t idx) -> SparseVecRef<typename DistFunc::DataT, typename DistFunc::IndexT> {
         const auto *ele = reinterpret_cast<const SparseT *>(column_vector.data()) + idx;
         const auto &[nnz, file_offset] = *ele;
         return column_vector.buffer_->template GetSparse<typename DistFunc::DataT, typename DistFunc::IndexT>(file_offset, nnz);
@@ -456,7 +456,7 @@ void PhysicalMatchSparseScan::ExecuteInnerT(DistFunc *dist_func,
             UnrecoverableError(status.message());
         }
 
-        for (SizeT query_id = 0; query_id < query_n; ++query_id) {
+        for (size_t query_id = 0; query_id < query_n; ++query_id) {
             auto query_sparse = get_ele(query_vector, query_id);
             for (BlockOffset i = 0; i < row_cnt; ++i) {
                 if (!bitmask.IsTrue(i)) {
@@ -500,7 +500,7 @@ void PhysicalMatchSparseScan::ExecuteInnerT(DistFunc *dist_func,
                 if (segment_it == block_index->new_segment_block_index_.end()) {
                     UnrecoverableError(fmt::format("Cannot find segment with id: {}", segment_id));
                 }
-                SizeT segment_row_count = segment_it->second.segment_offset();
+                size_t segment_row_count = segment_it->second.segment_offset();
                 bitmask = it->second;
                 if (bitmask.count() != segment_row_count) {
                     UnrecoverableError(fmt::format("Invalid segment row count: {} vs {}", bitmask.count(), segment_row_count));
@@ -511,7 +511,7 @@ void PhysicalMatchSparseScan::ExecuteInnerT(DistFunc *dist_func,
         }
         if (!has_some_result)
             break;
-        auto bmp_search = [&](BMPHandlerPtr bmp_handler, SizeT query_id, bool with_lock, const auto &filter) {
+        auto bmp_search = [&](BMPHandlerPtr bmp_handler, size_t query_id, bool with_lock, const auto &filter) {
             auto query = get_ele(query_vector, query_id);
             BmpSearchOptions options = BMPUtil::ParseBmpSearchOptions(match_sparse_expr_->opt_params_);
             options.use_lock_ = with_lock;
@@ -533,9 +533,9 @@ void PhysicalMatchSparseScan::ExecuteInnerT(DistFunc *dist_func,
                 const BMPHandlerPtr *bmp_handler = reinterpret_cast<const BMPHandlerPtr *>(index_handle.GetData());
                 bmp_search(*bmp_handler, 0, false, filter);
             }
-            SharedPtr<MemIndex> mem_index = segment_index_meta->GetMemIndex();
+            std::shared_ptr<MemIndex> mem_index = segment_index_meta->GetMemIndex();
             if (mem_index) {
-                SharedPtr<BMPIndexInMem> bmp_index = mem_index->GetBMPIndex();
+                std::shared_ptr<BMPIndexInMem> bmp_index = mem_index->GetBMPIndex();
                 if (bmp_index) {
                     bmp_search(bmp_index->get(), 0, true, filter);
                 }
@@ -556,9 +556,9 @@ void PhysicalMatchSparseScan::ExecuteInnerT(DistFunc *dist_func,
         merge_heap->End();
         i64 result_n = merge_heap->GetSize();
 
-        Vector<char *> result_dists_list;
-        Vector<RowID *> row_ids_list;
-        for (SizeT query_id = 0; query_id < query_n; ++query_id) {
+        std::vector<char *> result_dists_list;
+        std::vector<RowID *> row_ids_list;
+        for (size_t query_id = 0; query_id < query_n; ++query_id) {
             result_dists_list.push_back(reinterpret_cast<char *>(merge_heap->GetDistancesByIdx(query_id)));
             row_ids_list.push_back(merge_heap->GetIDsByIdx(query_id));
         }

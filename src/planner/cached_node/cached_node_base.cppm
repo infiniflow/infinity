@@ -23,7 +23,7 @@ namespace infinity {
 
 export class CachedNodeBase {
 public:
-    CachedNodeBase(LogicalNodeType type, SharedPtr<Vector<String>> output_names) : type_(type), output_names_(output_names) {}
+    CachedNodeBase(LogicalNodeType type, std::shared_ptr<std::vector<std::string>> output_names) : type_(type), output_names_(output_names) {}
 
     virtual ~CachedNodeBase() = default;
 
@@ -37,11 +37,11 @@ public:
 
     LogicalNodeType type() const { return type_; }
 
-    SharedPtr<Vector<String>> output_names() const { return output_names_; }
+    std::shared_ptr<std::vector<std::string>> output_names() const { return output_names_; }
 
 protected:
     LogicalNodeType type_;
-    SharedPtr<Vector<String>> output_names_;
+    std::shared_ptr<std::vector<std::string>> output_names_;
 };
 
 } // namespace infinity

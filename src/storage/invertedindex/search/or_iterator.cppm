@@ -38,21 +38,21 @@ public:
 
     void BuildHeap();
 
-    void AdjustDown(SizeT idx);
+    void AdjustDown(size_t idx);
 
     DocIteratorEntry &TopEntry() { return iterator_heap_[1]; }
 
 public:
-    Vector<DocIteratorEntry> iterator_heap_; // children begin with 1
+    std::vector<DocIteratorEntry> iterator_heap_; // children begin with 1
 };
 
 export class OrIterator : public MultiDocIterator {
 public:
-    OrIterator(Vector<UniquePtr<DocIterator>> iterators);
+    OrIterator(std::vector<std::unique_ptr<DocIterator>> iterators);
 
     DocIteratorType GetType() const override { return DocIteratorType::kOrIterator; }
 
-    String Name() const override { return "OrIterator"; }
+    std::string Name() const override { return "OrIterator"; }
 
     /* pure virtual methods implementation */
     bool Next(RowID doc_id) override;

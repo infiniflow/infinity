@@ -30,18 +30,18 @@ namespace infinity {
 
 CaseExpression::CaseExpression() : BaseExpression(ExpressionType::kCase, {}) {}
 
-void CaseExpression::AddCaseCheck(const SharedPtr<BaseExpression> &when_expr, const SharedPtr<BaseExpression> &then_expr) {
+void CaseExpression::AddCaseCheck(const std::shared_ptr<BaseExpression> &when_expr, const std::shared_ptr<BaseExpression> &then_expr) {
     case_check_.emplace_back(when_expr, then_expr);
 }
 
-void CaseExpression::AddElseExpr(const SharedPtr<BaseExpression> &else_expr) {
+void CaseExpression::AddElseExpr(const std::shared_ptr<BaseExpression> &else_expr) {
     if (else_expr_.get() != nullptr) {
         UnrecoverableError("else expression already been assigned before.");
     }
     else_expr_ = else_expr;
 }
 
-String CaseExpression::ToString() const {
+std::string CaseExpression::ToString() const {
     std::stringstream ss;
 
     for (auto &check : case_check_) {

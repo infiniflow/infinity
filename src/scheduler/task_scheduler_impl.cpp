@@ -43,7 +43,7 @@ import global_resource_usage;
 
 namespace infinity {
 
-Worker::Worker(u64 cpu_id, UniquePtr<FragmentTaskBlockQueue> queue, UniquePtr<Thread> thread)
+Worker::Worker(u64 cpu_id, std::unique_ptr<FragmentTaskBlockQueue> queue, std::unique_ptr<std::thread> thread)
     : cpu_id_(cpu_id), queue_(std::move(queue)), thread_(std::move(thread)) {}
 
 // Non-static memory methods
@@ -61,13 +61,13 @@ TaskScheduler::~TaskScheduler() {
 }
 
 void TaskScheduler::Init(Config *config_ptr) {
-    const u64 cpu_count = Thread::hardware_concurrency();
+    const u64 cpu_count = std::thread::hardware_concurrency();
     const u64 config_cpu_limit = config_ptr->CPULimit();
     worker_count_ = std::min(cpu_count, config_cpu_limit);
     worker_array_.reserve(worker_count_);
     worker_workloads_.resize(worker_count_);
 
-    Vector<u64> cpu_id_vec;
+    std::vector<u64> cpu_id_vec;
     cpu_id_vec.reserve(cpu_count);
     // even cpus first
     for (u64 cpu_id = 0; cpu_id < cpu_count; cpu_id += 2) {
@@ -80,8 +80,8 @@ void TaskScheduler::Init(Config *config_ptr) {
 
     for (u64 worker_id = 0; worker_id < worker_count_; ++worker_id) {
         const u64 cpu_id = cpu_id_vec[worker_id];
-        UniquePtr<FragmentTaskBlockQueue> worker_queue = MakeUnique<FragmentTaskBlockQueue>("TaskScheduler");
-        UniquePtr<Thread> worker_thread = MakeUnique<Thread>(&TaskScheduler::WorkerLoop, this, worker_queue.get(), worker_id);
+        std::unique_ptr<FragmentTaskBlockQueue> worker_queue = std::make_unique<FragmentTaskBlockQueue>("TaskScheduler");
+        std::unique_ptr<std::thread> worker_thread = std::make_unique<std::thread>(&TaskScheduler::WorkerLoop, this, worker_queue.get(), worker_id);
         // Pin the thread to specific cpu
         ThreadUtil::pin(*worker_thread, cpu_id);
 
@@ -90,7 +90,7 @@ void TaskScheduler::Init(Config *config_ptr) {
     }
 
     if (worker_array_.empty()) {
-        String error_message = "No cpu is used in scheduler";
+        std::string error_message = "No cpu is used in scheduler";
         UnrecoverableError(error_message);
     }
 
@@ -99,7 +99,7 @@ void TaskScheduler::Init(Config *config_ptr) {
 
 void TaskScheduler::UnInit() {
     initialized_ = false;
-    UniquePtr<FragmentTask> terminate_task = MakeUnique<FragmentTask>(true);
+    std::unique_ptr<FragmentTask> terminate_task = std::make_unique<FragmentTask>(true);
 
     LOG_INFO("Shutting down TaskScheduler...");
     for (const auto &worker : worker_array_) {
@@ -124,7 +124,7 @@ u64 TaskScheduler::FindLeastWorkloadWorker() {
 
 void TaskScheduler::Schedule(PlanFragment *plan_fragment, const BaseStatement *base_statement) {
     if (!initialized_) {
-        String error_message = "Scheduler isn't initialized";
+        std::string error_message = "Scheduler isn't initialized";
         UnrecoverableError(error_message);
     }
     // DumpPlanFragment(plan_fragment);
@@ -159,24 +159,22 @@ void TaskScheduler::Schedule(PlanFragment *plan_fragment, const BaseStatement *b
                 RunTask(task);
                 return;
             } else {
-                String error_message = "Oops! None select and create idnex statement has multiple fragments.";
-                UnrecoverableError(error_message);
+                UnrecoverableError("Oops! None select and create idnex statement has multiple fragments.");
             }
         } else {
-            String error_message = "None select statement has multiple fragments.";
-            UnrecoverableError(error_message);
+            UnrecoverableError("None select statement has multiple fragments.");
         }
     }
 
-    Vector<PlanFragment *> start_fragments;
-    SizeT task_n = plan_fragment->GetStartFragments(start_fragments);
+    std::vector<PlanFragment *> start_fragments;
+    size_t task_n = plan_fragment->GetStartFragments(start_fragments);
     plan_fragment->GetContext()->notifier()->SetTaskN(task_n);
     for (auto *sub_fragment : start_fragments) {
         auto &tasks = sub_fragment->GetContext()->Tasks();
         for (auto &task : tasks) {
             // set the status to running
             if (!task->TryIntoWorkerLoop()) {
-                String error_message = "Task can't be scheduled";
+                std::string error_message = "Task can't be scheduled";
                 UnrecoverableError(error_message);
             }
             u64 worker_id = FindLeastWorkloadWorker();
@@ -206,7 +204,7 @@ void TaskScheduler::RunTask(FragmentTask *task) {
 }
 
 void TaskScheduler::ScheduleFragment(PlanFragment *plan_fragment) {
-    Vector<FragmentTask *> task_ptrs;
+    std::vector<FragmentTask *> task_ptrs;
     auto &tasks = plan_fragment->GetContext()->Tasks();
     for (auto &task : tasks) {
         if (task->TryIntoWorkerLoop()) {
@@ -234,7 +232,7 @@ void TaskScheduler::WorkerLoop(FragmentTaskBlockQueue *task_queue, i64 worker_id
     auto last_iter = task_lists.end();
     while (true) {
         if (iter == last_iter) {
-            Vector<FragmentTask *> dequeue_output;
+            std::vector<FragmentTask *> dequeue_output;
             if (task_lists.empty()) {
                 task_queue->DequeueBulk(dequeue_output);
             } else {

@@ -30,10 +30,10 @@ public:
     InMemIndexSegmentReader(SegmentID segment_id, MemoryIndexer *memory_indexer);
     virtual ~InMemIndexSegmentReader() = default;
 
-    bool GetSegmentPosting(const String &term, SegmentPosting &seg_posting, bool fetch_position = true) const override;
+    bool GetSegmentPosting(const std::string &term, SegmentPosting &seg_posting, bool fetch_position = true) const override;
 
 private:
-    SharedPtr<MemoryIndexer::PostingTable> posting_table_;
+    std::shared_ptr<MemoryIndexer::PostingTable> posting_table_;
     RowID base_row_id_{INVALID_ROWID};
 };
 

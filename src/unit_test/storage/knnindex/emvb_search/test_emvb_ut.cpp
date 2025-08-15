@@ -50,7 +50,7 @@ class FakePQ final : public EMVBProductQuantizer {
 public:
     void Train(const f32 *embedding_data, u32 embedding_num, u32 iter_cnt) override {}
     void AddEmbeddings(const f32 *embedding_data, u32 embedding_num) override {}
-    UniquePtr<f32[]> GetIPDistanceTable(const f32 *query_data, u32 query_num) const override { return nullptr; }
+    std::unique_ptr<f32[]> GetIPDistanceTable(const f32 *query_data, u32 query_num) const override { return nullptr; }
     f32 GetSingleIPDistance(u32 embedding_id, u32 query_id, u32 query_num, const f32 *ip_table) const override { return 0.0f; }
     void
     GetMultipleIPDistance(u32 embedding_offset, u32 embedding_num, u32 query_id, u32 query_num, const f32 *ip_table, f32 *output_ptr) const override {
@@ -88,7 +88,7 @@ TEST_F(EMVBTest, test_fakepq) {
     for (u32 i = 0; i < centroid_num; ++i) {
         centroids_data[i * embedding_dimension + i] = 1.0f;
     }
-    const auto centroids_to_docid = MakeUnique<EMVBSharedVec<u32>[]>(centroid_num);
+    const auto centroids_to_docid = std::make_unique<EMVBSharedVec<u32>[]>(centroid_num);
     for (u32 i = 0; i < centroid_num; ++i) {
         for (u32 j = 0; j < docs_in_one_centroid; ++j) {
             centroids_to_docid[i].PushBack(i * docs_in_one_centroid + j);

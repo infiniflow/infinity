@@ -32,10 +32,10 @@ import admin_statement;
 
 namespace infinity {
 
-Pair<Optional<TempWalFileInfo>, Vector<WalFileInfo>> WalFile::ParseWalFilenames(const String &wal_dir) {
+std::pair<std::optional<TempWalFileInfo>, std::vector<WalFileInfo>> WalFile::ParseWalFilenames(const std::string &wal_dir) {
 
     if (!VirtualStore::Exists(wal_dir)) {
-        return {None, Vector<WalFileInfo>{}};
+        return {std::nullopt, std::vector<WalFileInfo>{}};
     }
 
     auto [entries, status] = VirtualStore::ListDirectory(wal_dir);
@@ -44,10 +44,10 @@ Pair<Optional<TempWalFileInfo>, Vector<WalFileInfo>> WalFile::ParseWalFilenames(
     }
 
     if (entries.empty()) {
-        return {None, Vector<WalFileInfo>{}};
+        return {std::nullopt, std::vector<WalFileInfo>{}};
     }
-    Optional<TempWalFileInfo> cur_wal_info;
-    Vector<WalFileInfo> wal_infos;
+    std::optional<TempWalFileInfo> cur_wal_info;
+    std::vector<WalFileInfo> wal_infos;
     for (const auto &entry : entries) {
         if (!entry->is_regular_file()) {
             LOG_WARN(fmt::format("Wal file {} is not a regular file", entry->path().string()));
@@ -61,7 +61,7 @@ Pair<Optional<TempWalFileInfo>, Vector<WalFileInfo>> WalFile::ParseWalFilenames(
             cur_wal_info = TempWalFileInfo{entry->path().string()};
         } else {
             auto dot_pos = filename.rfind('.');
-            if (dot_pos == String::npos) {
+            if (dot_pos == std::string::npos) {
                 LOG_WARN(fmt::format("Wal file {} has wrong file name", entry->path().string()));
                 continue;
             }
@@ -73,7 +73,7 @@ Pair<Optional<TempWalFileInfo>, Vector<WalFileInfo>> WalFile::ParseWalFilenames(
                 continue;
             }
             auto file_prefix = filename.substr(0, dot_pos);
-            if (!IsEqual(file_prefix, String(WAL_FILE_PREFIX))) {
+            if (!IsEqual(file_prefix, std::string(WAL_FILE_PREFIX))) {
                 LOG_WARN(fmt::format("Wal file {} has wrong file name", entry->path().string()));
                 continue;
             }
@@ -87,9 +87,9 @@ Pair<Optional<TempWalFileInfo>, Vector<WalFileInfo>> WalFile::ParseWalFilenames(
     return {cur_wal_info, wal_infos};
 }
 
-String WalFile::WalFilename(TxnTimeStamp max_commit_ts) { return fmt::format("{}.{}", String(WAL_FILE_PREFIX), max_commit_ts); }
+std::string WalFile::WalFilename(TxnTimeStamp max_commit_ts) { return fmt::format("{}.{}", std::string(WAL_FILE_PREFIX), max_commit_ts); }
 
-String WalFile::TempWalFilename() { return String(WAL_FILE_TEMP_FILE); }
+std::string WalFile::TempWalFilename() { return std::string(WAL_FILE_TEMP_FILE); }
 
 // /**
 //  * @brief Gc the old wal files.
@@ -97,7 +97,7 @@ String WalFile::TempWalFilename() { return String(WAL_FILE_TEMP_FILE); }
 //  * Check if the wal.log.* files are too old.
 //  * if * is less than the max_commit_ts, we will delete it.
 //  */
-void WalFile::RecycleWalFile(TxnTimeStamp max_commit_ts, const String &wal_dir) {
+void WalFile::RecycleWalFile(TxnTimeStamp max_commit_ts, const std::string &wal_dir) {
     auto [cur_wal_info, wal_infos] = ParseWalFilenames(wal_dir);
     for (const auto &wal_info : wal_infos) {
         if (wal_info.max_commit_ts_ <= max_commit_ts) {

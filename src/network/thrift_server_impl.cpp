@@ -101,7 +101,7 @@ void PoolThriftServer::Init(const std::string &server_address, i32 port_no, i32 
     initialized_ = true;
 }
 
-Thread PoolThriftServer::Start() {
+std::thread PoolThriftServer::Start() {
     if (!initialized_) {
         UnrecoverableError("Thrift server is not initialized");
     }
@@ -110,7 +110,7 @@ Thread PoolThriftServer::Start() {
             UnrecoverableError(fmt::format("Thrift server in unexpected state: {}", u8(expect)));
         }
     }
-    return Thread([this] {
+    return std::thread([this] {
         server->serve();
 
         status_.store(ThriftServerStatus::kStopped);

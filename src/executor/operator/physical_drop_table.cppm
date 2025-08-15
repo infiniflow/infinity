@@ -32,13 +32,13 @@ namespace infinity {
 
 export class PhysicalDropTable final : public PhysicalOperator {
 public:
-    explicit PhysicalDropTable(SharedPtr<String> schema_name,
-                               SharedPtr<String> tbl_name,
+    explicit PhysicalDropTable(std::shared_ptr<std::string> schema_name,
+                               std::shared_ptr<std::string> tbl_name,
                                ConflictType conflict_type,
-                               SharedPtr<Vector<String>> output_names,
-                               SharedPtr<Vector<SharedPtr<DataType>>> output_types,
+                               std::shared_ptr<std::vector<std::string>> output_names,
+                               std::shared_ptr<std::vector<std::shared_ptr<DataType>>> output_types,
                                u64 id,
-                               SharedPtr<Vector<LoadMeta>> load_metas)
+                               std::shared_ptr<std::vector<LoadMeta>> load_metas)
         : PhysicalOperator(PhysicalOperatorType::kDropTable, nullptr, nullptr, id, load_metas), schema_name_(std::move(schema_name)),
           table_name_(std::move(tbl_name)), conflict_type_(conflict_type), output_names_(std::move(output_names)),
           output_types_(std::move(output_types)) {}
@@ -49,23 +49,23 @@ public:
 
     bool Execute(QueryContext *query_context, OperatorState *operator_state) final;
 
-    inline SharedPtr<Vector<String>> GetOutputNames() const final { return output_names_; }
+    inline std::shared_ptr<std::vector<std::string>> GetOutputNames() const final { return output_names_; }
 
-    inline SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const final { return output_types_; }
+    inline std::shared_ptr<std::vector<std::shared_ptr<DataType>>> GetOutputTypes() const final { return output_types_; }
 
-    inline SharedPtr<String> schema_name() const { return schema_name_; }
+    inline std::shared_ptr<std::string> schema_name() const { return schema_name_; }
 
-    inline SharedPtr<String> table_name() const { return table_name_; }
+    inline std::shared_ptr<std::string> table_name() const { return table_name_; }
 
     inline ConflictType conflict_type() const { return conflict_type_; }
 
 private:
-    SharedPtr<String> schema_name_{};
-    SharedPtr<String> table_name_{};
+    std::shared_ptr<std::string> schema_name_{};
+    std::shared_ptr<std::string> table_name_{};
     ConflictType conflict_type_{ConflictType::kInvalid};
 
-    SharedPtr<Vector<String>> output_names_{};
-    SharedPtr<Vector<SharedPtr<DataType>>> output_types_{};
+    std::shared_ptr<std::vector<std::string>> output_names_{};
+    std::shared_ptr<std::vector<std::shared_ptr<DataType>>> output_types_{};
 };
 
 } // namespace infinity

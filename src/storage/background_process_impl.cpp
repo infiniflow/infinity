@@ -43,27 +43,27 @@ BGTaskProcessor::BGTaskProcessor() = default;
 BGTaskProcessor::~BGTaskProcessor() = default;
 
 void BGTaskProcessor::Start() {
-    processor_thread_ = Thread([this] { Process(); });
+    processor_thread_ = std::thread([this] { Process(); });
     LOG_INFO("Background processor is started.");
 }
 
 void BGTaskProcessor::Stop() {
     LOG_INFO("Background processor is stopping.");
-    SharedPtr<StopProcessorTask> stop_task = MakeShared<StopProcessorTask>();
+    std::shared_ptr<StopProcessorTask> stop_task = std::make_shared<StopProcessorTask>();
     task_queue_.Enqueue(stop_task);
     stop_task->Wait();
     processor_thread_.join();
     LOG_INFO("Background processor is stopped.");
 }
 
-void BGTaskProcessor::Submit(SharedPtr<BGTask> bg_task) {
+void BGTaskProcessor::Submit(std::shared_ptr<BGTask> bg_task) {
     ++task_count_;
     task_queue_.Enqueue(std::move(bg_task));
 }
 
 void BGTaskProcessor::Process() {
     bool running{true};
-    Deque<SharedPtr<BGTask>> tasks;
+    std::deque<std::shared_ptr<BGTask>> tasks;
     while (running) {
         task_queue_.DequeueBulk(tasks);
 
@@ -112,7 +112,7 @@ void BGTaskProcessor::Process() {
                     }
                     if (storage_mode == StorageMode::kWritable or storage_mode == StorageMode::kReadable) {
                         auto *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
-                        auto new_txn_shared = new_txn_mgr->BeginTxnShared(MakeUnique<String>("clean up"), TransactionType::kCleanup);
+                        auto new_txn_shared = new_txn_mgr->BeginTxnShared(std::make_unique<std::string>("clean up"), TransactionType::kCleanup);
                         Status status = new_txn_shared->Cleanup();
                         if (!status.ok()) {
                             UnrecoverableError(status.message());
@@ -125,8 +125,8 @@ void BGTaskProcessor::Process() {
                         CleanupTxnStore *cleanup_txn_store = static_cast<CleanupTxnStore *>(new_txn_shared->GetTxnStore());
                         if (cleanup_txn_store != nullptr) {
                             TxnTimeStamp clean_ts = cleanup_txn_store->timestamp_;
-                            SharedPtr<BGTaskInfo> bg_task_info = MakeShared<BGTaskInfo>(BGTaskType::kNewCleanup);
-                            String task_text = fmt::format("NewCleanup task, cleanup timestamp: {}", clean_ts);
+                            std::shared_ptr<BGTaskInfo> bg_task_info = std::make_shared<BGTaskInfo>(BGTaskType::kNewCleanup);
+                            std::string task_text = fmt::format("NewCleanup task, cleanup timestamp: {}", clean_ts);
                             bg_task_info->task_info_list_.emplace_back(task_text);
                             if (status.ok()) {
                                 bg_task_info->status_list_.emplace_back("OK");

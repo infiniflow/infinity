@@ -28,7 +28,7 @@ import row_id;
 
 namespace infinity {
 
-RankFeatureDocIterator::RankFeatureDocIterator(UniquePtr<PostingIterator> &&iter, const u64 column_id, float boost)
+RankFeatureDocIterator::RankFeatureDocIterator(std::unique_ptr<PostingIterator> &&iter, const u64 column_id, float boost)
     : column_id_(column_id), boost_(boost), iter_(std::move(iter)) {}
 
 RankFeatureDocIterator::~RankFeatureDocIterator() {}
@@ -49,7 +49,7 @@ float RankFeatureDocIterator::Score() {
     return weight * boost_;
 }
 
-void RankFeatureDocIterator::PrintTree(std::ostream &os, const String &prefix, bool is_final) const {
+void RankFeatureDocIterator::PrintTree(std::ostream &os, const std::string &prefix, bool is_final) const {
     os << prefix;
     os << (is_final ? "└──" : "├──");
     os << "RankFeatureDocIterator";

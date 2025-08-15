@@ -30,21 +30,21 @@ namespace infinity {
 
 export class LogicalSort : public LogicalNode {
 public:
-    inline LogicalSort(u64 node_id, Vector<SharedPtr<BaseExpression>> expressions, Vector<OrderType> order_by_types)
+    inline LogicalSort(u64 node_id, std::vector<std::shared_ptr<BaseExpression>> expressions, std::vector<OrderType> order_by_types)
         : LogicalNode(node_id, LogicalNodeType::kSort), expressions_(std::move(expressions)), order_by_types_(std::move(order_by_types)) {}
 
-    [[nodiscard]] Vector<ColumnBinding> GetColumnBindings() const final;
+    [[nodiscard]] std::vector<ColumnBinding> GetColumnBindings() const final;
 
-    [[nodiscard]] SharedPtr<Vector<String>> GetOutputNames() const final;
+    [[nodiscard]] std::shared_ptr<std::vector<std::string>> GetOutputNames() const final;
 
-    [[nodiscard]] SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const final;
+    [[nodiscard]] std::shared_ptr<std::vector<std::shared_ptr<DataType>>> GetOutputTypes() const final;
 
-    String ToString(i64 &space) const final;
+    std::string ToString(i64 &space) const final;
 
-    inline String name() final { return "LogicalSort"; }
+    inline std::string name() final { return "LogicalSort"; }
 
-    Vector<SharedPtr<BaseExpression>> expressions_{};
-    Vector<OrderType> order_by_types_{};
+    std::vector<std::shared_ptr<BaseExpression>> expressions_{};
+    std::vector<OrderType> order_by_types_{};
 };
 
 } // namespace infinity

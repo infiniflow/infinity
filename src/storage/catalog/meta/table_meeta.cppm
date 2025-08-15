@@ -37,10 +37,10 @@ struct TableDetail;
 
 export class TableMeeta {
 public:
-    // TableMeeta(const String &db_id_str, const String &table_id_str, KVInstance &kv_instance, TxnTimeStamp begin_ts, UsageEnum usage);
-    TableMeeta(const String &db_id_str, const String &table_id_str, KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts);
+    // TableMeeta(const std::string &db_id_str, const std::string &table_id_str, KVInstance &kv_instance, TxnTimeStamp begin_ts, UsageEnum usage);
+    TableMeeta(const std::string &db_id_str, const std::string &table_id_str, KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts);
 
-    TableMeeta(const String &db_id_str, const String &table_id_str, NewTxn *txn);
+    TableMeeta(const std::string &db_id_str, const std::string &table_id_str, NewTxn *txn);
 
     TxnTimeStamp begin_ts() const { return begin_ts_; }
     TxnTimeStamp commit_ts() const { return commit_ts_; }
@@ -48,23 +48,23 @@ public:
 
     /**
      * Get the table creation timestamp from KV instance
-     * @return Tuple containing the create timestamp and status
+     * @return std::tuple containing the create timestamp and status
      * @note This parses the actual key in KV store to get the creation timestamp
      */
-    Tuple<TxnTimeStamp, Status> GetCreateTimestampFromKV(const String &table_name) ;
+    std::tuple<TxnTimeStamp, Status> GetCreateTimestampFromKV(const std::string &table_name) ;
 
     KVInstance *kv_instance() const { return kv_instance_; }
 
-    const String &table_id_str() const { return table_id_str_; }
-    const String &db_id_str() const { return db_id_str_; }
+    const std::string &table_id_str() const { return table_id_str_; }
+    const std::string &db_id_str() const { return db_id_str_; }
 
     Status GetComment(TableInfo &table_info);
 
-    Status GetIndexIDs(Vector<String> *&index_id_strs, Vector<String> **index_names = nullptr);
+    Status GetIndexIDs(std::vector<std::string> *&index_id_strs, std::vector<std::string> **index_names = nullptr);
 
-    Status GetIndexID(const String &index_name, String &index_key, String &index_id_str, TxnTimeStamp &create_index_ts);
+    Status GetIndexID(const std::string &index_name, std::string &index_key, std::string &index_id_str, TxnTimeStamp &create_index_ts);
 
-    Status InitSet(SharedPtr<TableDef> table_def);
+    Status InitSet(std::shared_ptr<TableDef> table_def);
 
     Status LoadSet();
 
@@ -76,39 +76,39 @@ public:
 
     Status DelUnsealedSegmentID();
 
-    Status RemoveSegmentIDs1(const Vector<SegmentID> &segment_ids);
+    Status RemoveSegmentIDs1(const std::vector<SegmentID> &segment_ids);
 
-    Pair<SegmentID, Status> AddSegmentID1(TxnTimeStamp commit_ts);
+    std::pair<SegmentID, Status> AddSegmentID1(TxnTimeStamp commit_ts);
     Status AddSegmentWithID(TxnTimeStamp commit_ts, SegmentID segment_id);
 
     Status CommitSegment(SegmentID segment_id, TxnTimeStamp commit_ts);
 
-    Tuple<ColumnID, Status> GetColumnIDByColumnName(const String &column_name);
-    Tuple<String, Status> GetColumnKeyByColumnName(const String &column_name) const;
-    SharedPtr<String> GetTableDir();
+    std::tuple<ColumnID, Status> GetColumnIDByColumnName(const std::string &column_name);
+    std::tuple<std::string, Status> GetColumnKeyByColumnName(const std::string &column_name) const;
+    std::shared_ptr<std::string> GetTableDir();
 
-    Tuple<Vector<SegmentID> *, Status> GetSegmentIDs1();
-    Status CheckSegments(const Vector<SegmentID> &segment_ids);
+    std::tuple<std::vector<SegmentID> *, Status> GetSegmentIDs1();
+    Status CheckSegments(const std::vector<SegmentID> &segment_ids);
 
-    Tuple<SharedPtr<Vector<SharedPtr<ColumnDef>>>, Status> GetColumnDefs();
-    Tuple<SharedPtr<ColumnDef>, Status> GetColumnDefByColumnName(const String &column_name, SizeT *column_idx = nullptr);
-    Tuple<SharedPtr<ColumnDef>, Status> GetColumnDefByColumnID(const SizeT &column_idx);
+    std::tuple<std::shared_ptr<std::vector<std::shared_ptr<ColumnDef>>>, Status> GetColumnDefs();
+    std::tuple<std::shared_ptr<ColumnDef>, Status> GetColumnDefByColumnName(const std::string &column_name, size_t *column_idx = nullptr);
+    std::tuple<std::shared_ptr<ColumnDef>, Status> GetColumnDefByColumnID(const size_t &column_idx);
 
     Status GetTableInfo(TableInfo &table_info);
 
     Status GetTableDetail(TableDetail &table_detail);
 
-    Pair<String, String> GetDBTableName() const { return MakePair(db_name_, table_name_); }
-    void SetDBTableName(const String &db_name, const String &table_name) {
+    std::pair<std::string, std::string> GetDBTableName() const { return MakePair(db_name_, table_name_); }
+    void SetDBTableName(const std::string &db_name, const std::string &table_name) {
         db_name_ = db_name;
         table_name_ = table_name;
     }
 
     Status AddColumn(const ColumnDef &column_def);
 
-    Status AddFtIndexCache(SharedPtr<TableIndexReaderCache> ft_index_cache);
+    Status AddFtIndexCache(std::shared_ptr<TableIndexReaderCache> ft_index_cache);
 
-    Status GetFtIndexCache(SharedPtr<TableIndexReaderCache> &ft_index_cache);
+    Status GetFtIndexCache(std::shared_ptr<TableIndexReaderCache> &ft_index_cache);
 
     Status RemoveFtIndexCache();
 
@@ -120,18 +120,18 @@ public:
     
     Status GetNextRowID(RowID &next_row_id);
 
-    Tuple<String, Status> GetNextIndexID();
+    std::tuple<std::string, Status> GetNextIndexID();
 
-    Status SetNextIndexID(const String &index_id_str);
+    Status SetNextIndexID(const std::string &index_id_str);
 
-    Tuple<SharedPtr<TableSnapshotInfo>, Status> MapMetaToSnapShotInfo(const String &db_name, const String &table_name);
+    std::tuple<std::shared_ptr<TableSnapshotInfo>, Status> MapMetaToSnapShotInfo(const std::string &db_name, const std::string &table_name);
 
 
     Status RestoreFromSnapshot(WalCmdRestoreTableSnapshot *restore_table_snapshot_cmd, bool is_link_files = false);
 
     Status SetBeginTS(TxnTimeStamp begin_ts);
 
-    Tuple<SizeT,Status> GetTableRowCount();
+    std::tuple<size_t,Status> GetTableRowCount();
 
 
 private:
@@ -147,7 +147,7 @@ private:
 
     Status LoadNextColumnID();
 
-    String GetTableTag(const String &tag) const;
+    std::string GetTableTag(const std::string &tag) const;
 
 private:
     std::mutex mtx_;
@@ -156,21 +156,21 @@ private:
     TxnTimeStamp commit_ts_;
     NewTxn *txn_{};
     KVInstance *kv_instance_{};
-    String db_id_str_;
-    String table_id_str_;
-    String db_name_{};
-    String table_name_{};
+    std::string db_id_str_;
+    std::string table_id_str_;
+    std::string db_name_{};
+    std::string table_name_{};
 
-    Optional<String> comment_;
-    Optional<Vector<SharedPtr<ColumnDef>>> column_defs_;
-    // Optional<Vector<SegmentID>> segment_ids_;
-    Optional<Vector<SegmentID>> segment_ids1_;
+    std::optional<std::string> comment_;
+    std::optional<std::vector<std::shared_ptr<ColumnDef>>> column_defs_;
+    // std::optional<std::vector<SegmentID>> segment_ids_;
+    std::optional<std::vector<SegmentID>> segment_ids1_;
 
-    Optional<Vector<String>> index_id_strs_;
-    Optional<Vector<String>> index_names_;
-    Optional<SegmentID> next_segment_id_;
-    Optional<SegmentID> unsealed_segment_id_;
-    Optional<ColumnID> next_column_id_;
+    std::optional<std::vector<std::string>> index_id_strs_;
+    std::optional<std::vector<std::string>> index_names_;
+    std::optional<SegmentID> next_segment_id_;
+    std::optional<SegmentID> unsealed_segment_id_;
+    std::optional<ColumnID> next_column_id_;
 };
 
 } // namespace infinity

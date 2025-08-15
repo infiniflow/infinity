@@ -42,14 +42,14 @@ struct AndFunction {
                              std::is_same_v<std::remove_cv_t<TC>, BooleanT>) {
             result = left and right;
         } else {
-            String error_message = "AND function accepts only u8 and BooleanT.";
+            std::string error_message = "AND function accepts only u8 and BooleanT.";
             UnrecoverableError(error_message);
         }
     }
 };
 
-static void GenerateAndFunction(SharedPtr<ScalarFunctionSet> &function_set_ptr) {
-    String func_name = "AND";
+static void GenerateAndFunction(std::shared_ptr<ScalarFunctionSet> &function_set_ptr) {
+    std::string func_name = "AND";
     ScalarFunction and_function(func_name,
                                 {DataType(LogicalType::kBoolean), DataType(LogicalType::kBoolean)},
                                 {DataType(LogicalType::kBoolean)},
@@ -58,8 +58,8 @@ static void GenerateAndFunction(SharedPtr<ScalarFunctionSet> &function_set_ptr) 
 }
 
 void RegisterAndFunction(NewCatalog *catalog_ptr) {
-    String func_name = "AND";
-    SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
+    std::string func_name = "AND";
+    std::shared_ptr<ScalarFunctionSet> function_set_ptr = std::make_shared<ScalarFunctionSet>(func_name);
 
     GenerateAndFunction(function_set_ptr);
 

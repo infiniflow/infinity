@@ -37,13 +37,13 @@ namespace infinity {
 export class PhysicalMergeTop final : public PhysicalOperator {
 public:
     explicit PhysicalMergeTop(u64 id,
-                              SharedPtr<BaseTableRef> base_table_ref,
-                              UniquePtr<PhysicalOperator> left,
+                              std::shared_ptr<BaseTableRef> base_table_ref,
+                              std::unique_ptr<PhysicalOperator> left,
                               u32 limit,
                               u32 offset,
-                              Vector<SharedPtr<BaseExpression>> sort_expressions,
-                              Vector<OrderType> order_by_types,
-                              SharedPtr<Vector<LoadMeta>> load_metas)
+                              std::vector<std::shared_ptr<BaseExpression>> sort_expressions,
+                              std::vector<OrderType> order_by_types,
+                              std::shared_ptr<std::vector<LoadMeta>> load_metas)
         : PhysicalOperator(PhysicalOperatorType::kMergeTop, std::move(left), nullptr, id, load_metas), base_table_ref_(std::move(base_table_ref)),
           limit_(limit), offset_(offset), order_by_types_(std::move(order_by_types)), sort_expressions_(std::move(sort_expressions)) {}
 
@@ -53,11 +53,11 @@ public:
 
     bool Execute(QueryContext *query_context, OperatorState *operator_state) final;
 
-    inline SharedPtr<Vector<String>> GetOutputNames() const final { return PhysicalCommonFunctionUsingLoadMeta::GetOutputNames(*this); }
+    inline std::shared_ptr<std::vector<std::string>> GetOutputNames() const final { return PhysicalCommonFunctionUsingLoadMeta::GetOutputNames(*this); }
 
-    inline SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const final { return PhysicalCommonFunctionUsingLoadMeta::GetOutputTypes(*this); }
+    inline std::shared_ptr<std::vector<std::shared_ptr<DataType>>> GetOutputTypes() const final { return PhysicalCommonFunctionUsingLoadMeta::GetOutputTypes(*this); }
 
-    SizeT TaskletCount() override { return left_->TaskletCount(); }
+    size_t TaskletCount() override { return left_->TaskletCount(); }
 
     // for OperatorState and Explain
     inline auto const &GetSortExpressions() const { return sort_expressions_; }
@@ -73,17 +73,17 @@ public:
 
     // for InputLoad
     // necessary because MergeTop may be the first operator in a pipeline
-    void FillingTableRefs(HashMap<SizeT, SharedPtr<BaseTableRef>> &table_refs) override {
+    void FillingTableRefs(std::unordered_map<size_t, std::shared_ptr<BaseTableRef>> &table_refs) override {
         table_refs.insert({base_table_ref_->table_index_, base_table_ref_});
     }
 
 private:
-    SharedPtr<BaseTableRef> base_table_ref_;             // necessary for InputLoad
+    std::shared_ptr<BaseTableRef> base_table_ref_;             // necessary for InputLoad
     u32 limit_{};                                        // limit value
     u32 offset_{};                                       // offset value
     u32 sort_expr_count_{};                              // number of expressions to sort
-    Vector<OrderType> order_by_types_;                   // ASC or DESC
-    Vector<SharedPtr<BaseExpression>> sort_expressions_; // expressions to sort
+    std::vector<OrderType> order_by_types_;                   // ASC or DESC
+    std::vector<std::shared_ptr<BaseExpression>> sort_expressions_; // expressions to sort
     CompareTwoRowAndPreferLeft prefer_left_function_;    // compare function
 };
 

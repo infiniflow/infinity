@@ -82,7 +82,7 @@ inline BoundCastFunc BindIntegerCast(const DataType &source, const DataType &tar
 struct IntegerTryCastToFixlen {
     template <typename SourceType, typename TargetType>
     static inline bool Run(SourceType, TargetType &) {
-        String error_message =
+        std::string error_message =
             fmt::format("Not support to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>());
         UnrecoverableError(error_message);
         return false;
@@ -92,7 +92,7 @@ struct IntegerTryCastToFixlen {
 struct IntegerTryCastToVarlen {
     template <typename SourceType, typename TargetType>
     static inline bool Run(SourceType, TargetType &, ColumnVector *) {
-        String error_message =
+        std::string error_message =
             fmt::format("Not support to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>());
         UnrecoverableError(error_message);
         return false;
@@ -171,7 +171,7 @@ inline bool IntegerTryCastToVarlen::Run(u8 source, VarcharT &target, ColumnVecto
         return true;
     }
     // TODO: High performance itoa needed here.
-    String tmp_str = std::to_string(source);
+    std::string tmp_str = std::to_string(source);
     target.length_ = static_cast<u32>(tmp_str.size());
     if (target.length_ > VARCHAR_INLINE_LEN) {
         UnrecoverableError("Integer digits number should less than 14.");
@@ -252,7 +252,7 @@ inline bool IntegerTryCastToVarlen::Run(TinyIntT source, VarcharT &target, Colum
         return true;
     }
     // TODO: High performance itoa needed here.
-    String tmp_str = std::to_string(source);
+    std::string tmp_str = std::to_string(source);
     target.length_ = static_cast<u32>(tmp_str.size());
     if (target.length_ > VARCHAR_INLINE_LEN) {
         UnrecoverableError("Integer digits number should less than 14.");
@@ -339,7 +339,7 @@ inline bool IntegerTryCastToVarlen::Run(SmallIntT source, VarcharT &target, Colu
         return true;
     }
     // TODO: High performance itoa needed here.
-    String tmp_str = std::to_string(source);
+    std::string tmp_str = std::to_string(source);
     target.length_ = static_cast<u32>(tmp_str.size());
     if (target.length_ > VARCHAR_INLINE_LEN) {
         UnrecoverableError("Integer digits number should less than 14.");
@@ -429,7 +429,7 @@ inline bool IntegerTryCastToVarlen::Run(IntegerT source, VarcharT &target, Colum
         return true;
     }
     // TODO: High performance itoa needed here.
-    String tmp_str = std::to_string(source);
+    std::string tmp_str = std::to_string(source);
     target.length_ = static_cast<u32>(tmp_str.size());
     if (target.length_ > VARCHAR_INLINE_LEN) {
         UnrecoverableError("Integer digits number should less than 14.");
@@ -522,7 +522,7 @@ inline bool IntegerTryCastToVarlen::Run(BigIntT source, VarcharT &target, Column
         return true;
     }
     // TODO: High performance itoa needed here.
-    String tmp_str = std::to_string(source);
+    std::string tmp_str = std::to_string(source);
     vector_ptr->AppendVarcharInner({tmp_str.data(), tmp_str.size()}, target);
 
     return true;

@@ -31,7 +31,7 @@ public:
     explicit KVIterator(rocksdb::Iterator *iterator_);
     ~KVIterator();
 
-    void Seek(const String &key);
+    void Seek(const std::string &key);
     bool Valid();
     void Next();
     rocksdb::Slice Key();
@@ -49,14 +49,14 @@ public:
     KVInstance() = default;
     ~KVInstance();
 
-    Status Put(const String &key, const String &value);
-    Status Delete(const String &key);
-    Status Get(const String &key, String &value);
-    Status GetForUpdate(const String &key, String &value);
-    UniquePtr<KVIterator> GetIterator();
-    UniquePtr<KVIterator> GetIterator(const char *lower_bound_key, const char *upper_bound_key);
-    Vector<Pair<String, String>> GetAllKeyValue();
-    String ToString() const;
+    Status Put(const std::string &key, const std::string &value);
+    Status Delete(const std::string &key);
+    Status Get(const std::string &key, std::string &value);
+    Status GetForUpdate(const std::string &key, std::string &value);
+    std::unique_ptr<KVIterator> GetIterator();
+    std::unique_ptr<KVIterator> GetIterator(const char *lower_bound_key, const char *upper_bound_key);
+    std::vector<std::pair<std::string, std::string>> GetAllKeyValue();
+    std::string ToString() const;
 
     Status Commit();
     Status Rollback();
@@ -71,28 +71,28 @@ public:
     KVStore() = default;
     ~KVStore();
 
-    Status Init(const String &db_path);
+    Status Init(const std::string &db_path);
     Status Uninit();
     Status Flush();
-    Status CreateBackup(const String &backup_path, Vector<rocksdb::BackupInfo> &backup_info_list);
-    static Status RestoreFromBackup(const String &backup_path, const String &db_path);
+    Status CreateBackup(const std::string &backup_path, std::vector<rocksdb::BackupInfo> &backup_info_list);
+    static Status RestoreFromBackup(const std::string &backup_path, const std::string &db_path);
 
-    UniquePtr<KVInstance> GetInstance();
+    std::unique_ptr<KVInstance> GetInstance();
 
-    Status Put(const String &key, const String &value);
-    Status Delete(const String &key);
-    Status Get(const String &key, String &value);
-    Status Merge(const String &key, const String &value);
+    Status Put(const std::string &key, const std::string &value);
+    Status Delete(const std::string &key);
+    Status Get(const std::string &key, std::string &value);
+    Status Merge(const std::string &key, const std::string &value);
 
-    String ToString() const;
-    SizeT KeyValueNum() const;
-    Vector<Pair<String, String>> GetAllKeyValue();
+    std::string ToString() const;
+    size_t KeyValueNum() const;
+    std::vector<std::pair<std::string, std::string>> GetAllKeyValue();
 
     // For UT
-    static Status Destroy(const String &db_path);
+    static Status Destroy(const std::string &db_path);
 
 private:
-    String db_path_{};
+    std::string db_path_{};
     rocksdb::TransactionDB *transaction_db_{}; // RocksDB transaction db
     rocksdb::Options options_;
     rocksdb::TransactionDBOptions txn_db_options_;

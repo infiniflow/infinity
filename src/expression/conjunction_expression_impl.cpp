@@ -24,10 +24,10 @@ import :expression_type;
 namespace infinity {
 
 ConjunctionExpression::ConjunctionExpression(ConjunctionType type,
-                                             const SharedPtr<BaseExpression> &left_operand,
-                                             const SharedPtr<BaseExpression> &right_operand)
+                                             const std::shared_ptr<BaseExpression> &left_operand,
+                                             const std::shared_ptr<BaseExpression> &right_operand)
     : BaseExpression(ExpressionType::kConjunction, {left_operand, right_operand}), conjunction_type_(type) {}
 
-String ConjunctionExpression::ToString() const { return {}; }
+std::string ConjunctionExpression::ToString() const { return {}; }
 
 } // namespace infinity

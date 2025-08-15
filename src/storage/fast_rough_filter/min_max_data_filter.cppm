@@ -54,7 +54,7 @@ export struct InnerMinMaxDataFilterVarcharType {
     }
 
 private:
-    Array<char, INNER_STORED_LENGTH> str = {};
+    std::array<char, INNER_STORED_LENGTH> str = {};
     u8 length = 0;
 };
 
@@ -121,7 +121,7 @@ private:
 
     template <IsVarchar T = OriginalValueType>
     [[nodiscard]] inline bool MayInRangeT(const Value &value, FilterCompareType compare_type) const {
-        const String &str = value.GetVarchar();
+        const std::string &str = value.GetVarchar();
         u32 compare_length = std::min<u32>(str.size(), InnerMinMaxDataFilterVarcharType::INNER_STORED_LENGTH);
         std::string_view compare_str(str.data(), compare_length);
         switch (compare_type) {
@@ -162,7 +162,7 @@ void CreateInnerMinMaxDataFilter(InnerMinMaxDataFilter &filter, MinMaxInnerValT 
 // can not update when data is deleted
 export class MinMaxDataFilter {
 private:
-    Vector<InnerMinMaxDataFilter> min_max_filters_;
+    std::vector<InnerMinMaxDataFilter> min_max_filters_;
 
 public:
     constexpr static std::string_view JsonTag = "min_max_data_filter";

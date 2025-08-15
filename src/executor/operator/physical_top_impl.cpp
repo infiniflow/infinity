@@ -48,9 +48,9 @@ public:
         : limit_(limit), prefer_left_function_(prefer_left_function) {
         Init();
     }
-    u32 WriteTopResultsToOutput(const Vector<Vector<SharedPtr<ColumnVector>>> &eval_columns,
-                                const Vector<UniquePtr<DataBlock>> &input_data_block_array,
-                                Vector<UniquePtr<DataBlock>> &output_data_block_array) {
+    u32 WriteTopResultsToOutput(const std::vector<std::vector<std::shared_ptr<ColumnVector>>> &eval_columns,
+                                const std::vector<std::unique_ptr<DataBlock>> &input_data_block_array,
+                                std::vector<std::unique_ptr<DataBlock>> &output_data_block_array) {
         ResetInput(eval_columns);
         SolveTop();
         WriteToOutput(input_data_block_array, output_data_block_array);
@@ -61,14 +61,14 @@ private:
     u32 size_{};
     u32 limit_{};
     const CompareTwoRowAndPreferLeft &prefer_left_function_; // sort functions
-    UniquePtr<Pair<u32, u32>[]> candidate_local_row_ids_;
-    Pair<u32, u32> *row_ids_ptr_ = nullptr; // with offset, start from 1, for heap sort
-    const Vector<Vector<SharedPtr<ColumnVector>>> *input_data_ = nullptr;
+    std::unique_ptr<std::pair<u32, u32>[]> candidate_local_row_ids_;
+    std::pair<u32, u32> *row_ids_ptr_ = nullptr; // with offset, start from 1, for heap sort
+    const std::vector<std::vector<std::shared_ptr<ColumnVector>>> *input_data_ = nullptr;
     void Init() {
-        candidate_local_row_ids_ = MakeUniqueForOverwrite<Pair<u32, u32>[]>(limit_);
+        candidate_local_row_ids_ = std::make_unique_for_overwrite<std::pair<u32, u32>[]>(limit_);
         row_ids_ptr_ = candidate_local_row_ids_.get() - 1;
     }
-    void ResetInput(const Vector<Vector<SharedPtr<ColumnVector>>> &eval_columns) {
+    void ResetInput(const std::vector<std::vector<std::shared_ptr<ColumnVector>>> &eval_columns) {
         size_ = 0;
         input_data_ = &eval_columns;
     }
@@ -88,7 +88,7 @@ private:
         }
         row_ids_ptr_[index] = tmp_id;
     }
-    void AddCandidate(Pair<u32, u32> add_id, auto compare) {
+    void AddCandidate(std::pair<u32, u32> add_id, auto compare) {
         // when heap is full, only add candidate when compare(heap_top, add_id) is true
         if (size_ == limit_) {
             if (compare(row_ids_ptr_[1], add_id)) {
@@ -122,7 +122,7 @@ private:
     void SolveTop() {
         // compare_id_for_heap: for heap sort
         // example: x = heap_top, y = candidate, return true if y should be put into heap
-        auto compare_id_for_heap = [&](Pair<u32, u32> x, Pair<u32, u32> y) -> bool {
+        auto compare_id_for_heap = [&](std::pair<u32, u32> x, std::pair<u32, u32> y) -> bool {
             return !prefer_left_function_.Compare((*input_data_)[x.first], x.second, (*input_data_)[y.first], y.second);
         };
         const u32 input_block_cnt = input_data_->size();
@@ -134,7 +134,7 @@ private:
         }
         SortResult(compare_id_for_heap);
     }
-    void WriteToOutput(const Vector<UniquePtr<DataBlock>> &input_data_block_array, Vector<UniquePtr<DataBlock>> &output_data_block_array) {
+    void WriteToOutput(const std::vector<std::unique_ptr<DataBlock>> &input_data_block_array, std::vector<std::unique_ptr<DataBlock>> &output_data_block_array) {
         auto const &db_types = input_data_block_array[0]->types();
         {
             // prepare output blocks
@@ -177,9 +177,9 @@ private:
     }
 };
 
-std::function<std::strong_ordering(const SharedPtr<ColumnVector> &, u32, const SharedPtr<ColumnVector> &, u32)>
+std::function<std::strong_ordering(const std::shared_ptr<ColumnVector> &, u32, const std::shared_ptr<ColumnVector> &, u32)>
 InvalidPhysicalTopCompareType(const DataType &type_) {
-    return [type_name = type_.ToString()](const SharedPtr<ColumnVector> &, u32, const SharedPtr<ColumnVector> &, u32) -> std::strong_ordering {
+    return [type_name = type_.ToString()](const std::shared_ptr<ColumnVector> &, u32, const std::shared_ptr<ColumnVector> &, u32) -> std::strong_ordering {
         UnrecoverableError(fmt::format("OrderBy LogicalType {} not implemented.", type_name));
         return std::strong_ordering::equal;
     };
@@ -189,7 +189,7 @@ InvalidPhysicalTopCompareType(const DataType &type_) {
 template <OrderType compare_order, BinaryGenerateBoolean T>
 struct PhysicalTopCompareSingleValue {
     static std::strong_ordering
-    Compare(const SharedPtr<ColumnVector> &left_col, u32 left_id, const SharedPtr<ColumnVector> &right_col, u32 right_id) {
+    Compare(const std::shared_ptr<ColumnVector> &left_col, u32 left_id, const std::shared_ptr<ColumnVector> &right_col, u32 right_id) {
         auto compare_prefer_left = [](const T &x, const T &y) -> bool {
             if constexpr (compare_order == OrderType::kAsc) {
                 return x < y;
@@ -219,7 +219,7 @@ template <OrderType compare_order, BinaryGenerateBoolean T>
     requires ThreeWayComparePOD<T>
 struct PhysicalTopCompareSingleValue<compare_order, T> {
     static std::strong_ordering
-    Compare(const SharedPtr<ColumnVector> &left_col, u32 left_id, const SharedPtr<ColumnVector> &right_col, u32 right_id) {
+    Compare(const std::shared_ptr<ColumnVector> &left_col, u32 left_id, const std::shared_ptr<ColumnVector> &right_col, u32 right_id) {
         auto left = (reinterpret_cast<T *>(left_col->data()))[left_id];
         auto right = (reinterpret_cast<T *>(right_col->data()))[right_id];
         if constexpr (compare_order == OrderType::kAsc) {
@@ -235,7 +235,7 @@ template <OrderType compare_order, BinaryGenerateBoolean T>
     requires IsAnyOf<T, VarcharT, BooleanT>
 struct PhysicalTopCompareSingleValue<compare_order, T> {
     static std::strong_ordering
-    Compare(const SharedPtr<ColumnVector> &left_col, u32 left_id, const SharedPtr<ColumnVector> &right_col, u32 right_id) {
+    Compare(const std::shared_ptr<ColumnVector> &left_col, u32 left_id, const std::shared_ptr<ColumnVector> &right_col, u32 right_id) {
         ColumnValueReader<T> left(left_col);
         ColumnValueReader<T> right(right_col);
         if constexpr (compare_order == OrderType::kAsc) {
@@ -247,8 +247,8 @@ struct PhysicalTopCompareSingleValue<compare_order, T> {
 };
 
 template <OrderType compare_order>
-inline std::function<std::strong_ordering(const SharedPtr<ColumnVector> &, u32, const SharedPtr<ColumnVector> &, u32)>
-GenerateSortFunctionTemplate(SharedPtr<BaseExpression> &sort_expression) {
+inline std::function<std::strong_ordering(const std::shared_ptr<ColumnVector> &, u32, const std::shared_ptr<ColumnVector> &, u32)>
+GenerateSortFunctionTemplate(std::shared_ptr<BaseExpression> &sort_expression) {
     switch (auto switch_type = sort_expression->Type().type(); switch_type) {
         case LogicalType::kBoolean: {
             return PhysicalTopCompareSingleValue<compare_order, BooleanT>::Compare;
@@ -304,8 +304,8 @@ GenerateSortFunctionTemplate(SharedPtr<BaseExpression> &sort_expression) {
     }
 }
 
-std::function<std::strong_ordering(const SharedPtr<ColumnVector> &, u32, const SharedPtr<ColumnVector> &, u32)>
-PhysicalTop::GenerateSortFunction(OrderType compare_order, SharedPtr<BaseExpression> &sort_expression) {
+std::function<std::strong_ordering(const std::shared_ptr<ColumnVector> &, u32, const std::shared_ptr<ColumnVector> &, u32)>
+PhysicalTop::GenerateSortFunction(OrderType compare_order, std::shared_ptr<BaseExpression> &sort_expression) {
     switch (compare_order) {
         case OrderType::kAsc: {
             return GenerateSortFunctionTemplate<OrderType::kAsc>(sort_expression);
@@ -322,7 +322,7 @@ void PhysicalTop::Init(QueryContext* query_context) {
     if (sort_expr_count_ != sort_expressions_.size()) {
         UnrecoverableError("order_by_types_.size() != sort_expressions_.size()");
     }
-    Vector<std::function<std::strong_ordering(const SharedPtr<ColumnVector> &, u32, const SharedPtr<ColumnVector> &, u32)>> sort_functions;
+    std::vector<std::function<std::strong_ordering(const std::shared_ptr<ColumnVector> &, u32, const std::shared_ptr<ColumnVector> &, u32)>> sort_functions;
     sort_functions.reserve(sort_expr_count_);
     for (u32 i = 0; i < sort_expr_count_; ++i) {
         sort_functions.emplace_back(GenerateSortFunction(order_by_types_[i], sort_expressions_[i]));
@@ -340,7 +340,7 @@ bool PhysicalTop::Execute(QueryContext *, OperatorState *operator_state) {
     auto &input_data_block_array = prev_op_state->data_block_array_;
     auto &output_data_block_array = top_operator_state->data_block_array_;
 
-    SizeT total_hits_row_count = std::accumulate(input_data_block_array.begin(), input_data_block_array.end(), 0, [](u32 x, const auto &y) -> u32 {
+    size_t total_hits_row_count = std::accumulate(input_data_block_array.begin(), input_data_block_array.end(), 0, [](u32 x, const auto &y) -> u32 {
         return x + y->row_count();
     });
     // sometimes the input_data_block_array is empty, but the operator is not complete
@@ -373,7 +373,7 @@ bool PhysicalTop::Execute(QueryContext *, OperatorState *operator_state) {
     return true;
 }
 
-void PhysicalTop::HandleOutputOffset(u32 total_row_cnt, u32 offset, Vector<UniquePtr<DataBlock>> &output_data_block_array) {
+void PhysicalTop::HandleOutputOffset(u32 total_row_cnt, u32 offset, std::vector<std::unique_ptr<DataBlock>> &output_data_block_array) {
     if (offset == 0) {
         return;
     }
@@ -385,7 +385,7 @@ void PhysicalTop::HandleOutputOffset(u32 total_row_cnt, u32 offset, Vector<Uniqu
         output_data_block_array.erase(output_data_block_array.begin(), output_data_block_array.begin() + offset / DEFAULT_BLOCK_CAPACITY);
         return;
     }
-    UniquePtr<DataBlock> swap_block;
+    std::unique_ptr<DataBlock> swap_block;
     if (offset >= DEFAULT_BLOCK_CAPACITY) {
         std::swap(output_data_block_array[0], swap_block);
     } else {
@@ -413,23 +413,23 @@ void PhysicalTop::HandleOutputOffset(u32 total_row_cnt, u32 offset, Vector<Uniqu
     output_data_block_array.resize(result_block_cnt);
 }
 
-Vector<Vector<SharedPtr<ColumnVector>>> PhysicalTop::GetEvalColumns(const Vector<SharedPtr<BaseExpression>> &expressions,
-                                                                    Vector<SharedPtr<ExpressionState>> &expr_states,
-                                                                    const Vector<UniquePtr<DataBlock>> &data_block_array) {
-    Vector<Vector<SharedPtr<ColumnVector>>> eval_columns;
+std::vector<std::vector<std::shared_ptr<ColumnVector>>> PhysicalTop::GetEvalColumns(const std::vector<std::shared_ptr<BaseExpression>> &expressions,
+                                                                    std::vector<std::shared_ptr<ExpressionState>> &expr_states,
+                                                                    const std::vector<std::unique_ptr<DataBlock>> &data_block_array) {
+    std::vector<std::vector<std::shared_ptr<ColumnVector>>> eval_columns;
     eval_columns.reserve(data_block_array.size());
     const u32 sort_expr_count = expressions.size();
     for (auto &data_block_ptr : data_block_array) {
-        Vector<SharedPtr<ColumnVector>> results;
+        std::vector<std::shared_ptr<ColumnVector>> results;
         ExpressionEvaluator expr_evaluator;
         expr_evaluator.Init(data_block_ptr.get());
         results.reserve(sort_expr_count);
         for (u32 expr_id = 0; expr_id < sort_expr_count; ++expr_id) {
             auto &expr = expressions[expr_id];
-            SharedPtr<ColumnVector> result_vector;
+            std::shared_ptr<ColumnVector> result_vector;
             if (expr->type() != ExpressionType::kReference) {
                 // need to initialize the result vector
-                result_vector = MakeShared<ColumnVector>(MakeShared<DataType>(expr->Type()));
+                result_vector = std::make_shared<ColumnVector>(std::make_shared<DataType>(expr->Type()));
                 result_vector->Initialize();
             }
             expr_evaluator.Execute(expr, expr_states[expr_id], result_vector);

@@ -68,7 +68,7 @@ protected:
                     const auto [term_id2, block_size2, block_offsets2, values2] = iter2.Value();
                     EXPECT_EQ(term_id, term_id2);
                     EXPECT_EQ(block_size, block_size2);
-                    for (SizeT i = 0; i < block_size; ++i) {
+                    for (size_t i = 0; i < block_size; ++i) {
                         EXPECT_EQ(block_offsets[i], block_offsets2[i]);
                         EXPECT_EQ(values[i], values2[i]);
                     }
@@ -80,17 +80,17 @@ protected:
             }
         };
 
-        SizeT filesize1 = 0;
-        SizeT filesize2 = 0;
+        size_t filesize1 = 0;
+        size_t filesize2 = 0;
         {
-            SizeT mem_used;
+            size_t mem_used;
             BMPFwd1 fwd1(block_size);
             for (SparseMatrixIter iter(dataset); iter.HasNext(); iter.Next()) {
                 SparseVecRef vec = iter.val();
                 fwd1.AddDoc(vec, mem_used);
             }
             filesize1 = fwd1.GetSizeInBytes();
-            auto buffer = MakeUnique<char[]>(filesize1);
+            auto buffer = std::make_unique<char[]>(filesize1);
             char *p = buffer.get();
             fwd1.WriteAdv(p);
             EXPECT_EQ(p - buffer.get(), filesize1);
@@ -101,19 +101,19 @@ protected:
             }
             file_handle->Append(buffer.get(), filesize1);
         }
-        UniquePtr<BMPFwd1> fwd1;
+        std::unique_ptr<BMPFwd1> fwd1;
         {
             auto [file_handle, status] = VirtualStore::Open(save_path, FileAccessMode::kRead);
             if (!status.ok()) {
                 UnrecoverableError(fmt::format("Failed to open file: {}", save_path));
             }
-            auto buffer = MakeUnique<char[]>(filesize1);
+            auto buffer = std::make_unique<char[]>(filesize1);
             file_handle->Read(buffer.get(), filesize1);
             const char *p = buffer.get();
-            fwd1 = MakeUnique<BMPFwd1>(BMPFwd1::ReadAdv(p));
+            fwd1 = std::make_unique<BMPFwd1>(BMPFwd1::ReadAdv(p));
             EXPECT_EQ(p - buffer.get(), filesize1);
         }
-        UniquePtr<char[]> buffer2;
+        std::unique_ptr<char[]> buffer2;
         {
             {
                 char *p0 = nullptr;
@@ -121,23 +121,23 @@ protected:
                 char *p1 = nullptr;
                 filesize2 = p0 - p1;
             }
-            buffer2 = MakeUnique<char[]>(filesize2);
+            buffer2 = std::make_unique<char[]>(filesize2);
             char *p2 = buffer2.get();
             fwd1->WriteToPtr(p2);
             EXPECT_EQ(p2 - buffer2.get(), filesize2);
         }
-        UniquePtr<BMPFwd2> fwd2;
+        std::unique_ptr<BMPFwd2> fwd2;
         {
             const char *p = buffer2.get();
 
-            fwd2 = MakeUnique<BMPFwd2>(BMPFwd2::LoadFromPtr(p));
+            fwd2 = std::make_unique<BMPFwd2>(BMPFwd2::LoadFromPtr(p));
             EXPECT_EQ(p - buffer2.get(), filesize2);
 
             check(*fwd1, *fwd2);
         }
         {
             const char *p = buffer2.get();
-            fwd1 = MakeUnique<BMPFwd1>(BMPFwd1::LoadFromPtr(p));
+            fwd1 = std::make_unique<BMPFwd1>(BMPFwd1::LoadFromPtr(p));
             EXPECT_EQ(p - buffer2.get(), filesize2);
 
             check(*fwd1, *fwd2);

@@ -43,13 +43,13 @@ export class PhysicalMatchTensorScan final : public PhysicalFilterScanBase {
 public:
     explicit PhysicalMatchTensorScan(u64 id,
                                      u64 table_index,
-                                     SharedPtr<BaseTableRef> base_table_ref,
-                                     SharedPtr<MatchTensorExpression> match_tensor_expression,
-                                     const SharedPtr<CommonQueryFilter> &common_query_filter,
+                                     std::shared_ptr<BaseTableRef> base_table_ref,
+                                     std::shared_ptr<MatchTensorExpression> match_tensor_expression,
+                                     const std::shared_ptr<CommonQueryFilter> &common_query_filter,
                                      u32 topn,
-                                     Optional<f32> knn_threshold,
-                                     const SharedPtr<MatchTensorScanIndexOptions> &index_options,
-                                     SharedPtr<Vector<LoadMeta>> load_metas);
+                                     std::optional<f32> knn_threshold,
+                                     const std::shared_ptr<MatchTensorScanIndexOptions> &index_options,
+                                     std::shared_ptr<std::vector<LoadMeta>> load_metas);
 
     ~PhysicalMatchTensorScan() override;
 
@@ -57,9 +57,9 @@ public:
 
     bool Execute(QueryContext *query_context, OperatorState *operator_state) override;
 
-    SharedPtr<Vector<String>> GetOutputNames() const override;
+    std::shared_ptr<std::vector<std::string>> GetOutputNames() const override;
 
-    SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const override;
+    std::shared_ptr<std::vector<std::shared_ptr<DataType>>> GetOutputTypes() const override;
 
     ColumnID SearchColumnID() const;
 
@@ -67,43 +67,43 @@ public:
 
     void PlanWithIndex(QueryContext *query_context);
 
-    Vector<SharedPtr<Vector<GlobalBlockID>>> PlanBlockEntries(i64 parallel_count) const override;
+    std::vector<std::shared_ptr<std::vector<GlobalBlockID>>> PlanBlockEntries(i64 parallel_count) const override;
 
-    SizeT TaskletCount() override;
+    size_t TaskletCount() override;
 
-    [[nodiscard]] inline String TableAlias() const { return base_table_ref_->alias_; }
+    [[nodiscard]] inline std::string TableAlias() const { return base_table_ref_->alias_; }
 
 //    [[nodiscard]] inline TableInfo *table_info() const { return base_table_ref_->table_info_.get(); }
 
-    [[nodiscard]] inline const SharedPtr<MatchTensorExpression> &match_tensor_expr() const { return src_match_tensor_expr_; }
+    [[nodiscard]] inline const std::shared_ptr<MatchTensorExpression> &match_tensor_expr() const { return src_match_tensor_expr_; }
 
     [[nodiscard]] inline const CommonQueryFilter *common_query_filter() const { return common_query_filter_.get(); }
 
     [[nodiscard]] inline u32 GetTopN() const { return topn_; }
 
-    [[nodiscard]] inline Optional<f32> GetKnnThreshold() const { return knn_threshold_; }
+    [[nodiscard]] inline std::optional<f32> GetKnnThreshold() const { return knn_threshold_; }
 
-    const SharedPtr<MatchTensorScanIndexOptions> &index_options() const { return index_options_; }
+    const std::shared_ptr<MatchTensorScanIndexOptions> &index_options() const { return index_options_; }
 
 private:
-    SharedPtr<MatchTensorExpression> src_match_tensor_expr_;
+    std::shared_ptr<MatchTensorExpression> src_match_tensor_expr_;
 
     // real MatchTensorExpression used in calculation
-    SharedPtr<void> calc_match_tensor_aligned_holder_;
-    UniquePtr<MatchTensorExpression> calc_match_tensor_expr_holder_;
+    std::shared_ptr<void> calc_match_tensor_aligned_holder_;
+    std::unique_ptr<MatchTensorExpression> calc_match_tensor_expr_holder_;
     MatchTensorExpression *calc_match_tensor_expr_ = nullptr;
 
     // extra options from match_tensor_expr_
     u32 topn_ = 0;
-    Optional<f32> knn_threshold_;
-    SharedPtr<MatchTensorScanIndexOptions> index_options_;
+    std::optional<f32> knn_threshold_;
+    std::shared_ptr<MatchTensorScanIndexOptions> index_options_;
 
     // column to search
     ColumnID search_column_id_ = 0;
 
-    UniquePtr<Vector<BlockMeta *>> block_metas_{};
-    UniquePtr<TableIndexMeeta> table_index_meta_{};
-    UniquePtr<Vector<SharedPtr<SegmentIndexMeta>>> segment_index_metas_{};
+    std::unique_ptr<std::vector<BlockMeta *>> block_metas_{};
+    std::unique_ptr<TableIndexMeeta> table_index_meta_{};
+    std::unique_ptr<std::vector<std::shared_ptr<SegmentIndexMeta>>> segment_index_metas_{};
 
     mutable atomic_u32 task_executed_ = 0;
 
@@ -112,7 +112,7 @@ private:
 
 struct MatchTensorRerankDoc;
 class BufferManager;
-export void CalculateFusionMatchTensorRerankerScores(Vector<MatchTensorRerankDoc> &rerank_docs,
+export void CalculateFusionMatchTensorRerankerScores(std::vector<MatchTensorRerankDoc> &rerank_docs,
                                                      BufferManager *buffer_mgr,
                                                      const DataType *column_data_type,
                                                      ColumnID column_id,

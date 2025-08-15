@@ -34,7 +34,7 @@ import knn_expr;
 
 namespace infinity {
 
-SharedPtr<BaseExpression> LimitBinder::BuildExpression(const ParsedExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root) {
+std::shared_ptr<BaseExpression> LimitBinder::BuildExpression(const ParsedExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root) {
     switch (expr.type_) {
         case ParsedExprType::kParameter: {
             Status status = Status::SyntaxError("Parameter expression isn't allowed in limit expression.");
@@ -50,8 +50,8 @@ SharedPtr<BaseExpression> LimitBinder::BuildExpression(const ParsedExpr &expr, B
     }
 }
 
-SharedPtr<BaseExpression> LimitBinder::BuildFuncExpr(const FunctionExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root) {
-    SharedPtr<FunctionSet> function_set_ptr = FunctionSet::GetFunctionSet(query_context_->storage()->new_catalog(), expr);
+std::shared_ptr<BaseExpression> LimitBinder::BuildFuncExpr(const FunctionExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root) {
+    std::shared_ptr<FunctionSet> function_set_ptr = FunctionSet::GetFunctionSet(query_context_->storage()->new_catalog(), expr);
     if (function_set_ptr->type_ != FunctionType::kScalar) {
         Status status = Status::SyntaxError("Only scalar function is supported in limit clause.");
         RecoverableError(status);
@@ -59,7 +59,7 @@ SharedPtr<BaseExpression> LimitBinder::BuildFuncExpr(const FunctionExpr &expr, B
     return ExpressionBinder::BuildFuncExpr(expr, bind_context_ptr, depth, root);
 }
 
-SharedPtr<BaseExpression> LimitBinder::BuildColExpr(const ColumnExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root) {
+std::shared_ptr<BaseExpression> LimitBinder::BuildColExpr(const ColumnExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root) {
     if (expr.star_) {
         Status status = Status::SyntaxError("Star expression isn't allowed in limit clause.");
         RecoverableError(status);
@@ -67,7 +67,7 @@ SharedPtr<BaseExpression> LimitBinder::BuildColExpr(const ColumnExpr &expr, Bind
     return ExpressionBinder::BuildColExpr(expr, bind_context_ptr, depth, root);
 }
 
-SharedPtr<BaseExpression> LimitBinder::BuildKnnExpr(const KnnExpr &, BindContext *, i64, bool) {
+std::shared_ptr<BaseExpression> LimitBinder::BuildKnnExpr(const KnnExpr &, BindContext *, i64, bool) {
     Status status = Status::SyntaxError("KNN expression isn't supported in limit clause");
     RecoverableError(status);
     return nullptr;

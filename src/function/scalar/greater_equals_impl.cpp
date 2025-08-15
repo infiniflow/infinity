@@ -85,8 +85,8 @@ inline void GreaterEqualsFunction::Run(VarcharT left, MixedT right, bool &result
 }
 
 template <typename CompareType, typename GreaterEqualsFunction>
-static void GenerateGreaterEqualsFunction(SharedPtr<ScalarFunctionSet> &function_set_ptr, DataType data_type) {
-    String func_name = ">=";
+static void GenerateGreaterEqualsFunction(std::shared_ptr<ScalarFunctionSet> &function_set_ptr, DataType data_type) {
+    std::string func_name = ">=";
     ScalarFunction greater_equals_function(func_name,
                                            {data_type, data_type},
                                            {DataType(LogicalType::kBoolean)},
@@ -95,9 +95,9 @@ static void GenerateGreaterEqualsFunction(SharedPtr<ScalarFunctionSet> &function
 }
 
 void RegisterGreaterEqualsFunction(NewCatalog *catalog_ptr) {
-    String func_name = ">=";
+    std::string func_name = ">=";
 
-    SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
+    std::shared_ptr<ScalarFunctionSet> function_set_ptr = std::make_shared<ScalarFunctionSet>(func_name);
 
     GenerateGreaterEqualsFunction<TinyIntT, PODTypeGreaterEqualsFunction>(function_set_ptr, DataType(LogicalType::kTinyInt));
     GenerateGreaterEqualsFunction<SmallIntT, PODTypeGreaterEqualsFunction>(function_set_ptr, DataType(LogicalType::kSmallInt));

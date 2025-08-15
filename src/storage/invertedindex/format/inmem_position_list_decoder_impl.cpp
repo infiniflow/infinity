@@ -92,7 +92,7 @@ bool InMemPositionListDecoder::LocateRecord(const InDocPositionState *state, u32
 u32 InMemPositionListDecoder::DecodeRecord(pos_t *pos_buffer, u32 pos_buffer_len) {
     last_decode_offset_ = pos_list_reader_.Tell();
 
-    SizeT pos_count = 0;
+    size_t pos_count = 0;
     pos_list_reader_.Decode(pos_buffer, pos_buffer_len, pos_count);
 
     return pos_count;

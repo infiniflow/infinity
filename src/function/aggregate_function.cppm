@@ -32,19 +32,19 @@ import internal_types;
 
 namespace infinity {
 
-using AggregateInitializeFuncType = std::function<void(ptr_t)>;
-using AggregateUpdateFuncType = std::function<void(ptr_t, const SharedPtr<ColumnVector> &)>;
-using AggregateFinalizeFuncType = std::function<ptr_t(ptr_t)>;
+using AggregateInitializeFuncType = std::function<void(char *)>;
+using AggregateUpdateFuncType = std::function<void(char *, const std::shared_ptr<ColumnVector> &)>;
+using AggregateFinalizeFuncType = std::function<char *(char *)>;
 
 class AggregateOperation {
 public:
     template <typename AggregateState>
-    static inline void StateInitialize(const ptr_t state) {
+    static inline void StateInitialize(const char * state) {
         ((AggregateState *)state)->Initialize();
     }
 
     template <typename AggregateState, typename InputType>
-    static inline void StateUpdate(const ptr_t state, const SharedPtr<ColumnVector> &input_column_vector) {
+    static inline void StateUpdate(const char * state, const std::shared_ptr<ColumnVector> &input_column_vector) {
         // Loop execute state update according to the input column vector
 
         switch (input_column_vector->vector_type()) {
@@ -53,10 +53,10 @@ public:
                     UnrecoverableError("kCompactBit column vector only support Boolean type");
                 } else {
                     // only for count, min, max
-                    SizeT row_count = input_column_vector->Size();
+                    size_t row_count = input_column_vector->Size();
                     BooleanT value;
                     const VectorBuffer *buffer = input_column_vector->buffer_.get();
-                    for (SizeT idx = 0; idx < row_count; ++idx) {
+                    for (size_t idx = 0; idx < row_count; ++idx) {
                         value = buffer->GetCompactBit(idx);
                         ((AggregateState *)state)->Update(&value, 0);
                     }
@@ -64,9 +64,9 @@ public:
                 break;
             }
             case ColumnVectorType::kFlat: {
-                SizeT row_count = input_column_vector->Size();
+                size_t row_count = input_column_vector->Size();
                 auto *input_ptr = (InputType *)(input_column_vector->data());
-                for (SizeT idx = 0; idx < row_count; ++idx) {
+                for (size_t idx = 0; idx < row_count; ++idx) {
                     ((AggregateState *)state)->Update(input_ptr, idx);
                 }
                 break;
@@ -95,19 +95,19 @@ public:
     }
 
     template <typename AggregateState, typename ResultType>
-    static inline ptr_t StateFinalize(const ptr_t state) {
+    static inline char * StateFinalize(const char * state) {
         // Loop execute state update according to the input column vector
-        ptr_t result = ((AggregateState *)state)->Finalize();
+        char * result = ((AggregateState *)state)->Finalize();
         return result;
     }
 };
 
 export class AggregateFunction : public Function {
 public:
-    explicit AggregateFunction(String name,
+    explicit AggregateFunction(std::string name,
                                DataType argument_type,
                                DataType return_type,
-                               SizeT state_size,
+                               size_t state_size,
                                AggregateInitializeFuncType init_func,
                                AggregateUpdateFuncType update_func,
                                AggregateFinalizeFuncType finalize_func)
@@ -119,11 +119,11 @@ public:
 
     [[nodiscard]] const DataType &return_type() const { return return_type_; }
 
-    [[nodiscard]] String ToString() const override;
+    [[nodiscard]] std::string ToString() const override;
 
-    UniquePtr<char[]> InitState() const { return MakeUnique<char[]>(state_size_); }
+    std::unique_ptr<char[]> InitState() const { return std::make_unique<char[]>(state_size_); }
 
-    [[nodiscard]] String GetFuncName() const { return name_; }
+    [[nodiscard]] std::string GetFuncName() const { return name_; }
 
 public:
     AggregateInitializeFuncType init_func_;
@@ -133,11 +133,11 @@ public:
     DataType argument_type_;
     DataType return_type_;
 
-    SizeT state_size_{};
+    size_t state_size_{};
 };
 
 export template <typename AggregateState, typename InputType, typename ResultType>
-inline AggregateFunction UnaryAggregate(const String &name, const DataType &input_type, const DataType &return_type) {
+inline AggregateFunction UnaryAggregate(const std::string &name, const DataType &input_type, const DataType &return_type) {
     return AggregateFunction(name,
                              input_type,
                              return_type,

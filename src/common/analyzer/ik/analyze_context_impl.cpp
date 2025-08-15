@@ -52,7 +52,7 @@ bool AnalyzeContext::AddLexeme(Lexeme *lexeme) { return org_lexemes_->AddLexeme(
 
 void AnalyzeContext::AddLexemePath(LexemePath *path) {
     if (path != nullptr) {
-        path_map_[path->GetPathBegin()] = UniquePtr<LexemePath>(path);
+        path_map_[path->GetPathBegin()] = std::unique_ptr<LexemePath>(path);
     }
 }
 
@@ -115,7 +115,7 @@ Lexeme *AnalyzeContext::GetNextLexeme() {
 }
 
 void AnalyzeContext::Reset() {
-    org_lexemes_ = MakeUnique<QuickSortSet>();
+    org_lexemes_ = std::make_unique<QuickSortSet>();
     available_ = 0;
     buff_offset_ = 0;
     char_types_.clear();

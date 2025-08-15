@@ -11,10 +11,10 @@ import :vbyte_compress_encoder;
 namespace infinity {
 
 struct EncoderProvider {
-    UniquePtr<Int32Encoder> int32_encoder_ = MakeUnique<Int32Encoder>();
-    UniquePtr<Int16Encoder> int16_encoder_ = MakeUnique<Int16Encoder>();
-    UniquePtr<NoCompressEncoder> no_compress_encoder_ = MakeUnique<NoCompressEncoder>();
-    UniquePtr<VByteCompressEncoder> vbyte_compress_encoder_ = MakeUnique<VByteCompressEncoder>();
+    std::unique_ptr<Int32Encoder> int32_encoder_ = std::make_unique<Int32Encoder>();
+    std::unique_ptr<Int16Encoder> int16_encoder_ = std::make_unique<Int16Encoder>();
+    std::unique_ptr<NoCompressEncoder> no_compress_encoder_ = std::make_unique<NoCompressEncoder>();
+    std::unique_ptr<VByteCompressEncoder> vbyte_compress_encoder_ = std::make_unique<VByteCompressEncoder>();
 
     static EncoderProvider *GetInstance() {
         static EncoderProvider instance;

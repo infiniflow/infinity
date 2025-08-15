@@ -25,11 +25,11 @@ namespace infinity {
 
 export class DataFileWorker : public FileWorker {
 public:
-    explicit DataFileWorker(SharedPtr<String> data_dir,
-                            SharedPtr<String> temp_dir,
-                            SharedPtr<String> file_dir,
-                            SharedPtr<String> file_name,
-                            SizeT buffer_size,
+    explicit DataFileWorker(std::shared_ptr<std::string> data_dir,
+                            std::shared_ptr<std::string> temp_dir,
+                            std::shared_ptr<std::string> file_dir,
+                            std::shared_ptr<std::string> file_name,
+                            size_t buffer_size,
                             PersistenceManager *persistence_manager);
 
     virtual ~DataFileWorker() override;
@@ -39,23 +39,23 @@ public:
 
     void FreeInMemory() override;
 
-    SizeT GetMemoryCost() const override { return buffer_size_; }
+    size_t GetMemoryCost() const override { return buffer_size_; }
 
     FileWorkerType Type() const override { return FileWorkerType::kDataFile; }
 
 protected:
     bool WriteToFileImpl(bool to_spill, bool &prepare_success, const FileWorkerSaveCtx &ctx) override;
 
-    void ReadFromFileImpl(SizeT file_size, bool from_spill) override;
+    void ReadFromFileImpl(size_t file_size, bool from_spill) override;
 
-    bool ReadFromMmapImpl(const void *ptr, SizeT size) override;
+    bool ReadFromMmapImpl(const void *ptr, size_t size) override;
 
     void FreeFromMmapImpl() override;
 
-    void SetDataSize(SizeT size) override;
+    void SetDataSize(size_t size) override;
 
 private:
-    const SizeT buffer_size_;
-    Atomic<SizeT> data_size_{};
+    const size_t buffer_size_;
+    std::atomic<size_t> data_size_{};
 };
 } // namespace infinity

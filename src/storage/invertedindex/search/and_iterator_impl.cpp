@@ -30,13 +30,13 @@ import internal_types;
 
 namespace infinity {
 
-AndIterator::AndIterator(Vector<UniquePtr<DocIterator>> iterators) : MultiDocIterator(std::move(iterators)) {
+AndIterator::AndIterator(std::vector<std::unique_ptr<DocIterator>> iterators) : MultiDocIterator(std::move(iterators)) {
     std::sort(children_.begin(), children_.end(), [](const auto &lhs, const auto &rhs) {
         return lhs->GetEstimateIterateCost() < rhs->GetEstimateIterateCost();
     });
     bm25_score_upper_bound_ = 0.0f;
     estimate_iterate_cost_ = {};
-    for (SizeT i = 0; i < children_.size(); i++) {
+    for (size_t i = 0; i < children_.size(); i++) {
         const auto &it = children_[i];
         bm25_score_upper_bound_ += children_[i]->BM25ScoreUpperBound();
         estimate_iterate_cost_ = std::min(estimate_iterate_cost_, it->GetEstimateIterateCost());
@@ -61,7 +61,7 @@ bool AndIterator::Next(const RowID doc_id) {
         return true;
     RowID target_doc_id = doc_id;
     while (true) {
-        for (SizeT i = 0; i < children_.size(); i++) {
+        for (size_t i = 0; i < children_.size(); i++) {
             const auto &it = children_[i];
             bool ok = it->Next(target_doc_id);
             if (!ok) {
@@ -80,7 +80,7 @@ bool AndIterator::Next(const RowID doc_id) {
                 return true;
             }
             float sum_score = 0.0f;
-            for (SizeT i = 0; i < children_.size(); i++) {
+            for (size_t i = 0; i < children_.size(); i++) {
                 const auto &it = children_[i];
                 sum_score += it->Score();
             }
@@ -100,7 +100,7 @@ float AndIterator::Score() {
         return score_cache_;
     }
     float sum_score = 0.0f;
-    for (SizeT i = 0; i < children_.size(); i++) {
+    for (size_t i = 0; i < children_.size(); i++) {
         const auto &it = children_[i];
         sum_score += it->Score();
     }
@@ -114,7 +114,7 @@ void AndIterator::UpdateScoreThreshold(float threshold) {
         return;
     threshold_ = threshold;
     const float base_threshold = threshold - BM25ScoreUpperBound();
-    for (SizeT i = 0; i < children_.size(); i++) {
+    for (size_t i = 0; i < children_.size(); i++) {
         const auto &it = children_[i];
         float new_threshold = std::max(0.0f, base_threshold + it->BM25ScoreUpperBound());
         it->UpdateScoreThreshold(new_threshold);

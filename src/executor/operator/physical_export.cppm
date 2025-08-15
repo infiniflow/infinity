@@ -41,19 +41,19 @@ struct BlockIndex;
 export class PhysicalExport : public PhysicalOperator {
 public:
     explicit PhysicalExport(u64 id,
-                            const SharedPtr<TableInfo> &table_info,
-                            String schema_name,
-                            String table_name,
-                            String file_path,
+                            const std::shared_ptr<TableInfo> &table_info,
+                            std::string schema_name,
+                            std::string table_name,
+                            std::string file_path,
                             bool header,
                             char delimiter,
                             CopyFileType type,
-                            SizeT offset,
-                            SizeT limit,
-                            SizeT row_limit,
-                            Vector<u64> column_idx_array,
-                            SharedPtr<BlockIndex> block_index,
-                            SharedPtr<Vector<LoadMeta>> load_metas);
+                            size_t offset,
+                            size_t limit,
+                            size_t row_limit,
+                            std::vector<u64> column_idx_array,
+                            std::shared_ptr<BlockIndex> block_index,
+                            std::shared_ptr<std::vector<LoadMeta>> load_metas);
 
     ~PhysicalExport() override;
 
@@ -61,48 +61,48 @@ public:
 
     bool Execute(QueryContext *query_context, OperatorState *operator_state) final;
 
-    inline SharedPtr<Vector<String>> GetOutputNames() const final { return output_names_; }
+    inline std::shared_ptr<std::vector<std::string>> GetOutputNames() const final { return output_names_; }
 
-    inline SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const final { return output_types_; }
+    inline std::shared_ptr<std::vector<std::shared_ptr<DataType>>> GetOutputTypes() const final { return output_types_; }
 
-    SizeT ExportToCSV(QueryContext *query_context, ExportOperatorState *export_op_state);
+    size_t ExportToCSV(QueryContext *query_context, ExportOperatorState *export_op_state);
 
-    SizeT ExportToJSONL(QueryContext *query_context, ExportOperatorState *export_op_state);
+    size_t ExportToJSONL(QueryContext *query_context, ExportOperatorState *export_op_state);
 
-    SizeT ExportToFileInner(QueryContext *query_context, ExportOperatorState *export_op_state, std::function<String(const Vector<ColumnVector> &, SizeT)> line_to_string);
+    size_t ExportToFileInner(QueryContext *query_context, ExportOperatorState *export_op_state, std::function<std::string(const std::vector<ColumnVector> &, size_t)> line_to_string);
 
-    SizeT ExportToFVECS(QueryContext *query_context, ExportOperatorState *export_op_state);
+    size_t ExportToFVECS(QueryContext *query_context, ExportOperatorState *export_op_state);
 
-    SizeT ExportToPARQUET(QueryContext *query_context, ExportOperatorState *export_op_state);
+    size_t ExportToPARQUET(QueryContext *query_context, ExportOperatorState *export_op_state);
 
     inline CopyFileType FileType() const { return file_type_; }
 
-    inline const String &file_path() const { return file_path_; }
+    inline const std::string &file_path() const { return file_path_; }
 
-    inline const String &schema_name() const { return schema_name_; }
+    inline const std::string &schema_name() const { return schema_name_; }
 
-    inline const String &table_name() const { return table_name_; }
+    inline const std::string &table_name() const { return table_name_; }
 
     inline bool header() const { return header_; }
 
     inline char delimiter() const { return delimiter_; }
 
 private:
-    SharedPtr<Vector<String>> output_names_{};
-    SharedPtr<Vector<SharedPtr<DataType>>> output_types_{};
+    std::shared_ptr<std::vector<std::string>> output_names_{};
+    std::shared_ptr<std::vector<std::shared_ptr<DataType>>> output_types_{};
 
-    SharedPtr<TableInfo> table_info_{};
+    std::shared_ptr<TableInfo> table_info_{};
     CopyFileType file_type_{CopyFileType::kInvalid};
-    String file_path_{};
-    String table_name_{};
-    String schema_name_{"default_db"};
+    std::string file_path_{};
+    std::string table_name_{};
+    std::string schema_name_{"default_db"};
     bool header_{false};
     char delimiter_{','};
-    SizeT offset_{};
-    SizeT limit_{};
-    SizeT row_limit_{};
-    Vector<u64> column_idx_array_;
-    SharedPtr<BlockIndex> block_index_{};
+    size_t offset_{};
+    size_t limit_{};
+    size_t row_limit_{};
+    std::vector<u64> column_idx_array_;
+    std::shared_ptr<BlockIndex> block_index_{};
 };
 
 } // namespace infinity

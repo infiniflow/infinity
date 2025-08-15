@@ -33,16 +33,16 @@ export enum class FragmentTaskStatus : i8 {
     kError,
 };
 
-export String FragmentTaskStatus2String(FragmentTaskStatus status) {
+export std::string FragmentTaskStatus2String(FragmentTaskStatus status) {
     switch (status) {
         case FragmentTaskStatus::kPending:
-            return String("Pending");
+            return std::string("Pending");
         case FragmentTaskStatus::kRunning:
-            return String("Running");
+            return std::string("Running");
         case FragmentTaskStatus::kFinished:
-            return String("Finished");
+            return std::string("Finished");
         case FragmentTaskStatus::kError:
-            return String("Error");
+            return std::string("Error");
     }
 }
 
@@ -93,7 +93,7 @@ public:
 
     bool CompleteTask();
 
-    String PhysOpsToString();
+    std::string PhysOpsToString();
 
     // for test.
     [[nodiscard]] inline FragmentTaskStatus status() const { return status_; }
@@ -101,11 +101,11 @@ public:
     FragmentContext *fragment_context() const;
 
 public:
-    UniquePtr<SourceState> source_state_{};
+    std::unique_ptr<SourceState> source_state_{};
 
-    Vector<UniquePtr<OperatorState>> operator_states_{};
+    std::vector<std::unique_ptr<OperatorState>> operator_states_{};
 
-    UniquePtr<SinkState> sink_state_{};
+    std::unique_ptr<SinkState> sink_state_{};
 
 private:
     std::mutex mutex_;

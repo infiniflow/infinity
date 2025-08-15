@@ -50,7 +50,7 @@ inline BoundCastFunc BindGeographyCast(const DataType &source, DataType &target)
 struct GeographyTryCastToVarlen {
     template <typename SourceType, typename TargetType>
     static inline bool Run(const SourceType &, TargetType &, ColumnVector *) {
-        String error_message =
+        std::string error_message =
             fmt::format("Not support to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>());
         UnrecoverableError(error_message);
         return false;
@@ -82,13 +82,13 @@ inline bool GeographyTryCastToVarlen::Run(const BoxT &, VarcharT &, ColumnVector
 }
 #if 0
 template <>
-inline bool GeographyTryCastToVarlen::Run(const PathT &source, VarcharT &target, const SharedPtr<ColumnVector> &vector_ptr) {
+inline bool GeographyTryCastToVarlen::Run(const PathT &source, VarcharT &target, const std::shared_ptr<ColumnVector> &vector_ptr) {
     UnrecoverableError("Not implement: GeographyTryCastToVarlen::Run");
     return false;
 }
 
 template <>
-inline bool GeographyTryCastToVarlen::Run(const PolygonT &source, VarcharT &target, const SharedPtr<ColumnVector> &vector_ptr) {
+inline bool GeographyTryCastToVarlen::Run(const PolygonT &source, VarcharT &target, const std::shared_ptr<ColumnVector> &vector_ptr) {
     UnrecoverableError("Not implement: GeographyTryCastToVarlen::Run");
     return false;
 }

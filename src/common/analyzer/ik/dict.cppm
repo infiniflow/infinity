@@ -10,19 +10,19 @@ import :status;
 namespace infinity {
 export class Dictionary {
 public:
-    UniquePtr<DictSegment> main_dict_;
-    UniquePtr<DictSegment> quantifier_dict_;
-    UniquePtr<DictSegment> stop_words_;
-    UniquePtr<DictSegment> surname_dict_;
-    UniquePtr<DictSegment> suffix_dict_;
-    UniquePtr<DictSegment> prep_dict_;
+    std::unique_ptr<DictSegment> main_dict_;
+    std::unique_ptr<DictSegment> quantifier_dict_;
+    std::unique_ptr<DictSegment> stop_words_;
+    std::unique_ptr<DictSegment> surname_dict_;
+    std::unique_ptr<DictSegment> suffix_dict_;
+    std::unique_ptr<DictSegment> prep_dict_;
 
-    String conf_dir_;
-    HashMap<String, String> props_;
+    std::string conf_dir_;
+    std::unordered_map<std::string, std::string> props_;
 
-    Dictionary(const String &dir);
+    Dictionary(const std::string &dir);
 
-    String GetProperty(const String &key) {
+    std::string GetProperty(const std::string &key) {
         if (props_.find(key) != props_.end()) {
             return props_[key];
         }
@@ -31,29 +31,29 @@ public:
 
     Status Load();
 
-    void WalkFileTree(Vector<String> &files, const String &path_str);
+    void WalkFileTree(std::vector<std::string> &files, const std::string &path_str);
 
-    Status LoadDictFile(DictSegment *dict, const String &file_path, bool critical, const String &name);
+    Status LoadDictFile(DictSegment *dict, const std::string &file_path, bool critical, const std::string &name);
 
-    Vector<String> GetExtDictionarys();
+    std::vector<std::string> GetExtDictionarys();
 
-    Vector<String> GetExtStopWordDictionarys();
+    std::vector<std::string> GetExtStopWordDictionarys();
 
-    String GetDictRoot() { return conf_dir_; }
+    std::string GetDictRoot() { return conf_dir_; }
 
-    void AddWords(const Vector<String> &words);
+    void AddWords(const std::vector<std::string> &words);
 
-    void DisableWords(const Vector<String> &words);
+    void DisableWords(const std::vector<std::string> &words);
 
-    Hit *MatchInMainDict(const Vector<wchar_t> &char_array);
+    Hit *MatchInMainDict(const std::vector<wchar_t> &char_array);
 
-    Hit *MatchInMainDict(const Vector<wchar_t> &char_array, int begin, int length);
+    Hit *MatchInMainDict(const std::vector<wchar_t> &char_array, int begin, int length);
 
-    Hit *MatchInQuantifierDict(const Vector<wchar_t> &char_array, int begin, int length);
+    Hit *MatchInQuantifierDict(const std::vector<wchar_t> &char_array, int begin, int length);
 
-    Hit *MatchWithHit(const Vector<wchar_t> &char_array, int current_index, Hit *matched_hit);
+    Hit *MatchWithHit(const std::vector<wchar_t> &char_array, int current_index, Hit *matched_hit);
 
-    bool IsStopWord(const Vector<wchar_t> &char_array, int begin, int length);
+    bool IsStopWord(const std::vector<wchar_t> &char_array, int begin, int length);
 
     Status LoadMainDict();
 
@@ -70,6 +70,6 @@ public:
     Status LoadPrepDict();
 
 private:
-    void ParseProperties(const String &content);
+    void ParseProperties(const std::string &content);
 };
 } // namespace infinity
