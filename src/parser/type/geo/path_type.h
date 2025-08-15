@@ -107,8 +107,20 @@ public:
     [[nodiscard]] inline bool Closed() const { return closed != 0; }
 
     [[nodiscard]] inline std::string ToString() const {
-        ParserError("ToString() isn't implemented");
-        return std::string();
+        if (point_count == 0 || ptr == nullptr) {
+            return closed ? "[]" : "()";
+        }
+
+        std::string result = closed ? "[" : "(";
+        PointType *points = reinterpret_cast<PointType *>(ptr);
+        for (uint64_t i = 0; i < point_count; ++i) {
+            if (i > 0) {
+                result += ",";
+            }
+            result += points[i].ToString();
+        }
+        result += closed ? "]" : ")";
+        return result;
     }
 };
 

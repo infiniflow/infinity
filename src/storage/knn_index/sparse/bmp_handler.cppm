@@ -14,31 +14,35 @@
 
 module;
 
-namespace infinity {
-struct ChunkIndexMetaInfo;
-}
+// namespace infinity {
+// struct ChunkIndexMetaInfo;
+// }
 
-export module bmp_handler;
+export module infinity_core:bmp_handler;
 
-import stl;
-import bmp_alg;
-import bmp_util;
-import index_base;
+import :stl;
+import :bmp_alg;
+import :bmp_util;
+import :index_base;
+import :index_bmp;
+import :buffer_handle;
+import :base_memindex;
+import :memindex_tracer;
+import :sparse_util;
+import :infinity_exception;
+import :column_vector;
+
+import data_type;
 import column_def;
 import internal_types;
-import index_bmp;
 import sparse_info;
 import internal_types;
-import buffer_handle;
-import base_memindex;
-import memindex_tracer;
-import sparse_util;
-import infinity_exception;
 
 namespace infinity {
 
+struct ChunkIndexMetaInfo;
 class BufferManager;
-class ColumnVector;
+// class ColumnVector;
 class BufferObj;
 class LocalFileHandle;
 

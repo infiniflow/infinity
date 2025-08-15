@@ -2,13 +2,13 @@ module;
 
 #include <string>
 
-export module cjk_segmenter;
+export module infinity_core:cjk_segmenter;
 
-import stl;
-import hit;
-import segmenter;
-import analyze_context;
-import ik_dict;
+import :stl;
+import :hit;
+import :segmenter;
+import :analyze_context;
+import :ik_dict;
 
 namespace infinity {
 

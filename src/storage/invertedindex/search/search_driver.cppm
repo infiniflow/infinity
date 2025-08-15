@@ -18,10 +18,10 @@ module;
 #include <memory>
 #include <string>
 
-export module search_driver;
+export module infinity_core:search_driver;
 
-import stl;
-import query_node;
+import :stl;
+import :query_node;
 
 namespace infinity {
 

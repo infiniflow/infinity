@@ -343,6 +343,82 @@ class infinity_http:
         self.net.raise_exception(r)
         return database_result(data=r.json()["nodes"])
 
+    def list_snapshots(self):
+        """List all snapshots via HTTP API"""
+        url = "snapshots"
+        h = self.net.set_up_header(["accept"])
+        r = self.net.request(url, "get", h)
+        self.net.raise_exception(r)
+        response_data = r.json()
+        
+        # Extract snapshots from response
+        snapshots = []
+        if "snapshots" in response_data:
+            for snapshot_info in response_data["snapshots"]:
+                # Create a simple object with name attribute
+                class SnapshotInfo:
+                    def __init__(self, name):
+                        self.name = name
+                
+                snapshots.append(SnapshotInfo(snapshot_info.get("name", "")))
+        
+        return database_result(data=response_data, snapshots=snapshots)
+
+    def show_snapshot(self, snapshot_name):
+        """Show details of a specific snapshot via HTTP API"""
+        url = f"snapshots/{snapshot_name}"
+        h = self.net.set_up_header(["accept"])
+        r = self.net.request(url, "get", h)
+        self.net.raise_exception(r)
+        return database_result(data=r.json())
+
+    def create_database_snapshot(self, db_name, snapshot_name):
+        """Create a snapshot of an entire database"""
+        url = "snapshots/database"
+        h = self.net.set_up_header(["accept", "content-type"])
+        d = {
+            "db_name": db_name,
+            "snapshot_name": snapshot_name,
+        }
+        r = self.net.request(url, "post", h, d)
+        self.net.raise_exception(r)
+        return database_result()
+
+    def restore_database_snapshot(self, snapshot_name):
+        """Restore a database from a snapshot"""
+        url = "snapshots/database/restore"
+        h = self.net.set_up_header(["accept", "content-type"])
+        d = {"snapshot_name": snapshot_name}
+        r = self.net.request(url, "post", h, d)
+        self.net.raise_exception(r)
+        return database_result()
+
+    def create_system_snapshot(self, snapshot_name):
+        """Create a system-wide snapshot"""
+        url = "snapshots/system"
+        h = self.net.set_up_header(["accept", "content-type"])
+        d = {"snapshot_name": snapshot_name}
+        r = self.net.request(url, "post", h, d)
+        self.net.raise_exception(r)
+        return database_result()
+
+    def restore_system_snapshot(self, snapshot_name):
+        """Restore system from a snapshot"""
+        url = "snapshots/system/restore"
+        h = self.net.set_up_header(["accept", "content-type"])
+        d = {"snapshot_name": snapshot_name}
+        r = self.net.request(url, "post", h, d)
+        self.net.raise_exception(r)
+        return database_result()
+
+    def drop_snapshot(self, snapshot_name):
+        """Drop a snapshot"""
+        url = f"snapshots/{snapshot_name}"
+        h = self.net.set_up_header(["accept"])
+        r = self.net.request(url, "delete", h)
+        self.net.raise_exception(r)
+        return database_result()
+
 
 ####################3####################3####################3####################3####################3####################3####################3####################3
 
@@ -452,6 +528,29 @@ class database_http:
         return database_result(columns=["database", "table", "column_count", "block_count", "block_capacity",
                                         "segment_count", "segment_capacity", "comment"])
 
+    # table snapshot operations
+    def create_table_snapshot(self, snapshot_name, table_name):
+        """Create a snapshot of a specific table"""
+        url = "snapshots"
+        h = self.net.set_up_header(["accept", "content-type"])
+        d = {
+            "db_name": self.database_name,
+            "table_name": table_name,
+            "snapshot_name": snapshot_name,
+        }
+        r = self.net.request(url, "post", h, d)
+        self.net.raise_exception(r)
+        return database_result()
+
+    def restore_table_snapshot(self, snapshot_name):
+        """Restore a table from a snapshot"""
+        url = "snapshots/restore"
+        h = self.net.set_up_header(["accept", "content-type"])
+        d = {"snapshot_name": snapshot_name}
+        r = self.net.request(url, "post", h, d)
+        self.net.raise_exception(r)
+        return database_result()
+
 
 class table_http:
     def __init__(self, net: http_network_util, database_name: str, table_name: str):
@@ -483,6 +582,13 @@ class table_http:
         for col in r.json()["columns"]:
             res[col["name"]] = col["type"]
         return res
+
+    def compact(self):
+        url = f"databases/{self.database_name}/tables/{self.table_name}/compact"
+        h = self.net.set_up_header(["accept", "content-type"])
+        r = self.net.request(url, "put", h)
+        self.net.raise_exception(r)
+        return database_result()
 
     # index
     def create_index(
@@ -763,10 +869,35 @@ class table_http_result:
             tmp["option"] = self._option
         # print(tmp)
         d = self.table_http.net.set_up_data([], tmp)
+        
+        # Add timing measurement for network transfer and JSON parsing
+        import time
+        import json
+        
+        # Time the network transfer
+        start_network = time.perf_counter()
         r = self.table_http.net.request(url, "get", h, d)
+        end_network = time.perf_counter()
+        
+        network_time = (end_network - start_network) * 1000
+        response_size = len(r.content)
+        
+        # Time JSON parsing
+        start_parse = time.perf_counter()
+        result_json = r.json()
+        end_parse = time.perf_counter()
+        
+        parse_time = (end_parse - start_parse) * 1000
+        
+        # Print timing information for large responses
+        if response_size > 100000:  # Only print for responses > 100KB
+            print(f"HTTP Timing - Network: {network_time:.2f}ms, Parse: {parse_time:.2f}ms, Size: {response_size:,} bytes")
+            if "output" in result_json:
+                row_count = len(result_json["output"])
+                print(f"  Rows: {row_count:,}, Avg row size: {response_size/row_count:.1f} bytes")
+        
         self.table_http.net.raise_exception(r)
         # print(r.json())
-        result_json = r.json()
         if "output" in result_json:
             self.output_res = result_json["output"]
         else:
@@ -940,9 +1071,14 @@ class table_http_result:
         return self
 
     def to_result(self):
+        import time
+        
         if self.output_res == []:
             self.select()
 
+        # Time the data processing
+        start_process = time.perf_counter()
+        
         df_dict = {}
         col_types = self.table_http.show_columns_type()
         for output_col in self._output:
@@ -1029,6 +1165,14 @@ class table_http_result:
                     if (function_name in bool_functions):
                         df_type[k] = dtype('bool')
                         break
+        
+        end_process = time.perf_counter()
+        process_time = (end_process - start_process) * 1000
+        
+        # Print timing for large datasets
+        if len(self.output_res) > 1000:  # Only print for datasets with > 1000 rows
+            print(f"HTTP Data Processing - Time: {process_time:.2f}ms, Rows: {len(self.output_res):,}")
+        
         return df_dict, df_type, extra_result
 
     def to_pl(self):
@@ -1036,8 +1180,27 @@ class table_http_result:
         return pl.from_pandas(dataframe), extra_result
 
     def to_df(self):
+        import time
+        
+        # Time the to_result() call (data processing)
+        start_result = time.perf_counter()
         df_dict, df_type, extra_result = self.to_result()
-        return pd.DataFrame(df_dict).astype(df_type), extra_result
+        end_result = time.perf_counter()
+        
+        result_time = (end_result - start_result) * 1000
+        
+        # Time DataFrame construction
+        start_df = time.perf_counter()
+        df = pd.DataFrame(df_dict).astype(df_type)
+        end_df = time.perf_counter()
+        
+        df_time = (end_df - start_df) * 1000
+        
+        # Print timing for large DataFrames
+        if len(df) > 1000:  # Only print for DataFrames with > 1000 rows
+            print(f"HTTP DataFrame Timing - Processing: {result_time:.2f}ms, Construction: {df_time:.2f}ms, Rows: {len(df):,}")
+        
+        return df, extra_result
 
     def to_arrow(self):
         dataframe, extra_result = self.to_df()
@@ -1047,7 +1210,7 @@ class table_http_result:
 @dataclass
 class database_result():
     def __init__(self, list=[], database_name: str = "", error_code=ErrorCode.OK, columns=[], index_list=[],
-                 node_name="", node_role="", node_status="", index_comment=None, deleted_rows=0, data={}, nodes=[]):
+                 node_name="", node_role="", node_status="", index_comment=None, deleted_rows=0, data={}, nodes=[], error_msg="", snapshots=[]):
         self.db_names = list
         self.database_name = database_name  # get database
         self.error_code = error_code
@@ -1060,6 +1223,8 @@ class database_result():
         self.deleted_rows = deleted_rows
         self.data = data
         self.nodes = nodes
+        self.error_msg = error_msg
+        self.snapshots = snapshots
 
 
 identifier_limit = 65536

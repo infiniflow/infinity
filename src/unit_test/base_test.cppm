@@ -11,21 +11,27 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-
 module;
-
-#include "gtest/gtest.h"
 
 #include <filesystem>
 #include <stdlib.h>
 #include <sys/stat.h>
 #include <type_traits>
 #include <unistd.h>
+#include "gtest/gtest.h"
 
+#ifndef CI
+export module infinity_core:ut.base_test;
+
+import :stl;
+import :infinity_context;
+import :infinity_exception;
+#else
 export module base_test;
 
-import stl;
-import infinity_context;
+import infinity_core;
+#endif
+
 import global_resource_usage;
 
 namespace fs = std::filesystem;
@@ -37,8 +43,7 @@ class BaseTestWithParam : public std::conditional_t<std::is_same_v<T, void>, ::t
 public:
     BaseTestWithParam() {
         const char *infinity_home_ = GetHomeDir();
-        bool ok = ValidateDirPermission(infinity_home_);
-        if (!ok) {
+        if (bool ok = ValidateDirPermission(infinity_home_); !ok) {
             std::cerr << "Please create directory " << infinity_home_ << " and ensure current user has RWX permission of it." << std::endl;
             abort();
         }
@@ -47,7 +52,9 @@ public:
 
     ~BaseTestWithParam() override = default;
 
-    void SetUp() override {}
+    void SetUp() override {
+        // SetPrintStacktrace(false);
+    }
     void TearDown() override {}
 
 public:
@@ -68,6 +75,8 @@ public:
     static constexpr const char *NEW_CONFIG_NOWAL_PATH = "test/data/config/test_new_nowal.toml";
 
     static constexpr const char *NEW_VFS_OFF_CONFIG_NOWAL_PATH = "test/data/config/test_vfs_off_nowal.toml";
+
+    static constexpr const char *NEW_VFS_OFF_BG_OFF_PATH = "test/data/config/test_vfs_off_bg_off.toml";
 
 protected:
     const char *GetHomeDir() { return "/var/infinity"; }
@@ -101,6 +110,16 @@ protected:
             RemoveDirectory(dir);
         }
     }
+
+    // Create a data block with two columns, each with the specified row count.
+    SharedPtr<DataBlock> MakeInputBlock(const Value &v1, const Value &v2, SizeT row_cnt);
+    // Create a data block with two columns, each with the specified row count (data is specified in the function).
+    SharedPtr<DataBlock> MakeInputBlock1(SizeT row_cnt);
+    // Create a data block with two columns, each with the specified row count (data is specified in the function).
+    SharedPtr<DataBlock> MakeInputBlock2(SizeT row_cnt);
+
+    // Check if the file paths exist or not.
+    void CheckFilePaths(Vector<String> &delete_file_paths, Vector<String> &exist_file_paths);
 
 private:
     // Validate if given path satisfy all of following:
@@ -140,8 +159,7 @@ private:
         if (!fs::exists(dir)) {
             std::filesystem::create_directories(p, error_code);
             if (error_code.value() != 0) {
-                std::cerr << "Failed to create directory " << dir << std::endl;
-                abort();
+                UnrecoverableError(fmt::format("Failed to create directory {}", dir));
             }
         }
         try {
@@ -149,8 +167,7 @@ private:
                 std::filesystem::remove_all(dir_entry.path());
             };
         } catch (const std::filesystem::filesystem_error &e) {
-            std::cerr << "Failed to cleanup " << dir << ", exception: " << e.what() << std::endl;
-            abort();
+            UnrecoverableError(fmt::format("Failed to cleanup {}, exception: {}", dir, e.what()));
         }
     }
 
@@ -160,8 +177,7 @@ private:
         try {
             std::filesystem::remove_all(p, error_code);
         } catch (const std::filesystem::filesystem_error &e) {
-            std::cerr << "Failed to remove " << dir << ", exception: " << e.what() << std::endl;
-            abort();
+            UnrecoverableError(fmt::format("Failed to remove {}, exception: {}", dir, e.what()));
         }
     }
 };

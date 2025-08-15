@@ -14,23 +14,23 @@
 
 module;
 
-export module index_filter_evaluators;
+export module infinity_core:index_filter_evaluators;
 
-import stl;
-import roaring_bitmap;
-import secondary_index_data;
-import filter_expression_push_down;
-import filter_expression_push_down_helper;
-import filter_fulltext_expression;
-import base_expression;
-import meta_info;
-import query_node;
-import column_index_reader;
+import :stl;
+import :roaring_bitmap;
+import :secondary_index_data;
+import :filter_expression_push_down;
+import :filter_expression_push_down_helper;
+import :filter_fulltext_expression;
+import :base_expression;
+import :meta_info;
+import :query_node;
+import :column_index_reader;
 import logical_type;
-import value;
-import doc_iterator;
-import parse_fulltext_options;
-import table_index_meeta;
+import :value;
+import :doc_iterator;
+import :parse_fulltext_options;
+import :table_index_meeta;
 
 namespace infinity {
 

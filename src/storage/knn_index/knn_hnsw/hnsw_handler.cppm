@@ -6,37 +6,36 @@ module;
 
 #include <future>
 
-namespace infinity {
-struct ChunkIndexMetaInfo;
-}
+export module infinity_core:hnsw_handler;
 
-export module hnsw_handler;
+import :stl;
+import :hnsw_alg;
+import :data_store;
+import :vec_store_type;
+import :dist_func_l2;
+import :dist_func_ip;
+import :hnsw_common;
+import :index_hnsw;
+import :infinity_exception;
+import :index_base;
+import :logger;
+import :infinity_context;
+import :logger;
+import :base_memindex;
+import :memindex_tracer;
+import :buffer_handle;
+import :third_party;
+import :config;
+import :chunk_index_meta;
 
-import stl;
-import hnsw_alg;
-import data_store;
-import vec_store_type;
-import dist_func_l2;
-import dist_func_ip;
-import hnsw_common;
-import column_def;
-import index_hnsw;
-import infinity_exception;
-import index_base;
-import logger;
 import internal_types;
 import embedding_info;
-import infinity_context;
-import logger;
-import base_memindex;
-import memindex_tracer;
-import buffer_handle;
-import third_party;
+import column_def;
 
 namespace infinity {
 
 class BufferManager;
-class ColumnVector;
+struct ColumnVector;
 class BufferObj;
 class LocalFileHandle;
 
@@ -61,6 +60,9 @@ using AbstractHnsw = std::variant<UniquePtr<KnnHnsw<PlainCosVecStoreType<float>,
                                   UniquePtr<KnnHnsw<PlainCosVecStoreType<i8, true>, SegmentOffset>>,
                                   UniquePtr<KnnHnsw<PlainIPVecStoreType<i8, true>, SegmentOffset>>,
                                   UniquePtr<KnnHnsw<PlainL2VecStoreType<i8, true>, SegmentOffset>>,
+                                  UniquePtr<KnnHnsw<LVQCosVecStoreType<float, i8, true>, SegmentOffset>>,
+                                  UniquePtr<KnnHnsw<LVQIPVecStoreType<float, i8, true>, SegmentOffset>>,
+                                  UniquePtr<KnnHnsw<LVQL2VecStoreType<float, i8, true>, SegmentOffset>>,
 
                                   UniquePtr<KnnHnsw<PlainCosVecStoreType<float>, SegmentOffset, false>>,
                                   UniquePtr<KnnHnsw<PlainIPVecStoreType<float>, SegmentOffset, false>>,
@@ -83,6 +85,9 @@ using AbstractHnsw = std::variant<UniquePtr<KnnHnsw<PlainCosVecStoreType<float>,
                                   UniquePtr<KnnHnsw<PlainCosVecStoreType<i8, true>, SegmentOffset, false>>,
                                   UniquePtr<KnnHnsw<PlainIPVecStoreType<i8, true>, SegmentOffset, false>>,
                                   UniquePtr<KnnHnsw<PlainL2VecStoreType<i8, true>, SegmentOffset, false>>,
+                                  UniquePtr<KnnHnsw<LVQCosVecStoreType<float, i8, true>, SegmentOffset, false>>,
+                                  UniquePtr<KnnHnsw<LVQIPVecStoreType<float, i8, true>, SegmentOffset, false>>,
+                                  UniquePtr<KnnHnsw<LVQL2VecStoreType<float, i8, true>, SegmentOffset, false>>,
                                   std::nullptr_t>;
 
 export struct HnswHandler {

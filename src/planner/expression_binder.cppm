@@ -14,14 +14,14 @@
 
 module;
 
-export module expression_binder;
+export module infinity_core:expression_binder;
 
-import stl;
-import function;
-import bind_context;
-import base_expression;
-import query_context;
-import subquery_expression;
+import :stl;
+import :function;
+import :bind_context;
+import :base_expression;
+// import :query_context;
+import :subquery_expression;
 import parsed_expr;
 import column_expr;
 import constant_expr;

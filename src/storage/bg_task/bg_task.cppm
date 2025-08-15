@@ -14,15 +14,14 @@
 
 module;
 
-#include "type/complex/row_id.h"
+export module infinity_core:bg_task;
 
-export module bg_task;
-
-import stl;
-import third_party;
+import :stl;
+import :third_party;
 import global_resource_usage;
-import status;
-import bg_task_type;
+import :status;
+import :bg_task_type;
+import row_id;
 
 namespace infinity {
 
@@ -147,7 +146,15 @@ public:
 
     ~DumpMemIndexTask() override = default;
 
-    String ToString() const override { return "DumpMemIndexTask"; }
+    String ToString() const override {
+        return fmt::format("DumpMemIndexTask: db_name={}, table_name={}, index_name={}, segment_id={}, begin_row_id=({},{})",
+                           db_name_,
+                           table_name_,
+                           index_name_,
+                           segment_id_,
+                           begin_row_id_.segment_id_,
+                           begin_row_id_.segment_offset_);
+    }
 
 public:
     String db_name_{};

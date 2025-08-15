@@ -14,16 +14,16 @@
 
 module;
 
-export module skiplist_reader;
-import stl;
-import byte_slice;
-import byte_slice_reader;
-import index_defines;
-import doc_list_format_option;
+export module infinity_core:skiplist_reader;
+import :stl;
+import :byte_slice;
+import :byte_slice_reader;
+import :index_defines;
+import :doc_list_format_option;
 
-import posting_byte_slice;
-import posting_byte_slice_reader;
-import position_list_format_option;
+import :posting_byte_slice;
+import :posting_byte_slice_reader;
+import :position_list_format_option;
 
 namespace infinity {
 
@@ -98,6 +98,8 @@ public:
     explicit SkipListReaderByteSlice(const DocListFormatOption &doc_list_format_option) : SkipListReader(doc_list_format_option) {}
 
     explicit SkipListReaderByteSlice(const PositionListFormatOption &pos_list_format_option) : SkipListReader(pos_list_format_option) {}
+
+    ~SkipListReaderByteSlice() override = default;
 
     void Load(const ByteSliceList *byte_slice_list, u32 start, u32 end);
 

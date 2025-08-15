@@ -118,3 +118,19 @@ class RemoteDatabase(Database, ABC):
             return select_res_to_polars(res)
         else:
             raise InfinityException(res.error_code, res.error_msg)
+        
+    @name_validity_check("table_name", "Table")
+    def create_table_snapshot(self, snapshot_name: str, table_name: str):
+        res = self._conn.create_table_snapshot(db_name=self._db_name, table_name=table_name, snapshot_name=snapshot_name)
+        if res.error_code == ErrorCode.OK:
+            return res
+        else:
+            raise InfinityException(res.error_code, res.error_msg)
+        
+    def restore_table_snapshot(self, snapshot_name: str):
+        res = self._conn.restore_snapshot(snapshot_name=snapshot_name, scope="table")
+        if res.error_code == ErrorCode.OK:
+            return res
+        else:
+            raise InfinityException(res.error_code, res.error_msg)
+        

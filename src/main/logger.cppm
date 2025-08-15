@@ -13,11 +13,11 @@
 // limitations under the License.
 module;
 
-export module logger;
+export module infinity_core:logger;
 
-import stl;
-import third_party;
-import status;
+import :stl;
+import :status;
+import :third_party;
 
 namespace infinity {
 
@@ -96,6 +96,12 @@ export inline void LOG_CRITICAL(const String &msg) {
         infinity_logger->critical(msg);
     } else {
         fmt::print("[critical] {}\n", msg);
+    }
+}
+
+export inline void LOG_FLUSH() {
+    if (IS_LOGGER_INITIALIZED()) {
+        infinity_logger->flush();
     }
 }
 

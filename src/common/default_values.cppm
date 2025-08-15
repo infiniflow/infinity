@@ -14,9 +14,9 @@
 
 module;
 
-export module default_values;
+export module infinity_core:default_values;
 
-import stl;
+import :stl;
 
 namespace infinity {
 
@@ -169,6 +169,7 @@ export {
     constexpr SizeT HNSW_M = 16;
     constexpr SizeT HNSW_EF_CONSTRUCTION = 200;
     constexpr SizeT HNSW_BLOCK_SIZE = 8192;
+    constexpr SizeT DEFAULT_PREFETCH_SIZE = 4;
 
     constexpr SizeT BMP_BLOCK_SIZE = 16;
 
@@ -335,6 +336,11 @@ export {
 
     // IO related
     constexpr SizeT DEFAULT_READ_BUFFER_SIZE = 4096;
+
+    constexpr u32 BATCH_OR_LEN = 128;
+
+    constexpr int MAX_TUPLE_LENGTH = 1024;
+    constexpr SizeT L1_CACHE_SIZE = 32 * KB;
 }
 
 } // namespace infinity

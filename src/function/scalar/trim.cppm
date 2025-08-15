@@ -1,8 +1,8 @@
 module;
 
-export module trim;
+export module infinity_core:trim;
 
-import stl;
+import :stl;
 
 namespace infinity {
 

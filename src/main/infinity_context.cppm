@@ -14,23 +14,22 @@
 
 module;
 
-export module infinity_context;
+export module infinity_core:infinity_context;
 
-import stl;
-import config;
-import resource_manager;
-import task_scheduler;
-import storage;
-import singleton;
-import session_manager;
-import persistence_manager;
-import third_party;
-import global_resource_usage;
-import status;
-import cluster_manager;
+import :stl;
+import :status;
+import :singleton;
 import admin_statement;
+import :storage;
+import :task_scheduler;
+import :cluster_manager;
 
 namespace infinity {
+struct DefaultConfig;
+class SessionManager;
+class ResourceManager;
+class PersistenceManager;
+struct Config;
 
 export class InfinityContext : public Singleton<InfinityContext> {
 public:
@@ -80,7 +79,7 @@ private:
     friend class Singleton;
 
     InfinityContext();
-    ~InfinityContext();
+    virtual ~InfinityContext();
 
     UniquePtr<Config> config_{};
     UniquePtr<ResourceManager> resource_manager_{};

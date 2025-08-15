@@ -14,21 +14,21 @@
 
 module;
 
-export module standard_analyzer;
+export module infinity_core:standard_analyzer;
 
-import stl;
-import term;
-import stemmer;
-import analyzer;
-import tokenizer;
-import common_analyzer;
+import :stl;
+import :term;
+import :stemmer;
+import :analyzer;
+import :tokenizer;
+import :common_analyzer;
 
 namespace infinity {
 export class StandardAnalyzer : public CommonLanguageAnalyzer {
 public:
     StandardAnalyzer() : CommonLanguageAnalyzer() {}
 
-    ~StandardAnalyzer() {}
+    virtual ~StandardAnalyzer() {}
 
     void InitStemmer(Language language) { CommonLanguageAnalyzer::InitStemmer(language); }
 

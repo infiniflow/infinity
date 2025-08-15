@@ -14,19 +14,20 @@
 
 module;
 
-import stl;
-import term;
-import stemmer;
-import analyzer;
-import tokenizer;
-export module ngram_analyzer;
+export module infinity_core:ngram_analyzer;
+
+import :stl;
+import :term;
+import :stemmer;
+import :analyzer;
+import :tokenizer;
 
 namespace infinity {
 export class NGramAnalyzer : public Analyzer {
 public:
     NGramAnalyzer(u32 ngram) : ngram_(ngram) {}
 
-    ~NGramAnalyzer() = default;
+    virtual ~NGramAnalyzer() = default;
 
 protected:
     int AnalyzeImpl(const Term &input, void *data, HookType func) override;

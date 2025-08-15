@@ -14,16 +14,16 @@
 
 module;
 
-export module fast_rough_filter;
-import stl;
-import value;
-import default_values;
-import probabilistic_data_filter;
-import min_max_data_filter;
-import logger;
-import third_party;
-import infinity_exception;
-import filter_expression_push_down_helper;
+export module infinity_core:fast_rough_filter;
+import :stl;
+import :value;
+import :default_values;
+import :probabilistic_data_filter;
+import :min_max_data_filter;
+import :logger;
+import :third_party;
+import :infinity_exception;
+import :filter_expression_push_down_helper;
 
 namespace infinity {
 
@@ -68,7 +68,7 @@ public:
 
     void SaveToJsonFile(nlohmann::json &entry_json) const;
 
-    bool LoadFromJsonFile(const nlohmann::json &entry_json);
+    bool LoadFromJsonFile(std::string_view json_sv);
 
 private:
     inline bool HaveMinMaxFilter() const { return finished_build_minmax_filter_.test(std::memory_order_acquire); }

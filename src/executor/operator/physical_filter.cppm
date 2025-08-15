@@ -14,18 +14,18 @@
 
 module;
 
-export module physical_filter;
+export module infinity_core:physical_filter;
 
-import stl;
+import :stl;
 
-import query_context;
-import operator_state;
-import physical_operator;
-import physical_operator_type;
-import base_expression;
-import data_table;
-import load_meta;
-import infinity_exception;
+// import :query_context;
+import :operator_state;
+import :physical_operator;
+import :physical_operator_type;
+import :base_expression;
+import :data_table;
+import :load_meta;
+import :infinity_exception;
 import internal_types;
 import data_type;
 

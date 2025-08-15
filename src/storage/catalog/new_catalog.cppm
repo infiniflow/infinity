@@ -14,36 +14,36 @@
 
 module;
 
-export module new_catalog;
+export module infinity_core:new_catalog;
 
-import stl;
-import status;
-import meta_info;
+import :stl;
+import :status;
+import :meta_info;
 import extra_ddl_info;
-import default_values;
+import :default_values;
 import internal_types;
-import buffer_handle;
+import :buffer_handle;
 import column_def;
-import profiler;
-import third_party;
-import storage;
-import meta_tree;
+import :profiler;
+import :third_party;
+import :storage;
+import :meta_tree;
 
 namespace infinity {
 
 class NewTxn;
 struct MemIndex;
 class TableIndexReaderCache;
-class DBMeeta;
-class TableMeeta;
-class SegmentMeta;
-class BlockMeta;
-class ColumnMeta;
-class TableIndexMeeta;
-class SegmentIndexMeta;
-class ChunkIndexMeta;
+export class DBMeeta;
+export class TableMeeta;
+export class SegmentMeta;
+export class BlockMeta;
+export class ColumnMeta;
+export class TableIndexMeeta;
+export class SegmentIndexMeta;
+export class ChunkIndexMeta;
 class BufferObj;
-class ColumnVector;
+export struct ColumnVector;
 struct MetaKey;
 class KVStore;
 class KVInstance;
@@ -53,7 +53,7 @@ class IndexBase;
 struct WalSegmentInfo;
 struct WalBlockInfo;
 struct WalChunkIndexInfo;
-class Config;
+struct Config;
 struct MemIndexID;
 class TableCache;
 class DbCache;
@@ -61,7 +61,7 @@ class SystemCache;
 class FunctionSet;
 class SpecialFunction;
 
-enum class ColumnVectorTipe;
+enum class ColumnVectorMode;
 
 template <bool init_all_true>
 struct RoaringBitmap;
@@ -175,6 +175,7 @@ private:
 public:
     SharedPtr<MemIndex> GetMemIndex(const String &mem_index_key);
     SharedPtr<MemIndex> PopMemIndex(const String &mem_index_key);
+    bool HasMemIndex(const String &mem_index_key);
     Status DropMemIndexByMemIndexKey(const String &mem_index_key);
     Vector<Pair<String, String>> GetAllMemIndexInfo();
 
@@ -262,7 +263,7 @@ public:
     static Status CleanTable(TableMeeta &table_meta, TxnTimeStamp begin_ts, UsageFlag usage_flag);
 
     Status AddNewTableIndex(TableMeeta &table_meta,
-                            String &index_id_str,
+                            const String &index_id_str,
                             TxnTimeStamp commit_ts,
                             const SharedPtr<IndexBase> &index_base,
                             Optional<TableIndexMeeta> &table_index_meta);
@@ -285,6 +286,8 @@ public:
 
     static Status AddNewBlock1(SegmentMeta &segment_meta, TxnTimeStamp commit_ts, Optional<BlockMeta> &block_meta);
 
+    static Status LoadImportedOrCompactedSegment(TableMeeta &table_meta, const WalSegmentInfo &segment_info, TxnTimeStamp commit_ts);
+
     static Status AddNewBlockWithID(SegmentMeta &segment_meta, TxnTimeStamp commit_ts, Optional<BlockMeta> &block_meta, BlockID block_id);
 
     static Status AddNewBlockForTransform(SegmentMeta &segment_meta, TxnTimeStamp commit_ts, Optional<BlockMeta> &block_meta);
@@ -299,20 +302,16 @@ public:
 
     static Status CleanBlockColumn(ColumnMeta &column_meta, const ColumnDef *column_def, UsageFlag usage_flag);
 
-    static Status AddNewSegmentIndex(TableIndexMeeta &table_index_meta, SegmentID segment_id, Optional<SegmentIndexMeta> &segment_index_meta);
+    static Status RestoreNewSegmentIndex1(TableIndexMeeta &table_index_meta,
+                                          NewTxn *new_txn,
+                                          SegmentID segment_id,
+                                          Optional<SegmentIndexMeta> &segment_index_meta,
+                                          ChunkID next_chunk_id);
 
     static Status
     AddNewSegmentIndex1(TableIndexMeeta &table_index_meta, NewTxn *new_txn, SegmentID segment_id, Optional<SegmentIndexMeta> &segment_index_meta);
 
     static Status CleanSegmentIndex(SegmentIndexMeta &segment_index_meta, UsageFlag usage_flag);
-
-    static Status AddNewChunkIndex(SegmentIndexMeta &segment_index_meta,
-                                   ChunkID chunk_id,
-                                   RowID base_row_id,
-                                   SizeT row_count,
-                                   const String &base_name,
-                                   SizeT index_size,
-                                   Optional<ChunkIndexMeta> &chunk_index_meta);
 
     static Status AddNewChunkIndex1(SegmentIndexMeta &segment_index_meta,
                                     NewTxn *new_txn,
@@ -323,13 +322,21 @@ public:
                                     SizeT index_size,
                                     Optional<ChunkIndexMeta> &chunk_index_meta);
 
-    static Status LoadFlushedChunkIndex(SegmentIndexMeta &segment_index_meta, const WalChunkIndexInfo &chunk_info);
+    static Status RestoreNewChunkIndex1(SegmentIndexMeta &segment_index_meta,
+                                        NewTxn *new_txn,
+                                        ChunkID chunk_id,
+                                        RowID base_row_id,
+                                        SizeT row_count,
+                                        const String &base_name,
+                                        SizeT index_size,
+                                        Optional<ChunkIndexMeta> &chunk_index_meta,
+                                        bool is_link_files = false);
 
     static Status LoadFlushedChunkIndex1(SegmentIndexMeta &segment_index_meta, const WalChunkIndexInfo &chunk_info, NewTxn *new_txn);
 
     static Status CleanChunkIndex(ChunkIndexMeta &chunk_index_meta, UsageFlag usage_flag);
 
-    static Status GetColumnVector(ColumnMeta &column_meta, SizeT row_count, const ColumnVectorTipe &tipe, ColumnVector &column_vector);
+    static Status GetColumnVector(ColumnMeta &column_meta, SizeT row_count, const ColumnVectorMode &tipe, ColumnVector &column_vector);
 
     static Status GetBlockVisibleRange(BlockMeta &block_meta, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts, NewTxnGetVisibleRangeState &state);
 

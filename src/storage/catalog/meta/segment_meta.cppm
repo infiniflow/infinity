@@ -14,19 +14,21 @@
 
 module;
 
-export module segment_meta;
+export module infinity_core:segment_meta;
 
-import stl;
-import status;
-import default_values;
-import new_catalog;
+import :stl;
+import :status;
+import :default_values;
+import :new_catalog;
+import :snapshot_info;
+import :wal_entry;
 
 namespace infinity {
 
 class KVInstance;
 // class ColumnDef;
 class TableMeeta;
-class SegmentInfo;
+export struct SegmentInfo;
 class FastRoughFilter;
 
 export enum class SegmentStatus : u8 {
@@ -59,6 +61,8 @@ public:
     TxnTimeStamp begin_ts() const { return begin_ts_; }
     TxnTimeStamp commit_ts() const { return commit_ts_; }
 
+    TxnTimeStamp GetCreateTimestampFromKV() const;
+
     KVInstance &kv_instance() { return kv_instance_; }
 
     TableMeeta &table_meta() { return table_meta_; }
@@ -70,8 +74,6 @@ public:
     // Status SetBlockIDs(const Vector<BlockID> &block_ids);
 
     Status SetNextBlockID(BlockID next_block_id);
-
-    // Status SetRowCnt(SizeT row_cnt);
 
     Status SetFirstDeleteTS(TxnTimeStamp first_delete_ts);
 
@@ -107,6 +109,12 @@ public:
 
     Status SetFastRoughFilter(SharedPtr<FastRoughFilter> fast_rough_filter);
 
+    Tuple<SharedPtr<SegmentSnapshotInfo>, Status> MapMetaToSnapShotInfo();
+
+    Status RestoreSet();
+
+    Status RestoreFromSnapshot(const WalSegmentInfoV2 &segment_info, bool is_link_files = false);
+
 private:
     // Status LoadBlockIDs();
 
@@ -126,7 +134,7 @@ private:
     KVInstance &kv_instance_;
     TableMeeta &table_meta_;
     SegmentID segment_id_;
-    Optional<String> segment_dir_;
+    Optional<String> segment_dir_; // TODO: check if it is no longer in use
 
     // SharedPtr<Vector<BlockID>> block_ids_;
     Optional<BlockID> next_block_id_;

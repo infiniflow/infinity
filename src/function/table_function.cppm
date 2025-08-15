@@ -14,14 +14,14 @@
 
 module;
 
-export module table_function;
+export module infinity_core:table_function;
 
-import stl;
-import function;
-import function_data;
+import :stl;
+import :function;
+import :function_data;
 
-// import query_context;
-import data_block;
+// import :query_context;
+import :data_block;
 import logical_type;
 
 namespace infinity {

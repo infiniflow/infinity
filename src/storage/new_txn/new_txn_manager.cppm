@@ -14,13 +14,13 @@
 
 module;
 
-export module new_txn_manager;
+export module infinity_core:new_txn_manager;
 
-import stl;
-import buffer_manager;
-import txn_state;
-import default_values;
-import status;
+import :stl;
+import :buffer_manager;
+import :txn_state;
+import :default_values;
+import :status;
 
 namespace infinity {
 
@@ -69,6 +69,8 @@ public:
 
     TxnTimeStamp GetWriteCommitTS(SharedPtr<NewTxn> txn);
 
+    TxnTimeStamp GetCurrentTS();
+
     // Optional<String> CheckTxnConflict(NewTxn *txn);
 
     bool CheckConflict1(NewTxn *txn, String &conflict_reason, bool &retry_query);
@@ -94,11 +96,20 @@ public:
 
     void SetCurrentTransactionID(TransactionID latest_transaction_id);
 
-    TransactionID current_transaction_id() const { return current_transaction_id_; }
+    TransactionID current_transaction_id() const {
+        std::lock_guard guard(locker_);
+        return current_transaction_id_;
+    }
 
-    TxnTimeStamp CurrentTS() const { return current_ts_; }
+    TxnTimeStamp CurrentTS() const {
+        std::lock_guard guard(locker_);
+        return current_ts_;
+    }
 
-    TxnTimeStamp PrepareCommitTS() const { return prepare_commit_ts_; }
+    TxnTimeStamp PrepareCommitTS() const {
+        std::lock_guard guard(locker_);
+        return prepare_commit_ts_;
+    }
 
     TxnTimeStamp GetOldestAliveTS();
 
@@ -114,6 +125,7 @@ public:
     Storage *storage() const { return storage_; }
 
     void CommitBottom(NewTxn *txn);
+    void CommitKVInstance(NewTxn *txn);
 
 private:
     void UpdateCatalogCache(NewTxn *txn);
@@ -124,19 +136,24 @@ private:
 
 public:
     // Only used by follower and learner when received the replicated log from leader
-    void SetStartTS(TxnTimeStamp new_start_ts) { current_ts_ = new_start_ts; }
+    void SetStartTS(TxnTimeStamp new_start_ts) {
+        std::lock_guard guard(locker_);
+        current_ts_ = new_start_ts;
+    }
 
     void PrintAllKeyValue() const;
+
+    void PrintPMKeyValue() const;
+
+    void PrintAllDroppedKeys() const;
 
     SizeT KeyValueNum() const;
 
     KVStore *kv_store() const { return kv_store_; }
 
-    Vector<SharedPtr<NewTxn>> GetCheckCandidateTxns(TransactionID txn_id, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts);
+    Vector<SharedPtr<NewTxn>> GetCheckCandidateTxns(NewTxn *this_txn);
 
     void SubmitForAllocation(SharedPtr<TxnAllocatorTask> txn_allocator_task);
-
-    void RemoveFromAllocation(TxnTimeStamp commit_ts);
 
     void SetSystemCache(UniquePtr<SystemCache> system_cache);
 
@@ -164,6 +181,8 @@ private:
     TransactionID current_transaction_id_{0}; // The current transaction id, used for new txn
     TxnTimeStamp current_ts_{};               // The next txn ts
     TxnTimeStamp prepare_commit_ts_{};
+    TxnTimeStamp last_kv_commit_ts_{};        // record last kv commit ts, used for conflict check
+    TxnTimeStamp last_commit_ts_{};           // record last commit ts, used for conflict check
     TxnTimeStamp ckp_begin_ts_ = UNCOMMIT_TS; // current ckp begin ts, UNCOMMIT_TS if no ckp is happening, UNCOMMIT_TS is a maximum u64 integer
 
     // For stop the txn manager

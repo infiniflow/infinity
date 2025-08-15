@@ -6,7 +6,7 @@ module;
 
 #pragma GCC diagnostic pop
 
-export module darts;
+export module infinity_core:darts;
 
 namespace infinity {
 export template <typename A, typename B, typename T, typename C>

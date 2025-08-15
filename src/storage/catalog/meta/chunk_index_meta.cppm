@@ -14,16 +14,17 @@
 
 module;
 
-export module chunk_index_meta;
+export module infinity_core:chunk_index_meta;
 
-import stl;
-import status;
+import :stl;
+import :status;
 import internal_types;
-import third_party;
-import new_catalog;
+import :third_party;
+import :new_catalog;
+
 
 namespace infinity {
-
+export struct ChunkIndexSnapshotInfo;
 class KVInstance;
 class SegmentIndexMeta;
 class BufferObj;
@@ -41,6 +42,10 @@ export struct ChunkIndexMetaInfo {
 
     void FromJson(std::string_view json_str);
 
+    nlohmann::json Serialize();
+
+    static SharedPtr<ChunkIndexMetaInfo> Deserialize(const nlohmann::json &chunk_index_json);
+
     static String IndexFileName(ChunkID chunk_id) { return fmt::format("chunk_{}.idx", chunk_id); }
 };
 
@@ -52,16 +57,7 @@ public:
 
     SegmentIndexMeta &segment_index_meta() const { return segment_index_meta_; }
 
-    Status GetChunkInfo(ChunkIndexMetaInfo *&chunk_info) {
-        if (!chunk_info_) {
-            Status status = LoadChunkInfo();
-            if (!status.ok()) {
-                return status;
-            }
-        }
-        chunk_info = &chunk_info_.value();
-        return Status::OK();
-    }
+    Status GetChunkInfo(ChunkIndexMetaInfo *&chunk_info);
 
     Status GetIndexBuffer(BufferObj *&index_buffer);
 
@@ -71,6 +67,8 @@ public:
 
     Status RestoreSet();
 
+    Status RestoreSetFromSnapshot(const ChunkIndexMetaInfo &chunk_info);
+
     Status UninitSet(UsageFlag usage_flag);
 
     Status SetChunkInfo(const ChunkIndexMetaInfo &chunk_info);
@@ -79,6 +77,8 @@ public:
 
     Status FilePaths(Vector<String> &paths);
 
+    Tuple<SharedPtr<ChunkIndexSnapshotInfo>, Status> MapMetaToSnapShotInfo(ChunkID chunk_id);
+
 private:
     Status LoadChunkInfo();
 
@@ -86,7 +86,11 @@ private:
 
     String GetChunkIndexTag(const String &tag) const;
 
+
+
 private:
+    mutable std::mutex mtx_;
+
     KVInstance &kv_instance_;
     SegmentIndexMeta &segment_index_meta_;
     ChunkID chunk_id_;

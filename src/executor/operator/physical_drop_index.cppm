@@ -14,21 +14,21 @@
 
 module;
 
-export module physical_drop_index;
+export module infinity_core:physical_drop_index;
 
-import stl;
+import :stl;
 
-import physical_operator;
-import physical_operator_type;
-import query_context;
+import :physical_operator;
+import :physical_operator_type;
+// import :query_context;
 
-import operator_state;
-import load_meta;
-import infinity_exception;
+import :operator_state;
+import :load_meta;
+import :infinity_exception;
 import internal_types;
 import extra_ddl_info;
 import data_type;
-import logger;
+import :logger;
 
 namespace infinity {
 

@@ -14,10 +14,10 @@
 
 module;
 
-export module hash_table;
+export module infinity_core:hash_table;
 
-import stl;
-import column_vector;
+import :stl;
+import :column_vector;
 import internal_types;
 import data_type;
 
@@ -25,6 +25,7 @@ namespace infinity {
 
 class HashTableBase {
 public:
+    virtual ~HashTableBase() = default;
     bool Initialized() const { return !types_.empty(); }
 
     void Init(Vector<SharedPtr<DataType>> types);

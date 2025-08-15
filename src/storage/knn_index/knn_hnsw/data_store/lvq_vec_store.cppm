@@ -23,13 +23,13 @@ module;
 #include <simde/x86/sse.h>
 #endif
 
-export module lvq_vec_store;
+export module infinity_core:lvq_vec_store;
 
-import stl;
-import local_file_handle;
-import hnsw_common;
+import :stl;
+import :local_file_handle;
+import :hnsw_common;
 import serialize;
-import data_store_util;
+import :data_store_util;
 
 namespace infinity {
 
@@ -76,6 +76,9 @@ public:
     using GlobalCacheType = LVQCache::GlobalCacheType;
     using LVQData = LVQVecStoreMetaType<DataType, CompressType, LVQCache>::LVQData;
     using LVQQuery = LVQVecStoreMetaType<DataType, CompressType, LVQCache>::LVQQuery;
+    using StoreType = LVQVecStoreMetaType<DataType, CompressType, LVQCache>::StoreType;
+    using QueryType = LVQVecStoreMetaType<DataType, CompressType, LVQCache>::QueryType;
+    using DistanceType = f32;
 
 public:
     LVQVecStoreMetaBase() : dim_(0), compress_data_size_(0), normalize_(false) {}
@@ -94,6 +97,9 @@ public:
     }
 
     SizeT GetSizeInBytes() const { return sizeof(dim_) + sizeof(MeanType) * dim_ + sizeof(GlobalCacheType); }
+
+    // Get size of vector in search
+    SizeT GetVecSizeInBytes() const { return compress_data_size_; }
 
     void Save(LocalFileHandle &file_handle) const {
         file_handle.Append(&dim_, sizeof(dim_));
@@ -239,7 +245,7 @@ public:
         std::memcpy(meta.mean_.get(), ptr, sizeof(MeanType) * dim);
         ptr += sizeof(MeanType) * dim;
         if constexpr (!std::is_same_v<GlobalCacheType, Tuple<>>) {
-            std::memcpy(&meta.global_cache_, ptr, sizeof(GlobalCacheType));
+            std::memcpy(static_cast<void*>(&meta.global_cache_), ptr, sizeof(GlobalCacheType));
             ptr += sizeof(GlobalCacheType);
         }
         return meta;

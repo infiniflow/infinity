@@ -16,38 +16,38 @@ module;
 
 #include <compare>
 #include <concepts>
-#include <sstream>
+#include <vector>
 
-export module column_vector;
+export module infinity_core:column_vector;
 
-import stl;
+import :stl;
 import global_resource_usage;
-import vector_buffer;
-import roaring_bitmap;
-import selection;
-import default_values;
-import value;
-import status;
-import third_party;
-import infinity_exception;
+import :vector_buffer;
+import :roaring_bitmap;
+import :selection;
+import :default_values;
+import :value;
+import :status;
+import :third_party;
+import :infinity_exception;
 import internal_types;
 import data_type;
 import embedding_info;
 import sparse_info;
 import array_info;
 import constant_expr;
-import logger;
-import column_def;
+// import :logger;
+// import column_def;
 import logical_type;
-import var_buffer;
-import sparse_util;
+import :var_buffer;
+import :sparse_util;
 
 namespace infinity {
 
 class BufferManager;
 class BufferObj;
 
-export enum class ColumnVectorTipe : i8 {
+export enum class ColumnVectorMode : i8 {
     kReadWrite,
     kReadOnly,
 };
@@ -70,7 +70,7 @@ export enum class ColumnVectorType : i8 {
 // Basic unit of column data vector
 export struct ColumnVector {
 public:
-    static inline SharedPtr<ColumnVector> Make(SharedPtr<DataType> data_type) { return MakeShared<ColumnVector>(std::move(data_type)); }
+    static SharedPtr<ColumnVector> Make(SharedPtr<DataType> data_type);
 
 public:
     SizeT data_type_size_{0};
@@ -96,108 +96,31 @@ private:
 
     SizeT capacity_{0};
 
-    SizeT tail_index_{0};
+    Atomic<SizeT> tail_index_{0};
 
 public:
-    ColumnVector() : vector_type_(ColumnVectorType::kInvalid) {
-#ifdef INFINITY_DEBUG
-        GlobalResourceUsage::IncrObjectCount("ColumnVector");
-#endif
-    }
+    ColumnVector();
 
     // Construct a column vector without initialization;
-    explicit ColumnVector(SharedPtr<DataType> data_type) : vector_type_(ColumnVectorType::kInvalid), data_type_(std::move(data_type)) {
-#ifdef INFINITY_DEBUG
-        GlobalResourceUsage::IncrObjectCount("ColumnVector");
-#endif
-    }
+    explicit ColumnVector(SharedPtr<DataType> data_type);
 
     // used in BatchInvertTask::BatchInvertTask, keep ObjectCount correct
-    ColumnVector(const ColumnVector &right)
-        : data_type_size_(right.data_type_size_), buffer_(right.buffer_), nulls_ptr_(right.nulls_ptr_), initialized(right.initialized),
-          vector_type_(right.vector_type_), data_type_(right.data_type_), data_ptr_(right.data_ptr_), capacity_(right.capacity_),
-          tail_index_(right.tail_index_) {
-#ifdef INFINITY_DEBUG
-        GlobalResourceUsage::IncrObjectCount("ColumnVector");
-#endif
-    }
+    ColumnVector(const ColumnVector &right);
 
     // used in BlockColumnIter, keep ObjectCount correct
-    ColumnVector(ColumnVector &&right) noexcept
-        : data_type_size_(right.data_type_size_), buffer_(std::move(right.buffer_)), nulls_ptr_(std::move(right.nulls_ptr_)),
-          initialized(right.initialized), vector_type_(right.vector_type_), data_type_(std::move(right.data_type_)), data_ptr_(right.data_ptr_),
-          capacity_(right.capacity_), tail_index_(right.tail_index_) {
-#ifdef INFINITY_DEBUG
-        GlobalResourceUsage::IncrObjectCount("ColumnVector");
-#endif
-    }
+    ColumnVector(ColumnVector &&right) noexcept;
 
-    ColumnVector &operator=(ColumnVector &&right) noexcept {
-        if (this != &right) {
-            data_type_size_ = right.data_type_size_;
-            buffer_ = std::move(right.buffer_);
-            nulls_ptr_ = std::move(right.nulls_ptr_);
-            initialized = right.initialized;
-            vector_type_ = right.vector_type_;
-            data_type_ = std::move(right.data_type_);
-            data_ptr_ = std::exchange(right.data_ptr_, nullptr);
-            capacity_ = right.capacity_;
-            tail_index_ = right.tail_index_;
-        }
-        return *this;
-    }
+    ColumnVector &operator=(ColumnVector &&right) noexcept;
 
-    ~ColumnVector() {
-        // Reset(); // TODO: overload copy constructor and move constructor TO PREVENT USING `Reset`
-#ifdef INFINITY_DEBUG
-        GlobalResourceUsage::DecrObjectCount("ColumnVector");
-#endif
-    }
+    ~ColumnVector();
 
-    String ToString() const {
-        std::stringstream ss;
-        for (SizeT idx = 0; idx < tail_index_; ++idx) {
-            ss << ToString(idx) << std::endl;
-        }
-        return ss.str();
-    }
+    String ToString() const;
 
-    void AppendWith(const ColumnVector &other) { return AppendWith(other, 0, other.Size()); }
+    void AppendWith(const ColumnVector &other);
 
-    void AppendValue(const Value &value) {
-        if (!initialized) {
-            String error_message = "Column vector isn't initialized.";
-            UnrecoverableError(error_message);
-        }
-        if (vector_type_ == ColumnVectorType::kConstant) {
-            if (tail_index_ >= 1) {
-                String error_message = "Constant column vector will only have 1 value.";
-                UnrecoverableError(error_message);
-            }
-        }
+    void AppendValue(const Value &value);
 
-        if (tail_index_ >= capacity_) {
-            String error_message = fmt::format("Exceed the column vector capacity.({}/{})", tail_index_, capacity_);
-            UnrecoverableError(error_message);
-        }
-        SetValue(tail_index_++, value);
-    }
-
-    void SetVectorType(ColumnVectorType vector_type) {
-        if (initialized) {
-            String error_message = "Column vector isn't initialized.";
-            UnrecoverableError(error_message);
-        }
-        if (vector_type == ColumnVectorType::kInvalid) {
-            String error_message = "Invalid column vector type.";
-            UnrecoverableError(error_message);
-        }
-        if (vector_type_ == vector_type) {
-            return;
-        }
-        this->Reset();
-        this->Initialize(vector_type, DEFAULT_VECTOR_SIZE);
-    }
+    void SetVectorType(ColumnVectorType vector_type);
 
     static VectorBufferType GetVectorBufferType(const DataType &data_type);
 
@@ -210,11 +133,11 @@ public:
     void Initialize(BufferObj *buffer_obj,
                     BufferObj *outline_buffer_obj,
                     SizeT current_row_count,
-                    ColumnVectorTipe vector_tipe = ColumnVectorTipe::kReadWrite,
+                    ColumnVectorMode vector_tipe = ColumnVectorMode::kReadWrite,
                     ColumnVectorType vector_type = ColumnVectorType::kFlat,
                     SizeT capacity = DEFAULT_VECTOR_SIZE);
 
-    void SetToCatalog(BufferObj *buffer_obj, BufferObj *outline_buffer_obj, ColumnVectorTipe vector_tipe);
+    void SetToCatalog(BufferObj *buffer_obj, BufferObj *outline_buffer_obj, ColumnVectorMode vector_tipe);
 
     void Initialize(const ColumnVector &other, const Selection &input_select);
 
@@ -227,10 +150,10 @@ public:
     // Return the <index> of the vector
     // Since it will construct a new Value object, this function shouldn't be used in vectorized computation.
     // Directly uses data_ptr in vectorized computation.
-    Value GetValue(SizeT index) const;
+    Value GetValueByIndex(SizeT index) const;
 
     // Set the <index> element of the vector to the specified value.
-    void SetValue(SizeT index, const Value &value);
+    void SetValueByIndex(SizeT index, const Value &value);
 
     void Finalize(SizeT index);
 
@@ -338,7 +261,7 @@ public:
 
     template <typename DataT, typename IdxT>
     void AppendSparse(SizeT nnz, const DataT *data, const IdxT *index) {
-        SizeT dst_off = tail_index_++;
+        SizeT dst_off = tail_index_.fetch_add(1);
         AppendSparseInner(nnz, data, index, dst_off);
     }
 
@@ -384,14 +307,14 @@ public:
 
     [[nodiscard]] inline SizeT capacity() const { return capacity_; }
 
-    [[nodiscard]] inline SizeT Size() const { return tail_index_; }
+    [[nodiscard]] inline SizeT Size() const { return tail_index_.load(); }
 };
 
 template <typename T>
 void ColumnVector::CopyValue(ColumnVector &dst, const ColumnVector &src, SizeT from, SizeT count) {
     auto *src_ptr = (T *)(src.data_ptr_);
-    T *dst_ptr = &((T *)(dst.data_ptr_))[dst.tail_index_];
-    if (src.vector_type() == ColumnVectorType::kConstant && src.tail_index_ == 1) {
+    T *dst_ptr = &((T *)(dst.data_ptr_))[dst.tail_index_.load()];
+    if (src.vector_type() == ColumnVectorType::kConstant && src.tail_index_.load() == 1) {
         for (SizeT idx = 0; idx < count; ++idx) {
             dst_ptr[idx] = src_ptr[from];
         }
@@ -630,7 +553,7 @@ void CopyArray(ArrayT &dst_array,
 
 template <>
 void ColumnVector::CopyValue<BooleanT>(ColumnVector &dst, const ColumnVector &src, SizeT from, SizeT count) {
-    auto dst_tail = dst.tail_index_;
+    auto dst_tail = dst.tail_index_.load();
     const VectorBuffer *src_buffer = src.buffer_.get();
     auto dst_buffer = dst.buffer_.get();
     if (dst_tail % 8 == 0 && from % 8 == 0) {

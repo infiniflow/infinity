@@ -14,10 +14,10 @@
 
 module;
 
-export module index_base;
+export module infinity_core:index_base;
 
-import stl;
-import third_party;
+import :stl;
+import :third_party;
 import create_index_info;
 import global_resource_usage;
 

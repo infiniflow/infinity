@@ -45,7 +45,7 @@ template <typename T>
 inline T ReadBufAdv(const char *&buf) {
     static_assert(std::is_standard_layout_v<T>, "T must be POD");
     T value;
-    std::memcpy(&value, buf, sizeof(T));
+    std::memcpy(static_cast<void *>(&value), buf, sizeof(T));
     buf += sizeof(T);
     return value;
 }
@@ -70,6 +70,13 @@ inline std::tuple<> ReadBufAdv<std::tuple<>>(const char *&buf) {
 template <>
 inline std::string ReadBufAdv<std::string>(const char *&buf) {
     int32_t size = ReadBufAdv<int32_t>(buf);
+    
+    // Add bounds checking to prevent heap buffer overflow
+    if (size < 0 || size > 1024 * 1024 * 1024) { // Max 1GB string size
+        // Return empty string for corrupted data
+        return std::string();
+    }
+    
     std::string str(buf, size);
     buf += size;
     return str;

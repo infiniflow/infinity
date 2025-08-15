@@ -768,6 +768,64 @@ struct CompactRequest {
 3: string table_name,
 }
 
+struct CreateTableSnapshotRequest {
+1: i64 session_id
+2: string db_name,
+3: string table_name,
+4: string snapshot_name,
+}
+
+struct CreateDatabaseSnapshotRequest {
+1: i64 session_id
+2: string db_name,
+3: string snapshot_name,
+}
+
+struct CreateSystemSnapshotRequest {
+1: i64 session_id
+2: string snapshot_name,
+}
+
+struct RestoreSnapshotRequest {
+1: i64 session_id
+2: string snapshot_name,
+3: string scope,
+}
+
+struct SnapshotInfo {
+1:  string name,
+2:  string scope,
+3:  string time,
+4:  i64 commit,
+5:  string size,
+}
+
+struct ShowSnapshotRequest {
+1: i64 session_id,
+2: string snapshot_name,
+}
+
+struct ShowSnapshotResponse {
+1: i64 error_code,
+2: string error_msg,
+3: SnapshotInfo snapshot,
+}
+
+struct ListSnapshotsRequest {
+1: i64 session_id,
+}
+
+struct ListSnapshotsResponse {
+1: i64 error_code,
+2: string error_msg,
+3: list<SnapshotInfo> snapshots = [],
+}
+
+struct DropSnapshotRequest {
+1: i64 session_id,
+2: string snapshot_name,
+}
+
 // Service
 service InfinityService {
 CommonResponse Connect(1:ConnectRequest request),
@@ -823,5 +881,14 @@ CommonResponse Command(1: CommandRequest request),
 CommonResponse Flush(1: FlushRequest request),
 
 CommonResponse Compact(1: CompactRequest request),
+
+CommonResponse CreateTableSnapshot(1: CreateTableSnapshotRequest request),
+CommonResponse CreateDatabaseSnapshot(1: CreateDatabaseSnapshotRequest request),
+CommonResponse CreateSystemSnapshot(1: CreateSystemSnapshotRequest request),
+CommonResponse RestoreSnapshot(1: RestoreSnapshotRequest request),
+
+ShowSnapshotResponse ShowSnapshot(1: ShowSnapshotRequest request),
+ListSnapshotsResponse ListSnapshots(1: ListSnapshotsRequest request),
+CommonResponse DropSnapshot(1: DropSnapshotRequest request),
 
 }

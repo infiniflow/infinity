@@ -14,11 +14,11 @@
 
 module;
 
-export module fragment_data;
+export module infinity_core:fragment_data;
 
-import stl;
-import data_block;
-import status;
+import :stl;
+import :data_block;
+import :status;
 
 namespace infinity {
 
@@ -34,6 +34,7 @@ export struct FragmentDataBase {
     u64 fragment_id_{std::numeric_limits<u64>::max()};
 
     FragmentDataBase(FragmentDataType type, u64 fragment_id) : type_(type), fragment_id_(fragment_id) {}
+    virtual ~FragmentDataBase() = default;
 };
 
 export struct FragmentError : public FragmentDataBase {
@@ -62,6 +63,8 @@ export struct FragmentData : public FragmentDataBase {
                  SizeT total_hits_count)
         : FragmentDataBase(FragmentDataType::kData, fragment_id), data_block_(std::move(data_block)), task_id_(task_id), data_idx_(data_idx),
           data_count_(data_count), is_last_(is_last), total_hits_count_flag_(total_hits_count_flag), total_hits_count_(total_hits_count) {}
+
+    virtual ~FragmentData() = default;
 };
 
 export struct FragmentNone : public FragmentDataBase {

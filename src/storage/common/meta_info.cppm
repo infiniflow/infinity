@@ -14,21 +14,20 @@
 
 module;
 
-export module meta_info;
+export module infinity_core:meta_info;
 
-import stl;
+import :stl;
 import column_def;
-import default_values;
+import :default_values;
 import data_type;
 import create_index_info;
-import internal_types;
-import third_party;
+import :third_party;
+
 
 namespace infinity {
 
-struct WalChunkIndexInfo;
-
-enum class SegmentStatus;
+export struct WalChunkIndexInfo;
+export enum class SegmentStatus : u8;
 
 export struct DatabaseInfo {
     SharedPtr<String> db_name_{};

@@ -16,7 +16,7 @@ module;
 
 #include "infinity_thrift/InfinityService.h"
 
-export module infinity_thrift_types;
+export module infinity_core:infinity_thrift_types;
 
 namespace infinity_thrift_rpc {
 
@@ -111,4 +111,14 @@ export using infinity_thrift_rpc::InfinityServiceProcessorFactory;
 export using infinity_thrift_rpc::InfinityServiceProcessor;
 export using infinity_thrift_rpc::OptimizeOptions;
 export using infinity_thrift_rpc::InitParameter;
+export using infinity_thrift_rpc::SnapshotInfo;
+export using infinity_thrift_rpc::CreateTableSnapshotRequest;
+export using infinity_thrift_rpc::CreateDatabaseSnapshotRequest;
+export using infinity_thrift_rpc::CreateSystemSnapshotRequest;
+export using infinity_thrift_rpc::RestoreSnapshotRequest;
+export using infinity_thrift_rpc::ShowSnapshotRequest;
+export using infinity_thrift_rpc::ListSnapshotsRequest;
+export using infinity_thrift_rpc::DropSnapshotRequest;
+export using infinity_thrift_rpc::ShowSnapshotResponse;
+export using infinity_thrift_rpc::ListSnapshotsResponse;
 } // namespace infinity_thrift_rpc

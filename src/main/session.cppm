@@ -14,12 +14,9 @@
 
 module;
 
-export module session;
+export module infinity_core:session;
 
-import stl;
-import config;
-import options;
-import profiler;
+import :stl;
 import global_resource_usage;
 
 namespace infinity {
@@ -45,6 +42,7 @@ public:
 
     [[nodiscard]] inline NewTxn *GetNewTxn() const { return new_txn_.get(); }
     inline void SetNewTxn(const SharedPtr<NewTxn> &new_txn) { new_txn_ = new_txn; }
+    inline void ResetNewTxn() { new_txn_ = nullptr; }
 
     void IncreaseQueryCount() { ++query_count_; }
 

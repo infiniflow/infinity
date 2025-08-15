@@ -1,8 +1,8 @@
 module;
 
-export module char_length;
+export module infinity_core:char_length;
 
-import stl;
+import :stl;
 
 namespace infinity {
 

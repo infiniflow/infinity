@@ -14,17 +14,17 @@
 
 module;
 
-#include <boost/asio/io_service.hpp>
+#include <boost/asio/io_context.hpp>
 #include <boost/asio/ip/tcp.hpp>
 
-export module boost;
+export module infinity_core:boost;
 
 namespace boost {
 namespace system {
 export using boost::system::error_code;
 }
 namespace asio {
-export using boost::asio::io_service;
+export using boost::asio::io_context;
 namespace ip {
 export using boost::asio::ip::tcp;
 export using boost::asio::ip::make_address;

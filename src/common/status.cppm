@@ -14,10 +14,10 @@
 
 module;
 
-export module status;
+export module infinity_core:status;
 
-import stl;
-import third_party;
+import :stl;
+import :third_party;
 
 // If new error codes are added, it also needs to be added to python/infinity/errors.py.
 namespace infinity {
@@ -36,6 +36,7 @@ export enum class ErrorCode : long {
     kInvalidIPAddr = 1006,
     kInvalidLogLevel = 1007,
     kInvalidConfig = 1008,
+    kInvalidMemIndex = 1009,
 
     // 2. Auth error
     kWrongPasswd = 2001,
@@ -147,7 +148,8 @@ export enum class ErrorCode : long {
     kDuplicateColumnIndex = 3097,
     kInvalidParameter = 3098,
     kIndexOnColumn = 3099,
-
+    kSnapshotAlreadyExists = 3100,
+    kSnapshotAlreadyDeleted = 3101,
     // 4. Txn fail
     kTxnRollback = 4001,
     kTxnConflict = 4002,
@@ -232,6 +234,7 @@ public:
     static Status InvalidIPAddr(const String &ip_addr);
     static Status InvalidLogLevel(const String &log_level);
     static Status InvalidConfig(const String &detailed_info);
+    static Status InvalidMemIndex(const String &invalid_info);
 
     // 2. Auth error
     static Status WrongPasswd(const String &user_name);
@@ -340,7 +343,8 @@ public:
     static Status DuplicateColumnIndex(const String &detail);
     static Status InvalidParameter(const String &detail);
     static Status IndexOnColumn(const String &column_name);
-
+    static Status SnapshotAlreadyExists(const String &snapshot_name);
+    static Status SnapshotAlreadyDeleted(const String &snapshot_name);
     // 4. TXN fail
     static Status TxnRollback(u64 txn_id, const String &rollback_reason = "no reason");
     static Status TxnConflict(u64 txn_id, const String &conflict_reason);

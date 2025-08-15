@@ -14,15 +14,15 @@
 
 module;
 
-export module chinese_analyzer;
+export module infinity_core:chinese_analyzer;
 
-import stl;
-import jieba;
-import term;
-import analyzer;
-import common_analyzer;
-import third_party;
-import status;
+import :stl;
+import :jieba;
+import :term;
+import :analyzer;
+import :common_analyzer;
+import :third_party;
+import :status;
 
 namespace infinity {
 
@@ -32,7 +32,7 @@ public:
 
     ChineseAnalyzer(const ChineseAnalyzer &other);
 
-    ~ChineseAnalyzer();
+    virtual ~ChineseAnalyzer();
 
     Status Load();
 

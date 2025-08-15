@@ -14,10 +14,10 @@
 
 module;
 
-export module txn_allocator;
+export module infinity_core:txn_allocator;
 
-import stl;
-import blocking_queue;
+import :stl;
+import :blocking_queue;
 
 namespace infinity {
 
@@ -48,8 +48,6 @@ private:
     Storage *storage_{};
 
     Atomic<u64> task_count_{};
-
-    mutable std::mutex task_mutex_;
 
     SystemCache* system_cache_{};
 };

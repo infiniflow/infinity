@@ -21,16 +21,7 @@
 #endif
 
 import compilation_config;
-import stl;
-import third_party;
-import pg_server;
-import infinity_exception;
-import infinity_context;
-import thrift_server;
-import peer_thrift_server;
-import http_server;
-import logger;
-import simd_init;
+import infinity_core;
 
 namespace {
 
@@ -160,11 +151,20 @@ void SignalHandler(int signal_number, siginfo_t *, void *) {
 
             break;
         }
-        case SIGSEGV: {
+        case SIGSEGV:
+        case SIGABRT: {
             // Print back strace
+            const char *signal_name = (signal_number == SIGSEGV) ? "SEGMENT FAULTS" : "ABORT SIGNAL";
             infinity::PrintTransactionHistory();
-            infinity::PrintStacktrace("SEGMENT FAULTS");
-            exit(-1);
+            infinity::PrintStacktrace(signal_name);
+
+            // Restore default behavior and raise again to generate a coredump
+            struct sigaction sa;
+            sa.sa_handler = SIG_DFL;
+            sigemptyset(&sa.sa_mask);
+            sa.sa_flags = 0;
+            sigaction(signal_number, &sa, nullptr);
+            raise(signal_number);
             break;
         }
 #if defined(ENABLE_JEMALLOC_PROF) && !defined(__APPLE__)
@@ -197,6 +197,7 @@ void RegisterSignal() {
     sigaction(SIGQUIT, &sig_action, NULL);
     sigaction(SIGTERM, &sig_action, NULL);
     sigaction(SIGSEGV, &sig_action, NULL);
+    sigaction(SIGABRT, &sig_action, NULL);
 }
 
 void TerminateHandler() {

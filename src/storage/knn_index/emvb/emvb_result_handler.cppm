@@ -14,9 +14,9 @@
 
 module;
 
-export module emvb_result_handler;
-import stl;
-import infinity_exception;
+export module infinity_core:emvb_result_handler;
+import :stl;
+import :infinity_exception;
 
 namespace infinity {
 

@@ -1,15 +1,15 @@
 module;
 
-import stl;
-import byte_slice;
-import memory_chunk;
-import default_values;
-import file_writer;
-import file_reader;
+export module infinity_core:byte_slice_writer;
 
-import infinity_exception;
+import :stl;
+import :byte_slice;
+import :memory_chunk;
+import :default_values;
+import :file_writer;
+import :file_reader;
 
-export module byte_slice_writer;
+import :infinity_exception;
 
 namespace infinity {
 

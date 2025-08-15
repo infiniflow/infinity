@@ -14,12 +14,9 @@
 
 #pragma once
 
-#include "CLI11.hpp"
+#include <CLI/CLI.hpp>
 
-import stl;
-import virtual_store;
-import local_file_handle;
-import infinity_exception;
+import infinity_core;
 
 using namespace infinity;
 

@@ -17,13 +17,13 @@ module;
 #include <concepts>
 #include <type_traits>
 
-export module unary_operator;
+export module infinity_core:unary_operator;
 
-import stl;
-import column_vector;
-import logger;
-import infinity_exception;
-import roaring_bitmap;
+import :stl;
+import :column_vector;
+import :logger;
+import :infinity_exception;
+import :roaring_bitmap;
 import internal_types;
 
 namespace infinity {
@@ -107,11 +107,11 @@ public:
                     result_null->SetAllTrue();
                     if constexpr (std::is_same_v<InputType, BooleanT> and std::is_same_v<ResultType, BooleanT>) {
                         BooleanT result_value;
-                        Operator::template Execute(input->buffer_->GetCompactBit(0), result_value, result_null.get(), 0, state_ptr_input, state_ptr);
+                        Operator::Execute(input->buffer_->GetCompactBit(0), result_value, result_null.get(), 0, state_ptr_input, state_ptr);
                         result->buffer_->SetCompactBit(0, result_value);
                     } else if constexpr (std::is_same_v<ResultType, BooleanT>) {
                         BooleanT result_value;
-                        Operator::template Execute(input_ptr[0], result_value, result_null.get(), 0, state_ptr_input, state_ptr);
+                        Operator::Execute(input_ptr[0], result_value, result_null.get(), 0, state_ptr_input, state_ptr);
                         result->buffer_->SetCompactBit(0, result_value);
                     } else if constexpr (std::is_same_v<InputType, EmbeddingT>) {
                         EmbeddingT embedding_input(input->data(), false);
@@ -203,12 +203,12 @@ private:
         auto input_u8 = reinterpret_cast<const u8 *>(input->data());
         auto result_u8 = reinterpret_cast<u8 *>(result->data());
         for (SizeT i = 0; i < count_bytes; ++i) {
-            Operator::template Execute(input_u8[i], result_u8[i], result_null.get(), 0, state_ptr_input, state_ptr);
+            Operator::Execute(input_u8[i], result_u8[i], result_null.get(), 0, state_ptr_input, state_ptr);
         }
         if (count_tail > 0) {
             u8 &tail_u8 = result_u8[count_bytes];
             u8 ans;
-            Operator::template Execute(input_u8[count_bytes], ans, result_null.get(), 0, state_ptr_input, state_ptr);
+            Operator::Execute(input_u8[count_bytes], ans, result_null.get(), 0, state_ptr_input, state_ptr);
             u8 keep_mask = u8(0xff) << count_tail;
             tail_u8 = (tail_u8 & keep_mask) | (ans & ~keep_mask);
         }
@@ -229,7 +229,7 @@ private:
             }
             // This row isn't null
             BooleanT answer;
-            Operator::template Execute(input->buffer_->GetCompactBit(row_index), answer, result_null.get(), row_index, state_ptr_input, state_ptr);
+            Operator::Execute(input->buffer_->GetCompactBit(row_index), answer, result_null.get(), row_index, state_ptr_input, state_ptr);
             result->buffer_->SetCompactBit(row_index, answer);
             return row_index + 1 < count;
         });
@@ -243,7 +243,7 @@ private:
                                             void *state_ptr) {
         for (SizeT i = 0; i < count; i++) {
             BooleanT answer;
-            Operator::template Execute(input_ptr[i], answer, result->nulls_ptr_.get(), i, state_ptr_input, state_ptr);
+            Operator::Execute(input_ptr[i], answer, result->nulls_ptr_.get(), i, state_ptr_input, state_ptr);
             result->buffer_->SetCompactBit(i, answer);
         }
     }
@@ -260,7 +260,7 @@ private:
                 return false;
             }
             BooleanT answer;
-            Operator::template Execute(input_ptr[row_index], answer, result_null.get(), row_index, state_ptr_input, state_ptr);
+            Operator::Execute(input_ptr[row_index], answer, result_null.get(), row_index, state_ptr_input, state_ptr);
             result->buffer_->SetCompactBit(row_index, answer);
             return row_index + 1 < count;
         });

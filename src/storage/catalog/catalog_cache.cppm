@@ -14,16 +14,16 @@
 
 module;
 
-export module catalog_cache;
+export module infinity_core:catalog_cache;
 
-import stl;
-// import status;
-// import meta_info;
+import :stl;
+// import :status;
+// import :meta_info;
 // import extra_ddl_info;
-import default_values;
+import :default_values;
 import internal_types;
-import third_party;
-import status;
+import :third_party;
+import :status;
 
 namespace infinity {
 
@@ -247,7 +247,6 @@ private:
     mutable std::mutex cache_mtx_{};
     u64 next_db_id_{};
     Map<u64, SharedPtr<DbCache>> db_cache_map_{}; // db_id -> db_cache
-    Map<String, u64> db_name_map_{};              // db_name -> db_id
 };
 
 } // namespace infinity

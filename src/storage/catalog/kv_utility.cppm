@@ -14,10 +14,10 @@
 
 module;
 
-export module kv_utility;
+export module infinity_core:kv_utility;
 
-import stl;
-import status;
+import :stl;
+import :status;
 import internal_types;
 
 namespace infinity {
@@ -31,7 +31,8 @@ export Vector<SegmentID> GetTableIndexSegments(KVInstance *kv_instance,
                                                const String &db_id_str,
                                                const String &table_id_str,
                                                const String &index_id_str,
-                                               TxnTimeStamp begin_ts);
+                                               TxnTimeStamp begin_ts,
+                                               TxnTimeStamp commit_ts);
 
 export Vector<BlockID> GetTableSegmentBlocks(KVInstance *kv_instance,
                                              const String &db_id_str,

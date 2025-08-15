@@ -14,20 +14,20 @@
 
 module;
 
-export module logical_match_sparse_scan;
+export module infinity_core:logical_match_sparse_scan;
 
-import stl;
-import logical_node_type;
-import column_binding;
-import logical_node;
-import logical_match_scan_base;
-import base_expression;
-import match_sparse_expression;
-import base_table_ref;
+import :stl;
+import :logical_node_type;
+import :column_binding;
+import :logical_node;
+import :logical_match_scan_base;
+import :base_expression;
+import :match_sparse_expression;
+import :base_table_ref;
 import internal_types;
 import data_type;
-import fast_rough_filter;
-import common_query_filter;
+import :fast_rough_filter;
+import :common_query_filter;
 
 namespace infinity {
 

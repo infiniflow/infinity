@@ -2,6 +2,7 @@
 #include "column_expr.h"
 #include "search_options.h"
 #include "spdlog/fmt/fmt.h"
+#include <simdjson.h>
 #include "sstream"
 #include <cmath>
 #include <utility>
@@ -143,7 +144,7 @@ std::shared_ptr<ConstantExpr> BuildConstantExprFromJson(std::string_view json_st
             for (auto field : doc.get_object()) {
                 int64_t field_key = std::stoll(std::string((std::string_view)field.unescaped_key()));
                 auto field_value = field.value();
-                if (doc.type() != simdjson::ondemand::json_type::number) {
+                if (field_value.type() != simdjson::ondemand::json_type::number) {
                     const auto error_info = fmt::format("Unrecognized json object type in array");
                     ParserError(error_info);
                     return nullptr;

@@ -14,15 +14,15 @@
 
 module;
 
-export module min_max_data_filter;
-import stl;
-import value;
-import logger;
-import third_party;
-import infinity_exception;
-import filter_expression_push_down_helper;
+export module infinity_core:min_max_data_filter;
+import :stl;
+import :value;
+import :logger;
+import :third_party;
+import :infinity_exception;
+import :filter_expression_push_down_helper;
 import internal_types;
-import filter_value_type_classification;
+import :filter_value_type_classification;
 
 namespace infinity {
 
@@ -204,7 +204,7 @@ public:
 
     void SaveToJsonFile(nlohmann::json &entry_json) const;
 
-    bool LoadFromJsonFile(const nlohmann::json &entry_json);
+    bool LoadFromJsonFile(std::string_view json_sv);
 };
 
 } // namespace infinity

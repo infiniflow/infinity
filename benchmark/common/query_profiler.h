@@ -4,8 +4,8 @@
 
 #pragma once
 
-#include "magic_enum.hpp"
 #include "base_profiler.h"
+#include <magic_enum/magic_enum.hpp>
 #include <vector>
 
 namespace infinity {

@@ -14,13 +14,13 @@
 
 module;
 
-export module persistence_manager;
+export module infinity_core:persistence_manager;
 
-import stl;
+import :stl;
 import serialize;
-import third_party;
-import obj_status;
-import status;
+import :third_party;
+import :obj_status;
+import :status;
 
 // A view means a logical plan
 namespace infinity {
@@ -77,6 +77,7 @@ public:
     [[nodiscard]] PersistWriteResult Persist(const String &file_path, const String &tmp_file_path, bool try_compose = true);
 
     // Force finalize current object. Subsequent append on the finalized object is forbidden.
+    // IMPORT / COMPACT / OPTIMIZE / DUMP MEM INDEX operations should call this method to finalize the current object.
     [[nodiscard]] PersistWriteResult CurrentObjFinalize(bool validate = false);
 
     // Download the whole object from object store if it's not in cache. Increase refcount and return the cached object file path.

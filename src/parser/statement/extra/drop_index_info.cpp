@@ -19,7 +19,8 @@ namespace infinity {
 
 std::string DropIndexInfo::ToString() const {
     std::stringstream ss;
-    ss << "DROP INDEX: " << index_name_;
+    ss << "DROP INDEX " << index_name_;
+    ss << " ON " << table_name_;
     if (this->conflict_type_ == ConflictType::kIgnore) {
         ss << " IgnoreIfNotExists";
     } else {

@@ -8,7 +8,7 @@ import time
 python_executable = sys.executable
 
 
-def python_sdk_test(python_test_dir: str, pytest_mark: str):
+def python_sdk_test(python_test_dir: str, pytest_mark: str, test_case: str = ""):
     print("python test path is {}".format(python_test_dir))
     # run test
     print(f"start pysdk test with {pytest_mark}")
@@ -21,7 +21,7 @@ def python_sdk_test(python_test_dir: str, pytest_mark: str):
         "-x",
         "-m",
         pytest_mark,
-        f"{python_test_dir}/test_pysdk",
+        test_case,
         "--http",
     ]
     quoted_args = ['"' + arg + '"' if " " in arg else arg for arg in args]
@@ -52,12 +52,22 @@ if __name__ == "__main__":
         default="not complex and not slow",
         dest="pytest_mark",
     )
+    parser.add_argument(
+        "--test_case",
+        type=str,
+        required=False,
+    )
     args = parser.parse_args()
 
+    test_case = ""
+    if args.test_case:
+        test_case = f"{python_test_dir}/test_pysdk/{args.test_case}"
+    else:
+        test_case = f"{python_test_dir}/test_pysdk"
     print("Start Http API testing...")
     start = time.time()
     try:
-        python_sdk_test(python_test_dir, args.pytest_mark)
+        python_sdk_test(python_test_dir, args.pytest_mark, test_case)
     except Exception as e:
         print(e)
         sys.exit(-1)

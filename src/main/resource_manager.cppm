@@ -14,10 +14,10 @@
 
 module;
 
-export module resource_manager;
+export module infinity_core:resource_manager;
 
-import singleton;
-import stl;
+import :stl;
+import :singleton;
 import global_resource_usage;
 
 namespace infinity {

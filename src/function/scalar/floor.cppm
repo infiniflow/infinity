@@ -1,8 +1,8 @@
 module;
 
-export module floor;
+export module infinity_core:floor;
 
-import stl;
+import :stl;
 
 namespace infinity {
 

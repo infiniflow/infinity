@@ -14,18 +14,18 @@
 
 module;
 
-export module physical_merge_match_tensor;
+export module infinity_core:physical_merge_match_tensor;
 
-import stl;
-import query_context;
-import operator_state;
-import physical_operator;
-import meta_info;
-import match_tensor_expression;
-import base_table_ref;
+import :stl;
+import :query_context;
+import :operator_state;
+import :physical_operator;
+import :meta_info;
+import :match_tensor_expression;
+import :base_table_ref;
 import data_type;
-import base_expression;
-import logical_match_tensor_scan;
+import :base_expression;
+import :logical_match_tensor_scan;
 
 namespace infinity {
 

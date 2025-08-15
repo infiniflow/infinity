@@ -14,13 +14,14 @@
 
 module;
 
-export module table_index_meeta;
+export module infinity_core:table_index_meeta;
 
-import stl;
-import status;
+import :stl;
+import :status;
 import column_def;
-import meta_info;
-import new_catalog;
+import :meta_info;
+import :new_catalog;
+import :snapshot_info;
 
 namespace infinity {
 
@@ -69,11 +70,12 @@ public:
 
     Status RemoveSegmentIndexIDs(const Vector<SegmentID> &segment_ids);
 
+    Tuple<SharedPtr<TableIndexSnapshotInfo>, Status> MapMetaToSnapShotInfo();
+
 private:
     Status GetSegmentUpdateTS(SharedPtr<SegmentUpdateTS> &segment_update_ts);
 
 public:
-    Status UpdateFulltextSegmentTS(TxnTimeStamp ts);
 
     Status InitSet1(const SharedPtr<IndexBase> &index_base, NewCatalog *new_catalog);
 
@@ -93,6 +95,8 @@ public:
     Tuple<SecondaryIndexCardinality, Status> GetSecondaryIndexCardinality();
 
 private:
+    mutable std::mutex mtx_;
+
     KVInstance &kv_instance_;
     TableMeeta &table_meta_;
     String index_id_str_;

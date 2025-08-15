@@ -14,8 +14,7 @@
 
 #pragma once
 
-#include "json.hpp"
-#include "simdjson.h"
+#include "nlohmann/json.hpp"
 #include <cstdint>
 #include <string>
 

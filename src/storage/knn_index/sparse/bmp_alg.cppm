@@ -14,20 +14,21 @@
 
 module;
 
-export module bmp_alg;
+export module infinity_core:bmp_alg;
 
-import stl;
-import sparse_util;
-import local_file_handle;
-import bmp_util;
-import hnsw_common;
-import knn_result_handler;
-import bmp_ivt;
-import bmp_fwd;
-import bp_reordering;
+import :stl;
+import :sparse_util;
+import :local_file_handle;
+import :bmp_util;
+import :hnsw_common;
+import :knn_result_handler;
+import :bmp_ivt;
+import :bmp_fwd;
+import :bp_reordering;
 import serialize;
-import third_party;
-import infinity_exception;
+import :third_party;
+import :infinity_exception;
+import :sparse_vec_store;
 
 namespace infinity {
 
@@ -248,8 +249,7 @@ public:
         mem_usage_.fetch_add(sizeof(BMPDocID) + mem_usage);
     }
 
-    template <DataIteratorConcept<SparseVecRef<DataType, IdxType>, BMPDocID> Iterator>
-    SizeT AddDocs(Iterator iter) {
+    SizeT AddDocs(DataIteratorConcept<SparseVecRef<DataType, IdxType>, BMPDocID> auto iter) {
         SizeT cnt = 0;
         while (true) {
             auto ret = iter.Next();
@@ -477,6 +477,14 @@ public:
         auto block_fwd = BlockFwd<DataType, IdxType, BMPOwnMem::kFalse>::LoadFromPtr(p);
         SizeT doc_num = ReadBufAdvAligned<SizeT>(p);
         const BMPDocID *doc_ids = ReadBufVecAdvAligned<BMPDocID>(p, doc_num);
+        
+        // DEBUG: Validate consistency between block structure and doc_ids
+        SizeT expected_doc_count = block_fwd.block_num() * block_fwd.block_size();
+        if (doc_num != expected_doc_count) {
+            LOG_ERROR(fmt::format("BMP INCONSISTENCY: doc_num {} != expected_doc_count {} (block_num: {}, block_size: {})", 
+                                 doc_num, expected_doc_count, block_fwd.block_num(), block_fwd.block_size()));
+        }
+        
         if (SizeT(p - start) != size) {
             UnrecoverableError(fmt::format("BMPAlg::LoadFromPtr: p - start != size: {} != {}", p - start, size));
         }

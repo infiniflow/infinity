@@ -14,13 +14,14 @@
 
 module;
 
-export module block_meta;
+export module infinity_core:block_meta;
 
-import stl;
-import status;
-import default_values;
-import meta_info;
-import new_catalog;
+import :stl;
+import :status;
+import :default_values;
+import :meta_info;
+import :new_catalog;
+import :snapshot_info;
 
 namespace infinity {
 
@@ -46,17 +47,18 @@ public:
 
     Status GetBlockLock(SharedPtr<BlockLock> &block_lock);
 
-    // Status SetRowCnt(SizeT row_cnt);
-
     Status InitSet();
 
     Status LoadSet(TxnTimeStamp checkpoint_ts);
 
     Status RestoreSet();
 
+    Status RestoreSetFromSnapshot();
+
     Status UninitSet(UsageFlag usage_flag);
 
     // Tuple<SizeT, Status> GetRowCnt();
+    TxnTimeStamp GetCreateTimestampFromKV() const;
 
     Tuple<SizeT, Status> GetRowCnt1();
 
@@ -78,16 +80,22 @@ public:
 
     Status SetFastRoughFilter(SharedPtr<FastRoughFilter> fast_rough_filter);
 
+    Status RestoreFromSnapshot();
+
+    Tuple<SharedPtr<BlockSnapshotInfo>, Status> MapMetaToSnapShotInfo();
+
 private:
+    mutable std::mutex mtx_;
+
     TxnTimeStamp begin_ts_ = 0;
     TxnTimeStamp commit_ts_;
     KVInstance &kv_instance_;
     SegmentMeta &segment_meta_;
-    BlockID block_id_;
-    Optional<Vector<ColumnID>> column_ids1_;
+    BlockID block_id_;  
+    Optional<Vector<ColumnID>> column_ids1_; // stored in columndefs in kv
 
     SharedPtr<String> block_dir_;
-    Optional<SizeT> row_cnt_;
+    Optional<SizeT> row_cnt_; // stored in the block version file
 
     BufferObj *version_buffer_ = nullptr;
     SharedPtr<FastRoughFilter> fast_rough_filter_;

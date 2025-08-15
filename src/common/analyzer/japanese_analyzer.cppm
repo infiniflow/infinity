@@ -14,13 +14,13 @@
 
 module;
 
-export module japanese_analyzer;
+export module infinity_core:japanese_analyzer;
 
-import stl;
-import ijma;
-import term;
-import common_analyzer;
-import status;
+import :stl;
+import :ijma;
+import :term;
+import :common_analyzer;
+import :status;
 
 namespace infinity {
 

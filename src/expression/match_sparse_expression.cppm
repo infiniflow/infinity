@@ -14,19 +14,19 @@
 
 module;
 
-export module match_sparse_expression;
+export module infinity_core:match_sparse_expression;
 
-import stl;
-import base_expression;
+import :stl;
+import :base_expression;
 import data_type;
-import expression_type;
+import :expression_type;
 import internal_types;
 import statement_common;
 import match_sparse_expr;
 import sparse_info;
-import column_expression;
+import :column_expression;
 import constant_expr;
-import base_expression;
+import :base_expression;
 
 namespace infinity {
 

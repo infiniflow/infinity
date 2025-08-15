@@ -14,19 +14,22 @@
 
 module;
 
-export module snapshot;
+export module infinity_core:snapshot;
 
-import stl;
-import status;
-import snapshot_info;
-import query_context;
+import :stl;
+import :status;
+import :snapshot_info;
+// import :query_context;
 
 namespace infinity {
+class QueryContext;
 
 export class Snapshot {
 public:
     static Status CreateTableSnapshot(QueryContext *query_context, const String &snapshot_name, const String& table_name);
     static Status RestoreTableSnapshot(QueryContext *query_context, const String &snapshot_name);
+    static Status CreateDatabaseSnapshot(QueryContext *query_context, const String &snapshot_name, const String& db_name);
+    static Status RestoreDatabaseSnapshot(QueryContext *query_context, const String &snapshot_name);
     static Status DropSnapshot(QueryContext *query_context, const String &snapshot_name);
 };
 

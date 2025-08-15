@@ -69,7 +69,21 @@ public:
 
     void SetBit(uint64_t row_index, bool value);
 
-    [[nodiscard]] inline std::string ToString() const { ParserError("ToString() isn't implemented"); return std::string(); }
+    [[nodiscard]] inline std::string ToString() const {
+        if (ptr == nullptr || count == 0) {
+            return "[]";
+        }
+
+        std::string result = "[";
+        for (uint64_t i = 0; i < count; ++i) {
+            if (i > 0) {
+                result += ",";
+            }
+            result += GetBit(i) ? "1" : "0";
+        }
+        result += "]";
+        return result;
+    }
 };
 
 } // namespace infinity

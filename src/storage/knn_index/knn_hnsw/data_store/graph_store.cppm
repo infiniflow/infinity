@@ -17,12 +17,12 @@ module;
 #include <cassert>
 #include <ostream>
 
-export module graph_store;
+export module infinity_core:graph_store;
 
-import stl;
-import hnsw_common;
-import local_file_handle;
-import data_store_util;
+import :stl;
+import :hnsw_common;
+import :local_file_handle;
+import :data_store_util;
 import serialize;
 
 namespace infinity {

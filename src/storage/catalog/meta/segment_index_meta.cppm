@@ -14,13 +14,14 @@
 
 module;
 
-export module segment_index_meta;
+export module infinity_core:segment_index_meta;
 
-import stl;
-import status;
-import third_party;
-import meta_info;
-import new_catalog;
+import :stl;
+import :status;
+import :third_party;
+import :meta_info;
+import :new_catalog;
+import :snapshot_info;
 
 namespace infinity {
 
@@ -42,11 +43,9 @@ public:
 
     KVInstance &kv_instance() const { return kv_instance_; }
 
-    Tuple<Vector<ChunkID> *, Status> GetChunkIDs();
-
     Status GetNextChunkID(ChunkID &chunk_id);
-
-    Tuple<ChunkID, Status> GetNextChunkID1();
+    Status SetNextChunkID(ChunkID chunk_id);
+    Tuple<ChunkID, Status> GetAndSetNextChunkID();
 
     Tuple<Vector<ChunkID> *, Status> GetChunkIDs1();
 
@@ -56,19 +55,15 @@ public:
 
     Status RemoveChunkIDs(const Vector<ChunkID> &chunk_ids);
 
-    Status AddChunkID(ChunkID chunk_id);
-
     Status AddChunkIndexID1(ChunkID chunk_id, NewTxn *new_txn);
-
-    Status SetNextChunkID(ChunkID chunk_id);
 
     Status UpdateFtInfo(u64 column_len_sum, u32 column_len_cnt);
 
     Status SetNoMemIndex();
 
-    Status InitSet();
-
     Status InitSet1();
+
+    Status RestoreSet(const ChunkID &next_chunk_id);
 
     Status LoadSet();
 
@@ -78,14 +73,15 @@ public:
 
     SharedPtr<MemIndex> GetMemIndex();
     SharedPtr<MemIndex> PopMemIndex();
+    bool HasMemIndex();
 
     SharedPtr<String> GetSegmentIndexDir() const;
 
     SharedPtr<SegmentIndexInfo> GetSegmentIndexInfo();
 
-private:
-    Status LoadChunkIDs();
+    Tuple<SharedPtr<SegmentIndexSnapshotInfo>, Status> MapMetaToSnapShotInfo();
 
+private:
     Status LoadChunkIDs1();
 
     Status LoadNextChunkID();
@@ -95,6 +91,8 @@ private:
     String GetSegmentIndexTag(const String &tag);
 
 private:
+    mutable std::mutex mtx_;
+
     TxnTimeStamp begin_ts_;
     TxnTimeStamp commit_ts_;
     KVInstance &kv_instance_;

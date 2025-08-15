@@ -14,21 +14,21 @@
 
 module;
 
-export module knn_scan_data;
+export module infinity_core:knn_scan_data;
 
-import stl;
-import table_function;
+import :stl;
+import :table_function;
 
-import global_block_id;
-import merge_knn;
-import roaring_bitmap;
-import data_block;
-import column_vector;
-import base_expression;
-import expression_state;
+import :global_block_id;
+import :merge_knn;
+import :roaring_bitmap;
+import :data_block;
+import :column_vector;
+import :base_expression;
+import :expression_state;
 import knn_expr;
 import statement_common;
-import base_table_ref;
+import :base_table_ref;
 import internal_types;
 
 namespace infinity {
@@ -42,7 +42,7 @@ public:
     KnnScanSharedData(SharedPtr<BaseTableRef> table_ref,
                       UniquePtr<Vector<BlockMeta *>> block_metas,
                       SharedPtr<TableIndexMeeta> table_index_meta,
-                      UniquePtr<Vector<SegmentIndexMeta>> segment_index_metas,
+                      UniquePtr<Vector<SharedPtr<SegmentIndexMeta>>> segment_index_metas,
                       Vector<InitParameter> opt_params,
                       i64 topk,
                       i64 dimension,
@@ -58,7 +58,7 @@ public:
 
     UniquePtr<Vector<BlockMeta *>> block_metas_{};
     SharedPtr<TableIndexMeeta> table_index_meta_{};
-    UniquePtr<Vector<SegmentIndexMeta>> segment_index_metas_{};
+    UniquePtr<Vector<SharedPtr<SegmentIndexMeta>>> segment_index_metas_{};
 
     const Vector<InitParameter> opt_params_{};
     const i64 topk_;
