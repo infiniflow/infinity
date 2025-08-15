@@ -207,28 +207,22 @@ Status DBMeeta::GetTableID(const String &table_name, String &table_key, String &
     if ((!drop_table_ts.empty() && std::stoull(drop_table_ts) <= txn_begin_ts_) ||
         (!rename_table_ts.empty() && std::stoull(rename_table_ts) <= txn_begin_ts_)) {
 
-        table_cache = MakeShared<MetaTableCache>(db_id, table_name, std::stoull(table_id_str), max_commit_ts, table_key, true);
-        meta_cache_->Put({table_cache});
-
-        LOG_TRACE(fmt::format("Save dropped table meta from cache, db_id: {}, table_name: {}, table_key: {}, table_id: {}, commit_ts: {}",
-                              table_cache->db_id_,
-                              table_name,
-                              table_key,
-                              table_cache->table_id_,
-                              table_cache->commit_ts_));
+        //        table_cache = MakeShared<MetaTableCache>(db_id, table_name, std::stoull(table_id_str), max_commit_ts, table_key, true);
+        //        meta_cache_->Put({table_cache});
+        //
+        //        LOG_TRACE(fmt::format("Save dropped table meta from cache, db_id: {}, table_name: {}, table_key: {}, table_id: {}, commit_ts: {}",
+        //                              table_cache->db_id_,
+        //                              table_name,
+        //                              table_key,
+        //                              table_cache->table_id_,
+        //                              table_cache->commit_ts_));
 
         return Status::TableNotExist(table_name);
     }
 
-    table_cache = MakeShared<MetaTableCache>(db_id, table_name, std::stoull(table_id_str), max_commit_ts, table_key, false);
-    meta_cache_->Put({table_cache});
-
-    LOG_TRACE(fmt::format("Save created table meta from cache, db_id: {}, table_name: {}, table_key: {}, table_id: {}, commit_ts: {}",
-                          table_cache->db_id_,
-                          table_name,
-                          table_key,
-                          table_cache->table_id_,
-                          table_cache->commit_ts_));
+    if (txn_ != nullptr) {
+        txn_->AddMetaCache(MakeShared<MetaTableCache>(db_id, table_name, std::stoull(table_id_str), max_commit_ts, table_key, false));
+    }
 
     create_table_ts = max_commit_ts;
     return Status::OK();

@@ -83,6 +83,7 @@ import :virtual_store;
 import :txn_context;
 import :kv_utility;
 import :catalog_cache;
+import :meta_cache;
 import extra_ddl_info;
 import column_def;
 import row_id;
@@ -1810,6 +1811,11 @@ TransactionType NewTxn::GetTxnType() const {
     return txn_context_ptr_->txn_type_;
 }
 
+TxnType NewTxn::txn_type() const {
+    std::shared_lock<std::shared_mutex> r_locker(rw_locker_);
+    return txn_type_;
+}
+
 void NewTxn::SetTxnBottomDone() {
     std::shared_lock<std::shared_mutex> r_locker(rw_locker_);
     bottom_done_ = true;
@@ -1935,6 +1941,7 @@ Status NewTxn::Commit() {
         TxnTimeStamp commit_ts = txn_mgr_->GetReadCommitTS(this);
         this->SetTxnCommitting(commit_ts);
         this->SetTxnCommitted();
+        this->SaveMetaCache(); // Load the meta used in this txn to cache.
         LOG_TRACE(fmt::format("Commit READ txn: {}. begin ts: {}, Command: {}", txn_context_ptr_->txn_id_, BeginTS(), *GetTxnText()));
         return Status::OK();
     }
@@ -6226,6 +6233,21 @@ Status NewTxn::CheckpointforSnapshot(TxnTimeStamp last_ckp_ts, CheckpointTxnStor
     }
 
     return Status::OK();
+}
+
+void NewTxn::AddMetaCache(const SharedPtr<MetaBaseCache> &meta_base_cache) {
+    meta_cache_items_.emplace_back(meta_base_cache);
+    return;
+}
+
+void NewTxn::ResetMetaCache() { meta_cache_items_.clear(); }
+
+void NewTxn::SaveMetaCache() {
+    if (meta_cache_items_.empty()) {
+        return;
+    }
+    MetaCache *meta_cache_ptr = txn_mgr_->storage()->meta_cache();
+    meta_cache_ptr->Put(meta_cache_items_);
 }
 
 } // namespace infinity

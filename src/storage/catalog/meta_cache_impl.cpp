@@ -85,18 +85,18 @@ Status MetaCache::Erase(const Vector<SharedPtr<EraseBaseCache>> &cache_items, KV
     for (const auto &cache_item : cache_items) {
         switch (cache_item->type_) {
             case EraseCacheType::kEraseDB: {
-                SharedPtr<MetaEraseDbCache> db_cache = std::static_pointer_cast<MetaEraseDbCache>(cache_item);
-                EraseDbNolock(db_cache->db_name_);
+                MetaEraseDbCache *db_cache_ptr = static_cast<MetaEraseDbCache *>(cache_item.get());
+                EraseDbNolock(db_cache_ptr->db_name_);
                 break;
             }
             case EraseCacheType::kEraseTable: {
-                SharedPtr<MetaEraseTableCache> table_cache = std::static_pointer_cast<MetaEraseTableCache>(cache_item);
-                EraseTableNolock(table_cache->db_id_, table_cache->table_name_);
+                MetaEraseTableCache *table_cache_ptr = static_cast<MetaEraseTableCache *>(cache_item.get());
+                EraseTableNolock(table_cache_ptr->db_id_, table_cache_ptr->table_name_);
                 break;
             }
             case EraseCacheType::kEraseIndex: {
-                SharedPtr<MetaEraseIndexCache> index_cache = std::static_pointer_cast<MetaEraseIndexCache>(cache_item);
-                EraseIndexNolock(index_cache->db_id_, index_cache->table_id_, index_cache->index_name_);
+                MetaEraseIndexCache *index_cache_ptr = static_cast<MetaEraseIndexCache *>(cache_item.get());
+                EraseIndexNolock(index_cache_ptr->db_id_, index_cache_ptr->table_id_, index_cache_ptr->index_name_);
                 break;
             }
             default: {

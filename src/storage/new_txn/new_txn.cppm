@@ -116,6 +116,7 @@ struct BlockColumnInfo;
 struct TableDetail;
 struct CheckpointTxnStore;
 struct MetaKey;
+struct MetaBaseCache;
 
 export struct CheckpointOption {
     TxnTimeStamp checkpoint_ts_ = 0;
@@ -374,6 +375,8 @@ public:
     TxnState GetTxnState() const;
 
     TransactionType GetTxnType() const;
+
+    TxnType txn_type() const;
 
     bool NeedToAllocate() const;
 
@@ -666,6 +669,10 @@ public:
     const Vector<UniquePtr<std::binary_semaphore>> &semas() const;
     void AddMetaKeyForBufferObject(UniquePtr<MetaKey> object_meta_key);
 
+    void AddMetaCache(const SharedPtr<MetaBaseCache> &meta_base_cache);
+    void ResetMetaCache();
+    void SaveMetaCache();
+
 private:
     // Reference to external class
     NewTxnManager *txn_mgr_{};
@@ -710,6 +717,9 @@ private:
 
     // Use for commit and rollback
     Vector<UniquePtr<std::binary_semaphore>> semas_{};
+
+    // Meta cache
+    Vector<SharedPtr<MetaBaseCache>> meta_cache_items_{}; // cache item to store
 
 private:
     SharedPtr<TxnContext> txn_context_ptr_{};
