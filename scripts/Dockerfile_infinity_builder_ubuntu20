@@ -34,7 +34,7 @@ RUN --mount=type=cache,id=inf_apt,target=/var/cache/apt,sharing=locked \
     && echo "deb-src http://apt.llvm.org/focal/ llvm-toolchain-focal-20 main" >> /etc/apt/sources.list.d/llvm.list \
     && apt-get update \
     && apt-get install -y \
-        clang-20 clang++-20 clang-tools-20 \
+        clang-20 clang++-20 clang-format-20 clang-tidy-20 clang-tools-20 \
         libc++-20-dev libc++abi-20-dev \
         lld-20 lldb-20 \
     && update-alternatives --install /usr/bin/clang clang /usr/bin/clang-20 100 \
@@ -141,26 +141,16 @@ RUN --mount=type=bind,source=docker-28.3.3.tgz,target=/root/docker-28.3.3.tgz \
 # Set environment variables for vcpkg and infinity build
 ENV CC=clang CXX=clang++
 
-# Setup vcpkg
-# This populates the binary cache at /root/.cache/vcpkg for later use by infinity builds
-RUN --mount=type=cache,id=inf_vcpkg_downloads,target=/root/vcpkg_downloads,sharing=locked \
-    --mount=type=bind,source=vcpkg.json,target=/tmp/vcpkg.json \
-    mkdir -p /opt /root/workspace /root/vcpkg_downloads \
-    && git clone https://github.com/microsoft/vcpkg /opt/vcpkg \
+# Setup vcpkg for manifest mode (no global VCPKG_ROOT)
+RUN git clone https://github.com/microsoft/vcpkg.git /opt/vcpkg \
     && cd /opt/vcpkg \
-    && ./bootstrap-vcpkg.sh --disableMetrics \
-    && cp /tmp/vcpkg.json /root/workspace/ \
-    && cd /root/workspace \
-    && mkdir -p /opt/vcpkg/downloads \
-    && if [ "$(ls -A /root/vcpkg_downloads 2>/dev/null)" ]; then \
-           echo "vcpkg downloads cache exists, copy to vcpkg downloads directory"; \
-           cp -rf /root/vcpkg_downloads/* /opt/vcpkg/downloads/; \
-       fi \
-    && /opt/vcpkg/vcpkg install --only-downloads \
-    && cp -rf /opt/vcpkg/downloads/* /root/vcpkg_downloads/ \
-    && /opt/vcpkg/vcpkg install \
-    && rm -rf /root/workspace \
-    && rm -rf /opt/vcpkg/buildtrees /opt/vcpkg/downloads /opt/vcpkg/packages
+    && ./bootstrap-vcpkg.sh --disableMetrics
+
+# Pre-build vcpkg dependencies using manifest mode
+# This populates the binary cache at /root/.cache/vcpkg for later use by infinity builds
+RUN --mount=type=bind,source=vcpkg.json,target=/opt/vcpkg/vcpkg.json \
+    cd /opt/vcpkg && \
+    /opt/vcpkg/vcpkg install --clean-after-build
 
 # Set vcpkg toolchain path for CMake
 # Set Python paths for CMake to find the correct Python installation
