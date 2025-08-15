@@ -80,7 +80,7 @@ jobs:
                 if [ -f "$file" ]; then
                   echo "Checking formatting: $file"
                   clang-format-20 "$file" > "${file}.formatted"
-                  sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity; clang-format-20 '$file' > '${file}.formatted'; diff '$file' '${file}.formatted 2>/dev/null'"
+                  sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity; clang-format-20 $file > ${file}.formatted; diff $file ${file}.formatted 2>/dev/null"
                   if [ $? -ne 0 ]; then
                     echo "❌ $file needs formatting"
                     HAS_ERROR=1
