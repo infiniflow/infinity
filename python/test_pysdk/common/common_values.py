@@ -1,4 +1,5 @@
 from infinity import NetworkAddress
+from infinity.common import ConflictType
 import numpy as np
 
 TEST_LOCAL_HOST = NetworkAddress("127.0.0.1", 23817)
@@ -16,17 +17,16 @@ TEST_DATA_DIR = "/test/data/"
 TEST_TMP_DIR = "/var/infinity/test_data/"
 
 types_array = [
-    # # int
+    # int
     "int", "int8", "int16", "int32", "int64", "integer",
-    # "int128",
-    # # float
-    # "float", "float32", "double", "float64",
-    # # string
-    # "varchar",
-    # # bool
-    # "bool",
-    # # vector
-    # "vector, 3, float"
+    # float
+    "float", "float32", "double", "float64",
+    # string
+    "varchar",
+    # bool
+    "bool",
+    # vector
+    "vector, 3, float"
 ]
 
 types_example_array = [
@@ -45,18 +45,28 @@ types_example_array = [
 ]
 
 # db_name, table_name, index_name, column_name
+valid_name_array = [
+    'name',
+    'name12',
+    'name_',
+    'name_12',
+    'name12__',
+]
+
+# db_name, table_name, index_name, column_name
 invalid_name_array = [
-    [],
-    (),
-    {},
-    1,
-    1.1,
+    '[]',
+    '()',
+    '{}',
+    '1',
+    '1.1',
     '',
     ' ',
     '12',
     'name-12',
     '12name',
     '数据库名',
+    'my_table!@#'
     # ''.join('x' for i in range(identifier_limit + 1)),
     # None,
 ]
@@ -77,18 +87,17 @@ check_file_data = [{"file_name": "pysdk_test_blankspace.csv"},
 delimiter = [["blankspace", " "], ["commas", ","],
              ["semicolons", ";"], ["tabular", "\t"]]
 
-
 create_valid_option = [
-    "kError", "kIgnore", "kReplace"
+    ConflictType.Error, ConflictType.Ignore, 0, 1
 ]
 create_invalid_option = [
-    1.1, "#@$@!%string", [], {}, ()
+    "ConflictType.Replace", 1.1, "#@$@!%string", [], {}, ()
 ]
 drop_valid_option = [
-    "kError", "kIgnore"
+    ConflictType.Error, ConflictType.Ignore, 0, 1
 ]
 drop_invalid_option = [
-    "kReplace", 1.1, "#@$@!%string", [], {}, ()
+    "ConflictType.Replace", 1.1, "#@$@!%string", [], {}, ()
 ]
 
 check_file_data = [{"file_name": "pysdk_test_blankspace.csv"},
