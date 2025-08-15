@@ -1928,6 +1928,7 @@ show_statement: SHOW DATABASES {
 | SHOW DATABASE IDENTIFIER {
     $$ = new infinity::ShowStatement();
     $$->show_type_ = infinity::ShowStmtType::kDatabase;
+    ParserHelper::ToLower($3);
     $$->schema_name_ = $3;
     free($3);
 }
@@ -2037,6 +2038,7 @@ show_statement: SHOW DATABASES {
     free($3->table_name_ptr_);
     delete $3;
 
+    ParserHelper::ToLower($5);
     $$->index_name_ = $5;
     free($5);
 }
@@ -2051,6 +2053,7 @@ show_statement: SHOW DATABASES {
     free($3->table_name_ptr_);
     delete $3;
 
+    ParserHelper::ToLower($5);
     $$->index_name_ = $5;
     free($5);
 
@@ -2067,6 +2070,7 @@ show_statement: SHOW DATABASES {
       free($3->table_name_ptr_);
       delete $3;
 
+      ParserHelper::ToLower($5);
       $$->index_name_ = $5;
       free($5);
 
@@ -2116,6 +2120,7 @@ show_statement: SHOW DATABASES {
 | SHOW IDENTIFIER '(' ')' {
       $$ = new infinity::ShowStatement();
       $$->show_type_ = infinity::ShowStmtType::kFunction;
+      ParserHelper::ToLower($2);
       $$->function_name_ = $2;
       free($2);
 }
@@ -2126,6 +2131,7 @@ show_statement: SHOW DATABASES {
 | SHOW SNAPSHOT IDENTIFIER {
      $$ = new infinity::ShowStatement();
      $$->show_type_ = infinity::ShowStmtType::kShowSnapshot;
+     ParserHelper::ToLower($3);
      $$->snapshot_name_ = $3;
      free($3);
 }
@@ -2174,6 +2180,7 @@ optimize_statement: OPTIMIZE table_name {
     free($4->table_name_ptr_);
     delete $4;
 
+    ParserHelper::ToLower($2);
     $$->index_name_ = $2;
     free($2);
 
@@ -2340,8 +2347,6 @@ command_statement: USE IDENTIFIER {
 }
 | DUMP INDEX IDENTIFIER ON table_name {
     ParserHelper::ToLower($3);
-    ParserHelper::ToLower($5->schema_name_ptr_);
-    ParserHelper::ToLower($5->table_name_ptr_);
     $$ = new infinity::CommandStatement();
     $$->command_info_ = std::make_shared<infinity::DumpIndexCmd>($5->schema_name_ptr_, $5->table_name_ptr_, $3);
     free($3);
@@ -2538,6 +2543,7 @@ admin_statement: ADMIN SHOW CATALOG LONG_VALUE LONG_VALUE DATABASES {
 | ADMIN SHOW VARIABLE IDENTIFIER {
      $$ = new infinity::AdminStatement();
      $$->admin_type_ = infinity::AdminStmtType::kShowVariable;
+     ParserHelper::ToLower($4);
      $$->variable_name_ = $4;
      free($4);
 }
@@ -2552,6 +2558,7 @@ admin_statement: ADMIN SHOW CATALOG LONG_VALUE LONG_VALUE DATABASES {
 | ADMIN SHOW SNAPSHOT IDENTIFIER {
      $$ = new infinity::AdminStatement();
      $$->admin_type_ = infinity::AdminStmtType::kShowSnapshot;
+     ParserHelper::ToLower($4);
      $$->snapshot_name_ = $4;
      free($4);
 }
@@ -2634,6 +2641,7 @@ admin_statement: ADMIN SHOW CATALOG LONG_VALUE LONG_VALUE DATABASES {
 alter_statement : ALTER TABLE table_name RENAME TO IDENTIFIER {
     auto *ret = new infinity::RenameTableStatement($3->schema_name_ptr_, $3->table_name_ptr_);
     $$ = ret;
+    ParserHelper::ToLower($6);
     ret->new_table_name_ = $6;
     free($6);
     free($3->schema_name_ptr_);
@@ -2795,6 +2803,7 @@ MATCH TENSOR '(' column_expr ',' common_array_expr ',' STRING ',' STRING ',' STR
     // search options
     match_tensor_expr->SetExtraOptions($12);
     match_tensor_expr->SetOptionalFilter($13);
+    ParserHelper::ToLower($18);
     match_tensor_expr->index_name_ = $18;
     $$ = match_tensor_expr.release();
 }
@@ -2848,6 +2857,7 @@ match_vector_expr : MATCH VECTOR '(' expr ',' expr ',' STRING ',' STRING ',' LON
     free($8);
     free($10);
 
+    ParserHelper::ToLower($18);
     match_vector_expr->index_name_ = $18;
     free($18);
     match_vector_expr->topn_ = $12;
@@ -3056,6 +3066,7 @@ match_sparse_expr: MATCH SPARSE '(' expr ',' common_sparse_array_expr ',' STRING
     // optional filter
     match_sparse_expr->SetOptionalFilter($11);
 
+    ParserHelper::ToLower($16);
     match_sparse_expr->index_name_ = $16;
     free($16);
 }
@@ -3915,6 +3926,7 @@ copy_option_list : copy_option {
 copy_option : FORMAT IDENTIFIER {
     $$ = new infinity::CopyOption();
     $$->option_type_ = infinity::CopyOptionType::kFormat;
+    ParserHelper::ToLower($2);
     if (strcasecmp($2, "csv") == 0) {
         $$->file_type_ = infinity::CopyFileType::kCSV;
         free($2);
@@ -4104,6 +4116,7 @@ index_info : '(' IDENTIFIER ')' USING IDENTIFIER with_index_param_list {
     $$ = new infinity::IndexInfo();
 
     $$->index_type_ = index_type;
+    ParserHelper::ToLower($2);
     $$->column_name_ = $2;
     $$->index_param_list_ = $6;
     free($2);
@@ -4111,6 +4124,7 @@ index_info : '(' IDENTIFIER ')' USING IDENTIFIER with_index_param_list {
 | '(' IDENTIFIER ')' {
     $$ = new infinity::IndexInfo();
     $$->index_type_ = infinity::IndexType::kSecondary;
+    ParserHelper::ToLower($2);
     $$->column_name_ = $2;
     free($2);
 }
