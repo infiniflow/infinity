@@ -890,19 +890,21 @@ NewTxn::AppendMemIndex(SegmentIndexMeta &segment_index_meta, BlockID block_id, c
     }
 
     // Trigger dump if necessary
-    SizeT row_count = mem_index->GetRowCount();
-    SizeT row_quota = InfinityContext::instance().config()->MemIndexCapacity();
-    if (row_count >= row_quota) {
-        TableMeeta &table_meta = segment_index_meta.table_index_meta().table_meta();
-        auto [db_name, table_name] = table_meta.GetDBTableName();
-        auto [index_base, _] = segment_index_meta.table_index_meta().GetIndexBase();
-        String index_name = *index_base->index_name_;
-        SegmentID segment_id = segment_index_meta.segment_id();
-        RowID begin_row_id = mem_index->GetBeginRowID();
-        SharedPtr<DumpMemIndexTask> dump_task = MakeShared<DumpMemIndexTask>(db_name, table_name, index_name, segment_id, begin_row_id);
-        DumpIndexProcessor *dump_index_processor = InfinityContext::instance().storage()->dump_index_processor();
-        LOG_INFO(fmt::format("MemIndex row count {} exceeds quota {}.  Submit dump task: {}", row_count, row_quota, dump_task->ToString()));
-        dump_index_processor->Submit(std::move(dump_task));
+    if (!this->IsReplay()) {
+        SizeT row_count = mem_index->GetRowCount();
+        SizeT row_quota = InfinityContext::instance().config()->MemIndexCapacity();
+        if (row_count >= row_quota) {
+            TableMeeta &table_meta = segment_index_meta.table_index_meta().table_meta();
+            auto [db_name, table_name] = table_meta.GetDBTableName();
+            auto [index_base, _] = segment_index_meta.table_index_meta().GetIndexBase();
+            String index_name = *index_base->index_name_;
+            SegmentID segment_id = segment_index_meta.segment_id();
+            RowID begin_row_id = mem_index->GetBeginRowID();
+            SharedPtr<DumpMemIndexTask> dump_task = MakeShared<DumpMemIndexTask>(db_name, table_name, index_name, segment_id, begin_row_id);
+            DumpIndexProcessor *dump_index_processor = InfinityContext::instance().storage()->dump_index_processor();
+            LOG_INFO(fmt::format("MemIndex row count {} exceeds quota {}.  Submit dump task: {}", row_count, row_quota, dump_task->ToString()));
+            dump_index_processor->Submit(std::move(dump_task));
+        }
     }
 
     return Status::OK();
