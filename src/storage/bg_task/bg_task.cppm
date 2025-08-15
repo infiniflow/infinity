@@ -148,7 +148,15 @@ public:
 
     ~DumpMemIndexTask() override = default;
 
-    std::string ToString() const override { return "DumpMemIndexTask"; }
+    std::string ToString() const override {
+        return fmt::format("DumpMemIndexTask: db_name={}, table_name={}, index_name={}, segment_id={}, begin_row_id=({},{})",
+                           db_name_,
+                           table_name_,
+                           index_name_,
+                           segment_id_,
+                           begin_row_id_.segment_id_,
+                           begin_row_id_.segment_offset_);
+    }
 
 public:
     std::string db_name_{};
