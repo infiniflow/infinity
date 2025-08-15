@@ -12,11 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:index_emvb;
-
-import :stl;
 
 import :index_base;
 import :base_table_ref;

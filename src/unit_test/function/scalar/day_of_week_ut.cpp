@@ -24,7 +24,7 @@ module;
 module infinity_core:ut.day_of_week;
 
 import :ut.base_test;
-import :stl;
+
 import :infinity_exception;
 import :infinity_context;
 import :new_catalog;

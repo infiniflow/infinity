@@ -12,12 +12,9 @@
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
 
-module;
-
 module infinity_core:fast_rough_filter.impl;
 
 import :fast_rough_filter;
-import :stl;
 import :value;
 import :default_values;
 import :probabilistic_data_filter;

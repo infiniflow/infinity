@@ -1,8 +1,5 @@
-module;
-
 export module infinity_core:physical_check;
 
-import :stl;
 import :query_context;
 import :operator_state;
 import :physical_operator;

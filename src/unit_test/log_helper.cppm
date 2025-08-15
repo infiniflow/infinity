@@ -7,7 +7,6 @@ import infinity_core;
 #else
 export module infinity_core:ut.log_helper;
 
-import :stl;
 import :logger;
 #endif
 

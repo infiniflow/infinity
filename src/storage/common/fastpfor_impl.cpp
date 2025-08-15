@@ -30,7 +30,6 @@ module;
 module infinity_core:fastpfor.impl;
 
 import :fastpfor;
-import :stl;
 
 namespace infinity {
 

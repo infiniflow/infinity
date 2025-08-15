@@ -11,7 +11,6 @@ module;
 module infinity_core:ut.test_simd;
 
 import :ut.base_test;
-import :stl;
 import :simd_init;
 #endif
 

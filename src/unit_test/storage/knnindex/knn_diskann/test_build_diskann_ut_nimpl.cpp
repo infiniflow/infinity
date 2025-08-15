@@ -25,7 +25,6 @@ module;
 module infinity_core:ut.test_build_diskann;
 
 import :ut.base_test;
-import :stl;
 import :infinity_exception;
 import :virtual_store;
 import :index_base;

@@ -20,7 +20,7 @@ module;
 module infinity_core:ut.table_cache;
 
 import :ut.base_test;
-import :stl;
+
 import :catalog_cache;
 #else
 #include "gtest/gtest.h"

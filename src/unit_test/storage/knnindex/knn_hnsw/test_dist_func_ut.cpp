@@ -33,7 +33,6 @@ import :data_store;
 import :vec_store_type;
 import :hnsw_simd_func;
 import :hnsw_common;
-import :stl;
 
 import std;
 #endif

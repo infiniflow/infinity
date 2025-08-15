@@ -12,11 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:physical_planner;
 
-import :stl;
 import :physical_operator;
 import :logical_node;
 

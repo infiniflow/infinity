@@ -12,12 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:hash_table.impl;
 
 import :hash_table;
-import :stl;
 import :column_vector;
 import :status;
 import :infinity_exception;

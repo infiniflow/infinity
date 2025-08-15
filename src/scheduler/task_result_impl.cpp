@@ -12,12 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:task_result.impl;
 
 import :task_result;
-import :stl;
 import :data_block;
 
 import data_type;

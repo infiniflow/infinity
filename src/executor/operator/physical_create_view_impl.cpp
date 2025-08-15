@@ -12,12 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:physical_create_view.impl;
 
 import :physical_create_view;
-import :stl;
 import :query_context;
 import :table_def;
 import :data_table;

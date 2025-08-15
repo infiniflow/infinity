@@ -19,7 +19,6 @@ module;
 module infinity_core:common_query_filter.impl;
 
 import :common_query_filter;
-import :stl;
 import :roaring_bitmap;
 import :base_expression;
 import :base_table_ref;

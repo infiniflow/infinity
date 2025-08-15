@@ -12,12 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:logical_fusion.impl;
 
 import :logical_fusion;
-import :stl;
 import :base_table_ref;
 import :column_binding;
 import :logical_node_type;

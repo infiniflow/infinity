@@ -23,7 +23,6 @@ module;
 module infinity_core:search_driver.impl;
 
 import :search_driver;
-import :stl;
 import :term;
 import :infinity_exception;
 import :status;
@@ -31,6 +30,7 @@ import :logger;
 import :analyzer;
 import :analyzer_pool;
 import :query_node;
+import :infinity_type;
 
 import std;
 import third_party;
@@ -42,12 +42,12 @@ namespace infinity {
 std::pair<std::string, float> ParseField(const std::string_view &field) {
     size_t cap_idx = field.find_first_of('^', 0);
     if (cap_idx == std::string::npos) {
-        return MakePair(std::string(field), 1.0F);
+        return std::make_pair(std::string(field), 1.0F);
     } else {
         std::string field_name(field.substr(0, cap_idx));
         std::string_view field_boost = field.substr(cap_idx + 1);
         float boost = std::stof(std::string(field_boost));
-        return MakePair(std::move(field_name), boost);
+        return std::make_pair(std::move(field_name), boost);
     }
 }
 

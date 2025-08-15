@@ -12,12 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:query_binder;
 
 import :logical_node;
-import :stl;
 import :query_context;
 import :bound_select_statement;
 import :bind_context;

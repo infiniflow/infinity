@@ -24,7 +24,6 @@ module;
 module infinity_core:ut.explain;
 
 import :ut.base_test;
-import :stl;
 import :physical_explain;
 #endif
 

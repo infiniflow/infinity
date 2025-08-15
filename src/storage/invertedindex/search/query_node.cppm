@@ -12,11 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:query_node;
 
-import :stl;
 import :meta_info;
 import :doc_iterator;
 import :parse_fulltext_options;

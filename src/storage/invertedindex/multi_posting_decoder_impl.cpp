@@ -5,7 +5,6 @@ module;
 module infinity_core:multi_posting_decoder.impl;
 
 import :multi_posting_decoder;
-import :stl;
 import :byte_slice;
 import :byte_slice_reader;
 import :index_decoder;

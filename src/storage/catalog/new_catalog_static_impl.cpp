@@ -12,14 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:new_catalog_static.impl;
 
-import std;
-
 import :new_catalog;
-import :stl;
 import :block_version;
 import :infinity_exception;
 import :table_def;
@@ -45,7 +40,9 @@ import :chunk_index_meta;
 import :mem_index;
 import :scalar_function_set;
 import :special_function;
+import :utility;
 
+import std;
 import third_party;
 
 import logical_type;
@@ -1524,7 +1521,7 @@ Status NewCatalog::CheckSegmentRowsVisible(SegmentMeta &segment_meta, TxnTimeSta
 
 std::shared_ptr<FunctionSet> NewCatalog::GetFunctionSetByName(NewCatalog *catalog, std::string function_name) {
     // Transfer the function to upper case.
-    StringToLower(function_name);
+    ToLower(function_name);
 
     if (!catalog->function_sets_.contains(function_name)) {
         Status status = Status::FunctionNotFound(function_name);
@@ -1535,7 +1532,7 @@ std::shared_ptr<FunctionSet> NewCatalog::GetFunctionSetByName(NewCatalog *catalo
 
 void NewCatalog::AddFunctionSet(NewCatalog *catalog, const std::shared_ptr<FunctionSet> &function_set) {
     std::string name = function_set->name();
-    StringToLower(name);
+    ToLower(name);
     if (catalog->function_sets_.contains(name)) {
         UnrecoverableError(fmt::format("Trying to add duplicated function {} into catalog", name));
     }
@@ -1544,7 +1541,7 @@ void NewCatalog::AddFunctionSet(NewCatalog *catalog, const std::shared_ptr<Funct
 
 void NewCatalog::AppendToScalarFunctionSet(NewCatalog *catalog, const std::shared_ptr<FunctionSet> &function_set) {
     std::string name = function_set->name();
-    StringToLower(name);
+    ToLower(name);
     if (!catalog->function_sets_.contains(name)) {
         UnrecoverableError(fmt::format("Trying to append to non-existent function {} in catalog", name));
     }
@@ -1563,7 +1560,7 @@ void NewCatalog::AppendToScalarFunctionSet(NewCatalog *catalog, const std::share
 
 void NewCatalog::AddSpecialFunction(NewCatalog *catalog, const std::shared_ptr<SpecialFunction> &special_function) {
     std::string name = special_function->name();
-    StringToLower(name);
+    ToLower(name);
     if (catalog->special_functions_.contains(name)) {
         UnrecoverableError(fmt::format("Trying to add duplicated special function into catalog: {}", name));
     }
@@ -1592,7 +1589,7 @@ void NewCatalog::AddSpecialFunction(NewCatalog *catalog, const std::shared_ptr<S
 }
 
 std::tuple<SpecialFunction *, Status> NewCatalog::GetSpecialFunctionByNameNoExcept(NewCatalog *catalog, std::string function_name) {
-    StringToLower(function_name);
+    ToLower(function_name);
     if (!catalog->special_functions_.contains(function_name)) {
         return {nullptr, Status::SpecialFunctionNotFound()};
     }

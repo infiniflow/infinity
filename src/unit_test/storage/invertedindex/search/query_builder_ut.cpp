@@ -24,7 +24,7 @@ module;
 module infinity_core:ut.query_builder;
 
 import :ut.base_test;
-import :stl;
+
 import :index_defines;
 import :default_values;
 import :doc_iterator;

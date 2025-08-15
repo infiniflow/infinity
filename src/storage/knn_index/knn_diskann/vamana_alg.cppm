@@ -18,7 +18,6 @@ module;
 
 export module infinity_core:vamana_alg;
 
-import :stl;
 import :logger;
 import :index_base;
 import :local_file_handle;

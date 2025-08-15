@@ -12,13 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:dependent_join_flattener.impl;
 
 import :dependent_join_flattener;
 import :status;
-import :stl;
 import :logical_node;
 import :logical_node_type;
 import :infinity_exception;

@@ -1,9 +1,6 @@
-module;
-
 module infinity_core:arbitrator.impl;
 
 import :arbitrator;
-import :stl;
 import :analyze_context;
 import :lexeme;
 import :lexeme_path;

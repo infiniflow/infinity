@@ -12,12 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:rank_features_analyzer.impl;
 
 import :rank_features_analyzer;
-import :stl;
 import :term;
 import :analyzer;
 import :smallfloat;

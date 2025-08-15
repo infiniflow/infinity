@@ -7,7 +7,7 @@ module;
 
 module infinity_core;
 
-import :stl;
+
 import :config;
 import :resource_manager;
 import :task_scheduler;

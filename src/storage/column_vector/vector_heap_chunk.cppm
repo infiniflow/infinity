@@ -12,11 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:vector_heap_chunk;
 
-import :stl;
 import :allocator;
 import :buffer_obj;
 import :buffer_handle;

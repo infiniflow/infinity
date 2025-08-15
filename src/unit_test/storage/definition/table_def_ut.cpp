@@ -25,7 +25,6 @@ module infinity_core:ut.table_def;
 
 import :ut.base_test;
 import :infinity_exception;
-import :stl;
 import third_party;
 import :logger;
 import :table_def;

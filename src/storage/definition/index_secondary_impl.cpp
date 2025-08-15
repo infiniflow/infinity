@@ -12,12 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:index_secondary.impl;
 
 import :index_secondary;
-import :stl;
 import :status;
 import :base_table_ref;
 import :infinity_exception;

@@ -12,12 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:bmp_handler.impl;
 
 import :bmp_handler;
-import :stl;
 import :buffer_manager;
 import :buffer_handle;
 import :block_column_iter;

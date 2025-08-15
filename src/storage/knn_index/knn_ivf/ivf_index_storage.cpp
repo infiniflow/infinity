@@ -18,9 +18,6 @@ module;
 
 module infinity_core;
 
-// import :ivf_index_storage;
-
-import :stl;
 import :infinity_exception;
 import :status;
 import :logger;

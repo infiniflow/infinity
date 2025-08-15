@@ -12,12 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:kv_store.impl;
 
 import :kv_store;
-import :stl;
 import :status;
 import :rocksdb_merge_operator;
 import :logger;

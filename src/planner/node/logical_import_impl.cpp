@@ -12,12 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:logical_import.impl;
 
 import :logical_import;
-import :stl;
 import :column_binding;
 import :logical_import;
 

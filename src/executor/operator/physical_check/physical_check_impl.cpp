@@ -12,12 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:physical_check.impl;
 
 import :physical_check;
-import :stl;
 import :new_txn;
 import :query_context;
 import :profiler;

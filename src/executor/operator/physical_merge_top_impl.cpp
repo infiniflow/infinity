@@ -12,12 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:physical_merge_top.impl;
 
 import :physical_merge_top;
-import :stl;
 import :query_context;
 import :operator_state;
 import :base_expression;

@@ -17,7 +17,7 @@ module;
 module infinity_core:reference_expression.impl;
 
 import :reference_expression;
-import :stl;
+
 import :reference_expression;
 
 import std;

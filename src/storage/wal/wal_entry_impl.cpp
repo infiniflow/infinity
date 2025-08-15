@@ -24,7 +24,6 @@ import :data_block;
 import :table_def;
 import :index_base;
 import :infinity_exception;
-import :stl;
 import :defer_op;
 import :logger;
 import :block_version;

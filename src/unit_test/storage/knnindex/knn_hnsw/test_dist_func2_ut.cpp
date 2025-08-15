@@ -31,7 +31,6 @@ import :ut.base_test;
 import :dist_func_ip;
 import :data_store;
 import :vec_store_type;
-import :stl;
 import :hnsw_common;
 
 import std;

@@ -18,7 +18,6 @@ module;
 
 export module infinity_core:diskann_index_data;
 
-import :stl;
 import :index_base;
 import :search_top_1;
 import :kmeans_partition;
@@ -58,17 +57,18 @@ private:
     std::vector<LabelType> labels_;
     u32 train_size_{}; // size of sample training set
 
-    std::shared_ptr<f32[]> full_pivot_data_; // pivot data for all chunks, every num_pq_chunks chunks are combined into a dim vector [num_centers * dim]
-    std::shared_ptr<f32[]> centroid_;        // centroids after zero-mean, used for an option of L2 distance
-    std::vector<u32> rearrangement_;        // the dimensions in the order of chunks
-    std::vector<u32> chunk_offsets_;        // the starting index of each chunk in rearrangement_
+    std::shared_ptr<f32[]>
+        full_pivot_data_;             // pivot data for all chunks, every num_pq_chunks chunks are combined into a dim vector [num_centers * dim]
+    std::shared_ptr<f32[]> centroid_; // centroids after zero-mean, used for an option of L2 distance
+    std::vector<u32> rearrangement_;  // the dimensions in the order of chunks
+    std::vector<u32> chunk_offsets_;  // the starting index of each chunk in rearrangement_
 
-    Path data_file_path_;
-    Path mem_index_file_path_;
-    Path index_file_path_;
-    Path pqCompressed_data_file_path_;
-    Path sample_data_file_path_;
-    Path pq_pivot_file_path_;
+    std::filesystem::path data_file_path_;
+    std::filesystem::path mem_index_file_path_;
+    std::filesystem::path index_file_path_;
+    std::filesystem::path pqCompressed_data_file_path_;
+    std::filesystem::path sample_data_file_path_;
+    std::filesystem::path pq_pivot_file_path_;
 
 private:
     // build vamana graph and merge graph with num_parts_
@@ -109,8 +109,8 @@ private:
         std::unique_ptr<char[]> multisector_buf = std::make_unique<char[]>(RoundUp(max_node_len, DISKANN_SECTOR_LEN)); // multi-sector buffer
         std::unique_ptr<char[]> node_buf = std::make_unique<char[]>(max_node_len);                                     // node buffer
         std::unique_ptr<VectorDataType[]> cur_node_coord = std::make_unique<VectorDataType[]>(ndims);                  // vector buf
-        u32 &nnbrs = *(u32 *)(node_buf.get() + ndims * sizeof(VectorDataType));                            // neighbor num of node_buf
-        u32 *nhood_buf = (u32 *)(node_buf.get() + ndims * sizeof(VectorDataType) + sizeof(u32));           // neighbor id ptr of node_buf
+        u32 &nnbrs = *(u32 *)(node_buf.get() + ndims * sizeof(VectorDataType));                                        // neighbor num of node_buf
+        u32 *nhood_buf = (u32 *)(node_buf.get() + ndims * sizeof(VectorDataType) + sizeof(u32));                       // neighbor id ptr of node_buf
 
         u64 n_sectors = nnodes_per_sector > 0 ? RoundUp(npts, nnodes_per_sector) / nnodes_per_sector
                                               : npts * DivRoundUp(max_node_len, DISKANN_SECTOR_LEN); // total sectors num
@@ -141,7 +141,7 @@ private:
 
                     mem_index_file_handle.Read(&nnbrs, sizeof(u32)); // read neighbor num
                     assert(nnbrs <= width && nnbrs > 0);
-                    mem_index_file_handle.Read(nhood_buf, nnbrs * sizeof(size_t));                // read nnbrs * neighbor_id
+                    mem_index_file_handle.Read(nhood_buf, nnbrs * sizeof(size_t));               // read nnbrs * neighbor_id
                     data_file_handle.Read(cur_node_coord.get(), ndims * sizeof(VectorDataType)); // read vector
 
                     // node_buf: [vector(VectorDataType)*, neighbor_num(u32), neighbor_id(size_t)*]
@@ -167,7 +167,7 @@ private:
 
                 mem_index_file_handle.Read(&nnbrs, sizeof(u32)); // read neighbor num
                 assert(nnbrs <= width && nnbrs > 0);
-                mem_index_file_handle.Read(nhood_buf, nnbrs * sizeof(size_t));                // read nnbrs * neighbor_id
+                mem_index_file_handle.Read(nhood_buf, nnbrs * sizeof(size_t));               // read nnbrs * neighbor_id
                 data_file_handle.Read(cur_node_coord.get(), ndims * sizeof(VectorDataType)); // read vector
 
                 memcpy(multisector_buf.get(), cur_node_coord.get(), ndims * sizeof(VectorDataType)); // copy vector to multisector_buf
@@ -210,12 +210,12 @@ public:
     void BuildIndex(const u32 dimension,
                     const u32 data_num,
                     std::vector<LabelType> &labels,
-                    Path data_file_path,
-                    Path mem_index_file_path,
-                    Path index_file_path,
-                    Path pqCompressed_data_file_path,
-                    Path sample_data_file_path,
-                    Path pq_pivot_file_path) {
+                    std::filesystem::path data_file_path,
+                    std::filesystem::path mem_index_file_path,
+                    std::filesystem::path index_file_path,
+                    std::filesystem::path pqCompressed_data_file_path,
+                    std::filesystem::path sample_data_file_path,
+                    std::filesystem::path pq_pivot_file_path) {
         if (loaded_) {
             std::string error_message = "DiskAnnIndexData::BuildIndex(): Index data already exists.";
             UnrecoverableError(error_message);
@@ -361,8 +361,8 @@ public:
         // step 5. save sample data and clean mem vamana
         {
             data_file_handle->Seek(0);
-            Path train_data_path = sample_data_file_path_ / "train_data.bin";
-            Path train_data_ids_path = sample_data_file_path_ / "train_ids.bin";
+            std::filesystem::path train_data_path = sample_data_file_path_ / "train_data.bin";
+            std::filesystem::path train_data_ids_path = sample_data_file_path_ / "train_ids.bin";
             auto [train_data_handle, train_data_status] = VirtualStore::Open(train_data_path, FileAccessMode::kWrite);
             if (!train_data_status.ok()) {
                 UnrecoverableError(train_data_status.message());
@@ -389,8 +389,8 @@ public:
 
         LOG_TRACE("UnitTest(): Test train data and ids");
         {
-            Path train_data_path = sample_data_file_path_ / "train_data.bin";
-            Path train_data_ids_path = sample_data_file_path_ / "train_ids.bin";
+            std::filesystem::path train_data_path = sample_data_file_path_ / "train_data.bin";
+            std::filesystem::path train_data_ids_path = sample_data_file_path_ / "train_ids.bin";
             auto [train_data_handle, train_data_status] = VirtualStore::Open(train_data_path, FileAccessMode::kRead);
             if (!train_data_status.ok()) {
                 UnrecoverableError(train_data_status.message());

@@ -388,7 +388,6 @@ export import :task_result;
 export import :fragment_data;
 export import :fragment_task;
 export import :boost;
-export import :stl;
 export import :byte_slice;
 export import :memory_chunk;
 export import :ngram_analyzer;

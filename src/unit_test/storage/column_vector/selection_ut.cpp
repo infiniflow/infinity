@@ -31,7 +31,7 @@ import :logger;
 import :selection;
 import :default_values;
 import third_party;
-import :stl;
+
 import :infinity_context;
 #endif
 

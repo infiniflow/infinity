@@ -16,7 +16,7 @@ module;
 
 export module infinity_core:expression_transformer;
 
-import :stl;
+
 import :base_expression;
 import :conjunction_expression;
 

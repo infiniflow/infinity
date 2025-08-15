@@ -12,11 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:hnsw_util;
 
-import :stl;
 import :infinity_exception;
 import :status;
 
@@ -35,9 +32,9 @@ export struct HnswUtil {
     static std::optional<HnswOptimizeOptions> ParseOptimizeOptions(const std::vector<std::unique_ptr<InitParameter>> &opt_params) {
         HnswOptimizeOptions options;
         for (const auto &param : opt_params) {
-            if (IsEqual(param->param_name_, "compress_to_lvq")) {
+            if (param->param_name_ == "compress_to_lvq") {
                 options.compress_to_lvq = true;
-            } else if (IsEqual(param->param_name_, "lvq_avg")) {
+            } else if (param->param_name_ == "lvq_avg") {
                 options.lvq_avg = true;
             }
         }

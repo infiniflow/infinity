@@ -12,12 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:physical_merge_limit.impl;
 
 import :physical_merge_limit;
-import :stl;
 import :query_context;
 import :base_expression;
 import :load_meta;

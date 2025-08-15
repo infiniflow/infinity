@@ -22,7 +22,6 @@ module;
 
 module infinity_core:korean_analyzer.impl;
 
-import :stl;
 import :term;
 import :analyzer;
 import :common_analyzer;

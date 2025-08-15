@@ -17,7 +17,7 @@ module;
 export module infinity_core:filter_fulltext_expression;
 
 import :base_expression;
-import :stl;
+
 import :filter_expression_push_down;
 import :roaring_bitmap;
 

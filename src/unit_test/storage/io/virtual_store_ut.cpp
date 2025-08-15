@@ -25,7 +25,6 @@ module infinity_core:ut.virtual_store;
 
 import :ut.base_test;
 import :infinity_exception;
-import :stl;
 import third_party;
 import :logger;
 import :file_writer;

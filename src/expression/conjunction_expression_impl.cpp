@@ -17,7 +17,7 @@ module;
 module infinity_core:conjunction_expression.impl;
 
 import :conjunction_expression;
-import :stl;
+
 import :base_expression;
 import :expression_type;
 

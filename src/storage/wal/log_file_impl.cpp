@@ -12,12 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:log_file.impl;
 
 import :log_file;
-import :stl;
 import :virtual_store;
 import :infinity_exception;
 import :logger;
@@ -54,7 +51,7 @@ std::pair<std::optional<TempWalFileInfo>, std::vector<WalFileInfo>> WalFile::Par
             continue;
         }
         const auto &filename = entry->path().filename().string();
-        if (IsEqual(filename, WalFile::TempWalFilename())) {
+        if (filename == WalFile::TempWalFilename()) {
             if (cur_wal_info.has_value()) {
                 UnrecoverableError(fmt::format("Multiple current wal files found in the wal directory: {}", wal_dir));
             }
@@ -73,7 +70,7 @@ std::pair<std::optional<TempWalFileInfo>, std::vector<WalFileInfo>> WalFile::Par
                 continue;
             }
             auto file_prefix = filename.substr(0, dot_pos);
-            if (!IsEqual(file_prefix, std::string(WAL_FILE_PREFIX))) {
+            if (file_prefix != std::string(WAL_FILE_PREFIX)) {
                 LOG_WARN(fmt::format("Wal file {} has wrong file name", entry->path().string()));
                 continue;
             }

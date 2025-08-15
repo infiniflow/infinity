@@ -12,12 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:physical_source.impl;
 
 import :physical_source;
-import :stl;
 import :query_context;
 import :table_def;
 import :data_table;

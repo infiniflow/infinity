@@ -12,11 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:bitmap_cast;
 
-import :stl;
 import :column_vector_cast;
 import :infinity_exception;
 import :bound_cast_func;

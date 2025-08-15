@@ -12,14 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:column_remapper.impl;
 
 import :column_remapper;
 import :logical_node;
 import :logical_node_type;
-import :stl;
 import :base_expression;
 import :column_expression;
 import :reference_expression;

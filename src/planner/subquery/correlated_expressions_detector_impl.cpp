@@ -12,12 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:correlated_expressions_detector.impl;
 
 import :corrlated_expr_detector;
-import :stl;
 import :logical_node;
 import :base_expression;
 import :column_expression;

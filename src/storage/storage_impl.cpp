@@ -12,13 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:storage.impl;
 
 import :storage;
 import :config;
-import :stl;
 import :buffer_manager;
 import :default_values;
 import :wal_manager;

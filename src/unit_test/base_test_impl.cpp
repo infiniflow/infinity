@@ -27,7 +27,7 @@ import infinity_core;
 module infinity_core:ut.base_test.impl;
 
 import :ut.base_test;
-import :stl;
+
 import :infinity_context;
 import :infinity_exception;
 #endif

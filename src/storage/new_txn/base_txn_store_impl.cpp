@@ -12,12 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:base_txn_store.impl;
 
 import :base_txn_store;
-import :stl;
 import :wal_entry;
 import :data_block;
 import :default_values;

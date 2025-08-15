@@ -20,7 +20,6 @@ module;
 module infinity_core:random.impl;
 
 import :random;
-import :stl;
 import :logger;
 import :virtual_store;
 import :default_values;

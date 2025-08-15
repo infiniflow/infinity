@@ -23,7 +23,6 @@ module;
 #ifndef CI
 export module infinity_core:ut.base_test;
 
-import :stl;
 import :infinity_context;
 import :infinity_exception;
 #else

@@ -21,7 +21,6 @@ module;
 module infinity_core:ut.user_defined_analyzer;
 
 import :ut.base_test;
-import :stl;
 import :status;
 import :user_defined_analyzer;
 import :python_instance;

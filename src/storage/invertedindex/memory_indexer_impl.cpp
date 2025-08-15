@@ -28,7 +28,6 @@ module;
 module infinity_core:memory_indexer.impl;
 
 import :memory_indexer;
-import :stl;
 import :status;
 import :index_defines;
 import :posting_writer;
@@ -86,8 +85,8 @@ MemoryIndexer::MemoryIndexer(const std::string &index_dir, const std::string &ba
     assert(std::filesystem::path(index_dir).is_absolute());
     posting_table_ = std::make_shared<PostingTable>();
     prepared_posting_ = std::make_shared<PostingWriter>(posting_format_, column_lengths_);
-    spill_full_path_ = Path(index_dir) / (base_name + ".tmp.merge");
-    spill_full_path_ = Path(InfinityContext::instance().config()->TempDir()) / StringTransform(spill_full_path_, "/", "_");
+    spill_full_path_ = std::filesystem::path(index_dir) / (base_name + ".tmp.merge");
+    spill_full_path_ = std::filesystem::path(InfinityContext::instance().config()->TempDir()) / StringTransform(spill_full_path_, "/", "_");
 }
 
 MemoryIndexer::~MemoryIndexer() {
@@ -394,9 +393,9 @@ void MemoryIndexer::Dump(bool offline, bool spill) {
     }
     std::unique_lock commit_sync_lock(mutex_commit_sync_share_);
 
-    std::string posting_file = Path(index_dir_) / (base_name_ + POSTING_SUFFIX + (spill ? SPILL_SUFFIX : ""));
-    std::string dict_file = Path(index_dir_) / (base_name_ + DICT_SUFFIX + (spill ? SPILL_SUFFIX : ""));
-    std::string column_length_file = Path(index_dir_) / (base_name_ + LENGTH_SUFFIX + (spill ? SPILL_SUFFIX : ""));
+    std::string posting_file = std::filesystem::path(index_dir_) / (base_name_ + POSTING_SUFFIX + (spill ? SPILL_SUFFIX : ""));
+    std::string dict_file = std::filesystem::path(index_dir_) / (base_name_ + DICT_SUFFIX + (spill ? SPILL_SUFFIX : ""));
+    std::string column_length_file = std::filesystem::path(index_dir_) / (base_name_ + LENGTH_SUFFIX + (spill ? SPILL_SUFFIX : ""));
     std::string tmp_posting_file(posting_file);
     std::string tmp_dict_file(dict_file);
     std::string tmp_column_length_file(column_length_file);
@@ -404,7 +403,7 @@ void MemoryIndexer::Dump(bool offline, bool spill) {
     PersistenceManager *pm = InfinityContext::instance().persistence_manager();
     bool use_object_cache = pm != nullptr && !spill;
     if (use_object_cache) {
-        Path tmp_dir = Path(InfinityContext::instance().config()->TempDir());
+        std::filesystem::path tmp_dir = std::filesystem::path(InfinityContext::instance().config()->TempDir());
         tmp_posting_file = tmp_dir / StringTransform(tmp_posting_file, "/", "_");
         tmp_dict_file = tmp_dir / StringTransform(tmp_dict_file, "/", "_");
         tmp_column_length_file = tmp_dir / StringTransform(tmp_column_length_file, "/", "_");
@@ -476,7 +475,7 @@ void MemoryIndexer::Load() {
     if (!is_spilled_) {
         assert(doc_count_ == 0);
     }
-    Path path = Path(index_dir_) / base_name_;
+    std::filesystem::path path = std::filesystem::path(index_dir_) / base_name_;
     std::string index_prefix = path.string();
     std::string posting_file = index_prefix + POSTING_SUFFIX + SPILL_SUFFIX;
     std::string dict_file = index_prefix + DICT_SUFFIX + SPILL_SUFFIX;
@@ -560,10 +559,10 @@ void MemoryIndexer::DecreaseMemoryUsage(size_t mem) {
 void MemoryIndexer::TupleListToIndexFile(std::unique_ptr<SortMergerTermTuple<TermTuple, u32>> &merger) {
     auto &count = merger->Count();
     auto &term_tuple_list_queue = merger->TermTupleListQueue();
-    Path path = Path(index_dir_) / base_name_;
+    std::filesystem::path path = std::filesystem::path(index_dir_) / base_name_;
     std::string index_prefix = path.string();
 
-    PersistenceManager *pm = InfinityContext::instance().persistence_manager();
+    auto *pm = InfinityContext::instance().persistence_manager();
     bool use_object_cache = pm != nullptr;
     std::string posting_file = index_prefix + POSTING_SUFFIX;
     std::string dict_file = index_prefix + DICT_SUFFIX;
@@ -573,7 +572,7 @@ void MemoryIndexer::TupleListToIndexFile(std::unique_ptr<SortMergerTermTuple<Ter
     std::string tmp_column_length_file(column_length_file);
 
     if (use_object_cache) {
-        Path tmp_dir = Path(InfinityContext::instance().config()->TempDir());
+        auto tmp_dir = std::filesystem::path(InfinityContext::instance().config()->TempDir());
         tmp_posting_file = tmp_dir / StringTransform(tmp_posting_file, "/", "_");
         tmp_dict_file = tmp_dir / StringTransform(tmp_dict_file, "/", "_");
         tmp_column_length_file = tmp_dir / StringTransform(tmp_column_length_file, "/", "_");

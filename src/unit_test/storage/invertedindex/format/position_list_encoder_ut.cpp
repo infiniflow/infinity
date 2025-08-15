@@ -11,7 +11,7 @@ module;
 module infinity_core:ut.position_list_encoder;
 
 import :ut.base_test;
-import :stl;
+
 import :index_defines;
 import :posting_byte_slice;
 import :posting_list_format;

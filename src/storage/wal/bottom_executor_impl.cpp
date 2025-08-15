@@ -12,12 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:bottom_executor.impl;
 
 import :bottom_executor;
-import :stl;
 import :crc;
 import :blocking_queue;
 import :new_txn;

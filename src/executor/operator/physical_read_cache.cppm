@@ -9,11 +9,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:physical_read_cache;
 
-import :stl;
 import :physical_operator;
 import :query_context;
 import :operator_state;

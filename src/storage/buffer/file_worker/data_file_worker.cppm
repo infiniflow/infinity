@@ -12,11 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:data_file_worker;
 
-import :stl;
 import :file_worker;
 import :file_worker_type;
 import :persistence_manager;

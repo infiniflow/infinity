@@ -4,7 +4,6 @@ module infinity_core:byte_slice_writer.impl;
 
 import :byte_slice_writer;
 
-import :stl;
 import :byte_slice;
 import :file_writer;
 import :file_reader;

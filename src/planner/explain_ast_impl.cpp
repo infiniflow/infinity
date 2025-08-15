@@ -12,12 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:explain_ast.impl;
 
 import :explain_ast;
-import :stl;
 import :status;
 import :infinity_exception;
 

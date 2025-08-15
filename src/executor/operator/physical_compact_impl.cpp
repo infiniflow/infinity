@@ -12,12 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:physical_compact.impl;
 
 import :physical_compact;
-import :stl;
 import :bg_task;
 import :compaction_process;
 import :infinity_context;

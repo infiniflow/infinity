@@ -19,7 +19,6 @@ module;
 module infinity_core:and_iterator.impl;
 
 import :and_iterator;
-import :stl;
 import :doc_iterator;
 import :multi_doc_iterator;
 import :infinity_exception;

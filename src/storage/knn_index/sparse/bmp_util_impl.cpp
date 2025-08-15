@@ -12,14 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:bmp_util.impl;
 
 import :bmp_util;
 import :logger;
 import :bmp_util;
-import :stl;
 import :infinity_thrift_types;
 
 import std;
@@ -47,17 +44,17 @@ BmpSearchOptions BMPUtil::ParseBmpSearchOptions(const std::vector<std::unique_pt
             }
             options.beta_ = beta;
         } else if (opt_param->param_name_ == "use_tail") {
-            if (!IsEqual(opt_param->param_value_, "T") && !IsEqual(opt_param->param_value_, "F")) {
+            if (opt_param->param_value_ != "T" && opt_param->param_value_ != "F") {
                 LOG_WARN("Invalid use_tail value, should be T or F");
                 continue;
             }
-            options.use_tail_ = IsEqual(opt_param->param_value_, "T");
+            options.use_tail_ = opt_param->param_value_ == "T";
         } else if (opt_param->param_name_ == "use_lock") {
-            if (!IsEqual(opt_param->param_value_, "T") && !IsEqual(opt_param->param_value_, "F")) {
+            if (opt_param->param_value_ != "T" && opt_param->param_value_ != "F") {
                 LOG_WARN("Invalid use_lock value, should be T or F");
                 continue;
             }
-            options.use_lock_ = IsEqual(opt_param->param_value_, "T");
+            options.use_lock_ = opt_param->param_value_ == "T";
         }
     }
     return options;

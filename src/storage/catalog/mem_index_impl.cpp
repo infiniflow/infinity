@@ -12,12 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:mem_index.impl;
 
 import :mem_index;
-import :stl;
 import :base_memindex;
 import :secondary_index_in_mem;
 import :ivf_index_data_in_mem;

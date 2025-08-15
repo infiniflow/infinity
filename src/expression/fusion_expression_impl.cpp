@@ -17,7 +17,7 @@ module;
 module infinity_core:fusion_expression.impl;
 
 import :fusion_expression;
-import :stl;
+
 import :expression_type;
 import :scalar_function;
 import :infinity_exception;

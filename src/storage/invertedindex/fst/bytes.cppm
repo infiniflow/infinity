@@ -18,7 +18,6 @@ module;
 
 export module infinity_core:fst.bytes;
 
-import :stl;
 import :fst.writer;
 
 import third_party;

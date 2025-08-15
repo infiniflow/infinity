@@ -11,7 +11,7 @@ module;
 module infinity_core:ut.position_list_decoder;
 
 import :ut.base_test;
-import :stl;
+
 import :file_reader;
 import :file_writer;
 import :index_defines;

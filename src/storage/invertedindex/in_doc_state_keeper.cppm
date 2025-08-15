@@ -1,8 +1,4 @@
-module;
-
 export module infinity_core:in_doc_state_keeper;
-
-import :stl;
 
 import :byte_slice;
 import :in_doc_pos_state;

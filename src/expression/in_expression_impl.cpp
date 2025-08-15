@@ -18,7 +18,7 @@ module infinity_core:in_expression.impl;
 
 import :in_expression;
 import :infinity_exception;
-import :stl;
+
 import :expression_type;
 
 import std;

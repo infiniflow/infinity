@@ -1,9 +1,6 @@
-module;
-
 module infinity_core:column_index_iterator.impl;
 
 import :column_index_iterator;
-import :stl;
 import :byte_slice;
 import :byte_slice_reader;
 import :file_reader;
@@ -26,7 +23,7 @@ ColumnIndexIterator::ColumnIndexIterator(const std::string &index_dir, const std
     PersistenceManager *pm = InfinityContext::instance().persistence_manager();
     bool use_object_cache = pm != nullptr;
 
-    Path path = Path(InfinityContext::instance().config()->DataDir()) / index_dir / base_name;
+    std::filesystem::path path = std::filesystem::path(InfinityContext::instance().config()->DataDir()) / index_dir / base_name;
     std::string dict_file = path.string();
     dict_file.append(DICT_SUFFIX);
     std::string posting_file = path.string();

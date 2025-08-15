@@ -12,12 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:var_buffer.impl;
 
 import :var_buffer;
-import :stl;
 import :infinity_exception;
 import :buffer_manager;
 import :var_file_worker;

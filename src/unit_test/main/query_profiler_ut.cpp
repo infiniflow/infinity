@@ -24,7 +24,6 @@ module;
 module infinity_core:ut.query_profiler;
 
 import :ut.base_test;
-import :stl;
 import :profiler;
 import :infinity_context;
 import :infinity_exception;

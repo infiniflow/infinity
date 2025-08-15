@@ -1,8 +1,5 @@
-module;
-
 export module infinity_core:column_index_iterator;
 
-import :stl;
 import :byte_slice;
 import :byte_slice_reader;
 import :file_reader;

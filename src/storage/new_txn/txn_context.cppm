@@ -12,11 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:txn_context;
 
-import :stl;
 import :txn_state;
 import :default_values;
 

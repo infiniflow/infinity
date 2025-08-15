@@ -24,7 +24,6 @@ module;
 module infinity_core:ut.test_bmp_ivt;
 
 import :ut.base_test;
-import :stl;
 import :sparse_util;
 import :bmp_util;
 import :sparse_test_util;

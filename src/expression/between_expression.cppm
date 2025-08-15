@@ -18,7 +18,7 @@ export module infinity_core:between_expression;
 
 import :column_binding;
 import :base_expression;
-import :stl;
+
 
 import internal_types;
 import data_type;

@@ -1,8 +1,5 @@
-module;
-
 export module infinity_core:phrase_doc_iterator;
 
-import :stl;
 import :doc_iterator;
 import :posting_iterator;
 import :index_defines;

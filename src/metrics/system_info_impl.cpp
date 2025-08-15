@@ -40,7 +40,6 @@ module;
 module infinity_core:system_info.impl;
 
 import :system_info;
-import :stl;
 import :defer_op;
 import :status;
 import :logger;

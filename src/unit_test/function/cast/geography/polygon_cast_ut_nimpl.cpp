@@ -26,7 +26,6 @@ module infinity_core:ut.polygon_cast;
 import :ut.base_test;
 import third_party;
 import :logger;
-import :stl;
 import :infinity_context;
 import :function_set;
 import :aggregate_function_set;

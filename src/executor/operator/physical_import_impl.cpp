@@ -21,7 +21,6 @@ module;
 module infinity_core:physical_import.impl;
 
 import :physical_import;
-import :stl;
 import :query_context;
 import :table_def;
 import :data_table;
@@ -167,7 +166,7 @@ bool PhysicalImport::Execute(QueryContext *query_context, OperatorState *operato
     }
 
     if (file_type_ == CopyFileType::kInvalid) {
-        std::string extension = Path(file_path_).filename().extension().string();
+        std::string extension = std::filesystem::path(file_path_).filename().extension().string();
         if (extension == ".jsonl") {
             file_type_ = CopyFileType::kJSONL;
         } else if (extension == ".json") {

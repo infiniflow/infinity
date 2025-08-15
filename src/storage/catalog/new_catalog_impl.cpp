@@ -12,12 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:new_catalog.impl;
 
 import :new_catalog;
-import :stl;
 import :new_txn;
 import :status;
 import :kv_store;

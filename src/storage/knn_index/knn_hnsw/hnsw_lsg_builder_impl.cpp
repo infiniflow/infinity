@@ -12,12 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:hnsw_lsg_builder.impl;
 
 import :hnsw_lsg_builder;
-import :stl;
 import :hnsw_handler;
 import :index_hnsw;
 import :index_ivf;

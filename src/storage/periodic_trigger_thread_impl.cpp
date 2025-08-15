@@ -12,12 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:periodic_trigger_thread.impl;
 
 import :periodic_trigger_thread;
-import :stl;
 import :logger;
 
 import std;

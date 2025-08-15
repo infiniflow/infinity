@@ -12,12 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:merge_knn_data.impl;
 
 import :merge_knn_data;
-import :stl;
 import :base_table_ref;
 import :infinity_exception;
 import :merge_knn;

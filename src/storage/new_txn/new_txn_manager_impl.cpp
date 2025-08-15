@@ -12,14 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:new_txn_manager.impl;
 
 import :new_txn_manager;
 import :new_txn;
 import :txn_state;
-import :stl;
 import :wal_entry;
 import :infinity_exception;
 import :logger;

@@ -15,7 +15,6 @@
 module infinity_core:database_snapshot.impl;
 
 import :snapshot;
-import :stl;
 import :new_txn;
 import :new_txn_manager;
 import :query_context;

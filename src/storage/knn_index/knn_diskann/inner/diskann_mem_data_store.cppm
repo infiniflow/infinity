@@ -24,7 +24,6 @@ module;
 
 export module infinity_core:diskann_mem_data_store;
 
-import :stl;
 import :diskann_dist_func;
 import :diskann_utils;
 import :infinity_exception;

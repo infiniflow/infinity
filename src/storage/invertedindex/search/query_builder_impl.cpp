@@ -12,12 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:query_builder.impl;
 
 import :query_builder;
-import :stl;
 import :doc_iterator;
 import :column_index_reader;
 import :index_base;

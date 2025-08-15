@@ -26,7 +26,7 @@ module;
 module infinity_core:ut.index_base;
 
 import :ut.base_test;
-import :stl;
+
 import :index_base;
 import :index_ivf;
 import :index_hnsw;

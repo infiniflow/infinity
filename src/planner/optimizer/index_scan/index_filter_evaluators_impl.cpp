@@ -19,7 +19,6 @@ module;
 module infinity_core:index_filter_evaluators.impl;
 
 import :index_filter_evaluators;
-import :stl;
 import :roaring_bitmap;
 import :secondary_index_data;
 import :secondary_index_in_mem;

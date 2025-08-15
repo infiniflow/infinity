@@ -12,12 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:emvb_index_file_worker.impl;
 
 import :emvb_index_file_worker;
-import :stl;
 import :index_file_worker;
 import :file_worker;
 import :index_base;

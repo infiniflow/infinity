@@ -12,11 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:bmp_alg;
 
-import :stl;
 import :sparse_util;
 import :local_file_handle;
 import :bmp_util;

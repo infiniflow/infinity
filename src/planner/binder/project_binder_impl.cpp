@@ -12,12 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:project_binder.impl;
 
 import :project_binder;
-import :stl;
 import :base_expression;
 import :bind_context;
 import :function;
@@ -78,7 +75,7 @@ std::shared_ptr<BaseExpression> ProjectBinder::BuildExpression(const ParsedExpr 
         }
         auto function_set_ptr = FunctionSet::GetFunctionSet(query_context_->storage()->new_catalog(), function_expression);
 
-        if (IsEqual(function_set_ptr->name(), std::string("AVG")) && function_expression.arguments_->size() == 1 &&
+        if (function_set_ptr->name() == std::string("AVG") && function_expression.arguments_->size() == 1 &&
             (*function_expression.arguments_)[0]->type_ == ParsedExprType::kColumn) {
             auto column_expr = (ColumnExpr *)(*function_expression.arguments_)[0];
             std::vector<std::string> column_names(std::move(column_expr->names_));

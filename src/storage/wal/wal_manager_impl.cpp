@@ -12,12 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:wal_manager.impl;
 
 import :wal_manager;
-import :stl;
 import :logger;
 import :new_txn_manager;
 import :new_txn;
@@ -202,7 +199,7 @@ std::vector<std::shared_ptr<std::string>> WalManager::GetDiffWalEntryString(TxnT
             if (wal_entry->IsCheckPoint(checkpoint_cmd)) {
                 max_checkpoint_ts = checkpoint_cmd->max_commit_ts_;
                 std::string catalog_path = fmt::format("{}/{}", data_path_, "catalog");
-                catalog_dir = Path(fmt::format("{}/{}", catalog_path, checkpoint_cmd->catalog_name_)).parent_path().string();
+                catalog_dir = std::filesystem::path(fmt::format("{}/{}", catalog_path, checkpoint_cmd->catalog_name_)).parent_path().string();
                 break;
             }
             log_entries.push_back(wal_entry);
@@ -241,9 +238,9 @@ std::vector<std::shared_ptr<std::string>> WalManager::GetDiffWalEntryString(TxnT
         i32 act_size = ptr - buf_ptr->data();
         if (exp_size != act_size) {
             UnrecoverableError(fmt::format("WalManager::Flush WalEntry estimated size {} differ with the actual one {}, entry {}",
-                                               exp_size,
-                                               act_size,
-                                               log_entry->ToString()));
+                                           exp_size,
+                                           act_size,
+                                           log_entry->ToString()));
         }
 
         // LOG_TRACE(fmt::format("SYNC: {}", log_entry->ToString()));
@@ -313,9 +310,9 @@ void WalManager::NewFlush() {
             i32 act_size = ptr - buf->data();
             if (exp_size != act_size) {
                 UnrecoverableError(fmt::format("WalManager::Flush WalEntry estimated size {} differ with the actual one {}, entry {}",
-                                                   exp_size,
-                                                   act_size,
-                                                   entry->ToString()));
+                                               exp_size,
+                                               act_size,
+                                               entry->ToString()));
             }
             ofs_.write(buf->data(), ptr - buf->data());
 
@@ -460,10 +457,10 @@ void WalManager::UpdateCommitState(TxnTimeStamp commit_ts, i64 wal_size) {
         //                                    wal_size,
         //                                    wal_size_));
         LOG_ERROR(fmt::format("WalManager::UpdateCommitState commit_ts {} <= max_commit_ts_ {} or wal_size {} <= wal_size_ {}",
-                                           commit_ts,
-                                           max_commit_ts_,
-                                           wal_size,
-                                           wal_size_));
+                              commit_ts,
+                              max_commit_ts_,
+                              wal_size,
+                              wal_size_));
         return;
     }
     max_commit_ts_ = commit_ts;
@@ -578,7 +575,7 @@ std::string WalManager::GetWalFilename() const { return wal_path_; }
  */
 
 std::tuple<TransactionID, TxnTimeStamp, TxnTimeStamp> WalManager::GetReplayEntries(StorageMode targe_storage_mode,
-                                                                              std::vector<std::shared_ptr<WalEntry>> &replay_entries) {
+                                                                                   std::vector<std::shared_ptr<WalEntry>> &replay_entries) {
     std::vector<std::string> wal_list{};
     {
         auto [temp_wal_info, wal_infos] = WalFile::ParseWalFilenames(wal_dir_);
@@ -625,7 +622,7 @@ std::tuple<TransactionID, TxnTimeStamp, TxnTimeStamp> WalManager::GetReplayEntri
             if (wal_entry->IsCheckPointOrSnapshot(cmd)) {
                 if (cmd->GetType() == WalCommandType::CHECKPOINT_V2) {
                     auto checkpoint_cmd = static_cast<WalCmdCheckpointV2 *>(cmd);
-                    max_checkpoint_ts = checkpoint_cmd->max_commit_ts_;                    
+                    max_checkpoint_ts = checkpoint_cmd->max_commit_ts_;
                 } else if (cmd->GetType() == WalCommandType::CREATE_TABLE_SNAPSHOT) {
                     auto create_table_snapshot_cmd = static_cast<WalCmdCreateTableSnapshot *>(cmd);
                     max_checkpoint_ts = create_table_snapshot_cmd->max_commit_ts_;
@@ -634,7 +631,7 @@ std::tuple<TransactionID, TxnTimeStamp, TxnTimeStamp> WalManager::GetReplayEntri
                 max_transaction_id = wal_entry->txn_id_;
                 break;
             }
-            
+
             replay_entries.push_back(wal_entry);
         }
         LOG_INFO(fmt::format("Find and set checkpoint max commit ts: {}", max_checkpoint_ts));

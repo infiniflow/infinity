@@ -9,7 +9,6 @@ module;
 
 module infinity_core:ut.result_cache_manager;
 
-import :stl;
 import :result_cache_manager;
 import :logical_node;
 import :physical_operator;

@@ -12,12 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:bound_compact_statement.impl;
 
 import :bound_compact_statement;
-import :stl;
 import :logical_compact;
 import :base_table_ref;
 import :block_index;

@@ -12,12 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:group_binder.impl;
 
 import :group_binder;
-import :stl;
 import :base_expression;
 import :subquery_expression;
 import :bind_context;

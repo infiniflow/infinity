@@ -27,7 +27,6 @@ module infinity_core:ut.data_block;
 
 import :ut.base_test;
 import :infinity_exception;
-import :stl;
 import third_party;
 import :logger;
 import :table_def;

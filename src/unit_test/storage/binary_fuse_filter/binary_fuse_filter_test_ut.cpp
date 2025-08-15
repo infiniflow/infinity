@@ -24,7 +24,6 @@ module;
 module infinity_core:ut.binary_fuse_filter_test;
 
 import :ut.base_test;
-import :stl;
 import :binary_fuse_filter;
 #endif
 

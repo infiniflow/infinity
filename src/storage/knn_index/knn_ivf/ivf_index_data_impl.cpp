@@ -19,7 +19,6 @@ module;
 module infinity_core:ivf_index_data.impl;
 
 import :ivf_index_data;
-import :stl;
 import :index_ivf;
 import :ivf_index_storage;
 import :index_base;

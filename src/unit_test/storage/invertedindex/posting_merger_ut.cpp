@@ -12,7 +12,7 @@ module infinity_core:ut.posting_merger;
 
 import :ut.base_test;
 import :posting_merger;
-import :stl;
+
 import :segment_term_posting;
 import :memory_indexer;
 import :column_vector;

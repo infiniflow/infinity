@@ -28,7 +28,6 @@ module;
 module infinity_core:ut.test_lsg_build;
 
 import :ut.base_test;
-import :stl;
 import :hnsw_lsg_builder;
 import :index_hnsw;
 import :hnsw_common;

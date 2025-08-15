@@ -30,7 +30,7 @@ import :new_txn_manager;
 import :new_txn;
 import :status;
 import :infinity_context;
-import :stl;
+
 import :txn_state;
 import :infinity;
 import :query_options;

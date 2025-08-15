@@ -26,7 +26,6 @@ module;
 module infinity_core:ut.test_linscan;
 
 import :ut.base_test;
-import :stl;
 import :linscan_alg;
 import :sparse_util;
 import third_party;

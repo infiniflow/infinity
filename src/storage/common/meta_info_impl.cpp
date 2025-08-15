@@ -12,12 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:meta_info.impl;
 
 import :meta_info;
-import :stl;
 import :status;
 import :infinity_exception;
 import :wal_entry;

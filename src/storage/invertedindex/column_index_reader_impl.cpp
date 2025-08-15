@@ -12,12 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:column_index_reader.impl;
 
 import :column_index_reader;
-import :stl;
 import :segment_posting;
 import :index_segment_reader;
 import :posting_iterator;

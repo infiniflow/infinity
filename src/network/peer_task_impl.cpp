@@ -12,12 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:peer_task.impl;
 
 import :peer_task;
-import :stl;
 import :peer_task;
 
 import third_party;

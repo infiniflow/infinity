@@ -17,7 +17,7 @@ module;
 module infinity_core:between_expression.impl;
 
 import :between_expression;
-import :stl;
+
 import :expression_type;
 import :between_expression;
 

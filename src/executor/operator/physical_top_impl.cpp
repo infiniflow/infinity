@@ -12,12 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:physical_top.impl;
 
 import :physical_top;
-import :stl;
 import :logger;
 import :query_context;
 import :operator_state;

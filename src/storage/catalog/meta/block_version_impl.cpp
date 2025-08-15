@@ -12,12 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:block_version.impl;
 
 import :block_version;
-import :stl;
 import :infinity_exception;
 import :logger;
 import :default_values;

@@ -24,7 +24,6 @@ module;
 module infinity_core:ut.test_hnsw_bitmask;
 
 import :ut.base_test;
-import :stl;
 import :roaring_bitmap;
 import :data_store;
 import :vec_store_type;

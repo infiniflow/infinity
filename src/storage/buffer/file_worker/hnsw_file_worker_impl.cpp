@@ -12,13 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:hnsw_file_worker.impl;
 
 import :hnsw_file_worker;
 import :infinity_exception;
-import :stl;
 import :index_file_worker;
 import :hnsw_alg;
 import :hnsw_common;

@@ -17,7 +17,7 @@ module;
 export module infinity_core:cast_expression;
 
 import :column_binding;
-import :stl;
+
 import :expression_type;
 import :bound_cast_func;
 import :base_expression;

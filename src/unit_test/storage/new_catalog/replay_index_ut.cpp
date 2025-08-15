@@ -21,7 +21,7 @@ module infinity_core:ut.replay_index;
 
 import :ut.replay_test;
 import :ut.base_test;
-import :stl;
+
 import third_party;
 import :status;
 import :new_catalog;

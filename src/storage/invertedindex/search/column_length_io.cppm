@@ -18,7 +18,6 @@ module;
 
 export module infinity_core:column_length_io;
 
-import :stl;
 import :index_defines;
 import :memory_indexer;
 import :buffer_obj;

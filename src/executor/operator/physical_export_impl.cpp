@@ -12,8 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:physical_export.impl;
 
 import :physical_export;
@@ -23,7 +21,6 @@ import :logger;
 import :column_vector;
 import :value;
 import :virtual_store;
-import :stl;
 import :status;
 import :buffer_manager;
 import :default_values;

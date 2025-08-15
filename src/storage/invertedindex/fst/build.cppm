@@ -18,7 +18,6 @@ module;
 
 export module infinity_core:fst.build;
 
-import :stl;
 import :fst.bytes;
 import :fst.node;
 import :fst.registry;

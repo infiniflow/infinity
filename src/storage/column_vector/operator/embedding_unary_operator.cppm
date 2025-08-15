@@ -12,11 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:embedding_unary_operator;
 
-import :stl;
 import :roaring_bitmap;
 import :column_vector;
 import :infinity_exception;

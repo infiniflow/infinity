@@ -12,12 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:physical_create_index_prepare.impl;
 
 import :physical_create_index_prepare;
-import :stl;
 import :physical_operator_type;
 import :physical_operator;
 import :query_context;

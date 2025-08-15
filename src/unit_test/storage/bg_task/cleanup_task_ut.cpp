@@ -24,7 +24,6 @@ module;
 module infinity_core:ut.cleanup_task;
 
 import :ut.base_test;
-import :stl;
 import :logger;
 import :infinity_context;
 import :storage;

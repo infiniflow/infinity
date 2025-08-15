@@ -23,6 +23,7 @@ import :data_store;
 import :dist_func_lsg_wrapper;
 import :plain_vec_store;
 import :default_values;
+import :utility;
 
 import std;
 import third_party;

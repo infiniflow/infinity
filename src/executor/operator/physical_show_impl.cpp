@@ -12,12 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:physical_show.impl;
 
 import :physical_show;
-import :stl;
 import :new_txn;
 import :query_context;
 import :profiler;
@@ -1184,9 +1181,8 @@ void PhysicalShow::ExecuteShowIndex(QueryContext *query_context, ShowOperatorSta
     //
     //        ++column_id;
     //        {
-    //            const std::string table_dir = fmt::format("{}/{}", InfinityContext::instance().config()->DataDir(), *table_index_info->index_entry_dir_);
-    //            std::string index_size_str;
-    //            if (query_context->persistence_manager() == nullptr) {
+    //            const std::string table_dir = fmt::format("{}/{}", InfinityContext::instance().config()->DataDir(),
+    //            *table_index_info->index_entry_dir_); std::string index_size_str; if (query_context->persistence_manager() == nullptr) {
     //                index_size_str = Utility::FormatByteSize(VirtualStore::GetDirectorySize(table_dir));
     //            } else {
     //                const std::vector<std::string> &paths = table_index_info->files_;
@@ -1263,7 +1259,7 @@ void PhysicalShow::ExecuteShowIndexSegment(QueryContext *query_context, ShowOper
         }
     }
 
-    std::string full_segment_index_dir = Path(InfinityContext::instance().config()->DataDir()) / *segment_index_info->index_dir_;
+    std::string full_segment_index_dir = std::filesystem::path(InfinityContext::instance().config()->DataDir()) / *segment_index_info->index_dir_;
     {
         size_t column_id = 0;
         {
@@ -1697,16 +1693,16 @@ void PhysicalShow::ExecuteShowProfiles(QueryContext *query_context, ShowOperator
     // create data block for output state
     std::unique_ptr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
     std::vector<std::shared_ptr<DataType>> column_types{varchar_type,
-                                             varchar_type,
-                                             varchar_type,
-                                             varchar_type,
-                                             varchar_type,
-                                             varchar_type,
-                                             varchar_type,
-                                             varchar_type,
-                                             varchar_type,
-                                             varchar_type,
-                                             varchar_type};
+                                                        varchar_type,
+                                                        varchar_type,
+                                                        varchar_type,
+                                                        varchar_type,
+                                                        varchar_type,
+                                                        varchar_type,
+                                                        varchar_type,
+                                                        varchar_type,
+                                                        varchar_type,
+                                                        varchar_type};
     size_t row_count = 0;
     output_block_ptr->Init(*output_types_);
 
@@ -1886,8 +1882,8 @@ void PhysicalShow::ExecuteShowSegments(QueryContext *query_context, ShowOperator
         {
             std::string segment_size_str = "TODO";
             //            std::string full_segment_dir = fmt::format("{}/seg_{}")
-            //            std::string full_segment_dir = Path(InfinityContext::instance().config()->DataDir()) / *segment_info->segment_dir_;
-            //            if (query_context->persistence_manager() == nullptr) {
+            //            std::string full_segment_dir = std::filesystem::path(InfinityContext::instance().config()->DataDir()) /
+            //            *segment_info->segment_dir_; if (query_context->persistence_manager() == nullptr) {
             //                segment_size_str = Utility::FormatByteSize(VirtualStore::GetDirectorySize(full_segment_dir));
             //            } else {
             //                const std::vector<std::string> &paths = segment_info->files_;
@@ -2141,7 +2137,7 @@ void PhysicalShow::ExecuteShowBlocks(QueryContext *query_context, ShowOperatorSt
         {
             std::string block_size_str;
             if (query_context->persistence_manager() == nullptr) {
-                std::string full_block_dir = Path(InfinityContext::instance().config()->DataDir()) / *block_info->block_dir_;
+                std::string full_block_dir = std::filesystem::path(InfinityContext::instance().config()->DataDir()) / *block_info->block_dir_;
                 block_size_str = Utility::FormatByteSize(VirtualStore::GetDirectorySize(full_block_dir));
             } else {
                 std::vector<std::string> &paths = block_info->files_;
@@ -2223,7 +2219,7 @@ void PhysicalShow::ExecuteShowBlockDetail(QueryContext *query_context, ShowOpera
 
         ++column_id;
         {
-            std::string full_block_dir = Path(InfinityContext::instance().config()->DataDir()) / *block_info->block_dir_;
+            std::string full_block_dir = std::filesystem::path(InfinityContext::instance().config()->DataDir()) / *block_info->block_dir_;
             Value value = Value::MakeVarchar(full_block_dir);
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
@@ -3511,7 +3507,8 @@ void PhysicalShow::ExecuteShowViewDetail(QueryContext *query_context,
         std::make_shared<ColumnDef>(1, varchar_type, "column_type", std::set<ConstraintType>()),
     };
 
-    std::shared_ptr<TableDef> table_def = TableDef::Make(std::make_shared<std::string>("default_db"), std::make_shared<std::string>("Views"), nullptr, output_column_defs);
+    std::shared_ptr<TableDef> table_def =
+        TableDef::Make(std::make_shared<std::string>("default_db"), std::make_shared<std::string>("Views"), nullptr, output_column_defs);
     output_ = std::make_shared<DataTable>(table_def, TableType::kResult);
 
     std::shared_ptr<DataBlock> output_block_ptr = DataBlock::Make();
@@ -4323,8 +4320,10 @@ void PhysicalShow::ExecuteShowGlobalVariable(QueryContext *query_context, ShowOp
                     std::make_shared<ColumnDef>(0, integer_type, "value", std::set<ConstraintType>()),
                 };
 
-                std::shared_ptr<TableDef> table_def =
-                    TableDef::Make(std::make_shared<std::string>("default_db"), std::make_shared<std::string>("variables"), nullptr, output_column_defs);
+                std::shared_ptr<TableDef> table_def = TableDef::Make(std::make_shared<std::string>("default_db"),
+                                                                     std::make_shared<std::string>("variables"),
+                                                                     nullptr,
+                                                                     output_column_defs);
                 output_ = std::make_shared<DataTable>(table_def, TableType::kResult);
 
                 std::vector<std::shared_ptr<DataType>> output_column_types{

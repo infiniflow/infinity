@@ -12,8 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:physical_merge_aggregate;
 
 import :base_table_ref;
@@ -25,7 +23,6 @@ import :physical_operator_type;
 import :infinity_exception;
 import :value;
 import :data_block;
-import :stl;
 import :logger;
 
 import internal_types;

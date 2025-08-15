@@ -12,12 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:logical_compact.impl;
 
 import :logical_compact;
-import :stl;
 import :column_binding;
 import :base_table_ref;
 

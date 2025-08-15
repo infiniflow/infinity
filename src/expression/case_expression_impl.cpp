@@ -17,7 +17,7 @@ module;
 module infinity_core:case_expression.impl;
 
 import :case_expression;
-import :stl;
+
 import :expression_type;
 import :infinity_exception;
 import :case_expression;

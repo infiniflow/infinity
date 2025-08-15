@@ -12,12 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:snapshot_info.impl;
 
 import :snapshot_info;
-import :stl;
 import :status;
 import :logger;
 import :virtual_store;

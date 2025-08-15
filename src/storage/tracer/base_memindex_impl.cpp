@@ -12,12 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:base_memindex.impl;
 
 import :base_memindex;
-import :stl;
 import :memindex_tracer;
 import :infinity_context;
 import :storage;

@@ -12,12 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:kv_code.impl;
 
 import :kv_code;
-import :stl;
 import :infinity_exception;
 
 import std;

@@ -24,7 +24,6 @@ module;
 module infinity_core:ut.user_defined_term_weight;
 
 import :ut.base_test;
-import :stl;
 import :status;
 import :user_defined_term_weight;
 import :python_instance;

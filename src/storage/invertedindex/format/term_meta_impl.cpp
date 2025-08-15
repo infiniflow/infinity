@@ -1,10 +1,6 @@
-module;
-
 module infinity_core:term_meta.impl;
 
 import :term_meta;
-
-import :stl;
 import :byte_slice;
 import :byte_slice_reader;
 import :file_reader;

@@ -21,7 +21,7 @@ import infinity_core;
 #else
 export module infinity_core:ut.sql_runner;
 
-import :stl;
+
 import :data_table;
 #endif
 

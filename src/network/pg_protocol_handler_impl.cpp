@@ -12,13 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:pg_protocol_handler.impl;
 
 import :pg_protocol_handler;
 import :boost;
-import :stl;
 import :pg_message;
 
 import global_resource_usage;

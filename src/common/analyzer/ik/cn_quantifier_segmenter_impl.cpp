@@ -1,9 +1,6 @@
-module;
-
 module infinity_core:cn_quantifier_segmenter.impl;
 
 import :cn_quantifier_segmenter;
-import :stl;
 import :hit;
 import :segmenter;
 import :analyze_context;

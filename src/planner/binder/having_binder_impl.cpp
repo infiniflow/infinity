@@ -12,12 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:having_binder.impl;
 
 import :having_binder;
-import :stl;
 import :base_expression;
 import :bind_context;
 import :column_expression;

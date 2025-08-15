@@ -12,12 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:physical_nested_loop_join.impl;
 
 import :physical_nested_loop_join;
-import :stl;
 import :query_context;
 import :operator_state;
 import :physical_nested_loop_join;

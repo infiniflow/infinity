@@ -1,9 +1,6 @@
-module;
-
 module infinity_core:s3_client_minio.impl;
 
 import :s3_client_minio;
-import :stl;
 import :infinity_exception;
 import :logger;
 

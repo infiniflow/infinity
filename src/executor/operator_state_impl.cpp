@@ -12,13 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:operator_state.impl;
 
 import :operator_state;
 import :data_block;
-import :stl;
 import :physical_operator_type;
 import :fragment_data;
 import :infinity_exception;

@@ -12,12 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:multi_doc_iterator.impl;
 
 import :multi_doc_iterator;
-import :stl;
 import :infinity_exception;
 import :logger;
 import :multi_doc_iterator;

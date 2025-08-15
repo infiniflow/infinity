@@ -6,7 +6,7 @@ module;
 
 export module infinity_core:wrap_infinity;
 
-import :stl;
+
 import :config;
 import :resource_manager;
 import :task_scheduler;

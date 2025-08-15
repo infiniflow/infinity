@@ -17,7 +17,7 @@ module;
 module infinity_core:match_tensor_expression.impl;
 
 import :match_tensor_expression;
-import :stl;
+
 import :expression_type;
 import :base_expression;
 import :column_expression;

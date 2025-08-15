@@ -17,7 +17,7 @@ module;
 module infinity_core:knn_expression.impl;
 
 import :knn_expression;
-import :stl;
+
 import :expression_type;
 import :scalar_function;
 import :logger;

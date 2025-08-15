@@ -27,7 +27,6 @@ import :ut.base_test;
 import :infinity;
 import :infinity_exception;
 import :status;
-import :stl;
 import third_party;
 import :infinity_context;
 import :block_version;

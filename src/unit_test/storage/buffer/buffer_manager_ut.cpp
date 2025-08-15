@@ -26,7 +26,7 @@ module;
 module infinity_core:ut.buffer_manager;
 
 import :ut.base_test;
-import :stl;
+
 import :buffer_manager;
 import :buffer_obj;
 import :data_file_worker;

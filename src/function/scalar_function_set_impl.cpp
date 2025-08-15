@@ -12,12 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:scalar_function_set.impl;
 
 import :scalar_function_set;
-import :stl;
 import :base_expression;
 import :scalar_function;
 import :infinity_exception;

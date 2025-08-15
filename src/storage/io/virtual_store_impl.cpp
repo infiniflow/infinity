@@ -25,7 +25,6 @@ module;
 module infinity_core:virtual_store.impl;
 
 import :virtual_store;
-import :stl;
 import :s3_client_minio;
 import :infinity_context;
 import :utility;
@@ -155,7 +154,7 @@ std::unique_ptr<StreamReader> VirtualStore::OpenStreamReader(const std::string &
 // For local disk filesystem, such as temp file, disk cache and WAL
 bool VirtualStore::Exists(const std::string &path) {
     std::error_code error_code;
-    Path p{path};
+    fs::path p{path};
     bool is_exists = std::filesystem::exists(p, error_code);
     if (error_code.value() == 0) {
         return is_exists;
@@ -170,7 +169,7 @@ Status VirtualStore::DeleteFile(const std::string &file_name) {
         UnrecoverableError(fmt::format("{} isn't absolute path.", file_name));
     }
     std::error_code error_code;
-    Path p{file_name};
+    fs::path p{file_name};
     if (!Exists(p)) {
         LOG_WARN(fmt::format("The {} to be deleted does not exists ", file_name));
         return Status::OK();
@@ -219,7 +218,7 @@ Status VirtualStore::MakeDirectory(const std::string &path) {
     }
 
     std::error_code error_code;
-    Path p{path};
+    fs::path p{path};
     std::filesystem::create_directories(p, error_code);
     if (error_code.value() != 0) {
         UnrecoverableError(fmt::format("{} create exception: {}", path, strerror(errno)));
@@ -232,7 +231,7 @@ Status VirtualStore::RemoveDirectory(const std::string &path) {
         UnrecoverableError(fmt::format("{} isn't absolute path.", path));
     }
     std::error_code error_code;
-    Path p{path};
+    fs::path p{path};
     std::filesystem::remove_all(p, error_code);
     if (error_code.value() != 0) {
         UnrecoverableError(fmt::format("Delete directory {} exception: {}", path, error_code.message()));
@@ -245,7 +244,7 @@ Status VirtualStore::CleanupDirectory(const std::string &path) {
         UnrecoverableError(fmt::format("{} isn't absolute path.", path));
     }
     std::error_code error_code;
-    Path p{path};
+    fs::path p{path};
     if (!std::filesystem::exists(p)) {
         std::filesystem::create_directories(p, error_code);
         if (error_code.value() != 0) {
@@ -315,8 +314,8 @@ Status VirtualStore::Merge(const std::string &dst_path, const std::string &src_p
     if (!std::filesystem::path(src_path).is_absolute()) {
         UnrecoverableError(fmt::format("{} isn't absolute path.", src_path));
     }
-    Path dst{dst_path};
-    Path src{src_path};
+    fs::path dst{dst_path};
+    fs::path src{src_path};
     std::ifstream srcFile(src, std::ios::binary);
     if (!srcFile.is_open()) {
         UnrecoverableError(fmt::format("Failed to open source file {}", src_path));
@@ -362,7 +361,7 @@ std::tuple<std::vector<std::shared_ptr<std::filesystem::directory_entry>>, Statu
     if (!std::filesystem::path(path).is_absolute()) {
         UnrecoverableError(fmt::format("{} isn't absolute path.", path));
     }
-    Path dir_path(path);
+    fs::path dir_path(path);
     if (!is_directory(dir_path)) {
         UnrecoverableError(fmt::format("{} isn't a directory", path));
     }
@@ -380,7 +379,7 @@ size_t VirtualStore::GetFileSize(const std::string &path) {
     return std::filesystem::file_size(path);
 }
 
-std::string VirtualStore::GetParentPath(const std::string &path) { return Path(path).parent_path().string(); }
+std::string VirtualStore::GetParentPath(const std::string &path) { return fs::path(path).parent_path().string(); }
 
 size_t VirtualStore::GetDirectorySize(const std::string &path) {
     if (!std::filesystem::path(path).is_absolute()) {

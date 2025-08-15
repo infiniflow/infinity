@@ -12,12 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:index_hnsw.impl;
 
 import :index_hnsw;
-import :stl;
 import :status;
 import :index_base;
 import :infinity_exception;

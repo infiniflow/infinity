@@ -1,8 +1,5 @@
-module;
-
 export module infinity_core:segment_term_posting;
 
-import :stl;
 import :file_writer;
 import :posting_decoder;
 import :index_defines;

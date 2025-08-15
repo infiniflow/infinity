@@ -12,12 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:logical_node_visitor.impl;
 
 import :logical_node_visitor;
-import :stl;
 import :base_expression;
 import :logical_node_type;
 import :infinity_exception;

@@ -19,7 +19,6 @@ module;
 module infinity_core:ngram_analyzer.impl;
 
 import :ngram_analyzer;
-import :stl;
 import :term;
 import :stemmer;
 import :analyzer;

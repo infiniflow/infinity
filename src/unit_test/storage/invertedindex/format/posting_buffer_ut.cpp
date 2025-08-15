@@ -11,7 +11,7 @@ module;
 module infinity_core:ut.posting_buffer;
 
 import :ut.base_test;
-import :stl;
+
 import :index_defines;
 import :posting_field;
 import :posting_buffer;

@@ -19,7 +19,6 @@ module;
 module infinity_core:ivf_index_storage_parts.impl;
 
 import :ivf_index_storage;
-import :stl;
 import :infinity_exception;
 import :status;
 import :index_ivf;

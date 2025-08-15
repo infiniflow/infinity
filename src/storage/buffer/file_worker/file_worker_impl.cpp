@@ -19,7 +19,6 @@ module;
 module infinity_core:file_worker.impl;
 
 import :file_worker;
-import :stl;
 import :utility;
 import :infinity_exception;
 import :local_file_handle;
@@ -69,8 +68,8 @@ bool FileWorker::WriteToFile(bool to_spill, const FileWorkerSaveCtx &ctx) {
 
     if (persistence_manager_ != nullptr && !to_spill) {
         std::string write_dir = *file_dir_;
-        std::string write_path = Path(*data_dir_) / write_dir / *file_name_;
-        std::string tmp_write_path = Path(*temp_dir_) / StringTransform(write_path, "/", "_");
+        std::string write_path = std::filesystem::path(*data_dir_) / write_dir / *file_name_;
+        std::string tmp_write_path = std::filesystem::path(*temp_dir_) / StringTransform(write_path, "/", "_");
 
         auto [file_handle, status] = VirtualStore::Open(tmp_write_path, FileAccessMode::kWrite);
         if (!status.ok()) {
@@ -176,14 +175,14 @@ void FileWorker::SetData(void *data) {
     data_ = data;
 }
 
-void FileWorker::SetDataSize(size_t size) {
-    UnrecoverableError("Not implemented");
-}
+void FileWorker::SetDataSize(size_t size) { UnrecoverableError("Not implemented"); }
 
 // Get absolute file path. As key of buffer handle.
-std::string FileWorker::GetFilePath() const { return Path(*data_dir_) / *file_dir_ / *file_name_; }
+std::string FileWorker::GetFilePath() const { return std::filesystem::path(*data_dir_) / *file_dir_ / *file_name_; }
 
-std::string FileWorker::ChooseFileDir(bool spill) const { return spill ? (Path(*temp_dir_) / *file_dir_) : (Path(*data_dir_) / *file_dir_); }
+std::string FileWorker::ChooseFileDir(bool spill) const {
+    return spill ? (std::filesystem::path(*temp_dir_) / *file_dir_) : (std::filesystem::path(*data_dir_) / *file_dir_);
+}
 
 std::pair<std::optional<DeferFn<std::function<void()>>>, std::string> FileWorker::GetFilePathInner(bool from_spill) {
     bool use_object_cache = !from_spill && persistence_manager_ != nullptr;

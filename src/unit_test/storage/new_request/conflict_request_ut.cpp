@@ -26,7 +26,7 @@ module infinity_core:ut.txns_conflict;
 
 import :ut.base_test;
 import :ut.request_test;
-import :stl;
+
 import :status;
 import :new_txn_manager;
 import :infinity_context;

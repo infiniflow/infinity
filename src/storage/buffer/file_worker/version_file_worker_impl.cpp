@@ -12,12 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:version_file_worker.impl;
 
 import :version_file_worker;
-import :stl;
 import :file_worker;
 import :block_version;
 import :infinity_exception;

@@ -12,12 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:logical_match_tensor_scan.impl;
 
 import :logical_match_tensor_scan;
-import :stl;
 import :base_table_ref;
 import :column_binding;
 import :logical_node_type;

@@ -19,7 +19,6 @@ module;
 module infinity_core:fst.build.impl;
 
 import :fst.build;
-import :stl;
 import :infinity_exception;
 import :fst.bytes;
 import :fst.node;

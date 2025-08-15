@@ -1,8 +1,5 @@
-module;
-
 export module infinity_core:posting_merger;
 
-import :stl;
 import :file_writer;
 import :posting_decoder;
 import :posting_list_format;

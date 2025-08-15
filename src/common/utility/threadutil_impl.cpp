@@ -24,7 +24,6 @@ module;
 
 module infinity_core:threadutil.impl;
 
-import :stl;
 import :threadutil;
 
 namespace infinity {

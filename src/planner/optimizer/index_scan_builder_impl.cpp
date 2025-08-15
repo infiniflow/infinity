@@ -12,12 +12,9 @@
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
 
-module;
-
 module infinity_core:index_scan_builder.impl;
 
 import :index_scan_builder;
-import :stl;
 import :logical_node;
 import :logical_node_type;
 import :logical_filter;

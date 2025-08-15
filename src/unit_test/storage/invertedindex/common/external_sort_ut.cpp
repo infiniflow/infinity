@@ -26,7 +26,7 @@ module;
 module infinity_core:ut.external_sort;
 
 import :ut.base_test;
-import :stl;
+
 import third_party;
 import :external_sort_merger;
 #endif

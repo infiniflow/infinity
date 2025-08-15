@@ -27,7 +27,6 @@ module infinity_core:ut.buffer_obj;
 import :ut.base_test;
 import :infinity;
 import :infinity_exception;
-import :stl;
 import :logger;
 import :buffer_manager;
 import :buffer_handle;

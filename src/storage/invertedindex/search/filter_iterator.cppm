@@ -12,11 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:filter_iterator;
 
-import :stl;
 import :doc_iterator;
 import :query_node;
 import :index_defines;

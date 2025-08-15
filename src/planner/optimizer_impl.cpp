@@ -12,12 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:optimizer.impl;
 
 import :optimizer;
-import :stl;
 import :logical_node_type;
 import :logical_explain;
 import :column_remapper;

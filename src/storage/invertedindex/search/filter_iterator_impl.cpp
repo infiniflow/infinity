@@ -19,7 +19,6 @@ module;
 module infinity_core:filter_iterator.impl;
 
 import :filter_iterator;
-import :stl;
 import :doc_iterator;
 import :query_node;
 import :column_index_reader;

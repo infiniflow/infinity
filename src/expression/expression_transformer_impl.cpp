@@ -17,7 +17,7 @@ module;
 module infinity_core:expression_transformer.impl;
 
 import :expression_transformer;
-import :stl;
+
 import :base_expression;
 import :aggregate_expression;
 import :between_expression;

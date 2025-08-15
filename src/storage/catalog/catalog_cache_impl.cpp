@@ -12,12 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:catalog_cache.impl;
 
 import :catalog_cache;
-import :stl;
 import :default_values;
 import :infinity_exception;
 import :logger;

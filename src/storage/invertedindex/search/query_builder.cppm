@@ -12,11 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:query_builder;
 
-import :stl;
 import :doc_iterator;
 import :column_index_reader;
 import :meta_info;

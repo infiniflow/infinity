@@ -1,9 +1,6 @@
-module;
-
 module infinity_core:sqrt.impl;
 
 import :sqrt;
-import :stl;
 import :new_catalog;
 import :infinity_exception;
 import :scalar_function;

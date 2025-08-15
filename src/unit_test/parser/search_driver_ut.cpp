@@ -26,7 +26,6 @@ module infinity_core:ut.search_driver;
 
 import :ut.base_test;
 import :ut.log_helper;
-import :stl;
 import :search_driver;
 import :query_node;
 import :term;

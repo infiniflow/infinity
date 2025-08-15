@@ -12,12 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:new_txn_store.impl;
 
 import :new_txn_store;
-import :stl;
 import :status;
 import :infinity_exception;
 import :data_block;

@@ -1,9 +1,6 @@
-module;
-
 module infinity_core:posting_writer.impl;
 
 import :posting_writer;
-import :stl;
 import :file_writer;
 import :file_reader;
 import :doc_list_encoder;

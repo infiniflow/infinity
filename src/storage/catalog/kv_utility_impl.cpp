@@ -12,12 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:kv_utility.impl;
 
 import :kv_utility;
-import :stl;
 import :kv_code;
 import :kv_store;
 import :index_base;

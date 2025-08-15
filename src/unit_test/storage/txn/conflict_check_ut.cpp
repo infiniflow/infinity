@@ -24,7 +24,6 @@ module;
 module infinity_core:ut.conflict_check;
 
 import :ut.base_test;
-import :stl;
 import :infinity_context;
 import :table_def;
 import :storage;

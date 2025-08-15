@@ -28,7 +28,7 @@ module;
 module infinity_core:ut.dump_index_task;
 
 import :ut.base_test;
-import :stl;
+
 import :storage;
 import :infinity_context;
 import :status;

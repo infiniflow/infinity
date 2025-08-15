@@ -12,12 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:emvb_index.impl;
 
 import :emvb_index;
-import :stl;
 import :mlas_matrix_multiply;
 import :vector_distance;
 import :emvb_product_quantization;

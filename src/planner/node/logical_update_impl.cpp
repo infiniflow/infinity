@@ -12,12 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:logical_update.impl;
 
 import :logical_update;
-import :stl;
 import :logical_node;
 import :logical_node_type;
 import :column_binding;

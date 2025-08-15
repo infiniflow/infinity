@@ -26,7 +26,6 @@ module;
 module infinity_core:ut.test_hnsw;
 
 import :ut.base_test;
-import :stl;
 import :hnsw_alg;
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wunused-variable"

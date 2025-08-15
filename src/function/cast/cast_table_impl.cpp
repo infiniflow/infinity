@@ -12,12 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:cast_table.impl;
 
 import :cast_table;
-import :stl;
 import :cast_table;
 
 import logical_type;

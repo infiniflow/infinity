@@ -12,12 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:where_binder.impl;
 
 import :where_binder;
-import :stl;
 import :base_expression;
 import :function;
 import :bind_context;

@@ -26,7 +26,6 @@ module;
 module infinity_core:ut.test_bmp_index;
 
 import :ut.base_test;
-import :stl;
 import :bmp_alg;
 import :bmp_util;
 import :sparse_util;

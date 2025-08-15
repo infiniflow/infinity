@@ -19,7 +19,6 @@ module;
 module infinity_core:probabilistic_data_filter.impl;
 
 import :probabilistic_data_filter;
-import :stl;
 import :binary_fuse_filter;
 import :infinity_exception;
 import :logger;

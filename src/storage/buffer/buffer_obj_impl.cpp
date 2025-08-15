@@ -19,7 +19,6 @@ module;
 module infinity_core:buffer_obj.impl;
 
 import :buffer_obj;
-import :stl;
 import :file_worker;
 import :buffer_handle;
 import :buffer_manager;

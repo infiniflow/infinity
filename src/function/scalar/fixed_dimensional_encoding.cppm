@@ -12,11 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:fixed_dimensional_encoding;
 
-import :stl;
 import :new_catalog;
 import :data_block;
 import :column_vector;

@@ -12,12 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:score_threshold_iterator.impl;
 
 import :score_threshold_iterator;
-import :stl;
 import :doc_iterator;
 import :index_defines;
 

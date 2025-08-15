@@ -12,12 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:data_file_worker.impl;
 
 import :data_file_worker;
-import :stl;
 import :infinity_exception;
 import :status;
 import :logger;

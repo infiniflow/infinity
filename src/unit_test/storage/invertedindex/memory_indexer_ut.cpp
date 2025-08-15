@@ -28,7 +28,7 @@ module;
 module infinity_core:ut.memory_indexer;
 
 import :ut.base_test;
-import :stl;
+
 import :analyzer;
 import :analyzer_pool;
 import :index_defines;

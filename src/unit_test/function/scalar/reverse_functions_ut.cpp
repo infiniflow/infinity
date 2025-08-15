@@ -26,7 +26,7 @@ module;
 module infinity_core:ut.reverse_functions;
 
 import :ut.base_test;
-import :stl;
+
 import :infinity_exception;
 import :infinity_context;
 import :new_catalog;

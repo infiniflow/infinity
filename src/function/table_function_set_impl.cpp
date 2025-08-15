@@ -12,12 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:table_function_set.impl;
 
 import :table_function_set;
-import :stl;
 import :table_function;
 
 namespace infinity {

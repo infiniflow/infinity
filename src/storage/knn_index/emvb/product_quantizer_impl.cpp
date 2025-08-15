@@ -19,7 +19,6 @@ module;
 module infinity_core:product_quantizer.impl;
 
 import :emvb_product_quantization;
-import :stl;
 import :mlas_matrix_multiply;
 import :kmeans_partition;
 import :vector_distance;

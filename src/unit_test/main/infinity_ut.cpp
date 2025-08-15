@@ -26,7 +26,6 @@ module;
 module infinity_core:ut.infinity;
 
 import :ut.base_test;
-import :stl;
 import :infinity;
 import :query_result;
 import :data_block;

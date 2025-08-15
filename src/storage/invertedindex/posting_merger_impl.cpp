@@ -1,9 +1,6 @@
-module;
-
 module infinity_core:posting_merger.impl;
 
 import :posting_merger;
-import :stl;
 import :file_writer;
 import :doc_list_encoder;
 import :inmem_posting_decoder;

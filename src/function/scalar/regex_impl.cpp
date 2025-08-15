@@ -1,9 +1,6 @@
-module;
-
 module infinity_core:regex.impl;
 
 import :regex;
-import :stl;
 import :new_catalog;
 import :status;
 import :infinity_exception;

@@ -12,11 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:persist_result_handler;
 
-import :stl;
 import :persistence_manager;
 
 import global_resource_usage;

@@ -28,7 +28,6 @@ import :infinity_exception;
 import third_party;
 import :logger;
 import :null_value;
-import :stl;
 import :infinity_context;
 #endif
 

@@ -12,13 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:expression_state.impl;
 
 import :expression_state;
 import :infinity_exception;
-import :stl;
 import :column_vector;
 import :expression_type;
 import :aggregate_expression;

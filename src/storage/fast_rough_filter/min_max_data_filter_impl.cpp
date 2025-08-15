@@ -19,7 +19,6 @@ module;
 module infinity_core:min_max_data_filter.impl;
 
 import :min_max_data_filter;
-import :stl;
 import :value;
 import :logger;
 import :infinity_exception;

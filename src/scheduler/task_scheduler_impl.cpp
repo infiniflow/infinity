@@ -12,12 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:task_scheduler.impl;
 
 import :task_scheduler;
-import :stl;
 import :config;
 import :status;
 import :infinity_exception;

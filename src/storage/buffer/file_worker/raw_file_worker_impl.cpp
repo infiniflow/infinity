@@ -19,7 +19,6 @@ module;
 module infinity_core:raw_file_worker.impl;
 
 import :raw_file_worker;
-import :stl;
 import :infinity_exception;
 import :local_file_handle;
 import :status;

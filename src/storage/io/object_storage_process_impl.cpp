@@ -19,7 +19,6 @@ module;
 module infinity_core:object_storage_process.impl;
 
 import :object_storage_process;
-import :stl;
 import :object_storage_task;
 import :logger;
 import :blocking_queue;

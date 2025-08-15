@@ -12,12 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:physical_drop_index.impl;
 
 import :physical_drop_index;
-import :stl;
 import :query_context;
 import :operator_state;
 import :table_def;

@@ -1,9 +1,6 @@
-module;
-
 module infinity_core:posting_field.impl;
 
 import :posting_field;
-import :stl;
 import :int_encoder;
 import :no_compress_encoder;
 import :vbyte_compress_encoder;

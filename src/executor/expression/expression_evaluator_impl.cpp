@@ -12,12 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:expression_evaluator.impl;
 
 import :expression_evaluator;
-import :stl;
 import :base_expression;
 import :aggregate_expression;
 import :case_expression;

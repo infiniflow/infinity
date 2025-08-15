@@ -26,7 +26,7 @@ module infinity_core:ut.ddl_request;
 
 import :ut.base_test;
 import :ut.request_test;
-import :stl;
+
 import :infinity_context;
 import :query_context;
 import :query_result;

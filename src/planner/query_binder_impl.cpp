@@ -12,12 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:query_binder.impl;
 
 import :query_binder;
-import :stl;
 import :infinity_exception;
 import :bind_context;
 import :join_table_ref;

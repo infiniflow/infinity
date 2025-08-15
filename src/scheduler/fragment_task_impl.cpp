@@ -12,14 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:fragment_task.impl;
 
 import :fragment_task;
 import :profiler;
 import :plan_fragment;
-import :stl;
 import :logger;
 import :physical_source;
 import :physical_sink;

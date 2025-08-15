@@ -24,7 +24,7 @@ module;
 module infinity_core:ut.test_low_cardinality;
 
 import :ut.base_test;
-import :stl;
+
 import third_party;
 import :secondary_index_data;
 import :roaring_bitmap;

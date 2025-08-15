@@ -18,7 +18,7 @@ export module infinity_core:subquery_expression;
 
 import :base_expression;
 import :bound_select_statement;
-import :stl;
+
 import :column_expression;
 
 import internal_types;

@@ -19,7 +19,6 @@ module;
 module infinity_core:column_vector.impl;
 
 import :column_vector;
-import :stl;
 import :selection;
 import :infinity_exception;
 import :default_values;

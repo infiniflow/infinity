@@ -12,12 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:emvb_shared_vec.impl;
 
 import :emvb_shared_vec;
-import :stl;
 import :emvb_shared_vec;
 
 namespace infinity {

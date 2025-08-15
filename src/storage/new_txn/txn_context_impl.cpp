@@ -12,12 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:txn_context.impl;
 
 import :txn_context;
-import :stl;
 
 import std;
 

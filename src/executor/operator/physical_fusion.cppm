@@ -12,11 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:physical_fusion;
 
-import :stl;
 import :physical_operator;
 import :base_table_ref;
 import :fusion_expression;

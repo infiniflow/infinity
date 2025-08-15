@@ -10,7 +10,7 @@ module;
 module infinity_core:ut.obj_stat_accessor;
 
 import :ut.base_test;
-import :stl;
+
 import :obj_stat_accessor;
 import :obj_status;
 #endif

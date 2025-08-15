@@ -26,7 +26,6 @@ module;
 module infinity_core:ut.test_hnsw_handler;
 
 import :ut.base_test;
-import :stl;
 import :hnsw_alg;
 import :hnsw_handler;
 import :index_hnsw;

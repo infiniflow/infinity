@@ -23,7 +23,6 @@ module;
 module infinity_core:japanese_analyzer.impl;
 
 import :japanese_analyzer;
-import :stl;
 import :term;
 import :analyzer;
 import :common_analyzer;

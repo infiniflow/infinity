@@ -18,7 +18,6 @@ module;
 
 export module infinity_core:ivf_index_search;
 
-import :stl;
 import :knn_scan_data;
 import :knn_result_handler;
 import :multivector_result_handler;

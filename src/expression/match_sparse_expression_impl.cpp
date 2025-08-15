@@ -17,7 +17,7 @@ module;
 module infinity_core:match_sparse_expression.impl;
 
 import :match_sparse_expression;
-import :stl;
+
 import :column_expression;
 import :status;
 import :logger;

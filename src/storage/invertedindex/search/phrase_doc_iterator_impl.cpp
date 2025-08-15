@@ -5,7 +5,6 @@ module;
 module infinity_core:phrase_doc_iterator.impl;
 
 import :phrase_doc_iterator;
-import :stl;
 import :doc_iterator;
 import :posting_iterator;
 import :column_length_io;

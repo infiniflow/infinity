@@ -1,9 +1,6 @@
-module;
-
 module infinity_core:ik_analyzer.impl;
 
 import :ik_analyzer;
-import :stl;
 import :segmenter;
 import :cjk_segmenter;
 import :cn_quantifier_segmenter;

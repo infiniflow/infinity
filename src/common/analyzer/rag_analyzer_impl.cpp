@@ -25,7 +25,6 @@ module;
 module infinity_core:rag_analyzer.impl;
 
 import :rag_analyzer;
-import :stl;
 import :term;
 import :stemmer;
 import :analyzer;

@@ -22,7 +22,6 @@ import :user_defined_term_weight;
 #include "Python.h"
 #include <vector>
 
-import :stl;
 import :term;
 import :stemmer;
 import :analyzer;

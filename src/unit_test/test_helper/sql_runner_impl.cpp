@@ -14,8 +14,6 @@
 
 module;
 
-#include <memory>
-
 #ifdef CI
 module sql_runner;
 
@@ -24,7 +22,6 @@ import infinity_core;
 module infinity_core:ut.sql_runner.impl;
 
 import :ut.sql_runner;
-import :stl;
 import :fragment_builder;
 import :data_table;
 import :infinity_context;
@@ -38,6 +35,7 @@ import :query_context;
 import :physical_planner;
 #endif
 
+import std;
 import sql_parser;
 import base_statement;
 import parser_result;

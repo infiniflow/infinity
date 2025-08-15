@@ -19,7 +19,6 @@ module;
 module infinity_core:minimum_should_match_iterator.impl;
 
 import :minimum_should_match_iterator;
-import :stl;
 import :index_defines;
 import :multi_doc_iterator;
 import :logger;

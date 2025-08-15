@@ -11,7 +11,7 @@ module;
 module infinity_core:ut.skiplist_writer;
 
 import :ut.base_test;
-import :stl;
+
 import :skiplist_writer;
 import :posting_byte_slice_reader;
 import :posting_byte_slice;

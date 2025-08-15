@@ -12,8 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:cast_function.impl;
 
 import :cast_function;
@@ -29,7 +27,6 @@ import :tensor_array_cast;
 import :multi_vector_cast;
 import :empty_array_cast;
 import :array_cast;
-import :stl;
 import :sparse_cast;
 
 import logical_type;

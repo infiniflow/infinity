@@ -19,7 +19,6 @@ module;
 module infinity_core:physical_match.impl;
 
 import :physical_match;
-import :stl;
 import :query_context;
 import :operator_state;
 import :physical_operator;

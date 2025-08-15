@@ -12,12 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:db_meeta.impl;
 
 import :db_meeta;
-import :stl;
 import :kv_code;
 import :kv_store;
 import :infinity_exception;

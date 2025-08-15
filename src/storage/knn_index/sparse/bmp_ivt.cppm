@@ -18,7 +18,6 @@ module;
 
 export module infinity_core:bmp_ivt;
 
-import :stl;
 import :sparse_util;
 import :local_file_handle;
 import :bmp_util;

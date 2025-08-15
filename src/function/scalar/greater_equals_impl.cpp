@@ -12,13 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:greater_equals.impl;
 
 import :greater_equals;
-
-import :stl;
 import :new_catalog;
 import :status;
 import :infinity_exception;

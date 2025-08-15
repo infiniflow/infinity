@@ -12,12 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:physical_table_scan.impl;
 
 import :physical_table_scan;
-import :stl;
 import :query_context;
 import :table_def;
 import :data_table;

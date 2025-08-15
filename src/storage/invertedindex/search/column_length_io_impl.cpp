@@ -12,12 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:column_length_io.impl;
 
 import :column_length_io;
-import :stl;
 import :column_index_reader;
 import :memory_indexer;
 import :buffer_obj;

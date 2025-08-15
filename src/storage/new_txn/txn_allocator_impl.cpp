@@ -12,12 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:txn_allocator.impl;
 
 import :txn_allocator;
-import :stl;
 import :txn_allocator_task;
 import :new_txn;
 import :logger;

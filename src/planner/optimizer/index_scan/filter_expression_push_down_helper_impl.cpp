@@ -12,12 +12,9 @@
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
 
-module;
-
 module infinity_core:filter_expression_push_down_helper.impl;
 
 import :filter_expression_push_down_helper;
-import :stl;
 import :base_expression;
 import :expression_type;
 import :expression_state;

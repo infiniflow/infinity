@@ -19,7 +19,6 @@ module;
 module infinity_core:snapshot_brief.impl;
 
 import :snapshot_brief;
-import :stl;
 import :status;
 import :virtual_store;
 import :local_file_handle;

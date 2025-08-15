@@ -12,12 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:logical_create_index.impl;
 
 import :logical_create_index;
-import :stl;
 import :column_binding;
 import :base_expression;
 import :index_base;

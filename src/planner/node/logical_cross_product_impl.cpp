@@ -12,12 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:logical_cross_product.impl;
 
 import :logical_cross_product;
-import :stl;
 import :column_binding;
 import :logical_node_type;
 import :logical_node;

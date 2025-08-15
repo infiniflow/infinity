@@ -1,9 +1,6 @@
-module;
-
 module infinity_core:in_doc_state_keeper.impl;
 
 import :in_doc_state_keeper;
-import :stl;
 import :byte_slice;
 import :in_doc_pos_state;
 import :position_list_decoder;

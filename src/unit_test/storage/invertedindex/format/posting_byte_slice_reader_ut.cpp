@@ -13,7 +13,7 @@ module;
 module infinity_core:ut.posting_byte_slice_reader;
 
 import :ut.base_test;
-import :stl;
+
 import :posting_byte_slice;
 import :posting_byte_slice_reader;
 import :doc_list_format_option;

@@ -10,7 +10,7 @@ module;
 module infinity_core:ut.persistence_manager;
 
 import :ut.base_test;
-import :stl;
+
 import :persistence_manager;
 import :virtual_store;
 import third_party;

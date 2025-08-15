@@ -12,8 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:bound_update_statement.impl;
 
 import :bound_update_statement;
@@ -23,7 +21,6 @@ import :base_expression;
 import :bind_context;
 import :logical_node;
 import :query_context;
-import :stl;
 import :infinity_exception;
 import :status;
 import :base_table_ref;

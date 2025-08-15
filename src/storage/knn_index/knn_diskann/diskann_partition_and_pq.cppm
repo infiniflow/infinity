@@ -26,7 +26,6 @@ module;
 
 export module infinity_core:diskann_partition_and_pq;
 
-import :stl;
 import :infinity_exception;
 import :index_base;
 import :vector_distance;

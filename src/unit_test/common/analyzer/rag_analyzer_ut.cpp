@@ -28,7 +28,6 @@ module;
 module infinity_core:ut.rag_analyzer;
 
 import :ut.base_test;
-import :stl;
 import :term;
 import :analyzer;
 import :rag_analyzer;

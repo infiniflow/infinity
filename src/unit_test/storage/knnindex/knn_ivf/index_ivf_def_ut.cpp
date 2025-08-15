@@ -29,7 +29,6 @@ module infinity_core:ut.index_ivf_def;
 
 import :ut.base_test;
 import :infinity_exception;
-import :stl;
 import :index_ivf;
 import :infinity_context;
 import :defer_op;

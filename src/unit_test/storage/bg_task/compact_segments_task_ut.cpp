@@ -28,7 +28,6 @@ module;
 module infinity_core:ut.compact_segments_task;
 
 import :ut.base_test;
-import :stl;
 import :storage;
 import :infinity_context;
 import :status;

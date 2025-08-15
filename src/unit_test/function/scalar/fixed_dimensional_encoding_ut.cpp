@@ -24,7 +24,7 @@ module;
 module infinity_core:ut.fixed_dimensional_encoding;
 
 import :ut.base_test;
-import :stl;
+
 import :fixed_dimensional_encoding;
 #endif
 

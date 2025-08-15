@@ -24,7 +24,7 @@ module;
 module infinity_core:ut.column_inverter;
 
 import :ut.base_test;
-import :stl;
+
 import :analyzer;
 import :analyzer_pool;
 import :index_defines;

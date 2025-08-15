@@ -12,12 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:buffer_handle.impl;
 
 import :buffer_handle;
-import :stl;
 import :buffer_handle;
 import :buffer_obj;
 import :file_worker_type;

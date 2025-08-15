@@ -1,9 +1,6 @@
-module;
-
 module infinity_core:letter_segmenter.impl;
 
 import :letter_segmenter;
-import :stl;
 import :segmenter;
 import :analyze_context;
 import :lexeme;

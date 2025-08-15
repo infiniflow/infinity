@@ -21,7 +21,6 @@ module;
 module infinity_core:column_inverter.impl;
 
 import :column_inverter;
-import :stl;
 import :analyzer;
 import :analyzer_pool;
 import :string_ref;

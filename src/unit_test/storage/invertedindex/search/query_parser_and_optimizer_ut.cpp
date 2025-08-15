@@ -26,7 +26,7 @@ module infinity_core:ut.query_parser_and_optimizer;
 
 import :ut.base_test;
 import :ut.log_helper;
-import :stl;
+
 import :search_driver;
 import :query_node;
 import :infinity_exception;

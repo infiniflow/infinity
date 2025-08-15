@@ -24,7 +24,6 @@ module;
 module infinity_core:ut.standard_analyzer;
 
 import :ut.base_test;
-import :stl;
 import :term;
 import :stemmer;
 import :standard_analyzer;

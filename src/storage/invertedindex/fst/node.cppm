@@ -18,7 +18,6 @@ module;
 
 export module infinity_core:fst.node;
 
-import :stl;
 import :fst.common_inputs;
 import :fst.writer;
 import :fst.bytes;

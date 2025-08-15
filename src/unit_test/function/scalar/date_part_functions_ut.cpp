@@ -24,7 +24,7 @@ module;
 module infinity_core:ut.date_part_functions;
 
 import :ut.base_test;
-import :stl;
+
 import :infinity_exception;
 import :infinity_context;
 import :new_catalog;

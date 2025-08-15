@@ -19,7 +19,6 @@ module;
 module infinity_core:rank_feature_doc_iterator.impl;
 
 import :rank_feature_doc_iterator;
-import :stl;
 import :smallfloat;
 
 import std;

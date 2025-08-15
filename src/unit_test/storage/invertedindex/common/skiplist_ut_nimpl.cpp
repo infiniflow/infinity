@@ -24,7 +24,7 @@ module;
 module infinity_core:ut.skiplist;
 
 import :ut.base_test;
-import :stl;
+
 import :logger;
 import :skiplist;
 #endif

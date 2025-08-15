@@ -18,7 +18,6 @@ module;
 
 export module infinity_core:sparse_test_util;
 
-import :stl;
 import :sparse_vector_distance;
 import :linscan_alg;
 import :sparse_util;

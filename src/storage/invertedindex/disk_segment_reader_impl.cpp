@@ -20,7 +20,6 @@ module;
 module infinity_core:disk_index_segment_reader.impl;
 
 import :disk_index_segment_reader;
-import :stl;
 import :segment_posting;
 import :index_defines;
 import :index_segment_reader;
@@ -50,7 +49,7 @@ DiskIndexSegmentReader::DiskIndexSegmentReader(SegmentID segment_id,
                                                RowID base_row_id,
                                                optionflag_t flag)
     : IndexSegmentReader(segment_id, chunk_id), base_row_id_(base_row_id) {
-    Path path = Path(InfinityContext::instance().config()->DataDir()) / index_dir / base_name;
+    std::filesystem::path path = std::filesystem::path(InfinityContext::instance().config()->DataDir()) / index_dir / base_name;
     std::string path_str = path.string();
     PersistenceManager *pm = InfinityContext::instance().persistence_manager();
 

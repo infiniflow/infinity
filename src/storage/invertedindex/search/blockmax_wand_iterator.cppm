@@ -12,11 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:blockmax_wand_iterator;
 
-import :stl;
 import :index_defines;
 import :doc_iterator;
 import :blockmax_leaf_iterator;

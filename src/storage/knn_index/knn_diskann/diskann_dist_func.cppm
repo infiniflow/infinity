@@ -12,11 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:diskann_dist_func;
 
-import :stl;
 import :search_top_1;
 import :infinity_exception;
 

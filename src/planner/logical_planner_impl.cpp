@@ -19,7 +19,6 @@ module;
 module infinity_core:logical_planner.impl;
 
 import :logical_planner;
-import :stl;
 import :bind_context;
 import :infinity_exception;
 import :query_binder;
@@ -968,9 +967,8 @@ Status LogicalPlanner::BuildDropSchema(const DropStatement *statement, std::shar
         }
     }
 
-    if (IsEqual(drop_schema_info->schema_name_, query_context_ptr_->schema_name())) {
-        Status status = Status::DroppingUsingDb(drop_schema_info->schema_name_);
-        RecoverableError(status);
+    if (drop_schema_info->schema_name_ == query_context_ptr_->schema_name()) {
+        RecoverableError(Status::DroppingUsingDb(drop_schema_info->schema_name_));
     }
 
     std::shared_ptr<std::string> schema_name_ptr = std::make_shared<std::string>(drop_schema_info->schema_name_);

@@ -26,7 +26,7 @@ module infinity_core:ut.test_tracer;
 
 import :ut.base_test;
 import :ut.crash_handler;
-import :stl;
+
 import :base_memindex;
 import :mem_index;
 import :memindex_tracer;

@@ -12,13 +12,9 @@
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
 
-module;
-
 module infinity_core:logical_index_scan.impl;
 
 import :logical_index_scan;
-
-import :stl;
 import :logical_node_type;
 import :logical_node;
 import :column_binding;

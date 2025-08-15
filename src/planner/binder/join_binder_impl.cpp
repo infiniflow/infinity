@@ -12,12 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:join_binder.impl;
 
 import :join_binder;
-import :stl;
 import :base_expression;
 import :bind_context;
 import :status;

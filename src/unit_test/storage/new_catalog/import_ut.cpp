@@ -20,7 +20,7 @@ module;
 module infinity_core:ut.import1;
 
 import :ut.base_test;
-import :stl;
+
 import third_party;
 import :status;
 import :new_catalog;

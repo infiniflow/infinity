@@ -1107,7 +1107,7 @@ std::unordered_set<std::string> MetaTree::GetDataVfsPathSet() {
 
 std::unordered_set<std::string> MetaTree::GetDataVfsOffPathSet() {
     std::unordered_set<std::string> data_path_set;
-    Path data_dir = InfinityContext::instance().config()->DataDir();
+    std::filesystem::path data_dir = InfinityContext::instance().config()->DataDir();
 
     for (const auto &entry : std::filesystem::recursive_directory_iterator{data_dir}) {
         if (entry.is_regular_file()) {

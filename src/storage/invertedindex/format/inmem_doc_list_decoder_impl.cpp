@@ -5,7 +5,6 @@ module;
 module infinity_core:inmem_doc_list_decoder.impl;
 
 import :inmem_doc_list_decoder;
-import :stl;
 import :posting_byte_slice;
 import :posting_byte_slice_reader;
 import :index_decoder;

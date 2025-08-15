@@ -24,7 +24,7 @@ module;
 module infinity_core:ut.fst;
 
 import :ut.base_test;
-import :stl;
+
 import :fst.writer;
 import :fst.fst;
 import :fst.build;

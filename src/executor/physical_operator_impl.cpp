@@ -12,12 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:physical_operator.impl;
 
 import :physical_operator;
-import :stl;
 import :physical_operator_type;
 import :default_values;
 import :operator_state;

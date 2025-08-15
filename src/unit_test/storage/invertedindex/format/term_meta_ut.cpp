@@ -13,7 +13,7 @@ module;
 module infinity_core:ut.term_meta;
 
 import :ut.base_test;
-import :stl;
+
 import :posting_byte_slice;
 import :posting_byte_slice_reader;
 import :term_meta;

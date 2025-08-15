@@ -1,9 +1,6 @@
-module;
-
 module infinity_core:cjk_segmenter.impl;
 
 import :cjk_segmenter;
-import :stl;
 import :hit;
 import :segmenter;
 import :analyze_context;

@@ -1,11 +1,8 @@
-module;
-
 module infinity_core:ik_dict.impl;
 
 import :ik_dict;
 import :ik_dict_segment;
 import :hit;
-import :stl;
 import :status;
 import :character_util;
 

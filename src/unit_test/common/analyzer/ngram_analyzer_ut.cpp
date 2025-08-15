@@ -24,7 +24,6 @@ module;
 module infinity_core:ut.ngram_analyzer;
 
 import :ut.base_test;
-import :stl;
 import :term;
 import :ngram_analyzer;
 import :standard_analyzer;

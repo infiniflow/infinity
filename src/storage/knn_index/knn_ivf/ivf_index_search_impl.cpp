@@ -12,12 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:ivf_index_search.impl;
 
 import :ivf_index_search;
-import :stl;
 import :index_ivf;
 import :knn_scan_data;
 import :infinity_exception;

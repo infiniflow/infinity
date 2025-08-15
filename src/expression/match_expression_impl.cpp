@@ -17,7 +17,7 @@ module;
 module infinity_core:match_expression.impl;
 
 import :match_expression;
-import :stl;
+
 import :logger;
 import :base_expression;
 import :expression_type;

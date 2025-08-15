@@ -5,7 +5,6 @@ module;
 module infinity_core:column_index_merger.impl;
 
 import :column_index_merger;
-import :stl;
 import :byte_slice;
 import :byte_slice_reader;
 import :file_reader;
@@ -47,7 +46,7 @@ void ColumnIndexMerger::Merge(const std::vector<std::string> &base_names, const 
     if (base_rowids.empty()) {
         return;
     }
-    Path path = Path(InfinityContext::instance().config()->DataDir()) / index_dir_ / dst_base_name;
+    std::filesystem::path path = std::filesystem::path(InfinityContext::instance().config()->DataDir()) / index_dir_ / dst_base_name;
     std::string index_prefix = path.string();
     std::string dict_file = index_prefix + DICT_SUFFIX;
     std::string fst_file = dict_file + ".fst";
@@ -63,7 +62,7 @@ void ColumnIndexMerger::Merge(const std::vector<std::string> &base_names, const 
     PersistenceManager *pm = InfinityContext::instance().persistence_manager();
     bool use_object_cache = pm != nullptr;
     if (use_object_cache) {
-        Path temp_dir = Path(InfinityContext::instance().config()->TempDir());
+        std::filesystem::path temp_dir = std::filesystem::path(InfinityContext::instance().config()->TempDir());
         tmp_dict_file = temp_dir / StringTransform(tmp_dict_file, "/", "_");
         tmp_posting_file = temp_dir / StringTransform(tmp_posting_file, "/", "_");
         tmp_column_length_file = temp_dir / StringTransform(tmp_column_length_file, "/", "_");
@@ -95,7 +94,8 @@ void ColumnIndexMerger::Merge(const std::vector<std::string> &base_names, const 
         unsafe_column_lengths.clear();
         PersistResultHandler handler(pm);
         for (u32 i = 0; i < base_names.size(); ++i) {
-            std::string column_len_file = Path(InfinityContext::instance().config()->DataDir()) / index_dir_ / (base_names[i] + LENGTH_SUFFIX);
+            std::string column_len_file =
+                std::filesystem::path(InfinityContext::instance().config()->DataDir()) / index_dir_ / (base_names[i] + LENGTH_SUFFIX);
             RowID base_row_id = base_rowids[i];
             u32 id_offset = base_row_id - merge_base_rowid;
 
@@ -123,7 +123,8 @@ void ColumnIndexMerger::Merge(const std::vector<std::string> &base_names, const 
             }
 
             if (use_object_cache) {
-                column_len_file = Path(InfinityContext::instance().config()->DataDir()) / index_dir_ / (base_names[i] + LENGTH_SUFFIX);
+                column_len_file =
+                    std::filesystem::path(InfinityContext::instance().config()->DataDir()) / index_dir_ / (base_names[i] + LENGTH_SUFFIX);
                 PersistWriteResult res = pm->PutObjCache(column_len_file);
                 handler.HandleWriteResult(res);
             }

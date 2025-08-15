@@ -12,13 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:explain_physical_plan.impl;
 
 import :explain_physical_plan;
 
-import :stl;
 import :physical_operator;
 import :physical_union_all;
 import :physical_index_scan;

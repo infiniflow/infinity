@@ -24,7 +24,6 @@ module;
 module infinity_core:ut.global_resource_usage;
 
 import :ut.base_test;
-import :stl;
 #endif
 
 import global_resource_usage;

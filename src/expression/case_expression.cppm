@@ -16,7 +16,7 @@ module;
 
 export module infinity_core:case_expression;
 
-import :stl;
+
 import :base_expression;
 
 import logical_type;

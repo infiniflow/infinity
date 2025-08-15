@@ -62,4 +62,25 @@ void ToUpper(std::string &str) {
 
 std::vector<std::string> SplitStrByComma(std::string str);
 
+template <typename T1, typename T2>
+struct CompareByFirst {
+    using P = std::pair<T1, T2>;
+
+    bool operator()(const P &lhs, const P &rhs) const { return lhs.first < rhs.first; }
+};
+
+template <typename T1, typename T2>
+struct CompareByFirstReverse {
+    using P = std::pair<T1, T2>;
+
+    bool operator()(const P &lhs, const P &rhs) const { return lhs.first > rhs.first; }
+};
+
+std::string TrimPath(const std::string &path) {
+    const auto pos = path.find("/src/");
+    if (pos == std::string::npos)
+        return path;
+    return path.substr(pos + 1);
+}
+
 } // namespace infinity

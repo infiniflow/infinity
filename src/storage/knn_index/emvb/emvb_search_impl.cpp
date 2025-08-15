@@ -19,7 +19,6 @@ module;
 module infinity_core:emvb_search.impl;
 
 import :emvb_search;
-import :stl;
 import :emvb_result_handler;
 import :simd_init;
 import :emvb_simd_funcs;

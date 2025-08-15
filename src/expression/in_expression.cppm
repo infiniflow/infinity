@@ -15,7 +15,7 @@ module;
 
 export module infinity_core:in_expression;
 
-import :stl;
+
 import :value;
 import :infinity_exception;
 import :base_expression;

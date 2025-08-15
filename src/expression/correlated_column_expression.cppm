@@ -16,7 +16,7 @@ module;
 
 export module infinity_core:correlated_column_expression;
 
-import :stl;
+
 import :base_expression;
 
 import internal_types;

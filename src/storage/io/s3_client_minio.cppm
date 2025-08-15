@@ -1,8 +1,5 @@
-module;
-
 export module infinity_core:s3_client_minio;
 
-import :stl;
 import :s3_client;
 
 import third_party;

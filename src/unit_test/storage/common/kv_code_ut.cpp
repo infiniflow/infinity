@@ -25,7 +25,6 @@ module infinity_core:ut.kv_code;
 
 import :ut.base_test;
 import :kv_code;
-import :stl;
 #endif
 
 using namespace infinity;

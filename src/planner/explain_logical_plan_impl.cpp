@@ -14,13 +14,9 @@
 
 module;
 
-#include <string>
-
 module infinity_core:explain_logical_plan.impl;
 
 import :explain_logical_plan;
-
-import :stl;
 import :logical_node;
 import :logical_create_schema;
 import :logical_create_table;

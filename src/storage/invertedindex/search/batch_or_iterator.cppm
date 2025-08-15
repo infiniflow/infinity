@@ -12,11 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:batch_or_iterator;
 
-import :stl;
 import :index_defines;
 import :doc_iterator;
 import :multi_doc_iterator;

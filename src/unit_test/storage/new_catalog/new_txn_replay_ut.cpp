@@ -21,7 +21,7 @@ module infinity_core:ut.new_txn_replay;
 
 import :ut.base_test;
 import :ut.replay_test;
-import :stl;
+
 import third_party;
 import :status;
 import :new_txn_manager;

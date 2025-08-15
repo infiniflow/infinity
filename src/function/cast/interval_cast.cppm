@@ -12,11 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:interval_cast;
 
-import :stl;
 import :column_vector;
 import :vector_buffer;
 import :bound_cast_func;

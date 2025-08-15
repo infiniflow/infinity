@@ -21,7 +21,6 @@ module;
 module infinity_core:physical_command.impl;
 
 import :physical_command;
-import :stl;
 import :query_context;
 import :operator_state;
 import :profiler;

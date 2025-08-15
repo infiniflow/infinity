@@ -22,7 +22,7 @@ module infinity_core:ut.kv_utility;
 import :ut.base_test;
 import :kv_utility;
 import :kv_code;
-import :stl;
+
 #else
 #include "gtest/gtest.h"
 import infinity_core;

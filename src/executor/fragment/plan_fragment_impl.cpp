@@ -12,12 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:plan_fragment.impl;
 
 import :plan_fragment;
-import :stl;
 import :physical_source;
 import :physical_sink;
 import :data_table;

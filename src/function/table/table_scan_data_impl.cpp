@@ -12,12 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:table_scan_data.impl;
 
 import :table_scan_function_data;
-import :stl;
 import :global_block_id;
 import :block_index;
 

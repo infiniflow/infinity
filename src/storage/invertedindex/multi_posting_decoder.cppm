@@ -1,8 +1,5 @@
-module;
-
 export module infinity_core:multi_posting_decoder;
 
-import :stl;
 import :byte_slice_reader;
 import :index_decoder;
 import :in_doc_pos_iterator;

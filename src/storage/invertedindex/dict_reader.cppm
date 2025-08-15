@@ -12,11 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:dict_reader;
 
-import :stl;
 import :term_meta;
 import :posting_list_format;
 import :fst.fst;

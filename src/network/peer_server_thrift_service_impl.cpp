@@ -12,12 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:peer_server_thrift_service.impl;
 
 import :peer_server_thrift_service;
-import :stl;
 import :logger;
 import :peer_server_thrift_types;
 import :infinity_context;

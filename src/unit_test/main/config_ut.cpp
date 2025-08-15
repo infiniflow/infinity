@@ -24,7 +24,6 @@ module;
 module infinity_core:ut.config;
 
 import :ut.base_test;
-import :stl;
 import :config;
 import :infinity_exception;
 import third_party;

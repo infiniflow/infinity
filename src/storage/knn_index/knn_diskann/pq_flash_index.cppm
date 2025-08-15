@@ -24,7 +24,6 @@ module;
 
 export module infinity_core:pq_flash_index;
 
-import :stl;
 import :logger;
 import :index_base;
 import :local_file_handle;
@@ -177,7 +176,7 @@ public:
                 std::vector<std::pair<u32, size_t *>> nbr_buffers;
                 for (size_t cur_pt = start; cur_pt < end; cur_pt++) {
                     nodes_to_read.push_back(nodes_to_expand[cur_pt]);
-                    nbr_buffers.emplace_back(MakePair(0, new size_t[max_degree_ + 1]));
+                    nbr_buffers.emplace_back(std::make_pair(0, new size_t[max_degree_ + 1]));
                 }
 
                 auto read_status = ReadNodes(nodes_to_read, coord_buffers, nbr_buffers);

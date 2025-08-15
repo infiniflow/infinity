@@ -12,12 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:expression_selector.impl;
 
 import :expression_selector;
-import :stl;
 import :data_block;
 import :base_expression;
 import :expression_state;

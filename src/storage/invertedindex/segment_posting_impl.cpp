@@ -12,12 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:segment_posting.impl;
 
 import :segment_posting;
-import :stl;
 import :byte_slice;
 import :posting_list_format;
 import :posting_writer;

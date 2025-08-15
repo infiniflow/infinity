@@ -24,7 +24,7 @@ module;
 module infinity_core:ut.recycle_log;
 
 import :ut.base_test;
-import :stl;
+
 import :storage;
 import :infinity_context;
 import :infinity_exception;

@@ -25,7 +25,6 @@ module infinity_core:ut.test_emvb;
 
 import :ut.base_test;
 import :infinity_exception;
-import :stl;
 import :emvb_search;
 import :emvb_product_quantization;
 import :emvb_shared_vec;

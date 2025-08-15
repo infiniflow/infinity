@@ -19,7 +19,6 @@ module;
 module infinity_core:traditional_chinese_analyzer.impl;
 
 import :traditional_chinese_analyzer;
-import :stl;
 import :chinese_analyzer;
 
 import std;

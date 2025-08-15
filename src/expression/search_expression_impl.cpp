@@ -17,7 +17,7 @@ module;
 module infinity_core:search_expression.impl;
 
 import :search_expression;
-import :stl;
+
 import :expression_type;
 import :scalar_function;
 import :match_expression;

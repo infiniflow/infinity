@@ -12,12 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:column_identifier.impl;
 
 import :column_identifier;
-import :stl;
 import :infinity_exception;
 import :status;
 import :query_context;
@@ -84,11 +81,11 @@ std::string ColumnIdentifier::ToString() const {
 bool ColumnIdentifier::operator==(const ColumnIdentifier &other) const {
     if (this == &other)
         return true;
-    if (IsEqual(*column_name_ptr_, *other.column_name_ptr_)) {
+    if (*column_name_ptr_ == *other.column_name_ptr_) {
         return false;
     }
     if (table_name_ptr_.get() != nullptr && other.table_name_ptr_.get() != nullptr) {
-        return IsEqual(*table_name_ptr_, *other.table_name_ptr_);
+        return *table_name_ptr_ == *other.table_name_ptr_;
     }
 
     if (table_name_ptr_.get() == nullptr && other.table_name_ptr_.get() == nullptr) {

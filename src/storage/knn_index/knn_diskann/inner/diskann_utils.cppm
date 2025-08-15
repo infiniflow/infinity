@@ -18,7 +18,6 @@ module;
 
 export module infinity_core:diskann_utils;
 
-import :stl;
 import :default_values;
 import :status;
 import :local_file_handle;

@@ -12,12 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:physical_planner.impl;
 
 import :physical_planner;
-import :stl;
 import :physical_operator;
 import :physical_operator_type;
 import :physical_aggregate;

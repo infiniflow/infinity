@@ -12,12 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:logical_view_scan.impl;
 
 import :logical_view_scan;
-import :stl;
 import :column_binding;
 import :base_expression;
 import :view;

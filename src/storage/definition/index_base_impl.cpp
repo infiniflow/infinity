@@ -12,12 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:index_base.impl;
 
 import :index_base;
-import :stl;
 import :index_ivf;
 import :index_hnsw;
 import :index_diskann;

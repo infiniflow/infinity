@@ -32,7 +32,7 @@ import :column_vector;
 import :value;
 import :default_values;
 import third_party;
-import :stl;
+
 import :infinity_context;
 import :selection;
 import :vector_buffer;

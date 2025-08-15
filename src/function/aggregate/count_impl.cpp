@@ -12,12 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:count.impl;
 
 import :count;
-import :stl;
 import :new_catalog;
 import :infinity_exception;
 import :aggregate_function;

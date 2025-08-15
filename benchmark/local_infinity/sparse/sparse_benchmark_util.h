@@ -16,7 +16,7 @@
 
 #include "CLI11.hpp"
 
-import :stl;
+
 import :virtual_store;
 import :infinity_exception;
 import third_party;

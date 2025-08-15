@@ -7,7 +7,6 @@ module;
 
 export module infinity_core:mmap;
 
-import :stl;
 import :infinity_exception;
 
 import std.compat;

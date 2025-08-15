@@ -12,12 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:darts_trie.impl;
 
 import :darts_trie;
-import :stl;
 import :darts;
 import :status;
 

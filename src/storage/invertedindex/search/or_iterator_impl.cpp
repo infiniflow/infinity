@@ -19,7 +19,6 @@ module;
 module infinity_core:or_iterator.impl;
 
 import :or_iterator;
-import :stl;
 import :index_defines;
 import :multi_doc_iterator;
 import :doc_iterator;

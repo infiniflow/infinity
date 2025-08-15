@@ -12,12 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:bound_insert_statement.impl;
 
 import :bound_insert_statement;
-import :stl;
 import :logical_insert;
 import :base_table_ref;
 import :logical_node;

@@ -12,12 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:table_function_set;
 
 import :function_set;
-import :stl;
 import :table_function;
 import :function;
 
