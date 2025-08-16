@@ -15,12 +15,12 @@
 module;
 
 #include <cassert>
+#include <memory>
 #include <optional>
 #include <sstream>
 #include <string>
 #include <tuple>
 #include <vector>
-#include <memory>
 
 module infinity_core:logical_planner.impl;
 
@@ -1879,6 +1879,23 @@ Status LogicalPlanner::BuildShow(ShowStatement *statement, SharedPtr<BindContext
                                                           None,
                                                           None,
                                                           statement->function_name_);
+            break;
+        }
+        case ShowStmtType::kListCaches: {
+            this->logical_plan_ = MakeShared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
+                                                          ShowStmtType::kListCaches,
+                                                          "",
+                                                          None,
+                                                          bind_context_ptr->GenerateTableIndex(),
+                                                          None,
+                                                          None,
+                                                          None,
+                                                          None,
+                                                          None,
+                                                          None,
+                                                          None,
+                                                          None,
+                                                          None);
             break;
         }
         default: {

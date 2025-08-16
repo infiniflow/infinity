@@ -86,6 +86,7 @@ import :chunk_index_meta;
 import :new_txn_manager;
 import :kv_store;
 import :meta_tree;
+import :meta_cache;
 import show_statement;
 import column_def;
 import data_type;
@@ -603,6 +604,19 @@ void PhysicalShow::Init(QueryContext *query_context) {
             output_types_->emplace_back(varchar_type);
             break;
         }
+        case ShowStmtType::kListCaches: {
+            output_names_->reserve(4);
+            output_types_->reserve(4);
+            output_names_->emplace_back("type");
+            output_names_->emplace_back("name");
+            output_names_->emplace_back("commit_ts");
+            output_names_->emplace_back("detail");
+            output_types_->emplace_back(varchar_type);
+            output_types_->emplace_back(varchar_type);
+            output_types_->emplace_back(bigint_type);
+            output_types_->emplace_back(varchar_type);
+            break;
+        }
         default: {
             Status status = Status::NotSupport("Not implemented show type");
             RecoverableError(status);
@@ -777,6 +791,10 @@ bool PhysicalShow::Execute(QueryContext *query_context, OperatorState *operator_
         }
         case ShowStmtType::kShowSnapshot: {
             ExecuteShowSnapshot(query_context, show_operator_state);
+            break;
+        }
+        case ShowStmtType::kListCaches: {
+            ExecuteListCaches(query_context, show_operator_state);
             break;
         }
         default: {
@@ -6477,6 +6495,64 @@ void PhysicalShow::ExecuteShowSnapshot(QueryContext *query_context, ShowOperator
             Value value = Value::MakeVarchar(snapshot_size_str);
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+    }
+
+    output_block_ptr->Finalize();
+    operator_state->output_.emplace_back(std::move(output_block_ptr));
+    return;
+}
+
+void PhysicalShow::ExecuteListCaches(QueryContext *query_context, ShowOperatorState *operator_state) {
+    auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
+    UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
+    Storage *storage = query_context->storage();
+    MetaCache *meta_cache = storage->meta_cache();
+    Vector<SharedPtr<MetaBaseCache>> cache_items = meta_cache->GetAllCacheItems();
+
+    output_block_ptr->Init(*output_types_);
+
+    SizeT row_count = 0;
+    for (auto &cache_item : cache_items) {
+        if (output_block_ptr.get() == nullptr) {
+            output_block_ptr = DataBlock::MakeUniquePtr();
+            output_block_ptr->Init(*output_types_);
+        }
+
+        {
+            // name
+            Value value = Value::MakeVarchar(cache_item->name());
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+        }
+
+        {
+            // cache type
+            Value value = Value::MakeVarchar(cache_item->type());
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+        }
+
+        {
+            // commit ts
+            Value value = Value::MakeBigInt(cache_item->commit_ts());
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+        }
+
+        {
+            // detailed info
+            Value value = Value::MakeVarchar(cache_item->detail());
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[3]);
+        }
+
+        ++row_count;
+        if (row_count == output_block_ptr->capacity()) {
+            output_block_ptr->Finalize();
+            operator_state->output_.emplace_back(std::move(output_block_ptr));
+            output_block_ptr = nullptr;
+            row_count = 0;
         }
     }
 

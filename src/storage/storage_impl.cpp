@@ -58,6 +58,7 @@ import global_resource_usage;
 import :txn_state;
 import :mem_index_appender;
 import :catalog_cache;
+import :meta_cache;
 
 import :wal_entry;
 
@@ -211,6 +212,8 @@ Status Storage::AdminToReader() {
                                             config_ptr_->LRUNum());
     buffer_mgr_->Start();
 
+    meta_cache_ = MakeUnique<MetaCache>(DEFAULT_META_CACHE_SIZE);
+
     LOG_INFO("No checkpoint found in READER mode, waiting for log replication");
     reader_init_phase_ = ReaderInitPhase::kPhase1;
     return Status::OK();
@@ -256,6 +259,8 @@ Status Storage::AdminToWriter() {
                                             persistence_manager_.get(),
                                             config_ptr_->LRUNum());
     buffer_mgr_->Start();
+
+    meta_cache_ = MakeUnique<MetaCache>(DEFAULT_META_CACHE_SIZE);
 
     // Must init catalog before txn manager.
     // Replay wal file wrap init catalog
@@ -442,6 +447,10 @@ Status Storage::UnInitFromReader() {
             }
         }
 
+        if (meta_cache_ != nullptr) {
+            meta_cache_.reset();
+        }
+
         if (buffer_mgr_ != nullptr) {
             buffer_mgr_->Stop();
             buffer_mgr_.reset();
@@ -552,6 +561,10 @@ Status Storage::WriterToAdmin() {
     if (new_txn_mgr_ != nullptr) {
         new_txn_mgr_->Stop();
         new_txn_mgr_.reset();
+    }
+
+    if (meta_cache_ != nullptr) {
+        meta_cache_.reset();
     }
 
     if (buffer_mgr_ != nullptr) {
@@ -665,6 +678,10 @@ Status Storage::UnInitFromWriter() {
         new_txn_mgr_.reset();
     }
     kv_store_.reset();
+
+    if (meta_cache_ != nullptr) {
+        meta_cache_.reset();
+    }
 
     if (buffer_mgr_ != nullptr) {
         buffer_mgr_->Stop();
@@ -823,7 +840,7 @@ Status Storage::AdminToReaderBottom(TxnTimeStamp system_start_ts) {
 void Storage::AttachCatalog(TxnTimeStamp checkpoint_ts) {
     auto kv_instance = this->KVInstance();
 
-    Status status = NewCatalog::InitCatalog(kv_instance.get(), checkpoint_ts);
+    Status status = NewCatalog::InitCatalog(meta_cache_.get(), kv_instance.get(), checkpoint_ts);
     if (!status.ok()) {
         UnrecoverableError(fmt::format("Init catalog failed: {}", status.message()));
     }

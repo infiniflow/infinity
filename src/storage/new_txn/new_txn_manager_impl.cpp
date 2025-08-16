@@ -43,6 +43,7 @@ import :txn_allocator_task;
 import :storage;
 import :catalog_cache;
 import :base_txn_store;
+import :meta_cache;
 
 namespace infinity {
 
@@ -231,6 +232,21 @@ bool NewTxnManager::CheckConflict1(NewTxn *txn, String &conflict_reason, bool &r
 
     Vector<SharedPtr<NewTxn>> check_txns = GetCheckCandidateTxns(txn);
     LOG_DEBUG(fmt::format("CheckConflict1:: Txn {} check conflict with check_txns {}", txn->TxnID(), check_txns.size()));
+
+    // For read-only txn check if previous txn is writable txn. If so, remove the items to cache.
+    if ((txn->GetTxnStore() == nullptr && !txn->IsReplay()) or txn->txn_type() == TxnType::kReadOnly) {
+        for (const auto &check_txn : check_txns) {
+            if ((check_txn->GetTxnStore() == nullptr && !check_txn->IsReplay()) or check_txn->txn_type() == TxnType::kReadOnly) {
+                // Read only txn
+                continue;
+            } else {
+                // Writable Txn
+                txn->ResetMetaCache();
+                break;
+            }
+        }
+    }
+
     for (SharedPtr<NewTxn> &check_txn : check_txns) {
         if (txn->CheckConflictTxnStores(check_txn, conflict_reason, retry_query)) {
             return true;
@@ -434,11 +450,39 @@ void NewTxnManager::CommitBottom(NewTxn *txn) {
 }
 
 void NewTxnManager::CommitKVInstance(NewTxn *txn) {
-    Status status = txn->kv_instance_->Commit();
-    if (!status.ok()) {
-        UnrecoverableError(fmt::format("Commit kv_instance: {}", status.message()));
-    }
+    // Generate meta cache items
+    txn->GetTxnStore();
+
     TxnTimeStamp commit_ts = txn->CommitTS();
+    // Put meta cache items with kv_instance
+    WalEntry *wal_entry = txn->GetWALEntry();
+    Vector<SharedPtr<EraseBaseCache>> items_to_erase;
+    for (const auto &cmd : wal_entry->cmds_) {
+        Vector<SharedPtr<EraseBaseCache>> items_to_erase_part = cmd->ToCachedMeta(commit_ts);
+        items_to_erase.insert(items_to_erase.end(), items_to_erase_part.begin(), items_to_erase_part.end());
+    }
+
+    MetaCache *meta_cache_ptr = this->storage_->meta_cache();
+    Status status = meta_cache_ptr->Erase(items_to_erase, txn->kv_instance_.get());
+    if (!status.ok()) {
+        UnrecoverableError(fmt::format("Put cache: {}", status.message()));
+    }
+
+    //    BaseTxnStore *base_txn_store = txn->GetTxnStore();
+    //    if (base_txn_store != nullptr) {
+    //        Vector<SharedPtr<EraseBaseCache>> items_to_erase = txn->GetTxnStore()->ToCachedMeta(commit_ts);
+    //        MetaCache *meta_cache_ptr = this->storage_->meta_cache();
+    //        Status status = meta_cache_ptr->Erase(items_to_erase, txn->kv_instance_.get());
+    //        if (!status.ok()) {
+    //            UnrecoverableError(fmt::format("Put cache: {}", status.message()));
+    //        }
+    //    } else {
+    //        Status status = txn->kv_instance_->Commit();
+    //        if (!status.ok()) {
+    //            UnrecoverableError(fmt::format("Commit kv_instance: {}", status.message()));
+    //        }
+    //    }
+
     TxnTimeStamp kv_commit_ts;
     {
         std::lock_guard guard(locker_);

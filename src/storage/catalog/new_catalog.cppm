@@ -60,6 +60,7 @@ class DbCache;
 class SystemCache;
 class FunctionSet;
 class SpecialFunction;
+class MetaCache;
 
 enum class ColumnVectorMode;
 
@@ -236,7 +237,7 @@ private:
     Atomic<TxnTimeStamp> last_cleanup_ts_{0};
 
 public:
-    static Status InitCatalog(KVInstance *kv_instance, TxnTimeStamp checkpoint_ts);
+    static Status InitCatalog(MetaCache *meta_cache, KVInstance *kv_instance, TxnTimeStamp checkpoint_ts);
 
     static Status MemIndexRecover(NewTxn *txn);
 

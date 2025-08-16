@@ -25,11 +25,12 @@ namespace infinity {
 class KVInstance;
 struct DatabaseInfo;
 class NewTxn;
+class MetaCache;
 
 export class DBMeeta {
 public:
     DBMeeta(String db_id_str, NewTxn *txn);
-    DBMeeta(String db_id_str, KVInstance *kv_instance);
+    DBMeeta(String db_id_str, KVInstance *kv_instance, MetaCache *meta_cache);
 
     const String &db_id_str() const;
 
@@ -41,7 +42,7 @@ public:
 
     Status GetTableIDs(Vector<String> *&table_id_strs, Vector<String> **table_names = nullptr);
 
-    Status GetTableID(const String &table_name, String &table_key, String &table_id_str, TxnTimeStamp& create_table_ts);
+    Status GetTableID(const String &table_name, String &table_key, String &table_id_str, TxnTimeStamp &create_table_ts);
 
     Tuple<SharedPtr<DatabaseInfo>, Status> GetDatabaseInfo();
 
@@ -65,6 +66,7 @@ private:
     NewTxn *txn_{};
     TxnTimeStamp txn_begin_ts_{};
     KVInstance *kv_instance_{};
+    MetaCache *meta_cache_{};
 
     Optional<String> comment_;
     Optional<Vector<String>> table_id_strs_;

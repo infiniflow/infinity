@@ -47,6 +47,7 @@ import :chunk_index_meta;
 import :mem_index;
 import :scalar_function_set;
 import :special_function;
+import :meta_cache;
 
 import logical_type;
 import data_type;
@@ -120,11 +121,11 @@ Optional<BlockOffset> NewTxnBlockVisitor::Next() {
     return cur_++;
 }
 
-Status NewCatalog::InitCatalog(KVInstance *kv_instance, TxnTimeStamp checkpoint_ts) {
+Status NewCatalog::InitCatalog(MetaCache *meta_cache, KVInstance *kv_instance, TxnTimeStamp checkpoint_ts) {
     Status status;
 
     Vector<String> *db_id_strs_ptr;
-    CatalogMeta catalog_meta(kv_instance);
+    CatalogMeta catalog_meta(kv_instance, meta_cache);
     status = catalog_meta.GetDBIDs(db_id_strs_ptr);
     if (!status.ok()) {
         return status;
@@ -241,7 +242,7 @@ Status NewCatalog::InitCatalog(KVInstance *kv_instance, TxnTimeStamp checkpoint_
         return Status::OK();
     };
     auto InitDB = [&](const String &db_id_str) {
-        DBMeeta db_meta(db_id_str, kv_instance);
+        DBMeeta db_meta(db_id_str, kv_instance, meta_cache);
 
         Vector<String> *table_id_strs_ptr = nullptr;
         status = db_meta.GetTableIDs(table_id_strs_ptr);

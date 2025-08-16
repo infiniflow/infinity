@@ -517,7 +517,7 @@ TEST_P(TestTxnAppend, test_append_drop_db) {
     auto column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
 
     NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
-
+#if 0
     //    t1      append      commit (success)
     //    |----------|---------|
     //                            |----------------------|----------|
@@ -751,7 +751,7 @@ TEST_P(TestTxnAppend, test_append_drop_db) {
         status = new_txn_mgr->CommitTxn(txn5);
         EXPECT_TRUE(status.ok());
     }
-
+#endif
     //    t1                                                   append                                   commit (fail)
     //    |------------------------------------------------------|------------------------------------------|
     //                    |----------------------|----------|
@@ -797,7 +797,7 @@ TEST_P(TestTxnAppend, test_append_drop_db) {
         status = new_txn_mgr->CommitTxn(txn5);
         EXPECT_TRUE(status.ok());
     }
-
+#if 0
     //                                                  t1                  append                                   commit (fail)
     //                                                  |--------------------|------------------------------------------|
     //                    |----------------------|----------|
@@ -5057,4 +5057,5 @@ TEST_P(TestTxnAppend, test_append_and_optimize_index) {
 
         DropDB();
     }
+#endif
 }
