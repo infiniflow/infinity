@@ -1512,7 +1512,16 @@ Status NewTxn::OptimizeVecIndex(SharedPtr<IndexBase> index_base,
             if (!status.ok()) {
                 return status;
             }
-            ColumnMeta column_meta(column_def->id(), block_meta);
+            // get column_idx
+            TableInfo table_info;
+            Status status = segment_meta.table_meta().GetTableInfo(table_info);
+            if (!status.ok()) {
+                LOG_ERROR("Failed to get table info from segment meta");
+                return status;
+            }
+
+            SizeT col_idx = table_info.GetColumnIdxByID(column_def->id());
+            ColumnMeta column_meta(col_idx, block_meta);
             SizeT row_cnt = std::min(block_row_cnt, SizeT(total_row_cnt));
             total_row_cnt -= row_cnt;
             ColumnVector col;
@@ -1937,7 +1946,19 @@ Status NewTxn::GetFullTextIndexReader(const String &db_name, const String &table
     SharedPtr<TableIndexReaderCache> ft_index_cache;
     status = table_meta->GetFtIndexCache(ft_index_cache);
     if (!status.ok()) {
-        return status;
+        // Add cache if not exist
+        if (status.code() == ErrorCode::kCatalogError) {
+            ft_index_cache = MakeShared<TableIndexReaderCache>(table_meta->db_id_str(), table_meta->table_id_str());
+            status = table_meta->AddFtIndexCache(ft_index_cache);
+            if (status.code() == ErrorCode::kCatalogError) {
+                status = table_meta->GetFtIndexCache(ft_index_cache);
+                if (!status.ok()) {
+                    return status;
+                }
+            }
+        } else {
+            return status;
+        }
     }
     index_reader = ft_index_cache->GetIndexReader(this);
     return Status::OK();

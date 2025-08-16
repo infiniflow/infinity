@@ -12,7 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module infinity_core:database_snapshot.impl;
+module;
+
+module infinity_core:system_snapshot.impl;
 
 import :snapshot;
 
@@ -32,36 +34,25 @@ import :logger;
 
 namespace infinity {
 
-Status Snapshot::RestoreDatabaseSnapshot(QueryContext *query_context, const String &snapshot_name) {
+Status Snapshot::RestoreSystemSnapshot(QueryContext *query_context, const String &snapshot_name) {
     auto *txn_ptr = query_context->GetNewTxn();
     String snapshot_dir = query_context->global_config()->SnapshotDir();
 
-    SharedPtr<DatabaseSnapshotInfo> database_snapshot;
+    SharedPtr<SystemSnapshotInfo> system_snapshot;
     Status status;
-    std::tie(database_snapshot, status) = DatabaseSnapshotInfo::Deserialize(snapshot_dir, snapshot_name);
+    std::tie(system_snapshot, status) = SystemSnapshotInfo::Deserialize(snapshot_dir, snapshot_name);
     if (!status.ok()) {
         return status;
     }
 
     // check txn_type
     LOG_TRACE(fmt::format("txn type: {}", TransactionType2Str(txn_ptr->GetTxnType())));
-    // if (txn_ptr->GetTxnType() != TransactionType::kRestoreTable) {
-    //     return Status::InvalidArgument("Txn type is not RestoreTable");
-    // }
 
-    status = txn_ptr->RestoreDatabaseSnapshot(database_snapshot);
+    status = txn_ptr->RestoreSystemSnapshot(system_snapshot);
     if (!status.ok()) {
         return status;
     }
 
-    // print txn state
-    // LOG_INFO(fmt::format("txn state: {}", TxnState2Str(txn_ptr->GetTxnState())));
-    // txn_ptr->Commit();
-    // LOG_INFO(fmt::format("txn state: {}", TxnState2Str(txn_ptr->GetTxnState())));
-    //    if(!status.ok()) {
-    //        return status;
-    //    }
-    //    txn_ptr->ApplyTableSnapshot(table_snapshot);
     return Status::OK();
 }
 

@@ -25,8 +25,6 @@ import column_def;
 import :meta_info;
 import row_id;
 
-
-
 namespace infinity {
 
 export struct SnapshotInfo {
@@ -34,7 +32,13 @@ export struct SnapshotInfo {
     String snapshot_name_;
     SnapshotScope scope_;
     SizeT version_{1}; // version 1, start from 0.6.0
-    Status RestoreSnapshotFiles(const String& snapshot_dir, const String& snapshot_name, const Vector<String>& files_to_restore, const String& new_table_id_str, const String& new_db_id_str, Vector<String>& restored_file_paths, bool ignore_table_id = false);
+    Status RestoreSnapshotFiles(const String &snapshot_dir,
+                                const String &snapshot_name,
+                                const Vector<String> &files_to_restore,
+                                const String &new_table_id_str,
+                                const String &new_db_id_str,
+                                Vector<String> &restored_file_paths,
+                                bool ignore_table_id = false);
 };
 
 export struct OutlineSnapshotInfo {
@@ -149,6 +153,16 @@ export struct DatabaseSnapshotInfo : public SnapshotInfo {
     String ToString() const;
     nlohmann::json CreateSnapshotMetadataJSON() const;
     static Tuple<SharedPtr<DatabaseSnapshotInfo>, Status> Deserialize(const String &snapshot_dir, const String &snapshot_name);
+    static Tuple<SharedPtr<DatabaseSnapshotInfo>, Status> Deserialize(const nlohmann::json &snapshot_meta_json);
+};
+
+export struct SystemSnapshotInfo : public SnapshotInfo {
+    Vector<SharedPtr<DatabaseSnapshotInfo>> database_snapshots_{};
+    Vector<String> GetFiles() const;
+    Status Serialize(const String &save_path, TxnTimeStamp commit_ts);
+    String ToString() const;
+    nlohmann::json CreateSnapshotMetadataJSON() const;
+    static Tuple<SharedPtr<SystemSnapshotInfo>, Status> Deserialize(const String &snapshot_dir, const String &snapshot_name);
 };
 
 } // namespace infinity

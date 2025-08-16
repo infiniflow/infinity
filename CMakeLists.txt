@@ -43,6 +43,7 @@ if (CI)
     add_definitions(-DCI=1)
 endif ()
 
+
 message(STATUS "CXX: ${CMAKE_CXX_COMPILER}")
 execute_process(COMMAND ${CMAKE_CXX_COMPILER} --version OUTPUT_VARIABLE clang_full_version_string)
 string(REGEX REPLACE ".*clang version ([0-9]+\\.[0-9]+).*" "\\1" CLANG_VERSION_STRING ${clang_full_version_string})
@@ -106,6 +107,7 @@ find_library(STDCXX15EXP_STATIC
 get_filename_component(GCC15_LIB_DIR ${STDCXX15_STATIC} DIRECTORY)
 
 set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -L${GCC15_LIB_DIR} -static-libstdc++ -static-libgcc")
+
 
 find_package(absl CONFIG REQUIRED)
 find_package(Arrow CONFIG REQUIRED)

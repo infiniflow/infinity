@@ -29,6 +29,7 @@ import internal_types;
 import :persistence_manager;
 import column_def;
 import global_resource_usage;
+import command_statement;
 
 namespace infinity {
 
@@ -96,9 +97,10 @@ export enum class WalCommandType : i8 {
     // -----------------------------
     // Snapshot
     // -----------------------------
-    CREATE_TABLE_SNAPSHOT = 110,
+    CREATE_SNAPSHOT = 110,
     RESTORE_TABLE_SNAPSHOT = 111,
     RESTORE_DATABASE_SNAPSHOT = 112,
+    RESTORE_SYSTEM_SNAPSHOT = 113,
     // -----------------------------
     // Other
     // -----------------------------
@@ -327,6 +329,7 @@ export struct WalCmdDropDatabaseV2 final : public WalCmd {
     void WriteAdv(char *&buf) const final;
     String ToString() const final;
     String CompactInfo() const final;
+    static WalCmdDropDatabaseV2 ReadBufferAdv(const char *&ptr, i32 max_bytes);
 
     String db_name_{};
     String db_id_{};
@@ -1114,7 +1117,7 @@ export struct WalCmdDropColumnsV2 : public WalCmd {
 };
 
 export struct WalCmdCleanup : public WalCmd {
-    WalCmdCleanup(i64 timestamp) : WalCmd(WalCommandType::CLEANUP), timestamp_(timestamp) {};
+    WalCmdCleanup(i64 timestamp) : WalCmd(WalCommandType::CLEANUP), timestamp_(timestamp){};
     ~WalCmdCleanup() override = default;
 
     bool operator==(const WalCmd &other) const final;
@@ -1126,22 +1129,26 @@ export struct WalCmdCleanup : public WalCmd {
     i64 timestamp_{};
 };
 
-export struct WalCmdCreateTableSnapshot : public WalCmd {
-    WalCmdCreateTableSnapshot(const String &db_name, const String &table_name, const String &snapshot_name, TxnTimeStamp max_commit_ts)
-        : WalCmd(WalCommandType::CREATE_TABLE_SNAPSHOT), db_name_(db_name), table_name_(table_name), snapshot_name_(snapshot_name),
-          max_commit_ts_(max_commit_ts) {}
+export struct WalCmdCreateSnapshot : public WalCmd {
+    WalCmdCreateSnapshot(const String &db_name,
+                         const String &table_name,
+                         const String &snapshot_name,
+                         TxnTimeStamp max_commit_ts,
+                         SnapshotScope snapshot_type)
+        : WalCmd(WalCommandType::CREATE_SNAPSHOT), db_name_(db_name), table_name_(table_name), snapshot_name_(snapshot_name),
+          max_commit_ts_(max_commit_ts), snapshot_type_(snapshot_type) {}
 
     bool operator==(const WalCmd &other) const final;
     [[nodiscard]] i32 GetSizeInBytes() const final;
     void WriteAdv(char *&buf) const final;
     String ToString() const final;
     String CompactInfo() const final;
-    static WalCmdCreateTableSnapshot ReadBufferAdv(const char *&ptr, i32 max_bytes);
 
     String db_name_{};
     String table_name_{};
     String snapshot_name_{};
     TxnTimeStamp max_commit_ts_{};
+    SnapshotScope snapshot_type_{};
 };
 
 export struct WalCmdRestoreTableSnapshot : public WalCmd {
@@ -1201,12 +1208,31 @@ export struct WalCmdRestoreDatabaseSnapshot : public WalCmd {
     void WriteAdv(char *&buf) const final;
     String ToString() const final;
     String CompactInfo() const final;
+    static WalCmdRestoreDatabaseSnapshot ReadBufferAdv(const char *&ptr, i32 max_bytes);
 
     String db_name_{};
     String db_id_str_{};
     String db_comment_{};
 
     Vector<WalCmdRestoreTableSnapshot> restore_table_wal_cmds_{};
+};
+
+export struct WalCmdRestoreSystemSnapshot : public WalCmd {
+    WalCmdRestoreSystemSnapshot(const String &snapshot_name,
+                                const Vector<WalCmdRestoreDatabaseSnapshot> &restore_database_wal_cmds,
+                                const Vector<WalCmdDropDatabaseV2> &drop_database_wal_cmds)
+        : WalCmd(WalCommandType::RESTORE_SYSTEM_SNAPSHOT), snapshot_name_(snapshot_name), restore_database_wal_cmds_(restore_database_wal_cmds),
+          drop_database_wal_cmds_(drop_database_wal_cmds) {}
+
+    bool operator==(const WalCmd &other) const final;
+    [[nodiscard]] i32 GetSizeInBytes() const final;
+    void WriteAdv(char *&buf) const final;
+    String ToString() const final;
+    String CompactInfo() const final;
+
+    String snapshot_name_{};
+    Vector<WalCmdRestoreDatabaseSnapshot> restore_database_wal_cmds_{};
+    Vector<WalCmdDropDatabaseV2> drop_database_wal_cmds_{};
 };
 
 export struct WalEntryHeader {

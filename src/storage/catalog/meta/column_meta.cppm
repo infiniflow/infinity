@@ -61,7 +61,7 @@ public:
 
     Tuple<SharedPtr<BlockColumnSnapshotInfo>, Status> MapMetaToSnapShotInfo();
 
-    Status RestoreFromSnapshot(ColumnID column_id);
+    Status RestoreFromSnapshot(SizeT column_idx);
 
 private:
     Status GetColumnBuffer(BufferObj *&column_buffer, BufferObj *&outline_buffer, const ColumnDef *column_def);

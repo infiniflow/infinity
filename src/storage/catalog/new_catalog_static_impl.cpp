@@ -508,6 +508,28 @@ Status NewCatalog::AddNewTable(DBMeeta &db_meta,
     return status;
 }
 
+Status NewCatalog::RestoreTable(DBMeeta &db_meta,
+                                const String &table_id_str,
+                                TxnTimeStamp begin_ts,
+                                TxnTimeStamp commit_ts,
+                                const SharedPtr<TableDef> &table_def,
+                                Optional<TableMeeta> &table_meta) {
+    // Create table a key value pair
+    KVInstance *kv_instance = db_meta.kv_instance();
+    String table_key = KeyEncode::CatalogTableKey(db_meta.db_id_str(), *table_def->table_name(), commit_ts);
+    Status status = kv_instance->Put(table_key, table_id_str);
+    if (!status.ok()) {
+        return status;
+    }
+
+    table_meta.emplace(db_meta.db_id_str(), table_id_str, kv_instance, begin_ts, commit_ts);
+    status = table_meta->RestoreSet(table_def);
+    if (!status.ok()) {
+        return status;
+    }
+    return status;
+}
+
 Status NewCatalog::CleanTable(TableMeeta &table_meta, TxnTimeStamp begin_ts, UsageFlag usage_flag) {
     LOG_TRACE(fmt::format("CleanTable: cleaning table_id: {}", table_meta.table_id_str()));
 
@@ -779,8 +801,8 @@ Status NewCatalog::LoadImportedOrCompactedSegment(TableMeeta &table_meta, const 
                 return status;
             }
         }
-        for (const auto &column_def : *column_defs_ptr) {
-            ColumnMeta column_meta(column_def->id(), *block_meta);
+        for (SizeT column_idx = 0; column_idx < column_defs_ptr->size(); ++column_idx) {
+            ColumnMeta column_meta(column_idx, *block_meta);
             status = column_meta.LoadSet();
             if (!status.ok()) {
                 return status;
@@ -932,8 +954,9 @@ Status NewCatalog::CleanBlock(BlockMeta &block_meta, UsageFlag usage_flag) {
         return status;
     }
 
-    for (const auto &column_def : *column_defs_ptr) {
-        ColumnMeta column_meta(column_def->id(), block_meta);
+    for (SizeT column_idx = 0; column_idx < column_defs_ptr->size(); ++column_idx) {
+        ColumnMeta column_meta(column_idx, block_meta);
+        const auto &column_def = (*column_defs_ptr)[column_idx];
         status = NewCatalog::CleanBlockColumn(column_meta, column_def.get(), usage_flag);
         if (!status.ok()) {
             return status;

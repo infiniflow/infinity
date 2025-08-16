@@ -551,6 +551,15 @@ class database_http:
         self.net.raise_exception(r)
         return database_result()
 
+    def rename_table(self, old_name, new_name):
+        """Rename a table"""
+        url = f"databases/{self.database_name}/tables/{old_name}/rename"
+        h = self.net.set_up_header(["accept", "content-type"])
+        d = {"new_name": new_name}
+        r = self.net.request(url, "put", h, d)
+        self.net.raise_exception(r)
+        return database_result()
+
 
 class table_http:
     def __init__(self, net: http_network_util, database_name: str, table_name: str):
