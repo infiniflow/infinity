@@ -13,13 +13,13 @@
 // limitations under the License.
 
 #ifdef CI
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 import infinity_core;
 import base_test;
 #else
 module;
 
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 
 module infinity_core:ut.posting_writer;
 
@@ -48,14 +48,14 @@ public:
 
     void SetUp() override {
         BaseTestParamStr::SetUp();
-        file_ = String(GetFullTmpDir()) + "/posting_writer";
+        file_ = std::string(GetFullTmpDir()) + "/posting_writer";
     }
 
 protected:
-    String file_;
+    std::string file_;
     optionflag_t flag_{OPTION_FLAG_ALL};
     PostingFormat posting_format_{flag_};
-    String config_path_{};
+    std::string config_path_{};
 };
 
 INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
@@ -63,7 +63,7 @@ INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
                          ::testing::Values(BaseTestParamStr::NULL_CONFIG_PATH, BaseTestParamStr::VFS_OFF_CONFIG_PATH));
 
 TEST_P(PostingWriterTest, test1) {
-    Vector<docid_t> expected = {1, 3, 5, 7, 9};
+    std::vector<docid_t> expected = {1, 3, 5, 7, 9};
     VectorWithLock<u32> column_length_array(20, 10);
     {
         std::shared_ptr<PostingWriter> posting = std::make_shared<PostingWriter>(posting_format_, column_length_array);
@@ -93,7 +93,7 @@ TEST_P(PostingWriterTest, test1) {
             posting->EndDocument(docid, 0);
         }
 
-        std::shared_ptr<Vector<SegmentPosting>> seg_postings = std::make_shared<Vector<SegmentPosting>>();
+        std::shared_ptr<std::vector<SegmentPosting>> seg_postings = std::make_shared<std::vector<SegmentPosting>>();
         SegmentPosting seg_posting;
         RowID base_row_id = 0;
         seg_posting.Init(base_row_id, posting);

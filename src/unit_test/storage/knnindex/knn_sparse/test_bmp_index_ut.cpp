@@ -13,15 +13,15 @@
 // limitations under the License.
 
 #ifdef CI
+#include "unit_test/gtest_expand.h"
 #include <cassert>
-#include "gtest/gtest.h"
 import infinity_core;
 import base_test;
 #else
 module;
 
+#include "unit_test/gtest_expand.h"
 #include <cassert>
-#include "gtest/gtest.h"
 
 module infinity_core:ut.test_bmp_index;
 
@@ -63,8 +63,8 @@ protected:
         const SparseMatrix query_set = SparseTestUtil<DataType, IdxType>::GenerateDataset(query_n, ncol, sparsity, 0.0, 10.0);
         const auto [gt_indices_list, gt_scores_list] = SparseTestUtil<DataType, IdxType>::GenerateGroundtruth(dataset, query_set, topk, false);
 
-        String save_path = String(tmp_data_path()) + "/bmindex_test1.index";
-        String save2_path = String(tmp_data_path()) + "/bmindex_test2.index";
+        std::string save_path = std::string(tmp_data_path()) + "/bmindex_test1.index";
+        std::string save2_path = std::string(tmp_data_path()) + "/bmindex_test2.index";
         if (VirtualStore::Exists(save_path)) {
             VirtualStore::DeleteFile(save_path);
         }
@@ -192,20 +192,20 @@ TEST_F(BMPIndexTest, test2) {
     BmpSearchOptions options;
     options.use_lock_ = false;
 
-    Vector<i32> query_idx = {0, 1};
-    Vector<f32> query_data = {1.0, 1.0};
+    std::vector<i32> query_idx = {0, 1};
+    std::vector<f32> query_data = {1.0, 1.0};
     SparseVecRef query(query_idx.size(), query_idx.data(), query_data.data());
 
-    Vector<i32> vec1_idx = {0};
-    Vector<f32> vec1_data = {3.0};
+    std::vector<i32> vec1_idx = {0};
+    std::vector<f32> vec1_data = {3.0};
     SparseVecRef vec1(vec1_idx.size(), vec1_idx.data(), vec1_data.data());
 
-    Vector<i32> vec2_idx = {1};
-    Vector<f32> vec2_data = {1.0};
+    std::vector<i32> vec2_idx = {1};
+    std::vector<f32> vec2_data = {1.0};
     SparseVecRef vec2(vec2_idx.size(), vec2_idx.data(), vec2_data.data());
 
-    Vector<i32> vec3_idx = {0, 1};
-    Vector<f32> vec3_data = {1.0, 1.0};
+    std::vector<i32> vec3_idx = {0, 1};
+    std::vector<f32> vec3_data = {1.0, 1.0};
     SparseVecRef vec3(vec3_idx.size(), vec3_idx.data(), vec3_data.data());
 
     BMPAlg index(ncol, block_size);

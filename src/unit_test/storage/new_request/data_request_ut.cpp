@@ -13,14 +13,14 @@
 // limitations under the License.
 
 #ifdef CI
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 import infinity_core;
 import base_test;
 import request_test;
 #else
 module;
 
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 
 module infinity_core:ut.data_request;
 
@@ -43,7 +43,7 @@ class TestDataRequest : public NewRequestTest {
 protected:
     void PrepareCreateTable() {
         {
-            String create_table_sql = "create table t1(c1 int, c2 varchar)";
+            std::string create_table_sql = "create table t1(c1 int, c2 varchar)";
             std::unique_ptr<QueryContext> query_context = MakeQueryContext();
             QueryResult query_result = query_context->Query(create_table_sql);
             bool ok = HandleQueryResult(query_result);
@@ -59,7 +59,7 @@ INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
 TEST_P(TestDataRequest, test_append) {
     PrepareCreateTable();
     {
-        String append_req_sql = "insert into t1 values(1, 'abc')";
+        std::string append_req_sql = "insert into t1 values(1, 'abc')";
 
         std::unique_ptr<QueryContext> query_context = MakeQueryContext();
         QueryResult query_result = query_context->Query(append_req_sql);
@@ -67,7 +67,7 @@ TEST_P(TestDataRequest, test_append) {
         EXPECT_TRUE(ok);
     }
     {
-        String append_err_req_sql = "insert into t2 values(1, 'abc')";
+        std::string append_err_req_sql = "insert into t2 values(1, 'abc')";
 
         std::unique_ptr<QueryContext> query_context = MakeQueryContext();
         QueryResult query_result = query_context->Query(append_err_req_sql);
@@ -79,14 +79,14 @@ TEST_P(TestDataRequest, test_append) {
 TEST_P(TestDataRequest, test_select) {
     PrepareCreateTable();
     {
-        String append_req_sql = "insert into t1 values(1, 'abc')";
+        std::string append_req_sql = "insert into t1 values(1, 'abc')";
         std::unique_ptr<QueryContext> query_context = MakeQueryContext();
         QueryResult query_result = query_context->Query(append_req_sql);
         bool ok = HandleQueryResult(query_result);
         EXPECT_TRUE(ok);
     }
     {
-        String select_req_sql = "select * from t1";
+        std::string select_req_sql = "select * from t1";
         std::unique_ptr<QueryContext> query_context = MakeQueryContext();
         QueryResult query_result = query_context->Query(select_req_sql);
 
@@ -111,21 +111,21 @@ TEST_P(TestDataRequest, test_select) {
 TEST_P(TestDataRequest, test_delete) {
     PrepareCreateTable();
     {
-        String append_req_sql = "insert into t1 values(1, 'abc'),(2, 'def')";
+        std::string append_req_sql = "insert into t1 values(1, 'abc'),(2, 'def')";
         std::unique_ptr<QueryContext> query_context = MakeQueryContext();
         QueryResult query_result = query_context->Query(append_req_sql);
         bool ok = HandleQueryResult(query_result);
         EXPECT_TRUE(ok);
     }
     {
-        String delete_req_sql = "delete from t1 where c1 = 1";
+        std::string delete_req_sql = "delete from t1 where c1 = 1";
         std::unique_ptr<QueryContext> query_context = MakeQueryContext();
         QueryResult query_result = query_context->Query(delete_req_sql);
         bool ok = HandleQueryResult(query_result);
         EXPECT_TRUE(ok);
     }
     {
-        String select_req_sql = "select * from t1";
+        std::string select_req_sql = "select * from t1";
         std::unique_ptr<QueryContext> query_context = MakeQueryContext();
         QueryResult query_result = query_context->Query(select_req_sql);
 
@@ -150,21 +150,21 @@ TEST_P(TestDataRequest, test_delete) {
 TEST_P(TestDataRequest, test_update) {
     PrepareCreateTable();
     {
-        String append_req_sql = "insert into t1 values(1, 'abc'),(2, 'def')";
+        std::string append_req_sql = "insert into t1 values(1, 'abc'),(2, 'def')";
         std::unique_ptr<QueryContext> query_context = MakeQueryContext();
         QueryResult query_result = query_context->Query(append_req_sql);
         bool ok = HandleQueryResult(query_result);
         EXPECT_TRUE(ok);
     }
     {
-        String update_req_sql = "update t1 set c2 = 'xyz' where c1 = 1";
+        std::string update_req_sql = "update t1 set c2 = 'xyz' where c1 = 1";
         std::unique_ptr<QueryContext> query_context = MakeQueryContext();
         QueryResult query_result = query_context->Query(update_req_sql);
         bool ok = HandleQueryResult(query_result);
         EXPECT_TRUE(ok);
     }
     {
-        String select_req_sql = "select * from t1";
+        std::string select_req_sql = "select * from t1";
         std::unique_ptr<QueryContext> query_context = MakeQueryContext();
         QueryResult query_result = query_context->Query(select_req_sql);
 
@@ -190,21 +190,21 @@ TEST_P(TestDataRequest, test_update) {
 
 TEST_P(TestDataRequest, test_import_csv) {
     {
-        String create_table_sql = "create table t1(c1 int, c2 embedding(int,3))";
+        std::string create_table_sql = "create table t1(c1 int, c2 embedding(int,3))";
         std::unique_ptr<QueryContext> query_context = MakeQueryContext();
         QueryResult query_result = query_context->Query(create_table_sql);
         bool ok = HandleQueryResult(query_result);
         EXPECT_TRUE(ok);
     }
     {
-        String import_table_sql = "copy t1 from 'test/data/csv/embedding_int_dim3.csv' with(delimiter ',', format csv)";
+        std::string import_table_sql = "copy t1 from 'test/data/csv/embedding_int_dim3.csv' with(delimiter ',', format csv)";
         std::unique_ptr<QueryContext> query_context = MakeQueryContext();
         QueryResult query_result = query_context->Query(import_table_sql);
         bool ok = HandleQueryResult(query_result);
         EXPECT_TRUE(ok);
     }
     {
-        String select_req_sql = "select count(*) from t1";
+        std::string select_req_sql = "select count(*) from t1";
         std::unique_ptr<QueryContext> query_context = MakeQueryContext();
         QueryResult query_result = query_context->Query(select_req_sql);
 
@@ -219,21 +219,21 @@ TEST_P(TestDataRequest, test_import_csv) {
 
 TEST_P(TestDataRequest, test_import_json) {
     {
-        String create_table_sql = "create table t1(c1 int, c2 embedding(int,3))";
+        std::string create_table_sql = "create table t1(c1 int, c2 embedding(int,3))";
         std::unique_ptr<QueryContext> query_context = MakeQueryContext();
         QueryResult query_result = query_context->Query(create_table_sql);
         bool ok = HandleQueryResult(query_result);
         EXPECT_TRUE(ok);
     }
     {
-        String import_table_sql = "copy t1 from 'test/data/json/pysdk_test.json' with(format json)";
+        std::string import_table_sql = "copy t1 from 'test/data/json/pysdk_test.json' with(format json)";
         std::unique_ptr<QueryContext> query_context = MakeQueryContext();
         QueryResult query_result = query_context->Query(import_table_sql);
         bool ok = HandleQueryResult(query_result);
         EXPECT_TRUE(ok);
     }
     {
-        String select_req_sql = "select count(*) from t1";
+        std::string select_req_sql = "select count(*) from t1";
         std::unique_ptr<QueryContext> query_context = MakeQueryContext();
         QueryResult query_result = query_context->Query(select_req_sql);
 
@@ -247,21 +247,21 @@ TEST_P(TestDataRequest, test_import_json) {
 
 TEST_P(TestDataRequest, test_import_jsonl) {
     {
-        String create_table_sql = "create table t1(name varchar, age int, embedding_column embedding(int,5))";
+        std::string create_table_sql = "create table t1(name varchar, age int, embedding_column embedding(int,5))";
         std::unique_ptr<QueryContext> query_context = MakeQueryContext();
         QueryResult query_result = query_context->Query(create_table_sql);
         bool ok = HandleQueryResult(query_result);
         EXPECT_TRUE(ok);
     }
     {
-        String import_table_sql = "copy t1 from 'test/data/jsonl/test_jsonl.jsonl' with(format jsonl)";
+        std::string import_table_sql = "copy t1 from 'test/data/jsonl/test_jsonl.jsonl' with(format jsonl)";
         std::unique_ptr<QueryContext> query_context = MakeQueryContext();
         QueryResult query_result = query_context->Query(import_table_sql);
         bool ok = HandleQueryResult(query_result);
         EXPECT_TRUE(ok);
     }
     {
-        String select_req_sql = "select count(*) from t1";
+        std::string select_req_sql = "select count(*) from t1";
         std::unique_ptr<QueryContext> query_context = MakeQueryContext();
         QueryResult query_result = query_context->Query(select_req_sql);
 
@@ -276,21 +276,21 @@ TEST_P(TestDataRequest, test_import_jsonl) {
 
 TEST_P(TestDataRequest, test_import_fvecs) {
     {
-        String create_table_sql = "create table t1(c1 embedding(float,128))";
+        std::string create_table_sql = "create table t1(c1 embedding(float,128))";
         std::unique_ptr<QueryContext> query_context = MakeQueryContext();
         QueryResult query_result = query_context->Query(create_table_sql);
         bool ok = HandleQueryResult(query_result);
         EXPECT_TRUE(ok);
     }
     {
-        String import_table_sql = "copy t1 from 'test/data/fvecs/test.fvecs' with(format fvecs)";
+        std::string import_table_sql = "copy t1 from 'test/data/fvecs/test.fvecs' with(format fvecs)";
         std::unique_ptr<QueryContext> query_context = MakeQueryContext();
         QueryResult query_result = query_context->Query(import_table_sql);
         bool ok = HandleQueryResult(query_result);
         EXPECT_TRUE(ok);
     }
     {
-        String select_req_sql = "select count(*) from t1";
+        std::string select_req_sql = "select count(*) from t1";
         std::unique_ptr<QueryContext> query_context = MakeQueryContext();
         QueryResult query_result = query_context->Query(select_req_sql);
 
@@ -305,21 +305,21 @@ TEST_P(TestDataRequest, test_import_fvecs) {
 
 TEST_P(TestDataRequest, test_import_csr) {
     {
-        String create_table_sql = "create table t1(c1 sparse(float,30000))";
+        std::string create_table_sql = "create table t1(c1 sparse(float,30000))";
         std::unique_ptr<QueryContext> query_context = MakeQueryContext();
         QueryResult query_result = query_context->Query(create_table_sql);
         bool ok = HandleQueryResult(query_result);
         EXPECT_TRUE(ok);
     }
     {
-        String import_table_sql = "copy t1 from 'test/data/csr/test.csr' with(format csr)";
+        std::string import_table_sql = "copy t1 from 'test/data/csr/test.csr' with(format csr)";
         std::unique_ptr<QueryContext> query_context = MakeQueryContext();
         QueryResult query_result = query_context->Query(import_table_sql);
         bool ok = HandleQueryResult(query_result);
         EXPECT_TRUE(ok);
     }
     {
-        String select_req_sql = "select count(*) from t1";
+        std::string select_req_sql = "select count(*) from t1";
         std::unique_ptr<QueryContext> query_context = MakeQueryContext();
         QueryResult query_result = query_context->Query(select_req_sql);
 
@@ -334,21 +334,21 @@ TEST_P(TestDataRequest, test_import_csr) {
 
 TEST_P(TestDataRequest, test_import_bvecs) {
     {
-        String create_table_sql = "create table t1(c1 embedding(unsigned tinyint,128))";
+        std::string create_table_sql = "create table t1(c1 embedding(unsigned tinyint,128))";
         std::unique_ptr<QueryContext> query_context = MakeQueryContext();
         QueryResult query_result = query_context->Query(create_table_sql);
         bool ok = HandleQueryResult(query_result);
         EXPECT_TRUE(ok);
     }
     {
-        String import_table_sql = "copy t1 from 'test/data/bvecs/test.bvecs' with(format bvecs)";
+        std::string import_table_sql = "copy t1 from 'test/data/bvecs/test.bvecs' with(format bvecs)";
         std::unique_ptr<QueryContext> query_context = MakeQueryContext();
         QueryResult query_result = query_context->Query(import_table_sql);
         bool ok = HandleQueryResult(query_result);
         EXPECT_TRUE(ok);
     }
     {
-        String select_req_sql = "select count(*) from t1";
+        std::string select_req_sql = "select count(*) from t1";
         std::unique_ptr<QueryContext> query_context = MakeQueryContext();
         QueryResult query_result = query_context->Query(select_req_sql);
 
@@ -363,21 +363,21 @@ TEST_P(TestDataRequest, test_import_bvecs) {
 
 TEST_P(TestDataRequest, test_import_parquet) {
     {
-        String create_table_sql = "create table t1(c1 int, c2 embedding(int,128))";
+        std::string create_table_sql = "create table t1(c1 int, c2 embedding(int,128))";
         std::unique_ptr<QueryContext> query_context = MakeQueryContext();
         QueryResult query_result = query_context->Query(create_table_sql);
         bool ok = HandleQueryResult(query_result);
         EXPECT_TRUE(ok);
     }
     {
-        String import_table_sql = "copy t1 from 'test/data/parquet/gen_embedding.parquet' with(format parquet)";
+        std::string import_table_sql = "copy t1 from 'test/data/parquet/gen_embedding.parquet' with(format parquet)";
         std::unique_ptr<QueryContext> query_context = MakeQueryContext();
         QueryResult query_result = query_context->Query(import_table_sql);
         bool ok = HandleQueryResult(query_result);
         EXPECT_TRUE(ok);
     }
     {
-        String select_req_sql = "select count(*) from t1";
+        std::string select_req_sql = "select count(*) from t1";
         std::unique_ptr<QueryContext> query_context = MakeQueryContext();
         QueryResult query_result = query_context->Query(select_req_sql);
 
@@ -392,22 +392,22 @@ TEST_P(TestDataRequest, test_import_parquet) {
 
 TEST_P(TestDataRequest, test_export_csv) {
     {
-        String create_table_sql = "create table t1(c1 int, c2 embedding(int,3))";
+        std::string create_table_sql = "create table t1(c1 int, c2 embedding(int,3))";
         std::unique_ptr<QueryContext> query_context = MakeQueryContext();
         QueryResult query_result = query_context->Query(create_table_sql);
         bool ok = HandleQueryResult(query_result);
         EXPECT_TRUE(ok);
     }
     {
-        String import_table_sql = "copy t1 from 'test/data/csv/embedding_int_dim3.csv' with(delimiter ',', format csv)";
+        std::string import_table_sql = "copy t1 from 'test/data/csv/embedding_int_dim3.csv' with(delimiter ',', format csv)";
         std::unique_ptr<QueryContext> query_context = MakeQueryContext();
         QueryResult query_result = query_context->Query(import_table_sql);
         bool ok = HandleQueryResult(query_result);
         EXPECT_TRUE(ok);
     }
     {
-        String export_path = String(GetFullTmpDir()) + "/export_csv_test.csv";
-        String import_table_sql = fmt::format("copy t1 to '{}' with(delimiter ',', format csv)", export_path);
+        std::string export_path = std::string(GetFullTmpDir()) + "/export_csv_test.csv";
+        std::string import_table_sql = fmt::format("copy t1 to '{}' with(delimiter ',', format csv)", export_path);
         std::unique_ptr<QueryContext> query_context = MakeQueryContext();
         QueryResult query_result = query_context->Query(import_table_sql);
         bool ok = HandleQueryResult(query_result);
@@ -417,22 +417,22 @@ TEST_P(TestDataRequest, test_export_csv) {
 
 TEST_P(TestDataRequest, test_export_jsonl) {
     {
-        String create_table_sql = "create table t1(c1 int, c2 embedding(int,3))";
+        std::string create_table_sql = "create table t1(c1 int, c2 embedding(int,3))";
         std::unique_ptr<QueryContext> query_context = MakeQueryContext();
         QueryResult query_result = query_context->Query(create_table_sql);
         bool ok = HandleQueryResult(query_result);
         EXPECT_TRUE(ok);
     }
     {
-        String import_table_sql = "copy t1 from 'test/data/csv/embedding_int_dim3.csv' with(delimiter ',', format csv)";
+        std::string import_table_sql = "copy t1 from 'test/data/csv/embedding_int_dim3.csv' with(delimiter ',', format csv)";
         std::unique_ptr<QueryContext> query_context = MakeQueryContext();
         QueryResult query_result = query_context->Query(import_table_sql);
         bool ok = HandleQueryResult(query_result);
         EXPECT_TRUE(ok);
     }
     {
-        String export_path = String(GetFullTmpDir()) + "/export_csv_test.jsonl";
-        String import_table_sql = fmt::format("copy t1 to '{}' with(delimiter ',', format jsonl)", export_path);
+        std::string export_path = std::string(GetFullTmpDir()) + "/export_csv_test.jsonl";
+        std::string import_table_sql = fmt::format("copy t1 to '{}' with(delimiter ',', format jsonl)", export_path);
         std::unique_ptr<QueryContext> query_context = MakeQueryContext();
         QueryResult query_result = query_context->Query(import_table_sql);
         bool ok = HandleQueryResult(query_result);
@@ -442,22 +442,22 @@ TEST_P(TestDataRequest, test_export_jsonl) {
 
 TEST_P(TestDataRequest, test_export_parquet) {
     {
-        String create_table_sql = "create table t1(c1 int, c2 embedding(int,128))";
+        std::string create_table_sql = "create table t1(c1 int, c2 embedding(int,128))";
         std::unique_ptr<QueryContext> query_context = MakeQueryContext();
         QueryResult query_result = query_context->Query(create_table_sql);
         bool ok = HandleQueryResult(query_result);
         EXPECT_TRUE(ok);
     }
     {
-        String import_table_sql = "copy t1 from 'test/data/parquet/gen_embedding.parquet' with(format parquet)";
+        std::string import_table_sql = "copy t1 from 'test/data/parquet/gen_embedding.parquet' with(format parquet)";
         std::unique_ptr<QueryContext> query_context = MakeQueryContext();
         QueryResult query_result = query_context->Query(import_table_sql);
         bool ok = HandleQueryResult(query_result);
         EXPECT_TRUE(ok);
     }
     {
-        String export_path = String(GetFullTmpDir()) + "/export_csv_test.parquet";
-        String import_table_sql = fmt::format("copy t1 to '{}' with(format parquet)", export_path);
+        std::string export_path = std::string(GetFullTmpDir()) + "/export_csv_test.parquet";
+        std::string import_table_sql = fmt::format("copy t1 to '{}' with(format parquet)", export_path);
         std::unique_ptr<QueryContext> query_context = MakeQueryContext();
         QueryResult query_result = query_context->Query(import_table_sql);
         bool ok = HandleQueryResult(query_result);

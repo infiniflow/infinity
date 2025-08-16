@@ -1,12 +1,12 @@
 
 #ifdef CI
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 import infinity_core;
 import base_test;
 #else
 module;
 
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 
 module infinity_core:ut.inmem_doc_list_decoder;
 
@@ -134,9 +134,9 @@ protected:
     void TestDecode(const uint32_t doc_count, bool need_flush = false, bool need_tf = false) {
         InMemDocListDecoder *decoder = CreateDecoder(doc_count, need_flush, need_tf);
 
-        Vector<docid_t> doc_buffer(doc_count);
-        Vector<docpayload_t> doc_payload(doc_count);
-        Vector<tf_t> tf_buffer(doc_count);
+        std::vector<docid_t> doc_buffer(doc_count);
+        std::vector<docpayload_t> doc_payload(doc_count);
+        std::vector<tf_t> tf_buffer(doc_count);
 
         docid_t prev_last_doc_id = 0;
         docid_t first_doc_id = 0;

@@ -13,13 +13,13 @@
 // limitations under the License.
 
 #ifdef CI
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 import infinity_core;
 import base_test;
 #else
 module;
 
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 
 module infinity_core:ut.sql_parser;
 
@@ -52,7 +52,7 @@ class SQLParserTest : public BaseTest {};
 TEST_F(SQLParserTest, good_test1) {
     using namespace infinity;
 
-    Vector<String> inputs;
+    std::vector<std::string> inputs;
     inputs.emplace_back("create collection c1;");
     inputs.emplace_back("create schema s1;");
     inputs.emplace_back("create collection if not exists c2;");
@@ -118,7 +118,7 @@ TEST_F(SQLParserTest, good_test1) {
     std::shared_ptr<SQLParser> parser = std::make_shared<SQLParser>();
     std::shared_ptr<ParserResult> result = std::make_shared<ParserResult>();
 
-    for (const String &input : inputs) {
+    for (const std::string &input : inputs) {
         parser->Parse(input, result.get());
         //        std::cout << result->ToString() << std::endl;
         result->Reset();
@@ -131,7 +131,7 @@ TEST_F(SQLParserTest, good_test2) {
     std::shared_ptr<ParserResult> result = std::make_shared<ParserResult>();
 
     {
-        String input_sql = "create table t1 (a boolean primary key not null null unique,"
+        std::string input_sql = "create table t1 (a boolean primary key not null null unique,"
                            "                 b tinyint not null null unique, "
                            "                 c smallint null not null, "
                            "                 d integer not null, "
@@ -175,8 +175,8 @@ TEST_F(SQLParserTest, good_test2) {
             EXPECT_EQ(create_statement->create_info_->conflict_type_, ConflictType::kError);
 
             auto *create_table_info = (CreateTableInfo *)(create_statement->create_info_.get());
-            EXPECT_EQ(create_table_info->schema_name_, String(""));
-            EXPECT_EQ(create_table_info->table_name_, String("t1"));
+            EXPECT_EQ(create_table_info->schema_name_, std::string(""));
+            EXPECT_EQ(create_table_info->table_name_, std::string("t1"));
             EXPECT_EQ(create_table_info->column_defs_.size(), 27u);
 
             u64 column_id = 0;
@@ -450,16 +450,16 @@ TEST_F(SQLParserTest, good_test2) {
             EXPECT_EQ(create_table_info->constraints_.size(), 2u);
             {
                 EXPECT_EQ(create_table_info->constraints_[0]->constraint_, ConstraintType::kPrimaryKey);
-                const String &column1 = (*(create_table_info->constraints_[0]->names_ptr_))[0];
-                const String &column2 = (*(create_table_info->constraints_[0]->names_ptr_))[1];
+                const std::string &column1 = (*(create_table_info->constraints_[0]->names_ptr_))[0];
+                const std::string &column2 = (*(create_table_info->constraints_[0]->names_ptr_))[1];
                 EXPECT_EQ(column1, "a");
                 EXPECT_EQ(column2, "b");
             }
 
             {
                 EXPECT_EQ(create_table_info->constraints_[1]->constraint_, ConstraintType::kUnique);
-                const String &column3 = (*(create_table_info->constraints_[1]->names_ptr_))[0];
-                const String &column4 = (*(create_table_info->constraints_[1]->names_ptr_))[1];
+                const std::string &column3 = (*(create_table_info->constraints_[1]->names_ptr_))[0];
+                const std::string &column4 = (*(create_table_info->constraints_[1]->names_ptr_))[1];
                 EXPECT_EQ(column3, "c");
                 EXPECT_EQ(column4, "d");
             }
@@ -493,7 +493,7 @@ TEST_F(SQLParserTest, bad_test1) {
     std::shared_ptr<ParserResult> result = std::make_shared<ParserResult>();
 
     {
-        String input_sql = "create table t1 (a boolean primary key not null null unique,"
+        std::string input_sql = "create table t1 (a boolean primary key not null null unique,"
                            "                 b tinyint not null null unique,";
         parser->Parse(input_sql, result.get());
 
@@ -504,7 +504,7 @@ TEST_F(SQLParserTest, bad_test1) {
     }
 
     {
-        String input_sql = "create table t1 (a boolean primary key not null null unique,"
+        std::string input_sql = "create table t1 (a boolean primary key not null null unique,"
                            "                 b tinyint not null null unique "
                            "                 c smallint unique);";
         parser->Parse(input_sql, result.get());
@@ -516,7 +516,7 @@ TEST_F(SQLParserTest, bad_test1) {
     }
 
     {
-        String input_sql = "create table t1 t2 (a boolean primary key not null null unique);";
+        std::string input_sql = "create table t1 t2 (a boolean primary key not null null unique);";
         parser->Parse(input_sql, result.get());
 
         EXPECT_FALSE(result->error_message_.empty());
@@ -532,7 +532,7 @@ TEST_F(SQLParserTest, good_create_index_1) {
     auto result = std::make_shared<ParserResult>();
 
     {
-        String input_sql = "CREATE INDEX ON t1 (a) USING IVF;";
+        std::string input_sql = "CREATE INDEX ON t1 (a) USING IVF;";
         parser->Parse(input_sql, result.get());
 
         EXPECT_FALSE(result->error_message_.empty());
@@ -561,7 +561,7 @@ TEST_F(SQLParserTest, good_create_index_1) {
     }
 
     {
-        String input_sql = "CREATE INDEX idx1 ON t1 (a) USING IVF;";
+        std::string input_sql = "CREATE INDEX idx1 ON t1 (a) USING IVF;";
         parser->Parse(input_sql, result.get());
 
         EXPECT_TRUE(result->error_message_.empty());
@@ -588,7 +588,7 @@ TEST_F(SQLParserTest, good_create_index_1) {
     }
 
     {
-        String input_sql = "CREATE INDEX IF NOT EXISTS idx1 ON t1 (a) USING IVF;";
+        std::string input_sql = "CREATE INDEX IF NOT EXISTS idx1 ON t1 (a) USING IVF;";
         parser->Parse(input_sql, result.get());
 
         EXPECT_TRUE(result->error_message_.empty());
@@ -615,7 +615,7 @@ TEST_F(SQLParserTest, good_create_index_1) {
     }
 
     {
-        String input_sql = "CREATE INDEX idx1 ON db1.t1 (a) USING IVF;";
+        std::string input_sql = "CREATE INDEX idx1 ON db1.t1 (a) USING IVF;";
         parser->Parse(input_sql, result.get());
 
         EXPECT_TRUE(result->error_message_.empty());
@@ -642,7 +642,7 @@ TEST_F(SQLParserTest, good_create_index_1) {
     }
 
     {
-        String input_sql = "CREATE INDEX idx3 ON t1 (a) USING IVF WITH (metric = l2);";
+        std::string input_sql = "CREATE INDEX idx3 ON t1 (a) USING IVF WITH (metric = l2);";
         parser->Parse(input_sql, result.get());
 
         EXPECT_TRUE(result->error_message_.empty());
@@ -678,7 +678,7 @@ TEST_F(SQLParserTest, bad_create_index_1) {
     std::shared_ptr<ParserResult> result = std::make_shared<ParserResult>();
 
     {
-        String input_sql = "CREATE INDEX IF NOT EXISTS ON t1 (a) USING IVF;";
+        std::string input_sql = "CREATE INDEX IF NOT EXISTS ON t1 (a) USING IVF;";
         parser->Parse(input_sql, result.get());
 
         EXPECT_FALSE(result->error_message_.empty());

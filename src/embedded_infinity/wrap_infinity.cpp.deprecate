@@ -217,7 +217,7 @@ ParsedExpr *WrapFunctionExpr::GetParsedExpr(Status &status) {
     auto function_expr = new FunctionExpr();
     function_expr->func_name_ = func_name;
     function_expr->distinct_ = distinct;
-    Vector<ParsedExpr *> *func_arguments = new Vector<ParsedExpr *>();
+    std::vector<ParsedExpr *> *func_arguments = new std::vector<ParsedExpr *>();
     func_arguments->reserve(arguments.size());
     function_expr->arguments_ = func_arguments;
 
@@ -345,7 +345,7 @@ ParsedExpr *WrapKnnExpr::GetParsedExpr(Status &status) {
         return nullptr;
     }
 
-    knn_expr->opt_params_ = new Vector<InitParameter *>();
+    knn_expr->opt_params_ = new std::vector<InitParameter *>();
     for (auto &param : opt_params) {
         if (param.param_name_ == "index_name") {
             knn_expr->index_name_ = param.param_value_;
@@ -459,7 +459,7 @@ ParsedExpr *WrapMatchSparseExpr::GetParsedExpr(Status &status) {
 
     match_sparse_expr->SetMetricType(metric_type);
 
-    auto *opt_params_ptr = new Vector<InitParameter *>();
+    auto *opt_params_ptr = new std::vector<InitParameter *>();
     for (auto &param : opt_params) {
         if (param.param_name_ == "index_name") {
             match_sparse_expr->index_name_ = param.param_value_;
@@ -513,7 +513,7 @@ ParsedExpr *WrapSearchExpr::GetParsedExpr(Status &status) {
 ParsedExpr *WrapInExpr::GetParsedExpr(Status &status) {
     status.code_ = ErrorCode::kOk;
     auto in_expr = std::make_unique<InExpr>();
-    in_expr->arguments_ = new Vector<ParsedExpr *>();
+    in_expr->arguments_ = new std::vector<ParsedExpr *>();
     in_expr->arguments_->reserve(arguments.size());
     for (size_t i = 0; i < arguments.size(); ++i) {
         in_expr->arguments_->emplace_back(arguments[i]->GetParsedExpr(status));
@@ -757,7 +757,7 @@ DataType GetDataTypeFromWrapDataType(const WrapDataType &warp_data_type) {
     return data_type;
 }
 
-Optional<WrapQueryResult> UnwrapColumnDefs(Vector<WrapColumnDef> &column_defs, Vector<ColumnDef *> &column_defs_ptr) {
+Optional<WrapQueryResult> UnwrapColumnDefs(std::vector<WrapColumnDef> &column_defs, std::vector<ColumnDef *> &column_defs_ptr) {
     for (size_t i = 0; i < column_defs.size(); ++i) {
         auto &wrap_column_def = column_defs[i];
         auto column_type = std::make_shared<DataType>(GetDataTypeFromWrapDataType(wrap_column_def.column_type));
@@ -788,10 +788,10 @@ Optional<WrapQueryResult> UnwrapColumnDefs(Vector<WrapColumnDef> &column_defs, V
 WrapQueryResult WrapCreateTable(Infinity &instance,
                                 const String &db_name,
                                 const String &table_name,
-                                Vector<WrapColumnDef> column_defs,
+                                std::vector<WrapColumnDef> column_defs,
                                 WrapCreateTableOptions create_table_options) {
-    Vector<TableConstraint *> constraints;
-    Vector<ColumnDef *> column_defs_ptr;
+    std::vector<TableConstraint *> constraints;
+    std::vector<ColumnDef *> column_defs_ptr;
     auto res = UnwrapColumnDefs(column_defs, column_defs_ptr);
     if (res.has_value()) {
         return res.value();
@@ -860,7 +860,7 @@ WrapQueryResult WrapCreateIndex(Infinity &instance,
     index_info->index_type_ = wrap_index_info.index_type;
     index_info->column_name_ = wrap_index_info.column_name;
     {
-        auto index_param_list = new Vector<InitParameter *>();
+        auto index_param_list = new std::vector<InitParameter *>();
         for (size_t j = 0; j < wrap_index_info.index_param_list.size(); ++j) {
             auto &wrap_init_param = wrap_index_info.index_param_list[j];
             index_param_list->emplace_back(new InitParameter(wrap_init_param.param_name_, wrap_init_param.param_value_));
@@ -949,11 +949,11 @@ WrapQueryResult WrapShowCurrentNode(Infinity &instance) {
     return WrapQueryResult(query_result.ErrorCode(), query_result.ErrorMsg());
 }
 
-WrapQueryResult WrapInsert(Infinity &instance, const String &db_name, const String &table_name, Vector<WrapInsertRowExpr> &insert_rows) {
+WrapQueryResult WrapInsert(Infinity &instance, const String &db_name, const String &table_name, std::vector<WrapInsertRowExpr> &insert_rows) {
     if (insert_rows.empty()) {
         return WrapQueryResult(ErrorCode::kInsertWithoutValues, "insert values is empty");
     }
-    auto insert_rows_ptr = new Vector<InsertRowExpr *>();
+    auto insert_rows_ptr = new std::vector<InsertRowExpr *>();
     DeferFn delete_insert_rows([&insert_rows_ptr] {
         if (insert_rows_ptr) {
             for (auto *p : *insert_rows_ptr) {
@@ -985,10 +985,10 @@ WrapQueryResult WrapImport(Infinity &instance, const String &db_name, const Stri
 WrapQueryResult WrapExport(Infinity &instance,
                            const String &db_name,
                            const String &table_name,
-                           Vector<String> &columns,
+                           std::vector<String> &columns,
                            const String &path,
                            ExportOptions export_options) {
-    Vector<ParsedExpr *> *export_columns = new Vector<ParsedExpr *>();
+    std::vector<ParsedExpr *> *export_columns = new std::vector<ParsedExpr *>();
     export_columns->reserve(columns.size());
 
     for (size_t i = 0; i < columns.size(); ++i) {
@@ -1055,7 +1055,7 @@ WrapQueryResult WrapUpdate(Infinity &instance,
                            const String &db_name,
                            const String &table_name,
                            WrapParsedExpr *wrap_filter,
-                           Vector<WrapUpdateExpr> *wrap_update_list) {
+                           std::vector<WrapUpdateExpr> *wrap_update_list) {
     ParsedExpr *filter = nullptr;
     if (wrap_filter != nullptr) {
         Status status;
@@ -1068,9 +1068,9 @@ WrapQueryResult WrapUpdate(Infinity &instance,
             return WrapQueryResult(status.code_, status.msg_->c_str());
         }
     }
-    Vector<UpdateExpr *> *update_list = nullptr;
+    std::vector<UpdateExpr *> *update_list = nullptr;
     if (wrap_update_list != nullptr) {
-        update_list = new Vector<UpdateExpr *>(wrap_update_list->size());
+        update_list = new std::vector<UpdateExpr *>(wrap_update_list->size());
         for (size_t i = 0; i < wrap_update_list->size(); ++i) {
             auto &wrap_update_expr = (*wrap_update_list)[i];
             Status status;
@@ -1113,7 +1113,7 @@ void HandlePodType(ColumnField &output_column_field, size_t row_count, const std
 
 void HandleVarcharType(ColumnField &output_column_field, size_t row_count, const std::shared_ptr<ColumnVector> &column_vector) {
     size_t all_size = 0;
-    Vector<Pair<const char *, size_t>> raw_data;
+    std::vector<Pair<const char *, size_t>> raw_data;
     for (size_t index = 0; index < row_count; ++index) {
         Span<const char> data = column_vector->GetVarchar(index);
         all_size += sizeof(i32) + data.size();
@@ -1141,7 +1141,7 @@ void HandleEmbeddingType(ColumnField &output_column_field, size_t row_count, con
 
 void HandleMultiVectorType(ColumnField &output_column_field, size_t row_count, const std::shared_ptr<ColumnVector> &column_vector) {
     size_t all_size = 0;
-    Vector<Pair<const char *, size_t>> multi_vector_data(row_count);
+    std::vector<Pair<const char *, size_t>> multi_vector_data(row_count);
     for (size_t index = 0; index < row_count; ++index) {
         Span<const char> raw_data = column_vector->GetMultiVectorRaw(index).first;
         all_size += sizeof(i32) + raw_data.size();
@@ -1164,7 +1164,7 @@ void HandleMultiVectorType(ColumnField &output_column_field, size_t row_count, c
 
 void HandleTensorType(ColumnField &output_column_field, size_t row_count, const std::shared_ptr<ColumnVector> &column_vector) {
     size_t all_size = 0;
-    Vector<Pair<const char *, size_t>> tensor_data(row_count);
+    std::vector<Pair<const char *, size_t>> tensor_data(row_count);
     for (size_t index = 0; index < row_count; ++index) {
         Span<const char> raw_data = column_vector->GetTensorRaw(index).first;
         all_size += sizeof(i32) + raw_data.size();
@@ -1187,11 +1187,11 @@ void HandleTensorType(ColumnField &output_column_field, size_t row_count, const 
 
 void HandleTensorArrayType(ColumnField &output_column_field, size_t row_count, const std::shared_ptr<ColumnVector> &column_vector) {
     size_t all_size = 0;
-    Vector<Vector<Pair<const char *, size_t>>> tensor_array_data;
+    std::vector<std::vector<Pair<const char *, size_t>>> tensor_array_data;
     for (size_t index = 0; index < row_count; ++index) {
         all_size += sizeof(i32);
-        Vector<Pair<const char *, size_t>> tensor_data;
-        Vector<Pair<Span<const char>, size_t>> array_data = column_vector->GetTensorArrayRaw(index);
+        std::vector<Pair<const char *, size_t>> tensor_data;
+        std::vector<Pair<Span<const char>, size_t>> array_data = column_vector->GetTensorArrayRaw(index);
         for (const auto [raw_data, embedding_num] : array_data) {
             all_size += sizeof(i32) + raw_data.size();
             tensor_data.emplace_back(raw_data.data(), raw_data.size());
@@ -1219,7 +1219,7 @@ void HandleTensorArrayType(ColumnField &output_column_field, size_t row_count, c
 
 void HandleSparseType(ColumnField &output_column_field, size_t row_count, const std::shared_ptr<ColumnVector> &column_vector) {
     size_t all_size = 0;
-    Vector<Tuple<Span<const char>, Span<const char>, size_t>> raw_data;
+    std::vector<Tuple<Span<const char>, Span<const char>, size_t>> raw_data;
     for (size_t index = 0; index < row_count; ++index) {
         auto [data_span, index_span, nnz_size_t] = column_vector->GetSparseRaw(index);
         all_size += sizeof(i32) + data_span.size() + index_span.size();
@@ -1336,7 +1336,7 @@ void ProcessColumnFieldType(ColumnField &output_column_field, size_t row_count, 
     }
 }
 
-void ProcessColumns(const std::shared_ptr<DataBlock> &data_block, size_t column_count, Vector<ColumnField> &columns) {
+void ProcessColumns(const std::shared_ptr<DataBlock> &data_block, size_t column_count, std::vector<ColumnField> &columns) {
     auto row_count = data_block->row_count();
     for (size_t col_index = 0; col_index < column_count; ++col_index) {
         auto &result_column_vector = data_block->column_vectors[col_index];
@@ -1405,7 +1405,7 @@ void DataTypeToWrapDataType(WrapDataType &proto_data_type, const DataType &data_
     }
 }
 
-void HandleColumnDef(WrapQueryResult &wrap_query_result, size_t column_count, std::shared_ptr<TableDef> table_def, Vector<ColumnField> &all_column_vectors) {
+void HandleColumnDef(WrapQueryResult &wrap_query_result, size_t column_count, std::shared_ptr<TableDef> table_def, std::vector<ColumnField> &all_column_vectors) {
     assert(column_count == all_column_vectors.size());
 
     for (size_t col_index = 0; col_index < column_count; ++col_index) {
@@ -1422,7 +1422,7 @@ void HandleColumnDef(WrapQueryResult &wrap_query_result, size_t column_count, st
     }
 }
 
-void ProcessDataBlocks(QueryResult &query_result, WrapQueryResult &wrap_query_result, Vector<ColumnField> &columns) {
+void ProcessDataBlocks(QueryResult &query_result, WrapQueryResult &wrap_query_result, std::vector<ColumnField> &columns) {
     size_t blocks_count = query_result.result_table_->DataBlockCount();
     for (size_t block_idx = 0; block_idx < blocks_count; ++block_idx) {
         auto data_block = query_result.result_table_->GetDataBlockById(block_idx);
@@ -1441,10 +1441,10 @@ void ProcessDataBlocks(QueryResult &query_result, WrapQueryResult &wrap_query_re
 WrapQueryResult WrapSearch(Infinity &instance,
                            const String &db_name,
                            const String &table_name,
-                           Vector<WrapParsedExpr> select_list,
-                           Vector<WrapParsedExpr> highlight_list,
-                           Vector<WrapOrderByExpr> order_by_list,
-                           Vector<WrapParsedExpr> group_by_list,
+                           std::vector<WrapParsedExpr> select_list,
+                           std::vector<WrapParsedExpr> highlight_list,
+                           std::vector<WrapOrderByExpr> order_by_list,
+                           std::vector<WrapParsedExpr> group_by_list,
                            WrapParsedExpr *having_expr,
                            bool total_hits_count_flag,
                            WrapSearchExpr *wrap_search_expr,
@@ -1480,7 +1480,7 @@ WrapQueryResult WrapSearch(Infinity &instance,
             return WrapQueryResult(status.code_, status.msg_->c_str());
         }
     }
-    Vector<ParsedExpr *> *output_columns = nullptr;
+    std::vector<ParsedExpr *> *output_columns = nullptr;
     DeferFn defer_fn3([&]() {
         if (output_columns != nullptr) {
             size_t output_column_len = output_columns->size();
@@ -1495,7 +1495,7 @@ WrapQueryResult WrapSearch(Infinity &instance,
     if (select_list.empty()) {
         return WrapQueryResult(ErrorCode::kEmptySelectFields, "[error] Select fields are empty");
     } else {
-        output_columns = new Vector<ParsedExpr *>();
+        output_columns = new std::vector<ParsedExpr *>();
         output_columns->reserve(select_list.size());
         for (size_t i = 0; i < select_list.size(); ++i) {
             Status status;
@@ -1506,7 +1506,7 @@ WrapQueryResult WrapSearch(Infinity &instance,
         }
     }
 
-    Vector<ParsedExpr *> *highlight = nullptr;
+    std::vector<ParsedExpr *> *highlight = nullptr;
     DeferFn defer_fn7([&]() {
         if (highlight != nullptr) {
             size_t highlight_column_len = highlight->size();
@@ -1519,7 +1519,7 @@ WrapQueryResult WrapSearch(Infinity &instance,
         }
     });
     if (!highlight_list.empty()) {
-        highlight = new Vector<ParsedExpr *>();
+        highlight = new std::vector<ParsedExpr *>();
         highlight->reserve(highlight_list.size());
         for (size_t i = 0; i < highlight_list.size(); ++i) {
             Status status;
@@ -1560,7 +1560,7 @@ WrapQueryResult WrapSearch(Infinity &instance,
         }
     }
 
-    Vector<ParsedExpr *> *group_by_exprs = nullptr;
+    std::vector<ParsedExpr *> *group_by_exprs = nullptr;
     DeferFn defer_fn8([&]() {
         if (group_by_exprs != nullptr) {
             size_t group_by_column_len = group_by_exprs->size();
@@ -1573,7 +1573,7 @@ WrapQueryResult WrapSearch(Infinity &instance,
         }
     });
     if (!group_by_list.empty()) {
-        group_by_exprs = new Vector<ParsedExpr *>();
+        group_by_exprs = new std::vector<ParsedExpr *>();
         group_by_exprs->reserve(group_by_list.size());
         for (size_t i = 0; i < group_by_list.size(); ++i) {
             Status status;
@@ -1599,7 +1599,7 @@ WrapQueryResult WrapSearch(Infinity &instance,
         }
     }
 
-    Vector<OrderByExpr *> *order_by_exprs = nullptr;
+    std::vector<OrderByExpr *> *order_by_exprs = nullptr;
     DeferFn defer_fn6([&]() {
         if (order_by_exprs != nullptr) {
             size_t order_by_expr_len = order_by_exprs->size();
@@ -1614,7 +1614,7 @@ WrapQueryResult WrapSearch(Infinity &instance,
         }
     });
     if (!order_by_list.empty()) {
-        order_by_exprs = new Vector<OrderByExpr *>();
+        order_by_exprs = new std::vector<OrderByExpr *>();
         order_by_exprs->reserve(order_by_list.size());
         for (size_t i = 0; i < order_by_list.size(); ++i) {
             Status status;
@@ -1660,10 +1660,10 @@ WrapQueryResult WrapExplain(Infinity &instance,
                             const String &db_name,
                             const String &table_name,
                             ExplainType explain_type,
-                            Vector<WrapParsedExpr> select_list,
-                            Vector<WrapParsedExpr> highlight_list,
-                            Vector<WrapOrderByExpr> order_by_list,
-                            Vector<WrapParsedExpr> group_by_list,
+                            std::vector<WrapParsedExpr> select_list,
+                            std::vector<WrapParsedExpr> highlight_list,
+                            std::vector<WrapOrderByExpr> order_by_list,
+                            std::vector<WrapParsedExpr> group_by_list,
                             WrapParsedExpr *having_expr,
                             WrapSearchExpr *wrap_search_expr,
                             WrapParsedExpr *filter_expr,
@@ -1698,7 +1698,7 @@ WrapQueryResult WrapExplain(Infinity &instance,
             return WrapQueryResult(status.code_, status.msg_->c_str());
         }
     }
-    Vector<ParsedExpr *> *output_columns = nullptr;
+    std::vector<ParsedExpr *> *output_columns = nullptr;
     DeferFn defer_fn3([&]() {
         if (output_columns != nullptr) {
             size_t output_column_len = output_columns->size();
@@ -1713,7 +1713,7 @@ WrapQueryResult WrapExplain(Infinity &instance,
     if (select_list.empty()) {
         return WrapQueryResult(ErrorCode::kEmptySelectFields, "[error] Select fields are empty");
     } else {
-        output_columns = new Vector<ParsedExpr *>();
+        output_columns = new std::vector<ParsedExpr *>();
         output_columns->reserve(select_list.size());
         for (size_t i = 0; i < select_list.size(); ++i) {
             Status status;
@@ -1724,7 +1724,7 @@ WrapQueryResult WrapExplain(Infinity &instance,
         }
     }
 
-    Vector<ParsedExpr *> *highlight = nullptr;
+    std::vector<ParsedExpr *> *highlight = nullptr;
     DeferFn defer_fn11([&]() {
         if (highlight != nullptr) {
             size_t highlight_column_len = highlight->size();
@@ -1737,7 +1737,7 @@ WrapQueryResult WrapExplain(Infinity &instance,
         }
     });
     if (!highlight_list.empty()) {
-        highlight = new Vector<ParsedExpr *>();
+        highlight = new std::vector<ParsedExpr *>();
         highlight->reserve(highlight_list.size());
         for (size_t i = 0; i < highlight_list.size(); ++i) {
             Status status;
@@ -1778,7 +1778,7 @@ WrapQueryResult WrapExplain(Infinity &instance,
         }
     }
 
-    Vector<ParsedExpr *> *group_by_exprs = nullptr;
+    std::vector<ParsedExpr *> *group_by_exprs = nullptr;
     DeferFn defer_fn8([&]() {
         if (group_by_exprs != nullptr) {
             size_t group_by_column_len = group_by_exprs->size();
@@ -1791,7 +1791,7 @@ WrapQueryResult WrapExplain(Infinity &instance,
         }
     });
     if (!group_by_list.empty()) {
-        group_by_exprs = new Vector<ParsedExpr *>();
+        group_by_exprs = new std::vector<ParsedExpr *>();
         group_by_exprs->reserve(group_by_list.size());
         for (size_t i = 0; i < group_by_list.size(); ++i) {
             Status status;
@@ -1817,7 +1817,7 @@ WrapQueryResult WrapExplain(Infinity &instance,
         }
     }
 
-    Vector<OrderByExpr *> *order_by_exprs = nullptr;
+    std::vector<OrderByExpr *> *order_by_exprs = nullptr;
     DeferFn defer_fn6([&]() {
         if (order_by_exprs != nullptr) {
             size_t order_by_expr_len = order_by_exprs->size();
@@ -1832,7 +1832,7 @@ WrapQueryResult WrapExplain(Infinity &instance,
         }
     });
     if (!order_by_list.empty()) {
-        order_by_exprs = new Vector<OrderByExpr *>();
+        order_by_exprs = new std::vector<OrderByExpr *>();
         order_by_exprs->reserve(order_by_list.size());
         for (size_t i = 0; i < order_by_list.size(); ++i) {
             Status status;
@@ -1908,13 +1908,13 @@ WrapQueryResult WrapOptimize(Infinity &instance, const String &db_name, const St
     return WrapQueryResult(query_result.ErrorCode(), query_result.ErrorMsg());
 }
 
-WrapQueryResult WrapAddColumns(Infinity &instance, const String &db_name, const String &table_name, Vector<WrapColumnDef> wrapped_column_defs) {
-    Vector<ColumnDef *> column_defs_ptr;
+WrapQueryResult WrapAddColumns(Infinity &instance, const String &db_name, const String &table_name, std::vector<WrapColumnDef> wrapped_column_defs) {
+    std::vector<ColumnDef *> column_defs_ptr;
     auto res = UnwrapColumnDefs(wrapped_column_defs, column_defs_ptr);
     if (res.has_value()) {
         return res.value();
     }
-    Vector<std::shared_ptr<ColumnDef>> column_defs(column_defs_ptr.size());
+    std::vector<std::shared_ptr<ColumnDef>> column_defs(column_defs_ptr.size());
     std::transform(column_defs_ptr.begin(), column_defs_ptr.end(), column_defs.begin(), [](ColumnDef *column_def) {
         return std::shared_ptr<ColumnDef>(column_def);
     });
@@ -1922,7 +1922,7 @@ WrapQueryResult WrapAddColumns(Infinity &instance, const String &db_name, const 
     return WrapQueryResult(query_result.ErrorCode(), query_result.ErrorMsg());
 }
 
-WrapQueryResult WrapDropColumns(Infinity &instance, const String &db_name, const String &table_name, Vector<String> column_names) {
+WrapQueryResult WrapDropColumns(Infinity &instance, const String &db_name, const String &table_name, std::vector<String> column_names) {
     auto query_result = instance.DropColumns(db_name, table_name, std::move(column_names));
     return WrapQueryResult(query_result.ErrorCode(), query_result.ErrorMsg());
 }

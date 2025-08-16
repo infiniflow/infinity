@@ -13,14 +13,14 @@
 // limitations under the License.
 
 #ifdef CI
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 import infinity_core;
 import base_test;
 import request_test;
 #else
 module;
 
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 
 module infinity_core:ut.index_request;
 
@@ -49,28 +49,28 @@ INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
 
 TEST_P(TestIndexRequest, index_scan) {
     {
-        String create_table_sql = "create table t1(c1 int, c2 varchar)";
+        std::string create_table_sql = "create table t1(c1 int, c2 varchar)";
         std::unique_ptr<QueryContext> query_context = MakeQueryContext();
         QueryResult query_result = query_context->Query(create_table_sql);
         bool ok = HandleQueryResult(query_result);
         EXPECT_TRUE(ok);
     }
     {
-        String append_req_sql = "insert into t1 values(1, 'abc'), (2, 'def')";
+        std::string append_req_sql = "insert into t1 values(1, 'abc'), (2, 'def')";
         std::unique_ptr<QueryContext> query_context = MakeQueryContext();
         QueryResult query_result = query_context->Query(append_req_sql);
         bool ok = HandleQueryResult(query_result);
         EXPECT_TRUE(ok);
     }
     {
-        String create_index_sql = "create index idx1 on t1(c1)";
+        std::string create_index_sql = "create index idx1 on t1(c1)";
         std::unique_ptr<QueryContext> query_context = MakeQueryContext();
         QueryResult query_result = query_context->Query(create_index_sql);
         bool ok = HandleQueryResult(query_result);
         EXPECT_TRUE(ok);
     }
     {
-        String search_req_sql = "select * from t1 where c1 > 1";
+        std::string search_req_sql = "select * from t1 where c1 > 1";
         std::unique_ptr<QueryContext> query_context = MakeQueryContext();
         QueryResult query_result = query_context->Query(search_req_sql);
 
@@ -94,28 +94,28 @@ TEST_P(TestIndexRequest, index_scan) {
 
 TEST_P(TestIndexRequest, fulltext_index_scan) {
     {
-        String create_table_sql = "create table t1(c1 int, c2 varchar)";
+        std::string create_table_sql = "create table t1(c1 int, c2 varchar)";
         std::unique_ptr<QueryContext> query_context = MakeQueryContext();
         QueryResult query_result = query_context->Query(create_table_sql);
         bool ok = HandleQueryResult(query_result);
         EXPECT_TRUE(ok);
     }
     {
-        String append_req_sql = "insert into t1 values(1, 'abc'), (2, 'def')";
+        std::string append_req_sql = "insert into t1 values(1, 'abc'), (2, 'def')";
         std::unique_ptr<QueryContext> query_context = MakeQueryContext();
         QueryResult query_result = query_context->Query(append_req_sql);
         bool ok = HandleQueryResult(query_result);
         EXPECT_TRUE(ok);
     }
     {
-        String create_index_sql = "create index idx2 on t1(c2) using fulltext";
+        std::string create_index_sql = "create index idx2 on t1(c2) using fulltext";
         std::unique_ptr<QueryContext> query_context = MakeQueryContext();
         QueryResult query_result = query_context->Query(create_index_sql);
         bool ok = HandleQueryResult(query_result);
         EXPECT_TRUE(ok);
     }
     {
-        String search_req_sql = "select * from t1 search match text ('c2', 'def', 'topn=1')";
+        std::string search_req_sql = "select * from t1 search match text ('c2', 'def', 'topn=1')";
         std::unique_ptr<QueryContext> query_context = MakeQueryContext();
         QueryResult query_result = query_context->Query(search_req_sql);
 
@@ -138,21 +138,21 @@ TEST_P(TestIndexRequest, fulltext_index_scan) {
 
 TEST_P(TestIndexRequest, vector_index_scan) {
     {
-        String create_table_sql = "create table t1(c1 int, c2 embedding(float, 4))";
+        std::string create_table_sql = "create table t1(c1 int, c2 embedding(float, 4))";
         std::unique_ptr<QueryContext> query_context = MakeQueryContext();
         QueryResult query_result = query_context->Query(create_table_sql);
         bool ok = HandleQueryResult(query_result);
         EXPECT_TRUE(ok);
     }
     {
-        String append_req_sql = "insert into t1 values(1, [0.1, 0.1, 0.1, 0.1]), (2, [0.2, 0.2, 0.2, 0.2])";
+        std::string append_req_sql = "insert into t1 values(1, [0.1, 0.1, 0.1, 0.1]), (2, [0.2, 0.2, 0.2, 0.2])";
         std::unique_ptr<QueryContext> query_context = MakeQueryContext();
         QueryResult query_result = query_context->Query(append_req_sql);
         bool ok = HandleQueryResult(query_result);
         EXPECT_TRUE(ok);
     }
-    auto search_vec = [this](const String &index_name = "") {
-        String search_req_sql;
+    auto search_vec = [this](const std::string &index_name = "") {
+        std::string search_req_sql;
         if (index_name.empty()) {
             search_req_sql = "select c1 from t1 search match vector (c2, [0.3, 0.3, 0.2, 0.2], 'float', 'l2', 1)";
         } else {
@@ -172,7 +172,7 @@ TEST_P(TestIndexRequest, vector_index_scan) {
     };
     search_vec();
     {
-        String create_index_sql = "create index idx1 on t1(c2) using hnsw with (M=16, ef_construction=200, metric=l2)";
+        std::string create_index_sql = "create index idx1 on t1(c2) using hnsw with (M=16, ef_construction=200, metric=l2)";
         std::unique_ptr<QueryContext> query_context = MakeQueryContext();
         QueryResult query_result = query_context->Query(create_index_sql);
         bool ok = HandleQueryResult(query_result);
@@ -181,7 +181,7 @@ TEST_P(TestIndexRequest, vector_index_scan) {
     search_vec("");
     search_vec("idx1");
     {
-        String create_index_sql = "create index idx2 on t1(c2) using ivf with (metric=l2)";
+        std::string create_index_sql = "create index idx2 on t1(c2) using ivf with (metric=l2)";
         std::unique_ptr<QueryContext> query_context = MakeQueryContext();
         QueryResult query_result = query_context->Query(create_index_sql);
         bool ok = HandleQueryResult(query_result);
@@ -192,21 +192,21 @@ TEST_P(TestIndexRequest, vector_index_scan) {
 
 TEST_P(TestIndexRequest, sparse_index_scan) {
     {
-        String create_table_sql = "create table t1(c1 int, c2 sparse(float, 100))";
+        std::string create_table_sql = "create table t1(c1 int, c2 sparse(float, 100))";
         std::unique_ptr<QueryContext> query_context = MakeQueryContext();
         QueryResult query_result = query_context->Query(create_table_sql);
         bool ok = HandleQueryResult(query_result);
         EXPECT_TRUE(ok);
     }
     {
-        String append_req_sql = "insert into t1 values(1, [10:1.0, 20:1.0, 30:1.0]), (2, [40:1.0,50:1.0,60:1.0  ])";
+        std::string append_req_sql = "insert into t1 values(1, [10:1.0, 20:1.0, 30:1.0]), (2, [40:1.0,50:1.0,60:1.0  ])";
         std::unique_ptr<QueryContext> query_context = MakeQueryContext();
         QueryResult query_result = query_context->Query(append_req_sql);
         bool ok = HandleQueryResult(query_result);
         EXPECT_TRUE(ok);
     }
     auto search_vec = [this] {
-        String search_req_sql = "select c1 from t1 search match sparse (c2, [20:1.0,30:1.0,40:1.0], 'ip', 1)";
+        std::string search_req_sql = "select c1 from t1 search match sparse (c2, [20:1.0,30:1.0,40:1.0], 'ip', 1)";
         std::unique_ptr<QueryContext> query_context = MakeQueryContext();
         QueryResult query_result = query_context->Query(search_req_sql);
         DataTable *result_table = nullptr;
@@ -221,7 +221,7 @@ TEST_P(TestIndexRequest, sparse_index_scan) {
     };
     search_vec();
     {
-        String create_index_sql = "create index idx2 on t1(c2) using bmp with (block_size=8, compress_type=compress)";
+        std::string create_index_sql = "create index idx2 on t1(c2) using bmp with (block_size=8, compress_type=compress)";
         std::unique_ptr<QueryContext> query_context = MakeQueryContext();
         QueryResult query_result = query_context->Query(create_index_sql);
         bool ok = HandleQueryResult(query_result);
@@ -232,7 +232,7 @@ TEST_P(TestIndexRequest, sparse_index_scan) {
 
 TEST_P(TestIndexRequest, tensor_index_scan) {
     auto search_tensor = [this] {
-        String search_req_sql = "select c1 from t1 search match tensor(c2, [0.4,0.5,0.6,0.7], 'float', 'maxsim', '')";
+        std::string search_req_sql = "select c1 from t1 search match tensor(c2, [0.4,0.5,0.6,0.7], 'float', 'maxsim', '')";
         std::unique_ptr<QueryContext> query_context = MakeQueryContext();
         QueryResult query_result = query_context->Query(search_req_sql);
         DataTable *result_table = nullptr;
@@ -247,21 +247,21 @@ TEST_P(TestIndexRequest, tensor_index_scan) {
     };
     auto test = [&](bool use_index) {
         {
-            String create_table_sql = "create table t1(c1 int, c2 tensor(float, 4))";
+            std::string create_table_sql = "create table t1(c1 int, c2 tensor(float, 4))";
             std::unique_ptr<QueryContext> query_context = MakeQueryContext();
             QueryResult query_result = query_context->Query(create_table_sql);
             bool ok = HandleQueryResult(query_result);
             EXPECT_TRUE(ok);
         }
         if (use_index) {
-            String create_index_sql = "create index idx1 on t1(c2) using emvb with(pq_subspace_num=4, pq_subspace_bits=8)";
+            std::string create_index_sql = "create index idx1 on t1(c2) using emvb with(pq_subspace_num=4, pq_subspace_bits=8)";
             std::unique_ptr<QueryContext> query_context = MakeQueryContext();
             QueryResult query_result = query_context->Query(create_index_sql);
             bool ok = HandleQueryResult(query_result);
             EXPECT_TRUE(ok);
         }
         {
-            String append_req_sql = "insert into t1 values(1, [0.0,1.0,2.0,3.0]), (2, [0.0,1.0,2.0,3.0,4.0,5.0,6.0,7.0])";
+            std::string append_req_sql = "insert into t1 values(1, [0.0,1.0,2.0,3.0]), (2, [0.0,1.0,2.0,3.0,4.0,5.0,6.0,7.0])";
             std::unique_ptr<QueryContext> query_context = MakeQueryContext();
             QueryResult query_result = query_context->Query(append_req_sql);
             bool ok = HandleQueryResult(query_result);
@@ -269,7 +269,7 @@ TEST_P(TestIndexRequest, tensor_index_scan) {
         }
         search_tensor();
         {
-            String create_table_sql = "drop table t1";
+            std::string create_table_sql = "drop table t1";
             std::unique_ptr<QueryContext> query_context = MakeQueryContext();
             QueryResult query_result = query_context->Query(create_table_sql);
             bool ok = HandleQueryResult(query_result);
@@ -282,35 +282,35 @@ TEST_P(TestIndexRequest, tensor_index_scan) {
 
 TEST_P(TestIndexRequest, test_optimize_index) {
     {
-        String create_table_sql = "create table t1(c1 int, c2 embedding(float, 4))";
+        std::string create_table_sql = "create table t1(c1 int, c2 embedding(float, 4))";
         std::unique_ptr<QueryContext> query_context = MakeQueryContext();
         QueryResult query_result = query_context->Query(create_table_sql);
         bool ok = HandleQueryResult(query_result);
         EXPECT_TRUE(ok);
     }
     {
-        String create_index_sql = "create index idx1 on t1(c2) using hnsw with (M=16, ef_construction=200, metric=l2,encode=lvq)";
+        std::string create_index_sql = "create index idx1 on t1(c2) using hnsw with (M=16, ef_construction=200, metric=l2,encode=lvq)";
         std::unique_ptr<QueryContext> query_context = MakeQueryContext();
         QueryResult query_result = query_context->Query(create_index_sql);
         bool ok = HandleQueryResult(query_result);
         EXPECT_TRUE(ok);
     }
     {
-        String append_req_sql = "insert into t1 values(1, [0.1, 0.1, 0.1, 0.1]), (2, [0.2, 0.2, 0.2, 0.2])";
+        std::string append_req_sql = "insert into t1 values(1, [0.1, 0.1, 0.1, 0.1]), (2, [0.2, 0.2, 0.2, 0.2])";
         std::unique_ptr<QueryContext> query_context = MakeQueryContext();
         QueryResult query_result = query_context->Query(append_req_sql);
         bool ok = HandleQueryResult(query_result);
         EXPECT_TRUE(ok);
     }
     {
-        String optimize_index_sql = "optimize idx1 on t1 with(lvq_avg)";
+        std::string optimize_index_sql = "optimize idx1 on t1 with(lvq_avg)";
         std::unique_ptr<QueryContext> query_context = MakeQueryContext();
         QueryResult query_result = query_context->Query(optimize_index_sql);
         bool ok = HandleQueryResult(query_result);
         EXPECT_TRUE(ok);
     }
     {
-        String search_req_sql = "select c1 from t1 search match vector (c2, [0.3, 0.3, 0.2, 0.2], 'float', 'l2', 1)";
+        std::string search_req_sql = "select c1 from t1 search match vector (c2, [0.3, 0.3, 0.2, 0.2], 'float', 'l2', 1)";
         std::unique_ptr<QueryContext> query_context = MakeQueryContext();
         QueryResult query_result = query_context->Query(search_req_sql);
         DataTable *result_table = nullptr;

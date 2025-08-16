@@ -13,13 +13,13 @@
 // limitations under the License.
 
 #ifdef CI
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 import infinity_core;
 import base_test;
 #else
 module;
 
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 
 module infinity_core:ut.sql_file_parsing_test;
 
@@ -45,17 +45,25 @@ TEST_F(SQLFileParsingTest, tpch) {
     std::shared_ptr<SQLParser> parser = std::make_shared<SQLParser>();
     std::shared_ptr<ParserResult> result = std::make_shared<ParserResult>();
 
+    auto GetFilesFromDir = [](const std::string &path) {
+        std::vector<std::string> result;
+        for (auto &i : std::filesystem::directory_iterator(path)) {
+            result.emplace_back(i.path().string());
+        }
+        return result;
+    };
+
     // Get all tpch sql text;
-    String path = String(test_data_path()) + "/tpch";
-    Vector<String> files = GetFilesFromDir(path);
+    std::string path = std::string(test_data_path()) + "/tpch";
+    std::vector<std::string> files = GetFilesFromDir(path);
     size_t file_count = files.size();
     for (size_t idx = 0; idx < file_count; ++idx) {
-        const String &filename = files[idx];
+        const std::string &filename = files[idx];
         if (filename == "README.md") {
             continue;
         }
         std::ifstream t(filename);
-        String input_sql((std::istreambuf_iterator<char>(t)), std::istreambuf_iterator<char>());
+        std::string input_sql((std::istreambuf_iterator<char>(t)), std::istreambuf_iterator<char>());
         parser->Parse(input_sql, result.get());
         result->Reset();
     }
@@ -63,9 +71,9 @@ TEST_F(SQLFileParsingTest, tpch) {
 
 namespace infinity {
 
-void ReadSQLs(const String &file_path, Vector<String> &sqls) {
+void ReadSQLs(const std::string &file_path, std::vector<std::string> &sqls) {
     std::ifstream infile(file_path);
-    String line;
+    std::string line;
     while (std::getline(infile, line)) {
         std::istringstream iss(line);
         // Skip comments.
@@ -88,12 +96,12 @@ TEST_F(SQLFileParsingTest, hyrise) {
     std::shared_ptr<ParserResult> result = std::make_shared<ParserResult>();
 
     // Get all tpch sql text;
-    String good_sql = String(test_data_path()) + "/hyrise/good.sql";
-    String bad_sql = String(test_data_path()) + "/hyrise/bad.sql";
-    Path good_sql_path(good_sql);
-    Path bad_sql_path(bad_sql);
+    std::string good_sql = std::string(test_data_path()) + "/hyrise/good.sql";
+    std::string bad_sql = std::string(test_data_path()) + "/hyrise/bad.sql";
+    std::filesystem::path good_sql_path(good_sql);
+    std::filesystem::path bad_sql_path(bad_sql);
 
-    Vector<String> sqls;
+    std::vector<std::string> sqls;
     ReadSQLs(good_sql_path, sqls);
     for (auto &input_sql : sqls) {
         //        std::cout << input_sql << std::endl;
@@ -116,10 +124,10 @@ TEST_F(SQLFileParsingTest, infinity) {
     std::shared_ptr<ParserResult> result = std::make_shared<ParserResult>();
 
     // Get all tpch sql text;
-    String good_sql = String(test_data_path()) + "/infinity/good.sql";
-    Path good_sql_path(good_sql);
+    std::string good_sql = std::string(test_data_path()) + "/infinity/good.sql";
+    std::filesystem::path good_sql_path(good_sql);
 
-    Vector<String> sqls;
+    std::vector<std::string> sqls;
     ReadSQLs(good_sql_path, sqls);
     for (auto &input_sql : sqls) {
         //        std::cout << input_sql << std::endl;

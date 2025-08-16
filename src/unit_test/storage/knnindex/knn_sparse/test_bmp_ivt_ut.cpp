@@ -13,13 +13,13 @@
 // limitations under the License.
 
 #ifdef CI
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 import infinity_core;
 import base_test;
 #else
 module;
 
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 
 module infinity_core:ut.test_bmp_ivt;
 
@@ -52,8 +52,8 @@ protected:
 
         const SparseMatrix dataset = SparseTestUtil<DataType, IdxType>::GenerateDataset(nrow, ncol, sparsity, 0.0, 10.0);
 
-        String save_path = String(tmp_data_path()) + "/bmpivt_test1.index";
-        // String save2_path = String(tmp_data_path()) + "/bmpivt_test2.index";
+        std::string save_path = std::string(tmp_data_path()) + "/bmpivt_test1.index";
+        // std::string save2_path = std::string(tmp_data_path()) + "/bmpivt_test2.index";
 
         auto check = [&](const BMPIvt1 &ivt1, const BMPIvt2 &ivt2, BMPBlockID block_num) {
             for (BMPBlockID block_id = 0; block_id < block_num; ++block_id) {

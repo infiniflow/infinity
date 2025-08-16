@@ -14,14 +14,12 @@
 
 #ifdef CI
 #include "unit_test/gtest_expand.h"
-#include "gtest/gtest.h"
 import infinity_core;
 import base_test;
 #else
 module;
 
 #include "unit_test/gtest_expand.h"
-#include "gtest/gtest.h"
 
 module infinity_core:ut.tiny_integer_cast;
 
@@ -169,7 +167,7 @@ TEST_F(TinyIntegerCastTest, tiny_integer_cast0) {
     {
         TinyIntT source;
         VarcharT target;
-        String src_str, tgt_str;
+        std::string src_str, tgt_str;
 
         std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kVarchar);
         std::shared_ptr<ColumnVector> col_varchar_ptr = std::make_shared<ColumnVector>(data_type);
@@ -391,9 +389,9 @@ TEST_F(TinyIntegerCastTest, tiny_integer_cast1) {
         EXPECT_TRUE(result);
         for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
             i8 check_value = static_cast<i8>(i);
-            String check_str(std::to_string(check_value));
+            std::string check_str(std::to_string(check_value));
             Value vx = col_target->GetValueByIndex(i);
-            const String &s2 = vx.GetVarchar();
+            const std::string &s2 = vx.GetVarchar();
             EXPECT_STREQ(s2.c_str(), check_str.c_str());
         }
     }

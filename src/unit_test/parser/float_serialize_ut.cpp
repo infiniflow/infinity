@@ -1,26 +1,12 @@
 
 #ifdef CI
 #include "unit_test/gtest_expand.h"
-#include "gtest/gtest.h"
-#include <cassert>
-#include <charconv>
-#include <cstdio>
-#include <iostream>
-#include <limits>
-#include <string>
 import infinity_core;
 import base_test;
 #else
 module;
 
 #include "unit_test/gtest_expand.h"
-#include "gtest/gtest.h"
-#include <cassert>
-#include <charconv>
-#include <cstdio>
-#include <iostream>
-#include <limits>
-#include <string>
 
 module infinity_core:ut.float_serialize;
 

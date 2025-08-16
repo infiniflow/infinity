@@ -13,17 +13,13 @@
 // limitations under the License.
 
 #ifdef CI
-#include "gtest/gtest.h"
-#include <cstdint>
-#include <random>
+#include "unit_test/gtest_expand.h"
 import infinity_core;
 import base_test;
 #else
 module;
 
-#include "gtest/gtest.h"
-// #include <cstdint>
-// #include <random>
+#include "unit_test/gtest_expand.h"
 
 module infinity_core:ut.test_dist_func2;
 
@@ -90,8 +86,8 @@ TEST_F(DistFuncTest2, test2) {
         const auto &vec_store_meta = lvq_store.vec_store_meta();
         float dist1 = distance(query, i, lvq_store);
 
-        Vector<float> qv1(dim);
-        Vector<float> qv2(dim);
+        std::vector<float> qv1(dim);
+        std::vector<float> qv2(dim);
         {
             const auto *c1 = lvq1->compress_vec_;
             const auto *c2 = lvq2->compress_vec_;

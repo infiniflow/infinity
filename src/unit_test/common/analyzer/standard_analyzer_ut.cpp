@@ -13,13 +13,13 @@
 // limitations under the License.
 
 #ifdef CI
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 import infinity_core;
 import base_test;
 #else
 module;
 
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 
 module infinity_core:ut.standard_analyzer;
 
@@ -39,17 +39,17 @@ class StandardAnalyzerTest : public BaseTest {};
 TEST_F(StandardAnalyzerTest, test1) {
     StandardAnalyzer analyzer;
     TermList term_list;
-    String input("Boost unit tests.");
+    std::string input("Boost unit tests.");
     analyzer.InitStemmer(STEM_LANG_ENGLISH);
     analyzer.SetExtractEngStem(false);
     analyzer.Analyze(input, term_list);
 
     ASSERT_EQ(term_list.size(), 3U);
-    ASSERT_EQ(term_list[0].text_, String("boost"));
+    ASSERT_EQ(term_list[0].text_, std::string("boost"));
     ASSERT_EQ(term_list[0].word_offset_, 0U);
-    ASSERT_EQ(term_list[1].text_, String("unit"));
+    ASSERT_EQ(term_list[1].text_, std::string("unit"));
     ASSERT_EQ(term_list[1].word_offset_, 1U);
-    ASSERT_EQ(term_list[2].text_, String("tests"));
+    ASSERT_EQ(term_list[2].text_, std::string("tests"));
     ASSERT_EQ(term_list[2].word_offset_, 2U);
     //    ASSERT_EQ(term_list[3].text_, PLACE_HOLDER);
     //    ASSERT_EQ(term_list[3].word_offset_, 3U);
@@ -58,18 +58,18 @@ TEST_F(StandardAnalyzerTest, test1) {
 TEST_F(StandardAnalyzerTest, test2) {
     StandardAnalyzer analyzer;
     TermList term_list;
-    String input("Boost unit tests.");
+    std::string input("Boost unit tests.");
     analyzer.InitStemmer(STEM_LANG_ENGLISH);
     analyzer.SetExtractEngStem(false);
     analyzer.SetCaseSensitive(true, false);
     analyzer.Analyze(input, term_list);
 
     ASSERT_EQ(term_list.size(), 3U);
-    ASSERT_EQ(term_list[0].text_, String("Boost"));
+    ASSERT_EQ(term_list[0].text_, std::string("Boost"));
     ASSERT_EQ(term_list[0].word_offset_, 0U);
-    ASSERT_EQ(term_list[1].text_, String("unit"));
+    ASSERT_EQ(term_list[1].text_, std::string("unit"));
     ASSERT_EQ(term_list[1].word_offset_, 1U);
-    ASSERT_EQ(term_list[2].text_, String("tests"));
+    ASSERT_EQ(term_list[2].text_, std::string("tests"));
     ASSERT_EQ(term_list[2].word_offset_, 2U);
     //    ASSERT_EQ(term_list[3].text_, PLACE_HOLDER);
     //    ASSERT_EQ(term_list[3].word_offset_, 3U);
@@ -78,18 +78,18 @@ TEST_F(StandardAnalyzerTest, test2) {
 TEST_F(StandardAnalyzerTest, test3) {
     StandardAnalyzer analyzer;
     TermList term_list;
-    String input("Boost unit tests.");
+    std::string input("Boost unit tests.");
     analyzer.InitStemmer(STEM_LANG_ENGLISH);
     analyzer.Analyze(input, term_list);
 
     ASSERT_EQ(term_list.size(), 4U);
-    ASSERT_EQ(term_list[0].text_, String("boost"));
+    ASSERT_EQ(term_list[0].text_, std::string("boost"));
     ASSERT_EQ(term_list[0].word_offset_, 0U);
-    ASSERT_EQ(term_list[1].text_, String("unit"));
+    ASSERT_EQ(term_list[1].text_, std::string("unit"));
     ASSERT_EQ(term_list[1].word_offset_, 1U);
-    ASSERT_EQ(term_list[2].text_, String("tests"));
+    ASSERT_EQ(term_list[2].text_, std::string("tests"));
     ASSERT_EQ(term_list[2].word_offset_, 2U);
-    ASSERT_EQ(term_list[3].text_, String("test"));
+    ASSERT_EQ(term_list[3].text_, std::string("test"));
     ASSERT_EQ(term_list[3].word_offset_, 2U);
     //    ASSERT_EQ(term_list[3].text_, PLACE_HOLDER);
     //    ASSERT_EQ(term_list[3].word_offset_, 3U);
@@ -98,20 +98,20 @@ TEST_F(StandardAnalyzerTest, test3) {
 TEST_F(StandardAnalyzerTest, test4) {
     StandardAnalyzer analyzer;
     TermList term_list;
-    String input("Boost unit tests.");
+    std::string input("Boost unit tests.");
     analyzer.InitStemmer(STEM_LANG_ENGLISH);
     analyzer.SetExtractEngStem(false);
     analyzer.SetCaseSensitive(true, true);
     analyzer.Analyze(input, term_list);
 
     ASSERT_EQ(term_list.size(), 4U);
-    ASSERT_EQ(term_list[0].text_, String("Boost"));
+    ASSERT_EQ(term_list[0].text_, std::string("Boost"));
     ASSERT_EQ(term_list[0].word_offset_, 0U);
-    ASSERT_EQ(term_list[1].text_, String("boost"));
+    ASSERT_EQ(term_list[1].text_, std::string("boost"));
     ASSERT_EQ(term_list[1].word_offset_, 0U);
-    ASSERT_EQ(term_list[2].text_, String("unit"));
+    ASSERT_EQ(term_list[2].text_, std::string("unit"));
     ASSERT_EQ(term_list[2].word_offset_, 1U);
-    ASSERT_EQ(term_list[3].text_, String("tests"));
+    ASSERT_EQ(term_list[3].text_, std::string("tests"));
     ASSERT_EQ(term_list[3].word_offset_, 2U);
     //    ASSERT_EQ(term_list[3].text_, PLACE_HOLDER);
     //    ASSERT_EQ(term_list[3].word_offset_, 3U);
@@ -122,15 +122,15 @@ TEST_F(StandardAnalyzerTest, test5) {
     TermList term_list;
     analyzer.InitStemmer(STEM_LANG_ENGLISH);
     analyzer.SetExtractEngStem(false);
-    String input("BoostBoostboostBoostboost unit tests.");
+    std::string input("BoostBoostboostBoostboost unit tests.");
     analyzer.Analyze(input, term_list);
 
     ASSERT_EQ(term_list.size(), 3U);
-    ASSERT_EQ(term_list[0].text_, String("boostboostboostboostboost"));
+    ASSERT_EQ(term_list[0].text_, std::string("boostboostboostboostboost"));
     ASSERT_EQ(term_list[0].word_offset_, 0U);
-    ASSERT_EQ(term_list[1].text_, String("unit"));
+    ASSERT_EQ(term_list[1].text_, std::string("unit"));
     ASSERT_EQ(term_list[1].word_offset_, 1U);
-    ASSERT_EQ(term_list[2].text_, String("tests"));
+    ASSERT_EQ(term_list[2].text_, std::string("tests"));
     ASSERT_EQ(term_list[2].word_offset_, 2U);
     //    ASSERT_EQ(term_list[3].text_, PLACE_HOLDER);
     //    ASSERT_EQ(term_list[3].word_offset_, 3U);
@@ -139,11 +139,11 @@ TEST_F(StandardAnalyzerTest, test5) {
 TEST_F(StandardAnalyzerTest, test6) {
     StandardAnalyzer analyzer;
     TermList term_list;
-    String input("2012-01-02 unit tests.");
+    std::string input("2012-01-02 unit tests.");
     TokenizeConfig token_config;
-    String allow_str("-");
-    String divide_str("@#$");
-    String unite_str("/");
+    std::string allow_str("-");
+    std::string divide_str("@#$");
+    std::string unite_str("/");
     token_config.AddAllows(allow_str);
     token_config.AddDivides(divide_str);
     token_config.AddUnites(unite_str);
@@ -151,11 +151,11 @@ TEST_F(StandardAnalyzerTest, test6) {
     analyzer.Analyze(input, term_list);
 
     ASSERT_EQ(term_list.size(), 3U);
-    ASSERT_EQ(term_list[0].text_, String("2012-01-02"));
+    ASSERT_EQ(term_list[0].text_, std::string("2012-01-02"));
     ASSERT_EQ(term_list[0].word_offset_, 0U);
-    ASSERT_EQ(term_list[1].text_, String("unit"));
+    ASSERT_EQ(term_list[1].text_, std::string("unit"));
     ASSERT_EQ(term_list[1].word_offset_, 1U);
-    ASSERT_EQ(term_list[2].text_, String("tests"));
+    ASSERT_EQ(term_list[2].text_, std::string("tests"));
     ASSERT_EQ(term_list[2].word_offset_, 2U);
     //    ASSERT_EQ(term_list[3].text_, PLACE_HOLDER);
     //    ASSERT_EQ(term_list[3].word_offset_, 3U);
@@ -167,14 +167,14 @@ TEST_F(StandardAnalyzerTest, test7) {
     analyzer.SetExtractEngStem(true);
     analyzer.SetCharOffset(true);
     TokenizeConfig token_config;
-    String divide_str("@#$");
-    String unite_str("/");
+    std::string divide_str("@#$");
+    std::string unite_str("/");
     token_config.AddAllows("-");
     token_config.AddDivides(divide_str);
     token_config.AddUnites(unite_str);
     analyzer.SetTokenizerConfig(token_config);
     TermList term_list;
-    Vector<String> queries = {
+    std::vector<std::string> queries = {
         R"#({{Redirect|Anarchist|the fictional character|Anarchist (comics)}} {{Redirect|Anarchists}} {{Anarchism sidebar}} {{Libertarianism
          sidebar}}  '''Anarchism''' is generally defined as the [[political philosophy]] which holds the [[state (polity)|state]] to be undesirable,
          unnecessary, and harmful,<ref name="definition"> {{Cite journal|last=Malatesta|first=Errico|title=Towards

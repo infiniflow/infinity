@@ -15,7 +15,7 @@
 #ifndef CI
 module;
 
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 
 module infinity_core:ut.replay_append_delete;
 
@@ -50,7 +50,7 @@ import :buffer_obj;
 import :secondary_index_in_mem;
 import :memory_indexer;
 #else
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 import infinity_core;
 import base_test;
 import replay_test;
@@ -75,20 +75,20 @@ INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
 TEST_P(TestTxnReplayAppend, test_append0) {
     using namespace infinity;
 
-    std::shared_ptr<String> db_name = std::make_shared<String>("db1");
+    std::shared_ptr<std::string> db_name = std::make_shared<std::string>("db1");
     auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
     auto column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
     auto table_name = std::make_shared<std::string>("tb1");
-    auto table_def = TableDef::Make(db_name, table_name, std::make_shared<String>(), {column_def1, column_def2});
+    auto table_def = TableDef::Make(db_name, table_name, std::make_shared<std::string>(), {column_def1, column_def2});
     {
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("create db"), TransactionType::kNormal);
-        Status status = txn->CreateDatabase(*db_name, ConflictType::kError, std::make_shared<String>());
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kNormal);
+        Status status = txn->CreateDatabase(*db_name, ConflictType::kError, std::make_shared<std::string>());
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
     }
     {
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("create table"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
         Status status = txn->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
@@ -118,7 +118,7 @@ TEST_P(TestTxnReplayAppend, test_append0) {
     };
 
     auto append = [&] {
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("append"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("append"), TransactionType::kNormal);
         auto input_block = make_input_block(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"), 4);
         Status status = txn->Append(*db_name, *table_name, input_block);
         EXPECT_TRUE(status.ok());
@@ -131,19 +131,19 @@ TEST_P(TestTxnReplayAppend, test_append0) {
     RestartTxnMgr();
 
     {
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("scan"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kNormal);
         TxnTimeStamp begin_ts = txn->BeginTS();
         TxnTimeStamp commit_ts = txn->CommitTS();
 
-        Optional<DBMeeta> db_meta;
-        Optional<TableMeeta> table_meta;
+        std::optional<DBMeeta> db_meta;
+        std::optional<TableMeeta> table_meta;
         Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
 
-        Vector<SegmentID> *segment_ids_ptr = nullptr;
+        std::vector<SegmentID> *segment_ids_ptr = nullptr;
         std::tie(segment_ids_ptr, status) = table_meta->GetSegmentIDs1();
         EXPECT_TRUE(status.ok());
-        EXPECT_EQ(*segment_ids_ptr, Vector<SegmentID>({0}));
+        EXPECT_EQ(*segment_ids_ptr, std::vector<SegmentID>({0}));
         SegmentID segment_id = (*segment_ids_ptr)[0];
 
         SegmentMeta segment_meta(segment_id, *table_meta);
@@ -152,10 +152,10 @@ TEST_P(TestTxnReplayAppend, test_append0) {
         std::tie(segment_row_cnt, status) = segment_meta.GetRowCnt1();
         EXPECT_EQ(segment_row_cnt, 8);
 
-        Vector<BlockID> *block_ids_ptr = nullptr;
+        std::vector<BlockID> *block_ids_ptr = nullptr;
         std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1();
         EXPECT_TRUE(status.ok());
-        EXPECT_EQ(*block_ids_ptr, Vector<BlockID>({0}));
+        EXPECT_EQ(*block_ids_ptr, std::vector<BlockID>({0}));
 
         BlockID block_id = (*block_ids_ptr)[0];
         BlockMeta block_meta(block_id, segment_meta);
@@ -164,7 +164,7 @@ TEST_P(TestTxnReplayAppend, test_append0) {
         status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, commit_ts, state);
         EXPECT_TRUE(status.ok());
         {
-            Pair<BlockOffset, BlockOffset> range;
+            std::pair<BlockOffset, BlockOffset> range;
             BlockOffset offset = 0;
             bool has_next = state.Next(offset, range);
             EXPECT_TRUE(has_next);
@@ -180,13 +180,13 @@ TEST_P(TestTxnReplayAppend, test_append0) {
 TEST_P(TestTxnReplayAppend, test_replay_append_delete) {
     using namespace infinity;
 
-    std::shared_ptr<String> db_name = std::make_shared<String>("default_db");
+    std::shared_ptr<std::string> db_name = std::make_shared<std::string>("default_db");
     auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
     auto column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
     auto table_name = std::make_shared<std::string>("tb1");
-    auto table_def = TableDef::Make(db_name, table_name, std::make_shared<String>(), {column_def1, column_def2});
+    auto table_def = TableDef::Make(db_name, table_name, std::make_shared<std::string>(), {column_def1, column_def2});
     {
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("create table"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
         Status status = txn->CreateTable(*db_name, table_def, ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
@@ -213,7 +213,7 @@ TEST_P(TestTxnReplayAppend, test_replay_append_delete) {
         input_block->Finalize();
     }
     for (int i = 0; i < 2; ++i) {
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("append"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("append"), TransactionType::kNormal);
 
         Status status = txn->Append(*db_name, *table_name, input_block);
         EXPECT_TRUE(status.ok());
@@ -224,8 +224,8 @@ TEST_P(TestTxnReplayAppend, test_replay_append_delete) {
     RestartTxnMgr();
 
     {
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("delete"), TransactionType::kNormal);
-        Vector<RowID> row_ids;
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("delete"), TransactionType::kNormal);
+        std::vector<RowID> row_ids;
         row_ids.push_back(RowID(0, 1));
         row_ids.push_back(RowID(0, 3));
         Status status = txn->Delete(*db_name, *table_name, row_ids);
@@ -237,19 +237,19 @@ TEST_P(TestTxnReplayAppend, test_replay_append_delete) {
     RestartTxnMgr();
 
     {
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("scan"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kNormal);
         TxnTimeStamp begin_ts = txn->BeginTS();
         TxnTimeStamp commit_ts = txn->CommitTS();
 
-        Optional<DBMeeta> db_meta;
-        Optional<TableMeeta> table_meta;
+        std::optional<DBMeeta> db_meta;
+        std::optional<TableMeeta> table_meta;
         Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
 
-        Vector<SegmentID> *segment_ids_ptr = nullptr;
+        std::vector<SegmentID> *segment_ids_ptr = nullptr;
         std::tie(segment_ids_ptr, status) = table_meta->GetSegmentIDs1();
         EXPECT_TRUE(status.ok());
-        EXPECT_EQ(*segment_ids_ptr, Vector<SegmentID>({0}));
+        EXPECT_EQ(*segment_ids_ptr, std::vector<SegmentID>({0}));
         SegmentID segment_id = (*segment_ids_ptr)[0];
 
         SegmentMeta segment_meta(segment_id, *table_meta);
@@ -258,10 +258,10 @@ TEST_P(TestTxnReplayAppend, test_replay_append_delete) {
         std::tie(segment_row_cnt, status) = segment_meta.GetRowCnt1();
         EXPECT_EQ(segment_row_cnt, 4);
 
-        Vector<BlockID> *block_ids_ptr = nullptr;
+        std::vector<BlockID> *block_ids_ptr = nullptr;
         std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1();
         EXPECT_TRUE(status.ok());
-        EXPECT_EQ(*block_ids_ptr, Vector<BlockID>({0}));
+        EXPECT_EQ(*block_ids_ptr, std::vector<BlockID>({0}));
         BlockID block_id = (*block_ids_ptr)[0];
 
         BlockMeta block_meta(block_id, segment_meta);
@@ -270,7 +270,7 @@ TEST_P(TestTxnReplayAppend, test_replay_append_delete) {
         status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, commit_ts, state);
         EXPECT_TRUE(status.ok());
         {
-            Pair<BlockOffset, BlockOffset> range;
+            std::pair<BlockOffset, BlockOffset> range;
             BlockOffset offset = 0;
             bool has_next = state.Next(offset, range);
             EXPECT_TRUE(has_next);
@@ -291,25 +291,25 @@ TEST_P(TestTxnReplayAppend, test_replay_append_delete) {
 TEST_P(TestTxnReplayAppend, test_replay_append_with_index0) {
     using namespace infinity;
 
-    std::shared_ptr<String> db_name = std::make_shared<String>("default_db");
+    std::shared_ptr<std::string> db_name = std::make_shared<std::string>("default_db");
     auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
     auto column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
     auto table_name = std::make_shared<std::string>("tb1");
-    auto table_def = TableDef::Make(db_name, table_name, std::make_shared<String>(), {column_def1, column_def2});
+    auto table_def = TableDef::Make(db_name, table_name, std::make_shared<std::string>(), {column_def1, column_def2});
 
     auto index_name1 = std::make_shared<std::string>("index1");
-    auto index_def1 = IndexSecondary::Make(index_name1, std::make_shared<String>(), "file_name", {column_def1->name()});
-    auto index_name2 = std::make_shared<String>("index2");
-    auto index_def2 = IndexFullText::Make(index_name2, std::make_shared<String>(), "file_name", {column_def2->name()}, {});
+    auto index_def1 = IndexSecondary::Make(index_name1, std::make_shared<std::string>(), "file_name", {column_def1->name()});
+    auto index_name2 = std::make_shared<std::string>("index2");
+    auto index_def2 = IndexFullText::Make(index_name2, std::make_shared<std::string>(), "file_name", {column_def2->name()}, {});
     {
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("create table"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
         Status status = txn->CreateTable(*db_name, table_def, ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
     }
     auto create_index = [&](const std::shared_ptr<IndexBase> &index_base) {
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>(fmt::format("create index {}", *index_base->index_name_)), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("create index {}", *index_base->index_name_)), TransactionType::kNormal);
         Status status = txn->CreateIndex(*db_name, *table_name, index_base, ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
@@ -345,7 +345,7 @@ TEST_P(TestTxnReplayAppend, test_replay_append_with_index0) {
     };
 
     for (int i = 0; i < 2; ++i) {
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("append"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("append"), TransactionType::kNormal);
         Status status = txn->Append(*db_name, *table_name, make_input_block());
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
@@ -359,10 +359,10 @@ TEST_P(TestTxnReplayAppend, test_replay_append_with_index0) {
     new_txn_mgr->PrintAllKeyValue();
 
     auto check_segment_index = [&](SegmentIndexMeta &segment_index_meta,
-                                   const std::function<Pair<RowID, u32>(const std::shared_ptr<MemIndex> &)> &check_mem_index) {
+                                   const std::function<std::pair<RowID, u32>(const std::shared_ptr<MemIndex> &)> &check_mem_index) {
         auto [chunk_ids_ptr, status] = segment_index_meta.GetChunkIDs1();
         EXPECT_TRUE(status.ok());
-        EXPECT_EQ(*chunk_ids_ptr, Vector<ChunkID>({}));
+        EXPECT_EQ(*chunk_ids_ptr, std::vector<ChunkID>({}));
 
         std::shared_ptr<MemIndex> mem_index = segment_index_meta.GetMemIndex();
         ASSERT_NE(mem_index, nullptr);
@@ -372,21 +372,21 @@ TEST_P(TestTxnReplayAppend, test_replay_append_with_index0) {
         EXPECT_EQ(row_cnt, block_row_cnt * 2);
     };
 
-    auto check_index = [&](const String &index_name, const std::function<Pair<RowID, u32>(const std::shared_ptr<MemIndex> &)> &check_mem_index) {
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("check index"), TransactionType::kNormal);
+    auto check_index = [&](const std::string &index_name, const std::function<std::pair<RowID, u32>(const std::shared_ptr<MemIndex> &)> &check_mem_index) {
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("check index"), TransactionType::kNormal);
 
-        Optional<DBMeeta> db_meta;
-        Optional<TableMeeta> table_meta;
-        Optional<TableIndexMeeta> table_index_meta;
-        String table_key;
-        String index_key;
+        std::optional<DBMeeta> db_meta;
+        std::optional<TableMeeta> table_meta;
+        std::optional<TableIndexMeeta> table_index_meta;
+        std::string table_key;
+        std::string index_key;
         Status status = txn->GetTableIndexMeta(*db_name, *table_name, index_name, db_meta, table_meta, table_index_meta, &table_key, &index_key);
         EXPECT_TRUE(status.ok());
 
-        Vector<SegmentID> *segment_ids_ptr = nullptr;
+        std::vector<SegmentID> *segment_ids_ptr = nullptr;
         std::tie(segment_ids_ptr, status) = table_index_meta->GetSegmentIndexIDs1();
         EXPECT_TRUE(status.ok());
-        EXPECT_EQ(*segment_ids_ptr, Vector<SegmentID>({0}));
+        EXPECT_EQ(*segment_ids_ptr, std::vector<SegmentID>({0}));
 
         for (SegmentID segment_id : *segment_ids_ptr) {
             SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta);

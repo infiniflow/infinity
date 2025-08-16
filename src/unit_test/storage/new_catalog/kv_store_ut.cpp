@@ -15,7 +15,7 @@
 #ifndef CI
 module;
 
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 
 module infinity_core:ut.kv_store;
 
@@ -24,7 +24,7 @@ import third_party;
 import :status;
 import :kv_store;
 #else
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 import infinity_core;
 import base_test;
 #endif
@@ -278,7 +278,7 @@ TEST_P(TestTxnKVStoreTest, kv_store3) {
             status = kv_instance1->Commit();
             EXPECT_TRUE(status.ok());
 
-            const String prefix = "db|db1|";
+            const std::string prefix = "db|db1|";
             auto iter2 = kv_instance2->GetIterator();
             iter2->Seek(prefix);
             while (iter2->Valid() && iter2->Key().starts_with(prefix)) {
@@ -320,7 +320,7 @@ TEST_P(TestTxnKVStoreTest, kv_store4) {
 
         kv_store->Flush();
 
-        Vector<rocksdb::BackupInfo> backup_info_list;
+        std::vector<rocksdb::BackupInfo> backup_info_list;
         status = kv_store->CreateBackup(rocksdb_backup_path, backup_info_list);
         EXPECT_TRUE(status.ok());
 
@@ -342,7 +342,7 @@ TEST_P(TestTxnKVStoreTest, kv_store4) {
         EXPECT_TRUE(status.ok());
         {
             std::unique_ptr<KVInstance> kv_instance1 = kv_store->GetInstance();
-            const String prefix = "db|db1|";
+            const std::string prefix = "db|db1|";
             auto iter2 = kv_instance1->GetIterator();
             iter2->Seek(prefix);
             while (iter2->Valid() && iter2->Key().starts_with(prefix)) {
@@ -426,7 +426,7 @@ TEST_P(TestTxnKVStoreTest, kv_store5) {
         txn2->SetSnapshot();
         const Snapshot *snapshot = txn2->GetSnapshot();
 
-        const String prefix = "key";
+        const std::string prefix = "key";
         read_options.snapshot = snapshot;
         read_options.iterate_lower_bound = new Slice("key1");
         read_options.iterate_upper_bound = new Slice("key4");
@@ -481,7 +481,7 @@ TEST_P(TestTxnKVStoreTest, kv_store6) {
         //        auto iter2 = kv_instance1->GetIterator("key2", "key4");
         auto iter2 = kv_instance1->GetIterator();
 
-        String prefix = "";
+        std::string prefix = "";
         iter2->Seek(prefix);
         while (iter2->Valid() && iter2->Key().starts_with(prefix)) {
             std::cout << iter2->Key().ToString() << ": " << iter2->Value().ToString() << std::endl;

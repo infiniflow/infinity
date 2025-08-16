@@ -13,12 +13,7 @@
 // limitations under the License.
 module;
 
-#include "gtest/gtest.h"
-#include <filesystem>
-#include <stdlib.h>
-#include <sys/stat.h>
-#include <type_traits>
-#include <unistd.h>
+#include "gtest_expand.h"
 
 #ifdef CI
 module base_test;
@@ -118,7 +113,7 @@ template <typename T>
 void BaseTestWithParam<T>::CheckFilePaths(std::vector<std::string> &delete_file_paths, std::vector<std::string> &exist_file_paths) {
     auto *pm = infinity::InfinityContext::instance().persistence_manager();
     if (pm == nullptr) {
-        Path data_dir = this->GetFullDataDir();
+        std::filesystem::path data_dir = this->GetFullDataDir();
         for (auto &file_path : delete_file_paths) {
             file_path = data_dir / file_path;
         }
@@ -131,7 +126,7 @@ void BaseTestWithParam<T>::CheckFilePaths(std::vector<std::string> &delete_file_
             }
             EXPECT_FALSE(std::filesystem::exists(file_path));
 
-            auto path = static_cast<Path>(file_path).parent_path();
+            auto path = static_cast<std::filesystem::path>(file_path).parent_path();
             EXPECT_TRUE(!std::filesystem::exists(path) || std::filesystem::is_directory(path) && !std::filesystem::is_empty(path) ||
                         std::filesystem::is_directory(path) && std::filesystem::is_empty(path) && path == data_dir);
         }

@@ -13,13 +13,13 @@
 // limitations under the License.
 
 #ifdef CI
-#include <gtest/gtest.h>
+#include "unit_test/gtest_expand.h"
 import infinity_core;
 import base_test;
 #else
 module;
 
-#include <gtest/gtest.h>
+#include "unit_test/gtest_expand.h"
 
 module infinity_core:ut.config;
 
@@ -39,7 +39,7 @@ class ConfigTest : public BaseTest {};
 
 TEST_F(ConfigTest, test1) {
     using namespace infinity;
-    std::shared_ptr<String> path = nullptr;
+    std::shared_ptr<std::string> path = nullptr;
     Config config;
     auto status = config.Init(path, nullptr);
     ASSERT_TRUE(status.ok());
@@ -87,7 +87,7 @@ TEST_F(ConfigTest, test1) {
 
 TEST_F(ConfigTest, test2) {
     using namespace infinity;
-    std::shared_ptr<String> path = std::make_shared<String>(String(test_data_path()) + "/config/infinity_conf.toml");
+    std::shared_ptr<std::string> path = std::make_shared<std::string>(std::string(test_data_path()) + "/config/infinity_conf.toml");
     Config config;
     auto status = config.Init(path, nullptr);
     ASSERT_TRUE(status.ok());
@@ -139,7 +139,7 @@ TEST_F(ConfigTest, test2) {
 
 TEST_F(ConfigTest, TestWrongParamNames) {
     using namespace infinity;
-    std::shared_ptr<String> path = std::make_shared<String>(String(test_data_path()) + "/config/test_conf_invalid_param.toml");
+    std::shared_ptr<std::string> path = std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_conf_invalid_param.toml");
     Config config;
     auto status = config.Init(path, nullptr);
     ASSERT_FALSE(status.ok());
@@ -147,33 +147,33 @@ TEST_F(ConfigTest, TestWrongParamNames) {
 
 TEST_F(ConfigTest, TestConfInvalidValues) {
     using namespace infinity;
-    std::shared_ptr<String> path = std::make_shared<String>(String(test_data_path()) + "/config/test_conf_invalid_version.toml");
+    std::shared_ptr<std::string> path = std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_conf_invalid_version.toml");
     Config config_invalid_version;
     auto status = config_invalid_version.Init(path, nullptr);
     EXPECT_EQ(status.code(), ErrorCode::kMismatchVersion);
 
     Config config_invalid_timezone;
-    path = std::make_shared<String>(String(test_data_path()) + "/config/test_conf_invalid_timezone.toml");
+    path = std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_conf_invalid_timezone.toml");
     status = config_invalid_timezone.Init(path, nullptr);
     EXPECT_EQ(status.code(), ErrorCode::kInvalidTimezone);
 
     Config config_invalid_server_address;
-    path = std::make_shared<String>(String(test_data_path()) + "/config/test_conf_invalid_server_address.toml");
+    path = std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_conf_invalid_server_address.toml");
     status = config_invalid_server_address.Init(path, nullptr);
     EXPECT_EQ(status.code(), ErrorCode::kInvalidIPAddr);
 
     Config config_invalid_bytesize;
-    path = std::make_shared<String>(String(test_data_path()) + "/config/test_conf_invalid_bytesize.toml");
+    path = std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_conf_invalid_bytesize.toml");
     status = config_invalid_bytesize.Init(path, nullptr);
     EXPECT_EQ(status.code(), ErrorCode::kInvalidByteSize);
 
     Config config_invalid_log_level;
-    path = std::make_shared<String>(String(test_data_path()) + "/config/test_conf_invalid_log_level.toml");
+    path = std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_conf_invalid_log_level.toml");
     status = config_invalid_log_level.Init(path, nullptr);
     EXPECT_EQ(status.code(), ErrorCode::kInvalidLogLevel);
 
     Config config_invalid_timeinfo;
-    path = std::make_shared<String>(String(test_data_path()) + "/config/test_conf_invalid_timeinfo.toml");
+    path = std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_conf_invalid_timeinfo.toml");
     status = config_invalid_timeinfo.Init(path, nullptr);
     EXPECT_EQ(status.code(), ErrorCode::kInvalidTimeInfo);
 }
@@ -181,35 +181,35 @@ TEST_F(ConfigTest, TestConfInvalidValues) {
 TEST_F(ConfigTest, TestOutofRangeValues) {
 
     using namespace infinity;
-    std::shared_ptr<String> path = std::make_shared<String>(String(test_data_path()) + "/config/test_conf_out_of_bound_bytesize.toml");
+    std::shared_ptr<std::string> path = std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_conf_out_of_bound_bytesize.toml");
     Config config_bytesize;
     auto status = config_bytesize.Init(path, nullptr);
     EXPECT_EQ(status.code(), ErrorCode::kInvalidConfig);
 
     Config config_number;
-    path = std::make_shared<String>(String(test_data_path()) + "/config/test_conf_out_of_bound_number.toml");
+    path = std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_conf_out_of_bound_number.toml");
     status = config_number.Init(path, nullptr);
     EXPECT_EQ(status.code(), ErrorCode::kInvalidConfig);
 
     Config config_timeinfo;
-    path = std::make_shared<String>(String(test_data_path()) + "/config/test_conf_out_of_bound_timeinfo.toml");
+    path = std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_conf_out_of_bound_timeinfo.toml");
     status = config_timeinfo.Init(path, nullptr);
     EXPECT_EQ(status.code(), ErrorCode::kInvalidConfig);
 
     Config config_timezone;
-    path = std::make_shared<String>(String(test_data_path()) + "/config/test_conf_out_of_bound_timezone.toml");
+    path = std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_conf_out_of_bound_timezone.toml");
     status = config_timezone.Init(path, nullptr);
     EXPECT_EQ(status.code(), ErrorCode::kInvalidConfig);
 
     Config config_walflush;
-    path = std::make_shared<String>(String(test_data_path()) + "/config/test_conf_out_of_bound_walflush.toml");
+    path = std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_conf_out_of_bound_walflush.toml");
     status = config_walflush.Init(path, nullptr);
     EXPECT_EQ(status.code(), ErrorCode::kInvalidConfig);
 }
 
 TEST_F(ConfigTest, TestValidValues) {
     using namespace infinity;
-    std::shared_ptr<String> path = std::make_shared<String>(String(test_data_path()) + "/config/test_conf_valid_value.toml");
+    std::shared_ptr<std::string> path = std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_conf_valid_value.toml");
     Config config;
     auto status = config.Init(path, nullptr);
     ASSERT_TRUE(status.ok());

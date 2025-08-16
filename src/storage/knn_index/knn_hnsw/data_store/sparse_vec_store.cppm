@@ -101,8 +101,8 @@ public:
         auto data = std::make_unique_for_overwrite<DataType[]>(nnz);
         for (size_t i = 0; i < cur_vec_num; ++i) {
             const SparseVecEle &vec = vecs_[i];
-            Copy(vec.indices_.get(), vec.indices_.get() + vec.nnz_, indice.get() + indptr[i]);
-            Copy(vec.data_.get(), vec.data_.get() + vec.nnz_, data.get() + indptr[i]);
+            std::copy(vec.indices_.get(), vec.indices_.get() + vec.nnz_, indice.get() + indptr[i]);
+            std::copy(vec.data_.get(), vec.data_.get() + vec.nnz_, data.get() + indptr[i]);
             indptr[i + 1] = indptr[i] + vec.nnz_;
         }
         file_handle.Append(indptr.get(), sizeof(i32) * (cur_vec_num + 1));
@@ -129,8 +129,8 @@ public:
             vec.data_ = std::make_unique_for_overwrite<DataType[]>(vec.nnz_);
             mem_usage += sizeof(IdxType) * vec.nnz_ + sizeof(DataType) * vec.nnz_;
 
-            Copy(indice.get() + indptr[i], indice.get() + indptr[i + 1], vec.indices_.get());
-            Copy(data.get() + indptr[i], data.get() + indptr[i + 1], vec.data_.get());
+            std::copy(indice.get() + indptr[i], indice.get() + indptr[i + 1], vec.indices_.get());
+            std::copy(data.get() + indptr[i], data.get() + indptr[i + 1], vec.data_.get());
         }
         return ret;
     }
@@ -142,8 +142,8 @@ public:
         dst.data_ = std::make_unique_for_overwrite<DataType[]>(vec.nnz_);
         mem_usage += sizeof(IdxType) * vec.nnz_ + sizeof(DataType) * vec.nnz_;
 
-        Copy(vec.indices_, vec.indices_ + vec.nnz_, dst.indices_.get());
-        Copy(vec.data_, vec.data_ + vec.nnz_, dst.data_.get());
+        std::copy(vec.indices_, vec.indices_ + vec.nnz_, dst.indices_.get());
+        std::copy(vec.data_, vec.data_ + vec.nnz_, dst.data_.get());
     }
 
     SparseVecRef GetVec(size_t idx, const Meta &meta) const {

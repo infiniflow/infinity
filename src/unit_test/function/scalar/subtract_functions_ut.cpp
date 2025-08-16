@@ -13,13 +13,13 @@
 // limitations under the License.
 
 #ifdef CI
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 import infinity_core;
 import base_test;
 #else
 module;
 
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 
 module infinity_core:ut.subtract_functions;
 
@@ -68,13 +68,13 @@ TEST_F(SubtractFunctionsTest, sub_func) {
 
     RegisterSubtractFunction(catalog_ptr.get());
 
-    String op = "-";
+    std::string op = "-";
     std::shared_ptr<FunctionSet> function_set = NewCatalog::GetFunctionSetByName(catalog_ptr.get(), op);
     EXPECT_EQ(function_set->type_, FunctionType::kScalar);
     std::shared_ptr<ScalarFunctionSet> scalar_function_set = std::static_pointer_cast<ScalarFunctionSet>(function_set);
 
     {
-        Vector<std::shared_ptr<BaseExpression>> inputs;
+        std::vector<std::shared_ptr<BaseExpression>> inputs;
 
         std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kTinyInt);
         std::shared_ptr<DataType> result_type = std::make_shared<DataType>(LogicalType::kTinyInt);
@@ -87,7 +87,7 @@ TEST_F(SubtractFunctionsTest, sub_func) {
         ScalarFunction func = scalar_function_set->GetMostMatchFunction(inputs);
         EXPECT_STREQ("-(TinyInt, TinyInt)->TinyInt", func.ToString().c_str());
 
-        Vector<std::shared_ptr<DataType>> column_types;
+        std::vector<std::shared_ptr<DataType>> column_types;
         column_types.emplace_back(data_type);
         column_types.emplace_back(data_type);
 
@@ -123,7 +123,7 @@ TEST_F(SubtractFunctionsTest, sub_func) {
     }
 
     {
-        Vector<std::shared_ptr<BaseExpression>> inputs;
+        std::vector<std::shared_ptr<BaseExpression>> inputs;
 
         std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kSmallInt);
         std::shared_ptr<DataType> result_type = std::make_shared<DataType>(LogicalType::kSmallInt);
@@ -136,7 +136,7 @@ TEST_F(SubtractFunctionsTest, sub_func) {
         ScalarFunction func = scalar_function_set->GetMostMatchFunction(inputs);
         EXPECT_STREQ("-(SmallInt, SmallInt)->SmallInt", func.ToString().c_str());
 
-        Vector<std::shared_ptr<DataType>> column_types;
+        std::vector<std::shared_ptr<DataType>> column_types;
         column_types.emplace_back(data_type);
         column_types.emplace_back(data_type);
 
@@ -172,7 +172,7 @@ TEST_F(SubtractFunctionsTest, sub_func) {
     }
 
     {
-        Vector<std::shared_ptr<BaseExpression>> inputs;
+        std::vector<std::shared_ptr<BaseExpression>> inputs;
 
         std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kInteger);
         std::shared_ptr<DataType> result_type = std::make_shared<DataType>(LogicalType::kInteger);
@@ -185,7 +185,7 @@ TEST_F(SubtractFunctionsTest, sub_func) {
         ScalarFunction func = scalar_function_set->GetMostMatchFunction(inputs);
         EXPECT_STREQ("-(Integer, Integer)->Integer", func.ToString().c_str());
 
-        Vector<std::shared_ptr<DataType>> column_types;
+        std::vector<std::shared_ptr<DataType>> column_types;
         column_types.emplace_back(data_type);
         column_types.emplace_back(data_type);
 
@@ -221,7 +221,7 @@ TEST_F(SubtractFunctionsTest, sub_func) {
     }
 
     {
-        Vector<std::shared_ptr<BaseExpression>> inputs;
+        std::vector<std::shared_ptr<BaseExpression>> inputs;
 
         std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kBigInt);
         std::shared_ptr<DataType> result_type = std::make_shared<DataType>(LogicalType::kBigInt);
@@ -234,7 +234,7 @@ TEST_F(SubtractFunctionsTest, sub_func) {
         ScalarFunction func = scalar_function_set->GetMostMatchFunction(inputs);
         EXPECT_STREQ("-(BigInt, BigInt)->BigInt", func.ToString().c_str());
 
-        Vector<std::shared_ptr<DataType>> column_types;
+        std::vector<std::shared_ptr<DataType>> column_types;
         column_types.emplace_back(data_type);
         column_types.emplace_back(data_type);
 
@@ -270,7 +270,7 @@ TEST_F(SubtractFunctionsTest, sub_func) {
     }
 
     {
-        Vector<std::shared_ptr<BaseExpression>> inputs;
+        std::vector<std::shared_ptr<BaseExpression>> inputs;
 
         DataType data_type(LogicalType::kHugeInt);
         DataType result_type(LogicalType::kHugeInt);
@@ -285,7 +285,7 @@ TEST_F(SubtractFunctionsTest, sub_func) {
     }
 
     {
-        Vector<std::shared_ptr<BaseExpression>> inputs;
+        std::vector<std::shared_ptr<BaseExpression>> inputs;
 
         std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kFloat);
         std::shared_ptr<DataType> result_type = std::make_shared<DataType>(LogicalType::kFloat);
@@ -298,7 +298,7 @@ TEST_F(SubtractFunctionsTest, sub_func) {
         ScalarFunction func = scalar_function_set->GetMostMatchFunction(inputs);
         EXPECT_STREQ("-(Float, Float)->Float", func.ToString().c_str());
 
-        Vector<std::shared_ptr<DataType>> column_types;
+        std::vector<std::shared_ptr<DataType>> column_types;
         column_types.emplace_back(data_type);
         column_types.emplace_back(data_type);
 
@@ -334,7 +334,7 @@ TEST_F(SubtractFunctionsTest, sub_func) {
     }
 
     {
-        Vector<std::shared_ptr<BaseExpression>> inputs;
+        std::vector<std::shared_ptr<BaseExpression>> inputs;
 
         std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kDouble);
         std::shared_ptr<DataType> result_type = std::make_shared<DataType>(LogicalType::kDouble);
@@ -347,7 +347,7 @@ TEST_F(SubtractFunctionsTest, sub_func) {
         ScalarFunction func = scalar_function_set->GetMostMatchFunction(inputs);
         EXPECT_STREQ("-(Double, Double)->Double", func.ToString().c_str());
 
-        Vector<std::shared_ptr<DataType>> column_types;
+        std::vector<std::shared_ptr<DataType>> column_types;
         column_types.emplace_back(data_type);
         column_types.emplace_back(data_type);
 
@@ -383,7 +383,7 @@ TEST_F(SubtractFunctionsTest, sub_func) {
     }
 
     {
-        Vector<std::shared_ptr<BaseExpression>> inputs;
+        std::vector<std::shared_ptr<BaseExpression>> inputs;
 
         DataType data_type(LogicalType::kDecimal);
         DataType result_type(LogicalType::kDecimal);
@@ -398,7 +398,7 @@ TEST_F(SubtractFunctionsTest, sub_func) {
     }
 
     {
-        Vector<std::shared_ptr<BaseExpression>> inputs;
+        std::vector<std::shared_ptr<BaseExpression>> inputs;
 
         DataType data_type(LogicalType::kDecimal);
         DataType result_type(LogicalType::kDecimal);
@@ -413,7 +413,7 @@ TEST_F(SubtractFunctionsTest, sub_func) {
     }
 
     {
-        Vector<std::shared_ptr<BaseExpression>> inputs;
+        std::vector<std::shared_ptr<BaseExpression>> inputs;
 
         DataType data1_type(LogicalType::kDateTime);
         DataType data2_type(LogicalType::kInterval);
@@ -428,7 +428,7 @@ TEST_F(SubtractFunctionsTest, sub_func) {
     }
 
     {
-        Vector<std::shared_ptr<BaseExpression>> inputs;
+        std::vector<std::shared_ptr<BaseExpression>> inputs;
 
         DataType data1_type(LogicalType::kTimestamp);
         DataType data2_type(LogicalType::kInterval);
@@ -443,7 +443,7 @@ TEST_F(SubtractFunctionsTest, sub_func) {
     }
 
     {
-        Vector<std::shared_ptr<BaseExpression>> inputs;
+        std::vector<std::shared_ptr<BaseExpression>> inputs;
 
         DataType data1_type(LogicalType::kMixed);
         DataType data2_type(LogicalType::kBigInt);
@@ -458,7 +458,7 @@ TEST_F(SubtractFunctionsTest, sub_func) {
     }
 
     {
-        Vector<std::shared_ptr<BaseExpression>> inputs;
+        std::vector<std::shared_ptr<BaseExpression>> inputs;
 
         DataType data1_type(LogicalType::kBigInt);
         DataType data2_type(LogicalType::kMixed);
@@ -473,7 +473,7 @@ TEST_F(SubtractFunctionsTest, sub_func) {
     }
 
     {
-        Vector<std::shared_ptr<BaseExpression>> inputs;
+        std::vector<std::shared_ptr<BaseExpression>> inputs;
 
         DataType data1_type(LogicalType::kMixed);
         DataType data2_type(LogicalType::kDouble);
@@ -488,7 +488,7 @@ TEST_F(SubtractFunctionsTest, sub_func) {
     }
 
     {
-        Vector<std::shared_ptr<BaseExpression>> inputs;
+        std::vector<std::shared_ptr<BaseExpression>> inputs;
 
         DataType data1_type(LogicalType::kDouble);
         DataType data2_type(LogicalType::kMixed);
@@ -503,7 +503,7 @@ TEST_F(SubtractFunctionsTest, sub_func) {
     }
 
     {
-        Vector<std::shared_ptr<BaseExpression>> inputs;
+        std::vector<std::shared_ptr<BaseExpression>> inputs;
 
         DataType data1_type(LogicalType::kMixed);
         DataType data2_type(LogicalType::kMixed);

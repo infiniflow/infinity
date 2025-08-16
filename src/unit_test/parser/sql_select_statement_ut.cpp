@@ -13,13 +13,13 @@
 // limitations under the License.
 
 #ifdef CI
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 import infinity_core;
 import base_test;
 #else
 module;
 
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 
 module infinity_core:ut.sql_select_statement;
 
@@ -63,7 +63,7 @@ TEST_F(SelectStatementParsingTest, good_test1) {
     std::shared_ptr<ParserResult> result = std::make_shared<ParserResult>();
 
     {
-        String input_sql = "select a from t1;";
+        std::string input_sql = "select a from t1;";
         parser->Parse(input_sql, result.get());
 
         EXPECT_TRUE(result->error_message_.empty());
@@ -101,7 +101,7 @@ TEST_F(SelectStatementParsingTest, good_test2) {
     std::shared_ptr<ParserResult> result = std::make_shared<ParserResult>();
 
     {
-        String input_sql = "select 1;";
+        std::string input_sql = "select 1;";
         parser->Parse(input_sql, result.get());
 
         EXPECT_TRUE(result->error_message_.empty());
@@ -132,7 +132,7 @@ TEST_F(SelectStatementParsingTest, good_test2) {
     }
 
     {
-        String input_sql = "select a, sum(b), function(c, nested(d)) from t1;";
+        std::string input_sql = "select a, sum(b), function(c, nested(d)) from t1;";
         parser->Parse(input_sql, result.get());
 
         EXPECT_TRUE(result->error_message_.empty());
@@ -208,7 +208,7 @@ TEST_F(SelectStatementParsingTest, good_test2) {
     }
 
     {
-        String input_sql = "select * from t2;";
+        std::string input_sql = "select * from t2;";
         parser->Parse(input_sql, result.get());
 
         EXPECT_TRUE(result->error_message_.empty());
@@ -243,7 +243,7 @@ TEST_F(SelectStatementParsingTest, good_test2) {
     }
 
     {
-        String input_sql = "SELECT 10 - 20, 10 + -20, 10+-5.2, 9223372036854775807, -9223372036854775808";
+        std::string input_sql = "SELECT 10 - 20, 10 + -20, 10+-5.2, 9223372036854775807, -9223372036854775808";
         parser->Parse(input_sql, result.get());
 
         EXPECT_TRUE(result->error_message_.empty());
@@ -320,7 +320,7 @@ TEST_F(SelectStatementParsingTest, good_test2) {
         result->Reset();
     }
     {
-        String input_sql = "SELECT a, AVG(b) AS c FROM t1 GROUP BY a HAVING AVG(b) < 3.2";
+        std::string input_sql = "SELECT a, AVG(b) AS c FROM t1 GROUP BY a HAVING AVG(b) < 3.2";
         parser->Parse(input_sql, result.get());
 
         EXPECT_TRUE(result->error_message_.empty());
@@ -395,7 +395,7 @@ TEST_F(SelectStatementParsingTest, good_test2) {
     }
 
     {
-        String input_sql = "SELECT a AS c FROM s1.t1;";
+        std::string input_sql = "SELECT a AS c FROM s1.t1;";
         parser->Parse(input_sql, result.get());
 
         EXPECT_TRUE(result->error_message_.empty());
@@ -419,7 +419,7 @@ TEST_F(SelectStatementParsingTest, good_test2) {
     }
 
     {
-        String input_sql = "SELECT count(distinct a), count(b) AS c FROM s3.t2;";
+        std::string input_sql = "SELECT count(distinct a), count(b) AS c FROM s3.t2;";
         parser->Parse(input_sql, result.get());
 
         EXPECT_TRUE(result->error_message_.empty());
@@ -460,7 +460,7 @@ TEST_F(SelectStatementParsingTest, good_test2) {
     }
 
     {
-        String input_sql = "SELECT a, b FROM s3.t2 ORDER BY a, b DESC;";
+        std::string input_sql = "SELECT a, b FROM s3.t2 ORDER BY a, b DESC;";
         parser->Parse(input_sql, result.get());
 
         EXPECT_TRUE(result->error_message_.empty());
@@ -514,7 +514,7 @@ TEST_F(SelectStatementParsingTest, good_test2) {
     }
 
     {
-        String input_sql = "SELECT a, b FROM s3.t2 WHERE a BETWEEN 1 AND 4;";
+        std::string input_sql = "SELECT a, b FROM s3.t2 WHERE a BETWEEN 1 AND 4;";
         parser->Parse(input_sql, result.get());
 
         EXPECT_TRUE(result->error_message_.empty());
@@ -578,7 +578,7 @@ TEST_F(SelectStatementParsingTest, good_test2) {
     }
 
     {
-        String input_sql = "SELECT * FROM s3.t2 WHERE a = (SELECT MIN(c) FROM t1) AND EXISTS (SELECT * FROM test WHERE x < y);";
+        std::string input_sql = "SELECT * FROM s3.t2 WHERE a = (SELECT MIN(c) FROM t1) AND EXISTS (SELECT * FROM test WHERE x < y);";
         parser->Parse(input_sql, result.get());
 
         EXPECT_TRUE(result->error_message_.empty());
@@ -666,7 +666,7 @@ TEST_F(SelectStatementParsingTest, good_test2) {
     }
 
     {
-        String input_sql = "SELECT MIN(CASE WHEN c = 'xxx' THEN d ELSE 1 END) FROM s3.tx;";
+        std::string input_sql = "SELECT MIN(CASE WHEN c = 'xxx' THEN d ELSE 1 END) FROM s3.tx;";
         parser->Parse(input_sql, result.get());
 
         EXPECT_TRUE(result->error_message_.empty());
@@ -723,7 +723,7 @@ TEST_F(SelectStatementParsingTest, good_test2) {
     }
 
     {
-        String input_sql = "SELECT CASE WHEN a = 0 THEN 1 WHEN b > 3.5 THEN 2 END FROM s3.tx;";
+        std::string input_sql = "SELECT CASE WHEN a = 0 THEN 1 WHEN b > 3.5 THEN 2 END FROM s3.tx;";
         parser->Parse(input_sql, result.get());
 
         EXPECT_TRUE(result->error_message_.empty());
@@ -792,7 +792,7 @@ TEST_F(SelectStatementParsingTest, good_test2) {
     }
 
     {
-        String input_sql = "SELECT CASE b WHEN 1 THEN 10 WHEN 2 THEN 20 END FROM s3.tx;";
+        std::string input_sql = "SELECT CASE b WHEN 1 THEN 10 WHEN 2 THEN 20 END FROM s3.tx;";
         parser->Parse(input_sql, result.get());
 
         EXPECT_TRUE(result->error_message_.empty());
@@ -851,7 +851,7 @@ TEST_F(SelectStatementParsingTest, good_test2) {
     }
 
     {
-        String input_sql = "SELECT t1.a, t2.b, SUM(t2.price) FROM t3 INNER JOIN t1 ON t3.c = t1.c \
+        std::string input_sql = "SELECT t1.a, t2.b, SUM(t2.price) FROM t3 INNER JOIN t1 ON t3.c = t1.c \
                            OUTER JOIN t2 ON t1.d = t2.d GROUP BY t1.a, t2.b;";
         parser->Parse(input_sql, result.get());
 
@@ -919,7 +919,7 @@ TEST_F(SelectStatementParsingTest, good_test2) {
     }
 
     {
-        String input_sql = "SELECT * FROM t1, (SELECT a AS aa FROM aaa) AS t2, (SELECT b AS bb FROM bbb) AS t3";
+        std::string input_sql = "SELECT * FROM t1, (SELECT a AS aa FROM aaa) AS t2, (SELECT b AS bb FROM bbb) AS t3";
         parser->Parse(input_sql, result.get());
 
         EXPECT_TRUE(result->error_message_.empty());
@@ -968,7 +968,7 @@ TEST_F(SelectStatementParsingTest, good_test2) {
     }
 
     {
-        String input_sql = "SELECT * FROM t1 AS xxx(a, b)";
+        std::string input_sql = "SELECT * FROM t1 AS xxx(a, b)";
         parser->Parse(input_sql, result.get());
 
         EXPECT_TRUE(result->error_message_.empty());
@@ -997,7 +997,7 @@ TEST_F(SelectStatementParsingTest, good_test3) {
     std::shared_ptr<ParserResult> result = std::make_shared<ParserResult>();
 
     {
-        String input_sql = "SELECT * FROM t1; \
+        std::string input_sql = "SELECT * FROM t1; \
                             SELECt * FROM t2; ";
         parser->Parse(input_sql, result.get());
 
@@ -1020,7 +1020,7 @@ TEST_F(SelectStatementParsingTest, good_test3) {
     }
 
     {
-        String input_sql = "SELECT * FROM t1 join t2 on x = y; \
+        std::string input_sql = "SELECT * FROM t1 join t2 on x = y; \
 		                    SELECT * FROM t1 inner join t2 on x = y; \
 		                    SELECT * FROM t1 left join t2 on x = y; \
 		                    SELECT * FROM t1 right join t2 on x = y; \
@@ -1090,7 +1090,7 @@ TEST_F(SelectStatementParsingTest, good_test3) {
     }
 
     {
-        String input_sql = "SELECT * FROM t1 limit 1 + 1 offset 2 + 2; \
+        std::string input_sql = "SELECT * FROM t1 limit 1 + 1 offset 2 + 2; \
 		                    SELECT * FROM t1 limit (SELECT MIN(x) FROM t2) offset (SELECT MAX(y) FROM t2); ";
         parser->Parse(input_sql, result.get());
 
@@ -1135,7 +1135,7 @@ TEST_F(SelectStatementParsingTest, good_test3) {
     }
 
     {
-        String input_sql = "SELECT extract('year' from date '2025-03-04'); \
+        std::string input_sql = "SELECT extract('year' from date '2025-03-04'); \
 		                    SELECT * FROM t1 WHERE extract('year' from a) < 2023";
         parser->Parse(input_sql, result.get());
 
@@ -1168,7 +1168,7 @@ TEST_F(SelectStatementParsingTest, good_test3) {
     }
 
     {
-        String input_sql = "SELECT CAST(5.3 AS BIGINT);";
+        std::string input_sql = "SELECT CAST(5.3 AS BIGINT);";
         parser->Parse(input_sql, result.get());
 
         EXPECT_TRUE(result->error_message_.empty());
@@ -1186,7 +1186,7 @@ TEST_F(SelectStatementParsingTest, good_test3) {
     }
 
     {
-        String input_sql = "WITH t1 AS (SELECT a FROM x), t2 AS (SELECT b FROM y) SELECT * FROM t1, t2;";
+        std::string input_sql = "WITH t1 AS (SELECT a FROM x), t2 AS (SELECT b FROM y) SELECT * FROM t1, t2;";
         parser->Parse(input_sql, result.get());
 
         EXPECT_TRUE(result->error_message_.empty());
@@ -1221,7 +1221,7 @@ TEST_F(SelectStatementParsingTest, good_test3) {
     }
 
     {
-        String input_sql = "select a + 3 day from t1;";
+        std::string input_sql = "select a + 3 day from t1;";
         parser->Parse(input_sql, result.get());
 
         EXPECT_TRUE(result->error_message_.empty());
@@ -1243,7 +1243,7 @@ TEST_F(SelectStatementParsingTest, good_test3) {
     }
 
     {
-        String input_sql = "SELECT * FROM t where a = cast ('2023-01-01' as date) - INTERVAL 15 days;";
+        std::string input_sql = "SELECT * FROM t where a = cast ('2023-01-01' as date) - INTERVAL 15 days;";
         parser->Parse(input_sql, result.get());
 
         EXPECT_TRUE(result->error_message_.empty());
@@ -1275,7 +1275,7 @@ TEST_F(SelectStatementParsingTest, good_test4) {
     std::shared_ptr<ParserResult> result = std::make_shared<ParserResult>();
 
     {
-        String input_sql = "SELECT * FROM t where a = cast ('2023-01-01' as date) - INTERVAL 15 DAYS;";
+        std::string input_sql = "SELECT * FROM t where a = cast ('2023-01-01' as date) - INTERVAL 15 DAYS;";
         parser->Parse(input_sql, result.get());
 
         EXPECT_TRUE(result->error_message_.empty());
@@ -1309,7 +1309,7 @@ TEST_F(SelectStatementParsingTest, bad_test1) {
 
     {
         // bad dimension type double not match hamming
-        String input_sql = "SELECT b FROM t1 WHERE a > 0 OFFSET 3;";
+        std::string input_sql = "SELECT b FROM t1 WHERE a > 0 OFFSET 3;";
         parser->Parse(input_sql, result.get());
         EXPECT_FALSE(result->error_message_.empty());
         EXPECT_TRUE(result->statements_ptr_ == nullptr);
@@ -1324,7 +1324,7 @@ TEST_F(SelectStatementParsingTest, bad_knn_test) {
 
     {
         // bad dimension type double not match hamming
-        String input_sql = "SELECT b FROM t1 SEARCH MATCH VECTOR (c1, [1.0, 2.0], 'double', 'hamming', 3) WHERE a > 0;";
+        std::string input_sql = "SELECT b FROM t1 SEARCH MATCH VECTOR (c1, [1.0, 2.0], 'double', 'hamming', 3) WHERE a > 0;";
         parser->Parse(input_sql, result.get());
         EXPECT_FALSE(result->error_message_.empty());
         EXPECT_TRUE(result->statements_ptr_ == nullptr);
@@ -1332,7 +1332,7 @@ TEST_F(SelectStatementParsingTest, bad_knn_test) {
 
     {
         // bit which length should be aligned with 8
-        String input_sql = "SELECT b FROM t1 SEARCH MATCH VECTOR (c1, [1,0,1,0,1,1,0], 'bit', 'hamming', 3) WHERE a > 0;";
+        std::string input_sql = "SELECT b FROM t1 SEARCH MATCH VECTOR (c1, [1,0,1,0,1,1,0], 'bit', 'hamming', 3) WHERE a > 0;";
         parser->Parse(input_sql, result.get());
         EXPECT_FALSE(result->error_message_.empty());
         EXPECT_TRUE(result->statements_ptr_ == nullptr);
@@ -1340,7 +1340,7 @@ TEST_F(SelectStatementParsingTest, bad_knn_test) {
 
     {
         // bit only support hamming
-        String input_sql = "SELECT b FROM t1 SEARCH MATCH VECTOR (c1, [1,0,1,0,1,1,0,0,1,0,1,0,1,1,0,0], 'bit', 'cosine', 3) WHERE a > 0;";
+        std::string input_sql = "SELECT b FROM t1 SEARCH MATCH VECTOR (c1, [1,0,1,0,1,1,0,0,1,0,1,0,1,1,0,0], 'bit', 'cosine', 3) WHERE a > 0;";
         parser->Parse(input_sql, result.get());
         //        std::cout << result->error_message_ << std::endl;
         EXPECT_FALSE(result->error_message_.empty());
@@ -1356,7 +1356,7 @@ TEST_F(SelectStatementParsingTest, bad_search_test) {
 
     {
         // bad dimension type double not match hamming
-        String input_sql = "SELECT b FROM t1 SEARCH MATCH VECTOR (c1, [1.0, 2.0], 'double', 'hamming', 3) WHERE a > 0 ORDER BY c2;";
+        std::string input_sql = "SELECT b FROM t1 SEARCH MATCH VECTOR (c1, [1.0, 2.0], 'double', 'hamming', 3) WHERE a > 0 ORDER BY c2;";
         parser->Parse(input_sql, result.get());
         EXPECT_FALSE(result->error_message_.empty());
         EXPECT_TRUE(result->statements_ptr_ == nullptr);
@@ -1364,7 +1364,7 @@ TEST_F(SelectStatementParsingTest, bad_search_test) {
 
     {
         // bit which length should be aligned with 8
-        String input_sql = "SELECT b FROM t1 SEARCH MATCH VECTOR (c1, [1,0,1,0,1,1,0], 'bit', 'hamming', 3) WHERE a > 0 LIMIT 5;";
+        std::string input_sql = "SELECT b FROM t1 SEARCH MATCH VECTOR (c1, [1,0,1,0,1,1,0], 'bit', 'hamming', 3) WHERE a > 0 LIMIT 5;";
         parser->Parse(input_sql, result.get());
         EXPECT_FALSE(result->error_message_.empty());
         EXPECT_TRUE(result->statements_ptr_ == nullptr);
@@ -1372,7 +1372,7 @@ TEST_F(SelectStatementParsingTest, bad_search_test) {
 
     {
         // bit only support hamming
-        String input_sql = "SELECT b FROM t1 SEARCH MATCH VECTOR (c1, [1,0,1,0,1,1,0], 'bit', 'l2', 3) WHERE a > 0 LIMIT 5;";
+        std::string input_sql = "SELECT b FROM t1 SEARCH MATCH VECTOR (c1, [1,0,1,0,1,1,0], 'bit', 'l2', 3) WHERE a > 0 LIMIT 5;";
         parser->Parse(input_sql, result.get());
         //        std::cout << result->error_message_ << std::endl;
         EXPECT_FALSE(result->error_message_.empty());
@@ -1387,7 +1387,7 @@ TEST_F(SelectStatementParsingTest, good_search_test) {
     std::shared_ptr<ParserResult> result = std::make_shared<ParserResult>();
 
     // integer with l2
-    String input_sql = R"##(
+    std::string input_sql = R"##(
     SELECT *
     FROM t1
     SEARCH
@@ -1420,18 +1420,18 @@ TEST_F(SelectStatementParsingTest, good_search_test) {
 
     EXPECT_EQ(search_expr->match_exprs_.size(), 10u);
     auto *match_expr0 = (MatchExpr *)(search_expr->match_exprs_[0]);
-    EXPECT_EQ(match_expr0->fields_, String("author^2,name^5"));
-    EXPECT_EQ(match_expr0->matching_text_, String("frank dune"));
+    EXPECT_EQ(match_expr0->fields_, std::string("author^2,name^5"));
+    EXPECT_EQ(match_expr0->matching_text_, std::string("frank dune"));
     EXPECT_EQ(match_expr0->options_text_.empty(), true);
     auto *match_expr1 = (MatchExpr *)(search_expr->match_exprs_[1]);
-    EXPECT_EQ(match_expr1->fields_, String("name"));
-    EXPECT_EQ(match_expr1->matching_text_, String("to the star"));
+    EXPECT_EQ(match_expr1->fields_, std::string("name"));
+    EXPECT_EQ(match_expr1->matching_text_, std::string("to the star"));
 
     auto *query_expr0 = (MatchExpr *)(search_expr->match_exprs_[2]);
-    EXPECT_EQ(query_expr0->matching_text_, String("name:dune"));
+    EXPECT_EQ(query_expr0->matching_text_, std::string("name:dune"));
     EXPECT_EQ(query_expr0->options_text_.empty(), true);
     auto *query_expr1 = (MatchExpr *)(search_expr->match_exprs_[3]);
-    EXPECT_EQ(query_expr1->matching_text_, String(R"##(_exists_:"author" AND page_count:>200 AND (name:/star./ OR name:duna~))##"));
+    EXPECT_EQ(query_expr1->matching_text_, std::string(R"##(_exists_:"author" AND page_count:>200 AND (name:/star./ OR name:duna~))##"));
 
     auto *knn_expr0 = (KnnExpr *)(search_expr->match_exprs_[4]);
     EXPECT_EQ(knn_expr0->distance_type_, KnnDistanceType::kL2);
@@ -1440,7 +1440,7 @@ TEST_F(SelectStatementParsingTest, good_search_test) {
     EXPECT_EQ(knn_expr0->column_expr_->type_, ParsedExprType::kColumn);
     EXPECT_EQ(knn_expr0->dimension_, 2);
     EXPECT_EQ(knn_expr0->embedding_data_type_, EmbeddingDataType::kElemInt32);
-    Vector<i32> vec0 = {1, 2};
+    std::vector<i32> vec0 = {1, 2};
     for (long i = 0; i < knn_expr0->dimension_; ++i) {
         EXPECT_EQ(((i32 *)knn_expr0->embedding_data_ptr_)[i], vec0[i]);
     }
@@ -1453,7 +1453,7 @@ TEST_F(SelectStatementParsingTest, good_search_test) {
     EXPECT_EQ(knn_expr1->column_expr_->type_, ParsedExprType::kColumn);
     EXPECT_EQ(knn_expr1->dimension_, 3);
     EXPECT_EQ(knn_expr1->embedding_data_type_, EmbeddingDataType::kElemInt64);
-    Vector<i64> vec1 = {3, 10, 1111};
+    std::vector<i64> vec1 = {3, 10, 1111};
     for (long i = 0; i < knn_expr1->dimension_; ++i) {
         EXPECT_EQ(((i64 *)knn_expr1->embedding_data_ptr_)[i], vec1[i]);
     }
@@ -1466,7 +1466,7 @@ TEST_F(SelectStatementParsingTest, good_search_test) {
     EXPECT_EQ(knn_expr2->column_expr_->type_, ParsedExprType::kColumn);
     EXPECT_EQ(knn_expr2->dimension_, 2);
     EXPECT_EQ(knn_expr2->embedding_data_type_, EmbeddingDataType::kElemDouble);
-    Vector<f64> vec2 = {1.00, 2.00};
+    std::vector<f64> vec2 = {1.00, 2.00};
     for (long i = 0; i < knn_expr2->dimension_; ++i) {
         EXPECT_EQ(((f64 *)knn_expr2->embedding_data_ptr_)[i], vec2[i]);
     }
@@ -1479,7 +1479,7 @@ TEST_F(SelectStatementParsingTest, good_search_test) {
     EXPECT_EQ(knn_expr3->column_expr_->type_, ParsedExprType::kColumn);
     EXPECT_EQ(knn_expr3->dimension_, 2);
     EXPECT_EQ(knn_expr3->embedding_data_type_, EmbeddingDataType::kElemDouble);
-    Vector<f64> vec3 = {1.00, 2.00};
+    std::vector<f64> vec3 = {1.00, 2.00};
     for (long i = 0; i < knn_expr3->dimension_; ++i) {
         EXPECT_EQ(((f64 *)knn_expr3->embedding_data_ptr_)[i], vec3[i]);
     }
@@ -1494,7 +1494,7 @@ TEST_F(SelectStatementParsingTest, good_search_test) {
     EXPECT_EQ(knn_expr4->embedding_data_type_, EmbeddingDataType::kElemBit);
     // [1,0,1,0,1,1,0,0], 8
     long embedding_size = knn_expr4->dimension_ / 8;
-    Vector<i64> vec4 = {1, 0, 1, 0, 1, 1, 0, 0};
+    std::vector<i64> vec4 = {1, 0, 1, 0, 1, 1, 0, 0};
     for (long i = 0; i < embedding_size; ++i) {
         uint8_t embedding_unit = 0;
         for (long bit_idx = 0; bit_idx < 8; ++bit_idx) {
@@ -1517,7 +1517,7 @@ TEST_F(SelectStatementParsingTest, good_search_test) {
     EXPECT_EQ(knn_expr5->column_expr_->type_, ParsedExprType::kColumn);
     EXPECT_EQ(knn_expr5->dimension_, 2);
     EXPECT_EQ(knn_expr5->embedding_data_type_, EmbeddingDataType::kElemFloat);
-    Vector<f32> vec5 = {1.00, 2.00};
+    std::vector<f32> vec5 = {1.00, 2.00};
     for (long i = 0; i < knn_expr5->dimension_; ++i) {
         EXPECT_EQ(((f32 *)knn_expr5->embedding_data_ptr_)[i], vec5[i]);
     }
@@ -1526,7 +1526,7 @@ TEST_F(SelectStatementParsingTest, good_search_test) {
     EXPECT_EQ(search_expr->fusion_exprs_.size(), 1);
     EXPECT_NE(search_expr->fusion_exprs_[0], nullptr);
     auto *fusion_expr = search_expr->fusion_exprs_[0];
-    EXPECT_EQ(fusion_expr->method_, String("rrf"));
+    EXPECT_EQ(fusion_expr->method_, std::string("rrf"));
 
     EXPECT_NE(select_statement->where_expr_, nullptr);
     EXPECT_EQ(select_statement->where_expr_->type_, ParsedExprType::kFunction);

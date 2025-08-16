@@ -176,7 +176,7 @@ using HnswLVQLSG = KnnHnsw<LVQL2VecStoreType<float, i8, true>, LabelT>;
 
 // std::shared_ptr<String> index_name = std::make_shared<String>("index_name");
 // String filename = "filename";
-// Vector<String> column_names = {"col_name"};
+// std::vector<String> column_names = {"col_name"};
 
 // std::unique_ptr<IndexHnsw> MakeLSGIndexHnsw(const BenchmarkOption &option) {
 //     MetricType metric_type = MetricType::kMetricL2;
@@ -196,12 +196,12 @@ using HnswLVQLSG = KnnHnsw<LVQL2VecStoreType<float, i8, true>, LabelT>;
 
 std::unique_ptr<float[]> GetAvgBF(size_t vec_num, size_t dim, const float *data, size_t ls_k, size_t sample_num) {
     auto avg = std::make_unique<float[]>(vec_num);
-    Vector<size_t> sample_idx(sample_num);
+    std::vector<size_t> sample_idx(sample_num);
     for (size_t i = 0; i < sample_num; ++i) {
         sample_idx[i] = rand() % vec_num;
     }
     auto task = [&](size_t start_i, size_t end_i) {
-        Vector<float> distances(sample_num);
+        std::vector<float> distances(sample_num);
         for (size_t i = start_i; i < end_i; ++i) {
             const float *v = data + i * dim;
             for (size_t j = 0; j < sample_num; ++j) {
@@ -222,7 +222,7 @@ std::unique_ptr<float[]> GetAvgBF(size_t vec_num, size_t dim, const float *data,
             avg[i] /= ls_k;
         }
     };
-    Vector<std::thread> threads;
+    std::vector<std::thread> threads;
     size_t thread_num = 16;
     size_t task_size = (vec_num - 1) / thread_num + 1;
 
@@ -268,7 +268,7 @@ void Build(const BenchmarkOption &option) {
     hnsw->StoreData(iter);
     data.reset();
 
-    Vector<std::thread> build_threads;
+    std::vector<std::thread> build_threads;
     const size_t kBuildBucketSize = 1024;
     size_t bucket_size = std::max(kBuildBucketSize, vec_num / option.thread_n_);
     size_t bucket_num = (vec_num - 1) / bucket_size + 1;
@@ -329,7 +329,7 @@ void Query(const BenchmarkOption &option) {
     if (gt_num != query_num) {
         UnrecoverableError("gt_num != query_num");
     }
-    Vector<Vector<LabelT>> results(query_num, Vector<LabelT>(query_topk));
+    std::vector<Vector<LabelT>> results(query_num, Vector<LabelT>(query_topk));
 
     auto test = [&](size_t i, const KnnSearchOption &search_option) {
         profiler.Begin();

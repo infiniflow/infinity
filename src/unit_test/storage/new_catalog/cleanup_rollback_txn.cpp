@@ -3,7 +3,7 @@ module;
 
 #include <filesystem>
 
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 
 module infinity_core:ut.cleanup_rollback_txn;
 
@@ -52,7 +52,7 @@ import :index_emvb;
 import :wal_manager;
 #else
 #include <filesystem>
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 import infinity_core;
 import base_test;
 #endif

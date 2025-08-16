@@ -13,14 +13,14 @@
 // limitations under the License.
 
 #ifdef CI
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 #include <cassert>
 import infinity_core;
 import base_test;
 #else
 module;
 
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 #include <cassert>
 
 module infinity_core:ut.external_sort;
@@ -34,12 +34,12 @@ import :external_sort_merger;
 using namespace infinity;
 
 template <class T>
-Vector<char> RandStr(T key) {
+std::vector<char> RandStr(T key) {
     u32 len = rand() % 100 + sizeof(T);
     while (len == sizeof(T))
         len = rand() % 100 + sizeof(T);
 
-    Vector<char> str;
+    std::vector<char> str;
     str.reserve(len);
     for (u32 i = 0; i < len; ++i)
         str.push_back('a' + rand() % 26);
@@ -48,10 +48,10 @@ Vector<char> RandStr(T key) {
     return str;
 }
 
-Vector<char> RandStr() {
+std::vector<char> RandStr() {
     u32 len = rand() % 100;
 
-    Vector<char> str;
+    std::vector<char> str;
     str.reserve(len);
     for (u32 i = 0; i < len; ++i)
         str.push_back('a' + rand() % 26);
@@ -69,7 +69,7 @@ protected:
     void CheckMerger(const u64 SIZE, u32 bs = 100000000) {
         std::filesystem::remove("./tt");
 
-        Vector<char> str;
+        std::vector<char> str;
         FILE *f = fopen("./tt", "w+");
         fwrite(&SIZE, sizeof(u64), 1, f);
 
@@ -122,7 +122,7 @@ protected:
     void CheckTermTuple(const u64 SIZE, u32 bs = 100000000) {
         std::filesystem::remove("./tt");
 
-        Vector<char> str;
+        std::vector<char> str;
         FILE *f = fopen("./tt", "w+");
         fwrite(&SIZE, sizeof(u64), 1, f);
 
@@ -138,7 +138,7 @@ protected:
             u32 s = 0;
             for (u32 j = 0; j < SIZE / run_num; ++j) {
                 // str = RandStr();
-                String str = std::to_string(i * SIZE / run_num + j);
+                std::string str = std::to_string(i * SIZE / run_num + j);
                 u32 doc_id = 34567; // i * SIZE / run_num + j;
                 u32 term_pos = i;
                 u16 doc_payload = 10086;

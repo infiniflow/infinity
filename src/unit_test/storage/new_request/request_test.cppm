@@ -14,7 +14,7 @@
 
 module;
 
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 
 #ifdef CI
 export module request_test;

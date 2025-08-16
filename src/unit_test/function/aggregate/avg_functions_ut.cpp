@@ -14,14 +14,12 @@
 
 #ifdef CI
 #include "unit_test/gtest_expand.h"
-#include "gtest/gtest.h"
 import infinity_core;
 import base_test;
 #else
 module;
 
 #include "unit_test/gtest_expand.h"
-#include "gtest/gtest.h"
 
 module infinity_core:ut.avg_functions;
 
@@ -68,7 +66,7 @@ TEST_F(AvgFunctionTest, avg_func) {
 
     RegisterAvgFunction(catalog_ptr.get());
 
-    String op = "avg";
+    std::string op = "avg";
     std::shared_ptr<FunctionSet> function_set = NewCatalog::GetFunctionSetByName(catalog_ptr.get(), op);
     EXPECT_EQ(function_set->type_, FunctionType::kAggregate);
     std::shared_ptr<AggregateFunctionSet> aggregate_function_set = std::static_pointer_cast<AggregateFunctionSet>(function_set);
@@ -79,7 +77,7 @@ TEST_F(AvgFunctionTest, avg_func) {
         AggregateFunction func = aggregate_function_set->GetMostMatchFunction(col_expr_ptr);
         EXPECT_STREQ("AVG(TinyInt)->Double", func.ToString().c_str());
 
-        Vector<std::shared_ptr<DataType>> column_types;
+        std::vector<std::shared_ptr<DataType>> column_types;
         column_types.emplace_back(data_type);
 
         size_t row_count = DEFAULT_VECTOR_SIZE;
@@ -125,7 +123,7 @@ TEST_F(AvgFunctionTest, avg_func) {
         AggregateFunction func = aggregate_function_set->GetMostMatchFunction(col_expr_ptr);
         EXPECT_STREQ("AVG(SmallInt)->Double", func.ToString().c_str());
 
-        Vector<std::shared_ptr<DataType>> column_types;
+        std::vector<std::shared_ptr<DataType>> column_types;
         column_types.emplace_back(data_type);
 
         size_t row_count = DEFAULT_VECTOR_SIZE;
@@ -162,7 +160,7 @@ TEST_F(AvgFunctionTest, avg_func) {
         AggregateFunction func = aggregate_function_set->GetMostMatchFunction(col_expr_ptr);
         EXPECT_STREQ("AVG(Integer)->Double", func.ToString().c_str());
 
-        Vector<std::shared_ptr<DataType>> column_types;
+        std::vector<std::shared_ptr<DataType>> column_types;
         column_types.emplace_back(data_type);
 
         size_t row_count = DEFAULT_VECTOR_SIZE;
@@ -199,7 +197,7 @@ TEST_F(AvgFunctionTest, avg_func) {
         AggregateFunction func = aggregate_function_set->GetMostMatchFunction(col_expr_ptr);
         EXPECT_STREQ("AVG(BigInt)->Double", func.ToString().c_str());
 
-        Vector<std::shared_ptr<DataType>> column_types;
+        std::vector<std::shared_ptr<DataType>> column_types;
         column_types.emplace_back(data_type);
 
         size_t row_count = DEFAULT_VECTOR_SIZE;
@@ -236,7 +234,7 @@ TEST_F(AvgFunctionTest, avg_func) {
         AggregateFunction func = aggregate_function_set->GetMostMatchFunction(col_expr_ptr);
         EXPECT_STREQ("AVG(Float)->Double", func.ToString().c_str());
 
-        Vector<std::shared_ptr<DataType>> column_types;
+        std::vector<std::shared_ptr<DataType>> column_types;
         column_types.emplace_back(data_type);
 
         size_t row_count = DEFAULT_VECTOR_SIZE;
@@ -273,7 +271,7 @@ TEST_F(AvgFunctionTest, avg_func) {
         AggregateFunction func = aggregate_function_set->GetMostMatchFunction(col_expr_ptr);
         EXPECT_STREQ("AVG(Double)->Double", func.ToString().c_str());
 
-        Vector<std::shared_ptr<DataType>> column_types;
+        std::vector<std::shared_ptr<DataType>> column_types;
         column_types.emplace_back(data_type);
 
         size_t row_count = DEFAULT_VECTOR_SIZE;

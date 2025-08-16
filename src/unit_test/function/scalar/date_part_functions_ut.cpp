@@ -13,13 +13,13 @@
 // limitations under the License.
 
 #ifdef CI
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 import infinity_core;
 import base_test;
 #else
 module;
 
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 
 module infinity_core:ut.date_part_functions;
 
@@ -68,14 +68,14 @@ TEST_F(DatePartFunctionsTest, datepart_func) {
 
     RegisterDatePartFunction(catalog_ptr.get());
 
-    String op = "datepart";
+    std::string op = "datepart";
 
     std::shared_ptr<FunctionSet> function_set = NewCatalog::GetFunctionSetByName(catalog_ptr.get(), op);
     EXPECT_EQ(function_set->type_, FunctionType::kScalar);
     std::shared_ptr<ScalarFunctionSet> scalar_function_set = std::static_pointer_cast<ScalarFunctionSet>(function_set);
 
     {
-        Vector<std::shared_ptr<BaseExpression>> inputs;
+        std::vector<std::shared_ptr<BaseExpression>> inputs;
 
         DataType data_type1(LogicalType::kVarchar);
         DataType data_type2(LogicalType::kDate);
@@ -89,7 +89,7 @@ TEST_F(DatePartFunctionsTest, datepart_func) {
         ScalarFunction func = scalar_function_set->GetMostMatchFunction(inputs);
         EXPECT_STREQ("datepart(Varchar, Date)->BigInt", func.ToString().c_str());
 
-        Vector<std::shared_ptr<DataType>> column_types;
+        std::vector<std::shared_ptr<DataType>> column_types;
         column_types.emplace_back(std::make_shared<DataType>(data_type1));
         column_types.emplace_back(std::make_shared<DataType>(data_type2));
 
@@ -122,7 +122,7 @@ TEST_F(DatePartFunctionsTest, datepart_func) {
     }
 
     {
-        Vector<std::shared_ptr<BaseExpression>> inputs;
+        std::vector<std::shared_ptr<BaseExpression>> inputs;
 
         DataType data_type1(LogicalType::kVarchar);
         DataType data_type2(LogicalType::kDateTime);
@@ -136,7 +136,7 @@ TEST_F(DatePartFunctionsTest, datepart_func) {
         ScalarFunction func = scalar_function_set->GetMostMatchFunction(inputs);
         EXPECT_STREQ("datepart(Varchar, DateTime)->BigInt", func.ToString().c_str());
 
-        Vector<std::shared_ptr<DataType>> column_types;
+        std::vector<std::shared_ptr<DataType>> column_types;
         column_types.emplace_back(std::make_shared<DataType>(data_type1));
         column_types.emplace_back(std::make_shared<DataType>(data_type2));
 
@@ -170,7 +170,7 @@ TEST_F(DatePartFunctionsTest, datepart_func) {
     }
 
     {
-        Vector<std::shared_ptr<BaseExpression>> inputs;
+        std::vector<std::shared_ptr<BaseExpression>> inputs;
 
         DataType data_type1(LogicalType::kVarchar);
         DataType data_type2(LogicalType::kTimestamp);
@@ -184,7 +184,7 @@ TEST_F(DatePartFunctionsTest, datepart_func) {
         ScalarFunction func = scalar_function_set->GetMostMatchFunction(inputs);
         EXPECT_STREQ("datepart(Varchar, Timestamp)->BigInt", func.ToString().c_str());
 
-        Vector<std::shared_ptr<DataType>> column_types;
+        std::vector<std::shared_ptr<DataType>> column_types;
         column_types.emplace_back(std::make_shared<DataType>(data_type1));
         column_types.emplace_back(std::make_shared<DataType>(data_type2));
 

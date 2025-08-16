@@ -1,13 +1,13 @@
 
 #ifdef CI
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 #include <cassert>
 import infinity_core;
 import base_test;
 #else
 module;
 
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 #include <cassert>
 
 module infinity_core:ut.term_meta;
@@ -37,7 +37,7 @@ public:
         infinity::GlobalResourceUsage::Init();
 #endif
 
-        file_name_ = String(GetFullTmpDir()) + "/term_meta";
+        file_name_ = std::string(GetFullTmpDir()) + "/term_meta";
     }
     void TearDown() override {
 #ifdef INFINITY_DEBUG
@@ -70,7 +70,7 @@ public:
     }
 
 protected:
-    String file_name_;
+    std::string file_name_;
 };
 
 TEST_F(TermMetaTest, test1) { DoTest1(); }

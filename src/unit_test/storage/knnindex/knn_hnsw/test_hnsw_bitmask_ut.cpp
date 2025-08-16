@@ -13,13 +13,13 @@
 //  limitations under the License.
 
 #ifdef CI
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 import infinity_core;
 import base_test;
 #else
 module;
 
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 
 module infinity_core:ut.test_hnsw_bitmask;
 
@@ -93,8 +93,8 @@ TEST_F(HnswAlgBitmaskTest, test1) {
     auto iter = DenseVectorIter<f32, LabelT>(base_embedding.get(), dimension, base_embedding_count);
     hnsw_index->InsertVecs(std::move(iter));
 
-    Vector<f32> distance_array(top_k);
-    Vector<u64> id_array(top_k);
+    std::vector<f32> distance_array(top_k);
+    std::vector<u64> id_array(top_k);
     KnnSearchOption search_option{.ef_ = 2ul * top_k};
     {
         auto result = hnsw_index->KnnSearchSorted(query_embedding.get(), top_k, search_option);

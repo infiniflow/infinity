@@ -14,14 +14,12 @@
 
 #ifdef CI
 #include "unit_test/gtest_expand.h"
-#include "gtest/gtest.h"
 import infinity_core;
 import base_test;
 #else
 module;
 
 #include "unit_test/gtest_expand.h"
-#include "gtest/gtest.h"
 
 module infinity_core:ut.column_vector_embedding;
 
@@ -31,13 +29,12 @@ import :logger;
 import :column_vector;
 import :value;
 import :default_values;
-import third_party;
-
 import :selection;
 import :vector_buffer;
 import :infinity_context;
 #endif
 
+import third_party;
 import global_resource_usage;
 import internal_types;
 import logical_type;
@@ -87,7 +84,7 @@ TEST_F(ColumnVectorEmbeddingTest, flat_embedding) {
     EXPECT_NE(column_vector.nulls_ptr_, nullptr);
     EXPECT_TRUE(column_vector.initialized);
 
-    Vector<float> data((i64)embedding_info->Dimension());
+    std::vector<float> data((i64)embedding_info->Dimension());
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         for (i64 j = 0; j < (i64)embedding_info->Dimension(); ++j) {
             data[j] = static_cast<float>(i) + static_cast<float>(j) + 0.5f;
@@ -150,7 +147,7 @@ TEST_F(ColumnVectorEmbeddingTest, flat_embedding) {
         for (i64 j = 0; j < (i64)embedding_info->Dimension(); ++j) {
             data[j] = static_cast<float>(i) + static_cast<float>(j) + 0.5f;
         }
-        column_vector.AppendByPtr((const_ptr_t)data.data());
+        column_vector.AppendByPtr((const char *)data.data());
         Value v = Value::MakeEmbedding(data);
         Value vx = column_vector.GetValueByIndex(i);
         EXPECT_EQ(v == vx, true);
@@ -200,7 +197,7 @@ TEST_F(ColumnVectorEmbeddingTest, contant_embedding) {
     EXPECT_NE(column_vector.nulls_ptr_, nullptr);
     EXPECT_TRUE(column_vector.initialized);
 
-    Vector<float> data((i64)embedding_info->Dimension());
+    std::vector<float> data((i64)embedding_info->Dimension());
     for (i64 i = 0; i < 1; ++i) {
         for (i64 j = 0; j < (i64)embedding_info->Dimension(); ++j) {
             data[j] = static_cast<float>(i) + static_cast<float>(j) + 0.5f;
@@ -262,7 +259,7 @@ TEST_F(ColumnVectorEmbeddingTest, embedding_column_vector_select) {
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
-    Vector<float> data((i64)embedding_info->Dimension());
+    std::vector<float> data((i64)embedding_info->Dimension());
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         for (i64 j = 0; j < (i64)embedding_info->Dimension(); ++j) {
             data[j] = static_cast<float>(i) + static_cast<float>(j) + 0.5f;
@@ -308,7 +305,7 @@ TEST_F(ColumnVectorEmbeddingTest, embedding_column_slice_init) {
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
-    Vector<float> data((i64)embedding_info->Dimension());
+    std::vector<float> data((i64)embedding_info->Dimension());
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         for (i64 j = 0; j < (i64)embedding_info->Dimension(); ++j) {
             data[j] = static_cast<float>(i) + static_cast<float>(j) + 0.5f;

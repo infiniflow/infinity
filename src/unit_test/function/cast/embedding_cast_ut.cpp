@@ -14,14 +14,12 @@
 
 #ifdef CI
 #include "unit_test/gtest_expand.h"
-#include "gtest/gtest.h"
 import infinity_core;
 import base_test;
 #else
 module;
 
 #include "unit_test/gtest_expand.h"
-#include "gtest/gtest.h"
 
 module infinity_core:ut.embedding_cast;
 
@@ -71,7 +69,7 @@ TEST_F(EmbeddingCastTest, embedding_cast1) {
     std::shared_ptr<DataType> source_type = std::make_shared<DataType>(LogicalType::kEmbedding, embedding_info);
     auto col_source = std::make_shared<ColumnVector>(source_type);
     col_source->Initialize();
-    Vector<float> data(embedding_info->Dimension());
+    std::vector<float> data(embedding_info->Dimension());
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         for (size_t j = 0; j < embedding_info->Dimension(); ++j) {
             data[j] = static_cast<float>(i) + static_cast<float>(j) + 0.5f;
@@ -102,7 +100,7 @@ TEST_F(EmbeddingCastTest, embedding_cast1) {
         CastParameters cast_parameters;
         EXPECT_TRUE(source2target_ptr.function(col_source, col_target, DEFAULT_VECTOR_SIZE, cast_parameters));
 
-        Vector<double> data2(embedding_info->Dimension());
+        std::vector<double> data2(embedding_info->Dimension());
         for (i64 i = 0; i < 1; ++i) {
             for (size_t j = 0; j < embedding_info->Dimension(); ++j) {
                 data2[j] = double(static_cast<float>(i) + static_cast<float>(j) + 0.5f);

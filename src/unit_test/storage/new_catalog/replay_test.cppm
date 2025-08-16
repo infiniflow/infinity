@@ -13,7 +13,7 @@
 // limitations under the License.
 module;
 
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 
 #ifndef CI
 export module infinity_core:ut.replay_test;

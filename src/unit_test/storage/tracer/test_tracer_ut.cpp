@@ -13,14 +13,14 @@
 // limitations under the License.
 
 #ifdef CI
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 import infinity_core;
 import base_test;
 import crash_handler;
 #else
 module;
 
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 
 module infinity_core:ut.test_tracer;
 
@@ -49,13 +49,13 @@ public:
     void SetTracer(TestMemIndexTracer *tracer) { tracer_ = tracer; }
 
 public:
-    Vector<std::shared_ptr<MemIndexDetail>> GetMemIndexes();
+    std::vector<std::shared_ptr<MemIndexDetail>> GetMemIndexes();
 
-    std::shared_ptr<MemIndex> GetMemIndex(const String &index_name);
+    std::shared_ptr<MemIndex> GetMemIndex(const std::string &index_name);
 
-    void AppendMemIndex(const String &index_name, size_t row_cnt, size_t mem_used);
+    void AppendMemIndex(const std::string &index_name, size_t row_cnt, size_t mem_used);
 
-    void DumpMemIndex(const String &index_name);
+    void DumpMemIndex(const std::string &index_name);
 
     void reset() { memindexes_.clear(); }
 
@@ -63,12 +63,12 @@ private:
     TestMemIndexTracer *tracer_;
 
     std::mutex mtx_;
-    HashMap<String, std::shared_ptr<MemIndex>> memindexes_;
+    std::unordered_map<std::string, std::shared_ptr<MemIndex>> memindexes_;
 };
 
-Vector<std::shared_ptr<MemIndexDetail>> TestCatalog::GetMemIndexes() {
+std::vector<std::shared_ptr<MemIndexDetail>> TestCatalog::GetMemIndexes() {
     std::unique_lock<std::mutex> lock(mtx_);
-    Vector<std::shared_ptr<MemIndexDetail>> ret;
+    std::vector<std::shared_ptr<MemIndexDetail>> ret;
     for (auto &iter : memindexes_) {
         std::shared_ptr<MemIndexDetail> detail = std::make_shared<MemIndexDetail>();
         std::shared_ptr<DummyIndexInMem> memindex = iter.second->GetDummyIndex();
@@ -85,7 +85,7 @@ Vector<std::shared_ptr<MemIndexDetail>> TestCatalog::GetMemIndexes() {
     return ret;
 }
 
-std::shared_ptr<MemIndex> TestCatalog::GetMemIndex(const String &index_name) {
+std::shared_ptr<MemIndex> TestCatalog::GetMemIndex(const std::string &index_name) {
     std::lock_guard lck(mtx_);
     auto iter = memindexes_.find(index_name);
     if (iter != memindexes_.end()) {
@@ -94,7 +94,7 @@ std::shared_ptr<MemIndex> TestCatalog::GetMemIndex(const String &index_name) {
     return nullptr;
 }
 
-void TestCatalog::AppendMemIndex(const String &index_name, size_t row_cnt, size_t mem_used) {
+void TestCatalog::AppendMemIndex(const std::string &index_name, size_t row_cnt, size_t mem_used) {
     std::shared_ptr<MemIndex> mem_index = nullptr;
     {
         std::lock_guard lck(mtx_);
@@ -110,7 +110,7 @@ void TestCatalog::AppendMemIndex(const String &index_name, size_t row_cnt, size_
     mem_index->GetDummyIndex()->Append(row_cnt, mem_used);
 }
 
-void TestCatalog::DumpMemIndex(const String &index_name) {
+void TestCatalog::DumpMemIndex(const std::string &index_name) {
     std::shared_ptr<MemIndex> memindex = nullptr;
     {
         std::lock_guard lck(mtx_);
@@ -143,7 +143,7 @@ public:
 
     NewTxn *GetTxn() override { return nullptr; }
 
-    Vector<std::shared_ptr<MemIndexDetail>> GetAllMemIndexes(NewTxn *new_txn) override { return catalog_.GetMemIndexes(); }
+    std::vector<std::shared_ptr<MemIndexDetail>> GetAllMemIndexes(NewTxn *new_txn) override { return catalog_.GetMemIndexes(); }
 
     void HandleDump(std::shared_ptr<DumpMemIndexTask> task);
 
@@ -196,7 +196,7 @@ TEST_F(MemIndexTracerTest, test1) {
 
     std::this_thread::sleep_for(std::chrono::seconds(1));
     // Check idx2 has been dumpped.
-    Vector<std::shared_ptr<MemIndexDetail>> details = catalog.GetMemIndexes();
+    std::vector<std::shared_ptr<MemIndexDetail>> details = catalog.GetMemIndexes();
     EXPECT_EQ(details.size(), 2);
     for (const auto &detail : details) {
         EXPECT_NE(detail->index_name_, "idx2");
@@ -232,13 +232,13 @@ TEST_F(MemIndexTracerTest, test2) {
         auto test_f = [&](int id) {
             for (int i = 0; i < iterate_n; ++i) {
                 int idx_i = rand() % index_n;
-                String idx_name = "idx" + std::to_string(idx_i);
+                std::string idx_name = "idx" + std::to_string(idx_i);
                 size_t mem = rand() % max_append_mem + 1;
                 size_t row_cnt = mem;
                 catalog.AppendMemIndex(idx_name, row_cnt, mem);
             }
         };
-        Vector<std::thread> threads;
+        std::vector<std::thread> threads;
         for (int i = 0; i < thread_n; ++i) {
             threads.emplace_back(test_f, i);
         }

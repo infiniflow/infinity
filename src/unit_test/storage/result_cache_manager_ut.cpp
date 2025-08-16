@@ -1,11 +1,11 @@
 
 #ifdef CI
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 import infinity_core;
 #else
 module;
 
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 
 module infinity_core:ut.result_cache_manager;
 
@@ -28,11 +28,12 @@ using namespace infinity;
 
 class MockCachedNode : public CachedNodeBase {
 public:
-    MockCachedNode(String key, std::shared_ptr<Vector<String>> output_names) : CachedNodeBase(LogicalNodeType::kMock, output_names), key_(std::move(key)) {}
+    MockCachedNode(std::string key, std::shared_ptr<std::vector<std::string>> output_names)
+        : CachedNodeBase(LogicalNodeType::kMock, output_names), key_(std::move(key)) {}
 
     u64 Hash() const override {
         u64 h = CachedNodeBase::Hash();
-        h ^= std::hash<String>{}(key_);
+        h ^= std::hash<std::string>{}(key_);
         return h;
     }
 
@@ -45,46 +46,47 @@ public:
     }
 
 private:
-    String key_;
+    std::string key_;
 };
 
 TEST(ResultCacheManagerTest, test1) {
     ResultCacheManager cache_manager(100);
 
-    String key1 = "key1";
-    auto output_names1 = std::make_shared<Vector<String>>(Vector<String>{"col1", "col2"});
-    auto output_types1 = Vector<std::shared_ptr<DataType>>{std::make_unique<DataType>(LogicalType::kInteger), std::make_unique<DataType>(LogicalType::kFloat)};
+    std::string key1 = "key1";
+    auto output_names1 = std::make_shared<std::vector<std::string>>(std::vector<std::string>{"col1", "col2"});
+    auto output_types1 =
+        std::vector<std::shared_ptr<DataType>>{std::make_unique<DataType>(LogicalType::kInteger), std::make_unique<DataType>(LogicalType::kFloat)};
     auto block1 = std::make_unique<DataBlock>();
     block1->Init(output_types1, 1);
     block1->Finalize();
-    Vector<std::unique_ptr<DataBlock>> blocks1;
+    std::vector<std::unique_ptr<DataBlock>> blocks1;
     blocks1.push_back(std::move(block1));
     auto cached_node1 = std::make_unique<MockCachedNode>(key1, output_names1);
 
-    String key2 = key1;
-    auto output_names2 = std::make_shared<Vector<String>>(Vector<String>{"col2"});
-    auto output_types2 = Vector<std::shared_ptr<DataType>>{std::make_unique<DataType>(LogicalType::kFloat)};
+    std::string key2 = key1;
+    auto output_names2 = std::make_shared<std::vector<std::string>>(std::vector<std::string>{"col2"});
+    auto output_types2 = std::vector<std::shared_ptr<DataType>>{std::make_unique<DataType>(LogicalType::kFloat)};
     auto block2 = std::make_unique<DataBlock>();
     block2->Init(output_types2, 1);
     block2->Finalize();
-    Vector<std::unique_ptr<DataBlock>> blocks2;
+    std::vector<std::unique_ptr<DataBlock>> blocks2;
     blocks2.push_back(std::move(block2));
     auto cached_node2 = std::make_unique<MockCachedNode>(key2, output_names2);
 
-    String key3 = key1;
-    auto output_names3 = std::make_shared<Vector<String>>(Vector<String>{"col1", "col2", "col3"});
-    auto output_types3 = Vector<std::shared_ptr<DataType>>{std::make_unique<DataType>(LogicalType::kInteger),
-                                                     std::make_unique<DataType>(LogicalType::kFloat),
-                                                     std::make_unique<DataType>(LogicalType::kFloat)};
+    std::string key3 = key1;
+    auto output_names3 = std::make_shared<std::vector<std::string>>(std::vector<std::string>{"col1", "col2", "col3"});
+    auto output_types3 = std::vector<std::shared_ptr<DataType>>{std::make_unique<DataType>(LogicalType::kInteger),
+                                                                std::make_unique<DataType>(LogicalType::kFloat),
+                                                                std::make_unique<DataType>(LogicalType::kFloat)};
     auto block3 = std::make_unique<DataBlock>();
     block3->Init(output_types3, 1);
     block3->Finalize();
-    Vector<std::unique_ptr<DataBlock>> blocks3;
+    std::vector<std::unique_ptr<DataBlock>> blocks3;
     blocks3.push_back(std::move(block3));
     auto cached_node3 = std::make_unique<MockCachedNode>(key3, output_names3);
 
-    String key4 = key1;
-    auto output_names4 = std::make_shared<Vector<String>>(Vector<String>{"col3"});
+    std::string key4 = key1;
+    auto output_names4 = std::make_shared<std::vector<std::string>>(std::vector<std::string>{"col3"});
     auto cached_node4 = std::make_unique<MockCachedNode>(key4, output_names4);
 
     auto res1 = cache_manager.GetCache(*cached_node1);
@@ -116,16 +118,16 @@ TEST(ResultCacheManagerTest, test1) {
 
 TEST(ResultCacheManagerTest, test2) {
     ResultCacheManager cache_manager(2);
-    String key1 = "key1";
-    auto output_names1 = std::make_shared<Vector<String>>(Vector<String>{"col1"});
+    std::string key1 = "key1";
+    auto output_names1 = std::make_shared<std::vector<std::string>>(std::vector<std::string>{"col1"});
     auto cached_node1 = std::make_unique<MockCachedNode>(key1, output_names1);
 
-    String key2 = "key2";
-    auto output_names2 = std::make_shared<Vector<String>>(Vector<String>{"col2"});
+    std::string key2 = "key2";
+    auto output_names2 = std::make_shared<std::vector<std::string>>(std::vector<std::string>{"col2"});
     auto cached_node2 = std::make_unique<MockCachedNode>(key2, output_names2);
 
-    String key3 = "key3";
-    auto output_names3 = std::make_shared<Vector<String>>(Vector<String>{"col1", "col2", "col3"});
+    std::string key3 = "key3";
+    auto output_names3 = std::make_shared<std::vector<std::string>>(std::vector<std::string>{"col1", "col2", "col3"});
     auto cached_node3 = std::make_unique<MockCachedNode>(key3, output_names3);
 
     auto cached_node11 = std::make_unique<MockCachedNode>(key1, output_names1);

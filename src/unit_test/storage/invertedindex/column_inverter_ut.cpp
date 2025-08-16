@@ -13,18 +13,17 @@
 // limitations under the License.
 
 #ifdef CI
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 import infinity_core;
 import base_test;
 #else
 module;
 
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 
 module infinity_core:ut.column_inverter;
 
 import :ut.base_test;
-
 import :analyzer;
 import :analyzer_pool;
 import :index_defines;
@@ -49,18 +48,18 @@ class ColumnInverterTest : public BaseTest {
 protected:
     optionflag_t flag_{OPTION_FLAG_ALL};
     PostingFormat posting_format_{PostingFormatOption(flag_)};
-    Map<String, std::shared_ptr<PostingWriter>> postings_;
+    std::map<std::string, std::shared_ptr<PostingWriter>> postings_;
     VectorWithLock<u32> column_lengths_;
 
 public:
     struct ExpectedPosting {
-        String term;
-        Vector<RowID> doc_ids;
-        Vector<u32> tfs;
+        std::string term;
+        std::vector<RowID> doc_ids;
+        std::vector<u32> tfs;
     };
 
 public:
-    std::shared_ptr<PostingWriter> GetOrAddPosting(const String &term) {
+    std::shared_ptr<PostingWriter> GetOrAddPosting(const std::string &term) {
         auto it = postings_.find(term);
         if (it != postings_.end()) {
             return it->second;
@@ -84,12 +83,12 @@ TEST_F(ColumnInverterTest, Invert) {
     std::shared_ptr<ColumnVector> column = ColumnVector::Make(std::make_shared<DataType>(LogicalType::kVarchar));
     column->Initialize();
     for (size_t i = 0; i < num_paragraph; ++i) {
-        Value v = Value::MakeVarchar(String(paragraphs[i]));
+        Value v = Value::MakeVarchar(std::string(paragraphs[i]));
         column->AppendValue(v);
     }
-    Vector<ExpectedPosting> expected_postings = {{"fst", {0, 1, 2}, {4, 2, 2}}, {"automaton", {0, 3}, {2, 5}}, {"transducer", {0, 4}, {1, 4}}};
+    std::vector<ExpectedPosting> expected_postings = {{"fst", {0, 1, 2}, {4, 2, 2}}, {"automaton", {0, 3}, {2, 5}}, {"transducer", {0, 4}, {1, 4}}};
 
-    PostingWriterProvider provider = [this](const String &term) -> std::shared_ptr<PostingWriter> { return GetOrAddPosting(term); };
+    PostingWriterProvider provider = [this](const std::string &term) -> std::shared_ptr<PostingWriter> { return GetOrAddPosting(term); };
     ColumnInverter inverter1(provider, column_lengths_);
     inverter1.InitAnalyzer("standard");
     ColumnInverter inverter2(provider, column_lengths_);
@@ -105,14 +104,14 @@ TEST_F(ColumnInverterTest, Invert) {
 
     for (size_t i = 0; i < expected_postings.size(); ++i) {
         const ExpectedPosting &expected = expected_postings[i];
-        const String &term = expected.term;
+        const std::string &term = expected.term;
         auto it = postings_.find(term);
         ASSERT_TRUE(it != postings_.end());
         std::shared_ptr<PostingWriter> posting = it->second;
         ASSERT_TRUE(posting != nullptr);
         ASSERT_EQ(posting->GetDF(), expected.doc_ids.size());
 
-        std::shared_ptr<Vector<SegmentPosting>> seg_postings = std::make_shared<Vector<SegmentPosting>>(1);
+        std::shared_ptr<std::vector<SegmentPosting>> seg_postings = std::make_shared<std::vector<SegmentPosting>>(1);
         seg_postings->at(0).Init(u64(0), posting);
 
         PostingIterator post_iter(flag_);

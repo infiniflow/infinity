@@ -15,7 +15,7 @@
 #ifndef CI
 module;
 
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 
 module infinity_core:ut.table_meeta;
 
@@ -33,7 +33,7 @@ import :segment_meta;
 import :table_meeta;
 import :block_meta;
 #else
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 import infinity_core;
 import base_test;
 #endif
@@ -57,29 +57,29 @@ TEST_P(TestTxnTableMeeta, table_meeta) {
     Status status;
 
     NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
-    std::shared_ptr<String> db_name = std::make_shared<String>("db1");
+    std::shared_ptr<std::string> db_name = std::make_shared<std::string>("db1");
     auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
     auto column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
     auto table_name = std::make_shared<std::string>("tb1");
-    auto table_def = TableDef::Make(db_name, table_name, std::make_shared<String>(), {column_def1, column_def2});
+    auto table_def = TableDef::Make(db_name, table_name, std::make_shared<std::string>(), {column_def1, column_def2});
 
     {
         // create db1
-        auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<String>("create db"), TransactionType::kNormal);
-        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, std::make_shared<String>());
+        auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kNormal);
+        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, std::make_shared<std::string>());
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn1);
         EXPECT_TRUE(status.ok());
 
         // create table
-        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<String>("create table"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
         status = txn2->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());
 
         auto append = [&] {
-            auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("append"), TransactionType::kNormal);
+            auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("append"), TransactionType::kNormal);
             Status status =
                 txn->Append(*db_name, *table_name, MakeInputBlock(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"), 8192));
             EXPECT_TRUE(status.ok());
@@ -94,7 +94,7 @@ TEST_P(TestTxnTableMeeta, table_meeta) {
     // ---------------------------
 
     // get table
-    auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<String>("get table"), TransactionType::kNormal);
+    auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("get table"), TransactionType::kNormal);
     auto [table_info, get_status] = txn2->GetTableInfo(*db_name, *table_name);
     EXPECT_TRUE(get_status.ok());
 
@@ -192,7 +192,7 @@ TEST_P(TestTxnTableMeeta, table_meeta) {
     EXPECT_TRUE(get_status.ok());
 
     {
-        auto *txn3 = new_txn_mgr->BeginTxn(std::make_unique<String>("drop table"), TransactionType::kNormal);
+        auto *txn3 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop table"), TransactionType::kNormal);
         Status status = txn3->DropTable(*db_name, *table_name, ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn3);
@@ -201,7 +201,7 @@ TEST_P(TestTxnTableMeeta, table_meeta) {
 
     {
         // drop database
-        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<String>("create db"), TransactionType::kNormal);
+        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kNormal);
         Status status = txn4->DropDatabase("db1", ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn4);

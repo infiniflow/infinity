@@ -1,20 +1,21 @@
 
 #ifdef CI
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 import infinity_core;
 import base_test;
 #else
 module;
 
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 
 module infinity_core:ut.loser_tree;
 
 import :ut.base_test;
 import :random;
-import third_party;
 import :loser_tree;
 #endif
+
+import third_party;
 
 using namespace infinity;
 
@@ -34,12 +35,12 @@ public:
     void MultiWayMerge(size_t num_size, size_t loser_num, u64 max_val);
 
 protected:
-    Vector<u64> numbers;
-    Vector<u64> num_idx;
-    Vector<Vector<u64>> loser;
+    std::vector<u64> numbers;
+    std::vector<u64> num_idx;
+    std::vector<std::vector<u64>> loser;
 };
 
-void LoserTreeTest::GenerateData(infinity::size_t num_size, infinity::size_t loser_num, infinity::u64 max_val) {
+void LoserTreeTest::GenerateData(size_t num_size, size_t loser_num, u64 max_val) {
     numbers.clear();
     loser.clear();
     num_idx.clear();
@@ -57,7 +58,7 @@ void LoserTreeTest::GenerateData(infinity::size_t num_size, infinity::size_t los
     }
 }
 
-void LoserTreeTest::MultiWayMerge(infinity::size_t num_size, infinity::size_t loser_num, infinity::u64 max_val) {
+void LoserTreeTest::MultiWayMerge(size_t num_size, size_t loser_num, u64 max_val) {
     auto loser_tree = std::make_shared<LoserTree<u64, std::less<u64>>>(loser_num);
     for (size_t i = 0; i < loser_num; ++i) {
         if (!loser[i].empty()) {
@@ -69,7 +70,7 @@ void LoserTreeTest::MultiWayMerge(infinity::size_t num_size, infinity::size_t lo
         }
     }
     loser_tree->Init();
-    Vector<u64> merge_res;
+    std::vector<u64> merge_res;
     while (loser_tree->TopSource() != LoserTree<u64>::invalid_) {
         auto min_value = loser_tree->TopKey();
         auto min_source = loser_tree->TopSource();

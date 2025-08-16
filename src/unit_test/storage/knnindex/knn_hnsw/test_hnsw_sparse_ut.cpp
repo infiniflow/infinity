@@ -13,13 +13,13 @@
 // limitations under the License.
 
 #ifdef CI
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 import infinity_core;
 import base_test;
 #else
 module;
 
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 
 module infinity_core:ut.test_hnsw_sparse;
 
@@ -65,7 +65,7 @@ protected:
             hnsw_index->InsertVecs(std::move(iter));
 
             {
-                Path dump_path = Path(tmp_data_path()) / "dump.txt";
+                std::filesystem::path dump_path = std::filesystem::path(tmp_data_path()) / "dump.txt";
                 std::fstream ss(dump_path, std::fstream::out);
                 if (!ss.is_open()) {
                     UnrecoverableError("Failed to open file");
@@ -80,7 +80,7 @@ protected:
                 if (gt_score[i] == 0.0 || query.nnz_ == 0) {
                     continue;
                 }
-                Vector<Pair<f32, LabelT>> res = hnsw_index->KnnSearchSorted(query, 1, search_option);
+                std::vector<std::pair<f32, LabelT>> res = hnsw_index->KnnSearchSorted(query, 1, search_option);
                 //                if (int(res[0].second) != gt_idx[i]) {
                 //                    std::cout << (fmt::format("{}, {}", res[0].second, gt_idx[i])) << std::endl;
                 //                    std::cout << (fmt::format("{}, {}", -res[0].first, gt_score[i])) << std::endl;
@@ -108,7 +108,7 @@ protected:
                 if (gt_score[i] == 0.0 || query.nnz_ == 0) {
                     continue;
                 }
-                Vector<Pair<f32, LabelT>> res = hnsw_index->KnnSearchSorted(query, 1, search_option);
+                std::vector<std::pair<f32, LabelT>> res = hnsw_index->KnnSearchSorted(query, 1, search_option);
                 //                if (int(res[0].second) != gt_idx[i]) {
                 //                    std::cout << (fmt::format("{}, {}", res[0].second, gt_idx[i])) << std::endl;
                 //                    std::cout << (fmt::format("{}, {}", -res[0].first, gt_score[i])) << std::endl;
@@ -121,13 +121,13 @@ protected:
 
 private:
     template <typename T>
-    Vector<T> MakeRandom(T min, T max, size_t num, std::mt19937 &rng) {
+    std::vector<T> MakeRandom(T min, T max, size_t num, std::mt19937 &rng) {
         std::uniform_real_distribution<float> distrib_real;
-        HashSet<T> set;
+        std::unordered_set<T> set;
         while (set.size() < num) {
             set.insert(distrib_real(rng) * (max - min) + min);
         }
-        return Vector<T>(set.begin(), set.end());
+        return std::vector<T>(set.begin(), set.end());
     }
 };
 

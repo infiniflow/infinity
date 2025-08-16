@@ -14,14 +14,12 @@
 
 #ifdef CI
 #include "unit_test/gtest_expand.h"
-#include "gtest/gtest.h"
 import infinity_core;
 import base_test;
 #else
 module;
 
 #include "unit_test/gtest_expand.h"
-#include "gtest/gtest.h"
 
 module infinity_core:ut.column_vector_uuid;
 
@@ -31,13 +29,12 @@ import :logger;
 import :column_vector;
 import :value;
 import :default_values;
-import third_party;
-
 import :selection;
 import :vector_buffer;
 import :infinity_context;
 #endif
 
+import third_party;
 import global_resource_usage;
 import internal_types;
 import logical_type;
@@ -86,7 +83,7 @@ TEST_F(ColumnVectorUuidTest, flat_uuid) {
     EXPECT_TRUE(column_vector.initialized);
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
-        String s('a' + i % 26, 16);
+        std::string s('a' + i % 26, 16);
         UuidT uuid(s.c_str());
 
         Value v = Value::MakeUuid(uuid);
@@ -110,7 +107,7 @@ TEST_F(ColumnVectorUuidTest, flat_uuid) {
     EXPECT_EQ(column_vector.vector_type(), clone_column_vector.vector_type());
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
-        String s('a' + i % 26, 16);
+        std::string s('a' + i % 26, 16);
         UuidT uuid(s.c_str());
 
         Value vx = column_vector.GetValueByIndex(i);
@@ -144,9 +141,9 @@ TEST_F(ColumnVectorUuidTest, flat_uuid) {
     EXPECT_NE(column_vector.nulls_ptr_, nullptr);
     EXPECT_TRUE(column_vector.initialized);
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
-        String s('a' + i % 26, 16);
+        std::string s('a' + i % 26, 16);
         UuidT uuid(s.c_str());
-        column_vector.AppendByPtr((ptr_t)(&uuid));
+        column_vector.AppendByPtr((char *)(&uuid));
 
         Value vx = column_vector.GetValueByIndex(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kUuid);
@@ -156,7 +153,7 @@ TEST_F(ColumnVectorUuidTest, flat_uuid) {
 
     ColumnVector column_constant(data_type);
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
-        String s('a' + i % 26, 16);
+        std::string s('a' + i % 26, 16);
         UuidT uuid(s.c_str());
 
         column_constant.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
@@ -195,7 +192,7 @@ TEST_F(ColumnVectorUuidTest, contant_uuid) {
     EXPECT_TRUE(column_vector.initialized);
 
     for (i64 i = 0; i < 1; ++i) {
-        String s('a' + i % 26, 16);
+        std::string s('a' + i % 26, 16);
         UuidT uuid(s.c_str());
 
         Value v = Value::MakeUuid(uuid);
@@ -207,7 +204,7 @@ TEST_F(ColumnVectorUuidTest, contant_uuid) {
         EXPECT_THROW_WITHOUT_STACKTRACE(column_vector.GetValueByIndex(i + 1), UnrecoverableException);
     }
     for (i64 i = 0; i < 1; ++i) {
-        String s('a' + i % 26, 16);
+        std::string s('a' + i % 26, 16);
         UuidT uuid(s.c_str());
 
         Value vx = column_vector.GetValueByIndex(i);
@@ -243,7 +240,7 @@ TEST_F(ColumnVectorUuidTest, contant_uuid) {
     EXPECT_NE(column_vector.nulls_ptr_, nullptr);
     EXPECT_TRUE(column_vector.initialized);
     for (i64 i = 0; i < 1; ++i) {
-        String s('a' + i % 26, 16);
+        std::string s('a' + i % 26, 16);
         UuidT uuid(s.c_str());
 
         Value v = Value::MakeUuid(uuid);
@@ -264,7 +261,7 @@ TEST_F(ColumnVectorUuidTest, uuid_column_vector_select) {
     column_vector.Initialize();
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
-        String s('a' + i % 26, 16);
+        std::string s('a' + i % 26, 16);
         UuidT uuid(s.c_str());
 
         Value v = Value::MakeUuid(uuid);
@@ -272,7 +269,7 @@ TEST_F(ColumnVectorUuidTest, uuid_column_vector_select) {
     }
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
-        String s('a' + i % 26, 16);
+        std::string s('a' + i % 26, 16);
         UuidT uuid(s.c_str());
 
         Value vx = column_vector.GetValueByIndex(i);
@@ -291,7 +288,7 @@ TEST_F(ColumnVectorUuidTest, uuid_column_vector_select) {
     EXPECT_EQ(target_column_vector.Size(), (u64)DEFAULT_VECTOR_SIZE / 2);
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE / 2; ++i) {
-        String s('a' + (2 * i) % 26, 16);
+        std::string s('a' + (2 * i) % 26, 16);
         UuidT uuid(s.c_str());
 
         Value vx = target_column_vector.GetValueByIndex(i);
@@ -308,7 +305,7 @@ TEST_F(ColumnVectorUuidTest, uuid_column_slice_init) {
     column_vector.Initialize();
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
-        String s('a' + i % 26, 16);
+        std::string s('a' + i % 26, 16);
         UuidT uuid(s.c_str());
 
         Value v = Value::MakeUuid(uuid);
@@ -316,7 +313,7 @@ TEST_F(ColumnVectorUuidTest, uuid_column_slice_init) {
     }
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
-        String s('a' + i % 26, 16);
+        std::string s('a' + i % 26, 16);
         UuidT uuid(s.c_str());
 
         Value vx = column_vector.GetValueByIndex(i);
@@ -334,7 +331,7 @@ TEST_F(ColumnVectorUuidTest, uuid_column_slice_init) {
 
     for (i64 i = 0; i < count; ++i) {
         i64 src_idx = start_idx + i;
-        String s('a' + src_idx % 26, 16);
+        std::string s('a' + src_idx % 26, 16);
         UuidT uuid(s.c_str());
 
         Value vx = target_column_vector.GetValueByIndex(i);

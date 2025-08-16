@@ -1,17 +1,16 @@
 
 #ifdef CI
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 import infinity_core;
 import base_test;
 #else
 module;
 
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 
 module infinity_core:ut.skiplist_reader;
 
 import :ut.base_test;
-
 import :posting_byte_slice;
 import :in_doc_pos_state;
 import :byte_slice;
@@ -39,10 +38,10 @@ public:
 protected:
     void InitSkiplistWriter(PostingFields &posting_fields,
                             size_t doc_num,
-                            Vector<u32> &doc_ids,
-                            Vector<u32> &tfs,
-                            Vector<u32> &deltas,
-                            Vector<u32> &offsets);
+                            std::vector<u32> &doc_ids,
+                            std::vector<u32> &tfs,
+                            std::vector<u32> &deltas,
+                            std::vector<u32> &offsets);
 
 protected:
     std::shared_ptr<SkipListWriter> skiplist_writer_ = nullptr;
@@ -51,10 +50,10 @@ protected:
 
 void SkiplistReaderTest::InitSkiplistWriter(PostingFields &posting_fields,
                                             size_t doc_num,
-                                            Vector<infinity::u32> &doc_ids,
-                                            Vector<infinity::u32> &tfs,
-                                            Vector<infinity::u32> &deltas,
-                                            Vector<infinity::u32> &offsets) {
+                                            std::vector<u32> &doc_ids,
+                                            std::vector<u32> &tfs,
+                                            std::vector<u32> &deltas,
+                                            std::vector<u32> &offsets) {
     u8 row_count = 0;
     u32 offset = 0;
 
@@ -97,10 +96,10 @@ void SkiplistReaderTest::InitSkiplistWriter(PostingFields &posting_fields,
 TEST_F(SkiplistReaderTest, SkipListReaderByteSliceTest) {
     PostingFields posting_fields;
     auto doc_num = SKIP_LIST_BUFFER_SIZE + 2;
-    Vector<u32> doc_ids;
-    Vector<u32> tfs;
-    Vector<u32> deltas;
-    Vector<u32> offsets;
+    std::vector<u32> doc_ids;
+    std::vector<u32> tfs;
+    std::vector<u32> deltas;
+    std::vector<u32> offsets;
     InitSkiplistWriter(posting_fields, doc_num, doc_ids, tfs, deltas, offsets);
 
     auto byte_slice_list = skiplist_writer_->GetByteSliceList();
@@ -150,10 +149,10 @@ TEST_F(SkiplistReaderTest, SkipListReaderByteSliceTest) {
 TEST_F(SkiplistReaderTest, SkipListReaderPostingByteSliceTest) {
     PostingFields posting_fields;
     size_t doc_num = SKIP_LIST_BUFFER_SIZE + 2;
-    Vector<u32> doc_ids;
-    Vector<u32> tfs;
-    Vector<u32> deltas;
-    Vector<u32> offsets;
+    std::vector<u32> doc_ids;
+    std::vector<u32> tfs;
+    std::vector<u32> deltas;
+    std::vector<u32> offsets;
 
     InitSkiplistWriter(posting_fields, doc_num, doc_ids, tfs, deltas, offsets);
 

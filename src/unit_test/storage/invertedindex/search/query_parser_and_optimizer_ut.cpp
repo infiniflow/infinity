@@ -13,14 +13,14 @@
 //  limitations under the License.
 
 #ifdef CI
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 import infinity_core;
 import base_test;
 import log_helper;
 #else
 module;
 
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 
 module infinity_core:ut.query_parser_and_optimizer;
 
@@ -143,8 +143,8 @@ sda:rtw AND ((NOT name:god^2 AND NOT kddd:ss^4) AND NOT ee:ff^1.2)
 sda:rtw AND ((NOT name:god^2 OR NOT kddd:ss^4) OR NOT ee:ff^1.2)
     )##";
 
-    Map<String, String> column2analyzer;
-    String default_field("body");
+    std::map<std::string, std::string> column2analyzer;
+    std::string default_field("body");
     SearchDriver driver(column2analyzer, default_field);
     std::istringstream iss(row_quires);
     int rc = ParseAndOptimizeFromStream(driver, iss);
@@ -177,8 +177,8 @@ sda:rtw AND ((NOT name:god^2 AND NOT kddd:ss^4) AND NOT ee:ff^1.2)
 sda:rtw AND ((NOT name:god^2 OR NOT kddd:ss^4) OR NOT ee:ff^1.2)
     )##";
 
-    const Map<String, String> column2analyzer;
-    const String default_field("body");
+    const std::map<std::string, std::string> column2analyzer;
+    const std::string default_field("body");
     for (size_t i = 0; i < std::size(ops); ++i) {
         const auto op = ops[i];
         LOG_DEBUG(fmt::format("Test With Operator Option: {}", ops_chars[i]));
@@ -212,9 +212,9 @@ nanjing吉祥物"羽宝"头部head "DS-K3AJ303/Dm140"
 graphic cards
     )##";
 
-    Map<String, String> column2analyzer;
+    std::map<std::string, std::string> column2analyzer;
     column2analyzer["body"] = "chinese";
-    const String default_field("body");
+    const std::string default_field("body");
     for (size_t i = 0; i < std::size(ops); ++i) {
         const auto op = ops[i];
         LOG_DEBUG(fmt::format("Test With Operator Option: {}", ops_chars[i]));

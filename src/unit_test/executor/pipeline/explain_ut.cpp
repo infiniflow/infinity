@@ -13,13 +13,13 @@
 // limitations under the License.
 
 #ifdef CI
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 import infinity_core;
 import base_test;
 #else
 module;
 
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 
 module infinity_core:ut.explain;
 
@@ -33,42 +33,42 @@ class ExplainTest : public BaseTest {};
 TEST_F(ExplainTest, test1) {
     using namespace infinity;
 
-    Vector<std::shared_ptr<String>> fragment_text;
-    Vector<std::shared_ptr<String>> task_text;
+    std::vector<std::shared_ptr<std::string>> fragment_text;
+    std::vector<std::shared_ptr<std::string>> task_text;
 
-    fragment_text.push_back(std::make_shared<String>("FRAGMENT (1)"));
-    fragment_text.push_back(std::make_shared<String>("-> SINK (7)"));
-    fragment_text.push_back(std::make_shared<String>("-> PROJECT (4)"));
-    fragment_text.push_back(std::make_shared<String>("   - table index: #4"));
-    fragment_text.push_back(std::make_shared<String>("   - expressions: [c1 (#0)]"));
-    fragment_text.push_back(std::make_shared<String>("-> AGGREGATE (3)"));
-    fragment_text.push_back(std::make_shared<String>("   - aggregate table index: #3"));
-    fragment_text.push_back(std::make_shared<String>("   - aggregate: []"));
-    fragment_text.push_back(std::make_shared<String>("   - group by table index: #2"));
-    fragment_text.push_back(std::make_shared<String>("   - group by: [c1 (#0)]"));
-    fragment_text.push_back(std::make_shared<String>("-> SOURCE (11): FRAGMENT #2"));
-    fragment_text.push_back(std::make_shared<String>());
+    fragment_text.push_back(std::make_shared<std::string>("FRAGMENT (1)"));
+    fragment_text.push_back(std::make_shared<std::string>("-> SINK (7)"));
+    fragment_text.push_back(std::make_shared<std::string>("-> PROJECT (4)"));
+    fragment_text.push_back(std::make_shared<std::string>("   - table index: #4"));
+    fragment_text.push_back(std::make_shared<std::string>("   - expressions: [c1 (#0)]"));
+    fragment_text.push_back(std::make_shared<std::string>("-> AGGREGATE (3)"));
+    fragment_text.push_back(std::make_shared<std::string>("   - aggregate table index: #3"));
+    fragment_text.push_back(std::make_shared<std::string>("   - aggregate: []"));
+    fragment_text.push_back(std::make_shared<std::string>("   - group by table index: #2"));
+    fragment_text.push_back(std::make_shared<std::string>("   - group by: [c1 (#0)]"));
+    fragment_text.push_back(std::make_shared<std::string>("-> SOURCE (11): FRAGMENT #2"));
+    fragment_text.push_back(std::make_shared<std::string>());
 
-    fragment_text.push_back(std::make_shared<String>("FRAGMENT (2)"));
-    fragment_text.push_back(std::make_shared<String>("-> SINK (9)"));
-    fragment_text.push_back(std::make_shared<String>("-> TABLE SCAN (2)"));
-    fragment_text.push_back(std::make_shared<String>("   - table name: t1(default_db.t1)"));
-    fragment_text.push_back(std::make_shared<String>("   - table index: #1"));
-    fragment_text.push_back(std::make_shared<String>("   - output_columns: [c1]"));
-    fragment_text.push_back(std::make_shared<String>("-> SOURCE (10)"));
-    fragment_text.push_back(std::make_shared<String>());
+    fragment_text.push_back(std::make_shared<std::string>("FRAGMENT (2)"));
+    fragment_text.push_back(std::make_shared<std::string>("-> SINK (9)"));
+    fragment_text.push_back(std::make_shared<std::string>("-> TABLE SCAN (2)"));
+    fragment_text.push_back(std::make_shared<std::string>("   - table name: t1(default_db.t1)"));
+    fragment_text.push_back(std::make_shared<std::string>("   - table index: #1"));
+    fragment_text.push_back(std::make_shared<std::string>("   - output_columns: [c1]"));
+    fragment_text.push_back(std::make_shared<std::string>("-> SOURCE (10)"));
+    fragment_text.push_back(std::make_shared<std::string>());
 
-    task_text.push_back(std::make_shared<String>("Fragment #1 * 4 Task"));
-    task_text.push_back(std::make_shared<String>("-> Task #0"));
-    task_text.push_back(std::make_shared<String>("-> Task #1"));
-    task_text.push_back(std::make_shared<String>("-> Task #2"));
-    task_text.push_back(std::make_shared<String>("-> Task #3"));
-    task_text.push_back(std::make_shared<String>());
+    task_text.push_back(std::make_shared<std::string>("Fragment #1 * 4 Task"));
+    task_text.push_back(std::make_shared<std::string>("-> Task #0"));
+    task_text.push_back(std::make_shared<std::string>("-> Task #1"));
+    task_text.push_back(std::make_shared<std::string>("-> Task #2"));
+    task_text.push_back(std::make_shared<std::string>("-> Task #3"));
+    task_text.push_back(std::make_shared<std::string>());
 
-    task_text.push_back(std::make_shared<String>("Fragment #2 * 2 Task"));
-    task_text.push_back(std::make_shared<String>("-> Task #0"));
-    task_text.push_back(std::make_shared<String>("-> Task #1"));
-    task_text.push_back(std::make_shared<String>());
+    task_text.push_back(std::make_shared<std::string>("Fragment #2 * 2 Task"));
+    task_text.push_back(std::make_shared<std::string>("-> Task #0"));
+    task_text.push_back(std::make_shared<std::string>("-> Task #1"));
+    task_text.push_back(std::make_shared<std::string>());
 
     PhysicalExplain::AlignParagraphs(fragment_text, task_text);
 

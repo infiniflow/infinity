@@ -14,14 +14,12 @@
 
 #ifdef CI
 #include "unit_test/gtest_expand.h"
-#include "gtest/gtest.h"
 import infinity_core;
 import base_test;
 #else
 module;
 
 #include "unit_test/gtest_expand.h"
-#include "gtest/gtest.h"
 
 module infinity_core:ut.mixed_type;
 
@@ -130,10 +128,10 @@ TEST_F(MixedTypeTest, mixed_short_str) {
         EXPECT_EQ(mixed_short_string.type, MixedValueType::kShortStr);
 
         auto *short_string_mixed_ptr = (ShortStrMixedType *)(&mixed_short_string);
-        String result = String(short_string_mixed_ptr->ptr, short_string_mixed_ptr->length);
+        std::string result = std::string(short_string_mixed_ptr->ptr, short_string_mixed_ptr->length);
         EXPECT_STREQ(result.c_str(), "Hello");
         EXPECT_EQ(short_string_mixed_ptr->length, 5);
-        String another = "Hell";
+        std::string another = "Hell";
         EXPECT_TRUE(short_string_mixed_ptr->Equal(result));
         EXPECT_FALSE(short_string_mixed_ptr->Equal(another));
 
@@ -141,7 +139,7 @@ TEST_F(MixedTypeTest, mixed_short_str) {
 
         mixed_short_string = MixedType::MakeString("Hello a World!");
         EXPECT_EQ(mixed_short_string.type, MixedValueType::kShortStr);
-        result = String(short_string_mixed_ptr->ptr, short_string_mixed_ptr->length);
+        result = std::string(short_string_mixed_ptr->ptr, short_string_mixed_ptr->length);
         EXPECT_STREQ(result.c_str(), "Hello a World!");
         EXPECT_EQ(short_string_mixed_ptr->length, 14);
         result.clear();
@@ -150,12 +148,12 @@ TEST_F(MixedTypeTest, mixed_short_str) {
         MixedType mixed_short_string2 = mixed_short_string;
         EXPECT_EQ(mixed_short_string2.type, MixedValueType::kShortStr);
         auto *short_string_mixed_ptr2 = (ShortStrMixedType *)(&mixed_short_string2);
-        result = String(short_string_mixed_ptr2->ptr, short_string_mixed_ptr2->length);
+        result = std::string(short_string_mixed_ptr2->ptr, short_string_mixed_ptr2->length);
         EXPECT_STREQ(result.c_str(), "Hello a World!");
         EXPECT_EQ(short_string_mixed_ptr2->length, 14);
 
         // validate mixed_short_string not modified
-        result = String(short_string_mixed_ptr->ptr, short_string_mixed_ptr->length);
+        result = std::string(short_string_mixed_ptr->ptr, short_string_mixed_ptr->length);
         EXPECT_STREQ(result.c_str(), "Hello a World!");
         EXPECT_EQ(short_string_mixed_ptr->length, 14);
 
@@ -163,7 +161,7 @@ TEST_F(MixedTypeTest, mixed_short_str) {
         MixedType mixed_short_string3 = std::move(mixed_short_string2);
         EXPECT_EQ(mixed_short_string3.type, MixedValueType::kShortStr);
         auto *short_string_mixed_ptr3 = (ShortStrMixedType *)(&mixed_short_string3);
-        result = String(short_string_mixed_ptr3->ptr, short_string_mixed_ptr3->length);
+        result = std::string(short_string_mixed_ptr3->ptr, short_string_mixed_ptr3->length);
         EXPECT_STREQ(result.c_str(), "Hello a World!");
         EXPECT_EQ(short_string_mixed_ptr3->length, 14);
 
@@ -177,12 +175,12 @@ TEST_F(MixedTypeTest, mixed_short_str) {
         mixed_short_string4 = mixed_short_string3;
         EXPECT_EQ(mixed_short_string4.type, MixedValueType::kShortStr);
         auto *short_string_mixed_ptr4 = (ShortStrMixedType *)(&mixed_short_string4);
-        result = String(short_string_mixed_ptr4->ptr, short_string_mixed_ptr4->length);
+        result = std::string(short_string_mixed_ptr4->ptr, short_string_mixed_ptr4->length);
         EXPECT_STREQ(result.c_str(), "Hello a World!");
         EXPECT_EQ(short_string_mixed_ptr4->length, 14);
 
         // validate mixed_short_string3 not modified
-        result = String(short_string_mixed_ptr3->ptr, short_string_mixed_ptr3->length);
+        result = std::string(short_string_mixed_ptr3->ptr, short_string_mixed_ptr3->length);
         EXPECT_STREQ(result.c_str(), "Hello a World!");
         EXPECT_EQ(short_string_mixed_ptr3->length, 14);
 
@@ -191,7 +189,7 @@ TEST_F(MixedTypeTest, mixed_short_str) {
         mixed_short_string5 = std::move(mixed_short_string3);
         EXPECT_EQ(mixed_short_string5.type, MixedValueType::kShortStr);
         auto *short_string_mixed_ptr5 = (ShortStrMixedType *)(&mixed_short_string5);
-        result = String(short_string_mixed_ptr5->ptr, short_string_mixed_ptr5->length);
+        result = std::string(short_string_mixed_ptr5->ptr, short_string_mixed_ptr5->length);
         EXPECT_STREQ(result.c_str(), "Hello a World!");
         EXPECT_EQ(short_string_mixed_ptr5->length, 14);
 
@@ -210,13 +208,13 @@ TEST_F(MixedTypeTest, mixed_long_str) {
     EXPECT_EQ(mixed_long_string.type, MixedValueType::kLongStr);
     auto *long_string_mixed_ptr = (LongStrMixedType *)(&mixed_long_string);
 
-    String long_str(long_string_mixed_ptr->ptr, long_string_mixed_ptr->length);
+    std::string long_str(long_string_mixed_ptr->ptr, long_string_mixed_ptr->length);
     EXPECT_STREQ(long_str.c_str(), "Hello the world");
     EXPECT_EQ(long_string_mixed_ptr->length, 15);
-    String header = String(long_string_mixed_ptr->ptr, BaseMixedType::LONG_STR_HEADER);
+    std::string header = std::string(long_string_mixed_ptr->ptr, BaseMixedType::LONG_STR_HEADER);
     EXPECT_STREQ(header.c_str(), "Hello");
 
-    String another = "Aello the world";
+    std::string another = "Aello the world";
     EXPECT_FALSE(long_string_mixed_ptr->Equal(another));
     another = "Hellow";
     EXPECT_FALSE(long_string_mixed_ptr->Equal(another));
@@ -227,10 +225,10 @@ TEST_F(MixedTypeTest, mixed_long_str) {
     MixedType mixed_long_string1 = mixed_long_string;
     EXPECT_EQ(mixed_long_string1.type, MixedValueType::kLongStr);
     auto *long_string_mixed_ptr1 = (LongStrMixedType *)(&mixed_long_string1);
-    long_str = String(long_string_mixed_ptr->ptr, long_string_mixed_ptr->length);
+    long_str = std::string(long_string_mixed_ptr->ptr, long_string_mixed_ptr->length);
     EXPECT_STREQ(long_str.c_str(), "Hello the world");
     EXPECT_EQ(long_string_mixed_ptr1->length, 15);
-    String header1 = String(long_string_mixed_ptr1->ptr, BaseMixedType::LONG_STR_HEADER);
+    std::string header1 = std::string(long_string_mixed_ptr1->ptr, BaseMixedType::LONG_STR_HEADER);
     EXPECT_STREQ(header1.c_str(), "Hello");
 
     // Reset mixed_long_string
@@ -242,10 +240,10 @@ TEST_F(MixedTypeTest, mixed_long_str) {
     MixedType mixed_long_string2 = std::move(mixed_long_string1);
     EXPECT_EQ(mixed_long_string2.type, MixedValueType::kLongStr);
     auto *long_string_mixed_ptr2 = (LongStrMixedType *)(&mixed_long_string2);
-    long_str = String(long_string_mixed_ptr2->ptr, long_string_mixed_ptr2->length);
+    long_str = std::string(long_string_mixed_ptr2->ptr, long_string_mixed_ptr2->length);
     EXPECT_STREQ(long_str.c_str(), "Hello the world");
     EXPECT_EQ(long_string_mixed_ptr2->length, 15);
-    String header2 = String(long_string_mixed_ptr2->ptr, BaseMixedType::LONG_STR_HEADER);
+    std::string header2 = std::string(long_string_mixed_ptr2->ptr, BaseMixedType::LONG_STR_HEADER);
     EXPECT_STREQ(header2.c_str(), "Hello");
 
     // Validate mixed_long_string1 is reset.
@@ -257,10 +255,10 @@ TEST_F(MixedTypeTest, mixed_long_str) {
     mixed_long_string3 = mixed_long_string2;
     EXPECT_EQ(mixed_long_string3.type, MixedValueType::kLongStr);
     auto *long_string_mixed_ptr3 = (LongStrMixedType *)(&mixed_long_string3);
-    long_str = String(long_string_mixed_ptr3->ptr, long_string_mixed_ptr3->length);
+    long_str = std::string(long_string_mixed_ptr3->ptr, long_string_mixed_ptr3->length);
     EXPECT_STREQ(long_str.c_str(), "Hello the world");
     EXPECT_EQ(long_string_mixed_ptr3->length, 15);
-    String header3 = String(long_string_mixed_ptr3->ptr, BaseMixedType::LONG_STR_HEADER);
+    std::string header3 = std::string(long_string_mixed_ptr3->ptr, BaseMixedType::LONG_STR_HEADER);
     EXPECT_STREQ(header3.c_str(), "Hello");
 
     // std::move assignment
@@ -268,10 +266,10 @@ TEST_F(MixedTypeTest, mixed_long_str) {
     mixed_long_string4 = std::move(mixed_long_string2);
     EXPECT_EQ(mixed_long_string4.type, MixedValueType::kLongStr);
     auto *long_string_mixed_ptr4 = (LongStrMixedType *)(&mixed_long_string4);
-    long_str = String(long_string_mixed_ptr4->ptr, long_string_mixed_ptr4->length);
+    long_str = std::string(long_string_mixed_ptr4->ptr, long_string_mixed_ptr4->length);
     EXPECT_STREQ(long_str.c_str(), "Hello the world");
     EXPECT_EQ(long_string_mixed_ptr4->length, 15);
-    String header4 = String(long_string_mixed_ptr4->ptr, BaseMixedType::LONG_STR_HEADER);
+    std::string header4 = std::string(long_string_mixed_ptr4->ptr, BaseMixedType::LONG_STR_HEADER);
     EXPECT_STREQ(header4.c_str(), "Hello");
 
     // Validate mixed_long_string2 is reset.
@@ -331,7 +329,7 @@ TEST_F(MixedTypeTest, mixed_tuple1) {
         EXPECT_EQ(value3_ptr->type, MixedValueType::kShortStr);
         auto *short_str_value_ptr = (ShortStrMixedType *)(value3_ptr);
 
-        String result(short_str_value_ptr->ptr, short_str_value_ptr->length);
+        std::string result(short_str_value_ptr->ptr, short_str_value_ptr->length);
         EXPECT_STREQ(result.c_str(), "Hello World !!");
     }
 
@@ -342,7 +340,7 @@ TEST_F(MixedTypeTest, mixed_tuple1) {
         EXPECT_EQ(value4_ptr->type, MixedValueType::kLongStr);
         auto *long_str_value_ptr = (LongStrMixedType *)(value4_ptr);
 
-        String result(long_str_value_ptr->ptr, long_str_value_ptr->length);
+        std::string result(long_str_value_ptr->ptr, long_str_value_ptr->length);
         EXPECT_STREQ(result.c_str(), "Hello World Hello World");
     }
 
@@ -387,7 +385,7 @@ TEST_F(MixedTypeTest, mixed_tuple1) {
             EXPECT_EQ(value63_ptr->type, MixedValueType::kShortStr);
             auto *short_str_value63_ptr = (ShortStrMixedType *)(value63_ptr);
 
-            String result(short_str_value63_ptr->ptr, short_str_value63_ptr->length);
+            std::string result(short_str_value63_ptr->ptr, short_str_value63_ptr->length);
             EXPECT_STREQ(result.c_str(), "Hello World !!");
         }
 
@@ -398,7 +396,7 @@ TEST_F(MixedTypeTest, mixed_tuple1) {
             EXPECT_EQ(value64_ptr->type, MixedValueType::kLongStr);
             auto *long_str_value64_ptr = (LongStrMixedType *)(value64_ptr);
 
-            String result(long_str_value64_ptr->ptr, long_str_value64_ptr->length);
+            std::string result(long_str_value64_ptr->ptr, long_str_value64_ptr->length);
             EXPECT_STREQ(result.c_str(), "Hello World Hello World");
         }
 
@@ -441,7 +439,7 @@ TEST_F(MixedTypeTest, mixed_tuple1) {
                 EXPECT_EQ(value63_ptr->type, MixedValueType::kShortStr);
                 auto *short_str_value63_ptr = (ShortStrMixedType *)(value63_ptr);
 
-                String result(short_str_value63_ptr->ptr, short_str_value63_ptr->length);
+                std::string result(short_str_value63_ptr->ptr, short_str_value63_ptr->length);
                 EXPECT_STREQ(result.c_str(), "Hello World !!");
             }
             // Key64: long string
@@ -450,7 +448,7 @@ TEST_F(MixedTypeTest, mixed_tuple1) {
                 EXPECT_EQ(value64_ptr->type, MixedValueType::kLongStr);
                 auto *long_str_value64_ptr = (LongStrMixedType *)(value64_ptr);
 
-                String result(long_str_value64_ptr->ptr, long_str_value64_ptr->length);
+                std::string result(long_str_value64_ptr->ptr, long_str_value64_ptr->length);
                 EXPECT_STREQ(result.c_str(), "Hello World Hello World");
             }
             // Key65: null
@@ -499,7 +497,7 @@ TEST_F(MixedTypeTest, mixed_tuple1) {
             EXPECT_EQ(value3_ptr->type, MixedValueType::kShortStr);
             auto *short_str_value_ptr = (ShortStrMixedType *)(value3_ptr);
 
-            String result = String(short_str_value_ptr->ptr, short_str_value_ptr->length);
+            std::string result = std::string(short_str_value_ptr->ptr, short_str_value_ptr->length);
             EXPECT_STREQ(result.c_str(), "FunnyHalloween");
         }
 
@@ -510,7 +508,7 @@ TEST_F(MixedTypeTest, mixed_tuple1) {
             EXPECT_EQ(value4_ptr->type, MixedValueType::kLongStr);
             auto *long_str_value_ptr = (LongStrMixedType *)(value4_ptr);
 
-            String result = String(long_str_value_ptr->ptr, long_str_value_ptr->length);
+            std::string result = std::string(long_str_value_ptr->ptr, long_str_value_ptr->length);
             EXPECT_STREQ(result.c_str(), "FunnyHalloween OK");
         }
 
@@ -552,7 +550,7 @@ TEST_F(MixedTypeTest, mixed_tuple1) {
                 EXPECT_EQ(value3_ptr->type, MixedValueType::kShortStr);
                 auto *short_str_value_ptr = (ShortStrMixedType *)(value3_ptr);
 
-                String result = String(short_str_value_ptr->ptr, short_str_value_ptr->length);
+                std::string result = std::string(short_str_value_ptr->ptr, short_str_value_ptr->length);
                 EXPECT_STREQ(result.c_str(), "FunnyHalloween");
             }
             // Long str
@@ -561,7 +559,7 @@ TEST_F(MixedTypeTest, mixed_tuple1) {
                 EXPECT_EQ(value4_ptr->type, MixedValueType::kLongStr);
                 auto *long_str_value_ptr = (LongStrMixedType *)(value4_ptr);
 
-                String result = String(long_str_value_ptr->ptr, long_str_value_ptr->length);
+                std::string result = std::string(long_str_value_ptr->ptr, long_str_value_ptr->length);
                 EXPECT_STREQ(result.c_str(), "FunnyHalloween OK");
             }
             // Null
@@ -603,7 +601,7 @@ TEST_F(MixedTypeTest, mixed_tuple1) {
             EXPECT_EQ(value3_ptr->type, MixedValueType::kShortStr);
             auto *short_str_value_ptr = (ShortStrMixedType *)(value3_ptr);
 
-            String result(short_str_value_ptr->ptr, short_str_value_ptr->length);
+            std::string result(short_str_value_ptr->ptr, short_str_value_ptr->length);
             EXPECT_STREQ(result.c_str(), "Hello World !!");
         }
         // Key4: long string
@@ -612,7 +610,7 @@ TEST_F(MixedTypeTest, mixed_tuple1) {
             EXPECT_EQ(value4_ptr->type, MixedValueType::kLongStr);
             auto *long_str_value_ptr = (LongStrMixedType *)(value4_ptr);
 
-            String result(long_str_value_ptr->ptr, long_str_value_ptr->length);
+            std::string result(long_str_value_ptr->ptr, long_str_value_ptr->length);
             EXPECT_STREQ(result.c_str(), "Hello World Hello World");
         }
         // Key5: null
@@ -648,7 +646,7 @@ TEST_F(MixedTypeTest, mixed_tuple1) {
                 EXPECT_EQ(value63_ptr->type, MixedValueType::kShortStr);
                 auto *short_str_value63_ptr = (ShortStrMixedType *)(value63_ptr);
 
-                String result(short_str_value63_ptr->ptr, short_str_value63_ptr->length);
+                std::string result(short_str_value63_ptr->ptr, short_str_value63_ptr->length);
                 EXPECT_STREQ(result.c_str(), "Hello World !!");
             }
             // Key64: long string
@@ -657,7 +655,7 @@ TEST_F(MixedTypeTest, mixed_tuple1) {
                 EXPECT_EQ(value64_ptr->type, MixedValueType::kLongStr);
                 auto *long_str_value64_ptr = (LongStrMixedType *)(value64_ptr);
 
-                String result(long_str_value64_ptr->ptr, long_str_value64_ptr->length);
+                std::string result(long_str_value64_ptr->ptr, long_str_value64_ptr->length);
                 EXPECT_STREQ(result.c_str(), "Hello World Hello World");
             }
             // Key65: null
@@ -694,7 +692,7 @@ TEST_F(MixedTypeTest, mixed_tuple1) {
                 EXPECT_EQ(value3_ptr->type, MixedValueType::kShortStr);
                 auto *short_str_value_ptr = (ShortStrMixedType *)(value3_ptr);
 
-                String result = String(short_str_value_ptr->ptr, short_str_value_ptr->length);
+                std::string result = std::string(short_str_value_ptr->ptr, short_str_value_ptr->length);
                 EXPECT_STREQ(result.c_str(), "FunnyHalloween");
             }
             // Long str
@@ -703,7 +701,7 @@ TEST_F(MixedTypeTest, mixed_tuple1) {
                 EXPECT_EQ(value4_ptr->type, MixedValueType::kLongStr);
                 auto *long_str_value_ptr = (LongStrMixedType *)(value4_ptr);
 
-                String result = String(long_str_value_ptr->ptr, long_str_value_ptr->length);
+                std::string result = std::string(long_str_value_ptr->ptr, long_str_value_ptr->length);
                 EXPECT_STREQ(result.c_str(), "FunnyHalloween OK");
             }
             // Null
@@ -750,7 +748,7 @@ TEST_F(MixedTypeTest, mixed_tuple2) {
         auto *value3_ptr = mixed_tuple1.GetFromTuple("key3");
         EXPECT_EQ(value3_ptr->type, MixedValueType::kShortStr);
         auto *short_str_value_ptr = (ShortStrMixedType *)(value3_ptr);
-        String short_str(short_str_value_ptr->ptr, short_str_value_ptr->length);
+        std::string short_str(short_str_value_ptr->ptr, short_str_value_ptr->length);
         EXPECT_STREQ(short_str.c_str(), "Hello World !!");
     }
 
@@ -760,7 +758,7 @@ TEST_F(MixedTypeTest, mixed_tuple2) {
         auto *value4_ptr = mixed_tuple1.GetFromTuple("key4");
         EXPECT_EQ(value4_ptr->type, MixedValueType::kLongStr);
         auto *long_str_value_ptr = (LongStrMixedType *)(value4_ptr);
-        String long_str(long_str_value_ptr->ptr, long_str_value_ptr->length);
+        std::string long_str(long_str_value_ptr->ptr, long_str_value_ptr->length);
         EXPECT_STREQ(long_str.c_str(), "Hello World Hello World");
     }
 
@@ -804,7 +802,7 @@ TEST_F(MixedTypeTest, mixed_tuple2) {
             auto *value63_ptr = mixed_tuple_key6.GetFromTuple("key63");
             EXPECT_EQ(value63_ptr->type, MixedValueType::kShortStr);
             auto *short_str_value63_ptr = (ShortStrMixedType *)(value63_ptr);
-            String short_str(short_str_value63_ptr->ptr, short_str_value63_ptr->length);
+            std::string short_str(short_str_value63_ptr->ptr, short_str_value63_ptr->length);
             EXPECT_STREQ(short_str.c_str(), "Hello World !!");
         }
 
@@ -815,7 +813,7 @@ TEST_F(MixedTypeTest, mixed_tuple2) {
             EXPECT_EQ(value64_ptr->type, MixedValueType::kLongStr);
             auto *long_str_value64_ptr = (LongStrMixedType *)(value64_ptr);
 
-            String result(long_str_value64_ptr->ptr, long_str_value64_ptr->length);
+            std::string result(long_str_value64_ptr->ptr, long_str_value64_ptr->length);
             EXPECT_STREQ(result.c_str(), "Hello World Hello World");
         }
 
@@ -873,7 +871,7 @@ TEST_F(MixedTypeTest, mixed_tuple2) {
             auto *value4_ptr = mixed_array7.GetByIndex(3);
             EXPECT_EQ(value4_ptr->type, MixedValueType::kLongStr);
             auto *long_str_value_ptr = (LongStrMixedType *)(value4_ptr);
-            String result = String(long_str_value_ptr->ptr, long_str_value_ptr->length);
+            std::string result = std::string(long_str_value_ptr->ptr, long_str_value_ptr->length);
             EXPECT_STREQ(result.c_str(), "FunnyHalloween OK");
         }
 
@@ -918,7 +916,7 @@ TEST_F(MixedTypeTest, mixed_tuple2) {
             EXPECT_EQ(value3_ptr->type, MixedValueType::kShortStr);
             auto *short_str_value_ptr = (ShortStrMixedType *)(value3_ptr);
 
-            String result(short_str_value_ptr->ptr, short_str_value_ptr->length);
+            std::string result(short_str_value_ptr->ptr, short_str_value_ptr->length);
             EXPECT_STREQ(result.c_str(), "Hello World !!");
         }
         // Key4: long string
@@ -927,7 +925,7 @@ TEST_F(MixedTypeTest, mixed_tuple2) {
             EXPECT_EQ(value4_ptr->type, MixedValueType::kLongStr);
             auto *long_str_value_ptr = (LongStrMixedType *)(value4_ptr);
 
-            String result(long_str_value_ptr->ptr, long_str_value_ptr->length);
+            std::string result(long_str_value_ptr->ptr, long_str_value_ptr->length);
             EXPECT_STREQ(result.c_str(), "Hello World Hello World");
         }
         // Key5: null
@@ -963,7 +961,7 @@ TEST_F(MixedTypeTest, mixed_tuple2) {
                 EXPECT_EQ(value63_ptr->type, MixedValueType::kShortStr);
                 auto *short_str_value63_ptr = (ShortStrMixedType *)(value63_ptr);
 
-                String result(short_str_value63_ptr->ptr, short_str_value63_ptr->length);
+                std::string result(short_str_value63_ptr->ptr, short_str_value63_ptr->length);
                 EXPECT_STREQ(result.c_str(), "Hello World !!");
             }
             // Key64: long string
@@ -972,7 +970,7 @@ TEST_F(MixedTypeTest, mixed_tuple2) {
                 EXPECT_EQ(value64_ptr->type, MixedValueType::kLongStr);
                 auto *long_str_value64_ptr = (LongStrMixedType *)(value64_ptr);
 
-                String result(long_str_value64_ptr->ptr, long_str_value64_ptr->length);
+                std::string result(long_str_value64_ptr->ptr, long_str_value64_ptr->length);
                 EXPECT_STREQ(result.c_str(), "Hello World Hello World");
             }
             // Key65: null
@@ -1009,7 +1007,7 @@ TEST_F(MixedTypeTest, mixed_tuple2) {
                 EXPECT_EQ(value3_ptr->type, MixedValueType::kShortStr);
                 auto *short_str_value_ptr = (ShortStrMixedType *)(value3_ptr);
 
-                String result = String(short_str_value_ptr->ptr, short_str_value_ptr->length);
+                std::string result = std::string(short_str_value_ptr->ptr, short_str_value_ptr->length);
                 EXPECT_STREQ(result.c_str(), "FunnyHalloween");
             }
             // Long str
@@ -1018,7 +1016,7 @@ TEST_F(MixedTypeTest, mixed_tuple2) {
                 EXPECT_EQ(value4_ptr->type, MixedValueType::kLongStr);
                 auto *long_str_value_ptr = (LongStrMixedType *)(value4_ptr);
 
-                String result = String(long_str_value_ptr->ptr, long_str_value_ptr->length);
+                std::string result = std::string(long_str_value_ptr->ptr, long_str_value_ptr->length);
                 EXPECT_STREQ(result.c_str(), "FunnyHalloween OK");
             }
             // Null
@@ -1055,7 +1053,7 @@ TEST_F(MixedTypeTest, mixed_tuple3) {
         EXPECT_EQ(value1_ptr->type, MixedValueType::kShortStr);
         auto *short_str_value_ptr = (ShortStrMixedType *)(value1_ptr);
 
-        String result = String(short_str_value_ptr->ptr, short_str_value_ptr->length);
+        std::string result = std::string(short_str_value_ptr->ptr, short_str_value_ptr->length);
         EXPECT_STREQ(result.c_str(), "ABC");
     }
     EXPECT_THROW_WITHOUT_STACKTRACE(mixed_tuple3.InsertIntegerIntoTuple("key1key1key1key1key1key2", 900), ParserException);
@@ -1067,7 +1065,7 @@ TEST_F(MixedTypeTest, mixed_tuple3) {
         EXPECT_EQ(value1_ptr->type, MixedValueType::kLongStr);
         auto *long_str_value_ptr = (LongStrMixedType *)(value1_ptr);
 
-        String result = String(long_str_value_ptr->ptr, long_str_value_ptr->length);
+        std::string result = std::string(long_str_value_ptr->ptr, long_str_value_ptr->length);
         EXPECT_STREQ(result.c_str(), "ABCABCABCABCABCABCABCABCABC");
     }
 
@@ -1116,7 +1114,7 @@ TEST_F(MixedTypeTest, mixed_array1) {
         EXPECT_EQ(value3_ptr->type, MixedValueType::kShortStr);
         auto *short_str_value_ptr = (ShortStrMixedType *)(value3_ptr);
 
-        String result = String(short_str_value_ptr->ptr, short_str_value_ptr->length);
+        std::string result = std::string(short_str_value_ptr->ptr, short_str_value_ptr->length);
         EXPECT_STREQ(result.c_str(), "HappyHalloween");
     }
 
@@ -1127,7 +1125,7 @@ TEST_F(MixedTypeTest, mixed_array1) {
         EXPECT_EQ(value4_ptr->type, MixedValueType::kLongStr);
         auto *long_str_value_ptr = (LongStrMixedType *)(value4_ptr);
 
-        String result = String(long_str_value_ptr->ptr, long_str_value_ptr->length);
+        std::string result = std::string(long_str_value_ptr->ptr, long_str_value_ptr->length);
         EXPECT_STREQ(result.c_str(), "HappyHalloween OK");
     }
 
@@ -1171,7 +1169,7 @@ TEST_F(MixedTypeTest, mixed_array1) {
             EXPECT_EQ(value3_ptr->type, MixedValueType::kShortStr);
             auto *short_str_value_ptr = (ShortStrMixedType *)(value3_ptr);
 
-            String result = String(short_str_value_ptr->ptr, short_str_value_ptr->length);
+            std::string result = std::string(short_str_value_ptr->ptr, short_str_value_ptr->length);
             EXPECT_STREQ(result.c_str(), "ABCDEFGHIJKLMN");
         }
 
@@ -1182,7 +1180,7 @@ TEST_F(MixedTypeTest, mixed_array1) {
             EXPECT_EQ(value4_ptr->type, MixedValueType::kLongStr);
             auto *long_str_value_ptr = (LongStrMixedType *)(value4_ptr);
 
-            String result = String(long_str_value_ptr->ptr, long_str_value_ptr->length);
+            std::string result = std::string(long_str_value_ptr->ptr, long_str_value_ptr->length);
             EXPECT_STREQ(result.c_str(), "ABCDEFGHIJKLMNO");
         }
 
@@ -1226,7 +1224,7 @@ TEST_F(MixedTypeTest, mixed_array1) {
                 EXPECT_EQ(value3_ptr->type, MixedValueType::kShortStr);
                 auto *short_str_value_ptr = (ShortStrMixedType *)(value3_ptr);
 
-                String result = String(short_str_value_ptr->ptr, short_str_value_ptr->length);
+                std::string result = std::string(short_str_value_ptr->ptr, short_str_value_ptr->length);
                 EXPECT_STREQ(result.c_str(), "ABCDEFGHIJKLMN");
             }
 
@@ -1236,7 +1234,7 @@ TEST_F(MixedTypeTest, mixed_array1) {
                 EXPECT_EQ(value4_ptr->type, MixedValueType::kLongStr);
                 auto *long_str_value_ptr = (LongStrMixedType *)(value4_ptr);
 
-                String result = String(long_str_value_ptr->ptr, long_str_value_ptr->length);
+                std::string result = std::string(long_str_value_ptr->ptr, long_str_value_ptr->length);
                 EXPECT_STREQ(result.c_str(), "ABCDEFGHIJKLMNO");
             }
 
@@ -1286,7 +1284,7 @@ TEST_F(MixedTypeTest, mixed_array1) {
             EXPECT_EQ(value3_ptr->type, MixedValueType::kShortStr);
             auto *short_str_value_ptr = (ShortStrMixedType *)(value3_ptr);
 
-            String result = String(short_str_value_ptr->ptr, short_str_value_ptr->length);
+            std::string result = std::string(short_str_value_ptr->ptr, short_str_value_ptr->length);
             EXPECT_STREQ(result.c_str(), "MNOPQRSTUVWXYZ");
         }
 
@@ -1297,7 +1295,7 @@ TEST_F(MixedTypeTest, mixed_array1) {
             EXPECT_EQ(value4_ptr->type, MixedValueType::kLongStr);
             auto *long_str_value_ptr = (LongStrMixedType *)(value4_ptr);
 
-            String result = String(long_str_value_ptr->ptr, long_str_value_ptr->length);
+            std::string result = std::string(long_str_value_ptr->ptr, long_str_value_ptr->length);
             EXPECT_STREQ(result.c_str(), "LMNOPQRSTUVWXYZ");
         }
 
@@ -1342,7 +1340,7 @@ TEST_F(MixedTypeTest, mixed_array1) {
                 EXPECT_EQ(value3_ptr->type, MixedValueType::kShortStr);
                 auto *short_str_value_ptr = (ShortStrMixedType *)(value3_ptr);
 
-                String result = String(short_str_value_ptr->ptr, short_str_value_ptr->length);
+                std::string result = std::string(short_str_value_ptr->ptr, short_str_value_ptr->length);
                 EXPECT_STREQ(result.c_str(), "MNOPQRSTUVWXYZ");
             }
 
@@ -1352,7 +1350,7 @@ TEST_F(MixedTypeTest, mixed_array1) {
                 EXPECT_EQ(value4_ptr->type, MixedValueType::kLongStr);
                 auto *long_str_value_ptr = (LongStrMixedType *)(value4_ptr);
 
-                String result = String(long_str_value_ptr->ptr, long_str_value_ptr->length);
+                std::string result = std::string(long_str_value_ptr->ptr, long_str_value_ptr->length);
                 EXPECT_STREQ(result.c_str(), "LMNOPQRSTUVWXYZ");
             }
 
@@ -1395,7 +1393,7 @@ TEST_F(MixedTypeTest, mixed_array1) {
             EXPECT_EQ(value3_ptr->type, MixedValueType::kShortStr);
             auto *short_str_value_ptr = (ShortStrMixedType *)(value3_ptr);
 
-            String result = String(short_str_value_ptr->ptr, short_str_value_ptr->length);
+            std::string result = std::string(short_str_value_ptr->ptr, short_str_value_ptr->length);
             EXPECT_STREQ(result.c_str(), "HappyHalloween");
         }
         // 4. Long str
@@ -1404,7 +1402,7 @@ TEST_F(MixedTypeTest, mixed_array1) {
             EXPECT_EQ(value4_ptr->type, MixedValueType::kLongStr);
             auto *long_str_value_ptr = (LongStrMixedType *)(value4_ptr);
 
-            String result = String(long_str_value_ptr->ptr, long_str_value_ptr->length);
+            std::string result = std::string(long_str_value_ptr->ptr, long_str_value_ptr->length);
             EXPECT_STREQ(result.c_str(), "HappyHalloween OK");
         }
         // 5. Null
@@ -1441,7 +1439,7 @@ TEST_F(MixedTypeTest, mixed_array1) {
                     EXPECT_EQ(value3_ptr->type, MixedValueType::kShortStr);
                     auto *short_str_value_ptr = (ShortStrMixedType *)(value3_ptr);
 
-                    String result = String(short_str_value_ptr->ptr, short_str_value_ptr->length);
+                    std::string result = std::string(short_str_value_ptr->ptr, short_str_value_ptr->length);
                     EXPECT_STREQ(result.c_str(), "ABCDEFGHIJKLMN");
                 }
                 // Key54: long string
@@ -1450,7 +1448,7 @@ TEST_F(MixedTypeTest, mixed_array1) {
                     EXPECT_EQ(value4_ptr->type, MixedValueType::kLongStr);
                     auto *long_str_value_ptr = (LongStrMixedType *)(value4_ptr);
 
-                    String result = String(long_str_value_ptr->ptr, long_str_value_ptr->length);
+                    std::string result = std::string(long_str_value_ptr->ptr, long_str_value_ptr->length);
                     EXPECT_STREQ(result.c_str(), "ABCDEFGHIJKLMNO");
                 }
 
@@ -1490,7 +1488,7 @@ TEST_F(MixedTypeTest, mixed_array1) {
                     EXPECT_EQ(value3_ptr->type, MixedValueType::kShortStr);
                     auto *short_str_value_ptr = (ShortStrMixedType *)(value3_ptr);
 
-                    String result = String(short_str_value_ptr->ptr, short_str_value_ptr->length);
+                    std::string result = std::string(short_str_value_ptr->ptr, short_str_value_ptr->length);
                     EXPECT_STREQ(result.c_str(), "MNOPQRSTUVWXYZ");
                 }
                 // Long str
@@ -1499,7 +1497,7 @@ TEST_F(MixedTypeTest, mixed_array1) {
                     EXPECT_EQ(value4_ptr->type, MixedValueType::kLongStr);
                     auto *long_str_value_ptr = (LongStrMixedType *)(value4_ptr);
 
-                    String result = String(long_str_value_ptr->ptr, long_str_value_ptr->length);
+                    std::string result = std::string(long_str_value_ptr->ptr, long_str_value_ptr->length);
                     EXPECT_STREQ(result.c_str(), "LMNOPQRSTUVWXYZ");
                 }
 
@@ -1548,7 +1546,7 @@ TEST_F(MixedTypeTest, mixed_array2) {
         auto *value3_ptr = mixed_array1.GetByIndex(2);
         EXPECT_EQ(value3_ptr->type, MixedValueType::kShortStr);
         auto *short_str_value_ptr = (ShortStrMixedType *)(value3_ptr);
-        String short_str(short_str_value_ptr->ptr, short_str_value_ptr->length);
+        std::string short_str(short_str_value_ptr->ptr, short_str_value_ptr->length);
         EXPECT_STREQ(short_str.c_str(), "HappyHalloween");
     }
 
@@ -1558,7 +1556,7 @@ TEST_F(MixedTypeTest, mixed_array2) {
         auto *value4_ptr = mixed_array1.GetByIndex(3);
         EXPECT_EQ(value4_ptr->type, MixedValueType::kLongStr);
         auto *long_str_value_ptr = (LongStrMixedType *)(value4_ptr);
-        String result = String(long_str_value_ptr->ptr, long_str_value_ptr->length);
+        std::string result = std::string(long_str_value_ptr->ptr, long_str_value_ptr->length);
         EXPECT_STREQ(result.c_str(), "HappyHalloween OK");
     }
 
@@ -1600,7 +1598,7 @@ TEST_F(MixedTypeTest, mixed_array2) {
             auto *value3_ptr = mixed_tuple5.GetFromTuple("key53");
             EXPECT_EQ(value3_ptr->type, MixedValueType::kShortStr);
             auto *short_str_value_ptr = (ShortStrMixedType *)(value3_ptr);
-            String short_str(short_str_value_ptr->ptr, short_str_value_ptr->length);
+            std::string short_str(short_str_value_ptr->ptr, short_str_value_ptr->length);
             EXPECT_STREQ(short_str.c_str(), "ABCDEFGHIJKLMN");
         }
 
@@ -1610,7 +1608,7 @@ TEST_F(MixedTypeTest, mixed_array2) {
             auto *value4_ptr = mixed_tuple5.GetFromTuple("key54");
             EXPECT_EQ(value4_ptr->type, MixedValueType::kLongStr);
             auto *long_str_value_ptr = (LongStrMixedType *)(value4_ptr);
-            String long_str(long_str_value_ptr->ptr, long_str_value_ptr->length);
+            std::string long_str(long_str_value_ptr->ptr, long_str_value_ptr->length);
             EXPECT_STREQ(long_str.c_str(), "ABCDEFGHIJKLMNO");
         }
 
@@ -1662,7 +1660,7 @@ TEST_F(MixedTypeTest, mixed_array2) {
             auto *value3_ptr = nested_array.GetByIndex(2);
             EXPECT_EQ(value3_ptr->type, MixedValueType::kShortStr);
             auto *short_str_value_ptr = (ShortStrMixedType *)(value3_ptr);
-            String short_str(short_str_value_ptr->ptr, short_str_value_ptr->length);
+            std::string short_str(short_str_value_ptr->ptr, short_str_value_ptr->length);
             EXPECT_STREQ(short_str.c_str(), "MNOPQRSTUVWXYZ");
         }
 
@@ -1672,7 +1670,7 @@ TEST_F(MixedTypeTest, mixed_array2) {
             auto *value4_ptr = nested_array.GetByIndex(3);
             EXPECT_EQ(value4_ptr->type, MixedValueType::kLongStr);
             auto *long_str_value_ptr = (LongStrMixedType *)(value4_ptr);
-            String long_str(long_str_value_ptr->ptr, long_str_value_ptr->length);
+            std::string long_str(long_str_value_ptr->ptr, long_str_value_ptr->length);
             EXPECT_STREQ(long_str.c_str(), "LMNOPQRSTUVWXYZ");
         }
 
@@ -1720,7 +1718,7 @@ TEST_F(MixedTypeTest, mixed_array2) {
             EXPECT_EQ(value3_ptr->type, MixedValueType::kShortStr);
             auto *short_str_value_ptr = (ShortStrMixedType *)(value3_ptr);
 
-            String result = String(short_str_value_ptr->ptr, short_str_value_ptr->length);
+            std::string result = std::string(short_str_value_ptr->ptr, short_str_value_ptr->length);
             EXPECT_STREQ(result.c_str(), "HappyHalloween");
         }
         // 4. Long str
@@ -1729,7 +1727,7 @@ TEST_F(MixedTypeTest, mixed_array2) {
             EXPECT_EQ(value4_ptr->type, MixedValueType::kLongStr);
             auto *long_str_value_ptr = (LongStrMixedType *)(value4_ptr);
 
-            String result = String(long_str_value_ptr->ptr, long_str_value_ptr->length);
+            std::string result = std::string(long_str_value_ptr->ptr, long_str_value_ptr->length);
             EXPECT_STREQ(result.c_str(), "HappyHalloween OK");
         }
         // 5. Null
@@ -1766,7 +1764,7 @@ TEST_F(MixedTypeTest, mixed_array2) {
                     EXPECT_EQ(value3_ptr->type, MixedValueType::kShortStr);
                     auto *short_str_value_ptr = (ShortStrMixedType *)(value3_ptr);
 
-                    String result = String(short_str_value_ptr->ptr, short_str_value_ptr->length);
+                    std::string result = std::string(short_str_value_ptr->ptr, short_str_value_ptr->length);
                     EXPECT_STREQ(result.c_str(), "ABCDEFGHIJKLMN");
                 }
                 // Key54: long string
@@ -1775,7 +1773,7 @@ TEST_F(MixedTypeTest, mixed_array2) {
                     EXPECT_EQ(value4_ptr->type, MixedValueType::kLongStr);
                     auto *long_str_value_ptr = (LongStrMixedType *)(value4_ptr);
 
-                    String result = String(long_str_value_ptr->ptr, long_str_value_ptr->length);
+                    std::string result = std::string(long_str_value_ptr->ptr, long_str_value_ptr->length);
                     EXPECT_STREQ(result.c_str(), "ABCDEFGHIJKLMNO");
                 }
 
@@ -1815,7 +1813,7 @@ TEST_F(MixedTypeTest, mixed_array2) {
                     EXPECT_EQ(value3_ptr->type, MixedValueType::kShortStr);
                     auto *short_str_value_ptr = (ShortStrMixedType *)(value3_ptr);
 
-                    String result = String(short_str_value_ptr->ptr, short_str_value_ptr->length);
+                    std::string result = std::string(short_str_value_ptr->ptr, short_str_value_ptr->length);
                     EXPECT_STREQ(result.c_str(), "MNOPQRSTUVWXYZ");
                 }
                 // Long str
@@ -1824,7 +1822,7 @@ TEST_F(MixedTypeTest, mixed_array2) {
                     EXPECT_EQ(value4_ptr->type, MixedValueType::kLongStr);
                     auto *long_str_value_ptr = (LongStrMixedType *)(value4_ptr);
 
-                    String result = String(long_str_value_ptr->ptr, long_str_value_ptr->length);
+                    std::string result = std::string(long_str_value_ptr->ptr, long_str_value_ptr->length);
                     EXPECT_STREQ(result.c_str(), "LMNOPQRSTUVWXYZ");
                 }
 
@@ -1862,7 +1860,7 @@ TEST_F(MixedTypeTest, mixed_array3) {
         EXPECT_EQ(value1_ptr->type, MixedValueType::kLongStr);
         auto *long_str_value_ptr = (LongStrMixedType *)(value1_ptr);
 
-        String result = String(long_str_value_ptr->ptr, long_str_value_ptr->length);
+        std::string result = std::string(long_str_value_ptr->ptr, long_str_value_ptr->length);
         EXPECT_STREQ(result.c_str(), "XXXXXXXXXXXXXXXXXXXXXXXX");
     }
 

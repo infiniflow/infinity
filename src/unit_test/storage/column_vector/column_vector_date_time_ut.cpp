@@ -14,14 +14,12 @@
 
 #ifdef CI
 #include "unit_test/gtest_expand.h"
-#include "gtest/gtest.h"
 import infinity_core;
 import base_test;
 #else
 module;
 
 #include "unit_test/gtest_expand.h"
-#include "gtest/gtest.h"
 
 module infinity_core:ut.column_vector_date_time;
 
@@ -141,7 +139,7 @@ TEST_F(ColumnVectorDateTimeTest, flat_date) {
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         DateT date(static_cast<i32>(i));
-        column_vector.AppendByPtr((ptr_t)(&date));
+        column_vector.AppendByPtr((char *)(&date));
         Value vx = column_vector.GetValueByIndex(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kDate);
         EXPECT_EQ(vx.value_.date.value, static_cast<i32>(i));
@@ -388,7 +386,7 @@ TEST_F(ColumnVectorDateTimeTest, flat_time) {
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         TimeT time(static_cast<i32>(i));
-        column_vector.AppendByPtr((ptr_t)(&time));
+        column_vector.AppendByPtr((char *)(&time));
         Value vx = column_vector.GetValueByIndex(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kTime);
         EXPECT_EQ(vx.value_.time.value, static_cast<i32>(i));
@@ -636,7 +634,7 @@ TEST_F(ColumnVectorDateTimeTest, flat_datetime) {
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         DateTimeT datetime(static_cast<i32>(i), static_cast<i32>(i));
-        column_vector.AppendByPtr((ptr_t)(&datetime));
+        column_vector.AppendByPtr((char *)(&datetime));
         Value vx = column_vector.GetValueByIndex(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kDateTime);
         EXPECT_EQ(vx.value_.datetime.date, static_cast<i32>(i));
@@ -895,7 +893,7 @@ TEST_F(ColumnVectorDateTimeTest, flat_timestamp) {
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         TimestampT timestamp(static_cast<i32>(i), static_cast<i32>(i));
-        column_vector.AppendByPtr((ptr_t)(&timestamp));
+        column_vector.AppendByPtr((char *)(&timestamp));
         Value vx = column_vector.GetValueByIndex(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kTimestamp);
         EXPECT_EQ(vx.value_.timestamp.date, static_cast<i32>(i));

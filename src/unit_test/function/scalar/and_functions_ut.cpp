@@ -13,13 +13,13 @@
 // limitations under the License.
 
 #ifdef CI
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 import infinity_core;
 import base_test;
 #else
 module;
 
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 
 module infinity_core:ut.and_functions;
 
@@ -68,13 +68,13 @@ TEST_F(AndFunctionsTest, and_func) {
 
     RegisterAndFunction(catalog_ptr.get());
 
-    String op = "and";
+    std::string op = "and";
     std::shared_ptr<FunctionSet> function_set = NewCatalog::GetFunctionSetByName(catalog_ptr.get(), op);
     EXPECT_EQ(function_set->type_, FunctionType::kScalar);
     std::shared_ptr<ScalarFunctionSet> scalar_function_set = std::static_pointer_cast<ScalarFunctionSet>(function_set);
 
     {
-        Vector<std::shared_ptr<BaseExpression>> inputs;
+        std::vector<std::shared_ptr<BaseExpression>> inputs;
         std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kBoolean);
         std::shared_ptr<DataType> result_type = std::make_shared<DataType>(LogicalType::kBoolean);
         std::shared_ptr<ColumnExpression> col1_expr_ptr = std::make_shared<ColumnExpression>(*data_type, "t1", 1, "c1", 0, 0);
@@ -86,7 +86,7 @@ TEST_F(AndFunctionsTest, and_func) {
         ScalarFunction func = scalar_function_set->GetMostMatchFunction(inputs);
         EXPECT_STREQ("AND(Boolean, Boolean)->Boolean", func.ToString().c_str());
 
-        Vector<std::shared_ptr<DataType>> column_types;
+        std::vector<std::shared_ptr<DataType>> column_types;
         column_types.emplace_back(data_type);
         column_types.emplace_back(data_type);
 

@@ -13,17 +13,14 @@
 // limitations under the License.
 
 #ifdef CI
-#include "gtest/gtest.h"
-#include <cstdio>
-#include <random>
+#include "unit_test/gtest_expand.h"
+
 import infinity_core;
 import base_test;
 #else
 module;
 
-#include "gtest/gtest.h"
-#include <cstdio>
-#include <random>
+#include "unit_test/gtest_expand.h"
 
 module infinity_core:ut.test_lsg_build;
 
@@ -54,7 +51,7 @@ protected:
         dim = 128;
         element_size = 8192;
 
-        index_name = std::make_shared<String>("index_name");
+        index_name = std::make_shared<std::string>("index_name");
         filename = "filename";
         column_names = {"col_name"};
         metric_type = MetricType::kMetricL2;
@@ -81,13 +78,13 @@ protected:
     size_t dim;
     size_t element_size;
 
-    std::shared_ptr<String> index_name;
-    String filename;
-    Vector<String> column_names;
+    std::shared_ptr<std::string> index_name;
+    std::string filename;
+    std::vector<std::string> column_names;
     MetricType metric_type;
     HnswEncodeType encode_type;
     HnswBuildType build_type;
-    Optional<LSGConfig> lsg_config;
+    std::optional<LSGConfig> lsg_config;
 
     using LabelT = u32;
 };
@@ -174,7 +171,7 @@ TEST_F(LSGBuildTest, test1) {
         const float *query = data.get() + i * dim;
         HnswHandlerPtr hnsw_handler = hnsw_index->get();
         auto [result_n, d_ptr, v_ptr] = hnsw_handler->SearchIndex<float, LabelT>(query, topk, search_option);
-        Vector<Pair<f32, LabelT>> res(result_n);
+        std::vector<std::pair<f32, LabelT>> res(result_n);
         for (size_t i = 0; i < result_n; ++i) {
             res[i] = {d_ptr[i], hnsw_handler->GetLabel<LabelT>(v_ptr[i])};
         }

@@ -13,13 +13,13 @@
 // limitations under the License.
 
 #ifdef CI
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 import infinity_core;
 import base_test;
 #else
 module;
 
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 
 module infinity_core:ut.block_version;
 
@@ -57,7 +57,7 @@ TEST_P(BlockVersionTest, SaveAndLoad) {
     block_version.Append(20, 6);
     block_version.Delete(2, 30);
     block_version.Delete(5, 40);
-    String version_path = String(GetFullDataDir()) + "/block_version_test";
+    std::string version_path = std::string(GetFullDataDir()) + "/block_version_test";
 
     {
         auto [local_file_handle, status] = VirtualStore::Open(version_path, FileAccessMode::kWrite);
@@ -74,17 +74,17 @@ TEST_P(BlockVersionTest, SaveAndLoad) {
 }
 
 TEST_P(BlockVersionTest, SaveAndLoad2) {
-    auto data_dir = std::make_shared<String>(String(GetFullDataDir()) + "/block_version_test");
-    auto temp_dir = std::make_shared<String>(String(GetFullTmpDir()) + "/temp/block_version_test");
-    auto persistence_dir = std::make_shared<String>(String(GetFullTmpDir()) + "/persistence/block_version_test");
-    auto block_dir = std::make_shared<String>("block_version_test/block");
-    auto version_file_name = std::make_shared<String>("block_version_test");
+    auto data_dir = std::make_shared<std::string>(std::string(GetFullDataDir()) + "/block_version_test");
+    auto temp_dir = std::make_shared<std::string>(std::string(GetFullTmpDir()) + "/temp/block_version_test");
+    auto persistence_dir = std::make_shared<std::string>(std::string(GetFullTmpDir()) + "/persistence/block_version_test");
+    auto block_dir = std::make_shared<std::string>("block_version_test/block");
+    auto version_file_name = std::make_shared<std::string>("block_version_test");
 
     {
         BufferManager buffer_mgr(1 << 20 /*memory limit*/, data_dir, temp_dir, nullptr);
 
-        auto file_worker = std::make_unique<VersionFileWorker>(std::make_shared<String>(String(GetFullDataDir())),
-                                                         std::make_shared<String>(String(GetFullTmpDir())),
+        auto file_worker = std::make_unique<VersionFileWorker>(std::make_shared<std::string>(std::string(GetFullDataDir())),
+                                                         std::make_shared<std::string>(std::string(GetFullTmpDir())),
                                                          block_dir,
                                                          version_file_name,
                                                          8192,
@@ -107,8 +107,8 @@ TEST_P(BlockVersionTest, SaveAndLoad2) {
     {
         BufferManager buffer_mgr(1 << 20 /*memory limit*/, data_dir, temp_dir, nullptr);
 
-        auto file_worker = std::make_unique<VersionFileWorker>(std::make_shared<String>(String(GetFullDataDir())),
-                                                         std::make_shared<String>(String(GetFullTmpDir())),
+        auto file_worker = std::make_unique<VersionFileWorker>(std::make_shared<std::string>(std::string(GetFullDataDir())),
+                                                         std::make_shared<std::string>(std::string(GetFullTmpDir())),
                                                          block_dir,
                                                          version_file_name,
                                                          8192,
@@ -136,8 +136,8 @@ TEST_P(BlockVersionTest, SaveAndLoad2) {
     {
         BufferManager buffer_mgr(1 << 20 /*memory limit*/, data_dir, temp_dir, nullptr);
 
-        auto file_worker = std::make_unique<VersionFileWorker>(std::make_shared<String>(String(GetFullDataDir())),
-                                                         std::make_shared<String>(String(GetFullTmpDir())),
+        auto file_worker = std::make_unique<VersionFileWorker>(std::make_shared<std::string>(std::string(GetFullDataDir())),
+                                                         std::make_shared<std::string>(std::string(GetFullTmpDir())),
                                                          block_dir,
                                                          version_file_name,
                                                          8192,

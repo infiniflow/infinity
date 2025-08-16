@@ -1,13 +1,13 @@
 
 #ifdef CI
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 #include <cassert>
 import infinity_core;
 import base_test;
 #else
 module;
 
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 #include <cassert>
 
 module infinity_core:ut.posting_byte_slice_reader;
@@ -40,16 +40,16 @@ public:
 
 protected:
     void CheckDecode(u32 doc_count, u32 flush_count, std::shared_ptr<PostingByteSliceReader> &reader) {
-        Vector<u32> doc_id(doc_count);
-        Vector<uint16_t> payload(doc_count);
+        std::vector<u32> doc_id(doc_count);
+        std::vector<uint16_t> payload(doc_count);
 
         for (u32 i = 0; i < doc_count; ++i) {
             doc_id[i] = i;
             payload[i] = i * 2;
         }
 
-        Vector<u32> doc_id_buffer(doc_count * 2);
-        Vector<uint16_t> doc_payload_buffer(doc_count * 2);
+        std::vector<u32> doc_id_buffer(doc_count * 2);
+        std::vector<uint16_t> doc_payload_buffer(doc_count * 2);
 
         size_t decode_len;
         u32 i = 0;
@@ -102,8 +102,8 @@ protected:
     }
 
     std::shared_ptr<PostingByteSliceReader> CreateReader(u32 doc_count, u32 flush_count) {
-        Vector<u32> doc_id(doc_count);
-        Vector<uint16_t> payload(doc_count);
+        std::vector<u32> doc_id(doc_count);
+        std::vector<uint16_t> payload(doc_count);
 
         for (u32 i = 0; i < doc_count; ++i) {
             doc_id[i] = i;

@@ -13,13 +13,13 @@
 // limitations under the License.
 
 #ifdef CI
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 import infinity_core;
 import base_test;
 #else
 module;
 
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 
 module infinity_core:ut.table_def;
 
@@ -43,24 +43,29 @@ class TableDefTest : public BaseTest {};
 TEST_F(TableDefTest, test1) {
     using namespace infinity;
 
-    Vector<std::shared_ptr<ColumnDef>> columns;
+    std::vector<std::shared_ptr<ColumnDef>> columns;
 
     i64 column_id = 0;
     {
         std::set<ConstraintType> constraints;
         constraints.insert(ConstraintType::kUnique);
         constraints.insert(ConstraintType::kNotNull);
-        auto column_def_ptr = std::make_shared<ColumnDef>(column_id++, std::make_shared<DataType>(DataType(LogicalType::kTinyInt)), "c1", constraints);
+        auto column_def_ptr =
+            std::make_shared<ColumnDef>(column_id++, std::make_shared<DataType>(DataType(LogicalType::kTinyInt)), "c1", constraints);
         columns.emplace_back(column_def_ptr);
     }
     {
         std::set<ConstraintType> constraints;
         constraints.insert(ConstraintType::kPrimaryKey);
-        auto column_def_ptr = std::make_shared<ColumnDef>(column_id++, std::make_shared<DataType>(DataType(LogicalType::kVarchar)), "c2", constraints);
+        auto column_def_ptr =
+            std::make_shared<ColumnDef>(column_id++, std::make_shared<DataType>(DataType(LogicalType::kVarchar)), "c2", constraints);
         columns.emplace_back(column_def_ptr);
     }
 
-    TableDef table_def(std::make_shared<String>("default_db"), std::make_shared<String>("t1"), std::make_shared<String>("t1_comment"), columns);
+    TableDef table_def(std::make_shared<std::string>("default_db"),
+                       std::make_shared<std::string>("t1"),
+                       std::make_shared<std::string>("t1_comment"),
+                       columns);
 
     EXPECT_EQ(*table_def.table_name(), "t1");
     EXPECT_EQ(*table_def.schema_name(), "default_db");
@@ -73,14 +78,15 @@ TEST_F(TableDefTest, test1) {
 TEST_F(TableDefTest, ReadWrite) {
     using namespace infinity;
 
-    Vector<std::shared_ptr<ColumnDef>> columns;
+    std::vector<std::shared_ptr<ColumnDef>> columns;
 
     i64 column_id = 0;
     {
         std::set<ConstraintType> constraints;
         constraints.insert(ConstraintType::kUnique);
         constraints.insert(ConstraintType::kNotNull);
-        auto column_def_ptr = std::make_shared<ColumnDef>(column_id++, std::make_shared<DataType>(DataType(LogicalType::kTinyInt)), "c1", constraints);
+        auto column_def_ptr =
+            std::make_shared<ColumnDef>(column_id++, std::make_shared<DataType>(DataType(LogicalType::kTinyInt)), "c1", constraints);
         columns.emplace_back(column_def_ptr);
     }
     {
@@ -91,10 +97,13 @@ TEST_F(TableDefTest, ReadWrite) {
     }
 
     {
-        TableDef table_def(std::make_shared<String>("default_db"), std::make_shared<String>("t1"), std::make_shared<String>(), columns);
+        TableDef table_def(std::make_shared<std::string>("default_db"),
+                           std::make_shared<std::string>("t1"),
+                           std::make_shared<std::string>(),
+                           columns);
 
         int32_t exp_size = table_def.GetSizeInBytes();
-        Vector<char> buf(exp_size, char(0));
+        std::vector<char> buf(exp_size, char(0));
         char *buf_beg = buf.data();
         char *ptr = buf_beg;
         table_def.WriteAdv(ptr);
@@ -109,10 +118,13 @@ TEST_F(TableDefTest, ReadWrite) {
     }
 
     {
-        TableDef table_def(std::make_shared<String>("default_db"), std::make_shared<String>("t1"), std::make_shared<String>("t1_comment"), columns);
+        TableDef table_def(std::make_shared<std::string>("default_db"),
+                           std::make_shared<std::string>("t1"),
+                           std::make_shared<std::string>("t1_comment"),
+                           columns);
 
         int32_t exp_size = table_def.GetSizeInBytes();
-        Vector<char> buf(exp_size, char(0));
+        std::vector<char> buf(exp_size, char(0));
         char *buf_beg = buf.data();
         char *ptr = buf_beg;
         table_def.WriteAdv(ptr);

@@ -13,15 +13,13 @@
 // limitations under the License.
 
 #ifdef CI
-#include "gtest/gtest.h"
-#include <iomanip>
+#include "unit_test/gtest_expand.h"
 import infinity_core;
 import base_test;
 #else
 module;
 
-#include "gtest/gtest.h"
-#include <iomanip>
+#include "unit_test/gtest_expand.h"
 
 module infinity_core:ut.extract_function;
 
@@ -70,12 +68,12 @@ TEST_F(ExtractFunctionTest, extract_year_test) {
     RegisterExtractFunction(catalog_ptr.get());
 
     {
-        String op = "extract_year";
+        std::string op = "extract_year";
         std::shared_ptr<FunctionSet> function_set = NewCatalog::GetFunctionSetByName(catalog_ptr.get(), op);
         EXPECT_EQ(function_set->type_, FunctionType::kScalar);
         std::shared_ptr<ScalarFunctionSet> scalar_function_set = std::static_pointer_cast<ScalarFunctionSet>(function_set);
 
-        Vector<std::shared_ptr<BaseExpression>> inputs;
+        std::vector<std::shared_ptr<BaseExpression>> inputs;
 
         std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kDate);
         std::shared_ptr<ColumnExpression> col_expr_ptr = std::make_shared<ColumnExpression>(*data_type, "t1", 1, "c1", 0, 0);
@@ -84,7 +82,7 @@ TEST_F(ExtractFunctionTest, extract_year_test) {
         ScalarFunction func = scalar_function_set->GetMostMatchFunction(inputs);
         EXPECT_STREQ("extract_year(Date)->BigInt", func.ToString().c_str());
 
-        Vector<std::shared_ptr<DataType>> column_types;
+        std::vector<std::shared_ptr<DataType>> column_types;
         column_types.emplace_back(data_type);
 
         i64 row_count = DEFAULT_VECTOR_SIZE;
@@ -122,12 +120,12 @@ TEST_F(ExtractFunctionTest, extract_year_test) {
     }
 
     {
-        String op = "extract_month";
+        std::string op = "extract_month";
         std::shared_ptr<FunctionSet> function_set = NewCatalog::GetFunctionSetByName(catalog_ptr.get(), op);
         EXPECT_EQ(function_set->type_, FunctionType::kScalar);
         std::shared_ptr<ScalarFunctionSet> scalar_function_set = std::static_pointer_cast<ScalarFunctionSet>(function_set);
 
-        Vector<std::shared_ptr<BaseExpression>> inputs;
+        std::vector<std::shared_ptr<BaseExpression>> inputs;
 
         std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kDate);
         std::shared_ptr<ColumnExpression> col_expr_ptr = std::make_shared<ColumnExpression>(*data_type, "t1", 1, "c1", 0, 0);
@@ -136,7 +134,7 @@ TEST_F(ExtractFunctionTest, extract_year_test) {
         ScalarFunction func = scalar_function_set->GetMostMatchFunction(inputs);
         EXPECT_STREQ("extract_month(Date)->BigInt", func.ToString().c_str());
 
-        Vector<std::shared_ptr<DataType>> column_types;
+        std::vector<std::shared_ptr<DataType>> column_types;
         column_types.emplace_back(data_type);
 
         i64 row_count = DEFAULT_VECTOR_SIZE;
@@ -166,12 +164,12 @@ TEST_F(ExtractFunctionTest, extract_year_test) {
     }
 
     {
-        String op = "extract_day";
+        std::string op = "extract_day";
         std::shared_ptr<FunctionSet> function_set = NewCatalog::GetFunctionSetByName(catalog_ptr.get(), op);
         EXPECT_EQ(function_set->type_, FunctionType::kScalar);
         std::shared_ptr<ScalarFunctionSet> scalar_function_set = std::static_pointer_cast<ScalarFunctionSet>(function_set);
 
-        Vector<std::shared_ptr<BaseExpression>> inputs;
+        std::vector<std::shared_ptr<BaseExpression>> inputs;
 
         std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kDate);
         std::shared_ptr<ColumnExpression> col_expr_ptr = std::make_shared<ColumnExpression>(*data_type, "t1", 1, "c1", 0, 0);
@@ -180,7 +178,7 @@ TEST_F(ExtractFunctionTest, extract_year_test) {
         ScalarFunction func = scalar_function_set->GetMostMatchFunction(inputs);
         EXPECT_STREQ("extract_day(Date)->BigInt", func.ToString().c_str());
 
-        Vector<std::shared_ptr<DataType>> column_types;
+        std::vector<std::shared_ptr<DataType>> column_types;
         column_types.emplace_back(data_type);
 
         i64 row_count = DEFAULT_VECTOR_SIZE;

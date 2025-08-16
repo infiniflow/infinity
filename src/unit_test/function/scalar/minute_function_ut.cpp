@@ -13,13 +13,13 @@
 // limitations under the License.
 
 #ifdef CI
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 import infinity_core;
 import base_test;
 #else
 module;
 
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 
 module infinity_core:ut.minute_function;
 
@@ -68,14 +68,14 @@ TEST_F(MinuteFunctionsTest, minute_func) {
 
     RegisterMinuteFunction(catalog_ptr.get());
 
-    String op = "minute";
+    std::string op = "minute";
 
     std::shared_ptr<FunctionSet> function_set = NewCatalog::GetFunctionSetByName(catalog_ptr.get(), op);
     EXPECT_EQ(function_set->type_, FunctionType::kScalar);
     std::shared_ptr<ScalarFunctionSet> scalar_function_set = std::static_pointer_cast<ScalarFunctionSet>(function_set);
 
     {
-        Vector<std::shared_ptr<BaseExpression>> inputs;
+        std::vector<std::shared_ptr<BaseExpression>> inputs;
 
         DataType data_type(LogicalType::kDateTime);
         std::shared_ptr<DataType> result_type = std::make_shared<DataType>(LogicalType::kBigInt);
@@ -86,7 +86,7 @@ TEST_F(MinuteFunctionsTest, minute_func) {
         ScalarFunction func = scalar_function_set->GetMostMatchFunction(inputs);
         EXPECT_STREQ("minute(DateTime)->BigInt", func.ToString().c_str());
 
-        Vector<std::shared_ptr<DataType>> column_types;
+        std::vector<std::shared_ptr<DataType>> column_types;
         column_types.emplace_back(std::make_shared<DataType>(data_type));
 
         size_t row_count = DEFAULT_VECTOR_SIZE;
@@ -115,7 +115,7 @@ TEST_F(MinuteFunctionsTest, minute_func) {
     }
 
     {
-        Vector<std::shared_ptr<BaseExpression>> inputs;
+        std::vector<std::shared_ptr<BaseExpression>> inputs;
 
         DataType data_type(LogicalType::kTime);
         std::shared_ptr<DataType> result_type = std::make_shared<DataType>(LogicalType::kBigInt);
@@ -126,7 +126,7 @@ TEST_F(MinuteFunctionsTest, minute_func) {
         ScalarFunction func = scalar_function_set->GetMostMatchFunction(inputs);
         EXPECT_STREQ("minute(Time)->BigInt", func.ToString().c_str());
 
-        Vector<std::shared_ptr<DataType>> column_types;
+        std::vector<std::shared_ptr<DataType>> column_types;
         column_types.emplace_back(std::make_shared<DataType>(data_type));
 
         size_t row_count = DEFAULT_VECTOR_SIZE;
@@ -155,7 +155,7 @@ TEST_F(MinuteFunctionsTest, minute_func) {
     }
 
     {
-        Vector<std::shared_ptr<BaseExpression>> inputs;
+        std::vector<std::shared_ptr<BaseExpression>> inputs;
 
         DataType data_type(LogicalType::kTimestamp);
         std::shared_ptr<DataType> result_type = std::make_shared<DataType>(LogicalType::kBigInt);
@@ -166,7 +166,7 @@ TEST_F(MinuteFunctionsTest, minute_func) {
         ScalarFunction func = scalar_function_set->GetMostMatchFunction(inputs);
         EXPECT_STREQ("minute(Timestamp)->BigInt", func.ToString().c_str());
 
-        Vector<std::shared_ptr<DataType>> column_types;
+        std::vector<std::shared_ptr<DataType>> column_types;
         column_types.emplace_back(std::make_shared<DataType>(data_type));
 
         size_t row_count = DEFAULT_VECTOR_SIZE;

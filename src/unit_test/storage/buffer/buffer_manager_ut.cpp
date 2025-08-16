@@ -13,15 +13,13 @@
 // limitations under the License.
 
 #ifdef CI
-#include "gtest/gtest.h"
-#include <future>
+#include "unit_test/gtest_expand.h"
 import infinity_core;
 import base_test;
 #else
 module;
 
-#include "gtest/gtest.h"
-#include <future>
+#include "unit_test/gtest_expand.h"
 
 module infinity_core:ut.buffer_manager;
 
@@ -50,9 +48,9 @@ using namespace infinity;
 
 class BufferManagerTest : public BaseTest {
 private:
-    Vector<std::shared_ptr<DirEntry>> ListAllFile(const String &path) {
-        Vector<std::shared_ptr<DirEntry>> res;
-        std::function<void(const String &)> f = [&](const String &path) {
+    std::vector<std::shared_ptr<std::filesystem::directory_entry>> ListAllFile(const std::string &path) {
+        std::vector<std::shared_ptr<std::filesystem::directory_entry>> res;
+        std::function<void(const std::string &)> f = [&](const std::string &path) {
             auto [entries, status] = VirtualStore::ListDirectory(path);
             for (auto &entry : entries) {
                 if (entry->is_directory()) {
@@ -67,13 +65,13 @@ private:
     }
 
 protected:
-    Vector<std::shared_ptr<DirEntry>> ListAllData() { return ListAllFile(*data_dir_); }
+    std::vector<std::shared_ptr<std::filesystem::directory_entry>> ListAllData() { return ListAllFile(*data_dir_); }
 
-    Vector<std::shared_ptr<DirEntry>> ListAllTemp() { return ListAllFile(*temp_dir_); }
+    std::vector<std::shared_ptr<std::filesystem::directory_entry>> ListAllTemp() { return ListAllFile(*temp_dir_); }
 
-    std::shared_ptr<String> data_dir_;
-    std::shared_ptr<String> temp_dir_;
-    std::shared_ptr<String> persistence_dir_;
+    std::shared_ptr<std::string> data_dir_;
+    std::shared_ptr<std::string> temp_dir_;
+    std::shared_ptr<std::string> persistence_dir_;
 
     void SetUp() override {
         Config config;
@@ -82,9 +80,9 @@ protected:
 
         Logger::Initialize(&config);
 
-        data_dir_ = std::make_shared<String>(std::string(tmp_data_path()) + "/buffer/data");
-        temp_dir_ = std::make_shared<String>(std::string(tmp_data_path()) + "/buffer/temp");
-        persistence_dir_ = std::make_shared<String>(std::string(tmp_data_path()) + "/buffer/persistence");
+        data_dir_ = std::make_shared<std::string>(std::string(tmp_data_path()) + "/buffer/data");
+        temp_dir_ = std::make_shared<std::string>(std::string(tmp_data_path()) + "/buffer/temp");
+        persistence_dir_ = std::make_shared<std::string>(std::string(tmp_data_path()) + "/buffer/persistence");
         ResetDir();
     }
 
@@ -123,12 +121,16 @@ TEST_F(BufferManagerTest, cleanup_test) {
 
     {
         BufferManager buffer_mgr(buffer_size, data_dir_, temp_dir_, nullptr);
-        Vector<BufferObj *> buffer_objs;
+        std::vector<BufferObj *> buffer_objs;
 
         for (size_t i = 0; i < file_num; ++i) {
-            auto file_name = std::make_shared<String>(fmt::format("file_{}", i));
-            auto file_worker =
-                std::make_unique<DataFileWorker>(data_dir_, temp_dir_, std::make_shared<String>(""), file_name, file_size, buffer_mgr.persistence_manager());
+            auto file_name = std::make_shared<std::string>(fmt::format("file_{}", i));
+            auto file_worker = std::make_unique<DataFileWorker>(data_dir_,
+                                                                temp_dir_,
+                                                                std::make_shared<std::string>(""),
+                                                                file_name,
+                                                                file_size,
+                                                                buffer_mgr.persistence_manager());
             BufferObj *buffer_obj = buffer_mgr.AllocateBufferObject(std::move(file_worker));
             buffer_obj->AddObjRc();
             buffer_objs.push_back(buffer_obj);
@@ -214,10 +216,11 @@ TEST_F(BufferManagerTest, varfile_test) {
     std::shared_ptr<PersistenceManager> persistence_manager_ =
         std::make_shared<PersistenceManager>(*persistence_dir_, *data_dir_, DEFAULT_PERSISTENCE_OBJECT_SIZE_LIMIT);
     BufferManager buffer_mgr(buffer_size, data_dir_, temp_dir_, persistence_manager_.get());
-    Vector<BufferObj *> buffer_objs;
+    std::vector<BufferObj *> buffer_objs;
     for (size_t i = 0; i < file_num; ++i) {
-        auto file_name = std::make_shared<String>(fmt::format("file_{}", i));
-        auto file_worker = std::make_unique<VarFileWorker>(data_dir_, temp_dir_, std::make_shared<String>(), file_name, 0, buffer_mgr.persistence_manager());
+        auto file_name = std::make_shared<std::string>(fmt::format("file_{}", i));
+        auto file_worker =
+            std::make_unique<VarFileWorker>(data_dir_, temp_dir_, std::make_shared<std::string>(), file_name, 0, buffer_mgr.persistence_manager());
         auto *buffer_obj = buffer_mgr.AllocateBufferObject(std::move(file_worker));
         buffer_objs.push_back(buffer_obj);
     }
@@ -321,7 +324,7 @@ protected:
     const size_t test_n_ = 2;
     const size_t var_file_step = max_file_size / loop_n / test_n_;
 
-    void TestRoutine(Vector<FileInfo> &file_infos, size_t test_i, size_t thread_i, TestObj *test_obj, Atomic<size_t> &finished_n) {
+    void TestRoutine(std::vector<FileInfo> &file_infos, size_t test_i, size_t thread_i, TestObj *test_obj, std::atomic<size_t> &finished_n) {
         bool alloc_new = test_i == 0;
         bool clean = test_i == test_n_ - 1;
         while (finished_n.load() < file_n) {
@@ -374,26 +377,28 @@ protected:
 
 class Test1Obj : public TestObj {
 public:
-    Test1Obj(size_t avg_file_size, BufferManager *buffer_mgr, std::shared_ptr<String> data_dir, std::shared_ptr<String> temp_dir)
+    Test1Obj(size_t avg_file_size, BufferManager *buffer_mgr, std::shared_ptr<std::string> data_dir, std::shared_ptr<std::string> temp_dir)
         : avg_file_size(avg_file_size), buffer_mgr_(buffer_mgr), data_dir_(data_dir), temp_dir_(temp_dir) {}
 
 private:
     const size_t avg_file_size;
     BufferManager *buffer_mgr_;
-    std::shared_ptr<String> data_dir_;
-    std::shared_ptr<String> temp_dir_;
+    std::shared_ptr<std::string> data_dir_;
+    std::shared_ptr<std::string> temp_dir_;
 
 public:
     void Init(bool alloc_new, FileInfo &file_info) override {
-        auto file_name = std::make_shared<String>(fmt::format("file_{}", file_info.file_id_));
+        auto file_name = std::make_shared<std::string>(fmt::format("file_{}", file_info.file_id_));
         if (alloc_new) {
             size_t file_size = rand() % avg_file_size + avg_file_size / 2;
             file_info.file_size_ = file_size;
-            auto file_worker = std::make_unique<DataFileWorker>(data_dir_, temp_dir_, std::make_shared<String>(""), file_name, file_size, nullptr);
+            auto file_worker =
+                std::make_unique<DataFileWorker>(data_dir_, temp_dir_, std::make_shared<std::string>(""), file_name, file_size, nullptr);
             file_info.buffer_obj_ = buffer_mgr_->AllocateBufferObject(std::move(file_worker));
             file_info.buffer_obj_->AddObjRc();
         } else {
-            auto file_worker = std::make_unique<DataFileWorker>(data_dir_, temp_dir_, std::make_shared<String>(""), file_name, file_info.file_size_, nullptr);
+            auto file_worker =
+                std::make_unique<DataFileWorker>(data_dir_, temp_dir_, std::make_shared<std::string>(""), file_name, file_info.file_size_, nullptr);
             file_info.buffer_obj_ = buffer_mgr_->GetBufferObject(std::move(file_worker));
         }
     }
@@ -425,18 +430,18 @@ TEST_F(BufferManagerParallelTest, parallel_test1) {
         auto buffer_mgr = std::make_unique<BufferManager>(buffer_size, data_dir_, temp_dir_, persistence_manager_.get());
         auto test1_obj = std::make_unique<Test1Obj>(avg_file_size, buffer_mgr.get(), data_dir_, temp_dir_);
 
-        Vector<FileInfo> file_infos;
+        std::vector<FileInfo> file_infos;
         for (size_t i = 0; i < file_n; ++i) {
             file_infos.emplace_back(i);
         }
         //        LOG_INFO(fmt::format("Start parallel test1 {}", i));
         for (size_t test_i = 0; test_i < test_n_; test_i++) {
-            Atomic<size_t> finished_n = 0;
+            std::atomic<size_t> finished_n = 0;
             for (auto &file_info : file_infos) {
                 file_info.buffer_obj_ = nullptr;
             }
 
-            Vector<std::thread> threads;
+            std::vector<std::thread> threads;
             for (size_t thread_i = 0; thread_i < thread_n; ++thread_i) {
                 threads.emplace_back([&, thread_i]() { TestRoutine(file_infos, test_i, thread_i, test1_obj.get(), finished_n); });
             }
@@ -454,24 +459,25 @@ TEST_F(BufferManagerParallelTest, parallel_test1) {
 
 class Test2Obj : public TestObj {
 public:
-    Test2Obj(size_t var_file_step, BufferManager *buffer_mgr, std::shared_ptr<String> data_dir, std::shared_ptr<String> temp_dir)
+    Test2Obj(size_t var_file_step, BufferManager *buffer_mgr, std::shared_ptr<std::string> data_dir, std::shared_ptr<std::string> temp_dir)
         : var_file_step(var_file_step), buffer_mgr_(buffer_mgr), data_dir_(data_dir), temp_dir_(temp_dir) {}
 
 private:
     const size_t var_file_step;
     BufferManager *buffer_mgr_;
-    std::shared_ptr<String> data_dir_;
-    std::shared_ptr<String> temp_dir_;
+    std::shared_ptr<std::string> data_dir_;
+    std::shared_ptr<std::string> temp_dir_;
 
 public:
     void Init(bool alloc_new, FileInfo &file_info) override {
-        auto file_name = std::make_shared<String>(fmt::format("file_{}", file_info.file_id_));
+        auto file_name = std::make_shared<std::string>(fmt::format("file_{}", file_info.file_id_));
         if (alloc_new) {
-            auto file_worker = std::make_unique<VarFileWorker>(data_dir_, temp_dir_, std::make_shared<String>(""), file_name, 0, nullptr);
+            auto file_worker = std::make_unique<VarFileWorker>(data_dir_, temp_dir_, std::make_shared<std::string>(""), file_name, 0, nullptr);
             file_info.buffer_obj_ = buffer_mgr_->AllocateBufferObject(std::move(file_worker));
             file_info.buffer_obj_->AddObjRc();
         } else {
-            auto file_worker = std::make_unique<VarFileWorker>(data_dir_, temp_dir_, std::make_shared<String>(""), file_name, file_info.file_size_, nullptr);
+            auto file_worker =
+                std::make_unique<VarFileWorker>(data_dir_, temp_dir_, std::make_shared<std::string>(""), file_name, file_info.file_size_, nullptr);
             file_info.buffer_obj_ = buffer_mgr_->GetBufferObject(std::move(file_worker));
         }
     }
@@ -507,18 +513,18 @@ TEST_F(BufferManagerParallelTest, parallel_test2) {
         auto buffer_mgr = std::make_unique<BufferManager>(buffer_size, data_dir_, temp_dir_, nullptr);
         auto test2_obj = std::make_unique<Test2Obj>(var_file_step, buffer_mgr.get(), data_dir_, temp_dir_);
 
-        Vector<FileInfo> file_infos;
+        std::vector<FileInfo> file_infos;
         for (size_t i = 0; i < file_n; ++i) {
             file_infos.emplace_back(i);
         }
         //        LOG_INFO(fmt::format("Start parallel test2 {}", i));
         for (size_t test_i = 0; test_i < test_n_; test_i++) {
-            Atomic<size_t> finished_n = 0;
+            std::atomic<size_t> finished_n = 0;
             for (auto &file_info : file_infos) {
                 file_info.buffer_obj_ = nullptr;
             }
 
-            Vector<std::future<bool>> futures;
+            std::vector<std::future<bool>> futures;
             for (size_t thread_i = 0; thread_i < thread_n; ++thread_i) {
                 auto f = std::async(std::launch::async, [&, thread_i]() {
                     try {

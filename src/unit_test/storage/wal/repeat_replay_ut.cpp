@@ -13,13 +13,13 @@
 // limitations under the License.
 
 #ifdef CI
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 import infinity_core;
 import base_test;
 #else
 module;
 
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 
 module infinity_core:ut.repeat_replay;
 
@@ -87,13 +87,13 @@ TEST_P(RepeatReplayTest, append) {
     auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
     auto column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
     auto table_name = std::make_shared<std::string>("tb1");
-    auto table_def = TableDef::Make(db_name, table_name, std::make_shared<String>(), {column_def1, column_def2});
+    auto table_def = TableDef::Make(db_name, table_name, std::make_shared<std::string>(), {column_def1, column_def2});
 
     auto TestAppend = [&]() {
         NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("insert table"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("insert table"), TransactionType::kNormal);
 
-        Vector<std::shared_ptr<ColumnVector>> column_vectors;
+        std::vector<std::shared_ptr<ColumnVector>> column_vectors;
         for (size_t i = 0; i < table_def->columns().size(); ++i) {
             std::shared_ptr<DataType> data_type = table_def->columns()[i]->type();
             column_vectors.push_back(std::make_shared<ColumnVector>(data_type));
@@ -101,7 +101,7 @@ TEST_P(RepeatReplayTest, append) {
         }
         {
             int v1 = 1;
-            column_vectors[0]->AppendByPtr(reinterpret_cast<const_ptr_t>(&v1));
+            column_vectors[0]->AppendByPtr(reinterpret_cast<const char *>(&v1));
         }
         {
             std::string v2 = "v2v2v2v2v2v2v2v2v2v2v2v2v2v2v2v2v2v2v2v2";
@@ -120,26 +120,26 @@ TEST_P(RepeatReplayTest, append) {
     };
 
     auto CheckTable = [&](NewTxnManager *new_txn_mgr, size_t row_cnt) {
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("get table"), TransactionType::kRead);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("get table"), TransactionType::kRead);
         Status status;
 
-        Optional<DBMeeta> db_meta;
-        Optional<TableMeeta> table_meta;
+        std::optional<DBMeeta> db_meta;
+        std::optional<TableMeeta> table_meta;
         status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
 
-        Vector<SegmentID> *segment_ids_ptr = nullptr;
+        std::vector<SegmentID> *segment_ids_ptr = nullptr;
         std::tie(segment_ids_ptr, status) = table_meta->GetSegmentIDs1();
         EXPECT_TRUE(status.ok());
 
-        EXPECT_EQ(*segment_ids_ptr, Vector<SegmentID>({0}));
+        EXPECT_EQ(*segment_ids_ptr, std::vector<SegmentID>({0}));
         SegmentID segment_id = (*segment_ids_ptr)[0];
         SegmentMeta segment_meta(segment_id, *table_meta);
 
-        Vector<BlockID> *block_ids_ptr = nullptr;
+        std::vector<BlockID> *block_ids_ptr = nullptr;
         std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1();
         EXPECT_TRUE(status.ok());
-        EXPECT_EQ(*block_ids_ptr, Vector<BlockID>({0}));
+        EXPECT_EQ(*block_ids_ptr, std::vector<BlockID>({0}));
 
         for (BlockID block_id : *block_ids_ptr) {
             BlockMeta block_meta(block_id, segment_meta);
@@ -181,7 +181,7 @@ TEST_P(RepeatReplayTest, append) {
 
         {
             NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
-            auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("create table"), TransactionType::kNormal);
+            auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
 
             txn->CreateTable(*db_name, table_def, ConflictType::kError);
 
@@ -190,7 +190,7 @@ TEST_P(RepeatReplayTest, append) {
         }
         {
             NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
-            auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("get table"), TransactionType::kNormal);
+            auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("get table"), TransactionType::kNormal);
             auto [table_entry, status] = txn->GetTableInfo(*db_name, *table_name);
             EXPECT_TRUE(status.ok());
 
@@ -221,7 +221,7 @@ TEST_P(RepeatReplayTest, append) {
             NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
             WalManager *wal_manager_{};
             wal_manager_ = infinity::InfinityContext::instance().storage()->wal_manager();
-            auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("check point"), TransactionType::kNewCheckpoint);
+            auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("check point"), TransactionType::kNewCheckpoint);
             Status status = txn->Checkpoint(wal_manager_->LastCheckpointTS());
             EXPECT_TRUE(status.ok());
             status = new_txn_mgr->CommitTxn(txn, ckp_commit_ts.get());
@@ -247,10 +247,10 @@ TEST_P(RepeatReplayTest, import) {
     auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
     auto column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
     auto table_name = std::make_shared<std::string>("tb1");
-    auto table_def = TableDef::Make(db_name, table_name, std::make_shared<String>(), {column_def1, column_def2});
+    auto table_def = TableDef::Make(db_name, table_name, std::make_shared<std::string>(), {column_def1, column_def2});
     size_t block_row_cnt = 8192;
     auto TestImport = [&](NewTxnManager *new_txn_mgr, BufferManager *buffer_mgr) {
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("import table"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("import table"), TransactionType::kNormal);
         auto make_input_block = [&](const Value &v1, const Value &v2) {
             auto input_block = std::make_shared<DataBlock>();
             auto make_column = [&](const Value &v) {
@@ -276,13 +276,13 @@ TEST_P(RepeatReplayTest, import) {
         Status status =
             txn->Import(*db_name,
                         *table_name,
-                        Vector<std::shared_ptr<DataBlock>>{make_input_block(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"))});
+                        std::vector<std::shared_ptr<DataBlock>>{make_input_block(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"))});
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
     };
     auto CheckTable = [&](NewTxnManager *new_txn_mgr, size_t row_cnt) {
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("check table"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("check table"), TransactionType::kNormal);
 
         auto [table_entry, status] = txn->GetTableInfo(*db_name, *table_name);
         EXPECT_TRUE(status.ok());
@@ -303,7 +303,7 @@ TEST_P(RepeatReplayTest, import) {
         BufferManager *buffer_mgr = storage->buffer_manager();
         {
             NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
-            auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("create table"), TransactionType::kNormal);
+            auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
 
             txn->CreateTable(*db_name, table_def, ConflictType::kError);
 
@@ -312,7 +312,7 @@ TEST_P(RepeatReplayTest, import) {
         }
         {
             NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
-            auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("get table"), TransactionType::kNormal);
+            auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("get table"), TransactionType::kNormal);
             auto [table_entry, status] = txn->GetTableInfo(*db_name, *table_name);
             EXPECT_TRUE(status.ok());
 
@@ -349,7 +349,7 @@ TEST_P(RepeatReplayTest, import) {
             NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
             WalManager *wal_manager_{};
             wal_manager_ = infinity::InfinityContext::instance().storage()->wal_manager();
-            auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("check index"), TransactionType::kNewCheckpoint);
+            auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("check index"), TransactionType::kNewCheckpoint);
             Status status = txn->Checkpoint(wal_manager_->LastCheckpointTS());
             EXPECT_TRUE(status.ok());
             status = new_txn_mgr->CommitTxn(txn, ckp_commit_ts.get());

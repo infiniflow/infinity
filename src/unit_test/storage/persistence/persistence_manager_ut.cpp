@@ -1,11 +1,11 @@
 #ifdef CI
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 import infinity_core;
 import base_test;
 #else
 module;
 
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 
 module infinity_core:ut.persistence_manager;
 
@@ -27,9 +27,9 @@ class PersistenceManagerTest : public BaseTest {
 public:
     void SetUp() override {
         BaseTest::RemoveDbDirs();
-        workspace_ = String(GetFullTmpDir()) + "/persistence";
-        file_dir_ = String(GetFullTmpDir()) + "/persistence_src";
-        catalog_dir_ = String(GetFullTmpDir()) + "/catalog";
+        workspace_ = std::string(GetFullTmpDir()) + "/persistence";
+        file_dir_ = std::string(GetFullTmpDir()) + "/persistence_src";
+        catalog_dir_ = std::string(GetFullTmpDir()) + "/catalog";
 
         system(("mkdir -p " + workspace_).c_str());
         system(("mkdir -p " + file_dir_).c_str());
@@ -43,22 +43,22 @@ public:
         handler_ = std::make_unique<PersistResultHandler>(pm_.get());
     }
 
-    void CheckObjData(const String &obj_addr, const String &data);
+    void CheckObjData(const std::string &obj_addr, const std::string &data);
 
 protected:
-    String workspace_{};
-    String file_dir_{};
-    String catalog_dir_{};
+    std::string workspace_{};
+    std::string file_dir_{};
+    std::string catalog_dir_{};
     std::unique_ptr<KVStore> kv_store_{};
     std::unique_ptr<PersistenceManager> pm_{};
     static constexpr int ObjSizeLimit = 128;
     std::unique_ptr<PersistResultHandler> handler_;
 };
 
-void PersistenceManagerTest::CheckObjData(const String &local_file_path, const String &data) {
+void PersistenceManagerTest::CheckObjData(const std::string &local_file_path, const std::string &data) {
     PersistReadResult result = pm_->GetObjCache(local_file_path);
     const ObjAddr &obj_addr = handler_->HandleReadResult(result);
-    String obj_path = pm_->GetObjPath(obj_addr.obj_key_);
+    std::string obj_path = pm_->GetObjPath(obj_addr.obj_key_);
     fs::path obj_fp(obj_path);
     ASSERT_TRUE(fs::exists(obj_fp));
     ASSERT_EQ(obj_addr.part_size_, data.size());
@@ -73,16 +73,16 @@ void PersistenceManagerTest::CheckObjData(const String &local_file_path, const S
     auto buffer = std::make_unique<char[]>(file_size);
     auto [nread, read_status] = pm_file_handle->Read(buffer.get(), file_size);
     EXPECT_TRUE(read_status.ok());
-    ASSERT_EQ(String(buffer.get(), file_size), data);
+    ASSERT_EQ(std::string(buffer.get(), file_size), data);
 
     PersistWriteResult res = pm_->PutObjCache(local_file_path);
     handler_->HandleWriteResult(res);
 }
 
 TEST_F(PersistenceManagerTest, PersistFileBasic) {
-    String file_path = file_dir_ + "/persist_file";
+    std::string file_path = file_dir_ + "/persist_file";
     std::ofstream out_file(file_path);
-    String persist_str = "Persistence Manager Test";
+    std::string persist_str = "Persistence Manager Test";
     out_file << persist_str;
     out_file.close();
     PersistWriteResult result = pm_->Persist(file_path, file_path);
@@ -97,14 +97,14 @@ TEST_F(PersistenceManagerTest, PersistFileBasic) {
 }
 
 TEST_F(PersistenceManagerTest, PersistMultiFile) {
-    String file_path_base = file_dir_ + "/persist_file";
-    Vector<String> file_paths;
-    Vector<String> persist_strs;
-    Vector<ObjAddr> obj_addrs;
+    std::string file_path_base = file_dir_ + "/persist_file";
+    std::vector<std::string> file_paths;
+    std::vector<std::string> persist_strs;
+    std::vector<ObjAddr> obj_addrs;
     for (size_t i = 0; i < 10; ++i) {
-        String file_path = file_path_base + std::to_string(i);
+        std::string file_path = file_path_base + std::to_string(i);
         std::ofstream out_file(file_path);
-        String persist_str = "Persistence Manager Test " + std::to_string(i);
+        std::string persist_str = "Persistence Manager Test " + std::to_string(i);
         out_file << persist_str;
         out_file.close();
         file_paths.push_back(file_path);
@@ -128,17 +128,17 @@ TEST_F(PersistenceManagerTest, PersistMultiFile) {
 }
 
 TEST_F(PersistenceManagerTest, PersistFileMultiThread) {
-    String file_path_base = file_dir_ + "/persist_file";
-    Vector<String> file_paths;
-    Vector<String> persist_strs;
-    HashMap<String, ObjAddr> obj_addrs;
-    Vector<std::thread> threads;
+    std::string file_path_base = file_dir_ + "/persist_file";
+    std::vector<std::string> file_paths;
+    std::vector<std::string> persist_strs;
+    std::unordered_map<std::string, ObjAddr> obj_addrs;
+    std::vector<std::thread> threads;
     std::mutex obj_mutex;
 
     for (size_t i = 0; i < 10; ++i) {
-        String file_path = file_path_base + std::to_string(i);
+        std::string file_path = file_path_base + std::to_string(i);
         std::ofstream out_file(file_path);
-        String persist_str = "Persistence Manager Test " + std::to_string(i);
+        std::string persist_str = "Persistence Manager Test " + std::to_string(i);
         out_file << persist_str;
         out_file.close();
         file_paths.push_back(file_path);
@@ -168,16 +168,16 @@ TEST_F(PersistenceManagerTest, PersistFileMultiThread) {
 }
 
 TEST_F(PersistenceManagerTest, CleanupBasic) {
-    String file_path_base = file_dir_ + "/persist_file";
-    Vector<String> file_paths;
-    Vector<String> persist_strs;
-    Vector<ObjAddr> obj_addrs;
-    Set<String> obj_paths;
+    std::string file_path_base = file_dir_ + "/persist_file";
+    std::vector<std::string> file_paths;
+    std::vector<std::string> persist_strs;
+    std::vector<ObjAddr> obj_addrs;
+    std::set<std::string> obj_paths;
 
     for (size_t i = 0; i < 10; ++i) {
-        String file_path = file_path_base + std::to_string(i);
+        std::string file_path = file_path_base + std::to_string(i);
         std::ofstream out_file(file_path);
-        String persist_str = "Persistence Manager Test " + std::to_string(i);
+        std::string persist_str = "Persistence Manager Test " + std::to_string(i);
         out_file << persist_str;
         out_file.close();
         file_paths.push_back(file_path);

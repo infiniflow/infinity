@@ -13,13 +13,13 @@
 // limitations under the License.
 
 #ifdef CI
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 import infinity_core;
 import base_test;
 #else
 module;
 
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 
 module infinity_core:ut.definition_table;
 
@@ -51,14 +51,14 @@ TEST_F(TableTest, test1) {
     size_t column_count = 2;
     size_t block_count = 3;
     i64 row_count = DEFAULT_VECTOR_SIZE;
-    Vector<std::shared_ptr<ColumnDef>> columns;
-    Vector<std::shared_ptr<DataType>> column_types;
+    std::vector<std::shared_ptr<ColumnDef>> columns;
+    std::vector<std::shared_ptr<DataType>> column_types;
     columns.reserve(column_count);
     column_types.reserve(column_count);
 
     std::shared_ptr<DataType> col_type = std::make_shared<DataType>(LogicalType::kBoolean);
     column_types.emplace_back(col_type);
-    String col_name = "col1";
+    std::string col_name = "col1";
     auto col_def = std::make_shared<ColumnDef>(0, col_type, col_name, std::set<ConstraintType>());
 
     columns.emplace_back(col_def);
@@ -70,7 +70,7 @@ TEST_F(TableTest, test1) {
     columns.emplace_back(col_def);
 
     std::shared_ptr<TableDef> table_def =
-        TableDef::Make(std::make_shared<String>("default_db"), std::make_shared<String>("order_by_table"), std::make_shared<String>("comment"), columns);
+        TableDef::Make(std::make_shared<std::string>("default_db"), std::make_shared<std::string>("order_by_table"), std::make_shared<std::string>("comment"), columns);
 
     std::shared_ptr<DataTable> order_by_table = DataTable::Make(table_def, TableType::kOrderBy);
 
@@ -89,7 +89,7 @@ TEST_F(TableTest, test1) {
         order_by_table->Append(data_block);
     }
 
-    std::shared_ptr<Vector<RowID>> offset_column_vector = order_by_table->GetRowIDVector();
+    std::shared_ptr<std::vector<RowID>> offset_column_vector = order_by_table->GetRowIDVector();
     EXPECT_EQ(offset_column_vector->size(), block_count * DEFAULT_VECTOR_SIZE);
     for (size_t block_id = 0; block_id < block_count; ++block_id) {
         // Check Column1 data

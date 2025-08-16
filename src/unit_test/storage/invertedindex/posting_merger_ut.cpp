@@ -1,12 +1,12 @@
 
 #ifdef CI
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 import infinity_core;
 import base_test;
 #else
 module;
 
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 
 module infinity_core:ut.posting_merger;
 
@@ -51,9 +51,9 @@ public:
 
 public:
     struct ExpectedPosting {
-        String term;
-        Vector<RowID> doc_ids;
-        Vector<u32> tfs;
+        std::string term;
+        std::vector<RowID> doc_ids;
+        std::vector<u32> tfs;
     };
 
 protected:
@@ -62,7 +62,7 @@ protected:
 protected:
     optionflag_t flag_{OPTION_FLAG_ALL};
     static constexpr size_t BUFFER_SIZE_ = 1024;
-    String config_path_{};
+    std::string config_path_{};
 };
 
 INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
@@ -80,7 +80,7 @@ void PostingMergerTest::CreateIndex() {
     std::shared_ptr<ColumnVector> column = ColumnVector::Make(std::make_shared<DataType>(LogicalType::kVarchar));
     column->Initialize();
     for (size_t i = 0; i < num_paragraph; ++i) {
-        Value v = Value::MakeVarchar(String(paragraphs[i]));
+        Value v = Value::MakeVarchar(std::string(paragraphs[i]));
         column->AppendValue(v);
     }
 
@@ -97,31 +97,31 @@ TEST_P(PostingMergerTest, Basic) {
     // using namespace infinity;
     CreateIndex();
 
-    const String index_dir = GetFullDataDir();
+    const std::string index_dir = GetFullDataDir();
 
-    String dst_base_name = "merged_index";
-    Path path = Path(index_dir) / dst_base_name;
-    String index_prefix = path.string();
-    String dict_file = index_prefix;
+    std::string dst_base_name = "merged_index";
+    std::filesystem::path path = std::filesystem::path(index_dir) / dst_base_name;
+    std::string index_prefix = path.string();
+    std::string dict_file = index_prefix;
     dict_file.append(DICT_SUFFIX);
 
-    String posting_file = path.string();
+    std::string posting_file = path.string();
     posting_file.append(POSTING_SUFFIX);
 
-    Vector<String> base_names = {"chunk1", "chunk2"};
-    Vector<RowID> row_ids = {RowID{0U, 0U}, RowID{0U, 1U}};
-    Vector<SegmentTermPosting *> segment_term_postings;
+    std::vector<std::string> base_names = {"chunk1", "chunk2"};
+    std::vector<RowID> row_ids = {RowID{0U, 0U}, RowID{0U, 1U}};
+    std::vector<SegmentTermPosting *> segment_term_postings;
 
-    Vector<Vector<u32>> expected_pos{{0}, {0, 1}};
+    std::vector<std::vector<u32>> expected_pos{{0}, {0, 1}};
     for (size_t i = 0; i < base_names.size(); ++i) {
         auto base_name = base_names[i];
         auto row_id = row_ids[i];
         {
-            String expected_term("a");
+            std::string expected_term("a");
             auto segment_term_posting1 = std::make_unique<SegmentTermPosting>(index_dir, base_name, row_id, flag_);
             auto column_index_iterator = segment_term_posting1->column_index_iterator_;
             PostingDecoder *decoder;
-            String term_str;
+            std::string term_str;
             while (column_index_iterator->Next(term_str, decoder)) {
                 EXPECT_EQ(term_str, expected_term);
                 u32 pos_list_buf[1000];
@@ -147,7 +147,7 @@ TEST_P(PostingMergerTest, Basic) {
     }
 
     VectorWithLock<u32> column_length_array;
-    Vector<u32> &unsafe_column_length_array = column_length_array.UnsafeVec();
+    std::vector<u32> &unsafe_column_length_array = column_length_array.UnsafeVec();
     {
         // prepare column length info
         // the indexes to be merged should be from the same segment
@@ -156,8 +156,8 @@ TEST_P(PostingMergerTest, Basic) {
         PersistResultHandler handler(pm);
         unsafe_column_length_array.clear();
         for (u32 i = 0; i < base_names.size(); ++i) {
-            String column_len_file = (Path(index_dir) / base_names[i]).string() + LENGTH_SUFFIX;
-            String real_column_len_file = column_len_file;
+            std::string column_len_file = (std::filesystem::path(index_dir) / base_names[i]).string() + LENGTH_SUFFIX;
+            std::string real_column_len_file = column_len_file;
             if (pm != nullptr) {
                 PersistReadResult result = pm->GetObjCache(real_column_len_file);
                 const ObjAddr &obj_addr = handler.HandleReadResult(result);

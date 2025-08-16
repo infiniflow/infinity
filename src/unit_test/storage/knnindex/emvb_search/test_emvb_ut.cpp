@@ -13,13 +13,13 @@
 // limitations under the License.
 
 #ifdef CI
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 import infinity_core;
 import base_test;
 #else
 module;
 
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 
 module infinity_core:ut.test_emvb;
 
@@ -55,8 +55,8 @@ public:
     GetMultipleIPDistance(u32 embedding_offset, u32 embedding_num, u32 query_id, u32 query_num, const f32 *ip_table, f32 *output_ptr) const override {
         std::fill_n(output_ptr, embedding_num, 0.0f);
     }
-    void Save(LocalFileHandle &file_handler) override {}
-    void Load(LocalFileHandle &file_handler) override {}
+    void Save(infinity::LocalFileHandle &file_handler) override {}
+    void Load(infinity::LocalFileHandle &file_handler) override {}
 };
 
 class EMVBTest : public BaseTest {};
@@ -72,18 +72,18 @@ TEST_F(EMVBTest, test_fakepq) {
     // std::random_device rd;
     // std::mt19937 gen(rd());
     // std::uniform_real_distribution<f32> dis(-1024.0f, 1024.0f);
-    Vector<u32> doc_lens(n_docs, embedding_in_one_doc);
-    Vector<u32> doc_offsets(n_docs);
+    std::vector<u32> doc_lens(n_docs, embedding_in_one_doc);
+    std::vector<u32> doc_offsets(n_docs);
     for (u32 i = 1; i < n_docs; ++i) {
         doc_offsets[i] = doc_offsets[i - 1] + doc_lens[i - 1];
     }
-    Vector<u32> centroid_id_assignments(n_docs * embedding_in_one_doc);
+    std::vector<u32> centroid_id_assignments(n_docs * embedding_in_one_doc);
     for (u32 i = 0; i < n_docs; ++i) {
         for (u32 j = 0; j < embedding_in_one_doc; ++j) {
             centroid_id_assignments[i * embedding_in_one_doc + j] = i / docs_in_one_centroid;
         }
     }
-    Vector<f32> centroids_data(centroid_num * embedding_dimension);
+    std::vector<f32> centroids_data(centroid_num * embedding_dimension);
     for (u32 i = 0; i < centroid_num; ++i) {
         centroids_data[i * embedding_dimension + i] = 1.0f;
     }
@@ -103,7 +103,7 @@ TEST_F(EMVBTest, test_fakepq) {
                                                   centroids_data.data(),
                                                   centroids_to_docid.get(),
                                                   &fake_pq);
-    Vector<f32> query(FIXED_QUERY_TOKEN_NUM * embedding_dimension);
+    std::vector<f32> query(FIXED_QUERY_TOKEN_NUM * embedding_dimension);
     for (u32 i = 0; i < FIXED_QUERY_TOKEN_NUM; ++i) {
         query[i * embedding_dimension + 3] = 1.0f;
     }

@@ -40,7 +40,7 @@ import insert_row_expr;
 
 using namespace infinity;
 
-void ReadJsonl(std::ifstream &input_file, size_t lines_to_read, Vector<Tuple<char *, char *, char *>> &batch) {
+void ReadJsonl(std::ifstream &input_file, size_t lines_to_read, std::vector<Tuple<char *, char *, char *>> &batch) {
     String line;
     size_t lines_readed = 0;
     batch.clear();
@@ -73,7 +73,7 @@ void ReadJsonl(std::ifstream &input_file, size_t lines_to_read, Vector<Tuple<cha
 }
 
 std::shared_ptr<Infinity> CreateDbAndTable(const String &db_name, const String &table_name) {
-    Vector<ColumnDef *> column_defs;
+    std::vector<ColumnDef *> column_defs;
     {
         String col1_name = "id";
         auto col1_type = std::make_shared<DataType>(LogicalType::kVarchar);
@@ -109,7 +109,7 @@ std::shared_ptr<Infinity> CreateDbAndTable(const String &db_name, const String &
 
     CreateTableOptions create_tb_options;
     create_tb_options.conflict_type_ = ConflictType::kIgnore;
-    infinity->CreateTable(db_name, table_name, std::move(column_defs), Vector<TableConstraint *>{}, std::move(create_tb_options));
+    infinity->CreateTable(db_name, table_name, std::move(column_defs), std::vector<TableConstraint *>{}, std::move(create_tb_options));
     return infinity;
 }
 
@@ -149,18 +149,18 @@ void BenchmarkInsert(std::shared_ptr<Infinity> infinity, const String &db_name, 
     BaseProfiler profiler;
 
     profiler.Begin();
-    Vector<Tuple<char *, char *, char *>> batch_cache;
+    std::vector<Tuple<char *, char *, char *>> batch_cache;
     ReadJsonl(input_file, (size_t)(-1), batch_cache);
     size_t num_rows = batch_cache.size();
     LOG_INFO(fmt::format("ReadJsonl {} rows cost: {}", num_rows, profiler.ElapsedToString()));
     profiler.End();
 
     profiler.Begin();
-    Vector<String> orig_columns{"id", "title", "text"};
+    std::vector<String> orig_columns{"id", "title", "text"};
     std::unique_ptr<ConstantExpr> const_expr;
     size_t num_inserted = 0;
     while (num_inserted < num_rows) {
-        auto insert_rows = new Vector<InsertRowExpr *>();
+        auto insert_rows = new std::vector<InsertRowExpr *>();
         insert_rows->reserve(insert_batch);
         for (size_t i = 0; i < insert_batch && (num_inserted + i) < num_rows; i++) {
             auto &t = batch_cache[num_inserted + i];
@@ -192,7 +192,7 @@ void BenchmarkCreateIndex(std::shared_ptr<Infinity> infinity, const String &db_n
     auto index_info = new IndexInfo();
     index_info->index_type_ = IndexType::kFullText;
     index_info->column_name_ = "text";
-    index_info->index_param_list_ = new Vector<InitParameter *>();
+    index_info->index_param_list_ = new std::vector<InitParameter *>();
 
     String index_comment = "";
     auto r = infinity->CreateIndex(db_name, table_name, index_name, index_comment, index_info, CreateIndexOptions());

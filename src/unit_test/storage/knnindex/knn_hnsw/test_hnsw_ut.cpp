@@ -13,15 +13,13 @@
 // limitations under the License.
 
 #ifdef CI
-#include "gtest/gtest.h"
-#include <thread>
+#include "unit_test/gtest_expand.h"
 import infinity_core;
 import base_test;
 #else
 module;
 
-#include "gtest/gtest.h"
-#include <thread>
+#include "unit_test/gtest_expand.h"
 
 module infinity_core:ut.test_hnsw;
 
@@ -88,7 +86,7 @@ public:
             EXPECT_GE(correct_rate, 0.95);
         };
 
-        String filepath = save_dir_ + "/test_hnsw.bin";
+        std::string filepath = save_dir_ + "/test_hnsw.bin";
         {
             auto hnsw_index = Hnsw::Make(chunk_size, max_chunk_n, dim, M, ef_construction);
             auto iter = DenseVectorIter<float, LabelT>(data.get(), dim, element_size);
@@ -150,7 +148,7 @@ public:
             EXPECT_GE(correct_rate, 0.95);
         };
 
-        String filepath = save_dir_ + "/test_hnsw.bin";
+        std::string filepath = save_dir_ + "/test_hnsw.bin";
         {
             auto hnsw_index = Hnsw::Make(chunk_size, max_chunk_n, dim, M, ef_construction);
             auto iter = DenseVectorIter<float, LabelT>(data.get(), dim, element_size);

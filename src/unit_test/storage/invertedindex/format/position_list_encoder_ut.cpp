@@ -1,17 +1,16 @@
 
 #ifdef CI
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 import infinity_core;
 import base_test;
 #else
 module;
 
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 
 module infinity_core:ut.position_list_encoder;
 
 import :ut.base_test;
-
 import :index_defines;
 import :posting_byte_slice;
 import :posting_list_format;
@@ -29,10 +28,10 @@ class PositionListEncoderTest : public BaseTest {
 public:
     PositionListEncoderTest() {}
 
-    void SetUp() override { file_ = String(GetFullTmpDir()) + "/position"; }
+    void SetUp() override { file_ = std::string(GetFullTmpDir()) + "/position"; }
 
 protected:
-    String file_;
+    std::string file_;
 };
 
 TEST_F(PositionListEncoderTest, test1) {

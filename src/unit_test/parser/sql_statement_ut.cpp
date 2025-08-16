@@ -15,7 +15,7 @@
 #ifdef CI
 #include "base_statement.h"
 #include "statement/show_statement.h"
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 import infinity_core;
 import base_test;
 #else
@@ -23,7 +23,7 @@ module;
 
 #include "base_statement.h"
 #include "statement/show_statement.h"
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 
 module infinity_core:ut.sql_statement;
 
@@ -65,7 +65,7 @@ TEST_F(StatementParsingTest, good_test1) {
     std::shared_ptr<ParserResult> result = std::make_shared<ParserResult>();
 
     {
-        String input_sql = "SHOW DATABASE default_db";
+        std::string input_sql = "SHOW DATABASE default_db";
         parser->Parse(input_sql, result.get());
 
         EXPECT_TRUE(result->error_message_.empty());
@@ -83,7 +83,7 @@ TEST_F(StatementParsingTest, good_test1) {
     }
 
     {
-        String input_sql = "CREATE TABLE t1 AS SELECT a, b FROM t2;";
+        std::string input_sql = "CREATE TABLE t1 AS SELECT a, b FROM t2;";
         parser->Parse(input_sql, result.get());
 
         EXPECT_TRUE(result->error_message_.empty());
@@ -113,7 +113,7 @@ TEST_F(StatementParsingTest, good_test1) {
     }
 
     {
-        String input_sql = "UPDATE t1 SET a = 1, b = 2 WHERE c = 'O''K';";
+        std::string input_sql = "UPDATE t1 SET a = 1, b = 2 WHERE c = 'O''K';";
         parser->Parse(input_sql, result.get());
 
         EXPECT_TRUE(result->error_message_.empty());
@@ -143,7 +143,7 @@ TEST_F(StatementParsingTest, good_test1) {
     }
 
     {
-        String input_sql = "INSERT INTO t1 VALUES ('abc', 333);";
+        std::string input_sql = "INSERT INTO t1 VALUES ('abc', 333);";
         parser->Parse(input_sql, result.get());
 
         EXPECT_TRUE(result->error_message_.empty());
@@ -166,7 +166,7 @@ TEST_F(StatementParsingTest, good_test1) {
     }
 
     {
-        String input_sql = "INSERT INTO t1 VALUES ('abc', 333), ('def', 444);";
+        std::string input_sql = "INSERT INTO t1 VALUES ('abc', 333), ('def', 444);";
         parser->Parse(input_sql, result.get());
 
         EXPECT_TRUE(result->error_message_.empty());
@@ -194,7 +194,7 @@ TEST_F(StatementParsingTest, good_test1) {
     }
 
     {
-        String input_sql = "CREATE INDEX IF NOT EXISTS idx1 ON t1 (c1) USING IVF WITH(metric = l2);";
+        std::string input_sql = "CREATE INDEX IF NOT EXISTS idx1 ON t1 (c1) USING IVF WITH(metric = l2);";
         parser->Parse(input_sql, result.get());
 
         EXPECT_TRUE(result->error_message_.empty());
@@ -222,7 +222,7 @@ TEST_F(StatementParsingTest, good_test1) {
     }
 
     {
-        String input_sql = "SHOW TABLE t1 INDEX idx1";
+        std::string input_sql = "SHOW TABLE t1 INDEX idx1";
         parser->Parse(input_sql, result.get());
 
         EXPECT_TRUE(result->error_message_.empty());
@@ -240,7 +240,7 @@ TEST_F(StatementParsingTest, good_test1) {
     }
 
     {
-        String input_sql = "SHOW TABLE t1 SEGMENTS";
+        std::string input_sql = "SHOW TABLE t1 SEGMENTS";
         parser->Parse(input_sql, result.get());
 
         EXPECT_TRUE(result->error_message_.empty());
@@ -258,7 +258,7 @@ TEST_F(StatementParsingTest, good_test1) {
     }
 
     {
-        String input_sql = "SHOW TABLE t1 SEGMENT 1";
+        std::string input_sql = "SHOW TABLE t1 SEGMENT 1";
         parser->Parse(input_sql, result.get());
 
         EXPECT_TRUE(result->error_message_.empty());
@@ -277,7 +277,7 @@ TEST_F(StatementParsingTest, good_test1) {
     }
 
     {
-        String input_sql = "SHOW TABLE default_db.t1 SEGMENT 3 BLOCKS";
+        std::string input_sql = "SHOW TABLE default_db.t1 SEGMENT 3 BLOCKS";
         parser->Parse(input_sql, result.get());
 
         EXPECT_TRUE(result->error_message_.empty());
@@ -296,7 +296,7 @@ TEST_F(StatementParsingTest, good_test1) {
     }
 
     {
-        String input_sql = "SHOW TABLE t1 SEGMENT 3 BLOCK 5";
+        std::string input_sql = "SHOW TABLE t1 SEGMENT 3 BLOCK 5";
         parser->Parse(input_sql, result.get());
 
         EXPECT_TRUE(result->error_message_.empty());
@@ -316,7 +316,7 @@ TEST_F(StatementParsingTest, good_test1) {
     }
 
     {
-        String input_sql = "DROP INDEX index1 ON table1;";
+        std::string input_sql = "DROP INDEX index1 ON table1;";
         parser->Parse(input_sql, result.get());
 
         EXPECT_TRUE(result->error_message_.empty());
@@ -336,7 +336,7 @@ TEST_F(StatementParsingTest, good_test1) {
     }
 
     {
-        String input_sql = "DROP TABLE t1;";
+        std::string input_sql = "DROP TABLE t1;";
         parser->Parse(input_sql, result.get());
 
         EXPECT_TRUE(result->error_message_.empty());
@@ -356,7 +356,7 @@ TEST_F(StatementParsingTest, good_test1) {
     }
 
     {
-        String input_sql = "SHOW TABLES;";
+        std::string input_sql = "SHOW TABLES;";
         parser->Parse(input_sql, result.get());
 
         EXPECT_TRUE(result->error_message_.empty());
@@ -374,7 +374,7 @@ TEST_F(StatementParsingTest, good_test1) {
     }
 
     {
-        String input_sql = "DESCRIBE t1;";
+        std::string input_sql = "DESCRIBE t1;";
         parser->Parse(input_sql, result.get());
 
         EXPECT_FALSE(result->error_message_.empty());
@@ -384,7 +384,7 @@ TEST_F(StatementParsingTest, good_test1) {
     }
 
     {
-        String input_sql = "SHOW TABLE t1;";
+        std::string input_sql = "SHOW TABLE t1;";
         parser->Parse(input_sql, result.get());
 
         EXPECT_TRUE(result->error_message_.empty());
@@ -400,7 +400,7 @@ TEST_F(StatementParsingTest, good_test1) {
     }
 
     {
-        String input_sql = "copy t1 to '/usr/filename' with (format csv, header, delimiter '|');";
+        std::string input_sql = "copy t1 to '/usr/filename' with (format csv, header, delimiter '|');";
         parser->Parse(input_sql, result.get());
 
         EXPECT_TRUE(result->error_message_.empty());
@@ -422,7 +422,7 @@ TEST_F(StatementParsingTest, good_test1) {
     }
 
     {
-        String input_sql = "copy t1 to '/usr/filename' with (format json, header, delimiter '|');";
+        std::string input_sql = "copy t1 to '/usr/filename' with (format json, header, delimiter '|');";
         parser->Parse(input_sql, result.get());
 
         EXPECT_TRUE(result->error_message_.empty());
@@ -444,7 +444,7 @@ TEST_F(StatementParsingTest, good_test1) {
     }
 
     {
-        String input_sql = "copy t2 from '/usr/filename' with (format csv, header, delimiter '|');";
+        std::string input_sql = "copy t2 from '/usr/filename' with (format csv, header, delimiter '|');";
         parser->Parse(input_sql, result.get());
 
         EXPECT_TRUE(result->error_message_.empty());
@@ -465,7 +465,7 @@ TEST_F(StatementParsingTest, good_test1) {
     }
 
     {
-        String input_sql = "copy t2 from '/usr/filename' with (format json, header, delimiter '|');";
+        std::string input_sql = "copy t2 from '/usr/filename' with (format json, header, delimiter '|');";
         parser->Parse(input_sql, result.get());
 
         EXPECT_TRUE(result->error_message_.empty());
@@ -486,7 +486,7 @@ TEST_F(StatementParsingTest, good_test1) {
     }
 
     {
-        String input_sql = "select * from t1 except select * from t2;";
+        std::string input_sql = "select * from t1 except select * from t2;";
         parser->Parse(input_sql, result.get());
 
         EXPECT_TRUE(result->error_message_.empty());
@@ -508,7 +508,7 @@ TEST_F(StatementParsingTest, good_test1) {
     }
 
     {
-        String input_sql = "select * from t1 intersect select * from t2 union all select * from t3;";
+        std::string input_sql = "select * from t1 intersect select * from t2 union all select * from t3;";
         parser->Parse(input_sql, result.get());
 
         EXPECT_TRUE(result->error_message_.empty());

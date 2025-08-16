@@ -14,16 +14,14 @@
 
 #ifdef CI
 #include "common/simd/simd_common_intrin_include.h"
-#include "gtest/gtest.h"
-#include <cstdlib>
+#include "unit_test/gtest_expand.h"
 import infinity_core;
 import base_test;
 #else
 module;
 
 #include "common/simd/simd_common_intrin_include.h"
-#include "gtest/gtest.h"
-#include <cstdlib>
+#include "unit_test/gtest_expand.h"
 
 module infinity_core:ut.emvb_search_test_simd;
 
@@ -162,9 +160,9 @@ TEST_F(SIMDTest, testleftpackf) {
     auto ptr = std::aligned_alloc(32, 1024 * sizeof(f32));
     EXPECT_NE(ptr, nullptr);
     std::unique_ptr<f32[], decltype([](f32 *p) { std::free(p); })> test_input(static_cast<f32 *>(ptr));
-    Vector<u32> ids(1000);
+    std::vector<u32> ids(1000);
     std::iota(ids.begin(), ids.end(), 0);
-    Vector<u32> expect_out_ids;
+    std::vector<u32> expect_out_ids;
     std::random_device rd;
     std::mt19937 gen(rd());
     std::uniform_real_distribution<f32> dis(0.0f, 2.0f);

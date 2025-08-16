@@ -13,13 +13,13 @@
 // limitations under the License.
 
 #ifdef CI
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 import infinity_core;
 import base_test;
 #else
 module;
 
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 
 module infinity_core:ut.data_type;
 
@@ -149,7 +149,7 @@ TEST_F(DataTypeTest, Serialize) {
     using namespace infinity;
 
     DataType bool_type(LogicalType::kBoolean);
-    String bool_type_str = bool_type.Serialize().dump();
+    std::string bool_type_str = bool_type.Serialize().dump();
     std::cout << bool_type_str << std::endl;
 }
 
@@ -163,7 +163,7 @@ TEST_F(DataTypeTest, ReadWrite) {
     EXPECT_NE(type_info_decimal, nullptr);
     EXPECT_NE(type_info_embedding, nullptr);
 
-    Vector<std::shared_ptr<DataType>> data_types = {
+    std::vector<std::shared_ptr<DataType>> data_types = {
         std::make_shared<DataType>(LogicalType::kTinyInt),
         std::make_shared<DataType>(LogicalType::kFloat),
         std::make_shared<DataType>(LogicalType::kTuple),
@@ -175,7 +175,7 @@ TEST_F(DataTypeTest, ReadWrite) {
     for (size_t i = 0; i < data_types.size(); i++) {
         std::shared_ptr<DataType> &data_type = data_types[i];
         int32_t exp_size = data_type->GetSizeInBytes();
-        Vector<char> buf(exp_size);
+        std::vector<char> buf(exp_size);
         char *buf_beg = buf.data();
         char *ptr = buf_beg;
         data_type->WriteAdv(ptr);

@@ -15,7 +15,7 @@
 #ifndef CI
 module;
 
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 
 module infinity_core:ut.replay_alter;
 
@@ -43,7 +43,7 @@ import :chunk_index_meta;
 import :db_meeta;
 import :default_values;
 #else
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 import infinity_core;
 import base_test;
 import replay_test;
@@ -67,10 +67,10 @@ INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
 TEST_P(TestTxnReplayAlter, test_add_column) {
     using namespace infinity;
 
-    std::shared_ptr<String> db_name = std::make_shared<String>("default_db");
+    std::shared_ptr<std::string> db_name = std::make_shared<std::string>("default_db");
     auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
     auto table_name = std::make_shared<std::string>("tb1");
-    auto table_def = TableDef::Make(db_name, table_name, std::make_shared<String>(), {column_def1});
+    auto table_def = TableDef::Make(db_name, table_name, std::make_shared<std::string>(), {column_def1});
 
     std::shared_ptr<ConstantExpr> default_varchar = std::make_shared<ConstantExpr>(LiteralType::kString);
     default_varchar->str_value_ = strdup("");
@@ -78,7 +78,7 @@ TEST_P(TestTxnReplayAlter, test_add_column) {
         std::make_shared<ColumnDef>(2, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>(), default_varchar);
 
     {
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("create table"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
         Status status = txn->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
@@ -104,7 +104,7 @@ TEST_P(TestTxnReplayAlter, test_add_column) {
 
     size_t row_cnt = 4;
     auto append = [&] {
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("append"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("append"), TransactionType::kNormal);
         auto input_block = make_input_block(Value::MakeInt(1), row_cnt);
         Status status = txn->Append(*db_name, *table_name, input_block);
         EXPECT_TRUE(status.ok());
@@ -114,9 +114,9 @@ TEST_P(TestTxnReplayAlter, test_add_column) {
     append();
 
     {
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("add column"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("add column"), TransactionType::kNormal);
 
-        Status status = txn->AddColumns(*db_name, *table_name, Vector<std::shared_ptr<ColumnDef>>({column_def2}));
+        Status status = txn->AddColumns(*db_name, *table_name, std::vector<std::shared_ptr<ColumnDef>>({column_def2}));
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
@@ -125,19 +125,19 @@ TEST_P(TestTxnReplayAlter, test_add_column) {
     RestartTxnMgr();
 
     {
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("scan"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kNormal);
 
         // TxnTimeStamp begin_ts = txn->BeginTS();
 
-        Optional<DBMeeta> db_meta;
-        Optional<TableMeeta> table_meta;
+        std::optional<DBMeeta> db_meta;
+        std::optional<TableMeeta> table_meta;
         Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
 
-        Vector<SegmentID> *segment_ids_ptr = nullptr;
+        std::vector<SegmentID> *segment_ids_ptr = nullptr;
         std::tie(segment_ids_ptr, status) = table_meta->GetSegmentIDs1();
         EXPECT_TRUE(status.ok());
-        EXPECT_EQ(*segment_ids_ptr, Vector<SegmentID>({0}));
+        EXPECT_EQ(*segment_ids_ptr, std::vector<SegmentID>({0}));
         SegmentID segment_id = (*segment_ids_ptr)[0];
 
         SegmentMeta segment_meta(segment_id, *table_meta);
@@ -146,10 +146,10 @@ TEST_P(TestTxnReplayAlter, test_add_column) {
         std::tie(segment_row_cnt, status) = segment_meta.GetRowCnt1();
         EXPECT_EQ(segment_row_cnt, row_cnt);
 
-        Vector<BlockID> *block_ids_ptr = nullptr;
+        std::vector<BlockID> *block_ids_ptr = nullptr;
         std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1();
         EXPECT_TRUE(status.ok());
-        EXPECT_EQ(*block_ids_ptr, Vector<BlockID>({0}));
+        EXPECT_EQ(*block_ids_ptr, std::vector<BlockID>({0}));
 
         auto [column_defs, status1] = table_meta->GetColumnDefs();
         EXPECT_TRUE(status1.ok());
@@ -174,14 +174,14 @@ TEST_P(TestTxnReplayAlter, test_add_column) {
 TEST_P(TestTxnReplayAlter, test_drop_column) {
     using namespace infinity;
 
-    std::shared_ptr<String> db_name = std::make_shared<String>("default_db");
+    std::shared_ptr<std::string> db_name = std::make_shared<std::string>("default_db");
     auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
     auto column_def2 = std::make_shared<ColumnDef>(2, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
     auto table_name = std::make_shared<std::string>("tb1");
-    auto table_def = TableDef::Make(db_name, table_name, std::make_shared<String>(), {column_def1, column_def2});
+    auto table_def = TableDef::Make(db_name, table_name, std::make_shared<std::string>(), {column_def1, column_def2});
 
     {
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("create table"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
         Status status = txn->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
@@ -211,7 +211,7 @@ TEST_P(TestTxnReplayAlter, test_drop_column) {
 
     size_t row_cnt = 4;
     auto append = [&] {
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("append"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("append"), TransactionType::kNormal);
         auto input_block = make_input_block(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"), row_cnt);
         Status status = txn->Append(*db_name, *table_name, input_block);
         EXPECT_TRUE(status.ok());
@@ -221,9 +221,9 @@ TEST_P(TestTxnReplayAlter, test_drop_column) {
     append();
 
     {
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("drop column"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop column"), TransactionType::kNormal);
 
-        Status status = txn->DropColumns(*db_name, *table_name, Vector<String>({column_def2->name_}));
+        Status status = txn->DropColumns(*db_name, *table_name, std::vector<std::string>({column_def2->name_}));
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
@@ -232,12 +232,12 @@ TEST_P(TestTxnReplayAlter, test_drop_column) {
     RestartTxnMgr();
 
     {
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("scan"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kNormal);
 
         // TxnTimeStamp begin_ts = txn->BeginTS();
 
-        Optional<DBMeeta> db_meta;
-        Optional<TableMeeta> table_meta;
+        std::optional<DBMeeta> db_meta;
+        std::optional<TableMeeta> table_meta;
         Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
 

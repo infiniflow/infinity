@@ -13,13 +13,13 @@
 // limitations under the License.
 
 #ifdef CI
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 import infinity_core;
 import base_test;
 #else
 module;
 
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 
 module infinity_core:ut.cleanup_task;
 
@@ -67,30 +67,30 @@ TEST_P(CleanupTaskTest, test_delete_db_simple) {
     WalManager *wal_manager = infinity::InfinityContext::instance().storage()->wal_manager();
     i64 cleanup_interval = InfinityContext::instance().storage()->config()->CleanupInterval();
 
-    std::shared_ptr<String> db_name = std::make_shared<String>("default_db");
+    std::shared_ptr<std::string> db_name = std::make_shared<std::string>("default_db");
     auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
     auto column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
     auto table_name1 = std::make_shared<std::string>("tb1");
     auto table_name2 = std::make_shared<std::string>("tb2");
-    auto table_def1 = TableDef::Make(db_name, table_name1, std::make_shared<String>(), {column_def1, column_def2});
-    auto table_def2 = TableDef::Make(db_name, table_name2, std::make_shared<String>(), {column_def1, column_def2});
+    auto table_def1 = TableDef::Make(db_name, table_name1, std::make_shared<std::string>(), {column_def1, column_def2});
+    auto table_def2 = TableDef::Make(db_name, table_name2, std::make_shared<std::string>(), {column_def1, column_def2});
     {
         {
-            auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("create table"), TransactionType::kNormal);
+            auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
             Status status = txn->CreateTable(*db_name, std::move(table_def1), ConflictType::kIgnore);
             EXPECT_TRUE(status.ok());
             status = new_txn_mgr->CommitTxn(txn);
             EXPECT_TRUE(status.ok());
         }
         {
-            auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("create table"), TransactionType::kNormal);
+            auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
             Status status = txn->CreateTable(*db_name, std::move(table_def2), ConflictType::kIgnore);
             EXPECT_TRUE(status.ok());
             status = new_txn_mgr->CommitTxn(txn);
             EXPECT_TRUE(status.ok());
         }
         {
-            auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("append"), TransactionType::kNormal);
+            auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("append"), TransactionType::kNormal);
             auto input_block = MakeInputBlock(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"), 8192);
             Status status = txn->Append(*db_name, *table_name1, input_block);
             EXPECT_TRUE(status.ok());
@@ -98,7 +98,7 @@ TEST_P(CleanupTaskTest, test_delete_db_simple) {
             EXPECT_TRUE(status.ok());
         }
         {
-            auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("append"), TransactionType::kNormal);
+            auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("append"), TransactionType::kNormal);
             auto input_block = MakeInputBlock(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"), 8192);
             Status status = txn->Append(*db_name, *table_name2, input_block);
             EXPECT_TRUE(status.ok());
@@ -106,18 +106,18 @@ TEST_P(CleanupTaskTest, test_delete_db_simple) {
             EXPECT_TRUE(status.ok());
         }
 
-        Vector<String> exist_file_paths;
+        std::vector<std::string> exist_file_paths;
         {
-            auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("check table 1"), TransactionType::kNormal);
+            auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("check table 1"), TransactionType::kNormal);
             Status status = txn->GetTableFilePaths(*db_name, *table_name1, exist_file_paths);
             EXPECT_TRUE(status.ok());
             status = new_txn_mgr->CommitTxn(txn);
             EXPECT_TRUE(status.ok());
         }
 
-        Vector<String> delete_file_paths;
+        std::vector<std::string> delete_file_paths;
         {
-            auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("drop table 2"), TransactionType::kNormal);
+            auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop table 2"), TransactionType::kNormal);
             Status status = txn->GetTableFilePaths(*db_name, *table_name2, delete_file_paths);
             EXPECT_TRUE(status.ok());
             status = txn->DropTable(*db_name, *table_name2, ConflictType::kError);
@@ -127,7 +127,7 @@ TEST_P(CleanupTaskTest, test_delete_db_simple) {
         }
 
         {
-            auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("checkpoint"), TransactionType::kNewCheckpoint);
+            auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("checkpoint"), TransactionType::kNewCheckpoint);
             Status status = txn->Checkpoint(wal_manager->LastCheckpointTS());
             EXPECT_TRUE(status.ok());
             status = new_txn_mgr->CommitTxn(txn);

@@ -13,14 +13,14 @@
 // limitations under the License.
 
 #ifdef CI
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 import infinity_core;
 import base_test;
 import request_test;
 #else
 module;
 
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 
 module infinity_core:ut.txns_conflict;
 
@@ -62,32 +62,32 @@ public:
 
     size_t GetRowCount() {
         NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>("scan"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kNormal);
         TxnTimeStamp begin_ts = txn->BeginTS();
         TxnTimeStamp commit_ts = txn->CommitTS();
 
-        Optional<DBMeeta> db_meta;
-        Optional<TableMeeta> table_meta;
+        std::optional<DBMeeta> db_meta;
+        std::optional<TableMeeta> table_meta;
         Status status = txn->GetTableMeta("default_db", "t1", db_meta, table_meta);
         EXPECT_TRUE(status.ok());
 
         auto [segment_ids, seg_status] = table_meta->GetSegmentIDs1();
         EXPECT_TRUE(seg_status.ok());
-        EXPECT_EQ(*segment_ids, Vector<SegmentID>{0});
+        EXPECT_EQ(*segment_ids, std::vector<SegmentID>{0});
         SegmentMeta segment_meta((*segment_ids)[0], *table_meta);
 
-        Vector<BlockID> *block_ids_ptr = nullptr;
+        std::vector<BlockID> *block_ids_ptr = nullptr;
         std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1();
 
         EXPECT_TRUE(status.ok());
-        EXPECT_EQ(*block_ids_ptr, Vector<BlockID>({0}));
+        EXPECT_EQ(*block_ids_ptr, std::vector<BlockID>({0}));
         BlockMeta block_meta((*block_ids_ptr)[0], segment_meta);
 
         NewTxnGetVisibleRangeState state;
         status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, commit_ts, state);
         EXPECT_TRUE(status.ok());
         {
-            Pair<BlockOffset, BlockOffset> range;
+            std::pair<BlockOffset, BlockOffset> range;
             BlockOffset offset = 0;
             bool has_next = state.Next(offset, range);
             EXPECT_TRUE(has_next);
@@ -109,7 +109,7 @@ TEST_P(TestConflictRequestTest, create_index_append) {
 
     auto thread_create_index = [this]() {
         {
-            String create_table_sql = "create table t1(c1 int, c2 varchar)";
+            std::string create_table_sql = "create table t1(c1 int, c2 varchar)";
             std::unique_ptr<QueryContext> query_context = MakeQueryContext();
             QueryResult query_result = query_context->Query(create_table_sql);
             bool ok = HandleQueryResult(query_result);
@@ -117,7 +117,7 @@ TEST_P(TestConflictRequestTest, create_index_append) {
         }
 
         {
-            String append_req_sql = "insert into t1 values(1, 'abc'), (2, 'def')";
+            std::string append_req_sql = "insert into t1 values(1, 'abc'), (2, 'def')";
             std::unique_ptr<QueryContext> query_context = MakeQueryContext();
             QueryResult query_result = query_context->Query(append_req_sql);
             bool ok = HandleQueryResult(query_result);
@@ -131,7 +131,7 @@ TEST_P(TestConflictRequestTest, create_index_append) {
         }
 
         {
-            String create_index_sql = "create index idx1 on t1(c1)";
+            std::string create_index_sql = "create index idx1 on t1(c1)";
             std::unique_ptr<QueryContext> query_context = MakeQueryContext();
             QueryResult query_result = query_context->Query(create_index_sql);
             bool ok = HandleQueryResult(query_result);
@@ -147,7 +147,7 @@ TEST_P(TestConflictRequestTest, create_index_append) {
         }
 
         {
-            String append_req_sql = "insert into t1 values(3, 'abc'), (4, 'def')";
+            std::string append_req_sql = "insert into t1 values(3, 'abc'), (4, 'def')";
             std::unique_ptr<QueryContext> query_context = MakeQueryContext2();
             QueryResult query_result = query_context->Query(append_req_sql);
             bool ok = HandleQueryResult(query_result);
@@ -169,7 +169,7 @@ TEST_P(TestConflictRequestTest, create_index_append) {
     EXPECT_EQ(row_count, 4);
 
     {
-        String select_sql = "select * from t1";
+        std::string select_sql = "select * from t1";
         std::unique_ptr<QueryContext> query_context = MakeQueryContext();
         QueryResult query_result = query_context->Query(select_sql);
         bool ok = HandleQueryResult(query_result);
@@ -183,7 +183,7 @@ TEST_P(TestConflictRequestTest, add_column_append) {
 
     auto thread_add_column = [this]() {
         {
-            String create_table_sql = "create table t1(c1 int, c2 varchar)";
+            std::string create_table_sql = "create table t1(c1 int, c2 varchar)";
             std::unique_ptr<QueryContext> query_context = MakeQueryContext();
             QueryResult query_result = query_context->Query(create_table_sql);
             bool ok = HandleQueryResult(query_result);
@@ -191,7 +191,7 @@ TEST_P(TestConflictRequestTest, add_column_append) {
         }
 
         {
-            String append_req_sql = "insert into t1 values(1, 'abc'), (2, 'def')";
+            std::string append_req_sql = "insert into t1 values(1, 'abc'), (2, 'def')";
             std::unique_ptr<QueryContext> query_context = MakeQueryContext();
             QueryResult query_result = query_context->Query(append_req_sql);
             bool ok = HandleQueryResult(query_result);
@@ -205,7 +205,7 @@ TEST_P(TestConflictRequestTest, add_column_append) {
         }
 
         {
-            String add_column_sql = "alter table t1 add column (c3 varchar default 'default')";
+            std::string add_column_sql = "alter table t1 add column (c3 varchar default 'default')";
             std::unique_ptr<QueryContext> query_context = MakeQueryContext();
             QueryResult query_result = query_context->Query(add_column_sql);
             bool ok = HandleQueryResult(query_result);
@@ -221,7 +221,7 @@ TEST_P(TestConflictRequestTest, add_column_append) {
         }
 
         {
-            String append_req_sql = "insert into t1 values(3, 'abc'), (4, 'def')";
+            std::string append_req_sql = "insert into t1 values(3, 'abc'), (4, 'def')";
             std::unique_ptr<QueryContext> query_context = MakeQueryContext2();
             QueryResult query_result = query_context->Query(append_req_sql);
             ok = HandleQueryResult(query_result);
@@ -245,7 +245,7 @@ TEST_P(TestConflictRequestTest, add_column_append) {
     EXPECT_TRUE((append_ok && row_count == 4) || (!append_ok && row_count == 2));
 
     {
-        String select_sql = "select * from t1";
+        std::string select_sql = "select * from t1";
         std::unique_ptr<QueryContext> query_context = MakeQueryContext();
         QueryResult query_result = query_context->Query(select_sql);
         bool ok = HandleQueryResult(query_result);
@@ -259,7 +259,7 @@ TEST_P(TestConflictRequestTest, add_column_import) {
 
     auto thread_add_column = [this]() {
         {
-            String create_table_sql = "CREATE TABLE t1 (c1 integer default 1, c2 integer default 4, c3 embedding(float, 3) default [1,2,3], c4 "
+            std::string create_table_sql = "CREATE TABLE t1 (c1 integer default 1, c2 integer default 4, c3 embedding(float, 3) default [1,2,3], c4 "
                                       "TensorArray(float, 3) default [[[1,2,3],[5,7,8]],[[9,9,9]]], c5 embedding(int, 3) default [1.3, 4.1, 33.7])";
             std::unique_ptr<QueryContext> query_context = MakeQueryContext();
             QueryResult query_result = query_context->Query(create_table_sql);
@@ -274,7 +274,7 @@ TEST_P(TestConflictRequestTest, add_column_import) {
         }
 
         {
-            String add_column_sql = "alter table t1 add column (c6 varchar default 'default')";
+            std::string add_column_sql = "alter table t1 add column (c6 varchar default 'default')";
             std::unique_ptr<QueryContext> query_context = MakeQueryContext();
             QueryResult query_result = query_context->Query(add_column_sql);
             bool ok = HandleQueryResult(query_result);
@@ -290,7 +290,7 @@ TEST_P(TestConflictRequestTest, add_column_import) {
         }
 
         {
-            String import_sql = "COPY t1 FROM 'test/data/csv/pysdk_test_import_default.csv' WITH ( DELIMITER "
+            std::string import_sql = "COPY t1 FROM 'test/data/csv/pysdk_test_import_default.csv' WITH ( DELIMITER "
                                 "',', FORMAT CSV );";
             std::unique_ptr<QueryContext> query_context = MakeQueryContext2();
             QueryResult query_result = query_context->Query(import_sql);
@@ -318,7 +318,7 @@ TEST_P(TestConflictRequestTest, add_column_import) {
     EXPECT_TRUE((import_ok && row_count == 10) || (!import_ok && row_count == 0));
 
     {
-        String select_sql = "select * from t1";
+        std::string select_sql = "select * from t1";
         std::unique_ptr<QueryContext> query_context = MakeQueryContext();
         QueryResult query_result = query_context->Query(select_sql);
         bool ok = HandleQueryResult(query_result);
@@ -332,7 +332,7 @@ TEST_P(TestConflictRequestTest, add_column_compact) {
 
     auto thread_add_column = [this]() {
         {
-            String create_table_sql = "CREATE TABLE t1 (c1 integer default 1, c2 integer default 4, c3 embedding(float, 3) default [1,2,3], c4 "
+            std::string create_table_sql = "CREATE TABLE t1 (c1 integer default 1, c2 integer default 4, c3 embedding(float, 3) default [1,2,3], c4 "
                                       "TensorArray(float, 3) default [[[1,2,3],[5,7,8]],[[9,9,9]]], c5 embedding(int, 3) default [1.3, 4.1, 33.7])";
             std::unique_ptr<QueryContext> query_context = MakeQueryContext();
             QueryResult query_result = query_context->Query(create_table_sql);
@@ -341,7 +341,7 @@ TEST_P(TestConflictRequestTest, add_column_compact) {
         }
 
         {
-            String append_req_sql = "COPY t1 FROM 'test/data/csv/pysdk_test_import_default.csv' WITH ( DELIMITER "
+            std::string append_req_sql = "COPY t1 FROM 'test/data/csv/pysdk_test_import_default.csv' WITH ( DELIMITER "
                                     "',', FORMAT CSV );";
             std::unique_ptr<QueryContext> query_context = MakeQueryContext();
             QueryResult query_result = query_context->Query(append_req_sql);
@@ -356,7 +356,7 @@ TEST_P(TestConflictRequestTest, add_column_compact) {
         }
 
         {
-            String add_column_sql = "alter table t1 add column (c6 varchar default 'default')";
+            std::string add_column_sql = "alter table t1 add column (c6 varchar default 'default')";
             std::unique_ptr<QueryContext> query_context = MakeQueryContext();
             QueryResult query_result = query_context->Query(add_column_sql);
             bool ok = HandleQueryResult(query_result);
@@ -372,7 +372,7 @@ TEST_P(TestConflictRequestTest, add_column_compact) {
         }
 
         {
-            String compact_sql = "compact table t1;";
+            std::string compact_sql = "compact table t1;";
             std::unique_ptr<QueryContext> query_context = MakeQueryContext2();
             QueryResult query_result = query_context->Query(compact_sql);
             bool ok = HandleQueryResult(query_result);
@@ -391,7 +391,7 @@ TEST_P(TestConflictRequestTest, add_column_compact) {
     }
 
     {
-        String select_sql = "select * from t1";
+        std::string select_sql = "select * from t1";
         std::unique_ptr<QueryContext> query_context = MakeQueryContext();
         QueryResult query_result = query_context->Query(select_sql);
         bool ok = HandleQueryResult(query_result);
@@ -405,7 +405,7 @@ TEST_P(TestConflictRequestTest, add_column_add_column) {
 
     auto thread_add_column = [this]() {
         {
-            String create_table_sql = "create table t1(c1 int, c2 varchar)";
+            std::string create_table_sql = "create table t1(c1 int, c2 varchar)";
             std::unique_ptr<QueryContext> query_context = MakeQueryContext();
             QueryResult query_result = query_context->Query(create_table_sql);
             bool ok = HandleQueryResult(query_result);
@@ -413,7 +413,7 @@ TEST_P(TestConflictRequestTest, add_column_add_column) {
         }
 
         {
-            String append_req_sql = "insert into t1 values(1, 'abc'), (2, 'def')";
+            std::string append_req_sql = "insert into t1 values(1, 'abc'), (2, 'def')";
             std::unique_ptr<QueryContext> query_context = MakeQueryContext();
             QueryResult query_result = query_context->Query(append_req_sql);
             bool ok = HandleQueryResult(query_result);
@@ -427,7 +427,7 @@ TEST_P(TestConflictRequestTest, add_column_add_column) {
         }
 
         {
-            String add_column_sql = "alter table t1 add column (c3 varchar default 'default')";
+            std::string add_column_sql = "alter table t1 add column (c3 varchar default 'default')";
             std::unique_ptr<QueryContext> query_context = MakeQueryContext();
             QueryResult query_result = query_context->Query(add_column_sql);
             bool ok = HandleQueryResult(query_result);
@@ -443,7 +443,7 @@ TEST_P(TestConflictRequestTest, add_column_add_column) {
         }
 
         {
-            String add_column_sql = "alter table t1 add column (c4 varchar default 'default')";
+            std::string add_column_sql = "alter table t1 add column (c4 varchar default 'default')";
             std::unique_ptr<QueryContext> query_context = MakeQueryContext2();
             QueryResult query_result = query_context->Query(add_column_sql);
             bool ok = HandleQueryResult(query_result);
@@ -462,7 +462,7 @@ TEST_P(TestConflictRequestTest, add_column_add_column) {
     }
 
     {
-        String select_sql = "select * from t1";
+        std::string select_sql = "select * from t1";
         std::unique_ptr<QueryContext> query_context = MakeQueryContext();
         QueryResult query_result = query_context->Query(select_sql);
         bool ok = HandleQueryResult(query_result);
@@ -476,7 +476,7 @@ TEST_P(TestConflictRequestTest, drop_column_append) {
 
     auto thread_drop_column = [this]() {
         {
-            String create_table_sql = "create table t1(c1 int, c2 varchar)";
+            std::string create_table_sql = "create table t1(c1 int, c2 varchar)";
             std::unique_ptr<QueryContext> query_context = MakeQueryContext();
             QueryResult query_result = query_context->Query(create_table_sql);
             bool ok = HandleQueryResult(query_result);
@@ -484,7 +484,7 @@ TEST_P(TestConflictRequestTest, drop_column_append) {
         }
 
         {
-            String append_req_sql = "insert into t1 values(1, 'abc'), (2, 'def')";
+            std::string append_req_sql = "insert into t1 values(1, 'abc'), (2, 'def')";
             std::unique_ptr<QueryContext> query_context = MakeQueryContext();
             QueryResult query_result = query_context->Query(append_req_sql);
             bool ok = HandleQueryResult(query_result);
@@ -498,7 +498,7 @@ TEST_P(TestConflictRequestTest, drop_column_append) {
         }
 
         {
-            String drop_column_sql = "alter table t1 drop column (c2)";
+            std::string drop_column_sql = "alter table t1 drop column (c2)";
             std::unique_ptr<QueryContext> query_context = MakeQueryContext();
             QueryResult query_result = query_context->Query(drop_column_sql);
             bool ok = HandleQueryResult(query_result);
@@ -514,7 +514,7 @@ TEST_P(TestConflictRequestTest, drop_column_append) {
         }
 
         {
-            String append_req_sql = "insert into t1 values(3, 'abc'), (4, 'def')";
+            std::string append_req_sql = "insert into t1 values(3, 'abc'), (4, 'def')";
             std::unique_ptr<QueryContext> query_context = MakeQueryContext2();
             QueryResult query_result = query_context->Query(append_req_sql);
             ok = HandleQueryResult(query_result);
@@ -538,7 +538,7 @@ TEST_P(TestConflictRequestTest, drop_column_append) {
     EXPECT_TRUE((append_ok && row_count == 4) || (!append_ok && row_count == 2));
 
     {
-        String select_sql = "select * from t1";
+        std::string select_sql = "select * from t1";
         std::unique_ptr<QueryContext> query_context = MakeQueryContext();
         QueryResult query_result = query_context->Query(select_sql);
         bool ok = HandleQueryResult(query_result);
@@ -552,7 +552,7 @@ TEST_P(TestConflictRequestTest, drop_column_import) {
 
     auto thread_drop_column = [this]() {
         {
-            String create_table_sql = "CREATE TABLE t1 (c1 integer default 1, c2 integer default 4, c3 embedding(float, 3) default [1,2,3], c4 "
+            std::string create_table_sql = "CREATE TABLE t1 (c1 integer default 1, c2 integer default 4, c3 embedding(float, 3) default [1,2,3], c4 "
                                       "TensorArray(float, 3) default [[[1,2,3],[5,7,8]],[[9,9,9]]], c5 embedding(int, 3) default [1.3, 4.1, 33.7])";
             std::unique_ptr<QueryContext> query_context = MakeQueryContext();
             QueryResult query_result = query_context->Query(create_table_sql);
@@ -567,7 +567,7 @@ TEST_P(TestConflictRequestTest, drop_column_import) {
         }
 
         {
-            String drop_column_sql = "alter table t1 drop column (c2)";
+            std::string drop_column_sql = "alter table t1 drop column (c2)";
             std::unique_ptr<QueryContext> query_context = MakeQueryContext();
             QueryResult query_result = query_context->Query(drop_column_sql);
             bool ok = HandleQueryResult(query_result);
@@ -583,7 +583,7 @@ TEST_P(TestConflictRequestTest, drop_column_import) {
         }
 
         {
-            String import_sql = "COPY t1 FROM 'test/data/csv/pysdk_test_import_default.csv' WITH ( DELIMITER "
+            std::string import_sql = "COPY t1 FROM 'test/data/csv/pysdk_test_import_default.csv' WITH ( DELIMITER "
                                 "',', FORMAT CSV );";
             std::unique_ptr<QueryContext> query_context = MakeQueryContext2();
             QueryResult query_result = query_context->Query(import_sql);
@@ -608,7 +608,7 @@ TEST_P(TestConflictRequestTest, drop_column_import) {
     EXPECT_TRUE((import_ok && row_count == 10) || (!import_ok && row_count == 0));
 
     {
-        String select_sql = "select * from t1";
+        std::string select_sql = "select * from t1";
         std::unique_ptr<QueryContext> query_context = MakeQueryContext();
         QueryResult query_result = query_context->Query(select_sql);
         bool ok = HandleQueryResult(query_result);
@@ -622,7 +622,7 @@ TEST_P(TestConflictRequestTest, drop_column_compact) {
 
     auto thread_drop_column = [this]() {
         {
-            String create_table_sql = "CREATE TABLE t1 (c1 integer default 1, c2 integer default 4, c3 embedding(float, 3) default [1,2,3], c4 "
+            std::string create_table_sql = "CREATE TABLE t1 (c1 integer default 1, c2 integer default 4, c3 embedding(float, 3) default [1,2,3], c4 "
                                       "TensorArray(float, 3) default [[[1,2,3],[5,7,8]],[[9,9,9]]], c5 embedding(int, 3) default [1.3, 4.1, 33.7])";
             std::unique_ptr<QueryContext> query_context = MakeQueryContext();
             QueryResult query_result = query_context->Query(create_table_sql);
@@ -631,7 +631,7 @@ TEST_P(TestConflictRequestTest, drop_column_compact) {
         }
 
         {
-            String append_req_sql = "COPY t1 FROM 'test/data/csv/pysdk_test_import_default.csv' WITH ( DELIMITER "
+            std::string append_req_sql = "COPY t1 FROM 'test/data/csv/pysdk_test_import_default.csv' WITH ( DELIMITER "
                                     "',', FORMAT CSV );";
             std::unique_ptr<QueryContext> query_context = MakeQueryContext();
             QueryResult query_result = query_context->Query(append_req_sql);
@@ -646,7 +646,7 @@ TEST_P(TestConflictRequestTest, drop_column_compact) {
         }
 
         {
-            String add_column_sql = "alter table t1 drop column (c2)";
+            std::string add_column_sql = "alter table t1 drop column (c2)";
             std::unique_ptr<QueryContext> query_context = MakeQueryContext();
             QueryResult query_result = query_context->Query(add_column_sql);
             bool ok = HandleQueryResult(query_result);
@@ -662,7 +662,7 @@ TEST_P(TestConflictRequestTest, drop_column_compact) {
         }
 
         {
-            String compact_sql = "compact table t1;";
+            std::string compact_sql = "compact table t1;";
             std::unique_ptr<QueryContext> query_context = MakeQueryContext2();
             QueryResult query_result = query_context->Query(compact_sql);
             bool ok = HandleQueryResult(query_result);
@@ -681,7 +681,7 @@ TEST_P(TestConflictRequestTest, drop_column_compact) {
     }
 
     {
-        String select_sql = "select * from t1";
+        std::string select_sql = "select * from t1";
         std::unique_ptr<QueryContext> query_context = MakeQueryContext();
         QueryResult query_result = query_context->Query(select_sql);
         bool ok = HandleQueryResult(query_result);
@@ -695,7 +695,7 @@ TEST_P(TestConflictRequestTest, drop_column_create_index) {
 
     auto thread_drop_column = [this](bool &ok) {
         {
-            String create_table_sql = "create table t1(c1 int, c2 varchar)";
+            std::string create_table_sql = "create table t1(c1 int, c2 varchar)";
             std::unique_ptr<QueryContext> query_context = MakeQueryContext();
             QueryResult query_result = query_context->Query(create_table_sql);
             bool ok = HandleQueryResult(query_result);
@@ -703,7 +703,7 @@ TEST_P(TestConflictRequestTest, drop_column_create_index) {
         }
 
         {
-            String append_req_sql = "insert into t1 values(1, 'abc'), (2, 'def')";
+            std::string append_req_sql = "insert into t1 values(1, 'abc'), (2, 'def')";
             std::unique_ptr<QueryContext> query_context = MakeQueryContext();
             QueryResult query_result = query_context->Query(append_req_sql);
             bool ok = HandleQueryResult(query_result);
@@ -717,7 +717,7 @@ TEST_P(TestConflictRequestTest, drop_column_create_index) {
         }
 
         {
-            String drop_column_sql = "alter table t1 drop column (c1)";
+            std::string drop_column_sql = "alter table t1 drop column (c1)";
             std::unique_ptr<QueryContext> query_context = MakeQueryContext();
             QueryResult query_result = query_context->Query(drop_column_sql);
             ok = HandleQueryResult(query_result);
@@ -732,7 +732,7 @@ TEST_P(TestConflictRequestTest, drop_column_create_index) {
         }
 
         {
-            String create_index_sql = "create index idx1 on t1(c1)";
+            std::string create_index_sql = "create index idx1 on t1(c1)";
             std::unique_ptr<QueryContext> query_context = MakeQueryContext2();
             QueryResult query_result = query_context->Query(create_index_sql);
             ok = HandleQueryResult(query_result);
@@ -754,7 +754,7 @@ TEST_P(TestConflictRequestTest, drop_column_create_index) {
     EXPECT_TRUE(drop_column_pass || create_index_pass);
 
     {
-        String select_sql = "select * from t1";
+        std::string select_sql = "select * from t1";
         std::unique_ptr<QueryContext> query_context = MakeQueryContext();
         QueryResult query_result = query_context->Query(select_sql);
         bool ok = HandleQueryResult(query_result);
@@ -768,7 +768,7 @@ TEST_P(TestConflictRequestTest, delete_append) {
 
     auto thread_add_column = [this]() {
         {
-            String create_table_sql = "create table t1(c1 int, c2 varchar)";
+            std::string create_table_sql = "create table t1(c1 int, c2 varchar)";
             std::unique_ptr<QueryContext> query_context = MakeQueryContext();
             QueryResult query_result = query_context->Query(create_table_sql);
             bool ok = HandleQueryResult(query_result);
@@ -776,7 +776,7 @@ TEST_P(TestConflictRequestTest, delete_append) {
         }
 
         {
-            String append_req_sql = "insert into t1 values(1, 'abc'), (2, 'def')";
+            std::string append_req_sql = "insert into t1 values(1, 'abc'), (2, 'def')";
             std::unique_ptr<QueryContext> query_context = MakeQueryContext();
             QueryResult query_result = query_context->Query(append_req_sql);
             bool ok = HandleQueryResult(query_result);
@@ -790,7 +790,7 @@ TEST_P(TestConflictRequestTest, delete_append) {
         }
 
         {
-            String add_column_sql = "delete from t1 where c1 = 1";
+            std::string add_column_sql = "delete from t1 where c1 = 1";
             std::unique_ptr<QueryContext> query_context = MakeQueryContext();
             QueryResult query_result = query_context->Query(add_column_sql);
             bool ok = HandleQueryResult(query_result);
@@ -806,7 +806,7 @@ TEST_P(TestConflictRequestTest, delete_append) {
         }
 
         {
-            String append_req_sql = "insert into t1 values(1, 'hij'), (3, 'klm')";
+            std::string append_req_sql = "insert into t1 values(1, 'hij'), (3, 'klm')";
             std::unique_ptr<QueryContext> query_context = MakeQueryContext2();
             QueryResult query_result = query_context->Query(append_req_sql);
             bool ok = HandleQueryResult(query_result);
@@ -825,7 +825,7 @@ TEST_P(TestConflictRequestTest, delete_append) {
     }
 
     {
-        String select_sql = "select * from t1";
+        std::string select_sql = "select * from t1";
         std::unique_ptr<QueryContext> query_context = MakeQueryContext();
         QueryResult query_result = query_context->Query(select_sql);
         bool ok = HandleQueryResult(query_result);

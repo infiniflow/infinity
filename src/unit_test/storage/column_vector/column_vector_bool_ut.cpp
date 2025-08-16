@@ -14,14 +14,12 @@
 
 #ifdef CI
 #include "unit_test/gtest_expand.h"
-#include "gtest/gtest.h"
 import infinity_core;
 import base_test;
 #else
 module;
 
 #include "unit_test/gtest_expand.h"
-#include "gtest/gtest.h"
 
 module infinity_core:ut.column_vector_bool;
 
@@ -145,7 +143,7 @@ TEST_F(ColumnVectorBoolTest, flat_boolean) {
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         BooleanT boolean = static_cast<BooleanT>(i % 2 == 0);
-        column_vector.AppendByPtr((ptr_t)(&boolean));
+        column_vector.AppendByPtr((char *)(&boolean));
         Value vx = column_vector.GetValueByIndex(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kBoolean);
         EXPECT_EQ(vx.value_.boolean, static_cast<BooleanT>(i % 2 == 0));

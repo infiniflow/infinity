@@ -13,13 +13,13 @@
 // limitations under the License.
 
 #ifdef CI
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 import infinity_core;
 import base_test;
 #else
 module;
 
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 
 module infinity_core:ut.virtual_store;
 
@@ -43,7 +43,7 @@ class VirtualStoreTest : public BaseTest {};
 
 TEST_F(VirtualStoreTest, TestAppend) {
     using namespace infinity;
-    String path = String(GetFullTmpDir()) + "/test_file2.abc";
+    std::string path = std::string(GetFullTmpDir()) + "/test_file2.abc";
 
     auto [file_handle, status] = VirtualStore::Open(path, FileAccessMode::kWrite);
     if (!status.ok()) {
@@ -63,8 +63,8 @@ TEST_F(VirtualStoreTest, TestAppend) {
 
 TEST_F(VirtualStoreTest, TestDir) {
     using namespace infinity;
-    String dir = String(GetFullTmpDir()) + "/unit_test";
-    String path = dir + "/test_file.test";
+    std::string dir = std::string(GetFullTmpDir()) + "/unit_test";
+    std::string path = dir + "/test_file.test";
 
     VirtualStore::MakeDirectory(dir);
 
@@ -91,7 +91,7 @@ TEST_F(VirtualStoreTest, TestDir) {
 
 TEST_F(VirtualStoreTest, TestRead) {
     using namespace infinity;
-    String path = String(GetFullTmpDir()) + "/test_file_read.abc";
+    std::string path = std::string(GetFullTmpDir()) + "/test_file_read.abc";
 
     auto [file_handle, open_write_status] = VirtualStore::Open(path, FileAccessMode::kWrite);
     if (!open_write_status.ok()) {
@@ -125,8 +125,8 @@ TEST_F(VirtualStoreTest, TestRead) {
 
 TEST_F(VirtualStoreTest, TestRename) {
     using namespace infinity;
-    String old_path = String(GetFullTmpDir()) + "/test_file_old.abc";
-    String new_path = String(GetFullTmpDir()) + "/test_file_new.abc";
+    std::string old_path = std::string(GetFullTmpDir()) + "/test_file_old.abc";
+    std::string new_path = std::string(GetFullTmpDir()) + "/test_file_new.abc";
 
     auto [file_handle, status] = VirtualStore::Open(old_path, FileAccessMode::kWrite);
     if (!status.ok()) {
@@ -153,7 +153,7 @@ TEST_F(VirtualStoreTest, TestRename) {
 
 TEST_F(VirtualStoreTest, TestTruncate) {
     using namespace infinity;
-    String path = String(GetFullTmpDir()) + "/test_file_truncate.abc";
+    std::string path = std::string(GetFullTmpDir()) + "/test_file_truncate.abc";
 
     auto [file_handle, status] = VirtualStore::Open(path, FileAccessMode::kWrite);
     if (!status.ok()) {
@@ -190,8 +190,8 @@ TEST_F(VirtualStoreTest, TestTruncate) {
 
 TEST_F(VirtualStoreTest, TestMerge) {
     using namespace infinity;
-    String dst_path = String(GetFullTmpDir()) + "/test_file_append_dst.abc";
-    String src_path = String(GetFullTmpDir()) + "/test_file_append_src.abc";
+    std::string dst_path = std::string(GetFullTmpDir()) + "/test_file_append_dst.abc";
+    std::string src_path = std::string(GetFullTmpDir()) + "/test_file_append_src.abc";
 
     auto [src_handler, src_status] = VirtualStore::Open(src_path, FileAccessMode::kWrite);
     if (!src_status.ok()) {
@@ -246,9 +246,9 @@ TEST_F(VirtualStoreTest, TestMerge) {
 
 TEST_F(VirtualStoreTest, TestCleanDir) {
     using namespace infinity;
-    String dir = String(GetFullTmpDir()) + "/cleanup_test_dir";
-    String file_path1 = dir + "/file1.txt";
-    String file_path2 = dir + "/file2.txt";
+    std::string dir = std::string(GetFullTmpDir()) + "/cleanup_test_dir";
+    std::string file_path1 = dir + "/file1.txt";
+    std::string file_path2 = dir + "/file2.txt";
 
     VirtualStore::MakeDirectory(dir);
 
@@ -289,13 +289,13 @@ TEST_F(VirtualStoreTest, TestCleanDir) {
 /*
 TEST_F(VirtualStoreTest, minio_upload) {
     using namespace infinity;
-    auto config_path = std::make_shared<String>(std::string(test_data_path())+"/config/test_minio_s3_storage.toml");
+    auto config_path = std::make_shared<std::string>(std::string(test_data_path())+"/config/test_minio_s3_storage.toml");
     infinity::InfinityContext::instance().InitPhase1(config_path);
     infinity::InfinityContext::instance().InitPhase2();
     VirtualStore::InitRemoteStore(StorageType::kMinio, "192.168.200.165:9000", false, "minioadmin", "minioadmin", "infinity");
 
     if(VirtualStore::BucketExists()){
-        String path = String(GetFullTmpDir()) + "/test_minio_upload.abc";
+        std::string path = std::string(GetFullTmpDir()) + "/test_minio_upload.abc";
         auto [file_handle, status] = VirtualStore::Open(path, FileAccessMode::kWrite);
         if (!status.ok()) {
             UnrecoverableError(status.message());
@@ -326,13 +326,13 @@ TEST_F(VirtualStoreTest, minio_upload) {
 
 TEST_F(VirtualStoreTest, minio_download) {
     using namespace infinity;
-    auto config_path = std::make_shared<String>(std::string(test_data_path())+"/config/test_minio_s3_storage.toml");
+    auto config_path = std::make_shared<std::string>(std::string(test_data_path())+"/config/test_minio_s3_storage.toml");
     infinity::InfinityContext::instance().InitPhase1(config_path);
     infinity::InfinityContext::instance().InitPhase2();
     VirtualStore::InitRemoteStore(StorageType::kMinio, "192.168.200.165:9000", false, "minioadmin", "minioadmin", "infinity");
 
     if(VirtualStore::BucketExists()){
-        String path = String(GetFullTmpDir()) + "/test_minio_download.abc";
+        std::string path = std::string(GetFullTmpDir()) + "/test_minio_download.abc";
         auto [file_handle, status] = VirtualStore::Open(path, FileAccessMode::kWrite);
         if (!status.ok()) {
             UnrecoverableError(status.message());

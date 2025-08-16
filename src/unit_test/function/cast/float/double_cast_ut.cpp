@@ -14,14 +14,12 @@
 
 #ifdef CI
 #include "unit_test/gtest_expand.h"
-#include "gtest/gtest.h"
 import infinity_core;
 import base_test;
 #else
 module;
 
 #include "unit_test/gtest_expand.h"
-#include "gtest/gtest.h"
 
 module infinity_core:ut.double_cast;
 
@@ -191,7 +189,7 @@ TEST_F(DoubleCastTest, double_cast0) {
     {
         DoubleT source;
         VarcharT target;
-        String src_str, tgt_str;
+        std::string src_str, tgt_str;
 
         std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kVarchar);
 
@@ -413,9 +411,9 @@ TEST_F(DoubleCastTest, double_cast1) {
         EXPECT_TRUE(result);
         for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
             f64 check_value = static_cast<f64>(i);
-            String check_str(std::to_string(check_value));
+            std::string check_str(std::to_string(check_value));
             Value vx = col_target->GetValueByIndex(i);
-            const String &s2 = vx.GetVarchar();
+            const std::string &s2 = vx.GetVarchar();
             EXPECT_STREQ(s2.c_str(), check_str.c_str());
         }
     }

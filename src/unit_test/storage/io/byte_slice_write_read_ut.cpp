@@ -1,12 +1,12 @@
 
 #ifdef CI
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 import infinity_core;
 import base_test;
 #else
 module;
 
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 
 module infinity_core:ut.byte_slice_write_read;
 
@@ -121,7 +121,7 @@ TEST_F(ByteSliceReaderWriterTest, test2) {
 TEST_F(ByteSliceReaderWriterTest, test3) {
     using namespace infinity;
     ByteSliceWriter writer;
-    String str(16000, 'x');
+    std::string str(16000, 'x');
     writer.Write(str.c_str(), str.size());
     ASSERT_EQ(str.size(), writer.GetSize());
     CheckList<char>(writer.GetByteSliceList(), 16000, 'x');

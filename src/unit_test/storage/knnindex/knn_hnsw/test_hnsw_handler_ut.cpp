@@ -13,15 +13,13 @@
 // limitations under the License.
 
 #ifdef CI
-#include "gtest/gtest.h"
-#include <thread>
+#include "unit_test/gtest_expand.h"
 import infinity_core;
 import base_test;
 #else
 module;
 
-#include "gtest/gtest.h"
-#include <thread>
+#include "unit_test/gtest_expand.h"
 
 module infinity_core:ut.test_hnsw_handler;
 
@@ -65,7 +63,7 @@ public:
         max_chunk_n = 16;
         element_size = max_chunk_n * chunk_size;
 
-        index_name = std::make_shared<String>("index_name");
+        index_name = std::make_shared<std::string>("index_name");
         filename = "filename";
         column_names = {"col_name"};
         metric_type = MetricType::kMetricL2;
@@ -86,7 +84,7 @@ public:
     std::unique_ptr<IndexHnsw> MakeIndexHnsw(bool compress = false) {
         HnswEncodeType tmp_encode_type = compress ? HnswEncodeType::kLVQ : encode_type;
         return std::make_unique<
-            IndexHnsw>(index_name, nullptr, filename, column_names, metric_type, tmp_encode_type, build_type, M, ef_construction, chunk_size, None);
+            IndexHnsw>(index_name, nullptr, filename, column_names, metric_type, tmp_encode_type, build_type, M, ef_construction, chunk_size, std::nullopt);
     }
 
     std::unique_ptr<ColumnDef> MakeColumnDef() {
@@ -104,7 +102,7 @@ public:
         for (size_t i = 0; i < element_size; ++i) {
             const float *query = data.get() + i * dim;
             auto [result_n, d_ptr, v_ptr] = hnsw_handler->template SearchIndex<float, LabelT>(query, 1, search_option);
-            Vector<Pair<float, LabelT>> result(result_n);
+            std::vector<std::pair<float, LabelT>> result(result_n);
             for (size_t i = 0; i < result_n; ++i) {
                 result[i] = {d_ptr[i], hnsw_handler->template GetLabel<LabelT>(v_ptr[i])};
             }
@@ -129,15 +127,15 @@ protected:
     size_t max_chunk_n;
     size_t element_size;
 
-    std::shared_ptr<String> index_name;
-    String filename;
-    Vector<String> column_names;
+    std::shared_ptr<std::string> index_name;
+    std::string filename;
+    std::vector<std::string> column_names;
     MetricType metric_type;
     HnswEncodeType encode_type;
     HnswBuildType build_type;
 
     std::unique_ptr<float[]> data = nullptr;
-    String filepath;
+    std::string filepath;
     const std::string save_dir_ = GetFullTmpDir();
 };
 
@@ -357,7 +355,7 @@ TEST_F(HnswHandlerTest, test_parallel) {
                     const float *query = data.get() + i * dim;
                     auto r_lck = SharedOptLck();
                     auto [result_n, d_ptr, v_ptr] = hnsw_handler->template SearchIndex<float, LabelT>(query, 1);
-                    Vector<Pair<float, LabelT>> result(result_n);
+                    std::vector<std::pair<float, LabelT>> result(result_n);
                     for (size_t k = 0; k < result_n; ++k) {
                         result[k] = {d_ptr[k], hnsw_handler->template GetLabel<LabelT>(v_ptr[k])};
                     }

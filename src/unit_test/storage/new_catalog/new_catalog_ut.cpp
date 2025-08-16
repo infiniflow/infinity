@@ -15,7 +15,7 @@
 #ifndef CI
 module;
 
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 
 module infinity_core:ut.new_catalog;
 
@@ -61,7 +61,7 @@ import :roaring_bitmap;
 import :index_filter_evaluators;
 import :index_emvb;
 #else
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 import infinity_core;
 import base_test;
 #endif
@@ -88,12 +88,12 @@ TEST_P(TestTxnNewCatalog, test_block_lock) {
     using namespace infinity;
 
     NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-    String db_id_str = "0";
-    String table_id_str = "0";
+    std::string db_id_str = "0";
+    std::string table_id_str = "0";
     SegmentID segment_id = 0;
     BlockID block_id = 0;
-    String block_key1 = KeyEncode::CatalogTableSegmentBlockTagKey(db_id_str, table_id_str, segment_id, block_id, "lock");
-    String block_key2 = KeyEncode::CatalogTableSegmentBlockTagKey(db_id_str, table_id_str, segment_id, block_id + 1, "lock");
+    std::string block_key1 = KeyEncode::CatalogTableSegmentBlockTagKey(db_id_str, table_id_str, segment_id, block_id, "lock");
+    std::string block_key2 = KeyEncode::CatalogTableSegmentBlockTagKey(db_id_str, table_id_str, segment_id, block_id + 1, "lock");
 
     Status status = new_catalog->AddBlockLock(block_key1);
     EXPECT_TRUE(status.ok());

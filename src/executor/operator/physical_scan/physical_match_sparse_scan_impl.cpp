@@ -126,12 +126,11 @@ void PhysicalMatchSparseScan::PlanWithIndex(QueryContext *query_context) {
     size_t search_column_id = match_sparse_expr_->column_expr_->binding().column_idx;
     auto &search_column_name = base_table_ref_->table_info_->column_defs_[search_column_id]->name();
 
-    Status status;
     TableMeeta *table_meta = table_meta = base_table_ref_->block_index_->table_meta_.get();
 
     std::vector<std::string> *index_id_strs_ptr = nullptr;
     std::vector<std::string> *index_names_ptr = nullptr;
-    status = table_meta->GetIndexIDs(index_id_strs_ptr, &index_names_ptr);
+    auto status = table_meta->GetIndexIDs(index_id_strs_ptr, &index_names_ptr);
     if (!status.ok()) {
         RecoverableError(status);
     }
@@ -197,7 +196,9 @@ void PhysicalMatchSparseScan::PlanWithIndex(QueryContext *query_context) {
 }
 
 std::vector<std::shared_ptr<std::vector<SegmentID>>>
-PhysicalMatchSparseScan::PlanWithIndex(std::vector<std::shared_ptr<std::vector<GlobalBlockID>>> &block_groups, i64 parallel_count, QueryContext *query_context) {
+PhysicalMatchSparseScan::PlanWithIndex(std::vector<std::shared_ptr<std::vector<GlobalBlockID>>> &block_groups,
+                                       i64 parallel_count,
+                                       QueryContext *query_context) {
     std::vector<std::shared_ptr<std::vector<SegmentID>>> segment_groups(parallel_count);
     for (i64 i = 0; i < parallel_count; ++i) {
         segment_groups[i] = std::make_shared<std::vector<SegmentID>>();
@@ -491,8 +492,7 @@ void PhysicalMatchSparseScan::ExecuteInnerT(DistFunc *dist_func,
         if (common_query_filter_->AlwaysTrue()) {
             has_some_result = true;
         } else {
-            auto it = common_query_filter_->filter_result_.find(segment_id);
-            if (it != common_query_filter_->filter_result_.end()) {
+            if (auto it = common_query_filter_->filter_result_.find(segment_id); it != common_query_filter_->filter_result_.end()) {
                 auto segment_it = block_index->new_segment_block_index_.find(segment_id);
                 if (segment_it == block_index->new_segment_block_index_.end()) {
                     UnrecoverableError(fmt::format("Cannot find segment with id: {}", segment_id));
@@ -527,12 +527,11 @@ void PhysicalMatchSparseScan::ExecuteInnerT(DistFunc *dist_func,
                     UnrecoverableError(status.message());
                 }
                 BufferHandle index_handle = index_buffer->Load();
-                const BMPHandlerPtr *bmp_handler = reinterpret_cast<const BMPHandlerPtr *>(index_handle.GetData());
+                const auto *bmp_handler = reinterpret_cast<const BMPHandlerPtr *>(index_handle.GetData());
                 bmp_search(*bmp_handler, 0, false, filter);
             }
-            std::shared_ptr<MemIndex> mem_index = segment_index_meta->GetMemIndex();
-            if (mem_index) {
-                std::shared_ptr<BMPIndexInMem> bmp_index = mem_index->GetBMPIndex();
+            if (auto mem_index = segment_index_meta->GetMemIndex()) {
+                auto bmp_index = mem_index->GetBMPIndex();
                 if (bmp_index) {
                     bmp_search(bmp_index->get(), 0, true, filter);
                 }

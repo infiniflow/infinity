@@ -14,14 +14,12 @@
 
 #ifdef CI
 #include "unit_test/gtest_expand.h"
-#include "gtest/gtest.h"
 import infinity_core;
 import base_test;
 #else
 module;
 
 #include "unit_test/gtest_expand.h"
-#include "gtest/gtest.h"
 
 module infinity_core:ut.column_vector_row;
 
@@ -31,12 +29,12 @@ import :logger;
 import :column_vector;
 import :value;
 import :default_values;
-import third_party;
-
 import :selection;
 import :vector_buffer;
 import :infinity_context;
 #endif
+
+import third_party;
 
 import global_resource_usage;
 import internal_types;
@@ -151,7 +149,7 @@ TEST_F(ColumnVectorRowTest, flat_row) {
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         RowID row_id{static_cast<u32>(i), static_cast<u32>(i)};
-        column_vector.AppendByPtr((ptr_t)(&row_id));
+        column_vector.AppendByPtr((char *)(&row_id));
         Value vx = column_vector.GetValueByIndex(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kRowID);
         EXPECT_EQ(vx.value_.row.segment_id_, static_cast<u32>(i));

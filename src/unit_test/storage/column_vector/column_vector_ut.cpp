@@ -13,13 +13,13 @@
 // limitations under the License.
 
 #ifdef CI
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 import infinity_core;
 import base_test;
 #else
 module;
 
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 
 module infinity_core:ut.column_vector;
 
@@ -29,11 +29,10 @@ import :logger;
 import :column_vector;
 import :value;
 import :default_values;
-import third_party;
-
 import :infinity_context;
 #endif
 
+import third_party;
 import global_resource_usage;
 import internal_types;
 import logical_type;
@@ -45,7 +44,7 @@ class ColumnVectorTest : public BaseTest {};
 TEST_F(ColumnVectorTest, ReadWrite) {
     using namespace infinity;
 
-    Vector<std::shared_ptr<ColumnVector>> columns;
+    std::vector<std::shared_ptr<ColumnVector>> columns;
     size_t vector_size = DEFAULT_VECTOR_SIZE / 3;
     {
         std::shared_ptr<ColumnVector> column = ColumnVector::Make(std::make_shared<DataType>(LogicalType::kBoolean));
@@ -125,7 +124,7 @@ TEST_F(ColumnVectorTest, ReadWrite) {
         std::shared_ptr<ColumnVector> column = ColumnVector::Make(std::make_shared<DataType>(LogicalType::kVarchar));
         column->Initialize();
         for (size_t i = 0; i < vector_size; ++i) {
-            Value v = Value::MakeVarchar(String(i, 'a' + i % 26));
+            Value v = Value::MakeVarchar(std::string(i, 'a' + i % 26));
             column->AppendValue(v);
         }
         columns.push_back(column);
@@ -151,7 +150,7 @@ TEST_F(ColumnVectorTest, ReadWrite) {
     for (size_t i = 0; i < columns.size(); i++) {
         int32_t exp_size = columns[i]->GetSizeInBytes();
         int32_t act_size;
-        Vector<char> buf(exp_size);
+        std::vector<char> buf(exp_size);
         char *ptr = buf.data();
 
         columns[i]->WriteAdv(ptr);

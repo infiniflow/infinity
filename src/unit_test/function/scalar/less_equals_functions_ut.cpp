@@ -13,13 +13,13 @@
 // limitations under the License.
 
 #ifdef CI
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 import infinity_core;
 import base_test;
 #else
 module;
 
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 
 module infinity_core:ut.less_equals_functions;
 
@@ -67,13 +67,13 @@ TEST_F(LessEqualsFunctionsTest, less_equals_func) {
 
     RegisterLessEqualsFunction(catalog_ptr.get());
 
-    String op = "<=";
+    std::string op = "<=";
     std::shared_ptr<FunctionSet> function_set = NewCatalog::GetFunctionSetByName(catalog_ptr.get(), op);
     EXPECT_EQ(function_set->type_, FunctionType::kScalar);
     std::shared_ptr<ScalarFunctionSet> scalar_function_set = std::static_pointer_cast<ScalarFunctionSet>(function_set);
 
     {
-        Vector<std::shared_ptr<BaseExpression>> inputs;
+        std::vector<std::shared_ptr<BaseExpression>> inputs;
 
         std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kTinyInt);
         std::shared_ptr<DataType> result_type = std::make_shared<DataType>(LogicalType::kBoolean);
@@ -86,7 +86,7 @@ TEST_F(LessEqualsFunctionsTest, less_equals_func) {
         ScalarFunction func = scalar_function_set->GetMostMatchFunction(inputs);
         EXPECT_STREQ("<=(TinyInt, TinyInt)->Boolean", func.ToString().c_str());
 
-        Vector<std::shared_ptr<DataType>> column_types;
+        std::vector<std::shared_ptr<DataType>> column_types;
         column_types.emplace_back(data_type);
         column_types.emplace_back(data_type);
 
@@ -126,7 +126,7 @@ TEST_F(LessEqualsFunctionsTest, less_equals_func) {
     }
 
     {
-        Vector<std::shared_ptr<BaseExpression>> inputs;
+        std::vector<std::shared_ptr<BaseExpression>> inputs;
 
         std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kSmallInt);
         std::shared_ptr<DataType> result_type = std::make_shared<DataType>(LogicalType::kBoolean);
@@ -139,7 +139,7 @@ TEST_F(LessEqualsFunctionsTest, less_equals_func) {
         ScalarFunction func = scalar_function_set->GetMostMatchFunction(inputs);
         EXPECT_STREQ("<=(SmallInt, SmallInt)->Boolean", func.ToString().c_str());
 
-        Vector<std::shared_ptr<DataType>> column_types;
+        std::vector<std::shared_ptr<DataType>> column_types;
         column_types.emplace_back(data_type);
         column_types.emplace_back(data_type);
 
@@ -179,7 +179,7 @@ TEST_F(LessEqualsFunctionsTest, less_equals_func) {
     }
 
     {
-        Vector<std::shared_ptr<BaseExpression>> inputs;
+        std::vector<std::shared_ptr<BaseExpression>> inputs;
 
         std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kInteger);
         std::shared_ptr<DataType> result_type = std::make_shared<DataType>(LogicalType::kBoolean);
@@ -192,7 +192,7 @@ TEST_F(LessEqualsFunctionsTest, less_equals_func) {
         ScalarFunction func = scalar_function_set->GetMostMatchFunction(inputs);
         EXPECT_STREQ("<=(Integer, Integer)->Boolean", func.ToString().c_str());
 
-        Vector<std::shared_ptr<DataType>> column_types;
+        std::vector<std::shared_ptr<DataType>> column_types;
         column_types.emplace_back(data_type);
         column_types.emplace_back(data_type);
 
@@ -232,7 +232,7 @@ TEST_F(LessEqualsFunctionsTest, less_equals_func) {
     }
 
     {
-        Vector<std::shared_ptr<BaseExpression>> inputs;
+        std::vector<std::shared_ptr<BaseExpression>> inputs;
 
         std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kBigInt);
         std::shared_ptr<DataType> result_type = std::make_shared<DataType>(LogicalType::kBoolean);
@@ -245,7 +245,7 @@ TEST_F(LessEqualsFunctionsTest, less_equals_func) {
         ScalarFunction func = scalar_function_set->GetMostMatchFunction(inputs);
         EXPECT_STREQ("<=(BigInt, BigInt)->Boolean", func.ToString().c_str());
 
-        Vector<std::shared_ptr<DataType>> column_types;
+        std::vector<std::shared_ptr<DataType>> column_types;
         column_types.emplace_back(data_type);
         column_types.emplace_back(data_type);
 
@@ -285,7 +285,7 @@ TEST_F(LessEqualsFunctionsTest, less_equals_func) {
     }
 
     {
-        Vector<std::shared_ptr<BaseExpression>> inputs;
+        std::vector<std::shared_ptr<BaseExpression>> inputs;
 
         std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kHugeInt);
         std::shared_ptr<DataType> result_type = std::make_shared<DataType>(LogicalType::kBoolean);
@@ -298,7 +298,7 @@ TEST_F(LessEqualsFunctionsTest, less_equals_func) {
         ScalarFunction func = scalar_function_set->GetMostMatchFunction(inputs);
         EXPECT_STREQ("<=(HugeInt, HugeInt)->Boolean", func.ToString().c_str());
 
-        Vector<std::shared_ptr<DataType>> column_types;
+        std::vector<std::shared_ptr<DataType>> column_types;
         column_types.emplace_back(data_type);
         column_types.emplace_back(data_type);
 
@@ -338,7 +338,7 @@ TEST_F(LessEqualsFunctionsTest, less_equals_func) {
     }
 
     {
-        Vector<std::shared_ptr<BaseExpression>> inputs;
+        std::vector<std::shared_ptr<BaseExpression>> inputs;
 
         std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kFloat);
         std::shared_ptr<DataType> result_type = std::make_shared<DataType>(LogicalType::kBoolean);
@@ -351,7 +351,7 @@ TEST_F(LessEqualsFunctionsTest, less_equals_func) {
         ScalarFunction func = scalar_function_set->GetMostMatchFunction(inputs);
         EXPECT_STREQ("<=(Float, Float)->Boolean", func.ToString().c_str());
 
-        Vector<std::shared_ptr<DataType>> column_types;
+        std::vector<std::shared_ptr<DataType>> column_types;
         column_types.emplace_back(data_type);
         column_types.emplace_back(data_type);
 
@@ -391,7 +391,7 @@ TEST_F(LessEqualsFunctionsTest, less_equals_func) {
     }
 
     {
-        Vector<std::shared_ptr<BaseExpression>> inputs;
+        std::vector<std::shared_ptr<BaseExpression>> inputs;
 
         std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kDouble);
         std::shared_ptr<DataType> result_type = std::make_shared<DataType>(LogicalType::kBoolean);
@@ -404,7 +404,7 @@ TEST_F(LessEqualsFunctionsTest, less_equals_func) {
         ScalarFunction func = scalar_function_set->GetMostMatchFunction(inputs);
         EXPECT_STREQ("<=(Double, Double)->Boolean", func.ToString().c_str());
 
-        Vector<std::shared_ptr<DataType>> column_types;
+        std::vector<std::shared_ptr<DataType>> column_types;
         column_types.emplace_back(data_type);
         column_types.emplace_back(data_type);
 
@@ -444,7 +444,7 @@ TEST_F(LessEqualsFunctionsTest, less_equals_func) {
     }
 #if 0
     {
-        Vector<std::shared_ptr<BaseExpression>> inputs;
+        std::vector<std::shared_ptr<BaseExpression>> inputs;
 
         std::shared_ptr<DataType> data_type1 = std::make_shared<DataType>(LogicalType::kVarchar);
         std::shared_ptr<DataType> data_type2 = std::make_shared<DataType>(LogicalType::kVarchar);
@@ -458,7 +458,7 @@ TEST_F(LessEqualsFunctionsTest, less_equals_func) {
         ScalarFunction func = scalar_function_set->GetMostMatchFunction(inputs);
         EXPECT_STREQ("<=(Varchar, Varchar)->Boolean", func.ToString().c_str());
 
-        Vector<std::shared_ptr<DataType>> column_types;
+        std::vector<std::shared_ptr<DataType>> column_types;
         column_types.emplace_back(data_type1);
         column_types.emplace_back(data_type2);
 
@@ -500,16 +500,16 @@ TEST_F(LessEqualsFunctionsTest, less_equals_func) {
             Value v = result->GetValueByIndex(i);
             EXPECT_EQ(v.type_.type(), LogicalType::kBoolean);
             if (i % 2 == 0) {
-                String s1 = "Helloworld" + std::to_string(i);
-                String s2 = "Helloworld" + std::to_string(i);
+                std::string s1 = "Helloworld" + std::to_string(i);
+                std::string s2 = "Helloworld" + std::to_string(i);
                 if (s1 <= s2) {
                     EXPECT_EQ(v.value_.boolean, true);
                 } else {
                     EXPECT_EQ(v.value_.boolean, false);
                 }
             } else {
-                String s1 = "Helloworld" + std::to_string(i);
-                String s2 = "helloworld" + std::to_string(i);
+                std::string s1 = "Helloworld" + std::to_string(i);
+                std::string s2 = "helloworld" + std::to_string(i);
                 if (s1 <= s2) {
                     EXPECT_EQ(v.value_.boolean, true);
                 } else {

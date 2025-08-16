@@ -50,8 +50,11 @@ struct SparseTestUtil {
         return true;
     }
 
-    static std::pair<u32, u32>
-    CheckApproximateKnn(const i32 *gt_indices, const DataType *gt_scores, size_t gt_size, const std::vector<u32> &indices, const std::vector<DataType> &scores) {
+    static std::pair<u32, u32> CheckApproximateKnn(const i32 *gt_indices,
+                                                   const DataType *gt_scores,
+                                                   size_t gt_size,
+                                                   const std::vector<u32> &indices,
+                                                   const std::vector<DataType> &scores) {
         std::unordered_set<u32> gt_set;
         for (size_t i = 0; i < gt_size; ++i) {
             if (gt_scores[i] == 0.0) {
@@ -171,16 +174,16 @@ struct SparseTestUtil {
                 SparseVecRef query = iter.val();
                 auto [indices, scores] = index.SearchBF(query, topk);
                 u32 query_id = iter.row_id();
-                Copy(indices.begin(), indices.end(), gt_indices.get() + query_id * topk);
-                Copy(scores.begin(), scores.end(), gt_scores.get() + query_id * topk);
+                std::copy(indices.begin(), indices.end(), gt_indices.get() + query_id * topk);
+                std::copy(scores.begin(), scores.end(), gt_scores.get() + query_id * topk);
             }
         } else { // brute force, only used in linscan test
             for (auto iter = SparseMatrixIter<DataType, IdxType>(query); iter.HasNext(); iter.Next()) {
                 SparseVecRef query = iter.val();
                 auto [indices, scores] = SparseTestUtil<DataType, IdxType>::BruteForceKnn(mat, query, topk);
                 u32 query_id = iter.row_id();
-                Copy(indices.begin(), indices.end(), gt_indices.get() + query_id * topk);
-                Copy(scores.begin(), scores.end(), gt_scores.get() + query_id * topk);
+                std::copy(indices.begin(), indices.end(), gt_indices.get() + query_id * topk);
+                std::copy(scores.begin(), scores.end(), gt_scores.get() + query_id * topk);
             }
         }
         return {std::move(gt_indices), std::move(gt_scores)};

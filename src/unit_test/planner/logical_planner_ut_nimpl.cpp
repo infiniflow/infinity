@@ -14,7 +14,7 @@
 
 #ifdef CI
 #include "unit_test/gtest_expand.h"
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 import infinity_core;
 import base_test;
 import sql_runner;
@@ -22,7 +22,7 @@ import sql_runner;
 module;
 
 #include "unit_test/gtest_expand.h"
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 
 module infinity_core:ut.logical_planner;
 

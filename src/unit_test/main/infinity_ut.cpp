@@ -14,14 +14,14 @@
 
 #ifdef CI
 #include "statement/command_statement.h"
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 import infinity_core;
 import base_test;
 #else
 module;
 
 #include "statement/command_statement.h"
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 
 module infinity_core:ut.infinity;
 
@@ -51,7 +51,7 @@ TEST_F(InfinityTest, test1) {
     using namespace infinity;
     // Earlier cases may leave a dirty infinity instance. Destroy it first.
     infinity::Infinity::LocalUnInit();
-    String path = GetHomeDir();
+    std::string path = GetHomeDir();
     RemoveDbDirs();
     Infinity::LocalInit(path);
 
@@ -66,7 +66,7 @@ TEST_F(InfinityTest, test1) {
         std::shared_ptr<DataBlock> data_block = result.result_table_->GetDataBlockById(0);
         EXPECT_EQ(data_block->row_count(), 1u);
         Value value = data_block->GetValue(0, 0);
-        const String &s2 = value.GetVarchar();
+        const std::string &s2 = value.GetVarchar();
         EXPECT_STREQ(s2.c_str(), "default_db");
     }
 
@@ -77,11 +77,11 @@ TEST_F(InfinityTest, test1) {
         std::shared_ptr<DataBlock> data_block = result.result_table_->GetDataBlockById(0);
         EXPECT_EQ(data_block->row_count(), 2);
         Value value = data_block->GetValue(0, 0);
-        const String &s2 = value.GetVarchar();
+        const std::string &s2 = value.GetVarchar();
         EXPECT_STREQ(s2.c_str(), "db1");
 
         value = data_block->GetValue(0, 1);
-        const String &s3 = value.GetVarchar();
+        const std::string &s3 = value.GetVarchar();
         EXPECT_STREQ(s3.c_str(), "default_db");
 
         result = infinity->GetDatabase("db1");
@@ -104,7 +104,7 @@ TEST_F(InfinityTest, test1) {
         data_block = result.result_table_->GetDataBlockById(0);
         EXPECT_EQ(data_block->row_count(), 1);
         value = data_block->GetValue(0, 0);
-        const String &s4 = value.GetVarchar();
+        const std::string &s4 = value.GetVarchar();
         EXPECT_STREQ(s4.c_str(), "default_db");
         result = infinity->GetDatabase("default_db");
         EXPECT_TRUE(result.IsOk());
@@ -118,11 +118,11 @@ TEST_F(InfinityTest, test1) {
 
         size_t column_count = 2;
         //        Vector<std::shared_ptr<ColumnDef>> columns;
-        Vector<ColumnDef *> column_defs;
+        std::vector<ColumnDef *> column_defs;
         column_defs.reserve(column_count);
 
         std::shared_ptr<DataType> col_type = std::make_shared<DataType>(LogicalType::kBoolean);
-        String col_name = "col1";
+        std::string col_name = "col1";
         auto col_def = new ColumnDef(0, col_type, col_name, std::set<ConstraintType>());
         column_defs.emplace_back(col_def);
 
@@ -131,14 +131,14 @@ TEST_F(InfinityTest, test1) {
         col_def = new ColumnDef(1, col_type, col_name, std::set<ConstraintType>());
         column_defs.emplace_back(col_def);
 
-        result = infinity->CreateTable("default_db", "table1", column_defs, Vector<TableConstraint *>(), create_table_opts);
+        result = infinity->CreateTable("default_db", "table1", column_defs, std::vector<TableConstraint *>(), create_table_opts);
         EXPECT_TRUE(result.IsOk());
 
         result = infinity->ListTables("default_db");
         std::shared_ptr<DataBlock> data_block = result.result_table_->GetDataBlockById(0);
         EXPECT_EQ(data_block->row_count(), 1);
         Value value = data_block->GetValue(1, 0);
-        const String &s2 = value.GetVarchar();
+        const std::string &s2 = value.GetVarchar();
         EXPECT_STREQ(s2.c_str(), "table1");
 
         result = infinity->GetTable("default_db", "table1");
@@ -162,20 +162,20 @@ TEST_F(InfinityTest, test1) {
         CreateTableOptions create_table_opts;
 
         size_t column_count = 1;
-        Vector<ColumnDef *> column_defs;
+        std::vector<ColumnDef *> column_defs;
         column_defs.reserve(column_count);
 
         std::shared_ptr<DataType> col_type = std::make_shared<DataType>(LogicalType::kBigInt);
-        String col1_name = "col1";
+        std::string col1_name = "col1";
         auto col_def = new ColumnDef(0, col_type, col1_name, std::set<ConstraintType>());
         column_defs.emplace_back(col_def);
 
         col_type = std::make_shared<DataType>(LogicalType::kSmallInt);
-        String col2_name = "col2";
+        std::string col2_name = "col2";
         col_def = new ColumnDef(1, col_type, col2_name, std::set<ConstraintType>());
         column_defs.emplace_back(col_def);
 
-        result = infinity->CreateTable("default_db", "table1", column_defs, Vector<TableConstraint *>(), create_table_opts);
+        result = infinity->CreateTable("default_db", "table1", column_defs, std::vector<TableConstraint *>(), create_table_opts);
         EXPECT_TRUE(result.IsOk());
 
         result = infinity->GetTable("default_db", "table1");
@@ -183,8 +183,8 @@ TEST_F(InfinityTest, test1) {
 
         //        Vector<String> *columns, Vector<Vector<ParsedExpr *> *> *values
 
-        Vector<String> columns = {col1_name, col2_name};
-        Vector<std::unique_ptr<ParsedExpr>> values{};
+        std::vector<std::string> columns = {col1_name, col2_name};
+        std::vector<std::unique_ptr<ParsedExpr>> values{};
         auto value1 = std::make_unique<ConstantExpr>(LiteralType::kInteger);
         value1->integer_value_ = 11;
         values.emplace_back(std::move(value1));
@@ -194,7 +194,7 @@ TEST_F(InfinityTest, test1) {
         auto insert_row = new InsertRowExpr();
         insert_row->columns_ = std::move(columns);
         insert_row->values_ = std::move(values);
-        Vector<InsertRowExpr *> *insert_rows = new Vector<InsertRowExpr *>();
+        std::vector<InsertRowExpr *> *insert_rows = new std::vector<InsertRowExpr *>();
         insert_rows->emplace_back(insert_row);
         infinity->Insert("default_db", "table1", insert_rows);
 
@@ -205,7 +205,7 @@ TEST_F(InfinityTest, test1) {
         //                           ParsedExpr *offset,
         //                           ParsedExpr *limit);
 
-        Vector<ParsedExpr *> *output_columns = new Vector<ParsedExpr *>();
+        std::vector<ParsedExpr *> *output_columns = new std::vector<ParsedExpr *>();
         ColumnExpr *col1 = new ColumnExpr();
         col1->names_.emplace_back(col1_name);
         output_columns->emplace_back(col1);
@@ -240,11 +240,11 @@ TEST_F(InfinityTest, test1) {
         std::shared_ptr<DataBlock> data_block = result.result_table_->GetDataBlockById(0);
         EXPECT_EQ(data_block->row_count(), 2);
         Value value = data_block->GetValue(0, 0);
-        const String &s2 = value.GetVarchar();
+        const std::string &s2 = value.GetVarchar();
         EXPECT_STREQ(s2.c_str(), "db1");
 
         value = data_block->GetValue(0, 1);
-        const String &s3 = value.GetVarchar();
+        const std::string &s3 = value.GetVarchar();
         EXPECT_STREQ(s3.c_str(), "default_db");
 
         result = infinity->Query("drop database db1");
@@ -254,7 +254,7 @@ TEST_F(InfinityTest, test1) {
         data_block = result.result_table_->GetDataBlockById(0);
         EXPECT_EQ(data_block->row_count(), 1);
         value = data_block->GetValue(0, 0);
-        const String &s4 = value.GetVarchar();
+        const std::string &s4 = value.GetVarchar();
         EXPECT_STREQ(s4.c_str(), "default_db");
         result = infinity->GetDatabase("default_db");
         EXPECT_TRUE(result.IsOk());
@@ -268,7 +268,7 @@ TEST_F(InfinityTest, test2) {
     using namespace infinity;
     // Earlier cases may leave a dirty infinity instance. Destroy it first.
     Infinity::LocalUnInit();
-    String path = GetHomeDir();
+    std::string path = GetHomeDir();
     RemoveDbDirs();
     Infinity::LocalInit(path);
 

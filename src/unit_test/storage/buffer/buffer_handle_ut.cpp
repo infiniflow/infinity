@@ -14,14 +14,12 @@
 
 #ifdef CI
 #include "unit_test/gtest_expand.h"
-#include "gtest/gtest.h"
 import infinity_core;
 import base_test;
 #else
 module;
 
 #include "unit_test/gtest_expand.h"
-#include "gtest/gtest.h"
 
 module infinity_core:ut.buffer_handle;
 
@@ -50,29 +48,29 @@ TEST_P(BufferHandleTest, test1) {
     using namespace infinity;
 
     size_t memory_limit = 1024;
-    String data_dir(GetFullDataDir());
-    auto temp_dir = std::make_shared<String>(GetFullTmpDir());
-    auto base_dir = std::make_shared<String>(GetFullDataDir());
+    std::string data_dir(GetFullDataDir());
+    auto temp_dir = std::make_shared<std::string>(GetFullTmpDir());
+    auto base_dir = std::make_shared<std::string>(GetFullDataDir());
 
     Storage *storage = InfinityContext::instance().storage();
     PersistenceManager *persistence_manager = storage->persistence_manager();
     BufferManager buffer_manager(memory_limit, base_dir, temp_dir, persistence_manager);
 
     size_t test_size1 = 512;
-    auto file_dir1 = std::make_shared<String>("dir1");
-    auto test_fname1 = std::make_shared<String>("test1");
+    auto file_dir1 = std::make_shared<std::string>("dir1");
+    auto test_fname1 = std::make_shared<std::string>("test1");
     auto file_worker1 = std::make_unique<DataFileWorker>(base_dir, temp_dir, file_dir1, test_fname1, test_size1, persistence_manager);
     auto buf1 = buffer_manager.AllocateBufferObject(std::move(file_worker1));
 
     size_t test_size2 = 512;
-    auto file_dir2 = std::make_shared<String>("dir2");
-    auto test_fname2 = std::make_shared<String>("test2");
+    auto file_dir2 = std::make_shared<std::string>("dir2");
+    auto test_fname2 = std::make_shared<std::string>("test2");
     auto file_worker2 = std::make_unique<DataFileWorker>(base_dir, temp_dir, file_dir2, test_fname2, test_size2, persistence_manager);
     auto buf2 = buffer_manager.AllocateBufferObject(std::move(file_worker2));
 
     size_t test_size3 = 512;
-    auto file_dir3 = std::make_shared<String>("dir3");
-    auto test_fname3 = std::make_shared<String>("test3");
+    auto file_dir3 = std::make_shared<std::string>("dir3");
+    auto test_fname3 = std::make_shared<std::string>("test3");
     auto file_worker3 = std::make_unique<DataFileWorker>(base_dir, temp_dir, file_dir3, test_fname3, test_size3, persistence_manager);
     auto buf3 = buffer_manager.AllocateBufferObject(std::move(file_worker3));
 

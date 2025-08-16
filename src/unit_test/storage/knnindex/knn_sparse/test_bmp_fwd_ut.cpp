@@ -13,13 +13,13 @@
 // limitations under the License.
 
 #ifdef CI
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 import infinity_core;
 import base_test;
 #else
 module;
 
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 
 module infinity_core:ut.test_bmp_fwd;
 
@@ -51,8 +51,8 @@ protected:
 
         const SparseMatrix dataset = SparseTestUtil<DataType, IdxType>::GenerateDataset(nrow, ncol, sparsity, 0.0, 10.0);
 
-        String save_path = String(tmp_data_path()) + "/bmpfwd_test1.index";
-        // String save2_path = String(tmp_data_path()) + "/bmpfwd_test2.index";
+        std::string save_path = std::string(tmp_data_path()) + "/bmpfwd_test1.index";
+        // std::string save2_path = std::string(tmp_data_path()) + "/bmpfwd_test2.index";
 
         auto check = [&](const BMPFwd1 &fwd1, const BMPFwd2 &fwd2) {
             EXPECT_EQ(fwd1.block_size(), fwd2.block_size());

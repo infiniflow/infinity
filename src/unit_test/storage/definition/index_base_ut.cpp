@@ -13,20 +13,17 @@
 // limitations under the License.
 
 #ifdef CI
-#include "statement/statement_common.h"
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 import infinity_core;
 import base_test;
 #else
 module;
 
-#include "statement/statement_common.h"
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 
 module infinity_core:ut.index_base;
 
 import :ut.base_test;
-
 import :index_base;
 import :index_ivf;
 import :index_hnsw;
@@ -41,20 +38,20 @@ class IndexBaseTest : public BaseTest {};
 TEST_F(IndexBaseTest, ivf_readwrite) {
     using namespace infinity;
 
-    Vector<String> columns{"col1"};
-    Vector<InitParameter *> parameters;
+    std::vector<std::string> columns{"col1"};
+    std::vector<InitParameter *> parameters;
     parameters.emplace_back(new InitParameter("metric", "l2"));
     parameters.emplace_back(new InitParameter("plain_storage_data_type", "float"));
 
     std::shared_ptr<IndexBase> index_base =
-        IndexIVF::Make(std::make_shared<String>("idx1"), std::make_shared<String>("test comment"), "tbl1_idx1", columns, parameters);
+        IndexIVF::Make(std::make_shared<std::string>("idx1"), std::make_shared<std::string>("test comment"), "tbl1_idx1", columns, parameters);
     //    std::cout << "index_base: " << index_base->ToString() << std::endl;
     for (auto parameter : parameters) {
         delete parameter;
     }
 
     int32_t exp_size = index_base->GetSizeInBytes();
-    Vector<char> buf(exp_size, char(0));
+    std::vector<char> buf(exp_size, char(0));
     char *buf_beg = buf.data();
     char *ptr = buf_beg;
     index_base->WriteAdv(ptr);
@@ -72,14 +69,15 @@ TEST_F(IndexBaseTest, ivf_readwrite) {
 TEST_F(IndexBaseTest, hnsw_readwrite) {
     using namespace infinity;
 
-    Vector<String> columns{"col1", "col2"};
-    Vector<InitParameter *> parameters;
+    std::vector<std::string> columns{"col1", "col2"};
+    std::vector<InitParameter *> parameters;
     parameters.emplace_back(new InitParameter("metric", "l2"));
     parameters.emplace_back(new InitParameter("m", "16"));
     parameters.emplace_back(new InitParameter("ef_construction", "200"));
     parameters.emplace_back(new InitParameter("encode", "plain"));
 
-    auto index_base = IndexHnsw::Make(std::make_shared<String>("idx1"), std::make_shared<String>("test comment"), "tbl1_idx1", columns, parameters);
+    auto index_base =
+        IndexHnsw::Make(std::make_shared<std::string>("idx1"), std::make_shared<std::string>("test comment"), "tbl1_idx1", columns, parameters);
     //    std::cout << "index_base: " << index_base->ToString() << std::endl;
 
     for (auto parameter : parameters) {
@@ -87,7 +85,7 @@ TEST_F(IndexBaseTest, hnsw_readwrite) {
     }
 
     int32_t exp_size = index_base->GetSizeInBytes();
-    Vector<char> buf(exp_size, char(0));
+    std::vector<char> buf(exp_size, char(0));
     char *buf_beg = buf.data();
     char *ptr = buf_beg;
     index_base->WriteAdv(ptr);
@@ -105,9 +103,10 @@ TEST_F(IndexBaseTest, hnsw_readwrite) {
 TEST_F(IndexBaseTest, full_text_readwrite) {
     using namespace infinity;
 
-    Vector<String> columns{"col1", "col2"};
-    Vector<InitParameter *> parameters;
-    auto index_base = IndexFullText::Make(std::make_shared<String>("idx1"), std::make_shared<String>("test comment"), "tbl1_idx1", columns, parameters);
+    std::vector<std::string> columns{"col1", "col2"};
+    std::vector<InitParameter *> parameters;
+    auto index_base =
+        IndexFullText::Make(std::make_shared<std::string>("idx1"), std::make_shared<std::string>("test comment"), "tbl1_idx1", columns, parameters);
     //    std::cout << "index_base: " << index_base->ToString() << std::endl;
 
     for (auto parameter : parameters) {
@@ -115,7 +114,7 @@ TEST_F(IndexBaseTest, full_text_readwrite) {
     }
 
     int32_t exp_size = index_base->GetSizeInBytes();
-    Vector<char> buf(exp_size, char(0));
+    std::vector<char> buf(exp_size, char(0));
     char *buf_beg = buf.data();
     char *ptr = buf_beg;
     index_base->WriteAdv(ptr);

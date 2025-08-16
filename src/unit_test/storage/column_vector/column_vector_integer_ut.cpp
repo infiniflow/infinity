@@ -14,14 +14,12 @@
 
 #ifdef CI
 #include "unit_test/gtest_expand.h"
-#include "gtest/gtest.h"
 import infinity_core;
 import base_test;
 #else
 module;
 
 #include "unit_test/gtest_expand.h"
-#include "gtest/gtest.h"
 
 module infinity_core:ut.column_vector_integer;
 
@@ -150,7 +148,7 @@ TEST_F(ColumnVectorIntegerTest, flat_tinyint) {
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         TinyIntT value = static_cast<TinyIntT>(i);
-        column_vector.AppendByPtr((ptr_t)(&value));
+        column_vector.AppendByPtr((char *)(&value));
         Value vx = column_vector.GetValueByIndex(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kTinyInt);
         EXPECT_EQ(vx.value_.tiny_int, static_cast<TinyIntT>(i));
@@ -388,7 +386,7 @@ TEST_F(ColumnVectorIntegerTest, flat_smallint) {
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         SmallIntT value = static_cast<SmallIntT>(i);
-        column_vector.AppendByPtr((ptr_t)(&value));
+        column_vector.AppendByPtr((char *)(&value));
         Value vx = column_vector.GetValueByIndex(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kSmallInt);
         EXPECT_EQ(vx.value_.small_int, static_cast<SmallIntT>(i));
@@ -626,7 +624,7 @@ TEST_F(ColumnVectorIntegerTest, flat_int) {
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         IntegerT value = static_cast<IntegerT>(i);
-        column_vector.AppendByPtr((ptr_t)(&value));
+        column_vector.AppendByPtr((char *)(&value));
         Value vx = column_vector.GetValueByIndex(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kInteger);
         EXPECT_EQ(vx.value_.integer, static_cast<IntegerT>(i));
@@ -864,7 +862,7 @@ TEST_F(ColumnVectorIntegerTest, flat_bigint) {
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         BigIntT value = static_cast<BigIntT>(i);
-        column_vector.AppendByPtr((ptr_t)(&value));
+        column_vector.AppendByPtr((char *)(&value));
         Value vx = column_vector.GetValueByIndex(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kBigInt);
         EXPECT_EQ(vx.value_.big_int, static_cast<BigIntT>(i));
@@ -1104,7 +1102,7 @@ TEST_F(ColumnVectorIntegerTest, flat_hugeint) {
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         HugeIntT value(0, i);
-        column_vector.AppendByPtr((ptr_t)(&value));
+        column_vector.AppendByPtr((char *)(&value));
         Value vx = column_vector.GetValueByIndex(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kHugeInt);
         EXPECT_EQ(vx.value_.huge_int, value);

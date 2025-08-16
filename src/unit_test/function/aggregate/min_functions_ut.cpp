@@ -14,14 +14,12 @@
 
 #ifdef CI
 #include "unit_test/gtest_expand.h"
-#include "gtest/gtest.h"
 import infinity_core;
 import base_test;
 #else
 module;
 
 #include "unit_test/gtest_expand.h"
-#include "gtest/gtest.h"
 
 module infinity_core:ut.min_functions;
 
@@ -67,7 +65,7 @@ TEST_F(MinFunctionTest, min_func) {
 
     RegisterMinFunction(catalog_ptr.get());
 
-    String op = "min";
+    std::string op = "min";
     std::shared_ptr<FunctionSet> function_set = NewCatalog::GetFunctionSetByName(catalog_ptr.get(), op);
     EXPECT_EQ(function_set->type_, FunctionType::kAggregate);
     std::shared_ptr<AggregateFunctionSet> aggregate_function_set = std::static_pointer_cast<AggregateFunctionSet>(function_set);
@@ -78,7 +76,7 @@ TEST_F(MinFunctionTest, min_func) {
         AggregateFunction func = aggregate_function_set->GetMostMatchFunction(col_expr_ptr);
         EXPECT_STREQ("MIN(Boolean)->Boolean", func.ToString().c_str());
 
-        Vector<std::shared_ptr<DataType>> column_types;
+        std::vector<std::shared_ptr<DataType>> column_types;
         column_types.emplace_back(data_type);
 
         i64 row_count = DEFAULT_VECTOR_SIZE;
@@ -107,7 +105,7 @@ TEST_F(MinFunctionTest, min_func) {
         AggregateFunction func = aggregate_function_set->GetMostMatchFunction(col_expr_ptr);
         EXPECT_STREQ("MIN(TinyInt)->TinyInt", func.ToString().c_str());
 
-        Vector<std::shared_ptr<DataType>> column_types;
+        std::vector<std::shared_ptr<DataType>> column_types;
         column_types.emplace_back(data_type);
 
         i64 row_count = DEFAULT_VECTOR_SIZE;
@@ -136,7 +134,7 @@ TEST_F(MinFunctionTest, min_func) {
         AggregateFunction func = aggregate_function_set->GetMostMatchFunction(col_expr_ptr);
         EXPECT_STREQ("MIN(SmallInt)->SmallInt", func.ToString().c_str());
 
-        Vector<std::shared_ptr<DataType>> column_types;
+        std::vector<std::shared_ptr<DataType>> column_types;
         column_types.emplace_back(data_type);
 
         i64 row_count = DEFAULT_VECTOR_SIZE;
@@ -165,7 +163,7 @@ TEST_F(MinFunctionTest, min_func) {
         AggregateFunction func = aggregate_function_set->GetMostMatchFunction(col_expr_ptr);
         EXPECT_STREQ("MIN(Integer)->Integer", func.ToString().c_str());
 
-        Vector<std::shared_ptr<DataType>> column_types;
+        std::vector<std::shared_ptr<DataType>> column_types;
         column_types.emplace_back(data_type);
 
         i64 row_count = DEFAULT_VECTOR_SIZE;
@@ -194,7 +192,7 @@ TEST_F(MinFunctionTest, min_func) {
         AggregateFunction func = aggregate_function_set->GetMostMatchFunction(col_expr_ptr);
         EXPECT_STREQ("MIN(BigInt)->BigInt", func.ToString().c_str());
 
-        Vector<std::shared_ptr<DataType>> column_types;
+        std::vector<std::shared_ptr<DataType>> column_types;
         column_types.emplace_back(data_type);
 
         i64 row_count = DEFAULT_VECTOR_SIZE;
@@ -223,7 +221,7 @@ TEST_F(MinFunctionTest, min_func) {
         AggregateFunction func = aggregate_function_set->GetMostMatchFunction(col_expr_ptr);
         EXPECT_STREQ("MIN(Float)->Float", func.ToString().c_str());
 
-        Vector<std::shared_ptr<DataType>> column_types;
+        std::vector<std::shared_ptr<DataType>> column_types;
         column_types.emplace_back(data_type);
 
         i64 row_count = DEFAULT_VECTOR_SIZE;
@@ -252,7 +250,7 @@ TEST_F(MinFunctionTest, min_func) {
         AggregateFunction func = aggregate_function_set->GetMostMatchFunction(col_expr_ptr);
         EXPECT_STREQ("MIN(Double)->Double", func.ToString().c_str());
 
-        Vector<std::shared_ptr<DataType>> column_types;
+        std::vector<std::shared_ptr<DataType>> column_types;
         column_types.emplace_back(data_type);
 
         i64 row_count = DEFAULT_VECTOR_SIZE;
@@ -281,7 +279,7 @@ TEST_F(MinFunctionTest, min_func) {
         AggregateFunction func = aggregate_function_set->GetMostMatchFunction(col_expr_ptr);
         EXPECT_STREQ("MIN(HugeInt)->HugeInt", func.ToString().c_str());
 
-        Vector<std::shared_ptr<DataType>> column_types;
+        std::vector<std::shared_ptr<DataType>> column_types;
         column_types.emplace_back(data_type);
 
         i64 row_count = DEFAULT_VECTOR_SIZE;

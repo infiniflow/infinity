@@ -13,12 +13,7 @@
 // limitations under the License.
 module;
 
-#include <filesystem>
-#include <stdlib.h>
-#include <sys/stat.h>
-#include <type_traits>
-#include <unistd.h>
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 
 #ifndef CI
 export module infinity_core:ut.base_test;

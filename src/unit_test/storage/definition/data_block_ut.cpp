@@ -14,14 +14,12 @@
 
 #ifdef CI
 #include "unit_test/gtest_expand.h"
-#include "gtest/gtest.h"
 import infinity_core;
 import base_test;
 #else
 module;
 
 #include "unit_test/gtest_expand.h"
-#include "gtest/gtest.h"
 
 module infinity_core:ut.data_block;
 
@@ -58,7 +56,7 @@ TEST_P(DataBlockTest, test1) {
     using namespace infinity;
 
     DataBlock data_block;
-    Vector<std::shared_ptr<DataType>> column_types;
+    std::vector<std::shared_ptr<DataType>> column_types;
     // Bool * 1
     column_types.emplace_back(std::make_shared<DataType>(LogicalType::kBoolean));
 
@@ -159,7 +157,7 @@ TEST_P(DataBlockTest, test2) {
     using namespace infinity;
 
     DataBlock data_block;
-    Vector<std::shared_ptr<DataType>> column_types;
+    std::vector<std::shared_ptr<DataType>> column_types;
     column_types.emplace_back(std::make_shared<DataType>(LogicalType::kBoolean));
 
     u16 row_count = DEFAULT_VECTOR_SIZE;
@@ -179,7 +177,7 @@ TEST_P(DataBlockTest, test2) {
 
     EXPECT_EQ(data_block.row_count(), row_count);
 
-    std::shared_ptr<Vector<RowID>> row_ids = std::make_shared<Vector<RowID>>();
+    std::shared_ptr<std::vector<RowID>> row_ids = std::make_shared<std::vector<RowID>>();
     row_ids->reserve(row_count);
     data_block.FillRowIDVector(row_ids, 1);
     for (u16 row_id = 0; row_id < row_count; ++row_id) {
@@ -196,7 +194,7 @@ TEST_P(DataBlockTest, test3) {
     profiler.Begin();
 
     DataBlock data_block;
-    Vector<std::shared_ptr<DataType>> column_types;
+    std::vector<std::shared_ptr<DataType>> column_types;
     column_types.emplace_back(std::make_shared<DataType>(LogicalType::kTinyInt));
 
     size_t row_count = DEFAULT_VECTOR_SIZE;
@@ -235,7 +233,7 @@ TEST_P(DataBlockTest, ReadWrite) {
     using namespace infinity;
 
     DataBlock data_block;
-    Vector<std::shared_ptr<DataType>> column_types;
+    std::vector<std::shared_ptr<DataType>> column_types;
     // Bool * 1
     column_types.emplace_back(std::make_shared<DataType>(LogicalType::kBoolean));
 
@@ -298,7 +296,7 @@ TEST_P(DataBlockTest, ReadWrite) {
     data_block.Finalize();
 
     int32_t exp_size = data_block.GetSizeInBytes();
-    Vector<char> buf(exp_size);
+    std::vector<char> buf(exp_size);
     char *ptr = buf.data();
 
     data_block.WriteAdv(ptr);

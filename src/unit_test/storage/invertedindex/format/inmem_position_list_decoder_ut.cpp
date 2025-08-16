@@ -1,12 +1,11 @@
-
 #ifdef CI
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 import infinity_core;
 import base_test;
 #else
 module;
 
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 
 module infinity_core:ut.inmem_position_list_decoder;
 
@@ -46,7 +45,7 @@ protected:
         ASSERT_TRUE(position_list_decoder);
 
         // compress mode is useless in decoder
-        InDocPositionState state(option.GetPosListFormatOption());
+        infinity::InDocPositionState state(option.GetPosListFormatOption());
         ASSERT_TRUE(position_list_decoder->SkipTo(0, &state));
 
         u32 temp_tf = 0;

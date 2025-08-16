@@ -14,14 +14,12 @@
 
 #ifdef CI
 #include "unit_test/gtest_expand.h"
-#include "gtest/gtest.h"
 import infinity_core;
 import base_test;
 #else
 module;
 
 #include "unit_test/gtest_expand.h"
-#include "gtest/gtest.h"
 
 module infinity_core:ut.column_vector_float;
 
@@ -31,12 +29,12 @@ import :logger;
 import :column_vector;
 import :value;
 import :default_values;
-import third_party;
 import :selection;
 import :vector_buffer;
 import :infinity_context;
 #endif
 
+import third_party;
 import global_resource_usage;
 import internal_types;
 import logical_type;
@@ -145,7 +143,7 @@ TEST_F(ColumnVectorFloatTest, flat_float) {
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         FloatT f = static_cast<FloatT>(i) + 0.5f;
-        column_vector.AppendByPtr((ptr_t)(&f));
+        column_vector.AppendByPtr((char *)(&f));
         Value vx = column_vector.GetValueByIndex(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kFloat);
         EXPECT_FLOAT_EQ(vx.value_.float32, static_cast<FloatT>(i) + 0.5f);
@@ -389,7 +387,7 @@ TEST_F(ColumnVectorFloatTest, flat_double) {
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         DoubleT f = static_cast<DoubleT>(i) + 0.8f;
-        column_vector.AppendByPtr((ptr_t)(&f));
+        column_vector.AppendByPtr((char *)(&f));
         Value vx = column_vector.GetValueByIndex(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kDouble);
         EXPECT_FLOAT_EQ(vx.value_.float64, static_cast<DoubleT>(i) + 0.8f);

@@ -13,13 +13,13 @@
 // limitations under the License.
 
 #ifdef CI
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 import infinity_core;
 import base_test;
 #else
 module;
 
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 
 module infinity_core:ut.new_expression_evaluator;
 
@@ -73,15 +73,15 @@ TEST_F(ExpressionEvaluatorTest, add_bigint_constant_1) {
     std::unique_ptr<NewCatalog> catalog_ptr = std::make_unique<NewCatalog>(kv_store_ptr.get());
     RegisterAddFunction(catalog_ptr.get());
 
-    String op = "+";
+    std::string op = "+";
     std::shared_ptr<FunctionSet> function_set = NewCatalog::GetFunctionSetByName(catalog_ptr.get(), op);
     EXPECT_EQ(function_set->type_, FunctionType::kScalar);
     std::shared_ptr<ScalarFunctionSet> scalar_function_set = std::static_pointer_cast<ScalarFunctionSet>(function_set);
 
     // Input expressions
-    Vector<std::shared_ptr<BaseExpression>> exprs;
+    std::vector<std::shared_ptr<BaseExpression>> exprs;
     // Column expression
-    std::shared_ptr<ReferenceExpression> col_expr = ReferenceExpression::Make(DataType(LogicalType::kBigInt), "t1", "c1", String(), 0);
+    std::shared_ptr<ReferenceExpression> col_expr = ReferenceExpression::Make(DataType(LogicalType::kBigInt), "t1", "c1", std::string(), 0);
     // Value expression
     Value v = Value::MakeBigInt(1);
     std::shared_ptr<ValueExpression> value_expr = std::make_shared<ValueExpression>(v);
@@ -106,7 +106,7 @@ TEST_F(ExpressionEvaluatorTest, add_bigint_constant_1) {
 
     std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kBigInt);
     std::shared_ptr<ColumnDef> col_def = std::make_shared<ColumnDef>(0, data_type, "c1", std::set<ConstraintType>());
-    std::shared_ptr<TableDef> table_def = TableDef::Make(std::make_shared<String>("default_db"), std::make_shared<String>("t1"), std::make_shared<String>(), {col_def});
+    std::shared_ptr<TableDef> table_def = TableDef::Make(std::make_shared<std::string>("default_db"), std::make_shared<std::string>("t1"), std::make_shared<std::string>(), {col_def});
     std::shared_ptr<DataTable> input_table = DataTable::Make(table_def, TableType::kDataTable);
 
     {
@@ -179,15 +179,15 @@ TEST_F(ExpressionEvaluatorTest, subtract_constant_8192_bigint) {
     std::unique_ptr<NewCatalog> catalog_ptr = std::make_unique<NewCatalog>(kv_store_ptr.get());
     RegisterSubtractFunction(catalog_ptr.get());
 
-    String op = "-";
+    std::string op = "-";
     std::shared_ptr<FunctionSet> function_set = NewCatalog::GetFunctionSetByName(catalog_ptr.get(), op);
     EXPECT_EQ(function_set->type_, FunctionType::kScalar);
     std::shared_ptr<ScalarFunctionSet> scalar_function_set = std::static_pointer_cast<ScalarFunctionSet>(function_set);
 
     // Input expressions
-    Vector<std::shared_ptr<BaseExpression>> exprs;
+    std::vector<std::shared_ptr<BaseExpression>> exprs;
     // Column expression
-    std::shared_ptr<ReferenceExpression> col_expr = std::make_shared<ReferenceExpression>(DataType(LogicalType::kBigInt), "t1", "c1", String(), 0);
+    std::shared_ptr<ReferenceExpression> col_expr = std::make_shared<ReferenceExpression>(DataType(LogicalType::kBigInt), "t1", "c1", std::string(), 0);
     // Value expression
     Value v = Value::MakeBigInt(8192);
     std::shared_ptr<ValueExpression> value_expr = std::make_shared<ValueExpression>(v);
@@ -211,7 +211,7 @@ TEST_F(ExpressionEvaluatorTest, subtract_constant_8192_bigint) {
     ExpressionEvaluator expr_evaluator;
 
     std::shared_ptr<ColumnDef> col_def = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(DataType(LogicalType::kBigInt)), "c1", std::set<ConstraintType>());
-    std::shared_ptr<TableDef> table_def = TableDef::Make(std::make_shared<String>("default_db"), std::make_shared<String>("t1"), std::make_shared<String>(), {col_def});
+    std::shared_ptr<TableDef> table_def = TableDef::Make(std::make_shared<std::string>("default_db"), std::make_shared<std::string>("t1"), std::make_shared<std::string>(), {col_def});
     std::shared_ptr<DataTable> input_table = DataTable::Make(table_def, TableType::kDataTable);
 
     {
