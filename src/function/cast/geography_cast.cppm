@@ -47,9 +47,8 @@ inline BoundCastFunc BindGeographyCast(const DataType &source, DataType &target)
 struct GeographyTryCastToVarlen {
     template <typename SourceType, typename TargetType>
     static inline bool Run(const SourceType &, TargetType &, ColumnVector *) {
-        std::string error_message =
-            fmt::format("Not support to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>());
-        UnrecoverableError(error_message);
+        UnrecoverableError(
+            fmt::format("Not support to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>()));
         return false;
     }
 };

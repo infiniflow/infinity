@@ -36,8 +36,7 @@ MergeKnnFunctionData::MergeKnnFunctionData(i64 query_count,
     : query_count_(query_count), topk_(topk), elem_type_(elem_type), table_ref_(table_ref) {
     switch (elem_type) {
         case EmbeddingDataType::kElemInvalid: {
-            std::string error_message = "Invalid element type";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Invalid element type");
         }
         case EmbeddingDataType::kElemUInt8:
         case EmbeddingDataType::kElemInt8:
@@ -46,8 +45,7 @@ MergeKnnFunctionData::MergeKnnFunctionData(i64 query_count,
             break;
         }
         default: {
-            Status status = Status::NotSupport("Not implemented");
-            RecoverableError(status);
+            RecoverableError(Status::NotSupport("Not implemented"));
         }
     }
 }
@@ -56,8 +54,7 @@ template <typename DatType, typename DistType>
 void MergeKnnFunctionData::InitMergeKnn(KnnDistanceType knn_distance_type) {
     switch (knn_distance_type) {
         case KnnDistanceType::kInvalid: {
-            std::string error_message = "Invalid knn distance type";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Invalid knn distance type");
         }
         case KnnDistanceType::kL2:
         case KnnDistanceType::kHamming: {

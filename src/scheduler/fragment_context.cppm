@@ -26,6 +26,8 @@ import :create_index_data;
 import :compact_state_data;
 import :query_context;
 
+import std;
+import std.compat;
 import third_party;
 
 namespace infinity {

@@ -93,10 +93,9 @@ void SparseTryCastToSparseFunInner(const SparseInfo *source_info,
         } else {
             auto target_indice_tmp_ptr = std::make_unique_for_overwrite<TargetIndiceType[]>(source_nnz);
             if (!EmbeddingTryCastToFixlen::Run(source_sparse_ref.indices_, target_indice_tmp_ptr.get(), source_nnz)) {
-                std::string error_message = fmt::format("Fail to case from sparse with idx {} to sparse with idx {}",
-                                                   DataType::TypeToString<SourceIndiceType>(),
-                                                   DataType::TypeToString<TargetIndiceType>());
-                UnrecoverableError(error_message);
+                UnrecoverableError(fmt::format("Fail to case from sparse with idx {} to sparse with idx {}",
+                                               DataType::TypeToString<SourceIndiceType>(),
+                                               DataType::TypeToString<TargetIndiceType>()));
             }
             SparseVecRef<TargetValueType, TargetIndiceType> target_sparse_ref{static_cast<i32>(source_nnz),
                                                                               target_indice_tmp_ptr.get(),
@@ -108,10 +107,9 @@ void SparseTryCastToSparseFunInner(const SparseInfo *source_info,
         if constexpr (!std::is_same_v<TargetValueType, BooleanT>) {
             target_value_tmp_ptr = std::make_unique_for_overwrite<TargetValueType[]>(source_nnz);
             if (!EmbeddingTryCastToFixlen::Run(source_sparse_ref.data_, target_value_tmp_ptr.get(), source_nnz)) {
-                std::string error_message = fmt::format("Fail to case from sparse with idx {} to sparse with idx {}",
-                                                   DataType::TypeToString<SourceIndiceType>(),
-                                                   DataType::TypeToString<TargetIndiceType>());
-                UnrecoverableError(error_message);
+                UnrecoverableError(fmt::format("Fail to case from sparse with idx {} to sparse with idx {}",
+                                               DataType::TypeToString<SourceIndiceType>(),
+                                               DataType::TypeToString<TargetIndiceType>()));
             }
         }
         if constexpr (std::is_same_v<TargetIndiceType, SourceIndiceType>) {
@@ -122,10 +120,9 @@ void SparseTryCastToSparseFunInner(const SparseInfo *source_info,
         } else {
             auto target_indice_tmp_ptr = std::make_unique_for_overwrite<TargetIndiceType[]>(source_nnz);
             if (!EmbeddingTryCastToFixlen::Run(source_sparse_ref.indices_, target_indice_tmp_ptr.get(), source_nnz)) {
-                std::string error_message = fmt::format("Fail to case from sparse with idx {} to sparse with idx {}",
-                                                   DataType::TypeToString<SourceIndiceType>(),
-                                                   DataType::TypeToString<TargetIndiceType>());
-                UnrecoverableError(error_message);
+                UnrecoverableError(fmt::format("Fail to case from sparse with idx {} to sparse with idx {}",
+                                               DataType::TypeToString<SourceIndiceType>(),
+                                               DataType::TypeToString<TargetIndiceType>()));
             }
             SparseVecRef<TargetValueType, TargetIndiceType> target_sparse_ref{static_cast<i32>(source_nnz),
                                                                               target_indice_tmp_ptr.get(),

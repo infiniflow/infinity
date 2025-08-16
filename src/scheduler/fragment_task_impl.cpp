@@ -168,8 +168,7 @@ bool FragmentTask::CompleteTask() {
         if (status_ == FragmentTaskStatus::kRunning) {
             status_ = FragmentTaskStatus::kFinished;
         } else if (status_ != FragmentTaskStatus::kError) {
-            std::string error_message = "Status should be an error status";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Status should be an error status");
         }
     }
     FragmentContext *fragment_context = (FragmentContext *)fragment_context_;

@@ -99,8 +99,7 @@ export inline BoundCastFunc BindEmbeddingCast(const DataType &source, const Data
             return BindEmbeddingCast<BFloat16T>(target_info);
         }
         case EmbeddingDataType::kElemInvalid: {
-            std::string error_message = "Unreachable code";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Unreachable code");
         }
     }
     return BoundCastFunc(nullptr);
@@ -140,8 +139,7 @@ inline BoundCastFunc BindEmbeddingCast(const EmbeddingInfo *target) {
             return BoundCastFunc(&ColumnVectorCast::TryCastColumnVectorEmbedding<SourceElemType, BFloat16T, EmbeddingTryCastToFixlen>);
         }
         case EmbeddingDataType::kElemInvalid: {
-            std::string error_message = "Unreachable code";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Unreachable code");
         }
     }
     return BoundCastFunc(nullptr);
@@ -156,10 +154,9 @@ struct EmbeddingTryCastToFixlen {
                             std::is_same_v<SourceElemType, BigIntT> || std::is_same_v<SourceElemType, FloatT> ||
                             std::is_same_v<SourceElemType, DoubleT> || std::is_same_v<SourceElemType, Float16T> ||
                             std::is_same_v<SourceElemType, BFloat16T>)) {
-                std::string error_message = fmt::format("Not support to cast from {} to {}",
-                                                   DataType::TypeToString<SourceElemType>(),
-                                                   DataType::TypeToString<TargetElemType>());
-                UnrecoverableError(error_message);
+                UnrecoverableError(fmt::format("Not support to cast from {} to {}",
+                                               DataType::TypeToString<SourceElemType>(),
+                                               DataType::TypeToString<TargetElemType>()));
             }
             auto *dst = reinterpret_cast<u8 *>(target);
             std::fill_n(dst, (len + 7) / 8, 0);
@@ -175,10 +172,9 @@ struct EmbeddingTryCastToFixlen {
                             std::is_same_v<TargetElemType, BigIntT> || std::is_same_v<TargetElemType, FloatT> ||
                             std::is_same_v<TargetElemType, DoubleT> || std::is_same_v<TargetElemType, Float16T> ||
                             std::is_same_v<TargetElemType, BFloat16T>)) {
-                std::string error_message = fmt::format("Not support to cast from {} to {}",
-                                                   DataType::TypeToString<SourceElemType>(),
-                                                   DataType::TypeToString<TargetElemType>());
-                UnrecoverableError(error_message);
+                UnrecoverableError(fmt::format("Not support to cast from {} to {}",
+                                               DataType::TypeToString<SourceElemType>(),
+                                               DataType::TypeToString<TargetElemType>()));
             }
             const auto *src = reinterpret_cast<const u8 *>(source);
             for (size_t i = 0; i < len; ++i) {
@@ -212,9 +208,8 @@ struct EmbeddingTryCastToFixlen {
             }
             return true;
         } else {
-            std::string error_message =
-                fmt::format("Not support to cast from {} to {}", DataType::TypeToString<SourceElemType>(), DataType::TypeToString<TargetElemType>());
-            UnrecoverableError(error_message);
+            UnrecoverableError(
+                fmt::format("Not support to cast from {} to {}", DataType::TypeToString<SourceElemType>(), DataType::TypeToString<TargetElemType>()));
             return false;
         }
     }
@@ -236,11 +231,10 @@ inline bool EmbeddingTryCastToVarlen::Run(const EmbeddingT &source,
                                           const DataType &target_type,
                                           ColumnVector *vector_ptr) {
     if (source_type.type() != LogicalType::kEmbedding) {
-        std::string error_message = fmt::format("Type here is expected as Embedding, but actually it is: {}", source_type.ToString());
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("Type here is expected as Embedding, but actually it is: {}", source_type.ToString()));
     }
 
-    EmbeddingInfo *embedding_info = (EmbeddingInfo *)(source_type.type_info().get());
+    auto *embedding_info = static_cast<EmbeddingInfo *>(source_type.type_info().get());
 
     LOG_TRACE(fmt::format("EmbeddingInfo Dimension: {}", embedding_info->Dimension()));
 
@@ -432,10 +426,9 @@ void EmbeddingTryCastToSparseImpl(const EmbeddingT &source,
     } else {
         auto target_tmp_ptr = std::make_unique_for_overwrite<IdxT[]>(source_dim);
         if (!EmbeddingTryCastToFixlen::Run(reinterpret_cast<const SourceType *>(source.ptr), target_tmp_ptr.get(), source_dim)) {
-            std::string error_message = fmt::format("Failed to cast from embedding with type {} to sparse with type {}",
-                                               DataType::TypeToString<SourceType>(),
-                                               DataType::TypeToString<IdxT>());
-            UnrecoverableError(error_message);
+            UnrecoverableError(fmt::format("Failed to cast from embedding with type {} to sparse with type {}",
+                                           DataType::TypeToString<SourceType>(),
+                                           DataType::TypeToString<IdxT>()));
         }
         target_vector_ptr->AppendSparseInner(source_dim, static_cast<const bool *>(nullptr), target_tmp_ptr.get(), target);
     }
@@ -478,15 +471,13 @@ inline bool EmbeddingTryCastToVarlen::Run(const EmbeddingT &source,
                                           const DataType &target_type,
                                           ColumnVector *target_vector_ptr) {
     if (source_type.type() != LogicalType::kEmbedding) {
-        std::string error_message = fmt::format("Type here is expected as Embedding, but actually it is: {}", source_type.ToString());
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("Type here is expected as Embedding, but actually it is: {}", source_type.ToString()));
     }
     const auto *source_info = static_cast<EmbeddingInfo *>(source_type.type_info().get());
     const auto *target_info = static_cast<SparseInfo *>(target_type.type_info().get());
 
     if (target_info->DataType() != EmbeddingDataType::kElemBit) {
-        std::string error_message = fmt::format("No support data type: {}", EmbeddingType::EmbeddingDataType2String(target_info->IndexType()));
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("No support data type: {}", EmbeddingType::EmbeddingDataType2String(target_info->IndexType())));
     }
     switch (target_info->IndexType()) {
         case EmbeddingDataType::kElemInt8: {
@@ -506,8 +497,7 @@ inline bool EmbeddingTryCastToVarlen::Run(const EmbeddingT &source,
             break;
         }
         default: {
-            std::string error_message = fmt::format("No support data type: {}", EmbeddingType::EmbeddingDataType2String(target_info->IndexType()));
-            UnrecoverableError(error_message);
+            UnrecoverableError(fmt::format("No support data type: {}", EmbeddingType::EmbeddingDataType2String(target_info->IndexType())));
         }
     }
     return true;

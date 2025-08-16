@@ -52,8 +52,7 @@ struct ColumnValueReaderTypeLessFunction {
 
 template <>
 inline void LessFunction::Run(MixedT, BigIntT, bool &) {
-    std::string error_message = "Not implement: LessFunction::Run";
-    UnrecoverableError(error_message);
+    UnrecoverableError("Not implement: LessFunction::Run");
 }
 
 template <>
@@ -63,8 +62,7 @@ inline void LessFunction::Run(BigIntT left, MixedT right, bool &result) {
 
 template <>
 inline void LessFunction::Run(MixedT, DoubleT, bool &) {
-    std::string error_message = "Not implement: LessFunction::Run";
-    UnrecoverableError(error_message);
+    UnrecoverableError("Not implement: LessFunction::Run");
 }
 
 template <>
@@ -74,8 +72,7 @@ inline void LessFunction::Run(DoubleT left, MixedT right, bool &result) {
 
 template <>
 inline void LessFunction::Run(MixedT, VarcharT, bool &) {
-    std::string error_message = "Not implement: LessFunction::Run";
-    UnrecoverableError(error_message);
+    UnrecoverableError("Not implement: LessFunction::Run");
 }
 
 template <>

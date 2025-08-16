@@ -12,8 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:default_values;
 
 import :infinity_type;
@@ -30,11 +28,11 @@ export {
     constexpr u64 INVALID_COLUMN_ID = std::numeric_limits<u64>::max();
 
     // hidden columns' id
-    constexpr ColumnID COLUMN_IDENTIFIER_ROW_ID = (ColumnID)(std::numeric_limits<u64>::max() - 1);
-    constexpr ColumnID COLUMN_IDENTIFIER_CREATE = (ColumnID)(std::numeric_limits<u64>::max() - 2);
-    constexpr ColumnID COLUMN_IDENTIFIER_DELETE = (ColumnID)(std::numeric_limits<u64>::max() - 3);
-    constexpr ColumnID COLUMN_IDENTIFIER_SCORE = (ColumnID)(std::numeric_limits<u64>::max() - 4);
-    constexpr ColumnID COLUMN_IDENTIFIER_DISTANCE = (ColumnID)(std::numeric_limits<u64>::max() - 5);
+    constexpr ColumnID COLUMN_IDENTIFIER_ROW_ID = static_cast<ColumnID>(std::numeric_limits<u64>::max() - 1);
+    constexpr ColumnID COLUMN_IDENTIFIER_CREATE = static_cast<ColumnID>(std::numeric_limits<u64>::max() - 2);
+    constexpr ColumnID COLUMN_IDENTIFIER_DELETE = static_cast<ColumnID>(std::numeric_limits<u64>::max() - 3);
+    constexpr ColumnID COLUMN_IDENTIFIER_SCORE = static_cast<ColumnID>(std::numeric_limits<u64>::max() - 4);
+    constexpr ColumnID COLUMN_IDENTIFIER_DISTANCE = static_cast<ColumnID>(std::numeric_limits<u64>::max() - 5);
     constexpr std::string_view COLUMN_NAME_ROW_ID = "__rowid";
     constexpr std::string_view COLUMN_NAME_CREATE = "__create";
     constexpr std::string_view COLUMN_NAME_DELETE = "__delete";
@@ -71,8 +69,8 @@ export {
     // segment related constants
     constexpr size_t DEFAULT_SEGMENT_CAPACITY = 1024 * 8192; // 1024 * 8192 = 8M rows
     constexpr size_t DEFAULT_BLOCK_PER_SEGMENT = DEFAULT_SEGMENT_CAPACITY / DEFAULT_BLOCK_CAPACITY;
-    constexpr size_t SEGMENT_OFFSET_IN_DOCID = 23;           // it should be adjusted together with DEFAULT_SEGMENT_CAPACITY
-    constexpr u64 SEGMENT_MASK_IN_DOCID = 0x7FFFFF;         // it should be adjusted together with DEFAULT_SEGMENT_CAPACITY
+    constexpr size_t SEGMENT_OFFSET_IN_DOCID = 23;  // it should be adjusted together with DEFAULT_SEGMENT_CAPACITY
+    constexpr u64 SEGMENT_MASK_IN_DOCID = 0x7FFFFF; // it should be adjusted together with DEFAULT_SEGMENT_CAPACITY
     constexpr u32 INVALID_SEGMENT_ID = std::numeric_limits<u32>::max();
 
     // queue related constants, TODO: double check the necessary
@@ -101,17 +99,17 @@ export {
     constexpr size_t MIN_CLEANUP_INTERVAL_SEC = 0; // 0 means disable the function
     constexpr size_t DEFAULT_CLEANUP_INTERVAL_SEC = 10;
     constexpr std::string_view DEFAULT_CLEANUP_INTERVAL_SEC_STR = "10s"; // 10 seconds
-    constexpr size_t MAX_CLEANUP_INTERVAL_SEC = 60 * 60 * 24 * 30;        // 1 month
+    constexpr size_t MAX_CLEANUP_INTERVAL_SEC = 60 * 60 * 24 * 30;       // 1 month
 
     constexpr size_t MIN_COMPACT_INTERVAL_SEC = 0; // 0 means disable the function
     constexpr size_t DEFAULT_COMPACT_INTERVAL_SEC = 10;
     constexpr std::string_view DEFAULT_COMPACT_INTERVAL_SEC_STR = "10s"; // 10 seconds
-    constexpr size_t MAX_COMPACT_INTERVAL_SEC = 60 * 60 * 24 * 30;        // 1 month
+    constexpr size_t MAX_COMPACT_INTERVAL_SEC = 60 * 60 * 24 * 30;       // 1 month
 
     constexpr size_t MIN_OPTIMIZE_INTERVAL_SEC = 1;
     constexpr size_t DEFAULT_OPTIMIZE_INTERVAL_SEC = 10;
     constexpr std::string_view DEFAULT_OPTIMIZE_INTERVAL_SEC_STR = "10s"; // 10 seconds
-    constexpr size_t MAX_OPTIMIZE_INTERVAL_SEC = 60 * 60 * 24 * 30;        // 1 month
+    constexpr size_t MAX_OPTIMIZE_INTERVAL_SEC = 60 * 60 * 24 * 30;       // 1 month
 
     constexpr size_t MIN_MEMINDEX_CAPACITY = DEFAULT_BLOCK_CAPACITY;         // 1 Block
     constexpr size_t DEFAULT_MEMINDEX_CAPACITY = 8 * DEFAULT_BLOCK_CAPACITY; // 8 * 8192 = 65536 rows
@@ -156,14 +154,14 @@ export {
     constexpr size_t DISKANN_NUM_PQ_CHUNKS = 4;
     constexpr size_t DISKANN_NUM_PARTS = 1;
     constexpr size_t DISKANN_MAX_PQ_CHUNKS = 100;
-    constexpr size_t DISKANN_TRAINING_SET_SIZE = 100000;        // sample rate = data_size/TRAINING_SET_SIZE
+    constexpr size_t DISKANN_TRAINING_SET_SIZE = 100000;       // sample rate = data_size/TRAINING_SET_SIZE
     constexpr f64 DISKANN_SPACE_FOR_CACHED_NODES_IN_GB = 0.25; // cache vector memory in GB
     constexpr f64 DISKANN_THRESHOLD_FOR_CACHING_IN_GB = 1.0;   //
     constexpr u32 DISKANN_NUM_NODES_TO_CACHE = 250000;         // cache node num
     constexpr u32 DISKANN_WARMUP_L = 20;
-    constexpr u32 DISKANN_NUM_KMEANS_REPS = 12;       // max iterations of lloyds kmeans
-    constexpr u32 DISKANN_NUM_CENTERS = 256;          // number of centers for pq chunk
-    constexpr f32 DISKANN_GRAPH_SLACK_FACTOR = 1.3f;  // In-mem index reserve factor
+    constexpr u32 DISKANN_NUM_KMEANS_REPS = 12;        // max iterations of lloyds kmeans
+    constexpr u32 DISKANN_NUM_CENTERS = 256;           // number of centers for pq chunk
+    constexpr f32 DISKANN_GRAPH_SLACK_FACTOR = 1.3f;   // In-mem index reserve factor
     constexpr size_t DISKANN_MAX_GRAPH_DEGREE = 512;   // SSD index max degree
     constexpr size_t DISKANN_SECTOR_LEN = 4096u;       // SSD index sector size
     constexpr size_t DISKANN_MAX_N_SECTOR_READS = 128; // SSD index max sector reads
@@ -194,9 +192,9 @@ export {
     constexpr std::string_view DEFAULT_BUFFER_MANAGER_SIZE_STR = "8GB"; // 8Gib
 
     constexpr size_t DEFAULT_MEMINDEX_MEMORY_QUOTA = 4 * 1024lu * 1024lu * 1024lu; // 4GB
-    constexpr std::string_view DEFAULT_MEMINDEX_MEMORY_QUOTA_STR = "4GB";         // 4GB
+    constexpr std::string_view DEFAULT_MEMINDEX_MEMORY_QUOTA_STR = "4GB";          // 4GB
 
-    constexpr size_t DEFAULT_LOG_FILE_SIZE = 64 * 1024lu * 1024lu;  // 64MB
+    constexpr size_t DEFAULT_LOG_FILE_SIZE = 64 * 1024lu * 1024lu; // 64MB
     constexpr std::string_view DEFAULT_LOG_FILE_SIZE_STR = "64MB"; // 64MB
 
     constexpr size_t INSERT_BATCH_ROW_LIMIT = 8192;
@@ -209,12 +207,12 @@ export {
     // default persistence parameter
     constexpr std::string_view DEFAULT_PERSISTENCE_DIR = "/var/infinity/persistence";
     constexpr std::string_view DEFAULT_PERSISTENCE_OBJECT_SIZE_LIMIT_STR = "128MB"; // 128MB
-    constexpr size_t DEFAULT_PERSISTENCE_OBJECT_SIZE_LIMIT = 128 * 1024lu * 1024lu;  // 128MB
+    constexpr size_t DEFAULT_PERSISTENCE_OBJECT_SIZE_LIMIT = 128 * 1024lu * 1024lu; // 128MB
 
     constexpr std::string_view DEFAULT_STORAGE_TYPE = "local";
     constexpr std::string_view DEFAULT_OBJECT_STORAGE_BUCKET = "infinity";
     constexpr std::string_view DEFAULT_OBJECT_STORAGE_DISK_CACHE_DIR = "/var/infinity/localdiskcache";
-    constexpr std::string_view DEFAULT_OBJECT_STORAGE_DISK_CACHE_LIMIT_STR = "128GB";         // 128GB
+    constexpr std::string_view DEFAULT_OBJECT_STORAGE_DISK_CACHE_LIMIT_STR = "128GB";          // 128GB
     constexpr size_t DEFAULT_OBJECT_STORAGE_DISK_CACHE_LIMIT = 128 * 1024lu * 1024lu * 1024lu; // 128GB
 
     // network

@@ -609,17 +609,14 @@ void ColumnVector::Initialize(ColumnVectorType vector_type, const ColumnVector &
                 CopyFrom<MixedT>(other.buffer_.get(), this->buffer_.get(), start_idx, 0, end_idx - start_idx);
                 break;
 #endif
-                Status status = Status::NotSupport("Not implemented");
-                RecoverableError(status);
+                [[fallthrough]];
             }
             case LogicalType::kEmptyArray:
-            case LogicalType::kNull: {
-                Status status = Status::NotSupport("Not implemented");
-                RecoverableError(status);
-            }
+                [[fallthrough]];
+            case LogicalType::kNull:
+                [[fallthrough]];
             case LogicalType::kMissing: {
-                Status status = Status::NotSupport("Not implemented");
-                RecoverableError(status);
+                RecoverableError(Status::NotSupport("Not implemented"));
             }
             case LogicalType::kInvalid: {
                 UnrecoverableError("Invalid data type");
@@ -797,17 +794,13 @@ void ColumnVector::CopyRow(const ColumnVector &other, size_t dst_idx, size_t src
             break;
         }
         case LogicalType::kEmptyArray:
-        case LogicalType::kNull: {
-            Status status = Status::NotSupport("Not implemented");
-            RecoverableError(status);
-        }
-        case LogicalType::kMissing: {
-            Status status = Status::NotSupport("Not implemented");
-            RecoverableError(status);
-        }
+            [[fallthrough]];
+        case LogicalType::kNull:
+            [[fallthrough]];
+        case LogicalType::kMissing:
+            [[fallthrough]];
         case LogicalType::kInvalid: {
-            Status status = Status::NotSupport("Not implemented");
-            RecoverableError(status);
+            RecoverableError(Status::NotSupport("Not implemented"));
         }
         default: {
             UnrecoverableError("std::tuple is not implement.");
@@ -845,10 +838,6 @@ std::string ColumnVector::ToString(size_t row_index) const {
         case LogicalType::kBigInt: {
             return std::to_string(((BigIntT *)data_ptr_)[row_index]);
         }
-        case LogicalType::kHugeInt: {
-            Status status = Status::NotSupport("Not implemented");
-            RecoverableError(status);
-        }
         case LogicalType::kFloat: {
             return std::to_string(((FloatT *)data_ptr_)[row_index]);
         }
@@ -860,10 +849,6 @@ std::string ColumnVector::ToString(size_t row_index) const {
         }
         case LogicalType::kBFloat16: {
             return std::to_string(static_cast<float>(((BFloat16T *)data_ptr_)[row_index]));
-        }
-        case LogicalType::kDecimal: {
-            Status status = Status::NotSupport("Not implemented");
-            RecoverableError(status);
         }
         case LogicalType::kVarchar: {
             std::span<const char> data = this->GetVarchar(row_index);
@@ -881,53 +866,43 @@ std::string ColumnVector::ToString(size_t row_index) const {
         case LogicalType::kTimestamp: {
             return ((TimestampT *)data_ptr_)[row_index].ToString();
         }
-        case LogicalType::kInterval: {
-            Status status = Status::NotSupport("Not implemented");
-            RecoverableError(status);
-        }
-        case LogicalType::kTuple: {
-            Status status = Status::NotSupport("Not implemented");
-            RecoverableError(status);
-        }
-        case LogicalType::kPoint: {
-            Status status = Status::NotSupport("Not implemented");
-            RecoverableError(status);
-        }
-        case LogicalType::kLine: {
-            Status status = Status::NotSupport("Not implemented");
-            RecoverableError(status);
-        }
-        case LogicalType::kLineSeg: {
-            Status status = Status::NotSupport("Not implemented");
-            RecoverableError(status);
-        }
-        case LogicalType::kBox: {
-            Status status = Status::NotSupport("Not implemented");
-            RecoverableError(status);
-        }
+        case LogicalType::kInterval:
+            [[fallthrough]];
+        case LogicalType::kTuple:
+            [[fallthrough]];
+        case LogicalType::kPoint:
+            [[fallthrough]];
+        case LogicalType::kLine:
+            [[fallthrough]];
+        case LogicalType::kLineSeg:
+            [[fallthrough]];
+        case LogicalType::kBox:
+            [[fallthrough]];
             //        case kPath: {
             //        }
             //        case kPolygon: {
             //        }
-        case LogicalType::kCircle: {
-            Status status = Status::NotSupport("Not implemented");
-            RecoverableError(status);
-        }
+        case LogicalType::kCircle:
+            [[fallthrough]];
             //        case kBitmap: {
             //        }
-        case LogicalType::kUuid: {
-            Status status = Status::NotSupport("Not implemented");
-            RecoverableError(status);
+        case LogicalType::kUuid:
+            [[fallthrough]];
+        case LogicalType::kDecimal:
+            [[fallthrough]];
+        case LogicalType::kMixed:
+            [[fallthrough]];
+        case LogicalType::kHugeInt: {
+            RecoverableError(Status::NotSupport("Not implemented"));
         }
             //        case kBlob: {
             //        }
         case LogicalType::kEmbedding: {
             //            RecoverableError(Status::NotSupport("Not implemented"));
             if (data_type_->type_info()->type() != TypeInfoType::kEmbedding) {
-                Status status = Status::NotSupport("Not implemented");
-                RecoverableError(status);
+                RecoverableError(Status::NotSupport("Not implemented"));
             }
-            EmbeddingInfo *embedding_info = static_cast<EmbeddingInfo *>(data_type_->type_info().get());
+            auto *embedding_info = static_cast<EmbeddingInfo *>(data_type_->type_info().get());
             EmbeddingT embedding_element(nullptr, false);
             embedding_element.ptr = (data_ptr_ + row_index * data_type_->type_info()->Size());
             std::string embedding_str = EmbeddingT::Embedding2String(embedding_element, embedding_info->Type(), embedding_info->Dimension());
@@ -974,19 +949,18 @@ std::string ColumnVector::ToString(size_t row_index) const {
         case LogicalType::kRowID: {
             return (((RowID *)data_ptr_)[row_index]).ToString();
         }
-        case LogicalType::kMixed: {
-            Status status = Status::NotSupport("Not implemented");
-            RecoverableError(status);
-        }
         case LogicalType::kNull:
+            [[fallthrough]];
         case LogicalType::kMissing:
+            [[fallthrough]];
         case LogicalType::kEmptyArray:
+            [[fallthrough]];
         case LogicalType::kInvalid: {
             UnrecoverableError("Attempt to access an unaccepted type");
             // Null/Missing/Invalid
         }
     }
-    return std::string();
+    return std::string{};
 }
 
 Value ColumnVector::GetValueByIndex(size_t index) const {
@@ -995,9 +969,8 @@ Value ColumnVector::GetValueByIndex(size_t index) const {
     }
     size_t tail_index = tail_index_.load();
     if (index >= tail_index) {
-        std::string error_message =
-            fmt::format("Attempt to access an invalid index of column vector: {}, current tail index: {}", std::to_string(index), tail_index);
-        UnrecoverableError(error_message);
+        UnrecoverableError(
+            fmt::format("Attempt to access an invalid index of column vector: {}, current tail index: {}", std::to_string(index), tail_index));
     }
 
     // Not valid, make a same data type with null indicator
@@ -1136,9 +1109,13 @@ Value ColumnVector::GetArrayValueRecursively(const DataType &data_type, const ch
             return Value::MakeRow(*reinterpret_cast<const RowID *>(data_ptr));
         }
         case LogicalType::kMixed:
+            [[fallthrough]];
         case LogicalType::kNull:
+            [[fallthrough]];
         case LogicalType::kMissing:
+            [[fallthrough]];
         case LogicalType::kEmptyArray:
+            [[fallthrough]];
         case LogicalType::kInvalid: {
             UnrecoverableError(fmt::format("{}: Attempt to access an unaccepted type", __func__));
         }
@@ -1152,21 +1129,19 @@ void ColumnVector::SetValueByIndex(size_t index, const Value &value) {
     }
     size_t tail_index = tail_index_.load();
     if (index > tail_index || index >= capacity_) {
-        std::string error_message =
+        UnrecoverableError(
             fmt::format("Attempt to store value into unavailable row of column vector: {}, current column tail index: {}, capacity: {}",
                         std::to_string(index),
                         std::to_string(tail_index),
-                        std::to_string(capacity_));
-        UnrecoverableError(error_message);
+                        std::to_string(capacity_)));
     }
 
     // TODO: Check if the value type is same as column vector type
     // TODO: if not, try to cast
     if (value.type() != *data_type_) {
-        std::string error_message = fmt::format("Attempt to store a different type value into column vector: {}, column vector type: {}",
-                                           value.type().ToString(),
-                                           data_type_->ToString());
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("Attempt to store a different type value into column vector: {}, column vector type: {}",
+                                       value.type().ToString(),
+                                       data_type_->ToString()));
     }
 
     // TODO: Check if the value is null, then set the column vector validity.
@@ -1365,8 +1340,11 @@ void ColumnVector::SetArrayValueRecursively(const Value &value, char *dst_ptr) {
             break;
         }
         case LogicalType::kMixed:
+            [[fallthrough]];
         case LogicalType::kNull:
+            [[fallthrough]];
         case LogicalType::kMissing:
+            [[fallthrough]];
         case LogicalType::kInvalid: {
             UnrecoverableError(fmt::format("{}: Attempt to access an unaccepted type", __func__));
         }
@@ -1380,9 +1358,9 @@ void ColumnVector::Finalize(size_t index) {
     tail_index_.store(index);
 }
 
-char * ColumnVector::GetRawPtr(size_t index) { return data_ptr_ + index * data_type_->Size(); }
+char *ColumnVector::GetRawPtr(size_t index) { return data_ptr_ + index * data_type_->Size(); }
 
-void ColumnVector::SetByRawPtr(size_t index, const char * raw_ptr) {
+void ColumnVector::SetByRawPtr(size_t index, const char *raw_ptr) {
     if (!initialized) {
         UnrecoverableError("Column vector isn't initialized.");
     }
@@ -1391,12 +1369,11 @@ void ColumnVector::SetByRawPtr(size_t index, const char * raw_ptr) {
     }
     size_t tail_index = tail_index_.load();
     if (index > tail_index) {
-        std::string error_message =
+        UnrecoverableError(
             fmt::format("Attempt to store value into unavailable row of column vector: {}, current column tail index: {}, capacity: {}",
                         std::to_string(index),
                         std::to_string(tail_index),
-                        std::to_string(capacity_));
-        UnrecoverableError(error_message);
+                        std::to_string(capacity_)));
     }
     // We assume the value_ptr point to the same type data.
 
@@ -1522,7 +1499,7 @@ void ColumnVector::SetByRawPtr(size_t index, const char * raw_ptr) {
         }
         case LogicalType::kEmbedding: {
             //            auto *embedding_ptr = (EmbeddingT *)(value_ptr);
-            char * ptr = data_ptr_ + index * data_type_->Size();
+            char *ptr = data_ptr_ + index * data_type_->Size();
             std::memcpy(ptr, raw_ptr, data_type_->Size());
             break;
         }
@@ -1535,8 +1512,11 @@ void ColumnVector::SetByRawPtr(size_t index, const char * raw_ptr) {
             break;
         }
         case LogicalType::kNull:
+            [[fallthrough]];
         case LogicalType::kMissing:
+            [[fallthrough]];
         case LogicalType::kEmptyArray:
+            [[fallthrough]];
         case LogicalType::kInvalid: {
             UnrecoverableError("Attempt to access an unaccepted type");
 
@@ -1545,7 +1525,7 @@ void ColumnVector::SetByRawPtr(size_t index, const char * raw_ptr) {
     }
 }
 
-void ColumnVector::AppendByPtr(const char * value_ptr) {
+void ColumnVector::AppendByPtr(const char *value_ptr) {
     if (!initialized) {
         UnrecoverableError("Column vector isn't initialized.");
     }
@@ -2020,23 +2000,37 @@ void ColumnVector::AppendByStringView(std::string_view sv) {
             break;
         }
         case LogicalType::kHugeInt:
+            [[fallthrough]];
         case LogicalType::kDecimal:
+            [[fallthrough]];
         case LogicalType::kInterval:
+            [[fallthrough]];
         case LogicalType::kTuple:
+            [[fallthrough]];
         case LogicalType::kPoint:
+            [[fallthrough]];
         case LogicalType::kLine:
+            [[fallthrough]];
         case LogicalType::kLineSeg:
+            [[fallthrough]];
         case LogicalType::kBox:
+            [[fallthrough]];
         case LogicalType::kCircle:
+            [[fallthrough]];
         case LogicalType::kUuid:
+            [[fallthrough]];
         case LogicalType::kRowID:
+            [[fallthrough]];
         case LogicalType::kMixed:
+            [[fallthrough]];
         case LogicalType::kNull:
+            [[fallthrough]];
         case LogicalType::kMissing:
+            [[fallthrough]];
         case LogicalType::kEmptyArray:
+            [[fallthrough]];
         case LogicalType::kInvalid: {
-            Status status = Status::NotSupport("Not implemented");
-            RecoverableError(status);
+            RecoverableError(Status::NotSupport("Not implemented"));
         }
     }
 }
@@ -2068,16 +2062,14 @@ void ColumnVector::AppendWith(const ColumnVector &other, size_t from, size_t cou
     }
 
     if (*this->data_type_ != *other.data_type_) {
-        std::string error_message =
-            fmt::format("Attempt to append column vector {} to column vector {}", other.data_type_->ToString(), data_type_->ToString());
-        UnrecoverableError(error_message);
+        UnrecoverableError(
+            fmt::format("Attempt to append column vector {} to column vector {}", other.data_type_->ToString(), data_type_->ToString()));
     }
 
     size_t tail_index = tail_index_.load();
     if (tail_index + count > this->capacity_) {
-        std::string error_message =
-            fmt::format("Attempt to append {} rows data to {} rows data, which exceeds {} limit.", count, tail_index, this->capacity_);
-        UnrecoverableError(error_message);
+        UnrecoverableError(
+            fmt::format("Attempt to append {} rows data to {} rows data, which exceeds {} limit.", count, tail_index, this->capacity_));
     }
 
     switch (data_type_->type()) {
@@ -2248,10 +2240,10 @@ void ColumnVector::AppendWith(const ColumnVector &other, size_t from, size_t cou
         case LogicalType::kEmbedding: {
             //            auto *base_src_ptr = (EmbeddingT *)(other.data_ptr_);
             auto *base_src_ptr = other.data_ptr_;
-            char * base_dst_ptr = data_ptr_ + tail_index_.load() * data_type_->Size();
+            char *base_dst_ptr = data_ptr_ + tail_index_.load() * data_type_->Size();
             for (size_t idx = 0; idx < count; ++idx) {
-                char * src_ptr = base_src_ptr + (from + idx) * data_type_->Size();
-                char * dst_ptr = base_dst_ptr + idx * data_type_->Size();
+                char *src_ptr = base_src_ptr + (from + idx) * data_type_->Size();
+                char *dst_ptr = base_dst_ptr + idx * data_type_->Size();
                 std::memcpy(dst_ptr, src_ptr, data_type_->Size());
             }
             break;
@@ -2265,8 +2257,11 @@ void ColumnVector::AppendWith(const ColumnVector &other, size_t from, size_t cou
             break;
         }
         case LogicalType::kNull:
+            [[fallthrough]];
         case LogicalType::kMissing:
+            [[fallthrough]];
         case LogicalType::kEmptyArray:
+            [[fallthrough]];
         case LogicalType::kInvalid: {
             UnrecoverableError("Attempt to access an unaccepted type");
             // Null/Missing/Invalid
@@ -2291,7 +2286,7 @@ size_t ColumnVector::AppendWith(RowID from, size_t row_count) {
         appended_rows = capacity_ - tail_index;
     }
 
-    char * dst_ptr = data_ptr_ + tail_index * data_type_size_;
+    char *dst_ptr = data_ptr_ + tail_index * data_type_size_;
     for (size_t i = 0; i < row_count; i++) {
         *(RowID *)dst_ptr = RowID(from.segment_id_, from.segment_offset_ + i);
         dst_ptr += data_type_size_;
@@ -2302,9 +2297,8 @@ size_t ColumnVector::AppendWith(RowID from, size_t row_count) {
 
 void ColumnVector::ShallowCopy(const ColumnVector &other) {
     if (*this->data_type_ != *other.data_type_) {
-        std::string error_message =
-            fmt::format("Attempt to shallow copy: {} column vector to: {}", other.data_type_->ToString(), this->data_type_->ToString());
-        UnrecoverableError(error_message);
+        UnrecoverableError(
+            fmt::format("Attempt to shallow copy: {} column vector to: {}", other.data_type_->ToString(), this->data_type_->ToString()));
     }
     if (this->buffer_.get() != other.buffer_.get()) {
         this->buffer_ = other.buffer_;
@@ -2544,7 +2538,8 @@ ColumnVector::GetTensorArray(const TensorArrayT &src_tensor_array, const VectorB
     return res;
 }
 
-std::pair<std::span<const char>, size_t> ColumnVector::GetArray(const ArrayT &src_array, const VectorBuffer *src_buffer, const ArrayInfo *array_info) {
+std::pair<std::span<const char>, size_t>
+ColumnVector::GetArray(const ArrayT &src_array, const VectorBuffer *src_buffer, const ArrayInfo *array_info) {
     const auto elements_bytes = src_array.element_num_ * array_info->ElemSize();
     const char *raw_data = src_buffer->GetArrayRaw(src_array.file_offset_, elements_bytes);
     return {std::span<const char>(raw_data, elements_bytes), src_array.element_num_};
@@ -2821,28 +2816,51 @@ void CopyArray(ArrayT &dst_array,
     };
     switch (elem_type.type()) {
         case LogicalType::kBoolean:
+            [[fallthrough]];
         case LogicalType::kTinyInt:
+            [[fallthrough]];
         case LogicalType::kSmallInt:
+            [[fallthrough]];
         case LogicalType::kInteger:
+            [[fallthrough]];
         case LogicalType::kBigInt:
+            [[fallthrough]];
         case LogicalType::kHugeInt:
+            [[fallthrough]];
         case LogicalType::kDecimal:
+            [[fallthrough]];
         case LogicalType::kFloat:
+            [[fallthrough]];
         case LogicalType::kDouble:
+            [[fallthrough]];
         case LogicalType::kFloat16:
+            [[fallthrough]];
         case LogicalType::kBFloat16:
+            [[fallthrough]];
         case LogicalType::kDate:
+            [[fallthrough]];
         case LogicalType::kTime:
+            [[fallthrough]];
         case LogicalType::kDateTime:
+            [[fallthrough]];
         case LogicalType::kTimestamp:
+            [[fallthrough]];
         case LogicalType::kInterval:
+            [[fallthrough]];
         case LogicalType::kPoint:
+            [[fallthrough]];
         case LogicalType::kLine:
+            [[fallthrough]];
         case LogicalType::kLineSeg:
+            [[fallthrough]];
         case LogicalType::kBox:
+            [[fallthrough]];
         case LogicalType::kCircle:
+            [[fallthrough]];
         case LogicalType::kUuid:
+            [[fallthrough]];
         case LogicalType::kEmbedding:
+            [[fallthrough]];
         case LogicalType::kRowID: {
             dst_array.file_offset_ = dst_vec_buffer->AppendArrayRaw(raw_data.data(), raw_data.size());
             return;
@@ -2872,10 +2890,15 @@ void CopyArray(ArrayT &dst_array,
             return;
         }
         case LogicalType::kMixed:
+            [[fallthrough]];
         case LogicalType::kTuple:
+            [[fallthrough]];
         case LogicalType::kNull:
+            [[fallthrough]];
         case LogicalType::kEmptyArray:
+            [[fallthrough]];
         case LogicalType::kMissing:
+            [[fallthrough]];
         case LogicalType::kInvalid: {
             UnrecoverableError(fmt::format("{}: Unhandled element type: {}", __func__, elem_type.ToString()));
             break;

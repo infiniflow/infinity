@@ -39,8 +39,7 @@ struct OrFunction {
                              std::is_same_v<std::remove_cv_t<TC>, BooleanT>) {
             result = left or right;
         } else {
-            std::string error_message = "OR function accepts only u8 and BooleanT.";
-            UnrecoverableError(error_message);
+            UnrecoverableError("OR function accepts only u8 and BooleanT.");
         }
     }
 };

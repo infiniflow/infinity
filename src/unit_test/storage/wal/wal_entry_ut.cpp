@@ -76,7 +76,8 @@ std::shared_ptr<TableDef> MockTableDesc2() {
         {
             std::set<ConstraintType> constraints;
             constraints.insert(ConstraintType::kNotNull);
-            auto column_def_ptr = std::make_shared<ColumnDef>(column_id++, std::make_shared<DataType>(DataType(LogicalType::kDouble)), "double_col", constraints);
+            auto column_def_ptr =
+                std::make_shared<ColumnDef>(column_id++, std::make_shared<DataType>(DataType(LogicalType::kDouble)), "double_col", constraints);
             columns.emplace_back(column_def_ptr);
         }
     }
@@ -139,8 +140,7 @@ void MockWalFile(const String &wal_file_path, const String &ckp_file_path, const
 
         auto ofs = std::ofstream(wal_file_path, std::ios::app | std::ios::binary);
         if (!ofs.is_open()) {
-            String error_message = fmt::format("Failed to open wal file: {}", wal_file_path);
-            UnrecoverableError(error_message);
+            UnrecoverableError(fmt::format("Failed to open wal file: {}", wal_file_path));
         }
         ofs.write(buf.data(), ptr - buf.data());
         ofs.flush();
@@ -150,7 +150,8 @@ void MockWalFile(const String &wal_file_path, const String &ckp_file_path, const
         auto entry = std::make_shared<WalEntry>();
         Vector<WalSegmentInfo> new_segment_infos(3, MakeSegmentInfo(1, 0, 2));
         Vector<SegmentID> deprecated_segment_ids{0, 1, 2};
-        entry->cmds_.push_back(std::make_shared<WalCmdCompactV2>("db1", "2", "tbl1", "1", std::move(new_segment_infos), std::move(deprecated_segment_ids)));
+        entry->cmds_.push_back(
+            std::make_shared<WalCmdCompactV2>("db1", "2", "tbl1", "1", std::move(new_segment_infos), std::move(deprecated_segment_ids)));
         entry->commit_ts_ = 5;
         i32 expect_size = entry->GetSizeInBytes();
         Vector<char> buf(expect_size);
@@ -161,8 +162,7 @@ void MockWalFile(const String &wal_file_path, const String &ckp_file_path, const
 
         auto ofs = std::ofstream(wal_file_path, std::ios::app | std::ios::binary);
         if (!ofs.is_open()) {
-            String error_message = fmt::format("Failed to open wal file: {}", wal_file_path);
-            UnrecoverableError(error_message);
+            UnrecoverableError(fmt::format("Failed to open wal file: {}", wal_file_path));
         }
         ofs.write(buf.data(), ptr - buf.data());
         ofs.flush();
@@ -181,8 +181,7 @@ void MockWalFile(const String &wal_file_path, const String &ckp_file_path, const
 
         auto ofs = std::ofstream(wal_file_path, std::ios::app | std::ios::binary);
         if (!ofs.is_open()) {
-            String error_message = fmt::format("Failed to open wal file: {}", wal_file_path);
-            UnrecoverableError(error_message);
+            UnrecoverableError(fmt::format("Failed to open wal file: {}", wal_file_path));
         }
         ofs.write(buf.data(), ptr - buf.data());
         ofs.flush();
@@ -201,8 +200,7 @@ void MockWalFile(const String &wal_file_path, const String &ckp_file_path, const
 
         auto ofs = std::ofstream(wal_file_path, std::ios::app | std::ios::binary);
         if (!ofs.is_open()) {
-            String error_message = fmt::format("Failed to open wal file: {}", wal_file_path);
-            UnrecoverableError(error_message);
+            UnrecoverableError(fmt::format("Failed to open wal file: {}", wal_file_path));
         }
         ofs.write(buf.data(), ptr - buf.data());
         ofs.flush();
@@ -228,7 +226,8 @@ TEST_F(WalEntryTest, ReadWrite) {
     {
         Vector<InitParameter *> parameters = {new InitParameter("metric", "ip")};
         std::shared_ptr<String> index_name = std::make_shared<String>("idx1");
-        auto index_base = IndexIVF::Make(index_name, std::make_shared<String>("test comment"), "idx1_tbl1", Vector<String>{"col1", "col2"}, parameters);
+        auto index_base =
+            IndexIVF::Make(index_name, std::make_shared<String>("test comment"), "idx1_tbl1", Vector<String>{"col1", "col2"}, parameters);
         for (auto parameter : parameters) {
             delete parameter;
         }
@@ -277,10 +276,13 @@ TEST_F(WalEntryTest, ReadWrite) {
         Vector<std::shared_ptr<ColumnDef>> column_defs;
         std::set<ConstraintType> constraints;
 
-        auto column_def3 = std::make_shared<ColumnDef>(3 /*column_id*/, std::make_shared<DataType>(LogicalType::kBoolean), "boolean_col", constraints);
+        auto column_def3 =
+            std::make_shared<ColumnDef>(3 /*column_id*/, std::make_shared<DataType>(LogicalType::kBoolean), "boolean_col", constraints);
         auto embedding_info = EmbeddingInfo::Make(EmbeddingDataType::kElemFloat, 16);
-        auto column_def4 =
-            std::make_shared<ColumnDef>(4 /*column id*/, std::make_shared<DataType>(LogicalType::kEmbedding, embedding_info), "embedding_col", constraints);
+        auto column_def4 = std::make_shared<ColumnDef>(4 /*column id*/,
+                                                       std::make_shared<DataType>(LogicalType::kEmbedding, embedding_info),
+                                                       "embedding_col",
+                                                       constraints);
 
         column_defs.push_back(column_def3);
         column_defs.push_back(column_def4);
@@ -327,7 +329,8 @@ TEST_F(WalEntryTest, ReadWriteV2) {
     {
         Vector<InitParameter *> parameters = {new InitParameter("metric", "ip")};
         std::shared_ptr<String> index_name = std::make_shared<String>("idx1");
-        auto index_base = IndexIVF::Make(index_name, std::make_shared<String>("test comment"), "idx1_tbl1", Vector<String>{"col1", "col2"}, parameters);
+        auto index_base =
+            IndexIVF::Make(index_name, std::make_shared<String>("test comment"), "idx1_tbl1", Vector<String>{"col1", "col2"}, parameters);
         for (auto parameter : parameters) {
             delete parameter;
         }
@@ -377,10 +380,13 @@ TEST_F(WalEntryTest, ReadWriteV2) {
         Vector<std::shared_ptr<ColumnDef>> column_defs;
         std::set<ConstraintType> constraints;
 
-        auto column_def3 = std::make_shared<ColumnDef>(3 /*column_id*/, std::make_shared<DataType>(LogicalType::kBoolean), "boolean_col", constraints);
+        auto column_def3 =
+            std::make_shared<ColumnDef>(3 /*column_id*/, std::make_shared<DataType>(LogicalType::kBoolean), "boolean_col", constraints);
         auto embedding_info = EmbeddingInfo::Make(EmbeddingDataType::kElemFloat, 16);
-        auto column_def4 =
-            std::make_shared<ColumnDef>(4 /*column id*/, std::make_shared<DataType>(LogicalType::kEmbedding, embedding_info), "embedding_col", constraints);
+        auto column_def4 = std::make_shared<ColumnDef>(4 /*column id*/,
+                                                       std::make_shared<DataType>(LogicalType::kEmbedding, embedding_info),
+                                                       "embedding_col",
+                                                       constraints);
 
         column_defs.push_back(column_def3);
         column_defs.push_back(column_def4);
@@ -394,13 +400,13 @@ TEST_F(WalEntryTest, ReadWriteV2) {
         column_keys.push_back("column_key1");
         column_keys.push_back("column_key2");
         entry->cmds_.push_back(std::make_shared<WalCmdDropColumnsV2>("db1",
-                                                               "1",
-                                                               "tbl1",
-                                                               "2",
-                                                               std::move(column_names),
-                                                               Vector<ColumnID>{3, 4},
-                                                               "table_key",
-                                                               std::move(column_keys)));
+                                                                     "1",
+                                                                     "tbl1",
+                                                                     "2",
+                                                                     std::move(column_names),
+                                                                     Vector<ColumnID>{3, 4},
+                                                                     "table_key",
+                                                                     std::move(column_keys)));
     }
 
     i32 exp_size = entry->GetSizeInBytes();

@@ -28,7 +28,7 @@ import std.compat;
 import third_party;
 
 import type_info;
-// import array_info;
+import array_info;
 import internal_types;
 import sparse_info;
 import embedding_info;
@@ -198,6 +198,7 @@ void Sparse2JsonInternal(const SparseValueInfo &sparse_value_info, const SparseI
             break;
         }
         case EmbeddingDataType::kElemBit:
+            [[fallthrough]];
         case EmbeddingDataType::kElemInvalid: {
             UnrecoverableError("Not implemented.");
         }
@@ -348,7 +349,8 @@ void TensorArray2Arrow(const std::vector<std::span<char>> &tensor_array, const E
 
 } // namespace
 
-EmbeddingValueInfo::EmbeddingValueInfo(const std::vector<std::pair<char *, size_t>> &ptr_bytes) : ExtraValueInfo(ExtraValueInfoType::EMBEDDING_VALUE_INFO) {
+EmbeddingValueInfo::EmbeddingValueInfo(const std::vector<std::pair<char *, size_t>> &ptr_bytes)
+    : ExtraValueInfo(ExtraValueInfoType::EMBEDDING_VALUE_INFO) {
     len_ = 0;
     for (const auto &[ptr, bytes] : ptr_bytes) {
         len_ += bytes;
@@ -554,7 +556,7 @@ Value Value::MakeVarchar(const VarcharT &input) {
     return value;
 }
 
-Value Value::MakeEmbedding(const char * ptr, std::shared_ptr<TypeInfo> type_info_ptr) {
+Value Value::MakeEmbedding(const char *ptr, std::shared_ptr<TypeInfo> type_info_ptr) {
     if (type_info_ptr->type() != TypeInfoType::kEmbedding) {
         UnrecoverableError(fmt::format("Value::MakeEmbedding(type_info_ptr={}) is not supported!", type_info_ptr->ToString()));
     }
@@ -565,7 +567,7 @@ Value Value::MakeEmbedding(const char * ptr, std::shared_ptr<TypeInfo> type_info
     return value;
 }
 
-Value Value::MakeMultiVector(const char * ptr, size_t bytes, std::shared_ptr<TypeInfo> type_info_ptr) {
+Value Value::MakeMultiVector(const char *ptr, size_t bytes, std::shared_ptr<TypeInfo> type_info_ptr) {
     if (type_info_ptr->type() != TypeInfoType::kEmbedding) {
         UnrecoverableError(fmt::format("Value::MakeMultiVector(type_info_ptr={}) is not supported!", type_info_ptr->ToString()));
     }
@@ -597,7 +599,7 @@ Value Value::MakeMultiVector(const std::vector<std::pair<char *, size_t>> &ptr_b
     return value;
 }
 
-Value Value::MakeTensor(const char * ptr, size_t bytes, std::shared_ptr<TypeInfo> type_info_ptr) {
+Value Value::MakeTensor(const char *ptr, size_t bytes, std::shared_ptr<TypeInfo> type_info_ptr) {
     if (type_info_ptr->type() != TypeInfoType::kEmbedding) {
         UnrecoverableError(fmt::format("Value::MakeTensor(type_info_ptr={}) is not supported!", type_info_ptr->ToString()));
     }
@@ -670,7 +672,7 @@ Value Value::MakeSparse(size_t nnz, std::unique_ptr<char[]> indice_ptr, std::uni
     return value;
 }
 
-void Value::AppendToTensorArray(const char * ptr, size_t bytes) {
+void Value::AppendToTensorArray(const char *ptr, size_t bytes) {
     if (type_.type() != LogicalType::kTensorArray) {
         UnrecoverableError(fmt::format("Value::AppendToTensorArray() is not supported for type {}", type_.ToString()));
     }
@@ -996,6 +998,7 @@ bool Value::operator==(const Value &other) const {
             return value_.row == other.value_.row;
         }
         case LogicalType::kEmptyArray:
+            [[fallthrough]];
         case LogicalType::kNull: {
             return true;
         }
@@ -1005,7 +1008,9 @@ bool Value::operator==(const Value &other) const {
             return s1 == s2;
         }
         case LogicalType::kEmbedding:
+            [[fallthrough]];
         case LogicalType::kMultiVector:
+            [[fallthrough]];
         case LogicalType::kTensor: {
             const std::span<char> data1 = this->GetEmbedding();
             const std::span<char> data2 = other.GetEmbedding();
@@ -1031,9 +1036,13 @@ bool Value::operator==(const Value &other) const {
             return std::ranges::equal(array1, array2);
         }
         case LogicalType::kInterval:
+            [[fallthrough]];
         case LogicalType::kTuple:
+            [[fallthrough]];
         case LogicalType::kMixed:
+            [[fallthrough]];
         case LogicalType::kMissing:
+            [[fallthrough]];
         case LogicalType::kInvalid: {
             UnrecoverableError("Unhandled cases.");
             return false;
@@ -1138,23 +1147,33 @@ void Value::CopyUnionValue(const Value &other) {
             break;
         }
         case LogicalType::kEmptyArray:
+            [[fallthrough]];
         case LogicalType::kNull: {
             // No value for null value.
             break;
         }
         case LogicalType::kArray:
+            [[fallthrough]];
         case LogicalType::kVarchar:
+            [[fallthrough]];
         case LogicalType::kTensor:
+            [[fallthrough]];
         case LogicalType::kTensorArray:
+            [[fallthrough]];
         case LogicalType::kMultiVector:
+            [[fallthrough]];
         case LogicalType::kEmbedding:
+            [[fallthrough]];
         case LogicalType::kSparse: {
             this->value_info_ = other.value_info_;
             break;
         }
         case LogicalType::kTuple:
+            [[fallthrough]];
         case LogicalType::kMixed:
+            [[fallthrough]];
         case LogicalType::kMissing:
+            [[fallthrough]];
         case LogicalType::kInvalid: {
             UnrecoverableError("Unhandled cases.");
             break;
@@ -1258,23 +1277,33 @@ void Value::MoveUnionValue(Value &&other) noexcept {
             break;
         }
         case LogicalType::kEmptyArray:
+            [[fallthrough]];
         case LogicalType::kNull: {
             // No value for null type
             break;
         }
         case LogicalType::kArray:
+            [[fallthrough]];
         case LogicalType::kVarchar:
+            [[fallthrough]];
         case LogicalType::kTensor:
+            [[fallthrough]];
         case LogicalType::kTensorArray:
+            [[fallthrough]];
         case LogicalType::kMultiVector:
+            [[fallthrough]];
         case LogicalType::kEmbedding:
+            [[fallthrough]];
         case LogicalType::kSparse: {
             this->value_info_ = std::move(other.value_info_);
             break;
         }
         case LogicalType::kTuple:
+            [[fallthrough]];
         case LogicalType::kMixed:
+            [[fallthrough]];
         case LogicalType::kMissing:
+            [[fallthrough]];
         case LogicalType::kInvalid: {
             UnrecoverableError("Unhandled cases.");
             break;
@@ -1412,6 +1441,7 @@ std::string Value::ToString() const {
             return EmbeddingT::Embedding2String(embedding, embedding_info->Type(), embedding_info->Dimension());
         }
         case LogicalType::kMultiVector:
+            [[fallthrough]];
         case LogicalType::kTensor: {
             const auto *embedding_info = static_cast<const EmbeddingInfo *>(type_.type_info().get());
             std::span<char> data_span = this->GetEmbedding();
@@ -1492,8 +1522,11 @@ std::string Value::ToString() const {
             return {};
         }
         case LogicalType::kTuple:
+            [[fallthrough]];
         case LogicalType::kNull:
+            [[fallthrough]];
         case LogicalType::kMissing:
+            [[fallthrough]];
         case LogicalType::kInvalid: {
             UnrecoverableError(fmt::format("Value::ToString() not implemented for type {}", type_.ToString()));
             return {};
@@ -1579,6 +1612,7 @@ void Value::AppendToJson(const std::string &name, nlohmann::json &json) const {
             return;
         }
         case LogicalType::kMultiVector:
+            [[fallthrough]];
         case LogicalType::kTensor: {
             const auto *embedding_info = static_cast<const EmbeddingInfo *>(type_.type_info().get());
             Tensor2Json(this->GetEmbedding(), embedding_info->Type(), embedding_info->Dimension(), json[name]);
@@ -1619,17 +1653,29 @@ void Value::AppendToJson(const std::string &name, nlohmann::json &json) const {
             return;
         }
         case LogicalType::kHugeInt:
+            [[fallthrough]];
         case LogicalType::kDecimal:
+            [[fallthrough]];
         case LogicalType::kTuple:
+            [[fallthrough]];
         case LogicalType::kPoint:
+            [[fallthrough]];
         case LogicalType::kLine:
+            [[fallthrough]];
         case LogicalType::kLineSeg:
+            [[fallthrough]];
         case LogicalType::kBox:
+            [[fallthrough]];
         case LogicalType::kCircle:
+            [[fallthrough]];
         case LogicalType::kUuid:
+            [[fallthrough]];
         case LogicalType::kMixed:
+            [[fallthrough]];
         case LogicalType::kNull:
+            [[fallthrough]];
         case LogicalType::kMissing:
+            [[fallthrough]];
         case LogicalType::kInvalid: {
             UnrecoverableError(fmt::format("Value::AppendToJson() not implemented for type {}", type_.ToString()));
         }
@@ -1802,7 +1848,7 @@ void Value::AppendToArrowArray(const DataType &data_type, arrow::ArrayBuilder *a
 
 const std::vector<Value> &Value::GetArray() const { return this->value_info_->Get<ArrayValueInfo>().array_elements_; }
 
-std::shared_ptr<EmbeddingValueInfo> EmbeddingValueInfo::MakeTensorValueInfo(const char * ptr, size_t bytes) {
+std::shared_ptr<EmbeddingValueInfo> EmbeddingValueInfo::MakeTensorValueInfo(const char *ptr, size_t bytes) {
     if (bytes == 0) {
         UnrecoverableError("EmbeddingValueInfo::MakeTensorValueInfo(bytes=0) is invalid.");
     }
@@ -1813,7 +1859,9 @@ std::shared_ptr<EmbeddingValueInfo> EmbeddingValueInfo::MakeTensorValueInfo(cons
     return std::make_shared<EmbeddingValueInfo>(ptr_bytes);
 }
 
-std::shared_ptr<EmbeddingValueInfo> EmbeddingValueInfo::MakeMultiVectorValueInfo(const char * ptr, size_t bytes) { return MakeTensorValueInfo(ptr, bytes); }
+std::shared_ptr<EmbeddingValueInfo> EmbeddingValueInfo::MakeMultiVectorValueInfo(const char *ptr, size_t bytes) {
+    return MakeTensorValueInfo(ptr, bytes);
+}
 
 std::shared_ptr<EmbeddingValueInfo> EmbeddingValueInfo::MakeMultiVectorValueInfo(const std::vector<std::pair<char *, size_t>> &ptr_bytes) {
     return MakeTensorValueInfo(ptr_bytes);

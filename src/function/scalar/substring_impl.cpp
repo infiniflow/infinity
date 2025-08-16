@@ -30,8 +30,7 @@ namespace infinity {
 struct SubstrFunction {
     template <typename TA, typename TB, typename TC, typename TD>
     static inline bool Run(TA &first, TB &second, TC &third, TD &result, ColumnVector *first_ptr, ColumnVector *result_ptr) {
-        std::string error_message = "Not implement: SubstrFunction::Run";
-        UnrecoverableError(error_message);
+        UnrecoverableError("Not implement: SubstrFunction::Run");
     }
 };
 

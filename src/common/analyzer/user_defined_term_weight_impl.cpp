@@ -20,7 +20,6 @@ import :user_defined_term_weight;
 
 #if 0
 #include "Python.h"
-#include <vector>
 
 import :term;
 import :stemmer;

@@ -85,8 +85,7 @@ TEST_P(RecycleLogTest, recycle_wal_after_delta_checkpoint) {
             while (true) {
                 time_t now = time(nullptr);
                 if (now - start > 20) {
-                    String error_message = "Timeout";
-                    UnrecoverableError(error_message);
+                    UnrecoverableError("Timeout");
                 }
                 // create and drop db to fill wal log
                 {

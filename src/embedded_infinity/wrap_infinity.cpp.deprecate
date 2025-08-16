@@ -648,8 +648,7 @@ WrapQueryResult WrapShowDatabase(Infinity &instance, const String &db_name) {
         std::shared_ptr<DataBlock> data_block = query_result.result_table_->GetDataBlockById(0);
         auto row_count = data_block->row_count();
         if (row_count != 4) {
-            String error_message = "ShowDatabase: query result is invalid.";
-            UnrecoverableError(error_message);
+            UnrecoverableError("ShowDatabase: query result is invalid.");
         }
         {
             Value value = data_block->GetValue(1, 0);
@@ -888,8 +887,7 @@ WrapQueryResult WrapShowIndex(Infinity &instance, const String &db_name, const S
         std::shared_ptr<DataBlock> data_block = query_result.result_table_->GetDataBlockById(0);
         auto row_count = data_block->row_count();
         if (row_count != 10) {
-            String error_message = "ShowDatabase: query result is invalid.";
-            UnrecoverableError(error_message);
+            UnrecoverableError("ShowDatabase: query result is invalid.");
         }
         {
             Value value = data_block->GetValue(1, 0);
@@ -1038,8 +1036,7 @@ WrapQueryResult WrapDelete(Infinity &instance, const String &db_name, const Stri
         std::shared_ptr<DataBlock> data_block = query_result.result_table_->GetDataBlockById(0);
         auto row_count = data_block->row_count();
         if (row_count != 1) {
-            String error_message = "Delete: query result is invalid.";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Delete: query result is invalid.");
         }
 
         {
@@ -1403,8 +1400,7 @@ void DataTypeToWrapDataType(WrapDataType &proto_data_type, const DataType &data_
             break;
         }
         default: {
-            String error_message = fmt::format("Invalid logical data type: {}", data_type.ToString());
-            UnrecoverableError(error_message);
+            UnrecoverableError(fmt::format("Invalid logical data type: {}", data_type.ToString()));
         }
     }
 }

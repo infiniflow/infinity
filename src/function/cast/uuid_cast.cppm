@@ -35,8 +35,7 @@ export inline BoundCastFunc BindUuidCast(DataType &target) {
             return BoundCastFunc(&ColumnVectorCast::TryCastColumnVectorToVarlen<UuidT, VarcharT, UuidTryCastToVarlen>);
         }
         default: {
-            std::string error_message = fmt::format("Can't cast from Uuid type to {}", target.ToString());
-            UnrecoverableError(error_message);
+            UnrecoverableError(fmt::format("Can't cast from Uuid type to {}", target.ToString()));
         }
     }
     return BoundCastFunc(nullptr);

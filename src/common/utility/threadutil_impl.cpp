@@ -14,7 +14,8 @@
 
 module;
 
-#include <thread>
+#include <pthread.h>
+
 #ifdef __APPLE__
 #include <mach/mach_init.h>
 #include <mach/thread_act.h>

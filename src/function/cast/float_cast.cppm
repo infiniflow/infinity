@@ -84,9 +84,8 @@ inline BoundCastFunc BindFloatCast(const DataType &source, const DataType &targe
 struct FloatTryCastToFixlen {
     template <typename SourceType, typename TargetType>
     static inline bool Run(SourceType, TargetType &) {
-        std::string error_message =
-            fmt::format("Not implemented to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>());
-        UnrecoverableError(error_message);
+        UnrecoverableError(
+            fmt::format("Not implemented to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>()));
         return false;
     }
 };
@@ -94,9 +93,8 @@ struct FloatTryCastToFixlen {
 struct FloatTryCastToVarlen {
     template <typename SourceType, typename TargetType>
     static inline bool Run(SourceType, TargetType &, ColumnVector *) {
-        std::string error_message =
-            fmt::format("Not support to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>());
-        UnrecoverableError(error_message);
+        UnrecoverableError(
+            fmt::format("Not support to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>()));
         return false;
     }
 };

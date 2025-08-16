@@ -135,9 +135,7 @@ std::pair<int, bool> SkipListReaderByteSlice::LoadBuffer() {
             const Int16Encoder *tf_percentage_encoder = GetTermPercentageEncoder();
             u32 tf_percentage_num = tf_percentage_encoder->Decode(block_max_tf_percentage_buffer_.get(), SKIP_LIST_BUFFER_SIZE, byte_slice_reader_);
             if (tf_percentage_num != doc_num) {
-                std::string error_message =
-                    fmt::format("SKipList decode error, doc_num = {} block_max_tf_percentage_num = {}", doc_num, tf_percentage_num);
-                UnrecoverableError(error_message);
+                UnrecoverableError(fmt::format("SKipList decode error, doc_num = {} block_max_tf_percentage_num = {}", doc_num, tf_percentage_num));
                 return std::make_pair(-1, false);
             }
         }

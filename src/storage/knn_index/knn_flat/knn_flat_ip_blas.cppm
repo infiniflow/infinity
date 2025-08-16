@@ -56,8 +56,7 @@ public:
 
     void Search(const DistType *base, u16 base_count, u32 segment_id, u16 block_id) final {
         if (!begin_) {
-            std::string error_message = "KnnFlatIPBlas isn't begin";
-            UnrecoverableError(error_message);
+            UnrecoverableError("KnnFlatIPBlas isn't begin");
         }
 
         this->total_base_count_ += base_count;
@@ -100,8 +99,7 @@ public:
             return;
         }
         if (!begin_) {
-            std::string error_message = "KnnFlatIPBlas isn't begin";
-            UnrecoverableError(error_message);
+            UnrecoverableError("KnnFlatIPBlas isn't begin");
         }
 
         this->total_base_count_ += base_count;
@@ -152,16 +150,14 @@ public:
 
     [[nodiscard]] inline DistType *GetDistanceByIdx(u64 idx) const final {
         if (idx >= this->query_count_) {
-            std::string error_message = "Query index exceeds the limit";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Query index exceeds the limit");
         }
         return distance_array_.get() + idx * this->top_k_;
     }
 
     [[nodiscard]] inline RowID *GetIDByIdx(u64 idx) const final {
         if (idx >= this->query_count_) {
-            std::string error_message = "Query index exceeds the limit";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Query index exceeds the limit");
         }
         return id_array_.get() + idx * this->top_k_;
     }

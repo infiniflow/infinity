@@ -29,8 +29,7 @@ namespace infinity {
 struct PlusFunction {
     template <typename TA, typename TB>
     static inline bool Run(TA, TB &) {
-        std::string error_message = "Not implement: PlusFunction::Run";
-        UnrecoverableError(error_message);
+        UnrecoverableError("Not implement: PlusFunction::Run");
         return false;
     }
 };

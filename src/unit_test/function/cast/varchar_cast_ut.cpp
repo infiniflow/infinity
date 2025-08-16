@@ -57,8 +57,7 @@ void InitVarcharAsInline(VarcharT &varchar, const std::string_view sv) {
     if (sv.size() <= VARCHAR_INLINE_LEN) {
         std::memcpy(varchar.short_.data_, sv.data(), sv.size());
     } else {
-        String error_message = "Varchar length is too long";
-        UnrecoverableError(error_message);
+        UnrecoverableError("Varchar length is too long");
     }
 }
 

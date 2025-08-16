@@ -34,8 +34,7 @@ export struct TryCastVarcharToVarchar;
 
 export inline BoundCastFunc BindVarcharCast(const DataType &source, const DataType &target) {
     if (source.type() != LogicalType::kVarchar) {
-        std::string error_message = fmt::format("Expect Varchar type, but it is {}", source.ToString());
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("Expect Varchar type, but it is {}", source.ToString()));
     }
     switch (target.type()) {
         case LogicalType::kBoolean: {
@@ -69,12 +68,10 @@ export inline BoundCastFunc BindVarcharCast(const DataType &source, const DataTy
             return BoundCastFunc(&ColumnVectorCast::TryCastVarlenColumnVector<VarcharT, BFloat16T, TryCastVarcharVector>);
         }
         case LogicalType::kDecimal: {
-            std::string error_message = fmt::format("Not implement cast from varchar to decimal128 type.", source.ToString(), target.ToString());
-            UnrecoverableError(error_message);
+            UnrecoverableError(fmt::format("Not implement cast from varchar to decimal128 type.", source.ToString(), target.ToString()));
         }
         case LogicalType::kVarchar: {
-            std::string error_message = "Attempt to cast from varchar to varchar";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Attempt to cast from varchar to varchar");
         }
         case LogicalType::kDate: {
             return BoundCastFunc(&ColumnVectorCast::TryCastVarlenColumnVector<VarcharT, DateT, TryCastVarcharVector>);
@@ -92,28 +89,22 @@ export inline BoundCastFunc BindVarcharCast(const DataType &source, const DataTy
             return BoundCastFunc(&ColumnVectorCast::TryCastVarlenColumnVector<VarcharT, IntervalT, TryCastVarcharVector>);
         }
         case LogicalType::kArray: {
-            std::string error_message = "Cast from varchar to array";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Cast from varchar to array");
         }
         case LogicalType::kTuple: {
-            std::string error_message = "Cast from varchar to tuple";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Cast from varchar to tuple");
         }
         case LogicalType::kPoint: {
-            std::string error_message = "Cast from varchar to point";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Cast from varchar to point");
         }
         case LogicalType::kLine: {
-            std::string error_message = "Cast from varchar to line";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Cast from varchar to line");
         }
         case LogicalType::kLineSeg: {
-            std::string error_message = "Cast from varchar to line segment";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Cast from varchar to line segment");
         }
         case LogicalType::kBox: {
-            std::string error_message = "Cast from varchar to box";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Cast from varchar to box");
         }
             //        case kPath: {
             //            UnrecoverableError("Cast from varchar to path");
@@ -122,15 +113,13 @@ export inline BoundCastFunc BindVarcharCast(const DataType &source, const DataTy
             //            UnrecoverableError("Cast from varchar to polygon");
             //        }
         case LogicalType::kCircle: {
-            std::string error_message = "Cast from varchar to circle";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Cast from varchar to circle");
         }
             //        case kBitmap: {
             //            UnrecoverableError("Cast from varchar to bitmap");
             //        }
         case LogicalType::kUuid: {
-            std::string error_message = "Cast from varchar to uuid";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Cast from varchar to uuid");
         }
             //        case kBlob: {
             //            UnrecoverableError("Cast from varchar to blob");
@@ -142,12 +131,10 @@ export inline BoundCastFunc BindVarcharCast(const DataType &source, const DataTy
             return BoundCastFunc(&ColumnVectorCast::TryCastColumnVector<VarcharT, RowID, TryCastVarchar>);
         }
         case LogicalType::kMixed: {
-            std::string error_message = "Cast from varchar to mix";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Cast from varchar to mix");
         }
         default: {
-            std::string error_message = "Can't convert varchar";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Can't convert varchar");
         }
     }
     return BoundCastFunc(nullptr);
@@ -156,9 +143,8 @@ export inline BoundCastFunc BindVarcharCast(const DataType &source, const DataTy
 struct TryCastVarchar {
     template <typename SourceType, typename TargetType>
     static inline bool Run(const SourceType &, TargetType &) {
-        std::string error_message =
-            fmt::format("No implementation to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>());
-        UnrecoverableError(error_message);
+        UnrecoverableError(
+            fmt::format("No implementation to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>()));
         return false;
     }
 };
@@ -242,8 +228,7 @@ inline bool TryCastVarchar::Run(const VarcharT &source, IntegerT &target) {
 // Cast VarcharT to DateT type
 template <>
 inline bool TryCastVarchar::Run(const VarcharT &, DateT &) {
-    std::string error_message = "Cast from varchar to date";
-    UnrecoverableError(error_message);
+    UnrecoverableError("Cast from varchar to date");
     //    if (source.IsInlined()) {
     //        target.FromString(source.prefix, source.length);
     //    } else {
@@ -255,41 +240,36 @@ inline bool TryCastVarchar::Run(const VarcharT &, DateT &) {
 // Cast VarcharT to TimeT type
 template <>
 inline bool TryCastVarchar::Run(const VarcharT &, TimeT &) {
-    std::string error_message = "Cast from varchar to time";
-    UnrecoverableError(error_message);
+    UnrecoverableError("Cast from varchar to time");
     return true;
 }
 
 // Cast VarcharT to DateTimeT type
 template <>
 inline bool TryCastVarchar::Run(const VarcharT &, DateTimeT &) {
-    std::string error_message = "Cast from varchar to datetime";
-    UnrecoverableError(error_message);
+    UnrecoverableError("Cast from varchar to datetime");
     return true;
 }
 
 // Cast VarcharT to TimestampT type
 template <>
 inline bool TryCastVarchar::Run(const VarcharT &source, TimestampT &target) {
-    std::string error_message = "Cast from varchar to timestamp";
-    UnrecoverableError(error_message);
+    UnrecoverableError("Cast from varchar to timestamp");
     return true;
 }
 
 // Cast VarcharT to IntervalT type
 template <>
 inline bool TryCastVarchar::Run(const VarcharT &, IntervalT &) {
-    std::string error_message = "Cast from varchar to interval";
-    UnrecoverableError(error_message);
+    UnrecoverableError("Cast from varchar to interval");
     return true;
 }
 
 struct TryCastVarcharVector {
     template <typename SourceType, typename TargetType>
     static inline bool Run(const SourceType &, ColumnVector *source_vector, TargetType &) {
-        std::string error_message =
-            fmt::format("No implementation to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>());
-        UnrecoverableError(error_message);
+        UnrecoverableError(
+            fmt::format("No implementation to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>()));
         return false;
     }
 };

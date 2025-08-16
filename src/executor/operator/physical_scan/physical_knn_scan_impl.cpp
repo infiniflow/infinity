@@ -15,18 +15,15 @@
 module infinity_core:physical_knn_scan.impl;
 
 import :physical_knn_scan;
-import :query_context;
 import :operator_state;
 import :physical_operator_type;
 import :knn_expression;
-import :common_query_filter;
 import :physical_filter_scan_base;
 import :logger;
 import :block_index;
 import :knn_scan_data;
 import :knn_filter;
 import :infinity_exception;
-import :default_values;
 import :column_expression;
 import :buffer_manager;
 import :merge_knn;
@@ -34,7 +31,6 @@ import :knn_result_handler;
 import :buffer_obj;
 import :buffer_handle;
 import :data_block;
-import :roaring_bitmap;
 import :column_vector;
 import :index_hnsw;
 import :status;
@@ -62,7 +58,7 @@ import knn_expr;
 import embedding_info;
 import logical_type;
 import internal_types;
-import data_type;
+// import data_type;
 
 namespace infinity {
 
@@ -70,7 +66,7 @@ auto GetKnnExprForCalculation(const KnnExpression &src_knn_expr, const Embedding
     // check column basic embedding data type and query embedding data type
     // apply necessary cast
     const auto src_query_embedding_type = src_knn_expr.embedding_data_type_;
-    EmbeddingDataType new_query_embedding_type = EmbeddingDataType::kElemInvalid;
+    auto new_query_embedding_type = EmbeddingDataType::kElemInvalid;
     switch (column_embedding_type) {
         case EmbeddingDataType::kElemBit:
             [[fallthrough]];
@@ -158,11 +154,12 @@ PhysicalKnnScan::PhysicalKnnScan(u64 id,
 PhysicalKnnScan::~PhysicalKnnScan() = default;
 
 void PhysicalKnnScan::Init(QueryContext *query_context) {
-    KnnExpression *knn_expr = knn_expression_.get();
+    auto *knn_expr = knn_expression_.get();
     const auto *column_expr = static_cast<const ColumnExpression *>(knn_expr->arguments()[0].get());
     const auto column_data_type = column_expr->Type();
     switch (column_data_type.type()) {
         case LogicalType::kEmbedding:
+            [[fallthrough]];
         case LogicalType::kMultiVector: {
             // support knn
             column_logical_type_ = column_data_type.type();
@@ -388,7 +385,7 @@ std::string PhysicalKnnScan::TableAlias() const { return base_table_ref_->alias_
 std::vector<size_t> &PhysicalKnnScan::ColumnIDs() const { return base_table_ref_->column_ids_; }
 
 size_t PhysicalKnnScan::GetColumnID() const {
-    KnnExpression *knn_expr = knn_expression_.get();
+    auto *knn_expr = knn_expression_.get();
     auto *column_expr = static_cast<ColumnExpression *>(knn_expr->arguments()[0].get());
     return column_expr->binding().column_idx;
 }
@@ -411,7 +408,7 @@ void PhysicalKnnScan::PlanWithIndex(QueryContext *query_context) { // TODO: retu
     } else {
         std::vector<std::string> *index_id_strs_ptr = nullptr;
         std::vector<std::string> *index_names_ptr = nullptr;
-        Status status = table_meta->GetIndexIDs(index_id_strs_ptr, &index_names_ptr);
+        auto status = table_meta->GetIndexIDs(index_id_strs_ptr, &index_names_ptr);
         if (!status.ok()) {
             RecoverableError(status);
         }
@@ -528,7 +525,6 @@ void PhysicalKnnScan::ExecuteInternalByColumnDataTypeAndQueryDataType(QueryConte
         // not ready, abort and wait for next time
         return;
     }
-    Status status;
 
     auto knn_scan_function_data = knn_scan_operator_state->knn_scan_function_data_.get();
     auto knn_scan_shared_data = knn_scan_function_data->knn_scan_shared_data_;
@@ -631,6 +627,7 @@ void PhysicalKnnScan::ExecuteInternalByColumnDataTypeAndQueryDataType(QueryConte
         };
 
         if (has_some_result) {
+            Status status;
             const IndexBase *index_base;
             std::shared_ptr<IndexBase> index_base_ptr;
             std::tie(index_base_ptr, status) = segment_index_meta->table_index_meta().GetIndexBase();
@@ -654,7 +651,7 @@ void PhysicalKnnScan::ExecuteInternalByColumnDataTypeAndQueryDataType(QueryConte
                         if (!status.ok()) {
                             UnrecoverableError(status.message());
                         }
-                        BufferHandle index_handle = index_buffer->Load();
+                        auto index_handle = index_buffer->Load();
                         const auto *ivf_chunk = static_cast<const IVFIndexInChunk *>(index_handle.GetData());
                         ivf_result_handler->Search(ivf_chunk);
                     }
@@ -701,14 +698,14 @@ void PhysicalKnnScan::ExecuteInternalByColumnDataTypeAndQueryDataType(QueryConte
                                     BitmaskFilter<SegmentOffset> filter(bitmask);
                                     if (with_lock) {
                                         std::tie(result_n1, d_ptr, l_ptr) =
-                                            hnsw_handler->template SearchIndex<DistanceDataType, SegmentOffset, BitmaskFilter<SegmentOffset>, true>(
+                                            hnsw_handler->SearchIndex<DistanceDataType, SegmentOffset, BitmaskFilter<SegmentOffset>, true>(
                                                 query,
                                                 knn_scan_shared_data->topk_,
                                                 filter,
                                                 search_option);
                                     } else {
                                         std::tie(result_n1, d_ptr, l_ptr) =
-                                            hnsw_handler->template SearchIndex<DistanceDataType, SegmentOffset, BitmaskFilter<SegmentOffset>, false>(
+                                            hnsw_handler->SearchIndex<DistanceDataType, SegmentOffset, BitmaskFilter<SegmentOffset>, false>(
                                                 query,
                                                 knn_scan_shared_data->topk_,
                                                 filter,
@@ -717,14 +714,14 @@ void PhysicalKnnScan::ExecuteInternalByColumnDataTypeAndQueryDataType(QueryConte
                                 } else {
                                     if (!with_lock) {
                                         std::tie(result_n1, d_ptr, l_ptr) =
-                                            hnsw_handler->template SearchIndex<DistanceDataType, SegmentOffset, false>(query,
-                                                                                                                       knn_scan_shared_data->topk_,
-                                                                                                                       search_option);
+                                            hnsw_handler->SearchIndex<DistanceDataType, SegmentOffset, false>(query,
+                                                                                                              knn_scan_shared_data->topk_,
+                                                                                                              search_option);
                                     } else {
                                         SegmentOffset max_segment_offset = block_index->GetSegmentOffset(segment_id);
                                         AppendFilter filter(max_segment_offset);
                                         std::tie(result_n1, d_ptr, l_ptr) =
-                                            hnsw_handler->template SearchIndex<DistanceDataType, SegmentOffset, AppendFilter, true>(
+                                            hnsw_handler->SearchIndex<DistanceDataType, SegmentOffset, AppendFilter, true>(
                                                 query,
                                                 knn_scan_shared_data->topk_,
                                                 filter,
@@ -822,8 +819,8 @@ void PhysicalKnnScan::ExecuteInternalByColumnDataTypeAndQueryDataType(QueryConte
                             if (!status.ok()) {
                                 UnrecoverableError(status.message());
                             }
-                            BufferHandle index_handle = index_buffer->Load();
-                            const HnswHandlerPtr *hnsw_handler = reinterpret_cast<const HnswHandlerPtr *>(index_handle.GetData());
+                            auto index_handle = index_buffer->Load();
+                            const auto *hnsw_handler = reinterpret_cast<const HnswHandlerPtr *>(index_handle.GetData());
                             hnsw_search(*hnsw_handler, false);
                         }
                         if (mem_index) {

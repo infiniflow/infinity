@@ -54,8 +54,7 @@ inline bool PowFunction::Run(BFloat16T base, BFloat16T exponent, BFloat16T &resu
 
 template <>
 inline bool PowFunction::Run(MixedT, DoubleT, DoubleT &) {
-    std::string error_message = "Not implement: PowFunction::Run";
-    UnrecoverableError(error_message);
+    UnrecoverableError("Not implement: PowFunction::Run");
     return false;
 }
 

@@ -45,7 +45,7 @@ public:
         RecoverableError(status);
     }
 
-    inline char * Finalize() {
+    inline char *Finalize() {
         Status status = Status::NotSupport("Finalize average state.");
         RecoverableError(status);
     }
@@ -70,8 +70,7 @@ public:
 
     inline void Update(const TinyIntT *__restrict input, size_t idx) {
         if (count_ == std::numeric_limits<i64>::max()) {
-            std::string error_message = fmt::format("Data count exceeds: {}", count_);
-            UnrecoverableError(error_message);
+            UnrecoverableError(fmt::format("Data count exceeds: {}", count_));
         }
         this->count_++;
         value_ += input[idx];
@@ -82,7 +81,7 @@ public:
         value_ += (input[idx] * count);
     }
 
-    [[nodiscard]] inline char * Finalize() {
+    [[nodiscard]] inline char *Finalize() {
         result_ = value_ / count_;
         return (char *)&result_;
     }
@@ -104,8 +103,7 @@ public:
 
     inline void Update(const SmallIntT *__restrict input, size_t idx) {
         if (count_ == std::numeric_limits<i64>::max()) {
-            std::string error_message = fmt::format("Data count exceeds: {}", count_);
-            UnrecoverableError(error_message);
+            UnrecoverableError(fmt::format("Data count exceeds: {}", count_));
         }
         this->count_++;
         value_ += input[idx];
@@ -117,7 +115,7 @@ public:
         value_ += (input[idx] * count);
     }
 
-    inline char * Finalize() {
+    inline char *Finalize() {
         result_ = value_ / count_;
         return (char *)&result_;
     }
@@ -139,8 +137,7 @@ public:
 
     inline void Update(const IntegerT *__restrict input, size_t idx) {
         if (count_ == std::numeric_limits<i64>::max()) {
-            std::string error_message = fmt::format("Data count exceeds: {}", count_);
-            UnrecoverableError(error_message);
+            UnrecoverableError(fmt::format("Data count exceeds: {}", count_));
         }
         this->count_++;
         value_ += input[idx];
@@ -152,7 +149,7 @@ public:
         value_ += (input[idx] * count);
     }
 
-    inline char * Finalize() {
+    inline char *Finalize() {
         result_ = value_ / count_;
         return (char *)&result_;
     }
@@ -174,8 +171,7 @@ public:
 
     inline void Update(const BigIntT *__restrict input, size_t idx) {
         if (count_ == std::numeric_limits<i64>::max()) {
-            std::string error_message = fmt::format("Data count exceeds: {}", count_);
-            UnrecoverableError(error_message);
+            UnrecoverableError(fmt::format("Data count exceeds: {}", count_));
         }
         this->count_++;
         value_ += input[idx];
@@ -187,7 +183,7 @@ public:
         value_ += (input[idx] * count);
     }
 
-    inline char * Finalize() {
+    inline char *Finalize() {
         result_ = value_ / count_;
         return (char *)&result_;
     }
@@ -209,8 +205,7 @@ public:
 
     inline void Update(const Float16T *__restrict input, size_t idx) {
         if (count_ == std::numeric_limits<i64>::max()) {
-            std::string error_message = fmt::format("Data count exceeds: {}", count_);
-            UnrecoverableError(error_message);
+            UnrecoverableError(fmt::format("Data count exceeds: {}", count_));
         }
         this->count_++;
         value_ += static_cast<float>(input[idx]);
@@ -222,7 +217,7 @@ public:
         value_ += static_cast<float>(input[idx]) * count;
     }
 
-    inline char * Finalize() {
+    inline char *Finalize() {
         result_ = value_ / count_;
         return (char *)&result_;
     }
@@ -244,8 +239,7 @@ public:
 
     inline void Update(const BFloat16T *__restrict input, size_t idx) {
         if (count_ == std::numeric_limits<i64>::max()) {
-            std::string error_message = fmt::format("Data count exceeds: {}", count_);
-            UnrecoverableError(error_message);
+            UnrecoverableError(fmt::format("Data count exceeds: {}", count_));
         }
         this->count_++;
         value_ += static_cast<float>(input[idx]);
@@ -257,7 +251,7 @@ public:
         value_ += static_cast<float>(input[idx]) * count;
     }
 
-    inline char * Finalize() {
+    inline char *Finalize() {
         result_ = value_ / count_;
         return (char *)&result_;
     }
@@ -279,8 +273,7 @@ public:
 
     inline void Update(const FloatT *__restrict input, size_t idx) {
         if (count_ == std::numeric_limits<i64>::max()) {
-            std::string error_message = fmt::format("Data count exceeds: {}", count_);
-            UnrecoverableError(error_message);
+            UnrecoverableError(fmt::format("Data count exceeds: {}", count_));
         }
         this->count_++;
         value_ += input[idx];
@@ -292,7 +285,7 @@ public:
         value_ += (input[idx] * count);
     }
 
-    inline char * Finalize() {
+    inline char *Finalize() {
         result_ = value_ / count_;
         return (char *)&result_;
     }
@@ -314,8 +307,7 @@ public:
 
     inline void Update(const DoubleT *__restrict input, size_t idx) {
         if (count_ == std::numeric_limits<i64>::max()) {
-            std::string error_message = fmt::format("Data count exceeds: {}", count_);
-            UnrecoverableError(error_message);
+            UnrecoverableError(fmt::format("Data count exceeds: {}", count_));
         }
         this->count_++;
         value_ += input[idx];
@@ -327,7 +319,7 @@ public:
         value_ += (input[idx] * count);
     }
 
-    inline char * Finalize() {
+    inline char *Finalize() {
         result_ = value_ / count_;
         return (char *)&result_;
     }

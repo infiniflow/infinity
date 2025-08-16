@@ -217,20 +217,16 @@ public:
                     std::filesystem::path sample_data_file_path,
                     std::filesystem::path pq_pivot_file_path) {
         if (loaded_) {
-            std::string error_message = "DiskAnnIndexData::BuildIndex(): Index data already exists.";
-            UnrecoverableError(error_message);
+            UnrecoverableError("DiskAnnIndexData::BuildIndex(): Index data already exists.");
         }
         if (dimension != dimension_) {
-            std::string error_message = "DiskAnnIndexData::BuildIndex(): Dimension not match";
-            UnrecoverableError(error_message);
+            UnrecoverableError("DiskAnnIndexData::BuildIndex(): Dimension not match");
         }
         if (metric_ != MetricType::kMetricL2 && metric_ != MetricType::kMetricCosine) {
             if (metric_ != MetricType::kInvalid) {
-                Status status = Status::NotSupport("Metric type not implemented");
-                RecoverableError(status);
+                RecoverableError(Status::NotSupport("Metric type not implemented"));
             } else {
-                Status status = Status::NotSupport("Metric type is invalid");
-                RecoverableError(status);
+                RecoverableError(Status::NotSupport("Metric type is invalid"));
             }
             return;
         }

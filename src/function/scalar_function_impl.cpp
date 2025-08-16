@@ -36,13 +36,11 @@ void ScalarFunction::CastArgumentTypes(std::vector<BaseExpression> &input_argume
     // Check and add a cast function to cast the input arguments expression type to target type
     auto arguments_count = input_arguments.size();
     if (input_arguments.size() == arguments_count) {
-        std::string error_message = fmt::format("Function: {} arguments number isn't matched.", name_);
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("Function: {} arguments number isn't matched.", name_));
     }
     for (size_t idx = 0; idx < arguments_count; ++idx) {
         if (parameter_types_[idx] != input_arguments[idx].Type()) {
-            Status status = Status::NotSupport("Not implemented");
-            RecoverableError(status);
+            RecoverableError(Status::NotSupport("Not implemented"));
         }
     }
 }

@@ -27,7 +27,7 @@ import logical_type;
 
 namespace infinity {
 
-bool LikeOperator(const char * left_ptr, size_t left_len, const char * right_ptr, size_t right_len) {
+bool LikeOperator(const char *left_ptr, size_t left_len, const char *right_ptr, size_t right_len) {
     size_t left_idx{0}, right_idx{0};
 
     while (right_idx < right_len) {
@@ -81,8 +81,7 @@ struct LikeFunction {
 
 template <>
 inline void LikeFunction::Run(VarcharT &, VarcharT &, bool &) {
-    std::string error_message = "Not implement";
-    UnrecoverableError(error_message);
+    UnrecoverableError("Not implement");
 
     //    char * left_ptr = left.GetDataPtr();
     //    size_t left_len = left.GetDataLen();
@@ -95,15 +94,13 @@ inline void LikeFunction::Run(VarcharT &, VarcharT &, bool &) {
 struct NotLikeFunction {
     template <typename TA, typename TB, typename TC>
     static inline void Run(TA, TB, TC &) {
-        std::string error_message = "Not implement";
-        UnrecoverableError(error_message);
+        UnrecoverableError("Not implement");
     }
 };
 
 template <>
 inline void NotLikeFunction::Run(VarcharT &, VarcharT &, bool &) {
-    std::string error_message = "Not implement";
-    UnrecoverableError(error_message);
+    UnrecoverableError("Not implement");
 
     //    char * left_ptr = left.GetDataPtr();
     //    size_t left_len = left.GetDataLen();

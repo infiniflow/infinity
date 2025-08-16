@@ -1012,8 +1012,7 @@ struct ExecuteMatchTensorRerankerTypes {
                 return RerankerScoreT<CalcutateScoreOfTensorArrayRow, T...>(parameter_pack);
             }
             default: {
-                const auto error_message = "Invalid column type! target column is not Tensor or TensorArray type.";
-                UnrecoverableError(error_message);
+                UnrecoverableError("Invalid column type! target column is not Tensor or TensorArray type.");
             }
         }
     }

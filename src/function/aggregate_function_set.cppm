@@ -18,6 +18,9 @@ import :base_expression;
 import :aggregate_function;
 import :function;
 import :function_set;
+import :infinity_type;
+
+import std;
 
 namespace infinity {
 

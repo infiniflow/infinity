@@ -31,30 +31,15 @@ struct MinState {
 public:
     ValueType value_;
 
-    void Initialize() {
-        std::string error_message = "Not implement: MinState::Initialize";
-        UnrecoverableError(error_message);
-    }
+    void Initialize() { UnrecoverableError("Not implement: MinState::Initialize"); }
 
-    void Update(const ValueType *__restrict, size_t) {
-        std::string error_message = "Not implement: MinState::Update";
-        UnrecoverableError(error_message);
-    }
+    void Update(const ValueType *__restrict, size_t) { UnrecoverableError("Not implement: MinState::Update"); }
 
-    inline void ConstantUpdate(const ValueType *__restrict, size_t, size_t) {
-        std::string error_message = "Not implement: MinState::ConstantUpdate";
-        UnrecoverableError(error_message);
-    }
+    inline void ConstantUpdate(const ValueType *__restrict, size_t, size_t) { UnrecoverableError("Not implement: MinState::ConstantUpdate"); }
 
-    [[nodiscard]] char * Finalize() const {
-        std::string error_message = "Not implement: MinState::Finalize";
-        UnrecoverableError(error_message);
-    }
+    [[nodiscard]] char *Finalize() const { UnrecoverableError("Not implement: MinState::Finalize"); }
 
-    inline static size_t Size(const DataType &) {
-        std::string error_message = "Not implement: MinState::Size";
-        UnrecoverableError(error_message);
-    }
+    inline static size_t Size(const DataType &) { UnrecoverableError("Not implement: MinState::Size"); }
 };
 
 template <>
@@ -68,7 +53,7 @@ public:
 
     inline void ConstantUpdate(const BooleanT *__restrict input, size_t idx, size_t) { value_ = input[idx] < value_ ? input[idx] : value_; }
 
-    inline char * Finalize() { return (char *)&value_; }
+    inline char *Finalize() { return (char *)&value_; }
 
     inline static size_t Size(const DataType &) { return 1; }
 };
@@ -84,7 +69,7 @@ public:
 
     inline void ConstantUpdate(const TinyIntT *__restrict input, size_t idx, size_t) { value_ = input[idx] < value_ ? input[idx] : value_; }
 
-    inline char * Finalize() { return (char *)&value_; }
+    inline char *Finalize() { return (char *)&value_; }
 
     inline static size_t Size(const DataType &) { return sizeof(TinyIntT); }
 };
@@ -100,7 +85,7 @@ public:
 
     inline void ConstantUpdate(const SmallIntT *__restrict input, size_t idx, size_t) { value_ = input[idx] < value_ ? input[idx] : value_; }
 
-    inline char * Finalize() { return (char *)&value_; }
+    inline char *Finalize() { return (char *)&value_; }
 
     inline static size_t Size(const DataType &) { return sizeof(SmallIntT); }
 };
@@ -116,7 +101,7 @@ public:
 
     inline void ConstantUpdate(const IntegerT *__restrict input, size_t idx, size_t) { value_ = input[idx] < value_ ? input[idx] : value_; }
 
-    inline char * Finalize() { return (char *)&value_; }
+    inline char *Finalize() { return (char *)&value_; }
 
     inline static size_t Size(const DataType &) { return sizeof(IntegerT); }
 };
@@ -132,7 +117,7 @@ public:
 
     inline void ConstantUpdate(const BigIntT *__restrict input, size_t idx, size_t) { value_ = input[idx] < value_ ? input[idx] : value_; }
 
-    inline char * Finalize() { return (char *)&value_; }
+    inline char *Finalize() { return (char *)&value_; }
 
     inline static size_t Size(const DataType &) { return sizeof(BigIntT); }
 };
@@ -151,7 +136,7 @@ public:
 
     inline void ConstantUpdate(const HugeIntT *__restrict input, size_t idx, size_t) { value_ = input[idx] < value_ ? input[idx] : value_; }
 
-    inline char * Finalize() { return (char *)&value_; }
+    inline char *Finalize() { return (char *)&value_; }
 
     inline static size_t Size(const DataType &) { return sizeof(HugeIntT); }
 };
@@ -167,7 +152,7 @@ public:
 
     inline void ConstantUpdate(const Float16T *__restrict input, size_t idx, size_t) { value_ = input[idx] < value_ ? input[idx] : value_; }
 
-    inline char * Finalize() { return (char *)&value_; }
+    inline char *Finalize() { return (char *)&value_; }
 
     inline static size_t Size(const DataType &) { return sizeof(Float16T); }
 };
@@ -183,7 +168,7 @@ public:
 
     inline void ConstantUpdate(const BFloat16T *__restrict input, size_t idx, size_t) { value_ = input[idx] < value_ ? input[idx] : value_; }
 
-    inline char * Finalize() { return (char *)&value_; }
+    inline char *Finalize() { return (char *)&value_; }
 
     inline static size_t Size(const DataType &) { return sizeof(BFloat16T); }
 };
@@ -199,7 +184,7 @@ public:
 
     inline void ConstantUpdate(const FloatT *__restrict input, size_t idx, size_t) { value_ = input[idx] < value_ ? input[idx] : value_; }
 
-    inline char * Finalize() { return (char *)&value_; }
+    inline char *Finalize() { return (char *)&value_; }
 
     inline static size_t Size(const DataType &) { return sizeof(FloatT); }
 };
@@ -215,7 +200,7 @@ public:
 
     inline void ConstantUpdate(const DoubleT *__restrict input, size_t idx, size_t) { value_ = input[idx] < value_ ? input[idx] : value_; }
 
-    inline char * Finalize() { return (char *)&value_; }
+    inline char *Finalize() { return (char *)&value_; }
 
     inline static size_t Size(const DataType &) { return sizeof(DoubleT); }
 };

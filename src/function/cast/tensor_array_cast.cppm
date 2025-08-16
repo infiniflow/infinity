@@ -124,8 +124,7 @@ void TensorArrayTryCastToTensorArrayImpl(const u32 basic_embedding_dim,
             break;
         }
         case EmbeddingDataType::kElemInvalid: {
-            std::string error_message = "Unreachable code";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Unreachable code");
         }
     }
 }
@@ -179,8 +178,7 @@ void TensorArrayTryCastToTensorArrayFun(const u32 basic_embedding_dim,
             break;
         }
         case EmbeddingDataType::kElemInvalid: {
-            std::string error_message = "Unreachable code";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Unreachable code");
         }
     }
 }
@@ -193,8 +191,7 @@ struct TensorArrayTryCastToTensorArray {
                     TargetT &target,
                     const DataType &target_type,
                     ColumnVector *target_vector_ptr) {
-        std::string error_message = "Unreachable case";
-        UnrecoverableError(error_message);
+        UnrecoverableError("Unreachable case");
         return false;
     }
 };
@@ -214,8 +211,7 @@ bool TensorArrayTryCastToTensorArray::Run<TensorArrayT, TensorArrayT>(const Tens
         RecoverableError(Status::DataTypeMismatch(source_type.ToString(), target_type.ToString()));
     }
     if (target_vector_ptr->buffer_->buffer_type_ != VectorBufferType::kVarBuffer) {
-        std::string error_message = fmt::format("TensorArray column vector should use kHeap VectorBuffer.");
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("TensorArray column vector should use kHeap VectorBuffer."));
     }
     TensorArrayTryCastToTensorArrayFun(source_embedding_dim,
                                        source,

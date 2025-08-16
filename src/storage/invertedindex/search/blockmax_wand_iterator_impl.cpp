@@ -244,8 +244,7 @@ bool BlockMaxWandIterator::Next(RowID doc_id) {
         }
     }
 
-    std::string error_message = "Should not reach here!";
-    UnrecoverableError(error_message);
+    UnrecoverableError("Should not reach here!");
     return false;
 }
 

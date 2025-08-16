@@ -113,8 +113,7 @@ public:
         } else if (distance_metric_ == DiskAnnMetricType::IP) {
             return IPDistance<f32, DataType, DataType>(x, y, dim);
         } else {
-            std::string error_message = "Metric type is invalid";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Metric type is invalid");
             return 0;
         }
     }

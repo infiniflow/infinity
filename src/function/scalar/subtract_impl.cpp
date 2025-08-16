@@ -29,8 +29,7 @@ namespace infinity {
 struct SubFunction {
     template <typename TA, typename TB, typename TC>
     static inline bool Run(TA, TB, TC &) {
-        std::string error_message = "Not implement: SubFunction::Run";
-        UnrecoverableError(error_message);
+        UnrecoverableError("Not implement: SubFunction::Run");
     }
 };
 
@@ -69,8 +68,7 @@ inline bool SubFunction::Run(BigIntT left, BigIntT right, BigIntT &result) {
 // HugeIntT - HugeIntT = HugeIntT, and check overflow
 template <>
 inline bool SubFunction::Run(HugeIntT, HugeIntT, HugeIntT &) {
-    std::string error_message = "Not implement: SubFunction::Run";
-    UnrecoverableError(error_message);
+    UnrecoverableError("Not implement: SubFunction::Run");
     return false;
 }
 
@@ -117,8 +115,7 @@ inline bool SubFunction::Run(DoubleT left, DoubleT right, DoubleT &result) {
 // Decimal - Decimal = Decimal
 template <>
 inline bool SubFunction::Run(DecimalT, DecimalT, DecimalT &) {
-    std::string error_message = "Not implement: SubFunction::Run";
-    UnrecoverableError(error_message);
+    UnrecoverableError("Not implement: SubFunction::Run");
     return false;
 }
 
@@ -149,40 +146,35 @@ inline bool SubFunction::Run(TimestampT left, IntervalT right, TimestampT &resul
 // Mixed Type - i64
 template <>
 inline bool SubFunction::Run(MixedT, BigIntT, MixedT &) {
-    std::string error_message = "Not implement: SubFunction::Run";
-    UnrecoverableError(error_message);
+    UnrecoverableError("Not implement: SubFunction::Run");
     return false;
 }
 
 // i64 - Mixed Type
 template <>
 inline bool SubFunction::Run(BigIntT, MixedT, MixedT &) {
-    std::string error_message = "Not implement: SubFunction::Run";
-    UnrecoverableError(error_message);
+    UnrecoverableError("Not implement: SubFunction::Run");
     return false;
 }
 
 // Mixed Type - f64
 template <>
 inline bool SubFunction::Run(MixedT, DoubleT, MixedT &) {
-    std::string error_message = "Not implement: SubFunction::Run";
-    UnrecoverableError(error_message);
+    UnrecoverableError("Not implement: SubFunction::Run");
     return false;
 }
 
 // f64 - Mixed Type
 template <>
 inline bool SubFunction::Run(DoubleT, MixedT, MixedT &) {
-    std::string error_message = "Not implement: SubFunction::Run";
-    UnrecoverableError(error_message);
+    UnrecoverableError("Not implement: SubFunction::Run");
     return false;
 }
 
 // Mixed Type - Mixed Type
 template <>
 inline bool SubFunction::Run(MixedT, MixedT, MixedT &) {
-    std::string error_message = "Not implement: SubFunction::Run";
-    UnrecoverableError(error_message);
+    UnrecoverableError("Not implement: SubFunction::Run");
     return false;
 }
 

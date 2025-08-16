@@ -87,8 +87,7 @@ void TaskScheduler::Init(Config *config_ptr) {
     }
 
     if (worker_array_.empty()) {
-        std::string error_message = "No cpu is used in scheduler";
-        UnrecoverableError(error_message);
+        UnrecoverableError("No cpu is used in scheduler");
     }
 
     initialized_ = true;
@@ -121,8 +120,7 @@ u64 TaskScheduler::FindLeastWorkloadWorker() {
 
 void TaskScheduler::Schedule(PlanFragment *plan_fragment, const BaseStatement *base_statement) {
     if (!initialized_) {
-        std::string error_message = "Scheduler isn't initialized";
-        UnrecoverableError(error_message);
+        UnrecoverableError("Scheduler isn't initialized");
     }
     // DumpPlanFragment(plan_fragment);
     bool use_scheduler = false;
@@ -171,8 +169,7 @@ void TaskScheduler::Schedule(PlanFragment *plan_fragment, const BaseStatement *b
         for (auto &task : tasks) {
             // set the status to running
             if (!task->TryIntoWorkerLoop()) {
-                std::string error_message = "Task can't be scheduled";
-                UnrecoverableError(error_message);
+                UnrecoverableError("Task can't be scheduled");
             }
             u64 worker_id = FindLeastWorkloadWorker();
             ScheduleTask(task.get(), worker_id);

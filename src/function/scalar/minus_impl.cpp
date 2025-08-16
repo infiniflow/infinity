@@ -41,15 +41,13 @@ struct MinusFunction {
 
 template <>
 inline bool MinusFunction::Run(HugeIntT, HugeIntT &) {
-    std::string error_message = "Not implement: MinusFunction::Run";
-    UnrecoverableError(error_message);
+    UnrecoverableError("Not implement: MinusFunction::Run");
     return false;
 }
 
 template <>
 inline bool MinusFunction::Run(DecimalT, DecimalT &) {
-    std::string error_message = "Not implement: MinusFunction::Run";
-    UnrecoverableError(error_message);
+    UnrecoverableError("Not implement: MinusFunction::Run");
     return false;
 }
 

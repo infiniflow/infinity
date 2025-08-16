@@ -167,16 +167,14 @@ TEST_P(PostingMergerTest, Basic) {
             u32 id_offset = base_row_id - merge_base_rowid;
             auto [file_handle, status] = VirtualStore::Open(real_column_len_file, FileAccessMode::kRead);
             if (!status.ok()) {
-                String error_message = status.message();
-                UnrecoverableError(error_message);
+                UnrecoverableError(status.message());
             }
             const i64 file_size = file_handle->FileSize();
             u32 file_read_array_len = file_size / sizeof(u32);
             unsafe_column_length_array.resize(id_offset + file_read_array_len);
             auto [read_count, _] = file_handle->Read(unsafe_column_length_array.data() + id_offset, file_size);
             if (read_count != (size_t)file_size) {
-                String error_message = "ColumnIndexMerger: when loading column length file, read_count != file_size";
-                UnrecoverableError(error_message);
+                UnrecoverableError("ColumnIndexMerger: when loading column length file, read_count != file_size");
             }
             if (pm != nullptr) {
                 PersistWriteResult res = pm->PutObjCache(column_len_file);

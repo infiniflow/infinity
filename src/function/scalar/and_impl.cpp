@@ -39,8 +39,7 @@ struct AndFunction {
                              std::is_same_v<std::remove_cv_t<TC>, BooleanT>) {
             result = left and right;
         } else {
-            std::string error_message = "AND function accepts only u8 and BooleanT.";
-            UnrecoverableError(error_message);
+            UnrecoverableError("AND function accepts only u8 and BooleanT.");
         }
     }
 };
