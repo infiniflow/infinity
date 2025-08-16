@@ -12,23 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:avg.impl;
 
 import :avg;
-import :stl;
 import :new_catalog;
 import :status;
 import :infinity_exception;
 import :aggregate_function;
 import :aggregate_function_set;
 
-import :third_party;
 import logical_type;
 import internal_types;
 import data_type;
-import :logger;
 
 namespace infinity {
 
@@ -40,22 +35,22 @@ public:
         RecoverableError(status);
     }
 
-    inline void Update(const ValueType *__restrict, SizeT) {
+    inline void Update(const ValueType *__restrict, size_t) {
         Status status = Status::NotSupport("Update average state.");
         RecoverableError(status);
     }
 
-    inline void ConstantUpdate(const ValueType *__restrict, SizeT, SizeT) {
+    inline void ConstantUpdate(const ValueType *__restrict, size_t, size_t) {
         Status status = Status::NotSupport("Constant update average state.");
         RecoverableError(status);
     }
 
-    inline ptr_t Finalize() {
+    inline char *Finalize() {
         Status status = Status::NotSupport("Finalize average state.");
         RecoverableError(status);
     }
 
-    inline static SizeT Size(const DataType &data_type) {
+    inline static size_t Size(const DataType &data_type) {
         Status status = Status::NotSupport(fmt::format("Average state type size: {}", data_type.ToString()));
         RecoverableError(status);
     }
@@ -73,26 +68,25 @@ public:
         this->count_ = 0;
     }
 
-    inline void Update(const TinyIntT *__restrict input, SizeT idx) {
+    inline void Update(const TinyIntT *__restrict input, size_t idx) {
         if (count_ == std::numeric_limits<i64>::max()) {
-            String error_message = fmt::format("Data count exceeds: {}", count_);
-            UnrecoverableError(error_message);
+            UnrecoverableError(fmt::format("Data count exceeds: {}", count_));
         }
         this->count_++;
         value_ += input[idx];
     }
 
-    inline void ConstantUpdate(const TinyIntT *__restrict input, SizeT idx, SizeT count) {
+    inline void ConstantUpdate(const TinyIntT *__restrict input, size_t idx, size_t count) {
         this->count_ += count;
         value_ += (input[idx] * count);
     }
 
-    [[nodiscard]] inline ptr_t Finalize() {
+    [[nodiscard]] inline char *Finalize() {
         result_ = value_ / count_;
-        return (ptr_t)&result_;
+        return (char *)&result_;
     }
 
-    inline static SizeT Size(const DataType &) { return sizeof(value_) + sizeof(count_) + sizeof(result_); }
+    inline static size_t Size(const DataType &) { return sizeof(value_) + sizeof(count_) + sizeof(result_); }
 };
 
 template <>
@@ -107,27 +101,26 @@ public:
         this->count_ = 0;
     }
 
-    inline void Update(const SmallIntT *__restrict input, SizeT idx) {
+    inline void Update(const SmallIntT *__restrict input, size_t idx) {
         if (count_ == std::numeric_limits<i64>::max()) {
-            String error_message = fmt::format("Data count exceeds: {}", count_);
-            UnrecoverableError(error_message);
+            UnrecoverableError(fmt::format("Data count exceeds: {}", count_));
         }
         this->count_++;
         value_ += input[idx];
     }
 
-    inline void ConstantUpdate(const SmallIntT *__restrict input, SizeT idx, SizeT count) {
+    inline void ConstantUpdate(const SmallIntT *__restrict input, size_t idx, size_t count) {
         // TODO: Need to check overflow.
         this->count_ += count;
         value_ += (input[idx] * count);
     }
 
-    inline ptr_t Finalize() {
+    inline char *Finalize() {
         result_ = value_ / count_;
-        return (ptr_t)&result_;
+        return (char *)&result_;
     }
 
-    inline static SizeT Size(const DataType &) { return sizeof(value_) + sizeof(count_) + sizeof(result_); }
+    inline static size_t Size(const DataType &) { return sizeof(value_) + sizeof(count_) + sizeof(result_); }
 };
 
 template <>
@@ -142,27 +135,26 @@ public:
         this->count_ = 0;
     }
 
-    inline void Update(const IntegerT *__restrict input, SizeT idx) {
+    inline void Update(const IntegerT *__restrict input, size_t idx) {
         if (count_ == std::numeric_limits<i64>::max()) {
-            String error_message = fmt::format("Data count exceeds: {}", count_);
-            UnrecoverableError(error_message);
+            UnrecoverableError(fmt::format("Data count exceeds: {}", count_));
         }
         this->count_++;
         value_ += input[idx];
     }
 
-    inline void ConstantUpdate(const IntegerT *__restrict input, SizeT idx, SizeT count) {
+    inline void ConstantUpdate(const IntegerT *__restrict input, size_t idx, size_t count) {
         // TODO: Need to check overflow.
         this->count_ += count;
         value_ += (input[idx] * count);
     }
 
-    inline ptr_t Finalize() {
+    inline char *Finalize() {
         result_ = value_ / count_;
-        return (ptr_t)&result_;
+        return (char *)&result_;
     }
 
-    inline static SizeT Size(const DataType &) { return sizeof(value_) + sizeof(count_) + sizeof(result_); }
+    inline static size_t Size(const DataType &) { return sizeof(value_) + sizeof(count_) + sizeof(result_); }
 };
 
 template <>
@@ -177,27 +169,26 @@ public:
         this->count_ = 0;
     }
 
-    inline void Update(const BigIntT *__restrict input, SizeT idx) {
+    inline void Update(const BigIntT *__restrict input, size_t idx) {
         if (count_ == std::numeric_limits<i64>::max()) {
-            String error_message = fmt::format("Data count exceeds: {}", count_);
-            UnrecoverableError(error_message);
+            UnrecoverableError(fmt::format("Data count exceeds: {}", count_));
         }
         this->count_++;
         value_ += input[idx];
     }
 
-    inline void ConstantUpdate(const BigIntT *__restrict input, SizeT idx, SizeT count) {
+    inline void ConstantUpdate(const BigIntT *__restrict input, size_t idx, size_t count) {
         // TODO: Need to check overflow.
         this->count_ += count;
         value_ += (input[idx] * count);
     }
 
-    inline ptr_t Finalize() {
+    inline char *Finalize() {
         result_ = value_ / count_;
-        return (ptr_t)&result_;
+        return (char *)&result_;
     }
 
-    inline static SizeT Size(const DataType &) { return sizeof(value_) + sizeof(count_) + sizeof(result_); }
+    inline static size_t Size(const DataType &) { return sizeof(value_) + sizeof(count_) + sizeof(result_); }
 };
 
 template <>
@@ -212,27 +203,26 @@ public:
         this->count_ = 0;
     }
 
-    inline void Update(const Float16T *__restrict input, SizeT idx) {
+    inline void Update(const Float16T *__restrict input, size_t idx) {
         if (count_ == std::numeric_limits<i64>::max()) {
-            String error_message = fmt::format("Data count exceeds: {}", count_);
-            UnrecoverableError(error_message);
+            UnrecoverableError(fmt::format("Data count exceeds: {}", count_));
         }
         this->count_++;
         value_ += static_cast<float>(input[idx]);
     }
 
-    inline void ConstantUpdate(const Float16T *__restrict input, SizeT idx, SizeT count) {
+    inline void ConstantUpdate(const Float16T *__restrict input, size_t idx, size_t count) {
         // TODO: Need to check overflow.
         this->count_ += count;
         value_ += static_cast<float>(input[idx]) * count;
     }
 
-    inline ptr_t Finalize() {
+    inline char *Finalize() {
         result_ = value_ / count_;
-        return (ptr_t)&result_;
+        return (char *)&result_;
     }
 
-    inline static SizeT Size(const DataType &) { return sizeof(value_) + sizeof(count_) + sizeof(result_); }
+    inline static size_t Size(const DataType &) { return sizeof(value_) + sizeof(count_) + sizeof(result_); }
 };
 
 template <>
@@ -247,27 +237,26 @@ public:
         this->count_ = 0;
     }
 
-    inline void Update(const BFloat16T *__restrict input, SizeT idx) {
+    inline void Update(const BFloat16T *__restrict input, size_t idx) {
         if (count_ == std::numeric_limits<i64>::max()) {
-            String error_message = fmt::format("Data count exceeds: {}", count_);
-            UnrecoverableError(error_message);
+            UnrecoverableError(fmt::format("Data count exceeds: {}", count_));
         }
         this->count_++;
         value_ += static_cast<float>(input[idx]);
     }
 
-    inline void ConstantUpdate(const BFloat16T *__restrict input, SizeT idx, SizeT count) {
+    inline void ConstantUpdate(const BFloat16T *__restrict input, size_t idx, size_t count) {
         // TODO: Need to check overflow.
         this->count_ += count;
         value_ += static_cast<float>(input[idx]) * count;
     }
 
-    inline ptr_t Finalize() {
+    inline char *Finalize() {
         result_ = value_ / count_;
-        return (ptr_t)&result_;
+        return (char *)&result_;
     }
 
-    inline static SizeT Size(const DataType &) { return sizeof(value_) + sizeof(count_) + sizeof(result_); }
+    inline static size_t Size(const DataType &) { return sizeof(value_) + sizeof(count_) + sizeof(result_); }
 };
 
 template <>
@@ -282,27 +271,26 @@ public:
         this->count_ = 0;
     }
 
-    inline void Update(const FloatT *__restrict input, SizeT idx) {
+    inline void Update(const FloatT *__restrict input, size_t idx) {
         if (count_ == std::numeric_limits<i64>::max()) {
-            String error_message = fmt::format("Data count exceeds: {}", count_);
-            UnrecoverableError(error_message);
+            UnrecoverableError(fmt::format("Data count exceeds: {}", count_));
         }
         this->count_++;
         value_ += input[idx];
     }
 
-    inline void ConstantUpdate(const FloatT *__restrict input, SizeT idx, SizeT count) {
+    inline void ConstantUpdate(const FloatT *__restrict input, size_t idx, size_t count) {
         // TODO: Need to check overflow.
         this->count_ += count;
         value_ += (input[idx] * count);
     }
 
-    inline ptr_t Finalize() {
+    inline char *Finalize() {
         result_ = value_ / count_;
-        return (ptr_t)&result_;
+        return (char *)&result_;
     }
 
-    inline static SizeT Size(const DataType &) { return sizeof(value_) + sizeof(count_) + sizeof(result_); }
+    inline static size_t Size(const DataType &) { return sizeof(value_) + sizeof(count_) + sizeof(result_); }
 };
 
 template <>
@@ -317,33 +305,32 @@ public:
         this->count_ = 0;
     }
 
-    inline void Update(const DoubleT *__restrict input, SizeT idx) {
+    inline void Update(const DoubleT *__restrict input, size_t idx) {
         if (count_ == std::numeric_limits<i64>::max()) {
-            String error_message = fmt::format("Data count exceeds: {}", count_);
-            UnrecoverableError(error_message);
+            UnrecoverableError(fmt::format("Data count exceeds: {}", count_));
         }
         this->count_++;
         value_ += input[idx];
     }
 
-    inline void ConstantUpdate(const DoubleT *__restrict input, SizeT idx, SizeT count) {
+    inline void ConstantUpdate(const DoubleT *__restrict input, size_t idx, size_t count) {
         // TODO: Need to check overflow.
         this->count_ += count;
         value_ += (input[idx] * count);
     }
 
-    inline ptr_t Finalize() {
+    inline char *Finalize() {
         result_ = value_ / count_;
-        return (ptr_t)&result_;
+        return (char *)&result_;
     }
 
-    inline static SizeT Size(const DataType &) { return sizeof(value_) + sizeof(count_) + sizeof(result_); }
+    inline static size_t Size(const DataType &) { return sizeof(value_) + sizeof(count_) + sizeof(result_); }
 };
 
 void RegisterAvgFunction(NewCatalog *catalog_ptr) {
-    String func_name = "AVG";
+    std::string func_name = "AVG";
 
-    SharedPtr<AggregateFunctionSet> function_set_ptr = MakeShared<AggregateFunctionSet>(func_name);
+    std::shared_ptr<AggregateFunctionSet> function_set_ptr = std::make_shared<AggregateFunctionSet>(func_name);
 
     {
         AggregateFunction avg_function = UnaryAggregate<AvgState<TinyIntT, DoubleT>, TinyIntT, DoubleT>(func_name,

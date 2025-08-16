@@ -12,11 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:new_compaction_alg;
 
-import :stl;
+import :infinity_type;
+
+import std;
 
 namespace infinity {
 
@@ -24,11 +24,11 @@ export class NewCompactionAlg {
 public:
     virtual ~NewCompactionAlg() = default;
 
-    virtual void AddSegment(SegmentID segment_id, SizeT segment_row_cnt) = 0;
+    virtual void AddSegment(SegmentID segment_id, size_t segment_row_cnt) = 0;
 
-    virtual Vector<SegmentID> GetCompactableSegments() = 0;
+    virtual std::vector<SegmentID> GetCompactableSegments() = 0;
 
-    static UniquePtr<NewCompactionAlg> GetInstance();
+    static std::unique_ptr<NewCompactionAlg> GetInstance();
 };
 
 } // namespace infinity

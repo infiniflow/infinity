@@ -15,12 +15,12 @@
 module;
 
 #include "simd_common_intrin_include.h"
-#include <cmath>
 
 export module infinity_core:diskann_simd_func;
 
-import :stl;
 import :simd_common_tools;
+
+import std.compat;
 
 namespace infinity {
 

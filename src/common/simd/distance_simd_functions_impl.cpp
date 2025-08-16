@@ -15,7 +15,6 @@
 module;
 
 #include "simd_common_intrin_include.h"
-#include <cmath>
 
 /*
 #if defined(__x86_64__) && (defined(__clang_major__) && (__clang_major__ > 10))
@@ -43,33 +42,34 @@ IMPRECISE_FUNCTION_END
 module infinity_core:distance_simd_functions.impl;
 
 import :distance_simd_functions;
-import :stl;
 import :simd_common_tools;
+
+import std.compat;
 
 namespace infinity {
 
-f32 L2Distance_common(const f32 *x, const f32 *y, SizeT d) {
+f32 L2Distance_common(const f32 *x, const f32 *y, size_t d) {
     float res = 0.0f;
-    for (SizeT i = 0; i < d; ++i) {
+    for (size_t i = 0; i < d; ++i) {
         const float tmp = x[i] - y[i];
         res += tmp * tmp;
     }
     return res;
 }
 
-f32 IPDistance_common(const f32 *x, const f32 *y, SizeT d) {
+f32 IPDistance_common(const f32 *x, const f32 *y, size_t d) {
     float res = 0.0f;
-    for (SizeT i = 0; i < d; ++i) {
+    for (size_t i = 0; i < d; ++i) {
         res += x[i] * y[i];
     }
     return res;
 }
 
-f32 CosineDistance_common(const f32 *x, const f32 *y, SizeT d) {
+f32 CosineDistance_common(const f32 *x, const f32 *y, size_t d) {
     float dot = 0.0f;
     float sqr_x = 0.0f;
     float sqr_y = 0.0f;
-    for (SizeT i = 0; i < d; ++i) {
+    for (size_t i = 0; i < d; ++i) {
         dot += x[i] * y[i];
         sqr_x += x[i] * x[i];
         sqr_y += y[i] * y[i];
@@ -77,9 +77,9 @@ f32 CosineDistance_common(const f32 *x, const f32 *y, SizeT d) {
     return dot ? dot / sqrt(sqr_x * sqr_y) : 0.0f;
 }
 
-f32 HammingDistance_common(const u8 *x, const u8 *y, SizeT d) {
+f32 HammingDistance_common(const u8 *x, const u8 *y, size_t d) {
     f32 result = 0;
-    for (SizeT i = 0; i < d; ++i) {
+    for (size_t i = 0; i < d; ++i) {
         u8 xor_result = x[i] ^ y[i];
         result += __builtin_popcount(xor_result);
     }
@@ -88,9 +88,9 @@ f32 HammingDistance_common(const u8 *x, const u8 *y, SizeT d) {
 
 #if defined(__AVX2__)
 
-f32 HammingDistance_avx2(const u8 *x, const u8 *y, SizeT d) {
+f32 HammingDistance_avx2(const u8 *x, const u8 *y, size_t d) {
     f32 result = 0;
-    SizeT pos = 0;
+    size_t pos = 0;
     // 8 * 32 = 256
     for (; pos + 32 < d; pos += 32) {
         __m256i xor_result =
@@ -109,9 +109,9 @@ f32 HammingDistance_avx2(const u8 *x, const u8 *y, SizeT d) {
 
 #if defined(__SSE2__)
 
-f32 HammingDistance_sse2(const u8 *x, const u8 *y, SizeT d) {
+f32 HammingDistance_sse2(const u8 *x, const u8 *y, size_t d) {
     f32 result = 0;
-    SizeT pos = 0;
+    size_t pos = 0;
     // 8 * 16 = 128
     for (; pos + 16 < d; pos += 16) {
         __m128i xor_result =
@@ -129,7 +129,7 @@ f32 HammingDistance_sse2(const u8 *x, const u8 *y, SizeT d) {
 #endif // defined (__SSE2__)
 
 #if defined(__AVX2__)
-inline f32 L2Distance_avx2_128(const f32 *vector1, const f32 *vector2, SizeT) {
+inline f32 L2Distance_avx2_128(const f32 *vector1, const f32 *vector2, size_t) {
     __m256 diff_1 = _mm256_sub_ps(_mm256_loadu_ps(vector1), _mm256_loadu_ps(vector2));
     __m256 diff_2 = _mm256_sub_ps(_mm256_loadu_ps(vector1 + 8), _mm256_loadu_ps(vector2 + 8));
     __m256 diff_3 = _mm256_sub_ps(_mm256_loadu_ps(vector1 + 16), _mm256_loadu_ps(vector2 + 16));
@@ -174,7 +174,7 @@ inline f32 L2Distance_avx2_128(const f32 *vector1, const f32 *vector2, SizeT) {
     return hsum256_ps_avx(sum);
 }
 
-inline f32 L2Distance_avx2_16_multi(const f32 *vector1, const f32 *vector2, const SizeT dimension) {
+inline f32 L2Distance_avx2_16_multi(const f32 *vector1, const f32 *vector2, const size_t dimension) {
     if (dimension < 16) [[unlikely]] {
         return L2Distance_common(vector1, vector2, dimension);
     }
@@ -182,7 +182,7 @@ inline f32 L2Distance_avx2_16_multi(const f32 *vector1, const f32 *vector2, cons
     __m256 diff_2 = _mm256_sub_ps(_mm256_loadu_ps(vector1 + 8), _mm256_loadu_ps(vector2 + 8));
     __m256 sum_1 = _mm256_mul_ps(diff_1, diff_1);
     __m256 sum_2 = _mm256_mul_ps(diff_2, diff_2);
-    SizeT pos = 16;
+    size_t pos = 16;
     while (pos + 16 <= dimension) {
         vector1 += 16;
         vector2 += 16;
@@ -200,7 +200,7 @@ inline f32 L2Distance_avx2_16_multi(const f32 *vector1, const f32 *vector2, cons
     return distance;
 }
 
-f32 L2Distance_avx2(const f32 *vector1, const f32 *vector2, const SizeT dimension) {
+f32 L2Distance_avx2(const f32 *vector1, const f32 *vector2, const size_t dimension) {
     if (dimension == 128) {
         return L2Distance_avx2_128(vector1, vector2, dimension);
     }
@@ -215,7 +215,7 @@ f32 L2Distance_avx2(const f32 *vector1, const f32 *vector2, const SizeT dimensio
     __m256 sum_2 = _mm256_mul_ps(diff_2, diff_2);
     __m256 sum_3 = _mm256_mul_ps(diff_3, diff_3);
     __m256 sum_4 = _mm256_mul_ps(diff_4, diff_4);
-    for (SizeT pos = 32; pos + 32 <= dimension; pos += 32) {
+    for (size_t pos = 32; pos + 32 <= dimension; pos += 32) {
         vector1 += 32;
         vector2 += 32;
         diff_1 = _mm256_sub_ps(_mm256_loadu_ps(vector1), _mm256_loadu_ps(vector2));
@@ -233,13 +233,13 @@ f32 L2Distance_avx2(const f32 *vector1, const f32 *vector2, const SizeT dimensio
     return hsum256_ps_avx(sum);
 }
 
-f32 IPDistance_avx2(const f32 *vector1, const f32 *vector2, SizeT dimension) {
+f32 IPDistance_avx2(const f32 *vector1, const f32 *vector2, size_t dimension) {
     if (dimension < 16) [[unlikely]] {
         return IPDistance_common(vector1, vector2, dimension);
     }
     __m256 sum_1 = _mm256_mul_ps(_mm256_loadu_ps(vector1), _mm256_loadu_ps(vector2));
     __m256 sum_2 = _mm256_mul_ps(_mm256_loadu_ps(vector1 + 8), _mm256_loadu_ps(vector2 + 8));
-    SizeT i = 16;
+    size_t i = 16;
     for (; i + 16 <= dimension; i += 16) {
         vector1 += 16;
         vector2 += 16;
@@ -253,7 +253,7 @@ f32 IPDistance_avx2(const f32 *vector1, const f32 *vector2, SizeT dimension) {
     return distance;
 }
 
-f32 CosineDistance_avx2(const f32 *vector1, const f32 *vector2, SizeT dimension) {
+f32 CosineDistance_avx2(const f32 *vector1, const f32 *vector2, size_t dimension) {
     if (dimension < 16) [[unlikely]] {
         return CosineDistance_common(vector1, vector2, dimension);
     }
@@ -267,7 +267,7 @@ f32 CosineDistance_avx2(const f32 *vector1, const f32 *vector2, SizeT dimension)
     __m256 norm_v1_2 = _mm256_mul_ps(v1_2, v1_2);
     __m256 norm_v2_1 = _mm256_mul_ps(v2_1, v2_1);
     __m256 norm_v2_2 = _mm256_mul_ps(v2_2, v2_2);
-    SizeT i = 16;
+    size_t i = 16;
     for (; i + 16 <= dimension; i += 16) {
         vector1 += 16;
         vector2 += 16;

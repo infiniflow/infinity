@@ -17,7 +17,6 @@ module;
 module infinity_core:physical_except.impl;
 
 import :physical_except;
-
 import :query_context;
 import :operator_state;
 import :physical_except;

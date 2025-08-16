@@ -12,36 +12,34 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:match_expression;
 
-import :stl;
-import data_type;
 import :base_expression;
+
 import logical_type;
 import internal_types;
+import data_type;
 
 namespace infinity {
 
 export class MatchExpression : public BaseExpression {
 public:
-    MatchExpression(const String &fields, const String &matching_text, const String &options_text, const String &index_names);
+    MatchExpression(const std::string &fields, const std::string &matching_text, const std::string &options_text, const std::string &index_names);
 
     inline DataType Type() const override { return DataType(LogicalType::kFloat); }
 
-    String ToString() const override;
+    std::string ToString() const override;
 
     u64 Hash() const override;
 
     bool Eq(const BaseExpression &other) const override;
 
 public:
-    String fields_;
-    String matching_text_;
-    String options_text_;
-    Vector<String> index_names_;
-    SharedPtr<BaseExpression> optional_filter_;
+    std::string fields_;
+    std::string matching_text_;
+    std::string options_text_;
+    std::vector<std::string> index_names_;
+    std::shared_ptr<BaseExpression> optional_filter_;
 };
 
 } // namespace infinity

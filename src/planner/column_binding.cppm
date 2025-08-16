@@ -14,11 +14,9 @@
 
 module;
 
-#include <functional>
-
 export module infinity_core:column_binding;
 
-import :stl;
+import std.compat;
 
 namespace infinity {
 
@@ -26,12 +24,12 @@ export struct ColumnBinding {
 
     ColumnBinding() = default;
 
-    explicit ColumnBinding(SizeT tbl_idx, SizeT col_idx) : table_idx(tbl_idx), column_idx(col_idx) {}
+    explicit ColumnBinding(size_t tbl_idx, size_t col_idx) : table_idx(tbl_idx), column_idx(col_idx) {}
 
     friend auto operator<=>(const ColumnBinding &lhs, const ColumnBinding &rhs) = default;
 
-    SizeT table_idx{};
-    SizeT column_idx{};
+    size_t table_idx{};
+    size_t column_idx{};
 };
 
 } // namespace infinity

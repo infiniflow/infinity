@@ -12,16 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:roaring_bitmap;
 
-import :stl;
 import :croaring;
 import :infinity_exception;
-import serialize;
-import :third_party;
 import :logger;
+
+import third_party;
+
+import serialize;
 
 namespace infinity {
 
@@ -40,16 +39,16 @@ export using RoaringForwardIterator = roaring::RoaringSetBitForwardIterator;
 
 template <bool init_all_true>
 struct RoaringBitmap {
-    static SharedPtr<RoaringBitmap> MakeSharedAllTrue(u32 count)
+    static std::shared_ptr<RoaringBitmap> MakeSharedAllTrue(u32 count)
         requires init_all_true
     {
-        return MakeShared<RoaringBitmap>(count);
+        return std::make_shared<RoaringBitmap>(count);
     }
 
-    static SharedPtr<RoaringBitmap> MakeSharedAllFalse(u32 count)
+    static std::shared_ptr<RoaringBitmap> MakeSharedAllFalse(u32 count)
         requires(!init_all_true)
     {
-        return MakeShared<RoaringBitmap>(count);
+        return std::make_shared<RoaringBitmap>(count);
     }
 
     RoaringBitmap() = default;
@@ -292,7 +291,7 @@ struct RoaringBitmap {
     }
 
     // Read from a serialized version
-    static SharedPtr<RoaringBitmap> ReadAdv(const char *&ptr, i32 maxbytes) {
+    static std::shared_ptr<RoaringBitmap> ReadAdv(const char *&ptr, i32 maxbytes) {
         if (maxbytes < 0) {
             UnrecoverableError("RoaringBitmap::ReadAdv: maxbytes < 0");
         }
@@ -310,7 +309,7 @@ struct RoaringBitmap {
         if (size > maxbytes) {
             UnrecoverableError("RoaringBitmap::ReadAdv: size > maxbytes");
         }
-        auto bitmap = MakeShared<RoaringBitmap>(count);
+        auto bitmap = std::make_shared<RoaringBitmap>(count);
         if constexpr (init_all_true) {
             bitmap->all_true_flag_.value = false;
         }

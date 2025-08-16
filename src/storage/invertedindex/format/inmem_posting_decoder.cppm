@@ -1,6 +1,7 @@
 module;
 
 export module infinity_core:inmem_posting_decoder;
+
 import :inmem_doc_list_decoder;
 import :inmem_position_list_decoder;
 

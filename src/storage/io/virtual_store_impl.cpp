@@ -15,12 +15,9 @@
 module;
 
 #include <cerrno>
-#include <cstring>
 #include <fcntl.h>
-#include <filesystem>
 #include <lz4.h>
 #include <openssl/md5.h>
-#include <string>
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -28,17 +25,18 @@ module;
 module infinity_core:virtual_store.impl;
 
 import :virtual_store;
-
-import :stl;
 import :s3_client_minio;
 import :infinity_context;
 import :utility;
+
+import std;
+import std.compat;
 
 namespace fs = std::filesystem;
 
 namespace infinity {
 
-StorageType String2StorageType(const String &storage_type) {
+StorageType String2StorageType(const std::string &storage_type) {
     if (storage_type == "local") {
         return StorageType::kLocal;
     }
@@ -81,7 +79,7 @@ StorageType String2StorageType(const String &storage_type) {
     return StorageType::kInvalid;
 }
 
-String ToString(StorageType storage_type) {
+std::string ToString(StorageType storage_type) {
     switch (storage_type) {
         case StorageType::kLocal: {
             return "local";
@@ -119,7 +117,7 @@ String ToString(StorageType storage_type) {
     }
 }
 
-Tuple<UniquePtr<LocalFileHandle>, Status> VirtualStore::Open(const String &path, FileAccessMode access_mode) {
+std::tuple<std::unique_ptr<LocalFileHandle>, Status> VirtualStore::Open(const std::string &path, FileAccessMode access_mode) {
     i32 fd = -1;
     switch (access_mode) {
         case FileAccessMode::kRead: {
@@ -141,11 +139,11 @@ Tuple<UniquePtr<LocalFileHandle>, Status> VirtualStore::Open(const String &path,
     if (fd == -1) {
         return {nullptr, Status::IOError(fmt::format("File: {} open failed: {}", path, strerror(errno)))};
     }
-    return {MakeUnique<LocalFileHandle>(fd, path, access_mode), Status::OK()};
+    return {std::make_unique<LocalFileHandle>(fd, path, access_mode), Status::OK()};
 }
 
-UniquePtr<StreamReader> VirtualStore::OpenStreamReader(const String &path) {
-    auto res = MakeUnique<StreamReader>();
+std::unique_ptr<StreamReader> VirtualStore::OpenStreamReader(const std::string &path) {
+    auto res = std::make_unique<StreamReader>();
     auto status = res->Init(path);
     if (!status.ok()) {
         RecoverableError(status);
@@ -154,9 +152,9 @@ UniquePtr<StreamReader> VirtualStore::OpenStreamReader(const String &path) {
 }
 
 // For local disk filesystem, such as temp file, disk cache and WAL
-bool VirtualStore::Exists(const String &path) {
+bool VirtualStore::Exists(const std::string &path) {
     std::error_code error_code;
-    Path p{path};
+    fs::path p{path};
     bool is_exists = std::filesystem::exists(p, error_code);
     if (error_code.value() == 0) {
         return is_exists;
@@ -166,12 +164,12 @@ bool VirtualStore::Exists(const String &path) {
     return false;
 }
 
-Status VirtualStore::DeleteFile(const String &file_name) {
+Status VirtualStore::DeleteFile(const std::string &file_name) {
     if (!std::filesystem::path(file_name).is_absolute()) {
         UnrecoverableError(fmt::format("{} isn't absolute path.", file_name));
     }
     std::error_code error_code;
-    Path p{file_name};
+    fs::path p{file_name};
     if (!Exists(p)) {
         LOG_WARN(fmt::format("The {} to be deleted does not exists ", file_name));
         return Status::OK();
@@ -181,7 +179,7 @@ Status VirtualStore::DeleteFile(const String &file_name) {
         UnrecoverableError(fmt::format("Delete file {} exception: {}", file_name, strerror(errno)));
     }
     if (!is_deleted) {
-        String error_message = fmt::format("Failed to delete file: {}: {}", file_name, strerror(errno));
+        std::string error_message = fmt::format("Failed to delete file: {}: {}", file_name, strerror(errno));
         LOG_ERROR(error_message);
         Status status = Status::IOError(error_message);
         return status;
@@ -190,10 +188,10 @@ Status VirtualStore::DeleteFile(const String &file_name) {
     return Status::OK();
 }
 
-Status VirtualStore::DeleteFileBG(const String &path) {
+Status VirtualStore::DeleteFileBG(const std::string &path) {
     switch (VirtualStore::storage_type_) {
         case StorageType::kMinio: {
-            auto drop_task = MakeShared<LocalDropTask>(path);
+            auto drop_task = std::make_shared<LocalDropTask>(path);
             auto object_storage_processor = infinity::InfinityContext::instance().storage()->object_storage_processor();
             object_storage_processor->Submit(drop_task);
             drop_task->Wait();
@@ -208,33 +206,32 @@ Status VirtualStore::DeleteFileBG(const String &path) {
     return Status::OK();
 }
 
-Status VirtualStore::MakeDirectory(const String &path) {
+Status VirtualStore::MakeDirectory(const std::string &path) {
     if (VirtualStore::Exists(path)) {
         if (std::filesystem::is_directory(path)) {
             return Status::OK();
         } else {
-            String error_message = fmt::format("Exists file: {}", path);
+            std::string error_message = fmt::format("Exists file: {}", path);
             LOG_ERROR(error_message);
             return Status::IOError(error_message);
         }
     }
 
     std::error_code error_code;
-    Path p{path};
+    fs::path p{path};
     std::filesystem::create_directories(p, error_code);
     if (error_code.value() != 0) {
-        String error_message = fmt::format("{} create exception: {}", path, strerror(errno));
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("{} create exception: {}", path, strerror(errno)));
     }
     return Status::OK();
 }
 
-Status VirtualStore::RemoveDirectory(const String &path) {
+Status VirtualStore::RemoveDirectory(const std::string &path) {
     if (!std::filesystem::path(path).is_absolute()) {
         UnrecoverableError(fmt::format("{} isn't absolute path.", path));
     }
     std::error_code error_code;
-    Path p{path};
+    fs::path p{path};
     std::filesystem::remove_all(p, error_code);
     if (error_code.value() != 0) {
         UnrecoverableError(fmt::format("Delete directory {} exception: {}", path, error_code.message()));
@@ -242,12 +239,12 @@ Status VirtualStore::RemoveDirectory(const String &path) {
     return Status::OK();
 }
 
-Status VirtualStore::CleanupDirectory(const String &path) {
+Status VirtualStore::CleanupDirectory(const std::string &path) {
     if (!std::filesystem::path(path).is_absolute()) {
         UnrecoverableError(fmt::format("{} isn't absolute path.", path));
     }
     std::error_code error_code;
-    Path p{path};
+    fs::path p{path};
     if (!std::filesystem::exists(p)) {
         std::filesystem::create_directories(p, error_code);
         if (error_code.value() != 0) {
@@ -258,13 +255,12 @@ Status VirtualStore::CleanupDirectory(const String &path) {
     try {
         std::ranges::for_each(std::filesystem::directory_iterator{path}, [&](const auto &dir_entry) { std::filesystem::remove_all(dir_entry); });
     } catch (const std::filesystem::filesystem_error &e) {
-        String error_message = fmt::format("CleanupDirectory cleanup {} exception: {}", path, e.what());
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("CleanupDirectory cleanup {} exception: {}", path, e.what()));
     }
     return Status::OK();
 }
 
-void VirtualStore::RecursiveCleanupAllEmptyDir(const String &path) {
+void VirtualStore::RecursiveCleanupAllEmptyDir(const std::string &path) {
     if (!VirtualStore::Exists(path) || !std::filesystem::is_directory(path)) {
         return;
     }
@@ -283,7 +279,7 @@ void VirtualStore::RecursiveCleanupAllEmptyDir(const String &path) {
     }
 }
 
-Status VirtualStore::Rename(const String &old_path, const String &new_path) {
+Status VirtualStore::Rename(const std::string &old_path, const std::string &new_path) {
     if (!std::filesystem::path(old_path).is_absolute()) {
         UnrecoverableError(fmt::format("{} isn't absolute path.", old_path));
     }
@@ -296,7 +292,7 @@ Status VirtualStore::Rename(const String &old_path, const String &new_path) {
     return Status::OK();
 }
 
-Status VirtualStore::Truncate(const String &file_name, SizeT new_length) {
+Status VirtualStore::Truncate(const std::string &file_name, size_t new_length) {
     if (!std::filesystem::path(file_name).is_absolute()) {
         UnrecoverableError(fmt::format("{} isn't absolute path.", file_name));
     }
@@ -311,15 +307,15 @@ Status VirtualStore::Truncate(const String &file_name, SizeT new_length) {
     return Status::OK();
 }
 
-Status VirtualStore::Merge(const String &dst_path, const String &src_path) {
+Status VirtualStore::Merge(const std::string &dst_path, const std::string &src_path) {
     if (!std::filesystem::path(dst_path).is_absolute()) {
         UnrecoverableError(fmt::format("{} isn't absolute path.", dst_path));
     }
     if (!std::filesystem::path(src_path).is_absolute()) {
         UnrecoverableError(fmt::format("{} isn't absolute path.", src_path));
     }
-    Path dst{dst_path};
-    Path src{src_path};
+    fs::path dst{dst_path};
+    fs::path src{src_path};
     std::ifstream srcFile(src, std::ios::binary);
     if (!srcFile.is_open()) {
         UnrecoverableError(fmt::format("Failed to open source file {}", src_path));
@@ -340,7 +336,7 @@ Status VirtualStore::Merge(const String &dst_path, const String &src_path) {
     return Status::OK();
 }
 
-Status VirtualStore::Copy(const String &dst_path, const String &src_path) {
+Status VirtualStore::Copy(const std::string &dst_path, const std::string &src_path) {
     if (!std::filesystem::path(dst_path).is_absolute()) {
         UnrecoverableError(fmt::format("{} isn't absolute path.", dst_path));
     }
@@ -348,7 +344,7 @@ Status VirtualStore::Copy(const String &dst_path, const String &src_path) {
         UnrecoverableError(fmt::format("{} isn't absolute path.", src_path));
     }
 
-    String dst_dir = GetParentPath(dst_path);
+    std::string dst_dir = GetParentPath(dst_path);
     if (!VirtualStore::Exists(dst_dir)) {
         VirtualStore::MakeDirectory(dst_dir);
     }
@@ -361,31 +357,31 @@ Status VirtualStore::Copy(const String &dst_path, const String &src_path) {
     return Status::OK();
 }
 
-Tuple<Vector<SharedPtr<DirEntry>>, Status> VirtualStore::ListDirectory(const String &path) {
+std::tuple<std::vector<std::shared_ptr<std::filesystem::directory_entry>>, Status> VirtualStore::ListDirectory(const std::string &path) {
     if (!std::filesystem::path(path).is_absolute()) {
         UnrecoverableError(fmt::format("{} isn't absolute path.", path));
     }
-    Path dir_path(path);
+    fs::path dir_path(path);
     if (!is_directory(dir_path)) {
         UnrecoverableError(fmt::format("{} isn't a directory", path));
     }
 
-    Vector<SharedPtr<DirEntry>> file_array;
+    std::vector<std::shared_ptr<std::filesystem::directory_entry>> file_array;
     std::ranges::for_each(std::filesystem::directory_iterator{path},
-                          [&](const auto &dir_entry) { file_array.emplace_back(MakeShared<DirEntry>(dir_entry)); });
+                          [&](const auto &dir_entry) { file_array.emplace_back(std::make_shared<std::filesystem::directory_entry>(dir_entry)); });
     return {file_array, Status::OK()};
 }
 
-SizeT VirtualStore::GetFileSize(const String &path) {
+size_t VirtualStore::GetFileSize(const std::string &path) {
     if (!std::filesystem::path(path).is_absolute()) {
         UnrecoverableError(fmt::format("{} isn't absolute path.", path));
     }
     return std::filesystem::file_size(path);
 }
 
-String VirtualStore::GetParentPath(const String &path) { return Path(path).parent_path().string(); }
+std::string VirtualStore::GetParentPath(const std::string &path) { return fs::path(path).parent_path().string(); }
 
-SizeT VirtualStore::GetDirectorySize(const String &path) {
+size_t VirtualStore::GetDirectorySize(const std::string &path) {
     if (!std::filesystem::path(path).is_absolute()) {
         UnrecoverableError(fmt::format("{} isn't absolute path.", path));
     }
@@ -400,15 +396,15 @@ SizeT VirtualStore::GetDirectorySize(const String &path) {
     return totalSize;
 }
 
-String VirtualStore::ConcatenatePath(const String &dir_path, const String &file_path) {
+std::string VirtualStore::ConcatenatePath(const std::string &dir_path, const std::string &file_path) {
     std::filesystem::path full_path = std::filesystem::path(dir_path) / file_path;
     return full_path.string();
 }
 
 std::mutex VirtualStore::mtx_;
-HashMap<String, MmapInfo> VirtualStore::mapped_files_;
+std::unordered_map<std::string, MmapInfo> VirtualStore::mapped_files_;
 
-i32 VirtualStore::MmapFile(const String &file_path, u8 *&data_ptr, SizeT &data_len) {
+i32 VirtualStore::MmapFile(const std::string &file_path, u8 *&data_ptr, size_t &data_len) {
     if (!std::filesystem::path(file_path).is_absolute()) {
         UnrecoverableError(fmt::format("{} isn't absolute path.", file_path));
     }
@@ -446,12 +442,12 @@ i32 VirtualStore::MmapFile(const String &file_path, u8 *&data_ptr, SizeT &data_l
     return 0;
 }
 
-std::ofstream VirtualStore::BeginCompress(const String &compressed_file) {
+std::ofstream VirtualStore::BeginCompress(const std::string &compressed_file) {
     std::ofstream output(compressed_file, std::ios::binary);
     return output;
 }
 
-Status VirtualStore::AddFileCompress(std::ofstream &ofstream, const String &input_file) {
+Status VirtualStore::AddFileCompress(std::ofstream &ofstream, const std::string &input_file) {
     std::ifstream input(input_file, std::ios::binary);
     if (!input.is_open()) {
         return Status::IOError(fmt::format("Unable to open input file: {}", input_file));
@@ -466,7 +462,7 @@ Status VirtualStore::AddFileCompress(std::ofstream &ofstream, const String &inpu
     input.close();
 
     // Write the filename size
-    SizeT filename_size = input_file.size();
+    size_t filename_size = input_file.size();
     ofstream.write(reinterpret_cast<char *>(&filename_size), sizeof(filename_size));
 
     // Write filename
@@ -476,7 +472,7 @@ Status VirtualStore::AddFileCompress(std::ofstream &ofstream, const String &inpu
     ofstream.write(reinterpret_cast<char *>(&raw_file_size), sizeof(raw_file_size));
 
     // Write raw file md5
-    String md5 = CalcMD5(raw_data.data(), raw_file_size);
+    std::string md5 = CalcMD5(raw_data.data(), raw_file_size);
     ofstream.write(md5.c_str(), MD5_DIGEST_LENGTH);
 
     size_t max_compressed_size = LZ4_compressBound(raw_file_size);
@@ -497,7 +493,7 @@ Status VirtualStore::AddFileCompress(std::ofstream &ofstream, const String &inpu
 
 void VirtualStore::EndCompress(std::ofstream &ofstream) { ofstream.close(); }
 
-i32 VirtualStore::MunmapFile(const String &file_path) {
+i32 VirtualStore::MunmapFile(const std::string &file_path) {
     if (!std::filesystem::path(file_path).is_absolute()) {
         UnrecoverableError(fmt::format("{} isn't absolute path.", file_path));
     }
@@ -515,10 +511,10 @@ i32 VirtualStore::MunmapFile(const String &file_path) {
     return 0;
 }
 
-i32 VirtualStore::MmapFilePart(const String &file_path, SizeT offset, SizeT length, u8 *&data_ptr) {
-    SizeT align_offset = offset / getpagesize() * getpagesize();
-    SizeT diff = offset - align_offset;
-    SizeT align_length = length + diff;
+i32 VirtualStore::MmapFilePart(const std::string &file_path, size_t offset, size_t length, u8 *&data_ptr) {
+    size_t align_offset = offset / getpagesize() * getpagesize();
+    size_t diff = offset - align_offset;
+    size_t align_length = length + diff;
     int fd = open(file_path.c_str(), O_RDONLY);
     if (fd < 0) {
         return -1;
@@ -532,10 +528,10 @@ i32 VirtualStore::MmapFilePart(const String &file_path, SizeT offset, SizeT leng
     return 0;
 }
 
-i32 VirtualStore::MunmapFilePart(u8 *data_ptr, SizeT offset, SizeT length) {
-    SizeT align_offset = offset / getpagesize() * getpagesize();
+i32 VirtualStore::MunmapFilePart(u8 *data_ptr, size_t offset, size_t length) {
+    size_t align_offset = offset / getpagesize() * getpagesize();
     u8 *aligned_ptr = data_ptr - offset + align_offset;
-    SizeT align_length = length + data_ptr - aligned_ptr;
+    size_t align_length = length + data_ptr - aligned_ptr;
     return munmap(aligned_ptr, align_length);
 }
 
@@ -550,21 +546,21 @@ void VirtualStore::MunmapAllFiles() {
 
 // Remote storage
 StorageType VirtualStore::storage_type_ = StorageType::kInvalid;
-String VirtualStore::bucket_ = "infinity";
-UniquePtr<S3Client> VirtualStore::s3_client_ = nullptr;
-Atomic<u64> VirtualStore::total_request_count_ = 0;
-Atomic<u64> VirtualStore::cache_miss_count_ = 0;
+std::string VirtualStore::bucket_ = "infinity";
+std::unique_ptr<S3Client> VirtualStore::s3_client_ = nullptr;
+std::atomic_uint64_t VirtualStore::total_request_count_ = 0;
+std::atomic_uint64_t VirtualStore::cache_miss_count_ = 0;
 
 Status VirtualStore::InitRemoteStore(StorageType storage_type,
-                                     const String &URL,
+                                     const std::string &URL,
                                      bool HTTPS,
-                                     const String &access_key,
-                                     const String &secret_key,
-                                     const String &bucket) {
+                                     const std::string &access_key,
+                                     const std::string &secret_key,
+                                     const std::string &bucket) {
     switch (storage_type) {
         case StorageType::kMinio: {
             storage_type_ = StorageType::kMinio;
-            s3_client_ = MakeUnique<S3ClientMinio>(URL, HTTPS, access_key, secret_key);
+            s3_client_ = std::make_unique<S3ClientMinio>(URL, HTTPS, access_key, secret_key);
             break;
         }
         default: {
@@ -596,13 +592,13 @@ Status VirtualStore::UnInitRemoteStore() {
 
 bool VirtualStore::IsInit() { return s3_client_.get() != nullptr; }
 
-Status VirtualStore::DownloadObject(const String &file_path, const String &object_name) {
+Status VirtualStore::DownloadObject(const std::string &file_path, const std::string &object_name) {
     if (VirtualStore::storage_type_ == StorageType::kLocal) {
         return Status::OK();
     }
     switch (VirtualStore::storage_type_) {
         case StorageType::kMinio: {
-            auto download_task = MakeShared<DownloadTask>(file_path, object_name);
+            auto download_task = std::make_shared<DownloadTask>(file_path, object_name);
             auto object_storage_processor = infinity::InfinityContext::instance().storage()->object_storage_processor();
             object_storage_processor->Submit(download_task);
             download_task->Wait();
@@ -616,13 +612,13 @@ Status VirtualStore::DownloadObject(const String &file_path, const String &objec
     return Status::OK();
 }
 
-Status VirtualStore::UploadObject(const String &file_path, const String &object_name) {
+Status VirtualStore::UploadObject(const std::string &file_path, const std::string &object_name) {
     if (VirtualStore::storage_type_ == StorageType::kLocal) {
         return Status::OK();
     }
     switch (VirtualStore::storage_type_) {
         case StorageType::kMinio: {
-            auto upload_task = MakeShared<UploadTask>(file_path, object_name);
+            auto upload_task = std::make_shared<UploadTask>(file_path, object_name);
             auto object_storage_processor = infinity::InfinityContext::instance().storage()->object_storage_processor();
             object_storage_processor->Submit(upload_task);
             upload_task->Wait();
@@ -636,13 +632,13 @@ Status VirtualStore::UploadObject(const String &file_path, const String &object_
     return Status::OK();
 }
 
-Status VirtualStore::RemoveObject(const String &object_name) {
+Status VirtualStore::RemoveObject(const std::string &object_name) {
     if (VirtualStore::storage_type_ == StorageType::kLocal) {
         return Status::OK();
     }
     switch (VirtualStore::storage_type_) {
         case StorageType::kMinio: {
-            auto remove_task = MakeShared<RemoveTask>(object_name);
+            auto remove_task = std::make_shared<RemoveTask>(object_name);
             auto object_storage_processor = infinity::InfinityContext::instance().storage()->object_storage_processor();
             object_storage_processor->Submit(remove_task);
             remove_task->Wait();
@@ -655,13 +651,13 @@ Status VirtualStore::RemoveObject(const String &object_name) {
 
     return Status::OK();
 }
-Status VirtualStore::CopyObject(const String &src_object_name, const String &dst_object_name) {
+Status VirtualStore::CopyObject(const std::string &src_object_name, const std::string &dst_object_name) {
     if (VirtualStore::storage_type_ == StorageType::kLocal) {
         return Status::OK();
     }
     switch (VirtualStore::storage_type_) {
         case StorageType::kMinio: {
-            auto copy_task = MakeShared<CopyTask>(src_object_name, dst_object_name);
+            auto copy_task = std::make_shared<CopyTask>(src_object_name, dst_object_name);
             auto object_storage_processor = infinity::InfinityContext::instance().storage()->object_storage_processor();
             object_storage_processor->Submit(copy_task);
             copy_task->Wait();

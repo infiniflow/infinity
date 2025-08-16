@@ -13,8 +13,17 @@
 // limitations under the License.
 
 #include "search_options.h"
-#include "spdlog/fmt/fmt.h"
-#include <sstream>
+
+#ifndef PARESER_USE_STD_MODULE
+#define PARESER_USE_STD_MODULE 1
+import std;
+import std.compat;
+#endif
+
+#ifndef PARESER_USE_THIRD_PARTY_MODULE
+#define PARESER_USE_THIRD_PARTY_MODULE 1
+import third_party;
+#endif
 
 namespace infinity {
 

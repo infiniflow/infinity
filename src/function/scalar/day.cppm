@@ -16,8 +16,6 @@ module;
 
 export module infinity_core:day;
 
-import :stl;
-
 namespace infinity {
 
 class NewCatalog;

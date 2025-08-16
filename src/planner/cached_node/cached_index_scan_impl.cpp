@@ -17,7 +17,6 @@ module;
 module infinity_core:cached_index_scan.impl;
 
 import :cached_index_scan;
-
 import :logical_index_scan;
 import :physical_index_scan;
 import :logical_node_type;

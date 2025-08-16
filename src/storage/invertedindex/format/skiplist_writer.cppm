@@ -1,8 +1,5 @@
-module;
-
 export module infinity_core:skiplist_writer;
 
-import :stl;
 import :file_writer;
 import :file_reader;
 import :posting_byte_slice;
@@ -23,9 +20,9 @@ public:
 
     void AddItem(u32 last_doc_id, u32 total_tf, u32 block_max_tf, u16 block_max_percentage, u32 item_size);
 
-    void Dump(const SharedPtr<FileWriter> &file, bool spill = false);
+    void Dump(const std::shared_ptr<FileWriter> &file, bool spill = false);
 
-    void Load(const SharedPtr<FileReader> &file);
+    void Load(const std::shared_ptr<FileReader> &file);
 
 private:
     static const u32 INVALID_LAST_KEY = (u32)-1;

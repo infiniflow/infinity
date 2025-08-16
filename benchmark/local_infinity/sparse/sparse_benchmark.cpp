@@ -67,7 +67,7 @@ int main(int argc, char *argv[]) {
             break;
         }
         case ModeType::kQuery: {
-            Vector<Pair<Vector<u32>, Vector<f32>>> query_result;
+            std::vector<Pair<std::vector<u32>, std::vector<f32>>> query_result;
             i64 query_n = opt.query_n_;
             i32 thread_n = opt.thread_n_;
             bool bf = opt.bf_;
@@ -99,7 +99,7 @@ int main(int argc, char *argv[]) {
                                           query_mat,
                                           top_k,
                                           query_n,
-                                          [&](const SparseVecRef<f32, i32> &query, u32 top_k) -> Pair<Vector<u32>, Vector<f32>> {
+                                          [&](const SparseVecRef<f32, i32> &query, u32 top_k) -> Pair<std::vector<u32>, std::vector<f32>> {
                                               return index.SearchBF(query, top_k);
                                           });
                     profiler.End();
@@ -116,7 +116,7 @@ int main(int argc, char *argv[]) {
                                           query_mat,
                                           top_k,
                                           query_n,
-                                          [&](const SparseVecRef<f32, i32> &query, u32 top_k) -> Pair<Vector<u32>, Vector<f32>> {
+                                          [&](const SparseVecRef<f32, i32> &query, u32 top_k) -> Pair<std::vector<u32>, std::vector<f32>> {
                                               auto [candidate_indices, candidate_scores, used_budget] =
                                                   index.SearchKnn(query, option.candidate_n_, option.budget_);
                                               used_budget_all += used_budget;

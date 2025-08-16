@@ -12,11 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:system_info;
 
-import :stl;
+import :infinity_type;
 
 namespace infinity {
 

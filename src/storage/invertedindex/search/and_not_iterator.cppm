@@ -12,24 +12,22 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:and_not_iterator;
 
-import :stl;
 import :index_defines;
 import :multi_doc_iterator;
 import :doc_iterator;
+
 import internal_types;
 
 namespace infinity {
 export class AndNotIterator : public MultiDocIterator {
 public:
-    AndNotIterator(Vector<UniquePtr<DocIterator>> iterators);
+    AndNotIterator(std::vector<std::unique_ptr<DocIterator>> iterators);
 
     DocIteratorType GetType() const override { return DocIteratorType::kAndNotIterator; }
 
-    String Name() const override { return "AndNotIterator"; }
+    std::string Name() const override { return "AndNotIterator"; }
 
     /* pure virtual methods implementation */
     bool Next(RowID doc_id) override;

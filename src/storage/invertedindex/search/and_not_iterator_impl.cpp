@@ -12,21 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:and_not_iterator.impl;
 
 import :and_not_iterator;
-
-import :stl;
 import :index_defines;
 import :multi_doc_iterator;
 import :doc_iterator;
+
 import internal_types;
 
 namespace infinity {
 
-AndNotIterator::AndNotIterator(Vector<UniquePtr<DocIterator>> iterators) : MultiDocIterator(std::move(iterators)) {
+AndNotIterator::AndNotIterator(std::vector<std::unique_ptr<DocIterator>> iterators) : MultiDocIterator(std::move(iterators)) {
     std::sort(children_.begin() + 1, children_.end(), [](const auto &lhs, const auto &rhs) {
         return lhs->GetEstimateIterateCost() < rhs->GetEstimateIterateCost();
     });

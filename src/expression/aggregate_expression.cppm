@@ -12,26 +12,24 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:aggregate_expression;
 
 import :column_binding;
 import :base_expression;
-import data_type;
-import :stl;
 import :aggregate_function;
+
 import internal_types;
+import data_type;
 
 namespace infinity {
 
 export class AggregateExpression : public BaseExpression {
 public:
-    explicit AggregateExpression(AggregateFunction aggregate_function, Vector<SharedPtr<BaseExpression>> arguments);
+    explicit AggregateExpression(AggregateFunction aggregate_function, std::vector<std::shared_ptr<BaseExpression>> arguments);
 
     DataType Type() const override;
 
-    [[nodiscard]] String ToString() const override;
+    [[nodiscard]] std::string ToString() const override;
 
     bool IsCountStar() const;
 

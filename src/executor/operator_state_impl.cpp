@@ -12,22 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:operator_state.impl;
 
 import :operator_state;
-
 import :data_block;
-import :stl;
 import :physical_operator_type;
 import :fragment_data;
 import :infinity_exception;
 import :logger;
-import :third_party;
 import :table_scan_function_data;
 import :knn_scan_data;
 import :compact_state_data;
+
+import third_party;
 
 namespace infinity {
 
@@ -37,7 +34,7 @@ TableScanOperatorState::~TableScanOperatorState() = default;
 KnnScanOperatorState::KnnScanOperatorState() : OperatorState(PhysicalOperatorType::kKnnScan) {}
 KnnScanOperatorState::~KnnScanOperatorState() = default;
 
-CompactOperatorState::CompactOperatorState(SharedPtr<CompactStateData> compact_state_data)
+CompactOperatorState::CompactOperatorState(std::shared_ptr<CompactStateData> compact_state_data)
     : OperatorState(PhysicalOperatorType::kCompact), compact_state_data_(compact_state_data) {}
 
 CompactOperatorState::~CompactOperatorState() = default;
@@ -51,8 +48,7 @@ void QueueSourceState::MarkCompletedTask(u64 fragment_id) {
             num_tasks_.erase(it);
         }
     } else {
-        String error_message = "Get unexpected data from child fragment";
-        UnrecoverableError(error_message);
+        UnrecoverableError("Get unexpected data from child fragment");
     }
 }
 
@@ -60,10 +56,9 @@ void QueueSourceState::MarkCompletedTask(u64 fragment_id) {
 // A false return value indicate there are more data need to read from source.
 // True or false doesn't mean the source data is error or not.
 bool QueueSourceState::GetData() {
-    SharedPtr<FragmentDataBase> fragment_data_base = nullptr;
+    std::shared_ptr<FragmentDataBase> fragment_data_base = nullptr;
     if (!source_queue_.TryDequeue(fragment_data_base)) {
-        String error_message = "This task should not be scheduled if the source queue is empty";
-        UnrecoverableError(error_message);
+        UnrecoverableError("This task should not be scheduled if the source queue is empty");
     }
 
     switch (fragment_data_base->type_) {
@@ -92,8 +87,7 @@ bool QueueSourceState::GetData() {
             break;
         }
         default: {
-            String error_message = "Not support fragment data type";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Not support fragment data type");
             break;
         }
     }
@@ -204,8 +198,7 @@ bool QueueSourceState::GetData() {
             break;
         }
         default: {
-            String error_message = "Not support operator type";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Not support operator type");
             break;
         }
     }

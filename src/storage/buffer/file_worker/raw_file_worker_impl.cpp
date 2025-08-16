@@ -15,25 +15,24 @@
 module;
 
 #include <cassert>
-#include <tuple>
 
 module infinity_core:raw_file_worker.impl;
 
 import :raw_file_worker;
-import :stl;
 import :infinity_exception;
 import :local_file_handle;
-import :third_party;
 import :status;
-import :logger;
 import :raw_file_worker;
+
+import std;
+import third_party;
 
 namespace infinity {
 
-RawFileWorker::RawFileWorker(SharedPtr<String> data_dir,
-                             SharedPtr<String> temp_dir,
-                             SharedPtr<String> file_dir,
-                             SharedPtr<String> file_name,
+RawFileWorker::RawFileWorker(std::shared_ptr<std::string> data_dir,
+                             std::shared_ptr<std::string> temp_dir,
+                             std::shared_ptr<std::string> file_dir,
+                             std::shared_ptr<std::string> file_name,
                              u32 file_size,
                              PersistenceManager *persistence_manager)
     : FileWorker(std::move(data_dir), std::move(temp_dir), std::move(file_dir), std::move(file_name), persistence_manager), buffer_size_(file_size) {}
@@ -47,20 +46,17 @@ RawFileWorker::~RawFileWorker() {
 
 void RawFileWorker::AllocateInMemory() {
     if (data_ != nullptr) {
-        String error_message = "Data is already allocated.";
-        UnrecoverableError(error_message);
+        UnrecoverableError("Data is already allocated.");
     }
     if (buffer_size_ == 0) {
-        String error_message = "Buffer size is 0.";
-        UnrecoverableError(error_message);
+        UnrecoverableError("Buffer size is 0.");
     }
     data_ = static_cast<void *>(new char[buffer_size_]);
 }
 
 void RawFileWorker::FreeInMemory() {
     if (data_ == nullptr) {
-        String error_message = "Data is already freed.";
-        UnrecoverableError(error_message);
+        UnrecoverableError("Data is already freed.");
     }
     delete[] static_cast<char *>(data_);
     data_ = nullptr;
@@ -76,7 +72,7 @@ bool RawFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_success, const 
     return true;
 }
 
-void RawFileWorker::ReadFromFileImpl(SizeT file_size, bool from_spill) {
+void RawFileWorker::ReadFromFileImpl(size_t file_size, bool from_spill) {
     buffer_size_ = file_handle_->FileSize();
     data_ = static_cast<void *>(new char[buffer_size_]);
     auto [nbytes, status1] = file_handle_->Read(data_, buffer_size_);

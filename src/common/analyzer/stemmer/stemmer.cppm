@@ -12,11 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:stemmer;
 
-import :stl;
+import std;
 
 namespace infinity {
 
@@ -51,7 +49,7 @@ public:
 
     void DeInit();
 
-    bool Stem(const String &term, String &resultWord);
+    bool Stem(const std::string &term, std::string &resultWord);
 
 private:
     // int stemLang_; ///< language for stemming

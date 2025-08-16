@@ -12,11 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:corrlated_expr_detector;
 
-import :stl;
 import :logical_node_visitor;
 import :logical_node;
 import :subquery_expression;
@@ -25,19 +22,19 @@ namespace infinity {
 
 export class CorrelatedExpressionsDetector final : public LogicalNodeVisitor {
 public:
-    explicit CorrelatedExpressionsDetector(const Vector<SharedPtr<ColumnExpression>> &correlated_column_exprs)
+    explicit CorrelatedExpressionsDetector(const std::vector<std::shared_ptr<ColumnExpression>> &correlated_column_exprs)
         : correlated_column_exprs_(correlated_column_exprs) {}
 
     void VisitNode(LogicalNode &op) final;
 
-    virtual SharedPtr<BaseExpression> VisitReplace(const SharedPtr<ColumnExpression> &expression) override;
+    virtual std::shared_ptr<BaseExpression> VisitReplace(const std::shared_ptr<ColumnExpression> &expression) override;
 
-    virtual SharedPtr<BaseExpression> VisitReplace(const SharedPtr<SubqueryExpression> &expression) override;
+    virtual std::shared_ptr<BaseExpression> VisitReplace(const std::shared_ptr<SubqueryExpression> &expression) override;
 
     [[nodiscard]] inline bool IsCorrelated() const { return is_correlated_; }
 
 private:
-    const Vector<SharedPtr<ColumnExpression>> &correlated_column_exprs_;
+    const std::vector<std::shared_ptr<ColumnExpression>> &correlated_column_exprs_;
     bool is_correlated_{false};
 };
 

@@ -12,13 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:variables.impl;
 
 import :variables;
-
 import :default_values;
+
+import std;
 
 namespace infinity {
 
@@ -57,10 +56,10 @@ void VarUtil::InitVariablesMap() {
     session_name_map_[CONNECTED_TS_VAR_NAME.data()] = SessionVariable::kConnectedTime;
 }
 
-HashMap<String, GlobalVariable> VarUtil::global_name_map_;
-HashMap<String, SessionVariable> VarUtil::session_name_map_;
+std::unordered_map<std::string, GlobalVariable> VarUtil::global_name_map_;
+std::unordered_map<std::string, SessionVariable> VarUtil::session_name_map_;
 
-GlobalVariable VarUtil::GetGlobalVarByName(const String &variable_name) {
+GlobalVariable VarUtil::GetGlobalVarByName(const std::string &variable_name) {
     auto it = global_name_map_.find(variable_name);
     if (it != global_name_map_.end()) {
         return it->second;
@@ -68,9 +67,8 @@ GlobalVariable VarUtil::GetGlobalVarByName(const String &variable_name) {
     return GlobalVariable::kInvalid;
 }
 
-SessionVariable VarUtil::GetSessionVarByName(const String &variable_name) {
-    auto it = session_name_map_.find(variable_name);
-    if (it != session_name_map_.end()) {
+SessionVariable VarUtil::GetSessionVarByName(const std::string &variable_name) {
+    if (auto it = session_name_map_.find(variable_name); it != session_name_map_.end()) {
         return it->second;
     }
     return SessionVariable::kInvalid;

@@ -14,14 +14,12 @@
 
 #ifdef CI
 #include "unit_test/gtest_expand.h"
-#include "gtest/gtest.h"
 import infinity_core;
 import base_test;
 #else
 module;
 
 #include "unit_test/gtest_expand.h"
-#include "gtest/gtest.h"
 
 module infinity_core:ut.selection;
 
@@ -30,8 +28,8 @@ import :infinity_exception;
 import :logger;
 import :selection;
 import :default_values;
-import :third_party;
-import :stl;
+import third_party;
+
 import :infinity_context;
 #endif
 
@@ -51,7 +49,7 @@ TEST_F(SelectionTest, test1) {
 
     EXPECT_THROW_WITHOUT_STACKTRACE(s1.Initialize(std::numeric_limits<u16>::max() + 1), UnrecoverableException);
 
-    for (SizeT i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
+    for (size_t i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         EXPECT_EQ(s1.Get(i), i);
     }
 
@@ -61,24 +59,24 @@ TEST_F(SelectionTest, test1) {
     EXPECT_THROW_WITHOUT_STACKTRACE(s1.Get(DEFAULT_VECTOR_SIZE), UnrecoverableException);
     EXPECT_THROW_WITHOUT_STACKTRACE(s1.Get(0), UnrecoverableException);
 
-    for (SizeT i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
+    for (size_t i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         s1.Append(i * 2);
     }
-    for (SizeT i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
+    for (size_t i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         EXPECT_EQ(s1.Get(i), 2 * i);
     }
     EXPECT_EQ(s1.Size(), (u64)DEFAULT_VECTOR_SIZE);
-    for (SizeT i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
+    for (size_t i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         s1[i] = 3 * i;
     }
-    for (SizeT i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
+    for (size_t i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         EXPECT_EQ(s1.Get(i), 3 * i);
     }
     EXPECT_THROW_WITHOUT_STACKTRACE(s1.Get(DEFAULT_VECTOR_SIZE), UnrecoverableException);
-    for (SizeT i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
+    for (size_t i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         s1.Set(i, 4 * i);
     }
-    for (SizeT i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
+    for (size_t i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         EXPECT_EQ(s1.Get(i), 4 * i);
     }
 }

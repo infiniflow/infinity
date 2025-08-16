@@ -12,31 +12,24 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:multiply.impl;
 
 import :multiply;
-
-import :stl;
 import :new_catalog;
-import logical_type;
 import :infinity_exception;
 import :scalar_function;
 import :scalar_function_set;
 
-import :third_party;
 import internal_types;
 import data_type;
-import :logger;
+import logical_type;
 
 namespace infinity {
 
 struct MulFunction {
     template <typename TA, typename TB, typename TC>
     static inline bool Run(TA, TB, TC &) {
-        String error_message = "Not implement: MulFunction::Run";
-        UnrecoverableError(error_message);
+        UnrecoverableError("Not implement: MulFunction::Run");
         return false;
     }
 };
@@ -120,16 +113,14 @@ inline bool MulFunction::Run(DoubleT left, DoubleT right, DoubleT &result) {
 // Decimal * Decimal = Decimal
 template <>
 inline bool MulFunction::Run(DecimalT, DecimalT, DecimalT &) {
-    String error_message = "Not implement: MulFunction::Run";
-    UnrecoverableError(error_message);
+    UnrecoverableError("Not implement: MulFunction::Run");
     return false;
 }
 
 // Mixed Type * i64
 template <>
 inline bool MulFunction::Run(MixedT, BigIntT, MixedT &) {
-    String error_message = "Not implement: MulFunction::Run";
-    UnrecoverableError(error_message);
+    UnrecoverableError("Not implement: MulFunction::Run");
     return false;
 }
 
@@ -142,8 +133,7 @@ inline bool MulFunction::Run(BigIntT left, MixedT right, MixedT &result) {
 // Mixed Type * f64
 template <>
 inline bool MulFunction::Run(MixedT, DoubleT, MixedT &) {
-    String error_message = "Not implement: MulFunction::Run";
-    UnrecoverableError(error_message);
+    UnrecoverableError("Not implement: MulFunction::Run");
     return false;
 }
 
@@ -156,15 +146,14 @@ inline bool MulFunction::Run(DoubleT left, MixedT right, MixedT &result) {
 // Mixed Type * Mixed Type
 template <>
 inline bool MulFunction::Run(MixedT, MixedT, MixedT &) {
-    String error_message = "Not implement: MulFunction::Run";
-    UnrecoverableError(error_message);
+    UnrecoverableError("Not implement: MulFunction::Run");
     return false;
 }
 
 void RegisterMulFunction(NewCatalog *catalog_ptr) {
-    String func_name = "*";
+    std::string func_name = "*";
 
-    SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
+    std::shared_ptr<ScalarFunctionSet> function_set_ptr = std::make_shared<ScalarFunctionSet>(func_name);
 
     ScalarFunction mul_function_int8(func_name,
                                      {DataType(LogicalType::kTinyInt), DataType(LogicalType::kTinyInt)},

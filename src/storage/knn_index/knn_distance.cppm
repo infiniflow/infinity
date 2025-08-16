@@ -12,14 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:deprecated_knn_distance;
 
-import :stl;
+import :roaring_bitmap;
+
 import knn_expr;
 import internal_types;
-import :roaring_bitmap;
 
 namespace infinity {
 

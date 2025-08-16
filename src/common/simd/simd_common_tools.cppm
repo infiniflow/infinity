@@ -18,7 +18,7 @@ module;
 
 export module infinity_core:simd_common_tools;
 
-import :stl;
+import :infinity_type;
 
 namespace infinity {
 

@@ -14,16 +14,13 @@
 
 module;
 
-#include <cassert>
-#include <vector>
-
 module infinity_core:compact_state_data.impl;
 
 import :compact_state_data;
-
-import :third_party;
-import :logger;
 import :block_index;
+
+import std;
+
 import row_id;
 
 namespace infinity {
@@ -38,8 +35,7 @@ void RowIDRemap::AddMap(SegmentID segment_id, BlockID block_id, BlockOffset bloc
     //                      new_row_id.segment_id_,
     //                      new_row_id.segment_offset_ / block_capacity_,
     //                      new_row_id.segment_offset_ % block_capacity_));
-    bool insert_ok = block_vec.emplace(block_offset, new_row_id).second;
-    if (!insert_ok) {
+    if (auto insert_ok = block_vec.emplace(block_offset, new_row_id).second; !insert_ok) {
         UnrecoverableError(fmt::format("RowID already exists, segment_id: {}, block_id: {}, block_offset: {}", segment_id, block_id, block_offset));
     }
 }
@@ -67,28 +63,28 @@ RowID RowIDRemap::GetNewRowID(RowID old_row_id) const {
     return GetNewRowID(old_row_id.segment_id_, old_row_id.segment_offset_ / block_capacity_, old_row_id.segment_offset_ % block_capacity_);
 }
 
-CompactStateData::CompactStateData(SharedPtr<TableInfo> table_info)
-    : new_table_ref_(MakeShared<BaseTableRef>(std::move(table_info), MakeShared<BlockIndex>())) {
+CompactStateData::CompactStateData(std::shared_ptr<TableInfo> table_info)
+    : new_table_ref_(std::make_shared<BaseTableRef>(std::move(table_info), std::make_shared<BlockIndex>())) {
     // src/executor/operator/physical_create_index_prepare.cpp: Note1
-    new_table_ref_->index_index_ = MakeShared<IndexIndex>();
+    new_table_ref_->index_index_ = std::make_shared<IndexIndex>();
 };
 
-void CompactStateData::AddToDelete(TxnTimeStamp commit_ts, SegmentID segment_id, Vector<SegmentOffset> delete_offsets) {
+void CompactStateData::AddToDelete(TxnTimeStamp commit_ts, SegmentID segment_id, std::vector<SegmentOffset> delete_offsets) {
     std::lock_guard lock(mutex_);
     to_delete_.emplace_back(commit_ts, segment_id, std::move(delete_offsets));
 }
 
-Vector<Pair<SegmentID, Vector<SegmentOffset>>> CompactStateData::GetToDelete() const {
+std::vector<std::pair<SegmentID, std::vector<SegmentOffset>>> CompactStateData::GetToDelete() const {
     // return all to_delete entry that commits ts is larger than the current scan ts
     auto iter = std::upper_bound(to_delete_.begin(), to_delete_.end(), scan_ts_, [](const auto &ts, const auto &tp) { return ts < std::get<0>(tp); });
-    Vector<Pair<SegmentID, Vector<SegmentOffset>>> res;
+    std::vector<std::pair<SegmentID, std::vector<SegmentOffset>>> res;
     for (auto it = iter; it != to_delete_.end(); ++it) {
         res.emplace_back(std::get<1>(*it), std::get<2>(*it));
     }
     return res;
 }
 
-// void CompactStateData::AddNewSegment(SharedPtr<SegmentEntry> new_segment, Vector<SegmentEntry *> compacted_segments, Txn *txn) {
+// void CompactStateData::AddNewSegment(std::shared_ptr<SegmentEntry> new_segment, std::vector<SegmentEntry *> compacted_segments, Txn *txn) {
 //     std::lock_guard lock(mutex2_);
 //     auto *block_index = new_table_ref_->block_index_.get();
 //     block_index->Insert(new_segment.get(), txn);
@@ -106,14 +102,14 @@ Vector<Pair<SegmentID, Vector<SegmentOffset>>> CompactStateData::GetToDelete() c
 // void CompactStateData::AddNewIndexSegment(TableIndexEntry *table_index_entry, SegmentIndexEntry *index_segment_entry) {
 //     std::lock_guard lock(mutex2_);
 //     if (new_table_ref_->index_index_.get() == nullptr) {
-//         new_table_ref_->index_index_ = MakeShared<IndexIndex>();
+//         new_table_ref_->index_index_ = std::make_shared<IndexIndex>();
 //     }
 //     new_table_ref_->index_index_->Insert(table_index_entry, index_segment_entry);
 // }
 
-// Map<SegmentID, SegmentIndexEntry *> CompactStateData::GetSegmentIndexEntries(const String &index_name) {
+// std::map<SegmentID, SegmentIndexEntry *> CompactStateData::GetSegmentIndexEntries(const std::string &index_name) {
 //     std::lock_guard lock(mutex2_);
-//     Map<SegmentID, SegmentIndexEntry *> res;
+//     std::map<SegmentID, SegmentIndexEntry *> res;
 //     const IndexIndex &index_index = *new_table_ref_->index_index_;
 //     if (auto iter = index_index.index_snapshots_.find(index_name); iter != index_index.index_snapshots_.end()) {
 //         res = iter->second->segment_index_entries_;

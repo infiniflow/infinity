@@ -12,31 +12,27 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
-#include <memory>
-#include <thread>
-
 module infinity_core:mem_index_appender.impl;
 
 import :mem_index_appender;
-import :stl;
 import :bg_task;
 import :logger;
 import :infinity_exception;
-import :third_party;
 import :blocking_queue;
 import :infinity_context;
 import :base_memindex;
 import :status;
 import :wal_manager;
-import global_resource_usage;
-
 import :new_txn_manager;
 import :new_txn;
 import :column_vector;
 import :mem_index;
 import :memory_indexer;
+
+import std;
+import third_party;
+
+import global_resource_usage;
 
 namespace infinity {
 
@@ -54,28 +50,28 @@ MemIndexAppender::~MemIndexAppender() {
 
 void MemIndexAppender::Start() {
     LOG_INFO("Mem index appender is started.");
-    processor_thread_ = Thread([this] { Process(); });
+    processor_thread_ = std::thread([this] { Process(); });
 }
 
 void MemIndexAppender::Stop() {
     LOG_INFO("Mem index appender is stopping.");
-    SharedPtr<StopProcessorTask> stop_task = MakeShared<StopProcessorTask>();
+    std::shared_ptr<StopProcessorTask> stop_task = std::make_shared<StopProcessorTask>();
     this->Submit(stop_task);
     stop_task->Wait();
     processor_thread_.join();
     LOG_INFO("Mem index appender is stopped.");
 }
 
-void MemIndexAppender::Submit(SharedPtr<BGTask> bg_task) {
+void MemIndexAppender::Submit(std::shared_ptr<BGTask> bg_task) {
     task_queue_.Enqueue(std::move(bg_task));
     ++task_count_;
 }
 
 void MemIndexAppender::Process() {
-    Deque<SharedPtr<BGTask>> tasks;
+    std::deque<std::shared_ptr<BGTask>> tasks;
     StopProcessorTask *stop_task_{};
-    Vector<MemoryIndexer *> memory_indexers;
-    HashMap<MemoryIndexer *, SharedPtr<AppendMemIndexBatch>> memory_indexer_map;
+    std::vector<MemoryIndexer *> memory_indexers;
+    std::unordered_map<MemoryIndexer *, std::shared_ptr<AppendMemIndexBatch>> memory_indexer_map;
     while (true) {
         task_queue_.DequeueBulk(tasks);
 
@@ -92,14 +88,14 @@ void MemIndexAppender::Process() {
                     }
                     if (storage_mode == StorageMode::kWritable) {
                         auto append_mem_index_task = static_cast<AppendMemIndexTask *>(bg_task.get());
-                        SharedPtr<MemoryIndexer> memory_indexer = append_mem_index_task->mem_index_->GetFulltextIndex();
+                        std::shared_ptr<MemoryIndexer> memory_indexer = append_mem_index_task->mem_index_->GetFulltextIndex();
                         if (memory_indexer == nullptr) {
                             // Only used for full text index, currently
                             UnrecoverableError("Not inverted index");
                         }
                         if (memory_indexer_map.find(memory_indexer.get()) == memory_indexer_map.end()) {
                             memory_indexers.push_back(memory_indexer.get());
-                            memory_indexer_map.emplace(memory_indexer.get(), MakeShared<AppendMemIndexBatch>());
+                            memory_indexer_map.emplace(memory_indexer.get(), std::make_shared<AppendMemIndexBatch>());
                         }
                         AppendMemIndexBatch *append_mem_index_batch = memory_indexer_map[memory_indexer.get()].get();
                         append_mem_index_batch->InsertTask(append_mem_index_task);
@@ -113,8 +109,7 @@ void MemIndexAppender::Process() {
                     break;
                 }
                 default: {
-                    String error_message = fmt::format("Invalid background task: {}", (u8)bg_task->type_);
-                    UnrecoverableError(error_message);
+                    UnrecoverableError(fmt::format("Invalid background task: {}", (u8)bg_task->type_));
                     break;
                 }
             }

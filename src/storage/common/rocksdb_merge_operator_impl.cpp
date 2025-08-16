@@ -15,15 +15,13 @@
 module;
 
 #include <cassert>
-#include <cstdlib>
 
 module infinity_core:rocksdb_merge_operator.impl;
 
 import :rocksdb_merge_operator;
-import :stl;
-import :third_party;
-import :logger;
 import :infinity_exception;
+
+import third_party;
 
 namespace infinity {
 
@@ -46,7 +44,7 @@ bool String2UInt64AddOperator::Merge(const rocksdb::Slice & /*key*/,
 }
 
 u64 String2UInt64AddOperator::DecodeInteger(const rocksdb::Slice &value, rocksdb::Logger *logger) const {
-    String value_str = value.ToString();
+    std::string value_str = value.ToString();
     return std::stoull(value_str);
 }
 

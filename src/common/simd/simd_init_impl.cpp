@@ -12,13 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
-#include "simd_common_intrin_include.h"
-
 module infinity_core:simd_init.impl;
 
-import :stl;
 import :distance_simd_functions;
 import :hnsw_simd_func;
 import :maxsim_simd_funcs;

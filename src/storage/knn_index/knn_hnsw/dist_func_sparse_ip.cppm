@@ -12,11 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:dist_func_sparse_ip;
 
-import :stl;
 import :sparse_vec_store;
 import :sparse_vector_distance;
 import :sparse_util;
@@ -33,7 +30,7 @@ public:
 
 public:
     SparseIPDist() = default;
-    SparseIPDist(SizeT dim) {}
+    SparseIPDist(size_t dim) {}
 
     template <typename DataStore>
     DistanceType operator()(VertexType v1_i, VertexType v2_i, const DataStore &data_store) const {

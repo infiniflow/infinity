@@ -15,9 +15,12 @@
 #include "type/logical_type.h"
 #include "complex/array_type.h"
 #include "complex/sparse_type.h"
-#include <memory>
-#include <string>
-#include <unordered_map>
+
+#ifndef PARESER_USE_STD_MODULE
+#define PARESER_USE_STD_MODULE 1
+import std;
+import std.compat;
+#endif
 
 namespace infinity {
 

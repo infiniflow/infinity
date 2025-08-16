@@ -14,20 +14,20 @@
 
 module;
 
-#include <cstdlib>
-#include <memory>
-#include <string>
-
 module infinity_core:infinity_context.impl;
 
 import :infinity_context;
 import :wal_manager;
 import :infinity_thrift_service;
-import admin_statement;
-import knn_expr;
 import :resource_manager;
 import :session_manager;
 import :variables;
+
+import std;
+import std.compat;
+
+import admin_statement;
+import knn_expr;
 
 namespace infinity {
 
@@ -42,7 +42,7 @@ NodeRole InfinityContext::GetServerRole() const {
     return cluster_manager_->GetNodeRole();
 }
 
-void InfinityContext::InitPhase1(const SharedPtr<String> &config_path, DefaultConfig *default_config) {
+void InfinityContext::InitPhase1(const std::shared_ptr<std::string> &config_path, DefaultConfig *default_config) {
     if (GetServerRole() != NodeRole::kUnInitialized) {
         LOG_ERROR("Infinity is already initialized.");
         return;
@@ -52,7 +52,7 @@ void InfinityContext::InitPhase1(const SharedPtr<String> &config_path, DefaultCo
     VarUtil::InitVariablesMap();
 
     // Config
-    config_ = MakeUnique<Config>();
+    config_ = std::make_unique<Config>();
     auto status = config_->Init(config_path, default_config);
     if (!status.ok()) {
         fmt::print("Error: {}\n", status.message());
@@ -69,9 +69,9 @@ void InfinityContext::InitPhase1(const SharedPtr<String> &config_path, DefaultCo
     // Uncomment the following line to see if work.
     // UnrecoverableError("InfinityContext::InitPhase1");
 
-    resource_manager_ = MakeUnique<ResourceManager>(config_->CPULimit(), 0);
+    resource_manager_ = std::make_unique<ResourceManager>(config_->CPULimit(), 0);
 
-    session_mgr_ = MakeUnique<SessionManager>();
+    session_mgr_ = std::make_unique<SessionManager>();
 
     Status change_result = ChangeServerRole(NodeRole::kAdmin);
     if (!change_result.ok()) {
@@ -102,7 +102,7 @@ void InfinityContext::InitPhase2(bool admin_flag) {
     infinity_context_inited_ = true;
 }
 
-Status InfinityContext::ChangeServerRole(NodeRole target_role, bool from_leader, const String &node_name, String node_ip, u16 node_port) {
+Status InfinityContext::ChangeServerRole(NodeRole target_role, bool from_leader, const std::string &node_name, std::string node_ip, u16 node_port) {
     // infinity_context_inited_ = false;
     // DeferFn defer([&]() { infinity_context_inited_ = true; });
     NodeRole current_role = GetServerRole();
@@ -117,11 +117,11 @@ Status InfinityContext::ChangeServerRole(NodeRole target_role, bool from_leader,
                 Status status = Status::InvalidNodeRole("Un-init role can only be switch to Admin role");
                 return status;
             }
-            storage_ = MakeUnique<Storage>(config_.get());
+            storage_ = std::make_unique<Storage>(config_.get());
             if (cluster_manager_ != nullptr) {
                 UnrecoverableError("Cluster manager was initialized before");
             }
-            cluster_manager_ = MakeUnique<ClusterManager>();
+            cluster_manager_ = std::make_unique<ClusterManager>();
             cluster_manager_->InitAsAdmin();
             storage_->SetStorageMode(StorageMode::kAdmin);
             infinity_context_started_ = false;
@@ -177,7 +177,7 @@ Status InfinityContext::ChangeServerRole(NodeRole target_role, bool from_leader,
                         storage_->SetStorageMode(StorageMode::kAdmin);
                         cluster_manager_->UnInit(false);
                         cluster_manager_.reset();
-                        cluster_manager_ = MakeUnique<ClusterManager>();
+                        cluster_manager_ = std::make_unique<ClusterManager>();
                         cluster_manager_->InitAsAdmin();
                         return init_status;
                     }
@@ -201,7 +201,7 @@ Status InfinityContext::ChangeServerRole(NodeRole target_role, bool from_leader,
                         storage_->SetStorageMode(StorageMode::kAdmin);
                         cluster_manager_->UnInit(false);
                         cluster_manager_.reset();
-                        cluster_manager_ = MakeUnique<ClusterManager>();
+                        cluster_manager_ = std::make_unique<ClusterManager>();
                         cluster_manager_->InitAsAdmin();
                         return init_status;
                     }
@@ -225,7 +225,7 @@ Status InfinityContext::ChangeServerRole(NodeRole target_role, bool from_leader,
                     return status;
                 }
             }
-            task_scheduler_ = MakeUnique<TaskScheduler>(config_.get());
+            task_scheduler_ = std::make_unique<TaskScheduler>(config_.get());
 
             SetIndexThreadPool();
             break;
@@ -548,6 +548,6 @@ void InfinityContext::StopThriftServers() {
     LOG_INFO(fmt::format("Removed {} thrift sessions", removed_session_count));
 }
 
-void InfinityContext::SetConfig(UniquePtr<Config> &&config) { config_ = std::move(config); }
+void InfinityContext::SetConfig(std::unique_ptr<Config> &&config) { config_ = std::move(config); }
 
 } // namespace infinity

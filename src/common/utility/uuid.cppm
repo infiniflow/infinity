@@ -1,11 +1,11 @@
 // Refers to
 // https://datatracker.ietf.org/doc/rfc9562/, chapter 5.7, UUID Version 7
 
-module;
-
 export module infinity_core:uuid;
 
-import :stl;
+import :infinity_type;
+
+import std;
 
 export namespace infinity {
 
@@ -30,7 +30,7 @@ struct UUID {
         data[8] = (data[8] & 0x3f) | 0x80; // var, 2-bit, 0b10
     }
 
-    String to_string() const {
+    std::string to_string() const {
         char buf[37];
         std::sprintf(buf,
                      "%02x%02x%02x%02x-%02x%02x-%02x%02x-%02x%02x-%02x%02x%02x%02x%02x%02x",

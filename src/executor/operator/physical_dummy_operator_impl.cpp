@@ -17,7 +17,6 @@ module;
 module infinity_core:physical_dummy_operator.impl;
 
 import :physical_dummy_operator;
-
 import :query_context;
 import :operator_state;
 

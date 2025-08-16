@@ -1,19 +1,19 @@
 
 #ifdef CI
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 #include <cassert>
 import infinity_core;
 import base_test;
 #else
 module;
 
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 #include <cassert>
 
 module infinity_core:ut.term_meta;
 
 import :ut.base_test;
-import :stl;
+
 import :posting_byte_slice;
 import :posting_byte_slice_reader;
 import :term_meta;
@@ -37,7 +37,7 @@ public:
         infinity::GlobalResourceUsage::Init();
 #endif
 
-        file_name_ = String(GetFullTmpDir()) + "/term_meta";
+        file_name_ = std::string(GetFullTmpDir()) + "/term_meta";
     }
     void TearDown() override {
 #ifdef INFINITY_DEBUG
@@ -49,7 +49,7 @@ public:
     }
 
     void DoTest1() {
-        SharedPtr<FileWriter> file_writer = MakeShared<FileWriter>(file_name_, 128);
+        std::shared_ptr<FileWriter> file_writer = std::make_shared<FileWriter>(file_name_, 128);
         TermMeta term_meta(1, 2, 3);
         optionflag_t option_flag = OPTION_FLAG_ALL;
         PostingFormatOption format_option(option_flag);
@@ -57,7 +57,7 @@ public:
         term_dumper.Dump(file_writer, term_meta);
         file_writer->Sync();
 
-        SharedPtr<FileReader> file_reader = MakeShared<FileReader>(file_name_, 128);
+        std::shared_ptr<FileReader> file_reader = std::make_shared<FileReader>(file_name_, 128);
 
         TermMeta new_term_meta;
         TermMetaLoader term_loader(format_option);
@@ -70,7 +70,7 @@ public:
     }
 
 protected:
-    String file_name_;
+    std::string file_name_;
 };
 
 TEST_F(TermMetaTest, test1) { DoTest1(); }

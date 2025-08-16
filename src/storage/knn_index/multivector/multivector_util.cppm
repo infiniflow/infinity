@@ -12,29 +12,28 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:multivector_util;
 
-import :stl;
-import :third_party;
+import std;
+import std.compat;
+import third_party;
 
 namespace infinity {
 
 export template <typename ElementT>
 class MultiVectorRef {
-    Span<const char> raw_data_ = {};
-    SizeT embedding_num_ = 0;
+    std::span<const char> raw_data_ = {};
+    size_t embedding_num_ = 0;
 
 public:
     using ElementType = ElementT;
-    MultiVectorRef &operator=(const Pair<Span<const char>, SizeT> &data) {
+    MultiVectorRef &operator=(const std::pair<std::span<const char>, size_t> &data) {
         raw_data_ = data.first;
         embedding_num_ = data.second;
         return *this;
     }
-    [[nodiscard]] Span<const char> raw_data() const { return raw_data_; }
-    [[nodiscard]] SizeT embedding_num() const { return embedding_num_; }
+    [[nodiscard]] std::span<const char> raw_data() const { return raw_data_; }
+    [[nodiscard]] size_t embedding_num() const { return embedding_num_; }
 };
 
 } // namespace infinity

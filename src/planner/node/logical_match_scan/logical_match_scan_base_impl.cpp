@@ -12,55 +12,51 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
-#include <sstream>
-
 module infinity_core:logical_match_scan_base.impl;
 
 import :logical_match_scan_base;
-
-import :stl;
 import :base_table_ref;
 import :column_binding;
 import :logical_node_type;
 import :match_tensor_expression;
 import :default_values;
-import logical_type;
-import internal_types;
-import :third_party;
 import :explain_logical_plan;
-import search_options;
 import :infinity_exception;
 import :status;
-import :logger;
+
+import std;
+import third_party;
+
 import data_type;
+import logical_type;
+import internal_types;
+import search_options;
 
 namespace infinity {
 
 LogicalMatchScanBase::LogicalMatchScanBase(u64 node_id,
                                            LogicalNodeType node_type,
-                                           SharedPtr<BaseTableRef> base_table_ref,
-                                           SharedPtr<BaseExpression> query_expression)
+                                           std::shared_ptr<BaseTableRef> base_table_ref,
+                                           std::shared_ptr<BaseExpression> query_expression)
     : LogicalNode(node_id, node_type), base_table_ref_(base_table_ref), query_expression_(query_expression)
 
 {
     //
 }
 
-Vector<ColumnBinding> LogicalMatchScanBase::GetColumnBindings() const {
-    Vector<ColumnBinding> result;
+std::vector<ColumnBinding> LogicalMatchScanBase::GetColumnBindings() const {
+    std::vector<ColumnBinding> result;
     auto &column_ids = base_table_ref_->column_ids_;
     result.reserve(column_ids.size());
-    for (SizeT col_id : column_ids) {
+    for (size_t col_id : column_ids) {
         result.emplace_back(base_table_ref_->table_index_, col_id);
     }
     return result;
 }
 
-SharedPtr<Vector<String>> LogicalMatchScanBase::GetOutputNames() const {
-    SharedPtr<Vector<String>> result_names = MakeShared<Vector<String>>();
-    const SizeT column_count = base_table_ref_->column_names_->size();
+std::shared_ptr<std::vector<std::string>> LogicalMatchScanBase::GetOutputNames() const {
+    std::shared_ptr<std::vector<std::string>> result_names = std::make_shared<std::vector<std::string>>();
+    const size_t column_count = base_table_ref_->column_names_->size();
     result_names->reserve(column_count + 2);
     for (auto &name : *base_table_ref_->column_names_) {
         result_names->emplace_back(name);
@@ -70,29 +66,29 @@ SharedPtr<Vector<String>> LogicalMatchScanBase::GetOutputNames() const {
     return result_names;
 }
 
-SharedPtr<Vector<SharedPtr<DataType>>> LogicalMatchScanBase::GetOutputTypes() const {
-    SharedPtr<Vector<SharedPtr<DataType>>> result_types = MakeShared<Vector<SharedPtr<DataType>>>();
-    const SizeT column_count = base_table_ref_->column_names_->size();
+std::shared_ptr<std::vector<std::shared_ptr<DataType>>> LogicalMatchScanBase::GetOutputTypes() const {
+    std::shared_ptr<std::vector<std::shared_ptr<DataType>>> result_types = std::make_shared<std::vector<std::shared_ptr<DataType>>>();
+    const size_t column_count = base_table_ref_->column_names_->size();
     result_types->reserve(column_count + 2);
     for (auto &type : *base_table_ref_->column_types_) {
         result_types->emplace_back(type);
     }
-    result_types->emplace_back(MakeShared<DataType>(query_expression_->Type()));
-    result_types->emplace_back(MakeShared<DataType>(LogicalType::kRowID));
+    result_types->emplace_back(std::make_shared<DataType>(query_expression_->Type()));
+    result_types->emplace_back(std::make_shared<DataType>(LogicalType::kRowID));
     return result_types;
 }
 
 TableInfo *LogicalMatchScanBase::table_info() const { return base_table_ref_->table_info_.get(); }
 
-String LogicalMatchScanBase::TableAlias() const { return base_table_ref_->alias_; }
+std::string LogicalMatchScanBase::TableAlias() const { return base_table_ref_->alias_; }
 
 u64 LogicalMatchScanBase::TableIndex() const { return base_table_ref_->table_index_; }
 
-String LogicalMatchScanBase::ToString(i64 &space) const {
+std::string LogicalMatchScanBase::ToString(i64 &space) const {
     std::stringstream ss;
-    String arrow_str;
+    std::string arrow_str;
     if (space != 0) {
-        arrow_str = String(space - 2, ' ');
+        arrow_str = std::string(space - 2, ' ');
         arrow_str += "-> ";
     }
     arrow_str += const_cast<LogicalMatchScanBase *>(this)->name();
@@ -100,7 +96,7 @@ String LogicalMatchScanBase::ToString(i64 &space) const {
     ss << arrow_str << std::endl;
 
     // Table alias and name
-    String table_name = String(space, ' ');
+    std::string table_name = std::string(space, ' ');
     table_name += " - table name: ";
     table_name += this->TableAlias();
     table_name += "(";
@@ -111,36 +107,36 @@ String LogicalMatchScanBase::ToString(i64 &space) const {
     ss << table_name << std::endl;
 
     // Table index
-    String table_index = String(space, ' ');
+    std::string table_index = std::string(space, ' ');
     table_index += " - table index: #";
     table_index += std::to_string(this->TableIndex());
     ss << table_index << std::endl;
 
-    String match_info = String(space, ' ');
+    std::string match_info = std::string(space, ' ');
     match_info += " - match tensor expression: " + query_expression_->ToString();
     ss << match_info << std::endl;
 
     // filter expression
     if (filter_expression_.get() != nullptr) {
-        ss << String(space, ' ');
+        ss << std::string(space, ' ');
         ss << " - filter: ";
-        String filter_s;
+        std::string filter_s;
         ExplainLogicalPlan::Explain(filter_expression_.get(), filter_s);
         ss << filter_s << '\n';
         if (common_query_filter_) {
-            ss << String(space, ' ');
+            ss << std::string(space, ' ');
             ss << " - filter with index: ";
             if (common_query_filter_->index_filter_) {
-                String filter_str;
+                std::string filter_str;
                 ExplainLogicalPlan::Explain(common_query_filter_->index_filter_.get(), filter_str);
                 ss << filter_str << '\n';
             } else {
                 ss << "None\n";
             }
-            ss << String(space, ' ');
+            ss << std::string(space, ' ');
             ss << " - filter without index: ";
             if (common_query_filter_->leftover_filter_) {
-                String filter_str;
+                std::string filter_str;
                 ExplainLogicalPlan::Explain(common_query_filter_->leftover_filter_.get(), filter_str);
                 ss << filter_str << '\n';
             } else {
@@ -150,11 +146,11 @@ String LogicalMatchScanBase::ToString(i64 &space) const {
     }
 
     // Output columns
-    String output_columns = String(space, ' ');
+    std::string output_columns = std::string(space, ' ');
     output_columns += " - output columns: [";
-    SharedPtr<Vector<String>> output_names = this->GetOutputNames();
-    SizeT column_count = output_names->size();
-    for (SizeT idx = 0; idx < column_count; ++idx) {
+    std::shared_ptr<std::vector<std::string>> output_names = this->GetOutputNames();
+    size_t column_count = output_names->size();
+    for (size_t idx = 0; idx < column_count; ++idx) {
         if (idx != 0)
             output_columns += ", ";
         output_columns += output_names->at(idx);

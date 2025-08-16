@@ -1,22 +1,17 @@
-module;
-
 module infinity_core:upper.impl;
 
 import :upper;
-
-import :stl;
+import :column_vector;
 import :new_catalog;
 import :status;
 import :infinity_exception;
 import :scalar_function;
 import :scalar_function_set;
+import :utility;
 
-import :third_party;
 import logical_type;
 import internal_types;
 import data_type;
-import :logger;
-import :column_vector;
 
 namespace infinity {
 
@@ -30,18 +25,18 @@ struct UpperFunction {
 
 template <>
 inline void UpperFunction::Run(VarcharT &left, VarcharT &result, ColumnVector *left_ptr, ColumnVector *result_ptr) {
-    Span<const char> left_v = left_ptr->GetVarcharInner(left);
+    std::span<const char> left_v = left_ptr->GetVarcharInner(left);
     const char *input = left_v.data();
-    SizeT input_len = left_v.size();
-    String upper_str(input, input_len);
+    size_t input_len = left_v.size();
+    std::string upper_str(input, input_len);
     ToUpper(upper_str);
     result_ptr->AppendVarcharInner(upper_str, result);
 }
 
 void RegisterUpperFunction(NewCatalog *catalog_ptr) {
-    String func_name = "upper";
+    std::string func_name = "upper";
 
-    SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
+    std::shared_ptr<ScalarFunctionSet> function_set_ptr = std::make_shared<ScalarFunctionSet>(func_name);
 
     ScalarFunction upper_function(func_name,
                                   {DataType(LogicalType::kVarchar)},

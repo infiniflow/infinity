@@ -13,18 +13,17 @@
 //  limitations under the License.
 
 #ifdef CI
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 import infinity_core;
 import base_test;
 #else
 module;
 
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 
 module infinity_core:ut.test_hnsw_bitmask;
 
 import :ut.base_test;
-import :stl;
 import :roaring_bitmap;
 import :data_store;
 import :vec_store_type;
@@ -47,8 +46,8 @@ TEST_F(HnswAlgBitmaskTest, test1) {
     i64 top_k = 4;
     i64 base_embedding_count = 4;
     int max_chunk_n = 1;
-    UniquePtr<f32[]> base_embedding = MakeUnique<f32[]>(sizeof(f32) * dimension * base_embedding_count);
-    UniquePtr<f32[]> query_embedding = MakeUnique<f32[]>(sizeof(f32) * dimension);
+    std::unique_ptr<f32[]> base_embedding = std::make_unique<f32[]>(sizeof(f32) * dimension * base_embedding_count);
+    std::unique_ptr<f32[]> query_embedding = std::make_unique<f32[]>(sizeof(f32) * dimension);
 
     {
         base_embedding[0] = 0.1;
@@ -94,8 +93,8 @@ TEST_F(HnswAlgBitmaskTest, test1) {
     auto iter = DenseVectorIter<f32, LabelT>(base_embedding.get(), dimension, base_embedding_count);
     hnsw_index->InsertVecs(std::move(iter));
 
-    Vector<f32> distance_array(top_k);
-    Vector<u64> id_array(top_k);
+    std::vector<f32> distance_array(top_k);
+    std::vector<u64> id_array(top_k);
     KnnSearchOption search_option{.ef_ = 2ul * top_k};
     {
         auto result = hnsw_index->KnnSearchSorted(query_embedding.get(), top_k, search_option);

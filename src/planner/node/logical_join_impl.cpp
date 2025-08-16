@@ -12,20 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
-#include <sstream>
-#include <vector>
-
 module infinity_core:logical_join.impl;
 
 import :logical_join;
-
-import :stl;
 import :column_binding;
-
 import :logical_node_type;
 import :base_expression;
+
+import std;
+
 import internal_types;
 import join_reference;
 import data_type;
@@ -34,31 +29,31 @@ namespace infinity {
 
 LogicalJoin::LogicalJoin(u64 node_id,
                          JoinType join_type,
-                         String alias,
-                         Vector<SharedPtr<BaseExpression>> conditions,
-                         const SharedPtr<LogicalNode> &left,
-                         const SharedPtr<LogicalNode> &right)
+                         std::string alias,
+                         std::vector<std::shared_ptr<BaseExpression>> conditions,
+                         const std::shared_ptr<LogicalNode> &left,
+                         const std::shared_ptr<LogicalNode> &right)
     : LogicalNode(node_id, LogicalNodeType::kJoin), alias_(std::move(alias)), join_type_(join_type), conditions_(std::move(conditions)) {
     this->set_left_node(left);
     this->set_right_node(right);
 }
 
-Vector<ColumnBinding> LogicalJoin::GetColumnBindings() const {
-    Vector<ColumnBinding> result_binding;
+std::vector<ColumnBinding> LogicalJoin::GetColumnBindings() const {
+    std::vector<ColumnBinding> result_binding;
     if (join_type_ == JoinType::kMark) {
         result_binding.emplace_back(mark_index_, 0);
     }
-    Vector<ColumnBinding> left_binding = this->left_node_->GetColumnBindings();
-    Vector<ColumnBinding> right_binding = this->right_node_->GetColumnBindings();
+    std::vector<ColumnBinding> left_binding = this->left_node_->GetColumnBindings();
+    std::vector<ColumnBinding> right_binding = this->right_node_->GetColumnBindings();
     result_binding.insert(result_binding.end(), left_binding.begin(), left_binding.end());
     result_binding.insert(result_binding.end(), right_binding.begin(), right_binding.end());
     return result_binding;
 }
 
-SharedPtr<Vector<String>> LogicalJoin::GetOutputNames() const {
-    SharedPtr<Vector<String>> result = MakeShared<Vector<String>>();
-    SharedPtr<Vector<String>> left_output_names = left_node_->GetOutputNames();
-    SharedPtr<Vector<String>> right_output_names = right_node_->GetOutputNames();
+std::shared_ptr<std::vector<std::string>> LogicalJoin::GetOutputNames() const {
+    std::shared_ptr<std::vector<std::string>> result = std::make_shared<std::vector<std::string>>();
+    std::shared_ptr<std::vector<std::string>> left_output_names = left_node_->GetOutputNames();
+    std::shared_ptr<std::vector<std::string>> right_output_names = right_node_->GetOutputNames();
     result->reserve(left_output_names->size() + right_output_names->size());
     for (auto &name_str : *left_output_names) {
         result->emplace_back(name_str);
@@ -71,10 +66,10 @@ SharedPtr<Vector<String>> LogicalJoin::GetOutputNames() const {
     return result;
 }
 
-SharedPtr<Vector<SharedPtr<DataType>>> LogicalJoin::GetOutputTypes() const {
-    SharedPtr<Vector<SharedPtr<DataType>>> result = MakeShared<Vector<SharedPtr<DataType>>>();
-    SharedPtr<Vector<SharedPtr<DataType>>> left_output_names = left_node_->GetOutputTypes();
-    SharedPtr<Vector<SharedPtr<DataType>>> right_output_names = right_node_->GetOutputTypes();
+std::shared_ptr<std::vector<std::shared_ptr<DataType>>> LogicalJoin::GetOutputTypes() const {
+    std::shared_ptr<std::vector<std::shared_ptr<DataType>>> result = std::make_shared<std::vector<std::shared_ptr<DataType>>>();
+    std::shared_ptr<std::vector<std::shared_ptr<DataType>>> left_output_names = left_node_->GetOutputTypes();
+    std::shared_ptr<std::vector<std::shared_ptr<DataType>>> right_output_names = right_node_->GetOutputTypes();
     result->reserve(left_output_names->size() + right_output_names->size());
     for (auto &name_str : *left_output_names) {
         result->emplace_back(name_str);
@@ -87,14 +82,14 @@ SharedPtr<Vector<SharedPtr<DataType>>> LogicalJoin::GetOutputTypes() const {
     return result;
 }
 
-String LogicalJoin::ToString(i64 &space) const {
+std::string LogicalJoin::ToString(i64 &space) const {
     std::stringstream ss;
-    String arrow_str;
+    std::string arrow_str;
     if (space > 3) {
         space -= 4;
         arrow_str = "->  ";
     }
-    ss << String(space, ' ') << arrow_str << JoinReference::ToString(join_type_) << " on ";
+    ss << std::string(space, ' ') << arrow_str << JoinReference::ToString(join_type_) << " on ";
     for (auto &condition : conditions_) {
         ss << condition->Name() << " ";
     }

@@ -17,7 +17,6 @@ module;
 module infinity_core:physical_intersect.impl;
 
 import :physical_intersect;
-
 import :query_context;
 import :operator_state;
 import :physical_intersect;

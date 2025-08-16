@@ -12,11 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:index_segment_reader;
-
-import :stl;
 
 import :segment_posting;
 import :index_defines;
@@ -28,7 +24,7 @@ public:
     virtual ~IndexSegmentReader() {}
 
     // fetch_position is only valid in DiskIndexSegmentReader
-    virtual bool GetSegmentPosting(const String &term, SegmentPosting &seg_posting, bool fetch_position = true) const = 0;
+    virtual bool GetSegmentPosting(const std::string &term, SegmentPosting &seg_posting, bool fetch_position = true) const = 0;
 
     SegmentID segment_id() const { return segment_id_; }
 

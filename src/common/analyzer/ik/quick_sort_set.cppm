@@ -4,7 +4,6 @@ module;
 
 export module infinity_core:quick_sort_set;
 
-import :stl;
 import :lexeme;
 
 namespace infinity {

@@ -1,23 +1,17 @@
-module;
-
-#include <cmath>
-
 module infinity_core:isnan.impl;
 
 import :isnan;
-
-import :stl;
 import :new_catalog;
 import :status;
 import :infinity_exception;
 import :scalar_function;
 import :scalar_function_set;
 
-import :third_party;
+import std.compat;
+
 import logical_type;
 import internal_types;
 import data_type;
-import :logger;
 
 namespace infinity {
 
@@ -50,9 +44,9 @@ inline void IsnanFunction::Run(BFloat16T &left, BooleanT &result) {
 }
 
 void RegisterIsnanFunction(NewCatalog *catalog_ptr) {
-    String func_name = "isnan";
+    std::string func_name = "isnan";
 
-    SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
+    std::shared_ptr<ScalarFunctionSet> function_set_ptr = std::make_shared<ScalarFunctionSet>(func_name);
 
     ScalarFunction isnan_function_float(func_name,
                                         {DataType(LogicalType::kFloat)},

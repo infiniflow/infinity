@@ -12,13 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:dependent_join_flattener;
 
-import :stl;
 import :bind_context;
-// import :query_context;
 import :logical_node;
 import :column_binding;
 
@@ -26,26 +22,26 @@ namespace infinity {
 
 export class DependentJoinFlattener {
 public:
-    explicit DependentJoinFlattener(const SharedPtr<BindContext> &bind_context_ptr, QueryContext *query_context)
+    explicit DependentJoinFlattener(const std::shared_ptr<BindContext> &bind_context_ptr, QueryContext *query_context)
         : bind_context_ptr_(bind_context_ptr), query_context_(query_context) {}
 
-    bool DetectCorrelatedExpressions(const SharedPtr<LogicalNode> &logical_node);
+    bool DetectCorrelatedExpressions(const std::shared_ptr<LogicalNode> &logical_node);
 
-    SharedPtr<LogicalNode> PushDependentJoin(const SharedPtr<LogicalNode> &logical_node);
+    std::shared_ptr<LogicalNode> PushDependentJoin(const std::shared_ptr<LogicalNode> &logical_node);
 
-    inline SizeT CorrelatedColumnBaseIndex() const { return correlated_expression_offset_; }
-
-private:
-    SharedPtr<LogicalNode> PushDependentJoinInternal(const SharedPtr<LogicalNode> &logical_node);
-
-    SharedPtr<LogicalNode> BuildNoCorrelatedInternal(const SharedPtr<LogicalNode> &logical_node);
+    inline size_t CorrelatedColumnBaseIndex() const { return correlated_expression_offset_; }
 
 private:
-    const SharedPtr<BindContext> &bind_context_ptr_;
+    std::shared_ptr<LogicalNode> PushDependentJoinInternal(const std::shared_ptr<LogicalNode> &logical_node);
+
+    std::shared_ptr<LogicalNode> BuildNoCorrelatedInternal(const std::shared_ptr<LogicalNode> &logical_node);
+
+private:
+    const std::shared_ptr<BindContext> &bind_context_ptr_;
     QueryContext *query_context_{};
-    HashMap<u64, bool> operator2correlated_expression_map_;
+    std::unordered_map<u64, bool> operator2correlated_expression_map_;
     ColumnBinding base_binding_{};
-    SizeT correlated_expression_offset_{};
+    size_t correlated_expression_offset_{};
 };
 
 } // namespace infinity

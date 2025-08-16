@@ -139,7 +139,7 @@ module;
 
 export module infinity_core:spinlock;
 
-import :stl;
+import :infinity_type;
 
 namespace infinity {
 
@@ -267,7 +267,7 @@ public:
     [[nodiscard]] i32 bits() const noexcept { return bits_.load(std::memory_order::acquire); }
 
 private:
-    Atomic<i32> bits_;
+    std::atomic<i32> bits_;
 };
 
 export class ScopedSpinLock {

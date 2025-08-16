@@ -12,11 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:standard_analyzer;
 
-import :stl;
 import :term;
 import :stemmer;
 import :analyzer;
@@ -33,7 +30,7 @@ public:
     void InitStemmer(Language language) { CommonLanguageAnalyzer::InitStemmer(language); }
 
 protected:
-    inline void Parse(const String &input) override {
+    inline void Parse(const std::string &input) override {
         tokenizer_.Tokenize(input);
         local_offset_ = 0;
         ResetToken();

@@ -12,11 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:common_analyzer;
 
-import :stl;
 import :term;
 import :stemmer;
 import :analyzer;
@@ -48,7 +45,7 @@ public:
 protected:
     int AnalyzeImpl(const Term &input, void *data, HookType func) override;
     /// Parse given input
-    virtual void Parse(const String &input) = 0;
+    virtual void Parse(const std::string &input) = 0;
 
     /// Fill token_, len_, offset_
     virtual bool NextToken() = 0;
@@ -72,12 +69,12 @@ protected:
     }
 
 protected:
-    static const SizeT term_string_buffer_limit_ = 4096 * 3;
+    static const size_t term_string_buffer_limit_ = 4096 * 3;
 
-    Vector<char> lowercase_string_buffer_;
-    UniquePtr<Stemmer> stemmer_{nullptr};
+    std::vector<char> lowercase_string_buffer_;
+    std::unique_ptr<Stemmer> stemmer_{nullptr};
     const char *token_{nullptr};
-    SizeT len_{0};
+    size_t len_{0};
     u32 offset_{0};
     u32 end_offset_{0};
     u32 local_offset_{0};

@@ -1,9 +1,9 @@
-module;
-
 module infinity_core:quick_sort_set.impl;
 
 import :lexeme;
 import :quick_sort_set;
+
+import std;
 
 namespace infinity {
 
@@ -17,7 +17,7 @@ QuickSortSet::~QuickSortSet() {
 }
 
 bool QuickSortSet::AddLexeme(Lexeme *lexeme) {
-    UniquePtr<Cell> new_cell = MakeUnique<Cell>(lexeme);
+    std::unique_ptr<Cell> new_cell = std::make_unique<Cell>(lexeme);
     if (size_ == 0) {
         Cell *cell_ptr = new_cell.release();
         head_ = cell_ptr;

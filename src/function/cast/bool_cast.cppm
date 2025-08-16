@@ -12,28 +12,24 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:bool_cast;
 
-import :stl;
 import :bound_cast_func;
 import :column_vector_cast;
 import :infinity_exception;
-import :third_party;
+import :status;
 import :column_vector;
+
 import logical_type;
 import internal_types;
 import data_type;
-import :logger;
-import :status;
 
 namespace infinity {
 
 export struct TryCastBoolean {
     template <typename SourceType, typename TargetType>
     static inline bool Run(SourceType, TargetType &) {
-        String error_message =
+        std::string error_message =
             fmt::format("No implementation to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>());
         RecoverableError(Status::NotSupport(error_message));
         return false;
@@ -59,8 +55,7 @@ export struct TryCastBoolean {
 
 export inline BoundCastFunc BindBoolCast(const DataType &source, const DataType &target) {
     if (source.type() != LogicalType::kBoolean) {
-        String error_message = fmt::format("Expect boolean type, but it is {}", source.ToString());
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("Expect boolean type, but it is {}", source.ToString()));
     }
 
     switch (target.type()) {
@@ -68,7 +63,7 @@ export inline BoundCastFunc BindBoolCast(const DataType &source, const DataType 
             return BoundCastFunc(&ColumnVectorCast::TryCastColumnVector<BooleanT, VarcharT, TryCastBoolean>);
         }
         default: {
-            String error_message = fmt::format("Can't cast from Boolean to {}", target.ToString());
+            std::string error_message = fmt::format("Can't cast from Boolean to {}", target.ToString());
             RecoverableError(Status::NotSupport(error_message));
         }
     }

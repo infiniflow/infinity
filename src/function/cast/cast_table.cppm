@@ -12,12 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:cast_table;
 
 import :singleton;
-import :stl;
+import :infinity_type;
 
 import logical_type;
 
@@ -31,7 +29,7 @@ public:
     [[nodiscard]] i64 GetCastCost(LogicalType from, LogicalType to) const;
 
 private:
-    Array<Array<i64, to_underlying_val(LogicalType::kInvalid)>, to_underlying_val(LogicalType::kInvalid)> matrix_{};
+    std::array<std::array<i64, to_underlying_val(LogicalType::kInvalid)>, to_underlying_val(LogicalType::kInvalid)> matrix_{};
 };
 
 } // namespace infinity

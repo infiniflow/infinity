@@ -12,29 +12,23 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:like.impl;
 
 import :like;
-
-import :stl;
 import :new_catalog;
-import logical_type;
+import :status;
 import :infinity_exception;
 import :scalar_function;
 import :scalar_function_set;
 
-import :third_party;
 import internal_types;
 import data_type;
-import :logger;
-import :status;
+import logical_type;
 
 namespace infinity {
 
-bool LikeOperator(const ptr_t left_ptr, SizeT left_len, const ptr_t right_ptr, SizeT right_len) {
-    SizeT left_idx{0}, right_idx{0};
+bool LikeOperator(const char *left_ptr, size_t left_len, const char *right_ptr, size_t right_len) {
+    size_t left_idx{0}, right_idx{0};
 
     while (right_idx < right_len) {
         char left_char = left_ptr[left_idx];
@@ -87,13 +81,12 @@ struct LikeFunction {
 
 template <>
 inline void LikeFunction::Run(VarcharT &, VarcharT &, bool &) {
-    String error_message = "Not implement";
-    UnrecoverableError(error_message);
+    UnrecoverableError("Not implement");
 
-    //    ptr_t left_ptr = left.GetDataPtr();
-    //    SizeT left_len = left.GetDataLen();
-    //    ptr_t right_ptr = right.GetDataPtr();
-    //    SizeT right_len = right.GetDataLen();
+    //    char * left_ptr = left.GetDataPtr();
+    //    size_t left_len = left.GetDataLen();
+    //    char * right_ptr = right.GetDataPtr();
+    //    size_t right_len = right.GetDataLen();
 
     //    result = LikeOperator(left_ptr, left_len, right_ptr, right_len);
 }
@@ -101,28 +94,26 @@ inline void LikeFunction::Run(VarcharT &, VarcharT &, bool &) {
 struct NotLikeFunction {
     template <typename TA, typename TB, typename TC>
     static inline void Run(TA, TB, TC &) {
-        String error_message = "Not implement";
-        UnrecoverableError(error_message);
+        UnrecoverableError("Not implement");
     }
 };
 
 template <>
 inline void NotLikeFunction::Run(VarcharT &, VarcharT &, bool &) {
-    String error_message = "Not implement";
-    UnrecoverableError(error_message);
+    UnrecoverableError("Not implement");
 
-    //    ptr_t left_ptr = left.GetDataPtr();
-    //    SizeT left_len = left.GetDataLen();
-    //    ptr_t right_ptr = right.GetDataPtr();
-    //    SizeT right_len = right.GetDataLen();
+    //    char * left_ptr = left.GetDataPtr();
+    //    size_t left_len = left.GetDataLen();
+    //    char * right_ptr = right.GetDataPtr();
+    //    size_t right_len = right.GetDataLen();
 
     //    result = !LikeOperator(left_ptr, left_len, right_ptr, right_len);
 }
 
 void RegisterLikeFunction(NewCatalog *catalog_ptr) {
-    String func_name = "like";
+    std::string func_name = "like";
 
-    SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
+    std::shared_ptr<ScalarFunctionSet> function_set_ptr = std::make_shared<ScalarFunctionSet>(func_name);
 
     ScalarFunction varchar_like_function(func_name,
                                          {DataType(LogicalType::kVarchar), DataType(LogicalType::kVarchar)},
@@ -134,9 +125,9 @@ void RegisterLikeFunction(NewCatalog *catalog_ptr) {
 }
 
 void RegisterNotLikeFunction(NewCatalog *catalog_ptr) {
-    String func_name = "not_like";
+    std::string func_name = "not_like";
 
-    SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
+    std::shared_ptr<ScalarFunctionSet> function_set_ptr = std::make_shared<ScalarFunctionSet>(func_name);
 
     ScalarFunction varchar_not_like_function(func_name,
                                              {DataType(LogicalType::kVarchar), DataType(LogicalType::kVarchar)},

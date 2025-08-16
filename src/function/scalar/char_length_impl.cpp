@@ -1,20 +1,15 @@
-module;
-
 module infinity_core:char_length.impl;
 
 import :char_length;
-import :stl;
 import :new_catalog;
 import :status;
 import :infinity_exception;
 import :scalar_function;
 import :scalar_function_set;
 
-import :third_party;
 import logical_type;
 import internal_types;
 import data_type;
-import :logger;
 
 namespace infinity {
 
@@ -34,9 +29,9 @@ inline bool CharLengthFunction::Run(VarcharT &left, int &result) {
 }
 
 void RegisterCharLengthFunction(NewCatalog *catalog_ptr) {
-    String func_name = "char_length";
+    std::string func_name = "char_length";
 
-    SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
+    std::shared_ptr<ScalarFunctionSet> function_set_ptr = std::make_shared<ScalarFunctionSet>(func_name);
 
     ScalarFunction char_length_function(func_name,
                                         {DataType(LogicalType::kVarchar)},

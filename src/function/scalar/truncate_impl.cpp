@@ -12,22 +12,21 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-#include <cstdio>
 module infinity_core:truncate.impl;
 
 import :trunc;
-import :stl;
 import :new_catalog;
 import :status;
-import logical_type;
 import :infinity_exception;
 import :scalar_function;
 import :scalar_function_set;
-import :third_party;
+import :column_vector;
+
+import std.compat;
+
 import internal_types;
 import data_type;
-import :column_vector;
+import logical_type;
 
 namespace infinity {
 
@@ -91,9 +90,9 @@ inline void TruncFunction::Run(FloatT left, BigIntT right, VarcharT &result, Col
 
 
 void RegisterTruncFunction(NewCatalog *catalog_ptr) {
-    String func_name = "trunc";
+    std::string func_name = "trunc";
 
-    SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
+    std::shared_ptr<ScalarFunctionSet> function_set_ptr = std::make_shared<ScalarFunctionSet>(func_name);
 
     ScalarFunction truncate_double_bigint(func_name,
                               {DataType(LogicalType::kDouble), DataType(LogicalType::kBigInt)},

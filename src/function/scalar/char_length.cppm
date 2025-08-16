@@ -2,8 +2,6 @@ module;
 
 export module infinity_core:char_length;
 
-import :stl;
-
 namespace infinity {
 
 class NewCatalog;

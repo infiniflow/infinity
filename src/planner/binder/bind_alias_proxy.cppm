@@ -12,22 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:bind_alias_proxy;
 
-import :stl;
 import :base_expression;
-
 import :bind_context;
 import :expression_binder;
+
 import parsed_expr;
 
 namespace infinity {
 
 export class BindAliasProxy {
 public:
-    SharedPtr<BaseExpression>
+    std::shared_ptr<BaseExpression>
     BindAlias(ExpressionBinder &expression_binder, const ParsedExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root);
 
 private:

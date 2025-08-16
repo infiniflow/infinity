@@ -12,15 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:logical_unnest_aggregate;
 
-import :stl;
 import :logical_node_type;
 import :column_binding;
 import :logical_node;
 import :base_expression;
+
 import data_type;
 import internal_types;
 
@@ -29,37 +27,37 @@ namespace infinity {
 export class LogicalUnnestAggregate : public LogicalNode {
 public:
     explicit LogicalUnnestAggregate(u64 node_id,
-                                    Vector<SharedPtr<BaseExpression>> groups,
+                                    std::vector<std::shared_ptr<BaseExpression>> groups,
                                     u64 groupby_index,
-                                    Vector<SharedPtr<BaseExpression>> aggregates,
+                                    std::vector<std::shared_ptr<BaseExpression>> aggregates,
                                     u64 aggregate_index,
-                                    Vector<SharedPtr<BaseExpression>> unnest_expressions)
+                                    std::vector<std::shared_ptr<BaseExpression>> unnest_expressions)
         : LogicalNode(node_id, LogicalNodeType::kUnnestAggregate), groups_(std::move(groups)), groupby_index_(groupby_index),
           aggregates_(std::move(aggregates)), aggregate_index_(aggregate_index), unnest_expression_list_(std::move(unnest_expressions)) {}
 
-    [[nodiscard]] Vector<ColumnBinding> GetColumnBindings() const;
+    [[nodiscard]] std::vector<ColumnBinding> GetColumnBindings() const;
 
-    [[nodiscard]] SharedPtr<Vector<String>> GetOutputNames() const;
+    [[nodiscard]] std::shared_ptr<std::vector<std::string>> GetOutputNames() const;
 
-    [[nodiscard]] SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const;
+    [[nodiscard]] std::shared_ptr<std::vector<std::shared_ptr<DataType>>> GetOutputTypes() const;
 
-    String ToString(i64 &space) const final;
+    std::string ToString(i64 &space) const final;
 
-    inline String name() final { return "LogicalUnnestAggregate"; }
-    Vector<SharedPtr<BaseExpression>> &groups() { return groups_; }
+    inline std::string name() final { return "LogicalUnnestAggregate"; }
+    std::vector<std::shared_ptr<BaseExpression>> &groups() { return groups_; }
     u64 group_by_index() { return groupby_index_; }
-    Vector<SharedPtr<BaseExpression>> &aggregates() { return aggregates_; }
+    std::vector<std::shared_ptr<BaseExpression>> &aggregates() { return aggregates_; }
     u64 aggregate_index() { return aggregate_index_; }
-    Vector<SharedPtr<BaseExpression>> &unnest_expression_list() { return unnest_expression_list_; }
-    const Vector<SharedPtr<BaseExpression>> &unnest_expression_list() const { return unnest_expression_list_; }
+    std::vector<std::shared_ptr<BaseExpression>> &unnest_expression_list() { return unnest_expression_list_; }
+    const std::vector<std::shared_ptr<BaseExpression>> &unnest_expression_list() const { return unnest_expression_list_; }
 
-    Vector<SharedPtr<BaseExpression>> groups_{};
+    std::vector<std::shared_ptr<BaseExpression>> groups_{};
     u64 groupby_index_{};
-    Vector<SharedPtr<BaseExpression>> aggregates_{};
+    std::vector<std::shared_ptr<BaseExpression>> aggregates_{};
     u64 aggregate_index_{};
 
 private:
-    Vector<SharedPtr<BaseExpression>> unnest_expression_list_{};
+    std::vector<std::shared_ptr<BaseExpression>> unnest_expression_list_{};
 };
 
 } // namespace infinity

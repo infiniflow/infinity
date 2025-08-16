@@ -12,17 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
-#include <ostream>
-
 export module infinity_core:dist_func_l2;
 
-import :stl;
 import :hnsw_common;
 import :plain_vec_store;
 import :lvq_vec_store;
 import :simd_functions;
+
+import std;
 
 namespace infinity {
 
@@ -42,7 +39,7 @@ public:
     using LVQDist = LVQL2Dist<DataType, i8>;
 
 private:
-    using SIMDFuncType = std::conditional_t<std::is_same_v<DataType, float>, f32, i32> (*)(const DataType *, const DataType *, SizeT);
+    using SIMDFuncType = std::conditional_t<std::is_same_v<DataType, float>, f32, i32> (*)(const DataType *, const DataType *, size_t);
 
     SIMDFuncType SIMDFunc = nullptr;
 
@@ -57,7 +54,7 @@ public:
     }
     ~PlainL2Dist() = default;
 
-    PlainL2Dist(SizeT dim) {
+    PlainL2Dist(size_t dim) {
         if constexpr (std::is_same<DataType, float>()) {
             if (dim % 16 == 0) {
                 SIMDFunc = GetSIMD_FUNCTIONS().HNSW_F32L2_16_ptr_;
@@ -97,30 +94,30 @@ public:
         return Inner(v1, data_store.GetVec(v2_i), data_store.dim());
     }
 
-    LVQDist ToLVQDistance(SizeT dim) &&;
+    LVQDist ToLVQDistance(size_t dim) &&;
 
 private:
-    DistanceType Inner(const StoreType &v1, const StoreType &v2, SizeT dim) const { return SIMDFunc(v1, v2, dim); }
+    DistanceType Inner(const StoreType &v1, const StoreType &v2, size_t dim) const { return SIMDFunc(v1, v2, dim); }
 };
 
 export template <typename DataType, typename CompressType>
 class LVQL2Cache {
 public:
     // for l2 distance, const1 = scale * norm1(compress), const2 = scale * scale * norm2(compress)
-    using LocalCacheType = Pair<DataType, DataType>;
-    using GlobalCacheType = Tuple<>;
+    using LocalCacheType = std::pair<DataType, DataType>;
+    using GlobalCacheType = std::tuple<>;
 
-    static LocalCacheType MakeLocalCache(const CompressType *c, DataType scale, SizeT dim, const MeanType *) {
+    static LocalCacheType MakeLocalCache(const CompressType *c, DataType scale, size_t dim, const MeanType *) {
         i64 norm1 = 0;
         i64 norm2 = 0;
-        for (SizeT i = 0; i < dim; ++i) {
+        for (size_t i = 0; i < dim; ++i) {
             norm1 += c[i];
             norm2 += c[i] * c[i];
         }
         return {norm1 * scale, norm2 * scale * scale};
     }
 
-    static GlobalCacheType MakeGlobalCache(const MeanType *, SizeT) { return {}; }
+    static GlobalCacheType MakeGlobalCache(const MeanType *, size_t) { return {}; }
 
 public:
     static void DumpLocalCache(std::ostream &os, const LocalCacheType &local_cache) {
@@ -140,7 +137,7 @@ public:
     using DistanceType = typename VecStoreMetaType::DistanceType;
 
 private:
-    using SIMDFuncType = i32 (*)(const CompressType *, const CompressType *, SizeT);
+    using SIMDFuncType = i32 (*)(const CompressType *, const CompressType *, size_t);
 
     SIMDFuncType SIMDFunc = nullptr;
 
@@ -154,7 +151,7 @@ public:
         return *this;
     }
     ~LVQL2Dist() = default;
-    LVQL2Dist(SizeT dim) {
+    LVQL2Dist(size_t dim) {
         if constexpr (std::is_same<CompressType, i8>()) {
             if (dim % 64 == 0) {
                 SIMDFunc = GetSIMD_FUNCTIONS().HNSW_I8IP_64_ptr_;
@@ -172,19 +169,19 @@ public:
     DistanceType operator()(VertexType v1_i, VertexType v2_i, const DataStore &data_store) const {
         const StoreType &v1 = data_store.GetVec(v1_i);
         const StoreType &v2 = data_store.GetVec(v2_i);
-        SizeT dim = data_store.dim();
+        size_t dim = data_store.dim();
         return Inner(v1, v2, dim);
     }
 
     template <typename DataStore>
     DistanceType operator()(const StoreType &v1, VertexType v2_i, const DataStore &data_store, VertexType v1_i = kInvalidVertex) const {
         const StoreType &v2 = data_store.GetVec(v2_i);
-        SizeT dim = data_store.dim();
+        size_t dim = data_store.dim();
         return Inner(v1, v2, dim);
     }
 
 private:
-    DistanceType Inner(const StoreType &v1, const StoreType &v2, SizeT dim) const {
+    DistanceType Inner(const StoreType &v1, const StoreType &v2, size_t dim) const {
         i32 c1c2_ip = SIMDFunc(v1->compress_vec_, v2->compress_vec_, dim);
         auto scale1 = v1->scale_;
         auto scale2 = v2->scale_;
@@ -198,7 +195,7 @@ private:
 };
 
 template <typename DataType>
-LVQL2Dist<DataType, i8> PlainL2Dist<DataType>::ToLVQDistance(SizeT dim) && {
+LVQL2Dist<DataType, i8> PlainL2Dist<DataType>::ToLVQDistance(size_t dim) && {
     return LVQL2Dist<DataType, i8>(dim);
 }
 

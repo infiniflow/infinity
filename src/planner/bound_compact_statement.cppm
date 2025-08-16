@@ -12,33 +12,31 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:bound_compact_statement;
 
-import :stl;
 import :logical_compact;
 import :base_table_ref;
 import :logical_node;
-// import :query_context;
 import :bind_context;
 import :logger;
-import :third_party;
+
+import third_party;
+
 import compact_statement;
 
 namespace infinity {
 
 export struct BoundCompactStatement final {
 public:
-    BoundCompactStatement(SharedPtr<BindContext> bind_context, SharedPtr<BaseTableRef> base_table_ref, CompactStatementType compact_type)
+    BoundCompactStatement(std::shared_ptr<BindContext> bind_context, std::shared_ptr<BaseTableRef> base_table_ref, CompactStatementType compact_type)
         : bind_context_(std::move(bind_context)), base_table_ref_(base_table_ref), compact_type_(compact_type) {}
 
-    Vector<SharedPtr<LogicalNode>> BuildPlans(QueryContext *query_context);
+    std::vector<std::shared_ptr<LogicalNode>> BuildPlans(QueryContext *query_context);
 
 private:
-    SharedPtr<BindContext> bind_context_{};
+    std::shared_ptr<BindContext> bind_context_{};
 
-    SharedPtr<BaseTableRef> base_table_ref_{};
+    std::shared_ptr<BaseTableRef> base_table_ref_{};
     CompactStatementType compact_type_;
 };
 

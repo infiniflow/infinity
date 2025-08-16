@@ -12,11 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:emvb_product_quantization;
 
-import :stl;
+import :infinity_type;
 
 namespace infinity {
 class LocalFileHandle;
@@ -26,7 +24,7 @@ public:
     virtual ~EMVBProductQuantizer() = default;
     virtual void Train(const f32 *embedding_data, u32 embedding_num, u32 iter_cnt) = 0;
     virtual void AddEmbeddings(const f32 *embedding_data, u32 embedding_num) = 0;
-    virtual UniquePtr<f32[]> GetIPDistanceTable(const f32 *query_data, u32 query_num) const = 0;
+    virtual std::unique_ptr<f32[]> GetIPDistanceTable(const f32 *query_data, u32 query_num) const = 0;
     virtual f32 GetSingleIPDistance(u32 embedding_id, u32 query_id, u32 query_num, const f32 *ip_table) const = 0;
     virtual void
     GetMultipleIPDistance(u32 embedding_offset, u32 embedding_num, u32 query_id, u32 query_num, const f32 *ip_table, f32 *output_ptr) const = 0;
@@ -40,10 +38,10 @@ protected:
     static constexpr u32 subspace_centroid_num_ = std::numeric_limits<SUBSPACE_CENTROID_TAG>::max() + 1;
     const u32 subspace_dimension_;                             // dimension of each subspace
     const u32 dimension_ = SUBSPACE_NUM * subspace_dimension_; // dimension of each embedding
-    Array<Vector<f32>, SUBSPACE_NUM> subspace_centroids_ = {}; // centroids for each subspace, size: subspace_centroid_num_ * subspace_dimension_
-    Array<Array<f32, subspace_centroid_num_>, SUBSPACE_NUM> subspace_centroid_norms_neg_half =
+    std::array<std::vector<f32>, SUBSPACE_NUM> subspace_centroids_ = {}; // centroids for each subspace, size: subspace_centroid_num_ * subspace_dimension_
+    std::array<std::array<f32, subspace_centroid_num_>, SUBSPACE_NUM> subspace_centroid_norms_neg_half =
         {}; // (-0.5 * norm) for each centroid, size: subspace_centroid_num_
-    Deque<Array<SUBSPACE_CENTROID_TAG, SUBSPACE_NUM>> encoded_embedding_data_;
+    std::deque<std::array<SUBSPACE_CENTROID_TAG, SUBSPACE_NUM>> encoded_embedding_data_;
     u32 next_embedding_id_ = 0;
     mutable std::shared_mutex rw_mutex_;
 
@@ -58,7 +56,7 @@ protected:
 
     void EncodeEmbedding(const f32 *embedding_data, u32 embedding_num, auto output_iter) const;
 
-    UniquePtr<f32[]> DecodeEmbedding(auto input_iter_begin, u32 embedding_num) const;
+    std::unique_ptr<f32[]> DecodeEmbedding(auto input_iter_begin, u32 embedding_num) const;
 };
 
 // Optimized Product Quantization
@@ -66,7 +64,7 @@ protected:
 export template <std::unsigned_integral SUBSPACE_CENTROID_TAG, u32 SUBSPACE_NUM>
 class OPQ final : public PQ<SUBSPACE_CENTROID_TAG, SUBSPACE_NUM> {
     using PQ_BASE = PQ<SUBSPACE_CENTROID_TAG, SUBSPACE_NUM>;
-    UniquePtr<f32[]> matrix_R_; // matrix R for OPQ, size: dimension_ * dimension_
+    std::unique_ptr<f32[]> matrix_R_; // matrix R for OPQ, size: dimension_ * dimension_
 
 public:
     explicit OPQ(u32 subspace_dimension);
@@ -75,13 +73,13 @@ public:
 
     void AddEmbeddings(const f32 *embedding_data, u32 embedding_num) override;
 
-    UniquePtr<f32[]> GetIPDistanceTable(const f32 *query_data, u32 query_num) const override;
+    std::unique_ptr<f32[]> GetIPDistanceTable(const f32 *query_data, u32 query_num) const override;
 
     void Save(LocalFileHandle &file_handle) override;
 
     void Load(LocalFileHandle &file_handle) override;
 };
 
-export UniquePtr<EMVBProductQuantizer> GetEMVBOPQ(u32 pq_subspace_num, u32 pq_subspace_bits, u32 embedding_dimension);
+export std::unique_ptr<EMVBProductQuantizer> GetEMVBOPQ(u32 pq_subspace_num, u32 pq_subspace_bits, u32 embedding_dimension);
 
 } // namespace infinity

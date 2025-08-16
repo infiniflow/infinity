@@ -5,8 +5,6 @@ module;
 module infinity_core:in_doc_pos_iterator.impl;
 
 import :in_doc_pos_iterator;
-
-import :stl;
 import :index_defines;
 import :in_doc_pos_state;
 import :position_list_format_option;

@@ -1,14 +1,13 @@
 module;
 
-#include <string>
-
 export module infinity_core:cjk_segmenter;
 
-import :stl;
 import :hit;
 import :segmenter;
 import :analyze_context;
 import :ik_dict;
+
+import std;
 
 namespace infinity {
 
@@ -16,7 +15,7 @@ export class CJKSegmenter : public Segmenter {
 public:
     static const std::wstring SEGMENTER_NAME;
 
-    List<UniquePtr<Hit>> tmp_hits_;
+    std::list<std::unique_ptr<Hit>> tmp_hits_;
 
     Dictionary *dict_{nullptr};
 

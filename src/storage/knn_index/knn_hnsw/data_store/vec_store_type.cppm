@@ -12,11 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:vec_store_type;
 
-import :stl;
 import :plain_vec_store;
 import :sparse_vec_store;
 import :lvq_vec_store;
@@ -26,6 +23,7 @@ import :dist_func_ip;
 import :dist_func_sparse_ip;
 import :sparse_util;
 import :dist_func_lsg_wrapper;
+
 import data_type;
 
 namespace infinity {

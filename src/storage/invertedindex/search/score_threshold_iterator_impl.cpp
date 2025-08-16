@@ -12,17 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
-#include <iostream>
-
 module infinity_core:score_threshold_iterator.impl;
 
 import :score_threshold_iterator;
-import :stl;
 import :doc_iterator;
-import internal_types;
 import :index_defines;
+
+import std;
+
+import internal_types;
 
 namespace infinity {
 
@@ -42,11 +40,11 @@ bool ScoreThresholdIterator::Next(RowID doc_id) {
     }
 }
 
-void ScoreThresholdIterator::PrintTree(std::ostream &os, const String &prefix, const bool is_final) const {
+void ScoreThresholdIterator::PrintTree(std::ostream &os, const std::string &prefix, const bool is_final) const {
     os << prefix;
     os << (is_final ? "└──" : "├──");
     os << "ScoreThresholdIterator (score_threshold: " << score_threshold_ << ")\n";
-    const String next_prefix = prefix + (is_final ? "    " : "│   ");
+    const std::string next_prefix = prefix + (is_final ? "    " : "│   ");
     query_iterator_->PrintTree(os, next_prefix, true);
 }
 

@@ -12,11 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:inmem_index_segment_reader;
-
-import :stl;
 
 import :segment_posting;
 import :index_segment_reader;
@@ -31,10 +27,10 @@ public:
     InMemIndexSegmentReader(SegmentID segment_id, MemoryIndexer *memory_indexer);
     virtual ~InMemIndexSegmentReader() = default;
 
-    bool GetSegmentPosting(const String &term, SegmentPosting &seg_posting, bool fetch_position = true) const override;
+    bool GetSegmentPosting(const std::string &term, SegmentPosting &seg_posting, bool fetch_position = true) const override;
 
 private:
-    SharedPtr<MemoryIndexer::PostingTable> posting_table_;
+    std::shared_ptr<MemoryIndexer::PostingTable> posting_table_;
     RowID base_row_id_{INVALID_ROWID};
 };
 

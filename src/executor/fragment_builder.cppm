@@ -12,15 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:fragment_builder;
 
-import :stl;
-// import :query_context;
 import :plan_fragment;
 import :physical_operator;
-// import global_resource_usage;
 
 namespace infinity {
 
@@ -38,7 +33,7 @@ public:
 #endif
     }
 
-    SharedPtr<PlanFragment> BuildFragment(const Vector<PhysicalOperator *> &physical_plans);
+    std::shared_ptr<PlanFragment> BuildFragment(const std::vector<PhysicalOperator *> &physical_plans);
 
 private:
     void BuildFragments(PhysicalOperator *phys_op, PlanFragment *current_fragment_ptr);

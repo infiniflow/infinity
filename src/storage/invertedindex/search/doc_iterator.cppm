@@ -12,13 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:doc_iterator;
 
-import :stl;
-
 import :index_defines;
+
 import internal_types;
 
 namespace infinity {
@@ -87,7 +84,7 @@ public:
     /* virtual methods */
 
     virtual DocIteratorType GetType() const = 0;
-    virtual String Name() const = 0;
+    virtual std::string Name() const = 0;
 
     // Update doc_id_ to one no less than given doc_id.
     // If has_blockmax is true, it ensures its BM25 score be larger than current threshold.
@@ -101,7 +98,7 @@ public:
     virtual u32 MatchCount() const = 0;
 
     // print the query tree, for debugging
-    virtual void PrintTree(std::ostream &os, const String &prefix = "", bool is_final = true) const = 0;
+    virtual void PrintTree(std::ostream &os, const std::string &prefix = "", bool is_final = true) const = 0;
 
 protected:
     RowID doc_id_{INVALID_ROWID};

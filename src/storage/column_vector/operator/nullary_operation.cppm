@@ -12,15 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
-#include <concepts>
-#include <type_traits>
-
 export module infinity_core:nullary_operation;
 
-import :stl;
 import :column_vector;
+
 import internal_types;
 
 namespace infinity {
@@ -29,7 +24,7 @@ export class NullaryOperator {
 
 public:
     template <typename ResultType, typename Operator>
-    static void inline Execute(SharedPtr<ColumnVector> &result, void *state_ptr) {
+    static void inline Execute(std::shared_ptr<ColumnVector> &result, void *state_ptr) {
         result->Reset();
         result->Initialize(ColumnVectorType::kConstant);
         auto *result_ptr = (ResultType *)(result->data());

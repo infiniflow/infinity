@@ -17,13 +17,14 @@ module;
 module infinity_core:bg_task_type.impl;
 
 import :bg_task_type;
-import :stl;
 import :infinity_exception;
 import :bg_task_type;
 
+import std;
+
 namespace infinity {
 
-String ToString(BGTaskType type) {
+std::string ToString(BGTaskType type) {
     switch (type) {
         case BGTaskType::kInvalid: {
             return "Invalid";

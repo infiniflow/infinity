@@ -12,34 +12,32 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:distance_simd_functions;
 
-import :stl;
+import :infinity_type;
 
 namespace infinity {
 
-export f32 L2Distance_common(const f32 *x, const f32 *y, SizeT d);
+export f32 L2Distance_common(const f32 *x, const f32 *y, size_t d);
 
-export f32 IPDistance_common(const f32 *x, const f32 *y, SizeT d);
+export f32 IPDistance_common(const f32 *x, const f32 *y, size_t d);
 
-export f32 CosineDistance_common(const f32 *x, const f32 *y, SizeT d);
+export f32 CosineDistance_common(const f32 *x, const f32 *y, size_t d);
 
-export f32 HammingDistance_common(const u8 *x, const u8 *y, SizeT d);
+export f32 HammingDistance_common(const u8 *x, const u8 *y, size_t d);
 
 #if defined(__AVX2__)
-export f32 L2Distance_avx2(const f32 *vector1, const f32 *vector2, SizeT dimension);
+export f32 L2Distance_avx2(const f32 *vector1, const f32 *vector2, size_t dimension);
 
-export f32 IPDistance_avx2(const f32 *vector1, const f32 *vector2, SizeT dimension);
+export f32 IPDistance_avx2(const f32 *vector1, const f32 *vector2, size_t dimension);
 
-export f32 CosineDistance_avx2(const f32 *vector1, const f32 *vector2, SizeT dimension);
+export f32 CosineDistance_avx2(const f32 *vector1, const f32 *vector2, size_t dimension);
 
-export f32 HammingDistance_avx2(const u8 *vector1, const u8 *vector2, SizeT dimension);
+export f32 HammingDistance_avx2(const u8 *vector1, const u8 *vector2, size_t dimension);
 #endif
 
 #if defined(__SSE2__)
-export f32 HammingDistance_sse2(const u8 *vector1, const u8 *vector2, SizeT dimesion);
+export f32 HammingDistance_sse2(const u8 *vector1, const u8 *vector2, size_t dimesion);
 #endif
 
 } // namespace infinity

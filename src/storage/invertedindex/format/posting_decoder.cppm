@@ -1,8 +1,5 @@
-module;
-
 export module infinity_core:posting_decoder;
 
-import :stl;
 import :byte_slice_reader;
 import :posting_list_format;
 import :term_meta;
@@ -17,17 +14,17 @@ public:
     PostingDecoder(const PostingFormatOption &option);
 
     void Init(TermMeta *term_meta,
-              const SharedPtr<ByteSliceReader> &posting_list_reader,
-              const SharedPtr<ByteSliceReader> &position_list_reader,
-              SizeT posting_data_len);
+              const std::shared_ptr<ByteSliceReader> &posting_list_reader,
+              const std::shared_ptr<ByteSliceReader> &position_list_reader,
+              size_t posting_data_len);
 
     void Init(TermMeta *term_meta, bool is_doc_list, bool df_first);
 
-    u32 DecodeDocList(docid_t *doc_id_buf, tf_t *tf_list_buf, docpayload_t *doc_payload_buf, SizeT len);
+    u32 DecodeDocList(docid_t *doc_id_buf, tf_t *tf_list_buf, docpayload_t *doc_payload_buf, size_t len);
 
-    u32 DecodePosList(pos_t *pos_list_buf, SizeT len);
+    u32 DecodePosList(pos_t *pos_list_buf, size_t len);
 
-    SizeT GetPostingDataLength() const { return posting_data_length_; }
+    size_t GetPostingDataLength() const { return posting_data_length_; }
 
 private:
     void InitDocListEncoder(const DocListFormatOption &doc_list_format_option, df_t df);
@@ -35,8 +32,8 @@ private:
 
     TermMeta *term_meta_;
 
-    SharedPtr<ByteSliceReader> posting_list_reader_;
-    SharedPtr<ByteSliceReader> position_list_reader_;
+    std::shared_ptr<ByteSliceReader> posting_list_reader_;
+    std::shared_ptr<ByteSliceReader> position_list_reader_;
 
     const Int32Encoder *doc_id_encoder_;
     const Int32Encoder *tf_list_encoder_;
@@ -45,7 +42,7 @@ private:
 
     df_t decoded_doc_count_;
     tf_t decoded_pos_count_;
-    SizeT posting_data_length_;
+    size_t posting_data_length_;
     PostingFormatOption posting_format_option_;
 };
 } // namespace infinity

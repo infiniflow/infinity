@@ -12,24 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:physical_unnest_aggregate.impl;
 
 import :physical_unnest_aggregate;
-
-import :stl;
 import :query_context;
 import :table_def;
 import :data_table;
-
 import :physical_operator_type;
 import :operator_state;
 import :expression_state;
 import :expression_selector;
 import :data_block;
 import :logger;
-import :third_party;
+
+import third_party;
 
 import :infinity_exception;
 

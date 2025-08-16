@@ -12,11 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:cached_match_scan;
 
-import :stl;
 import :logical_match_scan_base;
 import :cached_scan_base;
 import :logical_match_tensor_scan;
@@ -55,8 +52,8 @@ public:
     const BaseExpression *query_expression() const { return query_expression_.get(); }
 
 private:
-    SharedPtr<BaseExpression> query_expression_{};
-    SharedPtr<BaseExpression> filter_expression_{};
+    std::shared_ptr<BaseExpression> query_expression_{};
+    std::shared_ptr<BaseExpression> filter_expression_{};
 };
 
 export class CachedKnnScan final : public CachedMatchScanBase {
@@ -91,7 +88,7 @@ public:
 
 private:
     u32 topn_;
-    SharedPtr<MatchTensorScanIndexOptions> index_options_;
+    std::shared_ptr<MatchTensorScanIndexOptions> index_options_;
 };
 
 } // namespace infinity

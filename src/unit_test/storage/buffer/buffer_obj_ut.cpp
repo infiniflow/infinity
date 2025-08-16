@@ -13,21 +13,19 @@
 // limitations under the License.
 
 #ifdef CI
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 import infinity_core;
 import base_test;
 #else
 module;
 
 #include "unit_test/gtest_expand.h"
-#include "gtest/gtest.h"
 
 module infinity_core:ut.buffer_obj;
 
 import :ut.base_test;
 import :infinity;
 import :infinity_exception;
-import :stl;
 import :logger;
 import :buffer_manager;
 import :buffer_handle;
@@ -41,7 +39,7 @@ import :table_def;
 import :column_vector;
 import :value;
 import :status;
-import :third_party;
+import third_party;
 import :base_table_ref;
 import :index_hnsw;
 import :bg_task;
@@ -86,7 +84,7 @@ public:
     void SaveBufferObj(BufferObj *buffer_obj) { buffer_obj->Save(); };
 
     void WaitCleanup(Storage *storage) {
-        auto cleanup_task = MakeShared<NewCleanupTask>();
+        auto cleanup_task = std::make_shared<NewCleanupTask>();
         TxnTimeStamp cur_cleanup_ts;
         cleanup_task->Execute(0, cur_cleanup_ts);
     }
@@ -96,7 +94,7 @@ public:
         WalManager *wal_manager = storage->wal_manager();
         NewTxn *new_txn = nullptr;
         do {
-            new_txn = txn_mgr->BeginTxn(MakeUnique<String>("checkpoint"), TransactionType::kNewCheckpoint);
+            new_txn = txn_mgr->BeginTxn(std::make_unique<std::string>("checkpoint"), TransactionType::kNewCheckpoint);
         } while (new_txn == nullptr); // wait until we get a new transaction, which means no other checkpoint is running
         TxnTimeStamp max_commit_ts{};
         i64 wal_size{};
@@ -120,25 +118,25 @@ TEST_F(BufferObjTest, test1) {
     infinity::InfinityContext::instance().InitPhase1(config_path);
     infinity::InfinityContext::instance().InitPhase2();
 
-    SizeT memory_limit = 1024;
-    String data_dir(GetFullDataDir());
-    auto temp_dir = MakeShared<String>(data_dir + "/spill");
-    auto base_dir = MakeShared<String>(GetFullDataDir());
+    size_t memory_limit = 1024;
+    std::string data_dir(GetFullDataDir());
+    auto temp_dir = std::make_shared<std::string>(data_dir + "/spill");
+    auto base_dir = std::make_shared<std::string>(GetFullDataDir());
 
     Storage *storage = InfinityContext::instance().storage();
     PersistenceManager *persistence_manager = storage->persistence_manager();
     BufferManager buffer_manager(memory_limit, base_dir, temp_dir, persistence_manager);
 
-    SizeT test_size1 = 1024;
-    auto file_dir1 = MakeShared<String>("dir1");
-    auto test_fname1 = MakeShared<String>("test1");
-    auto file_worker1 = MakeUnique<DataFileWorker>(base_dir, temp_dir, file_dir1, test_fname1, test_size1, persistence_manager);
+    size_t test_size1 = 1024;
+    auto file_dir1 = std::make_shared<std::string>("dir1");
+    auto test_fname1 = std::make_shared<std::string>("test1");
+    auto file_worker1 = std::make_unique<DataFileWorker>(base_dir, temp_dir, file_dir1, test_fname1, test_size1, persistence_manager);
     auto buf1 = buffer_manager.AllocateBufferObject(std::move(file_worker1));
 
-    SizeT test_size2 = 1024;
-    auto file_dir2 = MakeShared<String>("dir2");
-    auto test_fname2 = MakeShared<String>("test2");
-    auto file_worker2 = MakeUnique<DataFileWorker>(base_dir, temp_dir, file_dir2, test_fname2, test_size2, persistence_manager);
+    size_t test_size2 = 1024;
+    auto file_dir2 = std::make_shared<std::string>("dir2");
+    auto test_fname2 = std::make_shared<std::string>("test2");
+    auto file_worker2 = std::make_unique<DataFileWorker>(base_dir, temp_dir, file_dir2, test_fname2, test_size2, persistence_manager);
     auto buf2 = buffer_manager.AllocateBufferObject(std::move(file_worker2));
 
     /// kEphemeral
@@ -341,47 +339,47 @@ TEST_F(BufferObjTest, test_hnsw_index_buffer_obj_shutdown) {
 
     NewTxnManager *txn_mgr = storage->new_txn_manager();
 
-    auto db_name = MakeShared<String>("default_db");
-    auto table_name = MakeShared<String>("test_hnsw");
-    auto index_name = MakeShared<String>("hnsw_index");
-    auto column_name = MakeShared<String>("col1");
+    auto db_name = std::make_shared<std::string>("default_db");
+    auto table_name = std::make_shared<std::string>("test_hnsw");
+    auto index_name = std::make_shared<std::string>("hnsw_index");
+    auto column_name = std::make_shared<std::string>("col1");
 
     // CREATE TABLE test_hnsw (col1 embedding(float,128));
-    Vector<SharedPtr<ColumnDef>> column_defs;
+    std::vector<std::shared_ptr<ColumnDef>> column_defs;
     {
         {
             std::set<ConstraintType> constraints;
             constraints.insert(ConstraintType::kNotNull);
             i64 column_id = 0;
-            auto embedding_info = MakeShared<EmbeddingInfo>(EmbeddingDataType::kElemFloat, 128);
+            auto embedding_info = std::make_shared<EmbeddingInfo>(EmbeddingDataType::kElemFloat, 128);
             auto column_def_ptr =
-                MakeShared<ColumnDef>(column_id, MakeShared<DataType>(LogicalType::kEmbedding, embedding_info), "col1", constraints);
+                std::make_shared<ColumnDef>(column_id, std::make_shared<DataType>(LogicalType::kEmbedding, embedding_info), "col1", constraints);
             column_defs.emplace_back(column_def_ptr);
         }
         auto tbl1_def =
-            MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>("test_hnsw"), MakeShared<String>("test_comment"), column_defs);
-        NewTxn *txn = txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+            std::make_unique<TableDef>(std::make_shared<std::string>("default_db"), std::make_shared<std::string>("test_hnsw"), std::make_shared<std::string>("test_comment"), column_defs);
+        NewTxn *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
         Status status = txn->CreateTable("default_db", std::move(tbl1_def), ConflictType::kError);
         EXPECT_TRUE(status.ok());
         txn_mgr->CommitTxn(txn);
     }
     // CreateIndex
     {
-        auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create index"), TransactionType::kNormal);
-        Vector<String> columns1{"col1"};
-        Vector<InitParameter *> parameters1;
+        auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("create index"), TransactionType::kNormal);
+        std::vector<std::string> columns1{"col1"};
+        std::vector<InitParameter *> parameters1;
         parameters1.emplace_back(new InitParameter("metric", "l2"));
         parameters1.emplace_back(new InitParameter("encode", "plain"));
         parameters1.emplace_back(new InitParameter("m", "16"));
         parameters1.emplace_back(new InitParameter("ef_construction", "200"));
 
-        auto index_base_hnsw = IndexHnsw::Make(index_name, MakeShared<String>("test_comment"), "hnsw_index_test_hnsw", columns1, parameters1);
+        auto index_base_hnsw = IndexHnsw::Make(index_name, std::make_shared<std::string>("test_comment"), "hnsw_index_test_hnsw", columns1, parameters1);
         for (auto *init_parameter : parameters1) {
             delete init_parameter;
         }
 
-        const String &db_name = "default_db";
-        const String &table_name = "test_hnsw";
+        const std::string &db_name = "default_db";
+        const std::string &table_name = "test_hnsw";
         ConflictType conflict_type = ConflictType::kError;
 
         // create index idx1
@@ -392,15 +390,15 @@ TEST_F(BufferObjTest, test_hnsw_index_buffer_obj_shutdown) {
     }
     // Insert data
     {
-        for (SizeT i = 0; i < kInsertN; ++i) {
-            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("insert table"), TransactionType::kNormal);
-            Vector<SharedPtr<ColumnVector>> column_vectors;
-            SharedPtr<ColumnVector> column_vector = ColumnVector::Make(column_defs[0]->type());
+        for (size_t i = 0; i < kInsertN; ++i) {
+            auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("insert table"), TransactionType::kNormal);
+            std::vector<std::shared_ptr<ColumnVector>> column_vectors;
+            std::shared_ptr<ColumnVector> column_vector = ColumnVector::Make(column_defs[0]->type());
             column_vector->Initialize();
-            for (SizeT j = 0; j < kImportSize; ++j) {
-                Vector<float> vec;
+            for (size_t j = 0; j < kImportSize; ++j) {
+                std::vector<float> vec;
                 vec.reserve(128);
-                for (SizeT k = 0; k < 128; ++k) {
+                for (size_t k = 0; k < 128; ++k) {
                     vec.push_back(j * 1000 + k);
                 }
                 Value v = Value::MakeEmbedding(vec);
@@ -420,30 +418,30 @@ TEST_F(BufferObjTest, test_hnsw_index_buffer_obj_shutdown) {
     // Get Index
     {
 
-        auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("check index1"), TransactionType::kNormal);
+        auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("check index1"), TransactionType::kNormal);
 
-        Optional<DBMeeta> db_meta;
-        Optional<TableMeeta> table_meta;
-        Optional<TableIndexMeeta> table_index_meta;
-        String table_key;
-        String index_key;
-        Vector<String> index_names;
+        std::optional<DBMeeta> db_meta;
+        std::optional<TableMeeta> table_meta;
+        std::optional<TableIndexMeeta> table_index_meta;
+        std::string table_key;
+        std::string index_key;
+        std::vector<std::string> index_names;
         Status status = txn->ListIndex(*db_name, *table_name, index_names);
         EXPECT_TRUE(status.ok());
 
-        for (const String &index_name : index_names) {
+        for (const std::string &index_name : index_names) {
             status = txn->GetTableIndexMeta(*db_name, *table_name, index_name, db_meta, table_meta, table_index_meta, &table_key, &index_key);
             EXPECT_TRUE(status.ok());
 
             {
                 auto [segment_ids, status] = table_meta->GetSegmentIDs1();
                 EXPECT_TRUE(status.ok());
-                EXPECT_EQ(*segment_ids, Vector<SegmentID>({0}));
+                EXPECT_EQ(*segment_ids, std::vector<SegmentID>({0}));
             }
             SegmentID segment_id = 0;
             SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta);
 
-            SharedPtr<MemIndex> mem_index = segment_index_meta.GetMemIndex();
+            std::shared_ptr<MemIndex> mem_index = segment_index_meta.GetMemIndex();
             EXPECT_NE(mem_index, nullptr);
         }
 
@@ -451,7 +449,7 @@ TEST_F(BufferObjTest, test_hnsw_index_buffer_obj_shutdown) {
     }
     // Drop Table
     {
-        auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("drop table"), TransactionType::kNormal);
+        auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("drop table"), TransactionType::kNormal);
         Status status = txn->DropTable(*db_name, *table_name, ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = txn_mgr->CommitTxn(txn);
@@ -480,30 +478,30 @@ TEST_F(BufferObjTest, test_big_with_gc_and_cleanup) {
     NewTxnManager *txn_mgr = storage->new_txn_manager();
     //    BufferManager *buffer_mgr = storage->buffer_manager();
 
-    auto db_name = MakeShared<String>("default_db");
-    auto table_name = MakeShared<String>("table1");
-    auto table_comment = MakeShared<String>("table1_commment");
-    auto index_name = MakeShared<String>("idx1");
-    auto column_name = MakeShared<String>("col1");
+    auto db_name = std::make_shared<std::string>("default_db");
+    auto table_name = std::make_shared<std::string>("table1");
+    auto table_comment = std::make_shared<std::string>("table1_commment");
+    auto index_name = std::make_shared<std::string>("idx1");
+    auto column_name = std::make_shared<std::string>("col1");
 
-    Vector<SharedPtr<ColumnDef>> column_defs;
+    std::vector<std::shared_ptr<ColumnDef>> column_defs;
     {
         std::set<ConstraintType> constraints;
         ColumnID column_id = 0;
-        column_defs.push_back(MakeShared<ColumnDef>(column_id++, MakeShared<DataType>(DataType(LogicalType::kBigInt)), *column_name, constraints));
+        column_defs.push_back(std::make_shared<ColumnDef>(column_id++, std::make_shared<DataType>(DataType(LogicalType::kBigInt)), *column_name, constraints));
     }
     {
-        auto table_def = MakeUnique<TableDef>(db_name, table_name, table_comment, column_defs);
-        auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+        auto table_def = std::make_unique<TableDef>(db_name, table_name, table_comment, column_defs);
+        auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
         auto status = txn->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         txn_mgr->CommitTxn(txn);
     }
     {
-        for (SizeT i = 0; i < kInsertN; ++i) {
-            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("insert table"), TransactionType::kNormal);
-            Vector<SharedPtr<ColumnVector>> column_vectors;
-            SharedPtr<ColumnVector> column_vector = ColumnVector::Make(MakeShared<DataType>(column_defs[0]->type()->type()));
+        for (size_t i = 0; i < kInsertN; ++i) {
+            auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("insert table"), TransactionType::kNormal);
+            std::vector<std::shared_ptr<ColumnVector>> column_vectors;
+            std::shared_ptr<ColumnVector> column_vector = ColumnVector::Make(std::make_shared<DataType>(column_defs[0]->type()->type()));
             column_vector->Initialize();
             for (u64 j = 0; j < kImportSize; ++j) {
                 Value v = Value::MakeBigInt(i * 1000 + j);
@@ -521,12 +519,12 @@ TEST_F(BufferObjTest, test_big_with_gc_and_cleanup) {
     }
 
     {
-        auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
+        auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kNormal);
         TxnTimeStamp begin_ts = txn->BeginTS();
         TxnTimeStamp commit_ts = txn->CommitTS();
 
-        Optional<DBMeeta> db_meta;
-        Optional<TableMeeta> table_meta;
+        std::optional<DBMeeta> db_meta;
+        std::optional<TableMeeta> table_meta;
         Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
 
@@ -537,13 +535,13 @@ TEST_F(BufferObjTest, test_big_with_gc_and_cleanup) {
         EXPECT_EQ(segment_id, 0);
         SegmentMeta segment_meta(segment_id, *table_meta);
 
-        Vector<BlockID> *block_ids_ptr = nullptr;
+        std::vector<BlockID> *block_ids_ptr = nullptr;
         std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1();
 
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(block_ids_ptr->size(), kInsertN);
 
-        for (SizeT idx = 0; idx < kInsertN; ++idx) {
+        for (size_t idx = 0; idx < kInsertN; ++idx) {
             BlockID block_id = block_ids_ptr->at(idx);
             EXPECT_EQ(block_id, idx);
             BlockMeta block_meta(block_id, segment_meta);
@@ -551,7 +549,7 @@ TEST_F(BufferObjTest, test_big_with_gc_and_cleanup) {
             status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, commit_ts, state);
             EXPECT_TRUE(status.ok());
 
-            Pair<BlockOffset, BlockOffset> range;
+            std::pair<BlockOffset, BlockOffset> range;
             BlockOffset offset = 0;
             bool has_next = state.Next(offset, range);
             EXPECT_TRUE(has_next);
@@ -563,18 +561,18 @@ TEST_F(BufferObjTest, test_big_with_gc_and_cleanup) {
             has_next = state.Next(offset, range);
             EXPECT_FALSE(has_next);
 
-            SizeT row_count = state.block_offset_end();
+            size_t row_count = state.block_offset_end();
             EXPECT_EQ(row_count, DEFAULT_BLOCK_CAPACITY);
 
             {
-                SizeT column_idx = 0;
+                size_t column_idx = 0;
                 ColumnMeta column_meta(column_idx, block_meta);
                 ColumnVector col;
 
                 status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorMode::kReadOnly, col);
                 EXPECT_TRUE(status.ok());
 
-                for (SizeT row_id = 0; row_id < kImportSize; ++row_id) {
+                for (size_t row_id = 0; row_id < kImportSize; ++row_id) {
                     Value v1 = col.GetValueByIndex(row_id);
                     Value v2 = Value::MakeBigInt(idx * 1000 + row_id);
                     EXPECT_EQ(v1, v2);
@@ -585,7 +583,7 @@ TEST_F(BufferObjTest, test_big_with_gc_and_cleanup) {
     }
 
     {
-        auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("drop table"), TransactionType::kNormal);
+        auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("drop table"), TransactionType::kNormal);
         auto status = txn->DropTable(*db_name, *table_name, ConflictType::kError);
         EXPECT_TRUE(status.ok());
         txn_mgr->CommitTxn(txn);
@@ -611,30 +609,30 @@ TEST_F(BufferObjTest, DISABLED_test_multiple_threads_read) {
     EXPECT_EQ(storage->buffer_manager()->memory_limit(), (u64)512 * 1024);
 
     NewTxnManager *txn_mgr = storage->new_txn_manager();
-    auto db_name = MakeShared<String>("default_db");
-    auto table_name = MakeShared<String>("table1");
-    auto table_comment = MakeShared<String>("table_comment");
-    auto index_name = MakeShared<String>("idx1");
-    auto column_name = MakeShared<String>("col1");
+    auto db_name = std::make_shared<std::string>("default_db");
+    auto table_name = std::make_shared<std::string>("table1");
+    auto table_comment = std::make_shared<std::string>("table_comment");
+    auto index_name = std::make_shared<std::string>("idx1");
+    auto column_name = std::make_shared<std::string>("col1");
 
-    Vector<SharedPtr<ColumnDef>> column_defs;
+    std::vector<std::shared_ptr<ColumnDef>> column_defs;
     {
         std::set<ConstraintType> constraints;
         ColumnID column_id = 0;
-        column_defs.push_back(MakeShared<ColumnDef>(column_id++, MakeShared<DataType>(DataType(LogicalType::kBigInt)), *column_name, constraints));
+        column_defs.push_back(std::make_shared<ColumnDef>(column_id++, std::make_shared<DataType>(DataType(LogicalType::kBigInt)), *column_name, constraints));
     }
     {
-        auto table_def = MakeUnique<TableDef>(db_name, table_name, table_comment, column_defs);
-        auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+        auto table_def = std::make_unique<TableDef>(db_name, table_name, table_comment, column_defs);
+        auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
         auto status = txn->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         txn_mgr->CommitTxn(txn);
     }
     {
-        for (SizeT i = 0; i < kInsertN; ++i) {
-            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("insert table"), TransactionType::kNormal);
-            Vector<SharedPtr<ColumnVector>> column_vectors;
-            SharedPtr<ColumnVector> column_vector = ColumnVector::Make(MakeShared<DataType>(column_defs[0]->type()->type()));
+        for (size_t i = 0; i < kInsertN; ++i) {
+            auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("insert table"), TransactionType::kNormal);
+            std::vector<std::shared_ptr<ColumnVector>> column_vectors;
+            std::shared_ptr<ColumnVector> column_vector = ColumnVector::Make(std::make_shared<DataType>(column_defs[0]->type()->type()));
             column_vector->Initialize();
             for (u64 j = 0; j < kImportSize; ++j) {
                 Value v = Value::MakeBigInt(i * 1000 + j);
@@ -650,15 +648,15 @@ TEST_F(BufferObjTest, DISABLED_test_multiple_threads_read) {
             txn_mgr->CommitTxn(txn);
         }
     }
-    Vector<std::thread> ths;
-    for (SizeT i = 0; i < kThreadN; ++i) {
+    std::vector<std::thread> ths;
+    for (size_t i = 0; i < kThreadN; ++i) {
         std::thread th([&]() {
-            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
+            auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kNormal);
             TxnTimeStamp begin_ts = txn->BeginTS();
             TxnTimeStamp commit_ts = txn->CommitTS();
 
-            Optional<DBMeeta> db_meta;
-            Optional<TableMeeta> table_meta;
+            std::optional<DBMeeta> db_meta;
+            std::optional<TableMeeta> table_meta;
             Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
             EXPECT_TRUE(status.ok());
 
@@ -669,13 +667,13 @@ TEST_F(BufferObjTest, DISABLED_test_multiple_threads_read) {
             EXPECT_EQ(segment_id, 0);
             SegmentMeta segment_meta(segment_id, *table_meta);
 
-            Vector<BlockID> *block_ids_ptr = nullptr;
+            std::vector<BlockID> *block_ids_ptr = nullptr;
             std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1();
 
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(block_ids_ptr->size(), kInsertN);
 
-            for (SizeT idx = 0; idx < kInsertN; ++idx) {
+            for (size_t idx = 0; idx < kInsertN; ++idx) {
                 BlockID block_id = block_ids_ptr->at(idx);
                 EXPECT_EQ(block_id, idx);
                 BlockMeta block_meta(block_id, segment_meta);
@@ -683,7 +681,7 @@ TEST_F(BufferObjTest, DISABLED_test_multiple_threads_read) {
                 status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, commit_ts, state);
                 EXPECT_TRUE(status.ok());
 
-                Pair<BlockOffset, BlockOffset> range;
+                std::pair<BlockOffset, BlockOffset> range;
                 BlockOffset offset = 0;
                 bool has_next = state.Next(offset, range);
                 EXPECT_TRUE(has_next);
@@ -695,18 +693,18 @@ TEST_F(BufferObjTest, DISABLED_test_multiple_threads_read) {
                 has_next = state.Next(offset, range);
                 EXPECT_FALSE(has_next);
 
-                SizeT row_count = state.block_offset_end();
+                size_t row_count = state.block_offset_end();
                 EXPECT_EQ(row_count, DEFAULT_BLOCK_CAPACITY);
 
                 {
-                    SizeT column_idx = 0;
+                    size_t column_idx = 0;
                     ColumnMeta column_meta(column_idx, block_meta);
                     ColumnVector col;
 
                     status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorMode::kReadOnly, col);
                     EXPECT_TRUE(status.ok());
 
-                    for (SizeT row_id = 0; row_id < kImportSize; ++row_id) {
+                    for (size_t row_id = 0; row_id < kImportSize; ++row_id) {
                         Value v1 = col.GetValueByIndex(row_id);
                         Value v2 = Value::MakeBigInt(idx * 1000 + row_id);
                         EXPECT_EQ(v1, v2);
@@ -717,12 +715,12 @@ TEST_F(BufferObjTest, DISABLED_test_multiple_threads_read) {
         });
         ths.push_back(std::move(th));
     }
-    for (SizeT i = 0; i < kThreadN; ++i) {
+    for (size_t i = 0; i < kThreadN; ++i) {
         ths[i].join();
     }
 
     {
-        auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("drop table"), TransactionType::kNormal);
+        auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("drop table"), TransactionType::kNormal);
         auto status = txn->DropTable(*db_name, *table_name, ConflictType::kError);
         EXPECT_TRUE(status.ok());
         txn_mgr->CommitTxn(txn);

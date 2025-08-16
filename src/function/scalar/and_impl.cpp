@@ -12,25 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
-#include <type_traits>
-
 module infinity_core:and_func.impl;
 
 import :and_func;
-import :stl;
 import :new_catalog;
 import :status;
 import :infinity_exception;
 import :scalar_function;
 import :scalar_function_set;
 
-import :third_party;
+import std;
+
 import logical_type;
 import internal_types;
 import data_type;
-import :logger;
 
 namespace infinity {
 
@@ -44,14 +39,13 @@ struct AndFunction {
                              std::is_same_v<std::remove_cv_t<TC>, BooleanT>) {
             result = left and right;
         } else {
-            String error_message = "AND function accepts only u8 and BooleanT.";
-            UnrecoverableError(error_message);
+            UnrecoverableError("AND function accepts only u8 and BooleanT.");
         }
     }
 };
 
-static void GenerateAndFunction(SharedPtr<ScalarFunctionSet> &function_set_ptr) {
-    String func_name = "AND";
+static void GenerateAndFunction(std::shared_ptr<ScalarFunctionSet> &function_set_ptr) {
+    std::string func_name = "AND";
     ScalarFunction and_function(func_name,
                                 {DataType(LogicalType::kBoolean), DataType(LogicalType::kBoolean)},
                                 {DataType(LogicalType::kBoolean)},
@@ -60,8 +54,8 @@ static void GenerateAndFunction(SharedPtr<ScalarFunctionSet> &function_set_ptr) 
 }
 
 void RegisterAndFunction(NewCatalog *catalog_ptr) {
-    String func_name = "AND";
-    SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
+    std::string func_name = "AND";
+    std::shared_ptr<ScalarFunctionSet> function_set_ptr = std::make_shared<ScalarFunctionSet>(func_name);
 
     GenerateAndFunction(function_set_ptr);
 

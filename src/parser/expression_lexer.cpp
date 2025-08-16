@@ -806,7 +806,7 @@ static const flex_int16_t yy_rule_linenum[29] =
 
 #include "expression_parser.h"
 #include "expression_parser_result.h"
-#include <sstream>
+import std;
 
 static thread_local std::stringstream string_buffer;
 

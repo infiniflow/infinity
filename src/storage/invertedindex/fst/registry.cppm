@@ -12,11 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:fst.registry;
 
-import :stl;
+import std;
+import std.compat;
 
 namespace infinity {
 
@@ -34,7 +33,7 @@ export template <typename Val>
 struct RegistryEntry {
     bool found_{false};
     union {
-        SizeT slot_; // valid iff found==false
+        size_t slot_; // valid iff found==false
         Val value_;  // valid iff found==true
     };
     RegistryEntry() = default;
@@ -43,16 +42,16 @@ struct RegistryEntry {
 export template <typename Key, typename Val>
 class Registry {
 private:
-    Vector<RegistryCell<Key, Val>> table_;
-    SizeT mask_;
+    std::vector<RegistryCell<Key, Val>> table_;
+    size_t mask_;
 
 public:
-    explicit Registry(SizeT table_size_shift) : mask_((1ULL << table_size_shift) - 1ULL) { table_.resize(1ULL << table_size_shift); }
+    explicit Registry(size_t table_size_shift) : mask_((1ULL << table_size_shift) - 1ULL) { table_.resize(1ULL << table_size_shift); }
 
     // Find the entry with the given key.
     RegistryEntry<Val> Find(const Key &key) {
         RegistryEntry<Val> ent;
-        SizeT slot = key.Hash() & mask_;
+        size_t slot = key.Hash() & mask_;
         if (table_[slot].key_ == key) {
             ent.found_ = true;
             ent.value_ = table_[slot].value_;
@@ -63,7 +62,7 @@ public:
     }
 
     // Insert the pair into the given slot. Assume key.Hash()==slot. The existing one at the given slot is discared silently.
-    void Insert(SizeT slot, Key &key, Val value) {
+    void Insert(size_t slot, Key &key, Val value) {
         table_[slot].key_ = std::move(key);
         table_[slot].value_ = value;
     }

@@ -4,8 +4,6 @@ module infinity_core:byte_slice_writer.impl;
 
 import :byte_slice_writer;
 
-import :logger;
-import :stl;
 import :byte_slice;
 import :file_writer;
 import :file_reader;
@@ -29,9 +27,9 @@ ByteSlice *ByteSliceWriter::CreateSlice(u32 size) {
     return slice;
 }
 
-SizeT ByteSliceWriter::GetSize() const { return SizeT(slice_list_->GetTotalSize()); }
+size_t ByteSliceWriter::GetSize() const { return size_t(slice_list_->GetTotalSize()); }
 
-void ByteSliceWriter::Dump(const SharedPtr<FileWriter> &file) {
+void ByteSliceWriter::Dump(const std::shared_ptr<FileWriter> &file) {
     ByteSlice *slice = slice_list_->GetHead();
     while (slice != nullptr) {
         file->Write((char *)(slice->data_), slice->size_);
@@ -39,7 +37,7 @@ void ByteSliceWriter::Dump(const SharedPtr<FileWriter> &file) {
     }
 }
 
-void ByteSliceWriter::Load(const SharedPtr<FileReader> &file, u32 size) {
+void ByteSliceWriter::Load(const std::shared_ptr<FileReader> &file, u32 size) {
     ByteSlice *slice = CreateSlice(size);
     file->Read((char *)slice->data_, size);
     slice_list_->Clear();
@@ -63,7 +61,7 @@ void ByteSliceWriter::Close() {
     }
 }
 
-void ByteSliceWriter::Write(const void *value, SizeT len) {
+void ByteSliceWriter::Write(const void *value, size_t len) {
     u32 left = (u32)len;
     u8 *data = (u8 *)(value);
     ByteSlice *slice = slice_list_->GetTail();
@@ -86,8 +84,7 @@ void ByteSliceWriter::Write(ByteSliceList &src) { slice_list_->MergeWith(src); }
 
 void ByteSliceWriter::Write(const ByteSliceList &src, u32 start, u32 end) {
     if (start >= end || end > src.GetTotalSize()) {
-        String error_message = "Write past EOF";
-        UnrecoverableError(error_message);
+        UnrecoverableError("Write past EOF");
     }
 
     ByteSlice *curr_slice = nullptr;

@@ -16,8 +16,9 @@ module;
 
 #include "simd_common_intrin_include.h"
 #include <cassert>
+
 export module infinity_core:batch_bm25_simd_funcs;
-import :stl;
+
 import :simd_common_tools;
 
 namespace infinity {

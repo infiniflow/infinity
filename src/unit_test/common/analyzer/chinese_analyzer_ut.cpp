@@ -13,20 +13,17 @@
 // limitations under the License.
 
 #ifdef CI
-#include "gtest/gtest.h"
-#include <filesystem>
+#include "unit_test/gtest_expand.h"
 import infinity_core;
 import base_test;
 #else
 module;
 
-#include "gtest/gtest.h"
-#include <filesystem>
+#include "unit_test/gtest_expand.h"
 
 module infinity_core:ut.chinese_analyzer;
 
 import :ut.base_test;
-import :stl;
 import :term;
 import :analyzer;
 import :chinese_analyzer;
@@ -60,7 +57,7 @@ TEST_F(ChineseAnalyzerTest, test1) {
 
     ChineseAnalyzer analyzer(ROOT_PATH.string());
     analyzer.Load();
-    Vector<String> queries = {
+    std::vector<std::string> queries = {
         R"#(graphic card)#",
         R"#(graphics card)#",
         R"#(南京市长江大桥)#",

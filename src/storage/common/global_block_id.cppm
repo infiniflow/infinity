@@ -12,11 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:global_block_id;
 
-import :stl;
+import :infinity_type;
+
+import std;
 
 namespace infinity {
 
@@ -31,8 +31,8 @@ export struct GlobalBlockID {
 
 export class GlobalBlockIDHash {
 public:
-    SizeT operator()(const GlobalBlockID &global_block_id) const {
-        return Hash<SegmentID>()(global_block_id.segment_id_) ^ Hash<BlockID>()(global_block_id.block_id_);
+    size_t operator()(const GlobalBlockID &global_block_id) const {
+        return std::hash<SegmentID>()(global_block_id.segment_id_) ^ std::hash<BlockID>()(global_block_id.block_id_);
     }
 };
 

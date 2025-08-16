@@ -1,15 +1,12 @@
-module;
-
 module infinity_core:byte_slice.impl;
 
-import :stl;
 import :byte_slice;
 
 namespace infinity {
 
-ByteSlice *ByteSlice::CreateSlice(SizeT data_size) {
+ByteSlice *ByteSlice::CreateSlice(size_t data_size) {
     u8 *mem;
-    SizeT mem_size = data_size + GetHeadSize();
+    size_t mem_size = data_size + GetHeadSize();
     mem = new u8[mem_size];
     ByteSlice *slice = new (mem) ByteSlice;
     slice->data_ = mem + GetHeadSize();
@@ -19,7 +16,7 @@ ByteSlice *ByteSlice::CreateSlice(SizeT data_size) {
     return slice;
 }
 
-ByteSlice *ByteSlice::NewSlice(u8 *data, SizeT data_size) {
+ByteSlice *ByteSlice::NewSlice(u8 *data, size_t data_size) {
     ByteSlice *slice = new ByteSlice;
     slice->data_ = data;
     slice->size_ = data_size;
@@ -78,7 +75,7 @@ void ByteSliceList::Clear() {
     total_size_ = 0;
 }
 
-SizeT ByteSliceList::UpdateTotalSize() {
+size_t ByteSliceList::UpdateTotalSize() {
     total_size_ = 0;
     ByteSlice *slice = head_;
     while (slice) {
@@ -109,13 +106,13 @@ ByteSliceListIterator::ByteSliceListIterator(const ByteSliceListIterator &other)
     : slice_list_(other.slice_list_), slice_(other.slice_), pos_in_slice_(other.pos_in_slice_), seeked_slice_size_(other.seeked_slice_size_),
       end_pos_(other.end_pos_) {}
 
-bool ByteSliceListIterator::SeekSlice(SizeT begin_pos) {
+bool ByteSliceListIterator::SeekSlice(size_t begin_pos) {
     if (begin_pos < seeked_slice_size_ + pos_in_slice_) {
         return false;
     }
 
     while (slice_) {
-        SizeT slice_end_pos = seeked_slice_size_ + slice_->size_;
+        size_t slice_end_pos = seeked_slice_size_ + slice_->size_;
         if (begin_pos >= seeked_slice_size_ && begin_pos < slice_end_pos) {
             pos_in_slice_ = begin_pos - seeked_slice_size_;
             return true;
@@ -128,19 +125,19 @@ bool ByteSliceListIterator::SeekSlice(SizeT begin_pos) {
     return false;
 }
 
-bool ByteSliceListIterator::HasNext(SizeT end_pos) {
+bool ByteSliceListIterator::HasNext(size_t end_pos) {
     if (slice_ == nullptr || end_pos > slice_list_->GetTotalSize()) {
         return false;
     }
 
     end_pos_ = end_pos;
-    SizeT cur_pos = seeked_slice_size_ + pos_in_slice_;
+    size_t cur_pos = seeked_slice_size_ + pos_in_slice_;
     return cur_pos < end_pos;
 }
 
-void ByteSliceListIterator::Next(void *&data, SizeT &size) {
-    SizeT cur_pos = seeked_slice_size_ + pos_in_slice_;
-    SizeT slice_end_pos = seeked_slice_size_ + slice_->size_;
+void ByteSliceListIterator::Next(void *&data, size_t &size) {
+    size_t cur_pos = seeked_slice_size_ + pos_in_slice_;
+    size_t slice_end_pos = seeked_slice_size_ + slice_->size_;
 
     data = slice_->data_ + pos_in_slice_;
     if (end_pos_ >= slice_end_pos) {

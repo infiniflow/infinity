@@ -13,20 +13,17 @@
 // limitations under the License.
 
 #ifdef CI
-#include "gtest/gtest.h"
-#include <thread>
+#include "unit_test/gtest_expand.h"
 import infinity_core;
 import base_test;
 #else
 module;
 
-#include "gtest/gtest.h"
-#include <thread>
+#include "unit_test/gtest_expand.h"
 
 module infinity_core:ut.test_hnsw;
 
 import :ut.base_test;
-import :stl;
 import :hnsw_alg;
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wunused-variable"
@@ -64,7 +61,7 @@ public:
         rng.seed(0);
         std::uniform_real_distribution<float> distrib_real;
 
-        auto data = MakeUnique<float[]>(dim * element_size);
+        auto data = std::make_unique<float[]>(dim * element_size);
         for (int i = 0; i < dim * element_size; ++i) {
             data[i] = distrib_real(rng);
         }
@@ -89,7 +86,7 @@ public:
             EXPECT_GE(correct_rate, 0.95);
         };
 
-        String filepath = save_dir_ + "/test_hnsw.bin";
+        std::string filepath = save_dir_ + "/test_hnsw.bin";
         {
             auto hnsw_index = Hnsw::Make(chunk_size, max_chunk_n, dim, M, ef_construction);
             auto iter = DenseVectorIter<float, LabelT>(data.get(), dim, element_size);
@@ -129,7 +126,7 @@ public:
         rng.seed(0);
         std::uniform_real_distribution<float> distrib_real;
 
-        auto data = MakeUnique<float[]>(dim * element_size);
+        auto data = std::make_unique<float[]>(dim * element_size);
         for (int i = 0; i < dim * element_size; ++i) {
             data[i] = distrib_real(rng);
         }
@@ -151,7 +148,7 @@ public:
             EXPECT_GE(correct_rate, 0.95);
         };
 
-        String filepath = save_dir_ + "/test_hnsw.bin";
+        std::string filepath = save_dir_ + "/test_hnsw.bin";
         {
             auto hnsw_index = Hnsw::Make(chunk_size, max_chunk_n, dim, M, ef_construction);
             auto iter = DenseVectorIter<float, LabelT>(data.get(), dim, element_size);
@@ -164,7 +161,7 @@ public:
             hnsw_index->SaveToPtr(*file_handle);
         }
         {
-            SizeT file_size = VirtualStore::GetFileSize(filepath);
+            size_t file_size = VirtualStore::GetFileSize(filepath);
 #define USE_MMAP
 #ifdef USE_MMAP
             unsigned char *data_ptr = nullptr;
@@ -178,7 +175,7 @@ public:
             if (!status.ok()) {
                 UnrecoverableError(status.message());
             }
-            auto buffer = MakeUnique<char[]>(file_size);
+            auto buffer = std::make_unique<char[]>(file_size);
             file_handle->Read(buffer.get(), file_size);
             const char *ptr = buffer.get();
 #endif
@@ -191,7 +188,7 @@ public:
 #endif
         }
         {
-            SizeT file_size = VirtualStore::GetFileSize(filepath);
+            size_t file_size = VirtualStore::GetFileSize(filepath);
             auto [file_handle, status] = VirtualStore::Open(filepath, FileAccessMode::kRead);
             auto hnsw_index = Hnsw::LoadFromPtr(*file_handle, file_size);
 
@@ -212,7 +209,7 @@ public:
         rng.seed(0);
         std::uniform_real_distribution<float> distrib_real;
 
-        auto data = MakeUnique<float[]>(dim * element_size);
+        auto data = std::make_unique<float[]>(dim * element_size);
         for (int i = 0; i < dim * element_size; ++i) {
             data[i] = distrib_real(rng);
         }
@@ -283,7 +280,7 @@ public:
         rng.seed(0);
         std::uniform_real_distribution<float> distrib_real;
 
-        auto data = MakeUnique<float[]>(dim * element_size);
+        auto data = std::make_unique<float[]>(dim * element_size);
         for (int i = 0; i < dim * element_size; ++i) {
             data[i] = distrib_real(rng);
         }

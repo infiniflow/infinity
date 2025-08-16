@@ -1,17 +1,14 @@
-module;
-
 module infinity_core:skiplist_reader.impl;
 
 import :skiplist_reader;
-
-import :stl;
 import :byte_slice;
 import :status;
 import :posting_field;
 import :flush_info;
 import :infinity_exception;
 import :logger;
-import :third_party;
+
+import third_party;
 
 namespace infinity {
 
@@ -89,12 +86,10 @@ u32 SkipListReader::GetLastKeyInBuffer() const {
 
 void SkipListReaderByteSlice::Load(const ByteSliceList *byte_slice_list, u32 start, u32 end) {
     if (start > byte_slice_list->GetTotalSize()) {
-        String error_message = "start > byte_slice_list->GetTotalSize().";
-        UnrecoverableError(error_message);
+        UnrecoverableError("start > byte_slice_list->GetTotalSize().");
     }
     if (end > byte_slice_list->GetTotalSize()) {
-        String error_message = "end > byte_slice_list->GetTotalSize().";
-        UnrecoverableError(error_message);
+        UnrecoverableError("end > byte_slice_list->GetTotalSize().");
     }
     start_ = start;
     end_ = end;
@@ -104,12 +99,10 @@ void SkipListReaderByteSlice::Load(const ByteSliceList *byte_slice_list, u32 sta
 
 void SkipListReaderByteSlice::Load(ByteSlice *byte_slice, u32 start, u32 end) {
     if (start > byte_slice->size_) {
-        String error_message = "start > byte_slice->size_.";
-        UnrecoverableError(error_message);
+        UnrecoverableError("start > byte_slice->size_.");
     }
     if (end > byte_slice->size_) {
-        String error_message = "end > byte_slice->size_.";
-        UnrecoverableError(error_message);
+        UnrecoverableError("end > byte_slice->size_.");
     }
 
     start_ = start;
@@ -118,7 +111,7 @@ void SkipListReaderByteSlice::Load(ByteSlice *byte_slice, u32 start, u32 end) {
     byte_slice_reader_.Seek(start);
 }
 
-Pair<int, bool> SkipListReaderByteSlice::LoadBuffer() {
+std::pair<int, bool> SkipListReaderByteSlice::LoadBuffer() {
     u32 end = byte_slice_reader_.Tell();
     if (end < end_) {
         const Int32Encoder *doc_id_encoder = GetSkipListEncoder();
@@ -127,43 +120,38 @@ Pair<int, bool> SkipListReaderByteSlice::LoadBuffer() {
             const Int32Encoder *tf_encoder = GetSkipListEncoder();
             u32 ttf_num = tf_encoder->Decode(ttf_buffer_.get(), SKIP_LIST_BUFFER_SIZE, byte_slice_reader_);
             if (ttf_num != doc_num) {
-                String error_message = fmt::format("SKipList decode error, doc_num = {} ttf_num = {}", doc_num, ttf_num);
-                UnrecoverableError(error_message);
+                UnrecoverableError(fmt::format("SKipList decode error, doc_num = {} ttf_num = {}", doc_num, ttf_num));
 
-                return MakePair(-1, false);
+                return std::make_pair(-1, false);
             }
         }
         if (has_block_max_) {
             const Int32Encoder *block_max_tf_encoder = GetSkipListEncoder();
             u32 block_max_tf_num = block_max_tf_encoder->Decode(block_max_tf_buffer_.get(), SKIP_LIST_BUFFER_SIZE, byte_slice_reader_);
             if (block_max_tf_num != doc_num) {
-                String error_message = fmt::format("SKipList decode error, doc_num = {} block_max_tf_num = {}", doc_num, block_max_tf_num);
-                UnrecoverableError(error_message);
-                return MakePair(-1, false);
+                UnrecoverableError(fmt::format("SKipList decode error, doc_num = {} block_max_tf_num = {}", doc_num, block_max_tf_num));
+                return std::make_pair(-1, false);
             }
             const Int16Encoder *tf_percentage_encoder = GetTermPercentageEncoder();
             u32 tf_percentage_num = tf_percentage_encoder->Decode(block_max_tf_percentage_buffer_.get(), SKIP_LIST_BUFFER_SIZE, byte_slice_reader_);
             if (tf_percentage_num != doc_num) {
-                String error_message =
-                    fmt::format("SKipList decode error, doc_num = {} block_max_tf_percentage_num = {}", doc_num, tf_percentage_num);
-                UnrecoverableError(error_message);
-                return MakePair(-1, false);
+                UnrecoverableError(fmt::format("SKipList decode error, doc_num = {} block_max_tf_percentage_num = {}", doc_num, tf_percentage_num));
+                return std::make_pair(-1, false);
             }
         }
         {
             const Int32Encoder *offset_encoder = GetSkipListEncoder();
             u32 len_num = offset_encoder->Decode(static_cast<u32 *>(offset_buffer_), SKIP_LIST_BUFFER_SIZE, byte_slice_reader_);
             if (len_num != doc_num) {
-                String error_message = fmt::format("SKipList decode error, doc_num = {} offset_num = {}", doc_num, len_num);
-                UnrecoverableError(error_message);
-                return MakePair(-1, false);
+                UnrecoverableError(fmt::format("SKipList decode error, doc_num = {} offset_num = {}", doc_num, len_num));
+                return std::make_pair(-1, false);
             }
         }
         num_in_buffer_ = doc_num;
         current_cursor_ = 0;
-        return MakePair(0, true);
+        return std::make_pair(0, true);
     }
-    return MakePair(0, false);
+    return std::make_pair(0, false);
 }
 
 SkipListReaderPostingByteSlice::~SkipListReaderPostingByteSlice() {
@@ -179,70 +167,66 @@ void SkipListReaderPostingByteSlice::Load(const PostingByteSlice *posting_buffer
     skiplist_reader_.Open(skiplist_buffer_);
 }
 
-Pair<int, bool> SkipListReaderPostingByteSlice::LoadBuffer() {
-    SizeT flush_count = skiplist_buffer_->GetTotalCount();
+std::pair<int, bool> SkipListReaderPostingByteSlice::LoadBuffer() {
+    size_t flush_count = skiplist_buffer_->GetTotalCount();
     FlushInfo flush_info = skiplist_buffer_->GetFlushInfo();
 
-    SizeT decode_count = SKIP_LIST_BUFFER_SIZE;
+    size_t decode_count = SKIP_LIST_BUFFER_SIZE;
     if (flush_info.IsValidPostingBuffer() == false) {
         decode_count = flush_count;
     }
     if (decode_count == 0) {
-        return MakePair(0, false);
+        return std::make_pair(0, false);
     }
 
-    SizeT doc_num = 0;
+    size_t doc_num = 0;
     if (!skiplist_reader_.Decode(doc_id_buffer_, decode_count, doc_num)) {
-        return MakePair(0, false);
+        return std::make_pair(0, false);
     }
 
     if (has_tf_list_) {
-        SizeT ttf_num = 0;
+        size_t ttf_num = 0;
         if (!skiplist_reader_.Decode(ttf_buffer_.get(), decode_count, ttf_num)) {
-            return MakePair(0, false);
+            return std::make_pair(0, false);
         }
         if (doc_num != ttf_num) {
-            String error_message = fmt::format("SKipList decode error, doc_num = {} ttf_num = {}", doc_num, ttf_num);
-            UnrecoverableError(error_message);
-            return MakePair(-1, false);
+            UnrecoverableError(fmt::format("SKipList decode error, doc_num = {} ttf_num = {}", doc_num, ttf_num));
+            return std::make_pair(-1, false);
         }
     }
 
     if (has_block_max_) {
-        SizeT block_max_tf_num = 0;
+        size_t block_max_tf_num = 0;
         if (!skiplist_reader_.Decode(block_max_tf_buffer_.get(), decode_count, block_max_tf_num)) {
-            return MakePair(0, false);
+            return std::make_pair(0, false);
         }
         if (doc_num != block_max_tf_num) {
-            String error_message = fmt::format("SKipList decode error, doc_num = {} block_max_tf_num = {}", doc_num, block_max_tf_num);
-            UnrecoverableError(error_message);
-            return MakePair(-1, false);
+            UnrecoverableError(fmt::format("SKipList decode error, doc_num = {} block_max_tf_num = {}", doc_num, block_max_tf_num));
+            return std::make_pair(-1, false);
         }
 
-        SizeT tf_percentage_num = 0;
+        size_t tf_percentage_num = 0;
         if (!skiplist_reader_.Decode(block_max_tf_percentage_buffer_.get(), decode_count, tf_percentage_num)) {
-            return MakePair(0, false);
+            return std::make_pair(0, false);
         }
         if (doc_num != tf_percentage_num) {
-            String error_message = fmt::format("SKipList decode error, doc_num = {} block_max_tf_percentage_num = {}", doc_num, tf_percentage_num);
-            UnrecoverableError(error_message);
-            return MakePair(-1, false);
+            UnrecoverableError(fmt::format("SKipList decode error, doc_num = {} block_max_tf_percentage_num = {}", doc_num, tf_percentage_num));
+            return std::make_pair(-1, false);
         }
     }
 
-    SizeT len_num = 0;
+    size_t len_num = 0;
     if (!skiplist_reader_.Decode(offset_buffer_, decode_count, len_num)) {
-        return MakePair(0, false);
+        return std::make_pair(0, false);
     }
     if (doc_num != len_num) {
-        String error_message = fmt::format("SKipList decode error, doc_num = {} len_num = {}", doc_num, len_num);
-        UnrecoverableError(error_message);
-        return MakePair(-1, false);
+        UnrecoverableError(fmt::format("SKipList decode error, doc_num = {} len_num = {}", doc_num, len_num));
+        return std::make_pair(-1, false);
     }
 
     num_in_buffer_ = doc_num;
     current_cursor_ = 0;
-    return MakePair(0, true);
+    return std::make_pair(0, true);
 }
 
 } // namespace infinity

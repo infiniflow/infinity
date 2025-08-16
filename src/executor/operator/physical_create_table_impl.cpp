@@ -12,13 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:physical_create_table.impl;
 
 import :physical_create_table;
-
-import :stl;
 import :query_context;
 import :table_def;
 import :data_table;
@@ -26,34 +22,35 @@ import :physical_operator_type;
 import :operator_state;
 import :status;
 import :load_meta;
-import extra_ddl_info;
 import :wal_manager;
 import :infinity_context;
 import :new_txn;
+
 import data_type;
+import extra_ddl_info;
 
 namespace infinity {
 
-PhysicalCreateTable::PhysicalCreateTable(SharedPtr<String> schema_name,
-                                         SharedPtr<TableDef> table_def_ptr,
-                                         SharedPtr<Vector<String>> output_names,
-                                         SharedPtr<Vector<SharedPtr<DataType>>> output_types,
+PhysicalCreateTable::PhysicalCreateTable(std::shared_ptr<std::string> schema_name,
+                                         std::shared_ptr<TableDef> table_def_ptr,
+                                         std::shared_ptr<std::vector<std::string>> output_names,
+                                         std::shared_ptr<std::vector<std::shared_ptr<DataType>>> output_types,
                                          ConflictType conflict_type,
                                          u64 table_index,
                                          u64 id,
-                                         SharedPtr<Vector<LoadMeta>> load_metas)
+                                         std::shared_ptr<std::vector<LoadMeta>> load_metas)
     : PhysicalOperator(PhysicalOperatorType::kCreateTable, nullptr, nullptr, id, load_metas), table_def_ptr_(std::move(table_def_ptr)),
       schema_name_(std::move(schema_name)), table_index_(table_index), conflict_type_(conflict_type), output_names_(std::move(output_names)),
       output_types_(std::move(output_types)) {}
 
-PhysicalCreateTable::PhysicalCreateTable(SharedPtr<String> schema_name,
-                                         UniquePtr<PhysicalOperator> input,
-                                         SharedPtr<Vector<String>> output_names,
-                                         SharedPtr<Vector<SharedPtr<DataType>>> output_types,
+PhysicalCreateTable::PhysicalCreateTable(std::shared_ptr<std::string> schema_name,
+                                         std::unique_ptr<PhysicalOperator> input,
+                                         std::shared_ptr<std::vector<std::string>> output_names,
+                                         std::shared_ptr<std::vector<std::shared_ptr<DataType>>> output_types,
                                          ConflictType conflict_type,
                                          u64 table_index,
                                          u64 id,
-                                         SharedPtr<Vector<LoadMeta>> load_metas)
+                                         std::shared_ptr<std::vector<LoadMeta>> load_metas)
     : PhysicalOperator(PhysicalOperatorType::kCreateTable, std::move(input), nullptr, id, load_metas), schema_name_(std::move(schema_name)),
       table_index_(table_index), conflict_type_(conflict_type), output_names_(std::move(output_names)), output_types_(std::move(output_types)) {}
 

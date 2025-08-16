@@ -12,11 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:variables;
 
-import :stl;
+import std;
 
 namespace infinity {
 
@@ -62,12 +60,12 @@ export enum class SessionVariable {
 };
 
 export struct VarUtil {
-    static HashMap<String, GlobalVariable> global_name_map_;
-    static HashMap<String, SessionVariable> session_name_map_;
+    static std::unordered_map<std::string, GlobalVariable> global_name_map_;
+    static std::unordered_map<std::string, SessionVariable> session_name_map_;
 
     static void InitVariablesMap();
-    static GlobalVariable GetGlobalVarByName(const String &variable_name);
-    static SessionVariable GetSessionVarByName(const String &variable_name);
+    static GlobalVariable GetGlobalVarByName(const std::string &variable_name);
+    static SessionVariable GetSessionVarByName(const std::string &variable_name);
 };
 
 } // namespace infinity

@@ -1,8 +1,5 @@
-module;
-
 export module infinity_core:vbyte_compress_encoder;
 
-import :stl;
 import :byte_slice_reader;
 import :byte_slice_writer;
 

@@ -12,11 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:buffer_obj;
 
-import :stl;
 import :file_worker;
 import :buffer_handle;
 import :file_worker_type;
@@ -45,14 +42,14 @@ export enum class BufferType {
 };
 
 export struct BufferObjectInfo {
-    String object_path_{};
+    std::string object_path_{};
     BufferStatus buffered_status_{BufferStatus::kNew};
     BufferType buffered_type_{BufferType::kTemp};
     FileWorkerType file_type_{FileWorkerType::kInvalid};
-    SizeT object_size_{};
+    size_t object_size_{};
 };
 
-export String BufferStatusToString(BufferStatus status) {
+export std::string BufferStatusToString(BufferStatus status) {
     switch (status) {
         case BufferStatus::kLoaded:
             return "Loaded";
@@ -67,7 +64,7 @@ export String BufferStatusToString(BufferStatus status) {
     }
 }
 
-export String BufferTypeToString(BufferType buffer_type) {
+export std::string BufferTypeToString(BufferType buffer_type) {
     switch (buffer_type) {
         case BufferType::kPersistent:
             return "Persistent";
@@ -85,14 +82,14 @@ export String BufferTypeToString(BufferType buffer_type) {
 export class BufferObj {
 public:
     // called by BufferMgr::Get or BufferMgr::Allocate
-    explicit BufferObj(BufferManager *buffer_mgr, bool is_ephemeral, UniquePtr<FileWorker> file_worker, u32 id);
+    explicit BufferObj(BufferManager *buffer_mgr, bool is_ephemeral, std::unique_ptr<FileWorker> file_worker, u32 id);
 
     virtual ~BufferObj();
 
     BufferObj(const BufferObj &) = delete;
     BufferObj &operator=(const BufferObj &) = delete;
 
-    void UpdateFileWorkerInfo(UniquePtr<FileWorker> file_worker);
+    void UpdateFileWorkerInfo(std::unique_ptr<FileWorker> file_worker);
 
 public:
     // called by ObjectHandle when load first time for that ObjectHandle
@@ -112,9 +109,9 @@ public:
 
     void ToMmap();
 
-    SizeT GetBufferSize() const { return file_worker_->GetMemoryCost(); }
+    size_t GetBufferSize() const { return file_worker_->GetMemoryCost(); }
 
-    String GetFilename() const { return file_worker_->GetFilePath(); }
+    std::string GetFilename() const { return file_worker_->GetFilePath(); }
 
     const FileWorker *file_worker() const { return file_worker_.get(); }
 
@@ -134,7 +131,7 @@ private:
 
     friend class VarBuffer;
 
-    bool AddBufferSize(SizeT add_size);
+    bool AddBufferSize(size_t add_size);
 
 public:
     // interface for unit test
@@ -154,7 +151,7 @@ public:
     void CheckState() const;
 
     void SetData(void *data);
-    void SetDataSize(SizeT size);
+    void SetDataSize(size_t size);
 
 protected:
     mutable std::mutex w_locker_{};
@@ -164,7 +161,7 @@ protected:
     BufferStatus status_{BufferStatus::kNew};
     BufferType type_{BufferType::kTemp};
     u64 rc_{0};
-    UniquePtr<FileWorker> file_worker_;
+    std::unique_ptr<FileWorker> file_worker_;
 
 private:
     u32 id_;

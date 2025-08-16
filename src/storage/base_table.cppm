@@ -12,12 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:base_table;
 
-import :stl;
 import :infinity_exception;
+
 import global_resource_usage;
 
 namespace infinity {
@@ -28,7 +26,7 @@ enum class BaseTableType {
     kCollection,
 };
 
-inline String ToString(BaseTableType type) {
+inline std::string ToString(BaseTableType type) {
     switch (type) {
         case BaseTableType::kTable: {
             return "Table";
@@ -37,17 +35,16 @@ inline String ToString(BaseTableType type) {
             return "Collection";
         }
         default: {
-            String error_message = "Invalid base table type";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Invalid base table type");
         }
     }
 
-    return String();
+    return std::string();
 }
 
 export class BaseTable {
 public:
-    explicit BaseTable(SharedPtr<String> schema_name, SharedPtr<String> table_name)
+    explicit BaseTable(std::shared_ptr<std::string> schema_name, std::shared_ptr<std::string> table_name)
         : schema_name_(std::move(schema_name)), table_name_(std::move(table_name)) {
 #ifdef INFINITY_DEBUG
         GlobalResourceUsage::IncrObjectCount("BaseTable");
@@ -63,12 +60,12 @@ public:
 #endif
     }
 
-    [[nodiscard]] inline const SharedPtr<String> &schema_name() const { return schema_name_; }
+    [[nodiscard]] inline const std::shared_ptr<std::string> &schema_name() const { return schema_name_; }
 
-    [[nodiscard]] inline const SharedPtr<String> &table_name() const { return table_name_; }
+    [[nodiscard]] inline const std::shared_ptr<std::string> &table_name() const { return table_name_; }
 
-    const SharedPtr<String> schema_name_{};
-    const SharedPtr<String> table_name_{};
+    const std::shared_ptr<std::string> schema_name_{};
+    const std::shared_ptr<std::string> table_name_{};
 };
 
 } // namespace infinity

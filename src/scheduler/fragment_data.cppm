@@ -12,11 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:fragment_data;
 
-import :stl;
 import :data_block;
 import :status;
 
@@ -38,29 +35,29 @@ export struct FragmentDataBase {
 };
 
 export struct FragmentError : public FragmentDataBase {
-    //    UniquePtr<String> error_message_{};
+    //    std::unique_ptr<std::string> error_message_{};
     Status status_{};
 
     FragmentError(u64 fragment_id, Status status) : FragmentDataBase(FragmentDataType::kError, fragment_id), status_(std::move(status)) {}
 };
 
 export struct FragmentData : public FragmentDataBase {
-    UniquePtr<DataBlock> data_block_{};
+    std::unique_ptr<DataBlock> data_block_{};
     i64 task_id_{-1};
-    Optional<SizeT> data_idx_{};
-    SizeT data_count_{std::numeric_limits<u64>::max()};
+    std::optional<size_t> data_idx_{};
+    size_t data_count_{std::numeric_limits<u64>::max()};
     bool is_last_{false};
     bool total_hits_count_flag_{false};
-    SizeT total_hits_count_{};
+    size_t total_hits_count_{};
 
     FragmentData(u64 fragment_id,
-                 UniquePtr<DataBlock> data_block,
+                 std::unique_ptr<DataBlock> data_block,
                  i64 task_id,
-                 SizeT data_idx,
-                 SizeT data_count,
+                 size_t data_idx,
+                 size_t data_count,
                  bool is_last,
                  bool total_hits_count_flag,
-                 SizeT total_hits_count)
+                 size_t total_hits_count)
         : FragmentDataBase(FragmentDataType::kData, fragment_id), data_block_(std::move(data_block)), task_id_(task_id), data_idx_(data_idx),
           data_count_(data_count), is_last_(is_last), total_hits_count_flag_(total_hits_count_flag), total_hits_count_(total_hits_count) {}
 

@@ -12,28 +12,24 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
-#include <exception>
-#include <string>
-
 module infinity_core:peer_thrift_client.impl;
 
 import :peer_thrift_client;
-import :stl;
-import :third_party;
-import :logger;
 import :peer_server_thrift_types;
 import :status;
-import :thrift;
 import :infinity_exception;
 import :peer_task;
 import :infinity_context;
 import :cluster_manager;
-import admin_statement;
 import :node_info;
 import :config;
+import :utility;
+
+import std;
+import third_party;
+
 import global_resource_usage;
+import admin_statement;
 
 namespace infinity {
 
@@ -49,7 +45,7 @@ Status PeerClient::Init() {
 
     Status status = Reconnect();
     if (status.ok()) {
-        processor_thread_ = MakeShared<Thread>([this] { this->Process(); });
+        processor_thread_ = std::make_shared<std::thread>([this] { this->Process(); });
     }
 
     return status;
@@ -60,7 +56,7 @@ Status PeerClient::UnInit(bool sync) {
     LOG_INFO(fmt::format("Peer client: {} is stopping.", from_node_name_));
 
     if (processor_thread_.get() != nullptr) {
-        SharedPtr<TerminatePeerTask> terminate_task = MakeShared<TerminatePeerTask>(!sync);
+        std::shared_ptr<TerminatePeerTask> terminate_task = std::make_shared<TerminatePeerTask>(!sync);
         peer_task_queue_.Enqueue(terminate_task);
         terminate_task->Wait();
         if (sync) {
@@ -84,9 +80,9 @@ Status PeerClient::Reconnect() {
     try {
         Config *config_ptr = InfinityContext::instance().config();
 
-        socket_ = MakeShared<TSocket>(ip_address_, port_);
+        socket_ = std::make_shared<apache::thrift::transport::TSocket>(ip_address_, port_);
 
-        TSocket *socket = static_cast<TSocket *>(socket_.get());
+        auto *socket = static_cast<apache::thrift::transport::TSocket *>(socket_.get());
         if (i64 timeout = config_ptr->PeerConnectTimeout(); timeout > 0) {
             socket->setConnTimeout(timeout);
         }
@@ -96,9 +92,9 @@ Status PeerClient::Reconnect() {
         if (i64 timeout = config_ptr->PeerSendTimeout(); timeout > 0) {
             socket->setSendTimeout(timeout);
         }
-        transport_ = MakeShared<TBufferedTransport>(socket_);
-        protocol_ = MakeShared<TBinaryProtocol>(transport_);
-        client_ = MakeUnique<PeerServiceClient>(protocol_);
+        transport_ = std::make_shared<apache::thrift::transport::TBufferedTransport>(socket_);
+        protocol_ = std::make_shared<apache::thrift::protocol::TBinaryProtocol>(transport_);
+        client_ = std::make_unique<PeerServiceClient>(protocol_);
         transport_->open();
         server_connected_ = true;
     } catch (const std::exception &e) {
@@ -126,7 +122,7 @@ Status PeerClient::Disconnect() {
     return status;
 }
 
-void PeerClient::Send(SharedPtr<PeerTask> peer_task) {
+void PeerClient::Send(std::shared_ptr<PeerTask> peer_task) {
     if (peer_task->Type() == PeerTaskType::kTerminate) {
         UnrecoverableError("Terminate the background processor");
     }
@@ -135,7 +131,7 @@ void PeerClient::Send(SharedPtr<PeerTask> peer_task) {
 }
 
 void PeerClient::Process() {
-    Deque<SharedPtr<PeerTask>> peer_tasks;
+    std::deque<std::shared_ptr<PeerTask>> peer_tasks;
     bool running = true;
     while (running) {
         peer_task_queue_.DequeueBulk(peer_tasks);
@@ -148,19 +144,19 @@ void PeerClient::Process() {
                 }
                 case PeerTaskType::kRegister: {
                     LOG_TRACE(peer_task->ToString());
-                    RegisterPeerTask *register_peer_task = static_cast<RegisterPeerTask *>(peer_task.get());
+                    auto *register_peer_task = static_cast<RegisterPeerTask *>(peer_task.get());
                     Register(register_peer_task);
                     break;
                 }
                 case PeerTaskType::kUnregister: {
                     LOG_TRACE(peer_task->ToString());
-                    UnregisterPeerTask *unregister_peer_task = static_cast<UnregisterPeerTask *>(peer_task.get());
+                    auto *unregister_peer_task = static_cast<UnregisterPeerTask *>(peer_task.get());
                     Unregister(unregister_peer_task);
                     break;
                 }
                 case PeerTaskType::kHeartBeat: {
                     LOG_TRACE(peer_task->ToString());
-                    HeartBeatPeerTask *heartbeat_peer_task = static_cast<HeartBeatPeerTask *>(peer_task.get());
+                    auto *heartbeat_peer_task = static_cast<HeartBeatPeerTask *>(peer_task.get());
                     HeartBeat(heartbeat_peer_task);
                     break;
                 }
@@ -172,13 +168,12 @@ void PeerClient::Process() {
                 }
                 case PeerTaskType::kChangeRole: {
                     LOG_TRACE(peer_task->ToString());
-                    ChangeRoleTask *change_role_task = static_cast<ChangeRoleTask *>(peer_task.get());
+                    auto *change_role_task = static_cast<ChangeRoleTask *>(peer_task.get());
                     ChangeRole(change_role_task);
                     break;
                 }
                 default: {
-                    String error_message = fmt::format("Invalid peer task type");
-                    UnrecoverableError(error_message);
+                    UnrecoverableError(fmt::format("Invalid peer task type"));
                     break;
                 }
             }
@@ -195,13 +190,13 @@ void PeerClient::Call(std::function<void()> call_func) {
     Config *config_ptr = InfinityContext::instance().config();
     i64 retry_num = config_ptr->PeerRetryCount();
     i64 retry_delay = config_ptr->PeerRetryDelay();
-    Optional<apache::thrift::transport::TTransportException> exception;
+    std::optional<apache::thrift::transport::TTransportException> exception;
     for (i64 retry_count = 0; retry_count <= retry_num; ++retry_count) {
         try {
             call_func();
             exception.reset();
             break;
-        } catch (apache::thrift::transport::TTransportException e) {
+        } catch (const apache::thrift::transport::TTransportException &e) {
             LOG_ERROR(fmt::format("Error in data transfer in peer: {}. Retry({})", e.what(), retry_count));
             exception = std::move(e);
         }
@@ -228,8 +223,7 @@ void PeerClient::Register(RegisterPeerTask *peer_task) {
             break;
         }
         default: {
-            String error_message = fmt::format("Only follower and learner can send register message to leader");
-            UnrecoverableError(error_message);
+            UnrecoverableError(fmt::format("Only follower and learner can send register message to leader"));
         }
     }
     request.node_ip = peer_task->node_ip_;
@@ -248,14 +242,13 @@ void PeerClient::Register(RegisterPeerTask *peer_task) {
     } catch (apache::thrift::transport::TTransportException &thrift_exception) {
         server_connected_ = false;
         switch (thrift_exception.getType()) {
-            case TTransportExceptionType::END_OF_FILE: {
+            case apache::thrift::transport::TTransportException::TTransportExceptionType::END_OF_FILE: {
                 peer_task->error_message_ = thrift_exception.what();
                 peer_task->error_code_ = static_cast<i64>(ErrorCode::kCantConnectLeader);
                 return;
             }
             default: {
-                String error_message = "Register to the leader";
-                UnrecoverableError(error_message);
+                UnrecoverableError("Register to the leader");
             }
         }
     }
@@ -282,17 +275,16 @@ void PeerClient::Unregister(UnregisterPeerTask *peer_task) {
 #else
         client_->Unregister(response, request);
 #endif
-    } catch (apache::thrift::transport::TTransportException &thrift_exception) {
+    } catch (const apache::thrift::transport::TTransportException &thrift_exception) {
         server_connected_ = false;
         switch (thrift_exception.getType()) {
-            case TTransportExceptionType::END_OF_FILE: {
+            case apache::thrift::transport::TTransportException::TTransportExceptionType::END_OF_FILE: {
                 peer_task->error_message_ = thrift_exception.what();
                 peer_task->error_code_ = static_cast<i64>(ErrorCode::kCantConnectLeader);
                 return;
             }
             default: {
-                String error_message = "Unregister from the leader";
-                UnrecoverableError(error_message);
+                UnrecoverableError("Unregister from the leader");
             }
         }
     }
@@ -318,8 +310,7 @@ void PeerClient::HeartBeat(HeartBeatPeerTask *peer_task) {
             break;
         }
         default: {
-            String error_message = fmt::format("Only follower and learner can send register message to leader");
-            UnrecoverableError(error_message);
+            UnrecoverableError(fmt::format("Only follower and learner can send register message to leader"));
         }
     }
     request.node_ip = peer_task->node_ip_;
@@ -332,22 +323,21 @@ void PeerClient::HeartBeat(HeartBeatPeerTask *peer_task) {
 #else
         client_->HeartBeat(response, request);
 #endif
-    } catch (apache::thrift::transport::TTransportException &thrift_exception) {
+    } catch (const apache::thrift::transport::TTransportException &thrift_exception) {
         server_connected_ = false;
         switch (thrift_exception.getType()) {
-            case TTransportExceptionType::END_OF_FILE: {
+            case apache::thrift::transport::TTransportException::TTransportExceptionType::END_OF_FILE: {
                 peer_task->error_message_ = thrift_exception.what();
                 peer_task->error_code_ = static_cast<i64>(ErrorCode::kCantConnectLeader);
                 return;
             }
-            case TTransportExceptionType::NOT_OPEN: {
+            case apache::thrift::transport::TTransportException::TTransportExceptionType::NOT_OPEN: {
                 peer_task->error_message_ = thrift_exception.what();
                 peer_task->error_code_ = static_cast<i64>(ErrorCode::kCantConnectLeader);
                 return;
             }
             default: {
-                String error_message = "Heartbeat: error happens when data transfer to leader";
-                UnrecoverableError(error_message);
+                UnrecoverableError("Heartbeat: error happens when data transfer to leader");
             }
         }
     }
@@ -379,15 +369,14 @@ void PeerClient::HeartBeat(HeartBeatPeerTask *peer_task) {
                 break;
             }
             default: {
-                String error_message = "Invalid sender status";
-                UnrecoverableError(error_message);
+                UnrecoverableError("Invalid sender status");
             }
         }
 
         peer_task->leader_term_ = response.leader_term;
-        SizeT node_count = response.other_nodes.size();
+        size_t node_count = response.other_nodes.size();
         peer_task->other_nodes_.reserve(node_count);
-        for (SizeT idx = 0; idx < node_count; ++idx) {
+        for (size_t idx = 0; idx < node_count; ++idx) {
 
             auto &other_node = response.other_nodes[idx];
             if (from_node_name_ == other_node.node_name) {
@@ -408,8 +397,7 @@ void PeerClient::HeartBeat(HeartBeatPeerTask *peer_task) {
                     break;
                 }
                 default: {
-                    String error_message = "Invalid role type";
-                    UnrecoverableError(error_message);
+                    UnrecoverableError("Invalid role type");
                 }
             }
 
@@ -424,19 +412,18 @@ void PeerClient::HeartBeat(HeartBeatPeerTask *peer_task) {
                     break;
                 }
                 default: {
-                    String error_message = "Invalid node status";
-                    UnrecoverableError(error_message);
+                    UnrecoverableError("Invalid node status");
                 }
             }
 
-            SharedPtr<NodeInfo> node_info = MakeShared<NodeInfo>(node_role,
-                                                                 node_status,
-                                                                 other_node.node_name,
-                                                                 other_node.node_ip,
-                                                                 other_node.node_port,
-                                                                 other_node.txn_timestamp,
-                                                                 0,
-                                                                 other_node.hb_count);
+            std::shared_ptr<NodeInfo> node_info = std::make_shared<NodeInfo>(node_role,
+                                                                             node_status,
+                                                                             other_node.node_name,
+                                                                             other_node.node_ip,
+                                                                             other_node.node_port,
+                                                                             other_node.txn_timestamp,
+                                                                             0,
+                                                                             other_node.hb_count);
             peer_task->other_nodes_.emplace_back(node_info);
         }
     }
@@ -446,10 +433,10 @@ void PeerClient::SyncLogs(SyncLogTask *peer_task) {
     SyncLogRequest request;
     SyncLogResponse response;
     request.node_name = peer_task->node_name_;
-    SizeT log_count = peer_task->log_strings_.size();
+    size_t log_count = peer_task->log_strings_.size();
     request.log_entries.reserve(log_count);
     request.on_startup = peer_task->on_register_;
-    for (SizeT i = 0; i < log_count; ++i) {
+    for (size_t i = 0; i < log_count; ++i) {
         request.log_entries.emplace_back(*peer_task->log_strings_[i]);
     }
 
@@ -469,16 +456,16 @@ void PeerClient::SyncLogs(SyncLogTask *peer_task) {
         peer_task->error_message_ = fmt::format("Sync log to node, transport error: {}, error: {}", peer_task->node_name_, thrift_exception.what());
         peer_task->error_code_ = static_cast<i64>(ErrorCode::kCantConnectServer);
         LOG_ERROR(peer_task->error_message_);
-        Status status = InfinityContext::instance().cluster_manager()->UpdateNodeByLeader(peer_task->node_name_, UpdateNodeOp::kLostConnection);
-        if (!status.ok()) {
+        if (auto status = InfinityContext::instance().cluster_manager()->UpdateNodeByLeader(peer_task->node_name_, UpdateNodeOp::kLostConnection);
+            !status.ok()) {
             LOG_ERROR(status.message());
         }
     } catch (apache::thrift::TApplicationException &application_exception) {
         peer_task->error_message_ = fmt::format("Sync log to node, application: {}, error: {}", peer_task->node_name_, application_exception.what());
         peer_task->error_code_ = static_cast<i64>(ErrorCode::kCantConnectServer);
         LOG_ERROR(peer_task->error_message_);
-        Status status = InfinityContext::instance().cluster_manager()->UpdateNodeByLeader(peer_task->node_name_, UpdateNodeOp::kLostConnection);
-        if (!status.ok()) {
+        if (auto status = InfinityContext::instance().cluster_manager()->UpdateNodeByLeader(peer_task->node_name_, UpdateNodeOp::kLostConnection);
+            !status.ok()) {
             LOG_ERROR(status.message());
         }
     } catch (const std::exception &e) {
@@ -492,7 +479,7 @@ void PeerClient::ChangeRole(ChangeRoleTask *change_role_task) {
     request.node_name = change_role_task->node_name_;
     request.node_type = infinity_peer_server::NodeType::kInvalid;
     ToLower(change_role_task->role_name_);
-    if (IsEqual(change_role_task->role_name_, "admin")) {
+    if (change_role_task->role_name_ == "admin") {
         request.node_type = infinity_peer_server::NodeType::kAdmin;
     }
     try {

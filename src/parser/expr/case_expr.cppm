@@ -22,6 +22,5 @@ namespace infinity {
 
 export using infinity::CaseExpr;
 export using infinity::WhenThen;
-export using infinity::CaseExpr;
 
 } // namespace infinity

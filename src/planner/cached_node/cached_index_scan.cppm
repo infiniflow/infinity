@@ -12,11 +12,8 @@
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
 
-module;
-
 export module infinity_core:cached_index_scan;
 
-import :stl;
 import :cached_scan_base;
 import :base_expression;
 
@@ -36,7 +33,7 @@ public:
     bool Eq(const CachedNodeBase &other) const override;
 
 private:
-    SharedPtr<BaseExpression> filter_expression_;
+    std::shared_ptr<BaseExpression> filter_expression_;
 };
 
 } // namespace infinity

@@ -22,7 +22,11 @@
 #include "type/info/embedding_info.h"
 #include "type/info/sparse_info.h"
 #include "type/serialize.h"
-#include "simdjson.h"
+
+#ifndef PARESER_USE_THIRD_PARTY_MODULE
+#define PARESER_USE_THIRD_PARTY_MODULE 1
+import third_party;
+#endif
 
 namespace infinity {
 
@@ -241,16 +245,16 @@ nlohmann::json ColumnDef::ToJson() const {
 }
 
 std::shared_ptr<ColumnDef> ColumnDef::FromJson(std::string_view col_def_str) {
-    simdjson::ondemand::parser parser;
+    simdjson::parser parser;
     simdjson::padded_string col_def_json(col_def_str);
-    simdjson::ondemand::document doc = parser.iterate(col_def_json);
+    simdjson::document doc = parser.iterate(col_def_json);
 
     auto column_type = DataType::Deserialize(doc["column_type"].raw_json());
     int64_t column_id = doc["column_id"].get<int64_t>();
     std::string column_name = doc["column_name"].get<std::string>();
 
     std::set<ConstraintType> constraints;
-    if (simdjson::ondemand::array constraints_json; doc["constraints"].get(constraints_json) == simdjson::SUCCESS) {
+    if (simdjson::array constraints_json; doc["constraints"].get(constraints_json) == simdjson::SUCCESS) {
         for (auto item : constraints_json) {
             ConstraintType constraint = static_cast<ConstraintType>(static_cast<char>(item.get<char>()));
             constraints.insert(constraint);

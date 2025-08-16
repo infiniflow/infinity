@@ -1,12 +1,10 @@
 module;
 
-#include <sstream>
-#include <stdexcept>
-#include <string>
-
 module infinity_core:lexeme.impl;
 
 import :lexeme;
+
+import std;
 
 namespace infinity {
 

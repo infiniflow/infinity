@@ -57,7 +57,7 @@ export enum class ExpressionType {
     // Function,
     kFunction,
 
-    // List,
+    // std::list,
     kList,
 
     // Logical,

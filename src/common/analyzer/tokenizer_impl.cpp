@@ -12,16 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
-#include <cctype>
-#include <cstring>
-
 module infinity_core:tokenizer.impl;
 
-import :stl;
 import :term;
 import :tokenizer;
+
+import std;
+import std.compat;
 
 namespace infinity {
 
@@ -48,7 +45,7 @@ CharTypeTable::CharTypeTable(bool use_def_delim) {
 
 void CharTypeTable::SetConfig(const TokenizeConfig &conf) {
     // set the higher 4 bit to record user defined option type
-    String str; // why need to copy?
+    std::string str; // why need to copy?
 
     str = conf.divides_;
     if (!str.empty()) {
@@ -74,8 +71,8 @@ void CharTypeTable::SetConfig(const TokenizeConfig &conf) {
 
 void Tokenizer::SetConfig(const TokenizeConfig &conf) { table_.SetConfig(conf); }
 
-void Tokenizer::Tokenize(const String &input) {
-    input_ = (String *)&input;
+void Tokenizer::Tokenize(const std::string &input) {
+    input_ = (std::string *)&input;
     input_cursor_ = 0;
 }
 
@@ -120,11 +117,11 @@ bool Tokenizer::NextToken() {
 
 bool Tokenizer::GrowOutputBuffer() {
     output_buffer_size_ *= 2;
-    output_buffer_ = MakeUnique<char[]>(output_buffer_size_);
+    output_buffer_ = std::make_unique<char[]>(output_buffer_size_);
     return true;
 }
 
-bool Tokenizer::Tokenize(const String &input_string, TermList &special_terms, TermList &prim_terms) {
+bool Tokenizer::Tokenize(const std::string &input_string, TermList &special_terms, TermList &prim_terms) {
     special_terms.clear();
     prim_terms.clear();
 
@@ -194,7 +191,7 @@ bool Tokenizer::Tokenize(const String &input_string, TermList &special_terms, Te
     return true;
 }
 
-bool Tokenizer::Tokenize(const String &input_string, TermList &prim_terms) {
+bool Tokenizer::Tokenize(const std::string &input_string, TermList &prim_terms) {
     prim_terms.clear();
     size_t len = input_string.length();
     if (len == 0)
@@ -251,7 +248,7 @@ bool Tokenizer::Tokenize(const String &input_string, TermList &prim_terms) {
     return true;
 }
 
-bool Tokenizer::TokenizeWhite(const String &input_string, TermList &raw_terms) {
+bool Tokenizer::TokenizeWhite(const std::string &input_string, TermList &raw_terms) {
     raw_terms.clear();
 
     size_t len = input_string.length();

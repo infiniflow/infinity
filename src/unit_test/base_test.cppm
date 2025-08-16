@@ -13,17 +13,11 @@
 // limitations under the License.
 module;
 
-#include <filesystem>
-#include <stdlib.h>
-#include <sys/stat.h>
-#include <type_traits>
-#include <unistd.h>
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 
 #ifndef CI
 export module infinity_core:ut.base_test;
 
-import :stl;
 import :infinity_context;
 import :infinity_exception;
 #else
@@ -112,14 +106,14 @@ protected:
     }
 
     // Create a data block with two columns, each with the specified row count.
-    SharedPtr<DataBlock> MakeInputBlock(const Value &v1, const Value &v2, SizeT row_cnt);
+    std::shared_ptr<DataBlock> MakeInputBlock(const Value &v1, const Value &v2, size_t row_cnt);
     // Create a data block with two columns, each with the specified row count (data is specified in the function).
-    SharedPtr<DataBlock> MakeInputBlock1(SizeT row_cnt);
+    std::shared_ptr<DataBlock> MakeInputBlock1(size_t row_cnt);
     // Create a data block with two columns, each with the specified row count (data is specified in the function).
-    SharedPtr<DataBlock> MakeInputBlock2(SizeT row_cnt);
+    std::shared_ptr<DataBlock> MakeInputBlock2(size_t row_cnt);
 
     // Check if the file paths exist or not.
-    void CheckFilePaths(Vector<String> &delete_file_paths, Vector<String> &exist_file_paths);
+    void CheckFilePaths(std::vector<std::string> &delete_file_paths, std::vector<std::string> &exist_file_paths);
 
 private:
     // Validate if given path satisfy all of following:

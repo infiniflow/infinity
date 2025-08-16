@@ -16,17 +16,17 @@ module;
 
 export module infinity_core:obj_status;
 
-import :stl;
-import :third_party;
 import :status;
+
+import std;
+import std.compat;
+import third_party;
 
 namespace infinity {
 
-// class Status;
-
 export struct Range {
-    SizeT start_{}; // inclusive
-    SizeT end_{};   // exclusive
+    size_t start_{}; // inclusive
+    size_t end_{};   // exclusive
     bool operator<(const Range &rhs) const { return start_ < rhs.start_; }
     bool operator==(const Range &rhs) const { return start_ == rhs.start_ && end_ == rhs.end_; }
     bool Cover(const Range &rhs) const { return start_ <= rhs.start_ && rhs.end_ <= end_; }
@@ -40,16 +40,16 @@ export enum class ObjCached {
 };
 
 export struct ObjStat {
-    SizeT obj_size_{};  // footer (if present) is excluded
-    SizeT parts_{};     // an object attribute
-    SizeT ref_count_{}; // the number of user (R and W) of some part of this object
-    Set<Range> deleted_ranges_{};
+    size_t obj_size_{};  // footer (if present) is excluded
+    size_t parts_{};     // an object attribute
+    size_t ref_count_{}; // the number of user (R and W) of some part of this object
+    std::set<Range> deleted_ranges_{};
 
-    Atomic<ObjCached> cached_ = ObjCached::kCached; // whether the object is in localdisk cache
+    std::atomic<ObjCached> cached_ = ObjCached::kCached; // whether the object is in localdisk cache
 
     ObjStat() = default;
 
-    ObjStat(SizeT obj_size, SizeT parts, SizeT ref_count, ObjCached cached = ObjCached::kCached)
+    ObjStat(size_t obj_size, size_t parts, size_t ref_count, ObjCached cached = ObjCached::kCached)
         : obj_size_(obj_size), parts_(parts), ref_count_(ref_count), cached_(cached) {}
 
     ObjStat(const ObjStat &other)
@@ -84,17 +84,17 @@ export struct ObjStat {
 
     nlohmann::json Serialize() const;
 
-    String ToString() const;
+    std::string ToString() const;
 
     void Deserialize(std::string_view str);
 
-    SizeT GetSizeInBytes() const;
+    size_t GetSizeInBytes() const;
 
     void WriteBufAdv(char *&buf) const;
 
     static ObjStat ReadBufAdv(const char *&buf);
 
-    void CheckValid(const String &obj_key, SizeT current_object_size) const;
+    void CheckValid(const std::string &obj_key, size_t current_object_size) const;
 };
 
 } // namespace infinity

@@ -9,247 +9,205 @@
 
 #include <iosfwd>
 
-#include <thrift/Thrift.h>
 #include <thrift/TApplicationException.h>
 #include <thrift/TBase.h>
+#include <thrift/Thrift.h>
 #include <thrift/protocol/TProtocol.h>
 #include <thrift/transport/TTransport.h>
 
-#include <functional>
 #include <memory>
-
 
 namespace infinity_thrift_rpc {
 
 struct LogicType {
-  enum type {
-    Boolean = 0,
-    TinyInt = 1,
-    SmallInt = 2,
-    Integer = 3,
-    BigInt = 4,
-    HugeInt = 5,
-    Decimal = 6,
-    Float = 7,
-    Double = 8,
-    Float16 = 9,
-    BFloat16 = 10,
-    Varchar = 11,
-    Embedding = 12,
-    Tensor = 13,
-    TensorArray = 14,
-    Sparse = 15,
-    MultiVector = 16,
-    Date = 17,
-    Time = 18,
-    DateTime = 19,
-    Timestamp = 20,
-    Interval = 21,
-    Array = 22,
-    Invalid = 23
-  };
+    enum type {
+        Boolean = 0,
+        TinyInt = 1,
+        SmallInt = 2,
+        Integer = 3,
+        BigInt = 4,
+        HugeInt = 5,
+        Decimal = 6,
+        Float = 7,
+        Double = 8,
+        Float16 = 9,
+        BFloat16 = 10,
+        Varchar = 11,
+        Embedding = 12,
+        Tensor = 13,
+        TensorArray = 14,
+        Sparse = 15,
+        MultiVector = 16,
+        Date = 17,
+        Time = 18,
+        DateTime = 19,
+        Timestamp = 20,
+        Interval = 21,
+        Array = 22,
+        Invalid = 23
+    };
 };
 
-extern const std::map<int, const char*> _LogicType_VALUES_TO_NAMES;
+extern const std::map<int, const char *> _LogicType_VALUES_TO_NAMES;
 
-std::ostream& operator<<(std::ostream& out, const LogicType::type& val);
+std::ostream &operator<<(std::ostream &out, const LogicType::type &val);
 
-std::string to_string(const LogicType::type& val);
+std::string to_string(const LogicType::type &val);
 
 struct CreateConflict {
-  enum type {
-    Ignore = 0,
-    Error = 1,
-    Replace = 2
-  };
+    enum type { Ignore = 0, Error = 1, Replace = 2 };
 };
 
-extern const std::map<int, const char*> _CreateConflict_VALUES_TO_NAMES;
+extern const std::map<int, const char *> _CreateConflict_VALUES_TO_NAMES;
 
-std::ostream& operator<<(std::ostream& out, const CreateConflict::type& val);
+std::ostream &operator<<(std::ostream &out, const CreateConflict::type &val);
 
-std::string to_string(const CreateConflict::type& val);
+std::string to_string(const CreateConflict::type &val);
 
 struct DropConflict {
-  enum type {
-    Ignore = 0,
-    Error = 1
-  };
+    enum type { Ignore = 0, Error = 1 };
 };
 
-extern const std::map<int, const char*> _DropConflict_VALUES_TO_NAMES;
+extern const std::map<int, const char *> _DropConflict_VALUES_TO_NAMES;
 
-std::ostream& operator<<(std::ostream& out, const DropConflict::type& val);
+std::ostream &operator<<(std::ostream &out, const DropConflict::type &val);
 
-std::string to_string(const DropConflict::type& val);
+std::string to_string(const DropConflict::type &val);
 
 struct ElementType {
-  enum type {
-    ElementBit = 0,
-    ElementUInt8 = 1,
-    ElementInt8 = 2,
-    ElementInt16 = 3,
-    ElementInt32 = 4,
-    ElementInt64 = 5,
-    ElementFloat32 = 6,
-    ElementFloat64 = 7,
-    ElementFloat16 = 8,
-    ElementBFloat16 = 9
-  };
+    enum type {
+        ElementBit = 0,
+        ElementUInt8 = 1,
+        ElementInt8 = 2,
+        ElementInt16 = 3,
+        ElementInt32 = 4,
+        ElementInt64 = 5,
+        ElementFloat32 = 6,
+        ElementFloat64 = 7,
+        ElementFloat16 = 8,
+        ElementBFloat16 = 9
+    };
 };
 
-extern const std::map<int, const char*> _ElementType_VALUES_TO_NAMES;
+extern const std::map<int, const char *> _ElementType_VALUES_TO_NAMES;
 
-std::ostream& operator<<(std::ostream& out, const ElementType::type& val);
+std::ostream &operator<<(std::ostream &out, const ElementType::type &val);
 
-std::string to_string(const ElementType::type& val);
+std::string to_string(const ElementType::type &val);
 
 struct Constraint {
-  enum type {
-    PrimaryKey = 0,
-    NotNull = 1,
-    Null = 2,
-    Unique = 3
-  };
+    enum type { PrimaryKey = 0, NotNull = 1, Null = 2, Unique = 3 };
 };
 
-extern const std::map<int, const char*> _Constraint_VALUES_TO_NAMES;
+extern const std::map<int, const char *> _Constraint_VALUES_TO_NAMES;
 
-std::ostream& operator<<(std::ostream& out, const Constraint::type& val);
+std::ostream &operator<<(std::ostream &out, const Constraint::type &val);
 
-std::string to_string(const Constraint::type& val);
+std::string to_string(const Constraint::type &val);
 
 struct LiteralType {
-  enum type {
-    Boolean = 0,
-    Double = 1,
-    String = 2,
-    Int64 = 3,
-    Null = 4,
-    IntegerArray = 5,
-    DoubleArray = 6,
-    IntegerTensor = 7,
-    DoubleTensor = 8,
-    IntegerTensorArray = 9,
-    DoubleTensorArray = 10,
-    SparseIntegerArray = 11,
-    SparseDoubleArray = 12,
-    Date = 13,
-    Time = 14,
-    Inteval = 15,
-    DateTime = 16,
-    Timestamp = 17,
-    CurlyBracketsArray = 18
-  };
+    enum type {
+        Boolean = 0,
+        Double = 1,
+        String = 2,
+        Int64 = 3,
+        Null = 4,
+        IntegerArray = 5,
+        DoubleArray = 6,
+        IntegerTensor = 7,
+        DoubleTensor = 8,
+        IntegerTensorArray = 9,
+        DoubleTensorArray = 10,
+        SparseIntegerArray = 11,
+        SparseDoubleArray = 12,
+        Date = 13,
+        Time = 14,
+        Inteval = 15,
+        DateTime = 16,
+        Timestamp = 17,
+        CurlyBracketsArray = 18
+    };
 };
 
-extern const std::map<int, const char*> _LiteralType_VALUES_TO_NAMES;
+extern const std::map<int, const char *> _LiteralType_VALUES_TO_NAMES;
 
-std::ostream& operator<<(std::ostream& out, const LiteralType::type& val);
+std::ostream &operator<<(std::ostream &out, const LiteralType::type &val);
 
-std::string to_string(const LiteralType::type& val);
+std::string to_string(const LiteralType::type &val);
 
 struct KnnDistanceType {
-  enum type {
-    L2 = 0,
-    Cosine = 1,
-    InnerProduct = 2,
-    Hamming = 3
-  };
+    enum type { L2 = 0, Cosine = 1, InnerProduct = 2, Hamming = 3 };
 };
 
-extern const std::map<int, const char*> _KnnDistanceType_VALUES_TO_NAMES;
+extern const std::map<int, const char *> _KnnDistanceType_VALUES_TO_NAMES;
 
-std::ostream& operator<<(std::ostream& out, const KnnDistanceType::type& val);
+std::ostream &operator<<(std::ostream &out, const KnnDistanceType::type &val);
 
-std::string to_string(const KnnDistanceType::type& val);
+std::string to_string(const KnnDistanceType::type &val);
 
 struct CopyFileType {
-  enum type {
-    CSV = 0,
-    JSON = 1,
-    JSONL = 2,
-    FVECS = 3,
-    CSR = 4,
-    BVECS = 5
-  };
+    enum type { CSV = 0, JSON = 1, JSONL = 2, FVECS = 3, CSR = 4, BVECS = 5 };
 };
 
-extern const std::map<int, const char*> _CopyFileType_VALUES_TO_NAMES;
+extern const std::map<int, const char *> _CopyFileType_VALUES_TO_NAMES;
 
-std::ostream& operator<<(std::ostream& out, const CopyFileType::type& val);
+std::ostream &operator<<(std::ostream &out, const CopyFileType::type &val);
 
-std::string to_string(const CopyFileType::type& val);
+std::string to_string(const CopyFileType::type &val);
 
 struct ColumnType {
-  enum type {
-    ColumnBool = 0,
-    ColumnInt8 = 1,
-    ColumnInt16 = 2,
-    ColumnInt32 = 3,
-    ColumnInt64 = 4,
-    ColumnFloat32 = 5,
-    ColumnFloat64 = 6,
-    ColumnFloat16 = 7,
-    ColumnBFloat16 = 8,
-    ColumnVarchar = 9,
-    ColumnEmbedding = 10,
-    ColumnTensor = 11,
-    ColumnTensorArray = 12,
-    ColumnSparse = 13,
-    ColumnMultiVector = 14,
-    ColumnRowID = 15,
-    ColumnDate = 16,
-    ColumnTime = 17,
-    ColumnDateTime = 18,
-    ColumnTimestamp = 19,
-    ColumnInterval = 20,
-    ColumnArray = 21,
-    ColumnInvalid = 22
-  };
+    enum type {
+        ColumnBool = 0,
+        ColumnInt8 = 1,
+        ColumnInt16 = 2,
+        ColumnInt32 = 3,
+        ColumnInt64 = 4,
+        ColumnFloat32 = 5,
+        ColumnFloat64 = 6,
+        ColumnFloat16 = 7,
+        ColumnBFloat16 = 8,
+        ColumnVarchar = 9,
+        ColumnEmbedding = 10,
+        ColumnTensor = 11,
+        ColumnTensorArray = 12,
+        ColumnSparse = 13,
+        ColumnMultiVector = 14,
+        ColumnRowID = 15,
+        ColumnDate = 16,
+        ColumnTime = 17,
+        ColumnDateTime = 18,
+        ColumnTimestamp = 19,
+        ColumnInterval = 20,
+        ColumnArray = 21,
+        ColumnInvalid = 22
+    };
 };
 
-extern const std::map<int, const char*> _ColumnType_VALUES_TO_NAMES;
+extern const std::map<int, const char *> _ColumnType_VALUES_TO_NAMES;
 
-std::ostream& operator<<(std::ostream& out, const ColumnType::type& val);
+std::ostream &operator<<(std::ostream &out, const ColumnType::type &val);
 
-std::string to_string(const ColumnType::type& val);
+std::string to_string(const ColumnType::type &val);
 
 struct IndexType {
-  enum type {
-    IVF = 0,
-    Hnsw = 1,
-    FullText = 2,
-    BMP = 3,
-    Secondary = 4,
-    EMVB = 5,
-    DiskAnn = 6
-  };
+    enum type { IVF = 0, Hnsw = 1, FullText = 2, BMP = 3, Secondary = 4, EMVB = 5, DiskAnn = 6 };
 };
 
-extern const std::map<int, const char*> _IndexType_VALUES_TO_NAMES;
+extern const std::map<int, const char *> _IndexType_VALUES_TO_NAMES;
 
-std::ostream& operator<<(std::ostream& out, const IndexType::type& val);
+std::ostream &operator<<(std::ostream &out, const IndexType::type &val);
 
-std::string to_string(const IndexType::type& val);
+std::string to_string(const IndexType::type &val);
 
 struct ExplainType {
-  enum type {
-    Analyze = 0,
-    Ast = 1,
-    UnOpt = 2,
-    Opt = 3,
-    Physical = 4,
-    Pipeline = 5,
-    Fragment = 6
-  };
+    enum type { Analyze = 0, Ast = 1, UnOpt = 2, Opt = 3, Physical = 4, Pipeline = 5, Fragment = 6 };
 };
 
-extern const std::map<int, const char*> _ExplainType_VALUES_TO_NAMES;
+extern const std::map<int, const char *> _ExplainType_VALUES_TO_NAMES;
 
-std::ostream& operator<<(std::ostream& out, const ExplainType::type& val);
+std::ostream &operator<<(std::ostream &out, const ExplainType::type &val);
 
-std::string to_string(const ExplainType::type& val);
+std::string to_string(const ExplainType::type &val);
 
 class Property;
 
@@ -446,4719 +404,4452 @@ class ListSnapshotsResponse;
 class DropSnapshotRequest;
 
 typedef struct _Property__isset {
-  _Property__isset() : key(false), value(false) {}
-  bool key :1;
-  bool value :1;
+    _Property__isset() : key(false), value(false) {}
+    bool key : 1;
+    bool value : 1;
 } _Property__isset;
 
 class Property : public virtual ::apache::thrift::TBase {
- public:
+public:
+    Property(const Property &);
+    Property &operator=(const Property &);
+    Property() noexcept;
 
-  Property(const Property&);
-  Property& operator=(const Property&);
-  Property() noexcept;
+    virtual ~Property() noexcept;
+    std::string key;
+    std::string value;
 
-  virtual ~Property() noexcept;
-  std::string key;
-  std::string value;
+    _Property__isset __isset;
 
-  _Property__isset __isset;
+    void __set_key(const std::string &val);
 
-  void __set_key(const std::string& val);
+    void __set_value(const std::string &val);
 
-  void __set_value(const std::string& val);
+    bool operator==(const Property &rhs) const;
+    bool operator!=(const Property &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const Property & rhs) const;
-  bool operator != (const Property &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const Property &) const;
 
-  bool operator < (const Property & ) const;
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
-
-  virtual void printTo(std::ostream& out) const;
+    virtual void printTo(std::ostream &out) const;
 };
 
 void swap(Property &a, Property &b);
 
-std::ostream& operator<<(std::ostream& out, const Property& obj);
+std::ostream &operator<<(std::ostream &out, const Property &obj);
 
 typedef struct _CreateOption__isset {
-  _CreateOption__isset() : conflict_type(false), properties(true) {}
-  bool conflict_type :1;
-  bool properties :1;
+    _CreateOption__isset() : conflict_type(false), properties(true) {}
+    bool conflict_type : 1;
+    bool properties : 1;
 } _CreateOption__isset;
 
 class CreateOption : public virtual ::apache::thrift::TBase {
- public:
+public:
+    CreateOption(const CreateOption &);
+    CreateOption &operator=(const CreateOption &);
+    CreateOption() noexcept;
 
-  CreateOption(const CreateOption&);
-  CreateOption& operator=(const CreateOption&);
-  CreateOption() noexcept;
+    virtual ~CreateOption() noexcept;
+    /**
+     *
+     * @see CreateConflict
+     */
+    CreateConflict::type conflict_type;
+    std::vector<Property> properties;
 
-  virtual ~CreateOption() noexcept;
-  /**
-   * 
-   * @see CreateConflict
-   */
-  CreateConflict::type conflict_type;
-  std::vector<Property>  properties;
+    _CreateOption__isset __isset;
 
-  _CreateOption__isset __isset;
+    void __set_conflict_type(const CreateConflict::type val);
 
-  void __set_conflict_type(const CreateConflict::type val);
+    void __set_properties(const std::vector<Property> &val);
 
-  void __set_properties(const std::vector<Property> & val);
+    bool operator==(const CreateOption &rhs) const;
+    bool operator!=(const CreateOption &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const CreateOption & rhs) const;
-  bool operator != (const CreateOption &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const CreateOption &) const;
 
-  bool operator < (const CreateOption & ) const;
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
-
-  virtual void printTo(std::ostream& out) const;
+    virtual void printTo(std::ostream &out) const;
 };
 
 void swap(CreateOption &a, CreateOption &b);
 
-std::ostream& operator<<(std::ostream& out, const CreateOption& obj);
+std::ostream &operator<<(std::ostream &out, const CreateOption &obj);
 
 typedef struct _DropOption__isset {
-  _DropOption__isset() : conflict_type(false) {}
-  bool conflict_type :1;
+    _DropOption__isset() : conflict_type(false) {}
+    bool conflict_type : 1;
 } _DropOption__isset;
 
 class DropOption : public virtual ::apache::thrift::TBase {
- public:
+public:
+    DropOption(const DropOption &) noexcept;
+    DropOption &operator=(const DropOption &) noexcept;
+    DropOption() noexcept;
 
-  DropOption(const DropOption&) noexcept;
-  DropOption& operator=(const DropOption&) noexcept;
-  DropOption() noexcept;
+    virtual ~DropOption() noexcept;
+    /**
+     *
+     * @see DropConflict
+     */
+    DropConflict::type conflict_type;
 
-  virtual ~DropOption() noexcept;
-  /**
-   * 
-   * @see DropConflict
-   */
-  DropConflict::type conflict_type;
+    _DropOption__isset __isset;
 
-  _DropOption__isset __isset;
+    void __set_conflict_type(const DropConflict::type val);
 
-  void __set_conflict_type(const DropConflict::type val);
+    bool operator==(const DropOption &rhs) const;
+    bool operator!=(const DropOption &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const DropOption & rhs) const;
-  bool operator != (const DropOption &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const DropOption &) const;
 
-  bool operator < (const DropOption & ) const;
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
-
-  virtual void printTo(std::ostream& out) const;
+    virtual void printTo(std::ostream &out) const;
 };
 
 void swap(DropOption &a, DropOption &b);
 
-std::ostream& operator<<(std::ostream& out, const DropOption& obj);
-
+std::ostream &operator<<(std::ostream &out, const DropOption &obj);
 
 class NumberType : public virtual ::apache::thrift::TBase {
- public:
+public:
+    NumberType(const NumberType &) noexcept;
+    NumberType &operator=(const NumberType &) noexcept;
+    NumberType() noexcept;
 
-  NumberType(const NumberType&) noexcept;
-  NumberType& operator=(const NumberType&) noexcept;
-  NumberType() noexcept;
+    virtual ~NumberType() noexcept;
 
-  virtual ~NumberType() noexcept;
+    bool operator==(const NumberType & /* rhs */) const;
+    bool operator!=(const NumberType &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const NumberType & /* rhs */) const;
-  bool operator != (const NumberType &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const NumberType &) const;
 
-  bool operator < (const NumberType & ) const;
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
-
-  virtual void printTo(std::ostream& out) const;
+    virtual void printTo(std::ostream &out) const;
 };
 
 void swap(NumberType &a, NumberType &b);
 
-std::ostream& operator<<(std::ostream& out, const NumberType& obj);
-
+std::ostream &operator<<(std::ostream &out, const NumberType &obj);
 
 class VarcharType : public virtual ::apache::thrift::TBase {
- public:
+public:
+    VarcharType(const VarcharType &) noexcept;
+    VarcharType &operator=(const VarcharType &) noexcept;
+    VarcharType() noexcept;
 
-  VarcharType(const VarcharType&) noexcept;
-  VarcharType& operator=(const VarcharType&) noexcept;
-  VarcharType() noexcept;
+    virtual ~VarcharType() noexcept;
 
-  virtual ~VarcharType() noexcept;
+    bool operator==(const VarcharType & /* rhs */) const;
+    bool operator!=(const VarcharType &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const VarcharType & /* rhs */) const;
-  bool operator != (const VarcharType &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const VarcharType &) const;
 
-  bool operator < (const VarcharType & ) const;
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
-
-  virtual void printTo(std::ostream& out) const;
+    virtual void printTo(std::ostream &out) const;
 };
 
 void swap(VarcharType &a, VarcharType &b);
 
-std::ostream& operator<<(std::ostream& out, const VarcharType& obj);
+std::ostream &operator<<(std::ostream &out, const VarcharType &obj);
 
 typedef struct _EmbeddingType__isset {
-  _EmbeddingType__isset() : dimension(false), element_type(false) {}
-  bool dimension :1;
-  bool element_type :1;
+    _EmbeddingType__isset() : dimension(false), element_type(false) {}
+    bool dimension : 1;
+    bool element_type : 1;
 } _EmbeddingType__isset;
 
 class EmbeddingType : public virtual ::apache::thrift::TBase {
- public:
+public:
+    EmbeddingType(const EmbeddingType &) noexcept;
+    EmbeddingType &operator=(const EmbeddingType &) noexcept;
+    EmbeddingType() noexcept;
 
-  EmbeddingType(const EmbeddingType&) noexcept;
-  EmbeddingType& operator=(const EmbeddingType&) noexcept;
-  EmbeddingType() noexcept;
+    virtual ~EmbeddingType() noexcept;
+    int32_t dimension;
+    /**
+     *
+     * @see ElementType
+     */
+    ElementType::type element_type;
 
-  virtual ~EmbeddingType() noexcept;
-  int32_t dimension;
-  /**
-   * 
-   * @see ElementType
-   */
-  ElementType::type element_type;
+    _EmbeddingType__isset __isset;
 
-  _EmbeddingType__isset __isset;
+    void __set_dimension(const int32_t val);
 
-  void __set_dimension(const int32_t val);
+    void __set_element_type(const ElementType::type val);
 
-  void __set_element_type(const ElementType::type val);
+    bool operator==(const EmbeddingType &rhs) const;
+    bool operator!=(const EmbeddingType &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const EmbeddingType & rhs) const;
-  bool operator != (const EmbeddingType &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const EmbeddingType &) const;
 
-  bool operator < (const EmbeddingType & ) const;
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
-
-  virtual void printTo(std::ostream& out) const;
+    virtual void printTo(std::ostream &out) const;
 };
 
 void swap(EmbeddingType &a, EmbeddingType &b);
 
-std::ostream& operator<<(std::ostream& out, const EmbeddingType& obj);
+std::ostream &operator<<(std::ostream &out, const EmbeddingType &obj);
 
 typedef struct _SparseType__isset {
-  _SparseType__isset() : dimension(false), element_type(false), index_type(false) {}
-  bool dimension :1;
-  bool element_type :1;
-  bool index_type :1;
+    _SparseType__isset() : dimension(false), element_type(false), index_type(false) {}
+    bool dimension : 1;
+    bool element_type : 1;
+    bool index_type : 1;
 } _SparseType__isset;
 
 class SparseType : public virtual ::apache::thrift::TBase {
- public:
+public:
+    SparseType(const SparseType &) noexcept;
+    SparseType &operator=(const SparseType &) noexcept;
+    SparseType() noexcept;
 
-  SparseType(const SparseType&) noexcept;
-  SparseType& operator=(const SparseType&) noexcept;
-  SparseType() noexcept;
+    virtual ~SparseType() noexcept;
+    int64_t dimension;
+    /**
+     *
+     * @see ElementType
+     */
+    ElementType::type element_type;
+    /**
+     *
+     * @see ElementType
+     */
+    ElementType::type index_type;
 
-  virtual ~SparseType() noexcept;
-  int64_t dimension;
-  /**
-   * 
-   * @see ElementType
-   */
-  ElementType::type element_type;
-  /**
-   * 
-   * @see ElementType
-   */
-  ElementType::type index_type;
+    _SparseType__isset __isset;
 
-  _SparseType__isset __isset;
+    void __set_dimension(const int64_t val);
 
-  void __set_dimension(const int64_t val);
+    void __set_element_type(const ElementType::type val);
 
-  void __set_element_type(const ElementType::type val);
+    void __set_index_type(const ElementType::type val);
 
-  void __set_index_type(const ElementType::type val);
+    bool operator==(const SparseType &rhs) const;
+    bool operator!=(const SparseType &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const SparseType & rhs) const;
-  bool operator != (const SparseType &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const SparseType &) const;
 
-  bool operator < (const SparseType & ) const;
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
-
-  virtual void printTo(std::ostream& out) const;
+    virtual void printTo(std::ostream &out) const;
 };
 
 void swap(SparseType &a, SparseType &b);
 
-std::ostream& operator<<(std::ostream& out, const SparseType& obj);
+std::ostream &operator<<(std::ostream &out, const SparseType &obj);
 
 typedef struct _ArrayType__isset {
-  _ArrayType__isset() : element_data_type(false) {}
-  bool element_data_type :1;
+    _ArrayType__isset() : element_data_type(false) {}
+    bool element_data_type : 1;
 } _ArrayType__isset;
 
 class ArrayType : public virtual ::apache::thrift::TBase {
- public:
+public:
+    ArrayType(const ArrayType &) noexcept;
+    ArrayType &operator=(const ArrayType &) noexcept;
+    ArrayType() noexcept;
 
-  ArrayType(const ArrayType&) noexcept;
-  ArrayType& operator=(const ArrayType&) noexcept;
-  ArrayType() noexcept;
+    virtual ~ArrayType() noexcept;
+    ::std::shared_ptr<DataType> element_data_type;
 
-  virtual ~ArrayType() noexcept;
-  ::std::shared_ptr<DataType> element_data_type;
+    _ArrayType__isset __isset;
 
-  _ArrayType__isset __isset;
+    void __set_element_data_type(::std::shared_ptr<DataType> val);
 
-  void __set_element_data_type(::std::shared_ptr<DataType> val);
+    bool operator==(const ArrayType &rhs) const;
+    bool operator!=(const ArrayType &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const ArrayType & rhs) const;
-  bool operator != (const ArrayType &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const ArrayType &) const;
 
-  bool operator < (const ArrayType & ) const;
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
-
-  virtual void printTo(std::ostream& out) const;
+    virtual void printTo(std::ostream &out) const;
 };
 
 void swap(ArrayType &a, ArrayType &b);
 
-std::ostream& operator<<(std::ostream& out, const ArrayType& obj);
+std::ostream &operator<<(std::ostream &out, const ArrayType &obj);
 
 typedef struct _PhysicalType__isset {
-  _PhysicalType__isset() : number_type(false), varchar_type(false), embedding_type(false), sparse_type(false), array_type(false) {}
-  bool number_type :1;
-  bool varchar_type :1;
-  bool embedding_type :1;
-  bool sparse_type :1;
-  bool array_type :1;
+    _PhysicalType__isset() : number_type(false), varchar_type(false), embedding_type(false), sparse_type(false), array_type(false) {}
+    bool number_type : 1;
+    bool varchar_type : 1;
+    bool embedding_type : 1;
+    bool sparse_type : 1;
+    bool array_type : 1;
 } _PhysicalType__isset;
 
 class PhysicalType : public virtual ::apache::thrift::TBase {
- public:
+public:
+    PhysicalType(const PhysicalType &) noexcept;
+    PhysicalType &operator=(const PhysicalType &) noexcept;
+    PhysicalType() noexcept;
 
-  PhysicalType(const PhysicalType&) noexcept;
-  PhysicalType& operator=(const PhysicalType&) noexcept;
-  PhysicalType() noexcept;
+    virtual ~PhysicalType() noexcept;
+    NumberType number_type;
+    VarcharType varchar_type;
+    EmbeddingType embedding_type;
+    SparseType sparse_type;
+    ArrayType array_type;
 
-  virtual ~PhysicalType() noexcept;
-  NumberType number_type;
-  VarcharType varchar_type;
-  EmbeddingType embedding_type;
-  SparseType sparse_type;
-  ArrayType array_type;
+    _PhysicalType__isset __isset;
 
-  _PhysicalType__isset __isset;
+    void __set_number_type(const NumberType &val);
 
-  void __set_number_type(const NumberType& val);
+    void __set_varchar_type(const VarcharType &val);
 
-  void __set_varchar_type(const VarcharType& val);
+    void __set_embedding_type(const EmbeddingType &val);
 
-  void __set_embedding_type(const EmbeddingType& val);
+    void __set_sparse_type(const SparseType &val);
 
-  void __set_sparse_type(const SparseType& val);
+    void __set_array_type(const ArrayType &val);
 
-  void __set_array_type(const ArrayType& val);
+    bool operator==(const PhysicalType &rhs) const;
+    bool operator!=(const PhysicalType &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const PhysicalType & rhs) const;
-  bool operator != (const PhysicalType &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const PhysicalType &) const;
 
-  bool operator < (const PhysicalType & ) const;
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
-
-  virtual void printTo(std::ostream& out) const;
+    virtual void printTo(std::ostream &out) const;
 };
 
 void swap(PhysicalType &a, PhysicalType &b);
 
-std::ostream& operator<<(std::ostream& out, const PhysicalType& obj);
+std::ostream &operator<<(std::ostream &out, const PhysicalType &obj);
 
 typedef struct _DataType__isset {
-  _DataType__isset() : logic_type(false), physical_type(false) {}
-  bool logic_type :1;
-  bool physical_type :1;
+    _DataType__isset() : logic_type(false), physical_type(false) {}
+    bool logic_type : 1;
+    bool physical_type : 1;
 } _DataType__isset;
 
 class DataType : public virtual ::apache::thrift::TBase {
- public:
+public:
+    DataType(const DataType &) noexcept;
+    DataType &operator=(const DataType &) noexcept;
+    DataType() noexcept;
 
-  DataType(const DataType&) noexcept;
-  DataType& operator=(const DataType&) noexcept;
-  DataType() noexcept;
+    virtual ~DataType() noexcept;
+    /**
+     *
+     * @see LogicType
+     */
+    LogicType::type logic_type;
+    PhysicalType physical_type;
 
-  virtual ~DataType() noexcept;
-  /**
-   * 
-   * @see LogicType
-   */
-  LogicType::type logic_type;
-  PhysicalType physical_type;
+    _DataType__isset __isset;
 
-  _DataType__isset __isset;
+    void __set_logic_type(const LogicType::type val);
 
-  void __set_logic_type(const LogicType::type val);
+    void __set_physical_type(const PhysicalType &val);
 
-  void __set_physical_type(const PhysicalType& val);
+    bool operator==(const DataType &rhs) const;
+    bool operator!=(const DataType &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const DataType & rhs) const;
-  bool operator != (const DataType &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const DataType &) const;
 
-  bool operator < (const DataType & ) const;
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
-
-  virtual void printTo(std::ostream& out) const;
+    virtual void printTo(std::ostream &out) const;
 };
 
 void swap(DataType &a, DataType &b);
 
-std::ostream& operator<<(std::ostream& out, const DataType& obj);
+std::ostream &operator<<(std::ostream &out, const DataType &obj);
 
 typedef struct _ParsedExprType__isset {
-  _ParsedExprType__isset() : constant_expr(false), column_expr(false), function_expr(false), between_expr(false), knn_expr(false), match_sparse_expr(false), match_tensor_expr(false), match_expr(false), fusion_expr(false), search_expr(false), in_expr(false) {}
-  bool constant_expr :1;
-  bool column_expr :1;
-  bool function_expr :1;
-  bool between_expr :1;
-  bool knn_expr :1;
-  bool match_sparse_expr :1;
-  bool match_tensor_expr :1;
-  bool match_expr :1;
-  bool fusion_expr :1;
-  bool search_expr :1;
-  bool in_expr :1;
+    _ParsedExprType__isset()
+        : constant_expr(false), column_expr(false), function_expr(false), between_expr(false), knn_expr(false), match_sparse_expr(false),
+          match_tensor_expr(false), match_expr(false), fusion_expr(false), search_expr(false), in_expr(false) {}
+    bool constant_expr : 1;
+    bool column_expr : 1;
+    bool function_expr : 1;
+    bool between_expr : 1;
+    bool knn_expr : 1;
+    bool match_sparse_expr : 1;
+    bool match_tensor_expr : 1;
+    bool match_expr : 1;
+    bool fusion_expr : 1;
+    bool search_expr : 1;
+    bool in_expr : 1;
 } _ParsedExprType__isset;
 
 class ParsedExprType : public virtual ::apache::thrift::TBase {
- public:
+public:
+    ParsedExprType(const ParsedExprType &);
+    ParsedExprType &operator=(const ParsedExprType &);
+    ParsedExprType() noexcept;
 
-  ParsedExprType(const ParsedExprType&);
-  ParsedExprType& operator=(const ParsedExprType&);
-  ParsedExprType() noexcept;
+    virtual ~ParsedExprType() noexcept;
+    ::std::shared_ptr<ConstantExpr> constant_expr;
+    ::std::shared_ptr<ColumnExpr> column_expr;
+    ::std::shared_ptr<FunctionExpr> function_expr;
+    ::std::shared_ptr<BetweenExpr> between_expr;
+    ::std::shared_ptr<KnnExpr> knn_expr;
+    ::std::shared_ptr<MatchSparseExpr> match_sparse_expr;
+    ::std::shared_ptr<MatchTensorExpr> match_tensor_expr;
+    ::std::shared_ptr<MatchExpr> match_expr;
+    ::std::shared_ptr<FusionExpr> fusion_expr;
+    ::std::shared_ptr<SearchExpr> search_expr;
+    ::std::shared_ptr<InExpr> in_expr;
 
-  virtual ~ParsedExprType() noexcept;
-  ::std::shared_ptr<ConstantExpr> constant_expr;
-  ::std::shared_ptr<ColumnExpr> column_expr;
-  ::std::shared_ptr<FunctionExpr> function_expr;
-  ::std::shared_ptr<BetweenExpr> between_expr;
-  ::std::shared_ptr<KnnExpr> knn_expr;
-  ::std::shared_ptr<MatchSparseExpr> match_sparse_expr;
-  ::std::shared_ptr<MatchTensorExpr> match_tensor_expr;
-  ::std::shared_ptr<MatchExpr> match_expr;
-  ::std::shared_ptr<FusionExpr> fusion_expr;
-  ::std::shared_ptr<SearchExpr> search_expr;
-  ::std::shared_ptr<InExpr> in_expr;
+    _ParsedExprType__isset __isset;
 
-  _ParsedExprType__isset __isset;
+    void __set_constant_expr(::std::shared_ptr<ConstantExpr> val);
 
-  void __set_constant_expr(::std::shared_ptr<ConstantExpr> val);
+    void __set_column_expr(::std::shared_ptr<ColumnExpr> val);
 
-  void __set_column_expr(::std::shared_ptr<ColumnExpr> val);
+    void __set_function_expr(::std::shared_ptr<FunctionExpr> val);
 
-  void __set_function_expr(::std::shared_ptr<FunctionExpr> val);
+    void __set_between_expr(::std::shared_ptr<BetweenExpr> val);
 
-  void __set_between_expr(::std::shared_ptr<BetweenExpr> val);
+    void __set_knn_expr(::std::shared_ptr<KnnExpr> val);
 
-  void __set_knn_expr(::std::shared_ptr<KnnExpr> val);
+    void __set_match_sparse_expr(::std::shared_ptr<MatchSparseExpr> val);
 
-  void __set_match_sparse_expr(::std::shared_ptr<MatchSparseExpr> val);
+    void __set_match_tensor_expr(::std::shared_ptr<MatchTensorExpr> val);
 
-  void __set_match_tensor_expr(::std::shared_ptr<MatchTensorExpr> val);
+    void __set_match_expr(::std::shared_ptr<MatchExpr> val);
 
-  void __set_match_expr(::std::shared_ptr<MatchExpr> val);
+    void __set_fusion_expr(::std::shared_ptr<FusionExpr> val);
 
-  void __set_fusion_expr(::std::shared_ptr<FusionExpr> val);
+    void __set_search_expr(::std::shared_ptr<SearchExpr> val);
 
-  void __set_search_expr(::std::shared_ptr<SearchExpr> val);
+    void __set_in_expr(::std::shared_ptr<InExpr> val);
 
-  void __set_in_expr(::std::shared_ptr<InExpr> val);
+    bool operator==(const ParsedExprType &rhs) const;
+    bool operator!=(const ParsedExprType &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const ParsedExprType & rhs) const;
-  bool operator != (const ParsedExprType &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const ParsedExprType &) const;
 
-  bool operator < (const ParsedExprType & ) const;
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
-
-  virtual void printTo(std::ostream& out) const;
+    virtual void printTo(std::ostream &out) const;
 };
 
 void swap(ParsedExprType &a, ParsedExprType &b);
 
-std::ostream& operator<<(std::ostream& out, const ParsedExprType& obj);
+std::ostream &operator<<(std::ostream &out, const ParsedExprType &obj);
 
 typedef struct _ParsedExpr__isset {
-  _ParsedExpr__isset() : type(false), alias_name(false) {}
-  bool type :1;
-  bool alias_name :1;
+    _ParsedExpr__isset() : type(false), alias_name(false) {}
+    bool type : 1;
+    bool alias_name : 1;
 } _ParsedExpr__isset;
 
 class ParsedExpr : public virtual ::apache::thrift::TBase {
- public:
+public:
+    ParsedExpr(const ParsedExpr &);
+    ParsedExpr &operator=(const ParsedExpr &);
+    ParsedExpr() noexcept;
 
-  ParsedExpr(const ParsedExpr&);
-  ParsedExpr& operator=(const ParsedExpr&);
-  ParsedExpr() noexcept;
+    virtual ~ParsedExpr() noexcept;
+    ParsedExprType type;
+    std::string alias_name;
 
-  virtual ~ParsedExpr() noexcept;
-  ParsedExprType type;
-  std::string alias_name;
+    _ParsedExpr__isset __isset;
 
-  _ParsedExpr__isset __isset;
+    void __set_type(const ParsedExprType &val);
 
-  void __set_type(const ParsedExprType& val);
+    void __set_alias_name(const std::string &val);
 
-  void __set_alias_name(const std::string& val);
+    bool operator==(const ParsedExpr &rhs) const;
+    bool operator!=(const ParsedExpr &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const ParsedExpr & rhs) const;
-  bool operator != (const ParsedExpr &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const ParsedExpr &) const;
 
-  bool operator < (const ParsedExpr & ) const;
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
-
-  virtual void printTo(std::ostream& out) const;
+    virtual void printTo(std::ostream &out) const;
 };
 
 void swap(ParsedExpr &a, ParsedExpr &b);
 
-std::ostream& operator<<(std::ostream& out, const ParsedExpr& obj);
+std::ostream &operator<<(std::ostream &out, const ParsedExpr &obj);
 
 typedef struct _ColumnExpr__isset {
-  _ColumnExpr__isset() : column_name(true), star(false) {}
-  bool column_name :1;
-  bool star :1;
+    _ColumnExpr__isset() : column_name(true), star(false) {}
+    bool column_name : 1;
+    bool star : 1;
 } _ColumnExpr__isset;
 
 class ColumnExpr : public virtual ::apache::thrift::TBase {
- public:
+public:
+    ColumnExpr(const ColumnExpr &);
+    ColumnExpr &operator=(const ColumnExpr &);
+    ColumnExpr() noexcept;
 
-  ColumnExpr(const ColumnExpr&);
-  ColumnExpr& operator=(const ColumnExpr&);
-  ColumnExpr() noexcept;
+    virtual ~ColumnExpr() noexcept;
+    std::vector<std::string> column_name;
+    bool star;
 
-  virtual ~ColumnExpr() noexcept;
-  std::vector<std::string>  column_name;
-  bool star;
+    _ColumnExpr__isset __isset;
 
-  _ColumnExpr__isset __isset;
+    void __set_column_name(const std::vector<std::string> &val);
 
-  void __set_column_name(const std::vector<std::string> & val);
+    void __set_star(const bool val);
 
-  void __set_star(const bool val);
+    bool operator==(const ColumnExpr &rhs) const;
+    bool operator!=(const ColumnExpr &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const ColumnExpr & rhs) const;
-  bool operator != (const ColumnExpr &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const ColumnExpr &) const;
 
-  bool operator < (const ColumnExpr & ) const;
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
-
-  virtual void printTo(std::ostream& out) const;
+    virtual void printTo(std::ostream &out) const;
 };
 
 void swap(ColumnExpr &a, ColumnExpr &b);
 
-std::ostream& operator<<(std::ostream& out, const ColumnExpr& obj);
+std::ostream &operator<<(std::ostream &out, const ColumnExpr &obj);
 
 typedef struct _EmbeddingData__isset {
-  _EmbeddingData__isset() : bool_array_value(false), u8_array_value(false), i8_array_value(false), i16_array_value(false), i32_array_value(false), i64_array_value(false), f32_array_value(false), f64_array_value(false), f16_array_value(false), bf16_array_value(false) {}
-  bool bool_array_value :1;
-  bool u8_array_value :1;
-  bool i8_array_value :1;
-  bool i16_array_value :1;
-  bool i32_array_value :1;
-  bool i64_array_value :1;
-  bool f32_array_value :1;
-  bool f64_array_value :1;
-  bool f16_array_value :1;
-  bool bf16_array_value :1;
+    _EmbeddingData__isset()
+        : bool_array_value(false), u8_array_value(false), i8_array_value(false), i16_array_value(false), i32_array_value(false),
+          i64_array_value(false), f32_array_value(false), f64_array_value(false), f16_array_value(false), bf16_array_value(false) {}
+    bool bool_array_value : 1;
+    bool u8_array_value : 1;
+    bool i8_array_value : 1;
+    bool i16_array_value : 1;
+    bool i32_array_value : 1;
+    bool i64_array_value : 1;
+    bool f32_array_value : 1;
+    bool f64_array_value : 1;
+    bool f16_array_value : 1;
+    bool bf16_array_value : 1;
 } _EmbeddingData__isset;
 
 class EmbeddingData : public virtual ::apache::thrift::TBase {
- public:
+public:
+    EmbeddingData(const EmbeddingData &);
+    EmbeddingData &operator=(const EmbeddingData &);
+    EmbeddingData() noexcept;
 
-  EmbeddingData(const EmbeddingData&);
-  EmbeddingData& operator=(const EmbeddingData&);
-  EmbeddingData() noexcept;
+    virtual ~EmbeddingData() noexcept;
+    std::vector<bool> bool_array_value;
+    std::vector<int16_t> u8_array_value;
+    std::vector<int16_t> i8_array_value;
+    std::vector<int16_t> i16_array_value;
+    std::vector<int32_t> i32_array_value;
+    std::vector<int64_t> i64_array_value;
+    std::vector<double> f32_array_value;
+    std::vector<double> f64_array_value;
+    std::vector<double> f16_array_value;
+    std::vector<double> bf16_array_value;
 
-  virtual ~EmbeddingData() noexcept;
-  std::vector<bool>  bool_array_value;
-  std::vector<int16_t>  u8_array_value;
-  std::vector<int16_t>  i8_array_value;
-  std::vector<int16_t>  i16_array_value;
-  std::vector<int32_t>  i32_array_value;
-  std::vector<int64_t>  i64_array_value;
-  std::vector<double>  f32_array_value;
-  std::vector<double>  f64_array_value;
-  std::vector<double>  f16_array_value;
-  std::vector<double>  bf16_array_value;
+    _EmbeddingData__isset __isset;
 
-  _EmbeddingData__isset __isset;
+    void __set_bool_array_value(const std::vector<bool> &val);
 
-  void __set_bool_array_value(const std::vector<bool> & val);
+    void __set_u8_array_value(const std::vector<int16_t> &val);
 
-  void __set_u8_array_value(const std::vector<int16_t> & val);
+    void __set_i8_array_value(const std::vector<int16_t> &val);
 
-  void __set_i8_array_value(const std::vector<int16_t> & val);
+    void __set_i16_array_value(const std::vector<int16_t> &val);
 
-  void __set_i16_array_value(const std::vector<int16_t> & val);
+    void __set_i32_array_value(const std::vector<int32_t> &val);
 
-  void __set_i32_array_value(const std::vector<int32_t> & val);
+    void __set_i64_array_value(const std::vector<int64_t> &val);
 
-  void __set_i64_array_value(const std::vector<int64_t> & val);
+    void __set_f32_array_value(const std::vector<double> &val);
 
-  void __set_f32_array_value(const std::vector<double> & val);
+    void __set_f64_array_value(const std::vector<double> &val);
 
-  void __set_f64_array_value(const std::vector<double> & val);
+    void __set_f16_array_value(const std::vector<double> &val);
 
-  void __set_f16_array_value(const std::vector<double> & val);
+    void __set_bf16_array_value(const std::vector<double> &val);
 
-  void __set_bf16_array_value(const std::vector<double> & val);
+    bool operator==(const EmbeddingData &rhs) const;
+    bool operator!=(const EmbeddingData &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const EmbeddingData & rhs) const;
-  bool operator != (const EmbeddingData &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const EmbeddingData &) const;
 
-  bool operator < (const EmbeddingData & ) const;
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
-
-  virtual void printTo(std::ostream& out) const;
+    virtual void printTo(std::ostream &out) const;
 };
 
 void swap(EmbeddingData &a, EmbeddingData &b);
 
-std::ostream& operator<<(std::ostream& out, const EmbeddingData& obj);
+std::ostream &operator<<(std::ostream &out, const EmbeddingData &obj);
 
 typedef struct _InitParameter__isset {
-  _InitParameter__isset() : param_name(false), param_value(false) {}
-  bool param_name :1;
-  bool param_value :1;
+    _InitParameter__isset() : param_name(false), param_value(false) {}
+    bool param_name : 1;
+    bool param_value : 1;
 } _InitParameter__isset;
 
 class InitParameter : public virtual ::apache::thrift::TBase {
- public:
+public:
+    InitParameter(const InitParameter &);
+    InitParameter &operator=(const InitParameter &);
+    InitParameter() noexcept;
 
-  InitParameter(const InitParameter&);
-  InitParameter& operator=(const InitParameter&);
-  InitParameter() noexcept;
+    virtual ~InitParameter() noexcept;
+    std::string param_name;
+    std::string param_value;
 
-  virtual ~InitParameter() noexcept;
-  std::string param_name;
-  std::string param_value;
+    _InitParameter__isset __isset;
 
-  _InitParameter__isset __isset;
+    void __set_param_name(const std::string &val);
 
-  void __set_param_name(const std::string& val);
+    void __set_param_value(const std::string &val);
 
-  void __set_param_value(const std::string& val);
+    bool operator==(const InitParameter &rhs) const;
+    bool operator!=(const InitParameter &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const InitParameter & rhs) const;
-  bool operator != (const InitParameter &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const InitParameter &) const;
 
-  bool operator < (const InitParameter & ) const;
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
-
-  virtual void printTo(std::ostream& out) const;
+    virtual void printTo(std::ostream &out) const;
 };
 
 void swap(InitParameter &a, InitParameter &b);
 
-std::ostream& operator<<(std::ostream& out, const InitParameter& obj);
+std::ostream &operator<<(std::ostream &out, const InitParameter &obj);
 
 typedef struct _ConstantExpr__isset {
-  _ConstantExpr__isset() : literal_type(false), bool_value(false), i64_value(false), f64_value(false), str_value(false), i64_array_value(false), f64_array_value(false), i64_tensor_value(false), f64_tensor_value(false), i64_tensor_array_value(false), f64_tensor_array_value(false), i64_array_idx(false), curly_brackets_array(false) {}
-  bool literal_type :1;
-  bool bool_value :1;
-  bool i64_value :1;
-  bool f64_value :1;
-  bool str_value :1;
-  bool i64_array_value :1;
-  bool f64_array_value :1;
-  bool i64_tensor_value :1;
-  bool f64_tensor_value :1;
-  bool i64_tensor_array_value :1;
-  bool f64_tensor_array_value :1;
-  bool i64_array_idx :1;
-  bool curly_brackets_array :1;
+    _ConstantExpr__isset()
+        : literal_type(false), bool_value(false), i64_value(false), f64_value(false), str_value(false), i64_array_value(false),
+          f64_array_value(false), i64_tensor_value(false), f64_tensor_value(false), i64_tensor_array_value(false), f64_tensor_array_value(false),
+          i64_array_idx(false), curly_brackets_array(false) {}
+    bool literal_type : 1;
+    bool bool_value : 1;
+    bool i64_value : 1;
+    bool f64_value : 1;
+    bool str_value : 1;
+    bool i64_array_value : 1;
+    bool f64_array_value : 1;
+    bool i64_tensor_value : 1;
+    bool f64_tensor_value : 1;
+    bool i64_tensor_array_value : 1;
+    bool f64_tensor_array_value : 1;
+    bool i64_array_idx : 1;
+    bool curly_brackets_array : 1;
 } _ConstantExpr__isset;
 
 class ConstantExpr : public virtual ::apache::thrift::TBase {
- public:
+public:
+    ConstantExpr(const ConstantExpr &);
+    ConstantExpr &operator=(const ConstantExpr &);
+    ConstantExpr() noexcept;
 
-  ConstantExpr(const ConstantExpr&);
-  ConstantExpr& operator=(const ConstantExpr&);
-  ConstantExpr() noexcept;
+    virtual ~ConstantExpr() noexcept;
+    /**
+     *
+     * @see LiteralType
+     */
+    LiteralType::type literal_type;
+    bool bool_value;
+    int64_t i64_value;
+    double f64_value;
+    std::string str_value;
+    std::vector<int64_t> i64_array_value;
+    std::vector<double> f64_array_value;
+    std::vector<std::vector<int64_t>> i64_tensor_value;
+    std::vector<std::vector<double>> f64_tensor_value;
+    std::vector<std::vector<std::vector<int64_t>>> i64_tensor_array_value;
+    std::vector<std::vector<std::vector<double>>> f64_tensor_array_value;
+    std::vector<int64_t> i64_array_idx;
+    std::vector<ConstantExpr> curly_brackets_array;
 
-  virtual ~ConstantExpr() noexcept;
-  /**
-   * 
-   * @see LiteralType
-   */
-  LiteralType::type literal_type;
-  bool bool_value;
-  int64_t i64_value;
-  double f64_value;
-  std::string str_value;
-  std::vector<int64_t>  i64_array_value;
-  std::vector<double>  f64_array_value;
-  std::vector<std::vector<int64_t> >  i64_tensor_value;
-  std::vector<std::vector<double> >  f64_tensor_value;
-  std::vector<std::vector<std::vector<int64_t> > >  i64_tensor_array_value;
-  std::vector<std::vector<std::vector<double> > >  f64_tensor_array_value;
-  std::vector<int64_t>  i64_array_idx;
-  std::vector<ConstantExpr>  curly_brackets_array;
+    _ConstantExpr__isset __isset;
 
-  _ConstantExpr__isset __isset;
+    void __set_literal_type(const LiteralType::type val);
 
-  void __set_literal_type(const LiteralType::type val);
+    void __set_bool_value(const bool val);
 
-  void __set_bool_value(const bool val);
+    void __set_i64_value(const int64_t val);
 
-  void __set_i64_value(const int64_t val);
+    void __set_f64_value(const double val);
 
-  void __set_f64_value(const double val);
+    void __set_str_value(const std::string &val);
 
-  void __set_str_value(const std::string& val);
+    void __set_i64_array_value(const std::vector<int64_t> &val);
 
-  void __set_i64_array_value(const std::vector<int64_t> & val);
+    void __set_f64_array_value(const std::vector<double> &val);
 
-  void __set_f64_array_value(const std::vector<double> & val);
+    void __set_i64_tensor_value(const std::vector<std::vector<int64_t>> &val);
 
-  void __set_i64_tensor_value(const std::vector<std::vector<int64_t> > & val);
+    void __set_f64_tensor_value(const std::vector<std::vector<double>> &val);
 
-  void __set_f64_tensor_value(const std::vector<std::vector<double> > & val);
+    void __set_i64_tensor_array_value(const std::vector<std::vector<std::vector<int64_t>>> &val);
 
-  void __set_i64_tensor_array_value(const std::vector<std::vector<std::vector<int64_t> > > & val);
+    void __set_f64_tensor_array_value(const std::vector<std::vector<std::vector<double>>> &val);
 
-  void __set_f64_tensor_array_value(const std::vector<std::vector<std::vector<double> > > & val);
+    void __set_i64_array_idx(const std::vector<int64_t> &val);
 
-  void __set_i64_array_idx(const std::vector<int64_t> & val);
+    void __set_curly_brackets_array(const std::vector<ConstantExpr> &val);
 
-  void __set_curly_brackets_array(const std::vector<ConstantExpr> & val);
+    bool operator==(const ConstantExpr &rhs) const;
+    bool operator!=(const ConstantExpr &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const ConstantExpr & rhs) const;
-  bool operator != (const ConstantExpr &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const ConstantExpr &) const;
 
-  bool operator < (const ConstantExpr & ) const;
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
-
-  virtual void printTo(std::ostream& out) const;
+    virtual void printTo(std::ostream &out) const;
 };
 
 void swap(ConstantExpr &a, ConstantExpr &b);
 
-std::ostream& operator<<(std::ostream& out, const ConstantExpr& obj);
+std::ostream &operator<<(std::ostream &out, const ConstantExpr &obj);
 
 typedef struct _KnnExpr__isset {
-  _KnnExpr__isset() : column_expr(false), embedding_data(false), embedding_data_type(false), distance_type(false), topn(false), opt_params(true), filter_expr(false) {}
-  bool column_expr :1;
-  bool embedding_data :1;
-  bool embedding_data_type :1;
-  bool distance_type :1;
-  bool topn :1;
-  bool opt_params :1;
-  bool filter_expr :1;
+    _KnnExpr__isset()
+        : column_expr(false), embedding_data(false), embedding_data_type(false), distance_type(false), topn(false), opt_params(true),
+          filter_expr(false) {}
+    bool column_expr : 1;
+    bool embedding_data : 1;
+    bool embedding_data_type : 1;
+    bool distance_type : 1;
+    bool topn : 1;
+    bool opt_params : 1;
+    bool filter_expr : 1;
 } _KnnExpr__isset;
 
 class KnnExpr : public virtual ::apache::thrift::TBase {
- public:
+public:
+    KnnExpr(const KnnExpr &);
+    KnnExpr &operator=(const KnnExpr &);
+    KnnExpr() noexcept;
 
-  KnnExpr(const KnnExpr&);
-  KnnExpr& operator=(const KnnExpr&);
-  KnnExpr() noexcept;
+    virtual ~KnnExpr() noexcept;
+    ColumnExpr column_expr;
+    EmbeddingData embedding_data;
+    /**
+     *
+     * @see ElementType
+     */
+    ElementType::type embedding_data_type;
+    /**
+     *
+     * @see KnnDistanceType
+     */
+    KnnDistanceType::type distance_type;
+    int64_t topn;
+    std::vector<InitParameter> opt_params;
+    ParsedExpr filter_expr;
 
-  virtual ~KnnExpr() noexcept;
-  ColumnExpr column_expr;
-  EmbeddingData embedding_data;
-  /**
-   * 
-   * @see ElementType
-   */
-  ElementType::type embedding_data_type;
-  /**
-   * 
-   * @see KnnDistanceType
-   */
-  KnnDistanceType::type distance_type;
-  int64_t topn;
-  std::vector<InitParameter>  opt_params;
-  ParsedExpr filter_expr;
+    _KnnExpr__isset __isset;
 
-  _KnnExpr__isset __isset;
+    void __set_column_expr(const ColumnExpr &val);
 
-  void __set_column_expr(const ColumnExpr& val);
+    void __set_embedding_data(const EmbeddingData &val);
 
-  void __set_embedding_data(const EmbeddingData& val);
+    void __set_embedding_data_type(const ElementType::type val);
 
-  void __set_embedding_data_type(const ElementType::type val);
+    void __set_distance_type(const KnnDistanceType::type val);
 
-  void __set_distance_type(const KnnDistanceType::type val);
+    void __set_topn(const int64_t val);
 
-  void __set_topn(const int64_t val);
+    void __set_opt_params(const std::vector<InitParameter> &val);
 
-  void __set_opt_params(const std::vector<InitParameter> & val);
+    void __set_filter_expr(const ParsedExpr &val);
 
-  void __set_filter_expr(const ParsedExpr& val);
+    bool operator==(const KnnExpr &rhs) const;
+    bool operator!=(const KnnExpr &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const KnnExpr & rhs) const;
-  bool operator != (const KnnExpr &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const KnnExpr &) const;
 
-  bool operator < (const KnnExpr & ) const;
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
-
-  virtual void printTo(std::ostream& out) const;
+    virtual void printTo(std::ostream &out) const;
 };
 
 void swap(KnnExpr &a, KnnExpr &b);
 
-std::ostream& operator<<(std::ostream& out, const KnnExpr& obj);
+std::ostream &operator<<(std::ostream &out, const KnnExpr &obj);
 
 typedef struct _MatchSparseExpr__isset {
-  _MatchSparseExpr__isset() : column_expr(false), query_sparse_expr(false), metric_type(false), topn(false), opt_params(true), filter_expr(false) {}
-  bool column_expr :1;
-  bool query_sparse_expr :1;
-  bool metric_type :1;
-  bool topn :1;
-  bool opt_params :1;
-  bool filter_expr :1;
+    _MatchSparseExpr__isset() : column_expr(false), query_sparse_expr(false), metric_type(false), topn(false), opt_params(true), filter_expr(false) {}
+    bool column_expr : 1;
+    bool query_sparse_expr : 1;
+    bool metric_type : 1;
+    bool topn : 1;
+    bool opt_params : 1;
+    bool filter_expr : 1;
 } _MatchSparseExpr__isset;
 
 class MatchSparseExpr : public virtual ::apache::thrift::TBase {
- public:
+public:
+    MatchSparseExpr(const MatchSparseExpr &);
+    MatchSparseExpr &operator=(const MatchSparseExpr &);
+    MatchSparseExpr() noexcept;
 
-  MatchSparseExpr(const MatchSparseExpr&);
-  MatchSparseExpr& operator=(const MatchSparseExpr&);
-  MatchSparseExpr() noexcept;
+    virtual ~MatchSparseExpr() noexcept;
+    ColumnExpr column_expr;
+    ConstantExpr query_sparse_expr;
+    std::string metric_type;
+    int64_t topn;
+    std::vector<InitParameter> opt_params;
+    ParsedExpr filter_expr;
 
-  virtual ~MatchSparseExpr() noexcept;
-  ColumnExpr column_expr;
-  ConstantExpr query_sparse_expr;
-  std::string metric_type;
-  int64_t topn;
-  std::vector<InitParameter>  opt_params;
-  ParsedExpr filter_expr;
+    _MatchSparseExpr__isset __isset;
 
-  _MatchSparseExpr__isset __isset;
+    void __set_column_expr(const ColumnExpr &val);
 
-  void __set_column_expr(const ColumnExpr& val);
+    void __set_query_sparse_expr(const ConstantExpr &val);
 
-  void __set_query_sparse_expr(const ConstantExpr& val);
+    void __set_metric_type(const std::string &val);
 
-  void __set_metric_type(const std::string& val);
+    void __set_topn(const int64_t val);
 
-  void __set_topn(const int64_t val);
+    void __set_opt_params(const std::vector<InitParameter> &val);
 
-  void __set_opt_params(const std::vector<InitParameter> & val);
+    void __set_filter_expr(const ParsedExpr &val);
 
-  void __set_filter_expr(const ParsedExpr& val);
+    bool operator==(const MatchSparseExpr &rhs) const;
+    bool operator!=(const MatchSparseExpr &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const MatchSparseExpr & rhs) const;
-  bool operator != (const MatchSparseExpr &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const MatchSparseExpr &) const;
 
-  bool operator < (const MatchSparseExpr & ) const;
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
-
-  virtual void printTo(std::ostream& out) const;
+    virtual void printTo(std::ostream &out) const;
 };
 
 void swap(MatchSparseExpr &a, MatchSparseExpr &b);
 
-std::ostream& operator<<(std::ostream& out, const MatchSparseExpr& obj);
+std::ostream &operator<<(std::ostream &out, const MatchSparseExpr &obj);
 
 typedef struct _MatchTensorExpr__isset {
-  _MatchTensorExpr__isset() : search_method(false), column_expr(false), embedding_data_type(false), embedding_data(false), extra_options(false), filter_expr(false) {}
-  bool search_method :1;
-  bool column_expr :1;
-  bool embedding_data_type :1;
-  bool embedding_data :1;
-  bool extra_options :1;
-  bool filter_expr :1;
+    _MatchTensorExpr__isset()
+        : search_method(false), column_expr(false), embedding_data_type(false), embedding_data(false), extra_options(false), filter_expr(false) {}
+    bool search_method : 1;
+    bool column_expr : 1;
+    bool embedding_data_type : 1;
+    bool embedding_data : 1;
+    bool extra_options : 1;
+    bool filter_expr : 1;
 } _MatchTensorExpr__isset;
 
 class MatchTensorExpr : public virtual ::apache::thrift::TBase {
- public:
+public:
+    MatchTensorExpr(const MatchTensorExpr &);
+    MatchTensorExpr &operator=(const MatchTensorExpr &);
+    MatchTensorExpr() noexcept;
 
-  MatchTensorExpr(const MatchTensorExpr&);
-  MatchTensorExpr& operator=(const MatchTensorExpr&);
-  MatchTensorExpr() noexcept;
+    virtual ~MatchTensorExpr() noexcept;
+    std::string search_method;
+    ColumnExpr column_expr;
+    /**
+     *
+     * @see ElementType
+     */
+    ElementType::type embedding_data_type;
+    EmbeddingData embedding_data;
+    std::string extra_options;
+    ParsedExpr filter_expr;
 
-  virtual ~MatchTensorExpr() noexcept;
-  std::string search_method;
-  ColumnExpr column_expr;
-  /**
-   * 
-   * @see ElementType
-   */
-  ElementType::type embedding_data_type;
-  EmbeddingData embedding_data;
-  std::string extra_options;
-  ParsedExpr filter_expr;
+    _MatchTensorExpr__isset __isset;
 
-  _MatchTensorExpr__isset __isset;
+    void __set_search_method(const std::string &val);
 
-  void __set_search_method(const std::string& val);
+    void __set_column_expr(const ColumnExpr &val);
 
-  void __set_column_expr(const ColumnExpr& val);
+    void __set_embedding_data_type(const ElementType::type val);
 
-  void __set_embedding_data_type(const ElementType::type val);
+    void __set_embedding_data(const EmbeddingData &val);
 
-  void __set_embedding_data(const EmbeddingData& val);
+    void __set_extra_options(const std::string &val);
 
-  void __set_extra_options(const std::string& val);
+    void __set_filter_expr(const ParsedExpr &val);
 
-  void __set_filter_expr(const ParsedExpr& val);
+    bool operator==(const MatchTensorExpr &rhs) const;
+    bool operator!=(const MatchTensorExpr &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const MatchTensorExpr & rhs) const;
-  bool operator != (const MatchTensorExpr &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const MatchTensorExpr &) const;
 
-  bool operator < (const MatchTensorExpr & ) const;
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
-
-  virtual void printTo(std::ostream& out) const;
+    virtual void printTo(std::ostream &out) const;
 };
 
 void swap(MatchTensorExpr &a, MatchTensorExpr &b);
 
-std::ostream& operator<<(std::ostream& out, const MatchTensorExpr& obj);
+std::ostream &operator<<(std::ostream &out, const MatchTensorExpr &obj);
 
 typedef struct _MatchExpr__isset {
-  _MatchExpr__isset() : fields(false), matching_text(false), options_text(false), filter_expr(false) {}
-  bool fields :1;
-  bool matching_text :1;
-  bool options_text :1;
-  bool filter_expr :1;
+    _MatchExpr__isset() : fields(false), matching_text(false), options_text(false), filter_expr(false) {}
+    bool fields : 1;
+    bool matching_text : 1;
+    bool options_text : 1;
+    bool filter_expr : 1;
 } _MatchExpr__isset;
 
 class MatchExpr : public virtual ::apache::thrift::TBase {
- public:
+public:
+    MatchExpr(const MatchExpr &);
+    MatchExpr &operator=(const MatchExpr &);
+    MatchExpr() noexcept;
 
-  MatchExpr(const MatchExpr&);
-  MatchExpr& operator=(const MatchExpr&);
-  MatchExpr() noexcept;
+    virtual ~MatchExpr() noexcept;
+    std::string fields;
+    std::string matching_text;
+    std::string options_text;
+    ParsedExpr filter_expr;
 
-  virtual ~MatchExpr() noexcept;
-  std::string fields;
-  std::string matching_text;
-  std::string options_text;
-  ParsedExpr filter_expr;
+    _MatchExpr__isset __isset;
 
-  _MatchExpr__isset __isset;
+    void __set_fields(const std::string &val);
 
-  void __set_fields(const std::string& val);
+    void __set_matching_text(const std::string &val);
 
-  void __set_matching_text(const std::string& val);
+    void __set_options_text(const std::string &val);
 
-  void __set_options_text(const std::string& val);
+    void __set_filter_expr(const ParsedExpr &val);
 
-  void __set_filter_expr(const ParsedExpr& val);
+    bool operator==(const MatchExpr &rhs) const;
+    bool operator!=(const MatchExpr &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const MatchExpr & rhs) const;
-  bool operator != (const MatchExpr &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const MatchExpr &) const;
 
-  bool operator < (const MatchExpr & ) const;
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
-
-  virtual void printTo(std::ostream& out) const;
+    virtual void printTo(std::ostream &out) const;
 };
 
 void swap(MatchExpr &a, MatchExpr &b);
 
-std::ostream& operator<<(std::ostream& out, const MatchExpr& obj);
+std::ostream &operator<<(std::ostream &out, const MatchExpr &obj);
 
 typedef struct _GenericMatchExpr__isset {
-  _GenericMatchExpr__isset() : match_vector_expr(false), match_sparse_expr(false), match_tensor_expr(false), match_text_expr(false) {}
-  bool match_vector_expr :1;
-  bool match_sparse_expr :1;
-  bool match_tensor_expr :1;
-  bool match_text_expr :1;
+    _GenericMatchExpr__isset() : match_vector_expr(false), match_sparse_expr(false), match_tensor_expr(false), match_text_expr(false) {}
+    bool match_vector_expr : 1;
+    bool match_sparse_expr : 1;
+    bool match_tensor_expr : 1;
+    bool match_text_expr : 1;
 } _GenericMatchExpr__isset;
 
 class GenericMatchExpr : public virtual ::apache::thrift::TBase {
- public:
+public:
+    GenericMatchExpr(const GenericMatchExpr &);
+    GenericMatchExpr &operator=(const GenericMatchExpr &);
+    GenericMatchExpr() noexcept;
 
-  GenericMatchExpr(const GenericMatchExpr&);
-  GenericMatchExpr& operator=(const GenericMatchExpr&);
-  GenericMatchExpr() noexcept;
+    virtual ~GenericMatchExpr() noexcept;
+    ::std::shared_ptr<KnnExpr> match_vector_expr;
+    ::std::shared_ptr<MatchSparseExpr> match_sparse_expr;
+    ::std::shared_ptr<MatchTensorExpr> match_tensor_expr;
+    ::std::shared_ptr<MatchExpr> match_text_expr;
 
-  virtual ~GenericMatchExpr() noexcept;
-  ::std::shared_ptr<KnnExpr> match_vector_expr;
-  ::std::shared_ptr<MatchSparseExpr> match_sparse_expr;
-  ::std::shared_ptr<MatchTensorExpr> match_tensor_expr;
-  ::std::shared_ptr<MatchExpr> match_text_expr;
+    _GenericMatchExpr__isset __isset;
 
-  _GenericMatchExpr__isset __isset;
+    void __set_match_vector_expr(::std::shared_ptr<KnnExpr> val);
 
-  void __set_match_vector_expr(::std::shared_ptr<KnnExpr> val);
+    void __set_match_sparse_expr(::std::shared_ptr<MatchSparseExpr> val);
 
-  void __set_match_sparse_expr(::std::shared_ptr<MatchSparseExpr> val);
+    void __set_match_tensor_expr(::std::shared_ptr<MatchTensorExpr> val);
 
-  void __set_match_tensor_expr(::std::shared_ptr<MatchTensorExpr> val);
+    void __set_match_text_expr(::std::shared_ptr<MatchExpr> val);
 
-  void __set_match_text_expr(::std::shared_ptr<MatchExpr> val);
+    bool operator==(const GenericMatchExpr &rhs) const;
+    bool operator!=(const GenericMatchExpr &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const GenericMatchExpr & rhs) const;
-  bool operator != (const GenericMatchExpr &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const GenericMatchExpr &) const;
 
-  bool operator < (const GenericMatchExpr & ) const;
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
-
-  virtual void printTo(std::ostream& out) const;
+    virtual void printTo(std::ostream &out) const;
 };
 
 void swap(GenericMatchExpr &a, GenericMatchExpr &b);
 
-std::ostream& operator<<(std::ostream& out, const GenericMatchExpr& obj);
+std::ostream &operator<<(std::ostream &out, const GenericMatchExpr &obj);
 
 typedef struct _FusionExpr__isset {
-  _FusionExpr__isset() : method(false), options_text(false), optional_match_tensor_expr(false) {}
-  bool method :1;
-  bool options_text :1;
-  bool optional_match_tensor_expr :1;
+    _FusionExpr__isset() : method(false), options_text(false), optional_match_tensor_expr(false) {}
+    bool method : 1;
+    bool options_text : 1;
+    bool optional_match_tensor_expr : 1;
 } _FusionExpr__isset;
 
 class FusionExpr : public virtual ::apache::thrift::TBase {
- public:
+public:
+    FusionExpr(const FusionExpr &);
+    FusionExpr &operator=(const FusionExpr &);
+    FusionExpr() noexcept;
 
-  FusionExpr(const FusionExpr&);
-  FusionExpr& operator=(const FusionExpr&);
-  FusionExpr() noexcept;
+    virtual ~FusionExpr() noexcept;
+    std::string method;
+    std::string options_text;
+    MatchTensorExpr optional_match_tensor_expr;
 
-  virtual ~FusionExpr() noexcept;
-  std::string method;
-  std::string options_text;
-  MatchTensorExpr optional_match_tensor_expr;
+    _FusionExpr__isset __isset;
 
-  _FusionExpr__isset __isset;
+    void __set_method(const std::string &val);
 
-  void __set_method(const std::string& val);
+    void __set_options_text(const std::string &val);
 
-  void __set_options_text(const std::string& val);
+    void __set_optional_match_tensor_expr(const MatchTensorExpr &val);
 
-  void __set_optional_match_tensor_expr(const MatchTensorExpr& val);
+    bool operator==(const FusionExpr &rhs) const;
+    bool operator!=(const FusionExpr &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const FusionExpr & rhs) const;
-  bool operator != (const FusionExpr &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const FusionExpr &) const;
 
-  bool operator < (const FusionExpr & ) const;
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
-
-  virtual void printTo(std::ostream& out) const;
+    virtual void printTo(std::ostream &out) const;
 };
 
 void swap(FusionExpr &a, FusionExpr &b);
 
-std::ostream& operator<<(std::ostream& out, const FusionExpr& obj);
+std::ostream &operator<<(std::ostream &out, const FusionExpr &obj);
 
 typedef struct _SearchExpr__isset {
-  _SearchExpr__isset() : match_exprs(false), fusion_exprs(false) {}
-  bool match_exprs :1;
-  bool fusion_exprs :1;
+    _SearchExpr__isset() : match_exprs(false), fusion_exprs(false) {}
+    bool match_exprs : 1;
+    bool fusion_exprs : 1;
 } _SearchExpr__isset;
 
 class SearchExpr : public virtual ::apache::thrift::TBase {
- public:
+public:
+    SearchExpr(const SearchExpr &);
+    SearchExpr &operator=(const SearchExpr &);
+    SearchExpr() noexcept;
 
-  SearchExpr(const SearchExpr&);
-  SearchExpr& operator=(const SearchExpr&);
-  SearchExpr() noexcept;
+    virtual ~SearchExpr() noexcept;
+    std::vector<GenericMatchExpr> match_exprs;
+    std::vector<FusionExpr> fusion_exprs;
 
-  virtual ~SearchExpr() noexcept;
-  std::vector<GenericMatchExpr>  match_exprs;
-  std::vector<FusionExpr>  fusion_exprs;
+    _SearchExpr__isset __isset;
 
-  _SearchExpr__isset __isset;
+    void __set_match_exprs(const std::vector<GenericMatchExpr> &val);
 
-  void __set_match_exprs(const std::vector<GenericMatchExpr> & val);
+    void __set_fusion_exprs(const std::vector<FusionExpr> &val);
 
-  void __set_fusion_exprs(const std::vector<FusionExpr> & val);
+    bool operator==(const SearchExpr &rhs) const;
+    bool operator!=(const SearchExpr &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const SearchExpr & rhs) const;
-  bool operator != (const SearchExpr &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const SearchExpr &) const;
 
-  bool operator < (const SearchExpr & ) const;
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
-
-  virtual void printTo(std::ostream& out) const;
+    virtual void printTo(std::ostream &out) const;
 };
 
 void swap(SearchExpr &a, SearchExpr &b);
 
-std::ostream& operator<<(std::ostream& out, const SearchExpr& obj);
+std::ostream &operator<<(std::ostream &out, const SearchExpr &obj);
 
 typedef struct _FunctionExpr__isset {
-  _FunctionExpr__isset() : function_name(false), arguments(false) {}
-  bool function_name :1;
-  bool arguments :1;
+    _FunctionExpr__isset() : function_name(false), arguments(false) {}
+    bool function_name : 1;
+    bool arguments : 1;
 } _FunctionExpr__isset;
 
 class FunctionExpr : public virtual ::apache::thrift::TBase {
- public:
+public:
+    FunctionExpr(const FunctionExpr &);
+    FunctionExpr &operator=(const FunctionExpr &);
+    FunctionExpr() noexcept;
 
-  FunctionExpr(const FunctionExpr&);
-  FunctionExpr& operator=(const FunctionExpr&);
-  FunctionExpr() noexcept;
+    virtual ~FunctionExpr() noexcept;
+    std::string function_name;
+    std::vector<ParsedExpr> arguments;
 
-  virtual ~FunctionExpr() noexcept;
-  std::string function_name;
-  std::vector<ParsedExpr>  arguments;
+    _FunctionExpr__isset __isset;
 
-  _FunctionExpr__isset __isset;
+    void __set_function_name(const std::string &val);
 
-  void __set_function_name(const std::string& val);
+    void __set_arguments(const std::vector<ParsedExpr> &val);
 
-  void __set_arguments(const std::vector<ParsedExpr> & val);
+    bool operator==(const FunctionExpr &rhs) const;
+    bool operator!=(const FunctionExpr &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const FunctionExpr & rhs) const;
-  bool operator != (const FunctionExpr &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const FunctionExpr &) const;
 
-  bool operator < (const FunctionExpr & ) const;
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
-
-  virtual void printTo(std::ostream& out) const;
+    virtual void printTo(std::ostream &out) const;
 };
 
 void swap(FunctionExpr &a, FunctionExpr &b);
 
-std::ostream& operator<<(std::ostream& out, const FunctionExpr& obj);
+std::ostream &operator<<(std::ostream &out, const FunctionExpr &obj);
 
 typedef struct _BetweenExpr__isset {
-  _BetweenExpr__isset() : value(false), upper_bound(false), lower_bound(false) {}
-  bool value :1;
-  bool upper_bound :1;
-  bool lower_bound :1;
+    _BetweenExpr__isset() : value(false), upper_bound(false), lower_bound(false) {}
+    bool value : 1;
+    bool upper_bound : 1;
+    bool lower_bound : 1;
 } _BetweenExpr__isset;
 
 class BetweenExpr : public virtual ::apache::thrift::TBase {
- public:
+public:
+    BetweenExpr(const BetweenExpr &);
+    BetweenExpr &operator=(const BetweenExpr &);
+    BetweenExpr() noexcept;
 
-  BetweenExpr(const BetweenExpr&);
-  BetweenExpr& operator=(const BetweenExpr&);
-  BetweenExpr() noexcept;
+    virtual ~BetweenExpr() noexcept;
+    ParsedExpr value;
+    ParsedExpr upper_bound;
+    ParsedExpr lower_bound;
 
-  virtual ~BetweenExpr() noexcept;
-  ParsedExpr value;
-  ParsedExpr upper_bound;
-  ParsedExpr lower_bound;
+    _BetweenExpr__isset __isset;
 
-  _BetweenExpr__isset __isset;
+    void __set_value(const ParsedExpr &val);
 
-  void __set_value(const ParsedExpr& val);
+    void __set_upper_bound(const ParsedExpr &val);
 
-  void __set_upper_bound(const ParsedExpr& val);
+    void __set_lower_bound(const ParsedExpr &val);
 
-  void __set_lower_bound(const ParsedExpr& val);
+    bool operator==(const BetweenExpr &rhs) const;
+    bool operator!=(const BetweenExpr &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const BetweenExpr & rhs) const;
-  bool operator != (const BetweenExpr &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const BetweenExpr &) const;
 
-  bool operator < (const BetweenExpr & ) const;
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
-
-  virtual void printTo(std::ostream& out) const;
+    virtual void printTo(std::ostream &out) const;
 };
 
 void swap(BetweenExpr &a, BetweenExpr &b);
 
-std::ostream& operator<<(std::ostream& out, const BetweenExpr& obj);
+std::ostream &operator<<(std::ostream &out, const BetweenExpr &obj);
 
 typedef struct _UpdateExpr__isset {
-  _UpdateExpr__isset() : column_name(false), value(false) {}
-  bool column_name :1;
-  bool value :1;
+    _UpdateExpr__isset() : column_name(false), value(false) {}
+    bool column_name : 1;
+    bool value : 1;
 } _UpdateExpr__isset;
 
 class UpdateExpr : public virtual ::apache::thrift::TBase {
- public:
+public:
+    UpdateExpr(const UpdateExpr &);
+    UpdateExpr &operator=(const UpdateExpr &);
+    UpdateExpr() noexcept;
 
-  UpdateExpr(const UpdateExpr&);
-  UpdateExpr& operator=(const UpdateExpr&);
-  UpdateExpr() noexcept;
+    virtual ~UpdateExpr() noexcept;
+    std::string column_name;
+    ParsedExpr value;
 
-  virtual ~UpdateExpr() noexcept;
-  std::string column_name;
-  ParsedExpr value;
+    _UpdateExpr__isset __isset;
 
-  _UpdateExpr__isset __isset;
+    void __set_column_name(const std::string &val);
 
-  void __set_column_name(const std::string& val);
+    void __set_value(const ParsedExpr &val);
 
-  void __set_value(const ParsedExpr& val);
+    bool operator==(const UpdateExpr &rhs) const;
+    bool operator!=(const UpdateExpr &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const UpdateExpr & rhs) const;
-  bool operator != (const UpdateExpr &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const UpdateExpr &) const;
 
-  bool operator < (const UpdateExpr & ) const;
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
-
-  virtual void printTo(std::ostream& out) const;
+    virtual void printTo(std::ostream &out) const;
 };
 
 void swap(UpdateExpr &a, UpdateExpr &b);
 
-std::ostream& operator<<(std::ostream& out, const UpdateExpr& obj);
+std::ostream &operator<<(std::ostream &out, const UpdateExpr &obj);
 
 typedef struct _OrderByExpr__isset {
-  _OrderByExpr__isset() : expr(false), asc(false) {}
-  bool expr :1;
-  bool asc :1;
+    _OrderByExpr__isset() : expr(false), asc(false) {}
+    bool expr : 1;
+    bool asc : 1;
 } _OrderByExpr__isset;
 
 class OrderByExpr : public virtual ::apache::thrift::TBase {
- public:
+public:
+    OrderByExpr(const OrderByExpr &);
+    OrderByExpr &operator=(const OrderByExpr &);
+    OrderByExpr() noexcept;
 
-  OrderByExpr(const OrderByExpr&);
-  OrderByExpr& operator=(const OrderByExpr&);
-  OrderByExpr() noexcept;
+    virtual ~OrderByExpr() noexcept;
+    ParsedExpr expr;
+    bool asc;
 
-  virtual ~OrderByExpr() noexcept;
-  ParsedExpr expr;
-  bool asc;
+    _OrderByExpr__isset __isset;
 
-  _OrderByExpr__isset __isset;
+    void __set_expr(const ParsedExpr &val);
 
-  void __set_expr(const ParsedExpr& val);
+    void __set_asc(const bool val);
 
-  void __set_asc(const bool val);
+    bool operator==(const OrderByExpr &rhs) const;
+    bool operator!=(const OrderByExpr &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const OrderByExpr & rhs) const;
-  bool operator != (const OrderByExpr &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const OrderByExpr &) const;
 
-  bool operator < (const OrderByExpr & ) const;
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
-
-  virtual void printTo(std::ostream& out) const;
+    virtual void printTo(std::ostream &out) const;
 };
 
 void swap(OrderByExpr &a, OrderByExpr &b);
 
-std::ostream& operator<<(std::ostream& out, const OrderByExpr& obj);
+std::ostream &operator<<(std::ostream &out, const OrderByExpr &obj);
 
 typedef struct _InExpr__isset {
-  _InExpr__isset() : left_operand(false), arguments(false), in_type(false) {}
-  bool left_operand :1;
-  bool arguments :1;
-  bool in_type :1;
+    _InExpr__isset() : left_operand(false), arguments(false), in_type(false) {}
+    bool left_operand : 1;
+    bool arguments : 1;
+    bool in_type : 1;
 } _InExpr__isset;
 
 class InExpr : public virtual ::apache::thrift::TBase {
- public:
+public:
+    InExpr(const InExpr &);
+    InExpr &operator=(const InExpr &);
+    InExpr() noexcept;
 
-  InExpr(const InExpr&);
-  InExpr& operator=(const InExpr&);
-  InExpr() noexcept;
+    virtual ~InExpr() noexcept;
+    ParsedExpr left_operand;
+    std::vector<ParsedExpr> arguments;
+    bool in_type;
 
-  virtual ~InExpr() noexcept;
-  ParsedExpr left_operand;
-  std::vector<ParsedExpr>  arguments;
-  bool in_type;
+    _InExpr__isset __isset;
 
-  _InExpr__isset __isset;
+    void __set_left_operand(const ParsedExpr &val);
 
-  void __set_left_operand(const ParsedExpr& val);
+    void __set_arguments(const std::vector<ParsedExpr> &val);
 
-  void __set_arguments(const std::vector<ParsedExpr> & val);
+    void __set_in_type(const bool val);
 
-  void __set_in_type(const bool val);
+    bool operator==(const InExpr &rhs) const;
+    bool operator!=(const InExpr &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const InExpr & rhs) const;
-  bool operator != (const InExpr &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const InExpr &) const;
 
-  bool operator < (const InExpr & ) const;
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
-
-  virtual void printTo(std::ostream& out) const;
+    virtual void printTo(std::ostream &out) const;
 };
 
 void swap(InExpr &a, InExpr &b);
 
-std::ostream& operator<<(std::ostream& out, const InExpr& obj);
+std::ostream &operator<<(std::ostream &out, const InExpr &obj);
 
 typedef struct _ColumnDef__isset {
-  _ColumnDef__isset() : id(false), name(false), data_type(false), constraints(true), constant_expr(false), comment(false) {}
-  bool id :1;
-  bool name :1;
-  bool data_type :1;
-  bool constraints :1;
-  bool constant_expr :1;
-  bool comment :1;
+    _ColumnDef__isset() : id(false), name(false), data_type(false), constraints(true), constant_expr(false), comment(false) {}
+    bool id : 1;
+    bool name : 1;
+    bool data_type : 1;
+    bool constraints : 1;
+    bool constant_expr : 1;
+    bool comment : 1;
 } _ColumnDef__isset;
 
 class ColumnDef : public virtual ::apache::thrift::TBase {
- public:
+public:
+    ColumnDef(const ColumnDef &);
+    ColumnDef &operator=(const ColumnDef &);
+    ColumnDef() noexcept;
 
-  ColumnDef(const ColumnDef&);
-  ColumnDef& operator=(const ColumnDef&);
-  ColumnDef() noexcept;
+    virtual ~ColumnDef() noexcept;
+    int32_t id;
+    std::string name;
+    DataType data_type;
+    std::vector<Constraint::type> constraints;
+    ConstantExpr constant_expr;
+    std::string comment;
 
-  virtual ~ColumnDef() noexcept;
-  int32_t id;
-  std::string name;
-  DataType data_type;
-  std::vector<Constraint::type>  constraints;
-  ConstantExpr constant_expr;
-  std::string comment;
+    _ColumnDef__isset __isset;
 
-  _ColumnDef__isset __isset;
+    void __set_id(const int32_t val);
 
-  void __set_id(const int32_t val);
+    void __set_name(const std::string &val);
 
-  void __set_name(const std::string& val);
+    void __set_data_type(const DataType &val);
 
-  void __set_data_type(const DataType& val);
+    void __set_constraints(const std::vector<Constraint::type> &val);
 
-  void __set_constraints(const std::vector<Constraint::type> & val);
+    void __set_constant_expr(const ConstantExpr &val);
 
-  void __set_constant_expr(const ConstantExpr& val);
+    void __set_comment(const std::string &val);
 
-  void __set_comment(const std::string& val);
+    bool operator==(const ColumnDef &rhs) const;
+    bool operator!=(const ColumnDef &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const ColumnDef & rhs) const;
-  bool operator != (const ColumnDef &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const ColumnDef &) const;
 
-  bool operator < (const ColumnDef & ) const;
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
-
-  virtual void printTo(std::ostream& out) const;
+    virtual void printTo(std::ostream &out) const;
 };
 
 void swap(ColumnDef &a, ColumnDef &b);
 
-std::ostream& operator<<(std::ostream& out, const ColumnDef& obj);
+std::ostream &operator<<(std::ostream &out, const ColumnDef &obj);
 
 typedef struct _Field__isset {
-  _Field__isset() : column_names(true), parse_exprs(true) {}
-  bool column_names :1;
-  bool parse_exprs :1;
+    _Field__isset() : column_names(true), parse_exprs(true) {}
+    bool column_names : 1;
+    bool parse_exprs : 1;
 } _Field__isset;
 
 class Field : public virtual ::apache::thrift::TBase {
- public:
+public:
+    Field(const Field &);
+    Field &operator=(const Field &);
+    Field() noexcept;
 
-  Field(const Field&);
-  Field& operator=(const Field&);
-  Field() noexcept;
+    virtual ~Field() noexcept;
+    std::vector<std::string> column_names;
+    std::vector<ParsedExpr> parse_exprs;
 
-  virtual ~Field() noexcept;
-  std::vector<std::string>  column_names;
-  std::vector<ParsedExpr>  parse_exprs;
+    _Field__isset __isset;
 
-  _Field__isset __isset;
+    void __set_column_names(const std::vector<std::string> &val);
 
-  void __set_column_names(const std::vector<std::string> & val);
+    void __set_parse_exprs(const std::vector<ParsedExpr> &val);
 
-  void __set_parse_exprs(const std::vector<ParsedExpr> & val);
+    bool operator==(const Field &rhs) const;
+    bool operator!=(const Field &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const Field & rhs) const;
-  bool operator != (const Field &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const Field &) const;
 
-  bool operator < (const Field & ) const;
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
-
-  virtual void printTo(std::ostream& out) const;
+    virtual void printTo(std::ostream &out) const;
 };
 
 void swap(Field &a, Field &b);
 
-std::ostream& operator<<(std::ostream& out, const Field& obj);
+std::ostream &operator<<(std::ostream &out, const Field &obj);
 
 typedef struct _ColumnField__isset {
-  _ColumnField__isset() : column_type(false), column_vectors(true), column_name(false) {}
-  bool column_type :1;
-  bool column_vectors :1;
-  bool column_name :1;
+    _ColumnField__isset() : column_type(false), column_vectors(true), column_name(false) {}
+    bool column_type : 1;
+    bool column_vectors : 1;
+    bool column_name : 1;
 } _ColumnField__isset;
 
 class ColumnField : public virtual ::apache::thrift::TBase {
- public:
+public:
+    ColumnField(const ColumnField &);
+    ColumnField &operator=(const ColumnField &);
+    ColumnField() noexcept;
 
-  ColumnField(const ColumnField&);
-  ColumnField& operator=(const ColumnField&);
-  ColumnField() noexcept;
+    virtual ~ColumnField() noexcept;
+    /**
+     *
+     * @see ColumnType
+     */
+    ColumnType::type column_type;
+    std::vector<std::string> column_vectors;
+    std::string column_name;
 
-  virtual ~ColumnField() noexcept;
-  /**
-   * 
-   * @see ColumnType
-   */
-  ColumnType::type column_type;
-  std::vector<std::string>  column_vectors;
-  std::string column_name;
+    _ColumnField__isset __isset;
 
-  _ColumnField__isset __isset;
+    void __set_column_type(const ColumnType::type val);
 
-  void __set_column_type(const ColumnType::type val);
+    void __set_column_vectors(const std::vector<std::string> &val);
 
-  void __set_column_vectors(const std::vector<std::string> & val);
+    void __set_column_name(const std::string &val);
 
-  void __set_column_name(const std::string& val);
+    bool operator==(const ColumnField &rhs) const;
+    bool operator!=(const ColumnField &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const ColumnField & rhs) const;
-  bool operator != (const ColumnField &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const ColumnField &) const;
 
-  bool operator < (const ColumnField & ) const;
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
-
-  virtual void printTo(std::ostream& out) const;
+    virtual void printTo(std::ostream &out) const;
 };
 
 void swap(ColumnField &a, ColumnField &b);
 
-std::ostream& operator<<(std::ostream& out, const ColumnField& obj);
+std::ostream &operator<<(std::ostream &out, const ColumnField &obj);
 
 typedef struct _ImportOption__isset {
-  _ImportOption__isset() : delimiter(false), has_header(false), copy_file_type(false) {}
-  bool delimiter :1;
-  bool has_header :1;
-  bool copy_file_type :1;
+    _ImportOption__isset() : delimiter(false), has_header(false), copy_file_type(false) {}
+    bool delimiter : 1;
+    bool has_header : 1;
+    bool copy_file_type : 1;
 } _ImportOption__isset;
 
 class ImportOption : public virtual ::apache::thrift::TBase {
- public:
+public:
+    ImportOption(const ImportOption &);
+    ImportOption &operator=(const ImportOption &);
+    ImportOption() noexcept;
 
-  ImportOption(const ImportOption&);
-  ImportOption& operator=(const ImportOption&);
-  ImportOption() noexcept;
+    virtual ~ImportOption() noexcept;
+    std::string delimiter;
+    bool has_header;
+    /**
+     *
+     * @see CopyFileType
+     */
+    CopyFileType::type copy_file_type;
 
-  virtual ~ImportOption() noexcept;
-  std::string delimiter;
-  bool has_header;
-  /**
-   * 
-   * @see CopyFileType
-   */
-  CopyFileType::type copy_file_type;
+    _ImportOption__isset __isset;
 
-  _ImportOption__isset __isset;
+    void __set_delimiter(const std::string &val);
 
-  void __set_delimiter(const std::string& val);
+    void __set_has_header(const bool val);
 
-  void __set_has_header(const bool val);
+    void __set_copy_file_type(const CopyFileType::type val);
 
-  void __set_copy_file_type(const CopyFileType::type val);
+    bool operator==(const ImportOption &rhs) const;
+    bool operator!=(const ImportOption &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const ImportOption & rhs) const;
-  bool operator != (const ImportOption &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const ImportOption &) const;
 
-  bool operator < (const ImportOption & ) const;
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
-
-  virtual void printTo(std::ostream& out) const;
+    virtual void printTo(std::ostream &out) const;
 };
 
 void swap(ImportOption &a, ImportOption &b);
 
-std::ostream& operator<<(std::ostream& out, const ImportOption& obj);
+std::ostream &operator<<(std::ostream &out, const ImportOption &obj);
 
 typedef struct _ExportOption__isset {
-  _ExportOption__isset() : delimiter(false), has_header(false), copy_file_type(false), offset(false), limit(false), row_limit(false) {}
-  bool delimiter :1;
-  bool has_header :1;
-  bool copy_file_type :1;
-  bool offset :1;
-  bool limit :1;
-  bool row_limit :1;
+    _ExportOption__isset() : delimiter(false), has_header(false), copy_file_type(false), offset(false), limit(false), row_limit(false) {}
+    bool delimiter : 1;
+    bool has_header : 1;
+    bool copy_file_type : 1;
+    bool offset : 1;
+    bool limit : 1;
+    bool row_limit : 1;
 } _ExportOption__isset;
 
 class ExportOption : public virtual ::apache::thrift::TBase {
- public:
+public:
+    ExportOption(const ExportOption &);
+    ExportOption &operator=(const ExportOption &);
+    ExportOption() noexcept;
 
-  ExportOption(const ExportOption&);
-  ExportOption& operator=(const ExportOption&);
-  ExportOption() noexcept;
+    virtual ~ExportOption() noexcept;
+    std::string delimiter;
+    bool has_header;
+    /**
+     *
+     * @see CopyFileType
+     */
+    CopyFileType::type copy_file_type;
+    int64_t offset;
+    int64_t limit;
+    int64_t row_limit;
 
-  virtual ~ExportOption() noexcept;
-  std::string delimiter;
-  bool has_header;
-  /**
-   * 
-   * @see CopyFileType
-   */
-  CopyFileType::type copy_file_type;
-  int64_t offset;
-  int64_t limit;
-  int64_t row_limit;
+    _ExportOption__isset __isset;
 
-  _ExportOption__isset __isset;
+    void __set_delimiter(const std::string &val);
 
-  void __set_delimiter(const std::string& val);
+    void __set_has_header(const bool val);
 
-  void __set_has_header(const bool val);
+    void __set_copy_file_type(const CopyFileType::type val);
 
-  void __set_copy_file_type(const CopyFileType::type val);
+    void __set_offset(const int64_t val);
 
-  void __set_offset(const int64_t val);
+    void __set_limit(const int64_t val);
 
-  void __set_limit(const int64_t val);
+    void __set_row_limit(const int64_t val);
 
-  void __set_row_limit(const int64_t val);
+    bool operator==(const ExportOption &rhs) const;
+    bool operator!=(const ExportOption &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const ExportOption & rhs) const;
-  bool operator != (const ExportOption &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const ExportOption &) const;
 
-  bool operator < (const ExportOption & ) const;
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
-
-  virtual void printTo(std::ostream& out) const;
+    virtual void printTo(std::ostream &out) const;
 };
 
 void swap(ExportOption &a, ExportOption &b);
 
-std::ostream& operator<<(std::ostream& out, const ExportOption& obj);
+std::ostream &operator<<(std::ostream &out, const ExportOption &obj);
 
 typedef struct _OptimizeOptions__isset {
-  _OptimizeOptions__isset() : index_name(false), opt_params(true) {}
-  bool index_name :1;
-  bool opt_params :1;
+    _OptimizeOptions__isset() : index_name(false), opt_params(true) {}
+    bool index_name : 1;
+    bool opt_params : 1;
 } _OptimizeOptions__isset;
 
 class OptimizeOptions : public virtual ::apache::thrift::TBase {
- public:
+public:
+    OptimizeOptions(const OptimizeOptions &);
+    OptimizeOptions &operator=(const OptimizeOptions &);
+    OptimizeOptions() noexcept;
 
-  OptimizeOptions(const OptimizeOptions&);
-  OptimizeOptions& operator=(const OptimizeOptions&);
-  OptimizeOptions() noexcept;
+    virtual ~OptimizeOptions() noexcept;
+    std::string index_name;
+    std::vector<InitParameter> opt_params;
 
-  virtual ~OptimizeOptions() noexcept;
-  std::string index_name;
-  std::vector<InitParameter>  opt_params;
+    _OptimizeOptions__isset __isset;
 
-  _OptimizeOptions__isset __isset;
+    void __set_index_name(const std::string &val);
 
-  void __set_index_name(const std::string& val);
+    void __set_opt_params(const std::vector<InitParameter> &val);
 
-  void __set_opt_params(const std::vector<InitParameter> & val);
+    bool operator==(const OptimizeOptions &rhs) const;
+    bool operator!=(const OptimizeOptions &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const OptimizeOptions & rhs) const;
-  bool operator != (const OptimizeOptions &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const OptimizeOptions &) const;
 
-  bool operator < (const OptimizeOptions & ) const;
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
-
-  virtual void printTo(std::ostream& out) const;
+    virtual void printTo(std::ostream &out) const;
 };
 
 void swap(OptimizeOptions &a, OptimizeOptions &b);
 
-std::ostream& operator<<(std::ostream& out, const OptimizeOptions& obj);
+std::ostream &operator<<(std::ostream &out, const OptimizeOptions &obj);
 
 typedef struct _ConnectRequest__isset {
-  _ConnectRequest__isset() : client_version(false) {}
-  bool client_version :1;
+    _ConnectRequest__isset() : client_version(false) {}
+    bool client_version : 1;
 } _ConnectRequest__isset;
 
 class ConnectRequest : public virtual ::apache::thrift::TBase {
- public:
+public:
+    ConnectRequest(const ConnectRequest &) noexcept;
+    ConnectRequest &operator=(const ConnectRequest &) noexcept;
+    ConnectRequest() noexcept;
 
-  ConnectRequest(const ConnectRequest&) noexcept;
-  ConnectRequest& operator=(const ConnectRequest&) noexcept;
-  ConnectRequest() noexcept;
+    virtual ~ConnectRequest() noexcept;
+    int64_t client_version;
 
-  virtual ~ConnectRequest() noexcept;
-  int64_t client_version;
+    _ConnectRequest__isset __isset;
 
-  _ConnectRequest__isset __isset;
+    void __set_client_version(const int64_t val);
 
-  void __set_client_version(const int64_t val);
+    bool operator==(const ConnectRequest &rhs) const;
+    bool operator!=(const ConnectRequest &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const ConnectRequest & rhs) const;
-  bool operator != (const ConnectRequest &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const ConnectRequest &) const;
 
-  bool operator < (const ConnectRequest & ) const;
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
-
-  virtual void printTo(std::ostream& out) const;
+    virtual void printTo(std::ostream &out) const;
 };
 
 void swap(ConnectRequest &a, ConnectRequest &b);
 
-std::ostream& operator<<(std::ostream& out, const ConnectRequest& obj);
+std::ostream &operator<<(std::ostream &out, const ConnectRequest &obj);
 
 typedef struct _CommonRequest__isset {
-  _CommonRequest__isset() : session_id(false) {}
-  bool session_id :1;
+    _CommonRequest__isset() : session_id(false) {}
+    bool session_id : 1;
 } _CommonRequest__isset;
 
 class CommonRequest : public virtual ::apache::thrift::TBase {
- public:
+public:
+    CommonRequest(const CommonRequest &) noexcept;
+    CommonRequest &operator=(const CommonRequest &) noexcept;
+    CommonRequest() noexcept;
 
-  CommonRequest(const CommonRequest&) noexcept;
-  CommonRequest& operator=(const CommonRequest&) noexcept;
-  CommonRequest() noexcept;
+    virtual ~CommonRequest() noexcept;
+    int64_t session_id;
 
-  virtual ~CommonRequest() noexcept;
-  int64_t session_id;
+    _CommonRequest__isset __isset;
 
-  _CommonRequest__isset __isset;
+    void __set_session_id(const int64_t val);
 
-  void __set_session_id(const int64_t val);
+    bool operator==(const CommonRequest &rhs) const;
+    bool operator!=(const CommonRequest &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const CommonRequest & rhs) const;
-  bool operator != (const CommonRequest &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const CommonRequest &) const;
 
-  bool operator < (const CommonRequest & ) const;
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
-
-  virtual void printTo(std::ostream& out) const;
+    virtual void printTo(std::ostream &out) const;
 };
 
 void swap(CommonRequest &a, CommonRequest &b);
 
-std::ostream& operator<<(std::ostream& out, const CommonRequest& obj);
+std::ostream &operator<<(std::ostream &out, const CommonRequest &obj);
 
 typedef struct _CommonResponse__isset {
-  _CommonResponse__isset() : error_code(false), error_msg(false), session_id(false) {}
-  bool error_code :1;
-  bool error_msg :1;
-  bool session_id :1;
+    _CommonResponse__isset() : error_code(false), error_msg(false), session_id(false) {}
+    bool error_code : 1;
+    bool error_msg : 1;
+    bool session_id : 1;
 } _CommonResponse__isset;
 
 class CommonResponse : public virtual ::apache::thrift::TBase {
- public:
+public:
+    CommonResponse(const CommonResponse &);
+    CommonResponse &operator=(const CommonResponse &);
+    CommonResponse() noexcept;
 
-  CommonResponse(const CommonResponse&);
-  CommonResponse& operator=(const CommonResponse&);
-  CommonResponse() noexcept;
+    virtual ~CommonResponse() noexcept;
+    int64_t error_code;
+    std::string error_msg;
+    int64_t session_id;
 
-  virtual ~CommonResponse() noexcept;
-  int64_t error_code;
-  std::string error_msg;
-  int64_t session_id;
+    _CommonResponse__isset __isset;
 
-  _CommonResponse__isset __isset;
+    void __set_error_code(const int64_t val);
 
-  void __set_error_code(const int64_t val);
+    void __set_error_msg(const std::string &val);
 
-  void __set_error_msg(const std::string& val);
+    void __set_session_id(const int64_t val);
 
-  void __set_session_id(const int64_t val);
+    bool operator==(const CommonResponse &rhs) const;
+    bool operator!=(const CommonResponse &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const CommonResponse & rhs) const;
-  bool operator != (const CommonResponse &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const CommonResponse &) const;
 
-  bool operator < (const CommonResponse & ) const;
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
-
-  virtual void printTo(std::ostream& out) const;
+    virtual void printTo(std::ostream &out) const;
 };
 
 void swap(CommonResponse &a, CommonResponse &b);
 
-std::ostream& operator<<(std::ostream& out, const CommonResponse& obj);
+std::ostream &operator<<(std::ostream &out, const CommonResponse &obj);
 
 typedef struct _ListDatabaseRequest__isset {
-  _ListDatabaseRequest__isset() : session_id(false) {}
-  bool session_id :1;
+    _ListDatabaseRequest__isset() : session_id(false) {}
+    bool session_id : 1;
 } _ListDatabaseRequest__isset;
 
 class ListDatabaseRequest : public virtual ::apache::thrift::TBase {
- public:
+public:
+    ListDatabaseRequest(const ListDatabaseRequest &) noexcept;
+    ListDatabaseRequest &operator=(const ListDatabaseRequest &) noexcept;
+    ListDatabaseRequest() noexcept;
 
-  ListDatabaseRequest(const ListDatabaseRequest&) noexcept;
-  ListDatabaseRequest& operator=(const ListDatabaseRequest&) noexcept;
-  ListDatabaseRequest() noexcept;
+    virtual ~ListDatabaseRequest() noexcept;
+    int64_t session_id;
 
-  virtual ~ListDatabaseRequest() noexcept;
-  int64_t session_id;
+    _ListDatabaseRequest__isset __isset;
 
-  _ListDatabaseRequest__isset __isset;
+    void __set_session_id(const int64_t val);
 
-  void __set_session_id(const int64_t val);
+    bool operator==(const ListDatabaseRequest &rhs) const;
+    bool operator!=(const ListDatabaseRequest &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const ListDatabaseRequest & rhs) const;
-  bool operator != (const ListDatabaseRequest &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const ListDatabaseRequest &) const;
 
-  bool operator < (const ListDatabaseRequest & ) const;
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
-
-  virtual void printTo(std::ostream& out) const;
+    virtual void printTo(std::ostream &out) const;
 };
 
 void swap(ListDatabaseRequest &a, ListDatabaseRequest &b);
 
-std::ostream& operator<<(std::ostream& out, const ListDatabaseRequest& obj);
+std::ostream &operator<<(std::ostream &out, const ListDatabaseRequest &obj);
 
 typedef struct _ListDatabaseResponse__isset {
-  _ListDatabaseResponse__isset() : error_code(false), error_msg(false), db_names(true), db_dirs(true), db_comments(true) {}
-  bool error_code :1;
-  bool error_msg :1;
-  bool db_names :1;
-  bool db_dirs :1;
-  bool db_comments :1;
+    _ListDatabaseResponse__isset() : error_code(false), error_msg(false), db_names(true), db_dirs(true), db_comments(true) {}
+    bool error_code : 1;
+    bool error_msg : 1;
+    bool db_names : 1;
+    bool db_dirs : 1;
+    bool db_comments : 1;
 } _ListDatabaseResponse__isset;
 
 class ListDatabaseResponse : public virtual ::apache::thrift::TBase {
- public:
+public:
+    ListDatabaseResponse(const ListDatabaseResponse &);
+    ListDatabaseResponse &operator=(const ListDatabaseResponse &);
+    ListDatabaseResponse() noexcept;
 
-  ListDatabaseResponse(const ListDatabaseResponse&);
-  ListDatabaseResponse& operator=(const ListDatabaseResponse&);
-  ListDatabaseResponse() noexcept;
+    virtual ~ListDatabaseResponse() noexcept;
+    int64_t error_code;
+    std::string error_msg;
+    std::vector<std::string> db_names;
+    std::vector<std::string> db_dirs;
+    std::vector<std::string> db_comments;
 
-  virtual ~ListDatabaseResponse() noexcept;
-  int64_t error_code;
-  std::string error_msg;
-  std::vector<std::string>  db_names;
-  std::vector<std::string>  db_dirs;
-  std::vector<std::string>  db_comments;
+    _ListDatabaseResponse__isset __isset;
 
-  _ListDatabaseResponse__isset __isset;
+    void __set_error_code(const int64_t val);
 
-  void __set_error_code(const int64_t val);
+    void __set_error_msg(const std::string &val);
 
-  void __set_error_msg(const std::string& val);
+    void __set_db_names(const std::vector<std::string> &val);
 
-  void __set_db_names(const std::vector<std::string> & val);
+    void __set_db_dirs(const std::vector<std::string> &val);
 
-  void __set_db_dirs(const std::vector<std::string> & val);
+    void __set_db_comments(const std::vector<std::string> &val);
 
-  void __set_db_comments(const std::vector<std::string> & val);
+    bool operator==(const ListDatabaseResponse &rhs) const;
+    bool operator!=(const ListDatabaseResponse &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const ListDatabaseResponse & rhs) const;
-  bool operator != (const ListDatabaseResponse &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const ListDatabaseResponse &) const;
 
-  bool operator < (const ListDatabaseResponse & ) const;
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
-
-  virtual void printTo(std::ostream& out) const;
+    virtual void printTo(std::ostream &out) const;
 };
 
 void swap(ListDatabaseResponse &a, ListDatabaseResponse &b);
 
-std::ostream& operator<<(std::ostream& out, const ListDatabaseResponse& obj);
+std::ostream &operator<<(std::ostream &out, const ListDatabaseResponse &obj);
 
 typedef struct _ListTableRequest__isset {
-  _ListTableRequest__isset() : db_name(false), session_id(false) {}
-  bool db_name :1;
-  bool session_id :1;
+    _ListTableRequest__isset() : db_name(false), session_id(false) {}
+    bool db_name : 1;
+    bool session_id : 1;
 } _ListTableRequest__isset;
 
 class ListTableRequest : public virtual ::apache::thrift::TBase {
- public:
+public:
+    ListTableRequest(const ListTableRequest &);
+    ListTableRequest &operator=(const ListTableRequest &);
+    ListTableRequest() noexcept;
 
-  ListTableRequest(const ListTableRequest&);
-  ListTableRequest& operator=(const ListTableRequest&);
-  ListTableRequest() noexcept;
+    virtual ~ListTableRequest() noexcept;
+    std::string db_name;
+    int64_t session_id;
 
-  virtual ~ListTableRequest() noexcept;
-  std::string db_name;
-  int64_t session_id;
+    _ListTableRequest__isset __isset;
 
-  _ListTableRequest__isset __isset;
+    void __set_db_name(const std::string &val);
 
-  void __set_db_name(const std::string& val);
+    void __set_session_id(const int64_t val);
 
-  void __set_session_id(const int64_t val);
+    bool operator==(const ListTableRequest &rhs) const;
+    bool operator!=(const ListTableRequest &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const ListTableRequest & rhs) const;
-  bool operator != (const ListTableRequest &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const ListTableRequest &) const;
 
-  bool operator < (const ListTableRequest & ) const;
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
-
-  virtual void printTo(std::ostream& out) const;
+    virtual void printTo(std::ostream &out) const;
 };
 
 void swap(ListTableRequest &a, ListTableRequest &b);
 
-std::ostream& operator<<(std::ostream& out, const ListTableRequest& obj);
+std::ostream &operator<<(std::ostream &out, const ListTableRequest &obj);
 
 typedef struct _ListTableResponse__isset {
-  _ListTableResponse__isset() : error_code(false), error_msg(false), table_names(true) {}
-  bool error_code :1;
-  bool error_msg :1;
-  bool table_names :1;
+    _ListTableResponse__isset() : error_code(false), error_msg(false), table_names(true) {}
+    bool error_code : 1;
+    bool error_msg : 1;
+    bool table_names : 1;
 } _ListTableResponse__isset;
 
 class ListTableResponse : public virtual ::apache::thrift::TBase {
- public:
+public:
+    ListTableResponse(const ListTableResponse &);
+    ListTableResponse &operator=(const ListTableResponse &);
+    ListTableResponse() noexcept;
 
-  ListTableResponse(const ListTableResponse&);
-  ListTableResponse& operator=(const ListTableResponse&);
-  ListTableResponse() noexcept;
+    virtual ~ListTableResponse() noexcept;
+    int64_t error_code;
+    std::string error_msg;
+    std::vector<std::string> table_names;
 
-  virtual ~ListTableResponse() noexcept;
-  int64_t error_code;
-  std::string error_msg;
-  std::vector<std::string>  table_names;
+    _ListTableResponse__isset __isset;
 
-  _ListTableResponse__isset __isset;
+    void __set_error_code(const int64_t val);
 
-  void __set_error_code(const int64_t val);
+    void __set_error_msg(const std::string &val);
 
-  void __set_error_msg(const std::string& val);
+    void __set_table_names(const std::vector<std::string> &val);
 
-  void __set_table_names(const std::vector<std::string> & val);
+    bool operator==(const ListTableResponse &rhs) const;
+    bool operator!=(const ListTableResponse &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const ListTableResponse & rhs) const;
-  bool operator != (const ListTableResponse &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const ListTableResponse &) const;
 
-  bool operator < (const ListTableResponse & ) const;
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
-
-  virtual void printTo(std::ostream& out) const;
+    virtual void printTo(std::ostream &out) const;
 };
 
 void swap(ListTableResponse &a, ListTableResponse &b);
 
-std::ostream& operator<<(std::ostream& out, const ListTableResponse& obj);
+std::ostream &operator<<(std::ostream &out, const ListTableResponse &obj);
 
 typedef struct _ListIndexRequest__isset {
-  _ListIndexRequest__isset() : db_name(false), table_name(false), session_id(false) {}
-  bool db_name :1;
-  bool table_name :1;
-  bool session_id :1;
+    _ListIndexRequest__isset() : db_name(false), table_name(false), session_id(false) {}
+    bool db_name : 1;
+    bool table_name : 1;
+    bool session_id : 1;
 } _ListIndexRequest__isset;
 
 class ListIndexRequest : public virtual ::apache::thrift::TBase {
- public:
+public:
+    ListIndexRequest(const ListIndexRequest &);
+    ListIndexRequest &operator=(const ListIndexRequest &);
+    ListIndexRequest() noexcept;
 
-  ListIndexRequest(const ListIndexRequest&);
-  ListIndexRequest& operator=(const ListIndexRequest&);
-  ListIndexRequest() noexcept;
+    virtual ~ListIndexRequest() noexcept;
+    std::string db_name;
+    std::string table_name;
+    int64_t session_id;
 
-  virtual ~ListIndexRequest() noexcept;
-  std::string db_name;
-  std::string table_name;
-  int64_t session_id;
+    _ListIndexRequest__isset __isset;
 
-  _ListIndexRequest__isset __isset;
+    void __set_db_name(const std::string &val);
 
-  void __set_db_name(const std::string& val);
+    void __set_table_name(const std::string &val);
 
-  void __set_table_name(const std::string& val);
+    void __set_session_id(const int64_t val);
 
-  void __set_session_id(const int64_t val);
+    bool operator==(const ListIndexRequest &rhs) const;
+    bool operator!=(const ListIndexRequest &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const ListIndexRequest & rhs) const;
-  bool operator != (const ListIndexRequest &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const ListIndexRequest &) const;
 
-  bool operator < (const ListIndexRequest & ) const;
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
-
-  virtual void printTo(std::ostream& out) const;
+    virtual void printTo(std::ostream &out) const;
 };
 
 void swap(ListIndexRequest &a, ListIndexRequest &b);
 
-std::ostream& operator<<(std::ostream& out, const ListIndexRequest& obj);
+std::ostream &operator<<(std::ostream &out, const ListIndexRequest &obj);
 
 typedef struct _ListIndexResponse__isset {
-  _ListIndexResponse__isset() : error_code(false), error_msg(false), index_names(true) {}
-  bool error_code :1;
-  bool error_msg :1;
-  bool index_names :1;
+    _ListIndexResponse__isset() : error_code(false), error_msg(false), index_names(true) {}
+    bool error_code : 1;
+    bool error_msg : 1;
+    bool index_names : 1;
 } _ListIndexResponse__isset;
 
 class ListIndexResponse : public virtual ::apache::thrift::TBase {
- public:
+public:
+    ListIndexResponse(const ListIndexResponse &);
+    ListIndexResponse &operator=(const ListIndexResponse &);
+    ListIndexResponse() noexcept;
 
-  ListIndexResponse(const ListIndexResponse&);
-  ListIndexResponse& operator=(const ListIndexResponse&);
-  ListIndexResponse() noexcept;
+    virtual ~ListIndexResponse() noexcept;
+    int64_t error_code;
+    std::string error_msg;
+    std::vector<std::string> index_names;
 
-  virtual ~ListIndexResponse() noexcept;
-  int64_t error_code;
-  std::string error_msg;
-  std::vector<std::string>  index_names;
+    _ListIndexResponse__isset __isset;
 
-  _ListIndexResponse__isset __isset;
+    void __set_error_code(const int64_t val);
 
-  void __set_error_code(const int64_t val);
+    void __set_error_msg(const std::string &val);
 
-  void __set_error_msg(const std::string& val);
+    void __set_index_names(const std::vector<std::string> &val);
 
-  void __set_index_names(const std::vector<std::string> & val);
+    bool operator==(const ListIndexResponse &rhs) const;
+    bool operator!=(const ListIndexResponse &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const ListIndexResponse & rhs) const;
-  bool operator != (const ListIndexResponse &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const ListIndexResponse &) const;
 
-  bool operator < (const ListIndexResponse & ) const;
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
-
-  virtual void printTo(std::ostream& out) const;
+    virtual void printTo(std::ostream &out) const;
 };
 
 void swap(ListIndexResponse &a, ListIndexResponse &b);
 
-std::ostream& operator<<(std::ostream& out, const ListIndexResponse& obj);
+std::ostream &operator<<(std::ostream &out, const ListIndexResponse &obj);
 
 typedef struct _ShowDatabaseRequest__isset {
-  _ShowDatabaseRequest__isset() : db_name(false), session_id(false) {}
-  bool db_name :1;
-  bool session_id :1;
+    _ShowDatabaseRequest__isset() : db_name(false), session_id(false) {}
+    bool db_name : 1;
+    bool session_id : 1;
 } _ShowDatabaseRequest__isset;
 
 class ShowDatabaseRequest : public virtual ::apache::thrift::TBase {
- public:
+public:
+    ShowDatabaseRequest(const ShowDatabaseRequest &);
+    ShowDatabaseRequest &operator=(const ShowDatabaseRequest &);
+    ShowDatabaseRequest() noexcept;
 
-  ShowDatabaseRequest(const ShowDatabaseRequest&);
-  ShowDatabaseRequest& operator=(const ShowDatabaseRequest&);
-  ShowDatabaseRequest() noexcept;
+    virtual ~ShowDatabaseRequest() noexcept;
+    std::string db_name;
+    int64_t session_id;
 
-  virtual ~ShowDatabaseRequest() noexcept;
-  std::string db_name;
-  int64_t session_id;
+    _ShowDatabaseRequest__isset __isset;
 
-  _ShowDatabaseRequest__isset __isset;
+    void __set_db_name(const std::string &val);
 
-  void __set_db_name(const std::string& val);
+    void __set_session_id(const int64_t val);
 
-  void __set_session_id(const int64_t val);
+    bool operator==(const ShowDatabaseRequest &rhs) const;
+    bool operator!=(const ShowDatabaseRequest &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const ShowDatabaseRequest & rhs) const;
-  bool operator != (const ShowDatabaseRequest &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const ShowDatabaseRequest &) const;
 
-  bool operator < (const ShowDatabaseRequest & ) const;
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
-
-  virtual void printTo(std::ostream& out) const;
+    virtual void printTo(std::ostream &out) const;
 };
 
 void swap(ShowDatabaseRequest &a, ShowDatabaseRequest &b);
 
-std::ostream& operator<<(std::ostream& out, const ShowDatabaseRequest& obj);
+std::ostream &operator<<(std::ostream &out, const ShowDatabaseRequest &obj);
 
 typedef struct _ShowDatabaseResponse__isset {
-  _ShowDatabaseResponse__isset() : error_code(false), error_msg(false), database_name(false), store_dir(false), table_count(false), comment(false) {}
-  bool error_code :1;
-  bool error_msg :1;
-  bool database_name :1;
-  bool store_dir :1;
-  bool table_count :1;
-  bool comment :1;
+    _ShowDatabaseResponse__isset()
+        : error_code(false), error_msg(false), database_name(false), store_dir(false), table_count(false), comment(false) {}
+    bool error_code : 1;
+    bool error_msg : 1;
+    bool database_name : 1;
+    bool store_dir : 1;
+    bool table_count : 1;
+    bool comment : 1;
 } _ShowDatabaseResponse__isset;
 
 class ShowDatabaseResponse : public virtual ::apache::thrift::TBase {
- public:
+public:
+    ShowDatabaseResponse(const ShowDatabaseResponse &);
+    ShowDatabaseResponse &operator=(const ShowDatabaseResponse &);
+    ShowDatabaseResponse() noexcept;
 
-  ShowDatabaseResponse(const ShowDatabaseResponse&);
-  ShowDatabaseResponse& operator=(const ShowDatabaseResponse&);
-  ShowDatabaseResponse() noexcept;
+    virtual ~ShowDatabaseResponse() noexcept;
+    int64_t error_code;
+    std::string error_msg;
+    std::string database_name;
+    std::string store_dir;
+    int64_t table_count;
+    std::string comment;
 
-  virtual ~ShowDatabaseResponse() noexcept;
-  int64_t error_code;
-  std::string error_msg;
-  std::string database_name;
-  std::string store_dir;
-  int64_t table_count;
-  std::string comment;
+    _ShowDatabaseResponse__isset __isset;
 
-  _ShowDatabaseResponse__isset __isset;
+    void __set_error_code(const int64_t val);
 
-  void __set_error_code(const int64_t val);
+    void __set_error_msg(const std::string &val);
 
-  void __set_error_msg(const std::string& val);
+    void __set_database_name(const std::string &val);
 
-  void __set_database_name(const std::string& val);
+    void __set_store_dir(const std::string &val);
 
-  void __set_store_dir(const std::string& val);
+    void __set_table_count(const int64_t val);
 
-  void __set_table_count(const int64_t val);
+    void __set_comment(const std::string &val);
 
-  void __set_comment(const std::string& val);
+    bool operator==(const ShowDatabaseResponse &rhs) const;
+    bool operator!=(const ShowDatabaseResponse &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const ShowDatabaseResponse & rhs) const;
-  bool operator != (const ShowDatabaseResponse &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const ShowDatabaseResponse &) const;
 
-  bool operator < (const ShowDatabaseResponse & ) const;
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
-
-  virtual void printTo(std::ostream& out) const;
+    virtual void printTo(std::ostream &out) const;
 };
 
 void swap(ShowDatabaseResponse &a, ShowDatabaseResponse &b);
 
-std::ostream& operator<<(std::ostream& out, const ShowDatabaseResponse& obj);
+std::ostream &operator<<(std::ostream &out, const ShowDatabaseResponse &obj);
 
 typedef struct _ShowTableRequest__isset {
-  _ShowTableRequest__isset() : db_name(false), table_name(false), session_id(false) {}
-  bool db_name :1;
-  bool table_name :1;
-  bool session_id :1;
+    _ShowTableRequest__isset() : db_name(false), table_name(false), session_id(false) {}
+    bool db_name : 1;
+    bool table_name : 1;
+    bool session_id : 1;
 } _ShowTableRequest__isset;
 
 class ShowTableRequest : public virtual ::apache::thrift::TBase {
- public:
+public:
+    ShowTableRequest(const ShowTableRequest &);
+    ShowTableRequest &operator=(const ShowTableRequest &);
+    ShowTableRequest() noexcept;
 
-  ShowTableRequest(const ShowTableRequest&);
-  ShowTableRequest& operator=(const ShowTableRequest&);
-  ShowTableRequest() noexcept;
+    virtual ~ShowTableRequest() noexcept;
+    std::string db_name;
+    std::string table_name;
+    int64_t session_id;
 
-  virtual ~ShowTableRequest() noexcept;
-  std::string db_name;
-  std::string table_name;
-  int64_t session_id;
+    _ShowTableRequest__isset __isset;
 
-  _ShowTableRequest__isset __isset;
+    void __set_db_name(const std::string &val);
 
-  void __set_db_name(const std::string& val);
+    void __set_table_name(const std::string &val);
 
-  void __set_table_name(const std::string& val);
+    void __set_session_id(const int64_t val);
 
-  void __set_session_id(const int64_t val);
+    bool operator==(const ShowTableRequest &rhs) const;
+    bool operator!=(const ShowTableRequest &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const ShowTableRequest & rhs) const;
-  bool operator != (const ShowTableRequest &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const ShowTableRequest &) const;
 
-  bool operator < (const ShowTableRequest & ) const;
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
-
-  virtual void printTo(std::ostream& out) const;
+    virtual void printTo(std::ostream &out) const;
 };
 
 void swap(ShowTableRequest &a, ShowTableRequest &b);
 
-std::ostream& operator<<(std::ostream& out, const ShowTableRequest& obj);
+std::ostream &operator<<(std::ostream &out, const ShowTableRequest &obj);
 
 typedef struct _ShowTableResponse__isset {
-  _ShowTableResponse__isset() : error_code(false), error_msg(false), database_name(false), table_name(false), store_dir(false), column_count(false), segment_count(false), row_count(false) {}
-  bool error_code :1;
-  bool error_msg :1;
-  bool database_name :1;
-  bool table_name :1;
-  bool store_dir :1;
-  bool column_count :1;
-  bool segment_count :1;
-  bool row_count :1;
+    _ShowTableResponse__isset()
+        : error_code(false), error_msg(false), database_name(false), table_name(false), store_dir(false), column_count(false), segment_count(false),
+          row_count(false) {}
+    bool error_code : 1;
+    bool error_msg : 1;
+    bool database_name : 1;
+    bool table_name : 1;
+    bool store_dir : 1;
+    bool column_count : 1;
+    bool segment_count : 1;
+    bool row_count : 1;
 } _ShowTableResponse__isset;
 
 class ShowTableResponse : public virtual ::apache::thrift::TBase {
- public:
+public:
+    ShowTableResponse(const ShowTableResponse &);
+    ShowTableResponse &operator=(const ShowTableResponse &);
+    ShowTableResponse() noexcept;
 
-  ShowTableResponse(const ShowTableResponse&);
-  ShowTableResponse& operator=(const ShowTableResponse&);
-  ShowTableResponse() noexcept;
+    virtual ~ShowTableResponse() noexcept;
+    int64_t error_code;
+    std::string error_msg;
+    std::string database_name;
+    std::string table_name;
+    std::string store_dir;
+    int64_t column_count;
+    int64_t segment_count;
+    int64_t row_count;
 
-  virtual ~ShowTableResponse() noexcept;
-  int64_t error_code;
-  std::string error_msg;
-  std::string database_name;
-  std::string table_name;
-  std::string store_dir;
-  int64_t column_count;
-  int64_t segment_count;
-  int64_t row_count;
+    _ShowTableResponse__isset __isset;
 
-  _ShowTableResponse__isset __isset;
+    void __set_error_code(const int64_t val);
 
-  void __set_error_code(const int64_t val);
+    void __set_error_msg(const std::string &val);
 
-  void __set_error_msg(const std::string& val);
+    void __set_database_name(const std::string &val);
 
-  void __set_database_name(const std::string& val);
+    void __set_table_name(const std::string &val);
 
-  void __set_table_name(const std::string& val);
+    void __set_store_dir(const std::string &val);
 
-  void __set_store_dir(const std::string& val);
+    void __set_column_count(const int64_t val);
 
-  void __set_column_count(const int64_t val);
+    void __set_segment_count(const int64_t val);
 
-  void __set_segment_count(const int64_t val);
+    void __set_row_count(const int64_t val);
 
-  void __set_row_count(const int64_t val);
+    bool operator==(const ShowTableResponse &rhs) const;
+    bool operator!=(const ShowTableResponse &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const ShowTableResponse & rhs) const;
-  bool operator != (const ShowTableResponse &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const ShowTableResponse &) const;
 
-  bool operator < (const ShowTableResponse & ) const;
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
-
-  virtual void printTo(std::ostream& out) const;
+    virtual void printTo(std::ostream &out) const;
 };
 
 void swap(ShowTableResponse &a, ShowTableResponse &b);
 
-std::ostream& operator<<(std::ostream& out, const ShowTableResponse& obj);
+std::ostream &operator<<(std::ostream &out, const ShowTableResponse &obj);
 
 typedef struct _ShowColumnsRequest__isset {
-  _ShowColumnsRequest__isset() : db_name(false), table_name(false), session_id(false) {}
-  bool db_name :1;
-  bool table_name :1;
-  bool session_id :1;
+    _ShowColumnsRequest__isset() : db_name(false), table_name(false), session_id(false) {}
+    bool db_name : 1;
+    bool table_name : 1;
+    bool session_id : 1;
 } _ShowColumnsRequest__isset;
 
 class ShowColumnsRequest : public virtual ::apache::thrift::TBase {
- public:
+public:
+    ShowColumnsRequest(const ShowColumnsRequest &);
+    ShowColumnsRequest &operator=(const ShowColumnsRequest &);
+    ShowColumnsRequest() noexcept;
 
-  ShowColumnsRequest(const ShowColumnsRequest&);
-  ShowColumnsRequest& operator=(const ShowColumnsRequest&);
-  ShowColumnsRequest() noexcept;
+    virtual ~ShowColumnsRequest() noexcept;
+    std::string db_name;
+    std::string table_name;
+    int64_t session_id;
 
-  virtual ~ShowColumnsRequest() noexcept;
-  std::string db_name;
-  std::string table_name;
-  int64_t session_id;
+    _ShowColumnsRequest__isset __isset;
 
-  _ShowColumnsRequest__isset __isset;
+    void __set_db_name(const std::string &val);
 
-  void __set_db_name(const std::string& val);
+    void __set_table_name(const std::string &val);
 
-  void __set_table_name(const std::string& val);
+    void __set_session_id(const int64_t val);
 
-  void __set_session_id(const int64_t val);
+    bool operator==(const ShowColumnsRequest &rhs) const;
+    bool operator!=(const ShowColumnsRequest &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const ShowColumnsRequest & rhs) const;
-  bool operator != (const ShowColumnsRequest &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const ShowColumnsRequest &) const;
 
-  bool operator < (const ShowColumnsRequest & ) const;
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
-
-  virtual void printTo(std::ostream& out) const;
+    virtual void printTo(std::ostream &out) const;
 };
 
 void swap(ShowColumnsRequest &a, ShowColumnsRequest &b);
 
-std::ostream& operator<<(std::ostream& out, const ShowColumnsRequest& obj);
+std::ostream &operator<<(std::ostream &out, const ShowColumnsRequest &obj);
 
 typedef struct _GetTableRequest__isset {
-  _GetTableRequest__isset() : db_name(false), table_name(false), session_id(false) {}
-  bool db_name :1;
-  bool table_name :1;
-  bool session_id :1;
+    _GetTableRequest__isset() : db_name(false), table_name(false), session_id(false) {}
+    bool db_name : 1;
+    bool table_name : 1;
+    bool session_id : 1;
 } _GetTableRequest__isset;
 
 class GetTableRequest : public virtual ::apache::thrift::TBase {
- public:
+public:
+    GetTableRequest(const GetTableRequest &);
+    GetTableRequest &operator=(const GetTableRequest &);
+    GetTableRequest() noexcept;
 
-  GetTableRequest(const GetTableRequest&);
-  GetTableRequest& operator=(const GetTableRequest&);
-  GetTableRequest() noexcept;
+    virtual ~GetTableRequest() noexcept;
+    std::string db_name;
+    std::string table_name;
+    int64_t session_id;
 
-  virtual ~GetTableRequest() noexcept;
-  std::string db_name;
-  std::string table_name;
-  int64_t session_id;
+    _GetTableRequest__isset __isset;
 
-  _GetTableRequest__isset __isset;
+    void __set_db_name(const std::string &val);
 
-  void __set_db_name(const std::string& val);
+    void __set_table_name(const std::string &val);
 
-  void __set_table_name(const std::string& val);
+    void __set_session_id(const int64_t val);
 
-  void __set_session_id(const int64_t val);
+    bool operator==(const GetTableRequest &rhs) const;
+    bool operator!=(const GetTableRequest &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const GetTableRequest & rhs) const;
-  bool operator != (const GetTableRequest &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const GetTableRequest &) const;
 
-  bool operator < (const GetTableRequest & ) const;
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
-
-  virtual void printTo(std::ostream& out) const;
+    virtual void printTo(std::ostream &out) const;
 };
 
 void swap(GetTableRequest &a, GetTableRequest &b);
 
-std::ostream& operator<<(std::ostream& out, const GetTableRequest& obj);
+std::ostream &operator<<(std::ostream &out, const GetTableRequest &obj);
 
 typedef struct _IndexInfo__isset {
-  _IndexInfo__isset() : column_name(false), index_type(false), index_param_list(true) {}
-  bool column_name :1;
-  bool index_type :1;
-  bool index_param_list :1;
+    _IndexInfo__isset() : column_name(false), index_type(false), index_param_list(true) {}
+    bool column_name : 1;
+    bool index_type : 1;
+    bool index_param_list : 1;
 } _IndexInfo__isset;
 
 class IndexInfo : public virtual ::apache::thrift::TBase {
- public:
+public:
+    IndexInfo(const IndexInfo &);
+    IndexInfo &operator=(const IndexInfo &);
+    IndexInfo() noexcept;
 
-  IndexInfo(const IndexInfo&);
-  IndexInfo& operator=(const IndexInfo&);
-  IndexInfo() noexcept;
+    virtual ~IndexInfo() noexcept;
+    std::string column_name;
+    /**
+     *
+     * @see IndexType
+     */
+    IndexType::type index_type;
+    std::vector<InitParameter> index_param_list;
 
-  virtual ~IndexInfo() noexcept;
-  std::string column_name;
-  /**
-   * 
-   * @see IndexType
-   */
-  IndexType::type index_type;
-  std::vector<InitParameter>  index_param_list;
+    _IndexInfo__isset __isset;
 
-  _IndexInfo__isset __isset;
+    void __set_column_name(const std::string &val);
 
-  void __set_column_name(const std::string& val);
+    void __set_index_type(const IndexType::type val);
 
-  void __set_index_type(const IndexType::type val);
+    void __set_index_param_list(const std::vector<InitParameter> &val);
 
-  void __set_index_param_list(const std::vector<InitParameter> & val);
+    bool operator==(const IndexInfo &rhs) const;
+    bool operator!=(const IndexInfo &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const IndexInfo & rhs) const;
-  bool operator != (const IndexInfo &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const IndexInfo &) const;
 
-  bool operator < (const IndexInfo & ) const;
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
-
-  virtual void printTo(std::ostream& out) const;
+    virtual void printTo(std::ostream &out) const;
 };
 
 void swap(IndexInfo &a, IndexInfo &b);
 
-std::ostream& operator<<(std::ostream& out, const IndexInfo& obj);
+std::ostream &operator<<(std::ostream &out, const IndexInfo &obj);
 
 typedef struct _CreateIndexRequest__isset {
-  _CreateIndexRequest__isset() : db_name(false), table_name(false), index_name(false), index_comment(false), index_info(false), session_id(false), create_option(false) {}
-  bool db_name :1;
-  bool table_name :1;
-  bool index_name :1;
-  bool index_comment :1;
-  bool index_info :1;
-  bool session_id :1;
-  bool create_option :1;
+    _CreateIndexRequest__isset()
+        : db_name(false), table_name(false), index_name(false), index_comment(false), index_info(false), session_id(false), create_option(false) {}
+    bool db_name : 1;
+    bool table_name : 1;
+    bool index_name : 1;
+    bool index_comment : 1;
+    bool index_info : 1;
+    bool session_id : 1;
+    bool create_option : 1;
 } _CreateIndexRequest__isset;
 
 class CreateIndexRequest : public virtual ::apache::thrift::TBase {
- public:
+public:
+    CreateIndexRequest(const CreateIndexRequest &);
+    CreateIndexRequest &operator=(const CreateIndexRequest &);
+    CreateIndexRequest() noexcept;
 
-  CreateIndexRequest(const CreateIndexRequest&);
-  CreateIndexRequest& operator=(const CreateIndexRequest&);
-  CreateIndexRequest() noexcept;
+    virtual ~CreateIndexRequest() noexcept;
+    std::string db_name;
+    std::string table_name;
+    std::string index_name;
+    std::string index_comment;
+    IndexInfo index_info;
+    int64_t session_id;
+    CreateOption create_option;
 
-  virtual ~CreateIndexRequest() noexcept;
-  std::string db_name;
-  std::string table_name;
-  std::string index_name;
-  std::string index_comment;
-  IndexInfo index_info;
-  int64_t session_id;
-  CreateOption create_option;
+    _CreateIndexRequest__isset __isset;
 
-  _CreateIndexRequest__isset __isset;
+    void __set_db_name(const std::string &val);
 
-  void __set_db_name(const std::string& val);
+    void __set_table_name(const std::string &val);
 
-  void __set_table_name(const std::string& val);
+    void __set_index_name(const std::string &val);
 
-  void __set_index_name(const std::string& val);
+    void __set_index_comment(const std::string &val);
 
-  void __set_index_comment(const std::string& val);
+    void __set_index_info(const IndexInfo &val);
 
-  void __set_index_info(const IndexInfo& val);
+    void __set_session_id(const int64_t val);
 
-  void __set_session_id(const int64_t val);
+    void __set_create_option(const CreateOption &val);
 
-  void __set_create_option(const CreateOption& val);
+    bool operator==(const CreateIndexRequest &rhs) const;
+    bool operator!=(const CreateIndexRequest &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const CreateIndexRequest & rhs) const;
-  bool operator != (const CreateIndexRequest &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const CreateIndexRequest &) const;
 
-  bool operator < (const CreateIndexRequest & ) const;
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
-
-  virtual void printTo(std::ostream& out) const;
+    virtual void printTo(std::ostream &out) const;
 };
 
 void swap(CreateIndexRequest &a, CreateIndexRequest &b);
 
-std::ostream& operator<<(std::ostream& out, const CreateIndexRequest& obj);
+std::ostream &operator<<(std::ostream &out, const CreateIndexRequest &obj);
 
 typedef struct _DropIndexRequest__isset {
-  _DropIndexRequest__isset() : db_name(false), table_name(false), index_name(false), session_id(false), drop_option(false) {}
-  bool db_name :1;
-  bool table_name :1;
-  bool index_name :1;
-  bool session_id :1;
-  bool drop_option :1;
+    _DropIndexRequest__isset() : db_name(false), table_name(false), index_name(false), session_id(false), drop_option(false) {}
+    bool db_name : 1;
+    bool table_name : 1;
+    bool index_name : 1;
+    bool session_id : 1;
+    bool drop_option : 1;
 } _DropIndexRequest__isset;
 
 class DropIndexRequest : public virtual ::apache::thrift::TBase {
- public:
+public:
+    DropIndexRequest(const DropIndexRequest &);
+    DropIndexRequest &operator=(const DropIndexRequest &);
+    DropIndexRequest() noexcept;
 
-  DropIndexRequest(const DropIndexRequest&);
-  DropIndexRequest& operator=(const DropIndexRequest&);
-  DropIndexRequest() noexcept;
+    virtual ~DropIndexRequest() noexcept;
+    std::string db_name;
+    std::string table_name;
+    std::string index_name;
+    int64_t session_id;
+    DropOption drop_option;
 
-  virtual ~DropIndexRequest() noexcept;
-  std::string db_name;
-  std::string table_name;
-  std::string index_name;
-  int64_t session_id;
-  DropOption drop_option;
+    _DropIndexRequest__isset __isset;
 
-  _DropIndexRequest__isset __isset;
+    void __set_db_name(const std::string &val);
 
-  void __set_db_name(const std::string& val);
+    void __set_table_name(const std::string &val);
 
-  void __set_table_name(const std::string& val);
+    void __set_index_name(const std::string &val);
 
-  void __set_index_name(const std::string& val);
+    void __set_session_id(const int64_t val);
 
-  void __set_session_id(const int64_t val);
+    void __set_drop_option(const DropOption &val);
 
-  void __set_drop_option(const DropOption& val);
+    bool operator==(const DropIndexRequest &rhs) const;
+    bool operator!=(const DropIndexRequest &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const DropIndexRequest & rhs) const;
-  bool operator != (const DropIndexRequest &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const DropIndexRequest &) const;
 
-  bool operator < (const DropIndexRequest & ) const;
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
-
-  virtual void printTo(std::ostream& out) const;
+    virtual void printTo(std::ostream &out) const;
 };
 
 void swap(DropIndexRequest &a, DropIndexRequest &b);
 
-std::ostream& operator<<(std::ostream& out, const DropIndexRequest& obj);
+std::ostream &operator<<(std::ostream &out, const DropIndexRequest &obj);
 
 typedef struct _ShowIndexRequest__isset {
-  _ShowIndexRequest__isset() : db_name(false), table_name(false), index_name(false), session_id(false) {}
-  bool db_name :1;
-  bool table_name :1;
-  bool index_name :1;
-  bool session_id :1;
+    _ShowIndexRequest__isset() : db_name(false), table_name(false), index_name(false), session_id(false) {}
+    bool db_name : 1;
+    bool table_name : 1;
+    bool index_name : 1;
+    bool session_id : 1;
 } _ShowIndexRequest__isset;
 
 class ShowIndexRequest : public virtual ::apache::thrift::TBase {
- public:
+public:
+    ShowIndexRequest(const ShowIndexRequest &);
+    ShowIndexRequest &operator=(const ShowIndexRequest &);
+    ShowIndexRequest() noexcept;
 
-  ShowIndexRequest(const ShowIndexRequest&);
-  ShowIndexRequest& operator=(const ShowIndexRequest&);
-  ShowIndexRequest() noexcept;
+    virtual ~ShowIndexRequest() noexcept;
+    std::string db_name;
+    std::string table_name;
+    std::string index_name;
+    int64_t session_id;
 
-  virtual ~ShowIndexRequest() noexcept;
-  std::string db_name;
-  std::string table_name;
-  std::string index_name;
-  int64_t session_id;
+    _ShowIndexRequest__isset __isset;
 
-  _ShowIndexRequest__isset __isset;
+    void __set_db_name(const std::string &val);
 
-  void __set_db_name(const std::string& val);
+    void __set_table_name(const std::string &val);
 
-  void __set_table_name(const std::string& val);
+    void __set_index_name(const std::string &val);
 
-  void __set_index_name(const std::string& val);
+    void __set_session_id(const int64_t val);
 
-  void __set_session_id(const int64_t val);
+    bool operator==(const ShowIndexRequest &rhs) const;
+    bool operator!=(const ShowIndexRequest &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const ShowIndexRequest & rhs) const;
-  bool operator != (const ShowIndexRequest &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const ShowIndexRequest &) const;
 
-  bool operator < (const ShowIndexRequest & ) const;
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
-
-  virtual void printTo(std::ostream& out) const;
+    virtual void printTo(std::ostream &out) const;
 };
 
 void swap(ShowIndexRequest &a, ShowIndexRequest &b);
 
-std::ostream& operator<<(std::ostream& out, const ShowIndexRequest& obj);
+std::ostream &operator<<(std::ostream &out, const ShowIndexRequest &obj);
 
 typedef struct _ShowIndexResponse__isset {
-  _ShowIndexResponse__isset() : error_code(false), error_msg(false), db_name(false), table_name(false), index_name(false), index_comment(false), index_type(false), index_column_names(false), index_column_ids(false), other_parameters(false), store_dir(false), segment_index_count(false) {}
-  bool error_code :1;
-  bool error_msg :1;
-  bool db_name :1;
-  bool table_name :1;
-  bool index_name :1;
-  bool index_comment :1;
-  bool index_type :1;
-  bool index_column_names :1;
-  bool index_column_ids :1;
-  bool other_parameters :1;
-  bool store_dir :1;
-  bool segment_index_count :1;
+    _ShowIndexResponse__isset()
+        : error_code(false), error_msg(false), db_name(false), table_name(false), index_name(false), index_comment(false), index_type(false),
+          index_column_names(false), index_column_ids(false), other_parameters(false), store_dir(false), segment_index_count(false) {}
+    bool error_code : 1;
+    bool error_msg : 1;
+    bool db_name : 1;
+    bool table_name : 1;
+    bool index_name : 1;
+    bool index_comment : 1;
+    bool index_type : 1;
+    bool index_column_names : 1;
+    bool index_column_ids : 1;
+    bool other_parameters : 1;
+    bool store_dir : 1;
+    bool segment_index_count : 1;
 } _ShowIndexResponse__isset;
 
 class ShowIndexResponse : public virtual ::apache::thrift::TBase {
- public:
+public:
+    ShowIndexResponse(const ShowIndexResponse &);
+    ShowIndexResponse &operator=(const ShowIndexResponse &);
+    ShowIndexResponse() noexcept;
 
-  ShowIndexResponse(const ShowIndexResponse&);
-  ShowIndexResponse& operator=(const ShowIndexResponse&);
-  ShowIndexResponse() noexcept;
+    virtual ~ShowIndexResponse() noexcept;
+    int64_t error_code;
+    std::string error_msg;
+    std::string db_name;
+    std::string table_name;
+    std::string index_name;
+    std::string index_comment;
+    std::string index_type;
+    std::string index_column_names;
+    std::string index_column_ids;
+    std::string other_parameters;
+    std::string store_dir;
+    std::string segment_index_count;
 
-  virtual ~ShowIndexResponse() noexcept;
-  int64_t error_code;
-  std::string error_msg;
-  std::string db_name;
-  std::string table_name;
-  std::string index_name;
-  std::string index_comment;
-  std::string index_type;
-  std::string index_column_names;
-  std::string index_column_ids;
-  std::string other_parameters;
-  std::string store_dir;
-  std::string segment_index_count;
+    _ShowIndexResponse__isset __isset;
 
-  _ShowIndexResponse__isset __isset;
+    void __set_error_code(const int64_t val);
 
-  void __set_error_code(const int64_t val);
+    void __set_error_msg(const std::string &val);
 
-  void __set_error_msg(const std::string& val);
+    void __set_db_name(const std::string &val);
 
-  void __set_db_name(const std::string& val);
+    void __set_table_name(const std::string &val);
 
-  void __set_table_name(const std::string& val);
+    void __set_index_name(const std::string &val);
 
-  void __set_index_name(const std::string& val);
+    void __set_index_comment(const std::string &val);
 
-  void __set_index_comment(const std::string& val);
+    void __set_index_type(const std::string &val);
 
-  void __set_index_type(const std::string& val);
+    void __set_index_column_names(const std::string &val);
 
-  void __set_index_column_names(const std::string& val);
+    void __set_index_column_ids(const std::string &val);
 
-  void __set_index_column_ids(const std::string& val);
+    void __set_other_parameters(const std::string &val);
 
-  void __set_other_parameters(const std::string& val);
+    void __set_store_dir(const std::string &val);
 
-  void __set_store_dir(const std::string& val);
+    void __set_segment_index_count(const std::string &val);
 
-  void __set_segment_index_count(const std::string& val);
+    bool operator==(const ShowIndexResponse &rhs) const;
+    bool operator!=(const ShowIndexResponse &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const ShowIndexResponse & rhs) const;
-  bool operator != (const ShowIndexResponse &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const ShowIndexResponse &) const;
 
-  bool operator < (const ShowIndexResponse & ) const;
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
-
-  virtual void printTo(std::ostream& out) const;
+    virtual void printTo(std::ostream &out) const;
 };
 
 void swap(ShowIndexResponse &a, ShowIndexResponse &b);
 
-std::ostream& operator<<(std::ostream& out, const ShowIndexResponse& obj);
+std::ostream &operator<<(std::ostream &out, const ShowIndexResponse &obj);
 
 typedef struct _OptimizeRequest__isset {
-  _OptimizeRequest__isset() : db_name(false), table_name(false), optimize_options(false), session_id(false) {}
-  bool db_name :1;
-  bool table_name :1;
-  bool optimize_options :1;
-  bool session_id :1;
+    _OptimizeRequest__isset() : db_name(false), table_name(false), optimize_options(false), session_id(false) {}
+    bool db_name : 1;
+    bool table_name : 1;
+    bool optimize_options : 1;
+    bool session_id : 1;
 } _OptimizeRequest__isset;
 
 class OptimizeRequest : public virtual ::apache::thrift::TBase {
- public:
+public:
+    OptimizeRequest(const OptimizeRequest &);
+    OptimizeRequest &operator=(const OptimizeRequest &);
+    OptimizeRequest() noexcept;
 
-  OptimizeRequest(const OptimizeRequest&);
-  OptimizeRequest& operator=(const OptimizeRequest&);
-  OptimizeRequest() noexcept;
+    virtual ~OptimizeRequest() noexcept;
+    std::string db_name;
+    std::string table_name;
+    OptimizeOptions optimize_options;
+    int64_t session_id;
 
-  virtual ~OptimizeRequest() noexcept;
-  std::string db_name;
-  std::string table_name;
-  OptimizeOptions optimize_options;
-  int64_t session_id;
+    _OptimizeRequest__isset __isset;
 
-  _OptimizeRequest__isset __isset;
+    void __set_db_name(const std::string &val);
 
-  void __set_db_name(const std::string& val);
+    void __set_table_name(const std::string &val);
 
-  void __set_table_name(const std::string& val);
+    void __set_optimize_options(const OptimizeOptions &val);
 
-  void __set_optimize_options(const OptimizeOptions& val);
+    void __set_session_id(const int64_t val);
 
-  void __set_session_id(const int64_t val);
+    bool operator==(const OptimizeRequest &rhs) const;
+    bool operator!=(const OptimizeRequest &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const OptimizeRequest & rhs) const;
-  bool operator != (const OptimizeRequest &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const OptimizeRequest &) const;
 
-  bool operator < (const OptimizeRequest & ) const;
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
-
-  virtual void printTo(std::ostream& out) const;
+    virtual void printTo(std::ostream &out) const;
 };
 
 void swap(OptimizeRequest &a, OptimizeRequest &b);
 
-std::ostream& operator<<(std::ostream& out, const OptimizeRequest& obj);
+std::ostream &operator<<(std::ostream &out, const OptimizeRequest &obj);
 
 typedef struct _GetDatabaseRequest__isset {
-  _GetDatabaseRequest__isset() : db_name(false), session_id(false) {}
-  bool db_name :1;
-  bool session_id :1;
+    _GetDatabaseRequest__isset() : db_name(false), session_id(false) {}
+    bool db_name : 1;
+    bool session_id : 1;
 } _GetDatabaseRequest__isset;
 
 class GetDatabaseRequest : public virtual ::apache::thrift::TBase {
- public:
+public:
+    GetDatabaseRequest(const GetDatabaseRequest &);
+    GetDatabaseRequest &operator=(const GetDatabaseRequest &);
+    GetDatabaseRequest() noexcept;
 
-  GetDatabaseRequest(const GetDatabaseRequest&);
-  GetDatabaseRequest& operator=(const GetDatabaseRequest&);
-  GetDatabaseRequest() noexcept;
+    virtual ~GetDatabaseRequest() noexcept;
+    std::string db_name;
+    int64_t session_id;
 
-  virtual ~GetDatabaseRequest() noexcept;
-  std::string db_name;
-  int64_t session_id;
+    _GetDatabaseRequest__isset __isset;
 
-  _GetDatabaseRequest__isset __isset;
+    void __set_db_name(const std::string &val);
 
-  void __set_db_name(const std::string& val);
+    void __set_session_id(const int64_t val);
 
-  void __set_session_id(const int64_t val);
+    bool operator==(const GetDatabaseRequest &rhs) const;
+    bool operator!=(const GetDatabaseRequest &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const GetDatabaseRequest & rhs) const;
-  bool operator != (const GetDatabaseRequest &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const GetDatabaseRequest &) const;
 
-  bool operator < (const GetDatabaseRequest & ) const;
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
-
-  virtual void printTo(std::ostream& out) const;
+    virtual void printTo(std::ostream &out) const;
 };
 
 void swap(GetDatabaseRequest &a, GetDatabaseRequest &b);
 
-std::ostream& operator<<(std::ostream& out, const GetDatabaseRequest& obj);
+std::ostream &operator<<(std::ostream &out, const GetDatabaseRequest &obj);
 
 typedef struct _CreateDatabaseRequest__isset {
-  _CreateDatabaseRequest__isset() : db_name(false), session_id(false), create_option(false), db_comment(false) {}
-  bool db_name :1;
-  bool session_id :1;
-  bool create_option :1;
-  bool db_comment :1;
+    _CreateDatabaseRequest__isset() : db_name(false), session_id(false), create_option(false), db_comment(false) {}
+    bool db_name : 1;
+    bool session_id : 1;
+    bool create_option : 1;
+    bool db_comment : 1;
 } _CreateDatabaseRequest__isset;
 
 class CreateDatabaseRequest : public virtual ::apache::thrift::TBase {
- public:
+public:
+    CreateDatabaseRequest(const CreateDatabaseRequest &);
+    CreateDatabaseRequest &operator=(const CreateDatabaseRequest &);
+    CreateDatabaseRequest() noexcept;
 
-  CreateDatabaseRequest(const CreateDatabaseRequest&);
-  CreateDatabaseRequest& operator=(const CreateDatabaseRequest&);
-  CreateDatabaseRequest() noexcept;
+    virtual ~CreateDatabaseRequest() noexcept;
+    std::string db_name;
+    int64_t session_id;
+    CreateOption create_option;
+    std::string db_comment;
 
-  virtual ~CreateDatabaseRequest() noexcept;
-  std::string db_name;
-  int64_t session_id;
-  CreateOption create_option;
-  std::string db_comment;
+    _CreateDatabaseRequest__isset __isset;
 
-  _CreateDatabaseRequest__isset __isset;
+    void __set_db_name(const std::string &val);
 
-  void __set_db_name(const std::string& val);
+    void __set_session_id(const int64_t val);
 
-  void __set_session_id(const int64_t val);
+    void __set_create_option(const CreateOption &val);
 
-  void __set_create_option(const CreateOption& val);
+    void __set_db_comment(const std::string &val);
 
-  void __set_db_comment(const std::string& val);
+    bool operator==(const CreateDatabaseRequest &rhs) const;
+    bool operator!=(const CreateDatabaseRequest &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const CreateDatabaseRequest & rhs) const;
-  bool operator != (const CreateDatabaseRequest &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const CreateDatabaseRequest &) const;
 
-  bool operator < (const CreateDatabaseRequest & ) const;
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
-
-  virtual void printTo(std::ostream& out) const;
+    virtual void printTo(std::ostream &out) const;
 };
 
 void swap(CreateDatabaseRequest &a, CreateDatabaseRequest &b);
 
-std::ostream& operator<<(std::ostream& out, const CreateDatabaseRequest& obj);
+std::ostream &operator<<(std::ostream &out, const CreateDatabaseRequest &obj);
 
 typedef struct _DropDatabaseRequest__isset {
-  _DropDatabaseRequest__isset() : db_name(false), session_id(false), drop_option(false) {}
-  bool db_name :1;
-  bool session_id :1;
-  bool drop_option :1;
+    _DropDatabaseRequest__isset() : db_name(false), session_id(false), drop_option(false) {}
+    bool db_name : 1;
+    bool session_id : 1;
+    bool drop_option : 1;
 } _DropDatabaseRequest__isset;
 
 class DropDatabaseRequest : public virtual ::apache::thrift::TBase {
- public:
+public:
+    DropDatabaseRequest(const DropDatabaseRequest &);
+    DropDatabaseRequest &operator=(const DropDatabaseRequest &);
+    DropDatabaseRequest() noexcept;
 
-  DropDatabaseRequest(const DropDatabaseRequest&);
-  DropDatabaseRequest& operator=(const DropDatabaseRequest&);
-  DropDatabaseRequest() noexcept;
+    virtual ~DropDatabaseRequest() noexcept;
+    std::string db_name;
+    int64_t session_id;
+    DropOption drop_option;
 
-  virtual ~DropDatabaseRequest() noexcept;
-  std::string db_name;
-  int64_t session_id;
-  DropOption drop_option;
+    _DropDatabaseRequest__isset __isset;
 
-  _DropDatabaseRequest__isset __isset;
+    void __set_db_name(const std::string &val);
 
-  void __set_db_name(const std::string& val);
+    void __set_session_id(const int64_t val);
 
-  void __set_session_id(const int64_t val);
+    void __set_drop_option(const DropOption &val);
 
-  void __set_drop_option(const DropOption& val);
+    bool operator==(const DropDatabaseRequest &rhs) const;
+    bool operator!=(const DropDatabaseRequest &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const DropDatabaseRequest & rhs) const;
-  bool operator != (const DropDatabaseRequest &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const DropDatabaseRequest &) const;
 
-  bool operator < (const DropDatabaseRequest & ) const;
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
-
-  virtual void printTo(std::ostream& out) const;
+    virtual void printTo(std::ostream &out) const;
 };
 
 void swap(DropDatabaseRequest &a, DropDatabaseRequest &b);
 
-std::ostream& operator<<(std::ostream& out, const DropDatabaseRequest& obj);
+std::ostream &operator<<(std::ostream &out, const DropDatabaseRequest &obj);
 
 typedef struct _CreateTableRequest__isset {
-  _CreateTableRequest__isset() : db_name(false), table_name(false), column_defs(true), session_id(false), create_option(false) {}
-  bool db_name :1;
-  bool table_name :1;
-  bool column_defs :1;
-  bool session_id :1;
-  bool create_option :1;
+    _CreateTableRequest__isset() : db_name(false), table_name(false), column_defs(true), session_id(false), create_option(false) {}
+    bool db_name : 1;
+    bool table_name : 1;
+    bool column_defs : 1;
+    bool session_id : 1;
+    bool create_option : 1;
 } _CreateTableRequest__isset;
 
 class CreateTableRequest : public virtual ::apache::thrift::TBase {
- public:
+public:
+    CreateTableRequest(const CreateTableRequest &);
+    CreateTableRequest &operator=(const CreateTableRequest &);
+    CreateTableRequest() noexcept;
 
-  CreateTableRequest(const CreateTableRequest&);
-  CreateTableRequest& operator=(const CreateTableRequest&);
-  CreateTableRequest() noexcept;
+    virtual ~CreateTableRequest() noexcept;
+    std::string db_name;
+    std::string table_name;
+    std::vector<ColumnDef> column_defs;
+    int64_t session_id;
+    CreateOption create_option;
 
-  virtual ~CreateTableRequest() noexcept;
-  std::string db_name;
-  std::string table_name;
-  std::vector<ColumnDef>  column_defs;
-  int64_t session_id;
-  CreateOption create_option;
+    _CreateTableRequest__isset __isset;
 
-  _CreateTableRequest__isset __isset;
+    void __set_db_name(const std::string &val);
 
-  void __set_db_name(const std::string& val);
+    void __set_table_name(const std::string &val);
 
-  void __set_table_name(const std::string& val);
+    void __set_column_defs(const std::vector<ColumnDef> &val);
 
-  void __set_column_defs(const std::vector<ColumnDef> & val);
+    void __set_session_id(const int64_t val);
 
-  void __set_session_id(const int64_t val);
+    void __set_create_option(const CreateOption &val);
 
-  void __set_create_option(const CreateOption& val);
+    bool operator==(const CreateTableRequest &rhs) const;
+    bool operator!=(const CreateTableRequest &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const CreateTableRequest & rhs) const;
-  bool operator != (const CreateTableRequest &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const CreateTableRequest &) const;
 
-  bool operator < (const CreateTableRequest & ) const;
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
-
-  virtual void printTo(std::ostream& out) const;
+    virtual void printTo(std::ostream &out) const;
 };
 
 void swap(CreateTableRequest &a, CreateTableRequest &b);
 
-std::ostream& operator<<(std::ostream& out, const CreateTableRequest& obj);
+std::ostream &operator<<(std::ostream &out, const CreateTableRequest &obj);
 
 typedef struct _DropTableRequest__isset {
-  _DropTableRequest__isset() : db_name(false), table_name(false), session_id(false), drop_option(false) {}
-  bool db_name :1;
-  bool table_name :1;
-  bool session_id :1;
-  bool drop_option :1;
+    _DropTableRequest__isset() : db_name(false), table_name(false), session_id(false), drop_option(false) {}
+    bool db_name : 1;
+    bool table_name : 1;
+    bool session_id : 1;
+    bool drop_option : 1;
 } _DropTableRequest__isset;
 
 class DropTableRequest : public virtual ::apache::thrift::TBase {
- public:
+public:
+    DropTableRequest(const DropTableRequest &);
+    DropTableRequest &operator=(const DropTableRequest &);
+    DropTableRequest() noexcept;
 
-  DropTableRequest(const DropTableRequest&);
-  DropTableRequest& operator=(const DropTableRequest&);
-  DropTableRequest() noexcept;
+    virtual ~DropTableRequest() noexcept;
+    std::string db_name;
+    std::string table_name;
+    int64_t session_id;
+    DropOption drop_option;
 
-  virtual ~DropTableRequest() noexcept;
-  std::string db_name;
-  std::string table_name;
-  int64_t session_id;
-  DropOption drop_option;
+    _DropTableRequest__isset __isset;
 
-  _DropTableRequest__isset __isset;
+    void __set_db_name(const std::string &val);
 
-  void __set_db_name(const std::string& val);
+    void __set_table_name(const std::string &val);
 
-  void __set_table_name(const std::string& val);
+    void __set_session_id(const int64_t val);
 
-  void __set_session_id(const int64_t val);
+    void __set_drop_option(const DropOption &val);
 
-  void __set_drop_option(const DropOption& val);
+    bool operator==(const DropTableRequest &rhs) const;
+    bool operator!=(const DropTableRequest &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const DropTableRequest & rhs) const;
-  bool operator != (const DropTableRequest &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const DropTableRequest &) const;
 
-  bool operator < (const DropTableRequest & ) const;
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
-
-  virtual void printTo(std::ostream& out) const;
+    virtual void printTo(std::ostream &out) const;
 };
 
 void swap(DropTableRequest &a, DropTableRequest &b);
 
-std::ostream& operator<<(std::ostream& out, const DropTableRequest& obj);
+std::ostream &operator<<(std::ostream &out, const DropTableRequest &obj);
 
 typedef struct _InsertRequest__isset {
-  _InsertRequest__isset() : db_name(false), table_name(false), fields(true), session_id(false) {}
-  bool db_name :1;
-  bool table_name :1;
-  bool fields :1;
-  bool session_id :1;
+    _InsertRequest__isset() : db_name(false), table_name(false), fields(true), session_id(false) {}
+    bool db_name : 1;
+    bool table_name : 1;
+    bool fields : 1;
+    bool session_id : 1;
 } _InsertRequest__isset;
 
 class InsertRequest : public virtual ::apache::thrift::TBase {
- public:
+public:
+    InsertRequest(const InsertRequest &);
+    InsertRequest &operator=(const InsertRequest &);
+    InsertRequest() noexcept;
 
-  InsertRequest(const InsertRequest&);
-  InsertRequest& operator=(const InsertRequest&);
-  InsertRequest() noexcept;
+    virtual ~InsertRequest() noexcept;
+    std::string db_name;
+    std::string table_name;
+    std::vector<Field> fields;
+    int64_t session_id;
 
-  virtual ~InsertRequest() noexcept;
-  std::string db_name;
-  std::string table_name;
-  std::vector<Field>  fields;
-  int64_t session_id;
+    _InsertRequest__isset __isset;
 
-  _InsertRequest__isset __isset;
+    void __set_db_name(const std::string &val);
 
-  void __set_db_name(const std::string& val);
+    void __set_table_name(const std::string &val);
 
-  void __set_table_name(const std::string& val);
+    void __set_fields(const std::vector<Field> &val);
 
-  void __set_fields(const std::vector<Field> & val);
+    void __set_session_id(const int64_t val);
 
-  void __set_session_id(const int64_t val);
+    bool operator==(const InsertRequest &rhs) const;
+    bool operator!=(const InsertRequest &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const InsertRequest & rhs) const;
-  bool operator != (const InsertRequest &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const InsertRequest &) const;
 
-  bool operator < (const InsertRequest & ) const;
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
-
-  virtual void printTo(std::ostream& out) const;
+    virtual void printTo(std::ostream &out) const;
 };
 
 void swap(InsertRequest &a, InsertRequest &b);
 
-std::ostream& operator<<(std::ostream& out, const InsertRequest& obj);
+std::ostream &operator<<(std::ostream &out, const InsertRequest &obj);
 
 typedef struct _ImportRequest__isset {
-  _ImportRequest__isset() : db_name(false), table_name(false), file_name(false), import_option(false), session_id(false) {}
-  bool db_name :1;
-  bool table_name :1;
-  bool file_name :1;
-  bool import_option :1;
-  bool session_id :1;
+    _ImportRequest__isset() : db_name(false), table_name(false), file_name(false), import_option(false), session_id(false) {}
+    bool db_name : 1;
+    bool table_name : 1;
+    bool file_name : 1;
+    bool import_option : 1;
+    bool session_id : 1;
 } _ImportRequest__isset;
 
 class ImportRequest : public virtual ::apache::thrift::TBase {
- public:
+public:
+    ImportRequest(const ImportRequest &);
+    ImportRequest &operator=(const ImportRequest &);
+    ImportRequest() noexcept;
 
-  ImportRequest(const ImportRequest&);
-  ImportRequest& operator=(const ImportRequest&);
-  ImportRequest() noexcept;
+    virtual ~ImportRequest() noexcept;
+    std::string db_name;
+    std::string table_name;
+    std::string file_name;
+    ImportOption import_option;
+    int64_t session_id;
 
-  virtual ~ImportRequest() noexcept;
-  std::string db_name;
-  std::string table_name;
-  std::string file_name;
-  ImportOption import_option;
-  int64_t session_id;
+    _ImportRequest__isset __isset;
 
-  _ImportRequest__isset __isset;
+    void __set_db_name(const std::string &val);
 
-  void __set_db_name(const std::string& val);
+    void __set_table_name(const std::string &val);
 
-  void __set_table_name(const std::string& val);
+    void __set_file_name(const std::string &val);
 
-  void __set_file_name(const std::string& val);
+    void __set_import_option(const ImportOption &val);
 
-  void __set_import_option(const ImportOption& val);
+    void __set_session_id(const int64_t val);
 
-  void __set_session_id(const int64_t val);
+    bool operator==(const ImportRequest &rhs) const;
+    bool operator!=(const ImportRequest &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const ImportRequest & rhs) const;
-  bool operator != (const ImportRequest &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const ImportRequest &) const;
 
-  bool operator < (const ImportRequest & ) const;
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
-
-  virtual void printTo(std::ostream& out) const;
+    virtual void printTo(std::ostream &out) const;
 };
 
 void swap(ImportRequest &a, ImportRequest &b);
 
-std::ostream& operator<<(std::ostream& out, const ImportRequest& obj);
+std::ostream &operator<<(std::ostream &out, const ImportRequest &obj);
 
 typedef struct _ExportRequest__isset {
-  _ExportRequest__isset() : db_name(false), table_name(false), columns(false), file_name(false), export_option(false), session_id(false) {}
-  bool db_name :1;
-  bool table_name :1;
-  bool columns :1;
-  bool file_name :1;
-  bool export_option :1;
-  bool session_id :1;
+    _ExportRequest__isset() : db_name(false), table_name(false), columns(false), file_name(false), export_option(false), session_id(false) {}
+    bool db_name : 1;
+    bool table_name : 1;
+    bool columns : 1;
+    bool file_name : 1;
+    bool export_option : 1;
+    bool session_id : 1;
 } _ExportRequest__isset;
 
 class ExportRequest : public virtual ::apache::thrift::TBase {
- public:
+public:
+    ExportRequest(const ExportRequest &);
+    ExportRequest &operator=(const ExportRequest &);
+    ExportRequest() noexcept;
 
-  ExportRequest(const ExportRequest&);
-  ExportRequest& operator=(const ExportRequest&);
-  ExportRequest() noexcept;
+    virtual ~ExportRequest() noexcept;
+    std::string db_name;
+    std::string table_name;
+    std::vector<std::string> columns;
+    std::string file_name;
+    ExportOption export_option;
+    int64_t session_id;
 
-  virtual ~ExportRequest() noexcept;
-  std::string db_name;
-  std::string table_name;
-  std::vector<std::string>  columns;
-  std::string file_name;
-  ExportOption export_option;
-  int64_t session_id;
+    _ExportRequest__isset __isset;
 
-  _ExportRequest__isset __isset;
+    void __set_db_name(const std::string &val);
 
-  void __set_db_name(const std::string& val);
+    void __set_table_name(const std::string &val);
 
-  void __set_table_name(const std::string& val);
+    void __set_columns(const std::vector<std::string> &val);
 
-  void __set_columns(const std::vector<std::string> & val);
+    void __set_file_name(const std::string &val);
 
-  void __set_file_name(const std::string& val);
+    void __set_export_option(const ExportOption &val);
 
-  void __set_export_option(const ExportOption& val);
+    void __set_session_id(const int64_t val);
 
-  void __set_session_id(const int64_t val);
+    bool operator==(const ExportRequest &rhs) const;
+    bool operator!=(const ExportRequest &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const ExportRequest & rhs) const;
-  bool operator != (const ExportRequest &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const ExportRequest &) const;
 
-  bool operator < (const ExportRequest & ) const;
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
-
-  virtual void printTo(std::ostream& out) const;
+    virtual void printTo(std::ostream &out) const;
 };
 
 void swap(ExportRequest &a, ExportRequest &b);
 
-std::ostream& operator<<(std::ostream& out, const ExportRequest& obj);
+std::ostream &operator<<(std::ostream &out, const ExportRequest &obj);
 
 typedef struct _ExplainRequest__isset {
-  _ExplainRequest__isset() : session_id(false), db_name(false), table_name(false), select_list(true), highlight_list(true), search_expr(false), where_expr(false), group_by_list(true), having_expr(false), limit_expr(false), offset_expr(false), order_by_list(true), explain_type(false) {}
-  bool session_id :1;
-  bool db_name :1;
-  bool table_name :1;
-  bool select_list :1;
-  bool highlight_list :1;
-  bool search_expr :1;
-  bool where_expr :1;
-  bool group_by_list :1;
-  bool having_expr :1;
-  bool limit_expr :1;
-  bool offset_expr :1;
-  bool order_by_list :1;
-  bool explain_type :1;
+    _ExplainRequest__isset()
+        : session_id(false), db_name(false), table_name(false), select_list(true), highlight_list(true), search_expr(false), where_expr(false),
+          group_by_list(true), having_expr(false), limit_expr(false), offset_expr(false), order_by_list(true), explain_type(false) {}
+    bool session_id : 1;
+    bool db_name : 1;
+    bool table_name : 1;
+    bool select_list : 1;
+    bool highlight_list : 1;
+    bool search_expr : 1;
+    bool where_expr : 1;
+    bool group_by_list : 1;
+    bool having_expr : 1;
+    bool limit_expr : 1;
+    bool offset_expr : 1;
+    bool order_by_list : 1;
+    bool explain_type : 1;
 } _ExplainRequest__isset;
 
 class ExplainRequest : public virtual ::apache::thrift::TBase {
- public:
+public:
+    ExplainRequest(const ExplainRequest &);
+    ExplainRequest &operator=(const ExplainRequest &);
+    ExplainRequest() noexcept;
 
-  ExplainRequest(const ExplainRequest&);
-  ExplainRequest& operator=(const ExplainRequest&);
-  ExplainRequest() noexcept;
+    virtual ~ExplainRequest() noexcept;
+    int64_t session_id;
+    std::string db_name;
+    std::string table_name;
+    std::vector<ParsedExpr> select_list;
+    std::vector<ParsedExpr> highlight_list;
+    SearchExpr search_expr;
+    ParsedExpr where_expr;
+    std::vector<ParsedExpr> group_by_list;
+    ParsedExpr having_expr;
+    ParsedExpr limit_expr;
+    ParsedExpr offset_expr;
+    std::vector<OrderByExpr> order_by_list;
+    /**
+     *
+     * @see ExplainType
+     */
+    ExplainType::type explain_type;
 
-  virtual ~ExplainRequest() noexcept;
-  int64_t session_id;
-  std::string db_name;
-  std::string table_name;
-  std::vector<ParsedExpr>  select_list;
-  std::vector<ParsedExpr>  highlight_list;
-  SearchExpr search_expr;
-  ParsedExpr where_expr;
-  std::vector<ParsedExpr>  group_by_list;
-  ParsedExpr having_expr;
-  ParsedExpr limit_expr;
-  ParsedExpr offset_expr;
-  std::vector<OrderByExpr>  order_by_list;
-  /**
-   * 
-   * @see ExplainType
-   */
-  ExplainType::type explain_type;
+    _ExplainRequest__isset __isset;
 
-  _ExplainRequest__isset __isset;
+    void __set_session_id(const int64_t val);
 
-  void __set_session_id(const int64_t val);
+    void __set_db_name(const std::string &val);
 
-  void __set_db_name(const std::string& val);
+    void __set_table_name(const std::string &val);
 
-  void __set_table_name(const std::string& val);
+    void __set_select_list(const std::vector<ParsedExpr> &val);
 
-  void __set_select_list(const std::vector<ParsedExpr> & val);
+    void __set_highlight_list(const std::vector<ParsedExpr> &val);
 
-  void __set_highlight_list(const std::vector<ParsedExpr> & val);
+    void __set_search_expr(const SearchExpr &val);
 
-  void __set_search_expr(const SearchExpr& val);
+    void __set_where_expr(const ParsedExpr &val);
 
-  void __set_where_expr(const ParsedExpr& val);
+    void __set_group_by_list(const std::vector<ParsedExpr> &val);
 
-  void __set_group_by_list(const std::vector<ParsedExpr> & val);
+    void __set_having_expr(const ParsedExpr &val);
 
-  void __set_having_expr(const ParsedExpr& val);
+    void __set_limit_expr(const ParsedExpr &val);
 
-  void __set_limit_expr(const ParsedExpr& val);
+    void __set_offset_expr(const ParsedExpr &val);
 
-  void __set_offset_expr(const ParsedExpr& val);
+    void __set_order_by_list(const std::vector<OrderByExpr> &val);
 
-  void __set_order_by_list(const std::vector<OrderByExpr> & val);
+    void __set_explain_type(const ExplainType::type val);
 
-  void __set_explain_type(const ExplainType::type val);
+    bool operator==(const ExplainRequest &rhs) const;
+    bool operator!=(const ExplainRequest &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const ExplainRequest & rhs) const;
-  bool operator != (const ExplainRequest &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const ExplainRequest &) const;
 
-  bool operator < (const ExplainRequest & ) const;
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
-
-  virtual void printTo(std::ostream& out) const;
+    virtual void printTo(std::ostream &out) const;
 };
 
 void swap(ExplainRequest &a, ExplainRequest &b);
 
-std::ostream& operator<<(std::ostream& out, const ExplainRequest& obj);
+std::ostream &operator<<(std::ostream &out, const ExplainRequest &obj);
 
 typedef struct _ExplainResponse__isset {
-  _ExplainResponse__isset() : error_code(false), error_msg(false), column_defs(true), column_fields(true) {}
-  bool error_code :1;
-  bool error_msg :1;
-  bool column_defs :1;
-  bool column_fields :1;
+    _ExplainResponse__isset() : error_code(false), error_msg(false), column_defs(true), column_fields(true) {}
+    bool error_code : 1;
+    bool error_msg : 1;
+    bool column_defs : 1;
+    bool column_fields : 1;
 } _ExplainResponse__isset;
 
 class ExplainResponse : public virtual ::apache::thrift::TBase {
- public:
+public:
+    ExplainResponse(const ExplainResponse &);
+    ExplainResponse &operator=(const ExplainResponse &);
+    ExplainResponse() noexcept;
 
-  ExplainResponse(const ExplainResponse&);
-  ExplainResponse& operator=(const ExplainResponse&);
-  ExplainResponse() noexcept;
+    virtual ~ExplainResponse() noexcept;
+    int64_t error_code;
+    std::string error_msg;
+    std::vector<ColumnDef> column_defs;
+    std::vector<ColumnField> column_fields;
 
-  virtual ~ExplainResponse() noexcept;
-  int64_t error_code;
-  std::string error_msg;
-  std::vector<ColumnDef>  column_defs;
-  std::vector<ColumnField>  column_fields;
+    _ExplainResponse__isset __isset;
 
-  _ExplainResponse__isset __isset;
+    void __set_error_code(const int64_t val);
 
-  void __set_error_code(const int64_t val);
+    void __set_error_msg(const std::string &val);
 
-  void __set_error_msg(const std::string& val);
+    void __set_column_defs(const std::vector<ColumnDef> &val);
 
-  void __set_column_defs(const std::vector<ColumnDef> & val);
+    void __set_column_fields(const std::vector<ColumnField> &val);
 
-  void __set_column_fields(const std::vector<ColumnField> & val);
+    bool operator==(const ExplainResponse &rhs) const;
+    bool operator!=(const ExplainResponse &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const ExplainResponse & rhs) const;
-  bool operator != (const ExplainResponse &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const ExplainResponse &) const;
 
-  bool operator < (const ExplainResponse & ) const;
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
-
-  virtual void printTo(std::ostream& out) const;
+    virtual void printTo(std::ostream &out) const;
 };
 
 void swap(ExplainResponse &a, ExplainResponse &b);
 
-std::ostream& operator<<(std::ostream& out, const ExplainResponse& obj);
+std::ostream &operator<<(std::ostream &out, const ExplainResponse &obj);
 
 typedef struct _SelectRequest__isset {
-  _SelectRequest__isset() : session_id(false), db_name(false), table_name(false), select_list(true), highlight_list(true), search_expr(false), where_expr(false), group_by_list(true), having_expr(false), limit_expr(false), offset_expr(false), order_by_list(true), total_hits_count(false) {}
-  bool session_id :1;
-  bool db_name :1;
-  bool table_name :1;
-  bool select_list :1;
-  bool highlight_list :1;
-  bool search_expr :1;
-  bool where_expr :1;
-  bool group_by_list :1;
-  bool having_expr :1;
-  bool limit_expr :1;
-  bool offset_expr :1;
-  bool order_by_list :1;
-  bool total_hits_count :1;
+    _SelectRequest__isset()
+        : session_id(false), db_name(false), table_name(false), select_list(true), highlight_list(true), search_expr(false), where_expr(false),
+          group_by_list(true), having_expr(false), limit_expr(false), offset_expr(false), order_by_list(true), total_hits_count(false) {}
+    bool session_id : 1;
+    bool db_name : 1;
+    bool table_name : 1;
+    bool select_list : 1;
+    bool highlight_list : 1;
+    bool search_expr : 1;
+    bool where_expr : 1;
+    bool group_by_list : 1;
+    bool having_expr : 1;
+    bool limit_expr : 1;
+    bool offset_expr : 1;
+    bool order_by_list : 1;
+    bool total_hits_count : 1;
 } _SelectRequest__isset;
 
 class SelectRequest : public virtual ::apache::thrift::TBase {
- public:
+public:
+    SelectRequest(const SelectRequest &);
+    SelectRequest &operator=(const SelectRequest &);
+    SelectRequest() noexcept;
 
-  SelectRequest(const SelectRequest&);
-  SelectRequest& operator=(const SelectRequest&);
-  SelectRequest() noexcept;
+    virtual ~SelectRequest() noexcept;
+    int64_t session_id;
+    std::string db_name;
+    std::string table_name;
+    std::vector<ParsedExpr> select_list;
+    std::vector<ParsedExpr> highlight_list;
+    SearchExpr search_expr;
+    ParsedExpr where_expr;
+    std::vector<ParsedExpr> group_by_list;
+    ParsedExpr having_expr;
+    ParsedExpr limit_expr;
+    ParsedExpr offset_expr;
+    std::vector<OrderByExpr> order_by_list;
+    bool total_hits_count;
 
-  virtual ~SelectRequest() noexcept;
-  int64_t session_id;
-  std::string db_name;
-  std::string table_name;
-  std::vector<ParsedExpr>  select_list;
-  std::vector<ParsedExpr>  highlight_list;
-  SearchExpr search_expr;
-  ParsedExpr where_expr;
-  std::vector<ParsedExpr>  group_by_list;
-  ParsedExpr having_expr;
-  ParsedExpr limit_expr;
-  ParsedExpr offset_expr;
-  std::vector<OrderByExpr>  order_by_list;
-  bool total_hits_count;
+    _SelectRequest__isset __isset;
 
-  _SelectRequest__isset __isset;
+    void __set_session_id(const int64_t val);
 
-  void __set_session_id(const int64_t val);
+    void __set_db_name(const std::string &val);
 
-  void __set_db_name(const std::string& val);
+    void __set_table_name(const std::string &val);
 
-  void __set_table_name(const std::string& val);
+    void __set_select_list(const std::vector<ParsedExpr> &val);
 
-  void __set_select_list(const std::vector<ParsedExpr> & val);
+    void __set_highlight_list(const std::vector<ParsedExpr> &val);
 
-  void __set_highlight_list(const std::vector<ParsedExpr> & val);
+    void __set_search_expr(const SearchExpr &val);
 
-  void __set_search_expr(const SearchExpr& val);
+    void __set_where_expr(const ParsedExpr &val);
 
-  void __set_where_expr(const ParsedExpr& val);
+    void __set_group_by_list(const std::vector<ParsedExpr> &val);
 
-  void __set_group_by_list(const std::vector<ParsedExpr> & val);
+    void __set_having_expr(const ParsedExpr &val);
 
-  void __set_having_expr(const ParsedExpr& val);
+    void __set_limit_expr(const ParsedExpr &val);
 
-  void __set_limit_expr(const ParsedExpr& val);
+    void __set_offset_expr(const ParsedExpr &val);
 
-  void __set_offset_expr(const ParsedExpr& val);
+    void __set_order_by_list(const std::vector<OrderByExpr> &val);
 
-  void __set_order_by_list(const std::vector<OrderByExpr> & val);
+    void __set_total_hits_count(const bool val);
 
-  void __set_total_hits_count(const bool val);
+    bool operator==(const SelectRequest &rhs) const;
+    bool operator!=(const SelectRequest &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const SelectRequest & rhs) const;
-  bool operator != (const SelectRequest &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const SelectRequest &) const;
 
-  bool operator < (const SelectRequest & ) const;
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
-
-  virtual void printTo(std::ostream& out) const;
+    virtual void printTo(std::ostream &out) const;
 };
 
 void swap(SelectRequest &a, SelectRequest &b);
 
-std::ostream& operator<<(std::ostream& out, const SelectRequest& obj);
+std::ostream &operator<<(std::ostream &out, const SelectRequest &obj);
 
 typedef struct _SelectResponse__isset {
-  _SelectResponse__isset() : error_code(false), error_msg(false), column_defs(true), column_fields(true), extra_result(false) {}
-  bool error_code :1;
-  bool error_msg :1;
-  bool column_defs :1;
-  bool column_fields :1;
-  bool extra_result :1;
+    _SelectResponse__isset() : error_code(false), error_msg(false), column_defs(true), column_fields(true), extra_result(false) {}
+    bool error_code : 1;
+    bool error_msg : 1;
+    bool column_defs : 1;
+    bool column_fields : 1;
+    bool extra_result : 1;
 } _SelectResponse__isset;
 
 class SelectResponse : public virtual ::apache::thrift::TBase {
- public:
+public:
+    SelectResponse(const SelectResponse &);
+    SelectResponse &operator=(const SelectResponse &);
+    SelectResponse() noexcept;
 
-  SelectResponse(const SelectResponse&);
-  SelectResponse& operator=(const SelectResponse&);
-  SelectResponse() noexcept;
+    virtual ~SelectResponse() noexcept;
+    int64_t error_code;
+    std::string error_msg;
+    std::vector<ColumnDef> column_defs;
+    std::vector<ColumnField> column_fields;
+    std::string extra_result;
 
-  virtual ~SelectResponse() noexcept;
-  int64_t error_code;
-  std::string error_msg;
-  std::vector<ColumnDef>  column_defs;
-  std::vector<ColumnField>  column_fields;
-  std::string extra_result;
+    _SelectResponse__isset __isset;
 
-  _SelectResponse__isset __isset;
+    void __set_error_code(const int64_t val);
 
-  void __set_error_code(const int64_t val);
+    void __set_error_msg(const std::string &val);
 
-  void __set_error_msg(const std::string& val);
+    void __set_column_defs(const std::vector<ColumnDef> &val);
 
-  void __set_column_defs(const std::vector<ColumnDef> & val);
+    void __set_column_fields(const std::vector<ColumnField> &val);
 
-  void __set_column_fields(const std::vector<ColumnField> & val);
+    void __set_extra_result(const std::string &val);
 
-  void __set_extra_result(const std::string& val);
+    bool operator==(const SelectResponse &rhs) const;
+    bool operator!=(const SelectResponse &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const SelectResponse & rhs) const;
-  bool operator != (const SelectResponse &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const SelectResponse &) const;
 
-  bool operator < (const SelectResponse & ) const;
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
-
-  virtual void printTo(std::ostream& out) const;
+    virtual void printTo(std::ostream &out) const;
 };
 
 void swap(SelectResponse &a, SelectResponse &b);
 
-std::ostream& operator<<(std::ostream& out, const SelectResponse& obj);
+std::ostream &operator<<(std::ostream &out, const SelectResponse &obj);
 
 typedef struct _DeleteRequest__isset {
-  _DeleteRequest__isset() : db_name(false), table_name(false), where_expr(false), session_id(false) {}
-  bool db_name :1;
-  bool table_name :1;
-  bool where_expr :1;
-  bool session_id :1;
+    _DeleteRequest__isset() : db_name(false), table_name(false), where_expr(false), session_id(false) {}
+    bool db_name : 1;
+    bool table_name : 1;
+    bool where_expr : 1;
+    bool session_id : 1;
 } _DeleteRequest__isset;
 
 class DeleteRequest : public virtual ::apache::thrift::TBase {
- public:
+public:
+    DeleteRequest(const DeleteRequest &);
+    DeleteRequest &operator=(const DeleteRequest &);
+    DeleteRequest() noexcept;
 
-  DeleteRequest(const DeleteRequest&);
-  DeleteRequest& operator=(const DeleteRequest&);
-  DeleteRequest() noexcept;
+    virtual ~DeleteRequest() noexcept;
+    std::string db_name;
+    std::string table_name;
+    ParsedExpr where_expr;
+    int64_t session_id;
 
-  virtual ~DeleteRequest() noexcept;
-  std::string db_name;
-  std::string table_name;
-  ParsedExpr where_expr;
-  int64_t session_id;
+    _DeleteRequest__isset __isset;
 
-  _DeleteRequest__isset __isset;
+    void __set_db_name(const std::string &val);
 
-  void __set_db_name(const std::string& val);
+    void __set_table_name(const std::string &val);
 
-  void __set_table_name(const std::string& val);
+    void __set_where_expr(const ParsedExpr &val);
 
-  void __set_where_expr(const ParsedExpr& val);
+    void __set_session_id(const int64_t val);
 
-  void __set_session_id(const int64_t val);
+    bool operator==(const DeleteRequest &rhs) const;
+    bool operator!=(const DeleteRequest &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const DeleteRequest & rhs) const;
-  bool operator != (const DeleteRequest &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const DeleteRequest &) const;
 
-  bool operator < (const DeleteRequest & ) const;
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
-
-  virtual void printTo(std::ostream& out) const;
+    virtual void printTo(std::ostream &out) const;
 };
 
 void swap(DeleteRequest &a, DeleteRequest &b);
 
-std::ostream& operator<<(std::ostream& out, const DeleteRequest& obj);
+std::ostream &operator<<(std::ostream &out, const DeleteRequest &obj);
 
 typedef struct _DeleteResponse__isset {
-  _DeleteResponse__isset() : error_code(false), error_msg(false), deleted_rows(false) {}
-  bool error_code :1;
-  bool error_msg :1;
-  bool deleted_rows :1;
+    _DeleteResponse__isset() : error_code(false), error_msg(false), deleted_rows(false) {}
+    bool error_code : 1;
+    bool error_msg : 1;
+    bool deleted_rows : 1;
 } _DeleteResponse__isset;
 
 class DeleteResponse : public virtual ::apache::thrift::TBase {
- public:
+public:
+    DeleteResponse(const DeleteResponse &);
+    DeleteResponse &operator=(const DeleteResponse &);
+    DeleteResponse() noexcept;
 
-  DeleteResponse(const DeleteResponse&);
-  DeleteResponse& operator=(const DeleteResponse&);
-  DeleteResponse() noexcept;
+    virtual ~DeleteResponse() noexcept;
+    int64_t error_code;
+    std::string error_msg;
+    int64_t deleted_rows;
 
-  virtual ~DeleteResponse() noexcept;
-  int64_t error_code;
-  std::string error_msg;
-  int64_t deleted_rows;
+    _DeleteResponse__isset __isset;
 
-  _DeleteResponse__isset __isset;
+    void __set_error_code(const int64_t val);
 
-  void __set_error_code(const int64_t val);
+    void __set_error_msg(const std::string &val);
 
-  void __set_error_msg(const std::string& val);
+    void __set_deleted_rows(const int64_t val);
 
-  void __set_deleted_rows(const int64_t val);
+    bool operator==(const DeleteResponse &rhs) const;
+    bool operator!=(const DeleteResponse &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const DeleteResponse & rhs) const;
-  bool operator != (const DeleteResponse &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const DeleteResponse &) const;
 
-  bool operator < (const DeleteResponse & ) const;
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
-
-  virtual void printTo(std::ostream& out) const;
+    virtual void printTo(std::ostream &out) const;
 };
 
 void swap(DeleteResponse &a, DeleteResponse &b);
 
-std::ostream& operator<<(std::ostream& out, const DeleteResponse& obj);
+std::ostream &operator<<(std::ostream &out, const DeleteResponse &obj);
 
 typedef struct _UpdateRequest__isset {
-  _UpdateRequest__isset() : db_name(false), table_name(false), where_expr(false), update_expr_array(true), session_id(false) {}
-  bool db_name :1;
-  bool table_name :1;
-  bool where_expr :1;
-  bool update_expr_array :1;
-  bool session_id :1;
+    _UpdateRequest__isset() : db_name(false), table_name(false), where_expr(false), update_expr_array(true), session_id(false) {}
+    bool db_name : 1;
+    bool table_name : 1;
+    bool where_expr : 1;
+    bool update_expr_array : 1;
+    bool session_id : 1;
 } _UpdateRequest__isset;
 
 class UpdateRequest : public virtual ::apache::thrift::TBase {
- public:
+public:
+    UpdateRequest(const UpdateRequest &);
+    UpdateRequest &operator=(const UpdateRequest &);
+    UpdateRequest() noexcept;
 
-  UpdateRequest(const UpdateRequest&);
-  UpdateRequest& operator=(const UpdateRequest&);
-  UpdateRequest() noexcept;
+    virtual ~UpdateRequest() noexcept;
+    std::string db_name;
+    std::string table_name;
+    ParsedExpr where_expr;
+    std::vector<UpdateExpr> update_expr_array;
+    int64_t session_id;
 
-  virtual ~UpdateRequest() noexcept;
-  std::string db_name;
-  std::string table_name;
-  ParsedExpr where_expr;
-  std::vector<UpdateExpr>  update_expr_array;
-  int64_t session_id;
+    _UpdateRequest__isset __isset;
 
-  _UpdateRequest__isset __isset;
+    void __set_db_name(const std::string &val);
 
-  void __set_db_name(const std::string& val);
+    void __set_table_name(const std::string &val);
 
-  void __set_table_name(const std::string& val);
+    void __set_where_expr(const ParsedExpr &val);
 
-  void __set_where_expr(const ParsedExpr& val);
+    void __set_update_expr_array(const std::vector<UpdateExpr> &val);
 
-  void __set_update_expr_array(const std::vector<UpdateExpr> & val);
+    void __set_session_id(const int64_t val);
 
-  void __set_session_id(const int64_t val);
+    bool operator==(const UpdateRequest &rhs) const;
+    bool operator!=(const UpdateRequest &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const UpdateRequest & rhs) const;
-  bool operator != (const UpdateRequest &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const UpdateRequest &) const;
 
-  bool operator < (const UpdateRequest & ) const;
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
-
-  virtual void printTo(std::ostream& out) const;
+    virtual void printTo(std::ostream &out) const;
 };
 
 void swap(UpdateRequest &a, UpdateRequest &b);
 
-std::ostream& operator<<(std::ostream& out, const UpdateRequest& obj);
+std::ostream &operator<<(std::ostream &out, const UpdateRequest &obj);
 
 typedef struct _AddColumnsRequest__isset {
-  _AddColumnsRequest__isset() : db_name(false), table_name(false), column_defs(true), session_id(false) {}
-  bool db_name :1;
-  bool table_name :1;
-  bool column_defs :1;
-  bool session_id :1;
+    _AddColumnsRequest__isset() : db_name(false), table_name(false), column_defs(true), session_id(false) {}
+    bool db_name : 1;
+    bool table_name : 1;
+    bool column_defs : 1;
+    bool session_id : 1;
 } _AddColumnsRequest__isset;
 
 class AddColumnsRequest : public virtual ::apache::thrift::TBase {
- public:
+public:
+    AddColumnsRequest(const AddColumnsRequest &);
+    AddColumnsRequest &operator=(const AddColumnsRequest &);
+    AddColumnsRequest() noexcept;
 
-  AddColumnsRequest(const AddColumnsRequest&);
-  AddColumnsRequest& operator=(const AddColumnsRequest&);
-  AddColumnsRequest() noexcept;
+    virtual ~AddColumnsRequest() noexcept;
+    std::string db_name;
+    std::string table_name;
+    std::vector<ColumnDef> column_defs;
+    int64_t session_id;
 
-  virtual ~AddColumnsRequest() noexcept;
-  std::string db_name;
-  std::string table_name;
-  std::vector<ColumnDef>  column_defs;
-  int64_t session_id;
+    _AddColumnsRequest__isset __isset;
 
-  _AddColumnsRequest__isset __isset;
+    void __set_db_name(const std::string &val);
 
-  void __set_db_name(const std::string& val);
+    void __set_table_name(const std::string &val);
 
-  void __set_table_name(const std::string& val);
+    void __set_column_defs(const std::vector<ColumnDef> &val);
 
-  void __set_column_defs(const std::vector<ColumnDef> & val);
+    void __set_session_id(const int64_t val);
 
-  void __set_session_id(const int64_t val);
+    bool operator==(const AddColumnsRequest &rhs) const;
+    bool operator!=(const AddColumnsRequest &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const AddColumnsRequest & rhs) const;
-  bool operator != (const AddColumnsRequest &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const AddColumnsRequest &) const;
 
-  bool operator < (const AddColumnsRequest & ) const;
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
-
-  virtual void printTo(std::ostream& out) const;
+    virtual void printTo(std::ostream &out) const;
 };
 
 void swap(AddColumnsRequest &a, AddColumnsRequest &b);
 
-std::ostream& operator<<(std::ostream& out, const AddColumnsRequest& obj);
+std::ostream &operator<<(std::ostream &out, const AddColumnsRequest &obj);
 
 typedef struct _DropColumnsRequest__isset {
-  _DropColumnsRequest__isset() : db_name(false), table_name(false), column_names(true), session_id(false) {}
-  bool db_name :1;
-  bool table_name :1;
-  bool column_names :1;
-  bool session_id :1;
+    _DropColumnsRequest__isset() : db_name(false), table_name(false), column_names(true), session_id(false) {}
+    bool db_name : 1;
+    bool table_name : 1;
+    bool column_names : 1;
+    bool session_id : 1;
 } _DropColumnsRequest__isset;
 
 class DropColumnsRequest : public virtual ::apache::thrift::TBase {
- public:
+public:
+    DropColumnsRequest(const DropColumnsRequest &);
+    DropColumnsRequest &operator=(const DropColumnsRequest &);
+    DropColumnsRequest() noexcept;
 
-  DropColumnsRequest(const DropColumnsRequest&);
-  DropColumnsRequest& operator=(const DropColumnsRequest&);
-  DropColumnsRequest() noexcept;
+    virtual ~DropColumnsRequest() noexcept;
+    std::string db_name;
+    std::string table_name;
+    std::vector<std::string> column_names;
+    int64_t session_id;
 
-  virtual ~DropColumnsRequest() noexcept;
-  std::string db_name;
-  std::string table_name;
-  std::vector<std::string>  column_names;
-  int64_t session_id;
+    _DropColumnsRequest__isset __isset;
 
-  _DropColumnsRequest__isset __isset;
+    void __set_db_name(const std::string &val);
 
-  void __set_db_name(const std::string& val);
+    void __set_table_name(const std::string &val);
 
-  void __set_table_name(const std::string& val);
+    void __set_column_names(const std::vector<std::string> &val);
 
-  void __set_column_names(const std::vector<std::string> & val);
+    void __set_session_id(const int64_t val);
 
-  void __set_session_id(const int64_t val);
+    bool operator==(const DropColumnsRequest &rhs) const;
+    bool operator!=(const DropColumnsRequest &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const DropColumnsRequest & rhs) const;
-  bool operator != (const DropColumnsRequest &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const DropColumnsRequest &) const;
 
-  bool operator < (const DropColumnsRequest & ) const;
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
-
-  virtual void printTo(std::ostream& out) const;
+    virtual void printTo(std::ostream &out) const;
 };
 
 void swap(DropColumnsRequest &a, DropColumnsRequest &b);
 
-std::ostream& operator<<(std::ostream& out, const DropColumnsRequest& obj);
+std::ostream &operator<<(std::ostream &out, const DropColumnsRequest &obj);
 
 typedef struct _DumpIndexRequest__isset {
-  _DumpIndexRequest__isset() : db_name(false), table_name(false), index_name(false), session_id(false) {}
-  bool db_name :1;
-  bool table_name :1;
-  bool index_name :1;
-  bool session_id :1;
+    _DumpIndexRequest__isset() : db_name(false), table_name(false), index_name(false), session_id(false) {}
+    bool db_name : 1;
+    bool table_name : 1;
+    bool index_name : 1;
+    bool session_id : 1;
 } _DumpIndexRequest__isset;
 
 class DumpIndexRequest : public virtual ::apache::thrift::TBase {
- public:
+public:
+    DumpIndexRequest(const DumpIndexRequest &);
+    DumpIndexRequest &operator=(const DumpIndexRequest &);
+    DumpIndexRequest() noexcept;
 
-  DumpIndexRequest(const DumpIndexRequest&);
-  DumpIndexRequest& operator=(const DumpIndexRequest&);
-  DumpIndexRequest() noexcept;
+    virtual ~DumpIndexRequest() noexcept;
+    std::string db_name;
+    std::string table_name;
+    std::string index_name;
+    int64_t session_id;
 
-  virtual ~DumpIndexRequest() noexcept;
-  std::string db_name;
-  std::string table_name;
-  std::string index_name;
-  int64_t session_id;
+    _DumpIndexRequest__isset __isset;
 
-  _DumpIndexRequest__isset __isset;
+    void __set_db_name(const std::string &val);
 
-  void __set_db_name(const std::string& val);
+    void __set_table_name(const std::string &val);
 
-  void __set_table_name(const std::string& val);
+    void __set_index_name(const std::string &val);
 
-  void __set_index_name(const std::string& val);
+    void __set_session_id(const int64_t val);
 
-  void __set_session_id(const int64_t val);
+    bool operator==(const DumpIndexRequest &rhs) const;
+    bool operator!=(const DumpIndexRequest &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const DumpIndexRequest & rhs) const;
-  bool operator != (const DumpIndexRequest &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const DumpIndexRequest &) const;
 
-  bool operator < (const DumpIndexRequest & ) const;
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
-
-  virtual void printTo(std::ostream& out) const;
+    virtual void printTo(std::ostream &out) const;
 };
 
 void swap(DumpIndexRequest &a, DumpIndexRequest &b);
 
-std::ostream& operator<<(std::ostream& out, const DumpIndexRequest& obj);
+std::ostream &operator<<(std::ostream &out, const DumpIndexRequest &obj);
 
 typedef struct _ShowTablesRequest__isset {
-  _ShowTablesRequest__isset() : session_id(false), db_name(false) {}
-  bool session_id :1;
-  bool db_name :1;
+    _ShowTablesRequest__isset() : session_id(false), db_name(false) {}
+    bool session_id : 1;
+    bool db_name : 1;
 } _ShowTablesRequest__isset;
 
 class ShowTablesRequest : public virtual ::apache::thrift::TBase {
- public:
+public:
+    ShowTablesRequest(const ShowTablesRequest &);
+    ShowTablesRequest &operator=(const ShowTablesRequest &);
+    ShowTablesRequest() noexcept;
 
-  ShowTablesRequest(const ShowTablesRequest&);
-  ShowTablesRequest& operator=(const ShowTablesRequest&);
-  ShowTablesRequest() noexcept;
+    virtual ~ShowTablesRequest() noexcept;
+    int64_t session_id;
+    std::string db_name;
 
-  virtual ~ShowTablesRequest() noexcept;
-  int64_t session_id;
-  std::string db_name;
+    _ShowTablesRequest__isset __isset;
 
-  _ShowTablesRequest__isset __isset;
+    void __set_session_id(const int64_t val);
 
-  void __set_session_id(const int64_t val);
+    void __set_db_name(const std::string &val);
 
-  void __set_db_name(const std::string& val);
+    bool operator==(const ShowTablesRequest &rhs) const;
+    bool operator!=(const ShowTablesRequest &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const ShowTablesRequest & rhs) const;
-  bool operator != (const ShowTablesRequest &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const ShowTablesRequest &) const;
 
-  bool operator < (const ShowTablesRequest & ) const;
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
-
-  virtual void printTo(std::ostream& out) const;
+    virtual void printTo(std::ostream &out) const;
 };
 
 void swap(ShowTablesRequest &a, ShowTablesRequest &b);
 
-std::ostream& operator<<(std::ostream& out, const ShowTablesRequest& obj);
+std::ostream &operator<<(std::ostream &out, const ShowTablesRequest &obj);
 
 typedef struct _ShowSegmentsRequest__isset {
-  _ShowSegmentsRequest__isset() : session_id(false), db_name(false), table_name(false) {}
-  bool session_id :1;
-  bool db_name :1;
-  bool table_name :1;
+    _ShowSegmentsRequest__isset() : session_id(false), db_name(false), table_name(false) {}
+    bool session_id : 1;
+    bool db_name : 1;
+    bool table_name : 1;
 } _ShowSegmentsRequest__isset;
 
 class ShowSegmentsRequest : public virtual ::apache::thrift::TBase {
- public:
+public:
+    ShowSegmentsRequest(const ShowSegmentsRequest &);
+    ShowSegmentsRequest &operator=(const ShowSegmentsRequest &);
+    ShowSegmentsRequest() noexcept;
 
-  ShowSegmentsRequest(const ShowSegmentsRequest&);
-  ShowSegmentsRequest& operator=(const ShowSegmentsRequest&);
-  ShowSegmentsRequest() noexcept;
+    virtual ~ShowSegmentsRequest() noexcept;
+    int64_t session_id;
+    std::string db_name;
+    std::string table_name;
 
-  virtual ~ShowSegmentsRequest() noexcept;
-  int64_t session_id;
-  std::string db_name;
-  std::string table_name;
+    _ShowSegmentsRequest__isset __isset;
 
-  _ShowSegmentsRequest__isset __isset;
+    void __set_session_id(const int64_t val);
 
-  void __set_session_id(const int64_t val);
+    void __set_db_name(const std::string &val);
 
-  void __set_db_name(const std::string& val);
+    void __set_table_name(const std::string &val);
 
-  void __set_table_name(const std::string& val);
+    bool operator==(const ShowSegmentsRequest &rhs) const;
+    bool operator!=(const ShowSegmentsRequest &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const ShowSegmentsRequest & rhs) const;
-  bool operator != (const ShowSegmentsRequest &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const ShowSegmentsRequest &) const;
 
-  bool operator < (const ShowSegmentsRequest & ) const;
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
-
-  virtual void printTo(std::ostream& out) const;
+    virtual void printTo(std::ostream &out) const;
 };
 
 void swap(ShowSegmentsRequest &a, ShowSegmentsRequest &b);
 
-std::ostream& operator<<(std::ostream& out, const ShowSegmentsRequest& obj);
+std::ostream &operator<<(std::ostream &out, const ShowSegmentsRequest &obj);
 
 typedef struct _ShowSegmentRequest__isset {
-  _ShowSegmentRequest__isset() : session_id(false), db_name(false), table_name(false), segment_id(false) {}
-  bool session_id :1;
-  bool db_name :1;
-  bool table_name :1;
-  bool segment_id :1;
+    _ShowSegmentRequest__isset() : session_id(false), db_name(false), table_name(false), segment_id(false) {}
+    bool session_id : 1;
+    bool db_name : 1;
+    bool table_name : 1;
+    bool segment_id : 1;
 } _ShowSegmentRequest__isset;
 
 class ShowSegmentRequest : public virtual ::apache::thrift::TBase {
- public:
+public:
+    ShowSegmentRequest(const ShowSegmentRequest &);
+    ShowSegmentRequest &operator=(const ShowSegmentRequest &);
+    ShowSegmentRequest() noexcept;
 
-  ShowSegmentRequest(const ShowSegmentRequest&);
-  ShowSegmentRequest& operator=(const ShowSegmentRequest&);
-  ShowSegmentRequest() noexcept;
+    virtual ~ShowSegmentRequest() noexcept;
+    int64_t session_id;
+    std::string db_name;
+    std::string table_name;
+    int64_t segment_id;
 
-  virtual ~ShowSegmentRequest() noexcept;
-  int64_t session_id;
-  std::string db_name;
-  std::string table_name;
-  int64_t segment_id;
+    _ShowSegmentRequest__isset __isset;
 
-  _ShowSegmentRequest__isset __isset;
+    void __set_session_id(const int64_t val);
 
-  void __set_session_id(const int64_t val);
+    void __set_db_name(const std::string &val);
 
-  void __set_db_name(const std::string& val);
+    void __set_table_name(const std::string &val);
 
-  void __set_table_name(const std::string& val);
+    void __set_segment_id(const int64_t val);
 
-  void __set_segment_id(const int64_t val);
+    bool operator==(const ShowSegmentRequest &rhs) const;
+    bool operator!=(const ShowSegmentRequest &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const ShowSegmentRequest & rhs) const;
-  bool operator != (const ShowSegmentRequest &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const ShowSegmentRequest &) const;
 
-  bool operator < (const ShowSegmentRequest & ) const;
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
-
-  virtual void printTo(std::ostream& out) const;
+    virtual void printTo(std::ostream &out) const;
 };
 
 void swap(ShowSegmentRequest &a, ShowSegmentRequest &b);
 
-std::ostream& operator<<(std::ostream& out, const ShowSegmentRequest& obj);
+std::ostream &operator<<(std::ostream &out, const ShowSegmentRequest &obj);
 
 typedef struct _ShowSegmentResponse__isset {
-  _ShowSegmentResponse__isset() : error_code(false), error_msg(false), segment_id(false), status(false), path(false), size(false), block_count(false), row_capacity(false), row_count(false), room(false), column_count(false) {}
-  bool error_code :1;
-  bool error_msg :1;
-  bool segment_id :1;
-  bool status :1;
-  bool path :1;
-  bool size :1;
-  bool block_count :1;
-  bool row_capacity :1;
-  bool row_count :1;
-  bool room :1;
-  bool column_count :1;
+    _ShowSegmentResponse__isset()
+        : error_code(false), error_msg(false), segment_id(false), status(false), path(false), size(false), block_count(false), row_capacity(false),
+          row_count(false), room(false), column_count(false) {}
+    bool error_code : 1;
+    bool error_msg : 1;
+    bool segment_id : 1;
+    bool status : 1;
+    bool path : 1;
+    bool size : 1;
+    bool block_count : 1;
+    bool row_capacity : 1;
+    bool row_count : 1;
+    bool room : 1;
+    bool column_count : 1;
 } _ShowSegmentResponse__isset;
 
 class ShowSegmentResponse : public virtual ::apache::thrift::TBase {
- public:
+public:
+    ShowSegmentResponse(const ShowSegmentResponse &);
+    ShowSegmentResponse &operator=(const ShowSegmentResponse &);
+    ShowSegmentResponse() noexcept;
 
-  ShowSegmentResponse(const ShowSegmentResponse&);
-  ShowSegmentResponse& operator=(const ShowSegmentResponse&);
-  ShowSegmentResponse() noexcept;
+    virtual ~ShowSegmentResponse() noexcept;
+    int64_t error_code;
+    std::string error_msg;
+    int64_t segment_id;
+    std::string status;
+    std::string path;
+    std::string size;
+    int64_t block_count;
+    int64_t row_capacity;
+    int64_t row_count;
+    int64_t room;
+    int64_t column_count;
 
-  virtual ~ShowSegmentResponse() noexcept;
-  int64_t error_code;
-  std::string error_msg;
-  int64_t segment_id;
-  std::string status;
-  std::string path;
-  std::string size;
-  int64_t block_count;
-  int64_t row_capacity;
-  int64_t row_count;
-  int64_t room;
-  int64_t column_count;
+    _ShowSegmentResponse__isset __isset;
 
-  _ShowSegmentResponse__isset __isset;
+    void __set_error_code(const int64_t val);
 
-  void __set_error_code(const int64_t val);
+    void __set_error_msg(const std::string &val);
 
-  void __set_error_msg(const std::string& val);
+    void __set_segment_id(const int64_t val);
 
-  void __set_segment_id(const int64_t val);
+    void __set_status(const std::string &val);
 
-  void __set_status(const std::string& val);
+    void __set_path(const std::string &val);
 
-  void __set_path(const std::string& val);
+    void __set_size(const std::string &val);
 
-  void __set_size(const std::string& val);
+    void __set_block_count(const int64_t val);
 
-  void __set_block_count(const int64_t val);
+    void __set_row_capacity(const int64_t val);
 
-  void __set_row_capacity(const int64_t val);
+    void __set_row_count(const int64_t val);
 
-  void __set_row_count(const int64_t val);
+    void __set_room(const int64_t val);
 
-  void __set_room(const int64_t val);
+    void __set_column_count(const int64_t val);
 
-  void __set_column_count(const int64_t val);
+    bool operator==(const ShowSegmentResponse &rhs) const;
+    bool operator!=(const ShowSegmentResponse &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const ShowSegmentResponse & rhs) const;
-  bool operator != (const ShowSegmentResponse &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const ShowSegmentResponse &) const;
 
-  bool operator < (const ShowSegmentResponse & ) const;
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
-
-  virtual void printTo(std::ostream& out) const;
+    virtual void printTo(std::ostream &out) const;
 };
 
 void swap(ShowSegmentResponse &a, ShowSegmentResponse &b);
 
-std::ostream& operator<<(std::ostream& out, const ShowSegmentResponse& obj);
+std::ostream &operator<<(std::ostream &out, const ShowSegmentResponse &obj);
 
 typedef struct _ShowBlocksRequest__isset {
-  _ShowBlocksRequest__isset() : session_id(false), db_name(false), table_name(false), segment_id(false) {}
-  bool session_id :1;
-  bool db_name :1;
-  bool table_name :1;
-  bool segment_id :1;
+    _ShowBlocksRequest__isset() : session_id(false), db_name(false), table_name(false), segment_id(false) {}
+    bool session_id : 1;
+    bool db_name : 1;
+    bool table_name : 1;
+    bool segment_id : 1;
 } _ShowBlocksRequest__isset;
 
 class ShowBlocksRequest : public virtual ::apache::thrift::TBase {
- public:
+public:
+    ShowBlocksRequest(const ShowBlocksRequest &);
+    ShowBlocksRequest &operator=(const ShowBlocksRequest &);
+    ShowBlocksRequest() noexcept;
 
-  ShowBlocksRequest(const ShowBlocksRequest&);
-  ShowBlocksRequest& operator=(const ShowBlocksRequest&);
-  ShowBlocksRequest() noexcept;
+    virtual ~ShowBlocksRequest() noexcept;
+    int64_t session_id;
+    std::string db_name;
+    std::string table_name;
+    int64_t segment_id;
 
-  virtual ~ShowBlocksRequest() noexcept;
-  int64_t session_id;
-  std::string db_name;
-  std::string table_name;
-  int64_t segment_id;
+    _ShowBlocksRequest__isset __isset;
 
-  _ShowBlocksRequest__isset __isset;
+    void __set_session_id(const int64_t val);
 
-  void __set_session_id(const int64_t val);
+    void __set_db_name(const std::string &val);
 
-  void __set_db_name(const std::string& val);
+    void __set_table_name(const std::string &val);
 
-  void __set_table_name(const std::string& val);
+    void __set_segment_id(const int64_t val);
 
-  void __set_segment_id(const int64_t val);
+    bool operator==(const ShowBlocksRequest &rhs) const;
+    bool operator!=(const ShowBlocksRequest &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const ShowBlocksRequest & rhs) const;
-  bool operator != (const ShowBlocksRequest &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const ShowBlocksRequest &) const;
 
-  bool operator < (const ShowBlocksRequest & ) const;
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
-
-  virtual void printTo(std::ostream& out) const;
+    virtual void printTo(std::ostream &out) const;
 };
 
 void swap(ShowBlocksRequest &a, ShowBlocksRequest &b);
 
-std::ostream& operator<<(std::ostream& out, const ShowBlocksRequest& obj);
+std::ostream &operator<<(std::ostream &out, const ShowBlocksRequest &obj);
 
 typedef struct _ShowBlockRequest__isset {
-  _ShowBlockRequest__isset() : session_id(false), db_name(false), table_name(false), segment_id(false), block_id(false) {}
-  bool session_id :1;
-  bool db_name :1;
-  bool table_name :1;
-  bool segment_id :1;
-  bool block_id :1;
+    _ShowBlockRequest__isset() : session_id(false), db_name(false), table_name(false), segment_id(false), block_id(false) {}
+    bool session_id : 1;
+    bool db_name : 1;
+    bool table_name : 1;
+    bool segment_id : 1;
+    bool block_id : 1;
 } _ShowBlockRequest__isset;
 
 class ShowBlockRequest : public virtual ::apache::thrift::TBase {
- public:
+public:
+    ShowBlockRequest(const ShowBlockRequest &);
+    ShowBlockRequest &operator=(const ShowBlockRequest &);
+    ShowBlockRequest() noexcept;
 
-  ShowBlockRequest(const ShowBlockRequest&);
-  ShowBlockRequest& operator=(const ShowBlockRequest&);
-  ShowBlockRequest() noexcept;
+    virtual ~ShowBlockRequest() noexcept;
+    int64_t session_id;
+    std::string db_name;
+    std::string table_name;
+    int64_t segment_id;
+    int64_t block_id;
 
-  virtual ~ShowBlockRequest() noexcept;
-  int64_t session_id;
-  std::string db_name;
-  std::string table_name;
-  int64_t segment_id;
-  int64_t block_id;
+    _ShowBlockRequest__isset __isset;
 
-  _ShowBlockRequest__isset __isset;
+    void __set_session_id(const int64_t val);
 
-  void __set_session_id(const int64_t val);
+    void __set_db_name(const std::string &val);
 
-  void __set_db_name(const std::string& val);
+    void __set_table_name(const std::string &val);
 
-  void __set_table_name(const std::string& val);
+    void __set_segment_id(const int64_t val);
 
-  void __set_segment_id(const int64_t val);
+    void __set_block_id(const int64_t val);
 
-  void __set_block_id(const int64_t val);
+    bool operator==(const ShowBlockRequest &rhs) const;
+    bool operator!=(const ShowBlockRequest &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const ShowBlockRequest & rhs) const;
-  bool operator != (const ShowBlockRequest &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const ShowBlockRequest &) const;
 
-  bool operator < (const ShowBlockRequest & ) const;
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
-
-  virtual void printTo(std::ostream& out) const;
+    virtual void printTo(std::ostream &out) const;
 };
 
 void swap(ShowBlockRequest &a, ShowBlockRequest &b);
 
-std::ostream& operator<<(std::ostream& out, const ShowBlockRequest& obj);
+std::ostream &operator<<(std::ostream &out, const ShowBlockRequest &obj);
 
 typedef struct _ShowBlockResponse__isset {
-  _ShowBlockResponse__isset() : error_code(false), error_msg(false), block_id(false), path(false), size(false), row_capacity(false), row_count(false), column_count(false) {}
-  bool error_code :1;
-  bool error_msg :1;
-  bool block_id :1;
-  bool path :1;
-  bool size :1;
-  bool row_capacity :1;
-  bool row_count :1;
-  bool column_count :1;
+    _ShowBlockResponse__isset()
+        : error_code(false), error_msg(false), block_id(false), path(false), size(false), row_capacity(false), row_count(false), column_count(false) {
+    }
+    bool error_code : 1;
+    bool error_msg : 1;
+    bool block_id : 1;
+    bool path : 1;
+    bool size : 1;
+    bool row_capacity : 1;
+    bool row_count : 1;
+    bool column_count : 1;
 } _ShowBlockResponse__isset;
 
 class ShowBlockResponse : public virtual ::apache::thrift::TBase {
- public:
+public:
+    ShowBlockResponse(const ShowBlockResponse &);
+    ShowBlockResponse &operator=(const ShowBlockResponse &);
+    ShowBlockResponse() noexcept;
 
-  ShowBlockResponse(const ShowBlockResponse&);
-  ShowBlockResponse& operator=(const ShowBlockResponse&);
-  ShowBlockResponse() noexcept;
+    virtual ~ShowBlockResponse() noexcept;
+    int64_t error_code;
+    std::string error_msg;
+    int64_t block_id;
+    std::string path;
+    std::string size;
+    int64_t row_capacity;
+    int64_t row_count;
+    int64_t column_count;
 
-  virtual ~ShowBlockResponse() noexcept;
-  int64_t error_code;
-  std::string error_msg;
-  int64_t block_id;
-  std::string path;
-  std::string size;
-  int64_t row_capacity;
-  int64_t row_count;
-  int64_t column_count;
+    _ShowBlockResponse__isset __isset;
 
-  _ShowBlockResponse__isset __isset;
+    void __set_error_code(const int64_t val);
 
-  void __set_error_code(const int64_t val);
+    void __set_error_msg(const std::string &val);
 
-  void __set_error_msg(const std::string& val);
+    void __set_block_id(const int64_t val);
 
-  void __set_block_id(const int64_t val);
+    void __set_path(const std::string &val);
 
-  void __set_path(const std::string& val);
+    void __set_size(const std::string &val);
 
-  void __set_size(const std::string& val);
+    void __set_row_capacity(const int64_t val);
 
-  void __set_row_capacity(const int64_t val);
+    void __set_row_count(const int64_t val);
 
-  void __set_row_count(const int64_t val);
+    void __set_column_count(const int64_t val);
 
-  void __set_column_count(const int64_t val);
+    bool operator==(const ShowBlockResponse &rhs) const;
+    bool operator!=(const ShowBlockResponse &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const ShowBlockResponse & rhs) const;
-  bool operator != (const ShowBlockResponse &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const ShowBlockResponse &) const;
 
-  bool operator < (const ShowBlockResponse & ) const;
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
-
-  virtual void printTo(std::ostream& out) const;
+    virtual void printTo(std::ostream &out) const;
 };
 
 void swap(ShowBlockResponse &a, ShowBlockResponse &b);
 
-std::ostream& operator<<(std::ostream& out, const ShowBlockResponse& obj);
+std::ostream &operator<<(std::ostream &out, const ShowBlockResponse &obj);
 
 typedef struct _ShowBlockColumnRequest__isset {
-  _ShowBlockColumnRequest__isset() : session_id(false), db_name(false), table_name(false), segment_id(false), block_id(false), column_id(false) {}
-  bool session_id :1;
-  bool db_name :1;
-  bool table_name :1;
-  bool segment_id :1;
-  bool block_id :1;
-  bool column_id :1;
+    _ShowBlockColumnRequest__isset() : session_id(false), db_name(false), table_name(false), segment_id(false), block_id(false), column_id(false) {}
+    bool session_id : 1;
+    bool db_name : 1;
+    bool table_name : 1;
+    bool segment_id : 1;
+    bool block_id : 1;
+    bool column_id : 1;
 } _ShowBlockColumnRequest__isset;
 
 class ShowBlockColumnRequest : public virtual ::apache::thrift::TBase {
- public:
+public:
+    ShowBlockColumnRequest(const ShowBlockColumnRequest &);
+    ShowBlockColumnRequest &operator=(const ShowBlockColumnRequest &);
+    ShowBlockColumnRequest() noexcept;
 
-  ShowBlockColumnRequest(const ShowBlockColumnRequest&);
-  ShowBlockColumnRequest& operator=(const ShowBlockColumnRequest&);
-  ShowBlockColumnRequest() noexcept;
+    virtual ~ShowBlockColumnRequest() noexcept;
+    int64_t session_id;
+    std::string db_name;
+    std::string table_name;
+    int64_t segment_id;
+    int64_t block_id;
+    int64_t column_id;
 
-  virtual ~ShowBlockColumnRequest() noexcept;
-  int64_t session_id;
-  std::string db_name;
-  std::string table_name;
-  int64_t segment_id;
-  int64_t block_id;
-  int64_t column_id;
+    _ShowBlockColumnRequest__isset __isset;
 
-  _ShowBlockColumnRequest__isset __isset;
+    void __set_session_id(const int64_t val);
 
-  void __set_session_id(const int64_t val);
+    void __set_db_name(const std::string &val);
 
-  void __set_db_name(const std::string& val);
+    void __set_table_name(const std::string &val);
 
-  void __set_table_name(const std::string& val);
+    void __set_segment_id(const int64_t val);
 
-  void __set_segment_id(const int64_t val);
+    void __set_block_id(const int64_t val);
 
-  void __set_block_id(const int64_t val);
+    void __set_column_id(const int64_t val);
 
-  void __set_column_id(const int64_t val);
+    bool operator==(const ShowBlockColumnRequest &rhs) const;
+    bool operator!=(const ShowBlockColumnRequest &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const ShowBlockColumnRequest & rhs) const;
-  bool operator != (const ShowBlockColumnRequest &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const ShowBlockColumnRequest &) const;
 
-  bool operator < (const ShowBlockColumnRequest & ) const;
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
-
-  virtual void printTo(std::ostream& out) const;
+    virtual void printTo(std::ostream &out) const;
 };
 
 void swap(ShowBlockColumnRequest &a, ShowBlockColumnRequest &b);
 
-std::ostream& operator<<(std::ostream& out, const ShowBlockColumnRequest& obj);
+std::ostream &operator<<(std::ostream &out, const ShowBlockColumnRequest &obj);
 
 typedef struct _ShowBlockColumnResponse__isset {
-  _ShowBlockColumnResponse__isset() : error_code(false), error_msg(false), column_name(false), column_id(false), data_type(false), path(false), extra_file_count(false), extra_file_names(false) {}
-  bool error_code :1;
-  bool error_msg :1;
-  bool column_name :1;
-  bool column_id :1;
-  bool data_type :1;
-  bool path :1;
-  bool extra_file_count :1;
-  bool extra_file_names :1;
+    _ShowBlockColumnResponse__isset()
+        : error_code(false), error_msg(false), column_name(false), column_id(false), data_type(false), path(false), extra_file_count(false),
+          extra_file_names(false) {}
+    bool error_code : 1;
+    bool error_msg : 1;
+    bool column_name : 1;
+    bool column_id : 1;
+    bool data_type : 1;
+    bool path : 1;
+    bool extra_file_count : 1;
+    bool extra_file_names : 1;
 } _ShowBlockColumnResponse__isset;
 
 class ShowBlockColumnResponse : public virtual ::apache::thrift::TBase {
- public:
+public:
+    ShowBlockColumnResponse(const ShowBlockColumnResponse &);
+    ShowBlockColumnResponse &operator=(const ShowBlockColumnResponse &);
+    ShowBlockColumnResponse() noexcept;
 
-  ShowBlockColumnResponse(const ShowBlockColumnResponse&);
-  ShowBlockColumnResponse& operator=(const ShowBlockColumnResponse&);
-  ShowBlockColumnResponse() noexcept;
+    virtual ~ShowBlockColumnResponse() noexcept;
+    int64_t error_code;
+    std::string error_msg;
+    std::string column_name;
+    int64_t column_id;
+    std::string data_type;
+    std::string path;
+    int64_t extra_file_count;
+    std::string extra_file_names;
 
-  virtual ~ShowBlockColumnResponse() noexcept;
-  int64_t error_code;
-  std::string error_msg;
-  std::string column_name;
-  int64_t column_id;
-  std::string data_type;
-  std::string path;
-  int64_t extra_file_count;
-  std::string extra_file_names;
+    _ShowBlockColumnResponse__isset __isset;
 
-  _ShowBlockColumnResponse__isset __isset;
+    void __set_error_code(const int64_t val);
 
-  void __set_error_code(const int64_t val);
+    void __set_error_msg(const std::string &val);
 
-  void __set_error_msg(const std::string& val);
+    void __set_column_name(const std::string &val);
 
-  void __set_column_name(const std::string& val);
+    void __set_column_id(const int64_t val);
 
-  void __set_column_id(const int64_t val);
+    void __set_data_type(const std::string &val);
 
-  void __set_data_type(const std::string& val);
+    void __set_path(const std::string &val);
 
-  void __set_path(const std::string& val);
+    void __set_extra_file_count(const int64_t val);
 
-  void __set_extra_file_count(const int64_t val);
+    void __set_extra_file_names(const std::string &val);
 
-  void __set_extra_file_names(const std::string& val);
+    bool operator==(const ShowBlockColumnResponse &rhs) const;
+    bool operator!=(const ShowBlockColumnResponse &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const ShowBlockColumnResponse & rhs) const;
-  bool operator != (const ShowBlockColumnResponse &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const ShowBlockColumnResponse &) const;
 
-  bool operator < (const ShowBlockColumnResponse & ) const;
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
-
-  virtual void printTo(std::ostream& out) const;
+    virtual void printTo(std::ostream &out) const;
 };
 
 void swap(ShowBlockColumnResponse &a, ShowBlockColumnResponse &b);
 
-std::ostream& operator<<(std::ostream& out, const ShowBlockColumnResponse& obj);
+std::ostream &operator<<(std::ostream &out, const ShowBlockColumnResponse &obj);
 
 typedef struct _ShowCurrentNodeRequest__isset {
-  _ShowCurrentNodeRequest__isset() : session_id(false) {}
-  bool session_id :1;
+    _ShowCurrentNodeRequest__isset() : session_id(false) {}
+    bool session_id : 1;
 } _ShowCurrentNodeRequest__isset;
 
 class ShowCurrentNodeRequest : public virtual ::apache::thrift::TBase {
- public:
+public:
+    ShowCurrentNodeRequest(const ShowCurrentNodeRequest &) noexcept;
+    ShowCurrentNodeRequest &operator=(const ShowCurrentNodeRequest &) noexcept;
+    ShowCurrentNodeRequest() noexcept;
 
-  ShowCurrentNodeRequest(const ShowCurrentNodeRequest&) noexcept;
-  ShowCurrentNodeRequest& operator=(const ShowCurrentNodeRequest&) noexcept;
-  ShowCurrentNodeRequest() noexcept;
+    virtual ~ShowCurrentNodeRequest() noexcept;
+    int64_t session_id;
 
-  virtual ~ShowCurrentNodeRequest() noexcept;
-  int64_t session_id;
+    _ShowCurrentNodeRequest__isset __isset;
 
-  _ShowCurrentNodeRequest__isset __isset;
+    void __set_session_id(const int64_t val);
 
-  void __set_session_id(const int64_t val);
+    bool operator==(const ShowCurrentNodeRequest &rhs) const;
+    bool operator!=(const ShowCurrentNodeRequest &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const ShowCurrentNodeRequest & rhs) const;
-  bool operator != (const ShowCurrentNodeRequest &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const ShowCurrentNodeRequest &) const;
 
-  bool operator < (const ShowCurrentNodeRequest & ) const;
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
-
-  virtual void printTo(std::ostream& out) const;
+    virtual void printTo(std::ostream &out) const;
 };
 
 void swap(ShowCurrentNodeRequest &a, ShowCurrentNodeRequest &b);
 
-std::ostream& operator<<(std::ostream& out, const ShowCurrentNodeRequest& obj);
+std::ostream &operator<<(std::ostream &out, const ShowCurrentNodeRequest &obj);
 
 typedef struct _ShowCurrentNodeResponse__isset {
-  _ShowCurrentNodeResponse__isset() : error_code(false), error_msg(false), node_role(false), server_status(false) {}
-  bool error_code :1;
-  bool error_msg :1;
-  bool node_role :1;
-  bool server_status :1;
+    _ShowCurrentNodeResponse__isset() : error_code(false), error_msg(false), node_role(false), server_status(false) {}
+    bool error_code : 1;
+    bool error_msg : 1;
+    bool node_role : 1;
+    bool server_status : 1;
 } _ShowCurrentNodeResponse__isset;
 
 class ShowCurrentNodeResponse : public virtual ::apache::thrift::TBase {
- public:
+public:
+    ShowCurrentNodeResponse(const ShowCurrentNodeResponse &);
+    ShowCurrentNodeResponse &operator=(const ShowCurrentNodeResponse &);
+    ShowCurrentNodeResponse() noexcept;
 
-  ShowCurrentNodeResponse(const ShowCurrentNodeResponse&);
-  ShowCurrentNodeResponse& operator=(const ShowCurrentNodeResponse&);
-  ShowCurrentNodeResponse() noexcept;
+    virtual ~ShowCurrentNodeResponse() noexcept;
+    int64_t error_code;
+    std::string error_msg;
+    std::string node_role;
+    std::string server_status;
 
-  virtual ~ShowCurrentNodeResponse() noexcept;
-  int64_t error_code;
-  std::string error_msg;
-  std::string node_role;
-  std::string server_status;
+    _ShowCurrentNodeResponse__isset __isset;
 
-  _ShowCurrentNodeResponse__isset __isset;
+    void __set_error_code(const int64_t val);
 
-  void __set_error_code(const int64_t val);
+    void __set_error_msg(const std::string &val);
 
-  void __set_error_msg(const std::string& val);
+    void __set_node_role(const std::string &val);
 
-  void __set_node_role(const std::string& val);
+    void __set_server_status(const std::string &val);
 
-  void __set_server_status(const std::string& val);
+    bool operator==(const ShowCurrentNodeResponse &rhs) const;
+    bool operator!=(const ShowCurrentNodeResponse &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const ShowCurrentNodeResponse & rhs) const;
-  bool operator != (const ShowCurrentNodeResponse &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const ShowCurrentNodeResponse &) const;
 
-  bool operator < (const ShowCurrentNodeResponse & ) const;
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
-
-  virtual void printTo(std::ostream& out) const;
+    virtual void printTo(std::ostream &out) const;
 };
 
 void swap(ShowCurrentNodeResponse &a, ShowCurrentNodeResponse &b);
 
-std::ostream& operator<<(std::ostream& out, const ShowCurrentNodeResponse& obj);
+std::ostream &operator<<(std::ostream &out, const ShowCurrentNodeResponse &obj);
 
 typedef struct _CommandRequest__isset {
-  _CommandRequest__isset() : session_id(false), command_type(false), test_command_content(false) {}
-  bool session_id :1;
-  bool command_type :1;
-  bool test_command_content :1;
+    _CommandRequest__isset() : session_id(false), command_type(false), test_command_content(false) {}
+    bool session_id : 1;
+    bool command_type : 1;
+    bool test_command_content : 1;
 } _CommandRequest__isset;
 
 class CommandRequest : public virtual ::apache::thrift::TBase {
- public:
+public:
+    CommandRequest(const CommandRequest &);
+    CommandRequest &operator=(const CommandRequest &);
+    CommandRequest() noexcept;
 
-  CommandRequest(const CommandRequest&);
-  CommandRequest& operator=(const CommandRequest&);
-  CommandRequest() noexcept;
+    virtual ~CommandRequest() noexcept;
+    int64_t session_id;
+    std::string command_type;
+    std::string test_command_content;
 
-  virtual ~CommandRequest() noexcept;
-  int64_t session_id;
-  std::string command_type;
-  std::string test_command_content;
+    _CommandRequest__isset __isset;
 
-  _CommandRequest__isset __isset;
+    void __set_session_id(const int64_t val);
 
-  void __set_session_id(const int64_t val);
+    void __set_command_type(const std::string &val);
 
-  void __set_command_type(const std::string& val);
+    void __set_test_command_content(const std::string &val);
 
-  void __set_test_command_content(const std::string& val);
+    bool operator==(const CommandRequest &rhs) const;
+    bool operator!=(const CommandRequest &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const CommandRequest & rhs) const;
-  bool operator != (const CommandRequest &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const CommandRequest &) const;
 
-  bool operator < (const CommandRequest & ) const;
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
-
-  virtual void printTo(std::ostream& out) const;
+    virtual void printTo(std::ostream &out) const;
 };
 
 void swap(CommandRequest &a, CommandRequest &b);
 
-std::ostream& operator<<(std::ostream& out, const CommandRequest& obj);
+std::ostream &operator<<(std::ostream &out, const CommandRequest &obj);
 
 typedef struct _FlushRequest__isset {
-  _FlushRequest__isset() : session_id(false), flush_type(false) {}
-  bool session_id :1;
-  bool flush_type :1;
+    _FlushRequest__isset() : session_id(false), flush_type(false) {}
+    bool session_id : 1;
+    bool flush_type : 1;
 } _FlushRequest__isset;
 
 class FlushRequest : public virtual ::apache::thrift::TBase {
- public:
+public:
+    FlushRequest(const FlushRequest &);
+    FlushRequest &operator=(const FlushRequest &);
+    FlushRequest() noexcept;
 
-  FlushRequest(const FlushRequest&);
-  FlushRequest& operator=(const FlushRequest&);
-  FlushRequest() noexcept;
+    virtual ~FlushRequest() noexcept;
+    int64_t session_id;
+    std::string flush_type;
 
-  virtual ~FlushRequest() noexcept;
-  int64_t session_id;
-  std::string flush_type;
+    _FlushRequest__isset __isset;
 
-  _FlushRequest__isset __isset;
+    void __set_session_id(const int64_t val);
 
-  void __set_session_id(const int64_t val);
+    void __set_flush_type(const std::string &val);
 
-  void __set_flush_type(const std::string& val);
+    bool operator==(const FlushRequest &rhs) const;
+    bool operator!=(const FlushRequest &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const FlushRequest & rhs) const;
-  bool operator != (const FlushRequest &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const FlushRequest &) const;
 
-  bool operator < (const FlushRequest & ) const;
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
-
-  virtual void printTo(std::ostream& out) const;
+    virtual void printTo(std::ostream &out) const;
 };
 
 void swap(FlushRequest &a, FlushRequest &b);
 
-std::ostream& operator<<(std::ostream& out, const FlushRequest& obj);
+std::ostream &operator<<(std::ostream &out, const FlushRequest &obj);
 
 typedef struct _CompactRequest__isset {
-  _CompactRequest__isset() : session_id(false), db_name(false), table_name(false) {}
-  bool session_id :1;
-  bool db_name :1;
-  bool table_name :1;
+    _CompactRequest__isset() : session_id(false), db_name(false), table_name(false) {}
+    bool session_id : 1;
+    bool db_name : 1;
+    bool table_name : 1;
 } _CompactRequest__isset;
 
 class CompactRequest : public virtual ::apache::thrift::TBase {
- public:
+public:
+    CompactRequest(const CompactRequest &);
+    CompactRequest &operator=(const CompactRequest &);
+    CompactRequest() noexcept;
 
-  CompactRequest(const CompactRequest&);
-  CompactRequest& operator=(const CompactRequest&);
-  CompactRequest() noexcept;
+    virtual ~CompactRequest() noexcept;
+    int64_t session_id;
+    std::string db_name;
+    std::string table_name;
 
-  virtual ~CompactRequest() noexcept;
-  int64_t session_id;
-  std::string db_name;
-  std::string table_name;
+    _CompactRequest__isset __isset;
 
-  _CompactRequest__isset __isset;
+    void __set_session_id(const int64_t val);
 
-  void __set_session_id(const int64_t val);
+    void __set_db_name(const std::string &val);
 
-  void __set_db_name(const std::string& val);
+    void __set_table_name(const std::string &val);
 
-  void __set_table_name(const std::string& val);
+    bool operator==(const CompactRequest &rhs) const;
+    bool operator!=(const CompactRequest &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const CompactRequest & rhs) const;
-  bool operator != (const CompactRequest &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const CompactRequest &) const;
 
-  bool operator < (const CompactRequest & ) const;
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
-
-  virtual void printTo(std::ostream& out) const;
+    virtual void printTo(std::ostream &out) const;
 };
 
 void swap(CompactRequest &a, CompactRequest &b);
 
-std::ostream& operator<<(std::ostream& out, const CompactRequest& obj);
+std::ostream &operator<<(std::ostream &out, const CompactRequest &obj);
 
 typedef struct _CreateTableSnapshotRequest__isset {
-  _CreateTableSnapshotRequest__isset() : session_id(false), db_name(false), table_name(false), snapshot_name(false) {}
-  bool session_id :1;
-  bool db_name :1;
-  bool table_name :1;
-  bool snapshot_name :1;
+    _CreateTableSnapshotRequest__isset() : session_id(false), db_name(false), table_name(false), snapshot_name(false) {}
+    bool session_id : 1;
+    bool db_name : 1;
+    bool table_name : 1;
+    bool snapshot_name : 1;
 } _CreateTableSnapshotRequest__isset;
 
 class CreateTableSnapshotRequest : public virtual ::apache::thrift::TBase {
- public:
+public:
+    CreateTableSnapshotRequest(const CreateTableSnapshotRequest &);
+    CreateTableSnapshotRequest &operator=(const CreateTableSnapshotRequest &);
+    CreateTableSnapshotRequest() noexcept;
 
-  CreateTableSnapshotRequest(const CreateTableSnapshotRequest&);
-  CreateTableSnapshotRequest& operator=(const CreateTableSnapshotRequest&);
-  CreateTableSnapshotRequest() noexcept;
+    virtual ~CreateTableSnapshotRequest() noexcept;
+    int64_t session_id;
+    std::string db_name;
+    std::string table_name;
+    std::string snapshot_name;
 
-  virtual ~CreateTableSnapshotRequest() noexcept;
-  int64_t session_id;
-  std::string db_name;
-  std::string table_name;
-  std::string snapshot_name;
+    _CreateTableSnapshotRequest__isset __isset;
 
-  _CreateTableSnapshotRequest__isset __isset;
+    void __set_session_id(const int64_t val);
 
-  void __set_session_id(const int64_t val);
+    void __set_db_name(const std::string &val);
 
-  void __set_db_name(const std::string& val);
+    void __set_table_name(const std::string &val);
 
-  void __set_table_name(const std::string& val);
+    void __set_snapshot_name(const std::string &val);
 
-  void __set_snapshot_name(const std::string& val);
+    bool operator==(const CreateTableSnapshotRequest &rhs) const;
+    bool operator!=(const CreateTableSnapshotRequest &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const CreateTableSnapshotRequest & rhs) const;
-  bool operator != (const CreateTableSnapshotRequest &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const CreateTableSnapshotRequest &) const;
 
-  bool operator < (const CreateTableSnapshotRequest & ) const;
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
-
-  virtual void printTo(std::ostream& out) const;
+    virtual void printTo(std::ostream &out) const;
 };
 
 void swap(CreateTableSnapshotRequest &a, CreateTableSnapshotRequest &b);
 
-std::ostream& operator<<(std::ostream& out, const CreateTableSnapshotRequest& obj);
+std::ostream &operator<<(std::ostream &out, const CreateTableSnapshotRequest &obj);
 
 typedef struct _CreateDatabaseSnapshotRequest__isset {
-  _CreateDatabaseSnapshotRequest__isset() : session_id(false), db_name(false), snapshot_name(false) {}
-  bool session_id :1;
-  bool db_name :1;
-  bool snapshot_name :1;
+    _CreateDatabaseSnapshotRequest__isset() : session_id(false), db_name(false), snapshot_name(false) {}
+    bool session_id : 1;
+    bool db_name : 1;
+    bool snapshot_name : 1;
 } _CreateDatabaseSnapshotRequest__isset;
 
 class CreateDatabaseSnapshotRequest : public virtual ::apache::thrift::TBase {
- public:
+public:
+    CreateDatabaseSnapshotRequest(const CreateDatabaseSnapshotRequest &);
+    CreateDatabaseSnapshotRequest &operator=(const CreateDatabaseSnapshotRequest &);
+    CreateDatabaseSnapshotRequest() noexcept;
 
-  CreateDatabaseSnapshotRequest(const CreateDatabaseSnapshotRequest&);
-  CreateDatabaseSnapshotRequest& operator=(const CreateDatabaseSnapshotRequest&);
-  CreateDatabaseSnapshotRequest() noexcept;
+    virtual ~CreateDatabaseSnapshotRequest() noexcept;
+    int64_t session_id;
+    std::string db_name;
+    std::string snapshot_name;
 
-  virtual ~CreateDatabaseSnapshotRequest() noexcept;
-  int64_t session_id;
-  std::string db_name;
-  std::string snapshot_name;
+    _CreateDatabaseSnapshotRequest__isset __isset;
 
-  _CreateDatabaseSnapshotRequest__isset __isset;
+    void __set_session_id(const int64_t val);
 
-  void __set_session_id(const int64_t val);
+    void __set_db_name(const std::string &val);
 
-  void __set_db_name(const std::string& val);
+    void __set_snapshot_name(const std::string &val);
 
-  void __set_snapshot_name(const std::string& val);
+    bool operator==(const CreateDatabaseSnapshotRequest &rhs) const;
+    bool operator!=(const CreateDatabaseSnapshotRequest &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const CreateDatabaseSnapshotRequest & rhs) const;
-  bool operator != (const CreateDatabaseSnapshotRequest &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const CreateDatabaseSnapshotRequest &) const;
 
-  bool operator < (const CreateDatabaseSnapshotRequest & ) const;
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
-
-  virtual void printTo(std::ostream& out) const;
+    virtual void printTo(std::ostream &out) const;
 };
 
 void swap(CreateDatabaseSnapshotRequest &a, CreateDatabaseSnapshotRequest &b);
 
-std::ostream& operator<<(std::ostream& out, const CreateDatabaseSnapshotRequest& obj);
+std::ostream &operator<<(std::ostream &out, const CreateDatabaseSnapshotRequest &obj);
 
 typedef struct _CreateSystemSnapshotRequest__isset {
-  _CreateSystemSnapshotRequest__isset() : session_id(false), snapshot_name(false) {}
-  bool session_id :1;
-  bool snapshot_name :1;
+    _CreateSystemSnapshotRequest__isset() : session_id(false), snapshot_name(false) {}
+    bool session_id : 1;
+    bool snapshot_name : 1;
 } _CreateSystemSnapshotRequest__isset;
 
 class CreateSystemSnapshotRequest : public virtual ::apache::thrift::TBase {
- public:
+public:
+    CreateSystemSnapshotRequest(const CreateSystemSnapshotRequest &);
+    CreateSystemSnapshotRequest &operator=(const CreateSystemSnapshotRequest &);
+    CreateSystemSnapshotRequest() noexcept;
 
-  CreateSystemSnapshotRequest(const CreateSystemSnapshotRequest&);
-  CreateSystemSnapshotRequest& operator=(const CreateSystemSnapshotRequest&);
-  CreateSystemSnapshotRequest() noexcept;
+    virtual ~CreateSystemSnapshotRequest() noexcept;
+    int64_t session_id;
+    std::string snapshot_name;
 
-  virtual ~CreateSystemSnapshotRequest() noexcept;
-  int64_t session_id;
-  std::string snapshot_name;
+    _CreateSystemSnapshotRequest__isset __isset;
 
-  _CreateSystemSnapshotRequest__isset __isset;
+    void __set_session_id(const int64_t val);
 
-  void __set_session_id(const int64_t val);
+    void __set_snapshot_name(const std::string &val);
 
-  void __set_snapshot_name(const std::string& val);
+    bool operator==(const CreateSystemSnapshotRequest &rhs) const;
+    bool operator!=(const CreateSystemSnapshotRequest &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const CreateSystemSnapshotRequest & rhs) const;
-  bool operator != (const CreateSystemSnapshotRequest &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const CreateSystemSnapshotRequest &) const;
 
-  bool operator < (const CreateSystemSnapshotRequest & ) const;
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
-
-  virtual void printTo(std::ostream& out) const;
+    virtual void printTo(std::ostream &out) const;
 };
 
 void swap(CreateSystemSnapshotRequest &a, CreateSystemSnapshotRequest &b);
 
-std::ostream& operator<<(std::ostream& out, const CreateSystemSnapshotRequest& obj);
+std::ostream &operator<<(std::ostream &out, const CreateSystemSnapshotRequest &obj);
 
 typedef struct _RestoreSnapshotRequest__isset {
-  _RestoreSnapshotRequest__isset() : session_id(false), snapshot_name(false), scope(false) {}
-  bool session_id :1;
-  bool snapshot_name :1;
-  bool scope :1;
+    _RestoreSnapshotRequest__isset() : session_id(false), snapshot_name(false), scope(false) {}
+    bool session_id : 1;
+    bool snapshot_name : 1;
+    bool scope : 1;
 } _RestoreSnapshotRequest__isset;
 
 class RestoreSnapshotRequest : public virtual ::apache::thrift::TBase {
- public:
+public:
+    RestoreSnapshotRequest(const RestoreSnapshotRequest &);
+    RestoreSnapshotRequest &operator=(const RestoreSnapshotRequest &);
+    RestoreSnapshotRequest() noexcept;
 
-  RestoreSnapshotRequest(const RestoreSnapshotRequest&);
-  RestoreSnapshotRequest& operator=(const RestoreSnapshotRequest&);
-  RestoreSnapshotRequest() noexcept;
+    virtual ~RestoreSnapshotRequest() noexcept;
+    int64_t session_id;
+    std::string snapshot_name;
+    std::string scope;
 
-  virtual ~RestoreSnapshotRequest() noexcept;
-  int64_t session_id;
-  std::string snapshot_name;
-  std::string scope;
+    _RestoreSnapshotRequest__isset __isset;
 
-  _RestoreSnapshotRequest__isset __isset;
+    void __set_session_id(const int64_t val);
 
-  void __set_session_id(const int64_t val);
+    void __set_snapshot_name(const std::string &val);
 
-  void __set_snapshot_name(const std::string& val);
+    void __set_scope(const std::string &val);
 
-  void __set_scope(const std::string& val);
+    bool operator==(const RestoreSnapshotRequest &rhs) const;
+    bool operator!=(const RestoreSnapshotRequest &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const RestoreSnapshotRequest & rhs) const;
-  bool operator != (const RestoreSnapshotRequest &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const RestoreSnapshotRequest &) const;
 
-  bool operator < (const RestoreSnapshotRequest & ) const;
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
-
-  virtual void printTo(std::ostream& out) const;
+    virtual void printTo(std::ostream &out) const;
 };
 
 void swap(RestoreSnapshotRequest &a, RestoreSnapshotRequest &b);
 
-std::ostream& operator<<(std::ostream& out, const RestoreSnapshotRequest& obj);
+std::ostream &operator<<(std::ostream &out, const RestoreSnapshotRequest &obj);
 
 typedef struct _SnapshotInfo__isset {
-  _SnapshotInfo__isset() : name(false), scope(false), time(false), commit(false), size(false) {}
-  bool name :1;
-  bool scope :1;
-  bool time :1;
-  bool commit :1;
-  bool size :1;
+    _SnapshotInfo__isset() : name(false), scope(false), time(false), commit(false), size(false) {}
+    bool name : 1;
+    bool scope : 1;
+    bool time : 1;
+    bool commit : 1;
+    bool size : 1;
 } _SnapshotInfo__isset;
 
 class SnapshotInfo : public virtual ::apache::thrift::TBase {
- public:
+public:
+    SnapshotInfo(const SnapshotInfo &);
+    SnapshotInfo &operator=(const SnapshotInfo &);
+    SnapshotInfo() noexcept;
 
-  SnapshotInfo(const SnapshotInfo&);
-  SnapshotInfo& operator=(const SnapshotInfo&);
-  SnapshotInfo() noexcept;
+    virtual ~SnapshotInfo() noexcept;
+    std::string name;
+    std::string scope;
+    std::string time;
+    int64_t commit;
+    std::string size;
 
-  virtual ~SnapshotInfo() noexcept;
-  std::string name;
-  std::string scope;
-  std::string time;
-  int64_t commit;
-  std::string size;
+    _SnapshotInfo__isset __isset;
 
-  _SnapshotInfo__isset __isset;
+    void __set_name(const std::string &val);
 
-  void __set_name(const std::string& val);
+    void __set_scope(const std::string &val);
 
-  void __set_scope(const std::string& val);
+    void __set_time(const std::string &val);
 
-  void __set_time(const std::string& val);
+    void __set_commit(const int64_t val);
 
-  void __set_commit(const int64_t val);
+    void __set_size(const std::string &val);
 
-  void __set_size(const std::string& val);
+    bool operator==(const SnapshotInfo &rhs) const;
+    bool operator!=(const SnapshotInfo &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const SnapshotInfo & rhs) const;
-  bool operator != (const SnapshotInfo &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const SnapshotInfo &) const;
 
-  bool operator < (const SnapshotInfo & ) const;
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
-
-  virtual void printTo(std::ostream& out) const;
+    virtual void printTo(std::ostream &out) const;
 };
 
 void swap(SnapshotInfo &a, SnapshotInfo &b);
 
-std::ostream& operator<<(std::ostream& out, const SnapshotInfo& obj);
+std::ostream &operator<<(std::ostream &out, const SnapshotInfo &obj);
 
 typedef struct _ShowSnapshotRequest__isset {
-  _ShowSnapshotRequest__isset() : session_id(false), snapshot_name(false) {}
-  bool session_id :1;
-  bool snapshot_name :1;
+    _ShowSnapshotRequest__isset() : session_id(false), snapshot_name(false) {}
+    bool session_id : 1;
+    bool snapshot_name : 1;
 } _ShowSnapshotRequest__isset;
 
 class ShowSnapshotRequest : public virtual ::apache::thrift::TBase {
- public:
+public:
+    ShowSnapshotRequest(const ShowSnapshotRequest &);
+    ShowSnapshotRequest &operator=(const ShowSnapshotRequest &);
+    ShowSnapshotRequest() noexcept;
 
-  ShowSnapshotRequest(const ShowSnapshotRequest&);
-  ShowSnapshotRequest& operator=(const ShowSnapshotRequest&);
-  ShowSnapshotRequest() noexcept;
+    virtual ~ShowSnapshotRequest() noexcept;
+    int64_t session_id;
+    std::string snapshot_name;
 
-  virtual ~ShowSnapshotRequest() noexcept;
-  int64_t session_id;
-  std::string snapshot_name;
+    _ShowSnapshotRequest__isset __isset;
 
-  _ShowSnapshotRequest__isset __isset;
+    void __set_session_id(const int64_t val);
 
-  void __set_session_id(const int64_t val);
+    void __set_snapshot_name(const std::string &val);
 
-  void __set_snapshot_name(const std::string& val);
+    bool operator==(const ShowSnapshotRequest &rhs) const;
+    bool operator!=(const ShowSnapshotRequest &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const ShowSnapshotRequest & rhs) const;
-  bool operator != (const ShowSnapshotRequest &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const ShowSnapshotRequest &) const;
 
-  bool operator < (const ShowSnapshotRequest & ) const;
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
-
-  virtual void printTo(std::ostream& out) const;
+    virtual void printTo(std::ostream &out) const;
 };
 
 void swap(ShowSnapshotRequest &a, ShowSnapshotRequest &b);
 
-std::ostream& operator<<(std::ostream& out, const ShowSnapshotRequest& obj);
+std::ostream &operator<<(std::ostream &out, const ShowSnapshotRequest &obj);
 
 typedef struct _ShowSnapshotResponse__isset {
-  _ShowSnapshotResponse__isset() : error_code(false), error_msg(false), snapshot(false) {}
-  bool error_code :1;
-  bool error_msg :1;
-  bool snapshot :1;
+    _ShowSnapshotResponse__isset() : error_code(false), error_msg(false), snapshot(false) {}
+    bool error_code : 1;
+    bool error_msg : 1;
+    bool snapshot : 1;
 } _ShowSnapshotResponse__isset;
 
 class ShowSnapshotResponse : public virtual ::apache::thrift::TBase {
- public:
+public:
+    ShowSnapshotResponse(const ShowSnapshotResponse &);
+    ShowSnapshotResponse &operator=(const ShowSnapshotResponse &);
+    ShowSnapshotResponse() noexcept;
 
-  ShowSnapshotResponse(const ShowSnapshotResponse&);
-  ShowSnapshotResponse& operator=(const ShowSnapshotResponse&);
-  ShowSnapshotResponse() noexcept;
+    virtual ~ShowSnapshotResponse() noexcept;
+    int64_t error_code;
+    std::string error_msg;
+    SnapshotInfo snapshot;
 
-  virtual ~ShowSnapshotResponse() noexcept;
-  int64_t error_code;
-  std::string error_msg;
-  SnapshotInfo snapshot;
+    _ShowSnapshotResponse__isset __isset;
 
-  _ShowSnapshotResponse__isset __isset;
+    void __set_error_code(const int64_t val);
 
-  void __set_error_code(const int64_t val);
+    void __set_error_msg(const std::string &val);
 
-  void __set_error_msg(const std::string& val);
+    void __set_snapshot(const SnapshotInfo &val);
 
-  void __set_snapshot(const SnapshotInfo& val);
+    bool operator==(const ShowSnapshotResponse &rhs) const;
+    bool operator!=(const ShowSnapshotResponse &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const ShowSnapshotResponse & rhs) const;
-  bool operator != (const ShowSnapshotResponse &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const ShowSnapshotResponse &) const;
 
-  bool operator < (const ShowSnapshotResponse & ) const;
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
-
-  virtual void printTo(std::ostream& out) const;
+    virtual void printTo(std::ostream &out) const;
 };
 
 void swap(ShowSnapshotResponse &a, ShowSnapshotResponse &b);
 
-std::ostream& operator<<(std::ostream& out, const ShowSnapshotResponse& obj);
+std::ostream &operator<<(std::ostream &out, const ShowSnapshotResponse &obj);
 
 typedef struct _ListSnapshotsRequest__isset {
-  _ListSnapshotsRequest__isset() : session_id(false) {}
-  bool session_id :1;
+    _ListSnapshotsRequest__isset() : session_id(false) {}
+    bool session_id : 1;
 } _ListSnapshotsRequest__isset;
 
 class ListSnapshotsRequest : public virtual ::apache::thrift::TBase {
- public:
+public:
+    ListSnapshotsRequest(const ListSnapshotsRequest &) noexcept;
+    ListSnapshotsRequest &operator=(const ListSnapshotsRequest &) noexcept;
+    ListSnapshotsRequest() noexcept;
 
-  ListSnapshotsRequest(const ListSnapshotsRequest&) noexcept;
-  ListSnapshotsRequest& operator=(const ListSnapshotsRequest&) noexcept;
-  ListSnapshotsRequest() noexcept;
+    virtual ~ListSnapshotsRequest() noexcept;
+    int64_t session_id;
 
-  virtual ~ListSnapshotsRequest() noexcept;
-  int64_t session_id;
+    _ListSnapshotsRequest__isset __isset;
 
-  _ListSnapshotsRequest__isset __isset;
+    void __set_session_id(const int64_t val);
 
-  void __set_session_id(const int64_t val);
+    bool operator==(const ListSnapshotsRequest &rhs) const;
+    bool operator!=(const ListSnapshotsRequest &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const ListSnapshotsRequest & rhs) const;
-  bool operator != (const ListSnapshotsRequest &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const ListSnapshotsRequest &) const;
 
-  bool operator < (const ListSnapshotsRequest & ) const;
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
-
-  virtual void printTo(std::ostream& out) const;
+    virtual void printTo(std::ostream &out) const;
 };
 
 void swap(ListSnapshotsRequest &a, ListSnapshotsRequest &b);
 
-std::ostream& operator<<(std::ostream& out, const ListSnapshotsRequest& obj);
+std::ostream &operator<<(std::ostream &out, const ListSnapshotsRequest &obj);
 
 typedef struct _ListSnapshotsResponse__isset {
-  _ListSnapshotsResponse__isset() : error_code(false), error_msg(false), snapshots(true) {}
-  bool error_code :1;
-  bool error_msg :1;
-  bool snapshots :1;
+    _ListSnapshotsResponse__isset() : error_code(false), error_msg(false), snapshots(true) {}
+    bool error_code : 1;
+    bool error_msg : 1;
+    bool snapshots : 1;
 } _ListSnapshotsResponse__isset;
 
 class ListSnapshotsResponse : public virtual ::apache::thrift::TBase {
- public:
+public:
+    ListSnapshotsResponse(const ListSnapshotsResponse &);
+    ListSnapshotsResponse &operator=(const ListSnapshotsResponse &);
+    ListSnapshotsResponse() noexcept;
 
-  ListSnapshotsResponse(const ListSnapshotsResponse&);
-  ListSnapshotsResponse& operator=(const ListSnapshotsResponse&);
-  ListSnapshotsResponse() noexcept;
+    virtual ~ListSnapshotsResponse() noexcept;
+    int64_t error_code;
+    std::string error_msg;
+    std::vector<SnapshotInfo> snapshots;
 
-  virtual ~ListSnapshotsResponse() noexcept;
-  int64_t error_code;
-  std::string error_msg;
-  std::vector<SnapshotInfo>  snapshots;
+    _ListSnapshotsResponse__isset __isset;
 
-  _ListSnapshotsResponse__isset __isset;
+    void __set_error_code(const int64_t val);
 
-  void __set_error_code(const int64_t val);
+    void __set_error_msg(const std::string &val);
 
-  void __set_error_msg(const std::string& val);
+    void __set_snapshots(const std::vector<SnapshotInfo> &val);
 
-  void __set_snapshots(const std::vector<SnapshotInfo> & val);
+    bool operator==(const ListSnapshotsResponse &rhs) const;
+    bool operator!=(const ListSnapshotsResponse &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const ListSnapshotsResponse & rhs) const;
-  bool operator != (const ListSnapshotsResponse &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const ListSnapshotsResponse &) const;
 
-  bool operator < (const ListSnapshotsResponse & ) const;
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
-
-  virtual void printTo(std::ostream& out) const;
+    virtual void printTo(std::ostream &out) const;
 };
 
 void swap(ListSnapshotsResponse &a, ListSnapshotsResponse &b);
 
-std::ostream& operator<<(std::ostream& out, const ListSnapshotsResponse& obj);
+std::ostream &operator<<(std::ostream &out, const ListSnapshotsResponse &obj);
 
 typedef struct _DropSnapshotRequest__isset {
-  _DropSnapshotRequest__isset() : session_id(false), snapshot_name(false) {}
-  bool session_id :1;
-  bool snapshot_name :1;
+    _DropSnapshotRequest__isset() : session_id(false), snapshot_name(false) {}
+    bool session_id : 1;
+    bool snapshot_name : 1;
 } _DropSnapshotRequest__isset;
 
 class DropSnapshotRequest : public virtual ::apache::thrift::TBase {
- public:
+public:
+    DropSnapshotRequest(const DropSnapshotRequest &);
+    DropSnapshotRequest &operator=(const DropSnapshotRequest &);
+    DropSnapshotRequest() noexcept;
 
-  DropSnapshotRequest(const DropSnapshotRequest&);
-  DropSnapshotRequest& operator=(const DropSnapshotRequest&);
-  DropSnapshotRequest() noexcept;
+    virtual ~DropSnapshotRequest() noexcept;
+    int64_t session_id;
+    std::string snapshot_name;
 
-  virtual ~DropSnapshotRequest() noexcept;
-  int64_t session_id;
-  std::string snapshot_name;
+    _DropSnapshotRequest__isset __isset;
 
-  _DropSnapshotRequest__isset __isset;
+    void __set_session_id(const int64_t val);
 
-  void __set_session_id(const int64_t val);
+    void __set_snapshot_name(const std::string &val);
 
-  void __set_snapshot_name(const std::string& val);
+    bool operator==(const DropSnapshotRequest &rhs) const;
+    bool operator!=(const DropSnapshotRequest &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const DropSnapshotRequest & rhs) const;
-  bool operator != (const DropSnapshotRequest &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const DropSnapshotRequest &) const;
 
-  bool operator < (const DropSnapshotRequest & ) const;
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
-
-  virtual void printTo(std::ostream& out) const;
+    virtual void printTo(std::ostream &out) const;
 };
 
 void swap(DropSnapshotRequest &a, DropSnapshotRequest &b);
 
-std::ostream& operator<<(std::ostream& out, const DropSnapshotRequest& obj);
+std::ostream &operator<<(std::ostream &out, const DropSnapshotRequest &obj);
 
-} // namespace
+} // namespace infinity_thrift_rpc
 
 #endif

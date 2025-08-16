@@ -17,7 +17,6 @@ module;
 module infinity_core:create_index_data.impl;
 
 import :create_index_data;
-
 import :block_index;
 
 namespace infinity {
@@ -28,8 +27,7 @@ void CreateIndexSharedData::Init(BlockIndex *block_index) {
     for (const auto &[segment_id, segment_info] : block_index->new_segment_block_index_) {
         auto [iter, insert_ok] = create_index_idxes_.emplace(segment_id, 0);
         if (!insert_ok) {
-            String error_message = fmt::format("Duplicate segment id: %u", segment_id);
-            UnrecoverableError(error_message);
+            UnrecoverableError(fmt::format("Duplicate segment id: %u", segment_id));
         }
     }
 }

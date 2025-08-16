@@ -14,17 +14,10 @@
 
 module;
 
-#include <sstream>
-#include <vector>
-
 module infinity_core:match_sparse_expression.impl;
 
 import :match_sparse_expression;
 
-import :stl;
-import logical_type;
-import internal_types;
-import :third_party;
 import :column_expression;
 import :status;
 import :logger;
@@ -33,23 +26,30 @@ import :cast_function;
 import :cast_expression;
 import :bound_cast_func;
 import :value;
-import constant_expr;
-import sparse_info;
 import :value_expression;
+
+import std;
+import std.compat;
+import third_party;
+
 import match_sparse_expr;
 import statement_common;
 import data_type;
+import constant_expr;
+import sparse_info;
+import logical_type;
+import internal_types;
 
 namespace infinity {
 
-MatchSparseExpression::MatchSparseExpression(Vector<SharedPtr<BaseExpression>> search_column,
-                                             SharedPtr<BaseExpression> query_sparse_expr,
+MatchSparseExpression::MatchSparseExpression(std::vector<std::shared_ptr<BaseExpression>> search_column,
+                                             std::shared_ptr<BaseExpression> query_sparse_expr,
                                              SparseMetricType metric_type,
-                                             SizeT query_n,
-                                             SizeT topn,
-                                             Vector<UniquePtr<InitParameter>> opt_params,
-                                             SharedPtr<BaseExpression> optional_filter,
-                                             String index_name,
+                                             size_t query_n,
+                                             size_t topn,
+                                             std::vector<std::unique_ptr<InitParameter>> opt_params,
+                                             std::shared_ptr<BaseExpression> optional_filter,
+                                             std::string index_name,
                                              bool ignore_index)
     : BaseExpression(ExpressionType::kMatchSparse, std::move(search_column)), metric_type_(metric_type), query_n_(query_n), topn_(topn),
       opt_params_(std::move(opt_params)), optional_filter_(std::move(optional_filter)), index_name_(std::move(index_name)),
@@ -109,9 +109,9 @@ u64 MatchSparseExpression::Hash() const {
     h ^= column_expr_->Hash();
     h ^= query_sparse_expr_->Hash();
     h ^= std::hash<SparseMetricType>()(metric_type_);
-    h ^= std::hash<SizeT>()(query_n_);
-    h ^= std::hash<SizeT>()(topn_);
-    h ^= std::hash<String>()(index_name_);
+    h ^= std::hash<size_t>()(query_n_);
+    h ^= std::hash<size_t>()(topn_);
+    h ^= std::hash<std::string>()(index_name_);
     if (optional_filter_) {
         h ^= optional_filter_->Hash();
     }
@@ -147,14 +147,14 @@ bool MatchSparseExpression::Eq(const BaseExpression &other_base) const {
     return true;
 }
 
-void MatchSparseExpression::MakeQuery(SharedPtr<BaseExpression> query_sparse_expr) {
+void MatchSparseExpression::MakeQuery(std::shared_ptr<BaseExpression> query_sparse_expr) {
     const auto &column_type = column_expr_->Type();
     BoundCastFunc cast = CastFunction::GetBoundFunc(query_sparse_expr->Type(), column_type);
-    query_sparse_expr_ = MakeShared<CastExpression>(cast, query_sparse_expr, column_type);
+    query_sparse_expr_ = std::make_shared<CastExpression>(cast, query_sparse_expr, column_type);
 }
 
-String MatchSparseExpression::ToString() const {
-    String sparse_str = query_sparse_expr_->ToString();
+std::string MatchSparseExpression::ToString() const {
+    std::string sparse_str = query_sparse_expr_->ToString();
 
     std::stringstream ss;
     size_t opt_num = opt_params_.size();
@@ -164,7 +164,7 @@ String MatchSparseExpression::ToString() const {
             ss << ", ";
         }
     }
-    String opt_str = ss.str();
+    std::string opt_str = ss.str();
 
     return fmt::format("MATCH SPARSE ({}, [{}], {}, {}{}) WITH ({}) USING INDEX ({})",
                        column_expr_->Name(),

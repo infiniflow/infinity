@@ -21,7 +21,7 @@ import infinity_core;
 #else
 export module infinity_core:ut.sql_runner;
 
-import :stl;
+
 import :data_table;
 #endif
 
@@ -30,7 +30,7 @@ namespace infinity {
 export class SQLRunner {
 
 public:
-    static SharedPtr<DataTable> Run(const String &sql_text, bool print = true);
+    static std::shared_ptr<DataTable> Run(const std::string &sql_text, bool print = true);
 };
 
 } // namespace infinity

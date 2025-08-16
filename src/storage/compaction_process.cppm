@@ -12,11 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:compaction_process;
 
-import :stl;
 import :bg_task_type;
 import :blocking_queue;
 import :status;
@@ -29,24 +26,24 @@ class TableMeeta;
 
 class TestCommander {
 public:
-    void Add(BGTaskType type, const String &command) {
+    void Add(BGTaskType type, const std::string &command) {
         std::lock_guard<std::mutex> lock(mtx_);
         test_commands_[type] = command;
     }
 
-    Optional<String> Check(BGTaskType type) {
+    std::optional<std::string> Check(BGTaskType type) {
         std::lock_guard<std::mutex> lock(mtx_);
         auto iter = test_commands_.find(type);
         if (iter != test_commands_.end()) {
-            String res = iter->second;
+            std::string res = iter->second;
             test_commands_.erase(iter);
             return res;
         }
-        return None;
+        return std::nullopt;
     }
 
 private:
-    HashMap<BGTaskType, String> test_commands_;
+    std::unordered_map<BGTaskType, std::string> test_commands_;
     std::mutex mtx_;
 };
 
@@ -59,29 +56,29 @@ public:
 
     void Stop();
 
-    void Submit(SharedPtr<BGTask> bg_task);
+    void Submit(std::shared_ptr<BGTask> bg_task);
 
     void NewDoCompact();
 
-    Status NewManualCompact(const String &db_name, const String &table_name);
+    Status NewManualCompact(const std::string &db_name, const std::string &table_name);
 
     u64 RunningTaskCount() const { return task_count_; }
 
-    void AddTestCommand(BGTaskType type, const String &command) { test_commander_.Add(type, command); }
+    void AddTestCommand(BGTaskType type, const std::string &command) { test_commander_.Add(type, command); }
 
 private:
     void NewScanAndOptimize();
 
     void Process();
 
-    Vector<SegmentID> GetCompactableSegments(TableMeeta &table_meta, const Vector<SegmentID> &segment_ids);
+    std::vector<SegmentID> GetCompactableSegments(TableMeeta &table_meta, const std::vector<SegmentID> &segment_ids);
 
 private:
-    BlockingQueue<SharedPtr<BGTask>> task_queue_{"CompactionProcessor"};
+    BlockingQueue<std::shared_ptr<BGTask>> task_queue_{"CompactionProcessor"};
 
-    Thread processor_thread_{};
+    std::thread processor_thread_{};
 
-    Atomic<u64> task_count_{};
+    std::atomic<u64> task_count_{};
 
     TestCommander test_commander_;
 };

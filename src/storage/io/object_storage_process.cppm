@@ -12,13 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:object_storage_process;
 
 import :blocking_queue;
-import :stl;
 import :object_storage_task;
+
 import global_resource_usage;
 
 namespace infinity {
@@ -42,20 +40,20 @@ public:
     u64 RunningTaskCount() const { return task_count_; }
 
 public:
-    void Submit(SharedPtr<BaseObjectStorageTask> object_storage_task);
+    void Submit(std::shared_ptr<BaseObjectStorageTask> object_storage_task);
 
 private:
     void Process();
 
 private:
-    BlockingQueue<SharedPtr<BaseObjectStorageTask>> task_queue_{"ObjectStorageProcess"};
+    BlockingQueue<std::shared_ptr<BaseObjectStorageTask>> task_queue_{"ObjectStorageProcess"};
 
-    Thread processor_thread_{};
+    std::thread processor_thread_{};
 
-    Atomic<u64> task_count_{};
+    std::atomic<u64> task_count_{};
 
     mutable std::mutex task_mutex_;
-    String task_text_;
+    std::string task_text_;
 };
 
 } // namespace infinity

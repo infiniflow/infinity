@@ -12,21 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:table_scan_data.impl;
 
 import :table_scan_function_data;
-
-import :stl;
 import :global_block_id;
 import :block_index;
 
 namespace infinity {
 
 TableScanFunctionData::TableScanFunctionData(const BlockIndex *block_index,
-                                             const SharedPtr<Vector<GlobalBlockID>> &global_block_ids,
-                                             const Vector<SizeT> &column_ids)
+                                             const std::shared_ptr<std::vector<GlobalBlockID>> &global_block_ids,
+                                             const std::vector<size_t> &column_ids)
     : block_index_(block_index), global_block_ids_(global_block_ids), column_ids_(column_ids) {}
 
 } // namespace infinity

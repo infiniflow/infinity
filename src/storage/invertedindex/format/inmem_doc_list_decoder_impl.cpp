@@ -1,11 +1,10 @@
 module;
 
 #include <cassert>
+
 module infinity_core:inmem_doc_list_decoder.impl;
 
 import :inmem_doc_list_decoder;
-import :stl;
-
 import :posting_byte_slice;
 import :posting_byte_slice_reader;
 import :index_decoder;
@@ -68,7 +67,7 @@ bool InMemDocListDecoder::DecodeSkipListWithoutSkipList(docid_t last_doc_id_in_p
     }
     finish_decoded_ = true;
     last_doc_id = last_doc_id_in_prev_record;
-    for (SizeT i = 0; i < decode_count_; ++i) {
+    for (size_t i = 0; i < decode_count_; ++i) {
         last_doc_id += doc_buffer_to_copy_[i];
     }
     if (start_doc_id > last_doc_id) {
@@ -79,7 +78,7 @@ bool InMemDocListDecoder::DecodeSkipListWithoutSkipList(docid_t last_doc_id_in_p
 
 // u32: block max tf
 // u16: block max (ceil(tf / doc length) * numeric_limits<u16>::max())
-Pair<u32, u16> InMemDocListDecoder::GetBlockMaxInfo() const {
+std::pair<u32, u16> InMemDocListDecoder::GetBlockMaxInfo() const {
     if (!finish_decoded_) {
         return skiplist_reader_->GetBlockMaxInfo();
     }
@@ -94,17 +93,17 @@ bool InMemDocListDecoder::DecodeCurrentDocIDBuffer(docid_t *doc_buffer) {
         return true;
     }
     doc_list_reader_.Seek(offset_);
-    SizeT acutal_decode_count = 0;
+    size_t acutal_decode_count = 0;
     return doc_list_reader_.Decode(doc_buffer, MAX_DOC_PER_RECORD, acutal_decode_count);
 }
 
 bool InMemDocListDecoder::DecodeCurrentTFBuffer(tf_t *tf_buffer) {
-    SizeT decode_count;
+    size_t decode_count;
     return doc_list_reader_.Decode(tf_buffer, MAX_DOC_PER_RECORD, decode_count);
 }
 
 void InMemDocListDecoder::DecodeCurrentDocPayloadBuffer(docpayload_t *doc_payload_buffer) {
-    SizeT decode_count;
+    size_t decode_count;
     doc_list_reader_.Decode(doc_payload_buffer, MAX_DOC_PER_RECORD, decode_count);
 }
 

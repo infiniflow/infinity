@@ -12,34 +12,34 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:term;
 
-import :stl;
 import :jieba;
+import :infinity_type;
+
+import std;
 
 namespace infinity {
 export class Term {
 public:
     Term() : word_offset_(0), payload_(0) {}
-    Term(const String &str) : text_(str), word_offset_(0), payload_(0) {}
+    Term(const std::string &str) : text_(str), word_offset_(0), payload_(0) {}
     ~Term() {}
 
     void Reset();
 
     u32 Length() { return text_.length(); }
 
-    String Text() const { return text_; }
+    std::string Text() const { return text_; }
 
 public:
-    String text_;
+    std::string text_;
     u32 word_offset_;
     u32 end_offset_;
     u16 payload_;
 };
 
-export class TermList : public Deque<Term> {
+export class TermList : public std::deque<Term> {
 public:
     void Add(const char *text, const u32 len, const u32 offset, const u32 end_offset, const u16 payload = 0) {
         push_back(global_temporary_);
@@ -55,7 +55,7 @@ public:
         back().word_offset_ = cut_word.offset;
     }
 
-    void Add(const String &token, const u32 offset, const u32 end_offset, const u16 payload = 0) {
+    void Add(const std::string &token, const u32 offset, const u32 end_offset, const u16 payload = 0) {
         push_back(global_temporary_);
         back().text_ = token;
         back().word_offset_ = offset;
@@ -63,7 +63,7 @@ public:
         back().payload_ = payload;
     }
 
-    void Add(String &token, const u32 offset, const u32 end_offset, const u16 payload = 0) {
+    void Add(std::string &token, const u32 offset, const u32 end_offset, const u16 payload = 0) {
         push_back(global_temporary_);
         std::swap(back().text_, token);
         back().word_offset_ = offset;
@@ -75,6 +75,6 @@ private:
     static Term global_temporary_;
 };
 
-export extern String PLACE_HOLDER;
+export extern std::string PLACE_HOLDER;
 
 } // namespace infinity

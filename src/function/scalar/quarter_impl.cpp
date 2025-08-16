@@ -11,21 +11,20 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-module;
+
 module infinity_core:quarter.impl;
 
 import :quarter;
-import :stl;
 import :new_catalog;
 import :status;
-import logical_type;
+import :column_vector;
 import :infinity_exception;
 import :scalar_function;
 import :scalar_function_set;
-import :third_party;
+
 import internal_types;
 import data_type;
-import :column_vector;
+import logical_type;
 
 namespace infinity {
 
@@ -136,9 +135,9 @@ inline bool QuarterFunction::Run(TimestampT left, BigIntT &result) {
 }
 
 void RegisterQuarterFunction(NewCatalog *catalog_ptr) {
-    String func_name = "quarter";
+    std::string func_name = "quarter";
 
-    SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
+    std::shared_ptr<ScalarFunctionSet> function_set_ptr = std::make_shared<ScalarFunctionSet>(func_name);
 
     ScalarFunction quarter_date_function(func_name,
                                   {DataType(LogicalType::kDate)},

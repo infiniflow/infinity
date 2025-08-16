@@ -12,13 +12,9 @@
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
 
-module;
-
 export module infinity_core:apply_fast_rough_filter;
 
-import :stl;
 import :logical_node;
-// import :query_context;
 import :optimizer_rule;
 
 namespace infinity {
@@ -27,9 +23,9 @@ export class ApplyFastRoughFilter final : public OptimizerRule {
 public:
     ~ApplyFastRoughFilter() final = default;
 
-    void ApplyToPlan(QueryContext *, SharedPtr<LogicalNode> &logical_plan) final;
+    void ApplyToPlan(QueryContext *, std::shared_ptr<LogicalNode> &logical_plan) final;
 
-    String name() const final { return "Apply FastRoughFilter"; }
+    std::string name() const final { return "Apply FastRoughFilter"; }
 };
 
 } // namespace infinity

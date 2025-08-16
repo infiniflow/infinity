@@ -12,20 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:project_binder;
-
-import :stl;
 
 import :base_expression;
 import :bind_context;
 import :expression_binder;
-// import :query_context;
+import :bound_select_statement;
+
 import parsed_expr;
 import function_expr;
 import column_expr;
-import :bound_select_statement;
 
 namespace infinity {
 
@@ -36,19 +32,19 @@ public:
         : ExpressionBinder(query_context), bound_select_statement_(bound_select_statement) {}
 
     // Bind expression entry
-    SharedPtr<BaseExpression> BuildExpression(const ParsedExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root) final;
+    std::shared_ptr<BaseExpression> BuildExpression(const ParsedExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root) final;
 
-    SharedPtr<BaseExpression> BuildFuncExpr(const FunctionExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root) final;
+    std::shared_ptr<BaseExpression> BuildFuncExpr(const FunctionExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root) final;
 
-    SharedPtr<BaseExpression> BuildColExpr(const ColumnExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root) final;
+    std::shared_ptr<BaseExpression> BuildColExpr(const ColumnExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root) final;
 
-    [[nodiscard]] const String &BoundColumn() const { return bound_column_name_; }
+    [[nodiscard]] const std::string &BoundColumn() const { return bound_column_name_; }
 
-    SharedPtr<BaseExpression> BuildUnnestExpr(const FunctionExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root) final;
+    std::shared_ptr<BaseExpression> BuildUnnestExpr(const FunctionExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root) final;
 
 private:
     bool binding_agg_func_ = false;
-    String bound_column_name_;
+    std::string bound_column_name_;
 
     BoundSelectStatement *bound_select_statement_ = nullptr;
 };

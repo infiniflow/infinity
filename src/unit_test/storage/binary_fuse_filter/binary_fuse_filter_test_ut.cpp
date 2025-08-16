@@ -13,18 +13,17 @@
 // limitations under the License.
 
 #ifdef CI
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 import infinity_core;
 import base_test;
 #else
 module;
 
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 
 module infinity_core:ut.binary_fuse_filter_test;
 
 import :ut.base_test;
-import :stl;
 import :binary_fuse_filter;
 #endif
 

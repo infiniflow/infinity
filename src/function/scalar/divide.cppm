@@ -16,8 +16,6 @@ module;
 
 export module infinity_core:divide;
 
-import :stl;
-
 namespace infinity {
 
 class NewCatalog;

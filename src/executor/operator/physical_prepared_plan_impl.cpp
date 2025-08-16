@@ -17,7 +17,6 @@ module;
 module infinity_core:physical_prepared_plan.impl;
 
 import :physical_prepared_plan;
-
 import :query_context;
 import :operator_state;
 import :physical_prepared_plan;

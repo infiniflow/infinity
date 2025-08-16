@@ -12,19 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:peer_task.impl;
 
 import :peer_task;
-import :stl;
-import :third_party;
 import :peer_task;
+
+import third_party;
+
 import admin_statement;
 
 namespace infinity {
 
-String ToString(PeerTaskType type) {
+std::string ToString(PeerTaskType type) {
     switch (type) {
         case PeerTaskType::kRegister: {
             return "register";
@@ -53,18 +52,18 @@ String ToString(PeerTaskType type) {
     }
 }
 
-String TerminatePeerTask::ToString() const { return fmt::format("{}", infinity::ToString(type_)); }
+std::string TerminatePeerTask::ToString() const { return fmt::format("{}", infinity::ToString(type_)); }
 
-String RegisterPeerTask::ToString() const {
+std::string RegisterPeerTask::ToString() const {
     return fmt::format("{}@{}, {}:{}, {}", infinity::ToString(type_), node_name_, node_ip_, node_port_, infinity::ToString(node_role_));
 }
 
-String UnregisterPeerTask::ToString() const { return fmt::format("{}@{}", infinity::ToString(type_), node_name_); }
+std::string UnregisterPeerTask::ToString() const { return fmt::format("{}@{}", infinity::ToString(type_), node_name_); }
 
-String HeartBeatPeerTask::ToString() const { return fmt::format("{}@{}, {}", infinity::ToString(type_), node_name_, txn_ts_); }
+std::string HeartBeatPeerTask::ToString() const { return fmt::format("{}@{}, {}", infinity::ToString(type_), node_name_, txn_ts_); }
 
-String SyncLogTask::ToString() const { return fmt::format("{}@{}, {}", infinity::ToString(type_), node_name_, log_strings_.size()); }
+std::string SyncLogTask::ToString() const { return fmt::format("{}@{}, {}", infinity::ToString(type_), node_name_, log_strings_.size()); }
 
-String ChangeRoleTask::ToString() const { return fmt::format("{} to {}", infinity::ToString(type_), role_name_); }
+std::string ChangeRoleTask::ToString() const { return fmt::format("{} to {}", infinity::ToString(type_), role_name_); }
 
 } // namespace infinity

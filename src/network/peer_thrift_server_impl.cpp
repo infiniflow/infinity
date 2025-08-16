@@ -12,37 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
-#include <memory>
-#include <thrift/TToString.h>
-#include <thrift/concurrency/ThreadFactory.h>
-#include <thrift/concurrency/ThreadManager.h>
-#include <thrift/protocol/TBinaryProtocol.h>
-#include <thrift/protocol/TCompactProtocol.h>
-#include <thrift/server/TNonblockingServer.h>
-#include <thrift/server/TThreadPoolServer.h>
-#include <thrift/server/TThreadedServer.h>
-#include <thrift/transport/TNonblockingServerSocket.h>
-#include <thrift/transport/TServerSocket.h>
-#include <thrift/transport/TSocket.h>
-#include <thrift/transport/TTransportUtils.h>
-
 module infinity_core:peer_thrift_server.impl;
 
 import :peer_thrift_server;
 import :peer_server_thrift_service;
 import :peer_server_thrift_types;
-import :logger;
-import :third_party;
-import :stl;
 import :infinity_exception;
 
-using namespace apache::thrift;
-using namespace apache::thrift::concurrency;
-using namespace apache::thrift::protocol;
-using namespace apache::thrift::transport;
-using namespace apache::thrift::server;
+import std;
+import third_party;
 
 namespace infinity {
 
@@ -50,34 +28,38 @@ class PeerServiceCloneFactory final : public infinity_peer_server::PeerServiceIf
 public:
     ~PeerServiceCloneFactory() final = default;
 
-    infinity_peer_server::PeerServiceIf *getHandler(const ::apache::thrift::TConnectionInfo &connInfo) final { return new PeerServerThriftService; }
+    infinity_peer_server::PeerServiceIf *getHandler(const apache::thrift::TConnectionInfo &connInfo) final { return new PeerServerThriftService; }
 
     void releaseHandler(infinity_peer_server::PeerServiceIf *handler) final { delete handler; }
 };
 
-void PoolPeerThriftServer::Init(const String &server_address, i32 port_no, i32 pool_size) {
+void PoolPeerThriftServer::Init(const std::string &server_address, i32 port_no, i32 pool_size) {
 
-    SharedPtr<TServerSocket> server_socket = MakeShared<TServerSocket>(server_address, port_no);
+    std::shared_ptr<apache::thrift::transport::TServerSocket> server_socket =
+        std::make_shared<apache::thrift::transport::TServerSocket>(server_address, port_no);
 
-    SharedPtr<TBinaryProtocolFactory> protocol_factory = MakeShared<TBinaryProtocolFactory>();
+    std::shared_ptr<apache::thrift::protocol::TBinaryProtocolFactory> protocol_factory =
+        std::make_shared<apache::thrift::protocol::TBinaryProtocolFactory>();
 
-    SharedPtr<ThreadFactory> threadFactory = MakeShared<ThreadFactory>();
+    std::shared_ptr<apache::thrift::concurrency::ThreadFactory> threadFactory = std::make_shared<apache::thrift::concurrency::ThreadFactory>();
 
-    SharedPtr<ThreadManager> threadManager = ThreadManager::newSimpleThreadManager(pool_size);
+    std::shared_ptr<apache::thrift::concurrency::ThreadManager> threadManager =
+        apache::thrift::concurrency::ThreadManager::newSimpleThreadManager(pool_size);
     threadManager->threadFactory(threadFactory);
     threadManager->start();
 
     fmt::print("Peer server listen on {}: {}, connection limit: {}\n", server_address, port_no, pool_size);
 
-    server = MakeUnique<TThreadPoolServer>(MakeShared<infinity_peer_server::PeerServiceProcessorFactory>(MakeShared<PeerServiceCloneFactory>()),
-                                           server_socket,
-                                           MakeShared<TBufferedTransportFactory>(),
-                                           protocol_factory,
-                                           threadManager);
+    server = std::make_unique<apache::thrift::server::TThreadPoolServer>(
+        std::make_shared<infinity_peer_server::PeerServiceProcessorFactory>(std::make_shared<PeerServiceCloneFactory>()),
+        server_socket,
+        std::make_shared<apache::thrift::transport::TBufferedTransportFactory>(),
+        protocol_factory,
+        threadManager);
     initialized_ = true;
 }
 
-Thread PoolPeerThriftServer::Start() {
+std::thread PoolPeerThriftServer::Start() {
     if (!initialized_) {
         UnrecoverableError("Peer server is not initialized.");
     }
@@ -87,7 +69,7 @@ Thread PoolPeerThriftServer::Start() {
             UnrecoverableError(fmt::format("Peer server in unexpected state: {}", u8(expect)));
         }
     }
-    return Thread([this] {
+    return std::thread([this] {
         server->serve();
 
         status_.store(PeerThriftServerStatus::kStopped);

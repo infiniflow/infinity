@@ -20,32 +20,32 @@ module;
 module infinity_core:random.impl;
 
 import :random;
-import :stl;
-import :third_party;
 import :logger;
 import :virtual_store;
 import :default_values;
 import :infinity_context;
 import :status;
 
+import third_party;
+
 namespace infinity {
 
 namespace {
-String available_chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+std::string available_chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
 }
 
-String RandomString(SizeT len) {
+std::string RandomString(size_t len) {
     // LOG_WARN(fmt::format("Set seed: {}", seed));
-    String ret(len, '\0');
-    for (SizeT i = 0; i < len; i++) {
-        SizeT rand_i = random() % available_chars.size();
+    std::string ret(len, '\0');
+    for (size_t i = 0; i < len; i++) {
+        size_t rand_i = random() % available_chars.size();
         ret[i] = available_chars[rand_i];
     }
     return ret;
 }
 
-SharedPtr<String> DetermineRandomPath(const String &name) {
-    String rand, result;
+std::shared_ptr<std::string> DetermineRandomPath(const std::string &name) {
+    std::string rand, result;
     static bool initialized = false;
     if (!initialized) {
         initialized = true;
@@ -53,12 +53,12 @@ SharedPtr<String> DetermineRandomPath(const String &name) {
     }
     rand = RandomString(DEFAULT_RANDOM_NAME_LEN);
     result = fmt::format("{}_{}", rand, name);
-    return MakeShared<String>(std::move(result));
+    return std::make_shared<std::string>(std::move(result));
 }
 
-SharedPtr<String> DetermineRandomString(const String &parent_dir, const String &name) {
+std::shared_ptr<std::string> DetermineRandomString(const std::string &parent_dir, const std::string &name) {
     assert(std::filesystem::path(parent_dir).is_absolute());
-    String rand, temp, result;
+    std::string rand, temp, result;
     int cnt = 0;
     static bool initialized = false;
     if (!initialized) {
@@ -74,8 +74,7 @@ SharedPtr<String> DetermineRandomString(const String &parent_dir, const String &
         temp = VirtualStore::ConcatenatePath(parent_dir, result);
         ++cnt;
         if (!use_persistence_manager) {
-            Status status = VirtualStore::MakeDirectory(temp);
-            if (status.ok()) {
+            if (auto status = VirtualStore::MakeDirectory(temp); status.ok()) {
                 created = true;
             } else {
                 created = false;
@@ -85,7 +84,7 @@ SharedPtr<String> DetermineRandomString(const String &parent_dir, const String &
         }
     } while (!created);
     LOG_DEBUG(fmt::format("Created directory {} in {} times", temp, cnt));
-    return MakeShared<String>(std::move(result));
+    return std::make_shared<std::string>(std::move(result));
 }
 
 } // namespace infinity

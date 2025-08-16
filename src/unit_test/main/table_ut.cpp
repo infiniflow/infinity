@@ -13,25 +13,24 @@
 // limitations under the License.
 
 #ifdef CI
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 import infinity_core;
 import base_test;
 #else
 module;
 
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 
 module infinity_core:ut.table;
 
 import :ut.base_test;
-import :stl;
 import :infinity;
 import :query_result;
 import :data_block;
 import :value;
 import :query_options;
 import :status;
-import :third_party;
+import third_party;
 #endif
 
 import logical_type;
@@ -53,11 +52,11 @@ TEST_F(InfinityTableTest, test1) {
     using namespace infinity;
     // Earlier cases may leave a dirty infinity instance. Destroy it first.
     Infinity::LocalUnInit();
-    String path = GetHomeDir();
+    std::string path = GetHomeDir();
     RemoveDbDirs();
     Infinity::LocalInit(path);
 
-    SharedPtr<Infinity> infinity = Infinity::LocalConnect();
+    std::shared_ptr<Infinity> infinity = Infinity::LocalConnect();
     {
         CreateDatabaseOptions create_db_opts;
         infinity->CreateDatabase("db1", create_db_opts, "");
@@ -72,12 +71,12 @@ TEST_F(InfinityTableTest, test1) {
         // init column defs
         std::shared_ptr<DataType> col1_type =
             std::make_shared<DataType>(LogicalType::kEmbedding, std::make_shared<EmbeddingInfo>(EmbeddingDataType::kElemFloat, 128));
-        String col1_name = "col1";
+        std::string col1_name = "col1";
         auto col1_def = std::make_unique<ColumnDef>(0, col1_type, col1_name, std::set<ConstraintType>());
         column_defs.emplace_back(col1_def.release());
 
         std::shared_ptr<DataType> col2_type = std::make_shared<DataType>(LogicalType::kBigInt);
-        String col2_name = "col2";
+        std::string col2_name = "col2";
         auto col2_def = std::make_unique<ColumnDef>(0, col2_type, col2_name, std::set<ConstraintType>());
         column_defs.emplace_back(col2_def.release());
 
@@ -94,7 +93,7 @@ TEST_F(InfinityTableTest, test1) {
         EXPECT_TRUE(create_result.IsOk());
 
         {
-            Vector<ParsedExpr *> *output_columns = new Vector<ParsedExpr *>();
+            std::vector<ParsedExpr *> *output_columns = new std::vector<ParsedExpr *>();
             ColumnExpr *col2 = new ColumnExpr();
             col2->names_.emplace_back(col2_name);
             output_columns->emplace_back(col2);
@@ -116,7 +115,7 @@ TEST_F(InfinityTableTest, test1) {
         }
 
         {
-            Vector<ParsedExpr *> *output_columns = new Vector<ParsedExpr *>();
+            std::vector<ParsedExpr *> *output_columns = new std::vector<ParsedExpr *>();
             ColumnExpr *col2 = new ColumnExpr();
             col2->names_.emplace_back(col2_name);
             output_columns->emplace_back(col2);
@@ -138,7 +137,7 @@ TEST_F(InfinityTableTest, test1) {
         }
 
         {
-            Vector<ParsedExpr *> *output_columns = new Vector<ParsedExpr *>();
+            std::vector<ParsedExpr *> *output_columns = new std::vector<ParsedExpr *>();
             ColumnExpr *col2 = new ColumnExpr();
             col2->names_.emplace_back(col2_name);
             output_columns->emplace_back(col2);
@@ -161,7 +160,7 @@ TEST_F(InfinityTableTest, test1) {
         }
 
         {
-            Vector<ParsedExpr *> *output_columns = new Vector<ParsedExpr *>();
+            std::vector<ParsedExpr *> *output_columns = new std::vector<ParsedExpr *>();
             ColumnExpr *col2 = new ColumnExpr();
             col2->names_.emplace_back(col2_name);
             output_columns->emplace_back(col2);
@@ -183,7 +182,7 @@ TEST_F(InfinityTableTest, test1) {
         }
 
         {
-            Vector<ParsedExpr *> *output_columns = new Vector<ParsedExpr *>();
+            std::vector<ParsedExpr *> *output_columns = new std::vector<ParsedExpr *>();
             ColumnExpr *col2 = new ColumnExpr();
             col2->names_.emplace_back(col2_name);
             output_columns->emplace_back(col2);
@@ -205,7 +204,7 @@ TEST_F(InfinityTableTest, test1) {
         }
 
         {
-            Vector<ParsedExpr *> *output_columns = new Vector<ParsedExpr *>();
+            std::vector<ParsedExpr *> *output_columns = new std::vector<ParsedExpr *>();
             ColumnExpr *col2 = new ColumnExpr();
             col2->names_.emplace_back(col2_name);
             output_columns->emplace_back(col2);

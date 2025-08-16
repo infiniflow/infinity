@@ -1,11 +1,6 @@
-module;
-
-#include <string>
-
 module infinity_core:cn_quantifier_segmenter.impl;
 
 import :cn_quantifier_segmenter;
-import :stl;
 import :hit;
 import :segmenter;
 import :analyze_context;
@@ -13,11 +8,13 @@ import :lexeme;
 import :character_util;
 import :ik_dict;
 
+import std;
+
 namespace infinity {
 
 const std::wstring CNQuantifierSegmenter::SEGMENTER_NAME = L"QUAN_SEGMENTER";
 const std::wstring CNQuantifierSegmenter::ChnNum = L"一二两三四五六七八九十零壹贰叁肆伍陆柒捌玖拾百千万亿拾佰仟萬億兆卅廿";
-HashSet<wchar_t> CNQuantifierSegmenter::ChnNumberChars;
+std::unordered_set<wchar_t> CNQuantifierSegmenter::ChnNumberChars;
 
 void CNQuantifierSegmenter::InitChnNumber() {
     for (wchar_t nChar : ChnNum) {
@@ -94,7 +91,7 @@ void CNQuantifierSegmenter::ProcessCount(AnalyzeContext *context) {
             }
         }
 
-        UniquePtr<Hit> single_char_hit(dict_->MatchInQuantifierDict(context->GetSegmentBuff(), context->GetCursor(), 1));
+        std::unique_ptr<Hit> single_char_hit(dict_->MatchInQuantifierDict(context->GetSegmentBuff(), context->GetCursor(), 1));
         if (single_char_hit->IsMatch()) {
             Lexeme *new_lexeme = new Lexeme(context->GetBufferOffset(), context->GetCursor(), 1, Lexeme::TYPE_COUNT);
             if (!context->AddLexeme(new_lexeme))

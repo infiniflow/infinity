@@ -11,23 +11,22 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-module;
-#include <unordered_map>
+
 module infinity_core:date_part.impl;
 
 import :date_part;
-
-import :stl;
 import :new_catalog;
 import :status;
-import logical_type;
 import :infinity_exception;
 import :scalar_function;
 import :scalar_function_set;
-import :third_party;
+import :column_vector;
+
+import std;
+
+import logical_type;
 import internal_types;
 import data_type;
-import :column_vector;
 
 namespace infinity {
 
@@ -188,9 +187,9 @@ inline bool DatePartFunction::Run(VarcharT &left, TimestampT right, BigIntT &res
 }
 
 void RegisterDatePartFunction(NewCatalog *catalog_ptr) {
-    String func_name = "datepart";
+    std::string func_name = "datepart";
     DatePartFunction::InitDatePartFunction();
-    SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
+    std::shared_ptr<ScalarFunctionSet> function_set_ptr = std::make_shared<ScalarFunctionSet>(func_name);
 
     ScalarFunction date_part_date_function(func_name,
                                   {DataType(LogicalType::kVarchar), DataType(LogicalType::kDate)},

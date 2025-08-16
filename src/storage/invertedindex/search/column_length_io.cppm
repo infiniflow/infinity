@@ -18,13 +18,13 @@ module;
 
 export module infinity_core:column_length_io;
 
-import :stl;
 import :index_defines;
-import internal_types;
 import :memory_indexer;
 import :buffer_obj;
 import :buffer_handle;
 import :column_index_reader;
+
+import internal_types;
 
 namespace infinity {
 class FileSystem;
@@ -56,10 +56,10 @@ public:
 
 private:
     u32 SeekFile(RowID row_id);
-    const String &index_dir_;
-    Vector<ColumnReaderChunkInfo> chunk_index_meta_infos_{}; // must in ascending order
+    const std::string &index_dir_;
+    std::vector<ColumnReaderChunkInfo> chunk_index_meta_infos_{}; // must in ascending order
 
-    SharedPtr<MemoryIndexer> memory_indexer_{};
+    std::shared_ptr<MemoryIndexer> memory_indexer_{};
     u64 total_df_{};
     float avg_column_len_{};
     const u32 *column_lengths_{nullptr};

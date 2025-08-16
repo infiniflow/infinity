@@ -12,35 +12,35 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:log_file;
 
-import :stl;
+import :infinity_type;
+
+import std;
 
 // responsible for parsing and generating filenames for catalog files and wal files
 
 namespace infinity {
 
 export struct TempWalFileInfo {
-    String path_;
+    std::string path_;
 };
 
 export struct WalFileInfo {
-    String path_;
+    std::string path_;
     TxnTimeStamp max_commit_ts_;
 };
 
 export class WalFile {
 public:
-    static Pair<Optional<TempWalFileInfo>, Vector<WalFileInfo>> ParseWalFilenames(const String &wal_dir);
+    static std::pair<std::optional<TempWalFileInfo>, std::vector<WalFileInfo>> ParseWalFilenames(const std::string &wal_dir);
 
-    static String WalFilename(TxnTimeStamp max_commit_ts);
+    static std::string WalFilename(TxnTimeStamp max_commit_ts);
 
-    static String TempWalFilename();
+    static std::string TempWalFilename();
 
     // max_commit_ts is the largest commit ts before the latest checkpoint
-    static void RecycleWalFile(TxnTimeStamp max_commit_ts, const String &wal_dir);
+    static void RecycleWalFile(TxnTimeStamp max_commit_ts, const std::string &wal_dir);
 };
 
 } // namespace infinity

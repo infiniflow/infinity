@@ -14,9 +14,6 @@
 
 module;
 
-#include <memory>
-#include <string>
-
 module infinity_core:segment_index_meta.impl;
 
 import :segment_index_meta;
@@ -24,12 +21,10 @@ import :kv_code;
 import :kv_store;
 import :table_index_meeta;
 import :table_meeta;
-import :third_party;
 import :infinity_context;
 import :new_catalog;
 import :mem_index;
 import :index_base;
-import create_index_info;
 import :meta_info;
 import :chunk_index_meta;
 import :new_txn;
@@ -38,6 +33,11 @@ import :infinity_exception;
 import :utility;
 import :memory_indexer;
 import :logger;
+
+import std;
+import third_party;
+
+import create_index_info;
 
 namespace infinity {
 
@@ -61,8 +61,8 @@ Status SegmentIndexMeta::GetNextChunkID(ChunkID &chunk_id) {
 
 Status SegmentIndexMeta::SetNextChunkID(ChunkID chunk_id) {
     next_chunk_id_ = chunk_id;
-    String next_chunk_id_key = GetSegmentIndexTag("next_chunk_id");
-    String next_chunk_id_str = std::to_string(chunk_id);
+    std::string next_chunk_id_key = GetSegmentIndexTag("next_chunk_id");
+    std::string next_chunk_id_str = std::to_string(chunk_id);
     Status status = kv_instance_.Put(next_chunk_id_key, next_chunk_id_str);
     if (!status.ok()) {
         return status;
@@ -70,7 +70,7 @@ Status SegmentIndexMeta::SetNextChunkID(ChunkID chunk_id) {
     return Status::OK();
 }
 
-Tuple<ChunkID, Status> SegmentIndexMeta::GetAndSetNextChunkID() {
+std::tuple<ChunkID, Status> SegmentIndexMeta::GetAndSetNextChunkID() {
     std::lock_guard<std::mutex> lock(mtx_);
     ChunkID chunk_id = std::numeric_limits<ChunkID>::max();
     if (!next_chunk_id_) {
@@ -86,14 +86,14 @@ Tuple<ChunkID, Status> SegmentIndexMeta::GetAndSetNextChunkID() {
     chunk_id = *next_chunk_id_;
 
     (*next_chunk_id_)++;
-    String next_chunk_id_key = GetSegmentIndexTag("next_chunk_id");
-    String next_chunk_id_str = std::to_string(*next_chunk_id_);
+    std::string next_chunk_id_key = GetSegmentIndexTag("next_chunk_id");
+    std::string next_chunk_id_str = std::to_string(*next_chunk_id_);
     Status status = kv_instance_.Put(next_chunk_id_key, next_chunk_id_str);
 
     return {chunk_id, status};
 }
 
-Tuple<Vector<ChunkID> *, Status> SegmentIndexMeta::GetChunkIDs1() {
+std::tuple<std::vector<ChunkID> *, Status> SegmentIndexMeta::GetChunkIDs1() {
     if (!chunk_ids_) {
         auto status = LoadChunkIDs1();
         if (!status.ok()) {
@@ -103,7 +103,7 @@ Tuple<Vector<ChunkID> *, Status> SegmentIndexMeta::GetChunkIDs1() {
     return {&*chunk_ids_, Status::OK()};
 }
 
-Status SegmentIndexMeta::GetFtInfo(SharedPtr<SegmentIndexFtInfo> &ft_info) {
+Status SegmentIndexMeta::GetFtInfo(std::shared_ptr<SegmentIndexFtInfo> &ft_info) {
     if (!ft_info_) {
         Status status = LoadFtInfo();
         if (!status.ok()) {
@@ -114,10 +114,10 @@ Status SegmentIndexMeta::GetFtInfo(SharedPtr<SegmentIndexFtInfo> &ft_info) {
     return Status::OK();
 }
 
-Status SegmentIndexMeta::RemoveChunkIDs(const Vector<ChunkID> &chunk_ids) {
+Status SegmentIndexMeta::RemoveChunkIDs(const std::vector<ChunkID> &chunk_ids) {
     TableMeeta &table_meta = table_index_meta_.table_meta();
     for (ChunkID chunk_id : chunk_ids) {
-        String chunk_id_key =
+        std::string chunk_id_key =
             KeyEncode::CatalogIdxChunkKey(table_meta.db_id_str(), table_meta.table_id_str(), table_index_meta_.index_id_str(), segment_id_, chunk_id);
         Status status = kv_instance_.Delete(chunk_id_key);
         if (!status.ok()) {
@@ -137,9 +137,9 @@ Status SegmentIndexMeta::RemoveChunkIDs(const Vector<ChunkID> &chunk_ids) {
 Status SegmentIndexMeta::AddChunkIndexID1(ChunkID chunk_id, NewTxn *new_txn) {
 
     TableMeeta &table_meta = table_index_meta_.table_meta();
-    String chunk_id_key =
+    std::string chunk_id_key =
         KeyEncode::CatalogIdxChunkKey(table_meta.db_id_str(), table_meta.table_id_str(), table_index_meta_.index_id_str(), segment_id_, chunk_id);
-    String commit_ts_str;
+    std::string commit_ts_str;
     switch (new_txn->GetTxnState()) {
         case TxnState::kStarted: {
             commit_ts_str = "-1"; // Wait for commit
@@ -156,7 +156,7 @@ Status SegmentIndexMeta::AddChunkIndexID1(ChunkID chunk_id, NewTxn *new_txn) {
         }
     }
     if (!chunk_ids_) {
-        chunk_ids_ = Vector<ChunkID>();
+        chunk_ids_ = std::vector<ChunkID>();
     }
     chunk_ids_->push_back(chunk_id);
     return kv_instance_.Put(chunk_id_key, commit_ts_str);
@@ -172,9 +172,9 @@ Status SegmentIndexMeta::UpdateFtInfo(u64 column_len_sum, u32 column_len_cnt) {
     ft_info_->ft_column_len_sum_ += column_len_sum;
     ft_info_->ft_column_len_cnt_ += column_len_cnt;
 
-    String ft_info_key = GetSegmentIndexTag("ft_info");
-    Vector<u64> sum_cnt = {ft_info_->ft_column_len_sum_, ft_info_->ft_column_len_cnt_};
-    String ft_info_str = nlohmann::json(sum_cnt).dump();
+    std::string ft_info_key = GetSegmentIndexTag("ft_info");
+    std::vector<u64> sum_cnt = {ft_info_->ft_column_len_sum_, ft_info_->ft_column_len_cnt_};
+    std::string ft_info_str = nlohmann::json(sum_cnt).dump();
     Status status = kv_instance_.Put(ft_info_key, ft_info_str);
     LOG_INFO(fmt::format("UpdateFtInfo: column_len_sum={}, column_len_cnt={}, ft_info_key={}, ft_info_str={}",
                          column_len_sum,
@@ -185,8 +185,8 @@ Status SegmentIndexMeta::UpdateFtInfo(u64 column_len_sum, u32 column_len_cnt) {
 }
 
 Status SegmentIndexMeta::SetNoMemIndex() {
-    String has_mem_index_key = GetSegmentIndexTag("has_mem_index");
-    String has_mem_index_str = "0";
+    std::string has_mem_index_key = GetSegmentIndexTag("has_mem_index");
+    std::string has_mem_index_str = "0";
     // block here when mem index is inserting.
     Status status = kv_instance_.Put(has_mem_index_key, has_mem_index_str);
     if (!status.ok()) {
@@ -204,9 +204,9 @@ Status SegmentIndexMeta::RestoreSet(const ChunkID &next_chunk_id) { return SetNe
 
 Status SegmentIndexMeta::LoadSet() {
     // {
-    //     String mem_index_key = GetSegmentIndexTag("mem_index");
+    //     std::string mem_index_key = GetSegmentIndexTag("mem_index");
     //     NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
-    //     Status status = new_catalog->AddMemIndex(std::move(mem_index_key), MakeShared<MemIndex>());
+    //     Status status = new_catalog->AddMemIndex(std::move(mem_index_key), std::make_shared<MemIndex>());
     //     if (!status.ok()) {
     //         return status;
     //     }
@@ -228,7 +228,7 @@ Status SegmentIndexMeta::LoadSet() {
 
 Status SegmentIndexMeta::UninitSet(UsageFlag usage_flag) {
     {
-        String next_chunk_id_key = GetSegmentIndexTag("next_chunk_id");
+        std::string next_chunk_id_key = GetSegmentIndexTag("next_chunk_id");
         Status status = kv_instance_.Delete(next_chunk_id_key);
         if (!status.ok()) {
             return status;
@@ -237,7 +237,7 @@ Status SegmentIndexMeta::UninitSet(UsageFlag usage_flag) {
     }
     if (usage_flag == UsageFlag::kOther) {
         {
-            String mem_index_key = GetSegmentIndexTag("mem_index");
+            std::string mem_index_key = GetSegmentIndexTag("mem_index");
             NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
             Status status = new_catalog->DropMemIndexByMemIndexKey(mem_index_key);
             if (!status.ok()) {
@@ -246,14 +246,14 @@ Status SegmentIndexMeta::UninitSet(UsageFlag usage_flag) {
         }
     }
     {
-        // String has_mem_index_key = GetSegmentIndexTag("has_mem_index");
+        // std::string has_mem_index_key = GetSegmentIndexTag("has_mem_index");
         // Status status = kv_instance_.Delete(has_mem_index_key);
         // if (!status.ok()) {
         //     return status;
         // }
     }
     {
-        String ft_info_key = GetSegmentIndexTag("ft_info");
+        std::string ft_info_key = GetSegmentIndexTag("ft_info");
         Status status = kv_instance_.Delete(ft_info_key);
         if (!status.ok()) {
             return status;
@@ -267,7 +267,7 @@ Status SegmentIndexMeta::UninitSet1(UsageFlag usage_flag) {
     {
         // Remove all chunk ids
         TableMeeta &table_meta = table_index_meta_.table_meta();
-        String chunk_id_prefix =
+        std::string chunk_id_prefix =
             KeyEncode::CatalogIdxChunkPrefix(table_meta.db_id_str(), table_meta.table_id_str(), table_index_meta_.index_id_str(), segment_id_);
         auto iter = kv_instance_.GetIterator();
         iter->Seek(chunk_id_prefix);
@@ -279,7 +279,7 @@ Status SegmentIndexMeta::UninitSet1(UsageFlag usage_flag) {
     }
     {
         // Remove next chunk id
-        String next_chunk_id_key = GetSegmentIndexTag("next_chunk_id");
+        std::string next_chunk_id_key = GetSegmentIndexTag("next_chunk_id");
         Status status = kv_instance_.Delete(next_chunk_id_key);
         if (!status.ok()) {
             return status;
@@ -288,13 +288,13 @@ Status SegmentIndexMeta::UninitSet1(UsageFlag usage_flag) {
     }
     if (usage_flag == UsageFlag::kOther) {
         // Clear mem index
-        SharedPtr<MemIndex> mem_index = GetMemIndex();
+        std::shared_ptr<MemIndex> mem_index = GetMemIndex();
         if (mem_index != nullptr) {
             mem_index->ClearMemIndex();
         }
 
         // Remove mem index
-        String mem_index_key = GetSegmentIndexTag("mem_index");
+        std::string mem_index_key = GetSegmentIndexTag("mem_index");
         NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
         Status status = new_catalog->DropMemIndexByMemIndexKey(mem_index_key);
         if (!status.ok()) {
@@ -303,7 +303,7 @@ Status SegmentIndexMeta::UninitSet1(UsageFlag usage_flag) {
     }
     {
         // Remove mem index indicator
-        // String has_mem_index_key = GetSegmentIndexTag("has_mem_index");
+        // std::string has_mem_index_key = GetSegmentIndexTag("has_mem_index");
         // Status status = kv_instance_.Delete(has_mem_index_key);
         // if (!status.ok()) {
         //     return status;
@@ -311,7 +311,7 @@ Status SegmentIndexMeta::UninitSet1(UsageFlag usage_flag) {
     }
     {
         // Remove ft_info tag
-        String ft_info_key = GetSegmentIndexTag("ft_info");
+        std::string ft_info_key = GetSegmentIndexTag("ft_info");
         Status status = kv_instance_.Delete(ft_info_key);
         if (!status.ok()) {
             return status;
@@ -321,37 +321,37 @@ Status SegmentIndexMeta::UninitSet1(UsageFlag usage_flag) {
     return Status::OK();
 }
 
-SharedPtr<MemIndex> SegmentIndexMeta::GetMemIndex() {
-    String mem_index_key = GetSegmentIndexTag("mem_index");
+std::shared_ptr<MemIndex> SegmentIndexMeta::GetMemIndex() {
+    std::string mem_index_key = GetSegmentIndexTag("mem_index");
     NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
     return new_catalog->GetMemIndex(mem_index_key);
 }
 
-SharedPtr<MemIndex> SegmentIndexMeta::PopMemIndex() {
-    String mem_index_key = GetSegmentIndexTag("mem_index");
+std::shared_ptr<MemIndex> SegmentIndexMeta::PopMemIndex() {
+    std::string mem_index_key = GetSegmentIndexTag("mem_index");
     NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
     return new_catalog->PopMemIndex(mem_index_key);
 }
 
 bool SegmentIndexMeta::HasMemIndex() {
-    String mem_index_key = GetSegmentIndexTag("mem_index");
+    std::string mem_index_key = GetSegmentIndexTag("mem_index");
     NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
     return new_catalog->HasMemIndex(mem_index_key);
 }
 
 Status SegmentIndexMeta::LoadChunkIDs1() {
-    chunk_ids_ = Vector<ChunkID>();
-    Vector<ChunkID> &chunk_ids = *chunk_ids_;
+    chunk_ids_ = std::vector<ChunkID>();
+    std::vector<ChunkID> &chunk_ids = *chunk_ids_;
     TxnTimeStamp begin_ts = table_index_meta_.table_meta().begin_ts();
     TxnTimeStamp commit_ts = table_index_meta_.table_meta().commit_ts();
 
     TableMeeta &table_meta = table_index_meta_.table_meta();
-    String chunk_id_prefix =
+    std::string chunk_id_prefix =
         KeyEncode::CatalogIdxChunkPrefix(table_meta.db_id_str(), table_meta.table_id_str(), table_index_meta_.index_id_str(), segment_id_);
     auto iter = kv_instance_.GetIterator();
     iter->Seek(chunk_id_prefix);
     while (iter->Valid() && iter->Key().starts_with(chunk_id_prefix)) {
-        String key = iter->Key().ToString();
+        std::string key = iter->Key().ToString();
         auto [chunk_id, is_chunk_id] = ExtractU64FromStringSuffix(key, chunk_id_prefix.size());
         if (is_chunk_id) {
             TxnTimeStamp chunk_commit_ts = std::stoull(iter->Value().ToString());
@@ -370,8 +370,8 @@ Status SegmentIndexMeta::LoadChunkIDs1() {
 }
 
 Status SegmentIndexMeta::LoadNextChunkID() {
-    String next_chunk_id_key = GetSegmentIndexTag("next_chunk_id");
-    String next_chunk_id_str;
+    std::string next_chunk_id_key = GetSegmentIndexTag("next_chunk_id");
+    std::string next_chunk_id_str;
     Status status = kv_instance_.Get(next_chunk_id_key, next_chunk_id_str);
     if (!status.ok()) {
         return status;
@@ -382,10 +382,10 @@ Status SegmentIndexMeta::LoadNextChunkID() {
 
 Status SegmentIndexMeta::LoadFtInfo() {
     if (!ft_info_) {
-        ft_info_ = MakeShared<SegmentIndexFtInfo>(0, 0);
+        ft_info_ = std::make_shared<SegmentIndexFtInfo>(0, 0);
     }
-    String ft_info_key = GetSegmentIndexTag("ft_info");
-    String ft_info_str;
+    std::string ft_info_key = GetSegmentIndexTag("ft_info");
+    std::string ft_info_str;
     Status status = kv_instance_.Get(ft_info_key, ft_info_str);
     if (!status.ok()) {
         if (status.code() == ErrorCode::kNotFound) {
@@ -396,27 +396,27 @@ Status SegmentIndexMeta::LoadFtInfo() {
     simdjson::padded_string json_str(ft_info_str);
     simdjson::parser parser;
     simdjson::document doc = parser.iterate(json_str);
-    Vector<u64> sum_cnt = doc.get<Vector<u64>>();
+    std::vector<u64> sum_cnt = doc.get<std::vector<u64>>();
     ft_info_->ft_column_len_sum_ = sum_cnt[0];
     ft_info_->ft_column_len_cnt_ = sum_cnt[1];
     return Status::OK();
 }
 
-String SegmentIndexMeta::GetSegmentIndexTag(const String &tag) {
+std::string SegmentIndexMeta::GetSegmentIndexTag(const std::string &tag) {
     const TableMeeta &table_meta = table_index_meta_.table_meta();
     return KeyEncode::CatalogIdxSegmentTagKey(table_meta.db_id_str(), table_meta.table_id_str(), table_index_meta_.index_id_str(), segment_id_, tag);
 }
 
-SharedPtr<String> SegmentIndexMeta::GetSegmentIndexDir() const {
-    SharedPtr<String> table_index_dir = table_index_meta_.GetTableIndexDir();
+std::shared_ptr<std::string> SegmentIndexMeta::GetSegmentIndexDir() const {
+    std::shared_ptr<std::string> table_index_dir = table_index_meta_.GetTableIndexDir();
     if (!table_index_dir) {
         return nullptr;
     }
-    return MakeShared<String>(fmt::format("{}/seg_{}", *table_index_dir, segment_id_));
+    return std::make_shared<std::string>(fmt::format("{}/seg_{}", *table_index_dir, segment_id_));
 }
 
-SharedPtr<SegmentIndexInfo> SegmentIndexMeta::GetSegmentIndexInfo() {
-    SharedPtr<IndexBase> index_def;
+std::shared_ptr<SegmentIndexInfo> SegmentIndexMeta::GetSegmentIndexInfo() {
+    std::shared_ptr<IndexBase> index_def;
     Status status;
     std::tie(index_def, status) = table_index_meta_.GetIndexBase();
     if (!status.ok()) {
@@ -428,10 +428,10 @@ SharedPtr<SegmentIndexInfo> SegmentIndexMeta::GetSegmentIndexInfo() {
             return nullptr;
         }
     }
-    Vector<String> segment_index_files;
+    std::vector<std::string> segment_index_files;
     for (auto &chunk_id : *chunk_ids_) {
         ChunkIndexMeta chunk_index_meta(chunk_id, *this);
-        Vector<String> chunk_index_files;
+        std::vector<std::string> chunk_index_files;
         status = chunk_index_meta.FilePaths(chunk_index_files);
         if (!status.ok()) {
             return nullptr;
@@ -439,7 +439,7 @@ SharedPtr<SegmentIndexInfo> SegmentIndexMeta::GetSegmentIndexInfo() {
         segment_index_files.insert(segment_index_files.end(), chunk_index_files.begin(), chunk_index_files.end());
     }
 
-    SharedPtr<SegmentIndexInfo> segment_index_info = MakeShared<SegmentIndexInfo>();
+    std::shared_ptr<SegmentIndexInfo> segment_index_info = std::make_shared<SegmentIndexInfo>();
     segment_index_info->segment_id_ = segment_id_;
     segment_index_info->index_type_ = index_def->index_type_;
     segment_index_info->index_dir_ = GetSegmentIndexDir();
@@ -448,8 +448,8 @@ SharedPtr<SegmentIndexInfo> SegmentIndexMeta::GetSegmentIndexInfo() {
     return segment_index_info;
 }
 
-Tuple<SharedPtr<SegmentIndexSnapshotInfo>, Status> SegmentIndexMeta::MapMetaToSnapShotInfo() {
-    SharedPtr<SegmentIndexSnapshotInfo> segment_index_snapshot_info = MakeShared<SegmentIndexSnapshotInfo>();
+std::tuple<std::shared_ptr<SegmentIndexSnapshotInfo>, Status> SegmentIndexMeta::MapMetaToSnapShotInfo() {
+    std::shared_ptr<SegmentIndexSnapshotInfo> segment_index_snapshot_info = std::make_shared<SegmentIndexSnapshotInfo>();
     segment_index_snapshot_info->segment_id_ = segment_id_;
     auto [chunk_ids, status] = GetChunkIDs1();
     if (!status.ok()) {

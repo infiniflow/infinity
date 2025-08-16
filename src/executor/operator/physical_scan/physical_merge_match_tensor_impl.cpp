@@ -12,13 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:physical_merge_match_tensor.impl;
 
 import :physical_merge_match_tensor;
-
-import :stl;
 import :query_context;
 import :physical_operator_type;
 import :operator_state;
@@ -26,7 +22,6 @@ import :logger;
 import :status;
 import :infinity_exception;
 import :buffer_manager;
-import :third_party;
 import :default_values;
 import :data_block;
 import :value;
@@ -35,6 +30,8 @@ import :cached_match_scan;
 import :result_cache_manager;
 import :meta_info;
 import :new_txn;
+
+import third_party;
 
 namespace infinity {
 
@@ -59,14 +56,14 @@ struct VectorBlockRawIndex {
 };
 
 PhysicalMergeMatchTensor::PhysicalMergeMatchTensor(const u64 id,
-                                                   UniquePtr<PhysicalOperator> left,
+                                                   std::unique_ptr<PhysicalOperator> left,
                                                    const u64 table_index,
-                                                   SharedPtr<BaseTableRef> base_table_ref,
-                                                   SharedPtr<MatchTensorExpression> match_tensor_expr,
-                                                   SharedPtr<BaseExpression> filter_expression,
+                                                   std::shared_ptr<BaseTableRef> base_table_ref,
+                                                   std::shared_ptr<MatchTensorExpression> match_tensor_expr,
+                                                   std::shared_ptr<BaseExpression> filter_expression,
                                                    const u32 topn,
-                                                   const SharedPtr<MatchTensorScanIndexOptions> &index_options,
-                                                   SharedPtr<Vector<LoadMeta>> load_metas,
+                                                   const std::shared_ptr<MatchTensorScanIndexOptions> &index_options,
+                                                   std::shared_ptr<std::vector<LoadMeta>> load_metas,
                                                    bool cache_result)
     : PhysicalOperator(PhysicalOperatorType::kMergeMatchTensor, std::move(left), nullptr, id, load_metas, cache_result), table_index_(table_index),
       base_table_ref_(std::move(base_table_ref)), match_tensor_expr_(std::move(match_tensor_expr)), filter_expression_(std::move(filter_expression)),
@@ -74,9 +71,8 @@ PhysicalMergeMatchTensor::PhysicalMergeMatchTensor(const u64 id,
 
 void PhysicalMergeMatchTensor::Init(QueryContext *query_context) { left()->Init(query_context); }
 
-SizeT PhysicalMergeMatchTensor::TaskletCount() {
-    String error_message = "Not Expected: TaskletCount of PhysicalMergeMatchTensor?";
-    UnrecoverableError(error_message);
+size_t PhysicalMergeMatchTensor::TaskletCount() {
+    UnrecoverableError("Not Expected: TaskletCount of PhysicalMergeMatchTensor?");
     return 0;
 }
 
@@ -92,14 +88,11 @@ bool PhysicalMergeMatchTensor::Execute(QueryContext *query_context, OperatorStat
 void PhysicalMergeMatchTensor::ExecuteInner(QueryContext *query_context, MergeMatchTensorOperatorState *operator_state) const {
     auto &output_data_block_array = operator_state->data_block_array_;
     if (!output_data_block_array.empty()) {
-        String error_message = "output data_block_array_ is not empty";
-        UnrecoverableError(error_message);
+        UnrecoverableError("output data_block_array_ is not empty");
     }
     auto &input_data_block_array = operator_state->input_data_blocks_;
     if (input_data_block_array.empty()) {
-
-        String error_message = "PhysicalMergeMatchTensor: empty input";
-        UnrecoverableError(error_message);
+        UnrecoverableError("PhysicalMergeMatchTensor: empty input");
         return;
     }
     const auto output_type_ptr = GetOutputTypes();
@@ -135,7 +128,7 @@ void PhysicalMergeMatchTensor::ExecuteInner(QueryContext *query_context, MergeMa
             }
         };
         // 1. get merged topn ids
-        auto new_result_ids = MakeUniqueForOverwrite<VectorBlockRawIndex[]>(new_result_cnt);
+        auto new_result_ids = std::make_unique_for_overwrite<VectorBlockRawIndex[]>(new_result_cnt);
         {
             VectorBlockRawIndex middle_id(middle_result_count, 0, 0), input_id(input_result_count, middle_block_cnt, 0);
             for (u32 total_i = 0; total_i < new_result_cnt; ++total_i) {
@@ -149,7 +142,7 @@ void PhysicalMergeMatchTensor::ExecuteInner(QueryContext *query_context, MergeMa
             }
         }
         // 2. update middle_data_block_array
-        Vector<UniquePtr<DataBlock>> new_middle_data_block_array;
+        std::vector<std::unique_ptr<DataBlock>> new_middle_data_block_array;
         new_middle_data_block_array.reserve(new_result_block_cnt);
         auto get_block_ptr = [&](const u32 block_id) -> DataBlock * {
             if (block_id < middle_block_cnt) {
@@ -194,17 +187,17 @@ void PhysicalMergeMatchTensor::ExecuteInner(QueryContext *query_context, MergeMa
 
 void PhysicalMergeMatchTensor::AddCache(QueryContext *query_context,
                                         ResultCacheManager *cache_mgr,
-                                        const Vector<UniquePtr<DataBlock>> &output_data_blocks) const {
+                                        const std::vector<std::unique_ptr<DataBlock>> &output_data_blocks) const {
     NewTxn *new_txn = query_context->GetNewTxn();
     TxnTimeStamp begin_ts = new_txn->BeginTS();
 
     auto *table_info = base_table_ref_->table_info_.get();
     TxnTimeStamp query_ts = std::min(begin_ts, table_info->max_commit_ts_);
-    Vector<UniquePtr<DataBlock>> data_blocks(output_data_blocks.size());
-    for (SizeT i = 0; i < output_data_blocks.size(); ++i) {
+    std::vector<std::unique_ptr<DataBlock>> data_blocks(output_data_blocks.size());
+    for (size_t i = 0; i < output_data_blocks.size(); ++i) {
         data_blocks[i] = output_data_blocks[i]->Clone();
     }
-    auto cached_node = MakeUnique<CachedMatchTensorScan>(query_ts, this);
+    auto cached_node = std::make_unique<CachedMatchTensorScan>(query_ts, this);
     bool success = cache_mgr->AddCache(std::move(cached_node), std::move(data_blocks));
     if (!success) {
         LOG_WARN(fmt::format("Add cache failed for query: {}", begin_ts));

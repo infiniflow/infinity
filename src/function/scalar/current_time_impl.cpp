@@ -11,24 +11,24 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-module;
-#include <chrono>
+
 module infinity_core:current_time.impl;
 
 import :current_time;
-import :stl;
 import :config;
 import :new_catalog;
 import :status;
-import logical_type;
+import :column_vector;
 import :infinity_context;
 import :infinity_exception;
 import :scalar_function;
 import :scalar_function_set;
-import :third_party;
+
+import std;
+
+import logical_type;
 import internal_types;
 import data_type;
-import :column_vector;
 
 namespace infinity {
 using namespace std::chrono;
@@ -52,9 +52,9 @@ inline void CurrentTimeFunction::Run(TimeT &result) {
 }
 
 void RegisterCurrentTimeFunction(NewCatalog *catalog_ptr) {
-    String func_name = "current_time";
+    std::string func_name = "current_time";
 
-    SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
+    std::shared_ptr<ScalarFunctionSet> function_set_ptr = std::make_shared<ScalarFunctionSet>(func_name);
 
     ScalarFunction current_time_function(func_name,
                                   {},

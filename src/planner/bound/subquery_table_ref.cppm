@@ -12,24 +12,21 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:subquery_table_ref;
-
-import :stl;
 
 import :table_ref;
 import :bound_statement;
+
 import table_reference;
 
 namespace infinity {
 
 export class SubqueryTableRef : public TableRef {
 public:
-    explicit SubqueryTableRef(UniquePtr<BoundStatement> subquery_node, u64 table_index, String alias)
+    explicit SubqueryTableRef(std::unique_ptr<BoundStatement> subquery_node, u64 table_index, std::string alias)
         : TableRef(TableRefType::kSubquery, std::move(alias)), subquery_node_(std::move(subquery_node)), table_index_(table_index) {}
 
-    UniquePtr<BoundStatement> subquery_node_{nullptr};
+    std::unique_ptr<BoundStatement> subquery_node_{nullptr};
     u64 table_index_{};
 };
 

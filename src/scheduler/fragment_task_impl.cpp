@@ -12,18 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
-#include <sstream>
-
 module infinity_core:fragment_task.impl;
 
 import :fragment_task;
-
 import :profiler;
 import :plan_fragment;
-import :stl;
-import :third_party;
 import :logger;
 import :physical_source;
 import :physical_sink;
@@ -36,8 +29,12 @@ import :base_table_ref;
 import :defer_op;
 import :fragment_context;
 import :status;
-import parser_assert;
 import :infinity_context;
+
+import std;
+import third_party;
+
+import parser_assert;
 
 namespace infinity {
 
@@ -73,10 +70,10 @@ void FragmentTask::OnExecute() {
     Status operator_status{};
     if (source_state_->status_.ok()) {
         // No source error
-        Vector<PhysicalOperator *> &operator_refs = fragment_context->GetOperators();
+        std::vector<PhysicalOperator *> &operator_refs = fragment_context->GetOperators();
 
         TaskProfiler profiler(TaskBinding(), explain_analyze, operator_count_);
-        HashMap<SizeT, SharedPtr<BaseTableRef>> table_refs;
+        std::unordered_map<size_t, std::shared_ptr<BaseTableRef>> table_refs;
         profiler.Begin();
         try {
             for (i64 op_idx = operator_count_ - 1; op_idx >= 0; --op_idx) {
@@ -171,8 +168,7 @@ bool FragmentTask::CompleteTask() {
         if (status_ == FragmentTaskStatus::kRunning) {
             status_ = FragmentTaskStatus::kFinished;
         } else if (status_ != FragmentTaskStatus::kError) {
-            String error_message = "Status should be an error status";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Status should be an error status");
         }
     }
     FragmentContext *fragment_context = (FragmentContext *)fragment_context_;
@@ -180,10 +176,10 @@ bool FragmentTask::CompleteTask() {
     return fragment_context->TryFinishFragment();
 }
 
-String FragmentTask::PhysOpsToString() {
+std::string FragmentTask::PhysOpsToString() {
     std::stringstream ss;
 
-    for (const UniquePtr<OperatorState> &op : operator_states_) {
+    for (const std::unique_ptr<OperatorState> &op : operator_states_) {
         ss << PhysicalOperatorToString(op->operator_type_) << " ";
     }
     return ss.str();

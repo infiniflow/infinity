@@ -12,11 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:logical_node_visitor;
 
-import :stl;
 import :base_expression;
 import :logical_node;
 import :aggregate_expression;
@@ -44,33 +41,33 @@ public:
 
     void VisitNodeExpression(LogicalNode &op);
 
-    void VisitExpression(SharedPtr<BaseExpression> &expression);
+    void VisitExpression(std::shared_ptr<BaseExpression> &expression);
 
-    void VisitExpressionChildren(SharedPtr<BaseExpression> &expression);
+    void VisitExpressionChildren(std::shared_ptr<BaseExpression> &expression);
 
-    virtual SharedPtr<BaseExpression> VisitReplace(const SharedPtr<AggregateExpression> &expression);
+    virtual std::shared_ptr<BaseExpression> VisitReplace(const std::shared_ptr<AggregateExpression> &expression);
 
-    virtual SharedPtr<BaseExpression> VisitReplace(const SharedPtr<BetweenExpression> &expression);
+    virtual std::shared_ptr<BaseExpression> VisitReplace(const std::shared_ptr<BetweenExpression> &expression);
 
-    virtual SharedPtr<BaseExpression> VisitReplace(const SharedPtr<CaseExpression> &expression);
+    virtual std::shared_ptr<BaseExpression> VisitReplace(const std::shared_ptr<CaseExpression> &expression);
 
-    virtual SharedPtr<BaseExpression> VisitReplace(const SharedPtr<CastExpression> &expression);
+    virtual std::shared_ptr<BaseExpression> VisitReplace(const std::shared_ptr<CastExpression> &expression);
 
-    virtual SharedPtr<BaseExpression> VisitReplace(const SharedPtr<ColumnExpression> &expression);
+    virtual std::shared_ptr<BaseExpression> VisitReplace(const std::shared_ptr<ColumnExpression> &expression);
 
-    virtual SharedPtr<BaseExpression> VisitReplace(const SharedPtr<ConjunctionExpression> &expression);
+    virtual std::shared_ptr<BaseExpression> VisitReplace(const std::shared_ptr<ConjunctionExpression> &expression);
 
-    virtual SharedPtr<BaseExpression> VisitReplace(const SharedPtr<FunctionExpression> &expression);
+    virtual std::shared_ptr<BaseExpression> VisitReplace(const std::shared_ptr<FunctionExpression> &expression);
 
-    virtual SharedPtr<BaseExpression> VisitReplace(const SharedPtr<ValueExpression> &expression);
+    virtual std::shared_ptr<BaseExpression> VisitReplace(const std::shared_ptr<ValueExpression> &expression);
 
-    virtual SharedPtr<BaseExpression> VisitReplace(const SharedPtr<InExpression> &expression);
+    virtual std::shared_ptr<BaseExpression> VisitReplace(const std::shared_ptr<InExpression> &expression);
 
-    virtual SharedPtr<BaseExpression> VisitReplace(const SharedPtr<SubqueryExpression> &expression);
+    virtual std::shared_ptr<BaseExpression> VisitReplace(const std::shared_ptr<SubqueryExpression> &expression);
 
-    virtual SharedPtr<BaseExpression> VisitReplace(const SharedPtr<KnnExpression> &expression);
+    virtual std::shared_ptr<BaseExpression> VisitReplace(const std::shared_ptr<KnnExpression> &expression);
 
-    virtual SharedPtr<BaseExpression> VisitReplace(const SharedPtr<UnnestExpression> &expression);
+    virtual std::shared_ptr<BaseExpression> VisitReplace(const std::shared_ptr<UnnestExpression> &expression);
 };
 
 } // namespace infinity

@@ -12,11 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.module;
 
-module;
-
 export module infinity_core:highlighter;
 
-import :stl;
 import :singleton;
 import :aho_corasick;
 import :analyzer;
@@ -24,17 +21,17 @@ import :analyzer;
 namespace infinity {
 
 export struct HighlightInfo {
-    Vector<String> query_terms_;
-    String analyzer_;
+    std::vector<std::string> query_terms_;
+    std::string analyzer_;
 };
 
 export class Highlighter : public Singleton<Highlighter> {
 public:
     Highlighter();
 
-    void GetHighlightWithoutStemmer(const Vector<String> &query, const String &raw_text, String &output);
+    void GetHighlightWithoutStemmer(const std::vector<std::string> &query, const std::string &raw_text, std::string &output);
 
-    void GetHighlightWithStemmer(const Vector<String> &query, const String &raw_text, String &output, Analyzer *analyzer);
+    void GetHighlightWithStemmer(const std::vector<std::string> &query, const std::string &raw_text, std::string &output, Analyzer *analyzer);
 
 private:
     AhoCorasick sentence_delimiter_;

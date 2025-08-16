@@ -13,18 +13,17 @@
 // limitations under the License.
 
 #ifdef CI
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 import infinity_core;
 import base_test;
 #else
 module;
 
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 
 module infinity_core:ut.user_defined_term_weight;
 
 import :ut.base_test;
-import :stl;
 import :status;
 import :user_defined_term_weight;
 import :python_instance;
@@ -58,10 +57,10 @@ TEST_F(UserDefinedTermWeightTest, test1) {
 TEST_F(UserDefinedTermWeightTest, test2) {
     PythonInstance::Init();
 
-    SizeT thread_count = 4;
+    size_t thread_count = 4;
     std::vector<std::thread> threads;
     threads.reserve(thread_count);
-    for (SizeT i = 0; i < thread_count; ++i) {
+    for (size_t i = 0; i < thread_count; ++i) {
         threads.push_back(std::thread([&] {
             UserDefinedTermWeight term_weight(std::string(test_data_path()) + "/scripts/uda5.py");
             Vector<String> vec_str;
@@ -76,7 +75,7 @@ TEST_F(UserDefinedTermWeightTest, test2) {
         }));
     }
 
-    for (SizeT i = 0; i < thread_count; ++i) {
+    for (size_t i = 0; i < thread_count; ++i) {
         threads[i].join();
     }
 

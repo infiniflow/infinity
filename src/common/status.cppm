@@ -12,12 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:status;
 
-import :stl;
-import :third_party;
+import :infinity_type;
+
+import std;
+import third_party;
 
 // If new error codes are added, it also needs to be added to python/infinity/errors.py.
 namespace infinity {
@@ -226,19 +226,19 @@ public:
     static Status Ignore();
 
     // 1. Config error
-    static Status InvalidTimeInfo(const String &time_info);
+    static Status InvalidTimeInfo(const std::string &time_info);
     static Status EmptyConfigParameter();
-    static Status MismatchVersion(const String &current_version, const String &expected_version);
-    static Status InvalidTimezone(const String &timezone);
-    static Status InvalidByteSize(const String &byte_size);
-    static Status InvalidIPAddr(const String &ip_addr);
-    static Status InvalidLogLevel(const String &log_level);
-    static Status InvalidConfig(const String &detailed_info);
-    static Status InvalidMemIndex(const String &invalid_info);
+    static Status MismatchVersion(const std::string &current_version, const std::string &expected_version);
+    static Status InvalidTimezone(const std::string &timezone);
+    static Status InvalidByteSize(const std::string &byte_size);
+    static Status InvalidIPAddr(const std::string &ip_addr);
+    static Status InvalidLogLevel(const std::string &log_level);
+    static Status InvalidConfig(const std::string &detailed_info);
+    static Status InvalidMemIndex(const std::string &invalid_info);
 
     // 2. Auth error
-    static Status WrongPasswd(const String &user_name);
-    static Status InsufficientPrivilege(const String &user_name, const String &detailed_error);
+    static Status WrongPasswd(const std::string &user_name);
+    static Status InsufficientPrivilege(const std::string &user_name, const std::string &detailed_error);
     static Status UnsupportedVersionIndex(i64 given_index);
     static Status ClientVersionMismatch(const char *expected_version, const char *given_version);
     static Status AdminOnlySupportInMaintenanceMode();
@@ -247,46 +247,46 @@ public:
     static Status InfinityIsIniting();
 
     // 3. Syntax error or access rule violation`
-    static Status InvalidUserName(const String &user_name);
+    static Status InvalidUserName(const std::string &user_name);
     static Status InvalidPasswd();
-    static Status InvalidIdentifierName(const String &db_name);
-    static Status InvalidTableName(const String &table_name);
-    static Status InvalidColumnName(const String &column_name);
-    static Status InvalidIndexName(const String &index_name);
-    static Status InvalidColumnDefinition(const String &detailed_info);
-    static Status InvalidTableDefinition(const String &detailed_info);
-    static Status InvalidIndexDefinition(const String &detailed_info);
-    static Status DataTypeMismatch(const String &type1, const String &type2);
-    static Status NameTooLong(const String &name, const String &object_type);
-    static Status ReservedName(const String &name);
-    static Status SyntaxError(const String &detailed);
-    static Status InvalidParameterValue(const String &parameter_name, const String &parameter_value, const String &recommend_value);
-    static Status DuplicateUserName(const String &user_name);
-    static Status DuplicateDatabase(const String &db_name);
-    static Status DuplicateTable(const String &table_name);
-    static Status DuplicateIndex(const String &index_name);
-    static Status DuplicateIndexOnColumn(const String &table_name, const String &column_name);
-    static Status NoUser(const String &user_name);
-    static Status DBNotExist(const String &db_name);
-    static Status TableNotExist(const String &table_name);
-    static Status IndexNotExist(const String &index_name);
-    static Status ColumnNotExist(const String &column_name);
+    static Status InvalidIdentifierName(const std::string &db_name);
+    static Status InvalidTableName(const std::string &table_name);
+    static Status InvalidColumnName(const std::string &column_name);
+    static Status InvalidIndexName(const std::string &index_name);
+    static Status InvalidColumnDefinition(const std::string &detailed_info);
+    static Status InvalidTableDefinition(const std::string &detailed_info);
+    static Status InvalidIndexDefinition(const std::string &detailed_info);
+    static Status DataTypeMismatch(const std::string &type1, const std::string &type2);
+    static Status NameTooLong(const std::string &name, const std::string &object_type);
+    static Status ReservedName(const std::string &name);
+    static Status SyntaxError(const std::string &detailed);
+    static Status InvalidParameterValue(const std::string &parameter_name, const std::string &parameter_value, const std::string &recommend_value);
+    static Status DuplicateUserName(const std::string &user_name);
+    static Status DuplicateDatabase(const std::string &db_name);
+    static Status DuplicateTable(const std::string &table_name);
+    static Status DuplicateIndex(const std::string &index_name);
+    static Status DuplicateIndexOnColumn(const std::string &table_name, const std::string &column_name);
+    static Status NoUser(const std::string &user_name);
+    static Status DBNotExist(const std::string &db_name);
+    static Status TableNotExist(const std::string &table_name);
+    static Status IndexNotExist(const std::string &index_name);
+    static Status ColumnNotExist(const std::string &column_name);
     static Status ColumnNotExist(const ColumnID &column_id);
-    static Status AggNotAllowInWhere(const String &func_name);
-    static Status ColumnInSelectNotInGroupBy(const String &column_name);
-    static Status NoSysVar(const String &variable_name);
-    static Status SetInvalidVarValue(const String &variable_name, const String &valid_value_range);
-    static Status ReadOnlySysVar(const String &sys_var);
-    static Status FunctionNotFound(const String &function_name);
+    static Status AggNotAllowInWhere(const std::string &func_name);
+    static Status ColumnInSelectNotInGroupBy(const std::string &column_name);
+    static Status NoSysVar(const std::string &variable_name);
+    static Status SetInvalidVarValue(const std::string &variable_name, const std::string &valid_value_range);
+    static Status ReadOnlySysVar(const std::string &sys_var);
+    static Status FunctionNotFound(const std::string &function_name);
     static Status SpecialFunctionNotFound();
-    static Status NotSupport(const String &detailed);
-    static Status DroppingUsingDb(const String &db_name);
+    static Status NotSupport(const std::string &detailed);
+    static Status DroppingUsingDb(const std::string &db_name);
     static Status SessionNotFound(i64 session_id);
-    static Status RecursiveAggregate(const String &expr_name);
-    static Status FunctionArgsError(const String &func_name);
-    static Status ImportFileFormatError(const String &detailed_info);
-    static Status DataNotExist(const String &detailed_info);
-    static Status ColumnCountMismatch(const String &detailed_info);
+    static Status RecursiveAggregate(const std::string &expr_name);
+    static Status FunctionArgsError(const std::string &func_name);
+    static Status ImportFileFormatError(const std::string &detailed_info);
+    static Status DataNotExist(const std::string &detailed_info);
+    static Status ColumnCountMismatch(const std::string &detailed_info);
     static Status EmptyDBName();
     static Status EmptyTableName();
     static Status EmptyColumnName();
@@ -295,103 +295,103 @@ public:
     static Status ExceedTableNameLength(u64 table_name_length);
     static Status ExceedColumnNameLength(u64 column_name_length);
     static Status ExceedIndexNameLength(u64 index_name_length);
-    static Status NoColumnDefined(const String &table_name);
-    static Status NotSupportedTypeConversion(const String &from_type, const String &to_type);
+    static Status NoColumnDefined(const std::string &table_name);
+    static Status NotSupportedTypeConversion(const std::string &from_type, const std::string &to_type);
     static Status EmptySelectFields();
     static Status InvalidDataType();
-    static Status ParseMatchExprFailed(const String &fields, const String &matching_text);
-    static Status FTSIndexNotExist(const String &table_name);
+    static Status ParseMatchExprFailed(const std::string &fields, const std::string &matching_text);
+    static Status FTSIndexNotExist(const std::string &table_name);
     static Status UnknownFTSFault();
     static Status InvalidConstraintType();
     static Status InvalidKnnDistanceType();
-    static Status InvalidEmbeddingDataType(const String &type_str);
+    static Status InvalidEmbeddingDataType(const std::string &type_str);
     static Status InvalidConstantType();
     static Status InvalidParsedExprType();
-    static Status InvalidIndexType(const String &message);
-    static Status InvalidIndexParam(const String &param_name);
+    static Status InvalidIndexType(const std::string &message);
+    static Status InvalidIndexParam(const std::string &param_name);
     static Status LackIndexParam();
-    static Status InvalidFilterExpression(const String &expr);
-    static Status MultipleFunctionMatched(const String &function, const String &matched_functions);
+    static Status InvalidFilterExpression(const std::string &expr);
+    static Status MultipleFunctionMatched(const std::string &function, const std::string &matched_functions);
     static Status InsertWithoutValues();
     static Status InvalidConflictType();
-    static Status InvalidJsonFormat(const String &invalid_json);
-    static Status DuplicateColumnName(const String &column_name);
-    static Status InvalidExpression(const String &expr_str);
+    static Status InvalidJsonFormat(const std::string &invalid_json);
+    static Status DuplicateColumnName(const std::string &column_name);
+    static Status InvalidExpression(const std::string &expr_str);
     static Status SegmentNotExist(SegmentID segment_id);
     static Status BlockNotExist(BlockID block_id);
     static Status AggregateFunctionWithEmptyArgs();
-    static Status InvalidCommand(const String &detailed_error);
-    static Status AnalyzerNotFound(const String &name);
-    static Status NotSupportedAnalyzer(const String &name);
-    static Status InvalidAnalyzerName(const String &name);
-    static Status InvalidAnalyzerFile(const String &detailed_info);
+    static Status InvalidCommand(const std::string &detailed_error);
+    static Status AnalyzerNotFound(const std::string &name);
+    static Status NotSupportedAnalyzer(const std::string &name);
+    static Status InvalidAnalyzerName(const std::string &name);
+    static Status InvalidAnalyzerFile(const std::string &detailed_info);
     static Status ChunkNotExist(ChunkID chunk_id);
-    static Status NameMismatched(const String &name_left, const String &name_right);
+    static Status NameMismatched(const std::string &name_left, const std::string &name_right);
     static Status TransactionNotFound(TransactionID txn_id);
     static Status InvalidDatabaseIndex(u64 database_index, u64 capacity);
     static Status InvalidTableIndex(u64 table_index, u64 capacity);
-    static Status FunctionIsDisable(const String &function_name);
-    static Status NotFound(const String &detailed_info);
-    static Status ErrorInit(const String &detailed_info);
-    static Status FileIsOpen(const String &filename);
-    static Status Unknown(const String &name);
-    static Status InvalidQueryOption(const String &detail);
-    static Status FailToStartTxn(const String &detail);
-    static Status AlreadyLocked(const String &detail);
-    static Status NotLocked(const String &detail);
-    static Status TableIsUsing(const String &detail);
-    static Status DuplicateColumnIndex(const String &detail);
-    static Status InvalidParameter(const String &detail);
-    static Status IndexOnColumn(const String &column_name);
-    static Status SnapshotAlreadyExists(const String &snapshot_name);
-    static Status SnapshotAlreadyDeleted(const String &snapshot_name);
+    static Status FunctionIsDisable(const std::string &function_name);
+    static Status NotFound(const std::string &detailed_info);
+    static Status ErrorInit(const std::string &detailed_info);
+    static Status FileIsOpen(const std::string &filename);
+    static Status Unknown(const std::string &name);
+    static Status InvalidQueryOption(const std::string &detail);
+    static Status FailToStartTxn(const std::string &detail);
+    static Status AlreadyLocked(const std::string &detail);
+    static Status NotLocked(const std::string &detail);
+    static Status TableIsUsing(const std::string &detail);
+    static Status DuplicateColumnIndex(const std::string &detail);
+    static Status InvalidParameter(const std::string &detail);
+    static Status IndexOnColumn(const std::string &column_name);
+    static Status SnapshotAlreadyExists(const std::string &snapshot_name);
+    static Status SnapshotAlreadyDeleted(const std::string &snapshot_name);
     // 4. TXN fail
-    static Status TxnRollback(u64 txn_id, const String &rollback_reason = "no reason");
-    static Status TxnConflict(u64 txn_id, const String &conflict_reason);
-    static Status TxnWWConflict(const String &detailed_message);
-    static Status TxnRWConflict(const String &detailed_message);
-    static Status TxnConflictNoRetry(u64 txn_id, const String &conflict_reason);
+    static Status TxnRollback(u64 txn_id, const std::string &rollback_reason = "no reason");
+    static Status TxnConflict(u64 txn_id, const std::string &conflict_reason);
+    static Status TxnWWConflict(const std::string &detailed_message);
+    static Status TxnRWConflict(const std::string &detailed_message);
+    static Status TxnConflictNoRetry(u64 txn_id, const std::string &conflict_reason);
 
     // 5. Insufficient resource or exceed limits
-    static Status DiskFull(const String &detailed_info);
-    static Status OutOfMemory(const String &detailed_info);
-    static Status TooManyConnections(const String &detailed_info);
-    static Status ConfigurationLimitExceed(const String &config_name, const String &config_value, const String &valid_value_range);
-    static Status QueryTooBig(const String &query_text, u64 ast_node);
-    static Status FailToGetSysInfo(const String &detailed_info);
+    static Status DiskFull(const std::string &detailed_info);
+    static Status OutOfMemory(const std::string &detailed_info);
+    static Status TooManyConnections(const std::string &detailed_info);
+    static Status ConfigurationLimitExceed(const std::string &config_name, const std::string &config_value, const std::string &valid_value_range);
+    static Status QueryTooBig(const std::string &query_text, u64 ast_node);
+    static Status FailToGetSysInfo(const std::string &detailed_info);
 
     // 6. Operation intervention
-    static Status QueryCancelled(const String &query_text);
-    static Status QueryNotSupported(const String &query_text, const String &detailed_reason);
+    static Status QueryCancelled(const std::string &query_text);
+    static Status QueryNotSupported(const std::string &query_text, const std::string &detailed_reason);
     static Status ClientClose();
 
     // 7. System error
-    static Status IOError(const String &detailed_info);
-    static Status DuplicatedFile(const String &filename);
-    static Status ConfigFileError(const String &path, const String &detailed_info);
-    static Status LockFileError(const String &path, const String &error_msg);
-    static Status FileCorrupted(const String &path);
-    static Status DataCorrupted(const String &path);
-    static Status IndexCorrupted(const String &path);
-    static Status FileNotFound(const String &path);
-    static Status DirNotFound(const String &path);
-    static Status DataIOError(const String &detailed_info);
-    static Status UnexpectedError(const String &detailed_info);
-    static Status ParserError(const String &detailed_info);
-    static Status MmapFileError(const String &detailed_info);
-    static Status MunmapFileError(const String &detailed_info);
+    static Status IOError(const std::string &detailed_info);
+    static Status DuplicatedFile(const std::string &filename);
+    static Status ConfigFileError(const std::string &path, const std::string &detailed_info);
+    static Status LockFileError(const std::string &path, const std::string &error_msg);
+    static Status FileCorrupted(const std::string &path);
+    static Status DataCorrupted(const std::string &path);
+    static Status IndexCorrupted(const std::string &path);
+    static Status FileNotFound(const std::string &path);
+    static Status DirNotFound(const std::string &path);
+    static Status DataIOError(const std::string &detailed_info);
+    static Status UnexpectedError(const std::string &detailed_info);
+    static Status ParserError(const std::string &detailed_info);
+    static Status MmapFileError(const std::string &detailed_info);
+    static Status MunmapFileError(const std::string &detailed_info);
     static Status InvalidFileFlag(u8 flag);
-    static Status InvalidServerAddress(const String &error_address);
-    static Status FailToRunPython(const String &reason);
-    static Status CantConnectServer(const String &ip, i64 port, const String &reason);
-    static Status NotExistNode(const String &node_info);
-    static Status DuplicateNode(const String &node_info);
-    static Status CantConnectLeader(const String &leader_info);
-    static Status MinioInvalidAccessKey(const String &detailed);
-    static Status MinioBucketNotExists(const String &bucket_name);
-    static Status InvalidStorageType(const String &expected, const String &actual);
-    static Status NotRegistered(const String &node_info);
-    static Status CantSwitchRole(const String &detailed_info);
+    static Status InvalidServerAddress(const std::string &error_address);
+    static Status FailToRunPython(const std::string &reason);
+    static Status CantConnectServer(const std::string &ip, i64 port, const std::string &reason);
+    static Status NotExistNode(const std::string &node_info);
+    static Status DuplicateNode(const std::string &node_info);
+    static Status CantConnectLeader(const std::string &leader_info);
+    static Status MinioInvalidAccessKey(const std::string &detailed);
+    static Status MinioBucketNotExists(const std::string &bucket_name);
+    static Status InvalidStorageType(const std::string &expected, const std::string &actual);
+    static Status NotRegistered(const std::string &node_info);
+    static Status CantSwitchRole(const std::string &detailed_info);
     static Status TooManyFollower(u8 follower_limit);
     static Status TooManyLearner();
     static Status Checkpointing();
@@ -399,27 +399,27 @@ public:
     // meta
     static Status InvalidEntry();
     static Status NotFoundEntry();
-    static Status DuplicateEntry(const String &detailed_info);
+    static Status DuplicateEntry(const std::string &detailed_info);
     static Status EmptyEntryList();
-    static Status NoWALEntryFound(const String &file_name, i64 index);
-    static Status WrongCheckpointType(const String &expect_type, const String &actual_type);
-    static Status InvalidNodeRole(const String &message);
-    static Status InvalidNodeStatus(const String &message);
-    static Status NodeInfoUpdated(const String &message);
-    static Status NodeNameMismatch(const String &actual_node_name, const String &expected_node_name);
+    static Status NoWALEntryFound(const std::string &file_name, i64 index);
+    static Status WrongCheckpointType(const std::string &expect_type, const std::string &actual_type);
+    static Status InvalidNodeRole(const std::string &message);
+    static Status InvalidNodeStatus(const std::string &message);
+    static Status NodeInfoUpdated(const std::string &message);
+    static Status NodeNameMismatch(const std::string &actual_node_name, const std::string &expected_node_name);
 
     // catalog
-    static Status CatalogError(const String &detailed_info);
-    static Status BufferManagerError(const String &detailed_info);
-    static Status RocksDBError(rocksdb::Status rocksdb_s, const String &msg);
-    static Status RocksDBError(rocksdb::IOStatus rocksdb_s, const String &msg);
+    static Status CatalogError(const std::string &detailed_info);
+    static Status BufferManagerError(const std::string &detailed_info);
+    static Status RocksDBError(rocksdb::Status rocksdb_s, const std::string &msg);
+    static Status RocksDBError(rocksdb::IOStatus rocksdb_s, const std::string &msg);
 
 public:
     Status() = default;
 
     inline explicit Status(ErrorCode code) : code_(code) {}
 
-    inline Status(ErrorCode code, UniquePtr<String> message) : code_(code), msg_(std::move(message)) {}
+    inline Status(ErrorCode code, std::unique_ptr<std::string> message) : code_(code), msg_(std::move(message)) {}
 
     Status(ErrorCode code, rocksdb::Status detail);
 
@@ -450,12 +450,12 @@ public:
     void MoveStatus(Status &s);
     void MoveStatus(Status &&s);
 
-    void AppendMessage(const String &msg);
+    void AppendMessage(const std::string &msg);
 
-    inline Status clone() const { return Status{code_, MakeUnique<String>(*msg_)}; }
+    inline Status clone() const { return Status{code_, std::make_unique<std::string>(*msg_)}; }
 
     ErrorCode code_{ErrorCode::kOk};
-    mutable UniquePtr<String> msg_{};
+    mutable std::unique_ptr<std::string> msg_{};
 };
 
 } // namespace infinity

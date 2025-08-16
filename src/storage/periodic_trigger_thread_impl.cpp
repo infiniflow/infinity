@@ -12,16 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
-#include <memory>
-#include <thread>
-
 module infinity_core:periodic_trigger_thread.impl;
 
 import :periodic_trigger_thread;
-import :stl;
 import :logger;
+
+import std;
 
 namespace infinity {
 
@@ -34,7 +30,7 @@ PeriodicTriggerThread::~PeriodicTriggerThread() {
 void PeriodicTriggerThread::Start() {
     LOG_INFO("Periodic trigger start ...");
     running_ = true;
-    thread_ = Thread([this] { Run(); });
+    thread_ = std::thread([this] { Run(); });
 }
 
 void PeriodicTriggerThread::Stop() {

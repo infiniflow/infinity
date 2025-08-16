@@ -13,8 +13,12 @@
 // limitations under the License.
 
 #include "knn_expr.h"
-#include "spdlog/fmt/fmt.h"
 #include "type/internal_types.h"
+
+#ifndef PARESER_USE_THIRD_PARTY_MODULE
+#define PARESER_USE_THIRD_PARTY_MODULE 1
+import third_party;
+#endif
 
 namespace infinity {
 

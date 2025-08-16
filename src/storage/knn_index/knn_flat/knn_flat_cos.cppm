@@ -12,13 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
-#include <functional>
-
 export module infinity_core:deprecated_knn_flat_cos;
 
-import :stl;
 import :deprecated_knn_distance;
 import :logger;
 import :knn_result_handler;
@@ -26,6 +21,7 @@ import :infinity_exception;
 import :default_values;
 import :vector_distance;
 import :roaring_bitmap;
+
 import knn_expr;
 import internal_types;
 
@@ -39,9 +35,9 @@ public:
     explicit KnnFlatCOS(const DistType *queries, i64 query_count, i64 topk, i64 dimension, EmbeddingDataType elem_data_type)
         : KnnDistance<DistType>(KnnDistanceAlgoType::kKnnFlatCosine, elem_data_type, query_count, dimension, topk), queries_(queries) {
 
-        id_array_ = MakeUniqueForOverwrite<RowID[]>(topk * query_count);
-        distance_array_ = MakeUniqueForOverwrite<DistType[]>(topk * query_count);
-        result_handler_ = MakeUnique<ResultHandler>(query_count, topk, distance_array_.get(), id_array_.get());
+        id_array_ = std::make_unique_for_overwrite<RowID[]>(topk * query_count);
+        distance_array_ = std::make_unique_for_overwrite<DistType[]>(topk * query_count);
+        result_handler_ = std::make_unique<ResultHandler>(query_count, topk, distance_array_.get(), id_array_.get());
     }
 
     void Begin() final {
@@ -56,8 +52,7 @@ public:
 
     void Search(const DistType *base, u16 base_count, u32 segment_id, u16 block_id) final {
         if (!begin_) {
-            String error_message = "KnnFlatCOS isn't begin";
-            UnrecoverableError(error_message);
+            UnrecoverableError("KnnFlatCOS isn't begin");
         }
 
         this->total_base_count_ += base_count;
@@ -85,8 +80,7 @@ public:
             return;
         }
         if (!begin_) {
-            String error_message = "KnnFlatCOS isn't begin";
-            UnrecoverableError(error_message);
+            UnrecoverableError("KnnFlatCOS isn't begin");
         }
 
         this->total_base_count_ += base_count;
@@ -127,25 +121,23 @@ public:
 
     [[nodiscard]] inline DistType *GetDistanceByIdx(u64 idx) const final {
         if (idx >= this->query_count_) {
-            String error_message = "Query index exceeds the limit";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Query index exceeds the limit");
         }
         return distance_array_.get() + idx * this->top_k_;
     }
 
     [[nodiscard]] inline RowID *GetIDByIdx(u64 idx) const final {
         if (idx >= this->query_count_) {
-            String error_message = "Query index exceeds the limit";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Query index exceeds the limit");
         }
         return id_array_.get() + idx * this->top_k_;
     }
 
 private:
-    UniquePtr<RowID[]> id_array_{};
-    UniquePtr<DistType[]> distance_array_{};
+    std::unique_ptr<RowID[]> id_array_{};
+    std::unique_ptr<DistType[]> distance_array_{};
 
-    UniquePtr<ResultHandler> result_handler_{};
+    std::unique_ptr<ResultHandler> result_handler_{};
 
     const DistType *queries_{};
     bool begin_{false};

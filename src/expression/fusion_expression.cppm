@@ -12,13 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:fusion_expression;
 
-import :stl;
 import :base_expression;
 import :match_tensor_expression;
+
 import data_type;
 import logical_type;
 import internal_types;
@@ -28,16 +26,16 @@ namespace infinity {
 
 export class FusionExpression : public BaseExpression {
 public:
-    FusionExpression(const String &method, SharedPtr<SearchOptions> options);
+    FusionExpression(const std::string &method, std::shared_ptr<SearchOptions> options);
 
     [[nodiscard]] inline DataType Type() const override { return DataType(LogicalType::kFloat); }
 
-    String ToString() const override;
+    std::string ToString() const override;
 
 public:
-    String method_{};
-    SharedPtr<SearchOptions> options_{};
-    SharedPtr<MatchTensorExpression> match_tensor_expr_;
+    std::string method_{};
+    std::shared_ptr<SearchOptions> options_{};
+    std::shared_ptr<MatchTensorExpression> match_tensor_expr_;
 };
 
 } // namespace infinity

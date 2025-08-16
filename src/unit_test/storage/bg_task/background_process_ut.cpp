@@ -13,21 +13,20 @@
 // limitations under the License.
 
 #ifdef CI
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 import infinity_core;
 import base_test;
 #else
 module;
 
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 
 module infinity_core:ut.background_process;
 
 import :ut.base_test;
 import :infinity_context;
 import :infinity_exception;
-import :stl;
-import :third_party;
+import third_party;
 import :logger;
 import :table_def;
 import :value;

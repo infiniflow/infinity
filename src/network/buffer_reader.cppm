@@ -20,20 +20,23 @@ import :boost;
 import :pg_message;
 import :ring_buffer_iterator;
 import :default_values;
-import :stl;
+
+import std;
+import std.compat;
+
 import global_resource_usage;
 
 namespace infinity {
 
 export class BufferReader {
 public:
-    explicit BufferReader(const SharedPtr<boost::asio::ip::tcp::socket> &socket) : socket_(socket) {}
+    explicit BufferReader(const std::shared_ptr<boost::asio::ip::tcp::socket> &socket) : socket_(socket) {}
 
     ~BufferReader() = default;
 
-    [[nodiscard]] SizeT size() const;
+    [[nodiscard]] size_t size() const;
 
-    [[nodiscard]] static inline SizeT max_capacity() { return PG_MSG_BUFFER_SIZE - 1; }
+    [[nodiscard]] static inline size_t max_capacity() { return PG_MSG_BUFFER_SIZE - 1; }
 
     [[nodiscard]] inline bool full() const { return size() == max_capacity(); }
 
@@ -49,18 +52,18 @@ public:
 
     u32 read_value_u32();
 
-    String read_string(const SizeT string_length, NullTerminator null_terminator = NullTerminator::kYes);
+    std::string read_string(const size_t string_length, NullTerminator null_terminator = NullTerminator::kYes);
 
-    String read_string();
+    std::string read_string();
 
 private:
-    void receive_more(SizeT more_bytes = 1);
+    void receive_more(size_t more_bytes = 1);
 
-    Array<char, PG_MSG_BUFFER_SIZE> data_{};
+    std::array<char, PG_MSG_BUFFER_SIZE> data_{};
     RingBufferIterator start_pos_{data_};
     RingBufferIterator current_pos_{data_};
 
-    SharedPtr<boost::asio::ip::tcp::socket> socket_;
+    std::shared_ptr<boost::asio::ip::tcp::socket> socket_;
 };
 
 } // namespace infinity

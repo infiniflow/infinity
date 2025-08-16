@@ -12,25 +12,24 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:minimum_should_match_iterator;
-import :stl;
+
 import :doc_iterator;
 import :multi_doc_iterator;
+
 import internal_types;
 
 namespace infinity {
 
 export class MinimumShouldMatchIterator final : public MultiDocIterator {
 public:
-    MinimumShouldMatchIterator(Vector<UniquePtr<DocIterator>> &&iterators, u32 minimum_should_match);
+    MinimumShouldMatchIterator(std::vector<std::unique_ptr<DocIterator>> &&iterators, u32 minimum_should_match);
 
     ~MinimumShouldMatchIterator() override;
 
     DocIteratorType GetType() const override { return DocIteratorType::kMinimumShouldMatchIterator; }
 
-    String Name() const override { return "MinimumShouldMatchIterator"; }
+    std::string Name() const override { return "MinimumShouldMatchIterator"; }
 
     void UpdateScoreThreshold(float threshold) override;
 
@@ -44,13 +43,13 @@ private:
     RowID HeadHeapTop() const;
     void PushToHeadHeap(u32 idx);
     u32 PopFromHeadHeap();
-    Pair<bool, u32> PushToTailHeap(u32 idx);
+    std::pair<bool, u32> PushToTailHeap(u32 idx);
     u32 PopFromTailHeap();
 
     const u32 minimum_should_match_ = 0;
-    Vector<u32> lead_{};
-    Vector<u32> head_heap_{};
-    Vector<u32> tail_heap_{};
+    std::vector<u32> lead_{};
+    std::vector<u32> head_heap_{};
+    std::vector<u32> tail_heap_{};
     u32 tail_size_ = 0;
 
     // score cache
@@ -63,7 +62,7 @@ class MinimumShouldMatchWrapper final : public T {
     u32 minimum_should_match_ = 0;
 
 public:
-    MinimumShouldMatchWrapper(Vector<UniquePtr<DocIterator>> &&iterators, const u32 minimum_should_match)
+    MinimumShouldMatchWrapper(std::vector<std::unique_ptr<DocIterator>> &&iterators, const u32 minimum_should_match)
         : T(std::move(iterators)), minimum_should_match_(minimum_should_match) {}
     ~MinimumShouldMatchWrapper() override = default;
     bool Next(RowID doc_id) override {

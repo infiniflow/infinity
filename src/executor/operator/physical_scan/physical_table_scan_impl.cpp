@@ -12,19 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
-#include <string>
-
 module infinity_core:physical_table_scan.impl;
 
 import :physical_table_scan;
-
-import :stl;
 import :query_context;
 import :table_def;
 import :data_table;
-
 import :physical_operator_type;
 import :operator_state;
 import :global_block_id;
@@ -32,22 +25,23 @@ import :data_block;
 import :table_scan_function_data;
 import :base_table_ref;
 import :block_index;
-
 import :default_values;
 import :infinity_exception;
-import :third_party;
 import :logger;
 import :column_vector;
-import logical_type;
 import :meta_info;
-
 import :new_txn;
 import :block_meta;
 import :new_catalog;
 import :column_meta;
 import :status;
+
+import std;
+import third_party;
+
 import data_type;
 import row_id;
+import logical_type;
 
 namespace infinity {
 
@@ -59,10 +53,10 @@ bool PhysicalTableScan::Execute(QueryContext *query_context, OperatorState *oper
     return true;
 }
 
-SharedPtr<Vector<String>> PhysicalTableScan::GetOutputNames() const {
+std::shared_ptr<std::vector<std::string>> PhysicalTableScan::GetOutputNames() const {
     if (!add_row_id_)
         return base_table_ref_->column_names_;
-    auto dst = MakeShared<Vector<String>>();
+    auto dst = std::make_shared<std::vector<std::string>>();
     dst->reserve(base_table_ref_->column_names_->size() + 1);
     for (auto &name : *base_table_ref_->column_names_)
         dst->emplace_back(name);
@@ -70,24 +64,24 @@ SharedPtr<Vector<String>> PhysicalTableScan::GetOutputNames() const {
     return dst;
 }
 
-SharedPtr<Vector<SharedPtr<DataType>>> PhysicalTableScan::GetOutputTypes() const {
+std::shared_ptr<std::vector<std::shared_ptr<DataType>>> PhysicalTableScan::GetOutputTypes() const {
     if (!add_row_id_)
         return base_table_ref_->column_types_;
-    auto dst = MakeShared<Vector<SharedPtr<DataType>>>();
+    auto dst = std::make_shared<std::vector<std::shared_ptr<DataType>>>();
     dst->reserve(base_table_ref_->column_types_->size() + 1);
     for (auto &type : *base_table_ref_->column_types_)
         dst->emplace_back(type);
-    dst->emplace_back(MakeShared<DataType>(LogicalType::kRowID));
+    dst->emplace_back(std::make_shared<DataType>(LogicalType::kRowID));
     return dst;
 }
 
-String PhysicalTableScan::table_alias() const { return base_table_ref_->alias_; }
+std::string PhysicalTableScan::table_alias() const { return base_table_ref_->alias_; }
 
 u64 PhysicalTableScan::TableIndex() const { return base_table_ref_->table_index_; }
 
-SizeT PhysicalTableScan::BlockEntryCount() const { return base_table_ref_->block_index_->BlockCount(); }
+size_t PhysicalTableScan::BlockEntryCount() const { return base_table_ref_->block_index_->BlockCount(); }
 
-Vector<SizeT> &PhysicalTableScan::ColumnIDs() const {
+std::vector<size_t> &PhysicalTableScan::ColumnIDs() const {
     if (!add_row_id_)
         return base_table_ref_->column_ids_;
     if (!column_ids_.empty())
@@ -99,8 +93,7 @@ Vector<SizeT> &PhysicalTableScan::ColumnIDs() const {
 
 void PhysicalTableScan::ExecuteInternal(QueryContext *query_context, TableScanOperatorState *table_scan_operator_state) {
     if (!table_scan_operator_state->data_block_array_.empty()) {
-        String error_message = "Table scan output data block array should be empty";
-        UnrecoverableError(error_message);
+        UnrecoverableError("Table scan output data block array should be empty");
     }
 
     table_scan_operator_state->data_block_array_.emplace_back(DataBlock::MakeUniquePtr());
@@ -109,10 +102,10 @@ void PhysicalTableScan::ExecuteInternal(QueryContext *query_context, TableScanOp
 
     TableScanFunctionData *table_scan_function_data_ptr = table_scan_operator_state->table_scan_function_data_.get();
     const BlockIndex *block_index = table_scan_function_data_ptr->block_index_;
-    Vector<GlobalBlockID> *block_ids = table_scan_function_data_ptr->global_block_ids_.get();
-    const Vector<SizeT> &column_ids = table_scan_function_data_ptr->column_ids_;
+    std::vector<GlobalBlockID> *block_ids = table_scan_function_data_ptr->global_block_ids_.get();
+    const std::vector<size_t> &column_ids = table_scan_function_data_ptr->column_ids_;
     u64 &block_ids_idx = table_scan_function_data_ptr->current_block_ids_idx_;
-    SizeT block_ids_count = block_ids->size();
+    size_t block_ids_count = block_ids->size();
     if (block_ids_idx >= block_ids_count) {
         // No data or all data is read
         table_scan_operator_state->SetComplete();
@@ -125,7 +118,7 @@ void PhysicalTableScan::ExecuteInternal(QueryContext *query_context, TableScanOp
 #ifdef INFINITY_DEBUG
     // This part has performance issue
     {
-        String out;
+        std::string out;
         for (auto &global_block_id : *block_ids) {
             out += fmt::format("({},{}) ", global_block_id.segment_id_, global_block_id.block_id_);
         }
@@ -141,7 +134,7 @@ void PhysicalTableScan::ExecuteInternal(QueryContext *query_context, TableScanOp
 
         BlockMeta *current_block_meta = block_index->GetBlockMeta(segment_id, block_id);
 
-        Optional<NewTxnGetVisibleRangeState> &range_state = table_scan_function_data_ptr->get_visible_range_state_;
+        std::optional<NewTxnGetVisibleRangeState> &range_state = table_scan_function_data_ptr->get_visible_range_state_;
         if (!range_state) {
             // TODO
             range_state = NewTxnGetVisibleRangeState();
@@ -151,7 +144,7 @@ void PhysicalTableScan::ExecuteInternal(QueryContext *query_context, TableScanOp
             }
 
             // new block, check FastRoughFilter
-            SharedPtr<FastRoughFilter> block_filter;
+            std::shared_ptr<FastRoughFilter> block_filter;
             status = current_block_meta->GetFastRoughFilter(block_filter);
             if (status.ok()) {
                 if (fast_rough_filter_evaluator_ and !fast_rough_filter_evaluator_->Evaluate(begin_ts, *block_filter)) {
@@ -169,7 +162,7 @@ void PhysicalTableScan::ExecuteInternal(QueryContext *query_context, TableScanOp
             }
         }
 
-        Pair<BlockOffset, BlockOffset> visible_range;
+        std::pair<BlockOffset, BlockOffset> visible_range;
         bool has_next = range_state->Next(visible_range);
         if (!has_next || visible_range.first == visible_range.second) {
             // we have read all data from current block, move to next block
@@ -182,8 +175,8 @@ void PhysicalTableScan::ExecuteInternal(QueryContext *query_context, TableScanOp
             break;
         }
 
-        auto write_size = std::min(write_capacity, SizeT(visible_range.second - visible_range.first));
-        SizeT output_column_id{0};
+        auto write_size = std::min(write_capacity, size_t(visible_range.second - visible_range.first));
+        size_t output_column_id{0};
         for (auto column_id : column_ids) {
             switch (column_id) {
                 case COLUMN_IDENTIFIER_ROW_ID: {
@@ -214,7 +207,7 @@ void PhysicalTableScan::ExecuteInternal(QueryContext *query_context, TableScanOp
                 default: {
                     ColumnVector column_vector;
                     ColumnMeta column_meta(column_id, *current_block_meta);
-                    SizeT row_cnt = range_state->block_offset_end();
+                    size_t row_cnt = range_state->block_offset_end();
                     Status status = NewCatalog::GetColumnVector(column_meta, row_cnt, ColumnVectorMode::kReadOnly, column_vector);
                     if (!status.ok()) {
                         RecoverableError(status);

@@ -12,16 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:vector_heap_chunk;
 
-import :stl;
-import global_resource_usage;
 import :allocator;
 import :buffer_obj;
 import :buffer_handle;
 import :infinity_exception;
+
+import global_resource_usage;
 
 namespace infinity {
 
@@ -36,7 +34,7 @@ public:
 #endif
     }
 
-    explicit VectorHeapChunk(u64 capacity) : ptr_(MakeUniqueForOverwrite<char[]>(capacity)) {
+    explicit VectorHeapChunk(u64 capacity) : ptr_(std::make_unique_for_overwrite<char[]>(capacity)) {
 #ifdef INFINITY_DEBUG
         GlobalResourceUsage::IncrObjectCount("VectorHeapChunk");
 #endif
@@ -48,8 +46,8 @@ public:
 #ifdef INFINITY_DEBUG
         GlobalResourceUsage::IncrObjectCount("VectorHeapChunk");
 #endif
-        if (std::holds_alternative<UniquePtr<char[]>>(other.ptr_)) {
-            ptr_ = std::move(std::get<UniquePtr<char[]>>(other.ptr_));
+        if (std::holds_alternative<std::unique_ptr<char[]>>(other.ptr_)) {
+            ptr_ = std::move(std::get<std::unique_ptr<char[]>>(other.ptr_));
         } else {
             ptr_ = std::move(std::get<BufferHandle>(other.ptr_));
         }
@@ -66,23 +64,23 @@ public:
     }
 
     const char *GetPtr() const { // Pattern Matching here
-        if (std::holds_alternative<UniquePtr<char[]>>(ptr_)) {
-            return std::get<UniquePtr<char[]>>(ptr_).get();
+        if (std::holds_alternative<std::unique_ptr<char[]>>(ptr_)) {
+            return std::get<std::unique_ptr<char[]>>(ptr_).get();
         } else {
             return static_cast<const char *>(std::get<BufferHandle>(ptr_).GetData());
         }
     }
 
     char *GetPtrMut() {
-        if (std::holds_alternative<UniquePtr<char[]>>(ptr_)) {
-            return std::get<UniquePtr<char[]>>(ptr_).get();
+        if (std::holds_alternative<std::unique_ptr<char[]>>(ptr_)) {
+            return std::get<std::unique_ptr<char[]>>(ptr_).get();
         } else {
             return static_cast<char *>(std::get<BufferHandle>(ptr_).GetDataMut());
         }
     }
 
 private:
-    std::variant<UniquePtr<char[]>, BufferHandle> ptr_;
+    std::variant<std::unique_ptr<char[]>, BufferHandle> ptr_;
 };
 
 } // namespace infinity

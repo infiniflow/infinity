@@ -1,10 +1,6 @@
-module;
-
 module infinity_core:column_index_iterator.impl;
 
 import :column_index_iterator;
-
-import :stl;
 import :byte_slice;
 import :byte_slice_reader;
 import :file_reader;
@@ -13,22 +9,24 @@ import :posting_list_format;
 import :index_defines;
 import :term_meta;
 import :dict_reader;
-import :third_party;
+
 import :infinity_context;
 import :persistence_manager;
 import :persist_result_handler;
 
+import third_party;
+
 namespace infinity {
 
-ColumnIndexIterator::ColumnIndexIterator(const String &index_dir, const String &base_name, optionflag_t flag) {
+ColumnIndexIterator::ColumnIndexIterator(const std::string &index_dir, const std::string &base_name, optionflag_t flag) {
     PostingFormatOption format_option(flag);
     PersistenceManager *pm = InfinityContext::instance().persistence_manager();
     bool use_object_cache = pm != nullptr;
 
-    Path path = Path(InfinityContext::instance().config()->DataDir()) / index_dir / base_name;
-    String dict_file = path.string();
+    std::filesystem::path path = std::filesystem::path(InfinityContext::instance().config()->DataDir()) / index_dir / base_name;
+    std::string dict_file = path.string();
     dict_file.append(DICT_SUFFIX);
-    String posting_file = path.string();
+    std::string posting_file = path.string();
     posting_file.append(POSTING_SUFFIX);
 
     if (use_object_cache) {
@@ -43,14 +41,14 @@ ColumnIndexIterator::ColumnIndexIterator(const String &index_dir, const String &
         posting_file = pm->GetObjPath(obj_addr2.obj_key_);
     }
 
-    dict_reader_ = MakeShared<DictionaryReader>(dict_file, PostingFormatOption(flag));
-    posting_file_ = MakeShared<FileReader>(posting_file, 1024);
+    dict_reader_ = std::make_shared<DictionaryReader>(dict_file, PostingFormatOption(flag));
+    posting_file_ = std::make_shared<FileReader>(posting_file, 1024);
 
-    doc_list_reader_ = MakeShared<ByteSliceReader>();
+    doc_list_reader_ = std::make_shared<ByteSliceReader>();
     if (format_option.HasPositionList()) {
-        pos_list_reader_ = MakeShared<ByteSliceReader>();
+        pos_list_reader_ = std::make_shared<ByteSliceReader>();
     }
-    posting_decoder_ = MakeShared<PostingDecoder>(format_option);
+    posting_decoder_ = std::make_shared<PostingDecoder>(format_option);
 }
 
 ColumnIndexIterator::~ColumnIndexIterator() {
@@ -72,7 +70,7 @@ ColumnIndexIterator::~ColumnIndexIterator() {
     }
 }
 
-bool ColumnIndexIterator::Next(String &key, PostingDecoder *&decoder) {
+bool ColumnIndexIterator::Next(std::string &key, PostingDecoder *&decoder) {
     bool ret = dict_reader_->Next(key, term_meta_);
     if (!ret)
         return false;

@@ -12,39 +12,36 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
-#include <sstream>
-
 module infinity_core:logical_limit.impl;
 
 import :logical_limit;
-
-import internal_types;
-import :stl;
 import :logical_node_type;
 import :column_binding;
 import :logical_node;
 import :base_expression;
+
+import std;
+
+import internal_types;
 import data_type;
 
 namespace infinity {
 
-Vector<ColumnBinding> LogicalLimit::GetColumnBindings() const { return left_node_->GetColumnBindings(); }
+std::vector<ColumnBinding> LogicalLimit::GetColumnBindings() const { return left_node_->GetColumnBindings(); }
 
-SharedPtr<Vector<String>> LogicalLimit::GetOutputNames() const { return left_node_->GetOutputNames(); }
+std::shared_ptr<std::vector<std::string>> LogicalLimit::GetOutputNames() const { return left_node_->GetOutputNames(); }
 
-SharedPtr<Vector<SharedPtr<DataType>>> LogicalLimit::GetOutputTypes() const { return left_node_->GetOutputTypes(); }
+std::shared_ptr<std::vector<std::shared_ptr<DataType>>> LogicalLimit::GetOutputTypes() const { return left_node_->GetOutputTypes(); }
 
-String LogicalLimit::ToString(i64 &space) const {
+std::string LogicalLimit::ToString(i64 &space) const {
     std::stringstream ss;
-    String arrow_str;
+    std::string arrow_str;
     if (space > 3) {
         space -= 4;
         arrow_str = "->  ";
     }
 
-    ss << String(space, ' ') << arrow_str << "Limit (limit: " << limit_expression_->Name();
+    ss << std::string(space, ' ') << arrow_str << "Limit (limit: " << limit_expression_->Name();
     if (offset_expression_.get() != nullptr) {
         ss << ", offset: " << offset_expression_->Name();
     }

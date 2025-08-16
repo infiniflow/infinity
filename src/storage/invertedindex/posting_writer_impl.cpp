@@ -1,10 +1,6 @@
-module;
-
 module infinity_core:posting_writer.impl;
 
 import :posting_writer;
-
-import :stl;
 import :file_writer;
 import :file_reader;
 import :doc_list_encoder;
@@ -53,7 +49,7 @@ tf_t PostingWriter::GetCurrentTF() const { return doc_list_encoder_->GetCurrentT
 
 void PostingWriter::SetCurrentTF(tf_t tf) { doc_list_encoder_->SetCurrentTF(tf); }
 
-void PostingWriter::Dump(const SharedPtr<FileWriter> &file_writer, TermMeta &term_meta, bool spill) {
+void PostingWriter::Dump(const std::shared_ptr<FileWriter> &file_writer, TermMeta &term_meta, bool spill) {
     term_meta.doc_freq_ = GetDF();
     term_meta.total_tf_ = GetTotalTF();
     term_meta.payload_ = 0;
@@ -66,7 +62,7 @@ void PostingWriter::Dump(const SharedPtr<FileWriter> &file_writer, TermMeta &ter
     }
 }
 
-void PostingWriter::Load(const SharedPtr<FileReader> &file_reader) {
+void PostingWriter::Load(const std::shared_ptr<FileReader> &file_reader) {
     doc_list_encoder_->Load(file_reader);
     if (position_list_encoder_) {
         position_list_encoder_->Load(file_reader);
@@ -110,8 +106,8 @@ InMemPostingDecoder *PostingWriter::CreateInMemPostingDecoder() const {
 }
 
 MemUsageChange PostingWriter::GetSizeChange() {
-    SizeT size = doc_list_encoder_->GetSizeInBytes() + position_list_encoder_->GetSizeInBytes();
-    SizeT last_size = last_size_;
+    size_t size = doc_list_encoder_->GetSizeInBytes() + position_list_encoder_->GetSizeInBytes();
+    size_t last_size = last_size_;
     last_size_ = size;
     if (size >= last_size) {
         return MemUsageChange{true, size - last_size};

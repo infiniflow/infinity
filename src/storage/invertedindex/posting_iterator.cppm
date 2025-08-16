@@ -4,8 +4,6 @@ module;
 
 export module infinity_core:posting_iterator;
 
-import :stl;
-
 import :byte_slice_reader;
 import :posting_list_format;
 import :term_meta;
@@ -14,8 +12,10 @@ import :in_doc_pos_state;
 import :multi_posting_decoder;
 import :segment_posting;
 import :index_defines;
+
+import third_party;
+
 import internal_types;
-import :third_party;
 
 namespace infinity {
 export class PostingIterator {
@@ -24,7 +24,7 @@ public:
 
     ~PostingIterator();
 
-    bool Init(SharedPtr<Vector<SegmentPosting>> seg_postings, const u32 state_pool_size);
+    bool Init(std::shared_ptr<std::vector<SegmentPosting>> seg_postings, const u32 state_pool_size);
 
     void Reset();
 
@@ -40,13 +40,13 @@ public:
 
     // u32: block max tf
     // u16: block max (ceil(tf / doc length) * numeric_limits<u16>::max())
-    Pair<u32, u16> GetBlockMaxInfo() const;
+    std::pair<u32, u16> GetBlockMaxInfo() const;
 
     RowID SeekDoc(RowID docId);
 
     inline RowID DocID() const { return current_row_id_; }
 
-    Pair<bool, RowID> PeekInBlockRange(RowID doc_id, RowID doc_id_no_beyond);
+    std::pair<bool, RowID> PeekInBlockRange(RowID doc_id, RowID doc_id_no_beyond);
 
     void SeekPosition(pos_t pos, pos_t &result);
 
@@ -113,7 +113,7 @@ private:
     void MoveToCurrentDoc(bool fetch_position);
 
 private:
-    SharedPtr<Vector<SegmentPosting>> segment_postings_;
+    std::shared_ptr<std::vector<SegmentPosting>> segment_postings_;
     PostingFormatOption posting_option_;
     u32 doc_freq_ = 0;
 

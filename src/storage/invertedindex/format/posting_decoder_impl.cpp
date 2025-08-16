@@ -1,10 +1,6 @@
-module;
-
 module infinity_core:posting_decoder.impl;
 
 import :posting_decoder;
-
-import :stl;
 import :byte_slice_reader;
 import :posting_list_format;
 import :term_meta;
@@ -12,10 +8,10 @@ import :index_defines;
 import :posting_field;
 import :position_list_format_option;
 import :doc_list_format_option;
-
 import :infinity_exception;
-import :third_party;
 import :logger;
+
+import third_party;
 
 namespace infinity {
 
@@ -24,9 +20,9 @@ PostingDecoder::PostingDecoder(const PostingFormatOption &posting_format_option)
       decoded_doc_count_(0), decoded_pos_count_(0), posting_data_length_(0), posting_format_option_(posting_format_option) {}
 
 void PostingDecoder::Init(TermMeta *term_meta,
-                          const SharedPtr<ByteSliceReader> &posting_list_reader,
-                          const SharedPtr<ByteSliceReader> &position_list_reader,
-                          SizeT posting_data_len) {
+                          const std::shared_ptr<ByteSliceReader> &posting_list_reader,
+                          const std::shared_ptr<ByteSliceReader> &position_list_reader,
+                          size_t posting_data_len) {
     term_meta_ = term_meta;
     posting_list_reader_ = posting_list_reader;
     position_list_reader_ = position_list_reader;
@@ -58,7 +54,7 @@ void PostingDecoder::Init(TermMeta *term_meta, bool is_doc_list, bool df_first) 
     posting_data_length_ = 0;
 }
 
-u32 PostingDecoder::DecodeDocList(docid_t *doc_id_buf, tf_t *tf_list_buf, docpayload_t *doc_payload_buf, SizeT len) {
+u32 PostingDecoder::DecodeDocList(docid_t *doc_id_buf, tf_t *tf_list_buf, docpayload_t *doc_payload_buf, size_t len) {
     if (decoded_doc_count_ >= term_meta_->GetDocFreq()) {
         return 0;
     }
@@ -68,16 +64,14 @@ u32 PostingDecoder::DecodeDocList(docid_t *doc_id_buf, tf_t *tf_list_buf, docpay
     if (tf_list_encoder_) {
         auto tf_len = tf_list_encoder_->Decode((u32 *)tf_list_buf, len, *posting_list_reader_);
         if (doc_len != tf_len) {
-            String error_message = "doc/tf-list collapsed";
-            UnrecoverableError(error_message);
+            UnrecoverableError("doc/tf-list collapsed");
         }
     }
 
     if (doc_payload_encoder_) {
         auto payload_len = doc_payload_encoder_->Decode(doc_payload_buf, len, *posting_list_reader_);
         if (payload_len != doc_len) {
-            String error_message = "doc/docpayload-list collapsed";
-            UnrecoverableError(error_message);
+            UnrecoverableError("doc/docpayload-list collapsed");
         }
     }
 
@@ -85,7 +79,7 @@ u32 PostingDecoder::DecodeDocList(docid_t *doc_id_buf, tf_t *tf_list_buf, docpay
     return doc_len;
 }
 
-u32 PostingDecoder::DecodePosList(pos_t *pos_list_buf, SizeT len) {
+u32 PostingDecoder::DecodePosList(pos_t *pos_list_buf, size_t len) {
     if (decoded_pos_count_ >= term_meta_->GetTotalTermFreq()) {
         return 0;
     }

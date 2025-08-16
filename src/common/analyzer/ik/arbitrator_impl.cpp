@@ -1,16 +1,12 @@
-module;
-
-#include <stack>
-
 module infinity_core:arbitrator.impl;
 
 import :arbitrator;
-import :stl;
 import :analyze_context;
 import :lexeme;
 import :lexeme_path;
 import :quick_sort_set;
-import :third_party;
+
+import std;
 
 namespace infinity {
 
@@ -18,7 +14,7 @@ void IKArbitrator::Process(AnalyzeContext *context, bool use_smart) {
     QuickSortSet *org_lexemes = context->GetOrgLexemes();
     Lexeme *org_lexeme = org_lexemes->PollFirst();
 
-    UniquePtr<LexemePath> cross_path = MakeUnique<LexemePath>();
+    std::unique_ptr<LexemePath> cross_path = std::make_unique<LexemePath>();
     while (org_lexeme != nullptr) {
         if (!cross_path->AddCrossLexeme(org_lexeme)) {
             if (cross_path->Size() == 1 || !use_smart) {
@@ -28,7 +24,7 @@ void IKArbitrator::Process(AnalyzeContext *context, bool use_smart) {
                 LexemePath *judge_result = Judge(head_cell, cross_path->GetPathLength());
                 context->AddLexemePath(judge_result);
             }
-            cross_path = MakeUnique<LexemePath>();
+            cross_path = std::make_unique<LexemePath>();
             cross_path->AddCrossLexeme(org_lexeme);
         }
         org_lexeme = org_lexemes->PollFirst();
@@ -44,16 +40,16 @@ void IKArbitrator::Process(AnalyzeContext *context, bool use_smart) {
 }
 
 struct CompareLexemePath {
-    bool operator()(const UniquePtr<LexemePath> &lhs, const UniquePtr<LexemePath> &rhs) const { return lhs->CompareTo(*rhs); }
+    bool operator()(const std::unique_ptr<LexemePath> &lhs, const std::unique_ptr<LexemePath> &rhs) const { return lhs->CompareTo(*rhs); }
 };
 
 LexemePath *IKArbitrator::Judge(QuickSortSet::Cell *lexeme_cell, int fulltext_length) {
-    std::set<UniquePtr<LexemePath>, CompareLexemePath> path_options;
-    UniquePtr<LexemePath> option = MakeUnique<LexemePath>();
+    std::set<std::unique_ptr<LexemePath>, CompareLexemePath> path_options;
+    std::unique_ptr<LexemePath> option = std::make_unique<LexemePath>();
 
     std::stack<QuickSortSet::Cell *> lexeme_stack = ForwardPath(lexeme_cell, option.get());
 
-    path_options.insert(UniquePtr<LexemePath>(option->Copy()));
+    path_options.insert(std::unique_ptr<LexemePath>(option->Copy()));
 
     QuickSortSet::Cell *c = nullptr;
     while (!lexeme_stack.empty()) {
@@ -61,9 +57,9 @@ LexemePath *IKArbitrator::Judge(QuickSortSet::Cell *lexeme_cell, int fulltext_le
         lexeme_stack.pop();
         BackPath(c->GetLexeme(), option.get());
         ForwardPath(c, option.get());
-        path_options.insert(UniquePtr<LexemePath>(option->Copy()));
+        path_options.insert(std::unique_ptr<LexemePath>(option->Copy()));
     }
-    UniquePtr<LexemePath> ret = std::move(path_options.extract(path_options.begin()).value());
+    std::unique_ptr<LexemePath> ret = std::move(path_options.extract(path_options.begin()).value());
     return ret.release();
 }
 

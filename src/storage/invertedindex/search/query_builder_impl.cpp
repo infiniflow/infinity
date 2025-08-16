@@ -12,37 +12,32 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
-#include <iostream>
-#include <vector>
-#include <memory>
-
 module infinity_core:query_builder.impl;
 
 import :query_builder;
-
-import :stl;
 import :doc_iterator;
 import :column_index_reader;
-import internal_types;
 import :index_base;
 import :infinity_exception;
 import :query_node;
 import :base_table_ref;
 import :term_doc_iterator;
 import :logger;
-import :third_party;
 import :parse_fulltext_options;
 import :query_node;
 
+import std;
+import third_party;
+
+import internal_types;
+
 namespace infinity {
 
-void QueryBuilder::Init(SharedPtr<IndexReader> index_reader) { index_reader_ = std::move(index_reader); }
+void QueryBuilder::Init(std::shared_ptr<IndexReader> index_reader) { index_reader_ = std::move(index_reader); }
 
 QueryBuilder::~QueryBuilder() {}
 
-UniquePtr<DocIterator> QueryBuilder::CreateSearch(FullTextQueryContext &context) {
+std::unique_ptr<DocIterator> QueryBuilder::CreateSearch(FullTextQueryContext &context) {
     // Optimize the query tree.
     if (!context.optimized_query_tree_) {
         context.optimized_query_tree_ = QueryNode::GetOptimizedQueryTree(std::move(context.query_tree_));
@@ -77,7 +72,7 @@ UniquePtr<DocIterator> QueryBuilder::CreateSearch(FullTextQueryContext &context)
     auto result = context.optimized_query_tree_->CreateSearch(params);
 #ifdef INFINITY_DEBUG
     {
-        OStringStream oss;
+        std::ostringstream oss;
         oss << "DocIterator:\n";
         if (result) {
             result->PrintTree(oss);

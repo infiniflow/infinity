@@ -12,17 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:logical_aggregate;
 
-import :stl;
 import :logical_node_type;
 import :column_binding;
 import :logical_node;
 import :base_expression;
-
 import :base_table_ref;
+
 import internal_types;
 import data_type;
 
@@ -31,31 +28,31 @@ namespace infinity {
 export class LogicalAggregate : public LogicalNode {
 public:
     explicit LogicalAggregate(u64 node_id,
-                              SharedPtr<BaseTableRef> base_table_ref,
-                              Vector<SharedPtr<BaseExpression>> groups,
+                              std::shared_ptr<BaseTableRef> base_table_ref,
+                              std::vector<std::shared_ptr<BaseExpression>> groups,
                               u64 groupby_index,
-                              Vector<SharedPtr<BaseExpression>> aggregates,
+                              std::vector<std::shared_ptr<BaseExpression>> aggregates,
                               u64 aggregate_index)
         : LogicalNode(node_id, LogicalNodeType::kAggregate), groups_(std::move(groups)), groupby_index_(groupby_index),
           aggregates_(std::move(aggregates)), aggregate_index_(aggregate_index), base_table_ref_(std::move(base_table_ref)) {}
 
-    [[nodiscard]] Vector<ColumnBinding> GetColumnBindings() const final;
+    [[nodiscard]] std::vector<ColumnBinding> GetColumnBindings() const final;
 
-    [[nodiscard]] SharedPtr<Vector<String>> GetOutputNames() const final;
+    [[nodiscard]] std::shared_ptr<std::vector<std::string>> GetOutputNames() const final;
 
-    [[nodiscard]] SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const final;
+    [[nodiscard]] std::shared_ptr<std::vector<std::shared_ptr<DataType>>> GetOutputTypes() const final;
 
-    String ToString(i64 &space) const final;
+    std::string ToString(i64 &space) const final;
 
-    inline String name() final { return "LogicalAggregate"; }
+    inline std::string name() final { return "LogicalAggregate"; }
 
-    Vector<SharedPtr<BaseExpression>> groups_{};
+    std::vector<std::shared_ptr<BaseExpression>> groups_{};
     u64 groupby_index_{};
 
-    Vector<SharedPtr<BaseExpression>> aggregates_{};
+    std::vector<std::shared_ptr<BaseExpression>> aggregates_{};
     u64 aggregate_index_{};
 
-    SharedPtr<BaseTableRef> base_table_ref_;
+    std::shared_ptr<BaseTableRef> base_table_ref_;
 };
 
 } // namespace infinity

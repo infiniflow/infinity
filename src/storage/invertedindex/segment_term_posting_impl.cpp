@@ -1,22 +1,19 @@
-module;
-
 module infinity_core:segment_term_posting.impl;
 
 import :segment_term_posting;
-
-import :stl;
 import :file_writer;
 import :index_defines;
 import :posting_decoder;
 import :term_meta;
 import :column_index_iterator;
+
 import row_id;
 
 namespace infinity {
 
-SegmentTermPosting::SegmentTermPosting(const String &index_dir, const String &base_name, RowID base_row_id, optionflag_t flag)
+SegmentTermPosting::SegmentTermPosting(const std::string &index_dir, const std::string &base_name, RowID base_row_id, optionflag_t flag)
     : base_row_id_(base_row_id) {
-    column_index_iterator_ = MakeShared<ColumnIndexIterator>(index_dir, base_name, flag);
+    column_index_iterator_ = std::make_shared<ColumnIndexIterator>(index_dir, base_name, flag);
 }
 
 bool SegmentTermPosting::HasNext() {
@@ -26,9 +23,9 @@ bool SegmentTermPosting::HasNext() {
     return false;
 }
 
-SegmentTermPostingQueue::SegmentTermPostingQueue(const String &index_dir,
-                                                 const Vector<String> &base_names,
-                                                 const Vector<RowID> &base_rowids,
+SegmentTermPostingQueue::SegmentTermPostingQueue(const std::string &index_dir,
+                                                 const std::vector<std::string> &base_names,
+                                                 const std::vector<RowID> &base_rowids,
                                                  optionflag_t flag)
     : index_dir_(index_dir), base_names_(base_names), base_rowids_(base_rowids) {
     for (u32 i = 0; i < base_names.size(); ++i) {
@@ -51,7 +48,7 @@ SegmentTermPostingQueue::~SegmentTermPostingQueue() {
     }
 }
 
-const Vector<SegmentTermPosting *> &SegmentTermPostingQueue::GetCurrentMerging(String &term) {
+const std::vector<SegmentTermPosting *> &SegmentTermPostingQueue::GetCurrentMerging(std::string &term) {
     SegmentTermPosting *term_posting = segment_term_postings_.top();
     term = term_posting->term_;
     segment_term_postings_.pop();

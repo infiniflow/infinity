@@ -15,23 +15,23 @@
 module;
 
 #include "simd_common_intrin_include.h"
-#include <cmath>
 
 export module infinity_core:hnsw_simd_func;
 
-import :stl;
 import :simd_common_tools;
+
+import std.compat;
 
 namespace infinity {
 
 // for debug
 template <typename T>
 void log_m256(const __m256i &value) {
-    const SizeT n = sizeof(__m256i) / sizeof(T);
+    const size_t n = sizeof(__m256i) / sizeof(T);
     T buffer[n];
     _mm256_storeu_si256((__m256i *)buffer, value);
     std::cout << "[";
-    for (SizeT i = 0; i < n; i++) {
+    for (size_t i = 0; i < n; i++) {
         std::cout << (int)buffer[i];
         if (i != n - 1) {
             std::cout << ", ";
@@ -40,11 +40,11 @@ void log_m256(const __m256i &value) {
     std::cout << "]" << std::endl;
 }
 
-export float F32CosBF(const float *pv1, const float *pv2, SizeT dim) {
+export float F32CosBF(const float *pv1, const float *pv2, size_t dim) {
     float dot_product = 0;
     float norm1 = 0;
     float norm2 = 0;
-    for (SizeT i = 0; i < dim; i++) {
+    for (size_t i = 0; i < dim; i++) {
         dot_product += pv1[i] * pv2[i];
         norm1 += pv1[i] * pv1[i];
         norm2 += pv2[i] * pv2[i];
@@ -54,8 +54,8 @@ export float F32CosBF(const float *pv1, const float *pv2, SizeT dim) {
 
 #if defined(__AVX512F__)
 
-export float F32CosAVX512(const float *pv1, const float *pv2, SizeT dim) {
-    SizeT dim16 = dim >> 4;
+export float F32CosAVX512(const float *pv1, const float *pv2, size_t dim) {
+    size_t dim16 = dim >> 4;
 
     const float *pEnd1 = pv1 + (dim16 << 4);
 
@@ -80,10 +80,10 @@ export float F32CosAVX512(const float *pv1, const float *pv2, SizeT dim) {
     float v1_res = _mm512_reduce_add_ps(norm_v1);
     float v2_res = _mm512_reduce_add_ps(norm_v2);
 
-    SizeT tail = dim & 15;
+    size_t tail = dim & 15;
     const float *pBegin1 = pv1 + (dim & ~15);
     const float *pBegin2 = pv2 + (dim & ~15);
-    for (SizeT i = 0; i < tail; i++) {
+    for (size_t i = 0; i < tail; i++) {
         mul_res += pBegin1[i] * pBegin2[i];
         v1_res += pBegin1[i] * pBegin1[i];
         v2_res += pBegin2[i] * pBegin2[i];
@@ -92,17 +92,17 @@ export float F32CosAVX512(const float *pv1, const float *pv2, SizeT dim) {
     return mul_res != 0 ? mul_res / sqrt(v1_res * v2_res) : 0;
 }
 
-export float F32CosAVX512Residual(const float *pv1, const float *pv2, SizeT dim) { return F32CosAVX512(pv1, pv2, dim); }
+export float F32CosAVX512Residual(const float *pv1, const float *pv2, size_t dim) { return F32CosAVX512(pv1, pv2, dim); }
 
 #endif
 
 #if defined(__AVX2__)
 
-export float F32CosAVX(const float *pv1, const float *pv2, SizeT dim) {
+export float F32CosAVX(const float *pv1, const float *pv2, size_t dim) {
     alignas(64) float MulTmpRes[8];
     alignas(64) float V1TmpRes[8];
     alignas(64) float V2TmpRes[8];
-    SizeT dim16 = dim >> 4;
+    size_t dim16 = dim >> 4;
 
     const float *pEnd1 = pv1 + (dim16 << 4);
 
@@ -138,10 +138,10 @@ export float F32CosAVX(const float *pv1, const float *pv2, SizeT dim) {
     float v1_res = V1TmpRes[0] + V1TmpRes[1] + V1TmpRes[2] + V1TmpRes[3] + V1TmpRes[4] + V1TmpRes[5] + V1TmpRes[6] + V1TmpRes[7];
     float v2_res = V2TmpRes[0] + V2TmpRes[1] + V2TmpRes[2] + V2TmpRes[3] + V2TmpRes[4] + V2TmpRes[5] + V2TmpRes[6] + V2TmpRes[7];
 
-    SizeT tail = dim & 15;
+    size_t tail = dim & 15;
     const float *pBegin1 = pv1 + (dim & ~15);
     const float *pBegin2 = pv2 + (dim & ~15);
-    for (SizeT i = 0; i < tail; i++) {
+    for (size_t i = 0; i < tail; i++) {
         mul_res += pBegin1[i] * pBegin2[i];
         v1_res += pBegin1[i] * pBegin1[i];
         v2_res += pBegin2[i] * pBegin2[i];
@@ -150,17 +150,17 @@ export float F32CosAVX(const float *pv1, const float *pv2, SizeT dim) {
     return mul_res != 0 ? mul_res / sqrt(v1_res * v2_res) : 0;
 }
 
-export float F32CosAVXResidual(const float *pv1, const float *pv2, SizeT dim) { return F32CosAVX(pv1, pv2, dim); }
+export float F32CosAVXResidual(const float *pv1, const float *pv2, size_t dim) { return F32CosAVX(pv1, pv2, dim); }
 
 #endif
 
 #if defined(__SSE2__)
 
-export float F32CosSSE(const float *pv1, const float *pv2, SizeT dim) {
+export float F32CosSSE(const float *pv1, const float *pv2, size_t dim) {
     alignas(16) float MulTmpRes[4];
     alignas(16) float V1TmpRes[4];
     alignas(16) float V2TmpRes[4];
-    SizeT dim16 = dim >> 4;
+    size_t dim16 = dim >> 4;
 
     const float *pEnd1 = pv1 + (dim16 << 4);
 
@@ -212,10 +212,10 @@ export float F32CosSSE(const float *pv1, const float *pv2, SizeT dim) {
     float v1_res = V1TmpRes[0] + V1TmpRes[1] + V1TmpRes[2] + V1TmpRes[3];
     float v2_res = V2TmpRes[0] + V2TmpRes[1] + V2TmpRes[2] + V2TmpRes[3];
 
-    SizeT tail = dim & 15;
+    size_t tail = dim & 15;
     const float *pBegin1 = pv1 + (dim & ~15);
     const float *pBegin2 = pv2 + (dim & ~15);
-    for (SizeT i = 0; i < tail; i++) {
+    for (size_t i = 0; i < tail; i++) {
         mul_res += pBegin1[i] * pBegin2[i];
         v1_res += pBegin1[i] * pBegin1[i];
         v2_res += pBegin2[i] * pBegin2[i];
@@ -224,15 +224,15 @@ export float F32CosSSE(const float *pv1, const float *pv2, SizeT dim) {
     return mul_res != 0 ? mul_res / sqrt(v1_res * v2_res) : 0;
 }
 
-export float F32CosSSEResidual(const float *pv1, const float *pv2, SizeT dim) { return F32CosSSE(pv1, pv2, dim); }
+export float F32CosSSEResidual(const float *pv1, const float *pv2, size_t dim) { return F32CosSSE(pv1, pv2, dim); }
 
 #endif
 
 //------------------------------//------------------------------//------------------------------
 
-export i32 I8IPBF(const int8_t *pv1, const int8_t *pv2, SizeT dim) {
+export i32 I8IPBF(const int8_t *pv1, const int8_t *pv2, size_t dim) {
     i32 res = 0;
-    for (SizeT i = 0; i < dim; i++) {
+    for (size_t i = 0; i < dim; i++) {
         res += (int16_t)(pv1[i]) * pv2[i];
     }
     return res;
@@ -240,8 +240,8 @@ export i32 I8IPBF(const int8_t *pv1, const int8_t *pv2, SizeT dim) {
 
 #if defined(__AVX512F__)
 
-export i32 I8IPAVX512(const int8_t *pv1, const int8_t *pv2, SizeT dim) {
-    SizeT dim64 = dim >> 6;
+export i32 I8IPAVX512(const int8_t *pv1, const int8_t *pv2, size_t dim) {
+    size_t dim64 = dim >> 6;
     const int8_t *pend1 = pv1 + (dim64 << 6);
 
     __m512i v1, v2, msb, low7;
@@ -266,15 +266,15 @@ export i32 I8IPAVX512(const int8_t *pv1, const int8_t *pv2, SizeT dim) {
     return _mm512_reduce_add_epi32(sum);
 }
 
-export i32 I8IPAVX512Residual(const int8_t *pv1, const int8_t *pv2, SizeT dim) {
+export i32 I8IPAVX512Residual(const int8_t *pv1, const int8_t *pv2, size_t dim) {
     return I8IPAVX512(pv1, pv2, dim) + I8IPBF(pv1 + (dim & ~63), pv2 + (dim & ~63), dim & 63);
 }
 #endif
 
 #if defined(__AVX2__)
 
-export i32 I8IPAVX(const int8_t *pv1, const int8_t *pv2, SizeT dim) {
-    SizeT dim32 = dim >> 5;
+export i32 I8IPAVX(const int8_t *pv1, const int8_t *pv2, size_t dim) {
+    size_t dim32 = dim >> 5;
     const int8_t *pend1 = pv1 + (dim32 << 5);
 
     __m256i v1, v2, msb, low7;
@@ -303,7 +303,7 @@ export i32 I8IPAVX(const int8_t *pv1, const int8_t *pv2, SizeT dim) {
     return _mm256_extract_epi32(sum, 0) + _mm256_extract_epi32(sum, 4);
 }
 
-export i32 I8IPAVXResidual(const int8_t *pv1, const int8_t *pv2, SizeT dim) {
+export i32 I8IPAVXResidual(const int8_t *pv1, const int8_t *pv2, size_t dim) {
     return I8IPAVX(pv1, pv2, dim) + I8IPBF(pv1 + (dim & ~31), pv2 + (dim & ~31), dim & 31);
 }
 
@@ -311,8 +311,8 @@ export i32 I8IPAVXResidual(const int8_t *pv1, const int8_t *pv2, SizeT dim) {
 
 #if defined(__SSE2__)
 
-export i32 I8IPSSE(const int8_t *pv1, const int8_t *pv2, SizeT dim) {
-    SizeT dim16 = dim >> 4;
+export i32 I8IPSSE(const int8_t *pv1, const int8_t *pv2, size_t dim) {
+    size_t dim16 = dim >> 4;
     const int8_t *pend1 = pv1 + (dim16 << 4);
 
     __m128i v1, v2, msb, low7;
@@ -341,7 +341,7 @@ export i32 I8IPSSE(const int8_t *pv1, const int8_t *pv2, SizeT dim) {
     return _mm_extract_epi32(sum, 0);
 }
 
-export i32 I8IPSSEResidual(const int8_t *pv1, const int8_t *pv2, SizeT dim) {
+export i32 I8IPSSEResidual(const int8_t *pv1, const int8_t *pv2, size_t dim) {
     return I8IPSSE(pv1, pv2, dim) + I8IPBF(pv1 + (dim & ~15), pv2 + (dim & ~15), dim & 15);
 }
 
@@ -349,9 +349,9 @@ export i32 I8IPSSEResidual(const int8_t *pv1, const int8_t *pv2, SizeT dim) {
 
 //------------------------------//------------------------------//------------------------------
 
-export i32 I8L2BF(const int8_t *pv1, const int8_t *pv2, SizeT dim) {
+export i32 I8L2BF(const int8_t *pv1, const int8_t *pv2, size_t dim) {
     i32 res = 0;
-    for (SizeT i = 0; i < dim; ++i) {
+    for (size_t i = 0; i < dim; ++i) {
         const i32 t = static_cast<i32>(pv1[i]) - static_cast<i32>(pv2[i]);
         res += t * t;
     }
@@ -359,7 +359,7 @@ export i32 I8L2BF(const int8_t *pv1, const int8_t *pv2, SizeT dim) {
 }
 
 #if defined(__AVX512BW__)
-export i32 I8L2AVX512BW(const int8_t *pv1, const int8_t *pv2, SizeT dim) {
+export i32 I8L2AVX512BW(const int8_t *pv1, const int8_t *pv2, size_t dim) {
     const int8_t *pEnd1 = pv1 + (dim & ~(63u));
     const __m512i fix_high_bit = _mm512_set1_epi8(-128); // turn i8 to u8 by adding 128 (equivalent to xor with -128)
     __m512i sum = _mm512_setzero_si512();
@@ -380,13 +380,13 @@ export i32 I8L2AVX512BW(const int8_t *pv1, const int8_t *pv2, SizeT dim) {
     return hsum_epi32_avx512(sum);
 }
 
-export i32 I8L2AVX512BWResidual(const int8_t *pv1, const int8_t *pv2, SizeT dim) {
+export i32 I8L2AVX512BWResidual(const int8_t *pv1, const int8_t *pv2, size_t dim) {
     return I8L2AVX512BW(pv1, pv2, dim) + I8L2BF(pv1 + (dim & ~63), pv2 + (dim & ~63), dim & 63);
 }
 #endif
 
 #if defined(__AVX2__)
-export i32 I8L2AVX2(const int8_t *pv1, const int8_t *pv2, SizeT dim) {
+export i32 I8L2AVX2(const int8_t *pv1, const int8_t *pv2, size_t dim) {
     const int8_t *pEnd1 = pv1 + (dim & ~(31u));
     const __m256i fix_high_bit = _mm256_set1_epi8(-128); // turn i8 to u8 by adding 128 (equivalent to xor with -128)
     __m256i sum = _mm256_setzero_si256();
@@ -407,13 +407,13 @@ export i32 I8L2AVX2(const int8_t *pv1, const int8_t *pv2, SizeT dim) {
     return hsum_8x32_avx2(sum);
 }
 
-export i32 I8L2AVX2Residual(const int8_t *pv1, const int8_t *pv2, SizeT dim) {
+export i32 I8L2AVX2Residual(const int8_t *pv1, const int8_t *pv2, size_t dim) {
     return I8L2AVX2(pv1, pv2, dim) + I8L2BF(pv1 + (dim & ~31), pv2 + (dim & ~31), dim & 31);
 }
 #endif
 
 #if defined(__SSE2__)
-export i32 I8L2SSE2(const int8_t *pv1, const int8_t *pv2, SizeT dim) {
+export i32 I8L2SSE2(const int8_t *pv1, const int8_t *pv2, size_t dim) {
     const int8_t *pEnd1 = pv1 + (dim & ~(15u));
     const __m128i fix_high_bit = _mm_set1_epi8(-128); // turn i8 to u8 by adding 128 (equivalent to xor with -128)
     __m128i sum = _mm_setzero_si128();
@@ -434,18 +434,18 @@ export i32 I8L2SSE2(const int8_t *pv1, const int8_t *pv2, SizeT dim) {
     return hsum_epi32_sse2(sum);
 }
 
-export i32 I8L2SSE2Residual(const int8_t *pv1, const int8_t *pv2, SizeT dim) {
+export i32 I8L2SSE2Residual(const int8_t *pv1, const int8_t *pv2, size_t dim) {
     return I8L2SSE2(pv1, pv2, dim) + I8L2BF(pv1 + (dim & ~15), pv2 + (dim & ~15), dim & 15);
 }
 #endif
 
 //------------------------------//------------------------------//------------------------------
 
-export float I8CosBF(const int8_t *pv1, const int8_t *pv2, SizeT dim) {
+export float I8CosBF(const int8_t *pv1, const int8_t *pv2, size_t dim) {
     int dot_product = 0;
     int norm1 = 0;
     int norm2 = 0;
-    for (SizeT i = 0; i < dim; i++) {
+    for (size_t i = 0; i < dim; i++) {
         const int v1 = *pv1;
         const int v2 = *pv2;
         dot_product += v1 * v2;
@@ -456,7 +456,7 @@ export float I8CosBF(const int8_t *pv1, const int8_t *pv2, SizeT dim) {
 }
 
 #if defined(__AVX512BW__)
-export float I8CosAVX512BW(const int8_t *pv1, const int8_t *pv2, SizeT dim) {
+export float I8CosAVX512BW(const int8_t *pv1, const int8_t *pv2, size_t dim) {
     const int8_t *pend1 = pv1 + (dim & ~(31u));
     const int8_t *pend2 = pv1 + dim;
     __m512i sum_ip = _mm512_setzero_si512();
@@ -500,7 +500,7 @@ export float I8CosAVX512BW(const int8_t *pv1, const int8_t *pv2, SizeT dim) {
 #endif
 
 #if defined(__AVX2__)
-export float I8CosAVX2(const int8_t *pv1, const int8_t *pv2, SizeT dim) {
+export float I8CosAVX2(const int8_t *pv1, const int8_t *pv2, size_t dim) {
     const int8_t *pend1 = pv1 + (dim & ~(15u));
     const int8_t *pend2 = pv1 + dim;
     __m256i sum_ip = _mm256_setzero_si256();
@@ -544,7 +544,7 @@ export float I8CosAVX2(const int8_t *pv1, const int8_t *pv2, SizeT dim) {
 #endif
 
 #if defined(__SSE2__)
-export float I8CosSSE2(const int8_t *pv1, const int8_t *pv2, SizeT dim) {
+export float I8CosSSE2(const int8_t *pv1, const int8_t *pv2, size_t dim) {
     const int8_t *pend1 = pv1 + (dim & ~(15u));
     const int8_t *pend2 = pv1 + dim;
     __m128i sum_ip = _mm_setzero_si128();
@@ -599,11 +599,11 @@ export float I8CosSSE2(const int8_t *pv1, const int8_t *pv2, SizeT dim) {
 
 //------------------------------//------------------------------//------------------------------
 
-export float U8CosBF(const u8 *pv1, const u8 *pv2, SizeT dim) {
+export float U8CosBF(const u8 *pv1, const u8 *pv2, size_t dim) {
     int dot_product = 0;
     int norm1 = 0;
     int norm2 = 0;
-    for (SizeT i = 0; i < dim; i++) {
+    for (size_t i = 0; i < dim; i++) {
         const int v1 = pv1[i];
         const int v2 = pv2[i];
         dot_product += v1 * v2;
@@ -614,7 +614,7 @@ export float U8CosBF(const u8 *pv1, const u8 *pv2, SizeT dim) {
 }
 
 #if defined(__AVX512BW__)
-export float U8CosAVX512BW(const u8 *pv1, const u8 *pv2, SizeT dim) {
+export float U8CosAVX512BW(const u8 *pv1, const u8 *pv2, size_t dim) {
     const u8 *pend1 = pv1 + (dim & ~(63u));
     const u8 *pend2 = pv1 + dim;
     __m512i sum_ip = _mm512_setzero_si512();
@@ -666,7 +666,7 @@ export float U8CosAVX512BW(const u8 *pv1, const u8 *pv2, SizeT dim) {
 #endif
 
 #if defined(__AVX2__)
-export float U8CosAVX2(const u8 *pv1, const u8 *pv2, SizeT dim) {
+export float U8CosAVX2(const u8 *pv1, const u8 *pv2, size_t dim) {
     const u8 *pend1 = pv1 + (dim & ~(31u));
     const u8 *pend2 = pv1 + dim;
     __m256i sum_ip = _mm256_setzero_si256();
@@ -718,7 +718,7 @@ export float U8CosAVX2(const u8 *pv1, const u8 *pv2, SizeT dim) {
 #endif
 
 #if defined(__SSE2__)
-export float U8CosSSE2(const u8 *pv1, const u8 *pv2, SizeT dim) {
+export float U8CosSSE2(const u8 *pv1, const u8 *pv2, size_t dim) {
     const u8 *pend1 = pv1 + (dim & ~(15u));
     const u8 *pend2 = pv1 + dim;
     __m128i sum_ip = _mm_setzero_si128();
@@ -771,16 +771,16 @@ export float U8CosSSE2(const u8 *pv1, const u8 *pv2, SizeT dim) {
 
 //------------------------------//------------------------------//------------------------------
 
-export i32 U8IPBF(const u8 *pv1, const u8 *pv2, SizeT dim) {
+export i32 U8IPBF(const u8 *pv1, const u8 *pv2, size_t dim) {
     i32 res = 0;
-    for (SizeT i = 0; i < dim; ++i) {
+    for (size_t i = 0; i < dim; ++i) {
         res += static_cast<i32>(pv1[i]) * static_cast<i32>(pv2[i]);
     }
     return res;
 }
 
 #if defined(__AVX512BW__)
-export i32 U8IPAVX512BW(const u8 *pv1, const u8 *pv2, SizeT dim) {
+export i32 U8IPAVX512BW(const u8 *pv1, const u8 *pv2, size_t dim) {
     const u8 *pEnd1 = pv1 + (dim & ~(63u));
     __m512i sum = _mm512_setzero_si512();
     while (pv1 < pEnd1) {
@@ -801,13 +801,13 @@ export i32 U8IPAVX512BW(const u8 *pv1, const u8 *pv2, SizeT dim) {
     return hsum_epi32_avx512(sum);
 }
 
-export i32 U8IPAVX512BWResidual(const u8 *pv1, const u8 *pv2, SizeT dim) {
+export i32 U8IPAVX512BWResidual(const u8 *pv1, const u8 *pv2, size_t dim) {
     return U8IPAVX512BW(pv1, pv2, dim) + U8IPBF(pv1 + (dim & ~63), pv2 + (dim & ~63), dim & 63);
 }
 #endif
 
 #if defined(__AVX2__)
-export i32 U8IPAVX2(const u8 *pv1, const u8 *pv2, SizeT dim) {
+export i32 U8IPAVX2(const u8 *pv1, const u8 *pv2, size_t dim) {
     const u8 *pEnd1 = pv1 + (dim & ~(31u));
     __m256i sum = _mm256_setzero_si256();
     while (pv1 < pEnd1) {
@@ -828,13 +828,13 @@ export i32 U8IPAVX2(const u8 *pv1, const u8 *pv2, SizeT dim) {
     return hsum_8x32_avx2(sum);
 }
 
-export i32 U8IPAVX2Residual(const u8 *pv1, const u8 *pv2, SizeT dim) {
+export i32 U8IPAVX2Residual(const u8 *pv1, const u8 *pv2, size_t dim) {
     return U8IPAVX2(pv1, pv2, dim) + U8IPBF(pv1 + (dim & ~31), pv2 + (dim & ~31), dim & 31);
 }
 #endif
 
 #if defined(__SSE2__)
-export i32 U8IPSSE2(const u8 *pv1, const u8 *pv2, SizeT dim) {
+export i32 U8IPSSE2(const u8 *pv1, const u8 *pv2, size_t dim) {
     const u8 *pEnd1 = pv1 + (dim & ~(15u));
     __m128i sum = _mm_setzero_si128();
     while (pv1 < pEnd1) {
@@ -855,16 +855,16 @@ export i32 U8IPSSE2(const u8 *pv1, const u8 *pv2, SizeT dim) {
     return hsum_epi32_sse2(sum);
 }
 
-export i32 U8IPSSE2Residual(const u8 *pv1, const u8 *pv2, SizeT dim) {
+export i32 U8IPSSE2Residual(const u8 *pv1, const u8 *pv2, size_t dim) {
     return U8IPSSE2(pv1, pv2, dim) + U8IPBF(pv1 + (dim & ~15), pv2 + (dim & ~15), dim & 15);
 }
 #endif
 
 //------------------------------//------------------------------//------------------------------
 
-export i32 U8L2BF(const u8 *pv1, const u8 *pv2, SizeT dim) {
+export i32 U8L2BF(const u8 *pv1, const u8 *pv2, size_t dim) {
     i32 res = 0;
-    for (SizeT i = 0; i < dim; ++i) {
+    for (size_t i = 0; i < dim; ++i) {
         const i32 t = static_cast<i32>(pv1[i]) - static_cast<i32>(pv2[i]);
         res += t * t;
     }
@@ -872,7 +872,7 @@ export i32 U8L2BF(const u8 *pv1, const u8 *pv2, SizeT dim) {
 }
 
 #if defined(__AVX512BW__)
-export i32 U8L2AVX512BW(const u8 *pv1, const u8 *pv2, SizeT dim) {
+export i32 U8L2AVX512BW(const u8 *pv1, const u8 *pv2, size_t dim) {
     const u8 *pEnd1 = pv1 + (dim & ~(63u));
     __m512i sum = _mm512_setzero_si512();
     while (pv1 < pEnd1) {
@@ -892,13 +892,13 @@ export i32 U8L2AVX512BW(const u8 *pv1, const u8 *pv2, SizeT dim) {
     return hsum_epi32_avx512(sum);
 }
 
-export i32 U8L2AVX512BWResidual(const u8 *pv1, const u8 *pv2, SizeT dim) {
+export i32 U8L2AVX512BWResidual(const u8 *pv1, const u8 *pv2, size_t dim) {
     return U8L2AVX512BW(pv1, pv2, dim) + U8L2BF(pv1 + (dim & ~63), pv2 + (dim & ~63), dim & 63);
 }
 #endif
 
 #if defined(__AVX2__)
-export i32 U8L2AVX2(const u8 *pv1, const u8 *pv2, SizeT dim) {
+export i32 U8L2AVX2(const u8 *pv1, const u8 *pv2, size_t dim) {
     const u8 *pEnd1 = pv1 + (dim & ~(31u));
     __m256i sum = _mm256_setzero_si256();
     while (pv1 < pEnd1) {
@@ -918,13 +918,13 @@ export i32 U8L2AVX2(const u8 *pv1, const u8 *pv2, SizeT dim) {
     return hsum_8x32_avx2(sum);
 }
 
-export i32 U8L2AVX2Residual(const u8 *pv1, const u8 *pv2, SizeT dim) {
+export i32 U8L2AVX2Residual(const u8 *pv1, const u8 *pv2, size_t dim) {
     return U8L2AVX2(pv1, pv2, dim) + U8L2BF(pv1 + (dim & ~31), pv2 + (dim & ~31), dim & 31);
 }
 #endif
 
 #if defined(__SSE2__)
-export i32 U8L2SSE2(const u8 *pv1, const u8 *pv2, SizeT dim) {
+export i32 U8L2SSE2(const u8 *pv1, const u8 *pv2, size_t dim) {
     const u8 *pEnd1 = pv1 + (dim & ~(15u));
     __m128i sum = _mm_setzero_si128();
     while (pv1 < pEnd1) {
@@ -944,16 +944,16 @@ export i32 U8L2SSE2(const u8 *pv1, const u8 *pv2, SizeT dim) {
     return hsum_epi32_sse2(sum);
 }
 
-export i32 U8L2SSE2Residual(const u8 *pv1, const u8 *pv2, SizeT dim) {
+export i32 U8L2SSE2Residual(const u8 *pv1, const u8 *pv2, size_t dim) {
     return U8L2SSE2(pv1, pv2, dim) + U8L2BF(pv1 + (dim & ~15), pv2 + (dim & ~15), dim & 15);
 }
 #endif
 
 //------------------------------//------------------------------//------------------------------
 
-export float F32L2BF(const float *pv1, const float *pv2, SizeT dim) {
+export float F32L2BF(const float *pv1, const float *pv2, size_t dim) {
     float res = 0;
-    for (SizeT i = 0; i < dim; i++) {
+    for (size_t i = 0; i < dim; i++) {
         float t = pv1[i] - pv2[i];
         res += t * t;
     }
@@ -962,9 +962,9 @@ export float F32L2BF(const float *pv1, const float *pv2, SizeT dim) {
 
 #if defined(__AVX512F__)
 
-export float F32L2AVX512(const float *pv1, const float *pv2, SizeT dim) {
+export float F32L2AVX512(const float *pv1, const float *pv2, size_t dim) {
     alignas(64) float TmpRes[16];
-    SizeT dim16 = dim >> 4;
+    size_t dim16 = dim >> 4;
 
     const float *pEnd1 = pv1 + (dim16 << 4);
 
@@ -988,7 +988,7 @@ export float F32L2AVX512(const float *pv1, const float *pv2, SizeT dim) {
     return (res);
 }
 
-export float F32L2AVX512Residual(const float *pv1, const float *pv2, SizeT dim) {
+export float F32L2AVX512Residual(const float *pv1, const float *pv2, size_t dim) {
     return F32L2AVX512(pv1, pv2, dim) + F32L2BF(pv1 + (dim & ~15), pv2 + (dim & ~15), dim & 15);
 }
 
@@ -996,9 +996,9 @@ export float F32L2AVX512Residual(const float *pv1, const float *pv2, SizeT dim) 
 
 #if defined(__AVX2__)
 
-export float F32L2AVX(const float *pv1, const float *pv2, SizeT dim) {
+export float F32L2AVX(const float *pv1, const float *pv2, size_t dim) {
     alignas(32) float TmpRes[8];
-    SizeT dim16 = dim >> 4;
+    size_t dim16 = dim >> 4;
 
     const float *pEnd1 = pv1 + (dim16 << 4);
 
@@ -1025,7 +1025,7 @@ export float F32L2AVX(const float *pv1, const float *pv2, SizeT dim) {
     return TmpRes[0] + TmpRes[1] + TmpRes[2] + TmpRes[3] + TmpRes[4] + TmpRes[5] + TmpRes[6] + TmpRes[7];
 }
 
-export float F32L2AVXResidual(const float *pv1, const float *pv2, SizeT dim) {
+export float F32L2AVXResidual(const float *pv1, const float *pv2, size_t dim) {
     return F32L2AVX(pv1, pv2, dim) + F32L2BF(pv1 + (dim & ~15), pv2 + (dim & ~15), dim & 15);
 }
 
@@ -1033,9 +1033,9 @@ export float F32L2AVXResidual(const float *pv1, const float *pv2, SizeT dim) {
 
 #if defined(__SSE2__)
 
-export float F32L2SSE(const float *pv1, const float *pv2, SizeT dim) {
+export float F32L2SSE(const float *pv1, const float *pv2, size_t dim) {
     alignas(16) float TmpRes[4];
-    SizeT dim16 = dim >> 4;
+    size_t dim16 = dim >> 4;
 
     const float *pEnd1 = pv1 + (dim16 << 4);
 
@@ -1076,7 +1076,7 @@ export float F32L2SSE(const float *pv1, const float *pv2, SizeT dim) {
     return TmpRes[0] + TmpRes[1] + TmpRes[2] + TmpRes[3];
 }
 
-export float F32L2SSEResidual(const float *pv1, const float *pv2, SizeT dim) {
+export float F32L2SSEResidual(const float *pv1, const float *pv2, size_t dim) {
     return F32L2SSE(pv1, pv2, dim) + F32L2BF(pv1 + (dim & ~15), pv2 + (dim & ~15), dim & 15);
 }
 
@@ -1084,9 +1084,9 @@ export float F32L2SSEResidual(const float *pv1, const float *pv2, SizeT dim) {
 
 //------------------------------//------------------------------//------------------------------
 
-export float F32IPBF(const float *pv1, const float *pv2, SizeT dim) {
+export float F32IPBF(const float *pv1, const float *pv2, size_t dim) {
     float res = 0;
-    for (SizeT i = 0; i < dim; i++) {
+    for (size_t i = 0; i < dim; i++) {
         res += pv1[i] * pv2[i];
     }
     return res;
@@ -1094,10 +1094,10 @@ export float F32IPBF(const float *pv1, const float *pv2, SizeT dim) {
 
 #if defined(__AVX512F__)
 
-export float F32IPAVX512(const float *pVect1, const float *pVect2, SizeT qty) {
+export float F32IPAVX512(const float *pVect1, const float *pVect2, size_t qty) {
     alignas(64) float TmpRes[16];
 
-    SizeT qty16 = qty / 16;
+    size_t qty16 = qty / 16;
 
     const float *pEnd1 = pVect1 + 16 * qty16;
 
@@ -1120,7 +1120,7 @@ export float F32IPAVX512(const float *pVect1, const float *pVect2, SizeT qty) {
     return sum;
 }
 
-export float F32IPAVX512Residual(const float *pVect1, const float *pVect2, SizeT qty) {
+export float F32IPAVX512Residual(const float *pVect1, const float *pVect2, size_t qty) {
     return F32IPAVX512(pVect1, pVect2, qty) + F32IPBF(pVect1 + (qty & ~15), pVect2 + (qty & ~15), qty & 15);
 }
 
@@ -1128,10 +1128,10 @@ export float F32IPAVX512Residual(const float *pVect1, const float *pVect2, SizeT
 
 #if defined(__AVX2__)
 
-export float F32IPAVX(const float *pVect1, const float *pVect2, SizeT qty) {
+export float F32IPAVX(const float *pVect1, const float *pVect2, size_t qty) {
     alignas(32) float TmpRes[8];
 
-    SizeT qty16 = qty / 16;
+    size_t qty16 = qty / 16;
 
     const float *pEnd1 = pVect1 + 16 * qty16;
 
@@ -1159,7 +1159,7 @@ export float F32IPAVX(const float *pVect1, const float *pVect2, SizeT qty) {
     return sum;
 }
 
-export float F32IPAVXResidual(const float *pVect1, const float *pVect2, SizeT qty) {
+export float F32IPAVXResidual(const float *pVect1, const float *pVect2, size_t qty) {
     return F32IPAVX(pVect1, pVect2, qty) + F32IPBF(pVect1 + (qty & ~15), pVect2 + (qty & ~15), qty & 15);
 }
 
@@ -1167,10 +1167,10 @@ export float F32IPAVXResidual(const float *pVect1, const float *pVect2, SizeT qt
 
 #if defined(__SSE2__)
 
-export float F32IPSSE(const float *pVect1, const float *pVect2, SizeT qty) {
+export float F32IPSSE(const float *pVect1, const float *pVect2, size_t qty) {
     alignas(16) float TmpRes[4];
 
-    SizeT qty16 = qty / 16;
+    size_t qty16 = qty / 16;
 
     const float *pEnd1 = pVect1 + 16 * qty16;
 
@@ -1210,7 +1210,7 @@ export float F32IPSSE(const float *pVect1, const float *pVect2, SizeT qty) {
     return sum;
 }
 
-export float F32IPSSEResidual(const float *pVect1, const float *pVect2, SizeT qty) {
+export float F32IPSSEResidual(const float *pVect1, const float *pVect2, size_t qty) {
     return F32IPSSE(pVect1, pVect2, qty) + F32IPBF(pVect1 + (qty & ~15), pVect2 + (qty & ~15), qty & 15);
 }
 

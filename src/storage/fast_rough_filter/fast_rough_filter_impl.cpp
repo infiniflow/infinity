@@ -12,55 +12,49 @@
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
 
-module;
-
-#include <map> // fix nlohmann::json compile error in release mode
-#include <memory>
-
 module infinity_core:fast_rough_filter.impl;
 
 import :fast_rough_filter;
-import :stl;
 import :value;
 import :default_values;
 import :probabilistic_data_filter;
 import :min_max_data_filter;
 import :logger;
-import :third_party;
 import :infinity_exception;
 import :filter_expression_push_down_helper;
+
+import std;
+import third_party;
 
 namespace infinity {
 
 bool FastRoughFilter::IsValid() const { return min_max_data_filter_ != nullptr; }
 
-String FastRoughFilter::SerializeToString() const {
+std::string FastRoughFilter::SerializeToString() const {
     if (HaveMinMaxFilter()) {
         u32 probabilistic_data_filter_binary_bytes = probabilistic_data_filter_->GetSerializeSizeInBytes();
         u32 min_max_data_filter_binary_bytes = min_max_data_filter_->GetSerializeSizeInBytes();
         u32 total_binary_bytes =
             sizeof(total_binary_bytes) + sizeof(build_time_) + probabilistic_data_filter_binary_bytes + min_max_data_filter_binary_bytes;
-        String save_to_binary;
+        std::string save_to_binary;
         save_to_binary.reserve(total_binary_bytes);
-        OStringStream os(std::move(save_to_binary));
+        std::ostringstream os(std::move(save_to_binary));
         os.write(reinterpret_cast<const char *>(&total_binary_bytes), sizeof(total_binary_bytes));
         os.write(reinterpret_cast<const char *>(&build_time_), sizeof(build_time_));
         probabilistic_data_filter_->SerializeToStringStream(os, probabilistic_data_filter_binary_bytes);
         min_max_data_filter_->SerializeToStringStream(os, min_max_data_filter_binary_bytes);
         if (os.view().size() != total_binary_bytes) {
-            String error_message = "FastRoughFilter::SerializeToString(): save size error";
-            UnrecoverableError(error_message);
+            UnrecoverableError("FastRoughFilter::SerializeToString(): save size error");
         }
         return std::move(os).str();
     }
-    String error_message = "FastRoughFilter::SerializeToString(): No FastRoughFilter data.";
-    UnrecoverableError(error_message);
+    UnrecoverableError("FastRoughFilter::SerializeToString(): No FastRoughFilter data.");
     return {};
 }
 
-void FastRoughFilter::DeserializeFromString(const String &str) {
+void FastRoughFilter::DeserializeFromString(const std::string &str) {
     // load necessary parts
-    IStringStream is(str);
+    std::istringstream is(str);
     u32 total_binary_bytes{};
     if (str.empty()) {
         LOG_ERROR(fmt::format("FastRoughFilter: empty fast rough filter"));
@@ -69,22 +63,20 @@ void FastRoughFilter::DeserializeFromString(const String &str) {
 
     is.read(reinterpret_cast<char *>(&total_binary_bytes), sizeof(total_binary_bytes));
     if (total_binary_bytes != is.view().size()) {
-        String error_message = "FastRoughFilter::DeserializeToString(): load size error";
-        UnrecoverableError(error_message);
+        UnrecoverableError("FastRoughFilter::DeserializeToString(): load size error");
     }
     is.read(reinterpret_cast<char *>(&build_time_), sizeof(build_time_));
     if (!probabilistic_data_filter_) {
-        probabilistic_data_filter_ = MakeUnique<ProbabilisticDataFilter>();
+        probabilistic_data_filter_ = std::make_unique<ProbabilisticDataFilter>();
     }
     probabilistic_data_filter_->DeserializeFromStringStream(is);
     if (!min_max_data_filter_) {
-        min_max_data_filter_ = MakeUnique<MinMaxDataFilter>();
+        min_max_data_filter_ = std::make_unique<MinMaxDataFilter>();
     }
     min_max_data_filter_->DeserializeFromStringStream(is);
     // check position
     if (!is or u32(is.tellg()) != is.view().size()) {
-        String error_message = "FastRoughFilter::DeserializeToString(): load size error";
-        UnrecoverableError(error_message);
+        UnrecoverableError("FastRoughFilter::DeserializeToString(): load size error");
     }
     FinishBuildMinMaxFilterTask();
 }
@@ -107,8 +99,7 @@ bool FastRoughFilter::LoadFromJsonFile(std::string_view json_sv) {
     simdjson::parser parser;
     simdjson::document doc = parser.iterate(json_pad);
     if (HaveMinMaxFilter()) [[unlikely]] {
-        String error_message = "FastRoughFilter::LoadFromJsonFile(): Already have data.";
-        UnrecoverableError(error_message);
+        UnrecoverableError("FastRoughFilter::LoadFromJsonFile(): Already have data.");
     }
     // LOG_TRACE("FastRoughFilter::LoadFromJsonFile(): try to load filter data from json.");
     // try load JsonTagBuildTime first
@@ -120,7 +111,7 @@ bool FastRoughFilter::LoadFromJsonFile(std::string_view json_sv) {
     bool load_success = true;
     {
         // load ProbabilisticDataFilter
-        auto load_probabilistic_data_filter = MakeUnique<ProbabilisticDataFilter>();
+        auto load_probabilistic_data_filter = std::make_unique<ProbabilisticDataFilter>();
         if (load_probabilistic_data_filter->LoadFromJsonFile(json_sv)) {
             probabilistic_data_filter_ = std::move(load_probabilistic_data_filter);
             // LOG_TRACE("FastRoughFilter::LoadFromJsonFile(): Finish load ProbabilisticDataFilter data from json.");
@@ -131,7 +122,7 @@ bool FastRoughFilter::LoadFromJsonFile(std::string_view json_sv) {
     }
     {
         // load MinMaxDataFilter
-        auto load_min_max_data_filter = MakeUnique<MinMaxDataFilter>();
+        auto load_min_max_data_filter = std::make_unique<MinMaxDataFilter>();
         if (load_min_max_data_filter->LoadFromJsonFile(json_sv)) {
             min_max_data_filter_ = std::move(load_min_max_data_filter);
             // LOG_TRACE("FastRoughFilter::LoadFromJsonFile(): Finish load MinMaxDataFilter data from json.");
@@ -144,8 +135,7 @@ bool FastRoughFilter::LoadFromJsonFile(std::string_view json_sv) {
         FinishBuildMinMaxFilterTask();
         // LOG_TRACE("FastRoughFilter::LoadFromJsonFile(): successfully load FastRoughFilter data from json.");
     } else {
-        String error_message = "FastRoughFilter::LoadFromJsonFile(): partially failed to load FastRoughFilter data from json.";
-        UnrecoverableError(error_message);
+        UnrecoverableError("FastRoughFilter::LoadFromJsonFile(): partially failed to load FastRoughFilter data from json.");
     }
     return load_success;
 }

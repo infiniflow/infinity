@@ -13,13 +13,8 @@
 // limitations under the License.
 
 #include <cassert>
-#include <cstring>
-#include <functional>
-#include <iostream>
-#include <set>
-#include <thread>
-#include <memory>
 
+import std;
 import infinity_core;
 import compilation_config;
 import internal_types;
@@ -89,8 +84,8 @@ public:
     String dataset_ = "invalid";
     BuildType build_type_ = BuildType::PLAIN;
     EncodeType encode_type_ = EncodeType::LVQ;
-    SizeT ef_construction_ = 200;
-    SizeT M_ = 16;
+    size_t ef_construction_ = 200;
+    size_t M_ = 16;
 
     String dataset_dir_ = String(test_data_path());
     String infinity_dir_ = "/var/infinity";

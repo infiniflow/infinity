@@ -11,55 +11,48 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-module;
-
-#include <sstream>
 
 module infinity_core:scalar_function.impl;
 
 import :scalar_function;
-
-import :stl;
 import :function;
-
 import :status;
 import :infinity_exception;
 import :data_block;
 import :base_expression;
 import :column_vector;
-import :third_party;
-import :logger;
+
+import std;
+
 import data_type;
 
 namespace infinity {
 
-ScalarFunction::ScalarFunction(String name, Vector<DataType> argument_types, DataType return_type, ScalarFunctionTypePtr function)
+ScalarFunction::ScalarFunction(std::string name, std::vector<DataType> argument_types, DataType return_type, ScalarFunctionTypePtr function)
     : Function(std::move(name), FunctionType::kScalar), parameter_types_(std::move(argument_types)), return_type_(std::move(return_type)),
       function_(std::move(function)) {}
 
-void ScalarFunction::CastArgumentTypes(Vector<BaseExpression> &input_arguments) {
+void ScalarFunction::CastArgumentTypes(std::vector<BaseExpression> &input_arguments) {
     // Check and add a cast function to cast the input arguments expression type to target type
     auto arguments_count = input_arguments.size();
     if (input_arguments.size() == arguments_count) {
-        String error_message = fmt::format("Function: {} arguments number isn't matched.", name_);
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("Function: {} arguments number isn't matched.", name_));
     }
-    for (SizeT idx = 0; idx < arguments_count; ++idx) {
+    for (size_t idx = 0; idx < arguments_count; ++idx) {
         if (parameter_types_[idx] != input_arguments[idx].Type()) {
-            Status status = Status::NotSupport("Not implemented");
-            RecoverableError(status);
+            RecoverableError(Status::NotSupport("Not implemented"));
         }
     }
 }
 
-void ScalarFunction::NoOpFunction(const DataBlock &input, SharedPtr<ColumnVector> &output) {
+void ScalarFunction::NoOpFunction(const DataBlock &input, std::shared_ptr<ColumnVector> &output) {
     // TODO: this should be the pointer copy from input to output.
 
     // Fixme: Output reference the data of input
     output->ShallowCopy(*input.column_vectors[0]);
 }
 
-String ScalarFunction::ToString() const {
+std::string ScalarFunction::ToString() const {
 
     std::stringstream ss;
     ss << name_;
@@ -69,7 +62,7 @@ String ScalarFunction::ToString() const {
 
     } else {
         ss << "(";
-        for (SizeT i = 0; i < parameter_count - 1; ++i) {
+        for (size_t i = 0; i < parameter_count - 1; ++i) {
             ss << parameter_types_[i].ToString() << ", ";
         }
         ss << parameter_types_.back().ToString();
@@ -79,7 +72,7 @@ String ScalarFunction::ToString() const {
     return ss.str();
 }
 
-u64 ScalarFunction::Hash() const { return std::hash<SizeT>()(reinterpret_cast<SizeT>(function_)); }
+u64 ScalarFunction::Hash() const { return std::hash<size_t>()(reinterpret_cast<size_t>(function_)); }
 
 bool ScalarFunction::Eq(const ScalarFunction &other) const { return function_ == other.function_; }
 

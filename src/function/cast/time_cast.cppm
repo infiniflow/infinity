@@ -12,20 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:time_cast;
 
-import :stl;
 import :column_vector_cast;
-import logical_type;
 import :infinity_exception;
 import :bound_cast_func;
 import :column_vector;
-import :third_party;
+
 import internal_types;
 import data_type;
-import :logger;
+import logical_type;
 
 namespace infinity {
 
@@ -37,8 +33,7 @@ export inline BoundCastFunc BindTimeCast(DataType &target) {
             return BoundCastFunc(&ColumnVectorCast::TryCastColumnVectorToVarlen<TimeT, VarcharT, TimeTryCastToVarlen>);
         }
         default: {
-            String error_message = fmt::format("Can't cast from Time type to  {}", target.ToString());
-            UnrecoverableError(error_message);
+            UnrecoverableError(fmt::format("Can't cast from Time type to  {}", target.ToString()));
         }
     }
     return BoundCastFunc(nullptr);
@@ -47,17 +42,15 @@ export inline BoundCastFunc BindTimeCast(DataType &target) {
 struct TimeTryCastToVarlen {
     template <typename SourceType, typename TargetType>
     static inline bool Run(SourceType, TargetType &, ColumnVector *) {
-        String error_message =
-            fmt::format("Not support to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>());
-        UnrecoverableError(error_message);
+        UnrecoverableError(
+            fmt::format("Not support to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>()));
         return false;
     }
 };
 
 template <>
 inline bool TimeTryCastToVarlen::Run(TimeT, VarcharT &, ColumnVector *) {
-    String error_message = "Not implement: IntegerTryCastToFixlen::Run";
-    UnrecoverableError(error_message);
+    UnrecoverableError("Not implement: IntegerTryCastToFixlen::Run");
     return false;
 }
 

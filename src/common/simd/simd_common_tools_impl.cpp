@@ -18,7 +18,6 @@ module;
 
 module infinity_core:simd_common_tools.impl;
 
-import :stl;
 import :infinity_exception;
 import :simd_common_tools;
 

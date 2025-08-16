@@ -12,13 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:dummy_table_ref;
 
-import :stl;
-
 import :table_ref;
+
 import table_reference;
 
 namespace infinity {

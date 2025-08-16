@@ -16,9 +16,12 @@ module;
 
 export module infinity_core:mem_index;
 
-import row_id;
+import :infinity_type;
 
-import :stl;
+import std;
+import std.compat;
+
+import row_id;
 
 namespace infinity {
 
@@ -32,9 +35,9 @@ class BMPIndexInMem;
 class DummyIndexInMem;
 
 export struct MemIndexID {
-    String db_name_;
-    String table_name_;
-    String index_name_;
+    std::string db_name_;
+    std::string table_name_;
+    std::string index_name_;
     SegmentID segment_id_ = 0;
 };
 
@@ -44,37 +47,37 @@ public:
 
     bool IsNull() const;
     void ClearMemIndex();
-    SizeT GetMemUsed() const;
+    size_t GetMemUsed() const;
     RowID GetBeginRowID();
-    SizeT GetRowCount();
+    size_t GetRowCount();
 
     BaseMemIndex *GetBaseMemIndex(const MemIndexID &mem_index_id);
     const BaseMemIndex *GetBaseMemIndex() const;
-    void SetBaseMemIndexInfo(const String &db_name, const String &table_name, const String &index_name, const SegmentID &segment_id);
+    void SetBaseMemIndexInfo(const std::string &db_name, const std::string &table_name, const std::string &index_name, const SegmentID &segment_id);
 
-    void SetEMVBMemIndexInfo(const String &db_name, const String &table_name, const String &index_name, const SegmentID &segment_id);
+    void SetEMVBMemIndexInfo(const std::string &db_name, const std::string &table_name, const std::string &index_name, const SegmentID &segment_id);
     EMVBIndexInMem *GetEMVBMemIndex(const MemIndexID &mem_index_id);
 
-    SharedPtr<HnswIndexInMem> GetHnswIndex();
-    void SetHnswIndex(SharedPtr<HnswIndexInMem> hnsw_index);
+    std::shared_ptr<HnswIndexInMem> GetHnswIndex();
+    void SetHnswIndex(std::shared_ptr<HnswIndexInMem> hnsw_index);
 
-    SharedPtr<IVFIndexInMem> GetIVFIndex();
-    void SetIVFIndex(SharedPtr<IVFIndexInMem> ivf_index);
+    std::shared_ptr<IVFIndexInMem> GetIVFIndex();
+    void SetIVFIndex(std::shared_ptr<IVFIndexInMem> ivf_index);
 
-    SharedPtr<MemoryIndexer> GetFulltextIndex();
-    void SetFulltextIndex(SharedPtr<MemoryIndexer> indexer);
+    std::shared_ptr<MemoryIndexer> GetFulltextIndex();
+    void SetFulltextIndex(std::shared_ptr<MemoryIndexer> indexer);
 
-    SharedPtr<SecondaryIndexInMem> GetSecondaryIndex();
-    void SetSecondaryIndex(SharedPtr<SecondaryIndexInMem> secondary_index);
+    std::shared_ptr<SecondaryIndexInMem> GetSecondaryIndex();
+    void SetSecondaryIndex(std::shared_ptr<SecondaryIndexInMem> secondary_index);
 
-    SharedPtr<EMVBIndexInMem> GetEMVBIndex();
-    void SetEMVBIndex(SharedPtr<EMVBIndexInMem> emvb_index);
+    std::shared_ptr<EMVBIndexInMem> GetEMVBIndex();
+    void SetEMVBIndex(std::shared_ptr<EMVBIndexInMem> emvb_index);
 
-    SharedPtr<BMPIndexInMem> GetBMPIndex();
-    void SetBMPIndex(SharedPtr<BMPIndexInMem> bmp_index);
+    std::shared_ptr<BMPIndexInMem> GetBMPIndex();
+    void SetBMPIndex(std::shared_ptr<BMPIndexInMem> bmp_index);
 
-    SharedPtr<DummyIndexInMem> GetDummyIndex();
-    void SetDummyIndex(SharedPtr<DummyIndexInMem> dummy_index);
+    std::shared_ptr<DummyIndexInMem> GetDummyIndex();
+    void SetDummyIndex(std::shared_ptr<DummyIndexInMem> dummy_index);
 
     bool IsDumping() const;
     void SetIsDumping(bool is_dumping);
@@ -83,13 +86,13 @@ private:
     mutable std::mutex mtx_; // Used by append / mem index dump / clear
     bool is_dumping_{false};
 
-    SharedPtr<HnswIndexInMem> memory_hnsw_index_{};
-    SharedPtr<IVFIndexInMem> memory_ivf_index_{};
-    SharedPtr<MemoryIndexer> memory_indexer_{};
-    SharedPtr<SecondaryIndexInMem> memory_secondary_index_{};
-    SharedPtr<EMVBIndexInMem> memory_emvb_index_{};
-    SharedPtr<BMPIndexInMem> memory_bmp_index_{};
-    SharedPtr<DummyIndexInMem> memory_dummy_index_{};
+    std::shared_ptr<HnswIndexInMem> memory_hnsw_index_{};
+    std::shared_ptr<IVFIndexInMem> memory_ivf_index_{};
+    std::shared_ptr<MemoryIndexer> memory_indexer_{};
+    std::shared_ptr<SecondaryIndexInMem> memory_secondary_index_{};
+    std::shared_ptr<EMVBIndexInMem> memory_emvb_index_{};
+    std::shared_ptr<BMPIndexInMem> memory_bmp_index_{};
+    std::shared_ptr<DummyIndexInMem> memory_dummy_index_{};
 };
 
 } // namespace infinity

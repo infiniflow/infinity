@@ -18,7 +18,6 @@ module;
 
 export module infinity_core:emvb_simd_funcs;
 
-import :stl;
 import :simd_common_tools;
 
 namespace infinity {

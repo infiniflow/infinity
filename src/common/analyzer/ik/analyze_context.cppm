@@ -1,15 +1,14 @@
 module;
 
-#include <string>
-
 export module infinity_core:analyze_context;
 
-import :stl;
 import :quick_sort_set;
 import :character_util;
 import :lexeme;
 import :lexeme_path;
 import :ik_dict;
+
+import std;
 
 namespace infinity {
 
@@ -19,9 +18,9 @@ public:
 
     static constexpr int BUFF_EXHAUST_CRITICAL = 100;
 
-    Vector<wchar_t> segment_buff_;
+    std::vector<wchar_t> segment_buff_;
 
-    Vector<int> char_types_;
+    std::vector<int> char_types_;
 
     int buff_offset_;
 
@@ -31,11 +30,11 @@ public:
 
     int last_useless_char_num_;
 
-    UniquePtr<QuickSortSet> org_lexemes_;
+    std::unique_ptr<QuickSortSet> org_lexemes_;
 
-    HashMap<int, UniquePtr<LexemePath>> path_map_;
+    std::unordered_map<int, std::unique_ptr<LexemePath>> path_map_;
 
-    List<Lexeme *> results_;
+    std::list<Lexeme *> results_;
 
     Dictionary *dict_{nullptr};
 
@@ -45,7 +44,7 @@ public:
 
     int GetCursor() const { return cursor_; }
 
-    Vector<wchar_t> GetSegmentBuff() const { return segment_buff_; }
+    std::vector<wchar_t> GetSegmentBuff() const { return segment_buff_; }
 
     wchar_t GetCurrentChar() const { return segment_buff_[cursor_]; }
 

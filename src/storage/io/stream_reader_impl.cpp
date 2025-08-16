@@ -12,26 +12,21 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
-#include <fstream>
-
 module infinity_core:stream_reader.impl;
 
 import :stream_reader;
-
-import :stl;
-import :logger;
 import :status;
 import :infinity_exception;
-import :third_party;
 import :stream_reader;
+
+import std;
+import third_party;
 
 namespace infinity {
 
 StreamReader::~StreamReader() { Close(); }
 
-Status StreamReader::Init(const String &file_name) {
+Status StreamReader::Init(const std::string &file_name) {
     file_.open(file_name);
     if (!file_.is_open()) {
         return Status::IOError(fmt::format("{} can't open", file_name));
@@ -39,7 +34,7 @@ Status StreamReader::Init(const String &file_name) {
     return Status::OK();
 }
 
-bool StreamReader::ReadLine(String &line) {
+bool StreamReader::ReadLine(std::string &line) {
     if (getline(file_, line)) {
         return true;
     } else {

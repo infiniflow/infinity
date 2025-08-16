@@ -1,10 +1,6 @@
-module;
-
 module infinity_core:position.impl;
 
 import :position;
-
-import :stl;
 import :new_catalog;
 import :status;
 import :infinity_exception;
@@ -12,11 +8,9 @@ import :scalar_function;
 import :scalar_function_set;
 import :column_vector;
 
-import :third_party;
 import logical_type;
 import internal_types;
 import data_type;
-import :logger;
 
 namespace infinity {
 
@@ -31,12 +25,12 @@ struct PositionFunction {
 template <>
 inline void
 PositionFunction::Run(VarcharT &first, VarcharT &second, IntegerT &result, ColumnVector *first_ptr, ColumnVector *second_ptr, ColumnVector *) {
-    Span<const char> first_v = first_ptr->GetVarcharInner(first);
-    Span<const char> second_v = second_ptr->GetVarcharInner(second);
-    String first_str(first_v.data(), first_v.size());
-    String second_str(second_v.data(), second_v.size());
-    String::size_type pos = first_str.find(second_str);
-    if (pos == String::npos) {
+    std::span<const char> first_v = first_ptr->GetVarcharInner(first);
+    std::span<const char> second_v = second_ptr->GetVarcharInner(second);
+    std::string first_str(first_v.data(), first_v.size());
+    std::string second_str(second_v.data(), second_v.size());
+    std::string::size_type pos = first_str.find(second_str);
+    if (pos == std::string::npos) {
         result = 0;
     } else {
         result = pos + 1;
@@ -44,9 +38,9 @@ PositionFunction::Run(VarcharT &first, VarcharT &second, IntegerT &result, Colum
 }
 
 void RegisterPositionFunction(NewCatalog *catalog_ptr) {
-    String func_name = "char_position";
+    std::string func_name = "char_position";
 
-    SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
+    std::shared_ptr<ScalarFunctionSet> function_set_ptr = std::make_shared<ScalarFunctionSet>(func_name);
 
     ScalarFunction varchar_pos_int32(func_name,
                                      {DataType(LogicalType::kVarchar), DataType(LogicalType::kVarchar)},

@@ -12,30 +12,27 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
-#include <string>
-
 module infinity_core:hash_table.impl;
 
 import :hash_table;
-
-import :stl;
-import logical_type;
 import :column_vector;
 import :status;
 import :infinity_exception;
-import :third_party;
+
+import std;
+import third_party;
+
+import logical_type;
 import internal_types;
 import data_type;
 
 namespace infinity {
 
-void HashTableBase::Init(Vector<SharedPtr<DataType>> types) {
+void HashTableBase::Init(std::vector<std::shared_ptr<DataType>> types) {
     types_ = std::move(types);
-    SizeT key_size = 0;
-    SizeT type_count = types_.size();
-    for (SizeT idx = 0; idx < type_count; ++idx) {
+    size_t key_size = 0;
+    size_t type_count = types_.size();
+    for (size_t idx = 0; idx < type_count; ++idx) {
         const DataType &data_type = *types_[idx];
         switch (data_type.type()) {
             case LogicalType::kBoolean:
@@ -49,7 +46,7 @@ void HashTableBase::Init(Vector<SharedPtr<DataType>> types) {
             case LogicalType::kTime:
             case LogicalType::kDateTime:
             case LogicalType::kTimestamp: {
-                SizeT type_size = data_type.Size();
+                size_t type_size = data_type.Size();
                 key_size += type_size;
                 break; // All these type can be hashed.
             }
@@ -73,11 +70,11 @@ void HashTableBase::Init(Vector<SharedPtr<DataType>> types) {
     key_size_ = key_size;
 }
 
-void HashTableBase::GetHashKey(const Vector<SharedPtr<ColumnVector>> &columns, SizeT row_id, String &hash_key) const {
-    SizeT column_count = columns.size();
+void HashTableBase::GetHashKey(const std::vector<std::shared_ptr<ColumnVector>> &columns, size_t row_id, std::string &hash_key) const {
+    size_t column_count = columns.size();
     hash_key.clear();
     bool has_null = false;
-    for (SizeT column_id = 0; column_id < column_count; ++column_id) {
+    for (size_t column_id = 0; column_id < column_count; ++column_id) {
         if (!columns[column_id]->nulls_ptr_->IsTrue(row_id)) {
             hash_key += "\0\0";
             has_null = true;
@@ -87,11 +84,11 @@ void HashTableBase::GetHashKey(const Vector<SharedPtr<ColumnVector>> &columns, S
         const DataType &data_type = *types_[column_id];
 
         if (data_type.type() == LogicalType::kVarchar) {
-            Span<const char> text = columns[column_id]->GetVarchar(row_id);
+            std::span<const char> text = columns[column_id]->GetVarchar(row_id);
             hash_key.append(text.begin(), text.end());
         } else {
-            SizeT type_size = types_[column_id]->Size();
-            Span<const char> binary(reinterpret_cast<const char *>(columns[column_id]->data() + type_size * row_id), type_size);
+            size_t type_size = types_[column_id]->Size();
+            std::span<const char> binary(reinterpret_cast<const char *>(columns[column_id]->data() + type_size * row_id), type_size);
             hash_key.append(binary.begin(), binary.end());
         }
         hash_key += '\0';
@@ -101,34 +98,34 @@ void HashTableBase::GetHashKey(const Vector<SharedPtr<ColumnVector>> &columns, S
     }
 }
 
-void HashTable::Append(const Vector<SharedPtr<ColumnVector>> &columns, SizeT block_id, SizeT row_count) {
-    String hash_key;
+void HashTable::Append(const std::vector<std::shared_ptr<ColumnVector>> &columns, size_t block_id, size_t row_count) {
+    std::string hash_key;
     if (key_size_) {
         hash_key.reserve(key_size_);
     }
-    for (SizeT row_id = 0; row_id < row_count; ++row_id) {
+    for (size_t row_id = 0; row_id < row_count; ++row_id) {
         GetHashKey(columns, row_id, hash_key);
         hash_table_[std::move(hash_key)][block_id].emplace_back(row_id);
     }
 }
 
-void MergeHashTable::Append(const Vector<SharedPtr<ColumnVector>> &columns, SizeT block_id, SizeT row_count) {
-    String hash_key;
+void MergeHashTable::Append(const std::vector<std::shared_ptr<ColumnVector>> &columns, size_t block_id, size_t row_count) {
+    std::string hash_key;
     if (key_size_) {
         hash_key.reserve(key_size_);
     }
-    for (SizeT row_id = 0; row_id < row_count; ++row_id) {
+    for (size_t row_id = 0; row_id < row_count; ++row_id) {
         GetHashKey(columns, row_id, hash_key);
         if (auto iter = hash_table_.find(hash_key); iter != hash_table_.end()) {
             UnrecoverableError("Duplicate key in merge hash table");
         } else {
-            hash_table_.emplace_hint(iter, std::move(hash_key), Pair<SizeT, SizeT>(block_id, row_id));
+            hash_table_.emplace_hint(iter, std::move(hash_key), std::pair<size_t, size_t>(block_id, row_id));
         }
     }
 }
 
-bool MergeHashTable::GetOrInsert(const Vector<SharedPtr<ColumnVector>> &columns, SizeT row_id, Pair<SizeT, SizeT> &block_row_id) {
-    String hash_key;
+bool MergeHashTable::GetOrInsert(const std::vector<std::shared_ptr<ColumnVector>> &columns, size_t row_id, std::pair<size_t, size_t> &block_row_id) {
+    std::string hash_key;
     if (key_size_) {
         hash_key.reserve(key_size_);
     }

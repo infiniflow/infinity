@@ -14,7 +14,11 @@
 
 #include "interval_type.h"
 #include "parser_assert.h"
-#include "spdlog/fmt/fmt.h"
+
+#ifndef PARESER_USE_THIRD_PARTY_MODULE
+#define PARESER_USE_THIRD_PARTY_MODULE 1
+import third_party;
+#endif
 
 namespace infinity {
 

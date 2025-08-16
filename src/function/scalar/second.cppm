@@ -16,8 +16,6 @@ module;
 
 export module infinity_core:second;
 
-import :stl;
-
 namespace infinity {
 
 class NewCatalog;

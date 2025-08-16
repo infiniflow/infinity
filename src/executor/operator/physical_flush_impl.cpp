@@ -12,13 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:physical_flush.impl;
 
 import :physical_flush;
-
-import :stl;
 import :new_txn;
 import :query_context;
 import :table_def;
@@ -28,13 +24,15 @@ import :physical_operator_type;
 import :operator_state;
 import :logger;
 import :bg_task;
-import :third_party;
 import :status;
 import :infinity_context;
 import :background_process;
 import :new_txn;
 import :new_txn_manager;
 import :kv_store;
+
+import third_party;
+
 import flush_statement;
 
 namespace infinity {
@@ -97,7 +95,7 @@ void PhysicalFlush::FlushData(QueryContext *query_context, OperatorState *operat
     i64 wal_size{};
     std::tie(max_commit_ts, wal_size) = wal_manager->GetCommitState();
     LOG_TRACE(fmt::format("Construct checkpoint task with WAL size: {}, max_commit_ts: {}", wal_size, max_commit_ts));
-    auto checkpoint_task = MakeShared<NewCheckpointTask>(wal_size);
+    auto checkpoint_task = std::make_shared<NewCheckpointTask>(wal_size);
     NewTxn *new_txn = query_context->GetNewTxn();
     checkpoint_task->new_txn_ = new_txn;
 

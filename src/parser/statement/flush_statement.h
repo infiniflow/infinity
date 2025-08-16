@@ -15,13 +15,12 @@
 #pragma once
 
 #include "base_statement.h"
-#include "statement/extra/create_collection_info.h"
-#include "statement/extra/create_index_info.h"
-#include "statement/extra/create_schema_info.h"
-#include "statement/extra/create_table_info.h"
-#include "statement/extra/create_view_info.h"
 
-#include <string>
+#ifndef PARESER_USE_STD_MODULE
+#define PARESER_USE_STD_MODULE 1
+import std;
+import std.compat;
+#endif
 
 namespace infinity {
 

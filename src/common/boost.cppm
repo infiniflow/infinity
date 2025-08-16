@@ -16,6 +16,10 @@ module;
 
 #include <boost/asio/io_context.hpp>
 #include <boost/asio/ip/tcp.hpp>
+#include <boost/asio/read.hpp>
+#include <boost/asio/write.hpp>
+#include <boost/bind/bind.hpp>
+#include <boost/dynamic_bitset.hpp>
 
 export module infinity_core:boost;
 
@@ -23,8 +27,15 @@ namespace boost {
 namespace system {
 export using boost::system::error_code;
 }
+export using boost::bind;
+export using boost::dynamic_bitset;
 namespace asio {
 export using boost::asio::io_context;
+export using boost::asio::read;
+export using boost::asio::buffer;
+export using boost::asio::transfer_at_least;
+export using boost::asio::mutable_buffer;
+export using boost::asio::write;
 namespace ip {
 export using boost::asio::ip::tcp;
 export using boost::asio::ip::make_address;

@@ -12,11 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:fastpfor;
 
-import :stl;
+import :infinity_type;
 
 namespace infinity {
 
@@ -28,17 +26,17 @@ struct FastPForWrapper {
 
     ~FastPForWrapper();
 
-    u32 Compress(const u32 *src, u32 count, u32 *dest, SizeT &outsize) const;
+    u32 Compress(const u32 *src, u32 count, u32 *dest, size_t &outsize) const;
 
-    const u32 *Decompress(const u32 *src, u32 count, u32 *dest, SizeT &outsize) const;
+    const u32 *Decompress(const u32 *src, u32 count, u32 *dest, size_t &outsize) const;
 
-    static void ApplyDelta(u32 *src, SizeT count);
+    static void ApplyDelta(u32 *src, size_t count);
 
-    static void RevertDelta(u32 *src, SizeT count);
+    static void RevertDelta(u32 *src, size_t count);
 
 private:
     struct Impl;
-    UniquePtr<Impl> impl_;
+    std::unique_ptr<Impl> impl_;
 };
 
 export using SIMDFastPFor = FastPForWrapper<FastPForCodec::SIMDFastPFor>;

@@ -1,20 +1,17 @@
-module;
-
-#include <string>
-
 export module infinity_core:letter_segmenter;
 
-import :stl;
 import :segmenter;
 import :analyze_context;
+
+import std;
 
 namespace infinity {
 
 export class LetterSegmenter : public Segmenter {
 public:
     static const std::wstring SEGMENTER_NAME;
-    static Vector<wchar_t> Letter_Connector;
-    static Vector<wchar_t> Num_Connector;
+    static std::vector<wchar_t> Letter_Connector;
+    static std::vector<wchar_t> Num_Connector;
 
     int start_;
 

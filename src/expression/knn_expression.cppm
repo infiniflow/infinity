@@ -12,12 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:knn_expression;
 
-import :stl;
 import :base_expression;
+
 import data_type;
 import logical_type;
 import internal_types;
@@ -28,23 +26,23 @@ namespace infinity {
 
 export class KnnExpression : public BaseExpression {
 public:
-    static String KnnDistanceType2Str(KnnDistanceType type);
+    static std::string KnnDistanceType2Str(KnnDistanceType type);
 
 public:
     KnnExpression(EmbeddingDataType embedding_data_type,
                   i64 dimension,
                   KnnDistanceType knn_distance_type,
                   EmbeddingT query_embedding,
-                  Vector<SharedPtr<BaseExpression>> arguments,
+                  std::vector<std::shared_ptr<BaseExpression>> arguments,
                   i64 topn,
-                  Vector<InitParameter *> *opt_params,
-                  SharedPtr<BaseExpression> optional_filter,
-                  String using_index,
+                  std::vector<InitParameter *> *opt_params,
+                  std::shared_ptr<BaseExpression> optional_filter,
+                  std::string using_index,
                   bool ignore_index);
 
     inline DataType Type() const override { return DataType(LogicalType::kFloat); }
 
-    String ToString() const override;
+    std::string ToString() const override;
 
     bool IsKnnMinHeap() const {
         switch (distance_type_) {
@@ -70,10 +68,10 @@ public:
     const KnnDistanceType distance_type_{KnnDistanceType::kInvalid};
     EmbeddingT query_embedding_;
     const i64 topn_;
-    Vector<InitParameter> opt_params_;
-    const String using_index_;
+    std::vector<InitParameter> opt_params_;
+    const std::string using_index_;
     bool ignore_index_;
-    SharedPtr<BaseExpression> optional_filter_;
+    std::shared_ptr<BaseExpression> optional_filter_;
 };
 
 } // namespace infinity

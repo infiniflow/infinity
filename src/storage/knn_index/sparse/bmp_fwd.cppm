@@ -15,18 +15,19 @@
 module;
 
 #include "common/simd/simd_common_intrin_include.h"
-#include <vector>
 
 export module infinity_core:bmp_fwd;
 
-import :stl;
 import :sparse_util;
 import :local_file_handle;
 import :bmp_util;
 import :knn_result_handler;
-import serialize;
 import :infinity_exception;
-import :third_party;
+
+import std;
+import third_party;
+
+import serialize;
 
 namespace infinity {
 
@@ -40,9 +41,9 @@ public:
 
     bool HasNext() const { return ptr_ < ptr_end_; }
 
-    Tuple<IdxType, SizeT, const BMPBlockOffset *, const DataType *> Value() const {
+    std::tuple<IdxType, size_t, const BMPBlockOffset *, const DataType *> Value() const {
         const char *p = ptr_;
-        auto block_size = ReadBufAdv<SizeT>(p);
+        auto block_size = ReadBufAdv<size_t>(p);
         auto term_id = ReadBufAdv<IdxType>(p);
 
         auto *block_offsets = reinterpret_cast<const BMPBlockOffset *>(p);
@@ -51,7 +52,7 @@ public:
     }
 
     void Next() {
-        auto block_size = ReadBuf<SizeT>(ptr_);
+        auto block_size = ReadBuf<size_t>(ptr_);
         ptr_ += sizeof(block_size) + sizeof(IdxType) + block_size * sizeof(BMPBlockOffset) + block_size * sizeof(DataType);
     }
 
@@ -63,8 +64,8 @@ private:
 template <typename DataType, typename IdxType>
 class BlockTermsIter<DataType, IdxType, BMPOwnMem::kFalse> {
 public:
-    BlockTermsIter(SizeT block_term_remain,
-                   const SizeT *block_size_prefix_sum,
+    BlockTermsIter(size_t block_term_remain,
+                   const size_t *block_size_prefix_sum,
                    const IdxType *term_ids,
                    const BMPBlockOffset *block_offsets,
                    const DataType *values)
@@ -73,13 +74,13 @@ public:
 
     bool HasNext() const { return block_term_remain_ > 0; }
 
-    Tuple<IdxType, SizeT, const BMPBlockOffset *, const DataType *> Value() const {
-        SizeT block_size = block_size_prefix_sum_[1] - block_size_prefix_sum_[0];
+    std::tuple<IdxType, size_t, const BMPBlockOffset *, const DataType *> Value() const {
+        size_t block_size = block_size_prefix_sum_[1] - block_size_prefix_sum_[0];
         return {term_ids_[0], block_size, block_offsets_, values_};
     }
 
     void Next() {
-        SizeT block_size = block_size_prefix_sum_[1] - block_size_prefix_sum_[0];
+        size_t block_size = block_size_prefix_sum_[1] - block_size_prefix_sum_[0];
         ++block_size_prefix_sum_;
         ++term_ids_;
         block_offsets_ += block_size;
@@ -88,8 +89,8 @@ public:
     }
 
 private:
-    SizeT block_term_remain_{};
-    const SizeT *block_size_prefix_sum_;
+    size_t block_term_remain_{};
+    const size_t *block_size_prefix_sum_;
     const IdxType *term_ids_;
     const BMPBlockOffset *block_offsets_;
     const DataType *values_;
@@ -103,11 +104,11 @@ class BlockTerms<DataType, IdxType, BMPOwnMem::kTrue> {
     using IterT = BlockTermsIter<DataType, IdxType, BMPOwnMem::kTrue>;
 
 public:
-    BlockTerms(const Vector<Tuple<IdxType, Vector<BMPBlockOffset>, Vector<DataType>>> &block_terms)
-        : data_len_(GetBufferSize(block_terms)), data_(MakeUniqueForOverwrite<char[]>(data_len_)) {
+    BlockTerms(const std::vector<std::tuple<IdxType, std::vector<BMPBlockOffset>, std::vector<DataType>>> &block_terms)
+        : data_len_(GetBufferSize(block_terms)), data_(std::make_unique_for_overwrite<char[]>(data_len_)) {
         char *ptr = data_.get();
         for (const auto &[term_id, block_offsets, values] : block_terms) {
-            SizeT block_size = block_offsets.size();
+            size_t block_size = block_offsets.size();
             WriteBufAdv(ptr, block_size);
             WriteBufAdv(ptr, term_id);
             WriteBufVecAdv(ptr, block_offsets.data(), block_size);
@@ -116,10 +117,10 @@ public:
     }
 
 private:
-    static SizeT GetBufferSize(const Vector<Tuple<IdxType, Vector<BMPBlockOffset>, Vector<DataType>>> &block_terms) {
-        SizeT size = 0;
+    static size_t GetBufferSize(const std::vector<std::tuple<IdxType, std::vector<BMPBlockOffset>, std::vector<DataType>>> &block_terms) {
+        size_t size = 0;
         for (const auto &[term_id, block_offsets, values] : block_terms) {
-            SizeT block_size = block_offsets.size();
+            size_t block_size = block_offsets.size();
             if (block_size != values.size()) {
                 UnrecoverableError("Block offsets and values size mismatch");
             }
@@ -131,12 +132,12 @@ private:
         return size;
     }
 
-    BlockTerms(SizeT data_len, UniquePtr<char[]> data) : data_len_(data_len), data_(std::move(data)) {}
+    BlockTerms(size_t data_len, std::unique_ptr<char[]> data) : data_len_(data_len), data_(std::move(data)) {}
 
-    static SizeT GetBufferSize(SizeT block_term_num, const SizeT *block_size_prefix_sum) {
-        SizeT size = 0;
-        for (SizeT i = 0; i < block_term_num; ++i) {
-            SizeT block_size = block_size_prefix_sum[i + 1] - block_size_prefix_sum[i];
+    static size_t GetBufferSize(size_t block_term_num, const size_t *block_size_prefix_sum) {
+        size_t size = 0;
+        for (size_t i = 0; i < block_term_num; ++i) {
+            size_t block_size = block_size_prefix_sum[i + 1] - block_size_prefix_sum[i];
             size += sizeof(block_size);
             size += sizeof(IdxType);
             size += block_size * sizeof(BMPBlockOffset);
@@ -148,7 +149,7 @@ private:
 public:
     IterT Iter() const { return IterT(data_.get(), data_.get() + data_len_); }
 
-    SizeT GetSizeInBytes() const { return sizeof(data_len_) + data_len_; }
+    size_t GetSizeInBytes() const { return sizeof(data_len_) + data_len_; }
 
     void WriteAdv(char *&p) const {
         WriteBufAdv(p, data_len_);
@@ -156,65 +157,65 @@ public:
     }
 
     static BlockTerms ReadAdv(const char *&p) {
-        SizeT data_len = ReadBufAdv<SizeT>(p);
-        UniquePtr<char[]> data = MakeUniqueForOverwrite<char[]>(data_len);
+        size_t data_len = ReadBufAdv<size_t>(p);
+        std::unique_ptr<char[]> data = std::make_unique_for_overwrite<char[]>(data_len);
         std::memcpy(data.get(), p, data_len);
         p += data_len;
         return BlockTerms(data_len, std::move(data));
     }
 
     void GetSizeToPtr(char *&p) const {
-        GetSizeInBytesAligned<SizeT>(p);
-        SizeT block_size_sum = 0;
-        SizeT cnt = 0;
+        GetSizeInBytesAligned<size_t>(p);
+        size_t block_size_sum = 0;
+        size_t cnt = 0;
         for (auto iter = Iter(); iter.HasNext(); iter.Next()) {
             auto [term_id, block_size, block_offsets, values] = iter.Value();
             block_size_sum += block_size;
             ++cnt;
         }
-        GetSizeInBytesVecAligned<SizeT>(p, cnt + 1);
+        GetSizeInBytesVecAligned<size_t>(p, cnt + 1);
         GetSizeInBytesVecAligned<IdxType>(p, cnt);
         GetSizeInBytesVecAligned<BMPBlockOffset>(p, block_size_sum);
         GetSizeInBytesVecAligned<DataType>(p, block_size_sum);
     }
 
     void WriteToPtr(char *&p) const {
-        SizeT block_size_sum = 0;
-        Vector<SizeT> block_size_prefix_sum;
-        Vector<IdxType> term_ids;
-        Vector<BMPBlockOffset> block_offsets_vec;
-        Vector<DataType> values_vec;
+        size_t block_size_sum = 0;
+        std::vector<size_t> block_size_prefix_sum;
+        std::vector<IdxType> term_ids;
+        std::vector<BMPBlockOffset> block_offsets_vec;
+        std::vector<DataType> values_vec;
         block_size_prefix_sum.push_back(0);
         for (auto iter = Iter(); iter.HasNext(); iter.Next()) {
             auto [term_id, block_size, block_offsets, values] = iter.Value();
             block_size_sum += block_size;
             block_size_prefix_sum.push_back(block_size_sum);
             term_ids.push_back(term_id);
-            for (SizeT i = 0; i < block_size; ++i) {
+            for (size_t i = 0; i < block_size; ++i) {
                 block_offsets_vec.push_back(block_offsets[i]);
                 values_vec.push_back(values[i]);
             }
         }
-        WriteBufAdvAligned<SizeT>(p, term_ids.size());
-        WriteBufVecAdvAligned<SizeT>(p, block_size_prefix_sum.data(), block_size_prefix_sum.size());
+        WriteBufAdvAligned<size_t>(p, term_ids.size());
+        WriteBufVecAdvAligned<size_t>(p, block_size_prefix_sum.data(), block_size_prefix_sum.size());
         WriteBufVecAdvAligned<IdxType>(p, term_ids.data(), term_ids.size());
         WriteBufVecAdvAligned<BMPBlockOffset>(p, block_offsets_vec.data(), block_offsets_vec.size());
         WriteBufVecAdvAligned<DataType>(p, values_vec.data(), values_vec.size());
     }
 
     static BlockTerms ReadFromPtr(const char *&p) {
-        SizeT block_term_num = ReadBufAdvAligned<SizeT>(p);
-        const SizeT *block_size_prefix_sum = ReadBufVecAdvAligned<SizeT>(p, block_term_num + 1);
+        size_t block_term_num = ReadBufAdvAligned<size_t>(p);
+        const size_t *block_size_prefix_sum = ReadBufVecAdvAligned<size_t>(p, block_term_num + 1);
         const IdxType *term_ids = ReadBufVecAdvAligned<IdxType>(p, block_term_num);
-        SizeT block_size_sum = block_size_prefix_sum[block_term_num];
+        size_t block_size_sum = block_size_prefix_sum[block_term_num];
         const BMPBlockOffset *block_offsets = ReadBufVecAdvAligned<BMPBlockOffset>(p, block_size_sum);
         const DataType *values = ReadBufVecAdvAligned<DataType>(p, block_size_sum);
 
-        SizeT data_len = GetBufferSize(block_term_num, block_size_prefix_sum);
-        UniquePtr<char[]> data = MakeUniqueForOverwrite<char[]>(data_len);
+        size_t data_len = GetBufferSize(block_term_num, block_size_prefix_sum);
+        std::unique_ptr<char[]> data = std::make_unique_for_overwrite<char[]>(data_len);
         char *ptr = data.get();
-        for (SizeT i = 0; i < block_term_num; ++i) {
-            SizeT block_size = block_size_prefix_sum[i + 1] - block_size_prefix_sum[i];
+        for (size_t i = 0; i < block_term_num; ++i) {
+            size_t block_size = block_size_prefix_sum[i + 1] - block_size_prefix_sum[i];
             IdxType term_id = term_ids[i];
             const BMPBlockOffset *block_offsets_ptr = block_offsets + block_size_prefix_sum[i];
             const DataType *values_ptr = values + block_size_prefix_sum[i];
@@ -232,8 +233,8 @@ public:
     }
 
 private:
-    SizeT data_len_{};
-    UniquePtr<char[]> data_{};
+    size_t data_len_{};
+    std::unique_ptr<char[]> data_{};
 };
 
 export template <typename DataType, typename IdxType>
@@ -245,10 +246,10 @@ public:
 
     static BlockTerms ReadFromPtr(const char *&p) {
         BlockTerms ret;
-        ret.block_term_num_ = ReadBufAdvAligned<SizeT>(p);
-        ret.block_size_prefix_sum_ = ReadBufVecAdvAligned<SizeT>(p, ret.block_term_num_ + 1);
+        ret.block_term_num_ = ReadBufAdvAligned<size_t>(p);
+        ret.block_size_prefix_sum_ = ReadBufVecAdvAligned<size_t>(p, ret.block_term_num_ + 1);
         ret.term_ids_ = ReadBufVecAdvAligned<IdxType>(p, ret.block_term_num_);
-        SizeT block_size_sum = ret.block_size_prefix_sum_[ret.block_term_num_];
+        size_t block_size_sum = ret.block_size_prefix_sum_[ret.block_term_num_];
         ret.block_offsets_ = ReadBufVecAdvAligned<BMPBlockOffset>(p, block_size_sum);
         ret.values_ = ReadBufVecAdvAligned<DataType>(p, block_size_sum);
         return ret;
@@ -262,8 +263,8 @@ public:
     }
 
 private:
-    SizeT block_term_num_;
-    const SizeT *block_size_prefix_sum_;
+    size_t block_term_num_;
+    const size_t *block_size_prefix_sum_;
     const IdxType *term_ids_;
     const BMPBlockOffset *block_offsets_;
     const DataType *values_;
@@ -272,15 +273,15 @@ private:
 export template <typename DataType, typename IdxType>
 class TailFwd {
 private:
-    TailFwd(Vector<Pair<Vector<IdxType>, Vector<DataType>>> tail_terms) : tail_terms_(std::move(tail_terms)) {}
+    TailFwd(std::vector<std::pair<std::vector<IdxType>, std::vector<DataType>>> tail_terms) : tail_terms_(std::move(tail_terms)) {}
 
 public:
     TailFwd() = default;
-    TailFwd(SizeT block_size) { tail_terms_.reserve(block_size); }
+    TailFwd(size_t block_size) { tail_terms_.reserve(block_size); }
 
-    SizeT AddDoc(const SparseVecRef<DataType, IdxType> &doc) {
-        Vector<IdxType> indices;
-        Vector<DataType> data;
+    size_t AddDoc(const SparseVecRef<DataType, IdxType> &doc) {
+        std::vector<IdxType> indices;
+        std::vector<DataType> data;
         indices.reserve(doc.nnz_);
         data.reserve(doc.nnz_);
         for (i32 i = 0; i < doc.nnz_; ++i) {
@@ -291,14 +292,14 @@ public:
         return tail_terms_.size();
     }
 
-    const Vector<Pair<Vector<IdxType>, Vector<DataType>>> &GetTailTerms() const { return tail_terms_; }
+    const std::vector<std::pair<std::vector<IdxType>, std::vector<DataType>>> &GetTailTerms() const { return tail_terms_; }
 
-    Vector<Tuple<IdxType, Vector<BMPBlockOffset>, Vector<DataType>>> ToBlockFwd() const {
-        Vector<Tuple<IdxType, BMPBlockOffset, DataType>> term_pairs;
-        SizeT block_size = tail_terms_.size();
-        for (SizeT block_offset = 0; block_offset < block_size; ++block_offset) {
-            SizeT nnz = tail_terms_[block_offset].first.size();
-            for (SizeT i = 0; i < nnz; ++i) {
+    std::vector<std::tuple<IdxType, std::vector<BMPBlockOffset>, std::vector<DataType>>> ToBlockFwd() const {
+        std::vector<std::tuple<IdxType, BMPBlockOffset, DataType>> term_pairs;
+        size_t block_size = tail_terms_.size();
+        for (size_t block_offset = 0; block_offset < block_size; ++block_offset) {
+            size_t nnz = tail_terms_[block_offset].first.size();
+            for (size_t i = 0; i < nnz; ++i) {
                 IdxType term_id = tail_terms_[block_offset].first[i];
                 DataType score = tail_terms_[block_offset].second[i];
                 term_pairs.emplace_back(term_id, block_offset, score);
@@ -306,10 +307,10 @@ public:
         }
         std::sort(term_pairs.begin(), term_pairs.end(), [](const auto &a, const auto &b) { return std::get<0>(a) < std::get<0>(b); });
 
-        Vector<Tuple<IdxType, Vector<BMPBlockOffset>, Vector<DataType>>> res;
+        std::vector<std::tuple<IdxType, std::vector<BMPBlockOffset>, std::vector<DataType>>> res;
         IdxType last_term_id = -1;
-        Vector<BMPBlockOffset> block_offsets;
-        Vector<DataType> scores;
+        std::vector<BMPBlockOffset> block_offsets;
+        std::vector<DataType> scores;
         for (const auto &[term_id, block_offset, score] : term_pairs) {
             if (term_id != last_term_id) {
                 if (last_term_id != -1) {
@@ -326,12 +327,12 @@ public:
         return res;
     }
 
-    Vector<DataType> GetScores(const SparseVecRef<DataType, IdxType> &query) const {
-        SizeT tail_size = tail_terms_.size();
-        Vector<DataType> res(tail_size, 0.0);
-        for (SizeT offset = 0; offset < tail_size; ++offset) {
+    std::vector<DataType> GetScores(const SparseVecRef<DataType, IdxType> &query) const {
+        size_t tail_size = tail_terms_.size();
+        std::vector<DataType> res(tail_size, 0.0);
+        for (size_t offset = 0; offset < tail_size; ++offset) {
             const auto &[indices, data] = tail_terms_[offset];
-            SizeT j = 0;
+            size_t j = 0;
             for (i32 i = 0; i < query.nnz_; ++i) {
                 IdxType query_term = query.indices_[i];
                 DataType query_score = query.data_[i];
@@ -349,39 +350,39 @@ public:
         return res;
     }
 
-    SizeT GetSizeInBytes() const {
-        SizeT size = sizeof(SizeT);
+    size_t GetSizeInBytes() const {
+        size_t size = sizeof(size_t);
         for (const auto &tail_terms : tail_terms_) {
             const auto [indices, data] = tail_terms;
-            size += sizeof(SizeT) + indices.size() * sizeof(IdxType) + data.size() * sizeof(DataType);
+            size += sizeof(size_t) + indices.size() * sizeof(IdxType) + data.size() * sizeof(DataType);
         }
         return size;
     }
 
     void WriteAdv(char *&p) const {
-        SizeT tail_num = tail_terms_.size();
-        WriteBufAdv<SizeT>(p, tail_num);
+        size_t tail_num = tail_terms_.size();
+        WriteBufAdv<size_t>(p, tail_num);
         for (const auto &tail_terms : tail_terms_) {
             const auto &[indices, data] = tail_terms;
-            SizeT term_num = indices.size();
-            WriteBufAdv<SizeT>(p, term_num);
+            size_t term_num = indices.size();
+            WriteBufAdv<size_t>(p, term_num);
             WriteBufVecAdv(p, indices.data(), indices.size());
             WriteBufVecAdv(p, data.data(), data.size());
         }
     }
 
     static TailFwd<DataType, IdxType> ReadAdv(const char *&p) {
-        SizeT tail_num = ReadBufAdv<SizeT>(p);
-        Vector<Pair<Vector<IdxType>, Vector<DataType>>> tail_terms(tail_num);
-        for (SizeT i = 0; i < tail_num; ++i) {
-            SizeT term_num = ReadBufAdv<SizeT>(p);
+        size_t tail_num = ReadBufAdv<size_t>(p);
+        std::vector<std::pair<std::vector<IdxType>, std::vector<DataType>>> tail_terms(tail_num);
+        for (size_t i = 0; i < tail_num; ++i) {
+            size_t term_num = ReadBufAdv<size_t>(p);
             auto &[indices, data] = tail_terms[i];
             indices.resize(term_num);
             data.resize(term_num);
-            for (SizeT j = 0; j < term_num; ++j) {
+            for (size_t j = 0; j < term_num; ++j) {
                 indices[j] = ReadBufAdv<IdxType>(p);
             }
-            for (SizeT j = 0; j < term_num; ++j) {
+            for (size_t j = 0; j < term_num; ++j) {
                 data[j] = ReadBufAdv<DataType>(p);
             }
         }
@@ -389,7 +390,7 @@ public:
     }
 
 private:
-    Vector<Pair<Vector<IdxType>, Vector<DataType>>> tail_terms_;
+    std::vector<std::pair<std::vector<IdxType>, std::vector<DataType>>> tail_terms_;
 };
 
 export template <typename DataType, typename IdxType, BMPOwnMem OwnMem>
@@ -399,47 +400,47 @@ export template <typename DataType, typename IdxType>
 class BlockFwd<DataType, IdxType, BMPOwnMem::kTrue> {
 private:
     using BlockTerms = BlockTerms<DataType, IdxType, BMPOwnMem::kTrue>;
-    BlockFwd(SizeT block_size, Vector<BlockTerms> block_terms_list) : block_size_(block_size), block_terms_list_(std::move(block_terms_list)) {}
+    BlockFwd(size_t block_size, std::vector<BlockTerms> block_terms_list) : block_size_(block_size), block_terms_list_(std::move(block_terms_list)) {}
 
 public:
     BlockFwd() = default;
 
-    BlockFwd(SizeT block_size, Vector<BlockTerms> block_terms_list, TailFwd<DataType, IdxType> tail_fwd)
+    BlockFwd(size_t block_size, std::vector<BlockTerms> block_terms_list, TailFwd<DataType, IdxType> tail_fwd)
         : block_size_(block_size), block_terms_list_(std::move(block_terms_list)), tail_fwd_(std::move(tail_fwd)) {}
 
-    BlockFwd(SizeT block_size) : block_size_(block_size), tail_fwd_(block_size) {}
+    BlockFwd(size_t block_size) : block_size_(block_size), tail_fwd_(block_size) {}
 
-    Optional<TailFwd<DataType, IdxType>> AddDoc(const SparseVecRef<DataType, IdxType> &doc, SizeT &mem_usage) {
-        SizeT tail_size = tail_fwd_.AddDoc(doc);
+    std::optional<TailFwd<DataType, IdxType>> AddDoc(const SparseVecRef<DataType, IdxType> &doc, size_t &mem_usage) {
+        size_t tail_size = tail_fwd_.AddDoc(doc);
         if (tail_size < block_size_) {
-            return None;
+            return std::nullopt;
         }
         TailFwd<DataType, IdxType> tail_fwd1(block_size_);
         std::swap(tail_fwd1, tail_fwd_);
 
-        Vector<Tuple<IdxType, Vector<BMPBlockOffset>, Vector<DataType>>> block_terms = tail_fwd1.ToBlockFwd();
+        std::vector<std::tuple<IdxType, std::vector<BMPBlockOffset>, std::vector<DataType>>> block_terms = tail_fwd1.ToBlockFwd();
         block_terms_list_.emplace_back(block_terms);
         mem_usage += block_terms_list_.back().GetSizeInBytes();
         return tail_fwd1;
     }
 
-    Optional<TailFwd<DataType, IdxType>> Finalize() {
+    std::optional<TailFwd<DataType, IdxType>> Finalize() {
         if (tail_fwd_.GetTailTerms().size() == 0) {
-            return None;
+            return std::nullopt;
         }
-        Vector<Tuple<IdxType, Vector<BMPBlockOffset>, Vector<DataType>>> block_terms = tail_fwd_.ToBlockFwd();
+        std::vector<std::tuple<IdxType, std::vector<BMPBlockOffset>, std::vector<DataType>>> block_terms = tail_fwd_.ToBlockFwd();
         block_terms_list_.emplace_back(block_terms);
         return std::move(tail_fwd_);
     }
 
-    Vector<Pair<Vector<IdxType>, Vector<DataType>>> GetFwd(SizeT doc_num, SizeT term_num) const {
-        SizeT doc_n = doc_num / block_size_ * block_size_;
-        Vector<Pair<Vector<IdxType>, Vector<DataType>>> fwd(doc_n);
-        for (SizeT block_id = 0; block_id < block_terms_list_.size(); ++block_id) {
+    std::vector<std::pair<std::vector<IdxType>, std::vector<DataType>>> GetFwd(size_t doc_num, size_t term_num) const {
+        size_t doc_n = doc_num / block_size_ * block_size_;
+        std::vector<std::pair<std::vector<IdxType>, std::vector<DataType>>> fwd(doc_n);
+        for (size_t block_id = 0; block_id < block_terms_list_.size(); ++block_id) {
             const auto &block_terms = block_terms_list_[block_id];
             for (auto iter = block_terms.Iter(); iter.HasNext(); iter.Next()) {
                 const auto &[term_id, block_size, block_offsets, scores] = iter.Value();
-                for (SizeT i = 0; i < block_size; ++i) {
+                for (size_t i = 0; i < block_size; ++i) {
                     BMPDocID doc_id = block_offsets[i] + block_id * block_size_;
                     if (doc_id >= doc_num) {
                         break;
@@ -455,12 +456,12 @@ public:
 
     TailFwd<DataType, IdxType> GetTailFwd() { return std::move(tail_fwd_); }
 
-    Vector<Vector<DataType>> GetIvtScores(SizeT term_num) const {
-        Vector<Vector<DataType>> res(term_num);
+    std::vector<std::vector<DataType>> GetIvtScores(size_t term_num) const {
+        std::vector<std::vector<DataType>> res(term_num);
         for (const auto &block_terms : block_terms_list_) {
             for (auto iter = block_terms.Iter(); iter.HasNext(); iter.Next()) {
                 const auto [term_id, block_size, block_offsets, scores] = iter.Value();
-                for (SizeT i = 0; i < block_size; ++i) {
+                for (size_t i = 0; i < block_size; ++i) {
                     res[term_id].push_back(scores[i]);
                 }
             }
@@ -470,16 +471,16 @@ public:
 
     const BlockTerms &GetBlockTerms(BMPBlockID block_id) const { return block_terms_list_[block_id]; }
 
-    Vector<DataType> GetScoresTail(const SparseVecRef<DataType, IdxType> &query) const { return tail_fwd_.GetScores(query); }
+    std::vector<DataType> GetScoresTail(const SparseVecRef<DataType, IdxType> &query) const { return tail_fwd_.GetScores(query); }
 
     void Prefetch(BMPBlockID block_id) const { this->block_terms_list_[block_id].Prefetch(); }
 
-    SizeT block_size() const { return block_size_; }
+    size_t block_size() const { return block_size_; }
 
-    SizeT block_num() const { return block_terms_list_.size(); }
+    size_t block_num() const { return block_terms_list_.size(); }
 
-    SizeT GetSizeInBytes() const {
-        SizeT size = sizeof(this->block_size_) + sizeof(SizeT);
+    size_t GetSizeInBytes() const {
+        size_t size = sizeof(this->block_size_) + sizeof(size_t);
         for (const auto &block_terms : this->block_terms_list_) {
             size += block_terms.GetSizeInBytes();
         }
@@ -488,9 +489,9 @@ public:
     }
 
     void WriteAdv(char *&p) const {
-        WriteBufAdv<SizeT>(p, this->block_size_);
-        SizeT block_num = this->block_terms_list_.size();
-        WriteBufAdv<SizeT>(p, block_num);
+        WriteBufAdv<size_t>(p, this->block_size_);
+        size_t block_num = this->block_terms_list_.size();
+        WriteBufAdv<size_t>(p, block_num);
         for (const auto &block_terms : this->block_terms_list_) {
             block_terms.WriteAdv(p);
         }
@@ -498,11 +499,11 @@ public:
     }
 
     static BlockFwd ReadAdv(const char *&p) {
-        SizeT block_size = ReadBufAdv<SizeT>(p);
-        SizeT block_num = ReadBufAdv<SizeT>(p);
-        Vector<BlockTerms> block_terms_list;
+        size_t block_size = ReadBufAdv<size_t>(p);
+        size_t block_num = ReadBufAdv<size_t>(p);
+        std::vector<BlockTerms> block_terms_list;
         block_terms_list.reserve(block_num);
-        for (SizeT i = 0; i < block_num; ++i) {
+        for (size_t i = 0; i < block_num; ++i) {
             auto block_terms = BlockTerms::ReadAdv(p);
             block_terms_list.push_back(std::move(block_terms));
         }
@@ -511,21 +512,21 @@ public:
     }
 
     void GetSizeToPtr(char *&p) const {
-        GetSizeInBytesAligned<SizeT>(p);
-        GetSizeInBytesAligned<SizeT>(p);
-        GetSizeInBytesVecAligned<SizeT>(p, block_terms_list_.size() + 1);
+        GetSizeInBytesAligned<size_t>(p);
+        GetSizeInBytesAligned<size_t>(p);
+        GetSizeInBytesVecAligned<size_t>(p, block_terms_list_.size() + 1);
         for (const auto &block_terms : block_terms_list_) {
             block_terms.GetSizeToPtr(p);
         }
     }
 
     void WriteToPtr(char *&p) const {
-        WriteBufAdvAligned<SizeT>(p, block_size_);
-        WriteBufAdvAligned<SizeT>(p, block_terms_list_.size());
-        Vector<SizeT> offsets;
+        WriteBufAdvAligned<size_t>(p, block_size_);
+        WriteBufAdvAligned<size_t>(p, block_terms_list_.size());
+        std::vector<size_t> offsets;
         {
             char *p1 = p;
-            GetSizeInBytesVecAligned<SizeT>(p1, block_terms_list_.size());
+            GetSizeInBytesVecAligned<size_t>(p1, block_terms_list_.size());
             char *p2 = p1;
             offsets.push_back(0);
             for (const auto &block_terms : block_terms_list_) {
@@ -533,19 +534,19 @@ public:
                 offsets.push_back(p2 - p1);
             }
         }
-        WriteBufVecAdvAligned<SizeT>(p, offsets.data(), offsets.size());
+        WriteBufVecAdvAligned<size_t>(p, offsets.data(), offsets.size());
         for (const auto &block_terms : block_terms_list_) {
             block_terms.WriteToPtr(p);
         }
     }
 
     static BlockFwd LoadFromPtr(const char *&p) {
-        Vector<BlockTerms> block_terms_list;
+        std::vector<BlockTerms> block_terms_list;
 
-        SizeT block_size = ReadBufAdvAligned<SizeT>(p);
-        SizeT block_num = ReadBufAdvAligned<SizeT>(p);
-        const SizeT *offsets = ReadBufVecAdvAligned<SizeT>(p, block_num + 1);
-        for (SizeT i = 0; i < block_num; ++i) {
+        size_t block_size = ReadBufAdvAligned<size_t>(p);
+        size_t block_num = ReadBufAdvAligned<size_t>(p);
+        const size_t *offsets = ReadBufVecAdvAligned<size_t>(p, block_num + 1);
+        for (size_t i = 0; i < block_num; ++i) {
             const char *data = p + offsets[i];
             block_terms_list.push_back(BlockTerms::ReadFromPtr(data));
             if (data - p != i64(offsets[i + 1])) {
@@ -557,8 +558,8 @@ public:
     }
 
 private:
-    SizeT block_size_ = 0;
-    Vector<BlockTerms> block_terms_list_;
+    size_t block_size_ = 0;
+    std::vector<BlockTerms> block_terms_list_;
     TailFwd<DataType, IdxType> tail_fwd_;
 };
 
@@ -569,35 +570,35 @@ public:
 
     static BlockFwd LoadFromPtr(const char *&p) {
         BlockFwd<DataType, IdxType, BMPOwnMem::kFalse> ret;
-        ret.block_size_ = ReadBufAdvAligned<SizeT>(p);
-        ret.block_num_ = ReadBufAdvAligned<SizeT>(p);
-        ret.offsets_ = ReadBufVecAdvAligned<SizeT>(p, ret.block_num_ + 1);
+        ret.block_size_ = ReadBufAdvAligned<size_t>(p);
+        ret.block_num_ = ReadBufAdvAligned<size_t>(p);
+        ret.offsets_ = ReadBufVecAdvAligned<size_t>(p, ret.block_num_ + 1);
         ret.data_ = p;
         p += ret.offsets_[ret.block_num_];
         return ret;
     }
 
     BlockTerms<DataType, IdxType, BMPOwnMem::kFalse> GetBlockTerms(BMPBlockID block_id) const {
-        SizeT offset = offsets_[block_id];
+        size_t offset = offsets_[block_id];
         const char *ptr = data_ + offset;
         return BlockTerms<DataType, IdxType, BMPOwnMem::kFalse>::ReadFromPtr(ptr);
     }
 
-    Vector<DataType> GetScoresTail(const SparseVecRef<DataType, IdxType> &query) const { return {}; }
+    std::vector<DataType> GetScoresTail(const SparseVecRef<DataType, IdxType> &query) const { return {}; }
 
     void Prefetch(BMPBlockID block_id) const {
-        SizeT offset = offsets_[block_id];
+        size_t offset = offsets_[block_id];
         const char *ptr = data_ + offset;
         BlockTerms<DataType, IdxType, BMPOwnMem::kFalse>::ReadFromPtr(ptr).Prefetch();
     }
 
-    SizeT block_size() const { return block_size_; }
-    SizeT block_num() const { return block_num_; }
+    size_t block_size() const { return block_size_; }
+    size_t block_num() const { return block_num_; }
 
 private:
-    SizeT block_size_ = 0;
-    SizeT block_num_ = 0;
-    const SizeT *offsets_ = nullptr;
+    size_t block_size_ = 0;
+    size_t block_num_ = 0;
+    const size_t *offsets_ = nullptr;
     const char *data_ = nullptr;
 };
 

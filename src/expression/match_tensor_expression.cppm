@@ -12,39 +12,37 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:match_tensor_expression;
 
-import :stl;
+import :base_expression;
+import :column_expression;
+
+import match_tensor_expr;
 import data_type;
 import logical_type;
 import knn_expr;
 import internal_types;
-import :base_expression;
-import :column_expression;
-import match_tensor_expr;
 
 namespace infinity {
 
 export class MatchTensorExpression final : public BaseExpression {
 public:
-    MatchTensorExpression(Vector<SharedPtr<BaseExpression>> search_column,
+    MatchTensorExpression(std::vector<std::shared_ptr<BaseExpression>> search_column,
                           MatchTensorSearchMethod search_method,
                           EmbeddingDataType embedding_data_type,
                           u32 dimension,
                           EmbeddingT query_embedding,
                           u32 tensor_basic_embedding_dimension,
-                          const String &options_text,
-                          SharedPtr<BaseExpression> optional_filterm,
-                          String index_name,
+                          const std::string &options_text,
+                          std::shared_ptr<BaseExpression> optional_filterm,
+                          std::string index_name,
                           bool ignore_index);
 
     DataType Type() const override;
 
-    String ToString() const override;
+    std::string ToString() const override;
 
-    static String MethodToString(MatchTensorSearchMethod method);
+    static std::string MethodToString(MatchTensorSearchMethod method);
 
     u64 Hash() const override;
 
@@ -57,9 +55,9 @@ public:
     EmbeddingT query_embedding_;                 // treat the query tensor as an embedding here
     const u32 tensor_basic_embedding_dimension_; // dimension of single embedding in the tensor column
     const u32 num_of_embedding_in_query_tensor_ = dimension_ / tensor_basic_embedding_dimension_;
-    const String options_text_;
-    SharedPtr<BaseExpression> optional_filter_;
-    const String index_name_;
+    const std::string options_text_;
+    std::shared_ptr<BaseExpression> optional_filter_;
+    const std::string index_name_;
     bool ignore_index_;
 };
 

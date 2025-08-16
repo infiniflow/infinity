@@ -1,14 +1,12 @@
-module;
-
 export module infinity_core:memory_chunk;
 
-import :stl;
+import std.compat;
 
 namespace infinity {
 
 export class MemoryChunk {
 public:
-    MemoryChunk(SizeT num_size = 0) : size_(num_size) {
+    MemoryChunk(size_t num_size = 0) : size_(num_size) {
         pos_ = holder_ = sizeof(MemoryChunk);
         if (size_ < pos_) {
             size_ = pos_;
@@ -16,23 +14,23 @@ public:
     }
 
 public:
-    void *Allocate(SizeT num_bytes);
+    void *Allocate(size_t num_bytes);
 
     bool IsInChunk(const void *ptr) const { return ptr >= (void *)this && ptr < (void *)((char *)this + pos_); }
 
     bool IsEmpty() const { return (pos_ >= size_); }
 
-    SizeT GetTotalBytes() const { return size_; }
+    size_t GetTotalBytes() const { return size_; }
 
-    SizeT GetPos() const { return pos_; }
+    size_t GetPos() const { return pos_; }
 
-    SizeT GetFreeSize() const { return size_ - pos_; }
+    size_t GetFreeSize() const { return size_ - pos_; }
 
-    SizeT GetUsedSize() const { return pos_ - holder_; }
+    size_t GetUsedSize() const { return pos_ - holder_; }
 
     void Reset() { pos_ = holder_; }
 
-    SizeT GetHolderSize() const { return holder_; }
+    size_t GetHolderSize() const { return holder_; }
 
     void Clear() {
         if (size_ <= holder_) {
@@ -44,14 +42,14 @@ public:
     }
 
 protected:
-    SizeT size_;
-    SizeT pos_;
-    SizeT holder_;
+    size_t size_;
+    size_t pos_;
+    size_t holder_;
 };
 
 export class ChainedMemoryChunk : public MemoryChunk {
 public:
-    ChainedMemoryChunk(SizeT nSize) : MemoryChunk(nSize), next_(nullptr), prev_(nullptr) {
+    ChainedMemoryChunk(size_t nSize) : MemoryChunk(nSize), next_(nullptr), prev_(nullptr) {
         pos_ = holder_ = sizeof(ChainedMemoryChunk);
         if (size_ < pos_) {
             size_ = pos_;
@@ -72,25 +70,25 @@ private:
 
 export class ChunkAllocator {
 public:
-    ChunkAllocator(SizeT chunk_size) : chunk_size_(chunk_size), used_bytes_(0), total_bytes_(0) {}
+    ChunkAllocator(size_t chunk_size) : chunk_size_(chunk_size), used_bytes_(0), total_bytes_(0) {}
     ~ChunkAllocator() { Release(); }
 
 public:
-    MemoryChunk *Allocate(SizeT num_bytes);
+    MemoryChunk *Allocate(size_t num_bytes);
 
-    SizeT Release();
+    size_t Release();
 
-    SizeT Reset();
+    size_t Reset();
 
     void Clear();
 
-    SizeT GetUsedBytes() const { return used_bytes_; }
+    size_t GetUsedBytes() const { return used_bytes_; }
 
-    SizeT GetTotalBytes() const { return total_bytes_; }
+    size_t GetTotalBytes() const { return total_bytes_; }
 
-    SizeT GetChunkSize() const { return chunk_size_; }
+    size_t GetChunkSize() const { return chunk_size_; }
 
-    SizeT GetAvailableChunkSize() const { return chunk_size_ - sizeof(ChainedMemoryChunk); }
+    size_t GetAvailableChunkSize() const { return chunk_size_ - sizeof(ChainedMemoryChunk); }
 
     bool IsInChunk(const void *ptr) const {
         ChainedMemoryChunk *chunk = chunk_header_;
@@ -106,9 +104,9 @@ public:
 private:
     ChainedMemoryChunk *chunk_header_ = nullptr;
     ChainedMemoryChunk *current_chunk_ = nullptr;
-    SizeT chunk_size_;
-    SizeT used_bytes_;
-    SizeT total_bytes_;
+    size_t chunk_size_;
+    size_t used_bytes_;
+    size_t total_bytes_;
 };
 
 } // namespace infinity

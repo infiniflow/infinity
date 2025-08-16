@@ -12,7 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 #include "embedding_info.h"
-#include <arrow/type.h>
+
+#ifndef PARESER_USE_THIRD_PARTY_MODULE
+#define PARESER_USE_THIRD_PARTY_MODULE 1
+import third_party;
+#endif
 
 namespace infinity {
 

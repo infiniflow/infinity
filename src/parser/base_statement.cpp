@@ -13,7 +13,6 @@
 // limitations under the License.
 
 #include "base_statement.h"
-#include <string>
 
 namespace infinity {
 

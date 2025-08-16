@@ -12,17 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-#include <type_traits>
-
 export module infinity_core:diskann_dist_func;
 
-import :stl;
-// import :simd_functions;
-// import :mlas_matrix_multiply;
 import :search_top_1;
-// import :diskann_simd_func;
 import :infinity_exception;
+
+import std;
 
 namespace infinity {
 export enum class DiskAnnMetricType { L2, Cosine, IP, Invalid };
@@ -30,7 +25,7 @@ export enum class DiskAnnMetricType { L2, Cosine, IP, Invalid };
 export template <typename DiffType, typename ElemType1, typename ElemType2, typename DimType = u32>
 DiffType DiskL2Distance(const ElemType1 *vector1, const ElemType2 *vector2, const DimType dimension) {
     if constexpr (std::is_same_v<ElemType1, f32> && std::is_same_v<ElemType2, f32>) {
-        return GetSIMD_FUNCTIONS().L2Distance_func_ptr_(vector1, vector2, static_cast<SizeT>(dimension));
+        return GetSIMD_FUNCTIONS().L2Distance_func_ptr_(vector1, vector2, static_cast<size_t>(dimension));
     } else {
         DiffType distance{};
         for (u32 i = 0; i < dimension; ++i) {
@@ -44,7 +39,7 @@ DiffType DiskL2Distance(const ElemType1 *vector1, const ElemType2 *vector2, cons
 export template <typename DiffType, typename ElemType1, typename ElemType2, typename DimType = u32>
 DiffType DiskCosineDistance(const ElemType1 *vector1, const ElemType2 *vector2, const DimType dimension) {
     if constexpr (std::is_same_v<ElemType1, f32> && std::is_same_v<ElemType2, f32>) {
-        return GetSIMD_FUNCTIONS().CosineDistance_func_ptr_(vector1, vector2, static_cast<SizeT>(dimension));
+        return GetSIMD_FUNCTIONS().CosineDistance_func_ptr_(vector1, vector2, static_cast<size_t>(dimension));
     } else {
         DiffType dot_product{};
         DiffType norm1{};
@@ -61,7 +56,7 @@ DiffType DiskCosineDistance(const ElemType1 *vector1, const ElemType2 *vector2, 
 export template <typename DiffType, typename ElemType1, typename ElemType2, typename DimType = u32>
 DiffType DiskIPDistance(const ElemType1 *vector1, const ElemType2 *vector2, const DimType dimension) {
     if constexpr (std::is_same_v<ElemType1, f32> && std::is_same_v<ElemType2, f32>) {
-        return GetSIMD_FUNCTIONS().IPDistance_func_ptr_(vector1, vector2, static_cast<SizeT>(dimension));
+        return GetSIMD_FUNCTIONS().IPDistance_func_ptr_(vector1, vector2, static_cast<size_t>(dimension));
     } else {
         DiffType distance{};
         for (u32 i = 0; i < dimension; ++i) {
@@ -79,16 +74,16 @@ void DiskComputL2sq(ElemType *vecs_l2sq, ElemType *data, const DimType dim) {
 }
 
 export void ComputeClosestCenters(f32 *data,
-                                  SizeT num_points,
-                                  SizeT dim,
+                                  size_t num_points,
+                                  size_t dim,
                                   f32 *pivot_data,
-                                  SizeT num_centers,
+                                  size_t num_centers,
                                   u32 *closest_centers_ivf,
-                                  Vector<SizeT> *inverted_index = nullptr) {
+                                  std::vector<size_t> *inverted_index = nullptr) {
     search_top_1_without_dis<f32, f32, f32, u32>(dim, num_points, data, num_centers, pivot_data, closest_centers_ivf);
 
     if (inverted_index != nullptr) {
-        for (SizeT i = 0; i < num_points; ++i) {
+        for (size_t i = 0; i < num_points; ++i) {
             inverted_index[closest_centers_ivf[i]].push_back(i);
         }
     }
@@ -110,7 +105,7 @@ public:
 
     static This Make(DiskAnnMetricType metric) { return This(metric); }
 
-    f32 Compare(DataType *x, DataType *y, SizeT dim) const {
+    f32 Compare(DataType *x, DataType *y, size_t dim) const {
         if (distance_metric_ == DiskAnnMetricType::Cosine) {
             return CosineDistance<f32, DataType, DataType>(x, y, dim);
         } else if (distance_metric_ == DiskAnnMetricType::L2) {
@@ -118,8 +113,7 @@ public:
         } else if (distance_metric_ == DiskAnnMetricType::IP) {
             return IPDistance<f32, DataType, DataType>(x, y, dim);
         } else {
-            String error_message = "Metric type is invalid";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Metric type is invalid");
             return 0;
         }
     }
@@ -128,12 +122,12 @@ public:
 
     bool PreprocessingRequired() const { return false; }
 
-    void PreprocessBasePoints(DataType *original_data, const SizeT orig_dim, const SizeT num_points) {
+    void PreprocessBasePoints(DataType *original_data, const size_t orig_dim, const size_t num_points) {
         // preprocessing not required now
         return;
     }
 
-    void PreprocessQuery(const DataType *query_vec, const SizeT query_dim, DataType *scratch_query) {
+    void PreprocessQuery(const DataType *query_vec, const size_t query_dim, DataType *scratch_query) {
         // preprocessing not required now, just copy the query to scratch_query
         memcpy(scratch_query, query_vec, query_dim * sizeof(DataType));
 
@@ -141,11 +135,11 @@ public:
         // normalizeAndCopy(query_vec, (uint32_t)query_dim, query_scratch);
     }
 
-    SizeT GetRequiredAlignment() const { return alignment_factor_; }
+    size_t GetRequiredAlignment() const { return alignment_factor_; }
 
 protected:
     DiskAnnMetricType distance_metric_;
-    SizeT alignment_factor_ = 8;
+    size_t alignment_factor_ = 8;
 };
 
 } // namespace infinity

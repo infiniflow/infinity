@@ -14,9 +14,9 @@
 
 export module infinity_core:query_result;
 
-import :stl;
 import :status;
 import :logical_node_type;
+
 import global_resource_usage;
 
 namespace infinity {
@@ -54,16 +54,16 @@ public:
     [[nodiscard]] inline ErrorCode ErrorCode() const { return status_.code(); }
     [[nodiscard]] inline DataTable *ResultTable() const { return result_table_.get(); }
     [[nodiscard]] inline const char *ErrorMsg() const { return status_.message(); }
-    [[nodiscard]] inline String &ErrorStr() const { return *status_.msg_; }
+    [[nodiscard]] inline std::string &ErrorStr() const { return *status_.msg_; }
 
 public:
     Status status_{};
-    SharedPtr<DataTable> result_table_{};
+    std::shared_ptr<DataTable> result_table_{};
 };
 
 export struct QueryResult : public BaseResult {
     LogicalNodeType root_operator_type_{LogicalNodeType::kInvalid};
-    String ToString() const;
+    std::string ToString() const;
 
     static QueryResult UnusedResult() { return {}; }
 };

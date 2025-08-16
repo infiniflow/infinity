@@ -12,20 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
-#include <vector>
-
 module infinity_core:logical_node_visitor.impl;
 
 import :logical_node_visitor;
-
-import :stl;
 import :base_expression;
 import :logical_node_type;
 import :infinity_exception;
-
-import :third_party;
 import :expression_type;
 import :logical_node_type;
 import :logical_node;
@@ -57,7 +49,9 @@ import :in_expression;
 import :subquery_expression;
 import :knn_expression;
 import :conjunction_expression;
-import :logger;
+
+import std;
+import third_party;
 
 namespace infinity {
 
@@ -197,8 +191,8 @@ void LogicalNodeVisitor::VisitNodeExpression(LogicalNode &op) {
     }
 }
 
-void LogicalNodeVisitor::VisitExpression(SharedPtr<BaseExpression> &expression) {
-    SharedPtr<BaseExpression> result;
+void LogicalNodeVisitor::VisitExpression(std::shared_ptr<BaseExpression> &expression) {
+    std::shared_ptr<BaseExpression> result;
     switch (expression->type()) {
         case ExpressionType::kUnnest: {
             auto unnest_expression = static_pointer_cast<UnnestExpression>(expression);
@@ -236,8 +230,7 @@ void LogicalNodeVisitor::VisitExpression(SharedPtr<BaseExpression> &expression) 
         case ExpressionType::kCase: {
             auto case_expression = static_pointer_cast<CaseExpression>(expression);
             if (!case_expression->arguments().empty()) {
-                String error_message = "Case expression shouldn't have arguments";
-                UnrecoverableError(error_message);
+                UnrecoverableError("Case expression shouldn't have arguments");
             }
             for (auto &case_expr : case_expression->CaseExpr()) {
                 VisitExpression(case_expr.then_expr_);
@@ -267,14 +260,12 @@ void LogicalNodeVisitor::VisitExpression(SharedPtr<BaseExpression> &expression) 
         case ExpressionType::kColumn: {
             auto column_expression = static_pointer_cast<ColumnExpression>(expression);
             if (!column_expression->arguments().empty()) {
-                String error_message = "Case expression shouldn't have arguments";
-                UnrecoverableError(error_message);
+                UnrecoverableError("Case expression shouldn't have arguments");
             }
 
             result = VisitReplace(column_expression);
             if (result.get() == nullptr) {
-                String error_message = "Visit column expression will always rewrite the expression";
-                UnrecoverableError(error_message);
+                UnrecoverableError("Visit column expression will always rewrite the expression");
             }
             expression = result;
             break;
@@ -295,8 +286,7 @@ void LogicalNodeVisitor::VisitExpression(SharedPtr<BaseExpression> &expression) 
             auto value_expression = static_pointer_cast<ValueExpression>(expression);
 
             if (!value_expression->arguments().empty()) {
-                String error_message = "Case expression shouldn't have arguments";
-                UnrecoverableError(error_message);
+                UnrecoverableError("Case expression shouldn't have arguments");
             }
 
             result = VisitReplace(value_expression);
@@ -324,8 +314,7 @@ void LogicalNodeVisitor::VisitExpression(SharedPtr<BaseExpression> &expression) 
 
             result = VisitReplace(subquery_expression);
             if (result.get() != nullptr) {
-                String error_message = "Visit subquery expression will always rewrite the expression";
-                UnrecoverableError(error_message);
+                UnrecoverableError("Visit subquery expression will always rewrite the expression");
             }
             break;
         }
@@ -346,13 +335,12 @@ void LogicalNodeVisitor::VisitExpression(SharedPtr<BaseExpression> &expression) 
             break;
         }
         default: {
-            String error_message = fmt::format("Unexpected expression type: {}", expression->Name());
-            UnrecoverableError(error_message);
+            UnrecoverableError(fmt::format("Unexpected expression type: {}", expression->Name()));
         }
     }
 }
 
-void LogicalNodeVisitor::VisitExpressionChildren(SharedPtr<BaseExpression> &expression) {
+void LogicalNodeVisitor::VisitExpressionChildren(std::shared_ptr<BaseExpression> &expression) {
     switch (expression->type()) {
 
         case ExpressionType::kAggregate: {
@@ -453,28 +441,28 @@ void LogicalNodeVisitor::VisitExpressionChildren(SharedPtr<BaseExpression> &expr
     }
 }
 
-SharedPtr<BaseExpression> LogicalNodeVisitor::VisitReplace(const SharedPtr<AggregateExpression> &) { return nullptr; }
+std::shared_ptr<BaseExpression> LogicalNodeVisitor::VisitReplace(const std::shared_ptr<AggregateExpression> &) { return nullptr; }
 
-SharedPtr<BaseExpression> LogicalNodeVisitor::VisitReplace(const SharedPtr<BetweenExpression> &) { return nullptr; }
+std::shared_ptr<BaseExpression> LogicalNodeVisitor::VisitReplace(const std::shared_ptr<BetweenExpression> &) { return nullptr; }
 
-SharedPtr<BaseExpression> LogicalNodeVisitor::VisitReplace(const SharedPtr<CaseExpression> &) { return nullptr; }
+std::shared_ptr<BaseExpression> LogicalNodeVisitor::VisitReplace(const std::shared_ptr<CaseExpression> &) { return nullptr; }
 
-SharedPtr<BaseExpression> LogicalNodeVisitor::VisitReplace(const SharedPtr<CastExpression> &) { return nullptr; }
+std::shared_ptr<BaseExpression> LogicalNodeVisitor::VisitReplace(const std::shared_ptr<CastExpression> &) { return nullptr; }
 
-SharedPtr<BaseExpression> LogicalNodeVisitor::VisitReplace(const SharedPtr<ColumnExpression> &) { return nullptr; }
+std::shared_ptr<BaseExpression> LogicalNodeVisitor::VisitReplace(const std::shared_ptr<ColumnExpression> &) { return nullptr; }
 
-SharedPtr<BaseExpression> LogicalNodeVisitor::VisitReplace(const SharedPtr<ConjunctionExpression> &) { return nullptr; }
+std::shared_ptr<BaseExpression> LogicalNodeVisitor::VisitReplace(const std::shared_ptr<ConjunctionExpression> &) { return nullptr; }
 
-SharedPtr<BaseExpression> LogicalNodeVisitor::VisitReplace(const SharedPtr<FunctionExpression> &) { return nullptr; }
+std::shared_ptr<BaseExpression> LogicalNodeVisitor::VisitReplace(const std::shared_ptr<FunctionExpression> &) { return nullptr; }
 
-SharedPtr<BaseExpression> LogicalNodeVisitor::VisitReplace(const SharedPtr<ValueExpression> &) { return nullptr; }
+std::shared_ptr<BaseExpression> LogicalNodeVisitor::VisitReplace(const std::shared_ptr<ValueExpression> &) { return nullptr; }
 
-SharedPtr<BaseExpression> LogicalNodeVisitor::VisitReplace(const SharedPtr<InExpression> &) { return nullptr; }
+std::shared_ptr<BaseExpression> LogicalNodeVisitor::VisitReplace(const std::shared_ptr<InExpression> &) { return nullptr; }
 
-SharedPtr<BaseExpression> LogicalNodeVisitor::VisitReplace(const SharedPtr<SubqueryExpression> &) { return nullptr; }
+std::shared_ptr<BaseExpression> LogicalNodeVisitor::VisitReplace(const std::shared_ptr<SubqueryExpression> &) { return nullptr; }
 
-SharedPtr<BaseExpression> LogicalNodeVisitor::VisitReplace(const SharedPtr<KnnExpression> &) { return nullptr; }
+std::shared_ptr<BaseExpression> LogicalNodeVisitor::VisitReplace(const std::shared_ptr<KnnExpression> &) { return nullptr; }
 
-SharedPtr<BaseExpression> LogicalNodeVisitor::VisitReplace(const SharedPtr<UnnestExpression> &) { return nullptr; }
+std::shared_ptr<BaseExpression> LogicalNodeVisitor::VisitReplace(const std::shared_ptr<UnnestExpression> &) { return nullptr; }
 
 } // namespace infinity

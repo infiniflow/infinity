@@ -11,10 +11,10 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-module;
+
 export module infinity_core:skiplist;
 
-import :stl;
+import :infinity_type;
 
 namespace infinity {
 constexpr i32 MAX_NUM = 2147483647;
@@ -28,7 +28,7 @@ class Arena;
 class Iterator;
 
 u64 EncodeValue(u32 valOffset, u32 valSize) { return u64(valSize) << 32 | u64(valOffset); }
-Pair<u32, u32> DecodeVal(u64 value) {
+std::pair<u32, u32> DecodeVal(u64 value) {
     auto valOffset = u32(value);
     auto valSize = u32(value >> 32);
     return {valOffset, valSize};
@@ -42,7 +42,7 @@ public:
 export template <typename KeyType, typename ValueType>
 class SkipListNode {
 public:
-    Pair<u32, u32> GetValueOffset() {
+    std::pair<u32, u32> GetValueOffset() {
         u64 v = value_.load(std::memory_order_relaxed);
         return DecodeVal(v);
     }
@@ -62,11 +62,11 @@ public:
     bool CasNextOffset(i32 h, u32 old, u32 val) { return atomic_compare_exchange_strong(&next_[h], &old, val); }
 
 public:
-    Atomic<u64> value_;
+    std::atomic<u64> value_;
     u32 key_offset_;
     u16 key_size_;
-    Atomic<u16> height_;
-    Atomic<u32> next_[MAX_LEVEL];
+    std::atomic<u16> height_;
+    std::atomic<u32> next_[MAX_LEVEL];
 };
 
 export template <typename KeyType, typename ValueType, typename Comparator>
@@ -157,7 +157,7 @@ public:
         }
 
         i32 cmp = 0;
-        if constexpr (std::is_same_v<KeyType, String>) {
+        if constexpr (std::is_same_v<KeyType, std::string>) {
             auto nextkey = arena_->GetKeyForString(n->key_offset_, n->key_size_);
             cmp = comparator_(key.data(), nextkey);
         } else {
@@ -182,11 +182,11 @@ public:
     public:
         Iterator(SkipListNode<KeyType, ValueType> *node, SkipList<KeyType, ValueType, Comparator> *s) : s_(s), current_(node) {}
 
-        Pair<KeyType, ValueType> operator*() {
+        std::pair<KeyType, ValueType> operator*() {
             KeyType k{};
-            if constexpr (std::is_same_v<ValueType, String>) {
+            if constexpr (std::is_same_v<ValueType, std::string>) {
                 auto ret = current_->KeyForString(s_->arena_);
-                k = String(ret, current_->key_size_);
+                k = std::string(ret, current_->key_size_);
             } else {
                 k = current_->Key(s_->arena_);
             }
@@ -194,9 +194,9 @@ public:
         }
 
         const KeyType Key() {
-            if constexpr (std::is_same_v<ValueType, String>) {
+            if constexpr (std::is_same_v<ValueType, std::string>) {
                 auto ret = current_->KeyForString(s_->arena_);
-                return String(ret, current_->key_size_);
+                return std::string(ret, current_->key_size_);
             } else {
                 return current_->Key(s_->arena_);
             }
@@ -247,7 +247,7 @@ private:
         Node *node = arena_->GetNode(nodeOffset);
         node->key_offset_ = keyOffset;
 
-        if constexpr (std::is_same_v<ValueType, String>) {
+        if constexpr (std::is_same_v<ValueType, std::string>) {
             node->key_size_ = u16(key.size());
         } else {
             node->key_size_ = u16(sizeof(key));
@@ -266,7 +266,7 @@ private:
     }
 
     u64 GetTargetLen(const ValueType &val) {
-        if constexpr (std::is_same_v<ValueType, String>) {
+        if constexpr (std::is_same_v<ValueType, std::string>) {
             return val.size();
         } else {
             return sizeof(val);
@@ -279,7 +279,7 @@ private:
 
     i32 GetHeight() { return height_.load(std::memory_order_relaxed); }
 
-    Pair<Node *, bool> FindNear(const KeyType &k, bool less, bool allowEqual) {
+    std::pair<Node *, bool> FindNear(const KeyType &k, bool less, bool allowEqual) {
         auto x = GetHead();
         auto level = i32(GetHeight() - 1);
 
@@ -301,7 +301,7 @@ private:
             }
 
             i32 cmp = 0;
-            if constexpr (std::is_same_v<KeyType, String>) {
+            if constexpr (std::is_same_v<KeyType, std::string>) {
                 auto nextkey = next->KeyForString(arena_);
                 cmp = comparator_(k.data(), nextkey);
             } else {
@@ -345,7 +345,7 @@ private:
         }
     }
 
-    Pair<u32, u32> FindSpliceForLevel(const KeyType &k, u32 before, i32 level) {
+    std::pair<u32, u32> FindSpliceForLevel(const KeyType &k, u32 before, i32 level) {
         while (1) {
             auto beforeNode = arena_->GetNode(before);
             auto nextOffset = beforeNode->GetNextOffset(level);
@@ -356,7 +356,7 @@ private:
             }
 
             i32 cmp = 0;
-            if constexpr (std::is_same_v<KeyType, String>) {
+            if constexpr (std::is_same_v<KeyType, std::string>) {
                 auto nextkey = nextNode->KeyForString(arena_);
                 cmp = comparator_(k.data(), nextkey);
             } else {
@@ -399,8 +399,8 @@ private:
     Comparator const comparator_;
 
     // cur_height
-    Atomic<i32> height_;
-    Atomic<u32> head_offset_;
+    std::atomic<i32> height_;
+    std::atomic<u32> head_offset_;
 
     u32 buf_size_;
 };
@@ -414,7 +414,7 @@ class Arena {
     static constexpr u32 MAX_NODE_SIZE = sizeof(Node);
 
 public:
-    explicit Arena(SizeT n) : n_(1) { buf_.resize(n); }
+    explicit Arena(size_t n) : n_(1) { buf_.resize(n); }
 
     u32 Allocate(u32 sz) {
         n_.fetch_add(sz);
@@ -433,7 +433,7 @@ public:
     }
 
     u32 AddNode(i32 height) {
-        SizeT len = MAX_NODE_SIZE - ((MAX_LEVEL - height) * OFFSET_SIZE) + NODE_ALIGN;
+        size_t len = MAX_NODE_SIZE - ((MAX_LEVEL - height) * OFFSET_SIZE) + NODE_ALIGN;
         u32 n = Allocate(len);
         u32 alignN = (n + NODE_ALIGN) & ~(NODE_ALIGN);
         return alignN;
@@ -441,7 +441,7 @@ public:
 
     u32 AddVal(const ValueType &v) {
         u32 offset = 0;
-        if constexpr (std::is_same_v<ValueType, String>) {
+        if constexpr (std::is_same_v<ValueType, std::string>) {
             auto l = v.size();
             offset = Allocate(l + 1);
             std::memcpy(&buf_[offset], v.data(), l);
@@ -456,7 +456,7 @@ public:
 
     u32 AddKey(const KeyType &key) {
         u32 offset = 0;
-        if constexpr (std::is_same_v<KeyType, String>) {
+        if constexpr (std::is_same_v<KeyType, std::string>) {
             auto l = key.size();
             offset = Allocate(l + 1);
             std::memcpy(&buf_[offset], key.data(), l);
@@ -503,8 +503,8 @@ public:
         if (offset + size > ArenaSize()) {
             return ValueType{};
         }
-        if constexpr (std::is_same_v<ValueType, String>) {
-            return String(&buf_[offset], size);
+        if constexpr (std::is_same_v<ValueType, std::string>) {
+            return std::string(&buf_[offset], size);
         } else {
             return *reinterpret_cast<ValueType *>(&buf_[offset]);
         }
@@ -512,7 +512,7 @@ public:
 
     void Clear() {
         n_ = 0;
-        Vector<char>().swap(buf_);
+        std::vector<char>().swap(buf_);
     }
 
     char Buf(i32 idx) {
@@ -523,7 +523,7 @@ public:
     }
 
 private:
-    Atomic<u32> n_;
-    Vector<char> buf_;
+    std::atomic<u32> n_;
+    std::vector<char> buf_;
 };
 } // namespace infinity

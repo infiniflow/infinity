@@ -12,47 +12,43 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
-#include <sstream>
-
 module infinity_core:logical_create_index.impl;
 
 import :logical_create_index;
-
-import :stl;
 import :column_binding;
-
 import :base_expression;
 import :index_base;
+
+import std;
+
 import logical_type;
 import internal_types;
 import data_type;
 
 namespace infinity {
 
-Vector<ColumnBinding> LogicalCreateIndex::GetColumnBindings() const { return {}; };
+std::vector<ColumnBinding> LogicalCreateIndex::GetColumnBindings() const { return {}; };
 
-SharedPtr<Vector<String>> LogicalCreateIndex::GetOutputNames() const {
-    SharedPtr<Vector<String>> result = MakeShared<Vector<String>>();
+std::shared_ptr<std::vector<std::string>> LogicalCreateIndex::GetOutputNames() const {
+    std::shared_ptr<std::vector<std::string>> result = std::make_shared<std::vector<std::string>>();
     result->emplace_back("OK");
     return result;
 }
 
-SharedPtr<Vector<SharedPtr<DataType>>> LogicalCreateIndex::GetOutputTypes() const {
-    SharedPtr<Vector<SharedPtr<DataType>>> result_type = MakeShared<Vector<SharedPtr<DataType>>>();
-    result_type->emplace_back(MakeShared<DataType>(LogicalType::kInteger));
+std::shared_ptr<std::vector<std::shared_ptr<DataType>>> LogicalCreateIndex::GetOutputTypes() const {
+    std::shared_ptr<std::vector<std::shared_ptr<DataType>>> result_type = std::make_shared<std::vector<std::shared_ptr<DataType>>>();
+    result_type->emplace_back(std::make_shared<DataType>(LogicalType::kInteger));
     return result_type;
 }
 
-String LogicalCreateIndex::ToString(i64 &space) const {
+std::string LogicalCreateIndex::ToString(i64 &space) const {
     std::stringstream ss;
-    String arrow_str;
+    std::string arrow_str;
     if (space > 3) {
         space -= 4;
         arrow_str = "->  ";
     }
-    ss << String(space, ' ') << arrow_str << "Create Table: " << *base_table_ref_->table_name() << "." << index_definition_->ToString();
+    ss << std::string(space, ' ') << arrow_str << "Create Table: " << *base_table_ref_->table_name() << "." << index_definition_->ToString();
     space += arrow_str.size();
 
     return ss.str();

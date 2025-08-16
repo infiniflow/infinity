@@ -12,11 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:bottom_executor;
 
-import :stl;
 import :blocking_queue;
 
 namespace infinity {
@@ -29,7 +26,7 @@ public:
     BottomExecutor();
     virtual ~BottomExecutor();
 
-    void Start(SizeT executor_size);
+    void Start(size_t executor_size);
     void Stop();
 
     void Submit(NewTxn *txn);
@@ -38,11 +35,11 @@ private:
     void Process();
 
 private:
-    Atomic<bool> running_{true};
-    Vector<SharedPtr<BlockingQueue<NewTxn *>>> txn_queues_{};
-    Vector<Thread> executors_{};
+    std::atomic<bool> running_{true};
+    std::vector<std::shared_ptr<BlockingQueue<NewTxn *>>> txn_queues_{};
+    std::vector<std::thread> executors_{};
 
-    SizeT cnt_{0};
+    size_t cnt_{0};
     std::mutex mutex_{};
     std::condition_variable cv_{};
 };

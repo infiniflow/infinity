@@ -17,7 +17,8 @@ module;
 export module infinity_core:optimizer_rule;
 
 import :logical_node;
-import :stl;
+
+import std;
 
 namespace infinity {
 export class QueryContext;
@@ -25,9 +26,9 @@ export class QueryContext;
 // class QueryContext;
 export class OptimizerRule {
 public:
-    virtual void ApplyToPlan(QueryContext *query_context_ptr, SharedPtr<LogicalNode> &logical_plan) = 0;
+    virtual void ApplyToPlan(QueryContext *query_context_ptr, std::shared_ptr<LogicalNode> &logical_plan) = 0;
 
-    virtual String name() const = 0;
+    virtual std::string name() const = 0;
 
     virtual ~OptimizerRule() = default;
 };

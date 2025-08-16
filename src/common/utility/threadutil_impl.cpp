@@ -14,7 +14,8 @@
 
 module;
 
-#include <thread>
+#include <pthread.h>
+
 #ifdef __APPLE__
 #include <mach/mach_init.h>
 #include <mach/thread_act.h>
@@ -24,7 +25,6 @@ module;
 
 module infinity_core:threadutil.impl;
 
-import :stl;
 import :threadutil;
 
 namespace infinity {
@@ -77,7 +77,7 @@ inline int pthread_setaffinity_np(pthread_t thread, size_t cpu_size, cpu_set_t *
 } // namespace mac
 #endif
 
-bool ThreadUtil::pin(Thread &thread, const u16 cpu_id) {
+bool ThreadUtil::pin(std::thread &thread, const u16 cpu_id) {
 #if defined(__APPLE__)
     mac::cpu_set_t cpuset;
     CPU_ZERO(&cpuset);

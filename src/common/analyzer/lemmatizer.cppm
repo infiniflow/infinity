@@ -16,41 +16,40 @@ module;
 
 export module infinity_core:lemmatizer;
 
-import :stl;
 import :status;
 
 namespace infinity {
 
 export class Lemmatizer {
 public:
-    Lemmatizer(const String &path);
+    Lemmatizer(const std::string &path);
 
     ~Lemmatizer();
 
     Status Load();
 
-    String Lemmatize(const String &form, const String &pos = "");
+    std::string Lemmatize(const std::string &form, const std::string &pos = "");
 
 private:
     Status LoadLemmaPosOffsetMap();
 
     void LoadExceptionMap();
 
-    Vector<String> Morphy(const String &form, const String &pos, bool check_exceptions = true);
+    std::vector<std::string> Morphy(const std::string &form, const std::string &pos, bool check_exceptions = true);
 
-    Vector<String> ApplyRules(const Vector<String> &forms, const String &pos);
+    std::vector<std::string> ApplyRules(const std::vector<std::string> &forms, const std::string &pos);
 
-    Vector<String> FilterForms(const Vector<String> &forms, const String &pos);
+    std::vector<std::string> FilterForms(const std::vector<std::string> &forms, const std::string &pos);
 
-    String path_;
+    std::string path_;
 
-    HashMap<String, HashMap<String, Vector<int>>> lemma_pos_offset_map_;
-    HashMap<String, HashMap<String, Vector<String>>> exception_map_;
-    HashMap<String, int> pos_numbers_;
-    HashMap<int, String> pos_names_;
-    HashMap<String, String> file_map_;
-    HashMap<String, Vector<Pair<String, String>>> MORPHOLOGICAL_SUBSTITUTIONS;
-    Vector<String> POS_LIST;
+    std::unordered_map<std::string, std::unordered_map<std::string, std::vector<int>>> lemma_pos_offset_map_;
+    std::unordered_map<std::string, std::unordered_map<std::string, std::vector<std::string>>> exception_map_;
+    std::unordered_map<std::string, int> pos_numbers_;
+    std::unordered_map<int, std::string> pos_names_;
+    std::unordered_map<std::string, std::string> file_map_;
+    std::unordered_map<std::string, std::vector<std::pair<std::string, std::string>>> MORPHOLOGICAL_SUBSTITUTIONS;
+    std::vector<std::string> POS_LIST;
 };
 
 } // namespace infinity

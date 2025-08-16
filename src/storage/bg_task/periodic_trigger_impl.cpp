@@ -17,16 +17,16 @@ module;
 module infinity_core:periodic_trigger.impl;
 
 import :periodic_trigger;
-import :stl;
 import :logger;
 import :infinity_exception;
 import :background_process;
 import :compaction_process;
 import :bg_task;
-import :third_party;
-
 import :new_txn_manager;
 import :infinity_context;
+
+import std;
+import third_party;
 
 namespace infinity {
 
@@ -45,17 +45,17 @@ bool PeriodicTrigger::Check() {
     return true;
 }
 
-SharedPtr<NewCleanupTask> NewCleanupPeriodicTrigger::CreateNewCleanupTask() {
+std::shared_ptr<NewCleanupTask> NewCleanupPeriodicTrigger::CreateNewCleanupTask() {
     auto *bg_processor = InfinityContext::instance().storage()->bg_processor();
     auto *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
 
-    TxnTimeStamp last_cleanup_ts = bg_processor->last_cleanup_ts();
-    TxnTimeStamp cur_cleanup_ts = new_txn_mgr->GetOldestAliveTS();
+    auto last_cleanup_ts = bg_processor->last_cleanup_ts();
+    auto cur_cleanup_ts = new_txn_mgr->GetOldestAliveTS();
     if (cur_cleanup_ts <= last_cleanup_ts) {
         return nullptr;
     }
 
-    return MakeShared<NewCleanupTask>();
+    return std::make_shared<NewCleanupTask>();
 }
 
 void NewCleanupPeriodicTrigger::Trigger() {
@@ -73,8 +73,8 @@ void CheckpointPeriodicTrigger::Trigger() {
     auto *bg_processor = InfinityContext::instance().storage()->bg_processor();
     auto *wal_manager = InfinityContext::instance().storage()->wal_manager();
     auto *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
-    TxnTimeStamp last_ckp_ts = wal_manager->LastCheckpointTS();
-    TxnTimeStamp cur_ckp_ts = new_txn_mgr->CurrentTS() + 1;
+    auto last_ckp_ts = wal_manager->LastCheckpointTS();
+    auto cur_ckp_ts = new_txn_mgr->CurrentTS() + 1;
     if (cur_ckp_ts <= last_ckp_ts) {
         LOG_DEBUG("No write txn after last checkpoint");
         return;
@@ -86,13 +86,13 @@ void CheckpointPeriodicTrigger::Trigger() {
     TxnTimeStamp max_commit_ts{};
     i64 wal_size{};
     std::tie(max_commit_ts, wal_size) = wal_manager->GetCommitState();
-    auto checkpoint_task = MakeShared<NewCheckpointTask>(wal_size);
+    auto checkpoint_task = std::make_shared<NewCheckpointTask>(wal_size);
     bg_processor->Submit(std::move(checkpoint_task));
 }
 
 void CompactSegmentPeriodicTrigger::Trigger() {
     LOG_DEBUG(fmt::format("Trigger compact segment task, after {} seconds", duration_.load()));
-    auto compact_task = MakeShared<NotifyCompactTask>();
+    auto compact_task = std::make_shared<NotifyCompactTask>();
     auto *compact_processor = InfinityContext::instance().storage()->compaction_processor();
     compact_processor->Submit(std::move(compact_task));
 }
@@ -100,10 +100,10 @@ void CompactSegmentPeriodicTrigger::Trigger() {
 void OptimizeIndexPeriodicTrigger::Trigger() {
     LOG_DEBUG(fmt::format("Trigger optimize index task, after {} seconds", duration_.load()));
     if (!new_optimize_) {
-        auto optimize_task = MakeShared<NotifyOptimizeTask>();
+        auto optimize_task = std::make_shared<NotifyOptimizeTask>();
         compact_processor_->Submit(std::move(optimize_task));
     } else {
-        auto optimize_task = MakeShared<NotifyOptimizeTask>(true);
+        auto optimize_task = std::make_shared<NotifyOptimizeTask>(true);
         auto *compact_processor = InfinityContext::instance().storage()->compaction_processor();
         compact_processor->Submit(std::move(optimize_task));
     }

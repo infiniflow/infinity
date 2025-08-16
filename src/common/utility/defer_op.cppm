@@ -16,7 +16,7 @@ module;
 
 export module infinity_core:defer_op;
 
-import :stl;
+import std;
 
 namespace infinity {
 
@@ -26,7 +26,7 @@ public:
     explicit DeferFn(FN func) : func_(std::move(func)) {}
 
     DeferFn(const DeferFn &) = delete;
-    DeferFn(DeferFn &&) : func_(std::exchange(func_, None)) {}
+    DeferFn(DeferFn &&) : func_(std::exchange(func_, std::nullopt)) {}
 
     ~DeferFn() noexcept {
         if (func_) {
@@ -35,7 +35,7 @@ public:
     }
 
 private:
-    Optional<FN> func_;
+    std::optional<FN> func_;
 };
 
 } // namespace infinity

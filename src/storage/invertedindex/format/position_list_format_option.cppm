@@ -1,8 +1,5 @@
-module;
-
 export module infinity_core:position_list_format_option;
 
-import :stl;
 import :posting_field;
 import :index_defines;
 

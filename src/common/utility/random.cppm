@@ -1,16 +1,15 @@
-module;
-
 export module infinity_core:random;
 
-import :stl;
+import std;
+import std.compat;
 
 namespace infinity {
 
-export String RandomString(SizeT len);
+export std::string RandomString(size_t len);
 
 // Return randomized `name`
-export SharedPtr<String> DetermineRandomString(const String &parent_dir, const String &name);
+export std::shared_ptr<std::string> DetermineRandomString(const std::string &parent_dir, const std::string &name);
 
-export SharedPtr<String> DetermineRandomPath(const String &name);
+export std::shared_ptr<std::string> DetermineRandomPath(const std::string &name);
 
 } // namespace infinity

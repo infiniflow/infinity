@@ -13,15 +13,13 @@
 // limitations under the License.
 
 #ifdef CI
-#include <random>
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 import infinity_core;
 import base_test;
 #else
 module;
 
-#include <random>
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 
 module infinity_core:ut.test_lvq;
 
@@ -29,11 +27,12 @@ import :ut.base_test;
 import :dist_func_l2;
 import :data_store;
 import :vec_store_type;
-import :stl;
 import :infinity_exception;
 import :hnsw_common;
 import :virtual_store;
 import :local_file_handle;
+
+import std;
 #endif
 
 using namespace infinity;
@@ -168,7 +167,7 @@ TEST_F(HnswLVQTest, test1) {
     {
         auto lvq_store = DataStore::Make(vec_n_, 1 /*chunk_n*/, dim_, 0 /*Mmax0*/, 0 /*Mmax*/);
         {
-            for (SizeT i = 0; i < vec_n_; ++i) {
+            for (size_t i = 0; i < vec_n_; ++i) {
                 auto iter = DenseVectorIter<float, LabelT>(data.get() + i * dim_, dim_, 1);
                 auto [start_i, end_i] = lvq_store.OptAddVec(std::move(iter));
                 EXPECT_EQ(start_i, i);

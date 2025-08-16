@@ -14,8 +14,6 @@
 
 module;
 
-#include <cstring>
-
 #include "api.h"
 #include "stem_UTF_8_danish.h"
 #include "stem_UTF_8_dutch.h"
@@ -36,7 +34,6 @@ module;
 
 module infinity_core:stemmer.impl;
 
-import :stl;
 import :stemmer;
 
 namespace infinity {
@@ -87,26 +84,26 @@ Stemmer::~Stemmer() { DeInit(); }
 
 bool Stemmer::Init(Language language) {
     // create stemming function structure
-    stem_function_ = (void *)new StemFunc;
+    stem_function_ = static_cast<void *>(new StemFunc);
     if (stem_function_ == 0) {
         return false;
     }
 
     // set stemming functions
     if (language > 0 && language < STEM_LANG_EOS) {
-        ((StemFunc *)stem_function_)->create = STEM_FUNCTION[language].create;
-        ((StemFunc *)stem_function_)->close = STEM_FUNCTION[language].close;
-        ((StemFunc *)stem_function_)->stem = STEM_FUNCTION[language].stem;
-        ((StemFunc *)stem_function_)->env = STEM_FUNCTION[language].env;
+        static_cast<StemFunc *>(stem_function_)->create = STEM_FUNCTION[language].create;
+        static_cast<StemFunc *>(stem_function_)->close = STEM_FUNCTION[language].close;
+        static_cast<StemFunc *>(stem_function_)->stem = STEM_FUNCTION[language].stem;
+        static_cast<StemFunc *>(stem_function_)->env = STEM_FUNCTION[language].env;
     } else {
-        delete (StemFunc *)stem_function_;
+        delete static_cast<StemFunc *>(stem_function_);
         stem_function_ = 0;
         return false;
     }
 
     // create env
-    ((StemFunc *)stem_function_)->env = ((StemFunc *)stem_function_)->create();
-    if (((StemFunc *)stem_function_)->env == 0) {
+    static_cast<StemFunc *>(stem_function_)->env = static_cast<StemFunc *>(stem_function_)->create();
+    if (static_cast<StemFunc *>(stem_function_)->env == 0) {
         DeInit();
         return false;
     }
@@ -129,20 +126,20 @@ struct SN_env {
 
 void Stemmer::DeInit(void) {
     if (stem_function_) {
-        ((StemFunc *)stem_function_)->close(((StemFunc *)stem_function_)->env);
-        delete (StemFunc *)stem_function_;
+        static_cast<StemFunc *>(stem_function_)->close(((StemFunc *)stem_function_)->env);
+        delete static_cast<StemFunc *>(stem_function_);
         stem_function_ = 0;
     }
 }
 
-bool Stemmer::Stem(const String &term, String &resultWord) {
+bool Stemmer::Stem(const std::string &term, std::string &resultWord) {
     if (!stem_function_) {
         return false;
     }
 
     // set environment
-    if (SN_set_current(((StemFunc *)stem_function_)->env, term.length(), (const symbol *)term.c_str())) {
-        ((StemFunc *)stem_function_)->env->l = 0;
+    if (SN_set_current(static_cast<StemFunc *>(stem_function_)->env, term.length(), (const symbol *)term.c_str())) {
+        static_cast<StemFunc *>(stem_function_)->env->l = 0;
         return false;
     }
 

@@ -18,12 +18,19 @@ export module infinity_core:infinity_thrift_service;
 
 import :infinity_thrift_types;
 import :infinity;
-import :stl;
 import :query_options;
+import :data_block;
+import :table_def;
+import :column_vector;
+import :query_result;
+import :status;
+
+import std;
+import std.compat;
+
 import column_def;
 import statement_common;
 import data_type;
-import :status;
 import embedding_info;
 import constant_expr;
 import column_expr;
@@ -39,11 +46,7 @@ import update_statement;
 import search_expr;
 import explain_statement;
 import create_index_info;
-import :data_block;
-import :table_def;
 import internal_types;
-import :column_vector;
-import :query_result;
 import select_statement;
 import global_resource_usage;
 
@@ -52,9 +55,9 @@ namespace infinity {
 struct ClientVersions {
     ClientVersions();
 
-    HashMap<i64, String> client_version_map_;
+    std::unordered_map<i64, std::string> client_version_map_;
 
-    Pair<const char *, Status> GetVersionByIndex(i64);
+    std::pair<const char *, Status> GetVersionByIndex(i64);
 };
 
 export class InfinityThriftService final : public infinity_thrift_rpc::InfinityServiceIf {
@@ -63,7 +66,7 @@ private:
     static constexpr i64 current_version_index_{30}; // 0.6.0.dev4 and 0.6.0.dev5
 
     static std::mutex infinity_session_map_mutex_;
-    static HashMap<u64, SharedPtr<Infinity>> infinity_session_map_;
+    static std::unordered_map<u64, std::shared_ptr<Infinity>> infinity_session_map_;
 
     static ClientVersions client_version_;
 
@@ -96,7 +99,7 @@ public:
 
     void Insert(infinity_thrift_rpc::CommonResponse &response, const infinity_thrift_rpc::InsertRequest &request) final;
 
-    Tuple<CopyFileType, Status> GetCopyFileType(infinity_thrift_rpc::CopyFileType::type copy_file_type);
+    std::tuple<CopyFileType, Status> GetCopyFileType(infinity_thrift_rpc::CopyFileType::type copy_file_type);
 
     void Import(infinity_thrift_rpc::CommonResponse &response, const infinity_thrift_rpc::ImportRequest &request) final;
 
@@ -168,7 +171,8 @@ public:
 
     void CreateTableSnapshot(infinity_thrift_rpc::CommonResponse &response, const infinity_thrift_rpc::CreateTableSnapshotRequest &request) final;
 
-    void CreateDatabaseSnapshot(infinity_thrift_rpc::CommonResponse &response, const infinity_thrift_rpc::CreateDatabaseSnapshotRequest &request) final;
+    void CreateDatabaseSnapshot(infinity_thrift_rpc::CommonResponse &response,
+                                const infinity_thrift_rpc::CreateDatabaseSnapshotRequest &request) final;
 
     void CreateSystemSnapshot(infinity_thrift_rpc::CommonResponse &response, const infinity_thrift_rpc::CreateSystemSnapshotRequest &request) final;
 
@@ -177,17 +181,19 @@ public:
     void RestoreSnapshot(infinity_thrift_rpc::CommonResponse &response, const infinity_thrift_rpc::RestoreSnapshotRequest &request) final;
 
     template <typename T>
-    static void
-    HandleArrayTypeRecursively(String &output_str, const DataType &data_type, const T &data_value, const SharedPtr<ColumnVector> &column_vector);
+    static void HandleArrayTypeRecursively(std::string &output_str,
+                                           const DataType &data_type,
+                                           const T &data_value,
+                                           const std::shared_ptr<ColumnVector> &column_vector);
 
 private:
-    Tuple<Infinity *, Status> GetInfinityBySessionID(i64 session_id);
+    std::tuple<Infinity *, Status> GetInfinityBySessionID(i64 session_id);
 
     Status GetAndRemoveSessionID(i64 session_id);
 
-    static Tuple<ColumnDef *, Status> GetColumnDefFromProto(const infinity_thrift_rpc::ColumnDef &column_def);
+    static std::tuple<ColumnDef *, Status> GetColumnDefFromProto(const infinity_thrift_rpc::ColumnDef &column_def);
 
-    static SharedPtr<DataType> GetColumnTypeFromProto(const infinity_thrift_rpc::DataType &type);
+    static std::shared_ptr<DataType> GetColumnTypeFromProto(const infinity_thrift_rpc::DataType &type);
 
     static ConstraintType GetConstraintTypeFromProto(infinity_thrift_rpc::Constraint::type constraint);
 
@@ -223,59 +229,68 @@ private:
 
     static ExplainType GetExplainTypeFromProto(const infinity_thrift_rpc::ExplainType::type &type);
 
-    static Tuple<void *, i64, Status> GetEmbeddingDataTypeDataPtrFromProto(const infinity_thrift_rpc::EmbeddingData &embedding_data);
+    static std::tuple<void *, i64, Status> GetEmbeddingDataTypeDataPtrFromProto(const infinity_thrift_rpc::EmbeddingData &embedding_data);
 
-    static Tuple<UpdateExpr *, Status> GetUpdateExprFromProto(const infinity_thrift_rpc::UpdateExpr &update_expr);
+    static std::tuple<UpdateExpr *, Status> GetUpdateExprFromProto(const infinity_thrift_rpc::UpdateExpr &update_expr);
 
     static OptimizeOptions GetParsedOptimizeOptionFromProto(const infinity_thrift_rpc::OptimizeOptions &options);
 
-    static infinity_thrift_rpc::ColumnType::type DataTypeToProtoColumnType(const SharedPtr<DataType> &data_type);
+    static infinity_thrift_rpc::ColumnType::type DataTypeToProtoColumnType(const std::shared_ptr<DataType> &data_type);
 
-    UniquePtr<infinity_thrift_rpc::DataType> DataTypeToProtoDataType(const SharedPtr<DataType> &data_type);
+    std::unique_ptr<infinity_thrift_rpc::DataType> DataTypeToProtoDataType(const std::shared_ptr<DataType> &data_type);
 
     infinity_thrift_rpc::ElementType::type EmbeddingDataTypeToProtoElementType(const EmbeddingDataType &embedding_data_type);
 
-    void
-    ProcessDataBlocks(const QueryResult &result, infinity_thrift_rpc::SelectResponse &response, Vector<infinity_thrift_rpc::ColumnField> &columns);
+    void ProcessDataBlocks(const QueryResult &result,
+                           infinity_thrift_rpc::SelectResponse &response,
+                           std::vector<infinity_thrift_rpc::ColumnField> &columns);
 
-    Status ProcessColumns(const SharedPtr<DataBlock> &data_block, SizeT column_count, Vector<infinity_thrift_rpc::ColumnField> &columns);
+    Status ProcessColumns(const std::shared_ptr<DataBlock> &data_block, size_t column_count, std::vector<infinity_thrift_rpc::ColumnField> &columns);
 
     void HandleColumnDef(infinity_thrift_rpc::SelectResponse &response,
-                         SizeT column_count,
-                         SharedPtr<TableDef> table_def,
-                         Vector<infinity_thrift_rpc::ColumnField> &all_column_vectors);
+                         size_t column_count,
+                         std::shared_ptr<TableDef> table_def,
+                         std::vector<infinity_thrift_rpc::ColumnField> &all_column_vectors);
 
-    Status
-    ProcessColumnFieldType(infinity_thrift_rpc::ColumnField &output_column_field, SizeT row_count, const SharedPtr<ColumnVector> &column_vector);
-
-    static void HandleBoolType(infinity_thrift_rpc::ColumnField &output_column_field, SizeT row_count, const SharedPtr<ColumnVector> &column_vector);
-
-    static void HandlePodType(infinity_thrift_rpc::ColumnField &output_column_field, SizeT row_count, const SharedPtr<ColumnVector> &column_vector);
-
-    static void HandleArrayType(infinity_thrift_rpc::ColumnField &output_column_field, SizeT row_count, const SharedPtr<ColumnVector> &column_vector);
+    Status ProcessColumnFieldType(infinity_thrift_rpc::ColumnField &output_column_field,
+                                  size_t row_count,
+                                  const std::shared_ptr<ColumnVector> &column_vector);
 
     static void
-    HandleVarcharType(infinity_thrift_rpc::ColumnField &output_column_field, SizeT row_count, const SharedPtr<ColumnVector> &column_vector);
+    HandleBoolType(infinity_thrift_rpc::ColumnField &output_column_field, size_t row_count, const std::shared_ptr<ColumnVector> &column_vector);
 
     static void
-    HandleEmbeddingType(infinity_thrift_rpc::ColumnField &output_column_field, SizeT row_count, const SharedPtr<ColumnVector> &column_vector);
+    HandlePodType(infinity_thrift_rpc::ColumnField &output_column_field, size_t row_count, const std::shared_ptr<ColumnVector> &column_vector);
 
     static void
-    HandleMultiVectorType(infinity_thrift_rpc::ColumnField &output_column_field, SizeT row_count, const SharedPtr<ColumnVector> &column_vector);
+    HandleArrayType(infinity_thrift_rpc::ColumnField &output_column_field, size_t row_count, const std::shared_ptr<ColumnVector> &column_vector);
 
     static void
-    HandleTensorType(infinity_thrift_rpc::ColumnField &output_column_field, SizeT row_count, const SharedPtr<ColumnVector> &column_vector);
+    HandleVarcharType(infinity_thrift_rpc::ColumnField &output_column_field, size_t row_count, const std::shared_ptr<ColumnVector> &column_vector);
 
     static void
-    HandleTensorArrayType(infinity_thrift_rpc::ColumnField &output_column_field, SizeT row_count, const SharedPtr<ColumnVector> &column_vector);
+    HandleEmbeddingType(infinity_thrift_rpc::ColumnField &output_column_field, size_t row_count, const std::shared_ptr<ColumnVector> &column_vector);
+
+    static void HandleMultiVectorType(infinity_thrift_rpc::ColumnField &output_column_field,
+                                      size_t row_count,
+                                      const std::shared_ptr<ColumnVector> &column_vector);
 
     static void
-    HandleSparseType(infinity_thrift_rpc::ColumnField &output_column_field, SizeT row_count, const SharedPtr<ColumnVector> &column_vector);
+    HandleTensorType(infinity_thrift_rpc::ColumnField &output_column_field, size_t row_count, const std::shared_ptr<ColumnVector> &column_vector);
 
-    static void HandleRowIDType(infinity_thrift_rpc::ColumnField &output_column_field, SizeT row_count, const SharedPtr<ColumnVector> &column_vector);
+    static void HandleTensorArrayType(infinity_thrift_rpc::ColumnField &output_column_field,
+                                      size_t row_count,
+                                      const std::shared_ptr<ColumnVector> &column_vector);
 
     static void
-    HandleTimeRelatedTypes(infinity_thrift_rpc::ColumnField &output_column_field, SizeT row_count, const SharedPtr<ColumnVector> &column_vector);
+    HandleSparseType(infinity_thrift_rpc::ColumnField &output_column_field, size_t row_count, const std::shared_ptr<ColumnVector> &column_vector);
+
+    static void
+    HandleRowIDType(infinity_thrift_rpc::ColumnField &output_column_field, size_t row_count, const std::shared_ptr<ColumnVector> &column_vector);
+
+    static void HandleTimeRelatedTypes(infinity_thrift_rpc::ColumnField &output_column_field,
+                                       size_t row_count,
+                                       const std::shared_ptr<ColumnVector> &column_vector);
 
     static void
     ProcessStatus(infinity_thrift_rpc::CommonResponse &response, const Status &status, const std::string_view error_header = ErrorMsgHeader);

@@ -35,6 +35,8 @@
 // private implementation details that can be changed or removed.
 
 
+// Take the name prefix into account.
+#define yylex   searchlex
 
 
 
@@ -50,7 +52,7 @@
     #include <vector>
 
     // Import modules for implementation
-
+    import infinity_core;
     import search_scanner;
 
     #undef yylex
@@ -61,7 +63,7 @@
     #pragma GCC diagnostic ignored "-Wunused-but-set-variable"
     #endif
 
-#line 65 "search_parser.cpp"
+#line 67 "search_parser.cpp"
 
 
 #ifndef YY_
@@ -154,7 +156,7 @@
 
 #line 10 "search_parser.y"
 namespace infinity {
-#line 158 "search_parser.cpp"
+#line 160 "search_parser.cpp"
 
   /// Build a parser object.
   SearchParser::SearchParser (SearchScanner &scanner_yyarg, const SearchDriver &driver_yyarg, const std::string &default_field_yyarg, std::unique_ptr<QueryNode> &parse_result_yyarg)
@@ -795,13 +797,13 @@ namespace infinity {
             {
     parse_result = std::move(yystack_[1].value.as < std::unique_ptr<QueryNode> > ());
 }
-#line 799 "search_parser.cpp"
+#line 801 "search_parser.cpp"
     break;
 
   case 3: // query: clause
 #line 91 "search_parser.y"
          { yylhs.value.as < std::unique_ptr<QueryNode> > () = std::move(yystack_[0].value.as < std::unique_ptr<QueryNode> > ()); }
-#line 805 "search_parser.cpp"
+#line 807 "search_parser.cpp"
     break;
 
   case 4: // query: query clause
@@ -819,7 +821,7 @@ namespace infinity {
         yylhs.value.as < std::unique_ptr<QueryNode> > () = std::move(q);
     }
 }
-#line 823 "search_parser.cpp"
+#line 825 "search_parser.cpp"
     break;
 
   case 5: // query: query OR clause
@@ -836,13 +838,13 @@ namespace infinity {
         yylhs.value.as < std::unique_ptr<QueryNode> > () = std::move(q);
     }
 }
-#line 840 "search_parser.cpp"
+#line 842 "search_parser.cpp"
     break;
 
   case 6: // clause: term
 #line 119 "search_parser.y"
        { yylhs.value.as < std::unique_ptr<QueryNode> > () = std::move(yystack_[0].value.as < std::unique_ptr<QueryNode> > ()); }
-#line 846 "search_parser.cpp"
+#line 848 "search_parser.cpp"
     break;
 
   case 7: // clause: clause AND term
@@ -859,13 +861,13 @@ namespace infinity {
         yylhs.value.as < std::unique_ptr<QueryNode> > () = std::move(query);
     }
 }
-#line 863 "search_parser.cpp"
+#line 865 "search_parser.cpp"
     break;
 
   case 8: // term: basic_filter_boost
 #line 134 "search_parser.y"
                      { yylhs.value.as < std::unique_ptr<QueryNode> > () = std::move(yystack_[0].value.as < std::unique_ptr<QueryNode> > ()); }
-#line 869 "search_parser.cpp"
+#line 871 "search_parser.cpp"
     break;
 
   case 9: // term: NOT term
@@ -879,13 +881,13 @@ namespace infinity {
         yylhs.value.as < std::unique_ptr<QueryNode> > () = std::move(query);
     }
 }
-#line 883 "search_parser.cpp"
+#line 885 "search_parser.cpp"
     break;
 
   case 10: // term: LPAREN query RPAREN
 #line 144 "search_parser.y"
                       { yylhs.value.as < std::unique_ptr<QueryNode> > () = std::move(yystack_[1].value.as < std::unique_ptr<QueryNode> > ()); }
-#line 889 "search_parser.cpp"
+#line 891 "search_parser.cpp"
     break;
 
   case 11: // term: LPAREN query RPAREN CARAT
@@ -896,7 +898,7 @@ namespace infinity {
         yylhs.value.as < std::unique_ptr<QueryNode> > ()->MultiplyWeight(yystack_[0].value.as < float > ());
     }
 }
-#line 900 "search_parser.cpp"
+#line 902 "search_parser.cpp"
     break;
 
   case 12: // basic_filter_boost: basic_filter
@@ -904,7 +906,7 @@ namespace infinity {
                {
     yylhs.value.as < std::unique_ptr<QueryNode> > () = std::move(yystack_[0].value.as < std::unique_ptr<QueryNode> > ());
 }
-#line 908 "search_parser.cpp"
+#line 910 "search_parser.cpp"
     break;
 
   case 13: // basic_filter_boost: basic_filter CARAT
@@ -915,7 +917,7 @@ namespace infinity {
         yylhs.value.as < std::unique_ptr<QueryNode> > ()->MultiplyWeight(yystack_[0].value.as < float > ());
     }
 }
-#line 919 "search_parser.cpp"
+#line 921 "search_parser.cpp"
     break;
 
   case 14: // basic_filter: STRING
@@ -929,7 +931,7 @@ namespace infinity {
     std::string text = SearchDriver::Unescape(yystack_[0].value.as < InfString > ().text_);
     yylhs.value.as < std::unique_ptr<QueryNode> > () = driver.AnalyzeAndBuildQueryNode(field, text, yystack_[0].value.as < InfString > ().from_quoted_);
 }
-#line 933 "search_parser.cpp"
+#line 935 "search_parser.cpp"
     break;
 
   case 15: // basic_filter: STRING OP_COLON STRING
@@ -939,7 +941,7 @@ namespace infinity {
     std::string text = SearchDriver::Unescape(yystack_[0].value.as < InfString > ().text_);
     yylhs.value.as < std::unique_ptr<QueryNode> > () = driver.AnalyzeAndBuildQueryNode(field, text, yystack_[0].value.as < InfString > ().from_quoted_);
 }
-#line 943 "search_parser.cpp"
+#line 945 "search_parser.cpp"
     break;
 
   case 16: // basic_filter: STRING TILDE
@@ -953,7 +955,7 @@ namespace infinity {
     std::string text = SearchDriver::Unescape(yystack_[1].value.as < InfString > ().text_);
     yylhs.value.as < std::unique_ptr<QueryNode> > () = driver.AnalyzeAndBuildQueryNode(field, text, yystack_[1].value.as < InfString > ().from_quoted_, yystack_[0].value.as < unsigned long > ());
 }
-#line 957 "search_parser.cpp"
+#line 959 "search_parser.cpp"
     break;
 
   case 17: // basic_filter: STRING OP_COLON STRING TILDE
@@ -963,11 +965,11 @@ namespace infinity {
     std::string text = SearchDriver::Unescape(yystack_[1].value.as < InfString > ().text_);
     yylhs.value.as < std::unique_ptr<QueryNode> > () = driver.AnalyzeAndBuildQueryNode(field, text, yystack_[1].value.as < InfString > ().from_quoted_, yystack_[0].value.as < unsigned long > ());
 }
-#line 967 "search_parser.cpp"
+#line 969 "search_parser.cpp"
     break;
 
 
-#line 971 "search_parser.cpp"
+#line 973 "search_parser.cpp"
 
             default:
               break;
@@ -1447,7 +1449,7 @@ namespace infinity {
 
 #line 10 "search_parser.y"
 } // infinity
-#line 1451 "search_parser.cpp"
+#line 1453 "search_parser.cpp"
 
 #line 193 "search_parser.y"
 

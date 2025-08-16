@@ -12,21 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
-#include <numeric>
-
 module infinity_core:abs.impl;
 
 import :abs;
-import :stl;
 import :new_catalog;
-import logical_type;
 import :infinity_exception;
 import :scalar_function;
 import :scalar_function_set;
 
-import :third_party;
+import std;
+
+import logical_type;
 import internal_types;
 import data_type;
 
@@ -51,9 +47,9 @@ struct AbsFunctionFloat {
 };
 
 void RegisterAbsFunction(NewCatalog *catalog_ptr) {
-    String func_name = "ABS";
+    std::string func_name = "ABS";
 
-    SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
+    std::shared_ptr<ScalarFunctionSet> function_set_ptr = std::make_shared<ScalarFunctionSet>(func_name);
 
     ScalarFunction abs_int8(func_name,
                             {DataType(LogicalType::kTinyInt)},

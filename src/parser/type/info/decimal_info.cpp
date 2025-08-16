@@ -13,8 +13,12 @@
 // limitations under the License.
 
 #include "decimal_info.h"
-#include "spdlog/fmt/fmt.h"
 #include "type/number/decimal_type.h"
+
+#ifndef PARESER_USE_THIRD_PARTY_MODULE
+#define PARESER_USE_THIRD_PARTY_MODULE 1
+import third_party;
+#endif
 
 namespace infinity {
 

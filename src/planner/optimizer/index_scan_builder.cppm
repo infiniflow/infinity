@@ -12,13 +12,9 @@
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
 
-module;
-
 export module infinity_core:index_scan_builder;
 
-import :stl;
 import :logical_node;
-// import :query_context;
 import :optimizer_rule;
 
 namespace infinity {
@@ -27,9 +23,9 @@ export class IndexScanBuilder final : public OptimizerRule {
 public:
     ~IndexScanBuilder() final = default;
 
-    void ApplyToPlan(QueryContext *query_context_ptr, SharedPtr<LogicalNode> &logical_plan) override;
+    void ApplyToPlan(QueryContext *query_context_ptr, std::shared_ptr<LogicalNode> &logical_plan) override;
 
-    String name() const final { return "Build SecondaryIndexScan"; }
+    std::string name() const final { return "Build SecondaryIndexScan"; }
 };
 
 } // namespace infinity

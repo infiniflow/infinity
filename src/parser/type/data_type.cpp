@@ -15,20 +15,23 @@
 #include "data_type.h"
 #include "info/bitmap_info.h"
 #include "serialize.h"
-#include "spdlog/fmt/fmt.h"
 #include "type/info/array_info.h"
 #include "type/info/decimal_info.h"
 #include "type/info/embedding_info.h"
 #include "type/info/sparse_info.h"
 #include "type/logical_type.h"
 #include "type/type_info.h"
-#include <arrow/type.h>
-#include <simdjson.h>
-#include <charconv>
-#include <ctype.h>
-#include <iostream>
-#include <stdio.h>
-#include <stdlib.h>
+
+#ifndef PARESER_USE_STD_MODULE
+#define PARESER_USE_STD_MODULE 1
+import std;
+import std.compat;
+#endif
+
+#ifndef PARESER_USE_THIRD_PARTY_MODULE
+#define PARESER_USE_THIRD_PARTY_MODULE 1
+import third_party;
+#endif
 
 namespace infinity {
 
@@ -433,9 +436,9 @@ nlohmann::json DataType::Serialize() const {
 }
 
 std::shared_ptr<DataType> DataType::Deserialize(std::string_view data_type_str) {
-    simdjson::ondemand::parser parser;
+    simdjson::parser parser;
     simdjson::padded_string data_type_json(data_type_str);
-    simdjson::ondemand::document doc = parser.iterate(data_type_json);
+    simdjson::document doc = parser.iterate(data_type_json);
 
     const LogicalType logical_type = (LogicalType)(int8_t)doc["data_type"].get<int8_t>();
 

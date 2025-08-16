@@ -12,11 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:cached_match;
 
-import :stl;
 import :cached_node_base;
 import :cached_scan_base;
 import :logical_node_type;
@@ -40,8 +37,8 @@ public:
     bool Eq(const CachedNodeBase &other) const override;
 
 private:
-    SharedPtr<MatchExpression> match_expr_{};
-    SharedPtr<BaseExpression> filter_expression_{};
+    std::shared_ptr<MatchExpression> match_expr_{};
+    std::shared_ptr<BaseExpression> filter_expression_{};
     u32 topn_;
 };
 

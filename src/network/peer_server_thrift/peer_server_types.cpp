@@ -6,10 +6,9 @@
  */
 #include "peer_server_types.h"
 
-#include <algorithm>
-#include <ostream>
-
 #include <thrift/TToString.h>
+
+import std;
 
 namespace infinity_peer_server {
 

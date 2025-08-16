@@ -16,8 +16,6 @@ module;
 
 export module infinity_core:not_func;
 
-import :stl;
-
 namespace infinity {
 
 class NewCatalog;

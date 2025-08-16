@@ -12,16 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:expression_binder;
 
-import :stl;
 import :function;
 import :bind_context;
 import :base_expression;
-// import :query_context;
 import :subquery_expression;
+
 import parsed_expr;
 import column_expr;
 import constant_expr;
@@ -40,8 +37,8 @@ import cast_expr;
 namespace infinity {
 
 struct ExprBindResult {
-    SharedPtr<BaseExpression> bound_expression_ptr_{};
-    String err_msg_{};
+    std::shared_ptr<BaseExpression> bound_expression_ptr_{};
+    std::string err_msg_{};
 
     inline bool IsOk() { return err_msg_.empty(); }
 };
@@ -52,54 +49,54 @@ public:
 
     virtual ~ExpressionBinder() = default;
 
-    SharedPtr<BaseExpression> Bind(const ParsedExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root);
+    std::shared_ptr<BaseExpression> Bind(const ParsedExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root);
 
     // Bind expression entry
-    virtual SharedPtr<BaseExpression> BuildExpression(const ParsedExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root);
+    virtual std::shared_ptr<BaseExpression> BuildExpression(const ParsedExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root);
 
-    virtual SharedPtr<BaseExpression> BuildBetweenExpr(const BetweenExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root);
+    virtual std::shared_ptr<BaseExpression> BuildBetweenExpr(const BetweenExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root);
 
-    virtual SharedPtr<BaseExpression> BuildValueExpr(const ConstantExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root);
+    virtual std::shared_ptr<BaseExpression> BuildValueExpr(const ConstantExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root);
 
     // Bind column reference expression also include correlated column reference.
-    virtual SharedPtr<BaseExpression> BuildColExpr(const ColumnExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root);
+    virtual std::shared_ptr<BaseExpression> BuildColExpr(const ColumnExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root);
 
-    virtual SharedPtr<BaseExpression> BuildFuncExpr(const FunctionExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root);
+    virtual std::shared_ptr<BaseExpression> BuildFuncExpr(const FunctionExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root);
 
     virtual void CheckFuncType(FunctionType) const {}
 
-    virtual SharedPtr<BaseExpression> BuildCastExpr(const CastExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root);
+    virtual std::shared_ptr<BaseExpression> BuildCastExpr(const CastExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root);
 
-    virtual SharedPtr<BaseExpression> BuildCaseExpr(const CaseExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root);
+    virtual std::shared_ptr<BaseExpression> BuildCaseExpr(const CaseExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root);
 
-    virtual SharedPtr<BaseExpression> BuildInExpr(const InExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root);
+    virtual std::shared_ptr<BaseExpression> BuildInExpr(const InExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root);
 
-    virtual SharedPtr<BaseExpression> BuildKnnExpr(const KnnExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root);
+    virtual std::shared_ptr<BaseExpression> BuildKnnExpr(const KnnExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root);
 
-    virtual SharedPtr<BaseExpression> BuildMatchTextExpr(const MatchExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root);
+    virtual std::shared_ptr<BaseExpression> BuildMatchTextExpr(const MatchExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root);
 
-    virtual SharedPtr<BaseExpression> BuildMatchTensorExpr(const MatchTensorExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root);
+    virtual std::shared_ptr<BaseExpression> BuildMatchTensorExpr(const MatchTensorExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root);
 
-    virtual SharedPtr<BaseExpression> BuildMatchSparseExpr(MatchSparseExpr &&expr, BindContext *bind_context_ptr, i64 depth, bool root);
+    virtual std::shared_ptr<BaseExpression> BuildMatchSparseExpr(MatchSparseExpr &&expr, BindContext *bind_context_ptr, i64 depth, bool root);
 
-    virtual SharedPtr<BaseExpression> BuildSearchExpr(const SearchExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root);
+    virtual std::shared_ptr<BaseExpression> BuildSearchExpr(const SearchExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root);
 
     // Bind subquery expression.
-    virtual SharedPtr<SubqueryExpression>
+    virtual std::shared_ptr<SubqueryExpression>
     BuildSubquery(const SubqueryExpr &expr, BindContext *bind_context_ptr, SubqueryType subquery_type, i64 depth, bool root);
 
     //    // Bind window function.
-    //    virtual SharedPtr<BaseExpression>
-    //    BuildWindow(const hsql::Expr &expr, const SharedPtr<BindContext>& bind_context_ptr);
+    //    virtual std::shared_ptr<BaseExpression>
+    //    BuildWindow(const hsql::Expr &expr, const std::shared_ptr<BindContext>& bind_context_ptr);
 
-    //    SharedPtr<PlanBuilder> plan_builder_ptr_;
+    //    std::shared_ptr<PlanBuilder> plan_builder_ptr_;
 
-    virtual SharedPtr<BaseExpression> BuildUnnestExpr(const FunctionExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root);
+    virtual std::shared_ptr<BaseExpression> BuildUnnestExpr(const FunctionExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root);
 
 protected:
-    Optional<SharedPtr<BaseExpression>> TryBuildSpecialFuncExpr(const FunctionExpr &expr, BindContext *bind_context_ptr, i64 depth);
+    std::optional<std::shared_ptr<BaseExpression>> TryBuildSpecialFuncExpr(const FunctionExpr &expr, BindContext *bind_context_ptr, i64 depth);
 
-    static bool IsUnnestedFunction(const String &function_name);
+    static bool IsUnnestedFunction(const std::string &function_name);
 
     QueryContext *query_context_{};
 };

@@ -12,18 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:where_binder;
 
-import :stl;
 import :base_expression;
-
 import :function;
 import :bind_context;
 import :expression_binder;
-// import :query_context;
 import :bind_alias_proxy;
+
 import parsed_expr;
 import column_expr;
 
@@ -31,18 +27,18 @@ namespace infinity {
 
 export class WhereBinder final : public ExpressionBinder {
 public:
-    explicit WhereBinder(QueryContext *query_context, const SharedPtr<BindAliasProxy> &bind_alias_proxy)
+    explicit WhereBinder(QueryContext *query_context, const std::shared_ptr<BindAliasProxy> &bind_alias_proxy)
         : ExpressionBinder(query_context), bind_alias_proxy_(bind_alias_proxy) {}
 
     // Bind expression entry
-    SharedPtr<BaseExpression> BuildExpression(const ParsedExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root) final;
+    std::shared_ptr<BaseExpression> BuildExpression(const ParsedExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root) final;
 
-    SharedPtr<BaseExpression> BuildColExpr(const ColumnExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root) final;
+    std::shared_ptr<BaseExpression> BuildColExpr(const ColumnExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root) final;
 
     void CheckFuncType(FunctionType func_type) const override;
 
 private:
-    const SharedPtr<BindAliasProxy> &bind_alias_proxy_;
+    const std::shared_ptr<BindAliasProxy> &bind_alias_proxy_;
 };
 
 } // namespace infinity

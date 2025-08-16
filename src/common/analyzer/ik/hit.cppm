@@ -1,8 +1,4 @@
-module;
-
 export module infinity_core:hit;
-
-import :stl;
 
 namespace infinity {
 

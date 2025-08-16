@@ -12,17 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:secondary_index_in_mem;
 
-import :stl;
 import :roaring_bitmap;
-import internal_types;
-import column_def;
 import :base_memindex;
 import :memindex_tracer;
 import :chunk_index_meta;
+
+import internal_types;
+import column_def;
 
 namespace infinity {
 
@@ -55,9 +53,9 @@ public:
 
     virtual void Dump(BufferObj *buffer_obj) const = 0;
 
-    virtual Pair<u32, Bitmask> RangeQuery(const void *input) const = 0;
+    virtual std::pair<u32, Bitmask> RangeQuery(const void *input) const = 0;
 
-    static SharedPtr<SecondaryIndexInMem> NewSecondaryIndexInMem(const SharedPtr<ColumnDef> &column_def, RowID begin_row_id);
+    static std::shared_ptr<SecondaryIndexInMem> NewSecondaryIndexInMem(const std::shared_ptr<ColumnDef> &column_def, RowID begin_row_id);
 };
 
 } // namespace infinity

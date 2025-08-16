@@ -12,24 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-#include <string> 
-
-#include <string>
-
 module infinity_core:node_info.impl;
 
 import :node_info;
-import :stl;
-// import :third_party;
+
+import std;
+
 import admin_statement;
 
 namespace infinity {
 
 NodeInfo::NodeInfo(NodeRole role,
                    NodeStatus status,
-                   const String &name,
-                   const String &ip_addr,
+                   const std::string &name,
+                   const std::string &ip_addr,
                    i64 port,
                    i64 txn_ts,
                    u64 update_ts,
@@ -37,30 +33,30 @@ NodeInfo::NodeInfo(NodeRole role,
     : node_role_(role), node_status_(status), node_name_(name), ip_address_(ip_addr), port_(port), txn_ts_(txn_ts), update_ts_(update_ts),
       heartbeat_count_(heartbeat_count) {}
 
-NodeInfo::NodeInfo(NodeRole role, NodeStatus status, const String &name, const String &ip_addr, i64 port, i64 txn_ts, u64 update_ts)
+NodeInfo::NodeInfo(NodeRole role, NodeStatus status, const std::string &name, const std::string &ip_addr, i64 port, i64 txn_ts, u64 update_ts)
     : node_role_(role), node_status_(status), node_name_(name), ip_address_(ip_addr), port_(port), txn_ts_(txn_ts), update_ts_(update_ts) {}
 
-NodeInfo::NodeInfo(NodeRole role, NodeStatus status, const String &name, const String &ip_addr, i64 port, u64 update_ts)
+NodeInfo::NodeInfo(NodeRole role, NodeStatus status, const std::string &name, const std::string &ip_addr, i64 port, u64 update_ts)
     : node_role_(role), node_status_(status), node_name_(name), ip_address_(ip_addr), port_(port), update_ts_(update_ts) {}
 
-NodeInfo::NodeInfo(NodeRole role, const String &ip_addr, i64 port) : node_role_(role), ip_address_(ip_addr), port_(port) {}
+NodeInfo::NodeInfo(NodeRole role, const std::string &ip_addr, i64 port) : node_role_(role), ip_address_(ip_addr), port_(port) {}
 
-void NodeInfo::set_node_name(const String &new_node_name) {
+void NodeInfo::set_node_name(const std::string &new_node_name) {
     std::unique_lock locker(node_mutex_);
     node_name_ = new_node_name;
 }
 
-String NodeInfo::node_name() const {
+std::string NodeInfo::node_name() const {
     std::unique_lock locker(node_mutex_);
     return node_name_;
 }
 
-void NodeInfo::set_node_ip(const String &new_node_ip) {
+void NodeInfo::set_node_ip(const std::string &new_node_ip) {
     std::unique_lock locker(node_mutex_);
     ip_address_ = new_node_ip;
 }
 
-String NodeInfo::node_ip() const {
+std::string NodeInfo::node_ip() const {
     std::unique_lock locker(node_mutex_);
     return ip_address_;
 }
@@ -74,7 +70,7 @@ bool NodeInfo::IsSameNode(const NodeInfo &other) {
     }
 }
 
-String ToString(NodeStatus status) {
+std::string ToString(NodeStatus status) {
     switch (status) {
         case NodeStatus::kAlive:
             return "alive";

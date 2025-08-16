@@ -12,17 +12,17 @@
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
 
-module;
-
 export module infinity_core:min_max_data_filter;
-import :stl;
+
 import :value;
 import :logger;
-import :third_party;
 import :infinity_exception;
 import :filter_expression_push_down_helper;
-import internal_types;
 import :filter_value_type_classification;
+
+import third_party;
+
+import internal_types;
 
 namespace infinity {
 
@@ -47,11 +47,11 @@ export struct InnerMinMaxDataFilterVarcharType {
 
     void SetToTruncate(std::string_view &input) {
         length = std::min<u32>(input.size(), INNER_STORED_LENGTH);
-        Copy(input.begin(), input.begin() + length, str.begin());
+        std::copy(input.begin(), input.begin() + length, str.begin());
     }
 
 private:
-    Array<char, INNER_STORED_LENGTH> str = {};
+    std::array<char, INNER_STORED_LENGTH> str = {};
     u8 length = 0;
 };
 
@@ -86,12 +86,12 @@ public:
 
     [[nodiscard]] u32 SizeInBytes() const { return sizeof(min_) + sizeof(max_); }
 
-    void SaveToOStringStream(OStringStream &os) const {
+    void SaveToOStringStream(std::ostringstream &os) const {
         os.write(reinterpret_cast<const char *>(&min_), sizeof(min_));
         os.write(reinterpret_cast<const char *>(&max_), sizeof(max_));
     }
 
-    void LoadFromIStringStream(IStringStream &is) {
+    void LoadFromIStringStream(std::istringstream &is) {
         is.read(reinterpret_cast<char *>(&min_), sizeof(min_));
         is.read(reinterpret_cast<char *>(&max_), sizeof(max_));
     }
@@ -109,8 +109,7 @@ private:
                 return original_value <= max_;
             }
             default: {
-                String error_message = "InnerMinMaxDataFilterDerived::MayInRange(): Unexpected compare type!";
-                UnrecoverableError(error_message);
+                UnrecoverableError("InnerMinMaxDataFilterDerived::MayInRange(): Unexpected compare type!");
                 // cannot decide, return true
                 return true;
             }
@@ -119,7 +118,7 @@ private:
 
     template <IsVarchar T = OriginalValueType>
     [[nodiscard]] inline bool MayInRangeT(const Value &value, FilterCompareType compare_type) const {
-        const String &str = value.GetVarchar();
+        const std::string &str = value.GetVarchar();
         u32 compare_length = std::min<u32>(str.size(), InnerMinMaxDataFilterVarcharType::INNER_STORED_LENGTH);
         std::string_view compare_str(str.data(), compare_length);
         switch (compare_type) {
@@ -130,8 +129,7 @@ private:
                 return compare_str <= max_.GetStringView();
             }
             default: {
-                String error_message = "InnerMinMaxDataFilterDerived::MayInRange(): Unexpected compare type!";
-                UnrecoverableError(error_message);
+                UnrecoverableError("InnerMinMaxDataFilterDerived::MayInRange(): Unexpected compare type!");
                 // cannot decide, return true
                 return true;
             }
@@ -161,7 +159,7 @@ void CreateInnerMinMaxDataFilter(InnerMinMaxDataFilter &filter, MinMaxInnerValT 
 // can not update when data is deleted
 export class MinMaxDataFilter {
 private:
-    Vector<InnerMinMaxDataFilter> min_max_filters_;
+    std::vector<InnerMinMaxDataFilter> min_max_filters_;
 
 public:
     constexpr static std::string_view JsonTag = "min_max_data_filter";
@@ -172,8 +170,7 @@ public:
 
     [[nodiscard]] inline bool MayInRange(ColumnID column_id, const Value &value, FilterCompareType compare_type) const {
         return std::visit(Overload{[column_id](const std::monostate &empty) -> bool {
-                                       String error_message = fmt::format("No InnerMinMaxDataFilter for column_id: {}", column_id);
-                                       UnrecoverableError(error_message);
+                                       UnrecoverableError(fmt::format("No InnerMinMaxDataFilter for column_id: {}", column_id));
 
                                        // Should always have minmax filter for sealed segment
                                        return true;
@@ -191,16 +188,15 @@ public:
         if (std::holds_alternative<std::monostate>(filter)) {
             CreateInnerMinMaxDataFilter<OriginalValueType>(filter, std::forward<MinMaxInnerValT>(min), std::forward<MinMaxInnerValT>(max));
         } else {
-            String error_message = fmt::format("In MinMaxDataFilter::Build(), InnerMinMaxDataFilter already exist for column_id: {}", column_id);
-            UnrecoverableError(error_message);
+            UnrecoverableError(fmt::format("In MinMaxDataFilter::Build(), InnerMinMaxDataFilter already exist for column_id: {}", column_id));
         }
     }
 
     u32 GetSerializeSizeInBytes() const;
 
-    void SerializeToStringStream(OStringStream &os, u32 total_binary_bytes = 0) const;
+    void SerializeToStringStream(std::ostringstream &os, u32 total_binary_bytes = 0) const;
 
-    void DeserializeFromStringStream(IStringStream &is);
+    void DeserializeFromStringStream(std::istringstream &is);
 
     void SaveToJsonFile(nlohmann::json &entry_json) const;
 

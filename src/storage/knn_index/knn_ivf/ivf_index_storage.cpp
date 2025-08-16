@@ -14,39 +14,37 @@
 
 module;
 
-#include <algorithm>
 #include <cassert>
-#include <vector>
 
 module infinity_core;
 
-// import :ivf_index_storage;
-
-import :stl;
 import :infinity_exception;
 import :status;
 import :logger;
-import :third_party;
 import :index_ivf;
 import :column_vector;
-import internal_types;
-import logical_type;
-import data_type;
 import :kmeans_partition;
 import :search_top_1;
 import :search_top_k;
 import :column_vector;
 import :knn_scan_data;
 import :ivf_index_util_func;
-import knn_expr;
 import :vector_distance;
 import :mlas_matrix_multiply;
+
+import std;
+import third_party;
+
+import knn_expr;
+import internal_types;
+import logical_type;
+import data_type;
 
 namespace infinity {
 
 // IVF_Centroids_Storage
 
-IVF_Centroids_Storage::IVF_Centroids_Storage(const u32 embedding_dimension, const u32 centroids_num, Vector<f32> &&centroids_data)
+IVF_Centroids_Storage::IVF_Centroids_Storage(const u32 embedding_dimension, const u32 centroids_num, std::vector<f32> &&centroids_data)
     : embedding_dimension_(embedding_dimension), centroids_num_(centroids_num), centroids_data_(std::move(centroids_data)) {
     assert(centroids_data_.size() == embedding_dimension_ * centroids_num_);
 }
@@ -66,7 +64,7 @@ void IVF_Centroids_Storage::Load(LocalFileHandle &file_handle) {
     file_handle.Read(centroids_data_.data(), vec_size * sizeof(f32));
 }
 
-Pair<u32, const f32 *> IVF_Centroids_Storage::GetCentroidDataForMetric(const KnnDistanceBase1 *knn_distance) const {
+std::pair<u32, const f32 *> IVF_Centroids_Storage::GetCentroidDataForMetric(const KnnDistanceBase1 *knn_distance) const {
     switch (knn_distance->dist_type_) {
         case KnnDistanceType::kInnerProduct:
         case KnnDistanceType::kL2: {
@@ -96,7 +94,7 @@ Pair<u32, const f32 *> IVF_Centroids_Storage::GetCentroidDataForMetric(const Knn
 
 // IVF_Index_Storage
 
-SizeT IVF_Index_Storage::MemoryUsed() const { return ivf_centroids_storage_.MemoryUsed() + ivf_parts_storage_->MemoryUsed(); }
+size_t IVF_Index_Storage::MemoryUsed() const { return ivf_centroids_storage_.MemoryUsed() + ivf_parts_storage_->MemoryUsed(); }
 
 void IVF_Index_Storage::Save(LocalFileHandle &file_handle) const {
     file_handle.Append(&row_count_, sizeof(row_count_));
@@ -134,7 +132,7 @@ IVF_Index_Storage::IVF_Index_Storage(const IndexIVFOption &ivf_option,
       embedding_dimension_(embedding_dimension) {}
 
 void IVF_Index_Storage::Train(const u32 training_embedding_num, const f32 *training_data, const u32 expect_centroid_num) {
-    Vector<f32> output_centroids;
+    std::vector<f32> output_centroids;
     const auto partition_num = GetKMeansCentroids(ivf_option_.metric_,
                                                   embedding_dimension_,
                                                   training_embedding_num,
@@ -223,7 +221,7 @@ void IVF_Index_Storage::AddEmbeddingBatchT(const SegmentOffset start_segment_off
     assert(ivf_centroids_storage_.embedding_dimension() == embedding_dimension_);
     assert(ivf_centroids_storage_.centroids_num() == ivf_parts_storage_->centroids_num());
     const auto [embedding_f32_ptr, _] = GetF32Ptr(embedding_ptr, embedding_num * embedding_dimension_);
-    auto part_ids = Vector<u32>(embedding_num, std::numeric_limits<u32>::max());
+    auto part_ids = std::vector<u32>(embedding_num, std::numeric_limits<u32>::max());
     search_top_1_without_dis<f32>(embedding_dimension_,
                                   embedding_num,
                                   embedding_f32_ptr,
@@ -248,7 +246,7 @@ void IVF_Index_Storage::AddEmbeddingBatchT(const SegmentOffset *segment_offset_p
     assert(ivf_centroids_storage_.embedding_dimension() == embedding_dimension_);
     assert(ivf_centroids_storage_.centroids_num() == ivf_parts_storage_->centroids_num());
     const auto [embedding_f32_ptr, _] = GetF32Ptr(embedding_ptr, embedding_num * embedding_dimension_);
-    auto part_ids = Vector<u32>(embedding_num, std::numeric_limits<u32>::max());
+    auto part_ids = std::vector<u32>(embedding_num, std::numeric_limits<u32>::max());
     search_top_1_without_dis<f32>(embedding_dimension_,
                                   embedding_num,
                                   embedding_f32_ptr,
@@ -273,7 +271,7 @@ void IVF_Index_Storage::AddMultiVectorT(const SegmentOffset segment_offset,
     assert(ivf_centroids_storage_.embedding_dimension() == embedding_dimension_);
     assert(ivf_centroids_storage_.centroids_num() == ivf_parts_storage_->centroids_num());
     const auto [embedding_f32_ptr, _] = GetF32Ptr(multi_vector_ptr, embedding_num * embedding_dimension_);
-    auto part_ids = Vector<u32>(embedding_num, std::numeric_limits<u32>::max());
+    auto part_ids = std::vector<u32>(embedding_num, std::numeric_limits<u32>::max());
     search_top_1_without_dis<f32>(embedding_dimension_,
                                   embedding_num,
                                   embedding_f32_ptr,
@@ -304,15 +302,15 @@ void IVF_Index_Storage::SearchIndex(const KnnDistanceBase1 *knn_distance,
         [query_ptr, dimension]<EmbeddingDataType query_element_type> {
             return GetF32Ptr(static_cast<const EmbeddingDataTypeToCppTypeT<query_element_type> *>(query_ptr), dimension);
         },
-        [] { return Pair<const f32 *, UniquePtr<f32[]>>(); });
-    Vector<u32> nprobe_result;
+        [] { return std::pair<const f32 *, std::unique_ptr<f32[]>>(); });
+    std::vector<u32> nprobe_result;
     switch (knn_distance->dist_type_) {
         case KnnDistanceType::kL2: {
             nprobe_result.resize(nprobe);
             if (nprobe == 1) {
                 search_top_1_without_dis<f32>(dimension, 1, query_f32_ptr, centroids_num, centroids_data, nprobe_result.data());
             } else {
-                const auto centroid_dists = MakeUniqueForOverwrite<f32[]>(nprobe);
+                const auto centroid_dists = std::make_unique_for_overwrite<f32[]>(nprobe);
                 search_top_k_with_dis(nprobe,
                                       dimension,
                                       1,
@@ -327,7 +325,7 @@ void IVF_Index_Storage::SearchIndex(const KnnDistanceBase1 *knn_distance,
         }
         case KnnDistanceType::kCosine:
         case KnnDistanceType::kInnerProduct: {
-            const auto ip_result = MakeUniqueForOverwrite<f32[]>(centroids_num);
+            const auto ip_result = std::make_unique_for_overwrite<f32[]>(centroids_num);
             matrixA_multiply_matrixB_output_to_C(centroids_data, query_f32_ptr, centroids_num, 1, dimension, ip_result.get());
             nprobe_result.resize(centroids_num);
             std::iota(nprobe_result.begin(), nprobe_result.end(), static_cast<u32>(0));

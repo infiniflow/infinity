@@ -12,14 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:index_segment_reader.impl;
 
 import :index_segment_reader;
-
-import :stl;
-
 import :segment_posting;
 import :index_defines;
 

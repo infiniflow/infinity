@@ -13,9 +13,17 @@
 // limitations under the License.
 
 #include "type/complex/row_id.h"
-#include "spdlog/fmt/fmt.h"
 
-#include <string>
+#ifndef PARESER_USE_STD_MODULE
+#define PARESER_USE_STD_MODULE 1
+import std;
+import std.compat;
+#endif
+
+#ifndef PARESER_USE_THIRD_PARTY_MODULE
+#define PARESER_USE_THIRD_PARTY_MODULE 1
+import third_party;
+#endif
 
 namespace infinity {
 

@@ -12,12 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:block_index;
 
-import :stl;
 import :global_block_id;
+
+import std;
 
 namespace infinity {
 
@@ -32,11 +31,11 @@ class SegmentIndexMeta;
 export struct NewSegmentSnapshot {
 public:
     SegmentOffset segment_offset() const;
-    const Vector<UniquePtr<BlockMeta>> &block_map() const;
-    UniquePtr<SegmentMeta> segment_meta_;
+    const std::vector<std::unique_ptr<BlockMeta>> &block_map() const;
+    std::unique_ptr<SegmentMeta> segment_meta_;
 
 private:
-    mutable Vector<UniquePtr<BlockMeta>> block_map_;
+    mutable std::vector<std::unique_ptr<BlockMeta>> block_map_;
 };
 
 export struct BlockIndex {
@@ -45,11 +44,11 @@ public:
 
     ~BlockIndex();
 
-    void NewInit(UniquePtr<TableMeeta> table_meta);
+    void NewInit(std::unique_ptr<TableMeeta> table_meta);
 
-    SizeT BlockCount() const;
+    size_t BlockCount() const;
 
-    SizeT SegmentCount() const;
+    size_t SegmentCount() const;
 
     BlockMeta *GetBlockMeta(u32 segment_id, u16 block_id) const;
 
@@ -60,28 +59,28 @@ public:
     bool IsEmpty() const;
 
 public:
-    Vector<SharedPtr<TableIndexMeeta>> table_index_meta_map_;
-    UniquePtr<TableMeeta> table_meta_;
-    Map<SegmentID, NewSegmentSnapshot> new_segment_block_index_;
+    std::vector<std::shared_ptr<TableIndexMeeta>> table_index_meta_map_;
+    std::unique_ptr<TableMeeta> table_meta_;
+    std::map<SegmentID, NewSegmentSnapshot> new_segment_block_index_;
 };
 
 export struct NewIndexSnapshot {
-    SharedPtr<TableIndexMeeta> table_index_meta_;
+    std::shared_ptr<TableIndexMeeta> table_index_meta_;
 
-    Map<SegmentID, UniquePtr<SegmentIndexMeta>> segment_index_metas_;
+    std::map<SegmentID, std::unique_ptr<SegmentIndexMeta>> segment_index_metas_;
 };
 
 export struct IndexIndex {
 public:
-    SharedPtr<NewIndexSnapshot> Insert(const String &index_name, SharedPtr<TableIndexMeeta> table_index_meta);
+    std::shared_ptr<NewIndexSnapshot> Insert(const std::string &index_name, std::shared_ptr<TableIndexMeeta> table_index_meta);
 
-    void Insert(String index_name, SharedPtr<NewIndexSnapshot> new_index_snapshot);
+    void Insert(std::string index_name, std::shared_ptr<NewIndexSnapshot> new_index_snapshot);
 
     bool IsEmpty() const { return new_index_snapshots_vec_.empty(); }
 
 public:
-    HashMap<String, SharedPtr<NewIndexSnapshot>> new_index_snapshots_;
-    Vector<NewIndexSnapshot *> new_index_snapshots_vec_;
+    std::unordered_map<std::string, std::shared_ptr<NewIndexSnapshot>> new_index_snapshots_;
+    std::vector<NewIndexSnapshot *> new_index_snapshots_vec_;
 };
 
 } // namespace infinity

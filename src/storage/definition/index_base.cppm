@@ -16,8 +16,11 @@ module;
 
 export module infinity_core:index_base;
 
-import :stl;
-import :third_party;
+import :infinity_type;
+
+import std;
+import third_party;
+
 import create_index_info;
 import global_resource_usage;
 
@@ -31,17 +34,17 @@ export enum class MetricType : i8 {
     kInvalid,
 };
 
-export String MetricTypeToString(MetricType metric_type);
+export std::string MetricTypeToString(MetricType metric_type);
 
-export MetricType StringToMetricType(const String &str);
+export MetricType StringToMetricType(const std::string &str);
 
 export class IndexBase {
 protected:
     explicit IndexBase(IndexType index_type,
-                       SharedPtr<String> index_name,
-                       SharedPtr<String> index_comment,
-                       const String &file_name,
-                       Vector<String> column_names)
+                       std::shared_ptr<std::string> index_name,
+                       std::shared_ptr<std::string> index_comment,
+                       const std::string &file_name,
+                       std::vector<std::string> column_names)
         : index_type_(index_type), index_name_(std::move(index_name)), index_comment_(std::move(index_comment)), file_name_(file_name),
           column_names_(std::move(column_names)) {
 #ifdef INFINITY_DEBUG
@@ -50,7 +53,7 @@ protected:
     }
 
 public:
-    explicit IndexBase(SharedPtr<String> index_name) : index_name_(std::move(index_name)) {
+    explicit IndexBase(std::shared_ptr<std::string> index_name) : index_name_(std::move(index_name)) {
 #ifdef INFINITY_DEBUG
         GlobalResourceUsage::IncrObjectCount("IndexBase");
 #endif
@@ -82,23 +85,23 @@ public:
     virtual void WriteAdv(char *&ptr) const;
 
     // Read char from buffer
-    static SharedPtr<IndexBase> ReadAdv(const char *&ptr, i32 maxbytes);
+    static std::shared_ptr<IndexBase> ReadAdv(const char *&ptr, i32 maxbytes);
 
-    virtual String ToString() const;
-    virtual String BuildOtherParamsString() const { return ""; }
+    virtual std::string ToString() const;
+    virtual std::string BuildOtherParamsString() const { return ""; }
     virtual nlohmann::json Serialize() const;
 
-    static SharedPtr<IndexBase> Deserialize(std::string_view index_def_str);
+    static std::shared_ptr<IndexBase> Deserialize(std::string_view index_def_str);
 
-    inline String column_name() const { return column_names_[0]; }
+    inline std::string column_name() const { return column_names_[0]; }
 
-    bool ContainsColumn(const String &column_name) const;
+    bool ContainsColumn(const std::string &column_name) const;
 
 public:
     IndexType index_type_{IndexType::kInvalid};
-    SharedPtr<String> index_name_{};
-    SharedPtr<String> index_comment_{};
-    const String file_name_{};
-    const Vector<String> column_names_{};
+    std::shared_ptr<std::string> index_name_{};
+    std::shared_ptr<std::string> index_comment_{};
+    const std::string file_name_{};
+    const std::vector<std::string> column_names_{};
 };
 } // namespace infinity

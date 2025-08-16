@@ -12,27 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
-#include <compare>
-#include <type_traits>
-
 module infinity_core:equals.impl;
 
 import :equals;
-
-import :stl;
 import :new_catalog;
 import :status;
 import :infinity_exception;
 import :scalar_function;
 import :scalar_function_set;
 
-import :third_party;
 import logical_type;
 import internal_types;
 import data_type;
-import :logger;
 
 namespace infinity {
 
@@ -109,8 +100,8 @@ inline void EqualsFunction::Run(VarcharT left, MixedT right, bool &result) {
 }
 
 template <typename CompareType, typename EqualsFunction>
-static void GenerateEqualsFunction(SharedPtr<ScalarFunctionSet> &function_set_ptr, DataType data_type) {
-    String func_name = "=";
+static void GenerateEqualsFunction(std::shared_ptr<ScalarFunctionSet> &function_set_ptr, DataType data_type) {
+    std::string func_name = "=";
     ScalarFunction equals_function(func_name,
                                    {data_type, data_type},
                                    DataType(LogicalType::kBoolean),
@@ -119,9 +110,9 @@ static void GenerateEqualsFunction(SharedPtr<ScalarFunctionSet> &function_set_pt
 }
 
 void RegisterEqualsFunction(NewCatalog *catalog_ptr) {
-    String func_name = "=";
+    std::string func_name = "=";
 
-    SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
+    std::shared_ptr<ScalarFunctionSet> function_set_ptr = std::make_shared<ScalarFunctionSet>(func_name);
 
     GenerateEqualsFunction<BooleanT, BooleanEqualsFunction>(function_set_ptr, DataType(LogicalType::kBoolean));
     GenerateEqualsFunction<TinyIntT, PODTypeEqualsFunction>(function_set_ptr, DataType(LogicalType::kTinyInt));

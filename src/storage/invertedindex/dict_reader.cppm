@@ -12,11 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:dict_reader;
 
-import :stl;
 import :term_meta;
 import :posting_list_format;
 import :fst.fst;
@@ -25,24 +22,24 @@ namespace infinity {
 
 export class DictionaryReader {
 private:
-    const String &dict_path_;
+    const std::string &dict_path_;
     TermMetaLoader meta_loader_;
     u8 *data_ptr_;
-    SizeT data_len_;
-    UniquePtr<Fst> fst_;
-    UniquePtr<FstStream> s_;
+    size_t data_len_;
+    std::unique_ptr<Fst> fst_;
+    std::unique_ptr<FstStream> s_;
 
 public:
-    DictionaryReader(const String &dict_path, const PostingFormatOption &option);
+    DictionaryReader(const std::string &dict_path, const PostingFormatOption &option);
 
     ~DictionaryReader();
 
-    bool Lookup(const String &key, TermMeta &term_meta);
+    bool Lookup(const std::string &key, TermMeta &term_meta);
 
-    void InitIterator(const String &min, const String &max);
+    void InitIterator(const std::string &min, const std::string &max);
 
-    void InitIterator(const String &prefix);
+    void InitIterator(const std::string &prefix);
 
-    bool Next(String &term, TermMeta &term_meta);
+    bool Next(std::string &term, TermMeta &term_meta);
 };
 } // namespace infinity

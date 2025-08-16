@@ -12,44 +12,41 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
-#include <sstream>
-
 module infinity_core:logical_compact.impl;
 
 import :logical_compact;
-
-import :stl;
 import :column_binding;
-import data_type;
 import :base_table_ref;
+
+import std;
+
+import data_type;
 import logical_type;
 
 namespace infinity {
 
-Vector<ColumnBinding> LogicalCompact::GetColumnBindings() const { return {}; }
+std::vector<ColumnBinding> LogicalCompact::GetColumnBindings() const { return {}; }
 
-SharedPtr<Vector<String>> LogicalCompact::GetOutputNames() const {
-    auto result = MakeShared<Vector<String>>();
+std::shared_ptr<std::vector<std::string>> LogicalCompact::GetOutputNames() const {
+    auto result = std::make_shared<std::vector<std::string>>();
     result->push_back("OK");
     return result;
 }
 
-SharedPtr<Vector<SharedPtr<DataType>>> LogicalCompact::GetOutputTypes() const {
-    auto result = MakeShared<Vector<SharedPtr<DataType>>>();
-    result->push_back(MakeShared<DataType>(LogicalType::kInteger));
+std::shared_ptr<std::vector<std::shared_ptr<DataType>>> LogicalCompact::GetOutputTypes() const {
+    auto result = std::make_shared<std::vector<std::shared_ptr<DataType>>>();
+    result->push_back(std::make_shared<DataType>(LogicalType::kInteger));
     return result;
 }
 
-String LogicalCompact::ToString(i64 &space) const {
+std::string LogicalCompact::ToString(i64 &space) const {
     std::stringstream ss;
-    String arrow_str;
+    std::string arrow_str;
     if (space > 3) {
         space -= 4;
         arrow_str = "->  ";
     }
-    ss << String(space, ' ') << arrow_str << "COMPACT ";
+    ss << std::string(space, ' ') << arrow_str << "COMPACT ";
     ss << *base_table_ref_->db_name() << "." << *base_table_ref_->table_name();
     space += arrow_str.size();
     return ss.str();

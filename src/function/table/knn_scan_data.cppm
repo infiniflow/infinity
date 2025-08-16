@@ -12,13 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:knn_scan_data;
 
-import :stl;
 import :table_function;
-
 import :global_block_id;
 import :merge_knn;
 import :roaring_bitmap;
@@ -26,9 +22,10 @@ import :data_block;
 import :column_vector;
 import :base_expression;
 import :expression_state;
+import :base_table_ref;
+
 import knn_expr;
 import statement_common;
-import :base_table_ref;
 import internal_types;
 
 namespace infinity {
@@ -39,11 +36,11 @@ class SegmentIndexMeta;
 
 export class KnnScanSharedData {
 public:
-    KnnScanSharedData(SharedPtr<BaseTableRef> table_ref,
-                      UniquePtr<Vector<BlockMeta *>> block_metas,
-                      SharedPtr<TableIndexMeeta> table_index_meta,
-                      UniquePtr<Vector<SharedPtr<SegmentIndexMeta>>> segment_index_metas,
-                      Vector<InitParameter> opt_params,
+    KnnScanSharedData(std::shared_ptr<BaseTableRef> table_ref,
+                      std::unique_ptr<std::vector<BlockMeta *>> block_metas,
+                      std::shared_ptr<TableIndexMeeta> table_index_meta,
+                      std::unique_ptr<std::vector<std::shared_ptr<SegmentIndexMeta>>> segment_index_metas,
+                      std::vector<InitParameter> opt_params,
                       i64 topk,
                       i64 dimension,
                       i64 query_embedding_count,
@@ -54,13 +51,13 @@ public:
     ~KnnScanSharedData();
 
 public:
-    const SharedPtr<BaseTableRef> table_ref_{};
+    const std::shared_ptr<BaseTableRef> table_ref_{};
 
-    UniquePtr<Vector<BlockMeta *>> block_metas_{};
-    SharedPtr<TableIndexMeeta> table_index_meta_{};
-    UniquePtr<Vector<SharedPtr<SegmentIndexMeta>>> segment_index_metas_{};
+    std::unique_ptr<std::vector<BlockMeta *>> block_metas_{};
+    std::shared_ptr<TableIndexMeeta> table_index_meta_{};
+    std::unique_ptr<std::vector<std::shared_ptr<SegmentIndexMeta>>> segment_index_metas_{};
 
-    const Vector<InitParameter> opt_params_{};
+    const std::vector<InitParameter> opt_params_{};
     const i64 topk_;
     const i64 dimension_;
     const u64 query_count_;
@@ -68,15 +65,15 @@ public:
     const EmbeddingDataType query_elem_type_{EmbeddingDataType::kElemInvalid};
     const KnnDistanceType knn_distance_type_{KnnDistanceType::kInvalid};
 
-    atomic_u64 current_block_idx_{0};
-    atomic_u64 current_index_idx_{0};
+    std::atomic_uint64_t current_block_idx_{0};
+    std::atomic_uint64_t current_index_idx_{0};
 };
 
 //-------------------------------------------------------------------
 
 export class KnnDistanceBase1 {
 public:
-    static UniquePtr<KnnDistanceBase1> Make(EmbeddingDataType embedding_type, KnnDistanceType distance_type);
+    static std::unique_ptr<KnnDistanceBase1> Make(EmbeddingDataType embedding_type, KnnDistanceType distance_type);
 
     const KnnDistanceType dist_type_{};
     explicit KnnDistanceBase1(const KnnDistanceType dist_type) : dist_type_(dist_type) {}
@@ -90,17 +87,17 @@ public:
 
     void InitKnnDistance1(KnnDistanceType dist_type);
 
-    Vector<DistType> Calculate(const QueryDataType *datas, SizeT data_count, const QueryDataType *query, SizeT dim) const {
-        Vector<DistType> res(data_count);
-        for (SizeT i = 0; i < data_count; ++i) {
+    std::vector<DistType> Calculate(const QueryDataType *datas, size_t data_count, const QueryDataType *query, size_t dim) const {
+        std::vector<DistType> res(data_count);
+        for (size_t i = 0; i < data_count; ++i) {
             res[i] = dist_func_(query, datas + i * dim, dim);
         }
         return res;
     }
 
-    Vector<DistType> Calculate(const QueryDataType *datas, SizeT data_count, const QueryDataType *query, SizeT dim, Bitmask &bitmask) const {
-        Vector<DistType> res(data_count);
-        for (SizeT i = 0; i < data_count; ++i) {
+    std::vector<DistType> Calculate(const QueryDataType *datas, size_t data_count, const QueryDataType *query, size_t dim, Bitmask &bitmask) const {
+        std::vector<DistType> res(data_count);
+        for (size_t i = 0; i < data_count; ++i) {
             if (bitmask.IsTrue(i)) {
                 res[i] = dist_func_(query, datas + i * dim, dim);
             }
@@ -109,7 +106,7 @@ public:
     }
 
 public:
-    using DistFunc = DistType (*)(const QueryDataType *, const QueryDataType *, SizeT);
+    using DistFunc = DistType (*)(const QueryDataType *, const QueryDataType *, size_t);
 
     DistFunc dist_func_{};
 };
@@ -142,12 +139,12 @@ public:
     const u32 task_id_;
     bool execute_block_scan_job_ = false;
 
-    UniquePtr<MergeKnnBase> merge_knn_base_{};
-    UniquePtr<KnnDistanceBase1> knn_distance_{};
+    std::unique_ptr<MergeKnnBase> merge_knn_base_{};
+    std::unique_ptr<KnnDistanceBase1> knn_distance_{};
 
-    SharedPtr<ExpressionState> filter_state_{};
-    UniquePtr<DataBlock> db_for_filter_{};
-    SharedPtr<ColumnVector> bool_column_{};
+    std::shared_ptr<ExpressionState> filter_state_{};
+    std::unique_ptr<DataBlock> db_for_filter_{};
+    std::shared_ptr<ColumnVector> bool_column_{};
 };
 
 } // namespace infinity

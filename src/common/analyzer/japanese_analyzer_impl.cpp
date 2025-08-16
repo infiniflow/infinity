@@ -20,24 +20,20 @@ module;
 #include <ijma.h>
 #pragma clang diagnostic pop
 
-#include <cstring>
-#include <filesystem>
-#include <iostream>
-
 module infinity_core:japanese_analyzer.impl;
 
 import :japanese_analyzer;
-import :stl;
 import :term;
 import :analyzer;
 import :common_analyzer;
-import :logger;
 import :status;
+
+import std;
 
 namespace fs = std::filesystem;
 
 namespace infinity {
-static const String KNOWLEDGE_PATH = "mecab/ipadic";
+static const std::string KNOWLEDGE_PATH = "mecab/ipadic";
 
 // Foreign Language is Japanese POS
 static constexpr const char *JAPANESE_FL = "S-A";
@@ -54,7 +50,7 @@ private:
             knowledge_->setSystemDict(knowledge_path);
 
             if (knowledge_->loadDict() == 0) {
-                String msg = "Failed to load JMA knowledge from path: ";
+                std::string msg = "Failed to load JMA knowledge from path: ";
                 msg.append(knowledge_path);
                 throw std::logic_error(msg);
             }
@@ -71,7 +67,7 @@ public:
     jma::Knowledge *knowledge_{nullptr};
 };
 
-JapaneseAnalyzer::JapaneseAnalyzer(const String &base_path) {
+JapaneseAnalyzer::JapaneseAnalyzer(const std::string &base_path) {
     cjk_ = true;
     jma::JMA_Factory *factory = jma::JMA_Factory::instance();
     analyzer_ = factory->createAnalyzer();

@@ -12,11 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:heap_twin_operation;
 
-import :stl;
+import :infinity_type;
 
 namespace infinity {
 
@@ -30,7 +28,7 @@ class heap_twin_multiple {
     u32 top_k{};
     DistType *distance_ptr = nullptr;
     ID *id_ptr = nullptr;
-    Vector<u32> sizes;
+    std::vector<u32> sizes;
     static void down(DistType *distance, ID *id, u32 size, u32 index) {
         if (index == 0 || (index << 1) > size) {
             return;

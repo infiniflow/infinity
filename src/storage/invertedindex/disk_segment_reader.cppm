@@ -12,11 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:disk_index_segment_reader;
-
-import :stl;
 
 import :segment_posting;
 import :index_defines;
@@ -24,31 +20,32 @@ import :index_segment_reader;
 import :dict_reader;
 import :file_reader;
 import :posting_list_format;
-import internal_types;
 import :term_meta;
+
+import internal_types;
 
 namespace infinity {
 export class DiskIndexSegmentReader : public IndexSegmentReader {
 public:
     DiskIndexSegmentReader(SegmentID segment_id,
                            ChunkID chunk_id,
-                           const String &index_dir,
-                           const String &base_name,
+                           const std::string &index_dir,
+                           const std::string &base_name,
                            RowID base_row_id,
                            optionflag_t flag);
 
     virtual ~DiskIndexSegmentReader();
 
-    bool GetSegmentPosting(const String &term, SegmentPosting &seg_posting, bool fetch_position = true) const override;
+    bool GetSegmentPosting(const std::string &term, SegmentPosting &seg_posting, bool fetch_position = true) const override;
 
 private:
     RowID base_row_id_{INVALID_ROWID};
-    SharedPtr<DictionaryReader> dict_reader_;
-    String posting_file_{};
-    String posting_file_obj_{};
-    String dict_file_{};
+    std::shared_ptr<DictionaryReader> dict_reader_;
+    std::string posting_file_{};
+    std::string posting_file_obj_{};
+    std::string dict_file_{};
     u8 *data_ptr_{};
-    SizeT data_len_{};
+    size_t data_len_{};
 };
 
 } // namespace infinity

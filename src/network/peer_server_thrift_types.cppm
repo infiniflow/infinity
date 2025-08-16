@@ -16,6 +16,18 @@ module;
 
 #include "peer_server_thrift/PeerService.h"
 
+// wait for clang fix
+#ifndef PARESER_USE_STD_MODULE
+#define PARESER_USE_STD_MODULE 1
+import std;
+import std.compat;
+#endif
+
+#ifndef PARESER_USE_THIRD_PARTY_MODULE
+#define PARESER_USE_THIRD_PARTY_MODULE 1
+import third_party;
+#endif
+
 export module infinity_core:peer_server_thrift_types;
 
 namespace infinity_peer_server {

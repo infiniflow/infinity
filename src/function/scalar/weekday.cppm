@@ -14,8 +14,6 @@ module;
 
 export module infinity_core:weekday;
 
-import :stl;
-
 namespace infinity {
 
 class NewCatalog;

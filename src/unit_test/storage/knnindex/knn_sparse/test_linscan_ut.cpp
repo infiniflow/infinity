@@ -14,22 +14,21 @@
 
 #ifdef CI
 #include <cassert>
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 import infinity_core;
 import base_test;
 #else
 module;
 
 #include <cassert>
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 
 module infinity_core:ut.test_linscan;
 
 import :ut.base_test;
-import :stl;
 import :linscan_alg;
 import :sparse_util;
-import :third_party;
+import third_party;
 import :sparse_test_util;
 #endif
 

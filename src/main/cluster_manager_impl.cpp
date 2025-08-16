@@ -12,19 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
-#include <vector>
-#include <string>
-
 module infinity_core:cluster_manager.impl;
 
 import :cluster_manager;
+import :peer_thrift_client;
+import :infinity_exception;
+
+import std;
 
 import admin_statement;
 import global_resource_usage;
-import :peer_thrift_client;
-import :infinity_exception;
 
 namespace infinity {
 
@@ -100,8 +97,9 @@ Status ClusterManager::UnInit(bool not_unregister) {
     return Status::OK();
 }
 
-Tuple<SharedPtr<PeerClient>, Status> ClusterManager::ConnectToServerNoLock(const String &from_node_name, const String &server_ip, i64 server_port) {
-    SharedPtr<PeerClient> client = MakeShared<PeerClient>(from_node_name, server_ip, server_port);
+std::tuple<std::shared_ptr<PeerClient>, Status>
+ClusterManager::ConnectToServerNoLock(const std::string &from_node_name, const std::string &server_ip, i64 server_port) {
+    std::shared_ptr<PeerClient> client = std::make_shared<PeerClient>(from_node_name, server_ip, server_port);
     Status client_status = client->Init();
     if (!client_status.ok()) {
         return {nullptr, client_status};
@@ -109,10 +107,10 @@ Tuple<SharedPtr<PeerClient>, Status> ClusterManager::ConnectToServerNoLock(const
     return {client, client_status};
 }
 
-Vector<SharedPtr<NodeInfo>> ClusterManager::ListNodes() const {
+std::vector<std::shared_ptr<NodeInfo>> ClusterManager::ListNodes() const {
     // ADMIN SHOW NODES;
     std::unique_lock<std::mutex> cluster_lock(cluster_mutex_);
-    Vector<SharedPtr<NodeInfo>> result;
+    std::vector<std::shared_ptr<NodeInfo>> result;
     result.reserve(other_node_map_.size() + 2);
     result.emplace_back(this_node_);
     if (current_node_role_ == NodeRole::kFollower or current_node_role_ == NodeRole::kLearner) {
@@ -125,12 +123,11 @@ Vector<SharedPtr<NodeInfo>> ClusterManager::ListNodes() const {
     return result;
 }
 
-Tuple<Status, SharedPtr<NodeInfo>> ClusterManager::GetNodeInfoByName(const String &node_name) const {
+std::tuple<Status, std::shared_ptr<NodeInfo>> ClusterManager::GetNodeInfoByName(const std::string &node_name) const {
     std::unique_lock<std::mutex> cluster_lock(cluster_mutex_);
 
     if (current_node_role_ == NodeRole::kAdmin or current_node_role_ == NodeRole::kStandalone or current_node_role_ == NodeRole::kUnInitialized) {
-        String error_message = "Error node role type";
-        UnrecoverableError(error_message);
+        UnrecoverableError("Error node role type");
     }
 
     if (current_node_role_ == NodeRole::kFollower or current_node_role_ == NodeRole::kLearner) {
@@ -152,7 +149,7 @@ Tuple<Status, SharedPtr<NodeInfo>> ClusterManager::GetNodeInfoByName(const Strin
     return {Status::OK(), iter->second};
 }
 
-SharedPtr<NodeInfo> ClusterManager::ThisNode() const {
+std::shared_ptr<NodeInfo> ClusterManager::ThisNode() const {
     // ADMIN SHOW NODE;
     std::unique_lock<std::mutex> cluster_lock(cluster_mutex_);
     return this_node_;

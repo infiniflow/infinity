@@ -16,8 +16,11 @@ module;
 
 export module infinity_core:http_server;
 
-import :stl;
-import :third_party;
+import :infinity_type;
+
+import std;
+
+import third_party;
 
 namespace infinity {
 
@@ -30,16 +33,16 @@ enum struct HTTPServerStatus : u8 {
 
 export class HTTPServer {
 public:
-    Thread Start(const String &server_address, u16 port);
+    std::thread Start(const std::string &server_address, u16 port);
     void Shutdown();
 
 private:
-    Atomic<HTTPServerStatus> status_{HTTPServerStatus::kStopped};
-    SharedPtr<HttpRouter> router_{};
-    SharedPtr<WebServer> server_{};
+    std::atomic<HTTPServerStatus> status_{HTTPServerStatus::kStopped};
+    std::shared_ptr<HttpRouter> router_{};
+    std::shared_ptr<WebServer> server_{};
 
-    SharedPtr<HttpConnectionProvider> connection_provider_{};
-    SharedPtr<HttpConnectionHandler> connection_handler_{};
+    std::shared_ptr<HttpConnectionProvider> connection_provider_{};
+    std::shared_ptr<HttpConnectionHandler> connection_handler_{};
 };
 
 } // namespace infinity

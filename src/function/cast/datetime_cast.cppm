@@ -12,21 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:datetime_cast;
 
-import :stl;
 import :column_vector;
 import :vector_buffer;
 import :bound_cast_func;
-import data_type;
 import :column_vector_cast;
-import logical_type;
 import :infinity_exception;
-import :third_party;
+
+import data_type;
+import logical_type;
 import internal_types;
-import :logger;
 
 namespace infinity {
 
@@ -48,8 +44,7 @@ export inline BoundCastFunc BindDateTimeCast(DataType &target) {
             return BoundCastFunc(&ColumnVectorCast::TryCastColumnVectorToVarlen<DateTimeT, VarcharT, DateTimeTryCastToVarlen>);
         }
         default: {
-            String error_message = fmt::format("Can't cast from DateTime type to {}", target.ToString());
-            UnrecoverableError(error_message);
+            UnrecoverableError(fmt::format("Can't cast from DateTime type to {}", target.ToString()));
         }
     }
     return BoundCastFunc(nullptr);
@@ -58,9 +53,8 @@ export inline BoundCastFunc BindDateTimeCast(DataType &target) {
 struct DateTimeTryCastToFixlen {
     template <typename SourceType, typename TargetType>
     static inline bool Run(SourceType, TargetType &) {
-        String error_message =
-            fmt::format("Not support to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>());
-        UnrecoverableError(error_message);
+        UnrecoverableError(
+            fmt::format("Not support to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>()));
 
         return false;
     }
@@ -69,38 +63,33 @@ struct DateTimeTryCastToFixlen {
 struct DateTimeTryCastToVarlen {
     template <typename SourceType, typename TargetType>
     static inline bool Run(SourceType, TargetType &, ColumnVector *) {
-        String error_message =
-            fmt::format("Not support to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>());
-        UnrecoverableError(error_message);
+        UnrecoverableError(
+            fmt::format("Not support to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>()));
         return false;
     }
 };
 
 template <>
 inline bool DateTimeTryCastToFixlen::Run(DateTimeT, DateT &) {
-    String error_message = "Not implemented";
-    UnrecoverableError(error_message);
+    UnrecoverableError("Not implemented");
     return false;
 }
 
 template <>
 inline bool DateTimeTryCastToFixlen::Run(DateTimeT, TimeT &) {
-    String error_message = "Not implemented";
-    UnrecoverableError(error_message);
+    UnrecoverableError("Not implemented");
     return false;
 }
 
 template <>
 inline bool DateTimeTryCastToFixlen::Run(DateTimeT, TimestampT &) {
-    String error_message = "Not implemented";
-    UnrecoverableError(error_message);
+    UnrecoverableError("Not implemented");
     return false;
 }
 
 template <>
 inline bool DateTimeTryCastToVarlen::Run(DateTimeT, VarcharT &, ColumnVector *) {
-    String error_message = "Not implemented";
-    UnrecoverableError(error_message);
+    UnrecoverableError("Not implemented");
     return false;
 }
 

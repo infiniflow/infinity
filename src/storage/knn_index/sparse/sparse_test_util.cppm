@@ -15,16 +15,16 @@
 module;
 
 #include <cassert>
-#include <cstdlib>
-#include <iostream>
 
 export module infinity_core:sparse_test_util;
 
-import :stl;
 import :sparse_vector_distance;
 import :linscan_alg;
 import :sparse_util;
 import :infinity_exception;
+
+import std;
+import std.compat;
 
 namespace infinity {
 
@@ -32,14 +32,14 @@ export template <typename DataType, typename IdxType>
 struct SparseTestUtil {
     static bool CheckAccurateKnn(const i32 *gt_indices,
                                  const DataType *gt_scores,
-                                 SizeT gt_size,
-                                 const Vector<u32> &indices,
-                                 const Vector<DataType> &scores,
+                                 size_t gt_size,
+                                 const std::vector<u32> &indices,
+                                 const std::vector<DataType> &scores,
                                  f32 error_bound) {
         if (gt_size < indices.size()) {
             return false;
         }
-        for (SizeT i = 0; i < indices.size(); ++i) {
+        for (size_t i = 0; i < indices.size(); ++i) {
             if (gt_scores[i] == 0.0) {
                 break;
             }
@@ -50,10 +50,13 @@ struct SparseTestUtil {
         return true;
     }
 
-    static Pair<u32, u32>
-    CheckApproximateKnn(const i32 *gt_indices, const DataType *gt_scores, SizeT gt_size, const Vector<u32> &indices, const Vector<DataType> &scores) {
-        HashSet<u32> gt_set;
-        for (SizeT i = 0; i < gt_size; ++i) {
+    static std::pair<u32, u32> CheckApproximateKnn(const i32 *gt_indices,
+                                                   const DataType *gt_scores,
+                                                   size_t gt_size,
+                                                   const std::vector<u32> &indices,
+                                                   const std::vector<DataType> &scores) {
+        std::unordered_set<u32> gt_set;
+        for (size_t i = 0; i < gt_size; ++i) {
             if (gt_scores[i] == 0.0) {
                 break;
             }
@@ -71,17 +74,17 @@ struct SparseTestUtil {
     static void PrintQuery(u32 query_id,
                            const i32 *gt_indices,
                            const DataType *gt_scores,
-                           SizeT gt_size,
-                           const Vector<u32> &indices,
-                           const Vector<DataType> &scores) {
+                           size_t gt_size,
+                           const std::vector<u32> &indices,
+                           const std::vector<DataType> &scores) {
         std::cout << "Query " << query_id << std::endl;
         std::cout << "Result:\n";
-        for (SizeT i = 0; i < indices.size(); ++i) {
+        for (size_t i = 0; i < indices.size(); ++i) {
             std::cout << indices[i] << " " << scores[i] << ", ";
         }
         std::cout << std::endl;
         std::cout << "Groundtruth:\n";
-        for (SizeT i = 0; i < gt_size; ++i) {
+        for (size_t i = 0; i < gt_size; ++i) {
             std::cout << gt_indices[i] << " " << gt_scores[i] << ", ";
         }
         std::cout << std::endl;
@@ -101,9 +104,9 @@ struct SparseTestUtil {
             UnrecoverableError("Invalid dimension.");
         }
         u32 nnz = nrow * ncol * sparsity;
-        auto data = MakeUnique<DataType[]>(nnz);
-        auto indices = MakeUnique<IdxType[]>(nnz);
-        auto indptr = MakeUnique<i64[]>(nrow + 1);
+        auto data = std::make_unique<DataType[]>(nnz);
+        auto indices = std::make_unique<IdxType[]>(nnz);
+        auto indptr = std::make_unique<i64[]>(nrow + 1);
         {
             std::uniform_real_distribution<DataType> distrib(data_min, data_max);
             for (u32 i = 0; i < nnz; ++i) {
@@ -134,7 +137,7 @@ struct SparseTestUtil {
             for (u32 i = 0; i < nrow; ++i) {
                 i64 end = indptr[i + 1];
                 assert(end - start <= ncol);
-                HashSet<IdxType> indice_set;
+                std::unordered_set<IdxType> indice_set;
                 for (i64 j = start; j < end;) {
                     IdxType r = rng() % ncol;
                     if (auto [iter, insert_ok] = indice_set.emplace(r); insert_ok) {
@@ -153,13 +156,13 @@ struct SparseTestUtil {
         return SparseMatrix<DataType, IdxType>{std::move(data), std::move(indices), std::move(indptr), nrow, ncol, nnz};
     }
 
-    static Pair<UniquePtr<i32[]>, UniquePtr<DataType[]>>
+    static std::pair<std::unique_ptr<i32[]>, std::unique_ptr<DataType[]>>
     GenerateGroundtruth(const SparseMatrix<DataType, IdxType> &mat, const SparseMatrix<DataType, IdxType> &query, u32 topk, bool use_linscan = true) {
         if (mat.ncol_ != query.ncol_) {
             UnrecoverableError("Inconsistent dimension.");
         }
-        auto gt_indices = MakeUnique<i32[]>(query.nrow_ * topk);
-        auto gt_scores = MakeUnique<DataType[]>(query.nrow_ * topk);
+        auto gt_indices = std::make_unique<i32[]>(query.nrow_ * topk);
+        auto gt_scores = std::make_unique<DataType[]>(query.nrow_ * topk);
         if (use_linscan) {
             LinScan<DataType, IdxType> index(mat.ncol_);
             for (auto iter = SparseMatrixIter<DataType, IdxType>(mat); iter.HasNext(); iter.Next()) {
@@ -171,37 +174,37 @@ struct SparseTestUtil {
                 SparseVecRef query = iter.val();
                 auto [indices, scores] = index.SearchBF(query, topk);
                 u32 query_id = iter.row_id();
-                Copy(indices.begin(), indices.end(), gt_indices.get() + query_id * topk);
-                Copy(scores.begin(), scores.end(), gt_scores.get() + query_id * topk);
+                std::copy(indices.begin(), indices.end(), gt_indices.get() + query_id * topk);
+                std::copy(scores.begin(), scores.end(), gt_scores.get() + query_id * topk);
             }
         } else { // brute force, only used in linscan test
             for (auto iter = SparseMatrixIter<DataType, IdxType>(query); iter.HasNext(); iter.Next()) {
                 SparseVecRef query = iter.val();
                 auto [indices, scores] = SparseTestUtil<DataType, IdxType>::BruteForceKnn(mat, query, topk);
                 u32 query_id = iter.row_id();
-                Copy(indices.begin(), indices.end(), gt_indices.get() + query_id * topk);
-                Copy(scores.begin(), scores.end(), gt_scores.get() + query_id * topk);
+                std::copy(indices.begin(), indices.end(), gt_indices.get() + query_id * topk);
+                std::copy(scores.begin(), scores.end(), gt_scores.get() + query_id * topk);
             }
         }
         return {std::move(gt_indices), std::move(gt_scores)};
     }
 
 private:
-    static Pair<Vector<u32>, Vector<DataType>>
+    static std::pair<std::vector<u32>, std::vector<DataType>>
     BruteForceKnn(const SparseMatrix<DataType, IdxType> &mat, const SparseVecRef<DataType, IdxType> &query, u32 topk) {
-        Vector<DataType> scores(mat.nrow_, 0.0);
+        std::vector<DataType> scores(mat.nrow_, 0.0);
         for (auto iter = SparseMatrixIter<DataType, IdxType>(mat); iter.HasNext(); iter.Next()) {
             SparseVecRef vec = iter.val();
             u32 row_id = iter.row_id();
             DataType score = SparseVecUtil::DistanceIP(query, vec);
             scores[row_id] = score;
         }
-        Vector<u32> indices(mat.nrow_);
+        std::vector<u32> indices(mat.nrow_);
         std::iota(indices.begin(), indices.end(), 0);
         u32 result_size = std::min(topk, (u32)mat.nrow_);
         std::partial_sort(indices.begin(), indices.begin() + result_size, indices.end(), [&](u32 i, u32 j) { return scores[i] > scores[j]; });
         indices.resize(result_size);
-        Vector<DataType> top_scores(result_size);
+        std::vector<DataType> top_scores(result_size);
         std::transform(indices.begin(), indices.end(), top_scores.begin(), [&](u32 i) { return scores[i]; });
         return {std::move(indices), std::move(top_scores)};
     }

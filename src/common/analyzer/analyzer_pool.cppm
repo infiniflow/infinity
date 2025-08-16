@@ -12,23 +12,22 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:analyzer_pool;
 
-import :stl;
 import :singleton;
-import :third_party;
 import :analyzer;
 import :status;
+
+import std;
+import third_party;
 
 namespace infinity {
 
 export class AnalyzerPool : public Singleton<AnalyzerPool> {
 public:
-    using CacheType = FlatHashMap<std::string_view, UniquePtr<Analyzer>>;
+    using CacheType = FlatHashMap<std::string_view, std::unique_ptr<Analyzer>>;
 
-    Tuple<UniquePtr<Analyzer>, Status> GetAnalyzer(const std::string_view &name);
+    std::tuple<std::unique_ptr<Analyzer>, Status> GetAnalyzer(const std::string_view &name);
 
     static u64 AnalyzerNameToInt(const char *str);
 
