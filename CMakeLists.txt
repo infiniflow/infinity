@@ -2,9 +2,11 @@ cmake_minimum_required(VERSION 4.0.3)
 
 cmake_policy(SET CMP0167 OLD)
 
-#if (CMAKE_)
-set(CMAKE_EXPERIMENTAL_CXX_IMPORT_STD "d0edc3af-4c50-42ea-a356-e2862fe7a444")
-#endif ()
+if (CMAKE_VERSION GREATER_EQUAL 4.0.3 AND CMAKE_VERSION LESS_EQUAL 4.1.0)
+    set(CMAKE_EXPERIMENTAL_CXX_IMPORT_STD "d0edc3af-4c50-42ea-a356-e2862fe7a444")
+else ()
+    message(FATAL_ERROR "The CMake version must be between 4.0.3 and 4.1.0.")
+endif ()
 
 # Auto-detect and set vcpkg toolchain if not already set
 if (NOT CMAKE_TOOLCHAIN_FILE)
@@ -50,7 +52,7 @@ if (CLANG_VERSION_STRING VERSION_GREATER_EQUAL 20)
     message(STATUS "Building ${PROJECT_NAME} with CMake version: ${CMAKE_VERSION} On CLANG-${CLANG_VERSION_STRING}")
 
     # add_compile_options(-ftime-trace)
-#    add_compile_options(-fmodule-header)
+    #    add_compile_options(-fmodule-header)
     add_link_options(-fuse-ld=mold)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Wno-unused-parameter -Wno-unused-private-field")
 
@@ -164,15 +166,13 @@ include_directories(${OATPP_INCLUDE_DIRS})
 message(STATUS "Using vcpkg toolchain - automatic package discovery enabled")
 
 # https://youtrack.jetbrains.com/issue/CPP-39632/import-std-CLion-cant-resolve-module-std-in-case-of-clang
-#if (NOT CI)
-#    add_library(unused_std_target STATIC)
-#    target_sources(unused_std_target
-#            PRIVATE
-#            FILE_SET CXX_MODULES
-#            BASE_DIRS /usr/include/c++/15
-#            FILES /usr/include/c++/15/bits/std.cc /usr/include/c++/15/bits/std.compat.cc
-#    )
-#endif ()
+#add_library(unused_std_target STATIC)
+#target_sources(unused_std_target
+#        PRIVATE
+#        FILE_SET CXX_MODULES
+#        BASE_DIRS /usr/include/c++/15
+#        FILES /usr/include/c++/15/bits/std.cc /usr/include/c++/15/bits/std.compat.cc
+#)
 
 # Get current system time and print the build time
 execute_process(COMMAND "date" +"%Y-%m-%d %H:%M.%S" OUTPUT_VARIABLE CURRENT_SYS_TIME)

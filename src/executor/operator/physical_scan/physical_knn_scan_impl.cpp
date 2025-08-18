@@ -29,9 +29,7 @@ import :buffer_manager;
 import :merge_knn;
 import :knn_result_handler;
 import :buffer_obj;
-import :buffer_handle;
 import :data_block;
-import :column_vector;
 import :index_hnsw;
 import :status;
 import :hnsw_handler;
@@ -58,7 +56,6 @@ import knn_expr;
 import embedding_info;
 import logical_type;
 import internal_types;
-// import data_type;
 
 namespace infinity {
 
