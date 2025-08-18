@@ -40,6 +40,7 @@ import :block_meta;
 import :kv_utility;
 import :column_index_reader;
 import :new_txn;
+import :meta_cache;
 import row_id;
 
 namespace infinity {
@@ -60,10 +61,14 @@ TableMeeta::TableMeeta(const String &db_id_str, const String &table_id_str, NewT
 
 Status TableMeeta::GetComment(TableInfo &table_info) {
     if (!comment_) {
-        Status status = LoadComment();
-        if (!status.ok()) {
+        String table_comment_key = GetTableTag("comment");
+        String table_comment;
+        Status status = kv_instance_->Get(table_comment_key, table_comment);
+        if (!status.ok() && status.code() != ErrorCode::kNotFound) { // not found is ok
+            LOG_ERROR(fmt::format("Fail to get table comment from kv store, key: {}, cause: {}", table_comment_key, status.message()));
             return status;
         }
+        comment_ = std::move(table_comment);
     }
     table_info.table_comment_ = MakeShared<String>(*comment_);
     return Status::OK();
@@ -127,7 +132,7 @@ Status TableMeeta::GetIndexID(const String &index_name, String &index_key, Strin
 }
 
 Tuple<SharedPtr<ColumnDef>, Status> TableMeeta::GetColumnDefByColumnName(const String &column_name, SizeT *column_idx_ptr) {
-    if (!column_defs_) {
+    if (column_defs_ == nullptr) {
         Status status = LoadColumnDefs();
         if (!status.ok()) {
             return {nullptr, status};
@@ -143,31 +148,6 @@ Tuple<SharedPtr<ColumnDef>, Status> TableMeeta::GetColumnDefByColumnName(const S
     }
     return {nullptr, Status::ColumnNotExist(column_name)};
 }
-
-Tuple<SharedPtr<ColumnDef>, Status> TableMeeta::GetColumnDefByColumnID(const SizeT &column_idx) {
-    if (!column_defs_) {
-        Status status = LoadColumnDefs();
-        if (!status.ok()) {
-            return {nullptr, status};
-        }
-    }
-    if (column_idx >= column_defs_->size()) {
-        return {nullptr, Status::ColumnNotExist(column_idx)};
-    }
-    return {(*column_defs_)[column_idx], Status::OK()};
-}
-
-// Status TableMeeta::SetSegmentIDs(const Vector<SegmentID> &segment_ids) {
-//     segment_ids_ = segment_ids;
-//     String segment_ids_key = GetTableTag("segment_ids");
-//     String segment_ids_str = nlohmann::json(segment_ids).dump();
-//     Status status = kv_instance_.Put(segment_ids_key, segment_ids_str);
-//     if (!status.ok()) {
-//         LOG_ERROR(fmt::format("Fail to set segment ids to kv store, key: {}, cause: {}", segment_ids_key, status.message()));
-//         return status;
-//     }
-//     return Status::OK();
-// }
 
 Status TableMeeta::RemoveSegmentIDs1(const Vector<SegmentID> &segment_ids) {
     HashSet<SegmentID> segment_ids_set(segment_ids.begin(), segment_ids.end());
@@ -569,20 +549,12 @@ Status TableMeeta::SetNextColumnID(ColumnID next_column_id) {
     return Status::OK();
 }
 
-Status TableMeeta::LoadComment() {
-    String table_comment_key = GetTableTag("comment");
-    String table_comment;
-    Status status = kv_instance_->Get(table_comment_key, table_comment);
-    if (!status.ok() && status.code() != ErrorCode::kNotFound) { // not found is ok
-        LOG_ERROR(fmt::format("Fail to get table comment from kv store, key: {}, cause: {}", table_comment_key, status.message()));
-        return status;
-    }
-    comment_ = std::move(table_comment);
-    return Status::OK();
-}
-
 Status TableMeeta::LoadColumnDefs() {
-    Vector<SharedPtr<ColumnDef>> column_defs;
+    if (table_cache_.get() != nullptr) {
+        column_defs_ = table_cache_->get_columns();
+        return Status::OK();
+    }
+    SharedPtr<Vector<SharedPtr<ColumnDef>>> column_defs = MakeShared<Vector<SharedPtr<ColumnDef>>>();
     Map<String, Vector<Pair<String, String>>> column_kvs_map;
     String column_prefix = KeyEncode::TableColumnPrefix(db_id_str_, table_id_str_);
     auto iter = kv_instance_->GetIterator();
@@ -618,18 +590,15 @@ Status TableMeeta::LoadColumnDefs() {
 
             if (drop_column_ts.empty() || std::stoull(drop_column_ts) > begin_ts_) {
                 auto column_def = ColumnDef::FromJson(column_value);
-                column_defs.push_back(column_def);
+                column_defs->push_back(column_def);
             }
         }
     }
-    std::sort(column_defs.begin(), column_defs.end(), [](const SharedPtr<ColumnDef> &a, const SharedPtr<ColumnDef> &b) { return a->id_ < b->id_; });
+    std::sort(column_defs->begin(), column_defs->end(), [](const SharedPtr<ColumnDef> &a, const SharedPtr<ColumnDef> &b) { return a->id_ < b->id_; });
     column_defs_ = std::move(column_defs);
-
-    return Status::OK();
-}
-
-Status TableMeeta::LoadSegmentIDs1() {
-    segment_ids1_ = infinity::GetTableSegments(kv_instance_, db_id_str_, table_id_str_, begin_ts_, commit_ts_);
+    if (table_cache_.get() != nullptr) {
+        table_cache_->set_columns(column_defs_);
+    }
     return Status::OK();
 }
 
@@ -845,7 +814,7 @@ Tuple<SharedPtr<Vector<SharedPtr<ColumnDef>>>, Status> TableMeeta::GetColumnDefs
             return {nullptr, status};
         }
     }
-    return {MakeShared<Vector<SharedPtr<ColumnDef>>>(column_defs_.value()), Status::OK()};
+    return {column_defs_, Status::OK()};
 }
 
 Status TableMeeta::GetNextRowID(RowID &next_row_id) {

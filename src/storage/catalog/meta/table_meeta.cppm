@@ -91,7 +91,6 @@ public:
 
     Tuple<SharedPtr<Vector<SharedPtr<ColumnDef>>>, Status> GetColumnDefs();
     Tuple<SharedPtr<ColumnDef>, Status> GetColumnDefByColumnName(const String &column_name, SizeT *column_idx = nullptr);
-    Tuple<SharedPtr<ColumnDef>, Status> GetColumnDefByColumnID(const SizeT &column_idx);
 
     Status GetTableInfo(TableInfo &table_info);
 
@@ -132,11 +131,7 @@ public:
     Tuple<SizeT, Status> GetTableRowCount();
 
 private:
-    Status LoadComment();
-
     Status LoadColumnDefs();
-
-    Status LoadSegmentIDs1();
 
     Status LoadIndexIDs();
 
@@ -159,7 +154,7 @@ private:
     String table_name_{};
 
     Optional<String> comment_;
-    Optional<Vector<SharedPtr<ColumnDef>>> column_defs_;
+    SharedPtr<Vector<SharedPtr<ColumnDef>>> column_defs_;
     // Optional<Vector<SegmentID>> segment_ids_;
     Optional<Vector<SegmentID>> segment_ids1_;
 

@@ -15,6 +15,7 @@
 module;
 
 #include <iterator>
+#include <memory>
 
 module infinity_core:meta_cache.impl;
 
@@ -50,42 +51,110 @@ MetaCacheType MetaBaseCache::type() const {
     return type_;
 }
 
-String MetaDbCache::name() const { return db_name_; }
-u64 MetaDbCache::db_id() const { return db_id_; }
-const String &MetaDbCache::db_key() const { return db_key_; }
-u64 MetaDbCache::commit_ts() const { return commit_ts_; }
+String MetaDbCache::name() const {
+    std::unique_lock lock(mtx_);
+    return db_name_;
+}
+u64 MetaDbCache::db_id() const {
+    std::unique_lock lock(mtx_);
+    return db_id_;
+}
+const String &MetaDbCache::db_key() const {
+    std::unique_lock lock(mtx_);
+    return db_key_;
+}
+u64 MetaDbCache::commit_ts() const {
+    std::unique_lock lock(mtx_);
+    return commit_ts_;
+}
 String MetaDbCache::detail() const {
+    std::unique_lock lock(mtx_);
     String extend = is_dropped_ ? "dropped" : "created";
     return fmt::format("db_name: {}, db_id: {}, {}", db_name_, db_id_, extend);
 }
-bool MetaDbCache::is_dropped() const { return is_dropped_; }
+bool MetaDbCache::is_dropped() const {
+    std::unique_lock lock(mtx_);
+    return is_dropped_;
+}
 void MetaDbCache::set_comment(const SharedPtr<String> &comment) {
+    std::unique_lock lock(mtx_);
     get_comment_ = true;
     comment_ = comment;
 }
-bool MetaDbCache::get_comment() const { return get_comment_; }
-SharedPtr<String> MetaDbCache::comment() const { return comment_; }
+bool MetaDbCache::get_comment() const {
+    std::unique_lock lock(mtx_);
+    return get_comment_;
+}
+SharedPtr<String> MetaDbCache::comment() const {
+    std::unique_lock lock(mtx_);
+    return comment_;
+}
 
-String MetaTableCache::name() const { return table_name_; }
-u64 MetaTableCache::db_id() const { return db_id_; }
-u64 MetaTableCache::table_id() const { return table_id_; }
-const String &MetaTableCache::table_key() const { return table_key_; }
-u64 MetaTableCache::commit_ts() const { return commit_ts_; }
+String MetaTableCache::name() const {
+    std::unique_lock lock(mtx_);
+    return table_name_;
+}
+u64 MetaTableCache::db_id() const {
+    std::unique_lock lock(mtx_);
+    return db_id_;
+}
+u64 MetaTableCache::table_id() const {
+    std::unique_lock lock(mtx_);
+    return table_id_;
+}
+const String &MetaTableCache::table_key() const {
+    std::unique_lock lock(mtx_);
+    return table_key_;
+}
+u64 MetaTableCache::commit_ts() const {
+    std::unique_lock lock(mtx_);
+    return commit_ts_;
+}
 String MetaTableCache::detail() const {
+    std::unique_lock lock(mtx_);
     String extend = is_dropped_ ? "dropped" : "created";
     return fmt::format("db_id: {}, table_name: {}, table_id: {}, {}", db_id_, table_name_, table_id_, extend);
 }
-bool MetaTableCache::is_dropped() const { return is_dropped_; }
+bool MetaTableCache::is_dropped() const {
+    std::unique_lock lock(mtx_);
+    return is_dropped_;
+}
 
-String MetaIndexCache::name() const { return index_name_; }
-u64 MetaIndexCache::db_id() const { return db_id_; }
-u64 MetaIndexCache::table_id() const { return table_id_; }
-u64 MetaIndexCache::commit_ts() const { return commit_ts_; }
+SharedPtr<Vector<SharedPtr<ColumnDef>>> MetaTableCache::get_columns() const {
+    std::unique_lock lock(mtx_);
+    return columns_;
+}
+
+void MetaTableCache::set_columns(const SharedPtr<Vector<SharedPtr<ColumnDef>>> &columns) {
+    std::unique_lock lock(mtx_);
+    columns_ = columns;
+}
+
+String MetaIndexCache::name() const {
+    std::unique_lock lock(mtx_);
+    return index_name_;
+}
+u64 MetaIndexCache::db_id() const {
+    std::unique_lock lock(mtx_);
+    return db_id_;
+}
+u64 MetaIndexCache::table_id() const {
+    std::unique_lock lock(mtx_);
+    return table_id_;
+}
+u64 MetaIndexCache::commit_ts() const {
+    std::unique_lock lock(mtx_);
+    return commit_ts_;
+}
 String MetaIndexCache::detail() const {
+    std::unique_lock lock(mtx_);
     String extend = is_dropped_ ? "dropped" : "created";
     return fmt::format("db_id: {}, table_id: {}, index_name: {}, index_id: {}, {}", db_id_, table_id_, table_id_, index_name_, index_id_, extend);
 }
-bool MetaIndexCache::is_dropped() const { return is_dropped_; }
+bool MetaIndexCache::is_dropped() const {
+    std::unique_lock lock(mtx_);
+    return is_dropped_;
+}
 
 void MetaCache::Put(const Vector<SharedPtr<MetaBaseCache>> &cache_items) {
     std::unique_lock lock(cache_mtx_);
