@@ -4,7 +4,7 @@ import time
 import requests
 import logging
 from test_pysdk.common.common_data import *
-from infinity.common import ConflictType, InfinityException, SparseVector, SortType
+from infinity.common import ConflictType, InfinityException, SparseVector, SortType, FDE
 from typing import Optional, Any
 from infinity.errors import ErrorCode
 from infinity.utils import deprecated_api
@@ -695,14 +695,22 @@ class table_http:
         for value in values:
             if isinstance(value, dict):
                 for key in value:
-                    if isinstance(value[key],
+                    if isinstance(value[key], FDE):
+                        # Convert FDE object to HTTP API format
+                        fde_obj = value[key]
+                        value[key] = {
+                            "function": "fde",
+                            "tensor_data": fde_obj.tensor_data,
+                            "target_dimension": fde_obj.target_dimension
+                        }
+                    elif isinstance(value[key],
                                   np.ndarray):  # trans np array to list since http api can not parse np array
                         value[key] = value[key].tolist()
-                    if isinstance(value[key], list):
+                    elif isinstance(value[key], list):
                         for idx in range(len(value[key])):
                             if isinstance(value[key][idx], np.ndarray):
                                 value[key][idx] = value[key][idx].tolist()
-                    if isinstance(value[key], SparseVector):
+                    elif isinstance(value[key], SparseVector):
                         value[key] = value[key].to_dict()
 
         url = f"databases/{self.database_name}/tables/{self.table_name}/docs"

@@ -76,9 +76,26 @@ class Array:
         return str(self)
 
 
+@dataclass
+class FDE:
+    """Fixed Dimensional Encoding function call for insert operations."""
+    tensor_data: list  # 2D array of numbers
+    target_dimension: int  # Target embedding dimension
+
+    def __init__(self, tensor_data: list, target_dimension: int):
+        self.tensor_data = tensor_data
+        self.target_dimension = target_dimension
+
+    def __str__(self):
+        return f"FDE(tensor_data={self.tensor_data}, target_dimension={self.target_dimension})"
+
+    def __repr__(self):
+        return str(self)
+
+
 URI = Union[NetworkAddress, Path]
 VEC = Union[list, np.ndarray]
-INSERT_DATA = dict[str, Union[str, int, float, list[Union[int, float]]], SparseVector, dict, Array]
+INSERT_DATA = dict[str, Union[str, int, float, list[Union[int, float]]], SparseVector, dict, Array, FDE]
 
 LOCAL_HOST = NetworkAddress("127.0.0.1", 23817)
 

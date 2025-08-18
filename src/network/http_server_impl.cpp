@@ -42,6 +42,7 @@ import column_def;
 import internal_types;
 import parsed_expr;
 import constant_expr;
+import function_expr;
 import insert_row_expr;
 import expr_parser;
 import expression_parser_result;
@@ -1140,6 +1141,78 @@ public:
                         }
                         case simdjson::json_type::object: {
                             simdjson::object value_obj = value.get_object();
+
+                            // Check for FDE function call
+                            if (simdjson::value fde_func; value_obj["function"].get(fde_func) == simdjson::SUCCESS) {
+                                String func_name = String((std::string_view)fde_func.get_string());
+                                ToLower(func_name);
+
+                                if (func_name == "fde") {
+                                    // Parse FDE function parameters
+                                    auto tensor_data_result = value_obj["tensor_data"].get_array();
+                                    auto target_dim_result = value_obj["target_dimension"].get_uint64();
+
+                                    if (tensor_data_result.error() != simdjson::SUCCESS || target_dim_result.error() != simdjson::SUCCESS) {
+                                        json_response["error_code"] = ErrorCode::kInvalidJsonFormat;
+                                        json_response["error_message"] =
+                                            fmt::format("FDE function requires 'tensor_data' (array) and 'target_dimension' (number) "
+                                                        "parameters. tensor_result: {}, dim_result: {}",
+                                                        static_cast<int>(tensor_data_result.error()),
+                                                        static_cast<int>(target_dim_result.error()));
+                                        return ResponseFactory::createResponse(http_status, json_response.dump());
+                                    }
+
+                                    auto tensor_array = tensor_data_result.value();
+                                    auto target_dimension = target_dim_result.value();
+
+                                    // Create FDE function expression
+                                    auto func_expr = std::make_unique<FunctionExpr>();
+                                    func_expr->func_name_ = "fde";
+                                    func_expr->arguments_ = new std::vector<ParsedExpr *>();
+
+                                    // Parse tensor data (2D array) using SubArrayArray
+
+                                    auto tensor_const_expr = std::make_unique<ConstantExpr>(LiteralType::kSubArrayArray);
+
+                                    for (auto row : tensor_array) {
+                                        auto row_array_result = row.get_array();
+                                        if (row_array_result.error() != simdjson::SUCCESS) {
+                                            json_response["error_code"] = ErrorCode::kInvalidJsonFormat;
+                                            json_response["error_message"] = "FDE tensor_data must be a 2D array";
+                                            return ResponseFactory::createResponse(http_status, json_response.dump());
+                                        }
+
+                                        auto row_array = row_array_result.value();
+
+                                        // Create a sub-array for this row
+                                        auto sub_array_expr = std::make_unique<ConstantExpr>(LiteralType::kDoubleArray);
+                                        for (auto element : row_array) {
+                                            if (element.type() != simdjson::json_type::number) {
+                                                json_response["error_code"] = ErrorCode::kInvalidJsonFormat;
+                                                json_response["error_message"] = "FDE tensor elements must be numbers";
+                                                return ResponseFactory::createResponse(http_status, json_response.dump());
+                                            }
+                                            sub_array_expr->double_array_.emplace_back(element.get<double>());
+                                        }
+                                        tensor_const_expr->sub_array_array_.emplace_back(std::move(sub_array_expr));
+                                    }
+
+                                    func_expr->arguments_->emplace_back(tensor_const_expr.release());
+
+                                    // Parse target dimension
+                                    auto dim_const_expr = std::make_unique<ConstantExpr>(LiteralType::kInteger);
+                                    dim_const_expr->integer_value_ = static_cast<i64>(target_dimension);
+                                    func_expr->arguments_->emplace_back(dim_const_expr.release());
+
+                                    insert_one_row->values_.emplace_back(std::move(func_expr));
+                                    break;
+                                } else {
+                                    json_response["error_code"] = ErrorCode::kInvalidJsonFormat;
+                                    json_response["error_message"] = fmt::format("Unsupported function: {}", func_name);
+                                    return ResponseFactory::createResponse(http_status, json_response.dump());
+                                }
+                            }
+
                             // check array type
                             if (simdjson::value val_arr; value_obj.count_fields() == 1 && value_obj["array"].get(val_arr) == simdjson::SUCCESS) {
                                 SharedPtr<ConstantExpr> array_expr;

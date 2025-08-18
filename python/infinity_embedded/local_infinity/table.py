@@ -26,7 +26,7 @@ from infinity_embedded.index import IndexInfo
 from infinity_embedded.local_infinity.query_builder import Query, InfinityLocalQueryBuilder, ExplainQuery
 from infinity_embedded.local_infinity.types import build_result
 from infinity_embedded.local_infinity.utils import traverse_conditions, select_res_to_polars
-from infinity_embedded.local_infinity.utils import get_local_constant_expr_from_python_value
+from infinity_embedded.local_infinity.utils import get_local_constant_expr_from_python_value, get_local_function_expr_from_fde
 from infinity_embedded.local_infinity.utils import name_validity_check, check_valid_name, get_ordinary_info
 from infinity_embedded.table import ExplainType
 from infinity_embedded.index import InitParameter
@@ -164,8 +164,17 @@ class LocalTable():
             parse_exprs = []
             for column_name, value in row.items():
                 column_names.append(column_name)
-                constant_expression = get_local_constant_expr_from_python_value(value)
-                parse_exprs.append(constant_expression)
+
+                # Check if value is FDE object
+                from infinity_embedded.common import FDE
+                if isinstance(value, FDE):
+                    # Create function expression for FDE
+                    parsed_expr = get_local_function_expr_from_fde(value)
+                    parse_exprs.append(parsed_expr)
+                else:
+                    # Create constant expression for regular values
+                    constant_expression = get_local_constant_expr_from_python_value(value)
+                    parse_exprs.append(constant_expression)
             insert_row = WrapInsertRowExpr()
             insert_row.columns = column_names
             insert_row.values = parse_exprs
