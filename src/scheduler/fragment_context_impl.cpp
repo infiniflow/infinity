@@ -661,13 +661,16 @@ SizeT InitKnnScanFragmentContext(PhysicalKnnScan *knn_scan_operator, FragmentCon
     switch (fragment_context->ContextType()) {
         case FragmentType::kSerialMaterialize: {
             SerialMaterializedFragmentCtx *serial_materialize_fragment_ctx = static_cast<SerialMaterializedFragmentCtx *>(fragment_context);
+            // Use actual query embedding dimension if available (for FDE functions), otherwise use KnnExpression dimension
+            i64 actual_dimension =
+                knn_scan_operator->real_query_embedding_dimension_ > 0 ? knn_scan_operator->real_query_embedding_dimension_ : knn_expr->dimension_;
             serial_materialize_fragment_ctx->knn_scan_shared_data_ = MakeUnique<KnnScanSharedData>(knn_scan_operator->base_table_ref_,
                                                                                                    std::move(knn_scan_operator->block_metas_),
                                                                                                    std::move(knn_scan_operator->table_index_meta_),
                                                                                                    std::move(knn_scan_operator->segment_index_metas_),
                                                                                                    std::move(knn_expr->opt_params_),
                                                                                                    knn_expr->topn_,
-                                                                                                   knn_expr->dimension_,
+                                                                                                   actual_dimension,
                                                                                                    1,
                                                                                                    knn_scan_operator->real_knn_query_embedding_ptr_,
                                                                                                    knn_scan_operator->real_knn_query_elem_type_,
@@ -676,6 +679,9 @@ SizeT InitKnnScanFragmentContext(PhysicalKnnScan *knn_scan_operator, FragmentCon
         }
         case FragmentType::kParallelMaterialize: {
             ParallelMaterializedFragmentCtx *parallel_materialize_fragment_ctx = static_cast<ParallelMaterializedFragmentCtx *>(fragment_context);
+            // Use actual query embedding dimension if available (for FDE functions), otherwise use KnnExpression dimension
+            i64 actual_dimension =
+                knn_scan_operator->real_query_embedding_dimension_ > 0 ? knn_scan_operator->real_query_embedding_dimension_ : knn_expr->dimension_;
             parallel_materialize_fragment_ctx->knn_scan_shared_data_ =
                 MakeUnique<KnnScanSharedData>(knn_scan_operator->base_table_ref_,
                                               std::move(knn_scan_operator->block_metas_),
@@ -683,7 +689,7 @@ SizeT InitKnnScanFragmentContext(PhysicalKnnScan *knn_scan_operator, FragmentCon
                                               std::move(knn_scan_operator->segment_index_metas_),
                                               std::move(knn_expr->opt_params_),
                                               knn_expr->topn_,
-                                              knn_expr->dimension_,
+                                              actual_dimension,
                                               1,
                                               knn_scan_operator->real_knn_query_embedding_ptr_,
                                               knn_scan_operator->real_knn_query_elem_type_,

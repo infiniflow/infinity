@@ -14,7 +14,7 @@
 
 '''
 This example demonstrates FDE (Feature Dimension Expansion) functionality.
-It shows how to use the match_dense_fde method for vector search with tensor input.
+It shows how to use the match_dense method for vector search with tensor input.
 '''
 
 import sys
@@ -131,10 +131,12 @@ try:
 
     target_dimension = 64  # Target embedding dimension
 
+    # Create FDE object for search
+    fde_query = FDE(query_tensor, target_dimension)
+
     result_fde, extra_result_fde = (table_instance
                                    .output(["id", "name", "_similarity"])
-                                   .match_dense_fde("embedding_col", query_tensor, target_dimension,
-                                                   "float", "cosine", 4)
+                                   .match_dense("embedding_col", fde_query, "float", "cosine", 4)
                                    .to_pl())
 
     print("FDE search results (searches all data using FDE query):")
@@ -149,9 +151,12 @@ try:
         [0.8, 1.2]
     ]
 
+    # Create FDE object for small tensor search
+    fde_small = FDE(small_tensor, 64)
+
     result_small, _ = (table_instance
                       .output(["id", "name", "_similarity"])
-                      .match_dense_fde("embedding_col", small_tensor, 64, "float", "ip", 2)
+                      .match_dense("embedding_col", fde_small, "float", "ip", 2)
                       .to_pl())
 
     print("Small tensor FDE results:")
@@ -161,9 +166,12 @@ try:
     print("\n=== Different Distance Metrics ===")
 
     for metric in ["cosine", "ip"]:  # L2 has restrictions with _similarity
+        # Create FDE object for each metric test
+        fde_metric = FDE(query_tensor, 64)
+
         result_metric, _ = (table_instance
                            .output(["id", "name", "_similarity"])
-                           .match_dense_fde("embedding_col", query_tensor, 64, "float", metric, 1)
+                           .match_dense("embedding_col", fde_metric, "float", metric, 1)
                            .to_pl())
 
         print(f"{metric.upper()} distance results:")
@@ -172,9 +180,12 @@ try:
     # Example 7: With additional parameters
     print("\n=== FDE with Additional Parameters ===")
 
+    # Create FDE object for parameter test
+    fde_params = FDE(query_tensor, 64)
+
     result_params, _ = (table_instance
                        .output(["id", "name", "_similarity"])
-                       .match_dense_fde("embedding_col", query_tensor, 64, "float", "cosine", 3,
+                       .match_dense("embedding_col", fde_params, "float", "cosine", 3,
                                        {"ef": "50"})  # HNSW parameter example
                        .to_pl())
 

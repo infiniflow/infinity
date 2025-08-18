@@ -29,6 +29,7 @@ import logical_type;
 import internal_types;
 import :common_query_filter;
 import :physical_filter_scan_base;
+import :value;
 
 namespace infinity {
 
@@ -79,10 +80,12 @@ private:
 public:
     SharedPtr<KnnExpression> knn_expression_{};
     SharedPtr<void> real_knn_query_embedding_holder_{};
+    Value function_query_embedding_holder_{LogicalType::kInvalid}; // Holds embedding data from FDE function evaluation
     void *real_knn_query_embedding_ptr_ = nullptr;
     EmbeddingDataType real_knn_query_elem_type_ = EmbeddingDataType::kElemInvalid;
     EmbeddingDataType column_elem_type_ = EmbeddingDataType::kElemInvalid;
     LogicalType column_logical_type_ = LogicalType::kInvalid;
+    i64 real_query_embedding_dimension_ = 0; // Actual dimension of query embedding (for FDE functions)
 
     SharedPtr<Vector<String>> output_names_{};
     SharedPtr<Vector<SharedPtr<DataType>>> output_types_{};

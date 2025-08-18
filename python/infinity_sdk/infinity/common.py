@@ -94,7 +94,7 @@ class FDE:
 
 
 URI = Union[NetworkAddress, Path]
-VEC = Union[list, np.ndarray]
+VEC = Union[list, np.ndarray, FDE]
 INSERT_DATA = dict[str, Union[str, int, float, list[Union[int, float]]], SparseVector, dict, Array, FDE]
 
 LOCAL_HOST = NetworkAddress("127.0.0.1", 23817)

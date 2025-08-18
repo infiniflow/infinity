@@ -1354,13 +1354,59 @@ table_instance.insert({"c1": 1, "c7": "Tom", "c12": True})
 table_object = db_object.create_table("vector_table", {"c1": {"type": "integer", "default": 2024}, "vector_column": {"type": "vector,3,float"}})
 
 # Insert one incomplete row into the table:
-# Note that the 'c1' cell defaults to 0. 
+# Note that the 'c1' cell defaults to 0.
 table_object.insert({"vector_column": [1.1, 2.2, 3.3]})
 
 # Insert two incomplete rows into the table:
-# Note that the 'c1' cells default to 0. 
+# Note that the 'c1' cells default to 0.
 table_object.insert([{"vector_column": [1.1, 2.2, 3.3]}, {"vector_column": [4.4, 5.5, 6.6]}])
 ```
+
+##### Insert vectors using FDE (Feature Dimension Expansion)
+
+```python
+from infinity.common import FDE
+
+# Create a table with a 64-dimensional vector column:
+table_object = db_object.create_table("fde_table", {"id": {"type": "integer"}, "embedding_col": {"type": "vector,64,float"}})
+
+# Insert data using FDE function to generate embeddings from 2D tensor data:
+table_object.insert([
+    {
+        "id": 1,
+        "embedding_col": FDE(
+            tensor_data=[
+                [1.0, 2.0, 3.0, 4.0],      # Feature vector 1
+                [0.5, 1.5, 2.5, 3.5],      # Feature vector 2
+                [2.0, 1.0, 4.0, 3.0]       # Feature vector 3
+            ],
+            target_dimension=64  # Output embedding dimension
+        )
+    },
+    {
+        "id": 2,
+        "embedding_col": FDE(
+            tensor_data=[
+                [2.5, 1.5, 3.5, 2.5],
+                [1.0, 3.0, 2.0, 4.0],
+                [0.8, 1.2, 2.8, 3.2],
+                [1.5, 2.5, 1.5, 2.5]
+            ],
+            target_dimension=64
+        )
+    }
+])
+```
+
+**FDE Parameters:**
+- `tensor_data`: A 2D list (matrix) of numeric values representing input features
+- `target_dimension`: The desired output embedding dimension (must match the vector column dimension)
+
+**Benefits of FDE:**
+- Generate embeddings dynamically from feature matrices
+- No need to pre-compute embeddings
+- Flexible input tensor dimensions
+- Automatic conversion to fixed-dimension vectors
 
 ##### Insert sparse vectors
 
@@ -2126,6 +2172,123 @@ table_object.output(["*"]).match_dense("vec", [0.1,0.2,0.3], "float", "ip", 2, {
 
 :::tip NOTE
 If the HNSW index is not created successfully, the search will fall back to a brute-force search.
+:::
+
+---
+
+### FDE (Feature Dimension Expansion) with match_dense
+
+The `match_dense` method supports FDE (Feature Dimension Expansion) functionality by accepting `FDE` objects as the `embedding_data` parameter. This allows you to use 2D tensor input instead of pre-computed embeddings.
+
+```python
+from infinity.common import FDE
+
+# Create an FDE object with tensor data and target dimension
+fde_query = FDE(tensor_data, target_dimension)
+
+# Use the FDE object in match_dense
+table_object.match_dense(vector_column_name, fde_query, embedding_data_type, distance_type, topn, knn_params)
+```
+
+Creates a dense vector search expression using FDE (Feature Dimension Expansion) function to identify the closest top n rows. The FDE function takes a 2D tensor as input and expands it to the target dimension for vector similarity search.
+
+:::tip NOTE
+To display your query results, you must chain this method with `output(columns)`, which specifies the columns to output, and a method such as `to_pl()`, `to_df()`, or `to_arrow()` to format the query results.
+:::
+
+#### Parameters
+
+##### vector_column_name: `str`, *Required*
+
+A non-empty string indicating the name of the vector column to search on.
+
+##### query_tensor: `list[list[float]]`, *Required*
+
+A 2D array (matrix) of numeric values representing the input tensor data. Each inner list represents a feature vector.
+
+**Example**: `[[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]]`
+
+##### target_dimension: `int`, *Required*
+
+The target dimension for the output embedding vector. Must be a positive integer that matches the dimension of the vector column being searched.
+
+**Example**: `64`
+
+##### embedding_data_type: `str`, *Required*
+
+The data type of the embedding vector. Commonly used types include:
+
+- `"float"` or `"float32"`
+- `"float16"`
+- `"bfloat16"`
+- `"uint8"`
+- `"int8"`
+
+##### distance_type: `str`, *Required*
+
+The distance metric to use in similarity search:
+
+- `"ip"`: Inner product
+- `"l2"`: Euclidean distance
+- `"cosine"`: Cosine similarity
+
+##### topn: `int`, *Required*
+
+An integer indicating the number of nearest neighbors to return.
+
+##### knn_params: `dict`, *Optional*
+
+Additional parameters for the KNN search. Defaults to `None`.
+
+- `"ef"`: `str` - Recommended value: one to ten times the value of `topn`
+- `"threshold"`: `str` - A threshold value for the search
+- `"nprobe"`: `str` - The number of cells to search in the IVF index
+
+#### Returns
+
+- `Table` object: You can chain this method with other methods to form a query.
+
+#### Examples
+
+##### Basic FDE search
+
+```python
+# Perform FDE-based vector search with a 2D tensor input
+query_tensor = [
+    [1.0, 2.0, 3.0, 4.0],      # Feature vector 1
+    [0.5, 1.5, 2.5, 3.5],      # Feature vector 2
+    [2.0, 1.0, 4.0, 3.0],      # Feature vector 3
+]
+
+table_object.output(["id", "name", "_similarity"]).match_dense("embedding_col", query_tensor, 64, "float", "cosine", 5).to_pl()
+```
+
+##### FDE search with different configurations
+
+```python
+# Small tensor with different target dimension
+small_tensor = [
+    [1.0, 0.5],
+    [0.8, 1.2]
+]
+
+table_object.output(["*"]).match_dense("vec_col", small_tensor, 128, "float", "ip", 10).to_pl()
+```
+
+##### FDE search with additional parameters
+
+```python
+# FDE search with HNSW parameters
+query_tensor = [[1.0, 2.0], [3.0, 4.0]]
+
+table_object.output(["*"]).match_dense("vec_col", query_tensor, 64, "float", "cosine", 5, {"ef": "50"}).to_pl()
+```
+
+:::tip NOTE
+- The FDE function allows you to use 2D tensor input instead of pre-computed embeddings
+- The target dimension can be specified dynamically and must match the vector column dimension
+- All existing distance metrics and KNN parameters are supported
+- FDE is particularly useful when you have feature matrices that need to be transformed into embeddings for search
 :::
 
 ---
