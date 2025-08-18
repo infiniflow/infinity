@@ -194,6 +194,11 @@ struct ConstantExpr {
 13: optional list<ConstantExpr> curly_brackets_array,
 }
 
+struct FunctionExpr {
+1: string function_name,
+2: list<ParsedExpr> arguments,
+}
+
 struct KnnExpr {
 1: ColumnExpr  column_expr,
 2: EmbeddingData embedding_data,
@@ -202,6 +207,7 @@ struct KnnExpr {
 5: i64 topn,
 6: list<InitParameter> opt_params = [],
 7: optional ParsedExpr filter_expr,
+8: optional FunctionExpr query_embedding_expr,
 }
 
 struct MatchSparseExpr {
@@ -246,12 +252,6 @@ struct SearchExpr {
 	1: optional list<GenericMatchExpr> match_exprs,
 	2: optional list<FusionExpr> fusion_exprs,
 }
-
-struct FunctionExpr {
-1: string function_name,
-2: list<ParsedExpr> arguments,
-}
-
 
 struct BetweenExpr {
 1: ParsedExpr value,

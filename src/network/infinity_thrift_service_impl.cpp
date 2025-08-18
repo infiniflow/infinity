@@ -2292,16 +2292,31 @@ KnnExpr *InfinityThriftService::GetKnnExprFromProto(Status &status, const infini
         return nullptr;
     }
 
-    auto [embedding_data_ptr, dimension, status2] = GetEmbeddingDataTypeDataPtrFromProto(expr.embedding_data);
-    knn_expr->embedding_data_ptr_ = embedding_data_ptr;
-    if (knn_expr->embedding_data_type_ == EmbeddingDataType::kElemBit) {
-        knn_expr->dimension_ = dimension * 8;
-    } else {
-        knn_expr->dimension_ = dimension;
-    }
-    if (!status2.ok()) {
-        status = status2;
+    // Validate that either embedding_data or query_embedding_expr is provided, but not both
+    bool has_embedding_data = expr.__isset.embedding_data;
+    bool has_query_embedding_expr = expr.__isset.query_embedding_expr;
+
+    if (has_embedding_data && has_query_embedding_expr) {
+        status = Status::InvalidParameterValue("KnnExpr", "both embedding_data and query_embedding_expr", "only one should be provided");
         return nullptr;
+    }
+    if (!has_embedding_data && !has_query_embedding_expr) {
+        status = Status::InvalidParameterValue("KnnExpr", "neither embedding_data nor query_embedding_expr", "one must be provided");
+        return nullptr;
+    }
+
+    if (has_embedding_data) {
+        auto [embedding_data_ptr, dimension, status2] = GetEmbeddingDataTypeDataPtrFromProto(expr.embedding_data);
+        knn_expr->embedding_data_ptr_ = embedding_data_ptr;
+        if (knn_expr->embedding_data_type_ == EmbeddingDataType::kElemBit) {
+            knn_expr->dimension_ = dimension * 8;
+        } else {
+            knn_expr->dimension_ = dimension;
+        }
+        if (!status2.ok()) {
+            status = status2;
+            return nullptr;
+        }
     }
 
     knn_expr->topn_ = expr.topn;
@@ -2332,6 +2347,20 @@ KnnExpr *InfinityThriftService::GetKnnExprFromProto(Status &status, const infini
             return nullptr;
         }
     }
+
+    // Handle FDE function expression for query embedding
+    if (expr.__isset.query_embedding_expr) {
+        knn_expr->query_embedding_expr_.reset(GetFunctionExprFromProto(status, expr.query_embedding_expr));
+        if (!status.ok()) {
+            return nullptr;
+        }
+        knn_expr->embedding_data_type_str_ = EmbeddingT::EmbeddingDataType2String(knn_expr->embedding_data_type_);
+        // Dimension will be determined at runtime by the FDE function
+        knn_expr->dimension_ = -1; // Placeholder for runtime determination
+        // Clear the direct embedding data since we're using function expression
+        knn_expr->embedding_data_ptr_ = nullptr;
+    }
+
     status = Status::OK();
     return knn_expr.release();
 }

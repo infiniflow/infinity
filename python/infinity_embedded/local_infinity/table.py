@@ -327,6 +327,31 @@ class LocalTable():
             vector_column_name, embedding_data, embedding_data_type, distance_type, topn, knn_params)
         return self
 
+    def match_dense_fde(self, vector_column_name: str, query_tensor: VEC, target_dimension: int,
+                        embedding_data_type: str, distance_type: str, topn: int = DEFAULT_MATCH_VECTOR_TOPN,
+                        knn_params: {} = None):
+        """
+        Create a dense vector search using FDE (Feature Dimension Expansion) function.
+
+        Args:
+            vector_column_name: Name of the vector column to search
+            query_tensor: Input tensor data for FDE function (2D array)
+            target_dimension: Target dimension for FDE output
+            embedding_data_type: Data type of the embeddings ("float", "double", etc.)
+            distance_type: Distance metric ("l2", "cosine", "ip", "hamming")
+            topn: Number of top results to return
+            knn_params: Optional parameters for KNN search
+
+        Returns:
+            Self for method chaining
+
+        Example:
+            table.match_dense_fde("vec_col", [[1.0, 2.0], [3.0, 4.0]], 64, "float", "cosine", 10)
+        """
+        self.query_builder.match_dense_fde(
+            vector_column_name, query_tensor, target_dimension, embedding_data_type, distance_type, topn, knn_params)
+        return self
+
     def knn(self, *args, **kwargs):
         deprecated_api("knn is deprecated, please use match_dense instead")
         return self.match_dense(*args, **kwargs)

@@ -959,9 +959,12 @@ UniquePtr<KnnExpr> HTTPSearch::ParseMatchDense(std::string_view json_sv, HTTPSta
     auto knn_expr = MakeUnique<KnnExpr>();
     i64 topn = -1;
     std::string_view query_vector_json;
-    // must have: "match_method", "fields", "query_vector", "element_type", "metric_type", "topn"
+    std::string_view fde_json;
+    bool has_query_vector = false;
+    bool has_fde = false;
+    // must have: "match_method", "fields", ("query_vector" OR "fde"), "element_type", "metric_type", "topn"
     // may have: "params"
-    constexpr std::array possible_keys{"match_method", "fields", "query_vector", "element_type", "metric_type", "topn", "params"};
+    constexpr std::array possible_keys{"match_method", "fields", "query_vector", "fde", "element_type", "metric_type", "topn", "params"};
     std::set<String> possible_keys_set(possible_keys.begin(), possible_keys.end());
     for (auto field_json_obj : doc.get_object()) {
         String key = String((std::string_view)field_json_obj.unescaped_key());
@@ -987,6 +990,10 @@ UniquePtr<KnnExpr> HTTPSearch::ParseMatchDense(std::string_view json_sv, HTTPSta
             knn_expr->column_expr_ = column_expr.release();
         } else if (IsEqual(key, "query_vector")) {
             query_vector_json = value.raw_json();
+            has_query_vector = true;
+        } else if (IsEqual(key, "fde")) {
+            fde_json = value.raw_json();
+            has_fde = true;
         } else if (IsEqual(key, "element_type")) {
             String element_type = value.get<String>();
             ToUpper(element_type);
@@ -1054,6 +1061,22 @@ UniquePtr<KnnExpr> HTTPSearch::ParseMatchDense(std::string_view json_sv, HTTPSta
     }
     // "params" is optional
     possible_keys_set.erase("params");
+    // Either "query_vector" or "fde" is required, but not both
+    possible_keys_set.erase("query_vector");
+    possible_keys_set.erase("fde");
+
+    // Validate query_vector vs fde usage
+    if (has_query_vector && has_fde) {
+        response["error_code"] = ErrorCode::kInvalidExpression;
+        response["error_message"] = "MatchDense expression cannot have both 'query_vector' and 'fde' fields";
+        return nullptr;
+    }
+    if (!has_query_vector && !has_fde) {
+        response["error_code"] = ErrorCode::kInvalidExpression;
+        response["error_message"] = "MatchDense expression must have either 'query_vector' or 'fde' field";
+        return nullptr;
+    }
+
     // check if all required fields are set
     if (!possible_keys_set.empty()) {
         response["error_code"] = ErrorCode::kInvalidExpression;
@@ -1067,12 +1090,27 @@ UniquePtr<KnnExpr> HTTPSearch::ParseMatchDense(std::string_view json_sv, HTTPSta
         return nullptr;
     }
     knn_expr->topn_ = topn;
-    const auto [dimension, embedding_ptr] = ParseVector(query_vector_json, knn_expr->embedding_data_type_, http_status, response);
-    if (embedding_ptr == nullptr) {
-        return nullptr;
+
+    if (has_query_vector) {
+        // Traditional query_vector approach
+        const auto [dimension, embedding_ptr] = ParseVector(query_vector_json, knn_expr->embedding_data_type_, http_status, response);
+        if (embedding_ptr == nullptr) {
+            return nullptr;
+        }
+        knn_expr->dimension_ = dimension;
+        knn_expr->embedding_data_ptr_ = embedding_ptr;
+    } else if (has_fde) {
+        // FDE function approach
+        auto fde_expr = ParseFDEFunction(fde_json, knn_expr->embedding_data_type_, http_status, response);
+        if (!fde_expr) {
+            return nullptr;
+        }
+        knn_expr->query_embedding_expr_ = std::move(fde_expr);
+        knn_expr->embedding_data_type_str_ = EmbeddingT::EmbeddingDataType2String(knn_expr->embedding_data_type_);
+        // Dimension will be determined at runtime by the FDE function
+        knn_expr->dimension_ = -1; // Placeholder for runtime determination
     }
-    knn_expr->dimension_ = dimension;
-    knn_expr->embedding_data_ptr_ = embedding_ptr;
+
     return knn_expr;
 }
 
@@ -1788,6 +1826,93 @@ Tuple<i64, void *> HTTPSearch::ParseVector(std::string_view json_sv, EmbeddingDa
             return {0, nullptr};
         }
     }
+}
+
+UniquePtr<FunctionExpr>
+HTTPSearch::ParseFDEFunction(std::string_view json_sv, EmbeddingDataType elem_type, HTTPStatus &http_status, nlohmann::json &response) {
+    simdjson::padded_string json_pad(json_sv);
+    simdjson::parser parser;
+    simdjson::document doc = parser.iterate(json_pad);
+
+    if (doc.type() != simdjson::json_type::object) {
+        response["error_code"] = ErrorCode::kInvalidExpression;
+        response["error_message"] = "FDE field should be object";
+        return nullptr;
+    }
+
+    std::string_view query_tensor_json;
+    i64 target_dimension = -1;
+
+    // must have: "query_tensor", "target_dimension"
+    constexpr std::array possible_keys{"query_tensor", "target_dimension"};
+    std::set<String> possible_keys_set(possible_keys.begin(), possible_keys.end());
+
+    for (auto field_json_obj : doc.get_object()) {
+        String key = String((std::string_view)field_json_obj.unescaped_key());
+        auto value = field_json_obj.value();
+        ToLower(key);
+        if (!possible_keys_set.erase(key)) {
+            response["error_code"] = ErrorCode::kInvalidExpression;
+            response["error_message"] = fmt::format("Unknown or duplicate FDE field: {}", key);
+            return nullptr;
+        }
+        if (IsEqual(key, "query_tensor")) {
+            query_tensor_json = value.raw_json();
+        } else if (IsEqual(key, "target_dimension")) {
+            if (!value.is_integer()) {
+                response["error_code"] = ErrorCode::kInvalidExpression;
+                response["error_message"] = "FDE target_dimension field should be integer";
+                return nullptr;
+            }
+            target_dimension = value.get<i64>();
+        }
+    }
+
+    // check if all required fields are set
+    if (!possible_keys_set.empty()) {
+        response["error_code"] = ErrorCode::kInvalidExpression;
+        response["error_message"] =
+            fmt::format("Invalid FDE expression: following fields are required but not found: {}", fmt::join(possible_keys_set, ", "));
+        return nullptr;
+    }
+
+    if (target_dimension <= 0) {
+        response["error_code"] = ErrorCode::kInvalidExpression;
+        response["error_message"] = "FDE target_dimension should be positive integer";
+        return nullptr;
+    }
+
+    // Parse the query tensor
+    SharedPtr<ConstantExpr> tensor_expr;
+    try {
+        tensor_expr = BuildConstantExprFromJson(query_tensor_json);
+        if (!tensor_expr) {
+            response["error_code"] = ErrorCode::kInvalidExpression;
+            response["error_message"] = "Failed to parse query_tensor";
+            return nullptr;
+        }
+    } catch (std::exception &e) {
+        response["error_code"] = ErrorCode::kInvalidExpression;
+        response["error_message"] = fmt::format("Invalid query_tensor, error info: {}", e.what());
+        return nullptr;
+    }
+
+    // Create FDE function expression
+    auto fde_function = MakeUnique<FunctionExpr>();
+    fde_function->func_name_ = "FDE";
+    fde_function->arguments_ = new Vector<ParsedExpr *>();
+
+    // Transfer ownership of tensor_expr to FunctionExpr
+    // Create a new ConstantExpr by moving from the shared_ptr content
+    auto tensor_arg = new ConstantExpr(std::move(*tensor_expr));
+    fde_function->arguments_->push_back(tensor_arg);
+
+    // Add target dimension as second argument
+    auto target_dim_expr = MakeUnique<ConstantExpr>(LiteralType::kInteger);
+    target_dim_expr->integer_value_ = target_dimension;
+    fde_function->arguments_->push_back(target_dim_expr.release());
+
+    return fde_function;
 }
 
 } // namespace infinity
