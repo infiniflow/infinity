@@ -43,7 +43,7 @@ public:
     void TearDown() override { system(("rm -rf " + file_dir_).c_str()); }
 
     template <typename DataType>
-    bool CheckOrthogonalMatrix(const DataType *matrix, int dim, DataType tolerance = 1e-6f) {
+    bool CheckOrthogonalMatrix(const DataType *matrix, int dim, DataType tolerance = 1e-5f) {
         for (int i = 0; i < dim; ++i) {
             DataType dot_self = 0.0;
             for (int k = 0; k < dim; ++k) {
@@ -97,7 +97,7 @@ TEST_F(RabitqTest, test_base) {
 
         for (int i = 0; i < 20; ++i) {
             RabitqVecStoreMeta meta = RabitqVecStoreMeta::Make(dim_);
-            bool is_rom = CheckOrthogonalMatrix(meta.rom(), meta.dim(), 1e-3f);
+            bool is_rom = CheckOrthogonalMatrix(meta.rom(), meta.dim());
             ASSERT_EQ(is_rom, true);
             LOG_INFO(fmt::format("check rom: i {}", i));
         }
