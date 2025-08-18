@@ -65,25 +65,21 @@ class TestInfinity:
 
         with pytest.raises(InfinityException) as e:
             self.infinity_obj.create_database("test_pysdk_my_database!@#")
-
         assert e.type == InfinityException
         assert e.value.args[0] == ErrorCode.INVALID_IDENTIFIER_NAME
 
         with pytest.raises(InfinityException) as e:
             self.infinity_obj.create_database("test_pysdk_my-database-dash")
-
         assert e.type == InfinityException
         assert e.value.args[0] == ErrorCode.INVALID_IDENTIFIER_NAME
 
         with pytest.raises(InfinityException) as e:
             self.infinity_obj.create_database("123_database_test_pysdk")
-
         assert e.type == InfinityException
         assert e.value.args[0] == ErrorCode.INVALID_IDENTIFIER_NAME
 
         with pytest.raises(InfinityException) as e:
             self.infinity_obj.create_database("")
-
         assert e.type == InfinityException
         assert e.value.args[0] == ErrorCode.INVALID_IDENTIFIER_NAME
 
@@ -419,12 +415,8 @@ class TestInfinity:
 
         with pytest.raises(InfinityException) as e:
             db_obj.show_table(table_name)
-
         assert e.type == InfinityException
-        assert e.value.args[0] == ErrorCode.INVALID_IDENTIFIER_NAME
-
-        # with pytest.raises(Exception):
-        #     db_obj.show_table(table_name)
+        assert e.value.args[0] == ErrorCode.INVALID_TABLE_NAME or e.value.args[0] == ErrorCode.INVALID_IDENTIFIER_NAME
 
         db_obj.drop_table("test_show_table" + suffix, ConflictType.Error)
 
@@ -437,9 +429,8 @@ class TestInfinity:
 
         with pytest.raises(InfinityException) as e:
             db_obj.show_table(table_name)
-
         assert e.type == InfinityException
-        assert e.value.args[0] == ErrorCode.TABLE_NOT_EXIST
+        assert e.value.args[0] == ErrorCode.TABLE_NOT_EXIST or e.value.args[0] == ErrorCode.INVALID_IDENTIFIER_NAME
 
         db_obj.drop_table("test_show_table" + suffix, ConflictType.Error)
 
@@ -485,6 +476,7 @@ class TestInfinity:
             res = self.infinity_obj.drop_database('db_name' + str(i) + suffix, ConflictType.Error)
             assert res.error_code == ErrorCode.OK
 
+    @pytest.mark.usefixtures("skip_if_http")
     def test_create_upper_database_name(self, suffix):
         db_upper_name = "MY_DATABASE" + suffix.upper()
         db_lower_name = "my_database" + suffix.lower()

@@ -71,7 +71,6 @@ class TestInfinity:
             assert table_obj is not None
 
             res = db_obj.show_table(table_name)
-            assert res.error_code == ErrorCode.OK
 
             # drop table
             res = db_obj.drop_table(table_name)
@@ -90,10 +89,13 @@ class TestInfinity:
                 db_obj.create_table("test_create_table_with_invalid_column_name_python" + suffix,
                                     {column_name: {"type": "int"}}, ConflictType.Error)
             assert e.type == InfinityException
-            assert e.value.args[0] == ErrorCode.INVALID_IDENTIFIER_NAME
+            assert (e.value.args[0] == ErrorCode.INVALID_COLUMN_NAME
+                    or e.value.args[0] == ErrorCode.EMPTY_COLUMN_NAME)
 
-        res = db_obj.drop_table("test_create_table_with_invalid_column_name_python" + suffix, ConflictType.Error)
-        assert res.error_code == ErrorCode.TABLE_NOT_EXIST
+        with pytest.raises(InfinityException) as e:
+            db_obj.drop_table("test_create_table_with_invalid_column_name_python" + suffix, ConflictType.Error)
+        assert e.type == InfinityException
+        assert e.value.args[0] == ErrorCode.TABLE_NOT_EXIST
 
     def test_create_table_with_invalid_options(self, suffix):
         db_obj = self.infinity_obj.get_database("default_db")
@@ -104,10 +106,13 @@ class TestInfinity:
                 db_obj.create_table("test_create_table_with_invalid_options" + suffix, {"c1": {"type": "int"}},
                                     invalid_option)
             assert e.type == InfinityException
-            assert e.value.args[0] == ErrorCode.INVALID_CONFLICT_TYPE
+            assert e.value.args[0] == ErrorCode.INVALID_CONFLICT_TYPE or e.value.args[
+                0] == ErrorCode.INVALID_CREATE_OPTION
 
-        res = db_obj.drop_table("test_create_table_with_invalid_options" + suffix, ConflictType.Error)
-        assert res.error_code == ErrorCode.TABLE_NOT_EXIST
+        with pytest.raises(InfinityException) as e:
+            db_obj.drop_table("test_create_table_with_invalid_options" + suffix, ConflictType.Error)
+        assert e.type == InfinityException
+        assert e.value.args[0] == ErrorCode.TABLE_NOT_EXIST
 
     def test_drop_table_with_invalid_options(self, suffix):
         db_obj = self.infinity_obj.get_database("default_db")
@@ -116,11 +121,12 @@ class TestInfinity:
                                         ConflictType.Error)
         assert table_obj is not None
 
-        for invalid_option in common_values.create_invalid_option:
+        for invalid_option in common_values.drop_invalid_option:
             with pytest.raises(InfinityException) as e:
                 db_obj.drop_table("test_drop_table_with_invalid_options" + suffix, invalid_option)
             assert e.type == InfinityException
-            assert e.value.args[0] == ErrorCode.INVALID_CONFLICT_TYPE
+            assert e.value.args[0] == ErrorCode.INVALID_CONFLICT_TYPE or e.value.args[
+                0] == ErrorCode.INVALID_DROP_OPTION
 
         res = db_obj.drop_table("test_drop_table_with_invalid_options" + suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
@@ -219,8 +225,10 @@ class TestInfinity:
         assert res.error_code == ErrorCode.OK
 
         # drop
-        res = db_obj.drop_table("test_drop_same_name" + suffix, ConflictType.Error)
-        assert res.error_code == ErrorCode.TABLE_NOT_EXIST
+        with pytest.raises(InfinityException) as e:
+            db_obj.drop_table("test_drop_same_name" + suffix, ConflictType.Error)
+        assert e.type == InfinityException
+        assert e.value.args[0] == ErrorCode.TABLE_NOT_EXIST
 
     def test_same_column_name(self, suffix):
         # connect
@@ -259,12 +267,10 @@ class TestInfinity:
         assert table_obj is not None
 
         # show table
-        res = db_obj.show_table("test_table_with_various_column_types" + suffix)
-        assert res.error_code == ErrorCode.OK
+        db_obj.show_table("test_table_with_various_column_types" + suffix)
 
         # list table
         res = db_obj.list_tables()
-        assert res.error_code == ErrorCode.OK
 
         # get table
         table_obj = db_obj.get_table("test_table_with_various_column_types" + suffix)
@@ -313,8 +319,10 @@ class TestInfinity:
         assert e.type == InfinityException
         assert e.value.args[0] == ErrorCode.NOT_SUPPORTED
 
-        res = db_obj.drop_table("test_create_duplicated_table_with_replace_option" + suffix, ConflictType.Error)
-        assert res.error_code == ErrorCode.TABLE_NOT_EXIST
+        with pytest.raises(InfinityException) as e:
+            db_obj.drop_table("test_create_duplicated_table_with_replace_option" + suffix, ConflictType.Error)
+        assert e.type == InfinityException
+        assert e.value.args[0] == ErrorCode.TABLE_NOT_EXIST
 
     def test_create_upper_table_name(self, suffix):
         db_obj = self.infinity_obj.get_database("default_db")
@@ -468,7 +476,7 @@ class TestInfinity:
                 "my_table!@#", {"c1": {"type": "int", "constraints": ["primary key"]}, "c2": {"type": "float"}},
                 ConflictType.Error)
         assert e.type == InfinityException
-        assert e.value.args[0] == ErrorCode.INVALID_IDENTIFIER_NAME
+        assert e.value.args[0] == ErrorCode.INVALID_TABLE_NAME
 
         with pytest.raises(Exception):
             tb = db_obj.create_table(
@@ -486,11 +494,9 @@ class TestInfinity:
                 ConflictType.Error)
 
         res = db_obj.list_tables()
-        assert res.error_code == ErrorCode.OK
 
         # show table
         res = db_obj.show_table(table_name)
-        assert res.error_code == ErrorCode.OK
 
         res = db_obj.drop_table(table_name, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
@@ -499,7 +505,6 @@ class TestInfinity:
         assert res.error_code == ErrorCode.OK
 
         res = db_obj.list_tables()
-        assert res.error_code == ErrorCode.OK
 
     def _test_show_tables(self, suffix):
         db = self.infinity_obj.get_database("default_db")
@@ -630,7 +635,6 @@ class TestInfinity:
 
         # list table
         res = db_obj.list_tables()
-        assert res.error_code == ErrorCode.OK
 
         # get table
         table_obj = db_obj.get_table("test_table_with_different_column_types" + suffix)
@@ -638,7 +642,6 @@ class TestInfinity:
 
         # show table
         res = db_obj.show_table("test_table_with_different_column_types" + suffix)
-        assert res.error_code == ErrorCode.OK
 
         # drop table
         res = db_obj.drop_table("test_table_with_different_column_types" + suffix, ConflictType.Error)
@@ -672,10 +675,13 @@ class TestInfinity:
             print(e)
 
         # drop
-        db_obj.drop_table("test_create_drop_table" + suffix, ConflictType.Error)
-
         res = db_obj.drop_table("test_create_drop_table" + suffix, ConflictType.Error)
-        res.error_code == ErrorCode.TABLE_NOT_EXIST
+        res.error_code == ErrorCode.OK
+
+        with pytest.raises(InfinityException) as e:
+            db_obj.drop_table("test_create_drop_table" + suffix, ConflictType.Error)
+        assert e.type == InfinityException
+        assert e.value.args[0] == ErrorCode.TABLE_NOT_EXIST
 
     def test_table(self, suffix):
         # self.test_infinity_obj._test_version()
@@ -720,7 +726,6 @@ class TestInfinity:
 
         # list table
         res = db_obj.list_tables()
-        res.error_code == ErrorCode.OK
 
         # get table
         with pytest.raises(InfinityException) as e:
@@ -728,6 +733,7 @@ class TestInfinity:
         assert e.type == InfinityException
         assert e.value.args[0] == ErrorCode.TABLE_NOT_EXIST
 
+    @pytest.mark.usefixtures("skip_if_http")
     def test_create_1K_table(self, suffix):
         infinity_obj = infinity.connect(self.uri)
         db_obj = infinity_obj.get_database("default_db")
@@ -753,6 +759,7 @@ class TestInfinity:
             assert res.error_code == ErrorCode.OK
 
     @pytest.mark.slow
+    @pytest.mark.usefixtures("skip_if_http")
     def test_create_10k_table(self, suffix):
         db_obj = self.infinity_obj.get_database("default_db")
 

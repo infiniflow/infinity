@@ -303,7 +303,7 @@ public:
                     return ResponseFactory::createResponse(http_status, json_response.dump());
                 }
             } else {
-                json_response["error_code"] = 3067;
+                json_response["error_code"] = 3074;
                 json_response["error_message"] = "'CREATE OPTION' field value should be string type";
                 http_status = HTTPStatus::CODE_500;
                 return ResponseFactory::createResponse(http_status, json_response.dump());
@@ -362,7 +362,7 @@ public:
                     return ResponseFactory::createResponse(http_status, json_response.dump());
                 }
             } else {
-                json_response["error_code"] = 3067;
+                json_response["error_code"] = 3075;
                 json_response["error_message"] = "'DROP OPTION' field value should be string type";
                 http_status = HTTPStatus::CODE_500;
                 return ResponseFactory::createResponse(http_status, json_response.dump());
@@ -495,7 +495,7 @@ public:
                     http_status = HTTPStatus::CODE_500;
                 }
             } else {
-                json_response["error_code"] = 3067;
+                json_response["error_code"] = 3074;
                 json_response["error_message"] = "'CREATE OPTION' field value should be string type";
                 http_status = HTTPStatus::CODE_500;
             }
@@ -551,7 +551,7 @@ public:
                     http_status = HTTPStatus::CODE_500;
                 }
             } else {
-                json_response["error_code"] = 3067;
+                json_response["error_code"] = 3075;
                 json_response["error_message"] = "'DROP OPTION' field value should be string type";
                 http_status = HTTPStatus::CODE_500;
             }
@@ -1770,8 +1770,8 @@ public:
                     http_status = HTTPStatus::CODE_500;
                 }
             } else {
-                json_response["error_code"] = 3067;
-                json_response["error_message"] = "'CREATE OPTION' field value should be string type";
+                json_response["error_code"] = 3075;
+                json_response["error_message"] = "'DROP OPTION' field value should be string type";
                 http_status = HTTPStatus::CODE_500;
             }
         }
@@ -1827,12 +1827,12 @@ public:
                 } else if (option == "replace_if_exists") {
                     options.conflict_type_ = ConflictType::kReplace;
                 } else {
-                    json_response["error_code"] = 3075;
+                    json_response["error_code"] = 3074;
                     json_response["error_message"] = fmt::format("Invalid create option: {}", option);
                     http_status = HTTPStatus::CODE_500;
                 }
             } else {
-                json_response["error_code"] = 3067;
+                json_response["error_code"] = 3074;
                 json_response["error_message"] = "'CREATE OPTION' field value should be string type";
                 http_status = HTTPStatus::CODE_500;
             }
