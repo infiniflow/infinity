@@ -29,6 +29,11 @@ types_array = [
     "vector, 3, float"
 ]
 
+types_array_int = [
+    # int
+    "int", "int8", "int16", "int32", "int64", "integer",
+]
+
 types_example_array = [
     # int
     1, 127, 32767, 2147483647, pow(2, 63) - 1, 10,
