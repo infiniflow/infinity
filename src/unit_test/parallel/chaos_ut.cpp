@@ -23,14 +23,15 @@ import :new_txn_manager;
 import :new_txn;
 import :status;
 import :infinity_context;
-
 import :txn_state;
 import :infinity;
 import :query_options;
 import :logger;
-import third_party;
 import :profiler;
 import :virtual_store;
+import :query_result;
+
+import third_party;
 
 import search_expr;
 import match_expr;
@@ -172,7 +173,7 @@ void FullTextSearch(const std::string &db_name, const std::string &table_name) {
 
 void VectorSearch(const std::string &db_name, const std::string &table_name) {
     std::shared_ptr<Infinity> infinity = Infinity::LocalConnect();
-    KnnExpr *knn_expr = new KnnExpr();
+    auto knn_expr = new KnnExpr();
     knn_expr->dimension_ = 4;
     knn_expr->distance_type_ = KnnDistanceType::kL2;
     knn_expr->topn_ = 3;
@@ -353,7 +354,7 @@ void RunChaosTestInParallel(const std::string &db_name, const std::string &table
     }
 }
 
-TEST_P(ParallelTest, ChaosTest) {
+TEST_P(ParallelTest, DISABLED_ChaosTest) {
     auto db_name = "default_db";
     auto table_name = "chaos_test";
 

@@ -346,8 +346,6 @@ target_sources(infinity_core
 #    )
 #endif ()
 
-target_include_directories(infinity_core PUBLIC ${PARALLEL_HASHMAP_INCLUDE_DIRS})
-target_include_directories(infinity_core PUBLIC ${VIT_VIT_CTPL_INCLUDE_DIRS})
 target_include_directories(infinity_core PUBLIC ${Python3_INCLUDE_DIRS})
 target_include_directories(infinity_core PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 target_include_directories(infinity_core PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/parser")
@@ -536,57 +534,9 @@ file(GLOB_RECURSE
 )
 
 file(GLOB_RECURSE
-        common_ut
+        ut
         CONFIGURE_DEPENDS
-        unit_test/common/*_ut.cpp
-)
-
-file(GLOB_RECURSE
-        parser_ut
-        CONFIGURE_DEPENDS
-        unit_test/parser/*_ut.cpp
-)
-
-file(GLOB_RECURSE
-        storage_ut
-        CONFIGURE_DEPENDS
-        unit_test/storage/*_ut.cpp
-)
-
-file(GLOB_RECURSE
-        executor_ut
-        CONFIGURE_DEPENDS
-        unit_test/executor/*_ut.cpp
-)
-
-file(GLOB_RECURSE
-        main_ut
-        CONFIGURE_DEPENDS
-        unit_test/main/*_ut.cpp
-)
-
-file(GLOB_RECURSE
-        planner_ut
-        CONFIGURE_DEPENDS
-        unit_test/planner/*_ut.cpp
-)
-
-file(GLOB_RECURSE
-        function_ut
-        CONFIGURE_DEPENDS
-        unit_test/function/*_ut.cpp
-)
-
-file(GLOB_RECURSE
-        parallel_ut
-        CONFIGURE_DEPENDS
-        unit_test/parallel/*_ut.cpp
-)
-
-file(GLOB_RECURSE
-        thirdparty_ut
-        CONFIGURE_DEPENDS
-        unit_test/third_party/*_ut.cpp
+        unit_test/*_ut.cpp
 )
 
 file(GLOB_RECURSE
@@ -609,15 +559,7 @@ target_sources(unit_test
         FILE_SET ut_cxx_modules TYPE CXX_MODULES FILES
         ${ut_mod}
 
-        ${common_ut}
-        ${parser_ut}
-        ${storage_ut}
-        ${executor_ut}
-        ${planner_ut}
-        ${function_ut}
-        ${parralel_ut}
-        ${thirdparty_ut}
-        ${main_ut}
+        ${ut}
 )
 
 set_target_properties(unit_test PROPERTIES OUTPUT_NAME test_main)
