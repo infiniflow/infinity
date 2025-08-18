@@ -603,19 +603,6 @@ file(GLOB_RECURSE
 )
 add_executable(unit_test
         ${test_main_cpp}
-
-        ${ut_test_main_cpp}
-        ${ut_common_cpp}
-        ${ut_storage_cpp}
-        ${ut_main_cpp}
-        ${ut_parser_cpp}
-        ${ut_function_cpp}
-        ${ut_thirdparty_cpp}
-        ${ut_executor_cpp}
-        ${ut_test_helper_cpp}
-        ${ut_planner_cpp}
-        ${ut_function_cpp}
-        ${ut_parallel_cpp}
 )
 target_sources(unit_test
         PRIVATE
@@ -689,12 +676,6 @@ target_link_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/third_party/minio-
 target_link_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/third_party/curlpp/")
 target_link_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/third_party/curl/")
 target_link_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/third_party/")
-
-target_sources(unit_test
-        PRIVATE
-        FILE_SET core_cxx_modules TYPE CXX_MODULES FILES
-        ${ut_dependent_cppm}
-)
 
 target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/unit_test")
 
