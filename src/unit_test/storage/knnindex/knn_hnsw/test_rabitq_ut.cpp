@@ -1,0 +1,111 @@
+// Copyright(C) 2023 InfiniFlow, Inc. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+#ifdef CI
+#include "gtest/gtest.h"
+#include <random>
+import infinity_core;
+import base_test;
+#else
+module;
+
+#include "gtest/gtest.h"
+#include <random>
+
+module infinity_core:ut.test_rabitq;
+
+import :stl;
+import :ut.base_test;
+import :rabitq_vec_store;
+
+#endif
+
+using namespace infinity;
+
+class RabitqTest : public BaseTest {
+public:
+    void SetUp() override {
+        system(("rm -rf " + file_dir_).c_str());
+        system(("mkdir -p " + file_dir_).c_str());
+    }
+
+    void TearDown() override { system(("rm -rf " + file_dir_).c_str()); }
+
+    template <typename DataType>
+    bool CheckOrthogonalMatrix(const DataType *matrix, int dim, DataType tolerance = 1e-6f) {
+        for (int i = 0; i < dim; ++i) {
+            DataType dot_self = 0.0;
+            for (int k = 0; k < dim; ++k) {
+                dot_self += matrix[k * dim + i] * matrix[k * dim + i];
+            }
+            if (std::abs(dot_self - 1.0) > tolerance) {
+                LOG_WARN(fmt::format("Column {} non-unit length: |v|^2 = {:.6f} (should be 1.000000)", i, dot_self));
+                return false;
+            }
+
+            for (int j = i + 1; j < dim; ++j) {
+                DataType dot_product = 0.0;
+                for (int k = 0; k < dim; ++k) {
+                    // 行优先存储：matrix[row][col] = matrix[row*dim + col]
+                    dot_product += matrix[k * dim + i] * matrix[k * dim + j];
+                }
+
+                if (std::abs(dot_product) > tolerance) {
+                    LOG_WARN(fmt::format("Columns {} and {} are not orthogonal: dot product = {:.6f} (should be 0.000000)", i, j, dot_product));
+                    return false;
+                }
+            }
+        }
+
+        return true;
+    }
+
+public:
+    using DataType = f32;
+    using LabelType = i64;
+
+    static constexpr size_t dim_ = 100;
+    static constexpr size_t vec_n_ = 32;
+    const std::string file_dir_ = GetFullTmpDir();
+};
+
+TEST_F(RabitqTest, test_base) {
+    using namespace infinity;
+
+    auto data = std::make_unique<float[]>(dim_ * vec_n_);
+    std::default_random_engine rng;
+    std::uniform_real_distribution<float> distrib_real(100, 200);
+    for (size_t i = 0; i < dim_ * vec_n_; ++i) {
+        data[i] = distrib_real(rng);
+    }
+    LOG_INFO(fmt::format("vec: {:.2f}, {:.2f}, {:.2f}, ...", data[0], data[1], data[2]));
+
+    {
+        using RabitqVecStoreMeta = RabitqVecStoreMeta<DataType, true>;
+        using RabitqVecStoreInner = RabitqVecStoreInner<DataType, true>;
+
+        for (int i = 0; i < 20; ++i) {
+            RabitqVecStoreMeta meta = RabitqVecStoreMeta::Make(dim_);
+            bool is_rom = CheckOrthogonalMatrix(meta.rom(), meta.dim(), 1e-3f);
+            ASSERT_EQ(is_rom, true);
+            LOG_INFO(fmt::format("check rom: i {}", i));
+        }
+
+        RabitqVecStoreMeta meta = RabitqVecStoreMeta::Make(dim_);
+        LOG_INFO(fmt::format("meta: dim {}, compress_data_size {} bit", meta.dim(), meta.compress_data_size() * 8));
+        SizeT mem_usage = 0;
+        RabitqVecStoreInner inner = RabitqVecStoreInner::Make(vec_n_, meta, mem_usage);
+        LOG_INFO(fmt::format("inner: mem_usage {}", mem_usage));
+    }
+}
