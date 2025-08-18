@@ -68,7 +68,7 @@ jobs:
               | grep -E '\.(cpp|h|hpp|cppm)$' \
               | grep -v 'third_party/' \
               | grep -v 'build/' \
-              | grep -v 'cmake-build/' || true)
+              | grep -v 'parser/' || true)
 
             if [ -n "$CHANGED_FILES" ]; then
               echo "Check format of changed C/C++ files with clang-format-20"
