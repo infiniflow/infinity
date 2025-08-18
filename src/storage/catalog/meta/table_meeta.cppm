@@ -33,13 +33,14 @@ class TableIndexReaderCache;
 class NewTxn;
 // struct SegmentUpdateTS;
 struct TableDetail;
+struct MetaTableCache;
 
 export class TableMeeta {
 public:
     // TableMeeta(const String &db_id_str, const String &table_id_str, KVInstance &kv_instance, TxnTimeStamp begin_ts, UsageEnum usage);
     TableMeeta(const String &db_id_str, const String &table_id_str, KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts);
 
-    TableMeeta(const String &db_id_str, const String &table_id_str, NewTxn *txn);
+    TableMeeta(const String &db_id_str, const String &table_id_str, NewTxn *txn, const SharedPtr<MetaTableCache>& table_cache);
 
     TxnTimeStamp begin_ts() const { return begin_ts_; }
     TxnTimeStamp commit_ts() const { return commit_ts_; }
@@ -170,6 +171,8 @@ private:
     Optional<SegmentID> next_segment_id_;
     Optional<SegmentID> unsealed_segment_id_;
     Optional<ColumnID> next_column_id_;
+
+    SharedPtr<MetaTableCache> table_cache_{};
 };
 
 } // namespace infinity

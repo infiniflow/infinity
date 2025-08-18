@@ -433,7 +433,8 @@ Status NewTxn::CreateTable(const String &db_name, const SharedPtr<TableDef> &tab
     String table_id_str;
     String table_key;
     TxnTimeStamp create_table_ts;
-    status = db_meta->GetTableID(*table_def->table_name(), table_key, table_id_str, create_table_ts);
+    SharedPtr<MetaTableCache> table_cache{};
+    status = db_meta->GetTableID(*table_def->table_name(), table_key, table_id_str, create_table_ts, table_cache);
 
     if (status.ok()) {
         if (conflict_type == ConflictType::kIgnore) {
@@ -558,7 +559,8 @@ Status NewTxn::DropTable(const String &db_name, const String &table_name, Confli
     String table_key;
     String table_id_str;
     TxnTimeStamp table_create_ts;
-    status = db_meta->GetTableID(table_name, table_key, table_id_str, table_create_ts);
+    SharedPtr<MetaTableCache> table_cache{};
+    status = db_meta->GetTableID(table_name, table_key, table_id_str, table_create_ts, table_cache);
     if (!status.ok()) {
         if (status.code() != ErrorCode::kTableNotExist) {
             return status;
@@ -653,7 +655,8 @@ Status NewTxn::RenameTable(const String &db_name, const String &old_table_name, 
         String table_id;
         String table_key;
         TxnTimeStamp create_table_ts;
-        status = db_meta->GetTableID(new_table_name, table_key, table_id, create_table_ts);
+        SharedPtr<MetaTableCache> table_cache{};
+        status = db_meta->GetTableID(new_table_name, table_key, table_id, create_table_ts, table_cache);
 
         if (status.ok()) {
             return Status::DuplicateTable(new_table_name);
@@ -665,7 +668,8 @@ Status NewTxn::RenameTable(const String &db_name, const String &old_table_name, 
     String table_id_str;
     String table_key;
     TxnTimeStamp create_table_ts;
-    status = db_meta->GetTableID(old_table_name, table_key, table_id_str, create_table_ts);
+    SharedPtr<MetaTableCache> table_cache{};
+    status = db_meta->GetTableID(old_table_name, table_key, table_id_str, create_table_ts, table_cache);
     if (!status.ok()) {
         return status;
     }
@@ -1533,7 +1537,8 @@ Status NewTxn::RestoreTableSnapshot(const String &db_name, const SharedPtr<Table
     String table_id_str;
     String table_key;
     TxnTimeStamp table_create_ts;
-    status = db_meta->GetTableID(table_name, table_key, table_id_str, table_create_ts);
+    SharedPtr<MetaTableCache> table_cache{};
+    status = db_meta->GetTableID(table_name, table_key, table_id_str, table_create_ts, table_cache);
 
     if (status.ok()) {
         // if (conflict_type == ConflictType::kIgnore) {
@@ -1762,7 +1767,7 @@ Status NewTxn::CheckpointDB(DBMeeta &db_meta, const CheckpointOption &option, Ch
 
     LOG_DEBUG(fmt::format("checkpoint ts {}, db id {}, got {} tables.", option.checkpoint_ts_, db_meta.db_id_str(), table_id_strs_ptr->size()));
     for (const String &table_id_str : *table_id_strs_ptr) {
-        TableMeeta table_meta(db_meta.db_id_str(), table_id_str, this);
+        TableMeeta table_meta(db_meta.db_id_str(), table_id_str, this, nullptr);
         status = this->CheckpointTable(table_meta, option, ckp_txn_store);
         if (!status.ok()) {
             return status;
@@ -2329,12 +2334,13 @@ Status NewTxn::GetTableMeta(const String &table_name, DBMeeta &db_meta, Optional
     String table_key;
     String table_id_str;
     TxnTimeStamp create_table_ts;
-    Status status = db_meta.GetTableID(table_name, table_key, table_id_str, create_table_ts);
+    SharedPtr<MetaTableCache> table_cache{};
+    Status status = db_meta.GetTableID(table_name, table_key, table_id_str, create_table_ts, table_cache);
     if (!status.ok()) {
         return status;
     }
     LOG_DEBUG(fmt::format("GetTableMeta: txn_id: {} table_id: {}", TxnID(), table_id_str));
-    table_meta.emplace(db_meta.db_id_str(), table_id_str, this);
+    table_meta.emplace(db_meta.db_id_str(), table_id_str, this, table_cache);
     if (table_key_ptr) {
         *table_key_ptr = table_key;
     }
@@ -2638,7 +2644,7 @@ Status NewTxn::CommitCheckpointDB(DBMeeta &db_meta, const WalCmdCheckpointV2 *ch
         return status;
     }
     for (const String &table_id_str : *table_id_strs_ptr) {
-        TableMeeta table_meta(db_meta.db_id_str(), table_id_str, this);
+        TableMeeta table_meta(db_meta.db_id_str(), table_id_str, this, nullptr);
         status = this->CommitCheckpointTable(table_meta, checkpoint_cmd);
         if (!status.ok()) {
             return status;
@@ -2684,7 +2690,7 @@ Status NewTxn::RestoreTableFromSnapshot(const WalCmdRestoreTableSnapshot *restor
             return status;
         }
     } else {
-        table_meta.emplace(db_meta.db_id_str(), restore_table_snapshot_cmd->table_id_, this);
+        table_meta.emplace(db_meta.db_id_str(), restore_table_snapshot_cmd->table_id_, this, nullptr);
     }
 
     // restore meta data of the table

@@ -1471,7 +1471,7 @@ Status NewTxn::PrepareCommitImport(WalCmdImportV2 *import_cmd) {
     const String &table_id_str = import_cmd->table_id_;
 
     WalSegmentInfo &segment_info = import_cmd->segment_info_;
-    TableMeeta table_meta(db_id_str, table_id_str, this);
+    TableMeeta table_meta(db_id_str, table_id_str, this, nullptr);
     SegmentMeta segment_meta(segment_info.segment_id_, table_meta);
 
     status = table_meta.CommitSegment(segment_info.segment_id_, commit_ts);
@@ -1511,7 +1511,7 @@ Status NewTxn::CommitBottomAppend(WalCmdAppendV2 *append_cmd) {
     const String &db_id_str = append_cmd->db_id_;
     const String &table_id_str = append_cmd->table_id_;
     TxnTimeStamp commit_ts = CommitTS();
-    TableMeeta table_meta(db_id_str, table_id_str, this);
+    TableMeeta table_meta(db_id_str, table_id_str, this, nullptr);
     table_meta.SetDBTableName(db_name, table_name);
     Optional<SegmentMeta> segment_meta;
     Optional<BlockMeta> block_meta;
@@ -1632,7 +1632,7 @@ Status NewTxn::PrepareCommitDelete(const WalCmdDeleteV2 *delete_cmd) {
     const String &db_id_str = delete_cmd->db_id_;
     const String &table_id_str = delete_cmd->table_id_;
 
-    TableMeeta table_meta(db_id_str, table_id_str, this);
+    TableMeeta table_meta(db_id_str, table_id_str, this, nullptr);
 
     Optional<SegmentMeta> segment_meta;
     Optional<BlockMeta> block_meta;
@@ -1683,7 +1683,7 @@ Status NewTxn::RollbackDelete(const DeleteTxnStore *delete_txn_store) {
     const String &db_id_str = delete_txn_store->db_id_str_;
     const String &table_id_str = delete_txn_store->table_id_str_;
 
-    TableMeeta table_meta(db_id_str, table_id_str, this);
+    TableMeeta table_meta(db_id_str, table_id_str, this, nullptr);
 
     Optional<SegmentMeta> segment_meta;
     Optional<BlockMeta> block_meta;
@@ -1727,7 +1727,7 @@ Status NewTxn::PrepareCommitCompact(WalCmdCompactV2 *compact_cmd) {
     WalSegmentInfo &segment_info = segment_infos[0];
     Vector<SegmentID> new_segment_ids{segment_info.segment_id_};
 
-    TableMeeta table_meta(db_id_str, table_id_str, this);
+    TableMeeta table_meta(db_id_str, table_id_str, this, nullptr);
     SegmentMeta segment_meta(segment_info.segment_id_, table_meta);
 
     status = table_meta.CommitSegment(segment_info.segment_id_, commit_ts);

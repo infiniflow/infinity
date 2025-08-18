@@ -174,7 +174,8 @@ void PhysicalCheck::ExecuteCheckTable(QueryContext *query_context, CheckOperator
     String table_id_str;
     String table_key;
     TxnTimeStamp create_table_ts;
-    status = db_meta->GetTableID(table_name, table_key, table_id_str, create_table_ts);
+    SharedPtr<MetaTableCache> table_cache{};
+    status = db_meta->GetTableID(table_name, table_key, table_id_str, create_table_ts, table_cache);
 
     if (!status.ok()) {
         output_names_->reserve(1);

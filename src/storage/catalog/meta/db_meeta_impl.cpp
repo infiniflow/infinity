@@ -147,10 +147,10 @@ Status DBMeeta::GetTableIDs(Vector<String> *&table_id_strs, Vector<String> **tab
     return Status::OK();
 }
 
-Status DBMeeta::GetTableID(const String &table_name, String &table_key, String &table_id_str, TxnTimeStamp &create_table_ts) {
+Status DBMeeta::GetTableID(const String &table_name, String &table_key, String &table_id_str, TxnTimeStamp &create_table_ts, SharedPtr<MetaTableCache>& table_cache) {
 
     u64 db_id = std::stoull(db_id_str_);
-    SharedPtr<MetaTableCache> table_cache = meta_cache_->GetTable(db_id, table_name, txn_begin_ts_);
+    table_cache = meta_cache_->GetTable(db_id, table_name, txn_begin_ts_);
     if (table_cache.get() != nullptr) {
         if (table_cache->is_dropped_) {
             return Status::TableNotExist(table_name);

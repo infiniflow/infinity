@@ -297,7 +297,7 @@ Status NewCatalog::MemIndexRecover(NewTxn *txn) {
             return status;
         }
         for (const String &table_id_str : *table_id_strs_ptr) {
-            TableMeeta table_meta(db_meta.db_id_str(), table_id_str, txn);
+            TableMeeta table_meta(db_meta.db_id_str(), table_id_str, txn, nullptr);
             status = IndexRecoverTable(table_meta);
             if (!status.ok()) {
                 return status;
@@ -345,7 +345,7 @@ Status NewCatalog::MemIndexCommit(NewTxn *new_txn) {
             return status;
         }
         for (const String &table_id_str : *table_id_strs_ptr) {
-            TableMeeta table_meta(db_meta.db_id_str(), table_id_str, new_txn);
+            TableMeeta table_meta(db_meta.db_id_str(), table_id_str, new_txn, nullptr);
             status = IndexCommitTable(table_meta);
             if (!status.ok()) {
                 return status;
@@ -408,7 +408,7 @@ Status NewCatalog::GetAllMemIndexes(NewTxn *txn, Vector<SharedPtr<MemIndex>> &me
         for (SizeT i = 0; i < table_id_strs_ptr->size(); ++i) {
             const String &table_id_str = (*table_id_strs_ptr)[i];
             const String &table_name = (*table_names_ptr)[i];
-            TableMeeta table_meta(db_meta.db_id_str(), table_id_str, txn);
+            TableMeeta table_meta(db_meta.db_id_str(), table_id_str, txn, nullptr);
             status = TraverseTable(table_meta, db_name, table_name);
             if (!status.ok()) {
                 return status;
