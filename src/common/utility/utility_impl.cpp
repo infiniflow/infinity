@@ -177,6 +177,7 @@ std::vector<std::string> Partition(const std::string &text, char delimiter) {
         }
         tmp_str += c;
     }
+    parts.emplace_back(tmp_str);
     return parts;
 }
 

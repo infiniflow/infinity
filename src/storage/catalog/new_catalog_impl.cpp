@@ -277,7 +277,10 @@ void NewCatalog::DropSegmentUpdateTSByKey(const std::string &segment_update_ts_k
     segment_update_ts_map_.erase(segment_update_ts_key);
 }
 
-Status NewCatalog::GetCleanedMeta(TxnTimeStamp ts, KVInstance *kv_instance, std::vector<std::unique_ptr<MetaKey>> &metas, std::vector<std::string> &drop_keys) const {
+Status NewCatalog::GetCleanedMeta(TxnTimeStamp ts,
+                                  KVInstance *kv_instance,
+                                  std::vector<std::unique_ptr<MetaKey>> &metas,
+                                  std::vector<std::string> &drop_keys) const {
     auto GetCleanedMetaImpl = [&](const std::vector<std::string> &keys) {
         const std::string &type_str = keys[1];
         const std::string &meta_str = keys[2];
@@ -297,8 +300,10 @@ Status NewCatalog::GetCleanedMeta(TxnTimeStamp ts, KVInstance *kv_instance, std:
         } else if (type_str == "seg") {
             metas.emplace_back(std::make_unique<SegmentMetaKey>(std::move(meta_infos[0]), std::move(meta_infos[1]), std::stoull(meta_infos[2])));
         } else if (type_str == "blk") {
-            metas.emplace_back(
-                std::make_unique<BlockMetaKey>(std::move(meta_infos[0]), std::move(meta_infos[1]), std::stoull(meta_infos[2]), std::stoull(meta_infos[3])));
+            metas.emplace_back(std::make_unique<BlockMetaKey>(std::move(meta_infos[0]),
+                                                              std::move(meta_infos[1]),
+                                                              std::stoull(meta_infos[2]),
+                                                              std::stoull(meta_infos[3])));
         } else if (type_str == "tbl_col") {
             std::unique_ptr<TableColumnMetaKey> table_column_meta_key =
                 std::make_unique<TableColumnMetaKey>(std::move(meta_infos[0]), std::move(meta_infos[1]), std::move(meta_infos[2]));
@@ -306,26 +311,28 @@ Status NewCatalog::GetCleanedMeta(TxnTimeStamp ts, KVInstance *kv_instance, std:
             metas.emplace_back(std::move(table_column_meta_key));
         } else if (type_str == "blk_col") {
             metas.emplace_back(std::make_unique<ColumnMetaKey>(std::move(meta_infos[0]),
-                                                         std::move(meta_infos[1]),
-                                                         std::stoull(meta_infos[2]),
-                                                         std::stoull(meta_infos[3]),
-                                                         ColumnDef::FromJson(meta_infos[4])));
+                                                               std::move(meta_infos[1]),
+                                                               std::stoull(meta_infos[2]),
+                                                               std::stoull(meta_infos[3]),
+                                                               ColumnDef::FromJson(meta_infos[4])));
         } else if (type_str == "idx") {
-            std::unique_ptr<TableIndexMetaKey> table_index_meta_key =
-                std::make_unique<TableIndexMetaKey>(std::move(meta_infos[0]), std::move(meta_infos[1]), std::move(meta_infos[4]), std::move(meta_infos[2]));
+            std::unique_ptr<TableIndexMetaKey> table_index_meta_key = std::make_unique<TableIndexMetaKey>(std::move(meta_infos[0]),
+                                                                                                          std::move(meta_infos[1]),
+                                                                                                          std::move(meta_infos[4]),
+                                                                                                          std::move(meta_infos[2]));
             table_index_meta_key->commit_ts_ = std::stoull(meta_infos[3]);
             metas.emplace_back(std::move(table_index_meta_key));
         } else if (type_str == "idx_seg") {
             metas.emplace_back(std::make_unique<SegmentIndexMetaKey>(std::move(meta_infos[0]),
-                                                               std::move(meta_infos[1]),
-                                                               std::move(meta_infos[2]),
-                                                               std::stoull(meta_infos[3])));
+                                                                     std::move(meta_infos[1]),
+                                                                     std::move(meta_infos[2]),
+                                                                     std::stoull(meta_infos[3])));
         } else if (type_str == "idx_chunk") {
             metas.emplace_back(std::make_unique<ChunkIndexMetaKey>(std::move(meta_infos[0]),
-                                                             std::move(meta_infos[1]),
-                                                             std::move(meta_infos[2]),
-                                                             std::stoull(meta_infos[3]),
-                                                             std::stoull(meta_infos[4])));
+                                                                   std::move(meta_infos[1]),
+                                                                   std::move(meta_infos[2]),
+                                                                   std::stoull(meta_infos[3]),
+                                                                   std::stoull(meta_infos[4])));
         } else {
             UnrecoverableError("Unknown meta key type.");
         }
@@ -395,8 +402,7 @@ std::vector<std::shared_ptr<MetaKey>> NewCatalog::MakeMetaKeys() const {
 
     std::vector<std::string> dropped_keys;
     std::vector<std::unique_ptr<MetaKey>> metas;
-    Status status = GetCleanedMeta(MAX_TIMESTAMP, kv_instance_ptr.get(), metas, dropped_keys);
-    if (!status.ok()) {
+    if (auto status = GetCleanedMeta(MAX_TIMESTAMP, kv_instance_ptr.get(), metas, dropped_keys); !status.ok()) {
         LOG_ERROR((fmt::format("GetCleanedMeta failed: {}", status.message())));
         return meta_keys;
     }
@@ -420,15 +426,15 @@ std::vector<std::shared_ptr<MetaKey>> NewCatalog::MakeMetaKeys() const {
         meta_keys.emplace_back(meta_key);
     }
 
-    auto new_end = std::remove_if(meta_keys.begin(), meta_keys.end(), [&](const auto &meta_key) {
-        if (meta_key->type_ == MetaType::kPmObject) {
-            auto pm_path_key = static_cast<PmObjectMetaKey *>(meta_key.get());
-            simdjson::padded_string json(pm_path_key->value_);
-            simdjson::parser parser;
-            simdjson::document doc = parser.iterate(json);
-        }
-        return false;
-    });
+    auto new_end = std::ranges::remove_if(meta_keys, [&](const auto &meta_key) {
+                       if (meta_key->type_ == MetaType::kPmObject) {
+                           auto pm_path_key = static_cast<PmObjectMetaKey *>(meta_key.get());
+                           simdjson::padded_string json(pm_path_key->value_);
+                           simdjson::parser parser;
+                           simdjson::document doc = parser.iterate(json);
+                       }
+                       return false;
+                   }).begin();
     meta_keys.erase(new_end, meta_keys.end());
 
     kv_instance_ptr->Commit();

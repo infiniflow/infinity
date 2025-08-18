@@ -294,7 +294,7 @@ std::shared_ptr<MetaKey> MetaParse(const std::string &key, const std::string &va
         const std::string &db_name_str = fields[2];
         const std::string &commit_ts_str = fields[3];
         const std::string &db_id_str = value;
-        std::shared_ptr<DBMetaKey> db_meta_key = std::make_shared<DBMetaKey>(db_id_str, db_name_str);
+        auto db_meta_key = std::make_shared<DBMetaKey>(db_id_str, db_name_str);
         db_meta_key->commit_ts_ = std::stoull(commit_ts_str);
         return db_meta_key;
     }
@@ -305,7 +305,7 @@ std::shared_ptr<MetaKey> MetaParse(const std::string &key, const std::string &va
         const std::string &commit_ts_str = fields[4];
         const std::string &table_id_str = value;
 
-        std::shared_ptr<TableMetaKey> table_meta_key = std::make_shared<TableMetaKey>(db_id_str, table_id_str, table_name_str);
+        auto table_meta_key = std::make_shared<TableMetaKey>(db_id_str, table_id_str, table_name_str);
         table_meta_key->commit_ts_ = std::stoull(commit_ts_str);
         return table_meta_key;
     }
@@ -316,7 +316,7 @@ std::shared_ptr<MetaKey> MetaParse(const std::string &key, const std::string &va
         const std::string &commit_ts_str = fields[4];
         const std::string &table_id_str = value;
 
-        std::shared_ptr<TableNameMetaKey> table_name_meta_key = std::make_shared<TableNameMetaKey>(db_id_str, table_id_str, table_name_str);
+        auto table_name_meta_key = std::make_shared<TableNameMetaKey>(db_id_str, table_id_str, table_name_str);
         table_name_meta_key->commit_ts_ = std::stoull(commit_ts_str);
         return table_name_meta_key;
     }
@@ -374,7 +374,7 @@ std::shared_ptr<MetaKey> MetaParse(const std::string &key, const std::string &va
     if (fields[0] == "db") {
         const std::string &db_id_str = fields[1];
         const std::string &tag_name_str = fields[2];
-        std::shared_ptr<DBTagMetaKey> db_tag_meta_key = std::make_shared<DBTagMetaKey>(db_id_str, tag_name_str);
+        auto db_tag_meta_key = std::make_shared<DBTagMetaKey>(db_id_str, tag_name_str);
         db_tag_meta_key->value_ = value;
         return db_tag_meta_key;
     }
@@ -385,8 +385,7 @@ std::shared_ptr<MetaKey> MetaParse(const std::string &key, const std::string &va
             const std::string &table_id_str = fields[3];
             const std::string &column_name_str = fields[4];
             const std::string &commit_ts_str = fields[5];
-            std::shared_ptr<TableColumnMetaKey> table_column_meta_key =
-                std::make_shared<TableColumnMetaKey>(db_id_str, table_id_str, column_name_str);
+            auto table_column_meta_key = std::make_shared<TableColumnMetaKey>(db_id_str, table_id_str, column_name_str);
             table_column_meta_key->commit_ts_ = std::stoull(commit_ts_str);
             table_column_meta_key->value_ = value;
             return table_column_meta_key;
@@ -394,7 +393,7 @@ std::shared_ptr<MetaKey> MetaParse(const std::string &key, const std::string &va
         const std::string &db_id_str = fields[1];
         const std::string &table_id_str = fields[2];
         const std::string &tag_name_str = fields[3];
-        std::shared_ptr<TableTagMetaKey> table_tag_meta_key = std::make_shared<TableTagMetaKey>(db_id_str, table_id_str, tag_name_str);
+        auto table_tag_meta_key = std::make_shared<TableTagMetaKey>(db_id_str, table_id_str, tag_name_str);
         table_tag_meta_key->value_ = value;
         return table_tag_meta_key;
     }
@@ -406,8 +405,7 @@ std::shared_ptr<MetaKey> MetaParse(const std::string &key, const std::string &va
         const std::string &commit_ts_str = fields[5];
         const std::string &index_id_str = value;
 
-        std::shared_ptr<TableIndexMetaKey> table_index_meta_key =
-            std::make_shared<TableIndexMetaKey>(db_id_str, table_id_str, index_id_str, index_name_str);
+        auto table_index_meta_key = std::make_shared<TableIndexMetaKey>(db_id_str, table_id_str, index_id_str, index_name_str);
         table_index_meta_key->commit_ts_ = std::stoull(commit_ts_str);
         return table_index_meta_key;
     }
@@ -417,8 +415,7 @@ std::shared_ptr<MetaKey> MetaParse(const std::string &key, const std::string &va
         const std::string &table_id_str = fields[2];
         const std::string &index_id_str = fields[3];
         const std::string &tag_name_str = fields[4];
-        std::shared_ptr<TableIndexTagMetaKey> table_index_tag_meta_key =
-            std::make_shared<TableIndexTagMetaKey>(db_id_str, table_id_str, index_id_str, tag_name_str);
+        auto table_index_tag_meta_key = std::make_shared<TableIndexTagMetaKey>(db_id_str, table_id_str, index_id_str, tag_name_str);
         table_index_tag_meta_key->value_ = value;
         return table_index_tag_meta_key;
     }
@@ -467,7 +464,7 @@ std::shared_ptr<MetaKey> MetaParse(const std::string &key, const std::string &va
         }
         if (fields[1] == "object_stat") {
             const std::string &object_key = fields[2];
-            std::shared_ptr<PmStatMetaKey> pm_object_meta_key = std::make_shared<PmStatMetaKey>(object_key);
+            auto pm_object_meta_key = std::make_shared<PmStatMetaKey>(object_key);
             pm_object_meta_key->value_ = value;
             return pm_object_meta_key;
         }
@@ -477,13 +474,13 @@ std::shared_ptr<MetaKey> MetaParse(const std::string &key, const std::string &va
     if (fields[0] == "drop") {
         const std::string &scope = fields[1];
         const std::string &object_key = fields[2];
-        std::shared_ptr<DropMetaKey> drop_meta_key = std::make_shared<DropMetaKey>(scope, object_key);
+        auto drop_meta_key = std::make_shared<DropMetaKey>(scope, object_key);
         drop_meta_key->value_ = value;
         return drop_meta_key;
     }
 
     const std::string &tag_name_str = fields[0];
-    std::shared_ptr<SystemTagMetaKey> system_tag_meta_key = std::make_shared<SystemTagMetaKey>(tag_name_str);
+    auto system_tag_meta_key = std::make_shared<SystemTagMetaKey>(tag_name_str);
     system_tag_meta_key->value_ = value;
     return system_tag_meta_key;
 }
