@@ -1216,4 +1216,315 @@ export float F32IPSSEResidual(const float *pVect1, const float *pVect2, size_t q
 
 #endif
 
+//------------------------------//------------------------------//------------------------------
+
+export i32 U8BinIPBF(const u8 *pv, const u8 *pv_b, size_t dim) {
+    i32 res = 0;
+    for (size_t d = 0; d < dim; ++d) {
+        if ((pv_b[d / 8] >> (d % 8)) & 1) {
+            res += static_cast<i32>(pv[d]);
+        }
+    }
+    return res;
+}
+
+#if defined(__AVX512F__)
+inline __m512i load_8u8_avx512(const u8 *pv) {
+    return _mm512_setr_epi8(pv[0],
+                            pv[0],
+                            pv[0],
+                            pv[0],
+                            pv[0],
+                            pv[0],
+                            pv[0],
+                            pv[0],
+                            pv[1],
+                            pv[1],
+                            pv[1],
+                            pv[1],
+                            pv[1],
+                            pv[1],
+                            pv[1],
+                            pv[1],
+                            pv[2],
+                            pv[2],
+                            pv[2],
+                            pv[2],
+                            pv[2],
+                            pv[2],
+                            pv[2],
+                            pv[2],
+                            pv[3],
+                            pv[3],
+                            pv[3],
+                            pv[3],
+                            pv[3],
+                            pv[3],
+                            pv[3],
+                            pv[3],
+                            pv[4],
+                            pv[4],
+                            pv[4],
+                            pv[4],
+                            pv[4],
+                            pv[4],
+                            pv[4],
+                            pv[4],
+                            pv[5],
+                            pv[5],
+                            pv[5],
+                            pv[5],
+                            pv[5],
+                            pv[5],
+                            pv[5],
+                            pv[5],
+                            pv[6],
+                            pv[6],
+                            pv[6],
+                            pv[6],
+                            pv[6],
+                            pv[6],
+                            pv[6],
+                            pv[6],
+                            pv[7],
+                            pv[7],
+                            pv[7],
+                            pv[7],
+                            pv[7],
+                            pv[7],
+                            pv[7],
+                            pv[7]);
+}
+
+inline __m512i load_8x64_mask_avx512() {
+    return _mm512_setr_epi8(0x01,
+                            0x02,
+                            0x04,
+                            0x08,
+                            0x10,
+                            0x20,
+                            0x40,
+                            0x80,
+                            0x01,
+                            0x02,
+                            0x04,
+                            0x08,
+                            0x10,
+                            0x20,
+                            0x40,
+                            0x80,
+                            0x01,
+                            0x02,
+                            0x04,
+                            0x08,
+                            0x10,
+                            0x20,
+                            0x40,
+                            0x80,
+                            0x01,
+                            0x02,
+                            0x04,
+                            0x08,
+                            0x10,
+                            0x20,
+                            0x40,
+                            0x80,
+                            0x01,
+                            0x02,
+                            0x04,
+                            0x08,
+                            0x10,
+                            0x20,
+                            0x40,
+                            0x80,
+                            0x01,
+                            0x02,
+                            0x04,
+                            0x08,
+                            0x10,
+                            0x20,
+                            0x40,
+                            0x80,
+                            0x01,
+                            0x02,
+                            0x04,
+                            0x08,
+                            0x10,
+                            0x20,
+                            0x40,
+                            0x80,
+                            0x01,
+                            0x02,
+                            0x04,
+                            0x08,
+                            0x10,
+                            0x20,
+                            0x40,
+                            0x80);
+}
+
+export i32 U8BinIPAVX512BW(const u8 *pv, const u8 *pv_b, size_t dim) {
+    const u8 *pEnd1 = pv + (dim & ~(31u));
+    __m512i acc = _mm512_setzero_si512();
+    while (pv < pEnd1) {
+        __m512i v1 = _mm512_loadu_si512((__m512i *)pv);
+
+        __m512i v2 = load_8u8_avx512(pv_b);
+        v2 = _mm512_and_si512(v2, load_8x64_mask_avx512());
+        v2 = _mm512_cmpeq_epi8(v2, _mm512_setzero_si512());
+        v2 = _mm512_andnot_si512(v2, _mm512_set1_epi8(0xFF));
+
+        __m512i mask = _mm512_and_si512(v1, v2);
+        __m512i ones_8 = _mm512_set1_epi8(1);
+        __m512i ones_16 = _mm512_set1_epi16(1);
+        __m512i sum16 = _mm512_maddubs_epi16(mask, ones_8);
+        acc = _mm512_add_epi32(acc, _mm512_madd_epi16(sum16, ones_16));
+
+        pv += 32;
+        pv_b += 4;
+    }
+    return hsum_epi32_avx512(acc);
+}
+
+export i32 U8BinIPAVX512BWResidual(const u8 *pv, const u8 *pv_b, size_t dim) {
+    return U8BinIPAVX512BW(pv, pv_b, dim) + U8BinIPBF(pv + (dim & ~31), pv_b + (dim & ~31), dim & 31);
+}
+#endif
+
+#if defined(__AVX2__)
+inline __m256i load_4u8_avx2(const u8 *pv) {
+    return _mm256_setr_epi8(pv[0],
+                            pv[0],
+                            pv[0],
+                            pv[0],
+                            pv[0],
+                            pv[0],
+                            pv[0],
+                            pv[0],
+                            pv[1],
+                            pv[1],
+                            pv[1],
+                            pv[1],
+                            pv[1],
+                            pv[1],
+                            pv[1],
+                            pv[1],
+                            pv[2],
+                            pv[2],
+                            pv[2],
+                            pv[2],
+                            pv[2],
+                            pv[2],
+                            pv[2],
+                            pv[2],
+                            pv[3],
+                            pv[3],
+                            pv[3],
+                            pv[3],
+                            pv[3],
+                            pv[3],
+                            pv[3],
+                            pv[3]);
+}
+
+inline __m256i load_8x32_mask_avx2() {
+    return _mm256_setr_epi8(0x01,
+                            0x02,
+                            0x04,
+                            0x08,
+                            0x10,
+                            0x20,
+                            0x40,
+                            0x80,
+                            0x01,
+                            0x02,
+                            0x04,
+                            0x08,
+                            0x10,
+                            0x20,
+                            0x40,
+                            0x80,
+                            0x01,
+                            0x02,
+                            0x04,
+                            0x08,
+                            0x10,
+                            0x20,
+                            0x40,
+                            0x80,
+                            0x01,
+                            0x02,
+                            0x04,
+                            0x08,
+                            0x10,
+                            0x20,
+                            0x40,
+                            0x80);
+}
+
+export i32 U8BinIPAVX2(const u8 *pv, const u8 *pv_b, size_t dim) {
+    const u8 *pEnd1 = pv + (dim & ~(31u));
+    __m256i acc = _mm256_setzero_si256();
+    while (pv < pEnd1) {
+        __m256i v1 = _mm256_loadu_si256((__m256i *)pv);
+
+        __m256i v2 = load_4u8_avx2(pv_b);
+        v2 = _mm256_and_si256(v2, load_8x32_mask_avx2());
+        v2 = _mm256_cmpeq_epi8(v2, _mm256_setzero_si256());
+        v2 = _mm256_andnot_si256(v2, _mm256_set1_epi8(0xFF));
+
+        __m256i mask = _mm256_and_si256(v1, v2);
+        __m256i ones_8 = _mm256_set1_epi8(1);
+        __m256i ones_16 = _mm256_set1_epi16(1);
+        __m256i sum16 = _mm256_maddubs_epi16(mask, ones_8);
+        acc = _mm256_add_epi32(acc, _mm256_madd_epi16(sum16, ones_16));
+
+        pv += 32;
+        pv_b += 4;
+    }
+    return hsum_8x32_avx2(acc);
+}
+
+export i32 U8BinIPAVX2Residual(const u8 *pv, const u8 *pv_b, size_t dim) {
+    return U8BinIPAVX2(pv, pv_b, dim) + U8BinIPBF(pv + (dim & ~31), pv_b + (dim & ~31), dim & 31);
+}
+#endif
+
+#if defined(__SSE2__)
+inline __m128i load_2u8_sse2(const u8 *pv) {
+    return _mm_setr_epi8(pv[0], pv[0], pv[0], pv[0], pv[0], pv[0], pv[0], pv[0], pv[1], pv[1], pv[1], pv[1], pv[1], pv[1], pv[1], pv[1]);
+}
+
+inline __m128i load_8x16_mask_sse2() {
+    return _mm_setr_epi8(0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80, 0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80);
+}
+
+export i32 U8BinIPSSE2(const u8 *pv, const u8 *pv_b, size_t dim) {
+    const u8 *pEnd1 = pv + (dim & ~(15u));
+    __m128i acc = _mm_setzero_si128();
+    while (pv < pEnd1) {
+        __m128i v1 = _mm_loadu_si128((__m128i *)pv);
+
+        __m128i v2 = load_2u8_sse2(pv_b);
+        v2 = _mm_and_si128(v2, load_8x16_mask_sse2());
+        v2 = _mm_cmpeq_epi8(v2, _mm_setzero_si128());
+        v2 = _mm_andnot_si128(v2, _mm_set1_epi8(0xFF));
+
+        __m128i mask = _mm_and_si128(v1, v2);
+        __m128i ones_8 = _mm_set1_epi8(1);
+        __m128i ones_16 = _mm_set1_epi16(1);
+        __m128i sum16 = _mm_maddubs_epi16(mask, ones_8);
+        acc = _mm_add_epi32(acc, _mm_madd_epi16(sum16, ones_16));
+
+        pv += 16;
+        pv_b += 2;
+    }
+    return hsum_epi32_sse2(acc);
+}
+
+export i32 U8BinIPSSE2Residual(const u8 *pv1, const u8 *pv2, size_t dim) {
+    return U8BinIPSSE2(pv1, pv2, dim) + U8BinIPBF(pv1 + (dim & ~15), pv2 + (dim & ~15), dim & 15);
+}
+#endif
+
 } // namespace infinity

@@ -17,6 +17,7 @@ export module infinity_core:vec_store_type;
 import :plain_vec_store;
 import :sparse_vec_store;
 import :lvq_vec_store;
+import :rabitq_vec_store;
 import :dist_func_cos;
 import :dist_func_l2;
 import :dist_func_ip;
@@ -196,6 +197,57 @@ public:
     static constexpr LVQIPVecStoreType<DataType, CompressType, LSG> ToLVQ() {
         return {};
     }
+};
+
+export template <typename DataT>
+class RabitqCosVecStoreType {
+public:
+    using DataType = DataT;
+    template <bool OwnMem>
+    using Meta = RabitqVecStoreMeta<DataType, OwnMem>;
+    template <bool OwnMem>
+    using Inner = RabitqVecStoreInner<DataType, OwnMem>;
+    using QueryVecType = const DataType *;
+    using MetaType = RabitqVecStoreMetaType<DataType>;
+    using StoreType = typename MetaType::StoreType;
+    using QueryType = typename MetaType::QueryType;
+    using Distance = RabitqCosDist<DataType>;
+
+    static constexpr bool HasOptimize = true;
+};
+
+export template <typename DataT>
+class RabitqL2VecStoreType {
+public:
+    using DataType = DataT;
+    template <bool OwnMem>
+    using Meta = RabitqVecStoreMeta<DataType, OwnMem>;
+    template <bool OwnMem>
+    using Inner = RabitqVecStoreInner<DataType, OwnMem>;
+    using QueryVecType = const DataType *;
+    using MetaType = RabitqVecStoreMetaType<DataType>;
+    using StoreType = typename MetaType::StoreType;
+    using QueryType = typename MetaType::QueryType;
+    using Distance = RabitqL2Dist<DataType>;
+
+    static constexpr bool HasOptimize = true;
+};
+
+export template <typename DataT>
+class RabitqIPVecStoreType {
+public:
+    using DataType = DataT;
+    template <bool OwnMem>
+    using Meta = RabitqVecStoreMeta<DataType, OwnMem>;
+    template <bool OwnMem>
+    using Inner = RabitqVecStoreInner<DataType, OwnMem>;
+    using QueryVecType = const DataType *;
+    using MetaType = RabitqVecStoreMetaType<DataType>;
+    using StoreType = typename MetaType::StoreType;
+    using QueryType = typename MetaType::QueryType;
+    using Distance = RabitqIPDist<DataType>;
+
+    static constexpr bool HasOptimize = true;
 };
 
 } // namespace infinity
