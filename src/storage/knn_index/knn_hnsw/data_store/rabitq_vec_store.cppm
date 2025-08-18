@@ -39,34 +39,30 @@ SizeT AlignUp(SizeT num, SizeT align_size) { return (num + align_size - 1) & ~(a
 
 template <typename DataType>
 void GenerateRandomOrthogonalMatrix(DataType *rom, SizeT dim) {
+    // TODO: Speeding up through QR decomposition
     std::random_device rd;
     std::mt19937 gen(rd());
     std::uniform_real_distribution<DataType> dist(-1.0, 1.0);
 
-    // generate random matrix
-    for (SizeT i = 0; i < dim; ++i)
-        for (SizeT j = 0; j < dim; ++j)
-            rom[i * dim + j] = dist(gen);
+    // Initialize the identity matrix
+    std::memset(rom, 0, dim * dim * sizeof(DataType));
+    for (SizeT i = 0; i < dim; ++i) {
+        rom[i * dim + i] = 1.0;
+    }
 
-    // TODO: Achieved through QR decomposition
-    // Gram-Schmidt orthogonalization
-    for (SizeT j = 0; j < dim; ++j) {
-        // Orthogonalize column vector
-        for (SizeT k = 0; k < j; ++k) {
-            double dot = 0.0;
-            for (SizeT i = 0; i < dim; ++i)
-                dot += rom[i * dim + k] * rom[i * dim + j];
-            for (SizeT i = 0; i < dim; ++i)
-                rom[i * dim + j] -= dot * rom[i * dim + k];
+    // Random Givens Rotation
+    for (SizeT i = 0; i < dim; ++i) {
+        for (SizeT j = i + 1; j < dim; ++j) {
+            DataType angle = 2 * M_PI * dist(gen);
+            DataType c = std::cos(angle);
+            DataType s = std::sin(angle);
+            for (SizeT k = 0; k < dim; ++k) {
+                DataType q_ik = rom[k * dim + i] * c - rom[k * dim + j] * s;
+                DataType q_jk = rom[k * dim + i] * s + rom[k * dim + j] * c;
+                rom[k * dim + i] = q_ik;
+                rom[k * dim + j] = q_jk;
+            }
         }
-
-        // Normalized column vector
-        double norm = 0.0;
-        for (SizeT i = 0; i < dim; ++i)
-            norm += rom[i * dim + j] * rom[i * dim + j];
-        norm = sqrt(norm);
-        for (SizeT i = 0; i < dim; ++i)
-            rom[i * dim + j] /= norm;
     }
 }
 
