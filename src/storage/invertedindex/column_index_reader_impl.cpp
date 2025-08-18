@@ -15,8 +15,8 @@
 module;
 
 #include <cassert>
-#include <vector>
 #include <memory>
+#include <vector>
 
 module infinity_core:column_index_reader.impl;
 
