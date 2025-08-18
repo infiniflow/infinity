@@ -552,7 +552,9 @@ Status TableMeeta::SetNextColumnID(ColumnID next_column_id) {
 Status TableMeeta::LoadColumnDefs() {
     if (table_cache_.get() != nullptr) {
         column_defs_ = table_cache_->get_columns();
-        return Status::OK();
+        if (column_defs_ != nullptr) {
+            return Status::OK();
+        }
     }
     SharedPtr<Vector<SharedPtr<ColumnDef>>> column_defs = MakeShared<Vector<SharedPtr<ColumnDef>>>();
     Map<String, Vector<Pair<String, String>>> column_kvs_map;
