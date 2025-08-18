@@ -35,8 +35,8 @@
  ** Define the infinity::location class.
  */
 
-#ifndef YY_SEARCH_LOCATION_HH_INCLUDED
-# define YY_SEARCH_LOCATION_HH_INCLUDED
+#ifndef YY_YY_LOCATION_HH_INCLUDED
+# define YY_YY_LOCATION_HH_INCLUDED
 
 # include <iostream>
 # include <string>
@@ -303,4 +303,4 @@ namespace infinity {
 } // infinity
 #line 305 "location.hh"
 
-#endif // !YY_SEARCH_LOCATION_HH_INCLUDED
+#endif // !YY_YY_LOCATION_HH_INCLUDED

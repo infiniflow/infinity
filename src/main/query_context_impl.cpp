@@ -363,8 +363,7 @@ bool QueryContext::ExecuteBGStatement(BaseStatement *base_statement, BGQueryStat
     QueryResult query_result;
     try {
         std::shared_ptr<BindContext> bind_context;
-        auto status = logical_planner_->Build(base_statement, bind_context);
-        if (!status.ok()) {
+        if (auto status = logical_planner_->Build(base_statement, bind_context); !status.ok()) {
             RecoverableError(status);
         }
         current_max_node_id_ = bind_context->GetNewLogicalNodeId();
@@ -426,8 +425,8 @@ bool QueryContext::JoinBGStatement(BGQueryState &state, TxnTimeStamp &commit_ts,
 QueryResult QueryContext::HandleAdminStatement(const AdminStatement *admin_statement) { return AdminExecutor::Execute(this, admin_statement); }
 
 void QueryContext::BeginTxn(const BaseStatement *base_statement) {
-    NewTxnManager *txn_manager = storage_->new_txn_manager();
-    std::unique_ptr<std::string> txn_text = std::make_unique<std::string>(base_statement ? base_statement->ToString() : "");
+    auto *txn_manager = storage_->new_txn_manager();
+    auto txn_text = std::make_unique<std::string>(base_statement ? base_statement->ToString() : "");
 
     std::shared_ptr<NewTxn> new_txn{};
     if (base_statement->type_ == StatementType::kFlush) {
@@ -448,9 +447,8 @@ void QueryContext::BeginTxn(const BaseStatement *base_statement) {
 
 TxnTimeStamp QueryContext::CommitTxn() {
     TxnTimeStamp commit_ts = 0;
-    NewTxn *new_txn = session_ptr_->GetNewTxn();
-    Status status = storage_->new_txn_manager()->CommitTxn(new_txn, &commit_ts);
-    if (!status.ok()) {
+    auto *new_txn = session_ptr_->GetNewTxn();
+    if (auto status = storage_->new_txn_manager()->CommitTxn(new_txn, &commit_ts); !status.ok()) {
         session_ptr_->ResetNewTxn();
         RecoverableError(status);
     }
@@ -460,15 +458,13 @@ TxnTimeStamp QueryContext::CommitTxn() {
 }
 
 void QueryContext::RollbackTxn() {
-    NewTxn *new_txn = session_ptr_->GetNewTxn();
-    Status status = storage_->new_txn_manager()->RollBackTxn(new_txn);
-    if (!status.ok()) {
+    auto *new_txn = session_ptr_->GetNewTxn();
+    if (auto status = storage_->new_txn_manager()->RollBackTxn(new_txn); !status.ok()) {
         session_ptr_->ResetNewTxn();
         RecoverableError(status);
     }
     session_ptr_->IncreaseRollbackedTxnCount();
     session_ptr_->ResetNewTxn();
-    return;
 }
 
 NewTxn *QueryContext::GetNewTxn() const { return session_ptr_->GetNewTxn(); }
