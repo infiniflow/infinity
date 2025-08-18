@@ -26,7 +26,7 @@ class KVInstance;
 struct DatabaseInfo;
 class NewTxn;
 class MetaCache;
-struct MetaTableCache;
+class MetaTableCache;
 
 export class DBMeeta {
 public:

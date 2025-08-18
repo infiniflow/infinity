@@ -33,7 +33,7 @@ class TableIndexReaderCache;
 class NewTxn;
 // struct SegmentUpdateTS;
 struct TableDetail;
-struct MetaTableCache;
+class MetaTableCache;
 
 export class TableMeeta {
 public:

@@ -106,9 +106,9 @@ Status DBMeeta::GetComment(String *&comment) {
     if (!comment_) {
         SharedPtr<MetaDbCache> db_cache = meta_cache_->GetDb(db_name_, txn_begin_ts_);
         if (db_cache.get() != nullptr) {
-            if (db_cache->get_comment_) {
+            if (db_cache->get_comment()) {
                 LOG_TRACE(fmt::format("Get db comment from db: {}", db_name_));
-                comment_ = *db_cache->comment_;
+                comment_ = *db_cache->comment();
                 comment = &*comment_;
                 return Status::OK();
             }
@@ -124,8 +124,7 @@ Status DBMeeta::GetComment(String *&comment) {
         comment_ = std::move(comment_str);
 
         if (db_cache.get() != nullptr) {
-            db_cache->get_comment_ = true;
-            db_cache->comment_ = MakeShared<String>(*comment_);
+            db_cache->set_comment(MakeShared<String>(*comment_));
         }
     }
     comment = &*comment_;
@@ -156,18 +155,18 @@ Status DBMeeta::GetTableID(const String &table_name,
     u64 db_id = std::stoull(db_id_str_);
     table_cache = meta_cache_->GetTable(db_id, table_name, txn_begin_ts_);
     if (table_cache.get() != nullptr) {
-        if (table_cache->is_dropped_) {
+        if (table_cache->is_dropped()) {
             return Status::TableNotExist(table_name);
         }
-        table_id_str = std::to_string(table_cache->table_id_);
-        table_key = table_cache->table_key_;
-        create_table_ts = table_cache->commit_ts_;
+        table_id_str = std::to_string(table_cache->table_id());
+        table_key = table_cache->table_key();
+        create_table_ts = table_cache->commit_ts();
         LOG_TRACE(fmt::format("Get table meta from cache, db_id: {}, table_name: {}, table_key: {}, table_id: {}, commit_ts: {}",
-                              table_cache->db_id_,
+                              db_id,
                               table_name,
-                              table_cache->table_key_,
-                              table_cache->table_id_,
-                              table_cache->commit_ts_));
+                              table_key,
+                              table_id_str,
+                              create_table_ts));
         return Status::OK();
     }
 

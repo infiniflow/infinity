@@ -6528,7 +6528,7 @@ void PhysicalShow::ExecuteListCaches(QueryContext *query_context, ShowOperatorSt
 
         {
             // cache type
-            Value value = Value::MakeVarchar(cache_item->type());
+            Value value = Value::MakeVarchar(ToString(cache_item->type()));
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
         }

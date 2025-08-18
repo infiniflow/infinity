@@ -48,13 +48,13 @@ Status CatalogMeta::GetDBID(const String &db_name, String &db_key, String &db_id
 
     SharedPtr<MetaDbCache> db_cache = meta_cache_->GetDb(db_name, this->read_ts_);
     if (db_cache.get() != nullptr) {
-        if (db_cache->is_dropped_) {
+        if (db_cache->is_dropped()) {
             return Status::DBNotExist(db_name);
         }
-        db_id_str = std::to_string(db_cache->db_id_);
-        db_key = db_cache->db_key_;
-        create_ts = db_cache->commit_ts_;
-        LOG_TRACE(fmt::format("Get db meta from cache, db: {}, db_id: {}, commit_ts: {}", db_name, db_cache->db_id_, create_ts));
+        db_id_str = std::to_string(db_cache->db_id());
+        db_key = db_cache->db_key();
+        create_ts = db_cache->commit_ts();
+        LOG_TRACE(fmt::format("Get db meta from cache, db: {}, db_id: {}, commit_ts: {}", db_name, db_id_str, create_ts));
         return Status::OK();
     }
 

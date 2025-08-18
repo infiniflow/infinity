@@ -45,8 +45,8 @@ TEST_F(MetaCacheTest, test_db) {
         db_cache = cache.GetDb("db1", 3);
         EXPECT_EQ(db_cache.get(), nullptr);
         db_cache = cache.GetDb("db1", 5);
-        EXPECT_EQ(db_cache->commit_ts_, 4);
-        EXPECT_EQ(db_cache->is_dropped_, false);
+        EXPECT_EQ(db_cache->commit_ts(), 4);
+        EXPECT_EQ(db_cache->is_dropped(), false);
         SizeT size = cache.Size();
         EXPECT_EQ(size, 1);
     }
@@ -56,11 +56,11 @@ TEST_F(MetaCacheTest, test_db) {
         db_cache = cache.GetDb("db1", 3);
         EXPECT_EQ(db_cache.get(), nullptr);
         db_cache = cache.GetDb("db1", 5);
-        EXPECT_EQ(db_cache->commit_ts_, 4);
-        EXPECT_EQ(db_cache->is_dropped_, false);
+        EXPECT_EQ(db_cache->commit_ts(), 4);
+        EXPECT_EQ(db_cache->is_dropped(), false);
         db_cache = cache.GetDb("db1", 7);
-        EXPECT_EQ(db_cache->commit_ts_, 6);
-        EXPECT_EQ(db_cache->is_dropped_, true);
+        EXPECT_EQ(db_cache->commit_ts(), 6);
+        EXPECT_EQ(db_cache->is_dropped(), true);
         SizeT size = cache.Size();
         EXPECT_EQ(size, 2);
     }
@@ -72,11 +72,11 @@ TEST_F(MetaCacheTest, test_db) {
         db_cache = cache.GetDb("db1", 5);
         EXPECT_EQ(db_cache.get(), nullptr);
         db_cache = cache.GetDb("db1", 7);
-        EXPECT_EQ(db_cache->commit_ts_, 6);
-        EXPECT_EQ(db_cache->is_dropped_, true);
+        EXPECT_EQ(db_cache->commit_ts(), 6);
+        EXPECT_EQ(db_cache->is_dropped(), true);
         db_cache = cache.GetDb("db1", 9);
-        EXPECT_EQ(db_cache->commit_ts_, 8);
-        EXPECT_EQ(db_cache->is_dropped_, false);
+        EXPECT_EQ(db_cache->commit_ts(), 8);
+        EXPECT_EQ(db_cache->is_dropped(), false);
         SizeT size = cache.Size();
         EXPECT_EQ(size, 2);
     }
@@ -85,8 +85,8 @@ TEST_F(MetaCacheTest, test_db) {
         // cache.PrintLRU();
 
         SharedPtr<MetaDbCache> db_cache = cache.GetDb("db1", 7);
-        EXPECT_EQ(db_cache->commit_ts_, 6);
-        EXPECT_EQ(db_cache->is_dropped_, true);
+        EXPECT_EQ(db_cache->commit_ts(), 6);
+        EXPECT_EQ(db_cache->is_dropped(), true);
 
         // cache.PrintLRU();
 
@@ -96,12 +96,12 @@ TEST_F(MetaCacheTest, test_db) {
         // cache.PrintLRU();
 
         db_cache = cache.GetDb("db1", 9);
-        EXPECT_EQ(db_cache->commit_ts_, 6);
-        EXPECT_EQ(db_cache->is_dropped_, true);
+        EXPECT_EQ(db_cache->commit_ts(), 6);
+        EXPECT_EQ(db_cache->is_dropped(), true);
 
         db_cache = cache.GetDb("db2", 11);
-        EXPECT_EQ(db_cache->commit_ts_, 10);
-        EXPECT_EQ(db_cache->is_dropped_, false);
+        EXPECT_EQ(db_cache->commit_ts(), 10);
+        EXPECT_EQ(db_cache->is_dropped(), false);
 
         SizeT size = cache.Size();
         EXPECT_EQ(size, 2);
@@ -116,8 +116,8 @@ TEST_F(MetaCacheTest, test_table) {
         table_cache = cache.GetTable(0, "tbl1", 3);
         EXPECT_EQ(table_cache.get(), nullptr);
         table_cache = cache.GetTable(0, "tbl1", 5);
-        EXPECT_EQ(table_cache->commit_ts_, 4);
-        EXPECT_EQ(table_cache->is_dropped_, false);
+        EXPECT_EQ(table_cache->commit_ts(), 4);
+        EXPECT_EQ(table_cache->is_dropped(), false);
         SizeT size = cache.Size();
         EXPECT_EQ(size, 1);
     }
@@ -127,11 +127,11 @@ TEST_F(MetaCacheTest, test_table) {
         table_cache = cache.GetTable(0, "tbl1", 3);
         EXPECT_EQ(table_cache.get(), nullptr);
         table_cache = cache.GetTable(0, "tbl1", 5);
-        EXPECT_EQ(table_cache->commit_ts_, 4);
-        EXPECT_EQ(table_cache->is_dropped_, false);
+        EXPECT_EQ(table_cache->commit_ts(), 4);
+        EXPECT_EQ(table_cache->is_dropped(), false);
         table_cache = cache.GetTable(0, "tbl1", 7);
-        EXPECT_EQ(table_cache->commit_ts_, 6);
-        EXPECT_EQ(table_cache->is_dropped_, true);
+        EXPECT_EQ(table_cache->commit_ts(), 6);
+        EXPECT_EQ(table_cache->is_dropped(), true);
         SizeT size = cache.Size();
         EXPECT_EQ(size, 2);
     }
@@ -143,11 +143,11 @@ TEST_F(MetaCacheTest, test_table) {
         table_cache = cache.GetTable(0, "tbl1", 5);
         EXPECT_EQ(table_cache.get(), nullptr);
         table_cache = cache.GetTable(0, "tbl1", 7);
-        EXPECT_EQ(table_cache->commit_ts_, 6);
-        EXPECT_EQ(table_cache->is_dropped_, true);
+        EXPECT_EQ(table_cache->commit_ts(), 6);
+        EXPECT_EQ(table_cache->is_dropped(), true);
         table_cache = cache.GetTable(0, "tbl1", 9);
-        EXPECT_EQ(table_cache->commit_ts_, 8);
-        EXPECT_EQ(table_cache->is_dropped_, false);
+        EXPECT_EQ(table_cache->commit_ts(), 8);
+        EXPECT_EQ(table_cache->is_dropped(), false);
         SizeT size = cache.Size();
         EXPECT_EQ(size, 2);
     }
@@ -156,8 +156,8 @@ TEST_F(MetaCacheTest, test_table) {
         // cache.PrintLRU();
 
         SharedPtr<MetaTableCache> table_cache = cache.GetTable(0, "tbl1", 7);
-        EXPECT_EQ(table_cache->commit_ts_, 6);
-        EXPECT_EQ(table_cache->is_dropped_, true);
+        EXPECT_EQ(table_cache->commit_ts(), 6);
+        EXPECT_EQ(table_cache->is_dropped(), true);
 
         // cache.PrintLRU();
 
@@ -167,12 +167,12 @@ TEST_F(MetaCacheTest, test_table) {
         // cache.PrintLRU();
 
         table_cache = cache.GetTable(0, "tbl1", 9);
-        EXPECT_EQ(table_cache->commit_ts_, 6);
-        EXPECT_EQ(table_cache->is_dropped_, true);
+        EXPECT_EQ(table_cache->commit_ts(), 6);
+        EXPECT_EQ(table_cache->is_dropped(), true);
 
         table_cache = cache.GetTable(0, "tbl2", 11);
-        EXPECT_EQ(table_cache->commit_ts_, 10);
-        EXPECT_EQ(table_cache->is_dropped_, false);
+        EXPECT_EQ(table_cache->commit_ts(), 10);
+        EXPECT_EQ(table_cache->is_dropped(), false);
 
         SizeT size = cache.Size();
         EXPECT_EQ(size, 2);
@@ -197,11 +197,11 @@ TEST_F(MetaCacheTest, test_index) {
         index_cache = cache.GetIndex(0, 0, "idx1", 3);
         EXPECT_EQ(index_cache.get(), nullptr);
         index_cache = cache.GetIndex(0, 0, "idx1", 5);
-        EXPECT_EQ(index_cache->commit_ts_, 4);
-        EXPECT_EQ(index_cache->is_dropped_, false);
+        EXPECT_EQ(index_cache->commit_ts(), 4);
+        EXPECT_EQ(index_cache->is_dropped(), false);
         index_cache = cache.GetIndex(0, 0, "idx1", 7);
-        EXPECT_EQ(index_cache->commit_ts_, 6);
-        EXPECT_EQ(index_cache->is_dropped_, true);
+        EXPECT_EQ(index_cache->commit_ts(), 6);
+        EXPECT_EQ(index_cache->is_dropped(), true);
         SizeT size = cache.Size();
         EXPECT_EQ(size, 2);
     }
@@ -213,11 +213,11 @@ TEST_F(MetaCacheTest, test_index) {
         index_cache = cache.GetIndex(0, 0, "idx1", 5);
         EXPECT_EQ(index_cache.get(), nullptr);
         index_cache = cache.GetIndex(0, 0, "idx1", 7);
-        EXPECT_EQ(index_cache->commit_ts_, 6);
-        EXPECT_EQ(index_cache->is_dropped_, true);
+        EXPECT_EQ(index_cache->commit_ts(), 6);
+        EXPECT_EQ(index_cache->is_dropped(), true);
         index_cache = cache.GetIndex(0, 0, "idx1", 9);
-        EXPECT_EQ(index_cache->commit_ts_, 8);
-        EXPECT_EQ(index_cache->is_dropped_, false);
+        EXPECT_EQ(index_cache->commit_ts(), 8);
+        EXPECT_EQ(index_cache->is_dropped(), false);
         SizeT size = cache.Size();
         EXPECT_EQ(size, 2);
     }
@@ -226,8 +226,8 @@ TEST_F(MetaCacheTest, test_index) {
         // cache.PrintLRU();
 
         SharedPtr<MetaIndexCache> index_cache = cache.GetIndex(0, 0, "idx1", 7);
-        EXPECT_EQ(index_cache->commit_ts_, 6);
-        EXPECT_EQ(index_cache->is_dropped_, true);
+        EXPECT_EQ(index_cache->commit_ts(), 6);
+        EXPECT_EQ(index_cache->is_dropped(), true);
 
         // cache.PrintLRU();
 
@@ -237,12 +237,12 @@ TEST_F(MetaCacheTest, test_index) {
         // cache.PrintLRU();
 
         index_cache = cache.GetIndex(0, 0, "idx1", 9);
-        EXPECT_EQ(index_cache->commit_ts_, 6);
-        EXPECT_EQ(index_cache->is_dropped_, true);
+        EXPECT_EQ(index_cache->commit_ts(), 6);
+        EXPECT_EQ(index_cache->is_dropped(), true);
 
         index_cache = cache.GetIndex(0, 0, "idx2", 11);
-        EXPECT_EQ(index_cache->commit_ts_, 10);
-        EXPECT_EQ(index_cache->is_dropped_, false);
+        EXPECT_EQ(index_cache->commit_ts(), 10);
+        EXPECT_EQ(index_cache->is_dropped(), false);
 
         SizeT size = cache.Size();
         EXPECT_EQ(size, 2);
@@ -257,8 +257,8 @@ TEST_F(MetaCacheTest, test_mix) {
         db_cache = cache.GetDb("db1", 3);
         EXPECT_EQ(db_cache.get(), nullptr);
         db_cache = cache.GetDb("db1", 5);
-        EXPECT_EQ(db_cache->commit_ts_, 4);
-        EXPECT_EQ(db_cache->is_dropped_, false);
+        EXPECT_EQ(db_cache->commit_ts(), 4);
+        EXPECT_EQ(db_cache->is_dropped(), false);
         SizeT size = cache.Size();
         EXPECT_EQ(size, 1);
     }
@@ -268,11 +268,11 @@ TEST_F(MetaCacheTest, test_mix) {
         SharedPtr<MetaDbCache> db_cache = cache.GetDb("db1", 3);
         EXPECT_EQ(db_cache.get(), nullptr);
         db_cache = cache.GetDb("db1", 5);
-        EXPECT_EQ(db_cache->commit_ts_, 4);
+        EXPECT_EQ(db_cache->commit_ts(), 4);
 
         table_cache = cache.GetTable(0, "tbl1", 7);
-        EXPECT_EQ(table_cache->commit_ts_, 6);
-        EXPECT_EQ(table_cache->is_dropped_, true);
+        EXPECT_EQ(table_cache->commit_ts(), 6);
+        EXPECT_EQ(table_cache->is_dropped(), true);
         SizeT size = cache.Size();
         EXPECT_EQ(size, 2);
     }
@@ -285,12 +285,12 @@ TEST_F(MetaCacheTest, test_mix) {
         EXPECT_EQ(db_cache.get(), nullptr);
 
         SharedPtr<MetaTableCache> table_cache = cache.GetTable(0, "tbl1", 7);
-        EXPECT_EQ(table_cache->commit_ts_, 6);
-        EXPECT_EQ(table_cache->is_dropped_, true);
+        EXPECT_EQ(table_cache->commit_ts(), 6);
+        EXPECT_EQ(table_cache->is_dropped(), true);
 
         index_cache = cache.GetIndex(0, 0, "idx1", 9);
-        EXPECT_EQ(index_cache->commit_ts_, 8);
-        EXPECT_EQ(index_cache->is_dropped_, false);
+        EXPECT_EQ(index_cache->commit_ts(), 8);
+        EXPECT_EQ(index_cache->is_dropped(), false);
         SizeT size = cache.Size();
         EXPECT_EQ(size, 2);
     }
@@ -302,8 +302,8 @@ TEST_F(MetaCacheTest, test_erase) {
         SharedPtr<MetaDbCache> db_cache = MakeShared<MetaDbCache>("db1", 0, 4, "catalog|db|db1|4", false);
         cache.PutOrErase({db_cache}, nullptr);
         db_cache = cache.GetDb("db1", 5);
-        EXPECT_EQ(db_cache->commit_ts_, 4);
-        EXPECT_EQ(db_cache->is_dropped_, false);
+        EXPECT_EQ(db_cache->commit_ts(), 4);
+        EXPECT_EQ(db_cache->is_dropped(), false);
         SizeT size = cache.Size();
         EXPECT_EQ(size, 1);
     }
@@ -311,8 +311,8 @@ TEST_F(MetaCacheTest, test_erase) {
         SharedPtr<MetaTableCache> table_cache = MakeShared<MetaTableCache>(0, "tbl1", 0, 6, "catalog|tbl|0|tbl1|6", true);
         cache.PutOrErase({table_cache}, nullptr);
         table_cache = cache.GetTable(0, "tbl1", 7);
-        EXPECT_EQ(table_cache->commit_ts_, 6);
-        EXPECT_EQ(table_cache->is_dropped_, true);
+        EXPECT_EQ(table_cache->commit_ts(), 6);
+        EXPECT_EQ(table_cache->is_dropped(), true);
         SizeT size = cache.Size();
         EXPECT_EQ(size, 2);
     }
@@ -320,8 +320,8 @@ TEST_F(MetaCacheTest, test_erase) {
         SharedPtr<MetaIndexCache> index_cache = MakeShared<MetaIndexCache>(0, 0, "idx1", 0, 8, "catalog|idx|0|0|idx1|8", false);
         cache.PutOrErase({index_cache}, nullptr);
         index_cache = cache.GetIndex(0, 0, "idx1", 9);
-        EXPECT_EQ(index_cache->commit_ts_, 8);
-        EXPECT_EQ(index_cache->is_dropped_, false);
+        EXPECT_EQ(index_cache->commit_ts(), 8);
+        EXPECT_EQ(index_cache->is_dropped(), false);
         SizeT size = cache.Size();
         EXPECT_EQ(size, 3);
     }

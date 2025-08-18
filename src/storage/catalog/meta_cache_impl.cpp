@@ -27,37 +27,70 @@ import :kv_store;
 
 namespace infinity {
 
-String MetaDbCache::name() { return db_name_; }
-u64 MetaDbCache::commit_ts() { return commit_ts_; }
-String MetaDbCache::type() { return "Database"; }
-String MetaDbCache::detail() {
-    if (is_dropped_) {
-        return "dropped";
-    } else {
-        return "created";
+String ToString(MetaCacheType type) {
+    switch (type) {
+        case MetaCacheType::kCreateDB: {
+            return "database";
+        }
+        case MetaCacheType::kCreateTable: {
+            return "table";
+        }
+        case MetaCacheType::kCreateIndex: {
+            return "index";
+        }
+        default: {
+            UnrecoverableError("Invalid meta type");
+        }
     }
+    return String();
 }
 
-String MetaTableCache::name() { return table_name_; }
-u64 MetaTableCache::commit_ts() { return commit_ts_; }
-String MetaTableCache::type() { return "Table"; }
-String MetaTableCache::detail() {
+MetaCacheType MetaBaseCache::type() const {
+    std::unique_lock lock(mtx_);
+    return type_;
+}
+
+String MetaDbCache::name() const { return db_name_; }
+u64 MetaDbCache::db_id() const { return db_id_; }
+const String &MetaDbCache::db_key() const { return db_key_; }
+u64 MetaDbCache::commit_ts() const { return commit_ts_; }
+String MetaDbCache::detail() const {
+    String extend = is_dropped_ ? "dropped" : "created";
+    return fmt::format("db_name: {}, db_id: {}, {}", db_name_, db_id_, extend);
+}
+bool MetaDbCache::is_dropped() const { return is_dropped_; }
+void MetaDbCache::set_comment(const SharedPtr<String> &comment) {
+    get_comment_ = true;
+    comment_ = comment;
+}
+bool MetaDbCache::get_comment() const { return get_comment_; }
+SharedPtr<String> MetaDbCache::comment() const { return comment_; }
+
+String MetaTableCache::name() const { return table_name_; }
+u64 MetaTableCache::db_id() const { return db_id_; }
+u64 MetaTableCache::table_id() const { return table_id_; }
+const String &MetaTableCache::table_key() const { return table_key_; }
+u64 MetaTableCache::commit_ts() const { return commit_ts_; }
+String MetaTableCache::detail() const {
     String extend = is_dropped_ ? "dropped" : "created";
     return fmt::format("db_id: {}, table_name: {}, table_id: {}, {}", db_id_, table_name_, table_id_, extend);
 }
+bool MetaTableCache::is_dropped() const { return is_dropped_; }
 
-String MetaIndexCache::name() { return index_name_; }
-u64 MetaIndexCache::commit_ts() { return commit_ts_; }
-String MetaIndexCache::type() { return "Index"; }
-String MetaIndexCache::detail() {
+String MetaIndexCache::name() const { return index_name_; }
+u64 MetaIndexCache::db_id() const { return db_id_; }
+u64 MetaIndexCache::table_id() const { return table_id_; }
+u64 MetaIndexCache::commit_ts() const { return commit_ts_; }
+String MetaIndexCache::detail() const {
     String extend = is_dropped_ ? "dropped" : "created";
     return fmt::format("db_id: {}, table_id: {}, index_name: {}, index_id: {}, {}", db_id_, table_id_, table_id_, index_name_, index_id_, extend);
 }
+bool MetaIndexCache::is_dropped() const { return is_dropped_; }
 
 void MetaCache::Put(const Vector<SharedPtr<MetaBaseCache>> &cache_items) {
     std::unique_lock lock(cache_mtx_);
     for (const auto &cache_item : cache_items) {
-        switch (cache_item->type_) {
+        switch (cache_item->type()) {
             case MetaCacheType::kCreateDB: {
                 SharedPtr<MetaDbCache> db_cache = std::static_pointer_cast<MetaDbCache>(cache_item);
                 PutDbNolock(db_cache);
@@ -124,7 +157,7 @@ Status MetaCache::PutOrErase(const Vector<SharedPtr<MetaBaseCache>> &cache_items
 }
 
 void MetaCache::PutOrEraseNolock(const SharedPtr<MetaBaseCache> &meta_base_cache) {
-    switch (meta_base_cache->type_) {
+    switch (meta_base_cache->type()) {
         case MetaCacheType::kCreateDB: {
             SharedPtr<MetaDbCache> db_cache = std::static_pointer_cast<MetaDbCache>(meta_base_cache);
             PutDbNolock(db_cache);
@@ -147,8 +180,8 @@ void MetaCache::PutOrEraseNolock(const SharedPtr<MetaBaseCache> &meta_base_cache
 }
 
 void MetaCache::PutDbNolock(const SharedPtr<MetaDbCache> &db_cache) {
-    String name = KeyEncode::CatalogDbPrefix(db_cache->db_name_);
-    TxnTimeStamp commit_ts = db_cache->commit_ts_;
+    String name = KeyEncode::CatalogDbPrefix(db_cache->name());
+    TxnTimeStamp commit_ts = db_cache->commit_ts();
 
     auto iter = dbs_.find(name);
     if (iter != dbs_.end()) {
@@ -191,10 +224,10 @@ void MetaCache::EraseDbNolock(const String &db_name) {
 }
 
 void MetaCache::PutTableNolock(const SharedPtr<MetaTableCache> &table_cache) {
-    const String &table_name = table_cache->table_name_;
-    u64 db_id = table_cache->db_id_;
+    const String &table_name = table_cache->name();
+    u64 db_id = table_cache->db_id();
     String name = KeyEncode::CatalogTablePrefix(std::to_string(db_id), table_name);
-    TxnTimeStamp commit_ts = table_cache->commit_ts_;
+    TxnTimeStamp commit_ts = table_cache->commit_ts();
 
     auto iter = tables_.find(name);
     if (iter != tables_.end()) {
@@ -239,11 +272,11 @@ void MetaCache::EraseTableNolock(u64 db_id, const String &table_name) {
 }
 
 void MetaCache::PutIndexNolock(const SharedPtr<MetaIndexCache> &index_cache) {
-    const String &index_name = index_cache->index_name_;
-    u64 db_id = index_cache->db_id_;
-    u64 table_id = index_cache->table_id_;
+    const String &index_name = index_cache->name();
+    u64 db_id = index_cache->db_id();
+    u64 table_id = index_cache->table_id();
     String name = KeyEncode::CatalogIndexPrefix(std::to_string(db_id), std::to_string(table_id), index_name);
-    TxnTimeStamp commit_ts = index_cache->commit_ts_;
+    TxnTimeStamp commit_ts = index_cache->commit_ts();
 
     auto iter = indexes_.find(name);
     if (iter != indexes_.end()) {
@@ -290,20 +323,20 @@ void MetaCache::PrintLRU() const {
     std::unique_lock lock(cache_mtx_);
     for (const auto &item : lru_) {
         TxnTimeStamp commit_ts = 0;
-        switch (item.meta_cache_->type_) {
+        switch (item.meta_cache_->type()) {
             case MetaCacheType::kCreateDB: {
                 MetaDbCache *db_cache = static_cast<MetaDbCache *>(item.meta_cache_.get());
-                commit_ts = db_cache->commit_ts_;
+                commit_ts = db_cache->commit_ts();
                 break;
             }
             case MetaCacheType::kCreateTable: {
                 MetaTableCache *table_cache = static_cast<MetaTableCache *>(item.meta_cache_.get());
-                commit_ts = table_cache->commit_ts_;
+                commit_ts = table_cache->commit_ts();
                 break;
             }
             case MetaCacheType::kCreateIndex: {
                 MetaIndexCache *index_cache = static_cast<MetaIndexCache *>(item.meta_cache_.get());
-                commit_ts = index_cache->commit_ts_;
+                commit_ts = index_cache->commit_ts();
                 break;
             }
             default: {
@@ -317,12 +350,12 @@ void MetaCache::PrintLRU() const {
 void MetaCache::TrimCacheNolock() {
     while (lru_.size() > capacity_) {
         CacheItem &item = lru_.back();
-        switch (item.meta_cache_->type_) {
+        switch (item.meta_cache_->type()) {
             case MetaCacheType::kCreateDB: {
                 MetaDbCache *db_cache = static_cast<MetaDbCache *>(item.meta_cache_.get());
                 auto iter = dbs_.find(item.name_);
                 if (iter != dbs_.end()) {
-                    iter->second.erase(db_cache->commit_ts_);
+                    iter->second.erase(db_cache->commit_ts());
                 }
                 break;
             }
@@ -330,7 +363,7 @@ void MetaCache::TrimCacheNolock() {
                 MetaTableCache *table_cache = static_cast<MetaTableCache *>(item.meta_cache_.get());
                 auto iter = tables_.find(item.name_);
                 if (iter != tables_.end()) {
-                    iter->second.erase(table_cache->commit_ts_);
+                    iter->second.erase(table_cache->commit_ts());
                 }
                 break;
             }
@@ -338,7 +371,7 @@ void MetaCache::TrimCacheNolock() {
                 MetaIndexCache *index_cache = static_cast<MetaIndexCache *>(item.meta_cache_.get());
                 auto iter = indexes_.find(item.name_);
                 if (iter != indexes_.end()) {
-                    iter->second.erase(index_cache->commit_ts_);
+                    iter->second.erase(index_cache->commit_ts());
                 }
                 break;
             }
@@ -360,12 +393,12 @@ Vector<SharedPtr<MetaBaseCache>> MetaCache::GetAllCacheItems() const {
     std::unique_lock lock(cache_mtx_);
     result.reserve(lru_.size());
     for (const auto &item : lru_) {
-        switch (item.meta_cache_->type_) {
+        switch (item.meta_cache_->type()) {
             case MetaCacheType::kCreateDB: {
                 MetaDbCache *db_cache = static_cast<MetaDbCache *>(item.meta_cache_.get());
                 auto iter = dbs_.find(item.name_);
                 if (iter != dbs_.end()) {
-                    if (iter->second.contains(db_cache->commit_ts_)) {
+                    if (iter->second.contains(db_cache->commit_ts())) {
                         result.push_back(item.meta_cache_);
                     }
                 }
@@ -375,7 +408,7 @@ Vector<SharedPtr<MetaBaseCache>> MetaCache::GetAllCacheItems() const {
                 MetaTableCache *table_cache = static_cast<MetaTableCache *>(item.meta_cache_.get());
                 auto iter = tables_.find(item.name_);
                 if (iter != tables_.end()) {
-                    if (iter->second.contains(table_cache->commit_ts_)) {
+                    if (iter->second.contains(table_cache->commit_ts())) {
                         result.push_back(item.meta_cache_);
                     }
                 }
@@ -385,7 +418,7 @@ Vector<SharedPtr<MetaBaseCache>> MetaCache::GetAllCacheItems() const {
                 MetaIndexCache *index_cache = static_cast<MetaIndexCache *>(item.meta_cache_.get());
                 auto iter = indexes_.find(item.name_);
                 if (iter != tables_.end()) {
-                    if (iter->second.contains(index_cache->commit_ts_)) {
+                    if (iter->second.contains(index_cache->commit_ts())) {
                         result.push_back(item.meta_cache_);
                     }
                 }
