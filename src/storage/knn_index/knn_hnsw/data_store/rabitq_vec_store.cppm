@@ -130,12 +130,13 @@ public:
     constexpr static SizeT max_bucket_idx_ = std::numeric_limits<AlignType>::max() - std::numeric_limits<AlignType>::min(); // 255 for i8
 
 public:
-    RabitqVecStoreMetaBase() : align_dim_(0), compress_data_size_(0) {}
+    RabitqVecStoreMetaBase() : dim_(0), align_dim_(0), compress_data_size_(0) {}
     RabitqVecStoreMetaBase(This &&other)
-        : align_dim_(std::exchange(other.align_dim_, 0)), compress_data_size_(std::exchange(other.compress_data_size_, 0)),
-          rom_(std::exchange(other.rom_)) {}
+        : dim_(std::exchange(other.dim_, 0)), align_dim_(std::exchange(other.align_dim_, 0)),
+          compress_data_size_(std::exchange(other.compress_data_size_, 0)), rom_(std::move(other.rom_)) {}
     RabitqVecStoreMetaBase &operator=(This &&other) {
         if (this != &other) {
+            dim_ = std::exchange(other.dim_, 0);
             align_dim_ = std::exchange(other.align_dim_, 0);
             compress_data_size_ = std::exchange(other.compress_data_size_, 0);
             rom_ = std::move(other.rom_);
@@ -144,8 +145,8 @@ public:
     }
 
     void Save(LocalFileHandle &file_handle) const {
-        file_handle.Append(&align_dim_, sizeof(align_dim_));
-        file_handle.Append(rom_.get(), sizeof(MeanType) * align_dim_ * align_dim_);
+        file_handle.Append(&dim_, sizeof(dim_));
+        file_handle.Append(rom_.get(), sizeof(DataType) * align_dim_ * align_dim_);
     }
 
     QueryType MakeQuery(const DataType *vec) const {
@@ -159,24 +160,25 @@ public:
     void CompressToQuery(const DataType *src, QueryData *dest) const { UnrecoverableError("Not implemented"); }
 
     void Dump(std::ostream &os) const {
-        os << "[CONST] dim: " << align_dim_ << ", compress_data_size: " << compress_data_size_ << std::endl;
-        os << "rom: " << std::endl;
-        for (SizeT i = 0; i < align_dim_; ++i) {
-            for (SizeT j = 0; j < align_dim_; ++j) {
-                os << rom_[i * align_dim_ + j] << " ";
-            }
-            os << std::endl;
-        }
+        os << fmt::format("[CONST] dim: {}, align_dim: {}, compress_data_size: {}, rom: ({}, {})",
+                          dim_,
+                          align_dim_,
+                          compress_data_size_,
+                          align_dim_,
+                          align_dim_)
+           << std::endl;
     }
 
 public:
-    SizeT GetSizeInBytes() const { return sizeof(align_dim_); }
+    SizeT GetSizeInBytes() const { return sizeof(dim_) + align_dim_ * align_dim_ * sizeof(DataType); }
     SizeT GetVecSizeInBytes() const { return compress_data_size_; }
-    SizeT dim() const { return align_dim_; }
+    SizeT dim() const { return dim_; }
+    SizeT align_dim() const { return align_dim_; }
     SizeT compress_data_size() const { return compress_data_size_; }
     DataType *rom() const { return rom_.get(); }
 
 protected:
+    SizeT dim_;
     SizeT align_dim_;
     SizeT compress_data_size_;
     ArrayPtr<DataType, OwnMem> rom_; // Random orthogonal matrix
@@ -193,6 +195,7 @@ public:
 
 private:
     RabitqVecStoreMeta(SizeT dim) {
+        this->dim_ = dim;
         SizeT align_dim = AlignUp(dim, Base::align_size_);
         this->align_dim_ = align_dim;
         this->compress_data_size_ = sizeof(StoreData) + align_dim / 8;
@@ -207,12 +210,19 @@ public:
     static This Load(LocalFileHandle &file_handle) {
         SizeT dim;
         file_handle.Read(&dim, sizeof(dim));
-        return This(dim);
+        This meta(dim);
+        SizeT align_dim = meta.align_dim();
+        file_handle.Read(meta.rom(), align_dim * align_dim * sizeof(DataType));
+        return meta;
     }
 
     static This LoadFromPtr(const char *&ptr) {
         SizeT dim = ReadBufAdv<SizeT>(ptr);
-        return This(dim);
+        This meta(dim);
+        SizeT align_dim = meta.align_dim();
+        std::memcpy(meta.rom(), ptr, align_dim * align_dim * sizeof(DataType));
+        ptr += align_dim * align_dim * sizeof(DataType);
+        return meta;
     }
 
     template <typename LabelType, DataIteratorConcept<const DataType *, LabelType> Iterator>
@@ -230,12 +240,12 @@ public:
     using AlignType = typename Base::AlignType;
 
 private:
-    RabitqVecStoreMeta(SizeT dim) {
+    RabitqVecStoreMeta(SizeT dim, DataType *rom) {
+        this->dim_ = dim;
         SizeT align_dim = AlignUp(dim, Base::align_size_);
         this->align_dim_ = align_dim;
         this->compress_data_size_ = sizeof(StoreData) + align_dim / 8;
-        this->rom_ = MakeUnique<DataType[]>(align_dim * align_dim);
-        GenerateRandomOrthogonalMatrix<DataType>(this->rom_.get(), align_dim);
+        this->rom_ = rom;
     }
 
 public:
@@ -243,7 +253,10 @@ public:
 
     static This LoadFromPtr(const char *&ptr) {
         SizeT dim = ReadBufAdv<SizeT>(ptr);
-        return This(dim);
+        SizeT align_dim = AlignUp(dim, Base::align_size_);
+        auto *rom = reinterpret_cast<DataType *>(const_cast<char *>(ptr));
+        ptr += align_dim * align_dim * sizeof(DataType);
+        return This(dim, rom);
     }
 };
 

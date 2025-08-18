@@ -83,6 +83,7 @@ public:
 TEST_F(RabitqTest, test_base) {
     using namespace infinity;
 
+    String filepath = file_dir_ + "/test_rabitq.bin";
     auto data = std::make_unique<float[]>(dim_ * vec_n_);
     std::default_random_engine rng;
     std::uniform_real_distribution<float> distrib_real(100, 200);
@@ -91,21 +92,65 @@ TEST_F(RabitqTest, test_base) {
     }
     LOG_INFO(fmt::format("vec: {:.2f}, {:.2f}, {:.2f}, ...", data[0], data[1], data[2]));
 
+    // test rom
+    SizeT write_mem = 0;
     {
         using RabitqVecStoreMeta = RabitqVecStoreMeta<DataType, true>;
         using RabitqVecStoreInner = RabitqVecStoreInner<DataType, true>;
 
         for (int i = 0; i < 20; ++i) {
             RabitqVecStoreMeta meta = RabitqVecStoreMeta::Make(dim_);
-            bool is_rom = CheckOrthogonalMatrix(meta.rom(), meta.dim());
+            bool is_rom = CheckOrthogonalMatrix(meta.rom(), meta.align_dim());
             ASSERT_EQ(is_rom, true);
             LOG_INFO(fmt::format("check rom: i {}", i));
         }
 
         RabitqVecStoreMeta meta = RabitqVecStoreMeta::Make(dim_);
-        LOG_INFO(fmt::format("meta: dim {}, compress_data_size {} bit", meta.dim(), meta.compress_data_size() * 8));
+        meta.Dump(std::cout);
+        RabitqVecStoreInner inner = RabitqVecStoreInner::Make(vec_n_, meta, write_mem);
+        LOG_INFO(fmt::format("inner: mem_usage {}", write_mem));
+
+        auto [file_handle, status] = VirtualStore::Open(filepath, FileAccessMode::kWrite);
+        if (!status.ok()) {
+            UnrecoverableError(status.message());
+        }
+        meta.Save(*file_handle);
+        inner.Save(*file_handle, vec_n_, meta);
+    }
+
+    // load to memory
+    {
+        using RabitqVecStoreMeta = RabitqVecStoreMeta<DataType, true>;
+        using RabitqVecStoreInner = RabitqVecStoreInner<DataType, true>;
+
+        auto [file_handle, status] = VirtualStore::Open(filepath, FileAccessMode::kRead);
+        if (!status.ok()) {
+            UnrecoverableError(status.message());
+        }
+
+        RabitqVecStoreMeta meta = RabitqVecStoreMeta::Load(*file_handle);
+        meta.Dump(std::cout);
         SizeT mem_usage = 0;
-        RabitqVecStoreInner inner = RabitqVecStoreInner::Make(vec_n_, meta, mem_usage);
-        LOG_INFO(fmt::format("inner: mem_usage {}", mem_usage));
+        RabitqVecStoreInner inner = RabitqVecStoreInner::Load(*file_handle, 0, vec_n_, meta, mem_usage);
+        ASSERT_EQ(mem_usage, write_mem);
+    }
+
+    // load to mmap
+    {
+        using RabitqVecStoreMeta = RabitqVecStoreMeta<DataType, false>;
+        using RabitqVecStoreInner = RabitqVecStoreInner<DataType, false>;
+
+        unsigned char *data_ptr = nullptr;
+        SizeT file_size = VirtualStore::GetFileSize(filepath);
+        int ret = VirtualStore::MmapFile(filepath, data_ptr, file_size);
+        if (ret < 0) {
+            UnrecoverableError("mmap failed");
+        }
+        const char *ptr = reinterpret_cast<const char *>(data_ptr);
+
+        RabitqVecStoreMeta meta = RabitqVecStoreMeta::LoadFromPtr(ptr);
+        meta.Dump(std::cout);
+        RabitqVecStoreInner inner = RabitqVecStoreInner::LoadFromPtr(ptr, 0, meta);
+        ASSERT_EQ(inner.GetSizeInBytes(vec_n_, meta), write_mem);
     }
 }
