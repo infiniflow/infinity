@@ -94,6 +94,9 @@ jobs:
           cmake-build-reldeb/infinity-*.rpm
           cmake-build-reldeb/infinity-*.tar.gz
 
+    - name: Purge binary packages
+      run: sudo rm -rf cmake-build-reldeb/infinity-*.deb cmake-build-reldeb/infinity-*.rpm cmake-build-reldeb/infinity-*.tar.gz
+
     - name: Set up QEMU
       uses: docker/setup-qemu-action@v3
 
