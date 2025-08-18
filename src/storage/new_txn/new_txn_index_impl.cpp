@@ -699,7 +699,8 @@ Status NewTxn::AppendIndex(TableIndexMeeta &table_index_meta, const Pair<RowID, 
     auto append_in_column = [&]() {
         ColumnVector col;
         {
-            Status status = NewCatalog::GetColumnVector(*column_meta, cur_offset + cur_row_cnt, ColumnVectorMode::kReadOnly, col);
+            Status status =
+                NewCatalog::GetColumnVector(*column_meta, column_meta->get_column_def(), cur_offset + cur_row_cnt, ColumnVectorMode::kReadOnly, col);
             if (!status.ok()) {
                 return status;
             }
@@ -1209,7 +1210,7 @@ Status NewTxn::PopulateIndexToMem(SegmentIndexMeta &segment_index_meta, SegmentM
         SizeT row_cnt = block_id == block_ids->back() ? segment_row_cnt - block_capacity * (block_ids->size() - 1) : block_capacity;
 
         ColumnVector col;
-        status = NewCatalog::GetColumnVector(column_meta, row_cnt, ColumnVectorMode::kReadOnly, col);
+        status = NewCatalog::GetColumnVector(column_meta, column_meta.get_column_def(), row_cnt, ColumnVectorMode::kReadOnly, col);
         if (!status.ok()) {
             return status;
         }
@@ -1260,7 +1261,7 @@ Status NewTxn::PopulateFtIndexInner(SharedPtr<IndexBase> index_base,
         SizeT row_cnt = block_id == block_ids_ptr->back() ? segment_row_cnt - block_capacity * (block_ids_ptr->size() - 1) : block_capacity;
 
         ColumnVector col;
-        status = NewCatalog::GetColumnVector(column_meta, row_cnt, ColumnVectorMode::kReadOnly, col);
+        status = NewCatalog::GetColumnVector(column_meta, column_meta.get_column_def(), row_cnt, ColumnVectorMode::kReadOnly, col);
         if (!status.ok()) {
             return status;
         }
@@ -1492,7 +1493,7 @@ Status NewTxn::OptimizeVecIndex(SharedPtr<IndexBase> index_base,
             SizeT row_cnt = std::min(block_row_cnt, SizeT(total_row_cnt));
             total_row_cnt -= row_cnt;
             ColumnVector col;
-            status = NewCatalog::GetColumnVector(column_meta, row_cnt, ColumnVectorMode::kReadOnly, col);
+            status = NewCatalog::GetColumnVector(column_meta, column_meta.get_column_def(), row_cnt, ColumnVectorMode::kReadOnly, col);
             if (!status.ok()) {
                 return status;
             }
@@ -1516,7 +1517,7 @@ Status NewTxn::OptimizeVecIndex(SharedPtr<IndexBase> index_base,
             SizeT row_cnt = std::min(block_row_cnt, SizeT(total_row_cnt));
             total_row_cnt -= row_cnt;
             ColumnVector col;
-            status = NewCatalog::GetColumnVector(column_meta, row_cnt, ColumnVectorMode::kReadOnly, col);
+            status = NewCatalog::GetColumnVector(column_meta, column_meta.get_column_def(), row_cnt, ColumnVectorMode::kReadOnly, col);
             if (!status.ok()) {
                 return status;
             }

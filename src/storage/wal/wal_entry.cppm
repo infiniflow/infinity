@@ -1080,10 +1080,11 @@ export struct WalCmdAddColumnsV2 : public WalCmd {
                        const String &db_id,
                        const String &table_name,
                        const String &table_id,
+                       const Vector<u32> &column_idx_list,
                        const Vector<SharedPtr<ColumnDef>> &column_defs,
                        const String &table_key)
         : WalCmd(WalCommandType::ADD_COLUMNS_V2), db_name_(db_name), db_id_(db_id), table_name_(table_name), table_id_(table_id),
-          column_defs_(column_defs), table_key_(table_key) {}
+          column_idx_list_(column_idx_list), column_defs_(column_defs), table_key_(table_key) {}
     ~WalCmdAddColumnsV2() override = default;
 
     bool operator==(const WalCmd &other) const final;
@@ -1097,9 +1098,10 @@ export struct WalCmdAddColumnsV2 : public WalCmd {
     String db_id_{};
     String table_name_{};
     String table_id_{};
+    Vector<u32> column_idx_list_{};
     Vector<SharedPtr<ColumnDef>> column_defs_{};
 
-    // Redudant but usefule commit phase.
+    // Redundant but usefule commit phase.
     String table_key_{};
 };
 

@@ -380,6 +380,7 @@ TEST_F(WalEntryTest, ReadWriteV2) {
         entry->cmds_.push_back(MakeShared<WalCmdRenameTableV2>("db1", "1", "tbl1", "2", "tbl2", "old_table_key"));
     }
     {
+        Vector<u32> column_idx_list;
         Vector<SharedPtr<ColumnDef>> column_defs;
         std::set<ConstraintType> constraints;
 
@@ -390,7 +391,11 @@ TEST_F(WalEntryTest, ReadWriteV2) {
 
         column_defs.push_back(column_def3);
         column_defs.push_back(column_def4);
-        entry->cmds_.push_back(MakeShared<WalCmdAddColumnsV2>("db1", "1", "tbl1", "2", std::move(column_defs), "table_key"));
+
+        column_idx_list.push_back(3);
+        column_idx_list.push_back(4);
+        entry->cmds_.push_back(
+            MakeShared<WalCmdAddColumnsV2>("db1", "1", "tbl1", "2", std::move(column_idx_list), std::move(column_defs), "table_key"));
     }
     {
         Vector<String> column_names;

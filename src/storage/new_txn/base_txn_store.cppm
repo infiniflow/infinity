@@ -376,6 +376,7 @@ export struct AddColumnsTxnStore final : public BaseTxnStore {
     u64 db_id_{};
     u64 table_id_{};
 
+    Vector<u32> column_idx_list_{};
     Vector<SharedPtr<ColumnDef>> column_defs_{};
     String table_key_{};
 

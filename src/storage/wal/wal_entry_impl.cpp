@@ -874,14 +874,20 @@ SharedPtr<WalCmd> WalCmd::ReadAdv(const char *&ptr, i32 max_bytes) {
             String db_id = ReadBufAdv<String>(ptr);
             String table_name = ReadBufAdv<String>(ptr);
             String table_id = ReadBufAdv<String>(ptr);
+            i32 column_idx_n = ReadBufAdv<i32>(ptr);
+            Vector<u32> column_idx_list;
+            for (i32 i = 0; i < column_idx_n; ++i) {
+                u32 column_idx = ReadBufAdv<u32>(ptr);
+                column_idx_list.push_back(column_idx);
+            }
             i32 column_n = ReadBufAdv<i32>(ptr);
-            Vector<SharedPtr<ColumnDef>> columns;
+            Vector<SharedPtr<ColumnDef>> column_defs;
             for (i32 i = 0; i < column_n; i++) {
                 auto cd = ColumnDef::ReadAdv(ptr, max_bytes);
-                columns.push_back(cd);
+                column_defs.push_back(cd);
             }
             String table_key = ReadBufAdv<String>(ptr);
-            cmd = MakeShared<WalCmdAddColumnsV2>(db_name, db_id, table_name, table_id, columns, table_key);
+            cmd = MakeShared<WalCmdAddColumnsV2>(db_name, db_id, table_name, table_id, column_idx_list, column_defs, table_key);
             break;
         }
         case WalCommandType::DROP_COLUMNS: {
@@ -1362,7 +1368,8 @@ bool WalCmdAddColumns::operator==(const WalCmd &other) const {
 bool WalCmdAddColumnsV2::operator==(const WalCmd &other) const {
     auto other_cmd = dynamic_cast<const WalCmdAddColumnsV2 *>(&other);
     bool res = other_cmd != nullptr && db_name_ == other_cmd->db_name_ && db_id_ == other_cmd->db_id_ && table_name_ == other_cmd->table_name_ &&
-               table_id_ == other_cmd->table_id_ && column_defs_.size() == other_cmd->column_defs_.size() && table_key_ == other_cmd->table_key_;
+               table_id_ == other_cmd->table_id_ && column_idx_list_ == other_cmd->column_idx_list_ &&
+               column_defs_.size() == other_cmd->column_defs_.size() && table_key_ == other_cmd->table_key_;
     if (!res) {
         return false;
     }
@@ -1668,7 +1675,11 @@ i32 WalCmdAddColumns::GetSizeInBytes() const {
 
 i32 WalCmdAddColumnsV2::GetSizeInBytes() const {
     SizeT res = sizeof(WalCommandType) + sizeof(i32) + db_name_.size() + sizeof(i32) + db_id_.size() + sizeof(i32) + table_name_.size() +
-                sizeof(i32) + table_id_.size() + sizeof(i32);
+                sizeof(i32) + table_id_.size();
+    res += sizeof(i32); // size of column_idx_list
+    res += column_idx_list_.size() * sizeof(u32);
+
+    res += sizeof(i32); // size of column_defs
     for (const auto &column_def : column_defs_) {
         res += column_def->GetSizeInBytes();
     }
@@ -2166,6 +2177,10 @@ void WalCmdAddColumnsV2::WriteAdv(char *&buf) const {
     WriteBufAdv(buf, this->db_id_);
     WriteBufAdv(buf, this->table_name_);
     WriteBufAdv(buf, this->table_id_);
+    WriteBufAdv(buf, static_cast<i32>(this->column_idx_list_.size()));
+    for (u32 column_idx : column_idx_list_) {
+        WriteBufAdv(buf, column_idx);
+    }
     WriteBufAdv(buf, static_cast<i32>(this->column_defs_.size()));
     for (const auto &column_def : column_defs_) {
         column_def->WriteAdv(buf);
@@ -2608,6 +2623,11 @@ String WalCmdAddColumnsV2::ToString() const {
     ss << "db id: " << db_id_ << std::endl;
     ss << "table name: " << table_name_ << std::endl;
     ss << "table id: " << table_id_ << std::endl;
+    ss << "column index: ";
+    for (u32 column_idx : column_idx_list_) {
+        ss << column_idx << " | ";
+    }
+    ss << std::endl;
     ss << "columns: ";
     for (auto &column_def : column_defs_) {
         ss << column_def->ToString() << " | ";

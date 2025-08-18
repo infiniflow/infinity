@@ -571,7 +571,7 @@ TEST_F(BufferObjTest, test_big_with_gc_and_cleanup) {
                 ColumnMeta column_meta(column_idx, block_meta);
                 ColumnVector col;
 
-                status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorMode::kReadOnly, col);
+                status = NewCatalog::GetColumnVector(column_meta, column_meta.get_column_def(), row_count, ColumnVectorMode::kReadOnly, col);
                 EXPECT_TRUE(status.ok());
 
                 for (SizeT row_id = 0; row_id < kImportSize; ++row_id) {
@@ -703,7 +703,7 @@ TEST_F(BufferObjTest, DISABLED_test_multiple_threads_read) {
                     ColumnMeta column_meta(column_idx, block_meta);
                     ColumnVector col;
 
-                    status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorMode::kReadOnly, col);
+                    status = NewCatalog::GetColumnVector(column_meta, column_meta.get_column_def(), row_count, ColumnVectorMode::kReadOnly, col);
                     EXPECT_TRUE(status.ok());
 
                     for (SizeT row_id = 0; row_id < kImportSize; ++row_id) {

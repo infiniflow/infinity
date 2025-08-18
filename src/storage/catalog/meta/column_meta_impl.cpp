@@ -41,6 +41,12 @@ namespace infinity {
 ColumnMeta::ColumnMeta(SizeT column_idx, BlockMeta &block_meta)
     : kv_instance_(block_meta.kv_instance()), block_meta_(block_meta), column_idx_(column_idx) {}
 
+SharedPtr<ColumnDef> ColumnMeta::get_column_def() const {
+    auto [column_defs_ptr, status] = block_meta_.segment_meta().table_meta().GetColumnDefs();
+    SharedPtr<ColumnDef> &column_def = column_defs_ptr->at(column_idx_);
+    return column_def;
+}
+
 Status ColumnMeta::GetChunkOffset(SizeT &chunk_offset) {
     if (!chunk_offset_) {
         Status status = LoadChunkOffset();
@@ -62,22 +68,13 @@ Status ColumnMeta::SetChunkOffset(SizeT chunk_offset) {
     return Status::OK();
 }
 
-Status ColumnMeta::InitSet() {
+Status ColumnMeta::InitSet(const SharedPtr<ColumnDef> &col_def) {
     // Status status = SetChunkOffset(0);
     // if (!status.ok()) {
     //     return status;
     // }
 
     Status status;
-    SharedPtr<ColumnDef> col_def;
-    {
-        SharedPtr<Vector<SharedPtr<ColumnDef>>> column_defs_ptr;
-        std::tie(column_defs_ptr, status) = block_meta_.segment_meta().table_meta().GetColumnDefs();
-        if (!status.ok()) {
-            return status;
-        }
-        col_def = (*column_defs_ptr)[column_idx_];
-    }
     ColumnID column_id = col_def->id();
 
     SharedPtr<String> block_dir_ptr = block_meta_.GetBlockDir();
@@ -284,12 +281,7 @@ Tuple<SharedPtr<ColumnDef>, Status> ColumnMeta::GetColumnDef() const {
     return {(*column_defs_ptr)[column_idx_], Status::OK()};
 }
 
-Tuple<SizeT, Status> ColumnMeta::GetColumnSize(SizeT row_cnt) const {
-    auto [col_def, status2] = GetColumnDef();
-    if (!status2.ok()) {
-        return {0, status2};
-    }
-
+Tuple<SizeT, Status> ColumnMeta::GetColumnSize(SizeT row_cnt, const SharedPtr<ColumnDef> &col_def) const {
     SizeT total_data_size = 0;
     if (col_def->type()->type() == LogicalType::kBoolean) {
         total_data_size = (row_cnt + 7) / 8;
@@ -376,7 +368,7 @@ String ColumnMeta::GetColumnTag(const String &tag) const {
                                                            tag);
 }
 
-Tuple<SharedPtr<BlockColumnSnapshotInfo>, Status> ColumnMeta::MapMetaToSnapShotInfo(){
+Tuple<SharedPtr<BlockColumnSnapshotInfo>, Status> ColumnMeta::MapMetaToSnapShotInfo() {
     SharedPtr<BlockColumnSnapshotInfo> block_column_snapshot_info = MakeShared<BlockColumnSnapshotInfo>();
     block_column_snapshot_info->column_id_ = column_idx_;
     Vector<String> column_file_paths;
@@ -401,7 +393,7 @@ Tuple<SharedPtr<BlockColumnSnapshotInfo>, Status> ColumnMeta::MapMetaToSnapShotI
     return {block_column_snapshot_info, Status::OK()};
 }
 
-Status ColumnMeta::RestoreFromSnapshot(ColumnID column_id){
+Status ColumnMeta::RestoreFromSnapshot(ColumnID column_id) {
     // TODO: figure out whether we are still using chunkoffset
     Status status;
     SharedPtr<Vector<SharedPtr<ColumnDef>>> column_defs;
@@ -417,9 +409,5 @@ Status ColumnMeta::RestoreFromSnapshot(ColumnID column_id){
 
     return Status::OK();
 }
-
-
-
-
 
 } // namespace infinity

@@ -14,8 +14,8 @@
 
 module;
 
-#include <vector>
 #include <string>
+#include <vector>
 
 module infinity_core:physical_operator.impl;
 
@@ -159,7 +159,11 @@ void OutputToDataBlockHelper::OutputToDataBlock(BufferManager *buffer_mgr,
         if (column_id != cache_column_id) {
             // LOG_TRACE(fmt::format("Get column vector from segment_id: {}, block_id: {}, column_id: {}", segment_id, block_id, column_id));
             ColumnMeta column_meta(column_id, *cached_block_meta);
-            NewCatalog::GetColumnVector(column_meta, cached_block_row_cnt, ColumnVectorMode::kReadOnly, cache_column_vector);
+            NewCatalog::GetColumnVector(column_meta,
+                                        column_meta.get_column_def(),
+                                        cached_block_row_cnt,
+                                        ColumnVectorMode::kReadOnly,
+                                        cache_column_vector);
 
             cache_column_id = column_id;
         }

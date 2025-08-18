@@ -297,7 +297,8 @@ public:
 
     static Status CleanBlock(BlockMeta &block_meta, UsageFlag usage_flag);
 
-    static Status AddNewBlockColumn(BlockMeta &block_meta, SizeT column_idx, Optional<ColumnMeta> &column_meta);
+    static Status
+    AddNewBlockColumn(BlockMeta &block_meta, SizeT column_idx, const SharedPtr<ColumnDef> &column_def, Optional<ColumnMeta> &column_meta);
 
     static Status AddNewBlockColumnForTransform(BlockMeta &block_meta, SizeT column_idx, Optional<ColumnMeta> &column_meta, TxnTimeStamp commit_ts);
 
@@ -337,7 +338,11 @@ public:
 
     static Status CleanChunkIndex(ChunkIndexMeta &chunk_index_meta, UsageFlag usage_flag);
 
-    static Status GetColumnVector(ColumnMeta &column_meta, SizeT row_count, const ColumnVectorMode &tipe, ColumnVector &column_vector);
+    static Status GetColumnVector(ColumnMeta &column_meta,
+                                  const SharedPtr<ColumnDef> &col_def,
+                                  SizeT row_count,
+                                  const ColumnVectorMode &tipe,
+                                  ColumnVector &column_vector);
 
     static Status GetBlockVisibleRange(BlockMeta &block_meta, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts, NewTxnGetVisibleRangeState &state);
 

@@ -89,8 +89,7 @@ import data_type;
 
 namespace infinity {
 
-using AlignedMatchTensorExprHolderT =
-    std::pair<std::unique_ptr<void, decltype([](void *ptr) { std::free(ptr); })>, UniquePtr<MatchTensorExpression>>;
+using AlignedMatchTensorExprHolderT = std::pair<std::unique_ptr<void, decltype([](void *ptr) { std::free(ptr); })>, UniquePtr<MatchTensorExpression>>;
 
 AlignedMatchTensorExprHolderT GetMatchTensorExprForCalculation(MatchTensorExpression &src_match_tensor_expr, EmbeddingDataType column_embedding_type);
 
@@ -410,8 +409,11 @@ void PhysicalMatchTensorScan::ExecuteInner(QueryContext *query_context, MatchTen
                                                 }
                                                 ColumnMeta column_meta(this->search_column_id_, block_meta);
                                                 ColumnVector column_vector;
-                                                status =
-                                                    NewCatalog::GetColumnVector(column_meta, row_to_read, ColumnVectorMode::kReadOnly, column_vector);
+                                                status = NewCatalog::GetColumnVector(column_meta,
+                                                                                     column_meta.get_column_def(),
+                                                                                     row_to_read,
+                                                                                     ColumnVectorMode::kReadOnly,
+                                                                                     column_vector);
                                                 if (!status.ok()) {
                                                     UnrecoverableError(status.message());
                                                 }
@@ -476,7 +478,7 @@ void PhysicalMatchTensorScan::ExecuteInner(QueryContext *query_context, MatchTen
             }
             ColumnMeta column_meta(this->search_column_id_, *block_meta);
             ColumnVector column_vector;
-            status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorMode::kReadOnly, column_vector);
+            status = NewCatalog::GetColumnVector(column_meta, column_meta.get_column_def(), row_count, ColumnVectorMode::kReadOnly, column_vector);
             if (!status.ok()) {
                 UnrecoverableError(status.message());
             }
@@ -988,7 +990,7 @@ void GetRerankerScore(Vector<MatchTensorRerankDoc> &rerank_docs,
         if (!status.ok()) {
             UnrecoverableError("GetRowCnt1 failed!");
         }
-        status = NewCatalog::GetColumnVector(column_meta, block_row_cnt, ColumnVectorMode::kReadOnly, column_vec);
+        status = NewCatalog::GetColumnVector(column_meta, column_meta.get_column_def(), block_row_cnt, ColumnVectorMode::kReadOnly, column_vec);
         if (!status.ok()) {
             UnrecoverableError("GetRowCnt1 failed!");
         }

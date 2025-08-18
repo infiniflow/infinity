@@ -203,7 +203,11 @@ TEST_P(TestTxnCompactInternal, test_compact) {
                 ColumnMeta column_meta(column_idx, block_meta);
                 ColumnVector col;
 
-                Status status = NewCatalog::GetColumnVector(column_meta, state.block_offset_end(), ColumnVectorMode::kReadOnly, col);
+                Status status = NewCatalog::GetColumnVector(column_meta,
+                                                            column_meta.get_column_def(),
+                                                            state.block_offset_end(),
+                                                            ColumnVectorMode::kReadOnly,
+                                                            col);
                 EXPECT_TRUE(status.ok());
 
                 EXPECT_EQ(col.GetValueByIndex(0), Value::MakeInt(1));
@@ -242,7 +246,11 @@ TEST_P(TestTxnCompactInternal, test_compact) {
                 ColumnMeta column_meta(column_idx, block_meta);
                 ColumnVector col;
 
-                Status status = NewCatalog::GetColumnVector(column_meta, state.block_offset_end(), ColumnVectorMode::kReadOnly, col);
+                Status status = NewCatalog::GetColumnVector(column_meta,
+                                                            column_meta.get_column_def(),
+                                                            state.block_offset_end(),
+                                                            ColumnVectorMode::kReadOnly,
+                                                            col);
                 EXPECT_TRUE(status.ok());
 
                 EXPECT_EQ(col.GetValueByIndex(0), Value::MakeInt(1));
@@ -391,7 +399,11 @@ TEST_P(TestTxnCompactInternal, test_compact_with_index) {
                 ColumnMeta column_meta(column_idx, block_meta);
                 ColumnVector col;
 
-                Status status = NewCatalog::GetColumnVector(column_meta, state.block_offset_end(), ColumnVectorMode::kReadOnly, col);
+                Status status = NewCatalog::GetColumnVector(column_meta,
+                                                            column_meta.get_column_def(),
+                                                            state.block_offset_end(),
+                                                            ColumnVectorMode::kReadOnly,
+                                                            col);
                 EXPECT_TRUE(status.ok());
 
                 EXPECT_EQ(col.GetValueByIndex(0), Value::MakeInt(1));
@@ -430,7 +442,11 @@ TEST_P(TestTxnCompactInternal, test_compact_with_index) {
                 ColumnMeta column_meta(column_idx, block_meta);
                 ColumnVector col;
 
-                Status status = NewCatalog::GetColumnVector(column_meta, state.block_offset_end(), ColumnVectorMode::kReadOnly, col);
+                Status status = NewCatalog::GetColumnVector(column_meta,
+                                                            column_meta.get_column_def(),
+                                                            state.block_offset_end(),
+                                                            ColumnVectorMode::kReadOnly,
+                                                            col);
                 EXPECT_TRUE(status.ok());
 
                 EXPECT_EQ(col.GetValueByIndex(0), Value::MakeInt(1));

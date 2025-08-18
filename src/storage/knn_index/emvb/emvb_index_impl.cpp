@@ -100,7 +100,8 @@ void EMVBIndex::BuildEMVBIndex(const RowID base_rowid, const u32 row_count, Segm
         ColumnMeta column_meta(column_id, block_meta);
         ColumnVector column_vector;
         u32 block_row_count = std::min(DEFAULT_BLOCK_CAPACITY, i64(start_segment_offset + row_count - block_id * DEFAULT_BLOCK_CAPACITY));
-        Status status = NewCatalog::GetColumnVector(column_meta, block_row_count, ColumnVectorMode::kReadOnly, column_vector);
+        Status status =
+            NewCatalog::GetColumnVector(column_meta, column_meta.get_column_def(), block_row_count, ColumnVectorMode::kReadOnly, column_vector);
         if (!status.ok()) {
             UnrecoverableError("EMVBIndex::BuildEMVBIndex: GetColumnVector failed!");
         }
@@ -116,7 +117,11 @@ void EMVBIndex::BuildEMVBIndex(const RowID base_rowid, const u32 row_count, Segm
 
                     BlockMeta block_meta(block_id, segment_meta);
                     ColumnMeta column_meta(column_id, block_meta);
-                    Status status = NewCatalog::GetColumnVector(column_meta, block_row_count, ColumnVectorMode::kReadOnly, column_vector);
+                    Status status = NewCatalog::GetColumnVector(column_meta,
+                                                                column_meta.get_column_def(),
+                                                                block_row_count,
+                                                                ColumnVectorMode::kReadOnly,
+                                                                column_vector);
                     if (!status.ok()) {
                         UnrecoverableError("EMVBIndex::BuildEMVBIndex: GetColumnVector failed!");
                     }
@@ -178,7 +183,11 @@ void EMVBIndex::BuildEMVBIndex(const RowID base_rowid, const u32 row_count, Segm
                 ColumnMeta column_meta(column_id, block_meta);
                 ColumnVector column_vector;
                 u32 block_row_count = std::min(DEFAULT_BLOCK_CAPACITY, i64(start_segment_offset + row_count - block_id * DEFAULT_BLOCK_CAPACITY));
-                Status status = NewCatalog::GetColumnVector(column_meta, block_row_count, ColumnVectorMode::kReadOnly, column_vector);
+                Status status = NewCatalog::GetColumnVector(column_meta,
+                                                            column_meta.get_column_def(),
+                                                            block_row_count,
+                                                            ColumnVectorMode::kReadOnly,
+                                                            column_vector);
                 if (!status.ok()) {
                     UnrecoverableError("EMVBIndex::BuildEMVBIndex: GetColumnVector failed!");
                 }
@@ -216,7 +225,8 @@ void EMVBIndex::BuildEMVBIndex(const RowID base_rowid, const u32 row_count, Segm
 
         u32 block_row_count = std::min(DEFAULT_BLOCK_CAPACITY, i64(start_segment_offset + row_count - block_id * DEFAULT_BLOCK_CAPACITY));
         ColumnVector column_vector;
-        Status status = NewCatalog::GetColumnVector(column_meta, block_row_count, ColumnVectorMode::kReadOnly, column_vector);
+        Status status =
+            NewCatalog::GetColumnVector(column_meta, column_meta.get_column_def(), block_row_count, ColumnVectorMode::kReadOnly, column_vector);
         if (!status.ok()) {
             UnrecoverableError("EMVBIndex::BuildEMVBIndex: GetColumnVector failed!");
         }
@@ -232,7 +242,11 @@ void EMVBIndex::BuildEMVBIndex(const RowID base_rowid, const u32 row_count, Segm
                     ColumnMeta column_meta(column_id, block_meta);
 
                     u32 block_row_count = std::min(DEFAULT_BLOCK_CAPACITY, i64(start_segment_offset + row_count - block_id * DEFAULT_BLOCK_CAPACITY));
-                    Status status = NewCatalog::GetColumnVector(column_meta, block_row_count, ColumnVectorMode::kReadOnly, column_vector);
+                    Status status = NewCatalog::GetColumnVector(column_meta,
+                                                                column_meta.get_column_def(),
+                                                                block_row_count,
+                                                                ColumnVectorMode::kReadOnly,
+                                                                column_vector);
                 }
             }
             auto [raw_data, embedding_num] = column_vector.GetTensorRaw(block_offset);

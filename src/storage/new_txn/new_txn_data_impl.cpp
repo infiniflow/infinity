@@ -125,7 +125,7 @@ struct NewTxnCompactState {
 
         for (SizeT i = 0; i < column_cnt_; ++i) {
             ColumnMeta column_meta(i, *block_meta_);
-            status = NewCatalog::GetColumnVector(column_meta, 0, ColumnVectorMode::kReadWrite, column_vectors_[i]);
+            status = NewCatalog::GetColumnVector(column_meta, column_meta.get_column_def(), 0, ColumnVectorMode::kReadWrite, column_vectors_[i]);
             if (!status.ok()) {
                 return status;
             }
@@ -147,7 +147,7 @@ struct NewTxnCompactState {
                     return status;
                 }
 
-                auto [data_size, status2] = column_meta.GetColumnSize(cur_block_row_cnt_);
+                auto [data_size, status2] = column_meta.GetColumnSize(cur_block_row_cnt_, column_meta.get_column_def());
                 if (!status2.ok()) {
                     return status;
                 }
@@ -301,7 +301,7 @@ Status NewTxn::Import(const String &db_name, const String &table_name, const Vec
             //     }
             // }
 
-            auto [data_size, status2] = column_meta.GetColumnSize(row_cnt);
+            auto [data_size, status2] = column_meta.GetColumnSize(row_cnt, column_meta.get_column_def());
             if (!status2.ok()) {
                 return status;
             }
@@ -964,7 +964,7 @@ Status NewTxn::AppendInBlock(BlockMeta &block_meta, SizeT block_offset, SizeT ap
 Status NewTxn::AppendInColumn(ColumnMeta &column_meta, SizeT dest_offset, SizeT append_rows, const ColumnVector &column_vector, SizeT source_offset) {
     ColumnVector dest_vec;
     {
-        Status status = NewCatalog::GetColumnVector(column_meta, dest_offset, ColumnVectorMode::kReadWrite, dest_vec);
+        Status status = NewCatalog::GetColumnVector(column_meta, column_meta.get_column_def(), dest_offset, ColumnVectorMode::kReadWrite, dest_vec);
         if (!status.ok()) {
             return status;
         }
@@ -978,7 +978,7 @@ Status NewTxn::AppendInColumn(ColumnMeta &column_meta, SizeT dest_offset, SizeT 
         return status;
     }
 
-    auto [data_size, status2] = column_meta.GetColumnSize(dest_vec.Size());
+    auto [data_size, status2] = column_meta.GetColumnSize(dest_vec.Size(), column_meta.get_column_def());
     if (!status2.ok()) {
         return status;
     }
@@ -1107,7 +1107,11 @@ Status NewTxn::CompactBlock(BlockMeta &block_meta, NewTxnCompactState &compact_s
     for (SizeT column_id = 0; column_id < column_cnt; ++column_id) {
         ColumnMeta column_meta(column_id, block_meta);
 
-        status = NewCatalog::GetColumnVector(column_meta, block_row_cnt, ColumnVectorMode::kReadOnly, column_vectors[column_id]);
+        status = NewCatalog::GetColumnVector(column_meta,
+                                             column_meta.get_column_def(),
+                                             block_row_cnt,
+                                             ColumnVectorMode::kReadOnly,
+                                             column_vectors[column_id]);
         if (!status.ok()) {
             return status;
         }
@@ -1162,7 +1166,7 @@ Status NewTxn::CompactBlock(BlockMeta &block_meta, NewTxnCompactState &compact_s
     return Status::OK();
 }
 
-Status NewTxn::AddColumnsData(TableMeeta &table_meta, const Vector<SharedPtr<ColumnDef>> &column_defs) {
+Status NewTxn::AddColumnsData(TableMeeta &table_meta, const Vector<SharedPtr<ColumnDef>> &column_defs, const Vector<u32> &column_idx_list) {
     Status status;
     Vector<SegmentID> *segment_ids_ptr = nullptr;
     std::tie(segment_ids_ptr, status) = table_meta.GetSegmentIDs1();
@@ -1203,7 +1207,7 @@ Status NewTxn::AddColumnsData(TableMeeta &table_meta, const Vector<SharedPtr<Col
 
     for (SegmentID segment_id : *segment_ids_ptr) {
         SegmentMeta segment_meta(segment_id, table_meta);
-        status = this->AddColumnsDataInSegment(segment_meta, column_defs, default_values);
+        status = this->AddColumnsDataInSegment(segment_meta, column_defs, column_idx_list, default_values);
         if (!status.ok()) {
             return status;
         }
@@ -1211,8 +1215,10 @@ Status NewTxn::AddColumnsData(TableMeeta &table_meta, const Vector<SharedPtr<Col
     return Status::OK();
 }
 
-Status
-NewTxn::AddColumnsDataInSegment(SegmentMeta &segment_meta, const Vector<SharedPtr<ColumnDef>> &column_defs, const Vector<Value> &default_values) {
+Status NewTxn::AddColumnsDataInSegment(SegmentMeta &segment_meta,
+                                       const Vector<SharedPtr<ColumnDef>> &column_defs,
+                                       const Vector<u32> &column_idx_list,
+                                       const Vector<Value> &default_values) {
     auto [block_ids_ptr, status] = segment_meta.GetBlockIDs1();
     if (!status.ok()) {
         return status;
@@ -1220,7 +1226,7 @@ NewTxn::AddColumnsDataInSegment(SegmentMeta &segment_meta, const Vector<SharedPt
 
     for (BlockID block_id : *block_ids_ptr) {
         BlockMeta block_meta(block_id, segment_meta);
-        status = this->AddColumnsDataInBlock(block_meta, column_defs, default_values);
+        status = this->AddColumnsDataInBlock(block_meta, column_defs, column_idx_list, default_values);
         if (!status.ok()) {
             return status;
         }
@@ -1228,34 +1234,31 @@ NewTxn::AddColumnsDataInSegment(SegmentMeta &segment_meta, const Vector<SharedPt
     return Status::OK();
 }
 
-Status NewTxn::AddColumnsDataInBlock(BlockMeta &block_meta, const Vector<SharedPtr<ColumnDef>> &column_defs, const Vector<Value> &default_values) {
+Status NewTxn::AddColumnsDataInBlock(BlockMeta &block_meta,
+                                     const Vector<SharedPtr<ColumnDef>> &column_defs,
+                                     const Vector<u32> &column_idx_list,
+                                     const Vector<Value> &default_values) {
     // auto [block_row_count, status] = block_meta.GetRowCnt();
     auto [block_row_count, status] = block_meta.GetRowCnt1();
     if (!status.ok()) {
         return status;
     }
-    SizeT old_column_cnt = 0;
-    {
-        auto [all_column_defs, col_status] = block_meta.segment_meta().table_meta().GetColumnDefs();
-        if (!col_status.ok()) {
-            return col_status;
-        }
-        old_column_cnt = all_column_defs->size() - column_defs.size();
-    }
+
     LOG_TRACE("NewTxn::AddColumnsDataInBlock begin");
-    for (SizeT i = 0; i < column_defs.size(); ++i) {
-        SizeT column_idx = old_column_cnt + i;
-        // const SharedPtr<ColumnDef> &column_def = column_defs[column_idx];
+    SizeT new_column_count = column_defs.size();
+    for (SizeT i = 0; i < new_column_count; ++i) {
+        SizeT column_idx = column_idx_list[i];
+        const SharedPtr<ColumnDef> &column_def = column_defs[i];
         const Value &default_value = default_values[i];
 
         Optional<ColumnMeta> column_meta;
-        status = NewCatalog::AddNewBlockColumn(block_meta, column_idx, column_meta);
+        status = NewCatalog::AddNewBlockColumn(block_meta, column_idx, column_def, column_meta);
         if (!status.ok()) {
             return status;
         }
 
         ColumnVector column_vector;
-        status = NewCatalog::GetColumnVector(*column_meta, 0 /*row_count*/, ColumnVectorMode::kReadWrite, column_vector);
+        status = NewCatalog::GetColumnVector(*column_meta, column_def, 0 /*row_count*/, ColumnVectorMode::kReadWrite, column_vector);
         if (!status.ok()) {
             return status;
         }
@@ -1266,12 +1269,12 @@ Status NewTxn::AddColumnsDataInBlock(BlockMeta &block_meta, const Vector<SharedP
 
         BufferObj *buffer_obj = nullptr;
         BufferObj *outline_buffer_obj = nullptr;
-        Status status = column_meta->GetColumnBuffer(buffer_obj, outline_buffer_obj);
+        status = column_meta->GetColumnBuffer(buffer_obj, outline_buffer_obj);
         if (!status.ok()) {
             return status;
         }
 
-        auto [data_size, status2] = column_meta->GetColumnSize(column_vector.Size());
+        auto [data_size, status2] = column_meta->GetColumnSize(column_vector.Size(), column_def);
         if (!status2.ok()) {
             return status;
         }

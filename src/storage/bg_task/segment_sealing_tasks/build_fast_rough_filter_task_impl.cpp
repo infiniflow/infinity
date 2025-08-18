@@ -232,7 +232,7 @@ void BuildFastRoughFilterTask::BuildOnlyBloomFilter(NewBuildFastRoughFilterArg &
         }
         ColumnMeta column_meta(arg.column_id_, block_meta);
         ColumnVector column_vector;
-        status = NewCatalog::GetColumnVector(column_meta, block_row_cnt, ColumnVectorMode::kReadOnly, column_vector);
+        status = NewCatalog::GetColumnVector(column_meta, column_meta.get_column_def(), block_row_cnt, ColumnVectorMode::kReadOnly, column_vector);
         if (!status.ok()) {
             UnrecoverableError(status.message());
         }
@@ -335,7 +335,7 @@ void BuildFastRoughFilterTask::BuildOnlyMinMaxFilter(NewBuildFastRoughFilterArg 
 
         ColumnMeta column_meta(arg.column_id_, block_meta);
         ColumnVector column_vector;
-        status = NewCatalog::GetColumnVector(column_meta, block_row_cnt, ColumnVectorMode::kReadOnly, column_vector);
+        status = NewCatalog::GetColumnVector(column_meta, column_meta.get_column_def(), block_row_cnt, ColumnVectorMode::kReadOnly, column_vector);
         if (!status.ok()) {
             UnrecoverableError(status.message());
         }
@@ -405,7 +405,7 @@ void BuildFastRoughFilterTask::BuildMinMaxAndBloomFilter(NewBuildFastRoughFilter
         input_data.clear();
         ColumnMeta column_meta(arg.column_id_, block_meta);
         ColumnVector column_vector;
-        status = NewCatalog::GetColumnVector(column_meta, block_row_cnt, ColumnVectorMode::kReadOnly, column_vector);
+        status = NewCatalog::GetColumnVector(column_meta, column_meta.get_column_def(), block_row_cnt, ColumnVectorMode::kReadOnly, column_vector);
         if (!status.ok()) {
             UnrecoverableError(status.message());
         }

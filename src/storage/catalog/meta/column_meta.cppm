@@ -39,11 +39,13 @@ public:
 
     SizeT column_idx() const { return column_idx_; }
 
+    SharedPtr<ColumnDef> get_column_def() const;
+
     Status GetChunkOffset(SizeT &chunk_offset);
 
     Status SetChunkOffset(SizeT chunk_offset);
 
-    Status InitSet();
+    Status InitSet(const SharedPtr<ColumnDef> &col_def);
 
     Status LoadSet();
 
@@ -55,7 +57,7 @@ public:
 
     Tuple<SharedPtr<ColumnDef>, Status> GetColumnDef() const;
 
-    Tuple<SizeT, Status> GetColumnSize(SizeT row_cnt) const;
+    Tuple<SizeT, Status> GetColumnSize(SizeT row_cnt, const SharedPtr<ColumnDef> &col_def) const;
 
     Status FilePaths(Vector<String> &paths);
 

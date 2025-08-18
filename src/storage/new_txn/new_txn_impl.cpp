@@ -762,6 +762,9 @@ Status NewTxn::AddColumns(const String &db_name, const String &table_name, const
     if (!status.ok()) {
         return status;
     }
+
+    Vector<u32> new_column_idx;
+    u32 latest_column_idx = old_column_defs->size();
     for (auto &column_def : *old_column_defs) {
         if (column_name_set.contains(column_def->name())) {
             return Status::DuplicateColumnName(column_def->name());
@@ -769,6 +772,8 @@ Status NewTxn::AddColumns(const String &db_name, const String &table_name, const
         if (column_idx_set.contains(column_def->id())) {
             return Status::DuplicateColumnIndex(fmt::format("Duplicate table column index: {}", column_def->id()));
         }
+        new_column_idx.push_back(latest_column_idx + 1);
+        ++latest_column_idx;
     }
 
     // Put the data into local txn store
@@ -784,6 +789,7 @@ Status NewTxn::AddColumns(const String &db_name, const String &table_name, const
     txn_store->table_name_ = table_name;
     txn_store->table_id_str_ = table_meta->table_id_str();
     txn_store->table_id_ = std::stoull(table_meta->table_id_str());
+    txn_store->column_idx_list_ = new_column_idx;
     txn_store->column_defs_ = column_defs;
     txn_store->table_key_ = table_key;
 
@@ -2585,7 +2591,7 @@ Status NewTxn::PrepareCommitAddColumns(const WalCmdAddColumnsV2 *add_columns_cmd
         return status;
     }
 
-    status = this->AddColumnsData(*table_meta, add_columns_cmd->column_defs_);
+    status = this->AddColumnsData(*table_meta, add_columns_cmd->column_defs_, add_columns_cmd->column_idx_list_);
     if (!status.ok()) {
         return status;
     }

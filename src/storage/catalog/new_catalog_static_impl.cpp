@@ -752,8 +752,9 @@ Status NewCatalog::AddNewBlock1(SegmentMeta &segment_meta, TxnTimeStamp commit_t
         }
     }
     for (SizeT column_idx = 0; column_idx < column_defs_ptr->size(); ++column_idx) {
+        SharedPtr<ColumnDef> &col_def = column_defs_ptr->at(column_idx);
         ColumnMeta column_meta(column_idx, *block_meta);
-        status = column_meta.InitSet();
+        status = column_meta.InitSet(col_def);
         if (!status.ok()) {
             return status;
         }
@@ -839,8 +840,9 @@ Status NewCatalog::AddNewBlockWithID(SegmentMeta &segment_meta, TxnTimeStamp com
         }
     }
     for (SizeT column_idx = 0; column_idx < column_defs_ptr->size(); ++column_idx) {
+        SharedPtr<ColumnDef> &col_def = column_defs_ptr->at(column_idx);
         ColumnMeta column_meta(column_idx, *block_meta);
-        status = column_meta.InitSet();
+        status = column_meta.InitSet(col_def);
         if (!status.ok()) {
             return status;
         }
@@ -945,10 +947,11 @@ Status NewCatalog::CleanBlock(BlockMeta &block_meta, UsageFlag usage_flag) {
     return Status::OK();
 }
 
-Status NewCatalog::AddNewBlockColumn(BlockMeta &block_meta, SizeT column_idx, Optional<ColumnMeta> &column_meta) {
+Status
+NewCatalog::AddNewBlockColumn(BlockMeta &block_meta, SizeT column_idx, const SharedPtr<ColumnDef> &column_def, Optional<ColumnMeta> &column_meta) {
     column_meta.emplace(column_idx, block_meta);
     {
-        Status status = column_meta->InitSet();
+        Status status = column_meta->InitSet(column_def);
         if (!status.ok()) {
             return status;
         }
@@ -1179,28 +1182,12 @@ Status NewCatalog::CleanChunkIndex(ChunkIndexMeta &chunk_index_meta, UsageFlag u
     return Status::OK();
 }
 
-Status NewCatalog::GetColumnVector(ColumnMeta &column_meta, SizeT row_count, const ColumnVectorMode &tipe, ColumnVector &column_vector) {
-    SharedPtr<DataType> column_type{};
-    {
-        TableMeeta &table_meta = column_meta.block_meta().segment_meta().table_meta();
-        auto [column_defs_ptr, status] = table_meta.GetColumnDefs();
-        if (!status.ok()) {
-            return status;
-        }
-        //        ColumnDef *col_def = nullptr;
-        ColumnDef *col_def = (*column_defs_ptr)[column_meta.column_idx()].get();
-        column_type = col_def->type();
-        //        for (const auto &column_def_ptr : *column_defs_ptr) {
-        //            if (column_def_ptr->id() == i64(column_meta.column_idx())) {
-        //                column_type = column_def_ptr->type();
-        //                break;
-        //            }
-        //        }
-        //        if (column_type == nullptr) {
-        //            UnrecoverableError("Null ptr of column type");
-        //        }
-    }
-
+Status NewCatalog::GetColumnVector(ColumnMeta &column_meta,
+                                   const SharedPtr<ColumnDef> &col_def,
+                                   SizeT row_count,
+                                   const ColumnVectorMode &tipe,
+                                   ColumnVector &column_vector) {
+    SharedPtr<DataType> column_type = col_def->type();
     BufferObj *buffer_obj = nullptr;
     BufferObj *outline_buffer_obj = nullptr;
     Status status = column_meta.GetColumnBuffer(buffer_obj, outline_buffer_obj);

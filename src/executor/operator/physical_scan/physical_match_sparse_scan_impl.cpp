@@ -454,7 +454,7 @@ void PhysicalMatchSparseScan::ExecuteInnerT(DistFunc *dist_func,
         }
 
         ColumnMeta column_meta(search_column_id_, *block_meta);
-        status = NewCatalog::GetColumnVector(column_meta, row_cnt, ColumnVectorMode::kReadOnly, column_vector);
+        status = NewCatalog::GetColumnVector(column_meta, column_meta.get_column_def(), row_cnt, ColumnVectorMode::kReadOnly, column_vector);
         if (!status.ok()) {
             UnrecoverableError(status.message());
         }

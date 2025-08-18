@@ -468,11 +468,17 @@ private:
 
     Status CompactBlock(BlockMeta &block_meta, NewTxnCompactState &compact_state);
 
-    Status AddColumnsData(TableMeeta &table_meta, const Vector<SharedPtr<ColumnDef>> &column_defs);
+    Status AddColumnsData(TableMeeta &table_meta, const Vector<SharedPtr<ColumnDef>> &column_defs, const Vector<u32> &column_idx_list);
 
-    Status AddColumnsDataInSegment(SegmentMeta &segment_meta, const Vector<SharedPtr<ColumnDef>> &column_defs, const Vector<Value> &default_values);
+    Status AddColumnsDataInSegment(SegmentMeta &segment_meta,
+                                   const Vector<SharedPtr<ColumnDef>> &column_defs,
+                                   const Vector<u32> &column_idx_list,
+                                   const Vector<Value> &default_values);
 
-    Status AddColumnsDataInBlock(BlockMeta &block_meta, const Vector<SharedPtr<ColumnDef>> &column_defs, const Vector<Value> &default_values);
+    Status AddColumnsDataInBlock(BlockMeta &block_meta,
+                                 const Vector<SharedPtr<ColumnDef>> &column_defs,
+                                 const Vector<u32> &column_idx_list,
+                                 const Vector<Value> &default_values);
 
     Status DropColumnsData(TableMeeta &table_meta, const Vector<ColumnID> &column_ids);
 

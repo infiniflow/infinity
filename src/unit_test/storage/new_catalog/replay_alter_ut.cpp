@@ -160,7 +160,7 @@ TEST_P(TestTxnReplayAlter, test_add_column) {
             ColumnMeta column_meta(1, block_meta);
             ColumnVector column_vector;
 
-            Status status = NewCatalog::GetColumnVector(column_meta, row_cnt, ColumnVectorMode::kReadOnly, column_vector);
+            Status status = NewCatalog::GetColumnVector(column_meta, column_meta.get_column_def(), row_cnt, ColumnVectorMode::kReadOnly, column_vector);
             EXPECT_TRUE(status.ok());
 
             for (SizeT i = 0; i < row_cnt; ++i) {
