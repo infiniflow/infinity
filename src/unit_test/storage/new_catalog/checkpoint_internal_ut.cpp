@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef CI
 module;
 
 #include "unit_test/gtest_expand.h"
@@ -62,12 +61,6 @@ import :roaring_bitmap;
 import :index_filter_evaluators;
 import :index_emvb;
 import :infinity;
-#else
-#include "unit_test/gtest_expand.h"
-import infinity_core;
-import replay_test;
-import base_test;
-#endif
 
 import extra_ddl_info;
 import column_def;

@@ -1,9 +1,3 @@
-
-#ifdef CI
-#include "unit_test/gtest_expand.h"
-import infinity_core;
-import base_test;
-#else
 module;
 
 #include "unit_test/gtest_expand.h"
@@ -15,7 +9,6 @@ import :ut.base_test;
 import :index_defines;
 import :posting_field;
 import :posting_buffer;
-#endif
 
 using namespace infinity;
 

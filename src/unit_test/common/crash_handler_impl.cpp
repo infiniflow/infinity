@@ -16,21 +16,14 @@ module;
 
 #include <csignal>
 #include <cstdio>
-#include <cstdlib>
-#include <cstring>
-#include <ctime>
-#include <stacktrace>
 
-#ifdef CI
-module crash_handler;
-
-import infinity_core;
-#else
 module infinity_core:ut.crash_handler.impl;
 
 import :ut.crash_handler;
+
+import std;
+import std.compat;
 import third_party;
-#endif
 
 namespace infinity {
 

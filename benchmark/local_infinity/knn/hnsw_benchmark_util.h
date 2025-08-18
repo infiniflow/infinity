@@ -14,16 +14,16 @@
 
 #pragma once
 
-#include <CLI/CLI.hpp>
-
 import infinity_core;
+import std;
+import std.compat;
 
 using namespace infinity;
 
 namespace benchmark {
 
 template <typename T>
-Tuple<size_t, i32, std::unique_ptr<T[]>> DecodeFvecsDataset(const Path &path) {
+std::tuple<size_t, i32, std::unique_ptr<T[]>> DecodeFvecsDataset(const std::filesystem::path &path) {
     auto [file_handle, status] = VirtualStore::Open(path.string(), FileAccessMode::kRead);
     if (!status.ok()) {
         UnrecoverableError(status.message());

@@ -15,17 +15,12 @@ module;
 
 #include "gtest_expand.h"
 
-#ifdef CI
-module base_test;
-import infinity_core;
-#else
 module infinity_core:ut.base_test.impl;
 
 import :ut.base_test;
 
 import :infinity_context;
 import :infinity_exception;
-#endif
 
 import column_def;
 import data_type;

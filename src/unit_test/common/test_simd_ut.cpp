@@ -1,9 +1,3 @@
-
-#ifdef CI
-#include "unit_test/gtest_expand.h"
-import infinity_core;
-import base_test;
-#else
 module;
 
 #include "unit_test/gtest_expand.h"
@@ -12,7 +6,6 @@ module infinity_core:ut.test_simd;
 
 import :ut.base_test;
 import :simd_init;
-#endif
 
 using namespace infinity;
 

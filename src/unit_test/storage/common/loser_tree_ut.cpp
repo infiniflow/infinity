@@ -1,9 +1,3 @@
-
-#ifdef CI
-#include "unit_test/gtest_expand.h"
-import infinity_core;
-import base_test;
-#else
 module;
 
 #include "unit_test/gtest_expand.h"
@@ -13,7 +7,6 @@ module infinity_core:ut.loser_tree;
 import :ut.base_test;
 import :random;
 import :loser_tree;
-#endif
 
 import third_party;
 

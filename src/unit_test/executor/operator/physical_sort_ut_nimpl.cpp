@@ -13,12 +13,6 @@
 // limitations under the License.
 // import :ut.sql_runner;
 
-#ifdef CI
-#include "unit_test/gtest_expand.h"
-import infinity_core;
-import base_test;
-import sql_runner;
-#else
 module;
 
 #include "unit_test/gtest_expand.h"
@@ -37,7 +31,6 @@ import :table_def;
 import :value;
 import :data_block;
 import :physical_sort;
-#endif
 
 import global_resource_usage;
 

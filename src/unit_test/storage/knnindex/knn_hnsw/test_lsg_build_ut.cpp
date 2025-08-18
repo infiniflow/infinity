@@ -12,12 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifdef CI
-#include "unit_test/gtest_expand.h"
-
-import infinity_core;
-import base_test;
-#else
 module;
 
 #include "unit_test/gtest_expand.h"
@@ -32,7 +26,6 @@ import :index_base;
 import :hnsw_handler;
 import :infinity_exception;
 import :hnsw_alg;
-#endif
 
 import column_def;
 import embedding_info;

@@ -12,10 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifdef CI
-import infinity_core;
-import base_test;
-#else
 module;
 
 module infinity_core:ut.user_defined_analyzer;
@@ -24,7 +20,6 @@ import :ut.base_test;
 import :status;
 import :user_defined_analyzer;
 import :python_instance;
-#endif
 
 import compilation_config;
 

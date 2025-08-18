@@ -16,19 +16,12 @@ module;
 
 #include "unit_test/gtest_expand.h"
 
-#ifdef CI
-export module request_test;
-
-import infinity_core;
-import base_test;
-#else
 export module infinity_core:ut.request_test;
 
 import :ut.base_test;
 import :query_context;
 import :data_table;
 import :session_manager;
-#endif
 
 using namespace infinity;
 

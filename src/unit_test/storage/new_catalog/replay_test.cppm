@@ -11,21 +11,11 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-module;
 
-#include "unit_test/gtest_expand.h"
-
-#ifndef CI
 export module infinity_core:ut.replay_test;
 
 import :ut.base_test;
 import :new_txn_manager;
-#else
-export module replay_test;
-
-import infinity_core;
-import base_test;
-#endif
 
 using namespace infinity;
 

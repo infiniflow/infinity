@@ -1,9 +1,3 @@
-
-#ifdef CI
-#include "unit_test/gtest_expand.h"
-import infinity_core;
-import base_test;
-#else
 module;
 
 #include "unit_test/gtest_expand.h"
@@ -40,7 +34,6 @@ import :txn_state;
 import :new_txn_manager;
 import :new_txn;
 import :data_block;
-#endif
 
 import logical_type;
 import column_def;

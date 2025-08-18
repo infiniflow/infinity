@@ -1,8 +1,3 @@
-
-#ifdef CI
-#include "unit_test/gtest_expand.h"
-import infinity_core;
-#else
 module;
 
 #include "unit_test/gtest_expand.h"
@@ -19,7 +14,6 @@ import :physical_operator_type;
 import :query_context;
 import :operator_state;
 import :data_block;
-#endif
 
 import data_type;
 import logical_type;

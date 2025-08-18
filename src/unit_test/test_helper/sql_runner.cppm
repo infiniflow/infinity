@@ -12,18 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
-#ifdef CI
-export module sql_runner;
-
-import infinity_core;
-#else
 export module infinity_core:ut.sql_runner;
 
-
 import :data_table;
-#endif
 
 namespace infinity {
 

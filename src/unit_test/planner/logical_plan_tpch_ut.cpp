@@ -12,17 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifdef CI
-#include "unit_test/gtest_expand.h"
-import infinity_core;
-import base_test;
-#else
 module;
 
 module infinity_core:ut.logical_plan_tpch;
 
 import :ut.base_test;
-#endif
 
 #if 0
 using namespace infinity;

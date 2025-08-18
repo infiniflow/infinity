@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef CI
 module;
 
 #include "unit_test/gtest_expand.h"
@@ -23,11 +22,6 @@ import :ut.base_test;
 import third_party;
 import :status;
 import :kv_store;
-#else
-#include "unit_test/gtest_expand.h"
-import infinity_core;
-import base_test;
-#endif
 
 using namespace infinity;
 

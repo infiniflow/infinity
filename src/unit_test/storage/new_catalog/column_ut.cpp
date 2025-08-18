@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef CI
 module;
 
 #include "unit_test/gtest_expand.h"
@@ -38,11 +37,6 @@ import :column_meta;
 import :table_def;
 import :segment_meta;
 import :block_meta;
-#else
-#include "unit_test/gtest_expand.h"
-import infinity_core;
-import base_test;
-#endif
 
 import extra_ddl_info;
 import column_def;

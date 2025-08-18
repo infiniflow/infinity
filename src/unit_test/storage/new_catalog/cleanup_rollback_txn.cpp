@@ -1,7 +1,4 @@
-#ifndef CI
 module;
-
-#include <filesystem>
 
 #include "unit_test/gtest_expand.h"
 
@@ -50,12 +47,6 @@ import :roaring_bitmap;
 import :index_filter_evaluators;
 import :index_emvb;
 import :wal_manager;
-#else
-#include <filesystem>
-#include "unit_test/gtest_expand.h"
-import infinity_core;
-import base_test;
-#endif
 
 import extra_ddl_info;
 import column_def;

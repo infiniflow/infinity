@@ -15,16 +15,10 @@ module;
 
 #include "unit_test/gtest_expand.h"
 
-#ifndef CI
 export module infinity_core:ut.base_test;
 
 import :infinity_context;
 import :infinity_exception;
-#else
-export module base_test;
-
-import infinity_core;
-#endif
 
 import global_resource_usage;
 

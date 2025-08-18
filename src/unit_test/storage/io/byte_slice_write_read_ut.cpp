@@ -1,9 +1,3 @@
-
-#ifdef CI
-#include "unit_test/gtest_expand.h"
-import infinity_core;
-import base_test;
-#else
 module;
 
 #include "unit_test/gtest_expand.h"
@@ -17,7 +11,6 @@ import :file_reader;
 import :byte_slice;
 import :byte_slice_reader;
 import :byte_slice_writer;
-#endif
 
 import global_resource_usage;
 

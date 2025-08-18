@@ -1,9 +1,3 @@
-
-#ifdef CI
-#include "unit_test/gtest_expand.h"
-import infinity_core;
-import base_test;
-#else
 module;
 
 #include "unit_test/gtest_expand.h"
@@ -36,7 +30,6 @@ import :infinity_context;
 import :persistence_manager;
 import :persist_result_handler;
 import :local_file_handle;
-#endif
 
 import data_type;
 import internal_types;

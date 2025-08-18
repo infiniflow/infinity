@@ -1,8 +1,3 @@
-#ifdef CI
-#include "unit_test/gtest_expand.h"
-import infinity_core;
-import base_test;
-#else
 module;
 
 #include "unit_test/gtest_expand.h"
@@ -18,7 +13,6 @@ import :persist_result_handler;
 import :local_file_handle;
 import :kv_store;
 import :status;
-#endif
 
 using namespace infinity;
 namespace fs = std::filesystem;

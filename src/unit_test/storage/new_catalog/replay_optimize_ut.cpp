@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef CI
 module;
 
 #include "unit_test/gtest_expand.h"
@@ -47,13 +46,6 @@ import :index_full_text;
 import :index_hnsw;
 import :mem_index;
 import :index_base;
-
-#else
-#include "unit_test/gtest_expand.h"
-import infinity_core;
-import base_test;
-import replay_test;
-#endif
 
 import extra_ddl_info;
 import column_def;

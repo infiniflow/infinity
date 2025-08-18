@@ -1,8 +1,3 @@
-#ifdef CI
-#include "unit_test/gtest_expand.h"
-import infinity_core;
-import base_test;
-#else
 module;
 
 #include "unit_test/gtest_expand.h"
@@ -20,7 +15,6 @@ import :skiplist_reader;
 import :position_list_encoder;
 import :in_doc_pos_state;
 import :position_list_format_option;
-#endif
 
 using namespace infinity;
 

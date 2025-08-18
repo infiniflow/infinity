@@ -1,9 +1,3 @@
-
-#ifdef CI
-#include "unit_test/gtest_expand.h"
-import infinity_core;
-import base_test;
-#else
 module;
 
 #include "unit_test/gtest_expand.h"
@@ -24,7 +18,6 @@ import :posting_list_format;
 import third_party;
 import :byte_slice_reader;
 import :random;
-#endif
 
 using namespace infinity;
 

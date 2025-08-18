@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef CI
 module;
 
 #include "unit_test/gtest_expand.h"
@@ -66,12 +65,6 @@ import :emvb_index_in_mem;
 import :memory_indexer;
 import :hnsw_handler;
 import :bmp_handler;
-#else
-#include "unit_test/gtest_expand.h"
-import infinity_core;
-import replay_test;
-import base_test;
-#endif
 
 import extra_ddl_info;
 import column_def;

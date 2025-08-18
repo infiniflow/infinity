@@ -1,9 +1,3 @@
-
-#ifdef CI
-#include "unit_test/gtest_expand.h"
-import infinity_core;
-import base_test;
-#else
 module;
 
 #include "unit_test/gtest_expand.h"
@@ -15,7 +9,6 @@ import :infinity_exception;
 import third_party;
 import :logger;
 import :infinity_context;
-#endif
 
 import global_resource_usage;
 import float16;

@@ -1,14 +1,6 @@
-module;
-
-#ifdef CI
-export module log_helper;
-
-import infinity_core;
-#else
 export module infinity_core:ut.log_helper;
 
 import :logger;
-#endif
 
 export namespace infinity {
 struct LogHelper {

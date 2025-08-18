@@ -1,9 +1,3 @@
-
-#ifdef CI
-#include "unit_test/gtest_expand.h"
-import infinity_core;
-import base_test;
-#else
 module;
 
 #include "unit_test/gtest_expand.h"
@@ -17,7 +11,6 @@ import :posting_byte_slice;
 import :inmem_doc_list_decoder;
 import :doc_list_format_option;
 import :doc_list_encoder;
-#endif
 
 using namespace infinity;
 constexpr u32 default_document_legnth = 10;

@@ -333,7 +333,7 @@ target_sources(infinity_core
         ${common_impl_cpp}
         ${admin_impl_cpp}
         ${network_impl_cpp}
-#        ${parser_impl_cpp}
+        #        ${parser_impl_cpp}
 )
 
 #if (ARCH_AARCH64)
@@ -416,7 +416,7 @@ target_link_libraries(infinity
         fastpfor
         jma
         opencc
-#        $<IF:$<BOOL:${ARM64}>,opencc,>
+        #        $<IF:$<BOOL:${ARM64}>,opencc,>
         dl
         thrift::thrift
         # thriftnb::thriftnb
@@ -595,73 +595,43 @@ file(GLOB_RECURSE
         unit_test/*_impl.cpp
 )
 
-if (CI)
-    file(GLOB_RECURSE
-            ut_mod
-            CONFIGURE_DEPENDS
-            unit_test/*.cppm
-    )
-    add_executable(unit_test
-            ${test_main_cpp}
+file(GLOB_RECURSE
+        ut_mod
+        CONFIGURE_DEPENDS
+        unit_test/*.cppm
+        unit_test/*_impl.cpp
+)
+add_executable(unit_test
+        ${test_main_cpp}
 
-            ${common_ut}
-            ${storage_ut}
-            ${main_ut}
-            ${parser_ut}
-            ${function_ut}
-            ${thirdparty_ut}
-            ${executor_ut}
-            ${test_helper_ut}
-            ${planner_ut}
-            ${function_ut}
-            ${parallel_ut}
+        ${ut_test_main_cpp}
+        ${ut_common_cpp}
+        ${ut_storage_cpp}
+        ${ut_main_cpp}
+        ${ut_parser_cpp}
+        ${ut_function_cpp}
+        ${ut_thirdparty_cpp}
+        ${ut_executor_cpp}
+        ${ut_test_helper_cpp}
+        ${ut_planner_cpp}
+        ${ut_function_cpp}
+        ${ut_parallel_cpp}
+)
+target_sources(unit_test
+        PRIVATE
+        FILE_SET ut_cxx_modules TYPE CXX_MODULES FILES
+        ${ut_mod}
 
-            ${ut_impl}
-    )
-    target_sources(unit_test
-            PRIVATE
-            FILE_SET ut_cxx_modules TYPE CXX_MODULES FILES
-            ${ut_mod}
-    )
-else ()
-    file(GLOB_RECURSE
-            ut_mod
-            CONFIGURE_DEPENDS
-            unit_test/*.cppm
-            unit_test/*_impl.cpp
-    )
-    add_executable(unit_test
-            ${test_main_cpp}
-
-            ${ut_test_main_cpp}
-            ${ut_common_cpp}
-            ${ut_storage_cpp}
-            ${ut_main_cpp}
-            ${ut_parser_cpp}
-            ${ut_function_cpp}
-            ${ut_thirdparty_cpp}
-            ${ut_executor_cpp}
-            ${ut_test_helper_cpp}
-            ${ut_planner_cpp}
-            ${ut_function_cpp}
-            ${ut_parallel_cpp}
-    )
-    target_sources(unit_test
-            PRIVATE
-            FILE_SET ut_cxx_modules TYPE CXX_MODULES FILES
-            ${ut_mod}
-
-            ${common_ut}
-            ${parser_ut}
-            ${storage_ut}
-            ${executor_ut}
-            ${planner_ut}
-            ${function_ut}
-            ${parralel_ut}
-            ${thirdparty_ut}
-            ${main_ut}
-    )
-endif ()
+        ${common_ut}
+        ${parser_ut}
+        ${storage_ut}
+        ${executor_ut}
+        ${planner_ut}
+        ${function_ut}
+        ${parralel_ut}
+        ${thirdparty_ut}
+        ${main_ut}
+)
 
 set_target_properties(unit_test PROPERTIES OUTPUT_NAME test_main)
 add_dependencies(unit_test miniocpp curlpp_static libcurl_static infinity_core)

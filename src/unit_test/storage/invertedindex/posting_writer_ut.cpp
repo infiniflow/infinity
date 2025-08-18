@@ -12,11 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifdef CI
-#include "unit_test/gtest_expand.h"
-import infinity_core;
-import base_test;
-#else
 module;
 
 #include "unit_test/gtest_expand.h"
@@ -35,7 +30,6 @@ import :segment_posting;
 import :posting_iterator;
 import :vector_with_lock;
 import :infinity_context;
-#endif
 
 import data_type;
 import internal_types;

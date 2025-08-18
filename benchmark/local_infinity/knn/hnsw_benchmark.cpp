@@ -18,15 +18,6 @@
 import infinity_core;
 import compilation_config;
 
-// import :hnsw_lsg_builder;
-// import :index_hnsw;
-// import internal_types;
-// import :index_base;
-// import column_def;
-// import embedding_info;
-// import logical_type;
-// import data_type;
-
 using namespace infinity;
 
 enum class ModeType : i8 {
@@ -40,7 +31,7 @@ enum class BenchmarkType : i8 {
     GIST,
 };
 
-String BenchmarkTypeToString(BenchmarkType benchmark_type) {
+std::string BenchmarkTypeToString(BenchmarkType benchmark_type) {
     switch (benchmark_type) {
         case BenchmarkType::SIFT:
             return "sift";
@@ -58,7 +49,7 @@ enum class BuildType : i8 {
     LSGCompressToLVQ,
 };
 
-String BuildTypeToString(BuildType build_type) {
+std::string BuildTypeToString(BuildType build_type) {
     switch (build_type) {
         case BuildType::PLAIN:
             return "plain";
@@ -79,14 +70,14 @@ struct BenchmarkOption {
 public:
     BenchmarkOption() : app_("hnsw_benchmark") {}
 
-    static String IndexName(const BenchmarkType &benchmark_type, const BuildType &build_type, size_t M, size_t ef_construction) {
+    static std::string IndexName(const BenchmarkType &benchmark_type, const BuildType &build_type, size_t M, size_t ef_construction) {
         return fmt::format("hnsw_{}_{}_{}_{}", BenchmarkTypeToString(benchmark_type), BuildTypeToString(build_type), M, ef_construction);
     }
 
     void Parse(int argc, char *argv[]) {
-        Map<String, ModeType> mode_map = {{"build", ModeType::BUILD}, {"query", ModeType::QUERY}, {"compress", ModeType::COMPRESS}};
-        Map<String, BenchmarkType> benchmark_type_map = {{"sift", BenchmarkType::SIFT}, {"gist", BenchmarkType::GIST}};
-        Map<String, BuildType> build_type_map = {
+        std::map<std::string, ModeType> mode_map = {{"build", ModeType::BUILD}, {"query", ModeType::QUERY}, {"compress", ModeType::COMPRESS}};
+        std::map<std::string, BenchmarkType> benchmark_type_map = {{"sift", BenchmarkType::SIFT}, {"gist", BenchmarkType::GIST}};
+        std::map<std::string, BuildType> build_type_map = {
             {"plain", BuildType::PLAIN},
             {"lvq", BuildType::LVQ},
             {"clvq", BuildType::CompressToLVQ},
@@ -122,7 +113,7 @@ public:
     }
 
     void ParseInner() {
-        String index_name = IndexName(benchmark_type_, build_type_, M_, ef_construction_);
+        std::string index_name = IndexName(benchmark_type_, build_type_, M_, ef_construction_);
         switch (benchmark_type_) {
             case BenchmarkType::SIFT: {
                 data_path_ = "test/data/benchmark/sift_1m/sift_base.fvecs";
@@ -158,11 +149,11 @@ public:
     size_t query_topk_ = 0;
 
 public:
-    Path data_path_;
-    Path query_path_;
-    Path groundtruth_path_;
-    Path index_dir_ = Path(tmp_data_path());
-    Path index_save_path_;
+    std::filesystem::path data_path_;
+    std::filesystem::path query_path_;
+    std::filesystem::path groundtruth_path_;
+    std::filesystem::path index_dir_ = std::filesystem::path(tmp_data_path());
+    std::filesystem::path index_save_path_;
 
 private:
     CLI::App app_;
@@ -174,9 +165,9 @@ using HnswLSG = KnnHnsw<PlainL2VecStoreType<float, true>, LabelT>;
 using HnswLVQ = KnnHnsw<LVQL2VecStoreType<float, i8>, LabelT>;
 using HnswLVQLSG = KnnHnsw<LVQL2VecStoreType<float, i8, true>, LabelT>;
 
-// std::shared_ptr<String> index_name = std::make_shared<String>("index_name");
-// String filename = "filename";
-// std::vector<String> column_names = {"col_name"};
+// std::shared_ptr<std::string> index_name = std::make_shared<std::string>("index_name");
+// std::string filename = "filename";
+// std::vector<std::string> column_names = {"col_name"};
 
 // std::unique_ptr<IndexHnsw> MakeLSGIndexHnsw(const BenchmarkOption &option) {
 //     MetricType metric_type = MetricType::kMetricL2;
@@ -185,7 +176,8 @@ using HnswLVQLSG = KnnHnsw<LVQL2VecStoreType<float, i8, true>, LabelT>;
 //     size_t M = option.M_;
 //     size_t ef_construction = option.ef_construction_;
 //     size_t block_size = option.chunk_size_;
-//     return std::make_unique<IndexHnsw>(index_name, nullptr, filename, column_names, metric_type, encode_type, build_type, M, ef_construction, block_size);
+//     return std::make_unique<IndexHnsw>(index_name, nullptr, filename, column_names, metric_type, encode_type, build_type, M, ef_construction,
+//     block_size);
 // }
 
 // std::unique_ptr<ColumnDef> MakeColumnDef(size_t dim) {
@@ -329,11 +321,11 @@ void Query(const BenchmarkOption &option) {
     if (gt_num != query_num) {
         UnrecoverableError("gt_num != query_num");
     }
-    std::vector<Vector<LabelT>> results(query_num, Vector<LabelT>(query_topk));
+    std::vector<std::vector<LabelT>> results(query_num, std::vector<LabelT>(query_topk));
 
     auto test = [&](size_t i, const KnnSearchOption &search_option) {
         profiler.Begin();
-        Vector<std::thread> query_threads;
+        std::vector<std::thread> query_threads;
         std::atomic<i32> cur_i = 0;
 
         for (size_t i = 0; i < option.thread_n_; ++i) {
@@ -341,8 +333,8 @@ void Query(const BenchmarkOption &option) {
                 size_t i;
                 while ((i = cur_i.fetch_add(1)) < query_num) {
                     const float *query = query_data.get() + i * query_dim;
-                    Vector<Pair<float, LabelT>> pairs = hnsw->KnnSearchSorted(query, query_topk, search_option);
-                    if (pairs.size() < size_t(query_topk)) {
+                    std::vector<std::pair<float, LabelT>> pairs = hnsw->KnnSearchSorted(query, query_topk, search_option);
+                    if (pairs.size() < query_topk) {
                         UnrecoverableError("result_n != topk");
                     }
                     for (size_t j = 0; j < query_topk; ++j) {
@@ -361,7 +353,7 @@ void Query(const BenchmarkOption &option) {
     auto cal_recall = [&](const KnnSearchOption &search_option) {
         i32 correct = 0;
         for (size_t i = 0; i < query_num; ++i) {
-            HashSet<LabelT> gt_set(gt_data.get() + i * topk, gt_data.get() + i * topk + query_topk);
+            std::unordered_set<LabelT> gt_set(gt_data.get() + i * topk, gt_data.get() + i * topk + query_topk);
             for (size_t j = 0; j < query_topk; ++j) {
                 if (gt_set.contains(results[i][j])) {
                     correct++;
@@ -400,7 +392,7 @@ void Compress(const BenchmarkOption &option) {
     }
     auto hnsw = HnswT::Load(*index_file);
 
-    String new_index_name;
+    std::string new_index_name;
     if constexpr (std::is_same_v<HnswT, Hnsw>) {
         new_index_name = BenchmarkOption::IndexName(option.benchmark_type_, BuildType::CompressToLVQ, option.M_, option.ef_construction_);
     } else if constexpr (std::is_same_v<HnswT, HnswLSG>) {
@@ -408,7 +400,7 @@ void Compress(const BenchmarkOption &option) {
     } else {
         UnrecoverableError("Unsupport compress type");
     }
-    Path new_index_save_path = option.index_dir_ / fmt::format("{}.bin", new_index_name);
+    std::filesystem::path new_index_save_path = option.index_dir_ / fmt::format("{}.bin", new_index_name);
 
     auto hnsw_lvq = std::move(*hnsw).CompressToLVQ();
     auto [index_file_lvq, index_status_lvq] = VirtualStore::Open(new_index_save_path.string(), FileAccessMode::kWrite);

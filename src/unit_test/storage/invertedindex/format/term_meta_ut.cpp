@@ -1,10 +1,3 @@
-
-#ifdef CI
-#include "unit_test/gtest_expand.h"
-#include <cassert>
-import infinity_core;
-import base_test;
-#else
 module;
 
 #include "unit_test/gtest_expand.h"
@@ -23,7 +16,6 @@ import :index_defines;
 import :posting_list_format;
 import :virtual_store;
 import :infinity_context;
-#endif
 
 import global_resource_usage;
 

@@ -12,13 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
-#ifdef CI
-module sql_runner;
-
-import infinity_core;
-#else
 module infinity_core:ut.sql_runner.impl;
 
 import :ut.sql_runner;
@@ -33,7 +26,6 @@ import :fragment_context;
 import :logical_planner;
 import :query_context;
 import :physical_planner;
-#endif
 
 import std;
 import sql_parser;

@@ -42,12 +42,6 @@ endif ()
 #     message("Can not find ccache")
 # endif()
 
-option(CI "Build in CI mode" OFF)
-
-if (CI)
-    add_definitions(-DCI=1)
-endif ()
-
 message(STATUS "CXX: ${CMAKE_CXX_COMPILER}")
 execute_process(COMMAND ${CMAKE_CXX_COMPILER} --version OUTPUT_VARIABLE clang_full_version_string)
 string(REGEX REPLACE ".*clang version ([0-9]+\\.[0-9]+).*" "\\1" CLANG_VERSION_STRING ${clang_full_version_string})
