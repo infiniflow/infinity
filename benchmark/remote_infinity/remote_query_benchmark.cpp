@@ -105,7 +105,7 @@ inline void ParallelFor(size_t start, size_t end, size_t numThreads, auto fn) {
         id_begin = id_end;
     }
 
-    for(auto& thread: threads) {
+    for (auto &thread : threads) {
         thread.join();
     }
 }

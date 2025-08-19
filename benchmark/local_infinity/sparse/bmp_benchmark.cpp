@@ -118,8 +118,7 @@ int main(int argc, char *argv[]) {
                 profiler.End();
 
                 std::cout << fmt::format("Import data time: {}\n", profiler.ElapsedToString(1000));
-                auto [file_handler, status] =
-                    VirtualStore::Open(opt.index_save_path_.string(), FileAccessMode::kWrite);
+                auto [file_handler, status] = VirtualStore::Open(opt.index_save_path_.string(), FileAccessMode::kWrite);
                 if (!status.ok()) {
                     UnrecoverableError(fmt::format("Failed to open file: {}", opt.index_save_path_.string()));
                 }

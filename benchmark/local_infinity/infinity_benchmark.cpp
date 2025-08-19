@@ -40,7 +40,8 @@ using namespace infinity;
 
 constexpr u64 second_unit = 1000 * 1000 * 1000;
 
-double Measurement(String name, size_t thread_num, size_t times, const std::function<void(size_t, std::shared_ptr<Infinity>, std::thread::id)> &closure) {
+double
+Measurement(String name, size_t thread_num, size_t times, const std::function<void(size_t, std::shared_ptr<Infinity>, std::thread::id)> &closure) {
     infinity::BaseProfiler profiler(name);
     std::vector<std::thread> threads;
     threads.reserve(thread_num);
@@ -183,8 +184,11 @@ int main() {
                     column_definitions.emplace_back(col_def_2);
 
                     //                    auto [database, status] = infinity->GetDatabase("default_db");
-                    [[maybe_unused]] auto ignored =
-                        infinity->CreateTable("default_db", std::to_string(i), column_definitions, std::vector<TableConstraint *>(), create_table_opts);
+                    [[maybe_unused]] auto ignored = infinity->CreateTable("default_db",
+                                                                          std::to_string(i),
+                                                                          column_definitions,
+                                                                          std::vector<TableConstraint *>(),
+                                                                          create_table_opts);
                 });
             results.push_back(fmt::format("-> Create Table QPS: {}", total_times / tims_costing_second));
         }
@@ -305,19 +309,21 @@ int main() {
             infinity->LocalDisconnect();
         }
         {
-            auto tims_costing_second =
-                Measurement("Insert for Select Sort", thread_num, sort_row, [&](size_t i, std::shared_ptr<Infinity> infinity, std::thread::id thread_id) {
-                    auto insert_row = std::make_unique<InsertRowExpr>();
-                    insert_row->columns_ = {col_name_1, col_name_2};
-                    auto value1 = std::make_unique<ConstantExpr>(LiteralType::kInteger);
-                    value1->integer_value_ = std::rand();
-                    insert_row->values_.emplace_back(std::move(value1));
-                    auto value2 = std::make_unique<ConstantExpr>(LiteralType::kInteger);
-                    value2->integer_value_ = std::rand();
-                    insert_row->values_.emplace_back(std::move(value2));
-                    auto insert_rows = new Vector<InsertRowExpr *>({insert_row.release()});
-                    [[maybe_unused]] auto ignored = infinity->Insert("default_db", "benchmark_test", insert_rows);
-                });
+            auto tims_costing_second = Measurement("Insert for Select Sort",
+                                                   thread_num,
+                                                   sort_row,
+                                                   [&](size_t i, std::shared_ptr<Infinity> infinity, std::thread::id thread_id) {
+                                                       auto insert_row = std::make_unique<InsertRowExpr>();
+                                                       insert_row->columns_ = {col_name_1, col_name_2};
+                                                       auto value1 = std::make_unique<ConstantExpr>(LiteralType::kInteger);
+                                                       value1->integer_value_ = std::rand();
+                                                       insert_row->values_.emplace_back(std::move(value1));
+                                                       auto value2 = std::make_unique<ConstantExpr>(LiteralType::kInteger);
+                                                       value2->integer_value_ = std::rand();
+                                                       insert_row->values_.emplace_back(std::move(value2));
+                                                       auto insert_rows = new Vector<InsertRowExpr *>({insert_row.release()});
+                                                       [[maybe_unused]] auto ignored = infinity->Insert("default_db", "benchmark_test", insert_rows);
+                                                   });
             results.push_back(fmt::format("-> Insert for Sort Time: {}s", tims_costing_second));
         }
         {

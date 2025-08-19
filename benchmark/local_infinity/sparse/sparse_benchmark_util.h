@@ -16,7 +16,6 @@
 
 #include "CLI11.hpp"
 
-
 import :virtual_store;
 import :infinity_exception;
 import third_party;
@@ -105,11 +104,12 @@ void SaveGroundtruth(u32 top_k, u32 query_n, const i32 *indices, const f32 *scor
 
 const int kQueryLogInterval = 100;
 
-std::vector<Pair<std::vector<u32>, std::vector<f32>>> Search(i32 thread_n,
-                                              const SparseMatrix<f32, i32> &query_mat,
-                                              u32 top_k,
-                                              i64 query_n,
-                                              std::function<Pair<std::vector<u32>, std::vector<f32>>(const SparseVecRef<f32, i32> &, u32)> search_fn) {
+std::vector<Pair<std::vector<u32>, std::vector<f32>>>
+Search(i32 thread_n,
+       const SparseMatrix<f32, i32> &query_mat,
+       u32 top_k,
+       i64 query_n,
+       std::function<Pair<std::vector<u32>, std::vector<f32>>(const SparseVecRef<f32, i32> &, u32)> search_fn) {
     Vector<Pair<Vector<u32>, Vector<f32>>> res(query_n);
     Atomic<i64> query_idx = 0;
     Vector<std::thread> threads;
