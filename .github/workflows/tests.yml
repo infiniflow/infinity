@@ -372,20 +372,20 @@ jobs:
           echo "BUILDER_CONTAINER=${BUILDER_CONTAINER}" >> $GITHUB_ENV
           echo "CPUS=${CPUS}" >> $GITHUB_ENV
           TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
-          sudo docker rm -f -v ${BUILDER_CONTAINER} && sudo docker run --cap-add=NET_ADMIN -d --name ${BUILDER_CONTAINER} -e TZ=$TZ -e CMAKE_BUILD_PARALLEL_LEVEL=${CPUS} -v $PWD:/infinity -v /boot:/boot --cpus ${CPUS} infiniflow/infinity_builder:ubuntu20_clang20
+          docker rm -f -v ${BUILDER_CONTAINER} && docker run --cap-add=NET_ADMIN -d --name ${BUILDER_CONTAINER} -e TZ=$TZ -e CMAKE_BUILD_PARALLEL_LEVEL=${CPUS} -v $PWD:/infinity --cpus ${CPUS} infiniflow/infinity_builder:ubuntu20_clang20
 
-      - name: Start minio container
-        if: ${{ !cancelled() && !failure() }}
-        run: |
-          MINIO_CONTAINER=minio_$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')
-          MINIO_DIR=~/minio_data_$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')
-          echo "MINIO_CONTAINER=${MINIO_CONTAINER}" >> $GITHUB_ENV
-          echo "MINIO_DIR=${MINIO_DIR}" >> $GITHUB_ENV
-          sudo docker rm -f -v ${MINIO_CONTAINER} && sudo rm -fr ${MINIO_DIR} && sudo mkdir ${MINIO_DIR} && sudo docker run -d --net=container:${BUILDER_CONTAINER} --name ${MINIO_CONTAINER} -e "MINIO_ROOT_PASSWORD=minioadmin" -e "MINIO_ROOT_USER=minioadmin"  -v ${MINIO_DIR}:/data    quay.io/minio/minio server /data --console-address ":9006" --address ":9005" && sleep 5s
-          if ! sudo docker ps --filter "name=${MINIO_CONTAINER}" --filter "status=running" | grep -q ${MINIO_CONTAINER}; then
-              echo "Minio container is not running"
-              exit 1
-          fi
+#      - name: Start minio container
+#        if: ${{ !cancelled() && !failure() }}
+#        run: |
+#          MINIO_CONTAINER=minio_$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')
+#          MINIO_DIR=~/minio_data_$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')
+#          echo "MINIO_CONTAINER=${MINIO_CONTAINER}" >> $GITHUB_ENV
+#          echo "MINIO_DIR=${MINIO_DIR}" >> $GITHUB_ENV
+#          sudo docker rm -f -v ${MINIO_CONTAINER} && sudo rm -fr ${MINIO_DIR} && sudo mkdir ${MINIO_DIR} && sudo docker run -d --net=container:${BUILDER_CONTAINER} --name ${MINIO_CONTAINER} -e "MINIO_ROOT_PASSWORD=minioadmin" -e "MINIO_ROOT_USER=minioadmin"  -v ${MINIO_DIR}:/data    quay.io/minio/minio server /data --console-address ":9006" --address ":9005" && sleep 5s
+#          if ! sudo docker ps --filter "name=${MINIO_CONTAINER}" --filter "status=running" | grep -q ${MINIO_CONTAINER}; then
+#              echo "Minio container is not running"
+#              exit 1
+#          fi
 
       - name: Configure release version
         if: ${{ !cancelled() && !failure() }}
@@ -705,12 +705,12 @@ jobs:
             sudo docker rm -f -v ${BUILDER_CONTAINER}
           fi
 
-      - name: Destroy minio container
-        if: always()  # always run this step even if previous steps failed
-        run: |
-          if [ -n "${MINIO_CONTAINER}" ]; then
-            sudo docker rm -f -v ${MINIO_CONTAINER}
-          fi
+#      - name: Destroy minio container
+#        if: always()  # always run this step even if previous steps failed
+#        run: |
+#          if [ -n "${MINIO_CONTAINER}" ]; then
+#            sudo docker rm -f -v ${MINIO_CONTAINER}
+#          fi
 
       - name: Clear minio working dir
         if: always()  # always run this step even if previous steps failed
