@@ -304,7 +304,7 @@ public:
                     return ResponseFactory::createResponse(http_status, json_response.dump());
                 }
             } else {
-                json_response["error_code"] = 3067;
+                json_response["error_code"] = 3074;
                 json_response["error_message"] = "'CREATE OPTION' field value should be string type";
                 http_status = HTTPStatus::CODE_500;
                 return ResponseFactory::createResponse(http_status, json_response.dump());
@@ -363,7 +363,7 @@ public:
                     return ResponseFactory::createResponse(http_status, json_response.dump());
                 }
             } else {
-                json_response["error_code"] = 3067;
+                json_response["error_code"] = 3075;
                 json_response["error_message"] = "'DROP OPTION' field value should be string type";
                 http_status = HTTPStatus::CODE_500;
                 return ResponseFactory::createResponse(http_status, json_response.dump());
@@ -496,7 +496,7 @@ public:
                     http_status = HTTPStatus::CODE_500;
                 }
             } else {
-                json_response["error_code"] = 3067;
+                json_response["error_code"] = 3074;
                 json_response["error_message"] = "'CREATE OPTION' field value should be string type";
                 http_status = HTTPStatus::CODE_500;
             }
@@ -552,7 +552,7 @@ public:
                     http_status = HTTPStatus::CODE_500;
                 }
             } else {
-                json_response["error_code"] = 3067;
+                json_response["error_code"] = 3075;
                 json_response["error_message"] = "'DROP OPTION' field value should be string type";
                 http_status = HTTPStatus::CODE_500;
             }
@@ -1773,8 +1773,8 @@ public:
                     http_status = HTTPStatus::CODE_500;
                 }
             } else {
-                json_response["error_code"] = 3067;
-                json_response["error_message"] = "'CREATE OPTION' field value should be string type";
+                json_response["error_code"] = 3075;
+                json_response["error_message"] = "'DROP OPTION' field value should be string type";
                 http_status = HTTPStatus::CODE_500;
             }
         }
@@ -1830,12 +1830,12 @@ public:
                 } else if (option == "replace_if_exists") {
                     options.conflict_type_ = ConflictType::kReplace;
                 } else {
-                    json_response["error_code"] = 3075;
+                    json_response["error_code"] = 3074;
                     json_response["error_message"] = fmt::format("Invalid create option: {}", option);
                     http_status = HTTPStatus::CODE_500;
                 }
             } else {
-                json_response["error_code"] = 3067;
+                json_response["error_code"] = 3074;
                 json_response["error_message"] = "'CREATE OPTION' field value should be string type";
                 http_status = HTTPStatus::CODE_500;
             }
@@ -3455,7 +3455,6 @@ public:
 
         // Get snapshot name from path
         std::string snapshot_name = request->getPathVariable("snapshot_name");
-
         // Validate snapshot name
         if (snapshot_name.empty()) {
             json_response["error_code"] = 3001;
@@ -3478,7 +3477,6 @@ public:
             auto result_table = result.result_table_;
             if (result_table != nullptr) {
                 size_t blocks_count = result_table->DataBlockCount();
-
                 // The ShowSnapshot result has key-value pairs in alternating rows
                 // We need to extract the values for each field
                 std::string snapshot_name_value, scope, create_time, size;
@@ -3502,7 +3500,6 @@ public:
 
                                 std::string key = key_value.GetVarchar();
                                 std::string value = value_value.GetVarchar();
-
                                 if (key == "snapshot_name") {
                                     snapshot_name_value = value;
                                 } else if (key == "snapshot_scope") {

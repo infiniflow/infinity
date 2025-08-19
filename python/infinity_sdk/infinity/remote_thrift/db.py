@@ -79,8 +79,12 @@ class RemoteDatabase(Database, ABC):
     @name_validity_check("table_name", "Table")
     def drop_table(self, table_name, conflict_type: ConflictType = ConflictType.Error):
         if conflict_type == ConflictType.Error:
-            return self._conn.drop_table(db_name=self._db_name, table_name=table_name,
-                                         conflict_type=ttypes.DropConflict.Error)
+            res = self._conn.drop_table(db_name=self._db_name, table_name=table_name,
+                                        conflict_type=ttypes.DropConflict.Error)
+            if (res.error_code == ErrorCode.OK):
+                return res
+            else:
+                raise InfinityException(res.error_code, res.error_msg)
         elif conflict_type == ConflictType.Ignore:
             return self._conn.drop_table(db_name=self._db_name, table_name=table_name,
                                          conflict_type=ttypes.DropConflict.Ignore)
