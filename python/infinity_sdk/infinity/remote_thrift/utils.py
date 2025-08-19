@@ -120,6 +120,7 @@ def parsed_expression_to_string(expr: ttypes.ParsedExpr) -> str:
 
     return ""
 
+
 def search_to_string(search_expr: ttypes.SearchExpr) -> str:
     if search_expr.match_exprs:
         match_exprs_str = str
@@ -143,7 +144,6 @@ def search_to_string(search_expr: ttypes.SearchExpr) -> str:
 
         return fusion_exprs_str
 
-
     raise InfinityException(ErrorCode.INVALID_EXPRESSION, "Invalid search expression")
 
 
@@ -161,8 +161,8 @@ def fusion_to_string(fusion_expr: ttypes.FusionExpr) -> str:
     else:
         return f"fusion(name={fusion_expr.method}, options={fusion_expr.options_text})"
 
-def generic_match_to_string(generic_match_expr: ttypes.GenericMatchExpr) -> str:
 
+def generic_match_to_string(generic_match_expr: ttypes.GenericMatchExpr) -> str:
     if generic_match_expr.match_vector_expr:
         column_expr_str = parsed_expression_to_string(generic_match_expr.match_vector_expr.column_expr)
         return f"match_dense(column={column_expr_str}, top={generic_match_expr.match_vector_expr.topn})"
@@ -527,25 +527,37 @@ identifier_limit = 65536
 
 def check_valid_name(name, name_type: str = "Table"):
     if not isinstance(name, str):
-        raise InfinityException(ErrorCode.INVALID_IDENTIFIER_NAME,
-                                f"{name_type} name must be a string, got {type(name)}")
+        error_msg = f"{name_type} name must be a string, got {type(name)}"
+        if name_type == "Table":
+            raise InfinityException(ErrorCode.INVALID_TABLE_NAME, error_msg)
+        elif name_type == "Index":
+            raise InfinityException(ErrorCode.INVALID_INDEX_NAME, error_msg)
+        elif name_type == "Column":
+            raise InfinityException(ErrorCode.INVALID_COLUMN_NAME, error_msg)
+        else:
+            raise InfinityException(ErrorCode.INVALID_IDENTIFIER_NAME, error_msg)
+
     if not re.match(r"^[a-zA-Z][a-zA-Z0-9_]*$", name):
-        raise InfinityException(ErrorCode.INVALID_IDENTIFIER_NAME,
-                                f"{name_type} name '{name}' is not valid. It should start with a letter and can contain only letters, numbers and underscores")
+        error_msg = f"{name_type} name '{name}' is not valid. It should start with a letter and can contain only letters, numbers and underscores"
+        if name_type == "Table":
+            raise InfinityException(ErrorCode.INVALID_TABLE_NAME, error_msg)
+        elif name_type == "Index":
+            raise InfinityException(ErrorCode.INVALID_INDEX_NAME, error_msg)
+        elif name_type == "Column":
+            raise InfinityException(ErrorCode.INVALID_COLUMN_NAME, error_msg)
+        else:
+            raise InfinityException(ErrorCode.INVALID_IDENTIFIER_NAME, error_msg)
+
     if len(name) > identifier_limit:
-        raise InfinityException(ErrorCode.INVALID_IDENTIFIER_NAME,
-                                f"{name_type} name '{name}' is not of appropriate length")
-    if name is None:
-        raise InfinityException(ErrorCode.INVALID_IDENTIFIER_NAME, f"invalid name: {name}")
-    if name.isspace():
-        raise InfinityException(ErrorCode.INVALID_IDENTIFIER_NAME,
-                                f"{name_type} name cannot be composed of whitespace characters only")
-    if name == '':
-        raise InfinityException(ErrorCode.INVALID_IDENTIFIER_NAME, f"invalid name: {name}")
-    if name == ' ':
-        raise InfinityException(ErrorCode.INVALID_IDENTIFIER_NAME, f"invalid name: {name}")
-    if name.isdigit():
-        raise InfinityException(ErrorCode.INVALID_IDENTIFIER_NAME, f"invalid name: {name}")
+        error_msg = f"{name_type} name '{name}' is too long, maximum length is {identifier_limit}"
+        if name_type == "Table":
+            raise InfinityException(ErrorCode.INVALID_TABLE_NAME, error_msg)
+        elif name_type == "Index":
+            raise InfinityException(ErrorCode.INVALID_INDEX_NAME, error_msg)
+        elif name_type == "Column":
+            raise InfinityException(ErrorCode.INVALID_COLUMN_NAME, error_msg)
+        else:
+            raise InfinityException(ErrorCode.INVALID_IDENTIFIER_NAME, error_msg)
 
 
 def name_validity_check(arg_name: str, name_type: str = "Table"):
@@ -735,7 +747,8 @@ def get_data_type_from_column_big_info(column_big_info: list) -> ttypes.DataType
             array_type.logic_type = ttypes.LogicType.Array
             array_type.physical_type = ttypes.PhysicalType()
             array_type.physical_type.array_type = ttypes.ArrayType()
-            array_type.physical_type.array_type.element_data_type = get_data_type_from_column_big_info(column_big_info[1:])
+            array_type.physical_type.array_type.element_data_type = get_data_type_from_column_big_info(
+                column_big_info[1:])
             return array_type
         case _:
             if len(column_big_info) > 1:
@@ -777,7 +790,8 @@ def get_data_type_from_column_big_info(column_big_info: list) -> ttypes.DataType
                 case "interval":
                     proto_column_type.logic_type = ttypes.LogicType.Interval
                 case _:
-                    raise InfinityException(ErrorCode.INVALID_DATA_TYPE, f"Unknown datatype: {column_big_info_first_str}")
+                    raise InfinityException(ErrorCode.INVALID_DATA_TYPE,
+                                            f"Unknown datatype: {column_big_info_first_str}")
             return proto_column_type
 
 

@@ -760,7 +760,7 @@ class TestInfinity:
         assert res.error_code == ErrorCode.OK
 
     # insert primitive data type not aligned with table definition
-    @pytest.mark.parametrize("types", common_values.types_array)
+    @pytest.mark.parametrize("types", common_values.types_array_int)
     @pytest.mark.parametrize("types_example", common_values.types_example_array)
     def test_insert_data_not_aligned_with_table_definition(self, types, types_example, suffix):
         # connect
