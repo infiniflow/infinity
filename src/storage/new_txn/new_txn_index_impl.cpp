@@ -2211,21 +2211,6 @@ Status NewTxn::ManualDumpIndex(const String &db_name, const String &table_name) 
                 return status;
             }
 
-            // 8. Clean up old chunk references
-            TxnTimeStamp commit_ts = this->txn_context_ptr_->commit_ts_;
-            for (ChunkID deprecate_id : old_chunk_ids) {
-                auto ts_str = std::to_string(commit_ts);
-                status = this->kv_instance_->Put(KeyEncode::DropChunkIndexKey(table_index_meta.table_meta().db_id_str(),
-                                                                              table_index_meta.table_meta().table_id_str(),
-                                                                              table_index_meta.index_id_str(),
-                                                                              segment_id,
-                                                                              deprecate_id),
-                                                 ts_str);
-                if (!status.ok()) {
-                    return status;
-                }
-            }
-
             LOG_INFO(fmt::format("Successfully dumped segment {} to chunk {}", segment_id, chunk_id));
         }
 
