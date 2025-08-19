@@ -710,10 +710,6 @@ void NewTxnManager::PrintAllDroppedKeys() const {
 
 SizeT NewTxnManager::KeyValueNum() const { return kv_store_->KeyValueNum(); }
 
-//
-//
-//
-//
 Vector<SharedPtr<NewTxn>> NewTxnManager::GetCheckCandidateTxns(NewTxn *this_txn) {
 
     TxnTimeStamp this_begin_ts = this_txn->BeginTS();
