@@ -69,14 +69,13 @@ protected:
 
 INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
                          CompactTaskTest,
-                         ::testing::Values((std::string(test_data_path()) + "/config/test_new_bg_on.toml").c_str(),
-                                           (std::string(test_data_path()) + "/config/test_new_vfs_off_bg_on.toml").c_str()));
+                         ::testing::Values(BaseTestParamStr::NEW_BG_ON_CONFIG_PATH, BaseTestParamStr::NEW_VFS_OFF_BG_ON_CONFIG_PATH));
 
 TEST_P(CompactTaskTest, DISABLED_bg_compact) {
-    Storage *storage = infinity::InfinityContext::instance().storage();
-    NewTxnManager *txn_mgr = storage->new_txn_manager();
+    auto *storage = infinity::InfinityContext::instance().storage();
+    auto *txn_mgr = storage->new_txn_manager();
 
-    std::shared_ptr<std::string> db_name = std::make_shared<std::string>("default_db");
+    auto db_name = std::make_shared<std::string>("default_db");
     auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
     auto column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
     auto table_name = std::make_shared<std::string>("tb1");
@@ -85,7 +84,7 @@ TEST_P(CompactTaskTest, DISABLED_bg_compact) {
     {
         // create table
         auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
-        Status status = txn->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
+        auto status = txn->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
 
         status = txn_mgr->CommitTxn(txn);
@@ -109,7 +108,7 @@ TEST_P(CompactTaskTest, DISABLED_bg_compact) {
         auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("check"), TransactionType::kNormal);
         std::optional<DBMeeta> db_meta;
         std::optional<TableMeeta> table_meta;
-        Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
+        auto status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
 
         std::vector<SegmentID> *segment_ids_ptr = nullptr;

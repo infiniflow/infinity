@@ -54,7 +54,7 @@ if (CLANG_VERSION_STRING VERSION_GREATER_EQUAL 20)
     # add_compile_options(-ftime-trace)
     #    add_compile_options(-fmodule-header)
     add_link_options(-fuse-ld=mold)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Wno-unused-parameter -Wno-unused-private-field")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Wno-unused-parameter -Wno-unused-private-field -flto")
 
     add_link_options(-L/usr/local/lib)
     set(CMAKE_FIND_PACKAGE_SORT_ORDER NATURAL)

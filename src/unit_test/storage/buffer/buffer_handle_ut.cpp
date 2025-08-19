@@ -39,15 +39,14 @@ INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
                          ::testing::Values(BaseTestParamStr::NULL_CONFIG_PATH, BaseTestParamStr::VFS_OFF_CONFIG_PATH));
 
 TEST_P(BufferHandleTest, test1) {
-    using namespace infinity;
 
     size_t memory_limit = 1024;
     std::string data_dir(GetFullDataDir());
     auto temp_dir = std::make_shared<std::string>(GetFullTmpDir());
     auto base_dir = std::make_shared<std::string>(GetFullDataDir());
 
-    Storage *storage = InfinityContext::instance().storage();
-    PersistenceManager *persistence_manager = storage->persistence_manager();
+    auto *storage = InfinityContext::instance().storage();
+    auto *persistence_manager = storage->persistence_manager();
     BufferManager buffer_manager(memory_limit, base_dir, temp_dir, persistence_manager);
 
     size_t test_size1 = 512;

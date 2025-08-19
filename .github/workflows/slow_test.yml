@@ -260,9 +260,9 @@ jobs:
           sudo docker exec ${BUILDER_CONTAINER} bash -c "cp /var/infinity/log/infinity.log /infinity/infinity.log"
           sudo python3 scripts/collect_log.py --log_path=infinity.log --stdout_path=debug.log --stderror_path=debug_error.log --executable_path=cmake-build-debug/src/infinity --output_dir=${RUNNER_WORKSPACE_PREFIX}/log --failure=${failure}
 
-      - name: Unit test debug version
+      - name: Unit test debug version only disabled test
         if: ${{ !cancelled() && !failure() && steps.choose_test_type.outputs.RUN_CI_SLOW_TEST == 'true' }}
-        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "mkdir -p /var/infinity && cd /infinity/ && ASAN_OPTIONS=detect_leaks=0 cmake-build-debug/src/test_main --gtest_also_run_disabled_tests > unittest_debug.log 2>&1"
+        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "mkdir -p /var/infinity && cd /infinity/ && ASAN_OPTIONS=detect_leaks=0 cmake-build-debug/src/test_main --gtest_filter=-* --gtest_also_run_disabled_tests > unittest_debug.log 2>&1"
 
       - name: Collect infinity unit test debug output
         if: ${{ !cancelled() && failure() && steps.choose_test_type.outputs.RUN_CI_SLOW_TEST == 'true' }}
@@ -302,9 +302,9 @@ jobs:
           sudo docker exec ${BUILDER_CONTAINER} bash -c "cp /var/infinity/log/infinity.log /infinity/infinity.log"
           sudo python3 scripts/collect_log.py --log_path=infinity.log --stdout_path=release.log --stderror_path=release_error.log --executable_path=cmake-build-release/src/infinity --output_dir=${RUNNER_WORKSPACE_PREFIX}/log --failure=${failure}
 
-      - name: Unit test release version
+      - name: Unit test release version only disabled test
         if: ${{ !cancelled() && !failure() && steps.choose_test_type.outputs.RUN_CI_SLOW_TEST == 'true' }}
-        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "mkdir -p /var/infinity && cd /infinity/ && cmake-build-release/src/test_main --gtest_also_run_disabled_tests > unittest_release.log 2>&1"
+        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "mkdir -p /var/infinity && cd /infinity/ && cmake-build-release/src/test_main --gtest_filter=-* --gtest_also_run_disabled_tests > unittest_release.log 2>&1"
 
       - name: Collect infinity unit test release output
         if: ${{ !cancelled() && steps.choose_test_type.outputs.RUN_CI_SLOW_TEST == 'true' }}

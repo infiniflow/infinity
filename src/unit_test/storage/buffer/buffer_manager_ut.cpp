@@ -207,8 +207,7 @@ TEST_F(BufferManagerTest, varfile_test) {
     size_t buffer_size = 100;
     size_t file_num = 10;
 
-    std::shared_ptr<PersistenceManager> persistence_manager_ =
-        std::make_shared<PersistenceManager>(*persistence_dir_, *data_dir_, DEFAULT_PERSISTENCE_OBJECT_SIZE_LIMIT);
+    auto persistence_manager_ = std::make_shared<PersistenceManager>(*persistence_dir_, *data_dir_, DEFAULT_PERSISTENCE_OBJECT_SIZE_LIMIT);
     BufferManager buffer_mgr(buffer_size, data_dir_, temp_dir_, persistence_manager_.get());
     std::vector<BufferObj *> buffer_objs;
     for (size_t i = 0; i < file_num; ++i) {
@@ -399,7 +398,7 @@ public:
 
     void Write(FileInfo &file_info) override {
         size_t visit_cnt = file_info.visit_cnt_;
-        BufferHandle buffer_handle = file_info.buffer_obj_->Load();
+        auto buffer_handle = file_info.buffer_obj_->Load();
         auto *data = reinterpret_cast<char *>(buffer_handle.GetDataMut());
         for (size_t i = 0; i < file_info.file_size_; ++i) {
             data[i] = 'a' + (visit_cnt % 26);
@@ -409,7 +408,7 @@ public:
 
     void Check(const FileInfo &file_info) override {
         size_t visit_cnt = file_info.visit_cnt_;
-        BufferHandle buffer_handle = file_info.buffer_obj_->Load();
+        auto buffer_handle = file_info.buffer_obj_->Load();
         const auto *data = reinterpret_cast<const char *>(buffer_handle.GetData());
         for (size_t i = 0; i < file_info.file_size_; ++i) {
             EXPECT_EQ(data[i], char('a' + (visit_cnt - 1) % 26));
@@ -419,8 +418,7 @@ public:
 
 TEST_F(BufferManagerParallelTest, parallel_test1) {
     for (int i = 0; i < 1; ++i) {
-        std::shared_ptr<PersistenceManager> persistence_manager_ =
-            std::make_shared<PersistenceManager>(*persistence_dir_, *data_dir_, DEFAULT_PERSISTENCE_OBJECT_SIZE_LIMIT);
+        auto persistence_manager_ = std::make_shared<PersistenceManager>(*persistence_dir_, *data_dir_, DEFAULT_PERSISTENCE_OBJECT_SIZE_LIMIT);
         auto buffer_mgr = std::make_unique<BufferManager>(buffer_size, data_dir_, temp_dir_, persistence_manager_.get());
         auto test1_obj = std::make_unique<Test1Obj>(avg_file_size, buffer_mgr.get(), data_dir_, temp_dir_);
 
@@ -477,7 +475,7 @@ public:
     }
 
     void Write(FileInfo &file_info) override {
-        BufferHandle buffer_handle = file_info.buffer_obj_->Load();
+        auto buffer_handle = file_info.buffer_obj_->Load();
         auto *buffer = reinterpret_cast<VarBuffer *>(buffer_handle.GetDataMut());
         auto data = std::make_unique<char[]>(var_file_step);
         for (size_t i = 0; i < var_file_step; ++i) {
@@ -491,7 +489,7 @@ public:
     }
 
     void Check(const FileInfo &file_info) override {
-        BufferHandle buffer_handle = file_info.buffer_obj_->Load();
+        auto buffer_handle = file_info.buffer_obj_->Load();
         const auto *buffer = reinterpret_cast<const VarBuffer *>(buffer_handle.GetData());
         for (size_t i = 0; i < file_info.file_size_; i += var_file_step) {
             const char *data = buffer->Get(i, var_file_step);

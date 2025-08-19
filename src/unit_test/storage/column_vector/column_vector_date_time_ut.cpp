@@ -56,7 +56,7 @@ class ColumnVectorDateTimeTest : public BaseTest {
 TEST_F(ColumnVectorDateTimeTest, flat_date) {
     using namespace infinity;
 
-    std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kDate);
+    auto data_type = std::make_shared<DataType>(LogicalType::kDate);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
@@ -78,9 +78,9 @@ TEST_F(ColumnVectorDateTimeTest, flat_date) {
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         DateT date(static_cast<i32>(i));
-        Value v = Value::MakeDate(date);
+        auto v = Value::MakeDate(date);
         column_vector.AppendValue(v);
-        Value vx = column_vector.GetValueByIndex(i);
+        auto vx = column_vector.GetValueByIndex(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kDate);
         EXPECT_EQ(vx.value_.date.value, static_cast<i32>(i));
         EXPECT_THROW_WITHOUT_STACKTRACE(column_vector.GetValueByIndex(i + 1), UnrecoverableException);
@@ -99,11 +99,11 @@ TEST_F(ColumnVectorDateTimeTest, flat_date) {
     EXPECT_EQ(column_vector.vector_type(), clone_column_vector.vector_type());
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
-        Value vx = column_vector.GetValueByIndex(i);
+        auto vx = column_vector.GetValueByIndex(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kDate);
         EXPECT_EQ(vx.value_.date.value, static_cast<i32>(i));
     }
-    EXPECT_EQ(column_vector.Size(), (u64)DEFAULT_VECTOR_SIZE);
+    EXPECT_EQ(column_vector.Size(), static_cast<u64>(DEFAULT_VECTOR_SIZE));
 
     column_vector.Reset();
     EXPECT_EQ(column_vector.capacity(), 0u);
@@ -134,7 +134,7 @@ TEST_F(ColumnVectorDateTimeTest, flat_date) {
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         DateT date(static_cast<i32>(i));
         column_vector.AppendByPtr((char *)(&date));
-        Value vx = column_vector.GetValueByIndex(i);
+        auto vx = column_vector.GetValueByIndex(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kDate);
         EXPECT_EQ(vx.value_.date.value, static_cast<i32>(i));
         EXPECT_THROW_WITHOUT_STACKTRACE(column_vector.GetValueByIndex(i + 1), UnrecoverableException);
@@ -145,7 +145,7 @@ TEST_F(ColumnVectorDateTimeTest, flat_date) {
         column_constant.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
         column_constant.SetValueByIndex(0, column_vector.GetValueByIndex(i));
         column_constant.Finalize(1);
-        Value vx = column_constant.GetValueByIndex(0);
+        auto vx = column_constant.GetValueByIndex(0);
         EXPECT_EQ(vx.value_.date.value, static_cast<i32>(i));
         column_constant.Reset();
     }
@@ -155,7 +155,7 @@ TEST_F(ColumnVectorDateTimeTest, contant_date) {
 
     using namespace infinity;
 
-    std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kDate);
+    auto data_type = std::make_shared<DataType>(LogicalType::kDate);
     ColumnVector column_vector(data_type);
 
     column_vector.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
@@ -178,7 +178,7 @@ TEST_F(ColumnVectorDateTimeTest, contant_date) {
 
     for (i64 i = 0; i < 1; ++i) {
         DateT date(static_cast<i32>(i));
-        Value v = Value::MakeDate(date);
+        auto v = Value::MakeDate(date);
         column_vector.AppendValue(v);
         EXPECT_THROW_WITHOUT_STACKTRACE(column_vector.AppendValue(v), UnrecoverableException);
         Value vx = column_vector.GetValueByIndex(i);
@@ -220,10 +220,10 @@ TEST_F(ColumnVectorDateTimeTest, contant_date) {
     EXPECT_TRUE(column_vector.initialized);
     for (i64 i = 0; i < 1; ++i) {
         DateT date(static_cast<i32>(i));
-        Value v = Value::MakeDate(date);
+        auto v = Value::MakeDate(date);
         column_vector.AppendValue(v);
         EXPECT_THROW_WITHOUT_STACKTRACE(column_vector.AppendValue(v), UnrecoverableException);
-        Value vx = column_vector.GetValueByIndex(i);
+        auto vx = column_vector.GetValueByIndex(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kDate);
         EXPECT_EQ(vx.value_.date.value, static_cast<i32>(i));
         EXPECT_THROW_WITHOUT_STACKTRACE(column_vector.GetValueByIndex(i + 1), UnrecoverableException);
@@ -233,13 +233,13 @@ TEST_F(ColumnVectorDateTimeTest, contant_date) {
 TEST_F(ColumnVectorDateTimeTest, date_column_vector_select) {
     using namespace infinity;
 
-    std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kDate);
+    auto data_type = std::make_shared<DataType>(LogicalType::kDate);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         DateT date(static_cast<i32>(i));
-        Value v = Value::MakeDate(date);
+        auto v = Value::MakeDate(date);
         column_vector.AppendValue(v);
     }
 
@@ -269,7 +269,7 @@ TEST_F(ColumnVectorDateTimeTest, date_column_vector_select) {
 TEST_F(ColumnVectorDateTimeTest, date_column_slice_init) {
     using namespace infinity;
 
-    std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kDate);
+    auto data_type = std::make_shared<DataType>(LogicalType::kDate);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
@@ -290,7 +290,7 @@ TEST_F(ColumnVectorDateTimeTest, date_column_slice_init) {
     i64 end_idx = 3 * DEFAULT_VECTOR_SIZE / 4;
     i64 count = end_idx - start_idx;
     target_column_vector.Initialize(column_vector, start_idx, end_idx);
-    EXPECT_EQ(target_column_vector.Size(), (u64)DEFAULT_VECTOR_SIZE / 2);
+    EXPECT_EQ(target_column_vector.Size(), static_cast<u64>(DEFAULT_VECTOR_SIZE) / 2);
     EXPECT_EQ(count, DEFAULT_VECTOR_SIZE / 2);
 
     for (i64 i = 0; i < count; ++i) {
@@ -304,7 +304,7 @@ TEST_F(ColumnVectorDateTimeTest, date_column_slice_init) {
 TEST_F(ColumnVectorDateTimeTest, flat_time) {
     using namespace infinity;
 
-    std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kTime);
+    auto data_type = std::make_shared<DataType>(LogicalType::kTime);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
@@ -326,9 +326,9 @@ TEST_F(ColumnVectorDateTimeTest, flat_time) {
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         TimeT time(static_cast<i32>(i));
-        Value v = Value::MakeTime(time);
+        auto v = Value::MakeTime(time);
         column_vector.AppendValue(v);
-        Value vx = column_vector.GetValueByIndex(i);
+        auto vx = column_vector.GetValueByIndex(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kTime);
         EXPECT_EQ(vx.value_.time.value, static_cast<i32>(i));
         EXPECT_THROW_WITHOUT_STACKTRACE(column_vector.GetValueByIndex(i + 1), UnrecoverableException);
@@ -347,7 +347,7 @@ TEST_F(ColumnVectorDateTimeTest, flat_time) {
     EXPECT_EQ(column_vector.vector_type(), clone_column_vector.vector_type());
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
-        Value vx = column_vector.GetValueByIndex(i);
+        auto vx = column_vector.GetValueByIndex(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kTime);
         EXPECT_EQ(vx.value_.time.value, static_cast<i32>(i));
     }
@@ -402,14 +402,14 @@ TEST_F(ColumnVectorDateTimeTest, contant_time) {
 
     using namespace infinity;
 
-    std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kTime);
+    auto data_type = std::make_shared<DataType>(LogicalType::kTime);
     ColumnVector column_vector(data_type);
 
     column_vector.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
 
     EXPECT_THROW_WITHOUT_STACKTRACE(column_vector.SetVectorType(ColumnVectorType::kConstant), UnrecoverableException);
 
-    EXPECT_EQ(column_vector.capacity(), (u64)DEFAULT_VECTOR_SIZE);
+    EXPECT_EQ(column_vector.capacity(), static_cast<u64>(DEFAULT_VECTOR_SIZE));
     EXPECT_EQ(column_vector.Size(), 0u);
 
     EXPECT_THROW_WITHOUT_STACKTRACE(column_vector.GetValueByIndex(0), UnrecoverableException);
@@ -653,7 +653,7 @@ TEST_F(ColumnVectorDateTimeTest, contant_datetime) {
 
     using namespace infinity;
 
-    std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kDateTime);
+    auto data_type = std::make_shared<DataType>(LogicalType::kDateTime);
     ColumnVector column_vector(data_type);
 
     column_vector.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
@@ -734,7 +734,7 @@ TEST_F(ColumnVectorDateTimeTest, contant_datetime) {
 TEST_F(ColumnVectorDateTimeTest, datetime_column_vector_select) {
     using namespace infinity;
 
-    std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kDateTime);
+    auto data_type = std::make_shared<DataType>(LogicalType::kDateTime);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
@@ -772,7 +772,7 @@ TEST_F(ColumnVectorDateTimeTest, datetime_column_vector_select) {
 TEST_F(ColumnVectorDateTimeTest, datetime_column_slice_init) {
     using namespace infinity;
 
-    std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kDateTime);
+    auto data_type = std::make_shared<DataType>(LogicalType::kDateTime);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
@@ -809,7 +809,7 @@ TEST_F(ColumnVectorDateTimeTest, datetime_column_slice_init) {
 TEST_F(ColumnVectorDateTimeTest, flat_timestamp) {
     using namespace infinity;
 
-    std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kTimestamp);
+    auto data_type = std::make_shared<DataType>(LogicalType::kTimestamp);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
@@ -912,7 +912,7 @@ TEST_F(ColumnVectorDateTimeTest, contant_timestamp) {
 
     using namespace infinity;
 
-    std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kTimestamp);
+    auto data_type = std::make_shared<DataType>(LogicalType::kTimestamp);
     ColumnVector column_vector(data_type);
 
     column_vector.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);

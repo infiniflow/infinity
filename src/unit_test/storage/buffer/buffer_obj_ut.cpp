@@ -84,8 +84,8 @@ public:
     }
 
     void WaitFlushOp(Storage *storage) {
-        NewTxnManager *txn_mgr = storage->new_txn_manager();
-        WalManager *wal_manager = storage->wal_manager();
+        auto *txn_mgr = storage->new_txn_manager();
+        auto *wal_manager = storage->wal_manager();
         NewTxn *new_txn = nullptr;
         do {
             new_txn = txn_mgr->BeginTxn(std::make_unique<std::string>("checkpoint"), TransactionType::kNewCheckpoint);
@@ -95,8 +95,8 @@ public:
         std::tie(max_commit_ts, wal_size) = wal_manager->GetCommitState();
 
         new_txn->SetWalSize(wal_size);
-        TxnTimeStamp last_checkpoint_ts = wal_manager->LastCheckpointTS();
-        Status status = new_txn->Checkpoint(last_checkpoint_ts);
+        auto last_checkpoint_ts = wal_manager->LastCheckpointTS();
+        auto status = new_txn->Checkpoint(last_checkpoint_ts);
         if (status.ok()) {
             status = txn_mgr->CommitTxn(new_txn);
         }
@@ -107,7 +107,7 @@ TEST_F(BufferObjTest, test1) {
     // Earlier cases may leave a dirty infinity instance. Destroy it first.
     infinity::Infinity::LocalUnInit();
     RemoveDbDirs();
-    std::shared_ptr<std::string> config_path = std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_buffer_obj.toml");
+    auto config_path = std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_buffer_obj.toml");
     //    RemoveDbDirs();
     infinity::InfinityContext::instance().InitPhase1(config_path);
     infinity::InfinityContext::instance().InitPhase2();
@@ -117,8 +117,8 @@ TEST_F(BufferObjTest, test1) {
     auto temp_dir = std::make_shared<std::string>(data_dir + "/spill");
     auto base_dir = std::make_shared<std::string>(GetFullDataDir());
 
-    Storage *storage = InfinityContext::instance().storage();
-    PersistenceManager *persistence_manager = storage->persistence_manager();
+    auto *storage = InfinityContext::instance().storage();
+    auto *persistence_manager = storage->persistence_manager();
     BufferManager buffer_manager(memory_limit, base_dir, temp_dir, persistence_manager);
 
     size_t test_size1 = 1024;
@@ -319,7 +319,7 @@ TEST_F(BufferObjTest, test_hnsw_index_buffer_obj_shutdown) {
     infinity::GlobalResourceUsage::UnInit();
     infinity::GlobalResourceUsage::Init();
 #endif
-    std::shared_ptr<std::string> config_path = std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_buffer_obj_2.toml");
+    auto config_path = std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_buffer_obj_2.toml");
     //    RemoveDbDirs();
     infinity::InfinityContext::instance().InitPhase1(config_path);
     infinity::InfinityContext::instance().InitPhase2();
@@ -327,11 +327,11 @@ TEST_F(BufferObjTest, test_hnsw_index_buffer_obj_shutdown) {
     constexpr u64 kInsertN = 2;
     constexpr u64 kImportSize = 8192;
 
-    Storage *storage = InfinityContext::instance().storage();
+    auto *storage = InfinityContext::instance().storage();
     EXPECT_NE(storage, nullptr);
     EXPECT_EQ(storage->buffer_manager()->memory_limit(), (u64)8 * 4 * 128 * 8192);
 
-    NewTxnManager *txn_mgr = storage->new_txn_manager();
+    auto *txn_mgr = storage->new_txn_manager();
 
     auto db_name = std::make_shared<std::string>("default_db");
     auto table_name = std::make_shared<std::string>("test_hnsw");
@@ -352,8 +352,8 @@ TEST_F(BufferObjTest, test_hnsw_index_buffer_obj_shutdown) {
         }
         auto tbl1_def =
             std::make_unique<TableDef>(std::make_shared<std::string>("default_db"), std::make_shared<std::string>("test_hnsw"), std::make_shared<std::string>("test_comment"), column_defs);
-        NewTxn *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
-        Status status = txn->CreateTable("default_db", std::move(tbl1_def), ConflictType::kError);
+        auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
+        auto status = txn->CreateTable("default_db", std::move(tbl1_def), ConflictType::kError);
         EXPECT_TRUE(status.ok());
         txn_mgr->CommitTxn(txn);
     }
@@ -374,10 +374,10 @@ TEST_F(BufferObjTest, test_hnsw_index_buffer_obj_shutdown) {
 
         const std::string &db_name = "default_db";
         const std::string &table_name = "test_hnsw";
-        ConflictType conflict_type = ConflictType::kError;
+        auto conflict_type = ConflictType::kError;
 
         // create index idx1
-        Status status = txn->CreateIndex(db_name, table_name, index_base_hnsw, conflict_type);
+        auto status = txn->CreateIndex(db_name, table_name, index_base_hnsw, conflict_type);
         EXPECT_TRUE(status.ok());
         status = txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
@@ -387,7 +387,7 @@ TEST_F(BufferObjTest, test_hnsw_index_buffer_obj_shutdown) {
         for (size_t i = 0; i < kInsertN; ++i) {
             auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("insert table"), TransactionType::kNormal);
             std::vector<std::shared_ptr<ColumnVector>> column_vectors;
-            std::shared_ptr<ColumnVector> column_vector = ColumnVector::Make(column_defs[0]->type());
+            auto column_vector = ColumnVector::Make(column_defs[0]->type());
             column_vector->Initialize();
             for (size_t j = 0; j < kImportSize; ++j) {
                 std::vector<float> vec;
@@ -444,7 +444,7 @@ TEST_F(BufferObjTest, test_hnsw_index_buffer_obj_shutdown) {
     // Drop Table
     {
         auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("drop table"), TransactionType::kNormal);
-        Status status = txn->DropTable(*db_name, *table_name, ConflictType::kError);
+        auto status = txn->DropTable(*db_name, *table_name, ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
@@ -455,7 +455,7 @@ TEST_F(BufferObjTest, test_hnsw_index_buffer_obj_shutdown) {
 }
 
 TEST_F(BufferObjTest, test_big_with_gc_and_cleanup) {
-    std::shared_ptr<std::string> config_path = std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_buffer_obj.toml");
+    auto config_path = std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_buffer_obj.toml");
     // Earlier cases may leave a dirty infinity instance. Destroy it first.
     infinity::Infinity::LocalUnInit();
     RemoveDbDirs();
@@ -465,11 +465,11 @@ TEST_F(BufferObjTest, test_big_with_gc_and_cleanup) {
     constexpr u64 kInsertN = 256;
     constexpr u64 kImportSize = 8192;
 
-    Storage *storage = InfinityContext::instance().storage();
+    auto *storage = InfinityContext::instance().storage();
     EXPECT_NE(storage, nullptr);
     EXPECT_EQ(storage->buffer_manager()->memory_limit(), (u64)512 * 1024);
 
-    NewTxnManager *txn_mgr = storage->new_txn_manager();
+    auto *txn_mgr = storage->new_txn_manager();
     //    BufferManager *buffer_mgr = storage->buffer_manager();
 
     auto db_name = std::make_shared<std::string>("default_db");
@@ -495,7 +495,7 @@ TEST_F(BufferObjTest, test_big_with_gc_and_cleanup) {
         for (size_t i = 0; i < kInsertN; ++i) {
             auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("insert table"), TransactionType::kNormal);
             std::vector<std::shared_ptr<ColumnVector>> column_vectors;
-            std::shared_ptr<ColumnVector> column_vector = ColumnVector::Make(std::make_shared<DataType>(column_defs[0]->type()->type()));
+            auto column_vector = ColumnVector::Make(std::make_shared<DataType>(column_defs[0]->type()->type()));
             column_vector->Initialize();
             for (u64 j = 0; j < kImportSize; ++j) {
                 Value v = Value::MakeBigInt(i * 1000 + j);
@@ -514,12 +514,12 @@ TEST_F(BufferObjTest, test_big_with_gc_and_cleanup) {
 
     {
         auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kNormal);
-        TxnTimeStamp begin_ts = txn->BeginTS();
-        TxnTimeStamp commit_ts = txn->CommitTS();
+        auto begin_ts = txn->BeginTS();
+        auto commit_ts = txn->CommitTS();
 
         std::optional<DBMeeta> db_meta;
         std::optional<TableMeeta> table_meta;
-        Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
+        auto status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
 
         auto [segment_ids, seg_status] = table_meta->GetSegmentIDs1();
@@ -587,7 +587,7 @@ TEST_F(BufferObjTest, test_big_with_gc_and_cleanup) {
 }
 
 TEST_F(BufferObjTest, DISABLED_test_multiple_threads_read) {
-    std::shared_ptr<std::string> config_path = std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_buffer_obj.toml");
+    auto config_path = std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_buffer_obj.toml");
     // Earlier cases may leave a dirty infinity instance. Destroy it first.
     infinity::Infinity::LocalUnInit();
     RemoveDbDirs();
@@ -598,11 +598,11 @@ TEST_F(BufferObjTest, DISABLED_test_multiple_threads_read) {
     constexpr u64 kImportSize = 8192;
     constexpr u64 kThreadN = 4;
 
-    Storage *storage = InfinityContext::instance().storage();
+    auto *storage = InfinityContext::instance().storage();
     EXPECT_NE(storage, nullptr);
     EXPECT_EQ(storage->buffer_manager()->memory_limit(), (u64)512 * 1024);
 
-    NewTxnManager *txn_mgr = storage->new_txn_manager();
+    auto *txn_mgr = storage->new_txn_manager();
     auto db_name = std::make_shared<std::string>("default_db");
     auto table_name = std::make_shared<std::string>("table1");
     auto table_comment = std::make_shared<std::string>("table_comment");
@@ -626,7 +626,7 @@ TEST_F(BufferObjTest, DISABLED_test_multiple_threads_read) {
         for (size_t i = 0; i < kInsertN; ++i) {
             auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("insert table"), TransactionType::kNormal);
             std::vector<std::shared_ptr<ColumnVector>> column_vectors;
-            std::shared_ptr<ColumnVector> column_vector = ColumnVector::Make(std::make_shared<DataType>(column_defs[0]->type()->type()));
+            auto column_vector = ColumnVector::Make(std::make_shared<DataType>(column_defs[0]->type()->type()));
             column_vector->Initialize();
             for (u64 j = 0; j < kImportSize; ++j) {
                 Value v = Value::MakeBigInt(i * 1000 + j);
@@ -646,12 +646,12 @@ TEST_F(BufferObjTest, DISABLED_test_multiple_threads_read) {
     for (size_t i = 0; i < kThreadN; ++i) {
         std::thread th([&]() {
             auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kNormal);
-            TxnTimeStamp begin_ts = txn->BeginTS();
-            TxnTimeStamp commit_ts = txn->CommitTS();
+            auto begin_ts = txn->BeginTS();
+            auto commit_ts = txn->CommitTS();
 
             std::optional<DBMeeta> db_meta;
             std::optional<TableMeeta> table_meta;
-            Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
+            auto status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
             EXPECT_TRUE(status.ok());
 
             auto [segment_ids, seg_status] = table_meta->GetSegmentIDs1();
@@ -699,8 +699,8 @@ TEST_F(BufferObjTest, DISABLED_test_multiple_threads_read) {
                     EXPECT_TRUE(status.ok());
 
                     for (size_t row_id = 0; row_id < kImportSize; ++row_id) {
-                        Value v1 = col.GetValueByIndex(row_id);
-                        Value v2 = Value::MakeBigInt(idx * 1000 + row_id);
+                        auto v1 = col.GetValueByIndex(row_id);
+                        auto v2 = Value::MakeBigInt(idx * 1000 + row_id);
                         EXPECT_EQ(v1, v2);
                     }
                 }

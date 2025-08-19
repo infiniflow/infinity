@@ -57,7 +57,7 @@ class ColumnVectorBoolTest : public BaseTest {
 TEST_F(ColumnVectorBoolTest, flat_boolean) {
     using namespace infinity;
 
-    std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kBoolean);
+    auto data_type = std::make_shared<DataType>(LogicalType::kBoolean);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
@@ -78,14 +78,14 @@ TEST_F(ColumnVectorBoolTest, flat_boolean) {
     EXPECT_TRUE(column_vector.initialized);
 
     {
-        Value v = Value::MakeBool(true);
+        auto v = Value::MakeBool(true);
         EXPECT_THROW_WITHOUT_STACKTRACE(column_vector.SetValueByIndex(3, v), UnrecoverableException);
     }
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
-        Value v = Value::MakeBool(static_cast<BooleanT>(i % 2 == 0));
+        auto v = Value::MakeBool(static_cast<BooleanT>(i % 2 == 0));
         column_vector.AppendValue(v);
-        Value vx = column_vector.GetValueByIndex(i);
+        auto vx = column_vector.GetValueByIndex(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kBoolean);
         EXPECT_EQ(vx.value_.boolean, static_cast<BooleanT>(i % 2 == 0));
         EXPECT_THROW_WITHOUT_STACKTRACE(column_vector.GetValueByIndex(i + 1), UnrecoverableException);
@@ -104,7 +104,7 @@ TEST_F(ColumnVectorBoolTest, flat_boolean) {
     EXPECT_EQ(column_vector.vector_type(), clone_column_vector.vector_type());
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
-        Value vx = column_vector.GetValueByIndex(i);
+        auto vx = column_vector.GetValueByIndex(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kBoolean);
         EXPECT_EQ(vx.value_.boolean, static_cast<BooleanT>(i % 2 == 0));
     }
@@ -136,9 +136,9 @@ TEST_F(ColumnVectorBoolTest, flat_boolean) {
     EXPECT_TRUE(column_vector.initialized);
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
-        BooleanT boolean = static_cast<BooleanT>(i % 2 == 0);
+        auto boolean = static_cast<BooleanT>(i % 2 == 0);
         column_vector.AppendByPtr((char *)(&boolean));
-        Value vx = column_vector.GetValueByIndex(i);
+        auto vx = column_vector.GetValueByIndex(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kBoolean);
         EXPECT_EQ(vx.value_.boolean, static_cast<BooleanT>(i % 2 == 0));
         EXPECT_THROW_WITHOUT_STACKTRACE(column_vector.GetValueByIndex(i + 1), UnrecoverableException);
@@ -159,14 +159,14 @@ TEST_F(ColumnVectorBoolTest, contant_bool) {
 
     using namespace infinity;
 
-    std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kBoolean);
+    auto data_type = std::make_shared<DataType>(LogicalType::kBoolean);
     ColumnVector column_vector(data_type);
 
     column_vector.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
 
     EXPECT_THROW_WITHOUT_STACKTRACE(column_vector.SetVectorType(ColumnVectorType::kConstant), UnrecoverableException);
 
-    EXPECT_EQ(column_vector.capacity(), (u64)DEFAULT_VECTOR_SIZE);
+    EXPECT_EQ(column_vector.capacity(), static_cast<u64>(DEFAULT_VECTOR_SIZE));
     EXPECT_EQ(column_vector.Size(), 0u);
 
     EXPECT_THROW_WITHOUT_STACKTRACE(column_vector.GetValueByIndex(0), UnrecoverableException);
@@ -181,16 +181,16 @@ TEST_F(ColumnVectorBoolTest, contant_bool) {
     EXPECT_TRUE(column_vector.initialized);
 
     for (i64 i = 0; i < 1; ++i) {
-        Value v = Value::MakeBool(static_cast<BooleanT>(i % 2 == 0));
+        auto v = Value::MakeBool(static_cast<BooleanT>(i % 2 == 0));
         column_vector.AppendValue(v);
         EXPECT_THROW_WITHOUT_STACKTRACE(column_vector.AppendValue(v), UnrecoverableException);
-        Value vx = column_vector.GetValueByIndex(i);
+        auto vx = column_vector.GetValueByIndex(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kBoolean);
         EXPECT_EQ(vx.value_.boolean, static_cast<BooleanT>(i % 2 == 0));
         EXPECT_THROW_WITHOUT_STACKTRACE(column_vector.GetValueByIndex(i + 1), UnrecoverableException);
     }
     for (i64 i = 0; i < 1; ++i) {
-        Value vx = column_vector.GetValueByIndex(i);
+        auto vx = column_vector.GetValueByIndex(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kBoolean);
         EXPECT_EQ(vx.value_.boolean, static_cast<BooleanT>(i % 2 == 0));
     }
@@ -223,10 +223,10 @@ TEST_F(ColumnVectorBoolTest, contant_bool) {
     EXPECT_TRUE(column_vector.initialized);
 
     for (i64 i = 0; i < 1; ++i) {
-        Value v = Value::MakeBool(static_cast<BooleanT>(i % 2 == 0));
+        auto v = Value::MakeBool(static_cast<BooleanT>(i % 2 == 0));
         column_vector.AppendValue(v);
         EXPECT_THROW_WITHOUT_STACKTRACE(column_vector.AppendValue(v), UnrecoverableException);
-        Value vx = column_vector.GetValueByIndex(i);
+        auto vx = column_vector.GetValueByIndex(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kBoolean);
         EXPECT_EQ(vx.value_.boolean, static_cast<BooleanT>(i % 2 == 0));
         EXPECT_THROW_WITHOUT_STACKTRACE(column_vector.GetValueByIndex(i + 1), UnrecoverableException);
@@ -236,7 +236,7 @@ TEST_F(ColumnVectorBoolTest, contant_bool) {
 TEST_F(ColumnVectorBoolTest, bool_column_vector_select) {
     using namespace infinity;
 
-    std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kBoolean);
+    auto data_type = std::make_shared<DataType>(LogicalType::kBoolean);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
@@ -270,7 +270,7 @@ TEST_F(ColumnVectorBoolTest, bool_column_vector_select) {
 TEST_F(ColumnVectorBoolTest, bool_column_slice_init) {
     using namespace infinity;
 
-    std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kBoolean);
+    auto data_type = std::make_shared<DataType>(LogicalType::kBoolean);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 

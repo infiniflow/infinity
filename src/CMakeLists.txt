@@ -534,7 +534,7 @@ file(GLOB_RECURSE
 )
 
 file(GLOB_RECURSE
-        ut
+        ut_ut
         CONFIGURE_DEPENDS
         unit_test/*_ut.cpp
 )
@@ -556,10 +556,10 @@ add_executable(unit_test
 )
 target_sources(unit_test
         PRIVATE
-        FILE_SET ut_cxx_modules TYPE CXX_MODULES FILES
+        FILE_SET core_cxx_modules TYPE CXX_MODULES FILES
         ${ut_mod}
 
-        ${ut}
+        ${ut_ut}
 )
 
 set_target_properties(unit_test PROPERTIES OUTPUT_NAME test_main)
