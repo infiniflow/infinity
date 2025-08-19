@@ -23,6 +23,16 @@ if (NOT CMAKE_TOOLCHAIN_FILE)
     endif ()
 endif ()
 
+
+#set(VCPKG_ROOT "VCPKG_ROOT" CACHE STRING "VCPKG_ROOT")
+#
+#if (NOT DEFINED VCPKG_ROOT)
+#    message(FATAL_ERROR "MISSING ROOT FOR VCPKG setting to C:/vcpkg")
+#    set(VCPKG_ROOT "C:/vcpkg")
+#endif()
+#
+#set(CMAKE_TOOLCHAIN_FILE "${VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake")
+
 project(infinity VERSION 0.6.0)
 
 set(CMAKE_CXX_STANDARD 23)

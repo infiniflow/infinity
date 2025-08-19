@@ -556,18 +556,18 @@ add_executable(unit_test
 )
 target_sources(unit_test
         PRIVATE
-        FILE_SET core_cxx_modules TYPE CXX_MODULES FILES
+        FILE_SET ut_cxx_modules TYPE CXX_MODULES FILES
         ${ut_mod}
 
         ${ut_ut}
 )
 
 set_target_properties(unit_test PROPERTIES OUTPUT_NAME test_main)
-add_dependencies(unit_test miniocpp curlpp_static libcurl_static infinity_core)
+add_dependencies(unit_test miniocpp curlpp_static libcurl_static)
 
 target_link_libraries(unit_test
         infinity_core
-        GTest::gtest GTest::gtest_main GTest::gmock GTest::gmock_main
+        GTest::gtest GTest::gtest_main
         sql_parser
         onnxruntime_mlas
         zsv_parser
