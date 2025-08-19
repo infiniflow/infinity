@@ -749,14 +749,6 @@ Status NewTxn::AddColumns(const String &db_name, const String &table_name, const
         return status;
     }
 
-    // Construct added columns name map
-    Set<SizeT> column_idx_set;
-    Set<String> column_name_set;
-    for (const auto &column_def : column_defs) {
-        column_idx_set.insert(column_def->id());
-        column_name_set.insert(column_def->name());
-    }
-
     SharedPtr<Vector<SharedPtr<ColumnDef>>> old_column_defs;
     std::tie(old_column_defs, status) = table_meta->GetColumnDefs();
     if (!status.ok()) {
@@ -765,6 +757,16 @@ Status NewTxn::AddColumns(const String &db_name, const String &table_name, const
 
     Vector<u32> new_column_idx;
     u32 latest_column_idx = old_column_defs->size();
+    // Construct added columns name map
+    Set<SizeT> column_idx_set;
+    Set<String> column_name_set;
+    for (const auto &column_def : column_defs) {
+        column_idx_set.insert(column_def->id());
+        column_name_set.insert(column_def->name());
+        new_column_idx.push_back(latest_column_idx + 1);
+        ++latest_column_idx;
+    }
+
     for (auto &column_def : *old_column_defs) {
         if (column_name_set.contains(column_def->name())) {
             return Status::DuplicateColumnName(column_def->name());
@@ -772,8 +774,6 @@ Status NewTxn::AddColumns(const String &db_name, const String &table_name, const
         if (column_idx_set.contains(column_def->id())) {
             return Status::DuplicateColumnIndex(fmt::format("Duplicate table column index: {}", column_def->id()));
         }
-        new_column_idx.push_back(latest_column_idx + 1);
-        ++latest_column_idx;
     }
 
     // Put the data into local txn store
