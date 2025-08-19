@@ -277,7 +277,7 @@ class TestMemIdx:
             infinity_obj.optimize("default_db", "test_mem_ivf", optimize_opt=None)
             check()
 
-            db_obj.drop_table("test_memidx1")
+            db_obj.drop_table("test_mem_ivf")
 
         part3()
 
