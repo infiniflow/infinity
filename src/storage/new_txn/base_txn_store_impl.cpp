@@ -473,7 +473,8 @@ String AddColumnsTxnStore::ToString() const {
 SharedPtr<WalEntry> AddColumnsTxnStore::ToWalEntry(TxnTimeStamp commit_ts) const {
     SharedPtr<WalEntry> wal_entry = MakeShared<WalEntry>();
     wal_entry->commit_ts_ = commit_ts;
-    SharedPtr<WalCmd> wal_command = MakeShared<WalCmdAddColumnsV2>(db_name_, db_id_str_, table_name_, table_id_str_, column_idx_list_, column_defs_, table_key_);
+    SharedPtr<WalCmd> wal_command =
+        MakeShared<WalCmdAddColumnsV2>(db_name_, db_id_str_, table_name_, table_id_str_, column_idx_list_, column_defs_, table_key_);
     wal_entry->cmds_.push_back(wal_command);
     return wal_entry;
 }
