@@ -114,7 +114,7 @@ protected:
         std::optional<TableMeeta> table_meta;
         Status status = txn->GetTableMeta(db_name, table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
-        auto[row_cnt, status2] = table_meta->GetTableRowCount();
+        auto [row_cnt, status2] = table_meta->GetTableRowCount();
         EXPECT_TRUE(status2.ok());
 
         txn_mgr_->CommitTxn(txn);

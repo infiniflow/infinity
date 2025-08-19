@@ -85,7 +85,8 @@ void DataTable::UnionWith(const std::shared_ptr<DataTable> &other) {
         UnrecoverableError(fmt::format("Can't union two table with different row count {}:{}.", this->row_count_, other->row_count_));
     }
     if (this->data_blocks_.size() != other->data_blocks_.size()) {
-        UnrecoverableError(fmt::format("Can't union two table with different block count {}:{}.", this->data_blocks_.size(), other->data_blocks_.size()));
+        UnrecoverableError(
+            fmt::format("Can't union two table with different block count {}:{}.", this->data_blocks_.size(), other->data_blocks_.size()));
     }
     size_t block_count = this->data_blocks_.size();
     for (size_t idx = 0; idx < block_count; ++idx) {
@@ -118,7 +119,8 @@ std::shared_ptr<DataTable> DataTable::MakeSummaryResultTable(u64 count, u64 sum)
     std::vector<std::shared_ptr<ColumnDef>> column_defs;
     column_defs.emplace_back(
         std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kBigInt, nullptr), "count", std::set<ConstraintType>()));
-    column_defs.emplace_back(std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kBigInt, nullptr), "sum", std::set<ConstraintType>()));
+    column_defs.emplace_back(
+        std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kBigInt, nullptr), "sum", std::set<ConstraintType>()));
     std::shared_ptr<TableDef> result_table_def_ptr = TableDef::Make(nullptr, nullptr, nullptr, column_defs);
     std::shared_ptr<DataTable> result_table = Make(result_table_def_ptr, TableType::kResult);
 

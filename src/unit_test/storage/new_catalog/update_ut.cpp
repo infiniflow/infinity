@@ -62,293 +62,291 @@ INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
 
 // Helper functions for test preparation
 namespace {
-    struct TestSetup {
-        std::shared_ptr<std::string> db_name;
-        std::shared_ptr<std::string> table_name;
-        std::shared_ptr<std::string> index_name;
-        std::shared_ptr<ColumnDef> column_def1;
-        std::shared_ptr<ColumnDef> column_def2;
-        std::shared_ptr<TableDef> table_def;
-        NewTxnManager* new_txn_mgr;
-        
-        TestSetup() {
-            db_name = std::make_shared<std::string>("db1");
-            table_name = std::make_shared<std::string>("tb1");
-            index_name = std::make_shared<std::string>("idx1");
-            column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
-            column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
-            table_def = TableDef::Make(db_name, table_name, std::make_shared<std::string>(), {column_def1, column_def2});
-            new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
+struct TestSetup {
+    std::shared_ptr<std::string> db_name;
+    std::shared_ptr<std::string> table_name;
+    std::shared_ptr<std::string> index_name;
+    std::shared_ptr<ColumnDef> column_def1;
+    std::shared_ptr<ColumnDef> column_def2;
+    std::shared_ptr<TableDef> table_def;
+    NewTxnManager *new_txn_mgr;
+
+    TestSetup() {
+        db_name = std::make_shared<std::string>("db1");
+        table_name = std::make_shared<std::string>("tb1");
+        index_name = std::make_shared<std::string>("idx1");
+        column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
+        column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
+        table_def = TableDef::Make(db_name, table_name, std::make_shared<std::string>(), {column_def1, column_def2});
+        new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
+    }
+
+    void verify_original_data() {
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("verify"), TransactionType::kNormal);
+        TxnTimeStamp begin_ts = txn->BeginTS();
+        TxnTimeStamp commit_ts = txn->CommitTS();
+
+        std::optional<DBMeeta> db_meta;
+        std::optional<TableMeeta> table_meta;
+        Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
+        EXPECT_TRUE(status.ok());
+
+        SegmentID segment_id = 0;
+        NewTxnGetVisibleRangeState state;
+        SegmentMeta segment_meta(segment_id, *table_meta);
+
+        std::vector<BlockID> *block_ids_ptr = nullptr;
+        std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1();
+        EXPECT_TRUE(status.ok());
+        // Should only have original block (no update block since update failed)
+        EXPECT_EQ(*block_ids_ptr, std::vector<BlockID>({0}));
+
+        // Check that all rows in the original block are still visible (no deletions)
+        BlockMeta block_meta(0, segment_meta);
+        status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, commit_ts, state);
+        EXPECT_TRUE(status.ok());
+
+        std::pair<BlockOffset, BlockOffset> range;
+        BlockOffset offset = 0;
+        size_t total_rows = 0;
+        while (true) {
+            bool has_next = state.Next(offset, range);
+            if (!has_next) {
+                break;
+            }
+            // Since we appended one whole block, we expect one large range
+            total_rows += (range.second - range.first);
+            offset = range.second;
         }
+        // Should have all 8192 rows visible (no deletions from failed update)
+        EXPECT_EQ(total_rows, 8192);
 
-        void verify_original_data() {
-            auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("verify"), TransactionType::kNormal);
-            TxnTimeStamp begin_ts = txn->BeginTS();
-            TxnTimeStamp commit_ts = txn->CommitTS();
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+    }
 
-            std::optional<DBMeeta> db_meta;
-            std::optional<TableMeeta> table_meta;
-            Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
-            EXPECT_TRUE(status.ok());
+    void verify_data_after_delete_conflict() {
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("verify"), TransactionType::kNormal);
+        TxnTimeStamp begin_ts = txn->BeginTS();
+        TxnTimeStamp commit_ts = txn->CommitTS();
 
-            SegmentID segment_id = 0;
-            NewTxnGetVisibleRangeState state;
-            SegmentMeta segment_meta(segment_id, *table_meta);
+        std::optional<DBMeeta> db_meta;
+        std::optional<TableMeeta> table_meta;
+        Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
+        EXPECT_TRUE(status.ok());
 
-            std::vector<BlockID> *block_ids_ptr = nullptr;
-            std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1();
-            EXPECT_TRUE(status.ok());
-            // Should only have original block (no update block since update failed)
-            EXPECT_EQ(*block_ids_ptr, std::vector<BlockID>({0}));
-            
-            // Check that all rows in the original block are still visible (no deletions)
-            BlockMeta block_meta(0, segment_meta);
+        SegmentID segment_id = 0;
+        NewTxnGetVisibleRangeState state;
+        SegmentMeta segment_meta(segment_id, *table_meta);
+
+        std::vector<BlockID> *block_ids_ptr = nullptr;
+        std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1();
+        EXPECT_TRUE(status.ok());
+        // Should only have original block (no update block since update failed)
+        EXPECT_EQ(*block_ids_ptr, std::vector<BlockID>({0}));
+
+        // Check that only even-numbered rows are visible (odd rows were deleted)
+        BlockMeta block_meta(0, segment_meta);
+        status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, commit_ts, state);
+        EXPECT_TRUE(status.ok());
+
+        std::pair<BlockOffset, BlockOffset> range;
+        BlockOffset offset = 0;
+        size_t total_rows = 0;
+        size_t row_id = 0;
+        while (true) {
+            bool has_next = state.Next(offset, range);
+            if (!has_next) {
+                break;
+            }
+            // Should only see even-numbered rows (0, 2, 4, ..., 8190)
+            EXPECT_EQ(range.first, row_id);
+            EXPECT_EQ(range.second, row_id + 1);
+            total_rows += (range.second - range.first);
+            offset = range.second;
+            row_id += 2;
+        }
+        // Should have 4096 rows visible (only even-numbered rows, odd rows were deleted)
+        EXPECT_EQ(total_rows, 4096);
+
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+    }
+
+    void check_data() {
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kNormal);
+        TxnTimeStamp begin_ts = txn->BeginTS();
+        TxnTimeStamp commit_ts = txn->CommitTS();
+
+        std::optional<DBMeeta> db_meta;
+        std::optional<TableMeeta> table_meta;
+        Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
+        EXPECT_TRUE(status.ok());
+
+        SegmentID segment_id = 0;
+        NewTxnGetVisibleRangeState state;
+        SegmentMeta segment_meta(segment_id, *table_meta);
+
+        std::vector<BlockID> *block_ids_ptr = nullptr;
+        std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1();
+        EXPECT_TRUE(status.ok());
+        EXPECT_EQ(*block_ids_ptr, std::vector<BlockID>({0, 1}));
+        for (const auto block_id : *block_ids_ptr) {
+            BlockMeta block_meta(block_id, segment_meta);
+
             status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, commit_ts, state);
             EXPECT_TRUE(status.ok());
-            
             std::pair<BlockOffset, BlockOffset> range;
             BlockOffset offset = 0;
-            size_t total_rows = 0;
-            while (true) {
-                bool has_next = state.Next(offset, range);
-                if (!has_next) {
-                    break;
-                }
-                // Since we appended one whole block, we expect one large range
-                total_rows += (range.second - range.first);
-                offset = range.second;
-            }
-            // Should have all 8192 rows visible (no deletions from failed update)
-            EXPECT_EQ(total_rows, 8192);
-            
-            status = new_txn_mgr->CommitTxn(txn);
-            EXPECT_TRUE(status.ok());
-        }
 
-        void verify_data_after_delete_conflict() {
-            auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("verify"), TransactionType::kNormal);
-            TxnTimeStamp begin_ts = txn->BeginTS();
-            TxnTimeStamp commit_ts = txn->CommitTS();
-
-            std::optional<DBMeeta> db_meta;
-            std::optional<TableMeeta> table_meta;
-            Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
-            EXPECT_TRUE(status.ok());
-
-            SegmentID segment_id = 0;
-            NewTxnGetVisibleRangeState state;
-            SegmentMeta segment_meta(segment_id, *table_meta);
-
-            std::vector<BlockID> *block_ids_ptr = nullptr;
-            std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1();
-            EXPECT_TRUE(status.ok());
-            // Should only have original block (no update block since update failed)
-            EXPECT_EQ(*block_ids_ptr, std::vector<BlockID>({0}));
-            
-            // Check that only even-numbered rows are visible (odd rows were deleted)
-            BlockMeta block_meta(0, segment_meta);
-            status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, commit_ts, state);
-            EXPECT_TRUE(status.ok());
-            
-            std::pair<BlockOffset, BlockOffset> range;
-            BlockOffset offset = 0;
-            size_t total_rows = 0;
-            size_t row_id = 0;
-            while (true) {
-                bool has_next = state.Next(offset, range);
-                if (!has_next) {
-                    break;
-                }
-                // Should only see even-numbered rows (0, 2, 4, ..., 8190)
-                EXPECT_EQ(range.first, row_id);
-                EXPECT_EQ(range.second, row_id + 1);
-                total_rows += (range.second - range.first);
-                offset = range.second;
-                row_id += 2;
-            }
-            // Should have 4096 rows visible (only even-numbered rows, odd rows were deleted)
-            EXPECT_EQ(total_rows, 4096);
-            
-            status = new_txn_mgr->CommitTxn(txn);
-            EXPECT_TRUE(status.ok());
-        }
-
-        void check_data() {
-            auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kNormal);
-            TxnTimeStamp begin_ts = txn->BeginTS();
-            TxnTimeStamp commit_ts = txn->CommitTS();
-
-            std::optional<DBMeeta> db_meta;
-            std::optional<TableMeeta> table_meta;
-            Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
-            EXPECT_TRUE(status.ok());
-
-            SegmentID segment_id = 0;
-            NewTxnGetVisibleRangeState state;
-            SegmentMeta segment_meta(segment_id, *table_meta);
-
-            std::vector<BlockID> *block_ids_ptr = nullptr;
-            std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1();
-            EXPECT_TRUE(status.ok());
-            EXPECT_EQ(*block_ids_ptr, std::vector<BlockID>({0, 1}));
-            for (const auto block_id : *block_ids_ptr) {
-                BlockMeta block_meta(block_id, segment_meta);
-
-                status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, commit_ts, state);
-                EXPECT_TRUE(status.ok());
-                std::pair<BlockOffset, BlockOffset> range;
-                BlockOffset offset = 0;
-                
-                if (block_id == 0) {
-                    // Block 0: only even-numbered rows are visible (odd rows were deleted)
-                    size_t row_id = 0;
-                    while (true) {
-                        bool has_next = state.Next(offset, range);
-                        if (!has_next) {
-                            break;
-                        }
-                        EXPECT_EQ(range.first, row_id);
-                        EXPECT_EQ(range.second, row_id + 1);
-                        offset = range.second;
-                        row_id += 2;
-                    }
-                } else {
-                    // Block 1: all updated rows are visible (full block from append)
-                    bool has_next = state.Next(offset, range);
-                    EXPECT_TRUE(has_next);
-                    EXPECT_EQ(range.first, 0);
-                    EXPECT_EQ(range.second, 8192);
-                    offset = range.second;
-                    has_next = state.Next(offset, range);
-                    EXPECT_FALSE(has_next);
-                }
-            }
-            
-            status = new_txn_mgr->CommitTxn(txn);
-            EXPECT_TRUE(status.ok());
-        }
-
-        void check_data_no_conflicts() {
-            auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kNormal);
-            TxnTimeStamp begin_ts = txn->BeginTS();
-            TxnTimeStamp commit_ts = txn->CommitTS();
-
-            std::optional<DBMeeta> db_meta;
-            std::optional<TableMeeta> table_meta;
-            Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
-            EXPECT_TRUE(status.ok());
-
-            SegmentID segment_id = 0;
-            NewTxnGetVisibleRangeState state;
-            SegmentMeta segment_meta(segment_id, *table_meta);
-
-            std::vector<BlockID> *block_ids_ptr = nullptr;
-            std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1();
-            EXPECT_TRUE(status.ok());
-            EXPECT_EQ(*block_ids_ptr, std::vector<BlockID>({0, 1}));
-            
-            size_t total_visible_rows = 0;
-            for (const auto block_id : *block_ids_ptr) {
-                BlockMeta block_meta(block_id, segment_meta);
-
-                status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, commit_ts, state);
-                EXPECT_TRUE(status.ok());
-                std::pair<BlockOffset, BlockOffset> range;
-                BlockOffset offset = 0;
-                
+            if (block_id == 0) {
+                // Block 0: only even-numbered rows are visible (odd rows were deleted)
+                size_t row_id = 0;
                 while (true) {
                     bool has_next = state.Next(offset, range);
                     if (!has_next) {
                         break;
                     }
-                    total_visible_rows += (range.second - range.first);
+                    EXPECT_EQ(range.first, row_id);
+                    EXPECT_EQ(range.second, row_id + 1);
                     offset = range.second;
+                    row_id += 2;
                 }
+            } else {
+                // Block 1: all updated rows are visible (full block from append)
+                bool has_next = state.Next(offset, range);
+                EXPECT_TRUE(has_next);
+                EXPECT_EQ(range.first, 0);
+                EXPECT_EQ(range.second, 8192);
+                offset = range.second;
+                has_next = state.Next(offset, range);
+                EXPECT_FALSE(has_next);
             }
-            
-            // Should have 4096 total visible rows (only the updated odd-numbered rows)
-            // Even-numbered rows were deleted, odd-numbered rows were updated
-            EXPECT_EQ(total_visible_rows, 4096);
-            
-            status = new_txn_mgr->CommitTxn(txn);
-            EXPECT_TRUE(status.ok());
         }
-    };
 
-    void CreateDatabaseAndTable(TestSetup& setup) {
-        // Create database
-        auto *txn1 = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kNormal);
-        Status status = txn1->CreateDatabase(*setup.db_name, ConflictType::kError, std::make_shared<std::string>());
-        EXPECT_TRUE(status.ok());
-        status = setup.new_txn_mgr->CommitTxn(txn1);
-        EXPECT_TRUE(status.ok());
-
-        // Create table
-        auto *txn2 = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
-        status = txn2->CreateTable(*setup.db_name, std::move(setup.table_def), ConflictType::kIgnore);
-        EXPECT_TRUE(status.ok());
-        status = setup.new_txn_mgr->CommitTxn(txn2);
+        status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
     }
 
+    void check_data_no_conflicts() {
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kNormal);
+        TxnTimeStamp begin_ts = txn->BeginTS();
+        TxnTimeStamp commit_ts = txn->CommitTS();
 
-
-    void AppendData(TestSetup& setup, const std::shared_ptr<DataBlock>& input_block) {
-        auto *txn = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("append"), TransactionType::kNormal);
-        Status status = txn->Append(*setup.db_name, *setup.table_name, input_block);
+        std::optional<DBMeeta> db_meta;
+        std::optional<TableMeeta> table_meta;
+        Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
-        status = setup.new_txn_mgr->CommitTxn(txn);
+
+        SegmentID segment_id = 0;
+        NewTxnGetVisibleRangeState state;
+        SegmentMeta segment_meta(segment_id, *table_meta);
+
+        std::vector<BlockID> *block_ids_ptr = nullptr;
+        std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1();
+        EXPECT_TRUE(status.ok());
+        EXPECT_EQ(*block_ids_ptr, std::vector<BlockID>({0, 1}));
+
+        size_t total_visible_rows = 0;
+        for (const auto block_id : *block_ids_ptr) {
+            BlockMeta block_meta(block_id, segment_meta);
+
+            status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, commit_ts, state);
+            EXPECT_TRUE(status.ok());
+            std::pair<BlockOffset, BlockOffset> range;
+            BlockOffset offset = 0;
+
+            while (true) {
+                bool has_next = state.Next(offset, range);
+                if (!has_next) {
+                    break;
+                }
+                total_visible_rows += (range.second - range.first);
+                offset = range.second;
+            }
+        }
+
+        // Should have 4096 total visible rows (only the updated odd-numbered rows)
+        // Even-numbered rows were deleted, odd-numbered rows were updated
+        EXPECT_EQ(total_visible_rows, 4096);
+
+        status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
     }
+};
 
-    void CreateIndex(TestSetup& setup) {
-        auto *txn_idx = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("create index"), TransactionType::kNormal);
-        auto index_def1 = IndexSecondary::Make(setup.index_name, std::make_shared<std::string>(), "file_name", {setup.column_def1->name()});
-        Status status = txn_idx->CreateIndex(*setup.db_name, *setup.table_name, index_def1, ConflictType::kError);
-        EXPECT_TRUE(status.ok());
-        status = setup.new_txn_mgr->CommitTxn(txn_idx);
-        EXPECT_TRUE(status.ok());
-    }
+void CreateDatabaseAndTable(TestSetup &setup) {
+    // Create database
+    auto *txn1 = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kNormal);
+    Status status = txn1->CreateDatabase(*setup.db_name, ConflictType::kError, std::make_shared<std::string>());
+    EXPECT_TRUE(status.ok());
+    status = setup.new_txn_mgr->CommitTxn(txn1);
+    EXPECT_TRUE(status.ok());
 
-    void DropDatabase(TestSetup& setup) {
-        auto *txn = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop db"), TransactionType::kNormal);
-        Status status = txn->DropDatabase(*setup.db_name, ConflictType::kError);
-        EXPECT_TRUE(status.ok());
-        status = setup.new_txn_mgr->CommitTxn(txn);
-        EXPECT_TRUE(status.ok());
-    }
-
-    void DropTable(TestSetup& setup) {
-        auto *txn = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop table"), TransactionType::kNormal);
-        Status status = txn->DropTable(*setup.db_name, *setup.table_name, ConflictType::kError);
-        EXPECT_TRUE(status.ok());
-        status = setup.new_txn_mgr->CommitTxn(txn);
-        EXPECT_TRUE(status.ok());
-    }
-
-    void DropIndex(TestSetup& setup) {
-        auto *txn = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop index"), TransactionType::kNormal);
-        Status status = txn->DropIndexByName(*setup.db_name, *setup.table_name, *setup.index_name, ConflictType::kError);
-        EXPECT_TRUE(status.ok());
-        status = setup.new_txn_mgr->CommitTxn(txn);
-        EXPECT_TRUE(status.ok());
-    }
-
-    void DumpIndex(TestSetup& setup) {
-        auto *txn = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("dump index"), TransactionType::kNormal);
-        Status status = txn->DumpMemIndex(*setup.db_name, *setup.table_name, *setup.index_name);
-        EXPECT_TRUE(status.ok());
-        status = setup.new_txn_mgr->CommitTxn(txn);
-        EXPECT_TRUE(status.ok());
-    }
+    // Create table
+    auto *txn2 = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
+    status = txn2->CreateTable(*setup.db_name, std::move(setup.table_def), ConflictType::kIgnore);
+    EXPECT_TRUE(status.ok());
+    status = setup.new_txn_mgr->CommitTxn(txn2);
+    EXPECT_TRUE(status.ok());
 }
+
+void AppendData(TestSetup &setup, const std::shared_ptr<DataBlock> &input_block) {
+    auto *txn = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("append"), TransactionType::kNormal);
+    Status status = txn->Append(*setup.db_name, *setup.table_name, input_block);
+    EXPECT_TRUE(status.ok());
+    status = setup.new_txn_mgr->CommitTxn(txn);
+    EXPECT_TRUE(status.ok());
+}
+
+void CreateIndex(TestSetup &setup) {
+    auto *txn_idx = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("create index"), TransactionType::kNormal);
+    auto index_def1 = IndexSecondary::Make(setup.index_name, std::make_shared<std::string>(), "file_name", {setup.column_def1->name()});
+    Status status = txn_idx->CreateIndex(*setup.db_name, *setup.table_name, index_def1, ConflictType::kError);
+    EXPECT_TRUE(status.ok());
+    status = setup.new_txn_mgr->CommitTxn(txn_idx);
+    EXPECT_TRUE(status.ok());
+}
+
+void DropDatabase(TestSetup &setup) {
+    auto *txn = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop db"), TransactionType::kNormal);
+    Status status = txn->DropDatabase(*setup.db_name, ConflictType::kError);
+    EXPECT_TRUE(status.ok());
+    status = setup.new_txn_mgr->CommitTxn(txn);
+    EXPECT_TRUE(status.ok());
+}
+
+void DropTable(TestSetup &setup) {
+    auto *txn = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop table"), TransactionType::kNormal);
+    Status status = txn->DropTable(*setup.db_name, *setup.table_name, ConflictType::kError);
+    EXPECT_TRUE(status.ok());
+    status = setup.new_txn_mgr->CommitTxn(txn);
+    EXPECT_TRUE(status.ok());
+}
+
+void DropIndex(TestSetup &setup) {
+    auto *txn = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop index"), TransactionType::kNormal);
+    Status status = txn->DropIndexByName(*setup.db_name, *setup.table_name, *setup.index_name, ConflictType::kError);
+    EXPECT_TRUE(status.ok());
+    status = setup.new_txn_mgr->CommitTxn(txn);
+    EXPECT_TRUE(status.ok());
+}
+
+void DumpIndex(TestSetup &setup) {
+    auto *txn = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("dump index"), TransactionType::kNormal);
+    Status status = txn->DumpMemIndex(*setup.db_name, *setup.table_name, *setup.index_name);
+    EXPECT_TRUE(status.ok());
+    status = setup.new_txn_mgr->CommitTxn(txn);
+    EXPECT_TRUE(status.ok());
+}
+} // namespace
 
 TEST_P(TestTxnUpdate, test_update) {
     using namespace infinity;
 
     TestSetup setup;
     CreateDatabaseAndTable(setup);
-    
+
     auto input_block = std::make_shared<DataBlock>();
     {
         // Initialize input block
@@ -368,7 +366,7 @@ TEST_P(TestTxnUpdate, test_update) {
         }
         input_block->Finalize();
     }
-    
+
     for (int i = 0; i < 2; ++i) {
         auto *txn = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("append"), TransactionType::kNormal);
         Status status = txn->Append(*setup.db_name, *setup.table_name, input_block);
@@ -546,7 +544,7 @@ TEST_P(TestTxnUpdate, test_update_multiple_blocks) {
             EXPECT_TRUE(status.ok());
             std::pair<BlockOffset, BlockOffset> range;
             BlockOffset offset = 0;
-            
+
             if (block_id < 2) {
                 // Blocks 0 and 1: only even-numbered rows are visible
                 size_t row_id = 0;
@@ -579,7 +577,7 @@ TEST_P(TestTxnUpdate, test_update_and_drop_db) {
 
     TestSetup setup;
     size_t insert_row = 8192;
-    
+
     // Create custom input block for this test
     auto input_block1 = std::make_shared<DataBlock>();
     {
@@ -733,7 +731,7 @@ TEST_P(TestTxnUpdate, test_update_and_drop_table) {
 
     TestSetup setup;
     size_t insert_row = 8192;
-    
+
     // Create custom input block for this test
     auto input_block1 = std::make_shared<DataBlock>();
     {
@@ -779,7 +777,6 @@ TEST_P(TestTxnUpdate, test_update_and_drop_table) {
         update_block->Finalize();
     }
 
-
     //    t1      update      commit (success)
     //    |----------|---------|
     //                            |----------------------|----------|
@@ -810,7 +807,7 @@ TEST_P(TestTxnUpdate, test_update_and_drop_table) {
         EXPECT_EQ(status.code(), ErrorCode::kTableNotExist);
         status = setup.new_txn_mgr->CommitTxn(txn7);
         EXPECT_TRUE(status.ok());
-        
+
         DropDatabase(setup);
     }
 
@@ -904,7 +901,7 @@ TEST_P(TestTxnUpdate, test_update_and_drop_table) {
         for (size_t row_id = 1; row_id < 8192; row_id += 2) {
             row_ids.push_back(RowID(0, row_id));
         }
-        Status         status = txn4->Update(*setup.db_name, *setup.table_name, update_block, row_ids);
+        Status status = txn4->Update(*setup.db_name, *setup.table_name, update_block, row_ids);
         EXPECT_TRUE(status.ok());
         status = setup.new_txn_mgr->CommitTxn(txn4);
         EXPECT_FALSE(status.ok());
@@ -929,7 +926,7 @@ TEST_P(TestTxnUpdate, test_update_and_drop_index) {
 
     TestSetup setup;
     size_t insert_row = 8192;
-    
+
     // Create custom input block for this test
     auto input_block1 = std::make_shared<DataBlock>();
     {
@@ -974,7 +971,6 @@ TEST_P(TestTxnUpdate, test_update_and_drop_index) {
         }
         update_block->Finalize();
     }
-
 
     //    t1      update      commit (success)
     //    |----------|---------|
@@ -1066,7 +1062,7 @@ TEST_P(TestTxnUpdate, test_update_and_drop_index) {
 
         status = setup.new_txn_mgr->CommitTxn(txn4);
         EXPECT_FALSE(status.ok());
-        
+
         // Check that all rows in the original block are still visible (no deletions)
         setup.verify_original_data();
 
@@ -1081,7 +1077,7 @@ TEST_P(TestTxnUpdate, test_update_and_dump_index) {
 
     TestSetup setup;
     size_t insert_row = 8192;
-    
+
     // Create custom input block for this test
     auto input_block1 = std::make_shared<DataBlock>();
     {
@@ -1127,8 +1123,6 @@ TEST_P(TestTxnUpdate, test_update_and_dump_index) {
         update_block->Finalize();
     }
 
-
-
     //    t1      update                                            commit (fail)
     //    |----------|----------------------------------------------------|
     //                            |----------------------|----------|
@@ -1166,7 +1160,7 @@ TEST_P(TestTxnUpdate, test_update_and_dump_index) {
         CreateDatabaseAndTable(setup);
         CreateIndex(setup);
         AppendData(setup, input_block1);
-        
+
         // Update data
         auto *txn4 = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("update"), TransactionType::kNormal);
         std::vector<RowID> row_ids;
@@ -1180,7 +1174,6 @@ TEST_P(TestTxnUpdate, test_update_and_dump_index) {
 
         status = setup.new_txn_mgr->CommitTxn(txn4);
         EXPECT_TRUE(status.ok());
-
 
         status = txn5->DumpMemIndex(*setup.db_name, *setup.table_name, *setup.index_name);
         EXPECT_TRUE(status.ok());
@@ -1201,11 +1194,11 @@ TEST_P(TestTxnUpdate, test_update_and_add_drop_column_conflicts) {
 
     TestSetup setup;
     size_t insert_row = 8192;
-    
+
     // Define default value for varchar columns
     std::shared_ptr<ConstantExpr> default_varchar = std::make_shared<ConstantExpr>(LiteralType::kString);
     default_varchar->str_value_ = strdup("");
-    
+
     // Create custom input block for this test
     auto input_block1 = std::make_shared<DataBlock>();
     {
@@ -1270,7 +1263,8 @@ TEST_P(TestTxnUpdate, test_update_and_add_drop_column_conflicts) {
 
         // Add column in another transaction
         auto *txn5 = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("add_column"), TransactionType::kNormal);
-        auto new_column_def = std::make_shared<ColumnDef>(2, std::make_shared<DataType>(LogicalType::kVarchar), "col3", std::set<ConstraintType>(), default_varchar);
+        auto new_column_def =
+            std::make_shared<ColumnDef>(2, std::make_shared<DataType>(LogicalType::kVarchar), "col3", std::set<ConstraintType>(), default_varchar);
         status = txn5->AddColumns(*setup.db_name, *setup.table_name, std::vector<std::shared_ptr<ColumnDef>>{new_column_def});
         EXPECT_TRUE(status.ok());
         status = setup.new_txn_mgr->CommitTxn(txn5);
@@ -1337,15 +1331,14 @@ TEST_P(TestTxnUpdate, test_update_and_add_drop_column_conflicts) {
         Status status = txn4->Update(*setup.db_name, *setup.table_name, update_block, row_ids);
         EXPECT_TRUE(status.ok());
 
-
         // Add column later - should fail due to update already committed
         auto *txn5 = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("add_column"), TransactionType::kNormal);
-        auto new_column_def = std::make_shared<ColumnDef>(2, std::make_shared<DataType>(LogicalType::kVarchar), "col3", std::set<ConstraintType>(), default_varchar);
-        
+        auto new_column_def =
+            std::make_shared<ColumnDef>(2, std::make_shared<DataType>(LogicalType::kVarchar), "col3", std::set<ConstraintType>(), default_varchar);
+
         status = setup.new_txn_mgr->CommitTxn(txn4);
         EXPECT_TRUE(status.ok());
 
-        
         status = txn5->AddColumns(*setup.db_name, *setup.table_name, std::vector<std::shared_ptr<ColumnDef>>{new_column_def});
         EXPECT_TRUE(status.ok());
         status = setup.new_txn_mgr->CommitTxn(txn5);
@@ -1360,13 +1353,13 @@ TEST_P(TestTxnUpdate, test_update_and_add_drop_column_conflicts) {
         std::optional<TableMeeta> table_meta;
         status = txn7->GetTableMeta(*setup.db_name, *setup.table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
-        
+
         // Should only have 2 columns (col1 and col2), col3 should not exist
         std::shared_ptr<std::vector<std::shared_ptr<ColumnDef>>> column_defs;
         std::tie(column_defs, status) = table_meta->GetColumnDefs();
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(column_defs->size(), 2);
-        
+
         status = setup.new_txn_mgr->CommitTxn(txn7);
         EXPECT_TRUE(status.ok());
 
@@ -1390,10 +1383,9 @@ TEST_P(TestTxnUpdate, test_update_and_add_drop_column_conflicts) {
         Status status = txn4->Update(*setup.db_name, *setup.table_name, update_block, row_ids);
         EXPECT_TRUE(status.ok());
 
-
         // Drop column later - should fail due to update already committed
         auto *txn5 = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop_column"), TransactionType::kNormal);
-        
+
         // Commit the update transaction first
         status = setup.new_txn_mgr->CommitTxn(txn4);
         EXPECT_TRUE(status.ok());
@@ -1412,13 +1404,13 @@ TEST_P(TestTxnUpdate, test_update_and_add_drop_column_conflicts) {
         std::optional<TableMeeta> table_meta;
         status = txn7->GetTableMeta(*setup.db_name, *setup.table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
-        
+
         // Should have 2 columns (col1 and col2), col2 should still exist
         std::shared_ptr<std::vector<std::shared_ptr<ColumnDef>>> column_defs;
         std::tie(column_defs, status) = table_meta->GetColumnDefs();
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(column_defs->size(), 2);
-        
+
         status = setup.new_txn_mgr->CommitTxn(txn7);
         EXPECT_TRUE(status.ok());
 
@@ -1433,7 +1425,7 @@ TEST_P(TestTxnUpdate, test_update_and_compact_conflicts) {
 
     TestSetup setup;
     size_t insert_row = 8192;
-    
+
     // Create custom input block for this test
     auto input_block1 = std::make_shared<DataBlock>();
     {
@@ -1556,7 +1548,7 @@ TEST_P(TestTxnUpdate, test_update_and_create_index_conflicts) {
 
     TestSetup setup;
     size_t insert_row = 8192;
-    
+
     // Create custom input block for this test
     auto input_block1 = std::make_shared<DataBlock>();
     {
@@ -1682,7 +1674,7 @@ TEST_P(TestTxnUpdate, test_update_and_delete_conflicts) {
 
     TestSetup setup;
     size_t insert_row = 8192;
-    
+
     // Create custom input block for this test
     auto input_block1 = std::make_shared<DataBlock>();
     {
@@ -1814,7 +1806,6 @@ TEST_P(TestTxnUpdate, test_update_and_delete_conflicts) {
             row_ids.push_back(RowID(0, row_id));
         }
 
-
         // Update the same rows in another transaction
         auto *txn5 = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("update"), TransactionType::kNormal);
         Status status = txn5->Update(*setup.db_name, *setup.table_name, update_block, row_ids);
@@ -1844,7 +1835,7 @@ TEST_P(TestTxnUpdate, test_update_and_delete_no_conflicts) {
 
     TestSetup setup;
     size_t insert_row = 8192;
-    
+
     // Create custom input block for this test
     auto input_block1 = std::make_shared<DataBlock>();
     {
@@ -1907,7 +1898,6 @@ TEST_P(TestTxnUpdate, test_update_and_delete_no_conflicts) {
         }
         Status status = txn4->Update(*setup.db_name, *setup.table_name, update_block, update_row_ids);
         EXPECT_TRUE(status.ok());
-
 
         // Delete even-numbered rows (different from update)
         auto *txn5 = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("delete"), TransactionType::kNormal);

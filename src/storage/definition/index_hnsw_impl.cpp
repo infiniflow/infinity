@@ -151,10 +151,10 @@ std::string LSGConfig::ToString() const {
 }
 
 std::shared_ptr<IndexBase> IndexHnsw::Make(std::shared_ptr<std::string> index_name,
-                                     std::shared_ptr<std::string> index_comment,
-                                     const std::string &file_name,
-                                     std::vector<std::string> column_names,
-                                     const std::vector<InitParameter *> &index_param_list) {
+                                           std::shared_ptr<std::string> index_comment,
+                                           const std::string &file_name,
+                                           std::vector<std::string> column_names,
+                                           const std::vector<InitParameter *> &index_param_list) {
     size_t M = HNSW_M;
     size_t ef_construction = HNSW_EF_CONSTRUCTION;
     size_t block_size = HNSW_BLOCK_SIZE;
@@ -200,16 +200,16 @@ std::shared_ptr<IndexBase> IndexHnsw::Make(std::shared_ptr<std::string> index_na
     }
 
     return std::make_shared<IndexHnsw>(index_name,
-                                 index_comment,
-                                 file_name,
-                                 std::move(column_names),
-                                 metric_type,
-                                 encode_type,
-                                 build_type,
-                                 M,
-                                 ef_construction,
-                                 block_size,
-                                 lsg_config);
+                                       index_comment,
+                                       file_name,
+                                       std::move(column_names),
+                                       metric_type,
+                                       encode_type,
+                                       build_type,
+                                       M,
+                                       ef_construction,
+                                       block_size,
+                                       lsg_config);
 }
 
 bool IndexHnsw::operator==(const IndexHnsw &other) const {

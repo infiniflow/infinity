@@ -45,7 +45,11 @@ import create_index_info;
 
 namespace infinity {
 
-TableMeeta::TableMeeta(const std::string &db_id_str, const std::string &table_id_str, KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts)
+TableMeeta::TableMeeta(const std::string &db_id_str,
+                       const std::string &table_id_str,
+                       KVInstance *kv_instance,
+                       TxnTimeStamp begin_ts,
+                       TxnTimeStamp commit_ts)
     : begin_ts_(begin_ts), commit_ts_(commit_ts), kv_instance_(kv_instance), db_id_str_(db_id_str), table_id_str_(table_id_str) {}
 
 TableMeeta::TableMeeta(const std::string &db_id_str, const std::string &table_id_str, NewTxn *txn)
@@ -437,9 +441,9 @@ Status TableMeeta::GetTableInfo(TableInfo &table_info) {
         return status;
     }
     table_info.column_defs_ = *column_defs;
-    std::sort(table_info.column_defs_.begin(), table_info.column_defs_.end(), [](const std::shared_ptr<ColumnDef> &a, const std::shared_ptr<ColumnDef> &b) {
-        return a->id_ < b->id_;
-    });
+    std::sort(table_info.column_defs_.begin(),
+              table_info.column_defs_.end(),
+              [](const std::shared_ptr<ColumnDef> &a, const std::shared_ptr<ColumnDef> &b) { return a->id_ < b->id_; });
     table_info.column_count_ = table_info.column_defs_.size();
 
     table_info.db_id_ = db_id_str_;
@@ -622,7 +626,9 @@ Status TableMeeta::LoadColumnDefs() {
             }
         }
     }
-    std::sort(column_defs.begin(), column_defs.end(), [](const std::shared_ptr<ColumnDef> &a, const std::shared_ptr<ColumnDef> &b) { return a->id_ < b->id_; });
+    std::sort(column_defs.begin(), column_defs.end(), [](const std::shared_ptr<ColumnDef> &a, const std::shared_ptr<ColumnDef> &b) {
+        return a->id_ < b->id_;
+    });
     column_defs_ = std::move(column_defs);
 
     return Status::OK();

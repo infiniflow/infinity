@@ -78,11 +78,14 @@ Status Status::InvalidTimeInfo(const std::string &time_info) {
     return Status(ErrorCode::kInvalidTimeInfo, std::make_unique<std::string>(fmt::format("Invalid time info format: {}", time_info)));
 }
 
-Status Status::EmptyConfigParameter() { return Status(ErrorCode::kEmptyConfigParameter, std::make_unique<std::string>("Empty configure parameter.")); }
+Status Status::EmptyConfigParameter() {
+    return Status(ErrorCode::kEmptyConfigParameter, std::make_unique<std::string>("Empty configure parameter."));
+}
 
 Status Status::MismatchVersion(const std::string &current_version, const std::string &expected_version) {
-    return Status(ErrorCode::kMismatchVersion,
-                  std::make_unique<std::string>(fmt::format("Current infinity version: {}, expected version: {}", current_version, expected_version)));
+    return Status(
+        ErrorCode::kMismatchVersion,
+        std::make_unique<std::string>(fmt::format("Current infinity version: {}, expected version: {}", current_version, expected_version)));
 }
 
 Status Status::InvalidTimezone(const std::string &timezone) {
@@ -101,9 +104,13 @@ Status Status::InvalidLogLevel(const std::string &log_level) {
     return Status(ErrorCode::kInvalidLogLevel, std::make_unique<std::string>(fmt::format("Invalid log level: {}.", log_level)));
 }
 
-Status Status::InvalidConfig(const std::string &detailed_info) { return Status(ErrorCode::kInvalidConfig, std::make_unique<std::string>(detailed_info)); }
+Status Status::InvalidConfig(const std::string &detailed_info) {
+    return Status(ErrorCode::kInvalidConfig, std::make_unique<std::string>(detailed_info));
+}
 
-Status Status::InvalidMemIndex(const std::string &invalid_info) { return Status(ErrorCode::kInvalidMemIndex, std::make_unique<std::string>(invalid_info)); }
+Status Status::InvalidMemIndex(const std::string &invalid_info) {
+    return Status(ErrorCode::kInvalidMemIndex, std::make_unique<std::string>(invalid_info));
+}
 
 // 2. Auth error
 Status Status::WrongPasswd(const std::string &user_name) {
@@ -111,7 +118,8 @@ Status Status::WrongPasswd(const std::string &user_name) {
 }
 
 Status Status::InsufficientPrivilege(const std::string &user_name, const std::string &detailed_error) {
-    return Status(ErrorCode::kInsufficientPrivilege, std::make_unique<std::string>(fmt::format("{} do not have permission to {}", user_name, detailed_error)));
+    return Status(ErrorCode::kInsufficientPrivilege,
+                  std::make_unique<std::string>(fmt::format("{} do not have permission to {}", user_name, detailed_error)));
 }
 
 Status Status::UnsupportedVersionIndex(i64 given_index) {
@@ -190,8 +198,9 @@ Status Status::SyntaxError(const std::string &detailed_info) {
 }
 
 Status Status::InvalidParameterValue(const std::string &parameter_name, const std::string &parameter_value, const std::string &recommend_value) {
-    return Status(ErrorCode::kInvalidParameterValue,
-                  std::make_unique<std::string>(fmt::format("{}: {} is invalid, Recommended value: {}", parameter_name, parameter_value, recommend_value)));
+    return Status(
+        ErrorCode::kInvalidParameterValue,
+        std::make_unique<std::string>(fmt::format("{}: {} is invalid, Recommended value: {}", parameter_name, parameter_value, recommend_value)));
 }
 
 Status Status::DuplicateUserName(const std::string &user_name) {
@@ -246,7 +255,8 @@ Status Status::AggNotAllowInWhere(const std::string &func_name) {
 
 Status Status::ColumnInSelectNotInGroupBy(const std::string &column_name) {
     return Status(ErrorCode::kColumnInSelectNotInGroupBy,
-                  std::make_unique<std::string>(fmt::format("Column: {} must appear in the GROUP BY clause or be used in an aggregated function", column_name)));
+                  std::make_unique<std::string>(
+                      fmt::format("Column: {} must appear in the GROUP BY clause or be used in an aggregated function", column_name)));
 }
 
 Status Status::NoSysVar(const std::string &variable_name) {
@@ -254,7 +264,8 @@ Status Status::NoSysVar(const std::string &variable_name) {
 }
 
 Status Status::SetInvalidVarValue(const std::string &variable_name, const std::string &valid_value_range) {
-    return Status(ErrorCode::kInvalidSystemVarValue, std::make_unique<std::string>(fmt::format("{} value range is {}", variable_name, valid_value_range)));
+    return Status(ErrorCode::kInvalidSystemVarValue,
+                  std::make_unique<std::string>(fmt::format("{} value range is {}", variable_name, valid_value_range)));
 }
 
 Status Status::ReadOnlySysVar(const std::string &sys_var) {
@@ -326,7 +337,8 @@ Status Status::NoColumnDefined(const std::string &table_name) {
 }
 
 Status Status::NotSupportedTypeConversion(const std::string &from_type, const std::string &to_type) {
-    return Status(ErrorCode::kNotSupportedTypeConversion, std::make_unique<std::string>(fmt::format("Not support to convert {} to {}", from_type, to_type)));
+    return Status(ErrorCode::kNotSupportedTypeConversion,
+                  std::make_unique<std::string>(fmt::format("Not support to convert {} to {}", from_type, to_type)));
 }
 
 Status Status::EmptySelectFields() { return Status(ErrorCode::kEmptySelectFields, std::make_unique<std::string>("Select fields are empty")); }
@@ -342,11 +354,17 @@ Status Status::FTSIndexNotExist(const std::string &table_name) {
     return Status(ErrorCode::kFTSIndexNotExist, std::make_unique<std::string>(fmt::format("Full text index of table: {} not exists.", table_name)));
 }
 
-Status Status::UnknownFTSFault() { return Status(ErrorCode::kUnknownFTSFault, std::make_unique<std::string>(fmt::format("Unknown full text index fault."))); }
+Status Status::UnknownFTSFault() {
+    return Status(ErrorCode::kUnknownFTSFault, std::make_unique<std::string>(fmt::format("Unknown full text index fault.")));
+}
 
-Status Status::InvalidConstraintType() { return Status(ErrorCode::kInvalidConstraintType, std::make_unique<std::string>("Invalid constraint type.")); }
+Status Status::InvalidConstraintType() {
+    return Status(ErrorCode::kInvalidConstraintType, std::make_unique<std::string>("Invalid constraint type."));
+}
 
-Status Status::InvalidKnnDistanceType() { return Status(ErrorCode::kInvalidKnnDistanceType, std::make_unique<std::string>("Invalid knn distance type.")); }
+Status Status::InvalidKnnDistanceType() {
+    return Status(ErrorCode::kInvalidKnnDistanceType, std::make_unique<std::string>("Invalid knn distance type."));
+}
 
 Status Status::InvalidEmbeddingDataType(const std::string &type_str) {
     return Status(ErrorCode::kInvalidEmbeddingDataType, std::make_unique<std::string>(fmt::format("Invalid embedding data type: {}.", type_str)));
@@ -354,7 +372,9 @@ Status Status::InvalidEmbeddingDataType(const std::string &type_str) {
 
 Status Status::InvalidConstantType() { return Status(ErrorCode::kInvalidConstantType, std::make_unique<std::string>("Invalid constant type.")); }
 
-Status Status::InvalidParsedExprType() { return Status(ErrorCode::kInvalidParsedExprType, std::make_unique<std::string>("Invalid parsed expression type.")); }
+Status Status::InvalidParsedExprType() {
+    return Status(ErrorCode::kInvalidParsedExprType, std::make_unique<std::string>("Invalid parsed expression type."));
+}
 
 Status Status::InvalidIndexType(const std::string &message) {
     if (message.empty()) {
@@ -376,10 +396,13 @@ Status Status::InvalidFilterExpression(const std::string &expr_str) {
 }
 
 Status Status::MultipleFunctionMatched(const std::string &function, const std::string &functions) {
-    return Status(ErrorCode::kMultipleFunctionMatched, std::make_unique<std::string>(fmt::format("{}: matched multiple functions: {}", function, functions)));
+    return Status(ErrorCode::kMultipleFunctionMatched,
+                  std::make_unique<std::string>(fmt::format("{}: matched multiple functions: {}", function, functions)));
 }
 
-Status Status::InsertWithoutValues() { return Status(ErrorCode::kInsertWithoutValues, std::make_unique<std::string>("Insert into table without any values")); }
+Status Status::InsertWithoutValues() {
+    return Status(ErrorCode::kInsertWithoutValues, std::make_unique<std::string>("Insert into table without any values"));
+}
 
 Status Status::InvalidConflictType() { return Status(ErrorCode::kInvalidConflictType, std::make_unique<std::string>("invalid conflict type")); }
 
@@ -391,7 +414,9 @@ Status Status::DuplicateColumnName(const std::string &column_name) {
     return Status(ErrorCode::kDuplicateColumnName, std::make_unique<std::string>(fmt::format("Duplicated column name: {}", column_name)));
 }
 
-Status Status::InvalidExpression(const std::string &expr_str) { return Status(ErrorCode::kInvalidExpression, std::make_unique<std::string>(expr_str)); }
+Status Status::InvalidExpression(const std::string &expr_str) {
+    return Status(ErrorCode::kInvalidExpression, std::make_unique<std::string>(expr_str));
+}
 
 Status Status::SegmentNotExist(SegmentID segment_id) {
     return Status(ErrorCode::kSegmentNotExist, std::make_unique<std::string>(fmt::format("Segment: {} doesn't exist", segment_id)));
@@ -441,7 +466,8 @@ Status Status::InvalidDatabaseIndex(u64 database_index, u64 capacity) {
 }
 
 Status Status::InvalidTableIndex(u64 table_index, u64 capacity) {
-    return Status(ErrorCode::kInvalidTableIndex, std::make_unique<std::string>(fmt::format("Invalid table index: {} (0-{})", table_index, capacity - 1)));
+    return Status(ErrorCode::kInvalidTableIndex,
+                  std::make_unique<std::string>(fmt::format("Invalid table index: {} (0-{})", table_index, capacity - 1)));
 }
 
 Status Status::FunctionIsDisable(const std::string &function_name) {
@@ -454,7 +480,9 @@ Status Status::ErrorInit(const std::string &detailed_info) { return Status(Error
 
 Status Status::FileIsOpen(const std::string &filename) { return Status(ErrorCode::kFileIsOpen, std::make_unique<std::string>(filename)); }
 
-Status Status::Unknown(const std::string &name) { return Status(ErrorCode::kUnknown, std::make_unique<std::string>(fmt::format("Unknown {}", name))); }
+Status Status::Unknown(const std::string &name) {
+    return Status(ErrorCode::kUnknown, std::make_unique<std::string>(fmt::format("Unknown {}", name)));
+}
 
 Status Status::InvalidQueryOption(const std::string &detail) {
     return Status(ErrorCode::kUnknown, std::make_unique<std::string>(fmt::format("Invalid query option: {}", detail)));
@@ -468,7 +496,9 @@ Status Status::NotLocked(const std::string &detail) { return Status(ErrorCode::k
 
 Status Status::TableIsUsing(const std::string &detail) { return Status(ErrorCode::kTableIsUsing, std::make_unique<std::string>(detail)); }
 
-Status Status::DuplicateColumnIndex(const std::string &detail) { return Status(ErrorCode::kDuplicateColumnIndex, std::make_unique<std::string>(detail)); }
+Status Status::DuplicateColumnIndex(const std::string &detail) {
+    return Status(ErrorCode::kDuplicateColumnIndex, std::make_unique<std::string>(detail));
+}
 
 Status Status::InvalidParameter(const std::string &detail) { return Status(ErrorCode::kInvalidParameter, std::make_unique<std::string>(detail)); }
 
@@ -491,9 +521,13 @@ Status Status::TxnConflictNoRetry(u64 txn_id, const std::string &conflict_reason
                   std::make_unique<std::string>(fmt::format("Transaction: {} is conflicted, detailed info: {}", txn_id, conflict_reason)));
 }
 
-Status Status::TxnWWConflict(const std::string &detailed_message) { return Status(ErrorCode::kTxnWWConflict, std::make_unique<std::string>(detailed_message)); }
+Status Status::TxnWWConflict(const std::string &detailed_message) {
+    return Status(ErrorCode::kTxnWWConflict, std::make_unique<std::string>(detailed_message));
+}
 
-Status Status::TxnRWConflict(const std::string &detailed_message) { return Status(ErrorCode::kTxnRWConflict, std::make_unique<std::string>(detailed_message)); }
+Status Status::TxnRWConflict(const std::string &detailed_message) {
+    return Status(ErrorCode::kTxnRWConflict, std::make_unique<std::string>(detailed_message));
+}
 
 // 5. Insufficient resource or exceed limits
 Status Status::DiskFull(const std::string &detailed_info) {
@@ -515,10 +549,13 @@ Status Status::ConfigurationLimitExceed(const std::string &config_name, const st
 }
 
 Status Status::QueryTooBig(const std::string &query_text, u64 ast_node) {
-    return Status(ErrorCode::kQueryIsTooComplex, std::make_unique<std::string>(fmt::format("Query: {} is too complex with {} AST nodes", query_text, ast_node)));
+    return Status(ErrorCode::kQueryIsTooComplex,
+                  std::make_unique<std::string>(fmt::format("Query: {} is too complex with {} AST nodes", query_text, ast_node)));
 }
 
-Status Status::FailToGetSysInfo(const std::string &detailed_info) { return Status(ErrorCode::kFailToGetSysInfo, std::make_unique<std::string>(detailed_info)); }
+Status Status::FailToGetSysInfo(const std::string &detailed_info) {
+    return Status(ErrorCode::kFailToGetSysInfo, std::make_unique<std::string>(detailed_info));
+}
 
 // 6. Operation intervention
 Status Status::QueryCancelled(const std::string &query_text) {
@@ -526,7 +563,8 @@ Status Status::QueryCancelled(const std::string &query_text) {
 }
 
 Status Status::QueryNotSupported(const std::string &query_text, const std::string &detailed_reason) {
-    return Status(ErrorCode::kQueryNotSupported, std::make_unique<std::string>(fmt::format("Query: {} isn't supported, {}", query_text, detailed_reason)));
+    return Status(ErrorCode::kQueryNotSupported,
+                  std::make_unique<std::string>(fmt::format("Query: {} isn't supported, {}", query_text, detailed_reason)));
 }
 
 Status Status::ClientClose() { return Status(ErrorCode::kClientClose); }
@@ -634,7 +672,9 @@ Status Status::NotRegistered(const std::string &node_info) {
     return Status(ErrorCode::kNotRegistered, std::make_unique<std::string>(fmt::format("Not registered node: {}", node_info)));
 }
 
-Status Status::CantSwitchRole(const std::string &detailed_info) { return Status(ErrorCode::kCantSwitchRole, std::make_unique<std::string>(detailed_info)); }
+Status Status::CantSwitchRole(const std::string &detailed_info) {
+    return Status(ErrorCode::kCantSwitchRole, std::make_unique<std::string>(detailed_info));
+}
 
 Status Status::TooManyFollower(u8 follower_limit) {
     return Status(ErrorCode::kTooManyFollower, std::make_unique<std::string>(fmt::format("Too many followers, limit: {}", follower_limit)));
@@ -649,7 +689,9 @@ Status Status::InvalidEntry() { return Status(ErrorCode::kInvalidEntry, std::mak
 
 Status Status::NotFoundEntry() { return Status(ErrorCode::kNotFoundEntry, std::make_unique<std::string>("Not found entry")); }
 
-Status Status::DuplicateEntry(const std::string &detail_info) { return Status(ErrorCode::kDuplicateEntry, std::make_unique<std::string>(detail_info)); }
+Status Status::DuplicateEntry(const std::string &detail_info) {
+    return Status(ErrorCode::kDuplicateEntry, std::make_unique<std::string>(detail_info));
+}
 
 Status Status::EmptyEntryList() { return Status(ErrorCode::kEmptyEntryList, std::make_unique<std::string>("Empty entry list")); }
 

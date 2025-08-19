@@ -67,11 +67,11 @@ std::shared_ptr<BaseExpression> OrderBinder::BuildExpression(const ParsedExpr &e
         const std::shared_ptr<BaseExpression> &group_expr = bind_context_ptr->group_exprs_[groupby_index];
 
         std::shared_ptr<ColumnExpression> result = ColumnExpression::Make(group_expr->Type(),
-                                                                    bind_context_ptr->group_by_table_name_,
-                                                                    bind_context_ptr->group_by_table_index_,
-                                                                    expr_name,
-                                                                    groupby_index,
-                                                                    depth);
+                                                                          bind_context_ptr->group_by_table_name_,
+                                                                          bind_context_ptr->group_by_table_index_,
+                                                                          expr_name,
+                                                                          groupby_index,
+                                                                          depth);
 
         result->source_position_ = SourcePosition(bind_context_ptr->binding_context_id_, ExprSourceType::kGroupBy);
         return result;
@@ -82,11 +82,11 @@ std::shared_ptr<BaseExpression> OrderBinder::BuildExpression(const ParsedExpr &e
         const std::shared_ptr<BaseExpression> &aggregate_expr = bind_context_ptr->aggregate_exprs_[aggregate_index];
 
         std::shared_ptr<ColumnExpression> result = ColumnExpression::Make(aggregate_expr->Type(),
-                                                                    bind_context_ptr->aggregate_table_name_,
-                                                                    bind_context_ptr->aggregate_table_index_,
-                                                                    expr_name,
-                                                                    aggregate_index,
-                                                                    depth);
+                                                                          bind_context_ptr->aggregate_table_name_,
+                                                                          bind_context_ptr->aggregate_table_index_,
+                                                                          expr_name,
+                                                                          aggregate_index,
+                                                                          depth);
 
         result->source_position_ = SourcePosition(bind_context_ptr->binding_context_id_, ExprSourceType::kAggregate);
         return result;

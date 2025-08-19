@@ -234,10 +234,10 @@ public:
     GetSegmentIndexInfo(const std::string &db_name, const std::string &table_name, const std::string &index_name, SegmentID segment_id);
 
     std::tuple<std::shared_ptr<ChunkIndexMetaInfo>, Status> GetChunkIndexInfo(const std::string &db_name,
-                                                                         const std::string &table_name,
-                                                                         const std::string &index_name,
-                                                                         SegmentID segment_id,
-                                                                         ChunkID chunk_id);
+                                                                              const std::string &table_name,
+                                                                              const std::string &index_name,
+                                                                              SegmentID segment_id,
+                                                                              ChunkID chunk_id);
 
     std::tuple<std::shared_ptr<SegmentInfo>, Status> GetSegmentInfo(const std::string &db_name, const std::string &table_name, SegmentID segment_id);
 

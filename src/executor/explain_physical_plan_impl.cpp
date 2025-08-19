@@ -100,7 +100,10 @@ import check_statement;
 
 namespace infinity {
 
-void ExplainPhysicalPlan::Explain(const PhysicalOperator *op, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, bool is_recursive, i64 intent_size) {
+void ExplainPhysicalPlan::Explain(const PhysicalOperator *op,
+                                  std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result,
+                                  bool is_recursive,
+                                  i64 intent_size) {
     switch (op->operator_type()) {
         case PhysicalOperatorType::kAggregate: {
             Explain((PhysicalAggregate *)op, result, intent_size);
@@ -347,7 +350,9 @@ void ExplainPhysicalPlan::Explain(const PhysicalOperator *op, std::shared_ptr<st
     }
 }
 
-void ExplainPhysicalPlan::Explain(const PhysicalCreateSchema *create_node, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size) {
+void ExplainPhysicalPlan::Explain(const PhysicalCreateSchema *create_node,
+                                  std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result,
+                                  i64 intent_size) {
     {
         std::string create_header_str;
         if (intent_size != 0) {
@@ -379,7 +384,9 @@ void ExplainPhysicalPlan::Explain(const PhysicalCreateSchema *create_node, std::
     }
 }
 
-void ExplainPhysicalPlan::Explain(const PhysicalCreateTable *create_node, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size) {
+void ExplainPhysicalPlan::Explain(const PhysicalCreateTable *create_node,
+                                  std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result,
+                                  i64 intent_size) {
     {
         std::string create_header_str;
         if (intent_size != 0) {
@@ -433,7 +440,9 @@ void ExplainPhysicalPlan::Explain(const PhysicalCreateTable *create_node, std::s
     }
 }
 
-void ExplainPhysicalPlan::Explain(const PhysicalCreateIndexPrepare *create_node, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size) {
+void ExplainPhysicalPlan::Explain(const PhysicalCreateIndexPrepare *create_node,
+                                  std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result,
+                                  i64 intent_size) {
     {
         std::string create_header_str;
         if (intent_size != 0) {
@@ -475,7 +484,9 @@ void ExplainPhysicalPlan::Explain(const PhysicalCreateIndexPrepare *create_node,
     }
 }
 
-void ExplainPhysicalPlan::Explain(const PhysicalCreateCollection *create_node, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size) {
+void ExplainPhysicalPlan::Explain(const PhysicalCreateCollection *create_node,
+                                  std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result,
+                                  i64 intent_size) {
     {
         std::string create_header_str;
         if (intent_size != 0) {
@@ -513,7 +524,9 @@ void ExplainPhysicalPlan::Explain(const PhysicalCreateCollection *create_node, s
     }
 }
 
-void ExplainPhysicalPlan::Explain(const PhysicalDropSchema *drop_node, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size) {
+void ExplainPhysicalPlan::Explain(const PhysicalDropSchema *drop_node,
+                                  std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result,
+                                  i64 intent_size) {
     {
         std::string drop_header_str;
         if (intent_size != 0) {
@@ -545,7 +558,9 @@ void ExplainPhysicalPlan::Explain(const PhysicalDropSchema *drop_node, std::shar
     }
 }
 
-void ExplainPhysicalPlan::Explain(const PhysicalDropTable *drop_node, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size) {
+void ExplainPhysicalPlan::Explain(const PhysicalDropTable *drop_node,
+                                  std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result,
+                                  i64 intent_size) {
     {
         std::string drop_header_str;
         if (intent_size != 0) {
@@ -583,7 +598,9 @@ void ExplainPhysicalPlan::Explain(const PhysicalDropTable *drop_node, std::share
     }
 }
 
-void ExplainPhysicalPlan::Explain(const PhysicalDropCollection *drop_node, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size) {
+void ExplainPhysicalPlan::Explain(const PhysicalDropCollection *drop_node,
+                                  std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result,
+                                  i64 intent_size) {
     {
         std::string drop_header_str;
         if (intent_size != 0) {
@@ -621,7 +638,9 @@ void ExplainPhysicalPlan::Explain(const PhysicalDropCollection *drop_node, std::
     }
 }
 
-void ExplainPhysicalPlan::Explain(const PhysicalInsert *insert_node, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size) {
+void ExplainPhysicalPlan::Explain(const PhysicalInsert *insert_node,
+                                  std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result,
+                                  i64 intent_size) {
     {
         std::string insert_header_str;
         if (intent_size != 0) {
@@ -675,7 +694,9 @@ void ExplainPhysicalPlan::Explain(const PhysicalInsert *insert_node, std::shared
     }
 }
 
-void ExplainPhysicalPlan::Explain(const PhysicalProject *project_node, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size) {
+void ExplainPhysicalPlan::Explain(const PhysicalProject *project_node,
+                                  std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result,
+                                  i64 intent_size) {
     {
         std::string project_header;
         if (intent_size != 0) {
@@ -711,7 +732,9 @@ void ExplainPhysicalPlan::Explain(const PhysicalProject *project_node, std::shar
     }
 }
 
-void ExplainPhysicalPlan::Explain(const PhysicalFilter *filter_node, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size) {
+void ExplainPhysicalPlan::Explain(const PhysicalFilter *filter_node,
+                                  std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result,
+                                  i64 intent_size) {
     std::string filter_node_header;
     if (intent_size != 0) {
         filter_node_header = std::string(intent_size - 2, ' ') + "-> FILTER ";
@@ -740,7 +763,9 @@ void ExplainPhysicalPlan::Explain(const PhysicalFilter *filter_node, std::shared
     }
 }
 
-void ExplainPhysicalPlan::Explain(const PhysicalTableScan *table_scan_node, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size) {
+void ExplainPhysicalPlan::Explain(const PhysicalTableScan *table_scan_node,
+                                  std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result,
+                                  i64 intent_size) {
     std::string table_scan_header;
     if (intent_size != 0) {
         table_scan_header = std::string(intent_size - 2, ' ') + "-> TABLE SCAN ";
@@ -775,7 +800,9 @@ void ExplainPhysicalPlan::Explain(const PhysicalTableScan *table_scan_node, std:
     result->emplace_back(std::make_shared<std::string>(output_columns));
 }
 
-void ExplainPhysicalPlan::Explain(const PhysicalIndexScan *index_scan_node, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size) {
+void ExplainPhysicalPlan::Explain(const PhysicalIndexScan *index_scan_node,
+                                  std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result,
+                                  i64 intent_size) {
     std::string index_scan_header;
     if (intent_size != 0) {
         index_scan_header = std::string(intent_size - 2, ' ') + "-> INDEX SCAN ";
@@ -815,7 +842,9 @@ void ExplainPhysicalPlan::Explain(const PhysicalIndexScan *index_scan_node, std:
     result->emplace_back(std::make_shared<std::string>(output_columns));
 }
 
-void ExplainPhysicalPlan::Explain(const PhysicalKnnScan *knn_scan_node, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size) {
+void ExplainPhysicalPlan::Explain(const PhysicalKnnScan *knn_scan_node,
+                                  std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result,
+                                  i64 intent_size) {
     std::string knn_scan_header;
     if (intent_size != 0) {
         knn_scan_header = std::string(intent_size - 2, ' ') + "-> KNN SCAN ";
@@ -849,7 +878,8 @@ void ExplainPhysicalPlan::Explain(const PhysicalKnnScan *knn_scan_node, std::sha
     std::string embedding_dimension_str = std::string(intent_size + 2, ' ') + " - dimension: " + std::to_string(knn_expr_raw->dimension_);
     result->emplace_back(std::make_shared<std::string>(embedding_dimension_str));
 
-    std::string distance_type_str = std::string(intent_size + 2, ' ') + " - distance type: " + KnnExpr::KnnDistanceType2Str(knn_expr_raw->distance_type_);
+    std::string distance_type_str =
+        std::string(intent_size + 2, ' ') + " - distance type: " + KnnExpr::KnnDistanceType2Str(knn_expr_raw->distance_type_);
     result->emplace_back(std::make_shared<std::string>(distance_type_str));
 
     // Query embedding
@@ -883,7 +913,9 @@ void ExplainPhysicalPlan::Explain(const PhysicalKnnScan *knn_scan_node, std::sha
     }
 }
 
-void ExplainPhysicalPlan::Explain(const PhysicalAggregate *aggregate_node, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size) {
+void ExplainPhysicalPlan::Explain(const PhysicalAggregate *aggregate_node,
+                                  std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result,
+                                  i64 intent_size) {
     size_t groups_count = aggregate_node->groups_.size();
     size_t aggregates_count = aggregate_node->aggregates_.size();
     if (groups_count == 0 && aggregates_count == 0) {
@@ -926,7 +958,8 @@ void ExplainPhysicalPlan::Explain(const PhysicalAggregate *aggregate_node, std::
     // Group by expressions
     if (groups_count != 0) {
         // Group by table index
-        std::string group_table_index = std::string(intent_size, ' ') + " - group by table index: #" + std::to_string(aggregate_node->GroupTableIndex());
+        std::string group_table_index =
+            std::string(intent_size, ' ') + " - group by table index: #" + std::to_string(aggregate_node->GroupTableIndex());
         result->emplace_back(std::make_shared<std::string>(group_table_index));
 
         std::string group_by_expression_str = std::string(intent_size, ' ') + " - group by: [";
@@ -940,7 +973,9 @@ void ExplainPhysicalPlan::Explain(const PhysicalAggregate *aggregate_node, std::
     }
 }
 
-void ExplainPhysicalPlan::Explain(const PhysicalSort *sort_node, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size) {
+void ExplainPhysicalPlan::Explain(const PhysicalSort *sort_node,
+                                  std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result,
+                                  i64 intent_size) {
     {
         std::string sort_header;
         if (intent_size != 0) {
@@ -982,7 +1017,9 @@ void ExplainPhysicalPlan::Explain(const PhysicalSort *sort_node, std::shared_ptr
     }
 }
 
-void ExplainPhysicalPlan::Explain(const PhysicalLimit *limit_node, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size) {
+void ExplainPhysicalPlan::Explain(const PhysicalLimit *limit_node,
+                                  std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result,
+                                  i64 intent_size) {
     {
         std::string limit_header;
         if (intent_size != 0) {
@@ -1080,7 +1117,9 @@ void ExplainPhysicalPlan::Explain(const PhysicalTop *top_node, std::shared_ptr<s
     }
 }
 
-void ExplainPhysicalPlan::Explain(const PhysicalCrossProduct *cross_product_node, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size) {
+void ExplainPhysicalPlan::Explain(const PhysicalCrossProduct *cross_product_node,
+                                  std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result,
+                                  i64 intent_size) {
     {
         std::string cross_product_header;
         if (intent_size != 0) {
@@ -1105,7 +1144,9 @@ void ExplainPhysicalPlan::Explain(const PhysicalCrossProduct *cross_product_node
     }
 }
 
-void ExplainPhysicalPlan::Explain(const PhysicalNestedLoopJoin *join_node, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size) {
+void ExplainPhysicalPlan::Explain(const PhysicalNestedLoopJoin *join_node,
+                                  std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result,
+                                  i64 intent_size) {
     std::string join_header;
     if (intent_size != 0) {
         join_header = std::string(intent_size - 2, ' ') + "-> NESTED LOOP JOIN";
@@ -1146,7 +1187,9 @@ void ExplainPhysicalPlan::Explain(const PhysicalNestedLoopJoin *join_node, std::
     }
 }
 
-void ExplainPhysicalPlan::Explain(const PhysicalShow *show_node, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size) {
+void ExplainPhysicalPlan::Explain(const PhysicalShow *show_node,
+                                  std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result,
+                                  i64 intent_size) {
     switch (show_node->show_type()) {
         case ShowStmtType::kDatabase: {
             std::string show_str;
@@ -1339,7 +1382,8 @@ void ExplainPhysicalPlan::Explain(const PhysicalShow *show_node, std::shared_ptr
             show_column_table_str += *(show_node->object_name());
             result->emplace_back(std::make_shared<std::string>(show_column_table_str));
 
-            std::string output_columns_str = std::string(intent_size, ' ') + " - output columns: [index_name, method_type, column_names, other_parameters]";
+            std::string output_columns_str =
+                std::string(intent_size, ' ') + " - output columns: [index_name, method_type, column_names, other_parameters]";
             result->emplace_back(std::make_shared<std::string>(output_columns_str));
             break;
         }
@@ -1917,7 +1961,9 @@ void ExplainPhysicalPlan::Explain(const PhysicalIndexJoin *, std::shared_ptr<std
     RecoverableError(status);
 }
 
-void ExplainPhysicalPlan::Explain(const PhysicalDelete *delete_node, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size) {
+void ExplainPhysicalPlan::Explain(const PhysicalDelete *delete_node,
+                                  std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result,
+                                  i64 intent_size) {
     std::string header;
     if (intent_size != 0) {
         header = std::string(intent_size - 2, ' ') + "-> DELETE FROM ";
@@ -1930,7 +1976,9 @@ void ExplainPhysicalPlan::Explain(const PhysicalDelete *delete_node, std::shared
     result->emplace_back(std::make_shared<std::string>(header));
 }
 
-void ExplainPhysicalPlan::Explain(const PhysicalUpdate *update_node, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size) {
+void ExplainPhysicalPlan::Explain(const PhysicalUpdate *update_node,
+                                  std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result,
+                                  i64 intent_size) {
     std::string header;
     if (intent_size != 0) {
         header = std::string(intent_size - 2, ' ') + "-> UPDATE ";
@@ -1943,7 +1991,9 @@ void ExplainPhysicalPlan::Explain(const PhysicalUpdate *update_node, std::shared
     result->emplace_back(std::make_shared<std::string>(header));
 }
 
-void ExplainPhysicalPlan::Explain(const PhysicalImport *import_node, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size) {
+void ExplainPhysicalPlan::Explain(const PhysicalImport *import_node,
+                                  std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result,
+                                  i64 intent_size) {
     {
         std::string import_header_str;
         if (intent_size != 0) {
@@ -1957,12 +2007,14 @@ void ExplainPhysicalPlan::Explain(const PhysicalImport *import_node, std::shared
     }
 
     {
-        std::shared_ptr<std::string> schema_name = std::make_shared<std::string>(std::string(intent_size, ' ') + " - database name: " + *(import_node->table_info()->db_name_));
+        std::shared_ptr<std::string> schema_name =
+            std::make_shared<std::string>(std::string(intent_size, ' ') + " - database name: " + *(import_node->table_info()->db_name_));
         result->emplace_back(schema_name);
     }
 
     {
-        std::shared_ptr<std::string> table_name = std::make_shared<std::string>(std::string(intent_size, ' ') + " - table name: " + *(import_node->table_info()->table_name_));
+        std::shared_ptr<std::string> table_name =
+            std::make_shared<std::string>(std::string(intent_size, ' ') + " - table name: " + *(import_node->table_info()->table_name_));
         result->emplace_back(table_name);
     }
 
@@ -1976,10 +2028,12 @@ void ExplainPhysicalPlan::Explain(const PhysicalImport *import_node, std::shared
             std::shared_ptr<std::string> file_type = std::make_shared<std::string>(std::string(intent_size, ' ') + " - type: CSV");
             result->emplace_back(file_type);
 
-            std::shared_ptr<std::string> header = std::make_shared<std::string>(std::string(intent_size, ' ') + " - header: " + (import_node->header() ? "Yes" : "No"));
+            std::shared_ptr<std::string> header =
+                std::make_shared<std::string>(std::string(intent_size, ' ') + " - header: " + (import_node->header() ? "Yes" : "No"));
             result->emplace_back(header);
 
-            std::shared_ptr<std::string> delimiter = std::make_shared<std::string>(std::string(intent_size, ' ') + " - delimiter: " + import_node->delimiter());
+            std::shared_ptr<std::string> delimiter =
+                std::make_shared<std::string>(std::string(intent_size, ' ') + " - delimiter: " + import_node->delimiter());
             result->emplace_back(delimiter);
             break;
         }
@@ -2022,7 +2076,9 @@ void ExplainPhysicalPlan::Explain(const PhysicalImport *import_node, std::shared
     }
 }
 
-void ExplainPhysicalPlan::Explain(const PhysicalExport *export_node, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size) {
+void ExplainPhysicalPlan::Explain(const PhysicalExport *export_node,
+                                  std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result,
+                                  i64 intent_size) {
     {
         std::string export_header_str;
         if (intent_size != 0) {
@@ -2036,12 +2092,14 @@ void ExplainPhysicalPlan::Explain(const PhysicalExport *export_node, std::shared
     }
 
     {
-        std::shared_ptr<std::string> schema_name = std::make_shared<std::string>(std::string(intent_size, ' ') + " - database name: " + export_node->schema_name());
+        std::shared_ptr<std::string> schema_name =
+            std::make_shared<std::string>(std::string(intent_size, ' ') + " - database name: " + export_node->schema_name());
         result->emplace_back(schema_name);
     }
 
     {
-        std::shared_ptr<std::string> table_name = std::make_shared<std::string>(std::string(intent_size, ' ') + " - table name: " + export_node->table_name());
+        std::shared_ptr<std::string> table_name =
+            std::make_shared<std::string>(std::string(intent_size, ' ') + " - table name: " + export_node->table_name());
         result->emplace_back(table_name);
     }
 
@@ -2055,10 +2113,12 @@ void ExplainPhysicalPlan::Explain(const PhysicalExport *export_node, std::shared
             std::shared_ptr<std::string> file_type = std::make_shared<std::string>(std::string(intent_size, ' ') + " - type: CSV");
             result->emplace_back(file_type);
 
-            std::shared_ptr<std::string> header = std::make_shared<std::string>(std::string(intent_size, ' ') + " - header: " + (export_node->header() ? "Yes" : "No"));
+            std::shared_ptr<std::string> header =
+                std::make_shared<std::string>(std::string(intent_size, ' ') + " - header: " + (export_node->header() ? "Yes" : "No"));
             result->emplace_back(header);
 
-            std::shared_ptr<std::string> delimiter = std::make_shared<std::string>(std::string(intent_size, ' ') + " - delimiter: " + export_node->delimiter());
+            std::shared_ptr<std::string> delimiter =
+                std::make_shared<std::string>(std::string(intent_size, ' ') + " - delimiter: " + export_node->delimiter());
             result->emplace_back(delimiter);
             break;
         }
@@ -2102,12 +2162,16 @@ void ExplainPhysicalPlan::Explain(const PhysicalExport *export_node, std::shared
     }
 }
 
-void ExplainPhysicalPlan::Explain(const PhysicalAlter *create_node, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size) {
+void ExplainPhysicalPlan::Explain(const PhysicalAlter *create_node,
+                                  std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result,
+                                  i64 intent_size) {
     Status status = Status::NotSupport("Not implemented");
     RecoverableError(status);
 }
 
-void ExplainPhysicalPlan::Explain(const PhysicalCreateView *create_node, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size) {
+void ExplainPhysicalPlan::Explain(const PhysicalCreateView *create_node,
+                                  std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result,
+                                  i64 intent_size) {
     {
         std::string create_header_str;
         if (intent_size != 0) {
@@ -2160,7 +2224,9 @@ void ExplainPhysicalPlan::Explain(const PhysicalCreateView *create_node, std::sh
     }
 }
 
-void ExplainPhysicalPlan::Explain(const PhysicalDropView *drop_node, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size) {
+void ExplainPhysicalPlan::Explain(const PhysicalDropView *drop_node,
+                                  std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result,
+                                  i64 intent_size) {
     {
         std::string drop_header_str;
         if (intent_size != 0) {
@@ -2192,7 +2258,9 @@ void ExplainPhysicalPlan::Explain(const PhysicalDropView *drop_node, std::shared
     }
 }
 
-void ExplainPhysicalPlan::Explain(const PhysicalFlush *flush_node, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size) {
+void ExplainPhysicalPlan::Explain(const PhysicalFlush *flush_node,
+                                  std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result,
+                                  i64 intent_size) {
     std::string flush_header_str;
     if (intent_size != 0) {
         flush_header_str = std::string(intent_size - 2, ' ') + "-> FLUSH ";
@@ -2232,7 +2300,9 @@ void ExplainPhysicalPlan::Explain(const PhysicalSource *source_node,
     result->emplace_back(std::make_shared<std::string>(explain_header_str));
 }
 
-void ExplainPhysicalPlan::Explain(const PhysicalSink *sink_node, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size) {
+void ExplainPhysicalPlan::Explain(const PhysicalSink *sink_node,
+                                  std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result,
+                                  i64 intent_size) {
     std::string explain_header_str;
     if (intent_size != 0) {
         explain_header_str = std::string(intent_size - 2, ' ') + "-> SINK ";
@@ -2299,7 +2369,9 @@ void ExplainPhysicalPlan::Explain(const PhysicalExcept *except_node,
     result->emplace_back(std::make_shared<std::string>(explain_header_str));
 }
 
-void ExplainPhysicalPlan::Explain(const PhysicalHash *hash_node, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size) {
+void ExplainPhysicalPlan::Explain(const PhysicalHash *hash_node,
+                                  std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result,
+                                  i64 intent_size) {
     std::string explain_header_str;
     if (intent_size != 0) {
         explain_header_str = std::string(intent_size - 2, ' ') + "-> HASH ";
@@ -2362,7 +2434,9 @@ void ExplainPhysicalPlan::Explain(const PhysicalMergeLimit *merge_limit_node,
     }
 }
 
-void ExplainPhysicalPlan::Explain(const PhysicalMergeTop *merge_top_node, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size) {
+void ExplainPhysicalPlan::Explain(const PhysicalMergeTop *merge_top_node,
+                                  std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result,
+                                  i64 intent_size) {
     std::string explain_header_str;
     if (intent_size != 0) {
         explain_header_str = std::string(intent_size - 2, ' ') + "-> MERGE TOP ";
@@ -2464,7 +2538,9 @@ void ExplainPhysicalPlan::Explain(const PhysicalMergeKnn *merge_knn_node,
     result->emplace_back(std::make_shared<std::string>(output_columns));
 }
 
-void ExplainPhysicalPlan::Explain(const PhysicalMatch *match_node, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size) {
+void ExplainPhysicalPlan::Explain(const PhysicalMatch *match_node,
+                                  std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result,
+                                  i64 intent_size) {
     std::string explain_header_str;
     if (intent_size != 0) {
         explain_header_str = std::string(intent_size - 2, ' ') + "-> MATCH ";
@@ -2528,7 +2604,9 @@ void ExplainPhysicalPlan::Explain(const PhysicalMatch *match_node, std::shared_p
     }
 }
 
-void ExplainPhysicalPlan::Explain(const PhysicalMatchSparseScan *match_sparse_node, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size) {
+void ExplainPhysicalPlan::Explain(const PhysicalMatchSparseScan *match_sparse_node,
+                                  std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result,
+                                  i64 intent_size) {
     std::string explain_header_str;
     if (intent_size != 0) {
         explain_header_str = std::string(intent_size - 2, ' ') + "-> MatchSparseScan ";
@@ -2556,7 +2634,9 @@ void ExplainPhysicalPlan::Explain(const PhysicalMatchSparseScan *match_sparse_no
     result->emplace_back(std::make_shared<std::string>(output_columns));
 }
 
-void ExplainPhysicalPlan::Explain(const PhysicalMatchTensorScan *match_tensor_node, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size) {
+void ExplainPhysicalPlan::Explain(const PhysicalMatchTensorScan *match_tensor_node,
+                                  std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result,
+                                  i64 intent_size) {
     std::string explain_header_str;
     if (intent_size != 0) {
         explain_header_str = std::string(intent_size - 2, ' ') + "-> MatchTensorScan ";
@@ -2577,7 +2657,8 @@ void ExplainPhysicalPlan::Explain(const PhysicalMatchTensorScan *match_tensor_no
     std::string table_index = std::string(intent_size, ' ') + " - table index: #" + std::to_string(match_tensor_node->table_index());
     result->emplace_back(std::make_shared<std::string>(table_index));
 
-    std::string match_tensor_expression = std::string(intent_size, ' ') + " - MatchTensor expression: " + match_tensor_node->match_tensor_expr()->ToString();
+    std::string match_tensor_expression =
+        std::string(intent_size, ' ') + " - MatchTensor expression: " + match_tensor_node->match_tensor_expr()->ToString();
     result->emplace_back(std::make_shared<std::string>(std::move(match_tensor_expression)));
 
     std::string top_n_expression = std::string(intent_size, ' ') + " - Top N: " + std::to_string(match_tensor_node->GetTopN());
@@ -2719,7 +2800,9 @@ void ExplainPhysicalPlan::Explain(const PhysicalMergeMatchSparse *merge_match_sp
     }
 }
 
-void ExplainPhysicalPlan::Explain(const PhysicalFusion *fusion_node, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size) {
+void ExplainPhysicalPlan::Explain(const PhysicalFusion *fusion_node,
+                                  std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result,
+                                  i64 intent_size) {
     std::string explain_header_str;
     if (intent_size != 0) {
         explain_header_str = std::string(intent_size - 2, ' ') + "-> FUSION ";
@@ -2747,7 +2830,9 @@ void ExplainPhysicalPlan::Explain(const PhysicalFusion *fusion_node, std::shared
     result->emplace_back(std::make_shared<std::string>(output_columns));
 }
 
-void ExplainPhysicalPlan::Explain(const PhysicalMergeAggregate *merge_aggregate_node, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size) {
+void ExplainPhysicalPlan::Explain(const PhysicalMergeAggregate *merge_aggregate_node,
+                                  std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result,
+                                  i64 intent_size) {
     std::string explain_header_str;
     if (intent_size != 0) {
         explain_header_str = std::string(intent_size - 2, ' ') + "-> Merge aggregate ";
@@ -2771,7 +2856,9 @@ void ExplainPhysicalPlan::Explain(const PhysicalMergeAggregate *merge_aggregate_
     result->emplace_back(std::make_shared<std::string>(output_columns));
 }
 
-void ExplainPhysicalPlan::Explain(const PhysicalReadCache *read_cache_node, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size) {
+void ExplainPhysicalPlan::Explain(const PhysicalReadCache *read_cache_node,
+                                  std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result,
+                                  i64 intent_size) {
     std::string explain_header_str;
     if (intent_size != 0) {
         explain_header_str = std::string(intent_size - 2, ' ') + "-> Read cache ";
@@ -2802,7 +2889,9 @@ void ExplainPhysicalPlan::Explain(const PhysicalReadCache *read_cache_node, std:
     result->emplace_back(std::make_shared<std::string>(output_columns));
 }
 
-void ExplainPhysicalPlan::Explain(const PhysicalUnnest *unnest_node, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size) {
+void ExplainPhysicalPlan::Explain(const PhysicalUnnest *unnest_node,
+                                  std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result,
+                                  i64 intent_size) {
     std::string unnest_node_header_str;
     if (intent_size != 0) {
         unnest_node_header_str = std::string(intent_size - 2, ' ') + "-> Unnest ";
@@ -2920,7 +3009,9 @@ void ExplainPhysicalPlan::Explain(const PhysicalUnnestAggregate *unnest_aggregat
     }
 }
 
-void ExplainPhysicalPlan::Explain(const PhysicalCheck *check_node, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size) {
+void ExplainPhysicalPlan::Explain(const PhysicalCheck *check_node,
+                                  std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result,
+                                  i64 intent_size) {
     switch (check_node->check_type()) {
         case CheckStmtType::kSystem: {
             std::string check_str;

@@ -82,10 +82,10 @@ auto GetMandatoryParamNodeHandler(std::map<std::string, std::string> &params_map
 }
 
 std::shared_ptr<IndexIVF> IndexIVF::Make(std::shared_ptr<std::string> index_name,
-                                   std::shared_ptr<std::string> index_comment,
-                                   const std::string &file_name,
-                                   std::vector<std::string> column_names,
-                                   const std::vector<InitParameter *> &index_param_list) {
+                                         std::shared_ptr<std::string> index_comment,
+                                         const std::string &file_name,
+                                         std::vector<std::string> column_names,
+                                         const std::vector<InitParameter *> &index_param_list) {
     std::map<std::string, std::string> params_map;
     for (const auto *para : index_param_list) {
         std::string param_name = para->param_name_;

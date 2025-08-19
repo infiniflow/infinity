@@ -208,7 +208,8 @@ TEST_P(WalReplayTest, wal_replay_tables) {
         {
             std::set<ConstraintType> constraints;
             constraints.insert(ConstraintType::kNotNull);
-            auto column_def_ptr = std::make_shared<ColumnDef>(column_id++, std::make_shared<DataType>(DataType(LogicalType::kDouble)), "double_col", constraints);
+            auto column_def_ptr =
+                std::make_shared<ColumnDef>(column_id++, std::make_shared<DataType>(DataType(LogicalType::kDouble)), "double_col", constraints);
             columns.emplace_back(column_def_ptr);
         }
     }
@@ -228,14 +229,20 @@ TEST_P(WalReplayTest, wal_replay_tables) {
         WalManager *wal_manager = storage->wal_manager();
 
         {
-            auto tbl1_def = std::make_unique<TableDef>(std::make_shared<std::string>("default_db"), std::make_shared<std::string>("tbl1"), std::make_shared<std::string>(), columns);
+            auto tbl1_def = std::make_unique<TableDef>(std::make_shared<std::string>("default_db"),
+                                                       std::make_shared<std::string>("tbl1"),
+                                                       std::make_shared<std::string>(),
+                                                       columns);
             auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
             Status status = txn->CreateTable("default_db", std::move(tbl1_def), ConflictType::kIgnore);
             EXPECT_TRUE(status.ok());
             txn_mgr->CommitTxn(txn);
         }
         {
-            auto tbl2_def = std::make_unique<TableDef>(std::make_shared<std::string>("default_db"), std::make_shared<std::string>("tbl2"), std::make_shared<std::string>(), columns);
+            auto tbl2_def = std::make_unique<TableDef>(std::make_shared<std::string>("default_db"),
+                                                       std::make_shared<std::string>("tbl2"),
+                                                       std::make_shared<std::string>(),
+                                                       columns);
             auto *txn2 = txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
             Status status2 = txn2->CreateTable("default_db", std::move(tbl2_def), ConflictType::kIgnore);
             EXPECT_TRUE(status2.ok());
@@ -248,7 +255,10 @@ TEST_P(WalReplayTest, wal_replay_tables) {
             txn_mgr->CommitTxn(txn);
         }
         {
-            auto tbl3_def = std::make_unique<TableDef>(std::make_shared<std::string>("default_db"), std::make_shared<std::string>("tbl3"), std::make_shared<std::string>(), columns);
+            auto tbl3_def = std::make_unique<TableDef>(std::make_shared<std::string>("default_db"),
+                                                       std::make_shared<std::string>("tbl3"),
+                                                       std::make_shared<std::string>(),
+                                                       columns);
             auto *txn3 = txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
             Status status = txn3->CreateTable("default_db", std::move(tbl3_def), ConflictType::kIgnore);
             EXPECT_TRUE(status.ok());
@@ -281,7 +291,10 @@ TEST_P(WalReplayTest, wal_replay_tables) {
         NewTxnManager *txn_mgr = storage->new_txn_manager();
 
         {
-            auto tbl2_def = std::make_unique<TableDef>(std::make_shared<std::string>("default_db"), std::make_shared<std::string>("tbl2"), std::make_shared<std::string>(), columns);
+            auto tbl2_def = std::make_unique<TableDef>(std::make_shared<std::string>("default_db"),
+                                                       std::make_shared<std::string>("tbl2"),
+                                                       std::make_shared<std::string>(),
+                                                       columns);
             auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
             Status status = txn->CreateTable("default_db", std::move(tbl2_def), ConflictType::kIgnore);
             EXPECT_TRUE(status.ok());
@@ -327,8 +340,10 @@ TEST_P(WalReplayTest, wal_replay_append) {
                 std::set<ConstraintType> constraints;
                 constraints.insert(ConstraintType::kUnique);
                 constraints.insert(ConstraintType::kNotNull);
-                auto column_def_ptr =
-                    std::make_shared<ColumnDef>(column_id++, std::make_shared<DataType>(DataType(LogicalType::kTinyInt)), "tiny_int_col", constraints);
+                auto column_def_ptr = std::make_shared<ColumnDef>(column_id++,
+                                                                  std::make_shared<DataType>(DataType(LogicalType::kTinyInt)),
+                                                                  "tiny_int_col",
+                                                                  constraints);
                 columns.emplace_back(column_def_ptr);
             }
             {
@@ -348,21 +363,30 @@ TEST_P(WalReplayTest, wal_replay_append) {
         }
 
         {
-            auto tbl1_def = std::make_unique<TableDef>(std::make_shared<std::string>("default_db"), std::make_shared<std::string>("tbl1"), std::make_shared<std::string>(), columns);
+            auto tbl1_def = std::make_unique<TableDef>(std::make_shared<std::string>("default_db"),
+                                                       std::make_shared<std::string>("tbl1"),
+                                                       std::make_shared<std::string>(),
+                                                       columns);
             auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
             Status status = txn->CreateTable("default_db", std::move(tbl1_def), ConflictType::kIgnore);
             EXPECT_TRUE(status.ok());
             txn_mgr->CommitTxn(txn);
         }
         {
-            auto tbl3_def = std::make_unique<TableDef>(std::make_shared<std::string>("default_db"), std::make_shared<std::string>("tbl3"), std::make_shared<std::string>(), columns);
+            auto tbl3_def = std::make_unique<TableDef>(std::make_shared<std::string>("default_db"),
+                                                       std::make_shared<std::string>("tbl3"),
+                                                       std::make_shared<std::string>(),
+                                                       columns);
             auto *txn3 = txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
             Status status = txn3->CreateTable("default_db", std::move(tbl3_def), ConflictType::kIgnore);
             EXPECT_TRUE(status.ok());
             txn_mgr->CommitTxn(txn3);
         }
         {
-            auto tbl4_def = std::make_unique<TableDef>(std::make_shared<std::string>("default_db"), std::make_shared<std::string>("tbl4"), std::make_shared<std::string>(), columns);
+            auto tbl4_def = std::make_unique<TableDef>(std::make_shared<std::string>("default_db"),
+                                                       std::make_shared<std::string>("tbl4"),
+                                                       std::make_shared<std::string>(),
+                                                       columns);
             auto *txn4 = txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
             Status status = txn4->CreateTable("default_db", std::move(tbl4_def), ConflictType::kIgnore);
             EXPECT_TRUE(status.ok());
@@ -428,13 +452,18 @@ TEST_P(WalReplayTest, wal_replay_append) {
                 std::set<ConstraintType> constraints;
                 constraints.insert(ConstraintType::kUnique);
                 constraints.insert(ConstraintType::kNotNull);
-                auto column_def_ptr =
-                    std::make_shared<ColumnDef>(column_id++, std::make_shared<DataType>(DataType(LogicalType::kTinyInt)), "tiny_int_col", constraints);
+                auto column_def_ptr = std::make_shared<ColumnDef>(column_id++,
+                                                                  std::make_shared<DataType>(DataType(LogicalType::kTinyInt)),
+                                                                  "tiny_int_col",
+                                                                  constraints);
                 columns.emplace_back(column_def_ptr);
             }
         }
         {
-            auto tbl5_def = std::make_unique<TableDef>(std::make_shared<std::string>("default_db"), std::make_shared<std::string>("tbl5"), std::make_shared<std::string>(), columns);
+            auto tbl5_def = std::make_unique<TableDef>(std::make_shared<std::string>("default_db"),
+                                                       std::make_shared<std::string>("tbl5"),
+                                                       std::make_shared<std::string>(),
+                                                       columns);
             auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
 
             Status status = txn->CreateTable("default_db", std::move(tbl5_def), ConflictType::kIgnore);
@@ -536,8 +565,10 @@ TEST_P(WalReplayTest, wal_replay_import) {
                 std::set<ConstraintType> constraints;
                 constraints.insert(ConstraintType::kUnique);
                 constraints.insert(ConstraintType::kNotNull);
-                auto column_def_ptr =
-                    std::make_shared<ColumnDef>(column_id++, std::make_shared<DataType>(DataType(LogicalType::kTinyInt)), "tiny_int_col", constraints);
+                auto column_def_ptr = std::make_shared<ColumnDef>(column_id++,
+                                                                  std::make_shared<DataType>(DataType(LogicalType::kTinyInt)),
+                                                                  "tiny_int_col",
+                                                                  constraints);
                 columns.emplace_back(column_def_ptr);
             }
             {
@@ -557,14 +588,20 @@ TEST_P(WalReplayTest, wal_replay_import) {
         }
 
         {
-            auto tbl1_def = std::make_unique<TableDef>(std::make_shared<std::string>("default_db"), std::make_shared<std::string>("tbl1"), std::make_shared<std::string>(), columns);
+            auto tbl1_def = std::make_unique<TableDef>(std::make_shared<std::string>("default_db"),
+                                                       std::make_shared<std::string>("tbl1"),
+                                                       std::make_shared<std::string>(),
+                                                       columns);
             auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
             Status status = txn->CreateTable("default_db", std::move(tbl1_def), ConflictType::kIgnore);
             EXPECT_TRUE(status.ok());
             txn_mgr->CommitTxn(txn);
         }
         {
-            auto tbl2_def = std::make_unique<TableDef>(std::make_shared<std::string>("default_db"), std::make_shared<std::string>("tbl2"), std::make_shared<std::string>(), columns);
+            auto tbl2_def = std::make_unique<TableDef>(std::make_shared<std::string>("default_db"),
+                                                       std::make_shared<std::string>("tbl2"),
+                                                       std::make_shared<std::string>(),
+                                                       columns);
             auto *txn2 = txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
             Status status = txn2->CreateTable("default_db", std::move(tbl2_def), ConflictType::kIgnore);
             EXPECT_TRUE(status.ok());
@@ -579,7 +616,10 @@ TEST_P(WalReplayTest, wal_replay_import) {
         }
         {
             auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
-            auto tbl3_def = std::make_unique<TableDef>(std::make_shared<std::string>("default_db"), std::make_shared<std::string>("tbl3"), std::make_shared<std::string>(), columns);
+            auto tbl3_def = std::make_unique<TableDef>(std::make_shared<std::string>("default_db"),
+                                                       std::make_shared<std::string>("tbl3"),
+                                                       std::make_shared<std::string>(),
+                                                       columns);
             Status status = txn->CreateTable("default_db", std::move(tbl3_def), ConflictType::kIgnore);
             EXPECT_TRUE(status.ok());
             txn_mgr->CommitTxn(txn);
@@ -737,10 +777,14 @@ TEST_F(WalReplayTest, wal_replay_compact) {
 
         std::vector<std::shared_ptr<ColumnDef>> columns;
         std::set<ConstraintType> constraints;
-        auto column_def_ptr = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(DataType(LogicalType::kTinyInt)), "tiny_int_col", constraints);
+        auto column_def_ptr =
+            std::make_shared<ColumnDef>(0, std::make_shared<DataType>(DataType(LogicalType::kTinyInt)), "tiny_int_col", constraints);
         columns.emplace_back(column_def_ptr);
         { // create table
-            auto tbl1_def = std::make_unique<TableDef>(std::make_shared<std::string>("default_db"), std::make_shared<std::string>("tbl1"), std::make_shared<std::string>(), columns);
+            auto tbl1_def = std::make_unique<TableDef>(std::make_shared<std::string>("default_db"),
+                                                       std::make_shared<std::string>("tbl1"),
+                                                       std::make_shared<std::string>(),
+                                                       columns);
             auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
 
             Status status = txn->CreateTable("default_db", std::move(tbl1_def), ConflictType::kIgnore);
@@ -868,8 +912,10 @@ TEST_P(WalReplayTest, wal_replay_create_index_IvfFlat) {
                     std::make_shared<ColumnDef>(column_id, std::make_shared<DataType>(LogicalType::kEmbedding, embeddingInfo), "col1", constraints);
                 columns.emplace_back(column_def_ptr);
             }
-            auto tbl1_def =
-                std::make_unique<TableDef>(std::make_shared<std::string>("default_db"), std::make_shared<std::string>("test_annivfflat"), std::make_shared<std::string>(), columns);
+            auto tbl1_def = std::make_unique<TableDef>(std::make_shared<std::string>("default_db"),
+                                                       std::make_shared<std::string>("test_annivfflat"),
+                                                       std::make_shared<std::string>(),
+                                                       columns);
             auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
             Status status = txn->CreateTable("default_db", std::move(tbl1_def), ConflictType::kError);
             EXPECT_TRUE(status.ok());
@@ -967,7 +1013,10 @@ TEST_P(WalReplayTest, wal_replay_create_index_hnsw) {
                     std::make_shared<ColumnDef>(column_id, std::make_shared<DataType>(LogicalType::kEmbedding, embeddingInfo), "col1", constraints);
                 columns.emplace_back(column_def_ptr);
             }
-            auto tbl1_def = std::make_unique<TableDef>(std::make_shared<std::string>("default_db"), std::make_shared<std::string>("test_hnsw"), std::make_shared<std::string>(), columns);
+            auto tbl1_def = std::make_unique<TableDef>(std::make_shared<std::string>("default_db"),
+                                                       std::make_shared<std::string>("test_hnsw"),
+                                                       std::make_shared<std::string>(),
+                                                       columns);
             auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
             Status status = txn->CreateTable("default_db", std::move(tbl1_def), ConflictType::kError);
             EXPECT_TRUE(status.ok());
@@ -983,7 +1032,8 @@ TEST_P(WalReplayTest, wal_replay_create_index_hnsw) {
             parameters1.emplace_back(new InitParameter("ef_construction", "200"));
 
             std::shared_ptr<std::string> index_name = std::make_shared<std::string>("hnsw_index");
-            auto index_base_hnsw = IndexHnsw::Make(index_name, std::make_shared<std::string>("test comment"), "hnsw_index_test_hnsw", columns1, parameters1);
+            auto index_base_hnsw =
+                IndexHnsw::Make(index_name, std::make_shared<std::string>("test comment"), "hnsw_index_test_hnsw", columns1, parameters1);
             for (auto *init_parameter : parameters1) {
                 delete init_parameter;
             }

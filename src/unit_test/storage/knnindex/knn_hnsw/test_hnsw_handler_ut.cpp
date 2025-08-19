@@ -77,8 +77,17 @@ public:
 
     std::unique_ptr<IndexHnsw> MakeIndexHnsw(bool compress = false) {
         HnswEncodeType tmp_encode_type = compress ? HnswEncodeType::kLVQ : encode_type;
-        return std::make_unique<
-            IndexHnsw>(index_name, nullptr, filename, column_names, metric_type, tmp_encode_type, build_type, M, ef_construction, chunk_size, std::nullopt);
+        return std::make_unique<IndexHnsw>(index_name,
+                                           nullptr,
+                                           filename,
+                                           column_names,
+                                           metric_type,
+                                           tmp_encode_type,
+                                           build_type,
+                                           M,
+                                           ef_construction,
+                                           chunk_size,
+                                           std::nullopt);
     }
 
     std::unique_ptr<ColumnDef> MakeColumnDef() {

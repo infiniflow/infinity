@@ -94,6 +94,8 @@ public:
     }
 };
 
-void ApplyFastRoughFilter::ApplyToPlan(QueryContext *, std::shared_ptr<LogicalNode> &logical_plan) { ApplyFastRoughFilterMethod::VisitNode(logical_plan); }
+void ApplyFastRoughFilter::ApplyToPlan(QueryContext *, std::shared_ptr<LogicalNode> &logical_plan) {
+    ApplyFastRoughFilterMethod::VisitNode(logical_plan);
+}
 
 } // namespace infinity

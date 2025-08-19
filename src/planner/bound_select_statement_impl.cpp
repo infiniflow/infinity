@@ -108,11 +108,11 @@ std::shared_ptr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query
             // Build logical aggregate
             auto base_table_ref = std::static_pointer_cast<BaseTableRef>(table_ref_ptr_);
             auto aggregate = std::make_shared<LogicalAggregate>(bind_context->GetNewLogicalNodeId(),
-                                                          base_table_ref,
-                                                          group_by_expressions_,
-                                                          groupby_index_,
-                                                          aggregate_expressions_,
-                                                          aggregate_index_);
+                                                                base_table_ref,
+                                                                group_by_expressions_,
+                                                                groupby_index_,
+                                                                aggregate_expressions_,
+                                                                aggregate_index_);
             aggregate->set_left_node(root);
             root = aggregate;
         }
@@ -130,43 +130,44 @@ std::shared_ptr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query
             }
 
             if (limit_expression_.get() == nullptr) {
-                std::shared_ptr<LogicalNode> sort = std::make_shared<LogicalSort>(bind_context->GetNewLogicalNodeId(), order_by_expressions_, order_by_types_);
+                std::shared_ptr<LogicalNode> sort =
+                    std::make_shared<LogicalSort>(bind_context->GetNewLogicalNodeId(), order_by_expressions_, order_by_types_);
                 sort->set_left_node(root);
                 root = sort;
             } else {
                 std::shared_ptr<LogicalNode> top = std::make_shared<LogicalTop>(bind_context->GetNewLogicalNodeId(),
-                                                                    std::static_pointer_cast<BaseTableRef>(table_ref_ptr_),
-                                                                    limit_expression_,
-                                                                    offset_expression_,
-                                                                    order_by_expressions_,
-                                                                    order_by_types_,
-                                                                    total_hits_count_flag_);
+                                                                                std::static_pointer_cast<BaseTableRef>(table_ref_ptr_),
+                                                                                limit_expression_,
+                                                                                offset_expression_,
+                                                                                order_by_expressions_,
+                                                                                order_by_types_,
+                                                                                total_hits_count_flag_);
                 top->set_left_node(root);
                 root = top;
             }
         } else if (limit_expression_.get() != nullptr) {
             auto limit = std::make_shared<LogicalLimit>(bind_context->GetNewLogicalNodeId(),
-                                                  std::static_pointer_cast<BaseTableRef>(table_ref_ptr_),
-                                                  limit_expression_,
-                                                  offset_expression_,
-                                                  total_hits_count_flag_);
+                                                        std::static_pointer_cast<BaseTableRef>(table_ref_ptr_),
+                                                        limit_expression_,
+                                                        offset_expression_,
+                                                        total_hits_count_flag_);
             limit->set_left_node(root);
             root = limit;
         }
 
         auto project = std::make_shared<LogicalProject>(bind_context->GetNewLogicalNodeId(),
-                                                  projection_expressions_,
-                                                  projection_index_,
-                                                  std::map<size_t, std::shared_ptr<HighlightInfo>>());
+                                                        projection_expressions_,
+                                                        projection_index_,
+                                                        std::map<size_t, std::shared_ptr<HighlightInfo>>());
         project->set_left_node(root);
         root = project;
 
         if (!pruned_expression_.empty()) {
             UnrecoverableError("Projection method changed!");
             auto pruned_project = std::make_shared<LogicalProject>(bind_context->GetNewLogicalNodeId(),
-                                                             pruned_expression_,
-                                                             result_index_,
-                                                             std::map<size_t, std::shared_ptr<HighlightInfo>>());
+                                                                   pruned_expression_,
+                                                                   result_index_,
+                                                                   std::map<size_t, std::shared_ptr<HighlightInfo>>());
             pruned_project->set_left_node(root);
             root = pruned_project;
         }
@@ -217,7 +218,8 @@ std::shared_ptr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query
                         UnrecoverableError(fmt::format("Get full text index reader error: {}", status.message()));
                     }
 
-                    std::map<std::string, std::string> column2analyzer = match_node->index_reader_->GetColumn2Analyzer(match_node->match_expr_->index_names_);
+                    std::map<std::string, std::string> column2analyzer =
+                        match_node->index_reader_->GetColumn2Analyzer(match_node->match_expr_->index_names_);
                     SearchOptions search_ops(match_node->match_expr_->options_text_);
 
                     // option: begin_threshold
@@ -381,9 +383,9 @@ std::shared_ptr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query
                         common_query_filter = std::make_shared<CommonQueryFilter>(filter_expr, base_table_ref, query_context->GetNewTxn());
                     }
                     auto knn_scan = std::make_shared<LogicalKnnScan>(bind_context->GetNewLogicalNodeId(),
-                                                               base_table_ref,
-                                                               std::move(match_dense_expr),
-                                                               bind_context->knn_table_index_);
+                                                                     base_table_ref,
+                                                                     std::move(match_dense_expr),
+                                                                     bind_context->knn_table_index_);
                     knn_scan->filter_expression_ = std::move(filter_expr);
                     knn_scan->common_query_filter_ = std::move(common_query_filter);
                     match_knn_nodes.push_back(std::move(knn_scan));
@@ -423,7 +425,8 @@ std::shared_ptr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query
         }
         bind_context->GenerateTableIndex();
         if (!(search_expr_->fusion_exprs_.empty())) {
-            auto firstfusionNode = std::make_shared<LogicalFusion>(bind_context->GetNewLogicalNodeId(), base_table_ref, search_expr_->fusion_exprs_[0]);
+            auto firstfusionNode =
+                std::make_shared<LogicalFusion>(bind_context->GetNewLogicalNodeId(), base_table_ref, search_expr_->fusion_exprs_[0]);
             firstfusionNode->set_left_node(match_knn_nodes[0]);
             if (match_knn_nodes.size() > 1) {
                 firstfusionNode->set_right_node(match_knn_nodes[1]);
@@ -436,7 +439,8 @@ std::shared_ptr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query
             root = std::move(firstfusionNode);
             // extra fusion nodes
             for (u32 i = 1; i < search_expr_->fusion_exprs_.size(); ++i) {
-                auto extrafusionNode = std::make_shared<LogicalFusion>(bind_context->GetNewLogicalNodeId(), base_table_ref, search_expr_->fusion_exprs_[i]);
+                auto extrafusionNode =
+                    std::make_shared<LogicalFusion>(bind_context->GetNewLogicalNodeId(), base_table_ref, search_expr_->fusion_exprs_[i]);
                 extrafusionNode->set_left_node(root);
                 root = std::move(extrafusionNode);
             }
@@ -446,10 +450,10 @@ std::shared_ptr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query
 
         if (limit_expression_.get() != nullptr) {
             auto limit = std::make_shared<LogicalLimit>(bind_context->GetNewLogicalNodeId(),
-                                                  base_table_ref,
-                                                  limit_expression_,
-                                                  offset_expression_,
-                                                  total_hits_count_flag_);
+                                                        base_table_ref,
+                                                        limit_expression_,
+                                                        offset_expression_,
+                                                        total_hits_count_flag_);
             limit->set_left_node(root);
             root = limit;
         }
@@ -465,9 +469,9 @@ std::shared_ptr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query
         }
 
         auto project = std::make_shared<LogicalProject>(bind_context->GetNewLogicalNodeId(),
-                                                  projection_expressions_,
-                                                  projection_index_,
-                                                  std::move(highlight_columns_));
+                                                        projection_expressions_,
+                                                        projection_index_,
+                                                        std::move(highlight_columns_));
         project->set_left_node(root);
         root = std::move(project);
 
@@ -476,9 +480,9 @@ std::shared_ptr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query
 }
 
 std::shared_ptr<LogicalKnnScan> BoundSelectStatement::BuildInitialKnnScan(std::shared_ptr<TableRef> &table_ref,
-                                                                    std::shared_ptr<KnnExpression> knn_expr,
-                                                                    QueryContext *query_context,
-                                                                    const std::shared_ptr<BindContext> &bind_context) {
+                                                                          std::shared_ptr<KnnExpression> knn_expr,
+                                                                          QueryContext *query_context,
+                                                                          const std::shared_ptr<BindContext> &bind_context) {
     if (table_ref.get() == nullptr) {
         UnrecoverableError("Attempt to do KNN scan without table");
     }
@@ -494,9 +498,9 @@ std::shared_ptr<LogicalKnnScan> BoundSelectStatement::BuildInitialKnnScan(std::s
             auto base_table_ref = std::static_pointer_cast<BaseTableRef>(table_ref);
             // Change function table to knn table scan function
             std::shared_ptr<LogicalKnnScan> knn_scan_node = std::make_shared<LogicalKnnScan>(bind_context->GetNewLogicalNodeId(),
-                                                                                 std::move(base_table_ref),
-                                                                                 std::move(knn_expr),
-                                                                                 bind_context->knn_table_index_);
+                                                                                             std::move(base_table_ref),
+                                                                                             std::move(knn_expr),
+                                                                                             bind_context->knn_table_index_);
             return knn_scan_node;
         }
         case TableRefType::kSubquery: {
@@ -559,8 +563,8 @@ BoundSelectStatement::BuildSubqueryTable(std::shared_ptr<TableRef> &table_ref, Q
 }
 
 std::shared_ptr<LogicalNode> BoundSelectStatement::BuildCrossProductTable(std::shared_ptr<TableRef> &table_ref,
-                                                                    QueryContext *query_context,
-                                                                    const std::shared_ptr<BindContext> &bind_context) {
+                                                                          QueryContext *query_context,
+                                                                          const std::shared_ptr<BindContext> &bind_context) {
     // std::shared_ptr<CrossProductTableRef> cross_product_table_ref
     auto cross_product_table_ref = static_pointer_cast<CrossProductTableRef>(table_ref);
 
@@ -570,12 +574,14 @@ std::shared_ptr<LogicalNode> BoundSelectStatement::BuildCrossProductTable(std::s
     // TODO: Merge bind context ?
     u64 logical_node_id = bind_context->GetNewLogicalNodeId();
     std::string alias(fmt::format("cross_product{}", logical_node_id));
-    std::shared_ptr<LogicalCrossProduct> logical_cross_product_node = std::make_shared<LogicalCrossProduct>(logical_node_id, alias, left_node, right_node);
+    std::shared_ptr<LogicalCrossProduct> logical_cross_product_node =
+        std::make_shared<LogicalCrossProduct>(logical_node_id, alias, left_node, right_node);
     return logical_cross_product_node;
 }
 
-std::shared_ptr<LogicalNode>
-BoundSelectStatement::BuildJoinTable(std::shared_ptr<TableRef> &table_ref, QueryContext *query_context, const std::shared_ptr<BindContext> &bind_context) {
+std::shared_ptr<LogicalNode> BoundSelectStatement::BuildJoinTable(std::shared_ptr<TableRef> &table_ref,
+                                                                  QueryContext *query_context,
+                                                                  const std::shared_ptr<BindContext> &bind_context) {
     // std::shared_ptr<JoinTableRef> join_table_ref
     auto join_table_ref = static_pointer_cast<JoinTableRef>(table_ref);
 
@@ -590,17 +596,19 @@ BoundSelectStatement::BuildJoinTable(std::shared_ptr<TableRef> &table_ref, Query
     return logical_join_node;
 }
 
-std::shared_ptr<LogicalNode> BoundSelectStatement::BuildDummyTable(std::shared_ptr<TableRef> &, QueryContext *, const std::shared_ptr<BindContext> &bind_context) {
+std::shared_ptr<LogicalNode>
+BoundSelectStatement::BuildDummyTable(std::shared_ptr<TableRef> &, QueryContext *, const std::shared_ptr<BindContext> &bind_context) {
     u64 logical_node_id = bind_context->GetNewLogicalNodeId();
     std::string alias(fmt::format("DummyTable{}", logical_node_id));
-    std::shared_ptr<LogicalDummyScan> dummy_scan_node = std::make_shared<LogicalDummyScan>(logical_node_id, alias, bind_context->GenerateTableIndex());
+    std::shared_ptr<LogicalDummyScan> dummy_scan_node =
+        std::make_shared<LogicalDummyScan>(logical_node_id, alias, bind_context->GenerateTableIndex());
     return dummy_scan_node;
 }
 
 std::shared_ptr<LogicalNode> BoundSelectStatement::BuildFilter(std::shared_ptr<LogicalNode> &root,
-                                                         std::vector<std::shared_ptr<BaseExpression>> &conditions,
-                                                         QueryContext *query_context,
-                                                         const std::shared_ptr<BindContext> &bind_context) {
+                                                               std::vector<std::shared_ptr<BaseExpression>> &conditions,
+                                                               QueryContext *query_context,
+                                                               const std::shared_ptr<BindContext> &bind_context) {
     for (auto &cond : conditions) {
         // 1. Go through all the expression to find subquery
         //        VisitExpression(cond,
@@ -620,9 +628,9 @@ std::shared_ptr<LogicalNode> BoundSelectStatement::BuildFilter(std::shared_ptr<L
 }
 
 std::shared_ptr<LogicalNode> BoundSelectStatement::BuildUnnest(std::shared_ptr<LogicalNode> &root,
-                                                         std::vector<std::shared_ptr<BaseExpression>> &expressions,
-                                                         QueryContext *query_context,
-                                                         const std::shared_ptr<BindContext> &bind_context) {
+                                                               std::vector<std::shared_ptr<BaseExpression>> &expressions,
+                                                               QueryContext *query_context,
+                                                               const std::shared_ptr<BindContext> &bind_context) {
     // std::shared_ptr<LogicalUnnest> unnest
     expressions = {bind_context->unnest_exprs_};
     size_t unnest_idx = bind_context->unnest_table_index_;
@@ -650,9 +658,9 @@ void BoundSelectStatement::BuildSubquery(std::shared_ptr<LogicalNode> &root,
 }
 
 std::shared_ptr<BaseExpression> BoundSelectStatement::UnnestSubquery(std::shared_ptr<LogicalNode> &root,
-                                                               std::shared_ptr<BaseExpression> &condition,
-                                                               QueryContext *query_context,
-                                                               const std::shared_ptr<BindContext> &) {
+                                                                     std::shared_ptr<BaseExpression> &condition,
+                                                                     QueryContext *query_context,
+                                                                     const std::shared_ptr<BindContext> &) {
     building_subquery_ = true;
     SubqueryExpression *subquery_expr_ptr = (SubqueryExpression *)condition.get();
     std::shared_ptr<LogicalNode> subquery_plan = subquery_expr_ptr->bound_select_statement_ptr_->BuildPlan(query_context);

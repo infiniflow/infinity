@@ -40,11 +40,11 @@ Status ClusterManager::InitAsFollower(const std::string &node_name, const std::s
     }
 
     this_node_ = std::make_shared<NodeInfo>(NodeRole::kFollower,
-                                      NodeStatus::kAlive,
-                                      node_name,
-                                      config_ptr->PeerServerIP(),
-                                      config_ptr->PeerServerPort(),
-                                      std::chrono::duration_cast<std::chrono::seconds>(time_since_epoch).count());
+                                            NodeStatus::kAlive,
+                                            node_name,
+                                            config_ptr->PeerServerIP(),
+                                            config_ptr->PeerServerPort(),
+                                            std::chrono::duration_cast<std::chrono::seconds>(time_since_epoch).count());
 
     leader_node_ = std::make_shared<NodeInfo>(NodeRole::kLeader, leader_ip, leader_port);
     Status client_status = Status::OK();
@@ -70,11 +70,11 @@ Status ClusterManager::InitAsLearner(const std::string &node_name, const std::st
     }
 
     this_node_ = std::make_shared<NodeInfo>(NodeRole::kLearner,
-                                      NodeStatus::kAlive,
-                                      node_name,
-                                      config_ptr->PeerServerIP(),
-                                      config_ptr->PeerServerPort(),
-                                      std::chrono::duration_cast<std::chrono::seconds>(time_since_epoch).count());
+                                            NodeStatus::kAlive,
+                                            node_name,
+                                            config_ptr->PeerServerIP(),
+                                            config_ptr->PeerServerPort(),
+                                            std::chrono::duration_cast<std::chrono::seconds>(time_since_epoch).count());
 
     leader_node_ = std::make_shared<NodeInfo>(NodeRole::kLeader, leader_ip, leader_port);
 
@@ -194,10 +194,10 @@ void ClusterManager::HeartBeatToLeaderThread() {
 
             // Send heartbeat
             hb_task = std::make_shared<HeartBeatPeerTask>(this_node_name,
-                                                    this_node_role,
-                                                    this_node_ip,
-                                                    this_node_port,
-                                                    0); // storage_ptr->txn_manager()->CurrentTS());
+                                                          this_node_role,
+                                                          this_node_ip,
+                                                          this_node_port,
+                                                          0); // storage_ptr->txn_manager()->CurrentTS());
         }
         client_to_leader_->Send(hb_task);
         hb_task->Wait();

@@ -38,11 +38,11 @@ Status ClusterManager::InitAsLeader(const std::string &node_name) {
     }
 
     this_node_ = std::make_shared<NodeInfo>(NodeRole::kLeader,
-                                      NodeStatus::kAlive,
-                                      node_name,
-                                      config_ptr->PeerServerIP(),
-                                      config_ptr->PeerServerPort(),
-                                      std::chrono::duration_cast<std::chrono::seconds>(time_since_epoch).count());
+                                            NodeStatus::kAlive,
+                                            node_name,
+                                            config_ptr->PeerServerIP(),
+                                            config_ptr->PeerServerPort(),
+                                            std::chrono::duration_cast<std::chrono::seconds>(time_since_epoch).count());
 
     current_node_role_ = NodeRole::kLeader;
     return Status::OK();

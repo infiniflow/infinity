@@ -47,7 +47,10 @@ void ParseMultiIndexHints(const std::string &index_hints, std::vector<std::strin
     }
 }
 
-MatchExpression::MatchExpression(const std::string &fields, const std::string &matching_text, const std::string &options_text, const std::string &index_names)
+MatchExpression::MatchExpression(const std::string &fields,
+                                 const std::string &matching_text,
+                                 const std::string &options_text,
+                                 const std::string &index_names)
     : BaseExpression(ExpressionType::kMatch, std::vector<std::shared_ptr<BaseExpression>>()), fields_(fields), matching_text_(matching_text),
       options_text_(options_text) {
     ParseMultiIndexHints(index_names, index_names_);
@@ -58,10 +61,10 @@ std::string MatchExpression::ToString() const {
         return alias_;
     }
     std::string expr_str = fmt::format("MATCH TEXT ('{}', '{}', '{}'{})",
-                                  fields_,
-                                  matching_text_,
-                                  options_text_,
-                                  optional_filter_ ? fmt::format(", WHERE {}", optional_filter_->ToString()) : "");
+                                       fields_,
+                                       matching_text_,
+                                       options_text_,
+                                       optional_filter_ ? fmt::format(", WHERE {}", optional_filter_->ToString()) : "");
     return expr_str;
 }
 

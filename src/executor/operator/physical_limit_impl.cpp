@@ -153,7 +153,7 @@ PhysicalLimit::PhysicalLimit(u64 id,
     counter_ = std::make_unique<AtomicCounter>(offset, limit);
 }
 
-void PhysicalLimit::Init(QueryContext* query_context) {}
+void PhysicalLimit::Init(QueryContext *query_context) {}
 
 //    offset     limit + offset
 //    left       right

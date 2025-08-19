@@ -221,9 +221,7 @@ int64_t DateTypeStd::GetDatePart(DateTypeStd input, TimeUnit unit) {
     }
     return -1;
 }
-bool DateTypeStd::OuterDate2YMD(int32_t days, std::chrono::year_month_day &ymd) {
-    return Date2YMD( days, ymd);
-}
+bool DateTypeStd::OuterDate2YMD(int32_t days, std::chrono::year_month_day &ymd) { return Date2YMD(days, ymd); }
 
 int64_t DateTypeStd::GetEpochTime() const {
     constexpr int64_t TotalSecondsInDay = 24 * 60 * 60;

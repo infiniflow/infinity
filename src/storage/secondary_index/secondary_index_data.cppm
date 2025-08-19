@@ -184,7 +184,8 @@ public:
 // Type aliases for backward compatibility
 export using SecondaryIndexData = SecondaryIndexDataBase<HighCardinalityTag>;
 
-export SecondaryIndexDataBase<HighCardinalityTag> *GetSecondaryIndexData(const std::shared_ptr<DataType> &data_type, u32 chunk_row_count, bool allocate);
+export SecondaryIndexDataBase<HighCardinalityTag> *
+GetSecondaryIndexData(const std::shared_ptr<DataType> &data_type, u32 chunk_row_count, bool allocate);
 
 // New factory function that can create both cardinality variants
 export template <typename CardinalityTag>

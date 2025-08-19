@@ -369,16 +369,16 @@ std::tuple<u32, std::unique_ptr<f32[]>, std::unique_ptr<u32[]>> EMVBSearch<FIXED
 // return docid: start from start_segment_offset
 template <u32 FIXED_QUERY_TOKEN_NUM>
 std::tuple<u32, std::unique_ptr<f32[]>, std::unique_ptr<u32[]>> EMVBSearch<FIXED_QUERY_TOKEN_NUM>::GetQueryResult(const f32 *query_ptr,
-                                                                                                 const u32 nprobe,
-                                                                                                 const f32 thresh,
-                                                                                                 const u32 n_doc_to_score,
-                                                                                                 const u32 out_second_stage,
-                                                                                                 const u32 k,
-                                                                                                 const f32 thresh_query,
-                                                                                                 Bitmask &bitmask,
-                                                                                                 const u32 start_segment_offset,
-                                                                                                 const BlockIndex *block_index,
-                                                                                                 const TxnTimeStamp begin_ts) const {
+                                                                                                                  const u32 nprobe,
+                                                                                                                  const f32 thresh,
+                                                                                                                  const u32 n_doc_to_score,
+                                                                                                                  const u32 out_second_stage,
+                                                                                                                  const u32 k,
+                                                                                                                  const f32 thresh_query,
+                                                                                                                  Bitmask &bitmask,
+                                                                                                                  const u32 start_segment_offset,
+                                                                                                                  const BlockIndex *block_index,
+                                                                                                                  const TxnTimeStamp begin_ts) const {
     assert(n_centroids_ % 8 == 0);
     auto query_token_centroids_scores = Get256AlignedF32Array(FIXED_QUERY_TOKEN_NUM * n_centroids_);
     matrixA_multiply_transpose_matrixB_output_to_C(query_ptr,

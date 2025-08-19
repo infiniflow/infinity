@@ -27,7 +27,10 @@ import data_type;
 
 namespace infinity {
 
-LogicalCrossProduct::LogicalCrossProduct(u64 node_id, std::string alias, const std::shared_ptr<LogicalNode> &left, const std::shared_ptr<LogicalNode> &right)
+LogicalCrossProduct::LogicalCrossProduct(u64 node_id,
+                                         std::string alias,
+                                         const std::shared_ptr<LogicalNode> &left,
+                                         const std::shared_ptr<LogicalNode> &right)
     : LogicalNode(node_id, LogicalNodeType::kCrossProduct), alias_(std::move(alias)) {
     this->set_left_node(left);
     this->set_right_node(right);

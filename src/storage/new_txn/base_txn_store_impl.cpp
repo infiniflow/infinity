@@ -73,7 +73,12 @@ std::shared_ptr<WalEntry> CreateTableTxnStore::ToWalEntry(TxnTimeStamp commit_ts
 }
 
 std::string CreateTableSnapshotTxnStore::ToString() const {
-    return fmt::format("{}: database: {}, table: {}, snapshot: {}, max_commit_ts: {}", TransactionType2Str(type_), db_name_, table_name_, snapshot_name_, max_commit_ts_);
+    return fmt::format("{}: database: {}, table: {}, snapshot: {}, max_commit_ts: {}",
+                       TransactionType2Str(type_),
+                       db_name_,
+                       table_name_,
+                       snapshot_name_,
+                       max_commit_ts_);
 }
 
 // check if we need it
@@ -84,7 +89,6 @@ std::shared_ptr<WalEntry> CreateTableSnapshotTxnStore::ToWalEntry(TxnTimeStamp c
     wal_entry->cmds_.push_back(wal_command);
     return wal_entry;
 }
-
 
 std::string DropTableTxnStore::ToString() const {
     return fmt::format("{}: database: {}, table: {}, table_id: {}, create_ts: {}",
@@ -98,7 +102,8 @@ std::string DropTableTxnStore::ToString() const {
 std::shared_ptr<WalEntry> DropTableTxnStore::ToWalEntry(TxnTimeStamp commit_ts) const {
     std::shared_ptr<WalEntry> wal_entry = std::make_shared<WalEntry>();
     wal_entry->commit_ts_ = commit_ts;
-    std::shared_ptr<WalCmd> wal_command = std::make_shared<WalCmdDropTableV2>(db_name_, db_id_str_, table_name_, table_id_str_, create_ts_, table_key_);
+    std::shared_ptr<WalCmd> wal_command =
+        std::make_shared<WalCmdDropTableV2>(db_name_, db_id_str_, table_name_, table_id_str_, create_ts_, table_key_);
     wal_entry->cmds_.push_back(wal_command);
     return wal_entry;
 }
@@ -111,13 +116,22 @@ std::shared_ptr<WalEntry> RestoreTableTxnStore::ToWalEntry(TxnTimeStamp commit_t
     std::shared_ptr<WalEntry> wal_entry = std::make_shared<WalEntry>();
     wal_entry->commit_ts_ = commit_ts;
 
-    std::shared_ptr<WalCmd> wal_command =
-        std::make_shared<WalCmdRestoreTableSnapshot>(db_name_, db_id_str_, table_name_, table_id_str_, snapshot_name_, table_def_, segment_infos_, index_cmds_, files_);
+    std::shared_ptr<WalCmd> wal_command = std::make_shared<WalCmdRestoreTableSnapshot>(db_name_,
+                                                                                       db_id_str_,
+                                                                                       table_name_,
+                                                                                       table_id_str_,
+                                                                                       snapshot_name_,
+                                                                                       table_def_,
+                                                                                       segment_infos_,
+                                                                                       index_cmds_,
+                                                                                       files_);
     wal_entry->cmds_.push_back(wal_command);
     return wal_entry;
 }
 
-std::string RestoreDatabaseTxnStore::ToString() const { return fmt::format("{}: database: {}, db_id: {}", TransactionType2Str(type_), db_name_, db_id_str_); }
+std::string RestoreDatabaseTxnStore::ToString() const {
+    return fmt::format("{}: database: {}, db_id: {}", TransactionType2Str(type_), db_name_, db_id_str_);
+}
 
 std::shared_ptr<WalEntry> RestoreDatabaseTxnStore::ToWalEntry(TxnTimeStamp commit_ts) const {
     std::shared_ptr<WalEntry> wal_entry = std::make_shared<WalEntry>();
@@ -125,17 +139,15 @@ std::shared_ptr<WalEntry> RestoreDatabaseTxnStore::ToWalEntry(TxnTimeStamp commi
     std::vector<WalCmdRestoreTableSnapshot> restore_table_wal_cmds;
     for (const auto &restore_table_txn_store : restore_table_txn_stores_) {
         // Create WalCmdRestoreTableSnapshot directly from the stored data
-        WalCmdRestoreTableSnapshot restore_table_cmd(
-            restore_table_txn_store->db_name_,
-            restore_table_txn_store->db_id_str_,
-            restore_table_txn_store->table_name_,
-            restore_table_txn_store->table_id_str_,
-            restore_table_txn_store->snapshot_name_,
-            restore_table_txn_store->table_def_,
-            restore_table_txn_store->segment_infos_,
-            restore_table_txn_store->index_cmds_,
-            restore_table_txn_store->files_
-        );
+        WalCmdRestoreTableSnapshot restore_table_cmd(restore_table_txn_store->db_name_,
+                                                     restore_table_txn_store->db_id_str_,
+                                                     restore_table_txn_store->table_name_,
+                                                     restore_table_txn_store->table_id_str_,
+                                                     restore_table_txn_store->snapshot_name_,
+                                                     restore_table_txn_store->table_def_,
+                                                     restore_table_txn_store->segment_infos_,
+                                                     restore_table_txn_store->index_cmds_,
+                                                     restore_table_txn_store->files_);
         restore_table_wal_cmds.push_back(restore_table_cmd);
     }
     std::shared_ptr<WalCmd> wal_command = std::make_shared<WalCmdRestoreDatabaseSnapshot>(db_name_, db_id_str_, db_comment_, restore_table_wal_cmds);
@@ -233,15 +245,15 @@ std::shared_ptr<WalEntry> OptimizeIndexTxnStore::ToWalEntry(TxnTimeStamp commit_
     std::shared_ptr<WalCmdDumpIndexV2> dump_command;
     for (const auto &store_entry : entries_) {
         dump_command = std::make_shared<WalCmdDumpIndexV2>(store_entry.db_name_,
-                                                     store_entry.db_id_str_,
-                                                     store_entry.table_name_,
-                                                     store_entry.table_id_str_,
-                                                     store_entry.index_name_,
-                                                     store_entry.index_id_str_,
-                                                     store_entry.segment_id_,
-                                                     store_entry.new_chunk_infos_,
-                                                     store_entry.deprecate_chunks_,
-                                                     store_entry.table_key_);
+                                                           store_entry.db_id_str_,
+                                                           store_entry.table_name_,
+                                                           store_entry.table_id_str_,
+                                                           store_entry.index_name_,
+                                                           store_entry.index_id_str_,
+                                                           store_entry.segment_id_,
+                                                           store_entry.new_chunk_infos_,
+                                                           store_entry.deprecate_chunks_,
+                                                           store_entry.table_key_);
         dump_command->dump_cause_ = DumpIndexCause::kOptimizeIndex;
         wal_entry->cmds_.push_back(static_pointer_cast<WalCmd>(dump_command));
     }
@@ -263,7 +275,8 @@ size_t AppendTxnStore::RowCount() const { return input_block_->row_count(); }
 std::shared_ptr<WalEntry> AppendTxnStore::ToWalEntry(TxnTimeStamp commit_ts) const {
     std::shared_ptr<WalEntry> wal_entry = std::make_shared<WalEntry>();
     wal_entry->commit_ts_ = commit_ts;
-    std::shared_ptr<WalCmd> wal_command = std::make_shared<WalCmdAppendV2>(db_name_, db_id_str_, table_name_, table_id_str_, row_ranges_, input_block_);
+    std::shared_ptr<WalCmd> wal_command =
+        std::make_shared<WalCmdAppendV2>(db_name_, db_id_str_, table_name_, table_id_str_, row_ranges_, input_block_);
     wal_entry->cmds_.push_back(wal_command);
     return wal_entry;
 }
@@ -278,7 +291,8 @@ std::shared_ptr<WalEntry> ImportTxnStore::ToWalEntry(TxnTimeStamp commit_ts) con
     std::shared_ptr<WalEntry> wal_entry = std::make_shared<WalEntry>();
     wal_entry->commit_ts_ = commit_ts;
     for (size_t i = 0; i < segment_infos_.size(); ++i) {
-        std::shared_ptr<WalCmdImportV2> wal_command = std::make_shared<WalCmdImportV2>(db_name_, db_id_str_, table_name_, table_id_str_, segment_infos_[i]);
+        std::shared_ptr<WalCmdImportV2> wal_command =
+            std::make_shared<WalCmdImportV2>(db_name_, db_id_str_, table_name_, table_id_str_, segment_infos_[i]);
         wal_entry->cmds_.push_back(wal_command);
     }
 
@@ -286,15 +300,15 @@ std::shared_ptr<WalEntry> ImportTxnStore::ToWalEntry(TxnTimeStamp commit_ts) con
     for (const SegmentID &segment_id : segment_ids_) {
         for (size_t i = 0; i < index_names_.size(); ++i) {
             dump_command = std::make_shared<WalCmdDumpIndexV2>(db_name_,
-                                                         db_id_str_,
-                                                         table_name_,
-                                                         table_id_str_,
-                                                         index_names_[i],
-                                                         index_ids_str_[i],
-                                                         segment_id,
-                                                         chunk_infos_in_segments_.at(segment_id),
-                                                         deprecate_ids_in_segments_.at(segment_id),
-                                                         table_key_);
+                                                               db_id_str_,
+                                                               table_name_,
+                                                               table_id_str_,
+                                                               index_names_[i],
+                                                               index_ids_str_[i],
+                                                               segment_id,
+                                                               chunk_infos_in_segments_.at(segment_id),
+                                                               deprecate_ids_in_segments_.at(segment_id),
+                                                               table_key_);
             dump_command->dump_cause_ = DumpIndexCause::kImport;
             wal_entry->cmds_.push_back(dump_command);
         }
@@ -315,7 +329,8 @@ size_t ImportTxnStore::RowCount() const {
 
 size_t ImportTxnStore::SegmentCount() const {
     size_t row_count = RowCount();
-    size_t segment_count = row_count % DEFAULT_SEGMENT_CAPACITY == 0 ? row_count / DEFAULT_SEGMENT_CAPACITY : row_count / DEFAULT_SEGMENT_CAPACITY + 1;
+    size_t segment_count =
+        row_count % DEFAULT_SEGMENT_CAPACITY == 0 ? row_count / DEFAULT_SEGMENT_CAPACITY : row_count / DEFAULT_SEGMENT_CAPACITY + 1;
     return segment_count;
 }
 
@@ -357,7 +372,8 @@ std::string AddColumnsTxnStore::ToString() const {
 std::shared_ptr<WalEntry> AddColumnsTxnStore::ToWalEntry(TxnTimeStamp commit_ts) const {
     std::shared_ptr<WalEntry> wal_entry = std::make_shared<WalEntry>();
     wal_entry->commit_ts_ = commit_ts;
-    std::shared_ptr<WalCmd> wal_command = std::make_shared<WalCmdAddColumnsV2>(db_name_, db_id_str_, table_name_, table_id_str_, column_defs_, table_key_);
+    std::shared_ptr<WalCmd> wal_command =
+        std::make_shared<WalCmdAddColumnsV2>(db_name_, db_id_str_, table_name_, table_id_str_, column_defs_, table_key_);
     wal_entry->cmds_.push_back(wal_command);
     return wal_entry;
 }
@@ -404,15 +420,15 @@ std::shared_ptr<WalEntry> CompactTxnStore::ToWalEntry(TxnTimeStamp commit_ts) co
     for (const SegmentID &segment_id : segment_ids_) {
         for (size_t i = 0; i < index_names_.size(); ++i) {
             dump_command = std::make_shared<WalCmdDumpIndexV2>(db_name_,
-                                                         db_id_str_,
-                                                         table_name_,
-                                                         table_id_str_,
-                                                         index_names_[i],
-                                                         index_ids_str_[i],
-                                                         segment_id,
-                                                         chunk_infos_in_segments_.at(segment_id),
-                                                         deprecate_ids_in_segments_.at(segment_id),
-                                                         table_key_);
+                                                               db_id_str_,
+                                                               table_name_,
+                                                               table_id_str_,
+                                                               index_names_[i],
+                                                               index_ids_str_[i],
+                                                               segment_id,
+                                                               chunk_infos_in_segments_.at(segment_id),
+                                                               deprecate_ids_in_segments_.at(segment_id),
+                                                               table_key_);
             dump_command->dump_cause_ = DumpIndexCause::kCompact;
             wal_entry->cmds_.push_back(dump_command);
         }
@@ -471,7 +487,8 @@ std::shared_ptr<WalEntry> UpdateTxnStore::ToWalEntry(TxnTimeStamp commit_ts) con
             }
             input_block->Finalize();
         }
-        std::shared_ptr<WalCmd> wal_command2 = std::make_shared<WalCmdAppendV2>(db_name_, db_id_str_, table_name_, table_id_str_, row_ranges_, input_block);
+        std::shared_ptr<WalCmd> wal_command2 =
+            std::make_shared<WalCmdAppendV2>(db_name_, db_id_str_, table_name_, table_id_str_, row_ranges_, input_block);
         wal_entry->cmds_.push_back(wal_command2);
     }
     return wal_entry;

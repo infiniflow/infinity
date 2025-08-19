@@ -28,7 +28,9 @@ std::vector<ColumnBinding> LogicalOptimize::GetColumnBindings() const { return {
 
 std::shared_ptr<std::vector<std::string>> LogicalOptimize::GetOutputNames() const { return std::make_shared<std::vector<std::string>>(); }
 
-std::shared_ptr<std::vector<std::shared_ptr<DataType>>> LogicalOptimize::GetOutputTypes() const { return std::make_shared<std::vector<std::shared_ptr<DataType>>>(); }
+std::shared_ptr<std::vector<std::shared_ptr<DataType>>> LogicalOptimize::GetOutputTypes() const {
+    return std::make_shared<std::vector<std::shared_ptr<DataType>>>();
+}
 
 std::string LogicalOptimize::ToString(i64 &space) const {
     std::stringstream ss;

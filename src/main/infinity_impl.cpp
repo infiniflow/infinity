@@ -84,7 +84,7 @@ std::variant<std::unique_ptr<QueryContext>, QueryResult> Infinity::GetQueryConte
     if (std::holds_alternative<QueryResult>(result)) {                                                                                               \
         return std::get<QueryResult>(result);                                                                                                        \
     }                                                                                                                                                \
-    query_context_ptr = std::move(std::get<std::unique_ptr<QueryContext>>(result));                                                                        \
+    query_context_ptr = std::move(std::get<std::unique_ptr<QueryContext>>(result));                                                                  \
     query_context_ptr->CreateQueryProfiler();
 
 u64 Infinity::GetSessionId() { return session_->session_id(); }
@@ -564,8 +564,10 @@ QueryResult Infinity::CreateIndex(const std::string &db_name,
     return result;
 }
 
-QueryResult
-Infinity::DropIndex(const std::string &db_name, const std::string &table_name, const std::string &index_name, const DropIndexOptions &drop_index_options) {
+QueryResult Infinity::DropIndex(const std::string &db_name,
+                                const std::string &table_name,
+                                const std::string &index_name,
+                                const DropIndexOptions &drop_index_options) {
     std::unique_ptr<QueryContext> query_context_ptr;
     GET_QUERY_CONTEXT(GetQueryContext(), query_context_ptr);
     std::unique_ptr<DropStatement> drop_statement = std::make_unique<DropStatement>();
@@ -608,7 +610,8 @@ QueryResult Infinity::ShowIndex(const std::string &db_name, const std::string &t
     return result;
 }
 
-QueryResult Infinity::ShowIndexSegment(const std::string &db_name, const std::string &table_name, const std::string &index_name, SegmentID segment_id) {
+QueryResult
+Infinity::ShowIndexSegment(const std::string &db_name, const std::string &table_name, const std::string &index_name, SegmentID segment_id) {
     std::unique_ptr<QueryContext> query_context_ptr;
     GET_QUERY_CONTEXT(GetQueryContext(), query_context_ptr);
     std::unique_ptr<ShowStatement> show_statement = std::make_unique<ShowStatement>();
@@ -629,8 +632,11 @@ QueryResult Infinity::ShowIndexSegment(const std::string &db_name, const std::st
     return result;
 }
 
-QueryResult
-Infinity::ShowIndexChunk(const std::string &db_name, const std::string &table_name, const std::string &index_name, SegmentID segment_id, ChunkID chunk_id) {
+QueryResult Infinity::ShowIndexChunk(const std::string &db_name,
+                                     const std::string &table_name,
+                                     const std::string &index_name,
+                                     SegmentID segment_id,
+                                     ChunkID chunk_id) {
     std::unique_ptr<QueryContext> query_context_ptr;
     GET_QUERY_CONTEXT(GetQueryContext(), query_context_ptr);
     std::unique_ptr<ShowStatement> show_statement = std::make_unique<ShowStatement>();
@@ -925,8 +931,11 @@ QueryResult Infinity::Import(const std::string &db_name, const std::string &tabl
     return result;
 }
 
-QueryResult
-Infinity::Export(const std::string &db_name, const std::string &table_name, std::vector<ParsedExpr *> *columns, const std::string &path, ExportOptions export_options) {
+QueryResult Infinity::Export(const std::string &db_name,
+                             const std::string &table_name,
+                             std::vector<ParsedExpr *> *columns,
+                             const std::string &path,
+                             ExportOptions export_options) {
     DeferFn free_column_expressions([&]() {
         if (columns != nullptr) {
             for (auto &column_expr : *columns) {
@@ -1320,7 +1329,7 @@ QueryResult Infinity::CreateTableSnapshot(const std::string &db_name, const std:
 
     auto command_statement = std::make_unique<CommandStatement>();
     command_statement->command_info_ = std::make_unique<SnapshotCmd>(snapshot_name, SnapshotOp::kCreate, SnapshotScope::kTable, table_name);
-    
+
     QueryResult result = query_context_ptr->QueryStatement(command_statement.get());
     return result;
 }
@@ -1331,7 +1340,7 @@ QueryResult Infinity::CreateDatabaseSnapshot(const std::string &db_name, const s
 
     auto command_statement = std::make_unique<CommandStatement>();
     command_statement->command_info_ = std::make_unique<SnapshotCmd>(snapshot_name, SnapshotOp::kCreate, SnapshotScope::kDatabase, db_name);
-    
+
     QueryResult result = query_context_ptr->QueryStatement(command_statement.get());
     return result;
 }
@@ -1342,7 +1351,7 @@ QueryResult Infinity::CreateSystemSnapshot(const std::string &snapshot_name) {
 
     auto command_statement = std::make_unique<CommandStatement>();
     command_statement->command_info_ = std::make_unique<SnapshotCmd>(snapshot_name, SnapshotOp::kCreate, SnapshotScope::kSystem);
-    
+
     QueryResult result = query_context_ptr->QueryStatement(command_statement.get());
     return result;
 }
@@ -1353,7 +1362,7 @@ QueryResult Infinity::RestoreTableSnapshot(const std::string &snapshot_name) {
 
     auto command_statement = std::make_unique<CommandStatement>();
     command_statement->command_info_ = std::make_unique<SnapshotCmd>(snapshot_name, SnapshotOp::kRestore, SnapshotScope::kTable);
-    
+
     QueryResult result = query_context_ptr->QueryStatement(command_statement.get());
     return result;
 }
@@ -1364,7 +1373,7 @@ QueryResult Infinity::RestoreDatabaseSnapshot(const std::string &snapshot_name) 
 
     auto command_statement = std::make_unique<CommandStatement>();
     command_statement->command_info_ = std::make_unique<SnapshotCmd>(snapshot_name, SnapshotOp::kRestore, SnapshotScope::kDatabase);
-    
+
     QueryResult result = query_context_ptr->QueryStatement(command_statement.get());
     return result;
 }
@@ -1375,7 +1384,7 @@ QueryResult Infinity::RestoreSystemSnapshot(const std::string &snapshot_name) {
 
     auto command_statement = std::make_unique<CommandStatement>();
     command_statement->command_info_ = std::make_unique<SnapshotCmd>(snapshot_name, SnapshotOp::kRestore, SnapshotScope::kSystem);
-    
+
     QueryResult result = query_context_ptr->QueryStatement(command_statement.get());
     return result;
 }
@@ -1386,7 +1395,7 @@ QueryResult Infinity::DropSnapshot(const std::string &snapshot_name) {
 
     auto command_statement = std::make_unique<CommandStatement>();
     command_statement->command_info_ = std::make_unique<SnapshotCmd>(snapshot_name, SnapshotOp::kDrop, SnapshotScope::kIgnore);
-    
+
     QueryResult result = query_context_ptr->QueryStatement(command_statement.get());
     return result;
 }
@@ -1398,7 +1407,7 @@ QueryResult Infinity::ShowSnapshot(const std::string &snapshot_name) {
     auto show_statement = std::make_unique<ShowStatement>();
     show_statement->show_type_ = ShowStmtType::kShowSnapshot;
     show_statement->snapshot_name_ = snapshot_name;
-    
+
     QueryResult result = query_context_ptr->QueryStatement(show_statement.get());
     return result;
 }
@@ -1409,7 +1418,7 @@ QueryResult Infinity::ListSnapshots() {
 
     auto show_statement = std::make_unique<ShowStatement>();
     show_statement->show_type_ = ShowStmtType::kListSnapshots;
-    
+
     QueryResult result = query_context_ptr->QueryStatement(show_statement.get());
     return result;
 }

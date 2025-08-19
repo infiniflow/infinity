@@ -58,9 +58,9 @@ Status BlockMeta::GetBlockLock(std::shared_ptr<BlockLock> &block_lock) {
 
 TxnTimeStamp BlockMeta::GetCreateTimestampFromKV() const {
     std::string block_key = KeyEncode::CatalogTableSegmentBlockKey(segment_meta_.table_meta().db_id_str(),
-                                                              segment_meta_.table_meta().table_id_str(),
-                                                              segment_meta_.segment_id(),
-                                                              block_id_);
+                                                                   segment_meta_.table_meta().table_id_str(),
+                                                                   segment_meta_.segment_id(),
+                                                                   block_id_);
     std::string create_ts_str;
     Status status = kv_instance_.Get(block_key, create_ts_str);
     if (!status.ok()) {
@@ -82,11 +82,11 @@ Status BlockMeta::InitSet() {
     BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
     {
         auto version_file_worker = std::make_unique<VersionFileWorker>(std::make_shared<std::string>(InfinityContext::instance().config()->DataDir()),
-                                                                 std::make_shared<std::string>(InfinityContext::instance().config()->TempDir()),
-                                                                 block_dir_ptr,
-                                                                 BlockVersion::FileName(),
-                                                                 this->block_capacity(),
-                                                                 buffer_mgr->persistence_manager());
+                                                                       std::make_shared<std::string>(InfinityContext::instance().config()->TempDir()),
+                                                                       block_dir_ptr,
+                                                                       BlockVersion::FileName(),
+                                                                       this->block_capacity(),
+                                                                       buffer_mgr->persistence_manager());
         version_buffer_ = buffer_mgr->AllocateBufferObject(std::move(version_file_worker));
         if (!version_buffer_) {
             return Status::BufferManagerError(fmt::format("Get version buffer failed: {}", version_file_worker->GetFilePath()));
@@ -108,11 +108,11 @@ Status BlockMeta::LoadSet(TxnTimeStamp checkpoint_ts) {
     auto *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
     std::shared_ptr<std::string> block_dir_ptr = this->GetBlockDir();
     auto version_file_worker = std::make_unique<VersionFileWorker>(std::make_shared<std::string>(InfinityContext::instance().config()->DataDir()),
-                                                             std::make_shared<std::string>(InfinityContext::instance().config()->TempDir()),
-                                                             block_dir_ptr,
-                                                             BlockVersion::FileName(),
-                                                             this->block_capacity(),
-                                                             buffer_mgr->persistence_manager());
+                                                                   std::make_shared<std::string>(InfinityContext::instance().config()->TempDir()),
+                                                                   block_dir_ptr,
+                                                                   BlockVersion::FileName(),
+                                                                   this->block_capacity(),
+                                                                   buffer_mgr->persistence_manager());
     version_buffer_ = buffer_mgr->GetBufferObject(std::move(version_file_worker));
     if (!version_buffer_) {
         return Status::BufferManagerError(fmt::format("Get version buffer failed: {}", version_file_worker->GetFilePath()));
@@ -126,11 +126,11 @@ Status BlockMeta::RestoreSet() {
     auto *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
     std::shared_ptr<std::string> block_dir_ptr = this->GetBlockDir();
     auto version_file_worker = std::make_unique<VersionFileWorker>(std::make_shared<std::string>(InfinityContext::instance().config()->DataDir()),
-                                                             std::make_shared<std::string>(InfinityContext::instance().config()->TempDir()),
-                                                             block_dir_ptr,
-                                                             BlockVersion::FileName(),
-                                                             this->block_capacity(),
-                                                             buffer_mgr->persistence_manager());
+                                                                   std::make_shared<std::string>(InfinityContext::instance().config()->TempDir()),
+                                                                   block_dir_ptr,
+                                                                   BlockVersion::FileName(),
+                                                                   this->block_capacity(),
+                                                                   buffer_mgr->persistence_manager());
     auto *buffer_obj = buffer_mgr->GetBufferObject(version_file_worker->GetFilePath());
     if (buffer_obj == nullptr) {
         version_buffer_ = buffer_mgr->GetBufferObject(std::move(version_file_worker));
@@ -153,11 +153,11 @@ Status BlockMeta::RestoreSetFromSnapshot() {
     auto *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
     std::shared_ptr<std::string> block_dir_ptr = this->GetBlockDir();
     auto version_file_worker = std::make_unique<VersionFileWorker>(std::make_shared<std::string>(InfinityContext::instance().config()->DataDir()),
-                                                             std::make_shared<std::string>(InfinityContext::instance().config()->TempDir()),
-                                                             block_dir_ptr,
-                                                             BlockVersion::FileName(),
-                                                             this->block_capacity(),
-                                                             buffer_mgr->persistence_manager());
+                                                                   std::make_shared<std::string>(InfinityContext::instance().config()->TempDir()),
+                                                                   block_dir_ptr,
+                                                                   BlockVersion::FileName(),
+                                                                   this->block_capacity(),
+                                                                   buffer_mgr->persistence_manager());
 
     version_buffer_ = buffer_mgr->GetBufferObject(std::move(version_file_worker));
     if (!version_buffer_) {

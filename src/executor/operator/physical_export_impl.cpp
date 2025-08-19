@@ -180,8 +180,8 @@ size_t PhysicalExport::ExportToJSONL(QueryContext *query_context, ExportOperator
 }
 
 size_t PhysicalExport::ExportToFileInner(QueryContext *query_context,
-                                        ExportOperatorState *export_op_state,
-                                        std::function<std::string(const std::vector<ColumnVector> &, size_t)> line_to_string) {
+                                         ExportOperatorState *export_op_state,
+                                         std::function<std::string(const std::vector<ColumnVector> &, size_t)> line_to_string) {
     const std::vector<std::shared_ptr<ColumnDef>> &column_defs = table_info_->column_defs_;
 
     std::vector<ColumnID> select_columns;
@@ -469,7 +469,8 @@ new_label_return:
 
 std::shared_ptr<arrow::DataType> GetArrowType(const DataType &column_data_type);
 
-std::shared_ptr<arrow::Array> BuildArrowArray(const ColumnDef *column_def, const ColumnVector &column_vector, const std::vector<u32> &block_rows_for_output);
+std::shared_ptr<arrow::Array>
+BuildArrowArray(const ColumnDef *column_def, const ColumnVector &column_vector, const std::vector<u32> &block_rows_for_output);
 
 size_t PhysicalExport::ExportToPARQUET(QueryContext *query_context, ExportOperatorState *export_op_state) {
     const std::vector<std::shared_ptr<ColumnDef>> &column_defs = table_info_->column_defs_;
@@ -1082,7 +1083,8 @@ std::shared_ptr<arrow::ArrayBuilder> GetArrowBuilder(const DataType &column_type
     return array_builder;
 }
 
-std::shared_ptr<arrow::Array> BuildArrowArray(const ColumnDef *column_def, const ColumnVector &column_vector, const std::vector<u32> &block_rows_for_output) {
+std::shared_ptr<arrow::Array>
+BuildArrowArray(const ColumnDef *column_def, const ColumnVector &column_vector, const std::vector<u32> &block_rows_for_output) {
     auto &column_type = column_def->type();
     std::shared_ptr<arrow::ArrayBuilder> array_builder = GetArrowBuilder(*column_type);
 

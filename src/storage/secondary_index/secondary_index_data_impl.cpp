@@ -68,7 +68,10 @@ template <typename RawValueType>
 struct SecondaryIndexChunkMerger {
     using OrderedKeyType = ConvertToOrderedType<RawValueType>;
     std::vector<SecondaryIndexChunkDataReader<RawValueType>> readers_;
-    std::priority_queue<std::tuple<OrderedKeyType, u32, u32>, std::vector<std::tuple<OrderedKeyType, u32, u32>>, std::greater<std::tuple<OrderedKeyType, u32, u32>>> pq_;
+    std::priority_queue<std::tuple<OrderedKeyType, u32, u32>,
+                        std::vector<std::tuple<OrderedKeyType, u32, u32>>,
+                        std::greater<std::tuple<OrderedKeyType, u32, u32>>>
+        pq_;
     explicit SecondaryIndexChunkMerger(const std::vector<std::pair<u32, BufferObj *>> &buffer_objs) {
         readers_.reserve(buffer_objs.size());
         for (const auto &[row_count, buffer_obj] : buffer_objs) {

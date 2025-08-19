@@ -131,7 +131,8 @@ private:
         }
         SortResult(compare_id_for_heap);
     }
-    void WriteToOutput(const std::vector<std::unique_ptr<DataBlock>> &input_data_block_array, std::vector<std::unique_ptr<DataBlock>> &output_data_block_array) {
+    void WriteToOutput(const std::vector<std::unique_ptr<DataBlock>> &input_data_block_array,
+                       std::vector<std::unique_ptr<DataBlock>> &output_data_block_array) {
         auto const &db_types = input_data_block_array[0]->types();
         {
             // prepare output blocks
@@ -176,7 +177,8 @@ private:
 
 std::function<std::strong_ordering(const std::shared_ptr<ColumnVector> &, u32, const std::shared_ptr<ColumnVector> &, u32)>
 InvalidPhysicalTopCompareType(const DataType &type_) {
-    return [type_name = type_.ToString()](const std::shared_ptr<ColumnVector> &, u32, const std::shared_ptr<ColumnVector> &, u32) -> std::strong_ordering {
+    return [type_name =
+                type_.ToString()](const std::shared_ptr<ColumnVector> &, u32, const std::shared_ptr<ColumnVector> &, u32) -> std::strong_ordering {
         UnrecoverableError(fmt::format("OrderBy LogicalType {} not implemented.", type_name));
         return std::strong_ordering::equal;
     };
@@ -313,13 +315,14 @@ PhysicalTop::GenerateSortFunction(OrderType compare_order, std::shared_ptr<BaseE
     }
 }
 
-void PhysicalTop::Init(QueryContext* query_context) {
+void PhysicalTop::Init(QueryContext *query_context) {
     // Initialize sort parameters
     sort_expr_count_ = order_by_types_.size();
     if (sort_expr_count_ != sort_expressions_.size()) {
         UnrecoverableError("order_by_types_.size() != sort_expressions_.size()");
     }
-    std::vector<std::function<std::strong_ordering(const std::shared_ptr<ColumnVector> &, u32, const std::shared_ptr<ColumnVector> &, u32)>> sort_functions;
+    std::vector<std::function<std::strong_ordering(const std::shared_ptr<ColumnVector> &, u32, const std::shared_ptr<ColumnVector> &, u32)>>
+        sort_functions;
     sort_functions.reserve(sort_expr_count_);
     for (u32 i = 0; i < sort_expr_count_; ++i) {
         sort_functions.emplace_back(GenerateSortFunction(order_by_types_[i], sort_expressions_[i]));
@@ -411,8 +414,8 @@ void PhysicalTop::HandleOutputOffset(u32 total_row_cnt, u32 offset, std::vector<
 }
 
 std::vector<std::vector<std::shared_ptr<ColumnVector>>> PhysicalTop::GetEvalColumns(const std::vector<std::shared_ptr<BaseExpression>> &expressions,
-                                                                    std::vector<std::shared_ptr<ExpressionState>> &expr_states,
-                                                                    const std::vector<std::unique_ptr<DataBlock>> &data_block_array) {
+                                                                                    std::vector<std::shared_ptr<ExpressionState>> &expr_states,
+                                                                                    const std::vector<std::unique_ptr<DataBlock>> &data_block_array) {
     std::vector<std::vector<std::shared_ptr<ColumnVector>>> eval_columns;
     eval_columns.reserve(data_block_array.size());
     const u32 sort_expr_count = expressions.size();

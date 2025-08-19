@@ -28,10 +28,11 @@ Hit *DictSegment::Match(const std::vector<wchar_t> &char_array, int begin, int l
 
     if (!children_array_.empty()) {
         std::unique_ptr<DictSegment> key_segment = std::make_unique<DictSegment>(key_char);
-        auto it = std::lower_bound(children_array_.begin(),
-                                   children_array_.begin() + store_size_,
-                                   key_segment,
-                                   [](const std::unique_ptr<DictSegment> &a, const std::unique_ptr<DictSegment> &b) { return a->node_char_ < b->node_char_; });
+        auto it = std::lower_bound(
+            children_array_.begin(),
+            children_array_.begin() + store_size_,
+            key_segment,
+            [](const std::unique_ptr<DictSegment> &a, const std::unique_ptr<DictSegment> &b) { return a->node_char_ < b->node_char_; });
         if (it != children_array_.begin() + store_size_ && (*it)->node_char_ == key_char) {
             ds = (*it).get();
         }
@@ -84,10 +85,11 @@ DictSegment *DictSegment::LookforSegment(wchar_t key_char, int create) {
     if (store_size_ <= ARRAY_LENGTH_LIMIT) {
         std::vector<std::unique_ptr<DictSegment>> &children_array_ = GetChildrenArray();
         std::unique_ptr<DictSegment> key_segment = std::make_unique<DictSegment>(key_char);
-        auto it = std::lower_bound(children_array_.begin(),
-                                   children_array_.begin() + store_size_,
-                                   key_segment,
-                                   [](const std::unique_ptr<DictSegment> &a, const std::unique_ptr<DictSegment> &b) { return a->node_char_ < b->node_char_; });
+        auto it = std::lower_bound(
+            children_array_.begin(),
+            children_array_.begin() + store_size_,
+            key_segment,
+            [](const std::unique_ptr<DictSegment> &a, const std::unique_ptr<DictSegment> &b) { return a->node_char_ < b->node_char_; });
         if (it != children_array_.begin() + store_size_ && (*it)->node_char_ == key_char) {
             ds = (*it).get();
         }

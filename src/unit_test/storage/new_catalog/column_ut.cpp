@@ -198,7 +198,8 @@ TEST_P(TestTxnColumn, alter_column) {
         EXPECT_TRUE(status.ok());
 
         // create table tb1
-        auto table_def1 = TableDef::Make(db_name, std::make_shared<std::string>(table_name), std::make_shared<std::string>(), {column_def1, column_def2});
+        auto table_def1 =
+            TableDef::Make(db_name, std::make_shared<std::string>(table_name), std::make_shared<std::string>(), {column_def1, column_def2});
         auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
         status = txn2->CreateTable(*db_name, std::move(table_def1), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
@@ -268,7 +269,8 @@ TEST_P(TestTxnColumn, add_column_and_drop_db) {
         EXPECT_TRUE(status.ok());
 
         // create table tb1
-        auto table_def1 = TableDef::Make(db_name, std::make_shared<std::string>(table_name), std::make_shared<std::string>(), {column_def1, column_def2});
+        auto table_def1 =
+            TableDef::Make(db_name, std::make_shared<std::string>(table_name), std::make_shared<std::string>(), {column_def1, column_def2});
         auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
         status = txn2->CreateTable(*db_name, std::move(table_def1), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
@@ -308,7 +310,8 @@ TEST_P(TestTxnColumn, add_column_and_drop_db) {
         EXPECT_TRUE(status.ok());
 
         // create table tb1
-        auto table_def1 = TableDef::Make(db_name, std::make_shared<std::string>(table_name), std::make_shared<std::string>(), {column_def1, column_def2});
+        auto table_def1 =
+            TableDef::Make(db_name, std::make_shared<std::string>(table_name), std::make_shared<std::string>(), {column_def1, column_def2});
         auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
         status = txn2->CreateTable(*db_name, std::move(table_def1), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
@@ -351,7 +354,8 @@ TEST_P(TestTxnColumn, add_column_and_drop_db) {
         EXPECT_TRUE(status.ok());
 
         // create table tb1
-        auto table_def1 = TableDef::Make(db_name, std::make_shared<std::string>(table_name), std::make_shared<std::string>(), {column_def1, column_def2});
+        auto table_def1 =
+            TableDef::Make(db_name, std::make_shared<std::string>(table_name), std::make_shared<std::string>(), {column_def1, column_def2});
         auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
         status = txn2->CreateTable(*db_name, std::move(table_def1), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
@@ -400,7 +404,8 @@ TEST_P(TestTxnColumn, add_column_and_drop_table) {
         EXPECT_TRUE(status.ok());
 
         // create table tb1
-        auto table_def1 = TableDef::Make(db_name, std::make_shared<std::string>(table_name), std::make_shared<std::string>(), {column_def1, column_def2});
+        auto table_def1 =
+            TableDef::Make(db_name, std::make_shared<std::string>(table_name), std::make_shared<std::string>(), {column_def1, column_def2});
         auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
         status = txn2->CreateTable(*db_name, std::move(table_def1), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
@@ -448,7 +453,8 @@ TEST_P(TestTxnColumn, add_column_and_drop_table) {
         EXPECT_TRUE(status.ok());
 
         // create table tb1
-        auto table_def1 = TableDef::Make(db_name, std::make_shared<std::string>(table_name), std::make_shared<std::string>(), {column_def1, column_def2});
+        auto table_def1 =
+            TableDef::Make(db_name, std::make_shared<std::string>(table_name), std::make_shared<std::string>(), {column_def1, column_def2});
         auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
         status = txn2->CreateTable(*db_name, std::move(table_def1), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
@@ -496,7 +502,8 @@ TEST_P(TestTxnColumn, add_column_and_drop_table) {
         EXPECT_TRUE(status.ok());
 
         // create table tb1
-        auto table_def1 = TableDef::Make(db_name, std::make_shared<std::string>(table_name), std::make_shared<std::string>(), {column_def1, column_def2});
+        auto table_def1 =
+            TableDef::Make(db_name, std::make_shared<std::string>(table_name), std::make_shared<std::string>(), {column_def1, column_def2});
         auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
         status = txn2->CreateTable(*db_name, std::move(table_def1), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
@@ -544,7 +551,8 @@ TEST_P(TestTxnColumn, add_column_and_drop_table) {
         EXPECT_TRUE(status.ok());
 
         // create table tb1
-        auto table_def1 = TableDef::Make(db_name, std::make_shared<std::string>(table_name), std::make_shared<std::string>(), {column_def1, column_def2});
+        auto table_def1 =
+            TableDef::Make(db_name, std::make_shared<std::string>(table_name), std::make_shared<std::string>(), {column_def1, column_def2});
         auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
         status = txn2->CreateTable(*db_name, std::move(table_def1), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
@@ -594,7 +602,8 @@ TEST_P(TestTxnColumn, add_column_and_drop_table) {
         EXPECT_TRUE(status.ok());
 
         // create table tb1
-        auto table_def1 = TableDef::Make(db_name, std::make_shared<std::string>(table_name), std::make_shared<std::string>(), {column_def1, column_def2});
+        auto table_def1 =
+            TableDef::Make(db_name, std::make_shared<std::string>(table_name), std::make_shared<std::string>(), {column_def1, column_def2});
         auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
         status = txn2->CreateTable(*db_name, std::move(table_def1), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
@@ -644,7 +653,8 @@ TEST_P(TestTxnColumn, add_column_and_drop_table) {
         EXPECT_TRUE(status.ok());
 
         // create table tb1
-        auto table_def1 = TableDef::Make(db_name, std::make_shared<std::string>(table_name), std::make_shared<std::string>(), {column_def1, column_def2});
+        auto table_def1 =
+            TableDef::Make(db_name, std::make_shared<std::string>(table_name), std::make_shared<std::string>(), {column_def1, column_def2});
         auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
         status = txn2->CreateTable(*db_name, std::move(table_def1), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
@@ -700,7 +710,8 @@ TEST_P(TestTxnColumn, add_column_and_add_column) {
         EXPECT_TRUE(status.ok());
 
         // create table tb1
-        auto table_def1 = TableDef::Make(db_name, std::make_shared<std::string>(table_name), std::make_shared<std::string>(), {column_def1, column_def2});
+        auto table_def1 =
+            TableDef::Make(db_name, std::make_shared<std::string>(table_name), std::make_shared<std::string>(), {column_def1, column_def2});
         auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
         status = txn2->CreateTable(*db_name, std::move(table_def1), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
@@ -742,7 +753,8 @@ TEST_P(TestTxnColumn, add_column_and_add_column) {
         EXPECT_TRUE(status.ok());
 
         // create table tb1
-        auto table_def1 = TableDef::Make(db_name, std::make_shared<std::string>(table_name), std::make_shared<std::string>(), {column_def1, column_def2});
+        auto table_def1 =
+            TableDef::Make(db_name, std::make_shared<std::string>(table_name), std::make_shared<std::string>(), {column_def1, column_def2});
         auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
         status = txn2->CreateTable(*db_name, std::move(table_def1), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
@@ -784,7 +796,8 @@ TEST_P(TestTxnColumn, add_column_and_add_column) {
         EXPECT_TRUE(status.ok());
 
         // create table tb1
-        auto table_def1 = TableDef::Make(db_name, std::make_shared<std::string>(table_name), std::make_shared<std::string>(), {column_def1, column_def2});
+        auto table_def1 =
+            TableDef::Make(db_name, std::make_shared<std::string>(table_name), std::make_shared<std::string>(), {column_def1, column_def2});
         auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
         status = txn2->CreateTable(*db_name, std::move(table_def1), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
@@ -831,7 +844,8 @@ TEST_P(TestTxnColumn, add_column_and_add_column) {
         EXPECT_TRUE(status.ok());
 
         // create table tb1
-        auto table_def1 = TableDef::Make(db_name, std::make_shared<std::string>(table_name), std::make_shared<std::string>(), {column_def1, column_def2});
+        auto table_def1 =
+            TableDef::Make(db_name, std::make_shared<std::string>(table_name), std::make_shared<std::string>(), {column_def1, column_def2});
         auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
         status = txn2->CreateTable(*db_name, std::move(table_def1), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
@@ -880,7 +894,8 @@ TEST_P(TestTxnColumn, add_column_and_add_column) {
         EXPECT_TRUE(status.ok());
 
         // create table tb1
-        auto table_def1 = TableDef::Make(db_name, std::make_shared<std::string>(table_name), std::make_shared<std::string>(), {column_def1, column_def2});
+        auto table_def1 =
+            TableDef::Make(db_name, std::make_shared<std::string>(table_name), std::make_shared<std::string>(), {column_def1, column_def2});
         auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
         status = txn2->CreateTable(*db_name, std::move(table_def1), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
@@ -929,7 +944,8 @@ TEST_P(TestTxnColumn, add_column_and_add_column) {
         EXPECT_TRUE(status.ok());
 
         // create table tb1
-        auto table_def1 = TableDef::Make(db_name, std::make_shared<std::string>(table_name), std::make_shared<std::string>(), {column_def1, column_def2});
+        auto table_def1 =
+            TableDef::Make(db_name, std::make_shared<std::string>(table_name), std::make_shared<std::string>(), {column_def1, column_def2});
         auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
         status = txn2->CreateTable(*db_name, std::move(table_def1), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
@@ -989,7 +1005,8 @@ TEST_P(TestTxnColumn, drop_column_and_drop_db) {
         EXPECT_TRUE(status.ok());
 
         // create table tb1
-        auto table_def1 = TableDef::Make(db_name, std::make_shared<std::string>(table_name), std::make_shared<std::string>(), {column_def1, column_def2});
+        auto table_def1 =
+            TableDef::Make(db_name, std::make_shared<std::string>(table_name), std::make_shared<std::string>(), {column_def1, column_def2});
         auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
         status = txn2->CreateTable(*db_name, std::move(table_def1), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
@@ -1027,7 +1044,8 @@ TEST_P(TestTxnColumn, drop_column_and_drop_db) {
         EXPECT_TRUE(status.ok());
 
         // create table tb1
-        auto table_def1 = TableDef::Make(db_name, std::make_shared<std::string>(table_name), std::make_shared<std::string>(), {column_def1, column_def2});
+        auto table_def1 =
+            TableDef::Make(db_name, std::make_shared<std::string>(table_name), std::make_shared<std::string>(), {column_def1, column_def2});
         auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
         status = txn2->CreateTable(*db_name, std::move(table_def1), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
@@ -1069,7 +1087,8 @@ TEST_P(TestTxnColumn, drop_column_and_drop_db) {
         EXPECT_TRUE(status.ok());
 
         // create table tb1
-        auto table_def1 = TableDef::Make(db_name, std::make_shared<std::string>(table_name), std::make_shared<std::string>(), {column_def1, column_def2});
+        auto table_def1 =
+            TableDef::Make(db_name, std::make_shared<std::string>(table_name), std::make_shared<std::string>(), {column_def1, column_def2});
         auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
         status = txn2->CreateTable(*db_name, std::move(table_def1), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
@@ -1116,7 +1135,8 @@ TEST_P(TestTxnColumn, drop_column_and_drop_table) {
         EXPECT_TRUE(status.ok());
 
         // create table tb1
-        auto table_def1 = TableDef::Make(db_name, std::make_shared<std::string>(table_name), std::make_shared<std::string>(), {column_def1, column_def2});
+        auto table_def1 =
+            TableDef::Make(db_name, std::make_shared<std::string>(table_name), std::make_shared<std::string>(), {column_def1, column_def2});
         auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
         status = txn2->CreateTable(*db_name, std::move(table_def1), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
@@ -1161,7 +1181,8 @@ TEST_P(TestTxnColumn, drop_column_and_drop_table) {
         EXPECT_TRUE(status.ok());
 
         // create table tb1
-        auto table_def1 = TableDef::Make(db_name, std::make_shared<std::string>(table_name), std::make_shared<std::string>(), {column_def1, column_def2});
+        auto table_def1 =
+            TableDef::Make(db_name, std::make_shared<std::string>(table_name), std::make_shared<std::string>(), {column_def1, column_def2});
         auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
         status = txn2->CreateTable(*db_name, std::move(table_def1), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
@@ -1206,7 +1227,8 @@ TEST_P(TestTxnColumn, drop_column_and_drop_table) {
         EXPECT_TRUE(status.ok());
 
         // create table tb1
-        auto table_def1 = TableDef::Make(db_name, std::make_shared<std::string>(table_name), std::make_shared<std::string>(), {column_def1, column_def2});
+        auto table_def1 =
+            TableDef::Make(db_name, std::make_shared<std::string>(table_name), std::make_shared<std::string>(), {column_def1, column_def2});
         auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
         status = txn2->CreateTable(*db_name, std::move(table_def1), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
@@ -1251,7 +1273,8 @@ TEST_P(TestTxnColumn, drop_column_and_drop_table) {
         EXPECT_TRUE(status.ok());
 
         // create table tb1
-        auto table_def1 = TableDef::Make(db_name, std::make_shared<std::string>(table_name), std::make_shared<std::string>(), {column_def1, column_def2});
+        auto table_def1 =
+            TableDef::Make(db_name, std::make_shared<std::string>(table_name), std::make_shared<std::string>(), {column_def1, column_def2});
         auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
         status = txn2->CreateTable(*db_name, std::move(table_def1), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
@@ -1298,7 +1321,8 @@ TEST_P(TestTxnColumn, drop_column_and_drop_table) {
         EXPECT_TRUE(status.ok());
 
         // create table tb1
-        auto table_def1 = TableDef::Make(db_name, std::make_shared<std::string>(table_name), std::make_shared<std::string>(), {column_def1, column_def2});
+        auto table_def1 =
+            TableDef::Make(db_name, std::make_shared<std::string>(table_name), std::make_shared<std::string>(), {column_def1, column_def2});
         auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
         status = txn2->CreateTable(*db_name, std::move(table_def1), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
@@ -1345,7 +1369,8 @@ TEST_P(TestTxnColumn, drop_column_and_drop_table) {
         EXPECT_TRUE(status.ok());
 
         // create table tb1
-        auto table_def1 = TableDef::Make(db_name, std::make_shared<std::string>(table_name), std::make_shared<std::string>(), {column_def1, column_def2});
+        auto table_def1 =
+            TableDef::Make(db_name, std::make_shared<std::string>(table_name), std::make_shared<std::string>(), {column_def1, column_def2});
         auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
         status = txn2->CreateTable(*db_name, std::move(table_def1), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
@@ -1398,7 +1423,8 @@ TEST_P(TestTxnColumn, drop_column_and_add_column) {
         EXPECT_TRUE(status.ok());
 
         // create table tb1
-        auto table_def1 = TableDef::Make(db_name, std::make_shared<std::string>(table_name), std::make_shared<std::string>(), {column_def1, column_def2});
+        auto table_def1 =
+            TableDef::Make(db_name, std::make_shared<std::string>(table_name), std::make_shared<std::string>(), {column_def1, column_def2});
         auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
         status = txn2->CreateTable(*db_name, std::move(table_def1), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
@@ -1453,7 +1479,8 @@ TEST_P(TestTxnColumn, drop_column_and_add_column) {
         EXPECT_TRUE(status.ok());
 
         // create table tb1
-        auto table_def1 = TableDef::Make(db_name, std::make_shared<std::string>(table_name), std::make_shared<std::string>(), {column_def1, column_def2});
+        auto table_def1 =
+            TableDef::Make(db_name, std::make_shared<std::string>(table_name), std::make_shared<std::string>(), {column_def1, column_def2});
         auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
         status = txn2->CreateTable(*db_name, std::move(table_def1), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
@@ -1510,7 +1537,8 @@ TEST_P(TestTxnColumn, drop_column_and_add_column) {
         EXPECT_TRUE(status.ok());
 
         // create table tb1
-        auto table_def1 = TableDef::Make(db_name, std::make_shared<std::string>(table_name), std::make_shared<std::string>(), {column_def1, column_def2});
+        auto table_def1 =
+            TableDef::Make(db_name, std::make_shared<std::string>(table_name), std::make_shared<std::string>(), {column_def1, column_def2});
         auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
         status = txn2->CreateTable(*db_name, std::move(table_def1), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
@@ -1558,7 +1586,8 @@ TEST_P(TestTxnColumn, drop_column_and_add_column) {
         EXPECT_TRUE(status.ok());
 
         // create table tb1
-        auto table_def1 = TableDef::Make(db_name, std::make_shared<std::string>(table_name), std::make_shared<std::string>(), {column_def1, column_def2});
+        auto table_def1 =
+            TableDef::Make(db_name, std::make_shared<std::string>(table_name), std::make_shared<std::string>(), {column_def1, column_def2});
         auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
         status = txn2->CreateTable(*db_name, std::move(table_def1), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
@@ -1614,8 +1643,10 @@ TEST_P(TestTxnColumn, drop_column_and_drop_column) {
         EXPECT_TRUE(status.ok());
 
         // create table tb1
-        auto table_def1 =
-            TableDef::Make(db_name, std::make_shared<std::string>(table_name), std::make_shared<std::string>(), {column_def1, column_def2, column_def3});
+        auto table_def1 = TableDef::Make(db_name,
+                                         std::make_shared<std::string>(table_name),
+                                         std::make_shared<std::string>(),
+                                         {column_def1, column_def2, column_def3});
         auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
         status = txn2->CreateTable(*db_name, std::move(table_def1), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
@@ -1668,8 +1699,10 @@ TEST_P(TestTxnColumn, drop_column_and_drop_column) {
         EXPECT_TRUE(status.ok());
 
         // create table tb1
-        auto table_def1 =
-            TableDef::Make(db_name, std::make_shared<std::string>(table_name), std::make_shared<std::string>(), {column_def1, column_def2, column_def3});
+        auto table_def1 = TableDef::Make(db_name,
+                                         std::make_shared<std::string>(table_name),
+                                         std::make_shared<std::string>(),
+                                         {column_def1, column_def2, column_def3});
         auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
         status = txn2->CreateTable(*db_name, std::move(table_def1), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
@@ -1728,8 +1761,10 @@ TEST_P(TestTxnColumn, drop_column_and_drop_column) {
         EXPECT_TRUE(status.ok());
 
         // create table tb1
-        auto table_def1 =
-            TableDef::Make(db_name, std::make_shared<std::string>(table_name), std::make_shared<std::string>(), {column_def1, column_def2, column_def3});
+        auto table_def1 = TableDef::Make(db_name,
+                                         std::make_shared<std::string>(table_name),
+                                         std::make_shared<std::string>(),
+                                         {column_def1, column_def2, column_def3});
         auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
         status = txn2->CreateTable(*db_name, std::move(table_def1), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
@@ -1788,7 +1823,8 @@ TEST_P(TestTxnColumn, drop_column_and_drop_column) {
         EXPECT_TRUE(status.ok());
 
         // create table tb1
-        auto table_def1 = TableDef::Make(db_name, std::make_shared<std::string>(table_name), std::make_shared<std::string>(), {column_def1, column_def2});
+        auto table_def1 =
+            TableDef::Make(db_name, std::make_shared<std::string>(table_name), std::make_shared<std::string>(), {column_def1, column_def2});
         auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
         status = txn2->CreateTable(*db_name, std::move(table_def1), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
@@ -1841,7 +1877,8 @@ TEST_P(TestTxnColumn, drop_column_and_drop_column) {
         EXPECT_TRUE(status.ok());
 
         // create table tb1
-        auto table_def1 = TableDef::Make(db_name, std::make_shared<std::string>(table_name), std::make_shared<std::string>(), {column_def1, column_def2});
+        auto table_def1 =
+            TableDef::Make(db_name, std::make_shared<std::string>(table_name), std::make_shared<std::string>(), {column_def1, column_def2});
         auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
         status = txn2->CreateTable(*db_name, std::move(table_def1), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());

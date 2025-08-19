@@ -90,7 +90,7 @@ void AddToFulltextEvaluator(std::unique_ptr<IndexFilterEvaluatorFulltext> &targe
 }
 
 std::unique_ptr<IndexFilterEvaluatorSecondary> MergeSameColumn(std::vector<std::unique_ptr<IndexFilterEvaluatorSecondary>> &evaluators,
-                                                         const IndexFilterEvaluator::Type op) {
+                                                               const IndexFilterEvaluator::Type op) {
     assert(evaluators.size() > 0);
     std::unique_ptr<IndexFilterEvaluatorSecondary> result = std::move(evaluators[0]);
     for (size_t i = 1; i < evaluators.size(); ++i) {
@@ -157,7 +157,8 @@ std::unique_ptr<IndexFilterEvaluator> IndexFilterEvaluatorBuildFromAnd(std::vect
             }
             case Type::kAnd: {
                 // flatten all children
-                std::unique_ptr<IndexFilterEvaluatorLogicalChildren> child_logical(static_cast<IndexFilterEvaluatorLogicalChildren *>(child.release()));
+                std::unique_ptr<IndexFilterEvaluatorLogicalChildren> child_logical(
+                    static_cast<IndexFilterEvaluatorLogicalChildren *>(child.release()));
                 for (auto &chi : child_logical->secondary_index_evaluators_) {
                     secondary_index_evaluators.push_back(std::move(chi));
                 }
@@ -232,7 +233,8 @@ std::unique_ptr<IndexFilterEvaluator> IndexFilterEvaluatorBuildFromOr(std::vecto
             }
             case Type::kOr: {
                 // flatten all children
-                std::unique_ptr<IndexFilterEvaluatorLogicalChildren> child_logical(static_cast<IndexFilterEvaluatorLogicalChildren *>(child.release()));
+                std::unique_ptr<IndexFilterEvaluatorLogicalChildren> child_logical(
+                    static_cast<IndexFilterEvaluatorLogicalChildren *>(child.release()));
                 for (auto &chi : child_logical->secondary_index_evaluators_) {
                     secondary_index_evaluators.push_back(std::move(chi));
                 }
@@ -343,7 +345,7 @@ struct IndexFilterEvaluatorSecondaryT final : IndexFilterEvaluatorSecondary {
             }
             // final element
             const auto full_range_v = std::pair<SecondaryIndexOrderedT, SecondaryIndexOrderedT>{std::numeric_limits<SecondaryIndexOrderedT>::lowest(),
-                                                                                           std::numeric_limits<SecondaryIndexOrderedT>::max()};
+                                                                                                std::numeric_limits<SecondaryIndexOrderedT>::max()};
             if (back_v != full_range_v) {
                 new_start_end_pairs.push_back(back_v);
             }
@@ -380,10 +382,10 @@ struct IndexFilterEvaluatorSecondaryT final : IndexFilterEvaluatorSecondary {
         : IndexFilterEvaluatorSecondary(src_expr, column_id, column_logical_type, new_secondary_index) {}
 
     static std::unique_ptr<IndexFilterEvaluatorSecondaryT> Make(const BaseExpression *src_expr,
-                                                          const ColumnID column_id,
-                                                          std::shared_ptr<TableIndexMeeta> new_secondary_index,
-                                                          const FilterCompareType compare_type,
-                                                          const Value &val) {
+                                                                const ColumnID column_id,
+                                                                std::shared_ptr<TableIndexMeeta> new_secondary_index,
+                                                                const FilterCompareType compare_type,
+                                                                const Value &val) {
         constexpr auto expect_logical_type = GetLogicalType<ColumnValueT>;
         auto result = std::make_unique<IndexFilterEvaluatorSecondaryT>(src_expr, column_id, expect_logical_type, new_secondary_index);
         const SecondaryIndexOrderedT val_ordered = GetOrderedV<ColumnValueT>(val);
@@ -409,10 +411,10 @@ struct IndexFilterEvaluatorSecondaryT final : IndexFilterEvaluatorSecondary {
 };
 
 std::unique_ptr<IndexFilterEvaluatorSecondary> IndexFilterEvaluatorSecondary::Make(const BaseExpression *src_expr,
-                                                                             ColumnID column_id,
-                                                                             std::shared_ptr<TableIndexMeeta> new_secondary_index,
-                                                                             FilterCompareType compare_type,
-                                                                             const Value &val) {
+                                                                                   ColumnID column_id,
+                                                                                   std::shared_ptr<TableIndexMeeta> new_secondary_index,
+                                                                                   FilterCompareType compare_type,
+                                                                                   const Value &val) {
     ColumnDef *column_def;
     auto [column_def_ptr, status] = new_secondary_index->GetColumnDef();
     if (!status.ok()) {
@@ -823,9 +825,10 @@ struct TrunkReaderM<ColumnValueType, HighCardinalityTag> final : TrunkReader<Col
 };
 
 template <typename ColumnValueType>
-Bitmask ExecuteSingleRangeHighCardinalityT(const std::pair<ConvertToOrderedType<ColumnValueType>, ConvertToOrderedType<ColumnValueType>> interval_range,
-                                           SegmentIndexMeta *index_meta,
-                                           const SegmentOffset segment_row_count) {
+Bitmask
+ExecuteSingleRangeHighCardinalityT(const std::pair<ConvertToOrderedType<ColumnValueType>, ConvertToOrderedType<ColumnValueType>> interval_range,
+                                   SegmentIndexMeta *index_meta,
+                                   const SegmentOffset segment_row_count) {
     std::vector<std::unique_ptr<TrunkReader<ColumnValueType, HighCardinalityTag>>> trunk_readers;
     auto [chunk_ids_ptr, status] = index_meta->GetChunkIDs1();
     if (!status.ok()) {
@@ -862,9 +865,10 @@ Bitmask ExecuteSingleRangeHighCardinalityT(const std::pair<ConvertToOrderedType<
 }
 
 template <typename ColumnValueType>
-Bitmask ExecuteSingleRangeLowCardinalityT(const std::pair<ConvertToOrderedType<ColumnValueType>, ConvertToOrderedType<ColumnValueType>> interval_range,
-                                          SegmentIndexMeta *index_meta,
-                                          const SegmentOffset segment_row_count) {
+Bitmask
+ExecuteSingleRangeLowCardinalityT(const std::pair<ConvertToOrderedType<ColumnValueType>, ConvertToOrderedType<ColumnValueType>> interval_range,
+                                  SegmentIndexMeta *index_meta,
+                                  const SegmentOffset segment_row_count) {
     std::vector<std::unique_ptr<TrunkReader<ColumnValueType, LowCardinalityTag>>> trunk_readers;
     auto [chunk_ids_ptr, status] = index_meta->GetChunkIDs1();
     if (!status.ok()) {

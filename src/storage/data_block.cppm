@@ -68,7 +68,7 @@ public:
 
     void AppendValue(size_t column_index, const Value &value);
 
-    void AppendValueByPtr(size_t column_index, const char * value_ptr);
+    void AppendValueByPtr(size_t column_index, const char *value_ptr);
 
     void Finalize();
 

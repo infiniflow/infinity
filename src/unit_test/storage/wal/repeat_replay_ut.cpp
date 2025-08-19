@@ -267,10 +267,10 @@ TEST_P(RepeatReplayTest, import) {
             return input_block;
         };
 
-        Status status =
-            txn->Import(*db_name,
-                        *table_name,
-                        std::vector<std::shared_ptr<DataBlock>>{make_input_block(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"))});
+        Status status = txn->Import(
+            *db_name,
+            *table_name,
+            std::vector<std::shared_ptr<DataBlock>>{make_input_block(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"))});
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());

@@ -458,7 +458,10 @@ SystemCache::PrepareCompactSegments(u64 db_id, u64 table_id, const std::vector<S
     return table_cache->PrepareCompactSegmentsNolock(segment_ids, txn_id);
 }
 
-void SystemCache::CommitCompactSegments(u64 db_id, u64 table_id, const std::shared_ptr<CompactPrepareInfo> &compact_prepare_info, TransactionID txn_id) {
+void SystemCache::CommitCompactSegments(u64 db_id,
+                                        u64 table_id,
+                                        const std::shared_ptr<CompactPrepareInfo> &compact_prepare_info,
+                                        TransactionID txn_id) {
     std::unique_lock lock(cache_mtx_);
     TableCache *table_cache = this->GetTableCacheNolock(db_id, table_id);
     return table_cache->CommitCompactSegmentsNolock(compact_prepare_info, txn_id);

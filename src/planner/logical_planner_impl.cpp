@@ -436,9 +436,9 @@ Status LogicalPlanner::BuildInsertValue(const InsertStatement *statement, std::s
 
     // Create logical insert node.
     auto logical_insert = std::make_shared<LogicalInsert>(bind_context_ptr->GetNewLogicalNodeId(),
-                                                    table_info,
-                                                    bind_context_ptr->GenerateTableIndex(),
-                                                    std::move(value_list_array));
+                                                          table_info,
+                                                          bind_context_ptr->GenerateTableIndex(),
+                                                          std::move(value_list_array));
 
     // FIXME: check if we need to append operator
     //    this->AppendOperator(logical_insert, bind_context_ptr);
@@ -479,9 +479,9 @@ Status LogicalPlanner::BuildInsertSelect(const InsertStatement *statement, std::
 
     // Create INSERT node with SELECT as child
     auto logical_insert = std::make_shared<LogicalInsert>(bind_context_ptr->GetNewLogicalNodeId(),
-                                                    table_info,
-                                                    bind_context_ptr->GenerateTableIndex(),
-                                                    std::vector<std::vector<std::shared_ptr<BaseExpression>>>{});
+                                                          table_info,
+                                                          bind_context_ptr->GenerateTableIndex(),
+                                                          std::vector<std::vector<std::shared_ptr<BaseExpression>>>{});
     logical_insert->set_left_node(select_plan);
 
     this->logical_plan_ = logical_insert;
@@ -629,11 +629,11 @@ Status LogicalPlanner::BuildCreateTable(const CreateStatement *statement, std::s
         }
 
         std::shared_ptr<ColumnDef> column_def = std::make_shared<ColumnDef>(idx,
-                                                                create_table_info->column_defs_[idx]->type(),
-                                                                column_name,
-                                                                create_table_info->column_defs_[idx]->constraints_,
-                                                                column_comment,
-                                                                std::move(create_table_info->column_defs_[idx]->default_expr_));
+                                                                            create_table_info->column_defs_[idx]->type(),
+                                                                            column_name,
+                                                                            create_table_info->column_defs_[idx]->constraints_,
+                                                                            column_comment,
+                                                                            std::move(create_table_info->column_defs_[idx]->default_expr_));
         columns.emplace_back(column_def);
     }
 
@@ -652,9 +652,9 @@ Status LogicalPlanner::BuildCreateTable(const CreateStatement *statement, std::s
     }
 
     std::shared_ptr<TableDef> table_def_ptr = TableDef::Make(std::make_shared<std::string>("default_db"),
-                                                       std::make_shared<std::string>(create_table_info->table_name_),
-                                                       std::make_shared<std::string>(create_table_info->comment_),
-                                                       std::move(columns));
+                                                             std::make_shared<std::string>(create_table_info->table_name_),
+                                                             std::make_shared<std::string>(create_table_info->comment_),
+                                                             std::move(columns));
 
     for (std::unordered_set<std::string> visited_param_names; auto *property_ptr : create_table_info->properties_) {
         auto &[param_name, param_value] = *property_ptr;
@@ -697,10 +697,10 @@ Status LogicalPlanner::BuildCreateTable(const CreateStatement *statement, std::s
     }
 
     std::shared_ptr<LogicalNode> logical_create_table_operator = LogicalCreateTable::Make(bind_context_ptr->GetNewLogicalNodeId(),
-                                                                                    schema_name_ptr,
-                                                                                    table_def_ptr,
-                                                                                    bind_context_ptr->GenerateTableIndex(),
-                                                                                    create_table_info->conflict_type_);
+                                                                                          schema_name_ptr,
+                                                                                          table_def_ptr,
+                                                                                          bind_context_ptr->GenerateTableIndex(),
+                                                                                          create_table_info->conflict_type_);
 
     if (create_table_info->select_ != nullptr) {
         std::shared_ptr<BindContext> select_bind_context_ptr = BindContext::Make(nullptr);
@@ -722,10 +722,10 @@ Status LogicalPlanner::BuildCreateCollection(const CreateStatement *statement, s
     std::shared_ptr<std::string> collection_name_ptr = std::make_shared<std::string>(create_collection_info->collection_name_);
 
     std::shared_ptr<LogicalNode> logical_create_collection_operator = LogicalCreateCollection::Make(bind_context_ptr->GetNewLogicalNodeId(),
-                                                                                              schema_name_ptr,
-                                                                                              collection_name_ptr,
-                                                                                              bind_context_ptr->GenerateTableIndex(),
-                                                                                              create_collection_info->conflict_type_);
+                                                                                                    schema_name_ptr,
+                                                                                                    collection_name_ptr,
+                                                                                                    bind_context_ptr->GenerateTableIndex(),
+                                                                                                    create_collection_info->conflict_type_);
 
     this->logical_plan_ = logical_create_collection_operator;
     this->names_ptr_->emplace_back("OK");
@@ -878,8 +878,10 @@ Status LogicalPlanner::BuildCreateIndex(const CreateStatement *statement, std::s
         }
     }
 
-    auto logical_create_index_operator =
-        std::make_shared<LogicalCreateIndex>(bind_context_ptr->GetNewLogicalNodeId(), base_table_ref, base_index_ptr, create_index_info->conflict_type_);
+    auto logical_create_index_operator = std::make_shared<LogicalCreateIndex>(bind_context_ptr->GetNewLogicalNodeId(),
+                                                                              base_table_ref,
+                                                                              base_index_ptr,
+                                                                              create_index_info->conflict_type_);
 
     this->logical_plan_ = logical_create_index_operator;
     this->names_ptr_->emplace_back("OK");
@@ -942,10 +944,11 @@ Status LogicalPlanner::BuildDropCollection(const DropStatement *statement, std::
         schema_name_ptr = std::make_shared<std::string>(drop_collection_info->schema_name_);
     }
 
-    std::shared_ptr<LogicalNode> logical_drop_collection = std::make_shared<LogicalDropCollection>(bind_context_ptr->GetNewLogicalNodeId(),
-                                                                                       schema_name_ptr,
-                                                                                       std::make_shared<std::string>(drop_collection_info->collection_name_),
-                                                                                       drop_collection_info->conflict_type_);
+    std::shared_ptr<LogicalNode> logical_drop_collection =
+        std::make_shared<LogicalDropCollection>(bind_context_ptr->GetNewLogicalNodeId(),
+                                                schema_name_ptr,
+                                                std::make_shared<std::string>(drop_collection_info->collection_name_),
+                                                drop_collection_info->conflict_type_);
 
     this->logical_plan_ = logical_drop_collection;
     this->names_ptr_->emplace_back("OK");
@@ -990,10 +993,10 @@ Status LogicalPlanner::BuildDropIndex(const DropStatement *statement, std::share
     std::shared_ptr<std::string> index_name_ptr = std::make_shared<std::string>(drop_index_info->index_name_);
 
     std::shared_ptr<LogicalNode> logical_drop_index = std::make_shared<LogicalDropIndex>(bind_context_ptr->GetNewLogicalNodeId(),
-                                                                             schema_name_ptr,
-                                                                             table_name_ptr,
-                                                                             index_name_ptr,
-                                                                             drop_index_info->conflict_type_);
+                                                                                         schema_name_ptr,
+                                                                                         table_name_ptr,
+                                                                                         index_name_ptr,
+                                                                                         drop_index_info->conflict_type_);
 
     this->logical_plan_ = logical_drop_index;
     this->names_ptr_->emplace_back("OK");
@@ -1080,10 +1083,10 @@ Status LogicalPlanner::BuildExport(const CopyStatement *statement, std::shared_p
         RecoverableError(status);
     }
     auto table_meta = std::make_unique<TableMeeta>(tmp_table_meta->db_id_str(),
-                                             tmp_table_meta->table_id_str(),
-                                             tmp_table_meta->kv_instance(),
-                                             tmp_table_meta->begin_ts(),
-                                             tmp_table_meta->commit_ts());
+                                                   tmp_table_meta->table_id_str(),
+                                                   tmp_table_meta->kv_instance(),
+                                                   tmp_table_meta->begin_ts(),
+                                                   tmp_table_meta->commit_ts());
     table_info = std::make_shared<TableInfo>();
     status = table_meta->GetTableInfo(*table_info);
     if (!status.ok()) {
@@ -1209,18 +1212,18 @@ Status LogicalPlanner::BuildExport(const CopyStatement *statement, std::shared_p
     block_index->NewInit(std::move(table_meta));
 
     std::shared_ptr<LogicalNode> logical_export = std::make_shared<LogicalExport>(bind_context_ptr->GetNewLogicalNodeId(),
-                                                                      table_info,
-                                                                      statement->schema_name_,
-                                                                      statement->table_name_,
-                                                                      statement->file_path_,
-                                                                      statement->header_,
-                                                                      statement->delimiter_,
-                                                                      statement->copy_file_type_,
-                                                                      statement->offset_,
-                                                                      statement->limit_,
-                                                                      statement->row_limit_,
-                                                                      column_idx_array,
-                                                                      block_index);
+                                                                                  table_info,
+                                                                                  statement->schema_name_,
+                                                                                  statement->table_name_,
+                                                                                  statement->file_path_,
+                                                                                  statement->header_,
+                                                                                  statement->delimiter_,
+                                                                                  statement->copy_file_type_,
+                                                                                  statement->offset_,
+                                                                                  statement->limit_,
+                                                                                  statement->row_limit_,
+                                                                                  column_idx_array,
+                                                                                  block_index);
 
     this->logical_plan_ = logical_export;
     return Status::OK();
@@ -1251,11 +1254,11 @@ Status LogicalPlanner::BuildImport(const CopyStatement *statement, std::shared_p
     }
 
     std::shared_ptr<LogicalNode> logical_import = std::make_shared<LogicalImport>(bind_context_ptr->GetNewLogicalNodeId(),
-                                                                      table_info,
-                                                                      statement->file_path_,
-                                                                      statement->header_,
-                                                                      statement->delimiter_,
-                                                                      statement->copy_file_type_);
+                                                                                  table_info,
+                                                                                  statement->file_path_,
+                                                                                  statement->header_,
+                                                                                  statement->delimiter_,
+                                                                                  statement->copy_file_type_);
 
     this->logical_plan_ = logical_import;
     return Status::OK();
@@ -1285,8 +1288,8 @@ Status LogicalPlanner::BuildAlter(AlterStatement *statement, std::shared_ptr<Bin
         case AlterStatementType::kRenameTable: {
             auto *rename_table_statement = static_cast<RenameTableStatement *>(statement);
             this->logical_plan_ = std::make_shared<LogicalRenameTable>(bind_context_ptr->GetNewLogicalNodeId(),
-                                                                 table_info,
-                                                                 std::move(rename_table_statement->new_table_name_));
+                                                                       table_info,
+                                                                       std::move(rename_table_statement->new_table_name_));
             break;
         }
         case AlterStatementType::kAddColumns: {
@@ -1451,416 +1454,416 @@ Status LogicalPlanner::BuildShow(ShowStatement *statement, std::shared_ptr<BindC
     switch (statement->show_type_) {
         case ShowStmtType::kDatabase: {
             this->logical_plan_ = std::make_shared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
-                                                          ShowStmtType::kDatabase,
-                                                          statement->schema_name_,
-                                                          std::nullopt,
-                                                          bind_context_ptr->GenerateTableIndex());
+                                                                ShowStmtType::kDatabase,
+                                                                statement->schema_name_,
+                                                                std::nullopt,
+                                                                bind_context_ptr->GenerateTableIndex());
             break;
         }
         case ShowStmtType::kTable: {
             this->logical_plan_ = std::make_shared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
-                                                          ShowStmtType::kTable,
-                                                          statement->schema_name_,
-                                                          statement->table_name_,
-                                                          bind_context_ptr->GenerateTableIndex());
+                                                                ShowStmtType::kTable,
+                                                                statement->schema_name_,
+                                                                statement->table_name_,
+                                                                bind_context_ptr->GenerateTableIndex());
             break;
         }
         case ShowStmtType::kIndex: {
             this->logical_plan_ = std::make_shared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
-                                                          ShowStmtType::kIndex,
-                                                          statement->schema_name_,
-                                                          statement->table_name_,
-                                                          bind_context_ptr->GenerateTableIndex(),
-                                                          std::nullopt,
-                                                          std::nullopt,
-                                                          std::nullopt,
-                                                          std::nullopt,
-                                                          std::nullopt,
-                                                          statement->index_name_);
+                                                                ShowStmtType::kIndex,
+                                                                statement->schema_name_,
+                                                                statement->table_name_,
+                                                                bind_context_ptr->GenerateTableIndex(),
+                                                                std::nullopt,
+                                                                std::nullopt,
+                                                                std::nullopt,
+                                                                std::nullopt,
+                                                                std::nullopt,
+                                                                statement->index_name_);
             break;
         }
         case ShowStmtType::kIndexSegment: {
             this->logical_plan_ = std::make_shared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
-                                                          ShowStmtType::kIndexSegment,
-                                                          statement->schema_name_,
-                                                          statement->table_name_,
-                                                          bind_context_ptr->GenerateTableIndex(),
-                                                          std::nullopt,
-                                                          statement->segment_id_,
-                                                          std::nullopt,
-                                                          std::nullopt,
-                                                          std::nullopt,
-                                                          statement->index_name_);
+                                                                ShowStmtType::kIndexSegment,
+                                                                statement->schema_name_,
+                                                                statement->table_name_,
+                                                                bind_context_ptr->GenerateTableIndex(),
+                                                                std::nullopt,
+                                                                statement->segment_id_,
+                                                                std::nullopt,
+                                                                std::nullopt,
+                                                                std::nullopt,
+                                                                statement->index_name_);
             break;
         }
         case ShowStmtType::kIndexChunk: {
             this->logical_plan_ = std::make_shared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
-                                                          ShowStmtType::kIndexChunk,
-                                                          statement->schema_name_,
-                                                          statement->table_name_,
-                                                          bind_context_ptr->GenerateTableIndex(),
-                                                          std::nullopt,
-                                                          statement->segment_id_,
-                                                          std::nullopt,
-                                                          statement->chunk_id_,
-                                                          std::nullopt,
-                                                          statement->index_name_);
+                                                                ShowStmtType::kIndexChunk,
+                                                                statement->schema_name_,
+                                                                statement->table_name_,
+                                                                bind_context_ptr->GenerateTableIndex(),
+                                                                std::nullopt,
+                                                                statement->segment_id_,
+                                                                std::nullopt,
+                                                                statement->chunk_id_,
+                                                                std::nullopt,
+                                                                statement->index_name_);
             break;
         }
         case ShowStmtType::kDatabases: {
             this->logical_plan_ = std::make_shared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
-                                                          ShowStmtType::kDatabases,
-                                                          statement->schema_name_,
-                                                          std::nullopt,
-                                                          bind_context_ptr->GenerateTableIndex());
+                                                                ShowStmtType::kDatabases,
+                                                                statement->schema_name_,
+                                                                std::nullopt,
+                                                                bind_context_ptr->GenerateTableIndex());
             break;
         }
         case ShowStmtType::kTables:
         case ShowStmtType::kCollections: {
             this->logical_plan_ = std::make_shared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
-                                                          ShowStmtType::kTables,
-                                                          statement->schema_name_,
-                                                          std::nullopt,
-                                                          bind_context_ptr->GenerateTableIndex());
+                                                                ShowStmtType::kTables,
+                                                                statement->schema_name_,
+                                                                std::nullopt,
+                                                                bind_context_ptr->GenerateTableIndex());
             break;
         }
         case ShowStmtType::kTasks: {
             this->logical_plan_ = std::make_shared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
-                                                          ShowStmtType::kTasks,
-                                                          statement->schema_name_,
-                                                          std::nullopt,
-                                                          bind_context_ptr->GenerateTableIndex());
+                                                                ShowStmtType::kTasks,
+                                                                statement->schema_name_,
+                                                                std::nullopt,
+                                                                bind_context_ptr->GenerateTableIndex());
             break;
         }
         case ShowStmtType::kColumns: {
             this->logical_plan_ = std::make_shared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
-                                                          ShowStmtType::kColumns,
-                                                          statement->schema_name_,
-                                                          statement->table_name_,
-                                                          bind_context_ptr->GenerateTableIndex());
+                                                                ShowStmtType::kColumns,
+                                                                statement->schema_name_,
+                                                                statement->table_name_,
+                                                                bind_context_ptr->GenerateTableIndex());
 
             break;
         }
         case ShowStmtType::kIndexes: {
             this->logical_plan_ = std::make_shared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
-                                                          ShowStmtType::kIndexes,
-                                                          statement->schema_name_,
-                                                          statement->table_name_,
-                                                          bind_context_ptr->GenerateTableIndex());
+                                                                ShowStmtType::kIndexes,
+                                                                statement->schema_name_,
+                                                                statement->table_name_,
+                                                                bind_context_ptr->GenerateTableIndex());
             break;
         }
         case ShowStmtType::kConfigs: {
             this->logical_plan_ = std::make_shared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
-                                                          ShowStmtType::kConfigs,
-                                                          statement->schema_name_,
-                                                          statement->table_name_,
-                                                          bind_context_ptr->GenerateTableIndex());
+                                                                ShowStmtType::kConfigs,
+                                                                statement->schema_name_,
+                                                                statement->table_name_,
+                                                                bind_context_ptr->GenerateTableIndex());
             break;
         }
         case ShowStmtType::kProfiles: {
             this->logical_plan_ = std::make_shared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
-                                                          ShowStmtType::kProfiles,
-                                                          statement->schema_name_,
-                                                          statement->table_name_,
-                                                          bind_context_ptr->GenerateTableIndex());
+                                                                ShowStmtType::kProfiles,
+                                                                statement->schema_name_,
+                                                                statement->table_name_,
+                                                                bind_context_ptr->GenerateTableIndex());
             break;
         }
         case ShowStmtType::kQueries: {
             this->logical_plan_ = std::make_shared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
-                                                          ShowStmtType::kQueries,
-                                                          statement->schema_name_,
-                                                          statement->table_name_,
-                                                          bind_context_ptr->GenerateTableIndex());
+                                                                ShowStmtType::kQueries,
+                                                                statement->schema_name_,
+                                                                statement->table_name_,
+                                                                bind_context_ptr->GenerateTableIndex());
             break;
         }
         case ShowStmtType::kQuery: {
             this->logical_plan_ = std::make_shared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
-                                                          ShowStmtType::kQuery,
-                                                          statement->schema_name_,
-                                                          statement->table_name_,
-                                                          bind_context_ptr->GenerateTableIndex(),
-                                                          std::nullopt,
-                                                          std::nullopt,
-                                                          std::nullopt,
-                                                          std::nullopt,
-                                                          std::nullopt,
-                                                          std::nullopt,
-                                                          statement->session_id_);
+                                                                ShowStmtType::kQuery,
+                                                                statement->schema_name_,
+                                                                statement->table_name_,
+                                                                bind_context_ptr->GenerateTableIndex(),
+                                                                std::nullopt,
+                                                                std::nullopt,
+                                                                std::nullopt,
+                                                                std::nullopt,
+                                                                std::nullopt,
+                                                                std::nullopt,
+                                                                statement->session_id_);
             break;
         }
         case ShowStmtType::kTransactions: {
             this->logical_plan_ = std::make_shared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
-                                                          ShowStmtType::kTransactions,
-                                                          statement->schema_name_,
-                                                          statement->table_name_,
-                                                          bind_context_ptr->GenerateTableIndex());
+                                                                ShowStmtType::kTransactions,
+                                                                statement->schema_name_,
+                                                                statement->table_name_,
+                                                                bind_context_ptr->GenerateTableIndex());
             break;
         }
         case ShowStmtType::kTransaction: {
             this->logical_plan_ = std::make_shared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
-                                                          ShowStmtType::kTransaction,
-                                                          statement->schema_name_,
-                                                          statement->table_name_,
-                                                          bind_context_ptr->GenerateTableIndex(),
-                                                          std::nullopt,
-                                                          std::nullopt,
-                                                          std::nullopt,
-                                                          std::nullopt,
-                                                          std::nullopt,
-                                                          std::nullopt,
-                                                          std::nullopt,
-                                                          statement->txn_id_);
+                                                                ShowStmtType::kTransaction,
+                                                                statement->schema_name_,
+                                                                statement->table_name_,
+                                                                bind_context_ptr->GenerateTableIndex(),
+                                                                std::nullopt,
+                                                                std::nullopt,
+                                                                std::nullopt,
+                                                                std::nullopt,
+                                                                std::nullopt,
+                                                                std::nullopt,
+                                                                std::nullopt,
+                                                                statement->txn_id_);
             break;
         }
         case ShowStmtType::kTransactionHistory: {
             this->logical_plan_ = std::make_shared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
-                                                          ShowStmtType::kTransactionHistory,
-                                                          statement->schema_name_,
-                                                          statement->table_name_,
-                                                          bind_context_ptr->GenerateTableIndex());
+                                                                ShowStmtType::kTransactionHistory,
+                                                                statement->schema_name_,
+                                                                statement->table_name_,
+                                                                bind_context_ptr->GenerateTableIndex());
             break;
         }
         case ShowStmtType::kSegments: {
             this->logical_plan_ = std::make_shared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
-                                                          ShowStmtType::kSegments,
-                                                          statement->schema_name_,
-                                                          statement->table_name_,
-                                                          bind_context_ptr->GenerateTableIndex());
+                                                                ShowStmtType::kSegments,
+                                                                statement->schema_name_,
+                                                                statement->table_name_,
+                                                                bind_context_ptr->GenerateTableIndex());
             break;
         }
         case ShowStmtType::kSegment: {
             this->logical_plan_ = std::make_shared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
-                                                          ShowStmtType::kSegment,
-                                                          statement->schema_name_,
-                                                          statement->table_name_,
-                                                          bind_context_ptr->GenerateTableIndex(),
-                                                          std::nullopt,
-                                                          statement->segment_id_);
+                                                                ShowStmtType::kSegment,
+                                                                statement->schema_name_,
+                                                                statement->table_name_,
+                                                                bind_context_ptr->GenerateTableIndex(),
+                                                                std::nullopt,
+                                                                statement->segment_id_);
 
             break;
         }
         case ShowStmtType::kBlocks: {
             this->logical_plan_ = std::make_shared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
-                                                          ShowStmtType::kBlocks,
-                                                          statement->schema_name_,
-                                                          statement->table_name_,
-                                                          bind_context_ptr->GenerateTableIndex(),
-                                                          std::nullopt,
-                                                          statement->segment_id_);
+                                                                ShowStmtType::kBlocks,
+                                                                statement->schema_name_,
+                                                                statement->table_name_,
+                                                                bind_context_ptr->GenerateTableIndex(),
+                                                                std::nullopt,
+                                                                statement->segment_id_);
             break;
         }
         case ShowStmtType::kBlock: {
             this->logical_plan_ = std::make_shared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
-                                                          ShowStmtType::kBlock,
-                                                          statement->schema_name_,
-                                                          statement->table_name_,
-                                                          bind_context_ptr->GenerateTableIndex(),
-                                                          std::nullopt,
-                                                          statement->segment_id_,
-                                                          statement->block_id_);
+                                                                ShowStmtType::kBlock,
+                                                                statement->schema_name_,
+                                                                statement->table_name_,
+                                                                bind_context_ptr->GenerateTableIndex(),
+                                                                std::nullopt,
+                                                                statement->segment_id_,
+                                                                statement->block_id_);
             break;
         }
         case ShowStmtType::kBlockColumn: {
             this->logical_plan_ = std::make_shared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
-                                                          ShowStmtType::kBlockColumn,
-                                                          statement->schema_name_,
-                                                          statement->table_name_,
-                                                          bind_context_ptr->GenerateTableIndex(),
-                                                          std::nullopt,
-                                                          statement->segment_id_,
-                                                          statement->block_id_,
-                                                          statement->chunk_id_,
-                                                          statement->column_id_);
+                                                                ShowStmtType::kBlockColumn,
+                                                                statement->schema_name_,
+                                                                statement->table_name_,
+                                                                bind_context_ptr->GenerateTableIndex(),
+                                                                std::nullopt,
+                                                                statement->segment_id_,
+                                                                statement->block_id_,
+                                                                statement->chunk_id_,
+                                                                statement->column_id_);
             break;
         }
         case ShowStmtType::kSessionVariable: {
             this->logical_plan_ = std::make_shared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
-                                                          ShowStmtType::kSessionVariable,
-                                                          statement->schema_name_,
-                                                          statement->var_name_,
-                                                          bind_context_ptr->GenerateTableIndex());
+                                                                ShowStmtType::kSessionVariable,
+                                                                statement->schema_name_,
+                                                                statement->var_name_,
+                                                                bind_context_ptr->GenerateTableIndex());
 
             break;
         }
         case ShowStmtType::kSessionVariables: {
             this->logical_plan_ = std::make_shared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
-                                                          ShowStmtType::kSessionVariables,
-                                                          statement->schema_name_,
-                                                          statement->var_name_,
-                                                          bind_context_ptr->GenerateTableIndex());
+                                                                ShowStmtType::kSessionVariables,
+                                                                statement->schema_name_,
+                                                                statement->var_name_,
+                                                                bind_context_ptr->GenerateTableIndex());
 
             break;
         }
         case ShowStmtType::kGlobalVariable: {
             this->logical_plan_ = std::make_shared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
-                                                          ShowStmtType::kGlobalVariable,
-                                                          statement->schema_name_,
-                                                          statement->var_name_,
-                                                          bind_context_ptr->GenerateTableIndex());
+                                                                ShowStmtType::kGlobalVariable,
+                                                                statement->schema_name_,
+                                                                statement->var_name_,
+                                                                bind_context_ptr->GenerateTableIndex());
             break;
         }
         case ShowStmtType::kGlobalVariables: {
             this->logical_plan_ = std::make_shared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
-                                                          ShowStmtType::kGlobalVariables,
-                                                          statement->schema_name_,
-                                                          statement->var_name_,
-                                                          bind_context_ptr->GenerateTableIndex());
+                                                                ShowStmtType::kGlobalVariables,
+                                                                statement->schema_name_,
+                                                                statement->var_name_,
+                                                                bind_context_ptr->GenerateTableIndex());
             break;
         }
         case ShowStmtType::kConfig: {
             this->logical_plan_ = std::make_shared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
-                                                          ShowStmtType::kConfig,
-                                                          statement->schema_name_,
-                                                          statement->var_name_,
-                                                          bind_context_ptr->GenerateTableIndex());
+                                                                ShowStmtType::kConfig,
+                                                                statement->schema_name_,
+                                                                statement->var_name_,
+                                                                bind_context_ptr->GenerateTableIndex());
             break;
         }
         case ShowStmtType::kBuffer: {
             this->logical_plan_ = std::make_shared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
-                                                          ShowStmtType::kBuffer,
-                                                          statement->schema_name_,
-                                                          statement->var_name_,
-                                                          bind_context_ptr->GenerateTableIndex());
+                                                                ShowStmtType::kBuffer,
+                                                                statement->schema_name_,
+                                                                statement->var_name_,
+                                                                bind_context_ptr->GenerateTableIndex());
             break;
         }
         case ShowStmtType::kMemIndex: {
             this->logical_plan_ = std::make_shared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
-                                                          ShowStmtType::kMemIndex,
-                                                          statement->schema_name_,
-                                                          statement->var_name_,
-                                                          bind_context_ptr->GenerateTableIndex());
+                                                                ShowStmtType::kMemIndex,
+                                                                statement->schema_name_,
+                                                                statement->var_name_,
+                                                                bind_context_ptr->GenerateTableIndex());
             break;
         }
         case ShowStmtType::kLogs: {
             this->logical_plan_ = std::make_shared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
-                                                          ShowStmtType::kLogs,
-                                                          statement->schema_name_,
-                                                          statement->var_name_,
-                                                          bind_context_ptr->GenerateTableIndex());
+                                                                ShowStmtType::kLogs,
+                                                                statement->schema_name_,
+                                                                statement->var_name_,
+                                                                bind_context_ptr->GenerateTableIndex());
             break;
         }
         case ShowStmtType::kCatalog: {
             this->logical_plan_ = std::make_shared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
-                                                          ShowStmtType::kCatalog,
-                                                          statement->schema_name_,
-                                                          statement->var_name_,
-                                                          bind_context_ptr->GenerateTableIndex());
+                                                                ShowStmtType::kCatalog,
+                                                                statement->schema_name_,
+                                                                statement->var_name_,
+                                                                bind_context_ptr->GenerateTableIndex());
 
             break;
         }
         case ShowStmtType::kCatalogToFile: {
             this->logical_plan_ = std::make_shared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
-                                                          ShowStmtType::kCatalogToFile,
-                                                          statement->schema_name_,
-                                                          statement->var_name_,
-                                                          bind_context_ptr->GenerateTableIndex(),
-                                                          statement->file_path_);
+                                                                ShowStmtType::kCatalogToFile,
+                                                                statement->schema_name_,
+                                                                statement->var_name_,
+                                                                bind_context_ptr->GenerateTableIndex(),
+                                                                statement->file_path_);
 
             break;
         }
         case ShowStmtType::kPersistenceFiles: {
             this->logical_plan_ = std::make_shared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
-                                                          ShowStmtType::kPersistenceFiles,
-                                                          "",
-                                                          "",
-                                                          bind_context_ptr->GenerateTableIndex());
+                                                                ShowStmtType::kPersistenceFiles,
+                                                                "",
+                                                                "",
+                                                                bind_context_ptr->GenerateTableIndex());
 
             break;
         }
         case ShowStmtType::kPersistenceObjects: {
             this->logical_plan_ = std::make_shared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
-                                                          ShowStmtType::kPersistenceObjects,
-                                                          "",
-                                                          "",
-                                                          bind_context_ptr->GenerateTableIndex());
+                                                                ShowStmtType::kPersistenceObjects,
+                                                                "",
+                                                                "",
+                                                                bind_context_ptr->GenerateTableIndex());
 
             break;
         }
         case ShowStmtType::kPersistenceObject: {
             this->logical_plan_ = std::make_shared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
-                                                          ShowStmtType::kPersistenceObject,
-                                                          "",
-                                                          statement->file_name_.value(),
-                                                          bind_context_ptr->GenerateTableIndex());
+                                                                ShowStmtType::kPersistenceObject,
+                                                                "",
+                                                                statement->file_name_.value(),
+                                                                bind_context_ptr->GenerateTableIndex());
 
             break;
         }
         case ShowStmtType::kMemory: {
             this->logical_plan_ = std::make_shared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
-                                                          ShowStmtType::kMemory,
-                                                          "",
-                                                          "",
-                                                          bind_context_ptr->GenerateTableIndex());
+                                                                ShowStmtType::kMemory,
+                                                                "",
+                                                                "",
+                                                                bind_context_ptr->GenerateTableIndex());
 
             break;
         }
         case ShowStmtType::kMemoryObjects: {
             this->logical_plan_ = std::make_shared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
-                                                          ShowStmtType::kMemoryObjects,
-                                                          "",
-                                                          "",
-                                                          bind_context_ptr->GenerateTableIndex());
+                                                                ShowStmtType::kMemoryObjects,
+                                                                "",
+                                                                "",
+                                                                bind_context_ptr->GenerateTableIndex());
 
             break;
         }
         case ShowStmtType::kMemoryAllocation: {
             this->logical_plan_ = std::make_shared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
-                                                          ShowStmtType::kMemoryAllocation,
-                                                          "",
-                                                          "",
-                                                          bind_context_ptr->GenerateTableIndex());
+                                                                ShowStmtType::kMemoryAllocation,
+                                                                "",
+                                                                "",
+                                                                bind_context_ptr->GenerateTableIndex());
 
             break;
         }
         case ShowStmtType::kFunction: {
             this->logical_plan_ = std::make_shared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
-                                                          ShowStmtType::kFunction,
-                                                          "",
-                                                          "",
-                                                          bind_context_ptr->GenerateTableIndex(),
-                                                          std::nullopt,
-                                                          std::nullopt,
-                                                          std::nullopt,
-                                                          std::nullopt,
-                                                          std::nullopt,
-                                                          std::nullopt,
-                                                          std::nullopt,
-                                                          std::nullopt,
-                                                          statement->function_name_);
+                                                                ShowStmtType::kFunction,
+                                                                "",
+                                                                "",
+                                                                bind_context_ptr->GenerateTableIndex(),
+                                                                std::nullopt,
+                                                                std::nullopt,
+                                                                std::nullopt,
+                                                                std::nullopt,
+                                                                std::nullopt,
+                                                                std::nullopt,
+                                                                std::nullopt,
+                                                                std::nullopt,
+                                                                statement->function_name_);
             break;
         }
         case ShowStmtType::kListSnapshots: {
             this->logical_plan_ = std::make_shared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
-                                                          ShowStmtType::kListSnapshots,
-                                                          "",
-                                                          "",
-                                                          bind_context_ptr->GenerateTableIndex(),
-                                                          std::nullopt,
-                                                          std::nullopt,
-                                                          std::nullopt,
-                                                          std::nullopt,
-                                                          std::nullopt,
-                                                          std::nullopt,
-                                                          std::nullopt,
-                                                          std::nullopt,
-                                                          statement->function_name_);
+                                                                ShowStmtType::kListSnapshots,
+                                                                "",
+                                                                "",
+                                                                bind_context_ptr->GenerateTableIndex(),
+                                                                std::nullopt,
+                                                                std::nullopt,
+                                                                std::nullopt,
+                                                                std::nullopt,
+                                                                std::nullopt,
+                                                                std::nullopt,
+                                                                std::nullopt,
+                                                                std::nullopt,
+                                                                statement->function_name_);
             break;
         }
         case ShowStmtType::kShowSnapshot: {
             this->logical_plan_ = std::make_shared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
-                                                          ShowStmtType::kShowSnapshot,
-                                                          "",
-                                                          statement->snapshot_name_,
-                                                          bind_context_ptr->GenerateTableIndex(),
-                                                          std::nullopt,
-                                                          std::nullopt,
-                                                          std::nullopt,
-                                                          std::nullopt,
-                                                          std::nullopt,
-                                                          std::nullopt,
-                                                          std::nullopt,
-                                                          std::nullopt,
-                                                          statement->function_name_);
+                                                                ShowStmtType::kShowSnapshot,
+                                                                "",
+                                                                statement->snapshot_name_,
+                                                                bind_context_ptr->GenerateTableIndex(),
+                                                                std::nullopt,
+                                                                std::nullopt,
+                                                                std::nullopt,
+                                                                std::nullopt,
+                                                                std::nullopt,
+                                                                std::nullopt,
+                                                                std::nullopt,
+                                                                std::nullopt,
+                                                                statement->function_name_);
             break;
         }
         default: {
@@ -1916,10 +1919,10 @@ Status LogicalPlanner::BuildFlushBuffer(const FlushStatement *, std::shared_ptr<
 Status LogicalPlanner::BuildOptimize(OptimizeStatement *statement, std::shared_ptr<BindContext> &bind_context_ptr) {
     BindSchemaName(statement->schema_name_);
     std::shared_ptr<LogicalNode> logical_optimize = std::make_shared<LogicalOptimize>(bind_context_ptr->GetNewLogicalNodeId(),
-                                                                          statement->schema_name_,
-                                                                          statement->table_name_,
-                                                                          std::move(statement->index_name_),
-                                                                          std::move(statement->opt_params_));
+                                                                                      statement->schema_name_,
+                                                                                      statement->table_name_,
+                                                                                      std::move(statement->index_name_),
+                                                                                      std::move(statement->opt_params_));
     this->logical_plan_ = logical_optimize;
     return Status::OK();
 }
@@ -1963,7 +1966,8 @@ Status LogicalPlanner::BuildCheck(const CheckStatement *statement, std::shared_p
 
     switch (statement->check_type_) {
         case CheckStmtType::kSystem: {
-            this->logical_plan_ = std::make_shared<LogicalCheck>(bind_context_ptr->GetNewLogicalNodeId(), CheckStmtType::kSystem, std::nullopt, std::nullopt);
+            this->logical_plan_ =
+                std::make_shared<LogicalCheck>(bind_context_ptr->GetNewLogicalNodeId(), CheckStmtType::kSystem, std::nullopt, std::nullopt);
             break;
         }
         case CheckStmtType::kTable: {
@@ -1988,9 +1992,9 @@ Status LogicalPlanner::BuildCheck(const CheckStatement *statement, std::shared_p
                 RecoverableError(status);
             }
             this->logical_plan_ = std::make_shared<LogicalCheck>(bind_context_ptr->GetNewLogicalNodeId(),
-                                                           CheckStmtType::kTable,
-                                                           statement->schema_name_,
-                                                           statement->table_name_);
+                                                                 CheckStmtType::kTable,
+                                                                 statement->schema_name_,
+                                                                 statement->table_name_);
             break;
         }
         default: {

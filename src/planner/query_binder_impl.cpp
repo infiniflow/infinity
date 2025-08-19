@@ -435,10 +435,10 @@ std::shared_ptr<BaseTableRef> QueryBinder::BuildBaseTable(QueryContext *query_co
         RecoverableError(status);
     }
     auto table_meta = std::make_unique<TableMeeta>(tmp_table_meta->db_id_str(),
-                                             tmp_table_meta->table_id_str(),
-                                             tmp_table_meta->kv_instance(),
-                                             tmp_table_meta->begin_ts(),
-                                             tmp_table_meta->commit_ts());
+                                                   tmp_table_meta->table_id_str(),
+                                                   tmp_table_meta->kv_instance(),
+                                                   tmp_table_meta->begin_ts(),
+                                                   tmp_table_meta->commit_ts());
     table_info = std::make_shared<TableInfo>();
     status = table_meta->GetTableInfo(*table_info);
     if (!status.ok()) {
@@ -678,11 +678,11 @@ std::shared_ptr<TableRef> QueryBinder::BuildJoin(QueryContext *query_context, co
                 auto left_column_type = left_binding_ptr->column_types_->at(left_column_index);
 
                 std::shared_ptr<ColumnExpression> left_column_expression_ptr = std::make_shared<ColumnExpression>(*left_column_type,
-                                                                                                      left_binding_ptr->table_name_,
-                                                                                                      left_binding_ptr->table_index_,
-                                                                                                      column_name,
-                                                                                                      left_column_index,
-                                                                                                      0);
+                                                                                                                  left_binding_ptr->table_name_,
+                                                                                                                  left_binding_ptr->table_index_,
+                                                                                                                  column_name,
+                                                                                                                  left_column_index,
+                                                                                                                  0);
 
                 if (!result->right_bind_context_->binding_names_by_column_.contains(column_name)) {
                     Status status = Status::SyntaxError(fmt::format("Column: {} doesn't exist in right table", column_name));
@@ -706,13 +706,14 @@ std::shared_ptr<TableRef> QueryBinder::BuildJoin(QueryContext *query_context, co
                 auto right_column_type = right_binding_ptr->column_types_->at(right_column_index);
 
                 std::shared_ptr<ColumnExpression> right_column_expression_ptr = std::make_shared<ColumnExpression>(*right_column_type,
-                                                                                                       right_binding_ptr->table_name_,
-                                                                                                       right_binding_ptr->table_index_,
-                                                                                                       column_name,
-                                                                                                       right_column_index,
-                                                                                                       0);
+                                                                                                                   right_binding_ptr->table_name_,
+                                                                                                                   right_binding_ptr->table_index_,
+                                                                                                                   column_name,
+                                                                                                                   right_column_index,
+                                                                                                                   0);
 
-                auto condition = std::make_shared<ConjunctionExpression>(ConjunctionType::kAnd, left_column_expression_ptr, right_column_expression_ptr);
+                auto condition =
+                    std::make_shared<ConjunctionExpression>(ConjunctionType::kAnd, left_column_expression_ptr, right_column_expression_ptr);
                 result->on_conditions_.emplace_back(condition);
 
                 // For natural join, we can return now.
@@ -732,7 +733,9 @@ std::shared_ptr<TableRef> QueryBinder::BuildJoin(QueryContext *query_context, co
     return result;
 }
 
-void QueryBinder::UnfoldStarExpression(QueryContext *, const std::vector<ParsedExpr *> &input_select_list, std::vector<ParsedExpr *> &output_select_list) {
+void QueryBinder::UnfoldStarExpression(QueryContext *,
+                                       const std::vector<ParsedExpr *> &input_select_list,
+                                       std::vector<ParsedExpr *> &output_select_list) {
     output_select_list.reserve(input_select_list.size());
     for (auto *select_expr : input_select_list) {
         if (select_expr->type_ == ParsedExprType::kColumn) {
@@ -771,7 +774,9 @@ void QueryBinder::UnfoldStarExpression(QueryContext *, const std::vector<ParsedE
     }
 }
 
-void QueryBinder::GenerateColumns(const std::shared_ptr<Binding> &binding, const std::string &table_name, std::vector<ParsedExpr *> &output_select_list) {
+void QueryBinder::GenerateColumns(const std::shared_ptr<Binding> &binding,
+                                  const std::string &table_name,
+                                  std::vector<ParsedExpr *> &output_select_list) {
     switch (binding->binding_type_) {
 
         case BindingType::kInvalid: {
@@ -933,7 +938,9 @@ void QueryBinder::BuildOrderBy(QueryContext *query_context,
     }
 }
 
-void QueryBinder::BuildLimit(QueryContext *query_context, const SelectStatement &statement, std::unique_ptr<BoundSelectStatement> &bound_statement) const {
+void QueryBinder::BuildLimit(QueryContext *query_context,
+                             const SelectStatement &statement,
+                             std::unique_ptr<BoundSelectStatement> &bound_statement) const {
     auto limit_binder = std::make_shared<LimitBinder>(query_context);
     bound_statement->limit_expression_ = limit_binder->Bind(*statement.limit_expr_, this->bind_context_ptr_.get(), 0, true);
 
@@ -952,11 +959,11 @@ void QueryBinder::PruneOutput(QueryContext *, i64 select_column_count, std::uniq
     for (i64 column_id = 0; column_id < select_column_count; ++column_id) {
         const std::shared_ptr<BaseExpression> &expr = projection_expressions[column_id];
         std::shared_ptr<ColumnExpression> result = ColumnExpression::Make(expr->Type(),
-                                                                    bind_context_ptr_->project_table_name_,
-                                                                    bind_context_ptr_->project_table_index_,
-                                                                    output_names[column_id],
-                                                                    column_id,
-                                                                    0);
+                                                                          bind_context_ptr_->project_table_name_,
+                                                                          bind_context_ptr_->project_table_index_,
+                                                                          output_names[column_id],
+                                                                          column_id,
+                                                                          0);
         result->source_position_ = SourcePosition(bind_context_ptr_->binding_context_id_, ExprSourceType::kProjection);
         pruned_expressions.emplace_back(result);
     }

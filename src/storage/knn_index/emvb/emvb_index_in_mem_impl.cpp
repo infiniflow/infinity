@@ -81,8 +81,10 @@ void EMVBIndexInMem::Insert(const ColumnVector &column_vector, u32 row_offset, u
         }
         // build index if have enough data
         if (embedding_count_ >= build_index_threshold_) {
-            emvb_index_ =
-                std::make_unique<EMVBIndex>(begin_row_id_.segment_offset_, embedding_dimension_, residual_pq_subspace_num_, residual_pq_subspace_bits_);
+            emvb_index_ = std::make_unique<EMVBIndex>(begin_row_id_.segment_offset_,
+                                                      embedding_dimension_,
+                                                      residual_pq_subspace_num_,
+                                                      residual_pq_subspace_bits_);
 
             TableMeeta table_meta(db_id_str_, table_id_str_, &kv_instance, begin_ts, MAX_TIMESTAMP);
             SegmentMeta segment_meta(segment_id_, table_meta);
@@ -130,16 +132,16 @@ EMVBIndexInMem::NewEMVBIndexInMem(const std::shared_ptr<IndexBase> &index_base, 
 
 // return id: offset in the segment
 std::variant<std::pair<u32, u32>, EMVBInMemQueryResultType> EMVBIndexInMem::SearchWithBitmask(const f32 *query_ptr,
-                                                                                         const u32 query_embedding_num,
-                                                                                         const u32 top_n,
-                                                                                         Bitmask &bitmask,
-                                                                                         const BlockIndex *block_index,
-                                                                                         const TxnTimeStamp begin_ts,
-                                                                                         const u32 centroid_nprobe,
-                                                                                         const f32 threshold_first,
-                                                                                         const u32 n_doc_to_score,
-                                                                                         const u32 out_second_stage,
-                                                                                         const f32 threshold_final) const {
+                                                                                              const u32 query_embedding_num,
+                                                                                              const u32 top_n,
+                                                                                              Bitmask &bitmask,
+                                                                                              const BlockIndex *block_index,
+                                                                                              const TxnTimeStamp begin_ts,
+                                                                                              const u32 centroid_nprobe,
+                                                                                              const f32 threshold_first,
+                                                                                              const u32 n_doc_to_score,
+                                                                                              const u32 out_second_stage,
+                                                                                              const f32 threshold_final) const {
     std::shared_lock lock(rw_mutex_);
     if (is_built_.test(std::memory_order_acquire)) {
         // use index

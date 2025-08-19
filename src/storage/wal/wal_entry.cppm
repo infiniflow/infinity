@@ -209,7 +209,8 @@ export struct WalSegmentIndexInfo {
 
     WalSegmentIndexInfo() = default;
 
-    WalSegmentIndexInfo(SegmentID segment_id, const std::vector<WalChunkIndexInfo> &chunk_infos) : segment_id_(segment_id), chunk_infos_(chunk_infos) {}
+    WalSegmentIndexInfo(SegmentID segment_id, const std::vector<WalChunkIndexInfo> &chunk_infos)
+        : segment_id_(segment_id), chunk_infos_(chunk_infos) {}
 
     bool operator==(const WalSegmentIndexInfo &other) const;
 
@@ -414,7 +415,10 @@ export struct WalCmdDropTableV2 final : public WalCmd {
 };
 
 export struct WalCmdCreateIndex final : public WalCmd {
-    WalCmdCreateIndex(const std::string &db_name, const std::string &table_name, const std::string &index_dir_tail_, const std::shared_ptr<IndexBase> &index_base)
+    WalCmdCreateIndex(const std::string &db_name,
+                      const std::string &table_name,
+                      const std::string &index_dir_tail_,
+                      const std::shared_ptr<IndexBase> &index_base)
         : WalCmd(WalCommandType::CREATE_INDEX), db_name_(db_name), table_name_(table_name), index_dir_tail_(index_dir_tail_),
           index_base_(index_base) {
         assert(!std::filesystem::path(index_dir_tail_).is_absolute());
@@ -470,7 +474,9 @@ export struct WalCmdCreateIndexV2 final : public WalCmd {
 };
 
 export struct WalRestoreIndexV2 final {
-    WalRestoreIndexV2(const std::string &index_id, const std::shared_ptr<IndexBase> &index_base, const std::vector<WalSegmentIndexInfo> &segment_index_infos)
+    WalRestoreIndexV2(const std::string &index_id,
+                      const std::shared_ptr<IndexBase> &index_base,
+                      const std::vector<WalSegmentIndexInfo> &segment_index_infos)
         : index_id_(index_id), index_base_(index_base), segment_index_infos_(segment_index_infos) {}
     WalRestoreIndexV2() = default;
     bool operator==(const WalRestoreIndexV2 &other) const;
@@ -551,7 +557,11 @@ export struct WalCmdImport final : public WalCmd {
 };
 
 export struct WalCmdImportV2 final : public WalCmd {
-    WalCmdImportV2(const std::string &db_name, const std::string &db_id, const std::string &table_name, const std::string &table_id, const WalSegmentInfo &segment_info)
+    WalCmdImportV2(const std::string &db_name,
+                   const std::string &db_id,
+                   const std::string &table_name,
+                   const std::string &table_id,
+                   const WalSegmentInfo &segment_info)
         : WalCmd(WalCommandType::IMPORT_V2), db_name_(db_name), db_id_(db_id), table_name_(table_name), table_id_(table_id),
           segment_info_(segment_info) {}
     ~WalCmdImportV2() override = default;
@@ -630,7 +640,11 @@ export struct WalCmdDelete final : public WalCmd {
 };
 
 export struct WalCmdDeleteV2 final : public WalCmd {
-    WalCmdDeleteV2(const std::string &db_name, const std::string &db_id, const std::string &table_name, const std::string &table_id, const std::vector<RowID> &row_ids)
+    WalCmdDeleteV2(const std::string &db_name,
+                   const std::string &db_id,
+                   const std::string &table_name,
+                   const std::string &table_id,
+                   const std::vector<RowID> &row_ids)
         : WalCmd(WalCommandType::DELETE_V2), db_name_(db_name), db_id_(db_id), table_name_(table_name), table_id_(table_id), row_ids_(row_ids) {}
 
     ~WalCmdDeleteV2() override = default;
@@ -852,7 +866,10 @@ export struct WalCmdCompactV2 final : public WalCmd {
 };
 
 export struct WalCmdOptimize final : public WalCmd {
-    WalCmdOptimize(const std::string &db_name, const std::string &table_name, const std::string &index_name, std::vector<std::unique_ptr<InitParameter>> &&params)
+    WalCmdOptimize(const std::string &db_name,
+                   const std::string &table_name,
+                   const std::string &index_name,
+                   std::vector<std::unique_ptr<InitParameter>> &&params)
         : WalCmd(WalCommandType::OPTIMIZE), db_name_(db_name), table_name_(table_name), index_name_(index_name), params_(std::move(params)) {}
 
     ~WalCmdOptimize() override = default;

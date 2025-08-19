@@ -50,7 +50,7 @@ class NewIVFDataAccessor : public IVFDataAccessorBase {
 public:
     NewIVFDataAccessor(SegmentMeta &segment_meta, ColumnID column_id) : segment_meta_(segment_meta), column_id_(column_id) {}
 
-    const char * GetEmbedding(size_t offset) override {
+    const char *GetEmbedding(size_t offset) override {
         size_t block_offset = UpdateColumnVector(offset);
         return cur_column_vector_.data() + block_offset * cur_column_vector_.data_type_size_;
     }
@@ -96,7 +96,10 @@ void IVFIndexInChunk::BuildIVFIndex(SegmentMeta &segment_meta, u32 row_count, st
     BuildIVFIndex(base_rowid, row_count, &data_accessor, column_def);
 }
 
-void IVFIndexInChunk::BuildIVFIndex(RowID base_rowid, u32 row_count, IVFDataAccessorBase *data_accessor, const std::shared_ptr<ColumnDef> &column_def) {
+void IVFIndexInChunk::BuildIVFIndex(RowID base_rowid,
+                                    u32 row_count,
+                                    IVFDataAccessorBase *data_accessor,
+                                    const std::shared_ptr<ColumnDef> &column_def) {
     auto Call = [&]<LogicalType column_t> {
         static_assert(column_t == LogicalType::kEmbedding || column_t == LogicalType::kMultiVector);
         auto CallT = [&]<EmbeddingDataType embedding_t> {

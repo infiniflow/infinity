@@ -85,7 +85,7 @@ import internal_types;
 namespace infinity {
 
 template <typename T>
-char * GetConcatenatedTensorData(const ConstantExpr *tensor_expr_, const u32 tensor_column_basic_embedding_dim, u32 &query_total_dimension);
+char *GetConcatenatedTensorData(const ConstantExpr *tensor_expr_, const u32 tensor_column_basic_embedding_dim, u32 &query_total_dimension);
 
 std::shared_ptr<BaseExpression> ExpressionBinder::Bind(const ParsedExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root) {
     // Call implemented BuildExpression
@@ -865,15 +865,15 @@ std::shared_ptr<BaseExpression> ExpressionBinder::BuildKnnExpr(const KnnExpr &pa
         auto optional_filter = BuildSearchSubExprOptionalFilter(this, parsed_knn_expr.filter_expr_.get(), bind_context_ptr, depth);
 
         std::shared_ptr<KnnExpression> bound_knn_expr = std::make_shared<KnnExpression>(embedding_data_type,
-                                                                            dimension,
-                                                                            parsed_knn_expr.distance_type_,
-                                                                            std::move(query_embedding),
-                                                                            std::move(arguments),
-                                                                            parsed_knn_expr.topn_,
-                                                                            parsed_knn_expr.opt_params_,
-                                                                            std::move(optional_filter),
-                                                                            parsed_knn_expr.index_name_,
-                                                                            parsed_knn_expr.ignore_index_);
+                                                                                        dimension,
+                                                                                        parsed_knn_expr.distance_type_,
+                                                                                        std::move(query_embedding),
+                                                                                        std::move(arguments),
+                                                                                        parsed_knn_expr.topn_,
+                                                                                        parsed_knn_expr.opt_params_,
+                                                                                        std::move(optional_filter),
+                                                                                        parsed_knn_expr.index_name_,
+                                                                                        parsed_knn_expr.ignore_index_);
         return bound_knn_expr;
     } else {
         // Traditional array case
@@ -892,15 +892,15 @@ std::shared_ptr<BaseExpression> ExpressionBinder::BuildKnnExpr(const KnnExpr &pa
         auto optional_filter = BuildSearchSubExprOptionalFilter(this, parsed_knn_expr.filter_expr_.get(), bind_context_ptr, depth);
 
         std::shared_ptr<KnnExpression> bound_knn_expr = std::make_shared<KnnExpression>(embedding_data_type,
-                                                                            dimension,
-                                                                            parsed_knn_expr.distance_type_,
-                                                                            std::move(query_embedding),
-                                                                            std::move(arguments),
-                                                                            parsed_knn_expr.topn_,
-                                                                            parsed_knn_expr.opt_params_,
-                                                                            std::move(optional_filter),
-                                                                            parsed_knn_expr.index_name_,
-                                                                            parsed_knn_expr.ignore_index_);
+                                                                                        dimension,
+                                                                                        parsed_knn_expr.distance_type_,
+                                                                                        std::move(query_embedding),
+                                                                                        std::move(arguments),
+                                                                                        parsed_knn_expr.topn_,
+                                                                                        parsed_knn_expr.opt_params_,
+                                                                                        std::move(optional_filter),
+                                                                                        parsed_knn_expr.index_name_,
+                                                                                        parsed_knn_expr.ignore_index_);
         return bound_knn_expr;
     }
 }
@@ -946,15 +946,15 @@ std::shared_ptr<BaseExpression> ExpressionBinder::BuildMatchTensorExpr(const Mat
     // create optional filter
     auto optional_filter = BuildSearchSubExprOptionalFilter(this, expr.filter_expr_.get(), bind_context_ptr, depth);
     auto bound_match_tensor_expr = std::make_shared<MatchTensorExpression>(std::move(arguments),
-                                                                     expr.search_method_enum_,
-                                                                     expr.embedding_data_type_,
-                                                                     expr.dimension_,
-                                                                     std::move(query_embedding),
-                                                                     tensor_column_basic_embedding_dim,
-                                                                     expr.options_text_,
-                                                                     std::move(optional_filter),
-                                                                     expr.index_name_,
-                                                                     expr.ignore_index_);
+                                                                           expr.search_method_enum_,
+                                                                           expr.embedding_data_type_,
+                                                                           expr.dimension_,
+                                                                           std::move(query_embedding),
+                                                                           tensor_column_basic_embedding_dim,
+                                                                           expr.options_text_,
+                                                                           std::move(optional_filter),
+                                                                           expr.index_name_,
+                                                                           expr.ignore_index_);
     return bound_match_tensor_expr;
 }
 
@@ -980,14 +980,14 @@ std::shared_ptr<BaseExpression> ExpressionBinder::BuildMatchSparseExpr(MatchSpar
     // create optional filter
     auto optional_filter = BuildSearchSubExprOptionalFilter(this, expr.filter_expr_.get(), bind_context_ptr, depth);
     auto bound_match_sparse_expr = std::make_shared<MatchSparseExpression>(std::move(arguments),
-                                                                     query_expr,
-                                                                     expr.metric_type_,
-                                                                     expr.query_n_,
-                                                                     expr.topn_,
-                                                                     std::move(expr.opt_params_),
-                                                                     std::move(optional_filter),
-                                                                     expr.index_name_,
-                                                                     expr.ignore_index_);
+                                                                           query_expr,
+                                                                           expr.metric_type_,
+                                                                           expr.query_n_,
+                                                                           expr.topn_,
+                                                                           std::move(expr.opt_params_),
+                                                                           std::move(optional_filter),
+                                                                           expr.index_name_,
+                                                                           expr.ignore_index_);
     return bound_match_sparse_expr;
 }
 
@@ -1067,7 +1067,8 @@ ExpressionBinder::BuildSubquery(const SubqueryExpr &expr, BindContext *bind_cont
             QueryBinder query_binder(this->query_context_, subquery_binding_context_ptr);
             std::unique_ptr<BoundSelectStatement> bound_statement_ptr = query_binder.BindSelect(*expr.select_);
 
-            std::shared_ptr<SubqueryExpression> in_subquery_expr = std::make_shared<SubqueryExpression>(std::move(bound_statement_ptr), subquery_type);
+            std::shared_ptr<SubqueryExpression> in_subquery_expr =
+                std::make_shared<SubqueryExpression>(std::move(bound_statement_ptr), subquery_type);
             in_subquery_expr->left_ = bound_left_expr;
             in_subquery_expr->correlated_columns = bind_context_ptr->correlated_column_exprs_;
             return in_subquery_expr;
@@ -1113,11 +1114,11 @@ std::shared_ptr<BaseExpression> ExpressionBinder::BuildUnnestExpr(const Function
         const std::shared_ptr<BaseExpression> &group_expr = bind_context_ptr->group_exprs_[group_index];
 
         std::shared_ptr<ColumnExpression> col_expr = ColumnExpression::Make(group_expr->Type(),
-                                                                      bind_context_ptr->group_by_table_name_,
-                                                                      bind_context_ptr->group_by_table_index_,
-                                                                      expr_name,
-                                                                      group_index,
-                                                                      depth);
+                                                                            bind_context_ptr->group_by_table_name_,
+                                                                            bind_context_ptr->group_by_table_index_,
+                                                                            expr_name,
+                                                                            group_index,
+                                                                            depth);
         return col_expr;
     }
     if (bind_context_ptr->unnest_index_by_name_.contains(expr_name)) {
@@ -1125,11 +1126,11 @@ std::shared_ptr<BaseExpression> ExpressionBinder::BuildUnnestExpr(const Function
         const std::shared_ptr<BaseExpression> &unnest_expr = bind_context_ptr->unnest_exprs_[unnest_index];
 
         std::shared_ptr<ColumnExpression> col_expr = ColumnExpression::Make(unnest_expr->Type(),
-                                                                      bind_context_ptr->unnest_table_name_,
-                                                                      bind_context_ptr->unnest_table_index_,
-                                                                      expr_name,
-                                                                      unnest_index,
-                                                                      depth);
+                                                                            bind_context_ptr->unnest_table_name_,
+                                                                            bind_context_ptr->unnest_table_index_,
+                                                                            expr_name,
+                                                                            unnest_index,
+                                                                            depth);
         return col_expr;
     }
 
@@ -1161,7 +1162,8 @@ std::shared_ptr<BaseExpression> ExpressionBinder::BuildUnnestExpr(const Function
     return col_expr;
 }
 
-std::optional<std::shared_ptr<BaseExpression>> ExpressionBinder::TryBuildSpecialFuncExpr(const FunctionExpr &expr, BindContext *bind_context_ptr, i64 depth) {
+std::optional<std::shared_ptr<BaseExpression>>
+ExpressionBinder::TryBuildSpecialFuncExpr(const FunctionExpr &expr, BindContext *bind_context_ptr, i64 depth) {
     auto [special_function_ptr, status] = NewCatalog::GetSpecialFunctionByNameNoExcept(query_context_->storage()->new_catalog(), expr.func_name_);
     if (status.ok()) {
         switch (special_function_ptr->special_type()) {
@@ -1250,7 +1252,7 @@ void FillConcatenatedTensorData(T *output_ptr, const std::vector<U> &data_array,
 }
 
 template <typename T>
-char * GetConcatenatedTensorDataFromSubArray(const std::vector<std::shared_ptr<ConstantExpr>> &sub_array_array,
+char *GetConcatenatedTensorDataFromSubArray(const std::vector<std::shared_ptr<ConstantExpr>> &sub_array_array,
                                             const u32 tensor_column_basic_embedding_dim,
                                             u32 &query_total_dimension) {
     static_assert(!std::is_same_v<T, bool>);
@@ -1296,7 +1298,7 @@ void FillConcatenatedTensorDataBit(T *output_ptr, const std::vector<U> &data_arr
 }
 
 template <>
-char * GetConcatenatedTensorDataFromSubArray<bool>(const std::vector<std::shared_ptr<ConstantExpr>> &sub_array_array,
+char *GetConcatenatedTensorDataFromSubArray<bool>(const std::vector<std::shared_ptr<ConstantExpr>> &sub_array_array,
                                                   const u32 tensor_column_basic_embedding_dim,
                                                   u32 &query_total_dimension) {
     // expect children to be embedding of dimension tensor_column_basic_embedding_dim
@@ -1328,7 +1330,7 @@ char * GetConcatenatedTensorDataFromSubArray<bool>(const std::vector<std::shared
 }
 
 template <typename T, typename U>
-char * GetConcatenatedTensorData(const std::vector<U> &data_array, const u32 tensor_column_basic_embedding_dim, u32 &query_total_dimension) {
+char *GetConcatenatedTensorData(const std::vector<U> &data_array, const u32 tensor_column_basic_embedding_dim, u32 &query_total_dimension) {
     query_total_dimension = data_array.size();
     if (query_total_dimension == 0 or query_total_dimension % tensor_column_basic_embedding_dim != 0) {
         RecoverableError(Status::SyntaxError(fmt::format("Query embedding with dimension: {} which doesn't match with tensor basic dimension {}",
@@ -1353,7 +1355,7 @@ char * GetConcatenatedTensorData(const std::vector<U> &data_array, const u32 ten
 }
 
 template <typename T>
-char * GetConcatenatedTensorData(const ConstantExpr *tensor_expr_, const u32 tensor_column_basic_embedding_dim, u32 &query_total_dimension) {
+char *GetConcatenatedTensorData(const ConstantExpr *tensor_expr_, const u32 tensor_column_basic_embedding_dim, u32 &query_total_dimension) {
     if constexpr (std::is_same_v<T, bool>) {
         if (tensor_column_basic_embedding_dim % 8 != 0) {
             UnrecoverableError("The tensor column basic embedding dimension should be multiple of 8");

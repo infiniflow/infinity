@@ -155,7 +155,8 @@ TEST_F(LSGBuildTest, test1) {
 
     auto iter = DenseVectorIter<f32, LabelT>(data.get(), dim, element_size);
 
-    std::unique_ptr<HnswIndexInMem> hnsw_index = lsg_builder.MakeImplIter<decltype(iter), f32, f32>(std::move(iter), element_size, RowID(0, 0), false);
+    std::unique_ptr<HnswIndexInMem> hnsw_index =
+        lsg_builder.MakeImplIter<decltype(iter), f32, f32>(std::move(iter), element_size, RowID(0, 0), false);
 
     u32 correct_count = 0;
     i32 topk = 1;

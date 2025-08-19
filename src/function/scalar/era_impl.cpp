@@ -35,7 +35,6 @@ struct EraFunction {
         RecoverableError(status);
         return false;
     }
-
 };
 
 template <>
@@ -62,21 +61,21 @@ void RegisterEraFunction(NewCatalog *catalog_ptr) {
     std::shared_ptr<ScalarFunctionSet> function_set_ptr = std::make_shared<ScalarFunctionSet>(func_name);
 
     ScalarFunction era_date_function(func_name,
-                                  {DataType(LogicalType::kDate)},
-                                  {DataType(LogicalType::kBigInt)},
-                                  &ScalarFunction::UnaryFunctionWithFailure<DateT, BigIntT, EraFunction>);
+                                     {DataType(LogicalType::kDate)},
+                                     {DataType(LogicalType::kBigInt)},
+                                     &ScalarFunction::UnaryFunctionWithFailure<DateT, BigIntT, EraFunction>);
     function_set_ptr->AddFunction(era_date_function);
 
     ScalarFunction era_datetime_function(func_name,
-                                  {DataType(LogicalType::kDateTime)},
-                                  {DataType(LogicalType::kBigInt)},
-                                  &ScalarFunction::UnaryFunctionWithFailure<DateTimeT, BigIntT, EraFunction>);
+                                         {DataType(LogicalType::kDateTime)},
+                                         {DataType(LogicalType::kBigInt)},
+                                         &ScalarFunction::UnaryFunctionWithFailure<DateTimeT, BigIntT, EraFunction>);
     function_set_ptr->AddFunction(era_datetime_function);
 
     ScalarFunction era_timestamp_function(func_name,
-                                  {DataType(LogicalType::kTimestamp)},
-                                  {DataType(LogicalType::kBigInt)},
-                                  &ScalarFunction::UnaryFunctionWithFailure<TimestampT, BigIntT, EraFunction>);
+                                          {DataType(LogicalType::kTimestamp)},
+                                          {DataType(LogicalType::kBigInt)},
+                                          &ScalarFunction::UnaryFunctionWithFailure<TimestampT, BigIntT, EraFunction>);
     function_set_ptr->AddFunction(era_timestamp_function);
 
     NewCatalog::AddFunctionSet(catalog_ptr, function_set_ptr);

@@ -61,7 +61,7 @@ export struct CommonQueryFilter {
     std::atomic_uint32_t end_task_num_ = 0;
 
 public:
-    CommonQueryFilter(std::shared_ptr<BaseExpression> original_filter, std::shared_ptr<BaseTableRef> base_table_ref, NewTxn* new_txn);
+    CommonQueryFilter(std::shared_ptr<BaseExpression> original_filter, std::shared_ptr<BaseTableRef> base_table_ref, NewTxn *new_txn);
 
     // 1. try to finish building the filter
     // 2. return true if the filter is available for query

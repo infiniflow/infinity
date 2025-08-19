@@ -22,14 +22,14 @@ namespace infinity {
 
 export class Allocator {
 public:
-    static char * allocate(size_t bytes) {
+    static char *allocate(size_t bytes) {
 #ifdef INFINITY_DEBUG
         GlobalResourceUsage::IncrRawMemCount("Allocator");
 #endif
         return new char[bytes];
     }
 
-    static void deallocate(char * ptr) {
+    static void deallocate(char *ptr) {
         delete[] ptr;
 #ifdef INFINITY_DEBUG
         GlobalResourceUsage::DecrRawMemCount("Allocator");

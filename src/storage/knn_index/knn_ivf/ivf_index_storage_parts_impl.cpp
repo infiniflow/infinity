@@ -166,10 +166,10 @@ public:
 };
 
 std::unique_ptr<f32[]> GetTrainingResidual(const u32 training_embedding_num,
-                                     const f32 *training_data,
-                                     const IVF_Centroids_Storage *ivf_centroids_storage,
-                                     const u32 embedding_dimension,
-                                     const u32 centroids_num) {
+                                           const f32 *training_data,
+                                           const IVF_Centroids_Storage *ivf_centroids_storage,
+                                           const u32 embedding_dimension,
+                                           const u32 centroids_num) {
     auto residuals = std::make_unique_for_overwrite<f32[]>(training_embedding_num * embedding_dimension);
     const f32 *centroids_data = ivf_centroids_storage->data();
     // (-0.5 * norm) for each centroid
@@ -267,7 +267,7 @@ public:
             GetTrainingResidual(training_embedding_num, training_data, ivf_centroids_storage, embedding_dimension(), centroids_num());
         const auto exclude_num_each_end = std::min<u32>((training_embedding_num / 200u) + 1u, training_embedding_num);
         for (u32 i = 0; i < embedding_dimension(); ++i) {
-            std::priority_queue<f32> min_heap;                              // biggest on top
+            std::priority_queue<f32> min_heap;                                   // biggest on top
             std::priority_queue<f32, std::vector<f32>, std::greater<>> max_heap; // smallest on top
             const f32 *residual_data = residuals.get() + i;
             for (u32 j = 0; j < exclude_num_each_end; ++j) {
@@ -520,9 +520,9 @@ public:
 };
 
 std::unique_ptr<IVF_Parts_Storage> IVF_Parts_Storage::Make(const u32 embedding_dimension,
-                                                     const u32 centroids_num,
-                                                     const EmbeddingDataType embedding_data_type,
-                                                     const IndexIVFStorageOption &ivf_storage_option) {
+                                                           const u32 centroids_num,
+                                                           const EmbeddingDataType embedding_data_type,
+                                                           const IndexIVFStorageOption &ivf_storage_option) {
     auto GetPartsStorageT = [&]<IndexIVFStorageOption::Type t>() {
         return std::make_unique<IVF_Parts_Storage_T<t>>(embedding_dimension, centroids_num, embedding_data_type, ivf_storage_option);
     };
@@ -1228,9 +1228,9 @@ public:
 };
 
 std::unique_ptr<IVF_Part_Storage> IVF_Part_Storage::Make(const u32 part_id,
-                                                   const u32 embedding_dimension,
-                                                   const EmbeddingDataType embedding_data_type,
-                                                   const IndexIVFStorageOption &ivf_storage_option) {
+                                                         const u32 embedding_dimension,
+                                                         const EmbeddingDataType embedding_data_type,
+                                                         const IndexIVFStorageOption &ivf_storage_option) {
     switch (ivf_storage_option.type_) {
         case IndexIVFStorageOption::Type::kPlain: {
             auto GetPlainResult =
@@ -1280,7 +1280,8 @@ std::unique_ptr<IVF_Part_Storage> IVF_Part_Storage::Make(const u32 part_id,
         }
         case IndexIVFStorageOption::Type::kScalarQuantization: {
             const auto sq_bits = ivf_storage_option.scalar_quantization_bits_;
-            auto GetSQResult = [part_id, embedding_dimension, sq_bits]<EmbeddingDataType src_embedding_data_type>() -> std::unique_ptr<IVF_Part_Storage> {
+            auto GetSQResult =
+                [part_id, embedding_dimension, sq_bits]<EmbeddingDataType src_embedding_data_type>() -> std::unique_ptr<IVF_Part_Storage> {
                 switch (sq_bits) {
                     case 4: {
                         return std::make_unique<IVF_Part_Storage_SQ<4, src_embedding_data_type>>(part_id, embedding_dimension);

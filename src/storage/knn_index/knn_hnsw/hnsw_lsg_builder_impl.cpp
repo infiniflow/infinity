@@ -73,7 +73,7 @@ public:
         }
     }
 
-    const char * GetEmbedding(size_t offset) override { return embeddings_[offset].first; }
+    const char *GetEmbedding(size_t offset) override { return embeddings_[offset].first; }
 
     std::pair<std::span<const char>, size_t> GetMultiVector(size_t offset) override {
         UnrecoverableError("Not implemented");
@@ -88,7 +88,8 @@ private:
 
 } // namespace
 
-HnswLSGBuilder::HnswLSGBuilder(const IndexHnsw *index_hnsw, std::shared_ptr<ColumnDef> column_def) : index_hnsw_(index_hnsw), column_def_(column_def) {
+HnswLSGBuilder::HnswLSGBuilder(const IndexHnsw *index_hnsw, std::shared_ptr<ColumnDef> column_def)
+    : index_hnsw_(index_hnsw), column_def_(column_def) {
     if (index_hnsw_->build_type_ != HnswBuildType::kLSG) {
         RecoverableError(Status::NotSupport("Only support LSG build type"));
     }
@@ -388,8 +389,8 @@ std::unique_ptr<float[]> HnswLSGBuilder::GetAvgBF(Iter iter, size_t row_count) {
 }
 
 template std::unique_ptr<HnswIndexInMem> HnswLSGBuilder::MakeImplIter<DenseVectorIter<f32, u32>, f32, f32>(DenseVectorIter<f32, u32> iter,
-                                                                                                     size_t row_count,
-                                                                                                     const RowID &base_row_id,
-                                                                                                     bool trace);
+                                                                                                           size_t row_count,
+                                                                                                           const RowID &base_row_id,
+                                                                                                           bool trace);
 
 } // namespace infinity

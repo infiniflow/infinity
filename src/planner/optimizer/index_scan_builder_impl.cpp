@@ -70,11 +70,11 @@ public:
                         // try to push down the qualified index filter condition to the scan
                         // replace logical table scan with logical index scan
                         auto index_scan = std::make_shared<LogicalIndexScan>(query_context_->GetNextNodeID(),
-                                                                       std::move(base_table_ref_ptr),
-                                                                       std::move(index_filter),
-                                                                       std::move(index_filter_evaluator),
-                                                                       std::move(fast_rough_filter_evaluator),
-                                                                       true);
+                                                                             std::move(base_table_ref_ptr),
+                                                                             std::move(index_filter),
+                                                                             std::move(index_filter_evaluator),
+                                                                             std::move(fast_rough_filter_evaluator),
+                                                                             true);
                         op->set_left_node(std::move(index_scan));
                         LOG_TRACE("BuildSecondaryIndexScan: Push down the qualified index scan filter. Replace table scan with index scan.");
                     }

@@ -328,7 +328,8 @@ public:
 
 private:
     //                    index_filter               leftover_filter
-    inline std::pair<std::shared_ptr<BaseExpression>, std::shared_ptr<BaseExpression>> GetIndexFilterAndLeftoverFilterFromTreeNode(const TreeT &tree_node) const {
+    inline std::pair<std::shared_ptr<BaseExpression>, std::shared_ptr<BaseExpression>>
+    GetIndexFilterAndLeftoverFilterFromTreeNode(const TreeT &tree_node) const {
         std::pair<std::shared_ptr<BaseExpression>, std::shared_ptr<BaseExpression>> result;
         switch (tree_node.info) {
             case Enum::kVarcharSecondaryIndexColumnExprOrAfterCast:
@@ -629,15 +630,15 @@ private:
                     }
                 }
                 return std::make_unique<IndexFilterEvaluatorFulltext>(filter_fulltext_expr,
-                                                                table_info_,
-                                                                early_term_algo,
-                                                                std::move(index_reader),
-                                                                std::move(query_tree),
-                                                                std::move(minimum_should_match_option),
-                                                                score_threshold,
-                                                                ft_similarity,
-                                                                bm25_params,
-                                                                std::move(index_names));
+                                                                      table_info_,
+                                                                      early_term_algo,
+                                                                      std::move(index_reader),
+                                                                      std::move(query_tree),
+                                                                      std::move(minimum_should_match_option),
+                                                                      score_threshold,
+                                                                      ft_similarity,
+                                                                      bm25_params,
+                                                                      std::move(index_names));
             }
             case Enum::kAndExpr: {
                 std::vector<std::unique_ptr<IndexFilterEvaluator>> candidates;

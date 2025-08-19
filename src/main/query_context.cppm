@@ -16,7 +16,6 @@ module;
 
 export module infinity_core:query_context;
 
-
 import :session;
 import :config;
 import :storage;

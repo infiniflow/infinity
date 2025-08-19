@@ -244,19 +244,25 @@ class FastRoughFilterExpressionPushDownMethod {
                                         auto minmax_filter_le =
                                             std::make_unique<FastRoughFilterEvaluatorMinMaxFilter>(column_id, value, FilterCompareType::kLessEqual);
                                         auto minmax_filter_ge =
-                                            std::make_unique<FastRoughFilterEvaluatorMinMaxFilter>(column_id, value, FilterCompareType::kGreaterEqual);
+                                            std::make_unique<FastRoughFilterEvaluatorMinMaxFilter>(column_id,
+                                                                                                   value,
+                                                                                                   FilterCompareType::kGreaterEqual);
                                         return std::make_unique<FastRoughFilterEvaluatorCombineAnd>(std::move(minmax_filter_le),
-                                                                                              std::move(minmax_filter_ge));
+                                                                                                    std::move(minmax_filter_ge));
                                     }
                                     default: {
                                         auto minmax_filter_le =
                                             std::make_unique<FastRoughFilterEvaluatorMinMaxFilter>(column_id, value, FilterCompareType::kLessEqual);
                                         auto minmax_filter_ge =
-                                            std::make_unique<FastRoughFilterEvaluatorMinMaxFilter>(column_id, value, FilterCompareType::kGreaterEqual);
-                                        auto minmax_filter =
-                                            std::make_unique<FastRoughFilterEvaluatorCombineAnd>(std::move(minmax_filter_le), std::move(minmax_filter_ge));
-                                        auto bloom_filter = std::make_unique<FastRoughFilterEvaluatorProbabilisticDataFilter>(column_id, std::move(value));
-                                        return std::make_unique<FastRoughFilterEvaluatorCombineAnd>(std::move(bloom_filter), std::move(minmax_filter));
+                                            std::make_unique<FastRoughFilterEvaluatorMinMaxFilter>(column_id,
+                                                                                                   value,
+                                                                                                   FilterCompareType::kGreaterEqual);
+                                        auto minmax_filter = std::make_unique<FastRoughFilterEvaluatorCombineAnd>(std::move(minmax_filter_le),
+                                                                                                                  std::move(minmax_filter_ge));
+                                        auto bloom_filter =
+                                            std::make_unique<FastRoughFilterEvaluatorProbabilisticDataFilter>(column_id, std::move(value));
+                                        return std::make_unique<FastRoughFilterEvaluatorCombineAnd>(std::move(bloom_filter),
+                                                                                                    std::move(minmax_filter));
                                     }
                                 }
                             }
@@ -289,13 +295,13 @@ class FastRoughFilterExpressionPushDownMethod {
                 }
                 static constexpr std::array<std::string, 4> Case2FunctionNames{"<", ">", "<=", ">="};
                 constexpr std::array<FilterCompareType, 4> Case2CompareTypes{FilterCompareType::kLess,
-                                                       FilterCompareType::kGreater,
-                                                       FilterCompareType::kLessEqual,
-                                                       FilterCompareType::kGreaterEqual};
+                                                                             FilterCompareType::kGreater,
+                                                                             FilterCompareType::kLessEqual,
+                                                                             FilterCompareType::kGreaterEqual};
                 constexpr std::array<FilterCompareType, 4> Case2ReverseCompareTypes{FilterCompareType::kGreater,
-                                                              FilterCompareType::kLess,
-                                                              FilterCompareType::kGreaterEqual,
-                                                              FilterCompareType::kLessEqual};
+                                                                                    FilterCompareType::kLess,
+                                                                                    FilterCompareType::kGreaterEqual,
+                                                                                    FilterCompareType::kLessEqual};
                 if (auto it = std::find(Case2FunctionNames.begin(), Case2FunctionNames.end(), f_name); it != Case2FunctionNames.end()) {
                     // maybe known expression 2
                     auto SolveForExpr2 = [](std::shared_ptr<BaseExpression> &col_expr,

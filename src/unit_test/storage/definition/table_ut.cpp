@@ -63,8 +63,10 @@ TEST_F(TableTest, test1) {
     col_def = std::make_shared<ColumnDef>(1, col_type, col_name, std::set<ConstraintType>());
     columns.emplace_back(col_def);
 
-    std::shared_ptr<TableDef> table_def =
-        TableDef::Make(std::make_shared<std::string>("default_db"), std::make_shared<std::string>("order_by_table"), std::make_shared<std::string>("comment"), columns);
+    std::shared_ptr<TableDef> table_def = TableDef::Make(std::make_shared<std::string>("default_db"),
+                                                         std::make_shared<std::string>("order_by_table"),
+                                                         std::make_shared<std::string>("comment"),
+                                                         columns);
 
     std::shared_ptr<DataTable> order_by_table = DataTable::Make(table_def, TableType::kOrderBy);
 

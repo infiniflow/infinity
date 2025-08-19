@@ -33,10 +33,10 @@ import logical_type;
 namespace infinity {
 
 std::shared_ptr<IndexBMP> IndexBMP::Make(std::shared_ptr<std::string> index_name,
-                                   std::shared_ptr<std::string> index_comment,
-                                   const std::string &file_name,
-                                   std::vector<std::string> column_names,
-                                   const std::vector<InitParameter *> &index_param_list) {
+                                         std::shared_ptr<std::string> index_comment,
+                                         const std::string &file_name,
+                                         std::vector<std::string> column_names,
+                                         const std::vector<InitParameter *> &index_param_list) {
     size_t block_size = BMP_BLOCK_SIZE;
     BMPCompressType compress_type = BMPCompressType::kCompressed;
     for (const auto *para : index_param_list) {

@@ -191,7 +191,9 @@ bool PhysicalExplain::Execute(QueryContext *query_context, OperatorState *operat
 
 void PhysicalExplain::SetPlanFragment(PlanFragment *plan_fragment_ptr) { plan_fragment_ptr_ = plan_fragment_ptr; }
 
-void PhysicalExplain::ExplainAnalyze(std::vector<std::shared_ptr<std::string>> &result, PlanFragment *plan_fragment_ptr, QueryProfiler *query_profiler) {
+void PhysicalExplain::ExplainAnalyze(std::vector<std::shared_ptr<std::string>> &result,
+                                     PlanFragment *plan_fragment_ptr,
+                                     QueryProfiler *query_profiler) {
     std::vector<std::unique_ptr<FragmentTask>> &tasks = plan_fragment_ptr->GetContext()->Tasks();
     u64 fragment_id = plan_fragment_ptr->FragmentID();
     {
@@ -206,10 +208,11 @@ void PhysicalExplain::ExplainAnalyze(std::vector<std::shared_ptr<std::string>> &
             i64 times = 0;
             result.emplace_back(std::make_shared<std::string>(fmt::format("-> Task {}, Seq: {}", task_id, times)));
             for (const auto &operator_info : task_profile.timings_) {
-                std::string operator_info_str = fmt::format("  -> {} : ElapsedTime: {}, Output: {}",
-                                                       operator_info.name_,
-                                                       BaseProfiler::ElapsedToString(static_cast<std::chrono::nanoseconds>(operator_info.elapsed_)),
-                                                       operator_info.output_rows_);
+                std::string operator_info_str =
+                    fmt::format("  -> {} : ElapsedTime: {}, Output: {}",
+                                operator_info.name_,
+                                BaseProfiler::ElapsedToString(static_cast<std::chrono::nanoseconds>(operator_info.elapsed_)),
+                                operator_info.output_rows_);
                 result.emplace_back(std::make_shared<std::string>(operator_info_str));
             }
             ++times;
@@ -226,7 +229,9 @@ void PhysicalExplain::ExplainAnalyze(std::vector<std::shared_ptr<std::string>> &
     }
 }
 
-void PhysicalExplain::ExplainPipeline(std::vector<std::shared_ptr<std::string>> &result, PlanFragment *plan_fragment_ptr, QueryProfiler *query_profiler) {
+void PhysicalExplain::ExplainPipeline(std::vector<std::shared_ptr<std::string>> &result,
+                                      PlanFragment *plan_fragment_ptr,
+                                      QueryProfiler *query_profiler) {
     std::vector<std::unique_ptr<FragmentTask>> &tasks = plan_fragment_ptr->GetContext()->Tasks();
     u64 fragment_id = plan_fragment_ptr->FragmentID();
     {

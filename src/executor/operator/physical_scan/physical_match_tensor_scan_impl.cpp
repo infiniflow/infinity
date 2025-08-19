@@ -155,7 +155,8 @@ void PhysicalMatchTensorScan::CheckColumn() {
     }
     const auto *embedding_info = static_cast<const EmbeddingInfo *>(type_info.get());
     if (embedding_info->Dimension() != src_match_tensor_expr_->tensor_basic_embedding_dimension_) {
-        UnrecoverableError(fmt::format("Column {} embedding dimension not match with query {}", column_def->name(), src_match_tensor_expr_->ToString()));
+        UnrecoverableError(
+            fmt::format("Column {} embedding dimension not match with query {}", column_def->name(), src_match_tensor_expr_->ToString()));
     }
     // check column basic embedding data type and query embedding data type
     // apply necessary cast
@@ -373,51 +374,51 @@ void PhysicalMatchTensorScan::ExecuteInner(QueryContext *query_context, MatchTen
                                                                          index_options_->emvb_n_doc_to_score_,
                                                                          index_options_->emvb_n_doc_out_second_stage_,
                                                                          index_options_->emvb_threshold_final_);
-                std::visit(Overload{[segment_id, &function_data](const std::tuple<u32, std::unique_ptr<f32[]>, std::unique_ptr<u32[]>> &index_result) {
-                                        const auto &[result_num, score_ptr, row_id_ptr] = index_result;
-                                        for (u32 i = 0; i < result_num; ++i) {
-                                            function_data.result_handler_->AddResult(0, score_ptr[i], RowID(segment_id, row_id_ptr[i]));
-                                        }
-                                    },
-                                    [this, begin_ts, commit_ts, segment_id, &function_data, &segment_meta](const std::pair<u32, u32> &in_mem_result) {
-                                        const auto &[start_offset, total_row_count] = in_mem_result;
-                                        BlockID block_id = start_offset / DEFAULT_BLOCK_CAPACITY;
-                                        BlockOffset block_offset = start_offset % DEFAULT_BLOCK_CAPACITY;
-                                        u32 row_leftover = total_row_count;
-                                        do {
-                                            const u32 row_to_read = std::min<u32>(row_leftover, DEFAULT_BLOCK_CAPACITY - block_offset);
-                                            Bitmask block_bitmask;
-                                            if (this->CalculateFilterBitmask(segment_id, block_id, row_to_read, block_bitmask)) {
-                                                BlockMeta block_meta(block_id, *segment_meta);
-                                                Status status = NewCatalog::SetBlockDeleteBitmask(block_meta, begin_ts, commit_ts, block_bitmask);
-                                                if (!status.ok()) {
-                                                    UnrecoverableError(status.message());
-                                                }
-                                                ColumnMeta column_meta(this->search_column_id_, block_meta);
-                                                ColumnVector column_vector;
-                                                status =
-                                                    NewCatalog::GetColumnVector(column_meta, row_to_read, ColumnVectorMode::kReadOnly, column_vector);
-                                                if (!status.ok()) {
-                                                    UnrecoverableError(status.message());
-                                                }
+                std::visit(
+                    Overload{[segment_id, &function_data](const std::tuple<u32, std::unique_ptr<f32[]>, std::unique_ptr<u32[]>> &index_result) {
+                                 const auto &[result_num, score_ptr, row_id_ptr] = index_result;
+                                 for (u32 i = 0; i < result_num; ++i) {
+                                     function_data.result_handler_->AddResult(0, score_ptr[i], RowID(segment_id, row_id_ptr[i]));
+                                 }
+                             },
+                             [this, begin_ts, commit_ts, segment_id, &function_data, &segment_meta](const std::pair<u32, u32> &in_mem_result) {
+                                 const auto &[start_offset, total_row_count] = in_mem_result;
+                                 BlockID block_id = start_offset / DEFAULT_BLOCK_CAPACITY;
+                                 BlockOffset block_offset = start_offset % DEFAULT_BLOCK_CAPACITY;
+                                 u32 row_leftover = total_row_count;
+                                 do {
+                                     const u32 row_to_read = std::min<u32>(row_leftover, DEFAULT_BLOCK_CAPACITY - block_offset);
+                                     Bitmask block_bitmask;
+                                     if (this->CalculateFilterBitmask(segment_id, block_id, row_to_read, block_bitmask)) {
+                                         BlockMeta block_meta(block_id, *segment_meta);
+                                         Status status = NewCatalog::SetBlockDeleteBitmask(block_meta, begin_ts, commit_ts, block_bitmask);
+                                         if (!status.ok()) {
+                                             UnrecoverableError(status.message());
+                                         }
+                                         ColumnMeta column_meta(this->search_column_id_, block_meta);
+                                         ColumnVector column_vector;
+                                         status = NewCatalog::GetColumnVector(column_meta, row_to_read, ColumnVectorMode::kReadOnly, column_vector);
+                                         if (!status.ok()) {
+                                             UnrecoverableError(status.message());
+                                         }
 
-                                                // output score will always be float type
-                                                CalculateScoreOnColumnVector(column_vector,
-                                                                             segment_id,
-                                                                             block_id,
-                                                                             block_offset,
-                                                                             row_to_read,
-                                                                             block_bitmask,
-                                                                             *(this->calc_match_tensor_expr_),
-                                                                             function_data);
-                                            }
-                                            // prepare next block
-                                            row_leftover -= row_to_read;
-                                            ++block_id;
-                                            block_offset = 0;
-                                        } while (row_leftover);
-                                    }},
-                           result);
+                                         // output score will always be float type
+                                         CalculateScoreOnColumnVector(column_vector,
+                                                                      segment_id,
+                                                                      block_id,
+                                                                      block_offset,
+                                                                      row_to_read,
+                                                                      block_bitmask,
+                                                                      *(this->calc_match_tensor_expr_),
+                                                                      function_data);
+                                     }
+                                     // prepare next block
+                                     row_leftover -= row_to_read;
+                                     ++block_id;
+                                     block_offset = 0;
+                                 } while (row_leftover);
+                             }},
+                    result);
             }
             // 2. chunk index
             for (ChunkID chunk_id : *chunk_ids_ptr) {

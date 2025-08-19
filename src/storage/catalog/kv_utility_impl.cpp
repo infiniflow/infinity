@@ -35,8 +35,11 @@ import third_party;
 
 namespace infinity {
 
-std::vector<SegmentID>
-GetTableSegments(KVInstance *kv_instance, const std::string &db_id_str, const std::string &table_id_str, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts) {
+std::vector<SegmentID> GetTableSegments(KVInstance *kv_instance,
+                                        const std::string &db_id_str,
+                                        const std::string &table_id_str,
+                                        TxnTimeStamp begin_ts,
+                                        TxnTimeStamp commit_ts) {
     std::vector<SegmentID> segment_ids;
 
     std::string segment_id_prefix = KeyEncode::CatalogTableSegmentKeyPrefix(db_id_str, table_id_str);
@@ -64,11 +67,11 @@ GetTableSegments(KVInstance *kv_instance, const std::string &db_id_str, const st
 }
 
 std::vector<SegmentID> GetTableIndexSegments(KVInstance *kv_instance,
-                                        const std::string &db_id_str,
-                                        const std::string &table_id_str,
-                                        const std::string &index_id_str,
-                                        TxnTimeStamp begin_ts,
-                                        TxnTimeStamp commit_ts) {
+                                             const std::string &db_id_str,
+                                             const std::string &table_id_str,
+                                             const std::string &index_id_str,
+                                             TxnTimeStamp begin_ts,
+                                             TxnTimeStamp commit_ts) {
     std::vector<SegmentID> segment_ids;
 
     std::string segment_id_prefix = KeyEncode::CatalogIdxSegmentKeyPrefix(db_id_str, table_id_str, index_id_str);
@@ -96,11 +99,11 @@ std::vector<SegmentID> GetTableIndexSegments(KVInstance *kv_instance,
 }
 
 std::vector<BlockID> GetTableSegmentBlocks(KVInstance *kv_instance,
-                                      const std::string &db_id_str,
-                                      const std::string &table_id_str,
-                                      SegmentID segment_id,
-                                      TxnTimeStamp begin_ts,
-                                      TxnTimeStamp commit_ts) {
+                                           const std::string &db_id_str,
+                                           const std::string &table_id_str,
+                                           SegmentID segment_id,
+                                           TxnTimeStamp begin_ts,
+                                           TxnTimeStamp commit_ts) {
     std::vector<BlockID> block_ids;
 
     std::string block_id_prefix = KeyEncode::CatalogTableSegmentBlockKeyPrefix(db_id_str, table_id_str, segment_id);
@@ -124,11 +127,11 @@ std::vector<BlockID> GetTableSegmentBlocks(KVInstance *kv_instance,
 }
 
 std::vector<ColumnID> GetTableSegmentBlockColumns(KVInstance *kv_instance,
-                                             const std::string &db_id_str,
-                                             const std::string &table_id_str,
-                                             SegmentID segment_id,
-                                             BlockID block_id,
-                                             TxnTimeStamp begin_ts) {
+                                                  const std::string &db_id_str,
+                                                  const std::string &table_id_str,
+                                                  SegmentID segment_id,
+                                                  BlockID block_id,
+                                                  TxnTimeStamp begin_ts) {
     std::vector<ColumnID> column_ids;
     std::string block_column_id_prefix = KeyEncode::CatalogTableSegmentBlockColumnKeyPrefix(db_id_str, table_id_str, segment_id, block_id);
     auto iter = kv_instance->GetIterator();
@@ -148,8 +151,11 @@ std::vector<ColumnID> GetTableSegmentBlockColumns(KVInstance *kv_instance,
     return column_ids;
 }
 
-std::shared_ptr<IndexBase>
-GetTableIndexDef(KVInstance *kv_instance, const std::string &db_id_str, const std::string &table_id_str, const std::string &index_id_str, TxnTimeStamp begin_ts) {
+std::shared_ptr<IndexBase> GetTableIndexDef(KVInstance *kv_instance,
+                                            const std::string &db_id_str,
+                                            const std::string &table_id_str,
+                                            const std::string &index_id_str,
+                                            TxnTimeStamp begin_ts) {
     std::string index_def_key = KeyEncode::CatalogIndexTagKey(db_id_str, table_id_str, index_id_str, "index_base");
     std::string index_def_str;
     Status status = kv_instance->Get(index_def_key, index_def_str);
@@ -162,13 +168,13 @@ GetTableIndexDef(KVInstance *kv_instance, const std::string &db_id_str, const st
 }
 
 size_t GetBlockRowCount(KVInstance *kv_instance,
-                       const std::string &db_id_str,
-                       const std::string &table_id_str,
-                       SegmentID segment_id,
-                       BlockID block_id,
-                       TxnTimeStamp begin_ts,
-                       TxnTimeStamp commit_ts) {
-    
+                        const std::string &db_id_str,
+                        const std::string &table_id_str,
+                        SegmentID segment_id,
+                        BlockID block_id,
+                        TxnTimeStamp begin_ts,
+                        TxnTimeStamp commit_ts) {
+
     NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
     std::string block_lock_key = KeyEncode::CatalogTableSegmentBlockTagKey(db_id_str, table_id_str, segment_id, block_id, "lock");
 
@@ -180,12 +186,12 @@ size_t GetBlockRowCount(KVInstance *kv_instance,
 
     BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
     std::string version_filepath = fmt::format("{}/db_{}/tbl_{}/seg_{}/blk_{}/{}",
-                                          InfinityContext::instance().config()->DataDir(),
-                                          db_id_str,
-                                          table_id_str,
-                                          segment_id,
-                                          block_id,
-                                          BlockVersion::PATH);
+                                               InfinityContext::instance().config()->DataDir(),
+                                               db_id_str,
+                                               table_id_str,
+                                               segment_id,
+                                               block_id,
+                                               BlockVersion::PATH);
     BufferObj *version_buffer = buffer_mgr->GetBufferObject(version_filepath);
     if (version_buffer == nullptr) {
         UnrecoverableError(fmt::format("Get version buffer failed: {}", version_filepath));
@@ -201,24 +207,24 @@ size_t GetBlockRowCount(KVInstance *kv_instance,
         auto [offset, commit_cnt] = block_version->GetCommitRowCount(commit_ts);
         row_cnt += commit_cnt;
     }
-    
+
     return row_cnt;
 }
 
 size_t GetSegmentRowCount(KVInstance *kv_instance,
-                         const std::string &db_id_str,
-                         const std::string &table_id_str,
-                         SegmentID segment_id,
-                         TxnTimeStamp begin_ts,
-                         TxnTimeStamp commit_ts) {
+                          const std::string &db_id_str,
+                          const std::string &table_id_str,
+                          SegmentID segment_id,
+                          TxnTimeStamp begin_ts,
+                          TxnTimeStamp commit_ts) {
     std::vector<BlockID> blocks = GetTableSegmentBlocks(kv_instance, db_id_str, table_id_str, segment_id, begin_ts, commit_ts);
-    
+
     size_t segment_row_count = 0;
     for (BlockID block_id : blocks) {
         size_t block_row_cnt = GetBlockRowCount(kv_instance, db_id_str, table_id_str, segment_id, block_id, begin_ts, commit_ts);
         segment_row_count += block_row_cnt;
     }
-    
+
     return segment_row_count;
 }
 

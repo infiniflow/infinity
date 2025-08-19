@@ -40,7 +40,7 @@ import data_type;
 
 namespace infinity {
 
-void PhysicalAggregate::Init(QueryContext* query_context) {}
+void PhysicalAggregate::Init(QueryContext *query_context) {}
 
 bool PhysicalAggregate::Execute(QueryContext *query_context, OperatorState *operator_state) {
     OperatorState *prev_op_state = operator_state->prev_op_state_;
@@ -71,14 +71,17 @@ bool PhysicalAggregate::Execute(QueryContext *query_context, OperatorState *oper
     groupby_types.reserve(group_count);
 
     for (i64 idx = 0; auto &expr : groups_) {
-        std::shared_ptr<ColumnDef> col_def = std::make_shared<ColumnDef>(idx, std::make_shared<DataType>(expr->Type()), expr->Name(), std::set<ConstraintType>());
+        std::shared_ptr<ColumnDef> col_def =
+            std::make_shared<ColumnDef>(idx, std::make_shared<DataType>(expr->Type()), expr->Name(), std::set<ConstraintType>());
         groupby_columns.emplace_back(col_def);
         groupby_types.emplace_back(std::make_shared<DataType>(expr->Type()));
         ++idx;
     }
 
-    std::shared_ptr<TableDef> groupby_tabledef =
-        TableDef::Make(std::make_shared<std::string>("default_db"), std::make_shared<std::string>("groupby"), std::make_shared<std::string>(""), groupby_columns);
+    std::shared_ptr<TableDef> groupby_tabledef = TableDef::Make(std::make_shared<std::string>("default_db"),
+                                                                std::make_shared<std::string>("groupby"),
+                                                                std::make_shared<std::string>(""),
+                                                                groupby_columns);
     std::shared_ptr<DataTable> groupby_table = DataTable::Make(groupby_tabledef, TableType::kIntermediate);
 
     // Prepare the expression states
@@ -163,8 +166,10 @@ bool PhysicalAggregate::Execute(QueryContext *query_context, OperatorState *oper
         }
 
         // output aggregate table definition
-        std::shared_ptr<TableDef> aggregate_tabledef =
-            TableDef::Make(std::make_shared<std::string>("default_db"), std::make_shared<std::string>("aggregate"), std::make_shared<std::string>(""), aggregate_columns);
+        std::shared_ptr<TableDef> aggregate_tabledef = TableDef::Make(std::make_shared<std::string>("default_db"),
+                                                                      std::make_shared<std::string>("aggregate"),
+                                                                      std::make_shared<std::string>(""),
+                                                                      aggregate_columns);
         output_aggregate_table = DataTable::Make(aggregate_tabledef, TableType::kAggregate);
 
         // Loop blocks
@@ -256,7 +261,9 @@ void PhysicalAggregate::GroupByInputTable(const std::vector<std::unique_ptr<Data
     }
 }
 
-void PhysicalAggregate::GenerateGroupByResult(const std::shared_ptr<DataTable> &input_table, std::shared_ptr<DataTable> &output_table, HashTable &hash_table) {
+void PhysicalAggregate::GenerateGroupByResult(const std::shared_ptr<DataTable> &input_table,
+                                              std::shared_ptr<DataTable> &output_table,
+                                              HashTable &hash_table) {
 
     size_t column_count = input_table->ColumnCount();
     std::vector<std::shared_ptr<DataType>> types;

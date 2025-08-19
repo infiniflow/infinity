@@ -405,7 +405,9 @@ std::string PhysicalMatch::ToString(i64 &space) const {
     return res;
 }
 
-void PhysicalMatch::AddCache(QueryContext *query_context, ResultCacheManager *cache_mgr, const std::vector<std::unique_ptr<DataBlock>> &output_data_blocks) {
+void PhysicalMatch::AddCache(QueryContext *query_context,
+                             ResultCacheManager *cache_mgr,
+                             const std::vector<std::unique_ptr<DataBlock>> &output_data_blocks) {
     NewTxn *new_txn = query_context->GetNewTxn();
     TxnTimeStamp begin_ts = new_txn->BeginTS();
 

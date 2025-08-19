@@ -67,9 +67,9 @@ void SubqueryUnnest::UnnestSubqueries(std::shared_ptr<BaseExpression> &expr_ptr,
 }
 
 std::shared_ptr<BaseExpression> SubqueryUnnest::UnnestSubquery(std::shared_ptr<BaseExpression> &expr_ptr,
-                                                         std::shared_ptr<LogicalNode> &root,
-                                                         QueryContext *query_context,
-                                                         const std::shared_ptr<BindContext> &bind_context) {
+                                                               std::shared_ptr<LogicalNode> &root,
+                                                               QueryContext *query_context,
+                                                               const std::shared_ptr<BindContext> &bind_context) {
     // 1. Check the subquery type: uncorrelated subquery or correlated subquery.
     auto subquery_expr_ptr = static_cast<SubqueryExpression *>(expr_ptr.get());
 
@@ -86,10 +86,10 @@ std::shared_ptr<BaseExpression> SubqueryUnnest::UnnestSubquery(std::shared_ptr<B
 }
 
 std::shared_ptr<BaseExpression> SubqueryUnnest::UnnestUncorrelated(SubqueryExpression *expr_ptr,
-                                                             std::shared_ptr<LogicalNode> &root,
-                                                             std::shared_ptr<LogicalNode> &subquery_plan,
-                                                             QueryContext *query_context,
-                                                             const std::shared_ptr<BindContext> &bind_context) {
+                                                                   std::shared_ptr<LogicalNode> &root,
+                                                                   std::shared_ptr<LogicalNode> &subquery_plan,
+                                                                   QueryContext *query_context,
+                                                                   const std::shared_ptr<BindContext> &bind_context) {
     switch (expr_ptr->subquery_type_) {
 
         case SubqueryType::kScalar: {
@@ -106,11 +106,11 @@ std::shared_ptr<BaseExpression> SubqueryUnnest::UnnestUncorrelated(SubqueryExpre
             ColumnBinding limit_column_binding = limit_node->GetColumnBindings()[0];
 
             std::shared_ptr<ColumnExpression> argument = ColumnExpression::Make(expr_ptr->Type(),
-                                                                          subquery_plan->name(),
-                                                                          limit_column_binding.table_idx,
-                                                                          "0",
-                                                                          limit_column_binding.column_idx,
-                                                                          0);
+                                                                                subquery_plan->name(),
+                                                                                limit_column_binding.table_idx,
+                                                                                "0",
+                                                                                limit_column_binding.column_idx,
+                                                                                0);
 
             auto aggregate_function_set_ptr = static_pointer_cast<AggregateFunctionSet>(function_set_ptr);
             AggregateFunction first_function = aggregate_function_set_ptr->GetMostMatchFunction(argument);
@@ -132,11 +132,13 @@ std::shared_ptr<BaseExpression> SubqueryUnnest::UnnestUncorrelated(SubqueryExpre
             // Step3 Generate cross product on the root and subquery plan
             u64 logical_node_id = bind_context->GetNewLogicalNodeId();
             std::string alias = fmt::format("cross_product{}", logical_node_id);
-            std::shared_ptr<LogicalCrossProduct> cross_product_node = std::make_shared<LogicalCrossProduct>(logical_node_id, alias, root, aggregate_node);
+            std::shared_ptr<LogicalCrossProduct> cross_product_node =
+                std::make_shared<LogicalCrossProduct>(logical_node_id, alias, root, aggregate_node);
 
             root = cross_product_node;
             // Step4 Return the first column of the cross product as the result
-            std::shared_ptr<ColumnExpression> result = ColumnExpression::Make(expr_ptr->Type(), "", aggregate_index, first_function_expr->Name(), 0, 0);
+            std::shared_ptr<ColumnExpression> result =
+                ColumnExpression::Make(expr_ptr->Type(), "", aggregate_index, first_function_expr->Name(), 0, 0);
 
             return result;
         }
@@ -162,11 +164,11 @@ std::shared_ptr<BaseExpression> SubqueryUnnest::UnnestUncorrelated(SubqueryExpre
             // 1. Generate right column expression
             ColumnBinding right_column_binding = subquery_plan->GetColumnBindings()[0];
             std::shared_ptr<ColumnExpression> right_column = ColumnExpression::Make(expr_ptr->left_->Type(),
-                                                                              subquery_plan->name(),
-                                                                              right_column_binding.table_idx,
-                                                                              "0",
-                                                                              right_column_binding.column_idx,
-                                                                              0);
+                                                                                    subquery_plan->name(),
+                                                                                    right_column_binding.table_idx,
+                                                                                    "0",
+                                                                                    right_column_binding.column_idx,
+                                                                                    0);
 
             // 2. Generate condition expression;
             std::vector<std::shared_ptr<BaseExpression>> function_arguments;
@@ -194,7 +196,8 @@ std::shared_ptr<BaseExpression> SubqueryUnnest::UnnestUncorrelated(SubqueryExpre
             // 3. Generate mark join
             u64 logical_node_id = bind_context->GetNewLogicalNodeId();
             std::string alias = fmt::format("logical_join{}", logical_node_id);
-            std::shared_ptr<LogicalJoin> join_node = std::make_shared<LogicalJoin>(logical_node_id, JoinType::kMark, alias, conditions, root, subquery_plan);
+            std::shared_ptr<LogicalJoin> join_node =
+                std::make_shared<LogicalJoin>(logical_node_id, JoinType::kMark, alias, conditions, root, subquery_plan);
             join_node->mark_index_ = bind_context->GenerateTableIndex();
             root = join_node;
 
@@ -218,10 +221,10 @@ std::shared_ptr<BaseExpression> SubqueryUnnest::UnnestUncorrelated(SubqueryExpre
 }
 
 std::shared_ptr<BaseExpression> SubqueryUnnest::UnnestCorrelated(SubqueryExpression *expr_ptr,
-                                                           std::shared_ptr<LogicalNode> &root,
-                                                           std::shared_ptr<LogicalNode> &subquery_plan,
-                                                           QueryContext *query_context,
-                                                           const std::shared_ptr<BindContext> &bind_context) {
+                                                                 std::shared_ptr<LogicalNode> &root,
+                                                                 std::shared_ptr<LogicalNode> &subquery_plan,
+                                                                 QueryContext *query_context,
+                                                                 const std::shared_ptr<BindContext> &bind_context) {
     auto &correlated_columns = bind_context->correlated_column_exprs_;
 
     if (correlated_columns.empty()) {
@@ -265,7 +268,8 @@ std::shared_ptr<BaseExpression> SubqueryUnnest::UnnestCorrelated(SubqueryExpress
             root = logical_join;
             // Generate result expression
             std::shared_ptr<std::vector<std::string>> right_names = dependent_join->GetOutputNames();
-            std::shared_ptr<ColumnExpression> result = ColumnExpression::Make(expr_ptr->Type(), alias, logical_join->mark_index_, right_names->at(0), 0, 0);
+            std::shared_ptr<ColumnExpression> result =
+                ColumnExpression::Make(expr_ptr->Type(), alias, logical_join->mark_index_, right_names->at(0), 0, 0);
             return result;
         }
         case SubqueryType::kNotExists: {
@@ -329,11 +333,11 @@ std::shared_ptr<BaseExpression> SubqueryUnnest::UnnestCorrelated(SubqueryExpress
             std::vector<std::shared_ptr<BaseExpression>> in_arguments;
 
             std::shared_ptr<ColumnExpression> subquery_output_column = ColumnExpression::Make(*subplan_column_types->at(0),
-                                                                                        "",
-                                                                                        subplan_column_bindings[0].table_idx,
-                                                                                        subplan_column_names->at(0),
-                                                                                        subplan_column_bindings[0].column_idx,
-                                                                                        0);
+                                                                                              "",
+                                                                                              subplan_column_bindings[0].table_idx,
+                                                                                              subplan_column_names->at(0),
+                                                                                              subplan_column_bindings[0].column_idx,
+                                                                                              0);
 
             if (expr_ptr->left_->Type() == *subplan_column_types->at(0)) {
                 in_arguments.emplace_back(subquery_output_column);
@@ -358,7 +362,8 @@ std::shared_ptr<BaseExpression> SubqueryUnnest::UnnestCorrelated(SubqueryExpress
             root = logical_join;
             // Generate result expression
             std::shared_ptr<std::vector<std::string>> right_names = dependent_join->GetOutputNames();
-            std::shared_ptr<ColumnExpression> result = ColumnExpression::Make(expr_ptr->Type(), alias, logical_join->mark_index_, right_names->at(0), 0, 0);
+            std::shared_ptr<ColumnExpression> result =
+                ColumnExpression::Make(expr_ptr->Type(), alias, logical_join->mark_index_, right_names->at(0), 0, 0);
             return result;
         }
         case SubqueryType::kScalar: {
@@ -385,11 +390,11 @@ std::shared_ptr<BaseExpression> SubqueryUnnest::UnnestCorrelated(SubqueryExpress
             std::shared_ptr<std::vector<std::string>> right_names = dependent_join->GetOutputNames();
             ColumnBinding right_first_output_binding = subplan_column_bindings[0];
             std::shared_ptr<ColumnExpression> result = ColumnExpression::Make(expr_ptr->Type(),
-                                                                        alias,
-                                                                        right_first_output_binding.table_idx,
-                                                                        right_names->at(0),
-                                                                        right_first_output_binding.column_idx,
-                                                                        0);
+                                                                              alias,
+                                                                              right_first_output_binding.table_idx,
+                                                                              right_names->at(0),
+                                                                              right_first_output_binding.column_idx,
+                                                                              0);
             return result;
         }
         case SubqueryType::kAny: {
@@ -422,11 +427,11 @@ void SubqueryUnnest::GenerateJoinConditions(QueryContext *query_context,
         // Generate new correlated column expression
         auto &right_column_binding = subplan_column_bindings[correlated_column_index];
         std::shared_ptr<ColumnExpression> right_column_expr = ColumnExpression::Make(left_column_expr->Type(),
-                                                                               left_column_expr->table_name(),
-                                                                               right_column_binding.table_idx,
-                                                                               left_column_expr->column_name(),
-                                                                               right_column_binding.column_idx,
-                                                                               0);
+                                                                                     left_column_expr->table_name(),
+                                                                                     right_column_binding.table_idx,
+                                                                                     left_column_expr->column_name(),
+                                                                                     right_column_binding.column_idx,
+                                                                                     0);
 
         // Generate join condition expression
         std::vector<std::shared_ptr<BaseExpression>> function_arguments;

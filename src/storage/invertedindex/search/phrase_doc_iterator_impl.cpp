@@ -38,7 +38,10 @@ PhraseDocIterator::PhraseDocIterator(std::vector<std::unique_ptr<PostingIterator
     block_max_bm25_score_cache_part_info_vals_.resize(pos_iters_.size());
 }
 
-void PhraseDocIterator::InitBM25Info(std::unique_ptr<FullTextColumnLengthReader> &&column_length_reader, const float delta, const float k1, const float b) {
+void PhraseDocIterator::InitBM25Info(std::unique_ptr<FullTextColumnLengthReader> &&column_length_reader,
+                                     const float delta,
+                                     const float k1,
+                                     const float b) {
     column_length_reader_ = std::move(column_length_reader);
     const u64 total_df = column_length_reader_->GetTotalDF();
     const float avg_column_len = column_length_reader_->GetAvgColumnLength();

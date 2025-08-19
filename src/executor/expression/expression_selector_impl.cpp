@@ -34,10 +34,10 @@ import data_type;
 namespace infinity {
 
 size_t ExpressionSelector::Select(const std::shared_ptr<BaseExpression> &expr,
-                                 std::shared_ptr<ExpressionState> &state,
-                                 const DataBlock *input_data_block,
-                                 DataBlock *output_data_block,
-                                 size_t count) {
+                                  std::shared_ptr<ExpressionState> &state,
+                                  const DataBlock *input_data_block,
+                                  DataBlock *output_data_block,
+                                  size_t count) {
     this->input_data_ = input_data_block;
     std::shared_ptr<Selection> input_select = nullptr;
     std::shared_ptr<Selection> output_true_select = std::make_shared<Selection>();
@@ -84,7 +84,10 @@ void ExpressionSelector::Select(const std::shared_ptr<BaseExpression> &expr,
     Select(bool_column, count, output_true_select, true);
 }
 
-void ExpressionSelector::Select(const std::shared_ptr<ColumnVector> &bool_column, size_t count, std::shared_ptr<Selection> &output_true_select, bool nullable) {
+void ExpressionSelector::Select(const std::shared_ptr<ColumnVector> &bool_column,
+                                size_t count,
+                                std::shared_ptr<Selection> &output_true_select,
+                                bool nullable) {
     if (bool_column->vector_type() != ColumnVectorType::kCompactBit || bool_column->data_type()->type() != LogicalType::kBoolean) {
         UnrecoverableError("Attempting to select non-boolean expression");
     }

@@ -220,7 +220,7 @@ void DataBlock::AppendValue(size_t column_index, const Value &value) {
     finalized = false;
 }
 
-void DataBlock::AppendValueByPtr(size_t column_index, const char * value_ptr) {
+void DataBlock::AppendValueByPtr(size_t column_index, const char *value_ptr) {
     if (column_index >= column_count_) {
         UnrecoverableError(fmt::format("Attempt to access invalid column index: {} in column count: {}", column_index, column_count_));
     }
@@ -311,10 +311,10 @@ void DataBlock::AppendWith(const DataBlock *other) {
     }
     if (this->row_count_ + other->row_count_ > this->capacity_) {
         UnrecoverableError(fmt::format("Attempt append block with row count {} into block with row count {}, "
-                                           "which exceeds the capacity {}",
-                                           other->row_count(),
-                                           this->row_count(),
-                                           this->capacity()));
+                                       "which exceeds the capacity {}",
+                                       other->row_count(),
+                                       this->row_count(),
+                                       this->capacity()));
     }
 
     size_t column_count = this->column_count();
@@ -331,10 +331,10 @@ void DataBlock::AppendWith(const DataBlock *other, size_t from, size_t count) {
     }
     if (this->row_count_ + count > this->capacity_) {
         UnrecoverableError(fmt::format("Attempt append block with row count {} into block with row count{}, "
-                                           "which exceeds the capacity {}",
-                                           count,
-                                           this->row_count(),
-                                           this->capacity()));
+                                       "which exceeds the capacity {}",
+                                       count,
+                                       this->row_count(),
+                                       this->capacity()));
     }
     size_t column_count = this->column_count();
     for (size_t idx = 0; idx < column_count; ++idx) {

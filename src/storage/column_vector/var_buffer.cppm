@@ -38,7 +38,8 @@ public:
         buffers_ = buffer;
     }
 
-    VarBuffer(VarBuffer &&other) : buffers_(std::move(other.buffers_)), buffer_size_prefix_sum_(std::move(other.buffer_size_prefix_sum_)), buffer_obj_(other.buffer_obj_) {}
+    VarBuffer(VarBuffer &&other)
+        : buffers_(std::move(other.buffers_)), buffer_size_prefix_sum_(std::move(other.buffer_size_prefix_sum_)), buffer_obj_(other.buffer_obj_) {}
 
     VarBuffer &operator=(VarBuffer &&other) {
         if (this != &other) {

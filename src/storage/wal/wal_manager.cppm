@@ -89,7 +89,8 @@ public:
 
     std::string GetWalFilename() const;
 
-    std::tuple<TransactionID, TxnTimeStamp, TxnTimeStamp> GetReplayEntries(StorageMode targe_storage_mode, std::vector<std::shared_ptr<WalEntry>> &replay_entries);
+    std::tuple<TransactionID, TxnTimeStamp, TxnTimeStamp> GetReplayEntries(StorageMode targe_storage_mode,
+                                                                           std::vector<std::shared_ptr<WalEntry>> &replay_entries);
 
     std::tuple<TransactionID, TxnTimeStamp> ReplayWalEntries(const std::vector<std::shared_ptr<WalEntry>> &replay_entries);
 
@@ -102,7 +103,6 @@ public:
     void UpdateCommitState(TxnTimeStamp commit_ts, i64 wal_size);
 
 public:
-
     std::tuple<TxnTimeStamp, i64> GetCommitState();
     void SetLastCkpWalSize(i64 wal_size);
 

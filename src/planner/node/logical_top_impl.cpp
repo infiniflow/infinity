@@ -32,7 +32,9 @@ std::vector<ColumnBinding> LogicalTop::GetColumnBindings() const { return Logica
 
 std::shared_ptr<std::vector<std::string>> LogicalTop::GetOutputNames() const { return LogicalCommonFunctionUsingLoadMeta::GetOutputNames(*this); }
 
-std::shared_ptr<std::vector<std::shared_ptr<DataType>>> LogicalTop::GetOutputTypes() const { return LogicalCommonFunctionUsingLoadMeta::GetOutputTypes(*this); }
+std::shared_ptr<std::vector<std::shared_ptr<DataType>>> LogicalTop::GetOutputTypes() const {
+    return LogicalCommonFunctionUsingLoadMeta::GetOutputTypes(*this);
+}
 
 std::string LogicalTop::ToString(i64 &space) const {
     std::stringstream ss;

@@ -37,7 +37,6 @@ struct EpochFunction {
         RecoverableError(status);
         return false;
     }
-
 };
 
 template <>
@@ -64,21 +63,21 @@ void RegisterEpochFunction(NewCatalog *catalog_ptr) {
     std::shared_ptr<ScalarFunctionSet> function_set_ptr = std::make_shared<ScalarFunctionSet>(func_name);
 
     ScalarFunction epoch_date_function(func_name,
-                                  {DataType(LogicalType::kDate)},
-                                  {DataType(LogicalType::kBigInt)},
-                                  &ScalarFunction::UnaryFunctionWithFailure<DateT, BigIntT, EpochFunction>);
+                                       {DataType(LogicalType::kDate)},
+                                       {DataType(LogicalType::kBigInt)},
+                                       &ScalarFunction::UnaryFunctionWithFailure<DateT, BigIntT, EpochFunction>);
     function_set_ptr->AddFunction(epoch_date_function);
 
     ScalarFunction epoch_datetime_function(func_name,
-                                  {DataType(LogicalType::kDateTime)},
-                                  {DataType(LogicalType::kBigInt)},
-                                  &ScalarFunction::UnaryFunctionWithFailure<DateTimeT, BigIntT, EpochFunction>);
+                                           {DataType(LogicalType::kDateTime)},
+                                           {DataType(LogicalType::kBigInt)},
+                                           &ScalarFunction::UnaryFunctionWithFailure<DateTimeT, BigIntT, EpochFunction>);
     function_set_ptr->AddFunction(epoch_datetime_function);
 
     ScalarFunction epoch_timestamp_function(func_name,
-                                  {DataType(LogicalType::kTimestamp)},
-                                  {DataType(LogicalType::kBigInt)},
-                                  &ScalarFunction::UnaryFunctionWithFailure<TimestampT, BigIntT, EpochFunction>);
+                                            {DataType(LogicalType::kTimestamp)},
+                                            {DataType(LogicalType::kBigInt)},
+                                            &ScalarFunction::UnaryFunctionWithFailure<TimestampT, BigIntT, EpochFunction>);
     function_set_ptr->AddFunction(epoch_timestamp_function);
 
     NewCatalog::AddFunctionSet(catalog_ptr, function_set_ptr);

@@ -203,7 +203,8 @@ bool BufferObj::Save(const FileWorkerSaveCtx &ctx) {
                 break;
             }
             default: {
-                std::unique_ptr<std::string> err_msg = std::make_unique<std::string>(fmt::format("Invalid buffer status: {}.", BufferStatusToString(status_)));
+                std::unique_ptr<std::string> err_msg =
+                    std::make_unique<std::string>(fmt::format("Invalid buffer status: {}.", BufferStatusToString(status_)));
                 UnrecoverableError(*err_msg);
             }
         }
@@ -254,10 +255,10 @@ void BufferObj::PickForCleanup() {
         }
         default: {
             UnrecoverableError(fmt::format("Buffer: {}, Invalid status: {}, buffer type: {}, rc: {}",
-                                               GetFilename(),
-                                               BufferStatusToString(status_),
-                                               BufferTypeToString(type_),
-                                               rc_));
+                                           GetFilename(),
+                                           BufferStatusToString(status_),
+                                           BufferTypeToString(type_),
+                                           rc_));
         }
     }
     status_ = BufferStatus::kClean;

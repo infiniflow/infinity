@@ -221,7 +221,8 @@ bool PhysicalInsert::Execute(QueryContext *query_context, OperatorState *operato
         size_t column_count = value_list_[0].size();
         size_t table_collection_column_count = table_info_->column_count_;
         if (column_count != table_collection_column_count) {
-            UnrecoverableError(fmt::format("Insert values count{} isn't matched with table column count{}.", column_count, table_collection_column_count));
+            UnrecoverableError(
+                fmt::format("Insert values count{} isn't matched with table column count{}.", column_count, table_collection_column_count));
         }
 
         // Prepare the output block

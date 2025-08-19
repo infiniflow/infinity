@@ -29,8 +29,10 @@ import std;
 
 namespace infinity {
 
-SearchExpression::SearchExpression(std::vector<std::shared_ptr<BaseExpression>> &match_exprs, std::vector<std::shared_ptr<FusionExpression>> &fusion_exprs)
-    : BaseExpression(ExpressionType::kSearch, std::vector<std::shared_ptr<BaseExpression>>()), match_exprs_(match_exprs), fusion_exprs_(fusion_exprs) {}
+SearchExpression::SearchExpression(std::vector<std::shared_ptr<BaseExpression>> &match_exprs,
+                                   std::vector<std::shared_ptr<FusionExpression>> &fusion_exprs)
+    : BaseExpression(ExpressionType::kSearch, std::vector<std::shared_ptr<BaseExpression>>()), match_exprs_(match_exprs),
+      fusion_exprs_(fusion_exprs) {}
 
 std::string SearchExpression::ToString() const {
     if (!alias_.empty()) {

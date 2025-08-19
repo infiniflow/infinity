@@ -75,7 +75,8 @@ void PhysicalMergeAggregate::GroupByMergeAggregateExecute(MergeAggregateOperator
         std::vector<std::shared_ptr<DataType>> groupby_types;
         groupby_types.reserve(group_count);
         for (i64 idx = 0; auto &expr : agg_op->groups_) {
-            std::shared_ptr<ColumnDef> col_def = std::make_shared<ColumnDef>(idx, std::make_shared<DataType>(expr->Type()), expr->Name(), std::set<ConstraintType>());
+            std::shared_ptr<ColumnDef> col_def =
+                std::make_shared<ColumnDef>(idx, std::make_shared<DataType>(expr->Type()), expr->Name(), std::set<ConstraintType>());
             groupby_types.emplace_back(std::make_shared<DataType>(expr->Type()));
             ++idx;
         }
@@ -87,7 +88,8 @@ void PhysicalMergeAggregate::GroupByMergeAggregateExecute(MergeAggregateOperator
         return;
     }
 
-    std::vector<std::shared_ptr<ColumnVector>> input_groupby_columns(input_block->column_vectors.begin(), input_block->column_vectors.begin() + group_count);
+    std::vector<std::shared_ptr<ColumnVector>> input_groupby_columns(input_block->column_vectors.begin(),
+                                                                     input_block->column_vectors.begin() + group_count);
     if (op_state->data_block_array_.empty()) {
         hash_table.Append(input_groupby_columns, 0, input_block->row_count());
         op_state->data_block_array_.emplace_back(std::move(input_block));
@@ -272,7 +274,11 @@ T PhysicalMergeAggregate::GetOutputData(MergeAggregateOperatorState *op_state, s
 }
 
 template <typename T>
-void PhysicalMergeAggregate::WriteValueAtPosition(MergeAggregateOperatorState *op_state, size_t block_index, size_t col_idx, size_t row_idx, T value) {
+void PhysicalMergeAggregate::WriteValueAtPosition(MergeAggregateOperatorState *op_state,
+                                                  size_t block_index,
+                                                  size_t col_idx,
+                                                  size_t row_idx,
+                                                  T value) {
     op_state->data_block_array_[block_index]->SetValue(col_idx, row_idx, CreateValue(value));
 }
 

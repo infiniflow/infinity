@@ -91,7 +91,6 @@ import data_type;
 
 namespace infinity {
 
-
 BuiltinFunctions::BuiltinFunctions(NewCatalog *catalog_ptr) : catalog_ptr_(catalog_ptr) {}
 
 void BuiltinFunctions::Init() {
@@ -197,17 +196,20 @@ void BuiltinFunctions::RegisterTableFunction() {}
 
 void BuiltinFunctions::RegisterSpecialFunction() {
 
-    std::shared_ptr<SpecialFunction> row_function = std::make_shared<SpecialFunction>("ROW_ID", DataType(LogicalType::kBigInt), 1, SpecialType::kRowID);
+    std::shared_ptr<SpecialFunction> row_function =
+        std::make_shared<SpecialFunction>("ROW_ID", DataType(LogicalType::kBigInt), 1, SpecialType::kRowID);
     NewCatalog::AddSpecialFunction(catalog_ptr_, row_function);
 
-    std::shared_ptr<SpecialFunction> distance_function = std::make_shared<SpecialFunction>("DISTANCE", DataType(LogicalType::kFloat), 2, SpecialType::kDistance);
+    std::shared_ptr<SpecialFunction> distance_function =
+        std::make_shared<SpecialFunction>("DISTANCE", DataType(LogicalType::kFloat), 2, SpecialType::kDistance);
     NewCatalog::AddSpecialFunction(catalog_ptr_, distance_function);
 
     std::shared_ptr<SpecialFunction> similarity_function =
         std::make_shared<SpecialFunction>("SIMILARITY", DataType(LogicalType::kFloat), 3, SpecialType::kSimilarity);
     NewCatalog::AddSpecialFunction(catalog_ptr_, similarity_function);
 
-    std::shared_ptr<SpecialFunction> score_function = std::make_shared<SpecialFunction>("SCORE", DataType(LogicalType::kFloat), 4, SpecialType::kScore);
+    std::shared_ptr<SpecialFunction> score_function =
+        std::make_shared<SpecialFunction>("SCORE", DataType(LogicalType::kFloat), 4, SpecialType::kScore);
     NewCatalog::AddSpecialFunction(catalog_ptr_, score_function);
 
     std::shared_ptr<SpecialFunction> distance_factors_function =
@@ -230,11 +232,13 @@ void BuiltinFunctions::RegisterSpecialFunction() {
         std::make_shared<SpecialFunction>("DELETE_TIMESTAMP", DataType(LogicalType::kBigInt), COLUMN_IDENTIFIER_DELETE, SpecialType::kDeleteTs);
     NewCatalog::AddSpecialFunction(catalog_ptr_, deletets_function);
 
-    NewCatalog::AddSpecialFunction(catalog_ptr_,
-                                   std::make_shared<SpecialFunction>("FILTER_FULLTEXT", DataType(LogicalType::kBoolean), 0, SpecialType::kFilterFullText));
+    NewCatalog::AddSpecialFunction(
+        catalog_ptr_,
+        std::make_shared<SpecialFunction>("FILTER_FULLTEXT", DataType(LogicalType::kBoolean), 0, SpecialType::kFilterFullText));
 
-    NewCatalog::AddSpecialFunction(catalog_ptr_,
-                                   std::make_shared<SpecialFunction>("FILTER_TEXT", DataType(LogicalType::kBoolean), 0, SpecialType::kFilterFullText));
+    NewCatalog::AddSpecialFunction(
+        catalog_ptr_,
+        std::make_shared<SpecialFunction>("FILTER_TEXT", DataType(LogicalType::kBoolean), 0, SpecialType::kFilterFullText));
 }
 
 } // namespace infinity

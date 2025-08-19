@@ -99,7 +99,8 @@ TEST_P(TestTxnReplayIndex, DISABLED_test_replay_append_with_index) {
     auto table_name = std::make_shared<std::string>("tb1");
     auto column_def5 =
         std::make_shared<ColumnDef>(4, std::make_shared<DataType>(LogicalType::kTensor, column3_type_info), "col5", std::set<ConstraintType>());
-    auto table_def = TableDef::Make(db_name, table_name, std::make_shared<std::string>(), {column_def1, column_def2, column_def3, column_def4, column_def5});
+    auto table_def =
+        TableDef::Make(db_name, table_name, std::make_shared<std::string>(), {column_def1, column_def2, column_def3, column_def4, column_def5});
 
     auto index_name1 = std::make_shared<std::string>("index1");
     auto index_def1 = IndexSecondary::Make(index_name1, std::make_shared<std::string>(), "file_name", {column_def1->name()});
@@ -109,21 +110,25 @@ TEST_P(TestTxnReplayIndex, DISABLED_test_replay_append_with_index) {
     std::vector<InitParameter *> index3_parameters;
     index3_parameters.emplace_back(new InitParameter("metric", "l2"));
     index3_parameters.emplace_back(new InitParameter("plain_storage_data_type", "float"));
-    auto index_def3 = IndexIVF::Make(index_name3, std::make_shared<std::string>(), "file_name", std::vector<std::string>{column_def3->name()}, index3_parameters);
+    auto index_def3 =
+        IndexIVF::Make(index_name3, std::make_shared<std::string>(), "file_name", std::vector<std::string>{column_def3->name()}, index3_parameters);
     auto index_name4 = std::make_shared<std::string>("index4");
     std::vector<InitParameter *> index4_parameters;
     index4_parameters.emplace_back(new InitParameter("metric", "l2"));
-    auto index_def4 = IndexHnsw::Make(index_name4, std::make_shared<std::string>(), "file_name", std::vector<std::string>{column_def3->name()}, index4_parameters);
+    auto index_def4 =
+        IndexHnsw::Make(index_name4, std::make_shared<std::string>(), "file_name", std::vector<std::string>{column_def3->name()}, index4_parameters);
     auto index_name5 = std::make_shared<std::string>("index5");
     std::vector<InitParameter *> index5_parameters;
     index5_parameters.emplace_back(new InitParameter("block_size", "16"));
     index5_parameters.emplace_back(new InitParameter("compress_type", "compress"));
-    auto index_def5 = IndexBMP::Make(index_name5, std::make_shared<std::string>(), "file_name", std::vector<std::string>{column_def4->name()}, index5_parameters);
+    auto index_def5 =
+        IndexBMP::Make(index_name5, std::make_shared<std::string>(), "file_name", std::vector<std::string>{column_def4->name()}, index5_parameters);
     auto index_name6 = std::make_shared<std::string>("index6");
     std::vector<InitParameter *> index6_parameters;
     index6_parameters.emplace_back(new InitParameter("pq_subspace_num", "4"));
     index6_parameters.emplace_back(new InitParameter("pq_subspace_bits", "8"));
-    auto index_def6 = IndexEMVB::Make(index_name6, std::make_shared<std::string>(), "file_name", std::vector<std::string>{column_def5->name()}, index6_parameters);
+    auto index_def6 =
+        IndexEMVB::Make(index_name6, std::make_shared<std::string>(), "file_name", std::vector<std::string>{column_def5->name()}, index6_parameters);
     DeferFn defer_fn([&] {
         for (auto *parameter : index3_parameters) {
             delete parameter;
@@ -147,7 +152,8 @@ TEST_P(TestTxnReplayIndex, DISABLED_test_replay_append_with_index) {
         EXPECT_TRUE(status.ok());
     }
     auto create_index = [&](const std::shared_ptr<IndexBase> &index_base) {
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("create index {}", *index_base->index_name_)), TransactionType::kNormal);
+        auto *txn =
+            new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("create index {}", *index_base->index_name_)), TransactionType::kNormal);
         Status status = txn->CreateIndex(*db_name, *table_name, index_base, ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
@@ -185,14 +191,18 @@ TEST_P(TestTxnReplayIndex, DISABLED_test_replay_append_with_index) {
         {
             auto col3 = ColumnVector::Make(column_def3->type());
             col3->Initialize();
-            append_to_col(*col3, Value::MakeEmbedding(std::vector<float>{1.0, 2.0, 3.0, 4.0}), Value::MakeEmbedding(std::vector<float>{5.0, 6.0, 7.0, 8.0}));
+            append_to_col(*col3,
+                          Value::MakeEmbedding(std::vector<float>{1.0, 2.0, 3.0, 4.0}),
+                          Value::MakeEmbedding(std::vector<float>{5.0, 6.0, 7.0, 8.0}));
             input_block->InsertVector(col3, 2);
         }
         {
             auto col4 = ColumnVector::Make(column_def4->type());
             col4->Initialize();
-            std::pair<std::vector<float>, std::vector<int32_t>> vec{std::vector<float>{1.0, 2.0, 3.0, 4.0}, std::vector<int32_t>{100, 1000, 10000, 20000}};
-            std::pair<std::vector<float>, std::vector<int32_t>> vec2{std::vector<float>{1.0, 2.0, 3.0, 4.0}, std::vector<int32_t>{100, 2000, 10000, 20000}};
+            std::pair<std::vector<float>, std::vector<int32_t>> vec{std::vector<float>{1.0, 2.0, 3.0, 4.0},
+                                                                    std::vector<int32_t>{100, 1000, 10000, 20000}};
+            std::pair<std::vector<float>, std::vector<int32_t>> vec2{std::vector<float>{1.0, 2.0, 3.0, 4.0},
+                                                                     std::vector<int32_t>{100, 2000, 10000, 20000}};
             auto v1 = Value::MakeSparse(reinterpret_cast<const char *>(vec.first.data()),
                                         reinterpret_cast<const char *>(vec.second.data()),
                                         vec.first.size(),
@@ -467,7 +477,8 @@ TEST_P(TestTxnReplayIndex, DISABLED_test_populate_index) {
     auto table_name = std::make_shared<std::string>("tb1");
     auto column_def5 =
         std::make_shared<ColumnDef>(4, std::make_shared<DataType>(LogicalType::kTensor, column3_type_info), "col5", std::set<ConstraintType>());
-    auto table_def = TableDef::Make(db_name, table_name, std::make_shared<std::string>(), {column_def1, column_def2, column_def3, column_def4, column_def5});
+    auto table_def =
+        TableDef::Make(db_name, table_name, std::make_shared<std::string>(), {column_def1, column_def2, column_def3, column_def4, column_def5});
 
     auto index_name1 = std::make_shared<std::string>("index1");
     auto index_def1 = IndexSecondary::Make(index_name1, std::make_shared<std::string>(), "file_name", {column_def1->name()});
@@ -477,21 +488,25 @@ TEST_P(TestTxnReplayIndex, DISABLED_test_populate_index) {
     std::vector<InitParameter *> index3_parameters;
     index3_parameters.emplace_back(new InitParameter("metric", "l2"));
     index3_parameters.emplace_back(new InitParameter("plain_storage_data_type", "float"));
-    auto index_def3 = IndexIVF::Make(index_name3, std::make_shared<std::string>(), "file_name", std::vector<std::string>{column_def3->name()}, index3_parameters);
+    auto index_def3 =
+        IndexIVF::Make(index_name3, std::make_shared<std::string>(), "file_name", std::vector<std::string>{column_def3->name()}, index3_parameters);
     auto index_name4 = std::make_shared<std::string>("index4");
     std::vector<InitParameter *> index4_parameters;
     index4_parameters.emplace_back(new InitParameter("metric", "l2"));
-    auto index_def4 = IndexHnsw::Make(index_name4, std::make_shared<std::string>(), "file_name", std::vector<std::string>{column_def3->name()}, index4_parameters);
+    auto index_def4 =
+        IndexHnsw::Make(index_name4, std::make_shared<std::string>(), "file_name", std::vector<std::string>{column_def3->name()}, index4_parameters);
     auto index_name5 = std::make_shared<std::string>("index5");
     std::vector<InitParameter *> index5_parameters;
     index5_parameters.emplace_back(new InitParameter("block_size", "16"));
     index5_parameters.emplace_back(new InitParameter("compress_type", "compress"));
-    auto index_def5 = IndexBMP::Make(index_name5, std::make_shared<std::string>(), "file_name", std::vector<std::string>{column_def4->name()}, index5_parameters);
+    auto index_def5 =
+        IndexBMP::Make(index_name5, std::make_shared<std::string>(), "file_name", std::vector<std::string>{column_def4->name()}, index5_parameters);
     auto index_name6 = std::make_shared<std::string>("index6");
     std::vector<InitParameter *> index6_parameters;
     index6_parameters.emplace_back(new InitParameter("pq_subspace_num", "4"));
     index6_parameters.emplace_back(new InitParameter("pq_subspace_bits", "8"));
-    auto index_def6 = IndexEMVB::Make(index_name6, std::make_shared<std::string>(), "file_name", std::vector<std::string>{column_def5->name()}, index6_parameters);
+    auto index_def6 =
+        IndexEMVB::Make(index_name6, std::make_shared<std::string>(), "file_name", std::vector<std::string>{column_def5->name()}, index6_parameters);
     DeferFn defer_fn([&] {
         for (auto *parameter : index3_parameters) {
             delete parameter;
@@ -545,14 +560,18 @@ TEST_P(TestTxnReplayIndex, DISABLED_test_populate_index) {
         {
             auto col3 = ColumnVector::Make(column_def3->type());
             col3->Initialize();
-            append_to_col(*col3, Value::MakeEmbedding(std::vector<float>{1.0, 2.0, 3.0, 4.0}), Value::MakeEmbedding(std::vector<float>{5.0, 6.0, 7.0, 8.0}));
+            append_to_col(*col3,
+                          Value::MakeEmbedding(std::vector<float>{1.0, 2.0, 3.0, 4.0}),
+                          Value::MakeEmbedding(std::vector<float>{5.0, 6.0, 7.0, 8.0}));
             input_block->InsertVector(col3, 2);
         }
         {
             auto col4 = ColumnVector::Make(column_def4->type());
             col4->Initialize();
-            std::pair<std::vector<float>, std::vector<int32_t>> vec{std::vector<float>{1.0, 2.0, 3.0, 4.0}, std::vector<int32_t>{100, 1000, 10000, 20000}};
-            std::pair<std::vector<float>, std::vector<int32_t>> vec2{std::vector<float>{1.0, 2.0, 3.0, 4.0}, std::vector<int32_t>{100, 2000, 10000, 20000}};
+            std::pair<std::vector<float>, std::vector<int32_t>> vec{std::vector<float>{1.0, 2.0, 3.0, 4.0},
+                                                                    std::vector<int32_t>{100, 1000, 10000, 20000}};
+            std::pair<std::vector<float>, std::vector<int32_t>> vec2{std::vector<float>{1.0, 2.0, 3.0, 4.0},
+                                                                     std::vector<int32_t>{100, 2000, 10000, 20000}};
             auto v1 = Value::MakeSparse(reinterpret_cast<const char *>(vec.first.data()),
                                         reinterpret_cast<const char *>(vec.second.data()),
                                         vec.first.size(),
@@ -601,7 +620,8 @@ TEST_P(TestTxnReplayIndex, DISABLED_test_populate_index) {
         append_a_block();
     }
     auto create_index = [&](const std::shared_ptr<IndexBase> &index_base) {
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("create index {}", *index_base->index_name_)), TransactionType::kNormal);
+        auto *txn =
+            new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("create index {}", *index_base->index_name_)), TransactionType::kNormal);
         Status status = txn->CreateIndex(*db_name, *table_name, index_base, ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);

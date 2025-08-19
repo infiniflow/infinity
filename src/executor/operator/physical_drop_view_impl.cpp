@@ -25,7 +25,7 @@ import :operator_state;
 
 namespace infinity {
 
-void PhysicalDropView::Init(QueryContext* query_context) {}
+void PhysicalDropView::Init(QueryContext *query_context) {}
 
 bool PhysicalDropView::Execute(QueryContext *, OperatorState *operator_state) {
     StorageMode storage_mode = InfinityContext::instance().storage()->GetStorageMode();

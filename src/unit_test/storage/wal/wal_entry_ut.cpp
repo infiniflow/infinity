@@ -76,7 +76,10 @@ std::shared_ptr<TableDef> MockTableDesc2() {
         }
     }
 
-    return std::make_shared<TableDef>(std::make_shared<std::string>("default_db"), std::make_shared<std::string>("tbl1"), std::make_shared<std::string>(), columns);
+    return std::make_shared<TableDef>(std::make_shared<std::string>("default_db"),
+                                      std::make_shared<std::string>("tbl1"),
+                                      std::make_shared<std::string>(),
+                                      columns);
 }
 
 WalSegmentInfo MakeSegmentInfo(size_t row_count, TxnTimeStamp commit_ts, size_t column_count) {
@@ -121,8 +124,12 @@ void MockWalFile(const std::string &wal_file_path, const std::string &ckp_file_p
         data_block->Finalize();
 
         RowID start_row(0, 0);
-        entry->cmds_.push_back(
-            std::make_shared<WalCmdAppendV2>("db1", "2", "tbl1", "1", std::vector<std::pair<RowID, u64>>{std::pair<RowID, u64>{start_row, 8192}}, data_block));
+        entry->cmds_.push_back(std::make_shared<WalCmdAppendV2>("db1",
+                                                                "2",
+                                                                "tbl1",
+                                                                "1",
+                                                                std::vector<std::pair<RowID, u64>>{std::pair<RowID, u64>{start_row, 8192}},
+                                                                data_block));
         entry->commit_ts_ = commit_ts;
 
         i32 expect_size = entry->GetSizeInBytes();
@@ -220,8 +227,11 @@ TEST_F(WalEntryTest, ReadWrite) {
     {
         std::vector<InitParameter *> parameters = {new InitParameter("metric", "ip")};
         std::shared_ptr<std::string> index_name = std::make_shared<std::string>("idx1");
-        auto index_base =
-            IndexIVF::Make(index_name, std::make_shared<std::string>("test comment"), "idx1_tbl1", std::vector<std::string>{"col1", "col2"}, parameters);
+        auto index_base = IndexIVF::Make(index_name,
+                                         std::make_shared<std::string>("test comment"),
+                                         "idx1_tbl1",
+                                         std::vector<std::string>{"col1", "col2"},
+                                         parameters);
         for (auto parameter : parameters) {
             delete parameter;
         }
@@ -323,8 +333,11 @@ TEST_F(WalEntryTest, ReadWriteV2) {
     {
         std::vector<InitParameter *> parameters = {new InitParameter("metric", "ip")};
         std::shared_ptr<std::string> index_name = std::make_shared<std::string>("idx1");
-        auto index_base =
-            IndexIVF::Make(index_name, std::make_shared<std::string>("test comment"), "idx1_tbl1", std::vector<std::string>{"col1", "col2"}, parameters);
+        auto index_base = IndexIVF::Make(index_name,
+                                         std::make_shared<std::string>("test comment"),
+                                         "idx1_tbl1",
+                                         std::vector<std::string>{"col1", "col2"},
+                                         parameters);
         for (auto parameter : parameters) {
             delete parameter;
         }
@@ -353,7 +366,8 @@ TEST_F(WalEntryTest, ReadWriteV2) {
     entry->cmds_.push_back(std::make_shared<WalCmdCheckpointV2>(int64_t(123)));
     {
         std::vector<WalSegmentInfo> new_segment_infos(3, MakeSegmentInfo(1, 0, 2));
-        entry->cmds_.push_back(std::make_shared<WalCmdCompactV2>("db1", "1", "tbl1", "2", std::move(new_segment_infos), std::vector<SegmentID>{0, 1, 2}));
+        entry->cmds_.push_back(
+            std::make_shared<WalCmdCompactV2>("db1", "1", "tbl1", "2", std::move(new_segment_infos), std::vector<SegmentID>{0, 1, 2}));
     }
     {
         WalChunkIndexInfo info;

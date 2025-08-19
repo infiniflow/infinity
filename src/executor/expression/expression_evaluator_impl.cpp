@@ -45,7 +45,9 @@ namespace infinity {
 
 void ExpressionEvaluator::Init(const DataBlock *input_data_block) { input_data_block_ = input_data_block; }
 
-void ExpressionEvaluator::Execute(const std::shared_ptr<BaseExpression> &expr, std::shared_ptr<ExpressionState> &state, std::shared_ptr<ColumnVector> &output_column) {
+void ExpressionEvaluator::Execute(const std::shared_ptr<BaseExpression> &expr,
+                                  std::shared_ptr<ExpressionState> &state,
+                                  std::shared_ptr<ColumnVector> &output_column) {
 
     switch (expr->type()) {
         case ExpressionType::kAggregate:
@@ -106,14 +108,14 @@ void ExpressionEvaluator::Execute(const std::shared_ptr<AggregateExpression> &ex
         }
         case AggregateFlag::kFinish: {
             expr->aggregate_function_.update_func_(data_state, child_output_col);
-            const char * result_ptr = expr->aggregate_function_.finalize_func_(data_state);
+            const char *result_ptr = expr->aggregate_function_.finalize_func_(data_state);
             output_column_vector->AppendByPtr(result_ptr);
             break;
         }
         case AggregateFlag::kRunAndFinish: {
             expr->aggregate_function_.init_func_(data_state);
             expr->aggregate_function_.update_func_(data_state, child_output_col);
-            const char * result_ptr = expr->aggregate_function_.finalize_func_(data_state);
+            const char *result_ptr = expr->aggregate_function_.finalize_func_(data_state);
             output_column_vector->AppendByPtr(result_ptr);
             break;
         }
@@ -204,8 +206,8 @@ void ExpressionEvaluator::Execute(const std::shared_ptr<InExpression> &expr,
 
     // in expression evaluates to a constant
     if (left_state->OutputColumnVector()->vector_type() == ColumnVectorType::kConstant) {
-        bool in_result =
-            (expr->in_type() == InType::kIn) ? expr->Exists(left_state_output->GetValueByIndex(0)) : !expr->Exists(left_state_output->GetValueByIndex(0));
+        bool in_result = (expr->in_type() == InType::kIn) ? expr->Exists(left_state_output->GetValueByIndex(0))
+                                                          : !expr->Exists(left_state_output->GetValueByIndex(0));
         for (size_t idx = 0; idx < input_data_block_->row_count(); idx++) {
             output_column_vector->buffer_->SetCompactBit(idx, in_result);
         }

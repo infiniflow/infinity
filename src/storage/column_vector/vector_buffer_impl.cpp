@@ -156,7 +156,7 @@ void VectorBuffer::ResetToInit(VectorBufferType type) {
     }
 }
 
-void VectorBuffer::Copy(char * input, size_t size) {
+void VectorBuffer::Copy(char *input, size_t size) {
     if (data_size_ < size) {
         UnrecoverableError("Attempt to copy an amount of data that cannot currently be accommodated");
     }
@@ -194,7 +194,10 @@ void VectorBuffer::SetCompactBit(size_t idx, bool val) {
     VectorBuffer::RawPointerSetCompactBit(reinterpret_cast<u8 *>(GetDataMut()), idx, val);
 }
 
-bool VectorBuffer::CompactBitIsSame(const std::shared_ptr<VectorBuffer> &lhs, size_t lhs_cnt, const std::shared_ptr<VectorBuffer> &rhs, size_t rhs_cnt) {
+bool VectorBuffer::CompactBitIsSame(const std::shared_ptr<VectorBuffer> &lhs,
+                                    size_t lhs_cnt,
+                                    const std::shared_ptr<VectorBuffer> &rhs,
+                                    size_t rhs_cnt) {
     if (lhs_cnt != rhs_cnt) {
         return false;
     }

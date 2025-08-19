@@ -129,8 +129,14 @@ std::shared_ptr<NewTxn> NewTxnManager::BeginTxnShared(std::unique_ptr<std::strin
     }
 
     // Create txn instance
-    auto new_txn =
-        std::make_shared<NewTxn>(this, new_txn_id, begin_ts, last_kv_commit_ts_, last_commit_ts_, kv_store_->GetInstance(), std::move(txn_text), txn_type);
+    auto new_txn = std::make_shared<NewTxn>(this,
+                                            new_txn_id,
+                                            begin_ts,
+                                            last_kv_commit_ts_,
+                                            last_commit_ts_,
+                                            kv_store_->GetInstance(),
+                                            std::move(txn_text),
+                                            txn_type);
 
     // Storage txn in txn manager
     txn_map_[new_txn_id] = new_txn;
@@ -140,7 +146,9 @@ std::shared_ptr<NewTxn> NewTxnManager::BeginTxnShared(std::unique_ptr<std::strin
     return new_txn;
 }
 
-NewTxn *NewTxnManager::BeginTxn(std::unique_ptr<std::string> txn_text, TransactionType txn_type) { return BeginTxnShared(std::move(txn_text), txn_type).get(); }
+NewTxn *NewTxnManager::BeginTxn(std::unique_ptr<std::string> txn_text, TransactionType txn_type) {
+    return BeginTxnShared(std::move(txn_text), txn_type).get();
+}
 
 std::unique_ptr<NewTxn> NewTxnManager::BeginReplayTxn(const std::shared_ptr<WalEntry> &wal_entry) {
     // Check if the is_running_ is true
@@ -248,8 +256,8 @@ void NewTxnManager::SendToWAL(NewTxn *txn) {
     }
     if (wait_conflict_ck_.begin()->first > commit_ts) {
         UnrecoverableError(fmt::format("NewTxnManager::SendToWAL wait_conflict_ck_.begin()->first {} > txn->CommitTS() {}",
-                                           wait_conflict_ck_.begin()->first,
-                                           txn->CommitTS()));
+                                       wait_conflict_ck_.begin()->first,
+                                       txn->CommitTS()));
     }
 
     if (txn->GetTxnState() == TxnState::kRollbacking) {
@@ -752,8 +760,8 @@ void NewTxnManager::SubmitForAllocation(std::shared_ptr<TxnAllocatorTask> txn_al
     }
     if (allocator_map_.begin()->first > commit_ts) {
         UnrecoverableError(fmt::format("NewTxnManager::SubmitForAllocation allocator_map_.begin()->first {} > txn->CommitTS() {}",
-                                           allocator_map_.begin()->first,
-                                           txn->CommitTS()));
+                                       allocator_map_.begin()->first,
+                                       txn->CommitTS()));
     }
 
     allocator_map_.at(commit_ts) = txn_allocator_task;

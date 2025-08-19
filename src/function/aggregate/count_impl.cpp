@@ -37,7 +37,7 @@ public:
 
     inline void ConstantUpdate(ValueType *__restrict, size_t, size_t count) { count_ += count; }
 
-    inline char * Finalize() { return (char *)&count_; }
+    inline char *Finalize() { return (char *)&count_; }
 
     inline static size_t Size(const DataType &) { return sizeof(i64); }
 };

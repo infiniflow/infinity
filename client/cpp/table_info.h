@@ -63,7 +63,10 @@ enum class Constraint {
 
 class ColumnDefinition {
 public:
-    ColumnDefinition(const std::string& column_name, ColumnType column_type, std::unique_ptr<ExtraTypeInfo> extra_type_info, std::set<Constraint> constraints);
+    ColumnDefinition(const std::string &column_name,
+                     ColumnType column_type,
+                     std::unique_ptr<ExtraTypeInfo> extra_type_info,
+                     std::set<Constraint> constraints);
 
 private:
     std::string column_name_;
@@ -75,7 +78,6 @@ private:
 class TableProperties {
 public:
     TableProperties() = default;
-
 
 private:
     std::map<std::string, std::string> properties_;

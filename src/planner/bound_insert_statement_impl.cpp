@@ -34,23 +34,23 @@ namespace infinity {
 
 std::shared_ptr<LogicalNode> BoundInsertStatement::BuildPlan(QueryContext *query_context) {
     const std::shared_ptr<BindContext> &bind_context = this->bind_context_;
-    
+
     auto base_table_ref = std::static_pointer_cast<BaseTableRef>(table_ref_ptr_);
-    
+
     if (select_plan_) {
         // INSERT SELECT case
         auto logical_insert = std::make_shared<LogicalInsert>(bind_context->GetNewLogicalNodeId(),
-                                                        base_table_ref->table_info_,
-                                                        bind_context->GenerateTableIndex(),
-                                                        std::vector<std::vector<std::shared_ptr<BaseExpression>>>{});
+                                                              base_table_ref->table_info_,
+                                                              bind_context->GenerateTableIndex(),
+                                                              std::vector<std::vector<std::shared_ptr<BaseExpression>>>{});
         logical_insert->set_left_node(select_plan_);
         return logical_insert;
     } else {
         // INSERT VALUES case
         auto logical_insert = std::make_shared<LogicalInsert>(bind_context->GetNewLogicalNodeId(),
-                                                        base_table_ref->table_info_,
-                                                        bind_context->GenerateTableIndex(),
-                                                        std::move(value_list_));
+                                                              base_table_ref->table_info_,
+                                                              bind_context->GenerateTableIndex(),
+                                                              std::move(value_list_));
         return logical_insert;
     }
 }

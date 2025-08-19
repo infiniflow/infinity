@@ -53,7 +53,7 @@ PhysicalMergeMatchSparse::PhysicalMergeMatchSparse(u64 id,
     : PhysicalScanBase(id, PhysicalOperatorType::kMergeMatchSparse, std::move(left), nullptr, table_index, base_table_ref, load_metas, cache_result),
       match_sparse_expr_(std::move(match_sparse_expr)), filter_expression_(std::move(filter_expression)) {}
 
-void PhysicalMergeMatchSparse::Init(QueryContext* query_context) { left_->Init(query_context); }
+void PhysicalMergeMatchSparse::Init(QueryContext *query_context) { left_->Init(query_context); }
 
 size_t PhysicalMergeMatchSparse::TaskletCount() {
     UnrecoverableError("Not Expected: TaskletCount of PhysicalMergeMatchSparse?");

@@ -30,7 +30,9 @@ std::vector<ColumnBinding> LogicalImport::GetColumnBindings() const { return {};
 
 std::shared_ptr<std::vector<std::string>> LogicalImport::GetOutputNames() const { return std::make_shared<std::vector<std::string>>(); }
 
-std::shared_ptr<std::vector<std::shared_ptr<DataType>>> LogicalImport::GetOutputTypes() const { return std::make_shared<std::vector<std::shared_ptr<DataType>>>(); }
+std::shared_ptr<std::vector<std::shared_ptr<DataType>>> LogicalImport::GetOutputTypes() const {
+    return std::make_shared<std::vector<std::shared_ptr<DataType>>>();
+}
 
 std::string LogicalImport::ToString(i64 &space) const {
     std::stringstream ss;

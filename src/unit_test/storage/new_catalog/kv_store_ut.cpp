@@ -492,4 +492,3 @@ TEST_P(TestTxnKVStoreTest, kv_store6) {
     status = kv_store->Destroy(rocksdb_tmp_path);
     EXPECT_TRUE(status.ok());
 }
-

@@ -335,7 +335,11 @@ size_t BMPIndexInMem::GetSizeInBytes() const { return bmp_handler_->GetSizeInByt
 MemIndexTracerInfo BMPIndexInMem::GetInfo() const {
     size_t mem_used = bmp_handler_->MemUsage();
     size_t row_cnt = bmp_handler_->DocNum();
-    return MemIndexTracerInfo(std::make_shared<std::string>(index_name_), std::make_shared<std::string>(table_name_), std::make_shared<std::string>(db_name_), mem_used, row_cnt);
+    return MemIndexTracerInfo(std::make_shared<std::string>(index_name_),
+                              std::make_shared<std::string>(table_name_),
+                              std::make_shared<std::string>(db_name_),
+                              mem_used,
+                              row_cnt);
 }
 
 const ChunkIndexMetaInfo BMPIndexInMem::GetChunkIndexMetaInfo() const {

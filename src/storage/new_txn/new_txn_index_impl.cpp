@@ -152,7 +152,11 @@ Status NewTxn::DumpMemIndex(const std::string &db_name, const std::string &table
     return Status::OK();
 }
 
-Status NewTxn::DumpMemIndex(const std::string &db_name, const std::string &table_name, const std::string &index_name, SegmentID segment_id, RowID begin_row_id) {
+Status NewTxn::DumpMemIndex(const std::string &db_name,
+                            const std::string &table_name,
+                            const std::string &index_name,
+                            SegmentID segment_id,
+                            RowID begin_row_id) {
     Status status;
 
     std::optional<DBMeeta> db_meta;
@@ -641,12 +645,12 @@ Status NewTxn::OptimizeIndexByParams(const std::string &db_name,
     }
 
     std::shared_ptr<WalCmd> wal_command = std::make_shared<WalCmdOptimizeV2>(db_name,
-                                                                 db_meta->db_id_str(),
-                                                                 table_name,
-                                                                 table_meta_opt->table_id_str(),
-                                                                 index_name,
-                                                                 table_index_meta_opt->index_id_str(),
-                                                                 std::move(raw_params));
+                                                                             db_meta->db_id_str(),
+                                                                             table_name,
+                                                                             table_meta_opt->table_id_str(),
+                                                                             index_name,
+                                                                             table_index_meta_opt->index_id_str(),
+                                                                             std::move(raw_params));
     wal_entry_->cmds_.push_back(wal_command);
     txn_context_ptr_->AddOperation(std::make_shared<std::string>(wal_command->ToString()));
 
@@ -901,7 +905,8 @@ NewTxn::AppendMemIndex(SegmentIndexMeta &segment_index_meta, BlockID block_id, c
             std::string index_name = *index_base->index_name_;
             SegmentID segment_id = segment_index_meta.segment_id();
             RowID begin_row_id = mem_index->GetBeginRowID();
-            std::shared_ptr<DumpMemIndexTask> dump_task = std::make_shared<DumpMemIndexTask>(db_name, table_name, index_name, segment_id, begin_row_id);
+            std::shared_ptr<DumpMemIndexTask> dump_task =
+                std::make_shared<DumpMemIndexTask>(db_name, table_name, index_name, segment_id, begin_row_id);
             DumpIndexProcessor *dump_index_processor = InfinityContext::instance().storage()->dump_index_processor();
             LOG_INFO(fmt::format("MemIndex row count {} exceeds quota {}.  Submit dump task: {}", row_count, row_quota, dump_task->ToString()));
             dump_index_processor->Submit(std::move(dump_task));
@@ -1784,7 +1789,9 @@ Status NewTxn::DumpSegmentMemIndex(SegmentIndexMeta &segment_index_meta, const C
     return Status::OK();
 }
 
-Status NewTxn::CountMemIndexGapInSegment(SegmentIndexMeta &segment_index_meta, SegmentMeta &segment_meta, std::vector<std::pair<RowID, u64>> &append_ranges) {
+Status NewTxn::CountMemIndexGapInSegment(SegmentIndexMeta &segment_index_meta,
+                                         SegmentMeta &segment_meta,
+                                         std::vector<std::pair<RowID, u64>> &append_ranges) {
     Status status;
     std::vector<ChunkID> *chunk_ids_ptr = nullptr;
     std::tie(chunk_ids_ptr, status) = segment_index_meta.GetChunkIDs1();

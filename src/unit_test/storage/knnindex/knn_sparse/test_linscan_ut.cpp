@@ -14,8 +14,8 @@
 
 module;
 
-#include <cassert>
 #include "unit_test/gtest_expand.h"
+#include <cassert>
 
 module infinity_core:ut.test_linscan;
 

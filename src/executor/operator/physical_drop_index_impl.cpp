@@ -57,7 +57,8 @@ bool PhysicalDropIndex::Execute(QueryContext *query_context, OperatorState *oper
     std::vector<std::shared_ptr<ColumnDef>> column_defs = {
         std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "OK", std::set<ConstraintType>())};
 
-    auto result_table_def_ptr = TableDef::Make(std::make_shared<std::string>("default_db"), std::make_shared<std::string>("Tables"), nullptr, column_defs);
+    auto result_table_def_ptr =
+        TableDef::Make(std::make_shared<std::string>("default_db"), std::make_shared<std::string>("Tables"), nullptr, column_defs);
     output_ = std::make_shared<DataTable>(result_table_def_ptr, TableType::kDataTable);
     operator_state->SetComplete();
     return true;

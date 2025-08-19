@@ -117,11 +117,11 @@ void ObjStat::CheckValid(const std::string &obj_key, size_t current_object_size)
         while (it2 != deleted_ranges.end()) {
             if (it1->end_ >= it2->start_) {
                 std::string error_message = fmt::format("CurrentObjFinalize Object {} deleted ranges intersect: [{}, {}), [{}, {})",
-                                                   obj_key,
-                                                   it1->start_,
-                                                   it1->end_,
-                                                   it2->start_,
-                                                   it2->end_);
+                                                        obj_key,
+                                                        it1->start_,
+                                                        it1->end_,
+                                                        it2->start_,
+                                                        it2->end_);
                 LOG_ERROR(error_message);
             }
             it1 = it2;

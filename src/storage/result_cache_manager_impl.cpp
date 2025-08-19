@@ -131,31 +131,32 @@ bool ResultCacheManager::AddCache(std::unique_ptr<CachedNodeBase> cached_node, s
     if (cached_node == nullptr) {
         return false;
     }
-    auto update_content_func = [](std::unique_ptr<CachedNodeBase> cached_node, CacheContent &old_content, std::vector<std::unique_ptr<DataBlock>> data_blocks) {
-        auto new_content = std::make_shared<CacheContent>(std::move(data_blocks), cached_node->output_names());
-        std::shared_ptr<std::vector<std::string>> new_output_names = new_content->column_names_;
-        std::shared_ptr<std::vector<std::string>> old_output_names = old_content.column_names_;
+    auto update_content_func =
+        [](std::unique_ptr<CachedNodeBase> cached_node, CacheContent &old_content, std::vector<std::unique_ptr<DataBlock>> data_blocks) {
+            auto new_content = std::make_shared<CacheContent>(std::move(data_blocks), cached_node->output_names());
+            std::shared_ptr<std::vector<std::string>> new_output_names = new_content->column_names_;
+            std::shared_ptr<std::vector<std::string>> old_output_names = old_content.column_names_;
 
-        std::vector<size_t> add_columns;
-        for (size_t i = 0; i < new_output_names->size(); ++i) {
-            const std::string &output_name = (*new_output_names)[i];
-            auto iter = std::find(old_output_names->begin(), old_output_names->end(), output_name);
-            if (iter == old_output_names->end()) {
-                add_columns.push_back(i);
+            std::vector<size_t> add_columns;
+            for (size_t i = 0; i < new_output_names->size(); ++i) {
+                const std::string &output_name = (*new_output_names)[i];
+                auto iter = std::find(old_output_names->begin(), old_output_names->end(), output_name);
+                if (iter == old_output_names->end()) {
+                    add_columns.push_back(i);
+                }
             }
-        }
-        if (add_columns.empty()) {
-            return;
-        }
-        std::unique_ptr<CacheContent> updated_content = old_content.AppendColumns(*new_content, add_columns);
-        if (!updated_content) {
-            LOG_WARN("Failed to append columns to cache content");
-            old_content = std::move(*new_content);
-        } else {
-            LOG_INFO("Success update cache content");
-            old_content = std::move(*updated_content);
-        }
-    };
+            if (add_columns.empty()) {
+                return;
+            }
+            std::unique_ptr<CacheContent> updated_content = old_content.AppendColumns(*new_content, add_columns);
+            if (!updated_content) {
+                LOG_WARN("Failed to append columns to cache content");
+                old_content = std::move(*new_content);
+            } else {
+                LOG_INFO("Success update cache content");
+                old_content = std::move(*updated_content);
+            }
+        };
     return cache_map_.AddCache(std::move(cached_node), std::move(data_blocks), update_content_func);
 }
 

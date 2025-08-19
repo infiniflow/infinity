@@ -33,7 +33,7 @@ DictionaryReader::DictionaryReader(const std::string &dict_path, const PostingFo
     if (!VirtualStore::Exists(dict_path)) {
         throw UnrecoverableException("Dictionary file does not exist ");
     }
-    
+
     int rc = MmapFile(dict_path, data_ptr_, data_len_);
     if (rc < 0) {
         throw UnrecoverableException("MmapFile failed");
@@ -42,7 +42,7 @@ DictionaryReader::DictionaryReader(const std::string &dict_path, const PostingFo
     if (data_len_ < 12) {
         throw UnrecoverableException("Dictionary file too small");
     }
-    
+
     // fst_root_addr + addr_offset(21) == fst_len
     size_t fst_root_addr = ReadU64LE(data_ptr_ + data_len_ - 4 - 8);
     size_t fst_len;
@@ -50,19 +50,19 @@ DictionaryReader::DictionaryReader(const std::string &dict_path, const PostingFo
         fst_len = 36;
     else
         fst_len = fst_root_addr + 21;
-    
+
     // Validate FST length
     if (fst_len > data_len_) {
         throw UnrecoverableException("FST length exceeds file size");
     }
-    
+
     u8 *fst_data = data_ptr_ + (data_len_ - fst_len);
-    
+
     // Validate FST data pointer
     if (fst_data < data_ptr_ || fst_data >= data_ptr_ + data_len_) {
         throw UnrecoverableException("Invalid FST data pointer");
     }
-    
+
     fst_ = std::make_unique<Fst>(fst_data, fst_len);
     s_ = std::make_unique<FstStream>(*fst_);
 }

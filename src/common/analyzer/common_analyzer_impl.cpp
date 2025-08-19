@@ -31,8 +31,8 @@ import std.compat;
 namespace infinity {
 
 CommonLanguageAnalyzer::CommonLanguageAnalyzer()
-    : Analyzer(), lowercase_string_buffer_(term_string_buffer_limit_), stemmer_(std::make_unique<Stemmer>()), case_sensitive_(false), contain_lower_(false),
-      extract_eng_stem_(true), extract_synonym_(false), cjk_(false), remove_stopwords_(false) {}
+    : Analyzer(), lowercase_string_buffer_(term_string_buffer_limit_), stemmer_(std::make_unique<Stemmer>()), case_sensitive_(false),
+      contain_lower_(false), extract_eng_stem_(true), extract_synonym_(false), cjk_(false), remove_stopwords_(false) {}
 
 CommonLanguageAnalyzer::~CommonLanguageAnalyzer() {}
 

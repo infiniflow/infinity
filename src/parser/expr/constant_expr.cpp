@@ -13,14 +13,14 @@
 // limitations under the License.
 
 #include "constant_expr.h"
+#include "cstring"
 #include "definition/column_def.h"
 #include "expr/parsed_expr.h"
 #include "parser_assert.h"
 #include "type/datetime/interval_type.h"
-#include "type/internal_types.h"
 #include "type/info/sparse_info.h"
+#include "type/internal_types.h"
 #include "type/serialize.h"
-#include "cstring"
 
 #ifndef PARESER_USE_STD_MODULE
 #define PARESER_USE_STD_MODULE 1

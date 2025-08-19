@@ -40,8 +40,8 @@ std::unique_ptr<MergeKnnBase> InitMergeKnn(KnnScanSharedData *knn_scan_shared_da
         case KnnDistanceType::kHamming: {
             const auto knn_threshold = GetKnnThreshold(knn_scan_shared_data->opt_params_);
             auto ret = std::make_unique<MergeKnn<QueryDataType, CompareMax, DistDataType>>(knn_scan_shared_data->query_count_,
-                                                                                     knn_scan_shared_data->topk_,
-                                                                                     knn_threshold);
+                                                                                           knn_scan_shared_data->topk_,
+                                                                                           knn_threshold);
             ret->Begin();
             return ret;
         }
@@ -49,8 +49,8 @@ std::unique_ptr<MergeKnnBase> InitMergeKnn(KnnScanSharedData *knn_scan_shared_da
         case KnnDistanceType::kInnerProduct: {
             const auto knn_threshold = GetKnnThreshold(knn_scan_shared_data->opt_params_);
             auto ret = std::make_unique<MergeKnn<QueryDataType, CompareMin, DistDataType>>(knn_scan_shared_data->query_count_,
-                                                                                     knn_scan_shared_data->topk_,
-                                                                                     knn_threshold);
+                                                                                           knn_scan_shared_data->topk_,
+                                                                                           knn_threshold);
             ret->Begin();
             return ret;
         }
@@ -71,7 +71,7 @@ std::unique_ptr<MergeKnnBase> MergeKnnBase::Make(KnnScanSharedData *knn_scan_sha
             return InitMergeKnn<u8, f32>(knn_scan_shared_data);
         default: {
             RecoverableError(Status::NotSupport(fmt::format("Query EmbeddingDataType: {} is not support.",
-                                                           EmbeddingType::EmbeddingDataType2String(knn_scan_shared_data->query_elem_type_))));
+                                                            EmbeddingType::EmbeddingDataType2String(knn_scan_shared_data->query_elem_type_))));
             return nullptr;
         }
     }

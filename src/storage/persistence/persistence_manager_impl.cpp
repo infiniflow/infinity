@@ -509,11 +509,11 @@ void PersistenceManager::CleanupNoLock(const ObjAddr &object_addr,
         } else if (inst_it_prev->Intersect(orig_range)) {
             // Check intersection with prev range
             UnrecoverableError(fmt::format("ObjAddr {} range to delete [{}, {}) intersects with prev one [{}, {})",
-                                               object_addr.obj_key_,
-                                               orig_range.start_,
-                                               orig_range.end_,
-                                               inst_it_prev->start_,
-                                               inst_it_prev->end_));
+                                           object_addr.obj_key_,
+                                           orig_range.start_,
+                                           orig_range.end_,
+                                           inst_it_prev->start_,
+                                           inst_it_prev->end_));
         } else if (orig_range.start_ == inst_it_prev->end_) {
             // Try merge with prev range
             range.start_ = inst_it_prev->start_;
@@ -529,11 +529,11 @@ void PersistenceManager::CleanupNoLock(const ObjAddr &object_addr,
         } else if (inst_it->Intersect(orig_range)) {
             // Check intersection with next range
             UnrecoverableError(fmt::format("ObjAddr {} range to delete [{}, {}) intersects with next one [{}, {})",
-                                               object_addr.obj_key_,
-                                               orig_range.start_,
-                                               orig_range.end_,
-                                               inst_it->start_,
-                                               inst_it->end_));
+                                           object_addr.obj_key_,
+                                           orig_range.start_,
+                                           orig_range.end_,
+                                           inst_it->start_,
+                                           inst_it->end_));
         } else if (orig_range.end_ == inst_it->start_) {
             // Try merge with next range
             range.end_ = inst_it->end_;

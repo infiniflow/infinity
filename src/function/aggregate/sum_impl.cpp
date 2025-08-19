@@ -45,7 +45,7 @@ public:
         RecoverableError(status);
     }
 
-    inline char * Finalize() {
+    inline char *Finalize() {
         Status status = Status::NotSupport("Not implemented");
         RecoverableError(status);
     }
@@ -67,7 +67,7 @@ public:
 
     inline void ConstantUpdate(const TinyIntT *__restrict input, size_t idx, size_t count) { sum_ += input[idx] * count; }
 
-    inline char * Finalize() { return (char *)&sum_; }
+    inline char *Finalize() { return (char *)&sum_; }
 
     inline static size_t Size(const DataType &) { return sizeof(i64); }
 };
@@ -83,7 +83,7 @@ public:
 
     inline void ConstantUpdate(const SmallIntT *__restrict input, size_t idx, size_t count) { sum_ += input[idx] * count; }
 
-    inline char * Finalize() { return (char *)&sum_; }
+    inline char *Finalize() { return (char *)&sum_; }
 
     inline static size_t Size(const DataType &) { return sizeof(i64); }
 };
@@ -99,7 +99,7 @@ public:
 
     inline void ConstantUpdate(const IntegerT *__restrict input, size_t idx, size_t count) { sum_ += input[idx] * count; }
 
-    inline char * Finalize() { return (char *)&sum_; }
+    inline char *Finalize() { return (char *)&sum_; }
 
     inline static size_t Size(const DataType &) { return sizeof(i64); }
 };
@@ -115,7 +115,7 @@ public:
 
     inline void ConstantUpdate(const BigIntT *__restrict input, size_t idx, size_t count) { sum_ += input[idx] * count; }
 
-    inline char * Finalize() { return (char *)&sum_; }
+    inline char *Finalize() { return (char *)&sum_; }
 
     inline static size_t Size(const DataType &) { return sizeof(i64); }
 };
@@ -131,7 +131,7 @@ public:
 
     inline void ConstantUpdate(const Float16T *__restrict input, size_t idx, size_t count) { sum_ += static_cast<float>(input[idx]) * count; }
 
-    inline char * Finalize() { return (char *)&sum_; }
+    inline char *Finalize() { return (char *)&sum_; }
 
     inline static size_t Size(const DataType &) { return sizeof(DoubleT); }
 };
@@ -147,7 +147,7 @@ public:
 
     inline void ConstantUpdate(const BFloat16T *__restrict input, size_t idx, size_t count) { sum_ += static_cast<float>(input[idx]) * count; }
 
-    inline char * Finalize() { return (char *)&sum_; }
+    inline char *Finalize() { return (char *)&sum_; }
 
     inline static size_t Size(const DataType &) { return sizeof(DoubleT); }
 };
@@ -163,7 +163,7 @@ public:
 
     inline void ConstantUpdate(const FloatT *__restrict input, size_t idx, size_t count) { sum_ += input[idx] * count; }
 
-    inline char * Finalize() { return (char *)&sum_; }
+    inline char *Finalize() { return (char *)&sum_; }
 
     inline static size_t Size(const DataType &) { return sizeof(DoubleT); }
 };
@@ -179,7 +179,7 @@ public:
 
     inline void ConstantUpdate(const DoubleT *__restrict input, size_t idx, size_t count) { sum_ += input[idx] * count; }
 
-    inline char * Finalize() { return (char *)&sum_; }
+    inline char *Finalize() { return (char *)&sum_; }
 
     inline static size_t Size(const DataType &) { return sizeof(DoubleT); }
 };

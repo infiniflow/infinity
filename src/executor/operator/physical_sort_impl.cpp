@@ -146,12 +146,13 @@ void CopyWithIndexes(const std::vector<std::unique_ptr<DataBlock>> &input_blocks
     }
 }
 
-void PhysicalSort::Init(QueryContext* query_context) {
+void PhysicalSort::Init(QueryContext *query_context) {
     auto sort_expr_count = order_by_types_.size();
     if (sort_expr_count != expressions_.size()) {
         UnrecoverableError("order_by_types_.size() != expressions_.size()");
     }
-    std::vector<std::function<std::strong_ordering(const std::shared_ptr<ColumnVector> &, u32, const std::shared_ptr<ColumnVector> &, u32)>> sort_functions;
+    std::vector<std::function<std::strong_ordering(const std::shared_ptr<ColumnVector> &, u32, const std::shared_ptr<ColumnVector> &, u32)>>
+        sort_functions;
     sort_functions.reserve(sort_expr_count);
     for (u32 i = 0; i < sort_expr_count; ++i) {
         sort_functions.emplace_back(PhysicalTop::GenerateSortFunction(order_by_types_[i], expressions_[i]));

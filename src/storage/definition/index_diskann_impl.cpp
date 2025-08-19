@@ -49,10 +49,10 @@ DiskAnnEncodeType StringToDiskAnnEncodeType(const std::string &str) {
 }
 
 std::shared_ptr<IndexBase> IndexDiskAnn::Make(std::shared_ptr<std::string> index_name,
-                                        std::shared_ptr<std::string> index_comment,
-                                        const std::string &file_name,
-                                        std::vector<std::string> column_names,
-                                        const std::vector<InitParameter *> &index_param_list) {
+                                              std::shared_ptr<std::string> index_comment,
+                                              const std::string &file_name,
+                                              std::vector<std::string> column_names,
+                                              const std::vector<InitParameter *> &index_param_list) {
     size_t R = DISKANN_R;
     size_t L = DISKANN_L;
     size_t num_pq_chunks = DISKANN_NUM_PQ_CHUNKS;

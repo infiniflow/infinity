@@ -33,7 +33,9 @@ std::vector<ColumnBinding> LogicalSort::GetColumnBindings() const { return Logic
 
 std::shared_ptr<std::vector<std::string>> LogicalSort::GetOutputNames() const { return LogicalCommonFunctionUsingLoadMeta::GetOutputNames(*this); }
 
-std::shared_ptr<std::vector<std::shared_ptr<DataType>>> LogicalSort::GetOutputTypes() const { return LogicalCommonFunctionUsingLoadMeta::GetOutputTypes(*this); }
+std::shared_ptr<std::vector<std::shared_ptr<DataType>>> LogicalSort::GetOutputTypes() const {
+    return LogicalCommonFunctionUsingLoadMeta::GetOutputTypes(*this);
+}
 
 std::string LogicalSort::ToString(i64 &space) const {
 

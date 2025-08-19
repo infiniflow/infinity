@@ -59,9 +59,8 @@ void TableDef::UnionWith(const std::shared_ptr<TableDef> &other) {
 
 bool TableDef::operator==(const TableDef &other) const {
     if (this->schema_name_.get() == nullptr || other.schema_name_.get() == nullptr || this->table_name_.get() == nullptr ||
-        other.table_name_.get() == nullptr || *(this->schema_name_) != *(other.schema_name_) ||
-        *(this->table_name_) != *(other.table_name_) || this->columns_.size() != other.columns_.size() ||
-        this->column_name2id_.size() != other.column_name2id_.size()) {
+        other.table_name_.get() == nullptr || *(this->schema_name_) != *(other.schema_name_) || *(this->table_name_) != *(other.table_name_) ||
+        this->columns_.size() != other.columns_.size() || this->column_name2id_.size() != other.column_name2id_.size()) {
         return false;
     }
     for (u32 i = 0; i < this->columns_.size(); i++) {
@@ -121,7 +120,10 @@ std::shared_ptr<TableDef> TableDef::ReadAdv(const char *&ptr, i32 maxbytes) {
     if (maxbytes < 0) {
         UnrecoverableError("ptr goes out of range when reading TableDef");
     }
-    return TableDef::Make(std::make_shared<std::string>(schema_name), std::make_shared<std::string>(table_name), std::make_shared<std::string>(table_comment), columns);
+    return TableDef::Make(std::make_shared<std::string>(schema_name),
+                          std::make_shared<std::string>(table_name),
+                          std::make_shared<std::string>(table_comment),
+                          columns);
 }
 
 } // namespace infinity

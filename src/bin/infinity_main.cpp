@@ -201,7 +201,7 @@ void RegisterSignal() {
 }
 
 void TerminateHandler() {
-   std::string message = "TerminateHandler: ";
+    std::string message = "TerminateHandler: ";
     try {
         std::exception_ptr eptr{std::current_exception()};
         if (eptr) {

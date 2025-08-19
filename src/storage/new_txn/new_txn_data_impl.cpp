@@ -205,7 +205,7 @@ Status NewTxn::Import(const std::string &db_name, const std::string &table_name,
 
     size_t input_block_count = input_blocks.size();
     size_t segment_count = input_block_count % DEFAULT_BLOCK_PER_SEGMENT == 0 ? input_block_count / DEFAULT_BLOCK_PER_SEGMENT
-                                                                             : input_block_count / DEFAULT_BLOCK_PER_SEGMENT + 1;
+                                                                              : input_block_count / DEFAULT_BLOCK_PER_SEGMENT + 1;
 
     // If the number of input blocks is 0, infinity would output
     // "IMPORT 0 Rows" instead of throwing an exception.
@@ -581,7 +581,10 @@ Status NewTxn::DeleteInner(const std::string &db_name, const std::string &table_
     return Status::OK();
 }
 
-Status NewTxn::Update(const std::string &db_name, const std::string &table_name, const std::shared_ptr<DataBlock> &input_block, const std::vector<RowID> &row_ids) {
+Status NewTxn::Update(const std::string &db_name,
+                      const std::string &table_name,
+                      const std::shared_ptr<DataBlock> &input_block,
+                      const std::vector<RowID> &row_ids) {
     this->CheckTxn(db_name);
 
     std::optional<DBMeeta> db_meta;
@@ -736,11 +739,11 @@ Status NewTxn::Compact(const std::string &db_name, const std::string &table_name
             }
         }
         auto compact_command = std::make_shared<WalCmdCompactV2>(db_name,
-                                                           db_meta->db_id_str(),
-                                                           table_name,
-                                                           table_meta.table_id_str(),
-                                                           std::move(segment_infos),
-                                                           std::move(deprecated_segment_ids));
+                                                                 db_meta->db_id_str(),
+                                                                 table_name,
+                                                                 table_meta.table_id_str(),
+                                                                 std::move(segment_infos),
+                                                                 std::move(deprecated_segment_ids));
         wal_entry_->cmds_.push_back(static_pointer_cast<WalCmd>(compact_command));
         txn_context_ptr_->AddOperation(std::make_shared<std::string>(compact_command->ToString()));
 
@@ -954,7 +957,8 @@ Status NewTxn::AppendInBlock(BlockMeta &block_meta, size_t block_offset, size_t 
 }
 
 // This function is called when block is locked
-Status NewTxn::AppendInColumn(ColumnMeta &column_meta, size_t dest_offset, size_t append_rows, const ColumnVector &column_vector, size_t source_offset) {
+Status
+NewTxn::AppendInColumn(ColumnMeta &column_meta, size_t dest_offset, size_t append_rows, const ColumnVector &column_vector, size_t source_offset) {
     ColumnVector dest_vec;
     {
         Status status = NewCatalog::GetColumnVector(column_meta, dest_offset, ColumnVectorMode::kReadWrite, dest_vec);
@@ -1204,8 +1208,9 @@ Status NewTxn::AddColumnsData(TableMeeta &table_meta, const std::vector<std::sha
     return Status::OK();
 }
 
-Status
-NewTxn::AddColumnsDataInSegment(SegmentMeta &segment_meta, const std::vector<std::shared_ptr<ColumnDef>> &column_defs, const std::vector<Value> &default_values) {
+Status NewTxn::AddColumnsDataInSegment(SegmentMeta &segment_meta,
+                                       const std::vector<std::shared_ptr<ColumnDef>> &column_defs,
+                                       const std::vector<Value> &default_values) {
     auto [block_ids_ptr, status] = segment_meta.GetBlockIDs1();
     if (!status.ok()) {
         return status;
@@ -1221,7 +1226,9 @@ NewTxn::AddColumnsDataInSegment(SegmentMeta &segment_meta, const std::vector<std
     return Status::OK();
 }
 
-Status NewTxn::AddColumnsDataInBlock(BlockMeta &block_meta, const std::vector<std::shared_ptr<ColumnDef>> &column_defs, const std::vector<Value> &default_values) {
+Status NewTxn::AddColumnsDataInBlock(BlockMeta &block_meta,
+                                     const std::vector<std::shared_ptr<ColumnDef>> &column_defs,
+                                     const std::vector<Value> &default_values) {
     // auto [block_row_count, status] = block_meta.GetRowCnt();
     auto [block_row_count, status] = block_meta.GetRowCnt1();
     if (!status.ok()) {

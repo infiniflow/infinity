@@ -46,11 +46,11 @@ std::shared_ptr<BaseExpression> HavingBinder::BuildExpression(const ParsedExpr &
             const std::shared_ptr<BaseExpression> &group_expr = bind_context_ptr->group_exprs_[groupby_index];
 
             std::shared_ptr<ColumnExpression> result = ColumnExpression::Make(group_expr->Type(),
-                                                                        bind_context_ptr->group_by_table_name_,
-                                                                        bind_context_ptr->group_by_table_index_,
-                                                                        std::to_string(groupby_index),
-                                                                        groupby_index,
-                                                                        depth);
+                                                                              bind_context_ptr->group_by_table_name_,
+                                                                              bind_context_ptr->group_by_table_index_,
+                                                                              std::to_string(groupby_index),
+                                                                              groupby_index,
+                                                                              depth);
 
             result->source_position_ = SourcePosition(bind_context_ptr->binding_context_id_, ExprSourceType::kGroupBy);
             return result;
@@ -64,11 +64,11 @@ std::shared_ptr<BaseExpression> HavingBinder::BuildExpression(const ParsedExpr &
             const std::shared_ptr<BaseExpression> &aggregate_expr = bind_context_ptr->aggregate_exprs_[aggregate_index];
 
             std::shared_ptr<ColumnExpression> result = ColumnExpression::Make(aggregate_expr->Type(),
-                                                                        bind_context_ptr->aggregate_table_name_,
-                                                                        bind_context_ptr->aggregate_table_index_,
-                                                                        std::to_string(aggregate_index),
-                                                                        aggregate_index,
-                                                                        depth);
+                                                                              bind_context_ptr->aggregate_table_name_,
+                                                                              bind_context_ptr->aggregate_table_index_,
+                                                                              std::to_string(aggregate_index),
+                                                                              aggregate_index,
+                                                                              depth);
 
             result->source_position_ = SourcePosition(bind_context_ptr->binding_context_id_, ExprSourceType::kAggregate);
             return result;
@@ -127,11 +127,11 @@ std::shared_ptr<BaseExpression> HavingBinder::BuildFuncExpr(const FunctionExpr &
 
         this->binding_agg_func_ = false;
         std::shared_ptr<ColumnExpression> result = ColumnExpression::Make(func_expr_ptr->Type(),
-                                                                    bind_context_ptr->aggregate_table_name_,
-                                                                    bind_context_ptr->aggregate_table_index_,
-                                                                    std::to_string(aggregate_index),
-                                                                    aggregate_index,
-                                                                    depth);
+                                                                          bind_context_ptr->aggregate_table_name_,
+                                                                          bind_context_ptr->aggregate_table_index_,
+                                                                          std::to_string(aggregate_index),
+                                                                          aggregate_index,
+                                                                          depth);
 
         return result;
     }

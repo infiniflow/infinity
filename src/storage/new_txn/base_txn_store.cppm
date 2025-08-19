@@ -126,7 +126,6 @@ export struct CreateTableTxnStore final : public BaseTxnStore {
     std::shared_ptr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;
 };
 
-
 export struct CreateTableSnapshotTxnStore final : public BaseTxnStore {
     CreateTableSnapshotTxnStore() : BaseTxnStore(TransactionType::kCreateTableSnapshot) {}
 
@@ -138,7 +137,6 @@ export struct CreateTableSnapshotTxnStore final : public BaseTxnStore {
     std::string ToString() const final;
     std::shared_ptr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;
 };
-
 
 export struct RestoreTableTxnStore final : public BaseTxnStore {
     RestoreTableTxnStore() : BaseTxnStore(TransactionType::kRestoreTable) {}
@@ -157,7 +155,6 @@ export struct RestoreTableTxnStore final : public BaseTxnStore {
 
     std::string ToString() const final;
     std::shared_ptr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;
-
 };
 
 export struct RestoreDatabaseTxnStore final : public BaseTxnStore {
@@ -172,7 +169,6 @@ export struct RestoreDatabaseTxnStore final : public BaseTxnStore {
     std::shared_ptr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;
 };
 
-
 export struct DropTableTxnStore final : public BaseTxnStore {
     DropTableTxnStore() : BaseTxnStore(TransactionType::kDropTable) {}
     ~DropTableTxnStore() override = default;
@@ -186,7 +182,7 @@ export struct DropTableTxnStore final : public BaseTxnStore {
     TxnTimeStamp create_ts_{};
     std::string table_key_{};
 
-    std::string ToString() const final;\
+    std::string ToString() const final;
     std::shared_ptr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;
 };
 

@@ -53,13 +53,14 @@ void PeerServerThriftService::Register(infinity_peer_server::RegisterResponse &r
         auto now = std::chrono::system_clock::now();
         auto time_since_epoch = now.time_since_epoch();
 
-        std::shared_ptr<NodeInfo> register_node_info = std::make_shared<NodeInfo>(register_node_role,
-                                                                      NodeStatus::kAlive,
-                                                                      request.node_name,
-                                                                      request.node_ip,
-                                                                      request.node_port,
-                                                                      request.txn_timestamp,
-                                                                      std::chrono::duration_cast<std::chrono::seconds>(time_since_epoch).count());
+        std::shared_ptr<NodeInfo> register_node_info =
+            std::make_shared<NodeInfo>(register_node_role,
+                                       NodeStatus::kAlive,
+                                       request.node_name,
+                                       request.node_ip,
+                                       request.node_port,
+                                       request.txn_timestamp,
+                                       std::chrono::duration_cast<std::chrono::seconds>(time_since_epoch).count());
         Status status = InfinityContext::instance().cluster_manager()->AddNodeInfo(register_node_info);
         if (status.ok()) {
             LOG_INFO(fmt::format("Node: {} registered as {}.", request.node_name, infinity_peer_server::to_string(request.node_type)));
@@ -122,13 +123,14 @@ void PeerServerThriftService::HeartBeat(infinity_peer_server::HeartBeatResponse 
 
         auto now = std::chrono::system_clock::now();
         auto time_since_epoch = now.time_since_epoch();
-        std::shared_ptr<NodeInfo> register_node_info = std::make_shared<NodeInfo>(non_leader_node_role,
-                                                                      NodeStatus::kAlive,
-                                                                      request.node_name,
-                                                                      request.node_ip,
-                                                                      request.node_port,
-                                                                      request.txn_timestamp,
-                                                                      std::chrono::duration_cast<std::chrono::seconds>(time_since_epoch).count());
+        std::shared_ptr<NodeInfo> register_node_info =
+            std::make_shared<NodeInfo>(non_leader_node_role,
+                                       NodeStatus::kAlive,
+                                       request.node_name,
+                                       request.node_ip,
+                                       request.node_port,
+                                       request.txn_timestamp,
+                                       std::chrono::duration_cast<std::chrono::seconds>(time_since_epoch).count());
 
         Status status = InfinityContext::instance().cluster_manager()->UpdateNodeInfoByHeartBeat(register_node_info,
                                                                                                  response.other_nodes,

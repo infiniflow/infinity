@@ -35,12 +35,12 @@ namespace infinity {
 
 void LogicalMatchTensorScan::InitExtraOptions() {
     static const std::set<std::string> valid_options = {"topn",
-                                                   "threshold",
-                                                   "emvb_centroid_nprobe",
-                                                   "emvb_threshold_first",
-                                                   "emvb_n_doc_to_score",
-                                                   "emvb_n_doc_out_second_stage",
-                                                   "emvb_threshold_final"};
+                                                        "threshold",
+                                                        "emvb_centroid_nprobe",
+                                                        "emvb_threshold_first",
+                                                        "emvb_n_doc_to_score",
+                                                        "emvb_n_doc_out_second_stage",
+                                                        "emvb_threshold_final"};
     auto match_tensor_expr = static_cast<MatchTensorExpression *>(query_expression_.get());
     SearchOptions options(match_tensor_expr->options_text_);
     for (const auto &[x, _] : options.options_) {

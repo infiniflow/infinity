@@ -82,7 +82,7 @@ PhysicalFusion::PhysicalFusion(const u64 id,
 
 PhysicalFusion::~PhysicalFusion() {}
 
-void PhysicalFusion::Init(QueryContext* query_context) {
+void PhysicalFusion::Init(QueryContext *query_context) {
     {
         std::string &method = fusion_expr_->method_;
         std::string to_lower_method;
@@ -171,8 +171,8 @@ void PhysicalFusion::ExecuteRRFWeighted(const std::map<u64, std::vector<std::uni
         for (const std::unique_ptr<DataBlock> &input_data_block : input_blocks) {
             if (input_data_block->column_count() != GetOutputTypes()->size()) {
                 UnrecoverableError(fmt::format("input_data_block column count {} is incorrect, expect {}.",
-                                                   input_data_block->column_count(),
-                                                   GetOutputTypes()->size()));
+                                               input_data_block->column_count(),
+                                               GetOutputTypes()->size()));
             }
             auto &row_id_column = *input_data_block->column_vectors[input_data_block->column_count() - 1];
             auto row_ids = reinterpret_cast<RowID *>(row_id_column.data());
@@ -265,7 +265,7 @@ void PhysicalFusion::ExecuteRRFWeighted(const std::map<u64, std::vector<std::uni
                 if (!doc.mask_[i])
                     continue;
                 // Normalize the child score in R to [0, 1]
-                double normalized_score = std::atan(doc.child_scores_[i]) / std::numbers::pi  + 0.5;
+                double normalized_score = std::atan(doc.child_scores_[i]) / std::numbers::pi + 0.5;
                 if (!min_heaps[i])
                     normalized_score = 1.0 - normalized_score;
                 doc.fusion_score_ += weights[i] * normalized_score;
@@ -358,8 +358,8 @@ void PhysicalFusion::ExecuteMatchTensor(QueryContext *query_context,
             const std::unique_ptr<DataBlock> &input_data_block = input_blocks[block_id];
             if (input_data_block->column_count() != GetOutputTypes()->size()) {
                 UnrecoverableError(fmt::format("input_data_block column count {} is incorrect, expect {}.",
-                                                   input_data_block->column_count(),
-                                                   GetOutputTypes()->size()));
+                                               input_data_block->column_count(),
+                                               GetOutputTypes()->size()));
             }
             auto &row_id_column = *input_data_block->column_vectors[input_data_block->column_count() - 1];
             auto row_ids = reinterpret_cast<RowID *>(row_id_column.data());

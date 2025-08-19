@@ -106,11 +106,11 @@ void ResultCacheGetter::ApplyToPlan(QueryContext *query_context_ptr, std::shared
         } else {
             LOG_INFO(fmt::format("Cache found for match node {}", op->node_id()));
             auto logical_read_cache = std::make_shared<LogicalReadCache>(op->node_id(),
-                                                                   op->operator_type(),
-                                                                   base_table_ref,
-                                                                   std::move(cache_output->cache_content_),
-                                                                   std::move(cache_output->column_map_),
-                                                                   is_min_heap);
+                                                                         op->operator_type(),
+                                                                         base_table_ref,
+                                                                         std::move(cache_output->cache_content_),
+                                                                         std::move(cache_output->column_map_),
+                                                                         is_min_heap);
             logical_read_cache->set_left_node(op->left_node());
             logical_read_cache->set_right_node(op->right_node());
             op = logical_read_cache;

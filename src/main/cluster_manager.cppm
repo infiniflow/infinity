@@ -50,10 +50,12 @@ public:
     NodeRole GetNodeRole() const { return current_node_role_; }
 
 private:
-    std::tuple<std::shared_ptr<PeerClient>, Status> ConnectToServerNoLock(const std::string &from_node_name, const std::string &server_ip, i64 server_port);
-    std::shared_ptr<NodeInfo> this_node_;                   // Used by leader and follower/learner
-    std::map<std::string, std::shared_ptr<NodeInfo>> other_node_map_; // Used by leader and follower/learner
-                                                      // std::vector<std::shared_ptr<NodeInfo>> other_nodes_; // Used by leader and follower/learner
+    std::tuple<std::shared_ptr<PeerClient>, Status>
+    ConnectToServerNoLock(const std::string &from_node_name, const std::string &server_ip, i64 server_port);
+    std::shared_ptr<NodeInfo> this_node_; // Used by leader and follower/learner
+    std::map<std::string, std::shared_ptr<NodeInfo>>
+        other_node_map_; // Used by leader and follower/learner
+                         // std::vector<std::shared_ptr<NodeInfo>> other_nodes_; // Used by leader and follower/learner
     std::atomic<NodeRole> current_node_role_{NodeRole::kUnInitialized};
     mutable std::mutex cluster_mutex_;
 

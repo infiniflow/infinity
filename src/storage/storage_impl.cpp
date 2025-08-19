@@ -80,10 +80,10 @@ Status Storage::InitToAdmin() {
         }
 
         wal_mgr_ = std::make_unique<WalManager>(this,
-                                          config_ptr_->WALDir(),
-                                          config_ptr_->DataDir(),
-                                          config_ptr_->WALCompactThreshold(),
-                                          config_ptr_->FlushMethodAtCommit());
+                                                config_ptr_->WALDir(),
+                                                config_ptr_->DataDir(),
+                                                config_ptr_->WALCompactThreshold(),
+                                                config_ptr_->FlushMethodAtCommit());
 
         switch (config_ptr_->StorageType()) {
             case StorageType::kLocal: {
@@ -125,7 +125,8 @@ Status Storage::InitToAdmin() {
                 persistence_manager_.reset();
             }
             i64 persistence_object_size_limit = config_ptr_->PersistenceObjectSizeLimit();
-            persistence_manager_ = std::make_unique<PersistenceManager>(persistence_dir, config_ptr_->DataDir(), (size_t)persistence_object_size_limit);
+            persistence_manager_ =
+                std::make_unique<PersistenceManager>(persistence_dir, config_ptr_->DataDir(), (size_t)persistence_object_size_limit);
         }
 
         current_storage_mode_ = StorageMode::kAdmin;
@@ -196,10 +197,10 @@ Status Storage::AdminToReader() {
         buffer_mgr_.reset();
     }
     buffer_mgr_ = std::make_unique<BufferManager>(config_ptr_->BufferManagerSize(),
-                                            std::make_shared<std::string>(config_ptr_->DataDir()),
-                                            std::make_shared<std::string>(config_ptr_->TempDir()),
-                                            persistence_manager_.get(),
-                                            config_ptr_->LRUNum());
+                                                  std::make_shared<std::string>(config_ptr_->DataDir()),
+                                                  std::make_shared<std::string>(config_ptr_->TempDir()),
+                                                  persistence_manager_.get(),
+                                                  config_ptr_->LRUNum());
     buffer_mgr_->Start();
 
     LOG_INFO("No checkpoint found in READER mode, waiting for log replication");
@@ -242,10 +243,10 @@ Status Storage::AdminToWriter() {
         buffer_mgr_.reset();
     }
     buffer_mgr_ = std::make_unique<BufferManager>(config_ptr_->BufferManagerSize(),
-                                            std::make_shared<std::string>(config_ptr_->DataDir()),
-                                            std::make_shared<std::string>(config_ptr_->TempDir()),
-                                            persistence_manager_.get(),
-                                            config_ptr_->LRUNum());
+                                                  std::make_shared<std::string>(config_ptr_->DataDir()),
+                                                  std::make_shared<std::string>(config_ptr_->TempDir()),
+                                                  persistence_manager_.get(),
+                                                  config_ptr_->LRUNum());
     buffer_mgr_->Start();
 
     // Must init catalog before txn manager.
@@ -556,10 +557,10 @@ Status Storage::WriterToAdmin() {
 
     // wal_manager stop won't reset many member. We need to recreate the wal_manager object.
     wal_mgr_ = std::make_unique<WalManager>(this,
-                                      config_ptr_->WALDir(),
-                                      config_ptr_->DataDir(),
-                                      config_ptr_->WALCompactThreshold(),
-                                      config_ptr_->FlushMethodAtCommit());
+                                            config_ptr_->WALDir(),
+                                            config_ptr_->DataDir(),
+                                            config_ptr_->WALCompactThreshold(),
+                                            config_ptr_->FlushMethodAtCommit());
 
     std::unique_lock<std::mutex> lock(mutex_);
     current_storage_mode_ = StorageMode::kAdmin;

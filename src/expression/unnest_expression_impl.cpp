@@ -31,7 +31,8 @@ import data_type;
 
 namespace infinity {
 
-UnnestExpression::UnnestExpression(std::shared_ptr<BaseExpression> column_expression) : BaseExpression(ExpressionType::kUnnest, {column_expression}) {}
+UnnestExpression::UnnestExpression(std::shared_ptr<BaseExpression> column_expression)
+    : BaseExpression(ExpressionType::kUnnest, {column_expression}) {}
 
 DataType UnnestExpression::Type() const {
     const auto &expr = arguments_[0];

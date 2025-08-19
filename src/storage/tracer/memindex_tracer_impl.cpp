@@ -43,7 +43,8 @@ namespace infinity {
 void MemIndexTracer::InitMemUsed() {
     size_t cur_index_memory = 0;
     auto *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
-    std::shared_ptr<NewTxn> new_txn_shared = new_txn_mgr->BeginTxnShared(std::make_unique<std::string>("Init mem index tracer"), TransactionType::kNormal);
+    std::shared_ptr<NewTxn> new_txn_shared =
+        new_txn_mgr->BeginTxnShared(std::make_unique<std::string>("Init mem index tracer"), TransactionType::kNormal);
     std::vector<std::shared_ptr<MemIndexDetail>> mem_index_details = GetAllMemIndexes(new_txn_shared.get());
     for (auto &mem_index_detail : mem_index_details) {
         if (mem_index_detail->is_emvb_index_) {
@@ -121,10 +122,10 @@ std::vector<std::shared_ptr<DumpMemIndexTask>> MemIndexTracer::MakeDumpTask() {
         }
 
         auto dump_task = std::make_shared<DumpMemIndexTask>(mem_index_detail->db_name_,
-                                                      mem_index_detail->table_name_,
-                                                      mem_index_detail->index_name_,
-                                                      mem_index_detail->segment_id_,
-                                                      mem_index_detail->begin_row_id_);
+                                                            mem_index_detail->table_name_,
+                                                            mem_index_detail->index_name_,
+                                                            mem_index_detail->segment_id_,
+                                                            mem_index_detail->begin_row_id_);
         dump_tasks.push_back(std::move(dump_task));
         if (!mem_index_detail->is_emvb_index_) {
             break;
@@ -193,12 +194,14 @@ std::vector<std::shared_ptr<MemIndexDetail>> BGMemIndexTracer::GetAllMemIndexes(
 
     // Sort the mem indexes.
     // EMVB indexes will be sorted to the front of the list. Non-EMVB indexes will be sorted by mem_used_ in descending order.
-    std::sort(mem_index_details.begin(), mem_index_details.end(), [](const std::shared_ptr<MemIndexDetail> &lhs, const std::shared_ptr<MemIndexDetail> &rhs) {
-        if (lhs->is_emvb_index_ != rhs->is_emvb_index_) {
-            return lhs->is_emvb_index_;
-        }
-        return lhs->mem_used_ > rhs->mem_used_;
-    });
+    std::sort(mem_index_details.begin(),
+              mem_index_details.end(),
+              [](const std::shared_ptr<MemIndexDetail> &lhs, const std::shared_ptr<MemIndexDetail> &rhs) {
+                  if (lhs->is_emvb_index_ != rhs->is_emvb_index_) {
+                      return lhs->is_emvb_index_;
+                  }
+                  return lhs->mem_used_ > rhs->mem_used_;
+              });
     return mem_index_details;
 }
 

@@ -40,7 +40,7 @@ import array_info;
 
 namespace infinity {
 
-void PhysicalUnnest::Init(QueryContext* query_context) {}
+void PhysicalUnnest::Init(QueryContext *query_context) {}
 
 namespace {
 
@@ -73,7 +73,7 @@ std::vector<std::unique_ptr<DataBlock>> MakeDataBlocks(const std::vector<std::ve
     }
     return data_blocks;
 }
-}
+} // namespace
 
 bool PhysicalUnnest::Execute(QueryContext *, OperatorState *operator_state) {
     OperatorState *prev_op_state = operator_state->prev_op_state_;

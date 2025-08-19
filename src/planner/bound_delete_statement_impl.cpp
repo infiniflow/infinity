@@ -76,9 +76,9 @@ BoundDeleteStatement::BuildBaseTable(std::shared_ptr<TableRef> &table_ref, Query
 }
 
 std::shared_ptr<LogicalNode> BoundDeleteStatement::BuildFilter(std::shared_ptr<LogicalNode> &root,
-                                                         std::vector<std::shared_ptr<BaseExpression>> &conditions,
-                                                         QueryContext *query_context,
-                                                         const std::shared_ptr<BindContext> &bind_context) {
+                                                               std::vector<std::shared_ptr<BaseExpression>> &conditions,
+                                                               QueryContext *query_context,
+                                                               const std::shared_ptr<BindContext> &bind_context) {
     for (auto &cond : conditions) {
         // 1. Go through all the expression to find subquery
         //        VisitExpression(cond,
@@ -118,9 +118,9 @@ void BoundDeleteStatement::BuildSubquery(std::shared_ptr<LogicalNode> &root,
 }
 
 std::shared_ptr<BaseExpression> BoundDeleteStatement::UnnestSubquery(std::shared_ptr<LogicalNode> &root,
-                                                               std::shared_ptr<BaseExpression> &condition,
-                                                               QueryContext *query_context,
-                                                               const std::shared_ptr<BindContext> &) {
+                                                                     std::shared_ptr<BaseExpression> &condition,
+                                                                     QueryContext *query_context,
+                                                                     const std::shared_ptr<BindContext> &) {
     building_subquery_ = true;
     //    std::unique_ptr<QueryBinder> query_binder_ptr = std::make_unique<QueryBinder>(query_context,
     //                                                                      bind_context);

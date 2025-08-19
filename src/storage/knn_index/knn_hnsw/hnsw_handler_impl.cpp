@@ -184,11 +184,11 @@ std::unique_ptr<HnswHandler> HnswHandler::Make(const IndexBase *index_base, cons
 }
 
 size_t HnswHandler::InsertVecs(SegmentOffset block_offset,
-                              const ColumnVector &col,
-                              BlockOffset offset,
-                              BlockOffset row_count,
-                              const HnswInsertConfig &config,
-                              size_t kBuildBucketSize) {
+                               const ColumnVector &col,
+                               BlockOffset offset,
+                               BlockOffset row_count,
+                               const HnswInsertConfig &config,
+                               size_t kBuildBucketSize) {
     size_t mem_usage{};
     std::visit(
         [&](auto &&index) {
@@ -472,7 +472,11 @@ std::unique_ptr<HnswIndexInMem> HnswIndexInMem::Make(const IndexBase *index_base
 
 MemIndexTracerInfo HnswIndexInMem::GetInfo() const {
     auto [mem_used, row_cnt] = hnsw_handler_->GetInfo();
-    return MemIndexTracerInfo(std::make_shared<std::string>(index_name_), std::make_shared<std::string>(table_name_), std::make_shared<std::string>(db_name_), mem_used, row_cnt);
+    return MemIndexTracerInfo(std::make_shared<std::string>(index_name_),
+                              std::make_shared<std::string>(table_name_),
+                              std::make_shared<std::string>(db_name_),
+                              mem_used,
+                              row_cnt);
 }
 
 void HnswIndexInMem::InsertVecs(SegmentOffset block_offset,

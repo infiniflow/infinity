@@ -312,10 +312,13 @@ public:
 };
 
 template <LogicalType column_logical_type>
-std::shared_ptr<IVFIndexInMem> GetNewIVFIndexInMem(const DataType *column_data_type, const RowID begin_row_id, const IndexIVFOption &index_ivf_option) {
+std::shared_ptr<IVFIndexInMem>
+GetNewIVFIndexInMem(const DataType *column_data_type, const RowID begin_row_id, const IndexIVFOption &index_ivf_option) {
     const auto *embedding_info_ptr = static_cast<const EmbeddingInfo *>(column_data_type->type_info().get());
     auto GetResult = [&]<EmbeddingDataType embedding_data_type> {
-        return std::make_shared<IVFIndexInMemT<column_logical_type, embedding_data_type>>(begin_row_id, index_ivf_option, embedding_info_ptr->Dimension());
+        return std::make_shared<IVFIndexInMemT<column_logical_type, embedding_data_type>>(begin_row_id,
+                                                                                          index_ivf_option,
+                                                                                          embedding_info_ptr->Dimension());
     };
     switch (embedding_info_ptr->Type()) {
         case EmbeddingDataType::kElemInt8: {

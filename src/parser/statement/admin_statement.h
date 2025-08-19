@@ -93,5 +93,5 @@ public:
     std::optional<std::string> export_path_{};
 };
 
-}
+} // namespace infinity
 // namespace infinity

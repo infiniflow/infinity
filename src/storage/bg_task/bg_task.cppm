@@ -144,7 +144,11 @@ public:
 
 export class DumpMemIndexTask final : public BGTask {
 public:
-    DumpMemIndexTask(const std::string &db_name, const std::string &table_name, const std::string &index_name, SegmentID segment_id, RowID begin_row_id = RowID());
+    DumpMemIndexTask(const std::string &db_name,
+                     const std::string &table_name,
+                     const std::string &index_name,
+                     SegmentID segment_id,
+                     RowID begin_row_id = RowID());
 
     ~DumpMemIndexTask() override = default;
 
@@ -168,7 +172,10 @@ public:
 
 export class AppendMemIndexTask final : public BGTask {
 public:
-    AppendMemIndexTask(const std::shared_ptr<MemIndex> &mem_index, const std::shared_ptr<ColumnVector> &input_column, BlockOffset offset, BlockOffset row_cnt);
+    AppendMemIndexTask(const std::shared_ptr<MemIndex> &mem_index,
+                       const std::shared_ptr<ColumnVector> &input_column,
+                       BlockOffset offset,
+                       BlockOffset row_cnt);
 
     ~AppendMemIndexTask() override = default;
 

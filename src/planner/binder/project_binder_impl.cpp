@@ -90,11 +90,11 @@ std::shared_ptr<BaseExpression> ProjectBinder::BuildExpression(const ParsedExpr 
         const std::shared_ptr<BaseExpression> &group_expr = bind_context_ptr->group_exprs_[groupby_index];
 
         std::shared_ptr<ColumnExpression> result = ColumnExpression::Make(group_expr->Type(),
-                                                                    bind_context_ptr->group_by_table_name_,
-                                                                    bind_context_ptr->group_by_table_index_,
-                                                                    expr_name,
-                                                                    groupby_index,
-                                                                    depth);
+                                                                          bind_context_ptr->group_by_table_name_,
+                                                                          bind_context_ptr->group_by_table_index_,
+                                                                          expr_name,
+                                                                          groupby_index,
+                                                                          depth);
 
         result->source_position_ = SourcePosition(bind_context_ptr->binding_context_id_, ExprSourceType::kGroupBy);
         return result;
@@ -106,11 +106,11 @@ std::shared_ptr<BaseExpression> ProjectBinder::BuildExpression(const ParsedExpr 
         const std::shared_ptr<BaseExpression> &aggregate_expr = bind_context_ptr->aggregate_exprs_[aggregate_index];
 
         std::shared_ptr<ColumnExpression> result = ColumnExpression::Make(aggregate_expr->Type(),
-                                                                    bind_context_ptr->aggregate_table_name_,
-                                                                    bind_context_ptr->aggregate_table_index_,
-                                                                    expr_name,
-                                                                    aggregate_index,
-                                                                    depth);
+                                                                          bind_context_ptr->aggregate_table_name_,
+                                                                          bind_context_ptr->aggregate_table_index_,
+                                                                          expr_name,
+                                                                          aggregate_index,
+                                                                          depth);
 
         result->source_position_ = SourcePosition(bind_context_ptr->binding_context_id_, ExprSourceType::kAggregate);
         return result;
@@ -123,11 +123,11 @@ std::shared_ptr<BaseExpression> ProjectBinder::BuildExpression(const ParsedExpr 
             const std::shared_ptr<BaseExpression> &aggregate_expr = bind_context_ptr->aggregate_exprs_[aggregate_index];
 
             std::shared_ptr<ColumnExpression> result = ColumnExpression::Make(aggregate_expr->Type(),
-                                                                        bind_context_ptr->aggregate_table_name_,
-                                                                        bind_context_ptr->aggregate_table_index_,
-                                                                        expr_name,
-                                                                        aggregate_index,
-                                                                        depth);
+                                                                              bind_context_ptr->aggregate_table_name_,
+                                                                              bind_context_ptr->aggregate_table_index_,
+                                                                              expr_name,
+                                                                              aggregate_index,
+                                                                              depth);
 
             result->source_position_ = SourcePosition(bind_context_ptr->binding_context_id_, ExprSourceType::kAggregate);
             return result;
@@ -160,11 +160,11 @@ std::shared_ptr<BaseExpression> ProjectBinder::BuildFuncExpr(const FunctionExpr 
         bind_context_ptr->aggregate_index_by_name_[expr_name] = aggregate_index;
 
         std::shared_ptr<ColumnExpression> column_expr_ptr = ColumnExpression::Make(func_expr_ptr->Type(),
-                                                                             bind_context_ptr->aggregate_table_name_,
-                                                                             bind_context_ptr->aggregate_table_index_,
-                                                                             expr_name,
-                                                                             aggregate_index,
-                                                                             depth);
+                                                                                   bind_context_ptr->aggregate_table_name_,
+                                                                                   bind_context_ptr->aggregate_table_index_,
+                                                                                   expr_name,
+                                                                                   aggregate_index,
+                                                                                   depth);
 
         column_expr_ptr->source_position_ = SourcePosition(bind_context_ptr->binding_context_id_, ExprSourceType::kAggregate);
         this->binding_agg_func_ = false;

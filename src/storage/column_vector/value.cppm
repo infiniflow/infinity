@@ -138,12 +138,12 @@ public:
         : ExtraValueInfo(ExtraValueInfoType::EMBEDDING_VALUE_INFO), data_(std::move(data)), len_(len) {}
 
     // Also used for tensor info
-    static std::shared_ptr<EmbeddingValueInfo> MakeTensorValueInfo(const char * ptr, size_t bytes);
+    static std::shared_ptr<EmbeddingValueInfo> MakeTensorValueInfo(const char *ptr, size_t bytes);
 
     static std::shared_ptr<EmbeddingValueInfo> MakeTensorValueInfo(const std::vector<std::pair<char *, size_t>> &ptr_bytes);
 
     // Also used for multivector info
-    static std::shared_ptr<EmbeddingValueInfo> MakeMultiVectorValueInfo(const char * ptr, size_t bytes);
+    static std::shared_ptr<EmbeddingValueInfo> MakeMultiVectorValueInfo(const char *ptr, size_t bytes);
 
     static std::shared_ptr<EmbeddingValueInfo> MakeMultiVectorValueInfo(const std::vector<std::pair<char *, size_t>> &ptr_bytes);
 
@@ -161,7 +161,7 @@ export struct TensorArrayValueInfo : public ExtraValueInfo {
     static constexpr ExtraValueInfoType TYPE = ExtraValueInfoType::TENSORARRAY_VALUE_INFO;
     friend struct Value;
     TensorArrayValueInfo() : ExtraValueInfo(ExtraValueInfoType::TENSORARRAY_VALUE_INFO) {}
-    void AppendTensor(const char * ptr, size_t bytes) { member_tensor_data_.emplace_back(EmbeddingValueInfo::MakeTensorValueInfo(ptr, bytes)); }
+    void AppendTensor(const char *ptr, size_t bytes) { member_tensor_data_.emplace_back(EmbeddingValueInfo::MakeTensorValueInfo(ptr, bytes)); }
     void AppendTensor(const std::vector<std::pair<char *, size_t>> &ptr_bytes) {
         member_tensor_data_.emplace_back(EmbeddingValueInfo::MakeTensorValueInfo(ptr_bytes));
     }
@@ -283,13 +283,13 @@ public:
         return value;
     }
 
-    static Value MakeEmbedding(const char * ptr, std::shared_ptr<TypeInfo> type_info_ptr);
+    static Value MakeEmbedding(const char *ptr, std::shared_ptr<TypeInfo> type_info_ptr);
 
-    static Value MakeMultiVector(const char * ptr, size_t bytes, std::shared_ptr<TypeInfo> type_info_ptr);
+    static Value MakeMultiVector(const char *ptr, size_t bytes, std::shared_ptr<TypeInfo> type_info_ptr);
 
     static Value MakeMultiVector(const std::vector<std::pair<char *, size_t>> &ptr_bytes, std::shared_ptr<TypeInfo> type_info_ptr);
 
-    static Value MakeTensor(const char * ptr, size_t bytes, std::shared_ptr<TypeInfo> type_info_ptr);
+    static Value MakeTensor(const char *ptr, size_t bytes, std::shared_ptr<TypeInfo> type_info_ptr);
 
     static Value MakeTensor(const std::vector<std::pair<char *, size_t>> &ptr_bytes, std::shared_ptr<TypeInfo> type_info_ptr);
 
@@ -325,9 +325,10 @@ public:
 
     static Value MakeSparse(const char *raw_data_ptr, const char *raw_idx_ptr, size_t nnz, const std::shared_ptr<TypeInfo> type_info);
 
-    static Value MakeSparse(size_t nnz, std::unique_ptr<char[]> indice_ptr, std::unique_ptr<char[]> data_ptr, const std::shared_ptr<TypeInfo> type_info);
+    static Value
+    MakeSparse(size_t nnz, std::unique_ptr<char[]> indice_ptr, std::unique_ptr<char[]> data_ptr, const std::shared_ptr<TypeInfo> type_info);
 
-    void AppendToTensorArray(const char * ptr, size_t bytes);
+    void AppendToTensorArray(const char *ptr, size_t bytes);
 
     void AppendToTensorArray(const std::vector<std::pair<char *, size_t>> &ptr_bytes);
 

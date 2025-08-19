@@ -25,11 +25,10 @@ import query_result;
 import query_context;
 import request_test;
 
-#include <thread>
-#include <mutex>
-#include <condition_variable>
 #include <chrono>
-
+#include <condition_variable>
+#include <mutex>
+#include <thread>
 
 using namespace infinity;
 
@@ -38,54 +37,54 @@ public:
     std::mutex mtx_{};
     std::condition_variable cv_{};
     bool ready_{false};
-    
+
     std::shared_ptr<TableSnapshotInfo> table_snapshot_;
-    
+
     void SetUp() override {
         NewRequestTest::SetUp();
         SetupTestTable();
     }
-    
+
     void SetupTestTable() {
         using namespace infinity;
         NewTxnManager *txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
 
         // Create a table to snapshot
         NewTxn *create_table_txn = txn_mgr->BeginTxn(std::make_unique<String>("create table"), TransactionType::kNormal);
-        
+
         Vector<std::shared_ptr<ColumnDef>> columns;
         {
             std::shared_ptr<DataType> col_type = std::make_shared<DataType>(LogicalType::kInteger);
             std::shared_ptr<ColumnDef> col_def = std::make_shared<ColumnDef>(0, col_type, "col1", std::set<ConstraintType>());
             columns.emplace_back(col_def);
         }
-        
+
         std::shared_ptr<TableDef> table_def = std::make_shared<TableDef>(std::make_shared<String>("default_db"),
-                                                            std::make_shared<String>("test_table"),
-                                                            std::make_shared<String>(""),
-                                                            columns);
-        
+                                                                         std::make_shared<String>("test_table"),
+                                                                         std::make_shared<String>(""),
+                                                                         columns);
+
         Status status = create_table_txn->CreateTable("default_db", table_def, ConflictType::kError);
         EXPECT_TRUE(status.ok());
         txn_mgr->CommitTxn(create_table_txn);
 
         // Insert data into the table
         NewTxn *insert_txn = txn_mgr->BeginTxn(std::make_unique<String>("insert data"), TransactionType::kNormal);
-        
+
         Vector<std::shared_ptr<ColumnVector>> column_vectors;
         {
             auto column_vector = std::make_shared<ColumnVector>(table_def->columns()[0]->type());
             column_vector->Initialize();
-            
+
             for (size_t i = 1; i <= 3; i++) {
                 column_vector->AppendValue(Value::MakeInt(i));
             }
             column_vectors.push_back(column_vector);
         }
-        
+
         auto data_block = DataBlock::Make();
         data_block->Init(column_vectors);
-        
+
         status = insert_txn->Append("default_db", "test_table", data_block);
         EXPECT_TRUE(status.ok());
         txn_mgr->CommitTxn(insert_txn);
@@ -104,9 +103,7 @@ public:
     }
 };
 
-INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
-                         TableSnapshotTest,
-                         ::testing::Values(BaseTestParamStr::NEW_CONFIG_PATH));    
+INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams, TableSnapshotTest, ::testing::Values(BaseTestParamStr::NEW_CONFIG_PATH));
 
 TEST_P(TableSnapshotTest, test_restore_table_rollback_basic) {
     using namespace infinity;
@@ -114,14 +111,14 @@ TEST_P(TableSnapshotTest, test_restore_table_rollback_basic) {
 
     // Test 1: Successful restore
     NewTxn *restore_txn = txn_mgr->BeginTxn(std::make_unique<String>("restore table"), TransactionType::kNormal);
-    
+
     // Deserialize the snapshot info
     String snapshot_dir = InfinityContext::instance().config()->SnapshotDir();
     std::shared_ptr<TableSnapshotInfo> table_snapshot;
     Status status;
     std::tie(table_snapshot, status) = TableSnapshotInfo::Deserialize(snapshot_dir, "test_snapshot");
     EXPECT_TRUE(status.ok());
-    
+
     // Attempt to restore table
     status = restore_txn->RestoreTableSnapshot("default_db", table_snapshot);
     EXPECT_TRUE(status.ok());
@@ -140,15 +137,15 @@ TEST_P(TableSnapshotTest, test_restore_table_rollback_basic) {
 
     // Test 2: Rollback restore
     NewTxn *restore_txn1 = txn_mgr->BeginTxn(std::make_unique<String>("restore table"), TransactionType::kNormal);
-    
+
     // Deserialize the snapshot info again
     std::tie(table_snapshot, status) = TableSnapshotInfo::Deserialize(snapshot_dir, "test_snapshot");
     EXPECT_TRUE(status.ok());
-    
+
     // Attempt to restore table
     status = restore_txn1->RestoreTableSnapshot("default_db", table_snapshot);
     EXPECT_TRUE(status.ok());
-    
+
     // Now rollback the transaction
     status = restore_txn1->Rollback();
     EXPECT_TRUE(status.ok());
@@ -159,7 +156,6 @@ TEST_P(TableSnapshotTest, test_restore_table_rollback_basic) {
     auto [table_info, check_status] = check_txn->GetTableInfo("default_db", "test_table");
     EXPECT_FALSE(check_status.ok()); // Table should not exist after rollback
     txn_mgr->CommitTxn(check_txn);
-    
 }
 
 TEST_P(TableSnapshotTest, test_restore_table_create_table_multithreaded) {
@@ -325,17 +321,16 @@ TEST_P(TableSnapshotTest, test_show_snapshot_multithreaded) {
         EXPECT_TRUE(ok);
     }
 
-
     auto thread_create_snapshot1 = [this]() {
-            String create_snapshot_sql = "create snapshot conflict_snapshot on table t1";
-            std::unique_ptr<QueryContext> query_context = MakeQueryContext();
-            QueryResult query_result = query_context->Query(create_snapshot_sql);
-            bool ok = HandleQueryResult(query_result);
-            if (ok) {
-                LOG_INFO("Snapshot 1 creation succeeded");
-            } else {
-                LOG_INFO("Snapshot 1 creation failed");
-            }
+        String create_snapshot_sql = "create snapshot conflict_snapshot on table t1";
+        std::unique_ptr<QueryContext> query_context = MakeQueryContext();
+        QueryResult query_result = query_context->Query(create_snapshot_sql);
+        bool ok = HandleQueryResult(query_result);
+        if (ok) {
+            LOG_INFO("Snapshot 1 creation succeeded");
+        } else {
+            LOG_INFO("Snapshot 1 creation failed");
+        }
     };
 
     auto thread_show_snapshot = [this]() {
@@ -425,6 +420,3 @@ TEST_P(TableSnapshotTest, test_restore_table_same_snapshot_multithreaded) {
         }
     }
 }
-
-
-

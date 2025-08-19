@@ -33,8 +33,8 @@ Status Logger::Initialize(Config *config_ptr) {
     if (rotating_file_sinker.get() == nullptr) {
         try {
             rotating_file_sinker = std::make_shared<spdlog::sinks::rotating_file_sink_mt>(config_ptr->LogFilePath(),
-                                                                                    log_file_max_size,
-                                                                                    log_file_rotate_count); // NOLINT
+                                                                                          log_file_max_size,
+                                                                                          log_file_rotate_count); // NOLINT
         } catch (const std::exception &e) {
             std::string error_message = fmt::format("Error to create log sinker, cause: {}", e.what());
             fmt::print("{}", error_message);
@@ -71,8 +71,8 @@ void Logger::Initialize(const LoggerConfig &config) {
     bool log_stdout = config.log_to_stdout_;
     if (rotating_file_sinker.get() == nullptr) {
         rotating_file_sinker = std::make_shared<spdlog::sinks::rotating_file_sink_mt>(config.log_file_path_,
-                                                                                config.log_file_max_size_,
-                                                                                config.log_file_rotate_count_); // NOLINT
+                                                                                      config.log_file_max_size_,
+                                                                                      config.log_file_rotate_count_); // NOLINT
     }
     if (log_stdout) {
         if (stdout_sinker.get() == nullptr) {

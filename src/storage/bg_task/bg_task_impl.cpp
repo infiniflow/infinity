@@ -60,13 +60,13 @@ Status NewCheckpointTask::ExecuteWithNewTxn() {
             std::shared_ptr<BGTaskInfo> bg_task_info = std::make_shared<BGTaskInfo>(BGTaskType::kNewCheckpoint);
             for (const std::shared_ptr<FlushDataEntry> &flush_data_entry : ckp_idx_store->entries_) {
                 std::string task_text = fmt::format("Txn: {}, commit: {}, checkpoint data: {}.{}.{}.{} {}",
-                                               new_txn_shared->TxnID(),
-                                               new_txn_shared->CommitTS(),
-                                               flush_data_entry->db_id_str_,
-                                               flush_data_entry->table_id_str_,
-                                               flush_data_entry->segment_id_,
-                                               flush_data_entry->block_id_,
-                                               flush_data_entry->to_flush_);
+                                                    new_txn_shared->TxnID(),
+                                                    new_txn_shared->CommitTS(),
+                                                    flush_data_entry->db_id_str_,
+                                                    flush_data_entry->table_id_str_,
+                                                    flush_data_entry->segment_id_,
+                                                    flush_data_entry->block_id_,
+                                                    flush_data_entry->to_flush_);
                 bg_task_info->task_info_list_.emplace_back(task_text);
                 bg_task_info->status_list_.emplace_back("OK");
             }
@@ -115,7 +115,8 @@ void AppendMemIndexBatch::WaitForCompletion() {
     cv_.wait(lock, [this] { return task_count_ == 0; });
 }
 
-TestCommandTask::TestCommandTask(std::string command_content) : BGTask(BGTaskType::kTestCommand, true), command_content_(std::move(command_content)) {}
+TestCommandTask::TestCommandTask(std::string command_content)
+    : BGTask(BGTaskType::kTestCommand, true), command_content_(std::move(command_content)) {}
 
 BGTaskInfo::BGTaskInfo(BGTaskType type) : type_(type), task_time_(std::chrono::system_clock::now()) {}
 

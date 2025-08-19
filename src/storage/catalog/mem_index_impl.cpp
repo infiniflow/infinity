@@ -128,7 +128,10 @@ const BaseMemIndex *MemIndex::GetBaseMemIndex() const {
     return res;
 }
 
-void MemIndex::SetBaseMemIndexInfo(const std::string &db_name, const std::string &table_name, const std::string &index_name, const SegmentID &segment_id) {
+void MemIndex::SetBaseMemIndexInfo(const std::string &db_name,
+                                   const std::string &table_name,
+                                   const std::string &index_name,
+                                   const SegmentID &segment_id) {
     BaseMemIndex *res = nullptr;
     if (memory_hnsw_index_.get() != nullptr) {
         res = static_cast<BaseMemIndex *>(memory_hnsw_index_.get());
@@ -151,7 +154,10 @@ void MemIndex::SetBaseMemIndexInfo(const std::string &db_name, const std::string
     res->segment_id_ = segment_id;
 }
 
-void MemIndex::SetEMVBMemIndexInfo(const std::string &db_name, const std::string &table_name, const std::string &index_name, const SegmentID &segment_id) {
+void MemIndex::SetEMVBMemIndexInfo(const std::string &db_name,
+                                   const std::string &table_name,
+                                   const std::string &index_name,
+                                   const SegmentID &segment_id) {
     EMVBIndexInMem *res = memory_emvb_index_.get();
     if (res != nullptr) {
         res->db_name_ = db_name;

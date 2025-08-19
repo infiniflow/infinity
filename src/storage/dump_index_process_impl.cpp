@@ -101,14 +101,15 @@ void DumpIndexProcessor::DoDump(DumpMemIndexTask *dump_task) {
 
             DumpMemIndexTxnStore *dump_index_txn_store = static_cast<DumpMemIndexTxnStore *>(new_txn_shared->GetTxnStore());
             if (dump_index_txn_store != nullptr) {
-                std::string task_text = fmt::format("Txn: {}, commit: {}, dump mem index: {}.{}.{} in segment: {} into chunk:{}",
-                                               new_txn_shared->TxnID(),
-                                               new_txn_shared->CommitTS(),
-                                               db_name,
-                                               table_name,
-                                               dump_index_txn_store->index_name_,
-                                               dump_index_txn_store->segment_ids_[0],
-                                               dump_index_txn_store->chunk_infos_in_segments_[dump_index_txn_store->segment_ids_[0]][0].chunk_id_);
+                std::string task_text =
+                    fmt::format("Txn: {}, commit: {}, dump mem index: {}.{}.{} in segment: {} into chunk:{}",
+                                new_txn_shared->TxnID(),
+                                new_txn_shared->CommitTS(),
+                                db_name,
+                                table_name,
+                                dump_index_txn_store->index_name_,
+                                dump_index_txn_store->segment_ids_[0],
+                                dump_index_txn_store->chunk_infos_in_segments_[dump_index_txn_store->segment_ids_[0]][0].chunk_id_);
                 bg_task_info->task_info_list_.emplace_back(task_text);
                 if (commit_status.ok()) {
                     bg_task_info->status_list_.emplace_back("OK");

@@ -16,9 +16,9 @@
 
 #include "expr/constant_expr.h"
 #include "expr/parsed_expr.h"
+#include "type/data_type.h"
 #include "type/logical_type.h"
 #include "type/type_info.h"
-#include "type/data_type.h"
 
 #ifndef PARESER_USE_STD_MODULE
 #define PARESER_USE_STD_MODULE 1

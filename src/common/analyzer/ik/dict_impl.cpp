@@ -178,7 +178,9 @@ void Dictionary::DisableWords(const std::vector<std::string> &words) {
 
 Hit *Dictionary::MatchInMainDict(const std::vector<wchar_t> &char_array) { return main_dict_->Match(char_array); }
 
-Hit *Dictionary::MatchInMainDict(const std::vector<wchar_t> &char_array, int begin, int length) { return main_dict_->Match(char_array, begin, length); }
+Hit *Dictionary::MatchInMainDict(const std::vector<wchar_t> &char_array, int begin, int length) {
+    return main_dict_->Match(char_array, begin, length);
+}
 
 Hit *Dictionary::MatchInQuantifierDict(const std::vector<wchar_t> &char_array, int begin, int length) {
     return quantifier_dict_->Match(char_array, begin, length);

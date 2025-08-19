@@ -84,7 +84,8 @@ import check_statement;
 
 namespace infinity {
 
-Status ExplainLogicalPlan::Explain(const LogicalNode *statement, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size) {
+Status
+ExplainLogicalPlan::Explain(const LogicalNode *statement, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size) {
     switch (statement->operator_type()) {
         case LogicalNodeType::kAggregate: {
             Explain((LogicalAggregate *)statement, result, intent_size);
@@ -253,7 +254,9 @@ Status ExplainLogicalPlan::Explain(const LogicalNode *statement, std::shared_ptr
     return Status::OK();
 }
 
-Status ExplainLogicalPlan::Explain(const LogicalCreateSchema *create_node, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size) {
+Status ExplainLogicalPlan::Explain(const LogicalCreateSchema *create_node,
+                                   std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result,
+                                   i64 intent_size) {
     {
         std::string create_header_str;
         if (intent_size != 0) {
@@ -274,7 +277,8 @@ Status ExplainLogicalPlan::Explain(const LogicalCreateSchema *create_node, std::
 
     // Conflict type
     {
-        std::string conflict_type_str = fmt::format("{} - conflict type: {}", std::string(intent_size, ' '), ConflictTypeToStr(create_node->conflict_type()));
+        std::string conflict_type_str =
+            fmt::format("{} - conflict type: {}", std::string(intent_size, ' '), ConflictTypeToStr(create_node->conflict_type()));
         result->emplace_back(std::make_shared<std::string>(conflict_type_str));
     }
 
@@ -286,7 +290,9 @@ Status ExplainLogicalPlan::Explain(const LogicalCreateSchema *create_node, std::
     return Status::OK();
 }
 
-Status ExplainLogicalPlan::Explain(const LogicalCreateTable *create_node, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size) {
+Status ExplainLogicalPlan::Explain(const LogicalCreateTable *create_node,
+                                   std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result,
+                                   i64 intent_size) {
     {
         std::string create_header_str;
         if (intent_size != 0) {
@@ -307,7 +313,8 @@ Status ExplainLogicalPlan::Explain(const LogicalCreateTable *create_node, std::s
 
     // Table name
     {
-        std::string table_name_str = fmt::format("{} - table name: {}", std::string(intent_size, ' '), *create_node->table_definitions()->table_name());
+        std::string table_name_str =
+            fmt::format("{} - table name: {}", std::string(intent_size, ' '), *create_node->table_definitions()->table_name());
         result->emplace_back(std::make_shared<std::string>(table_name_str));
     }
 
@@ -330,7 +337,8 @@ Status ExplainLogicalPlan::Explain(const LogicalCreateTable *create_node, std::s
 
     // Conflict type
     {
-        std::string conflict_type_str = fmt::format("{} - conflict type: {}", std::string(intent_size, ' '), ConflictTypeToStr(create_node->conflict_type()));
+        std::string conflict_type_str =
+            fmt::format("{} - conflict type: {}", std::string(intent_size, ' '), ConflictTypeToStr(create_node->conflict_type()));
         result->emplace_back(std::make_shared<std::string>(conflict_type_str));
     }
 
@@ -342,7 +350,9 @@ Status ExplainLogicalPlan::Explain(const LogicalCreateTable *create_node, std::s
     return Status::OK();
 }
 
-Status ExplainLogicalPlan::Explain(const LogicalCreateIndex *create_node, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size) {
+Status ExplainLogicalPlan::Explain(const LogicalCreateIndex *create_node,
+                                   std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result,
+                                   i64 intent_size) {
     {
         std::string create_header_str;
         if (intent_size != 0) {
@@ -383,7 +393,9 @@ Status ExplainLogicalPlan::Explain(const LogicalCreateIndex *create_node, std::s
     return Status::OK();
 }
 
-Status ExplainLogicalPlan::Explain(const LogicalCreateCollection *create_node, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size) {
+Status ExplainLogicalPlan::Explain(const LogicalCreateCollection *create_node,
+                                   std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result,
+                                   i64 intent_size) {
     {
         std::string create_header_str;
         if (intent_size != 0) {
@@ -410,7 +422,8 @@ Status ExplainLogicalPlan::Explain(const LogicalCreateCollection *create_node, s
 
     // Conflict type
     {
-        std::string conflict_type_str = fmt::format("{} - conflict type: {}", std::string(intent_size, ' '), ConflictTypeToStr(create_node->conflict_type()));
+        std::string conflict_type_str =
+            fmt::format("{} - conflict type: {}", std::string(intent_size, ' '), ConflictTypeToStr(create_node->conflict_type()));
         result->emplace_back(std::make_shared<std::string>(conflict_type_str));
     }
 
@@ -422,7 +435,9 @@ Status ExplainLogicalPlan::Explain(const LogicalCreateCollection *create_node, s
     return Status::OK();
 }
 
-Status ExplainLogicalPlan::Explain(const LogicalCreateView *create_node, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size) {
+Status ExplainLogicalPlan::Explain(const LogicalCreateView *create_node,
+                                   std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result,
+                                   i64 intent_size) {
     {
         std::string create_header_str;
         if (intent_size != 0) {
@@ -436,7 +451,8 @@ Status ExplainLogicalPlan::Explain(const LogicalCreateView *create_node, std::sh
 
     // Schema name
     {
-        std::string schema_name_str = fmt::format("{} - database name: {}", std::string(intent_size, ' '), create_node->create_view_info()->schema_name_);
+        std::string schema_name_str =
+            fmt::format("{} - database name: {}", std::string(intent_size, ' '), create_node->create_view_info()->schema_name_);
         result->emplace_back(std::make_shared<std::string>(schema_name_str));
     }
 
@@ -484,7 +500,8 @@ Status ExplainLogicalPlan::Explain(const LogicalCreateView *create_node, std::sh
     return Status::OK();
 }
 
-Status ExplainLogicalPlan::Explain(const LogicalDropSchema *drop_node, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size) {
+Status
+ExplainLogicalPlan::Explain(const LogicalDropSchema *drop_node, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size) {
     {
         std::string drop_header_str;
         if (intent_size != 0) {
@@ -505,7 +522,8 @@ Status ExplainLogicalPlan::Explain(const LogicalDropSchema *drop_node, std::shar
 
     // Conflict type
     {
-        std::string conflict_type_str = fmt::format("{} - conflict type: {}", std::string(intent_size, ' '), ConflictTypeToStr(drop_node->conflict_type()));
+        std::string conflict_type_str =
+            fmt::format("{} - conflict type: {}", std::string(intent_size, ' '), ConflictTypeToStr(drop_node->conflict_type()));
         result->emplace_back(std::make_shared<std::string>(conflict_type_str));
     }
 
@@ -517,7 +535,8 @@ Status ExplainLogicalPlan::Explain(const LogicalDropSchema *drop_node, std::shar
     return Status::OK();
 }
 
-Status ExplainLogicalPlan::Explain(const LogicalDropTable *drop_node, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size) {
+Status
+ExplainLogicalPlan::Explain(const LogicalDropTable *drop_node, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size) {
     {
         std::string drop_header_str;
         if (intent_size != 0) {
@@ -544,7 +563,8 @@ Status ExplainLogicalPlan::Explain(const LogicalDropTable *drop_node, std::share
 
     // Conflict type
     {
-        std::string conflict_type_str = fmt::format("{} - conflict type: {}", std::string(intent_size, ' '), ConflictTypeToStr(drop_node->conflict_type()));
+        std::string conflict_type_str =
+            fmt::format("{} - conflict type: {}", std::string(intent_size, ' '), ConflictTypeToStr(drop_node->conflict_type()));
         result->emplace_back(std::make_shared<std::string>(conflict_type_str));
     }
 
@@ -556,7 +576,9 @@ Status ExplainLogicalPlan::Explain(const LogicalDropTable *drop_node, std::share
     return Status::OK();
 }
 
-Status ExplainLogicalPlan::Explain(const LogicalDropCollection *drop_node, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size) {
+Status ExplainLogicalPlan::Explain(const LogicalDropCollection *drop_node,
+                                   std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result,
+                                   i64 intent_size) {
     {
         std::string drop_header_str;
         if (intent_size != 0) {
@@ -583,7 +605,8 @@ Status ExplainLogicalPlan::Explain(const LogicalDropCollection *drop_node, std::
 
     // Conflict type
     {
-        std::string conflict_type_str = fmt::format("{} - conflict type: {}", std::string(intent_size, ' '), ConflictTypeToStr(drop_node->conflict_type()));
+        std::string conflict_type_str =
+            fmt::format("{} - conflict type: {}", std::string(intent_size, ' '), ConflictTypeToStr(drop_node->conflict_type()));
         result->emplace_back(std::make_shared<std::string>(conflict_type_str));
     }
 
@@ -595,7 +618,8 @@ Status ExplainLogicalPlan::Explain(const LogicalDropCollection *drop_node, std::
     return Status::OK();
 }
 
-Status ExplainLogicalPlan::Explain(const LogicalDropView *drop_node, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size) {
+Status
+ExplainLogicalPlan::Explain(const LogicalDropView *drop_node, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size) {
     return Status::NotSupport("DROP VIEW isn't supported");
 #if 0
     {
@@ -636,7 +660,8 @@ Status ExplainLogicalPlan::Explain(const LogicalDropView *drop_node, std::shared
 #endif
 }
 
-Status ExplainLogicalPlan::Explain(const LogicalInsert *insert_node, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size) {
+Status
+ExplainLogicalPlan::Explain(const LogicalInsert *insert_node, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size) {
     {
         std::string insert_header_str;
         if (intent_size != 0) {
@@ -692,19 +717,22 @@ Status ExplainLogicalPlan::Explain(const LogicalInsert *insert_node, std::shared
     return Status::OK();
 }
 
-Status ExplainLogicalPlan::Explain(const LogicalDelete *delete_node, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size) {
+Status
+ExplainLogicalPlan::Explain(const LogicalDelete *delete_node, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size) {
     std::string header = delete_node->ToString(intent_size);
     result->emplace_back(std::make_shared<std::string>(header));
     return Status::OK();
 }
 
-Status ExplainLogicalPlan::Explain(const LogicalUpdate *update_node, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size) {
+Status
+ExplainLogicalPlan::Explain(const LogicalUpdate *update_node, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size) {
     std::string header = update_node->ToString(intent_size);
     result->emplace_back(std::make_shared<std::string>(header));
     return Status::OK();
 }
 
-Status ExplainLogicalPlan::Explain(const LogicalProject *project_node, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size) {
+Status
+ExplainLogicalPlan::Explain(const LogicalProject *project_node, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size) {
     {
         std::string project_header;
         if (intent_size != 0) {
@@ -742,7 +770,8 @@ Status ExplainLogicalPlan::Explain(const LogicalProject *project_node, std::shar
     return Status::OK();
 }
 
-Status ExplainLogicalPlan::Explain(const LogicalFilter *filter_node, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size) {
+Status
+ExplainLogicalPlan::Explain(const LogicalFilter *filter_node, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size) {
     std::string filter_node_header;
     if (intent_size != 0) {
         filter_node_header = fmt::format("{}-> FILTER ", std::string(intent_size - 2, ' '));
@@ -777,7 +806,8 @@ Status ExplainLogicalPlan::Explain(const LogicalFilter *filter_node, std::shared
     return Status::OK();
 }
 
-Status ExplainLogicalPlan::Explain(const LogicalUnnest *unnest_node, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size) {
+Status
+ExplainLogicalPlan::Explain(const LogicalUnnest *unnest_node, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size) {
     std::string unnest_node_header_str;
     if (intent_size != 0) {
         unnest_node_header_str = fmt::format("{}-> UNNEST ", std::string(intent_size - 2, ' '));
@@ -816,8 +846,9 @@ Status ExplainLogicalPlan::Explain(const LogicalUnnest *unnest_node, std::shared
     return Status::OK();
 }
 
-Status
-ExplainLogicalPlan::Explain(const LogicalUnnestAggregate *unnest_aggregate_node, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size) {
+Status ExplainLogicalPlan::Explain(const LogicalUnnestAggregate *unnest_aggregate_node,
+                                   std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result,
+                                   i64 intent_size) {
     std::string unnest_node_header_str;
     if (intent_size != 0) {
         unnest_node_header_str = fmt::format("{}-> UNNEST AGGREGATE ", std::string(intent_size - 2, ' '));
@@ -896,7 +927,9 @@ ExplainLogicalPlan::Explain(const LogicalUnnestAggregate *unnest_aggregate_node,
     return Status::OK();
 }
 
-Status ExplainLogicalPlan::Explain(const LogicalTableScan *table_scan_node, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size) {
+Status ExplainLogicalPlan::Explain(const LogicalTableScan *table_scan_node,
+                                   std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result,
+                                   i64 intent_size) {
     std::string table_scan_header;
     if (intent_size != 0) {
         table_scan_header = std::string(intent_size - 2, ' ');
@@ -943,7 +976,9 @@ Status ExplainLogicalPlan::Explain(const LogicalTableScan *table_scan_node, std:
     return Status::OK();
 }
 
-Status ExplainLogicalPlan::Explain(const LogicalIndexScan *index_scan_node, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size) {
+Status ExplainLogicalPlan::Explain(const LogicalIndexScan *index_scan_node,
+                                   std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result,
+                                   i64 intent_size) {
     std::string index_scan_header;
     if (intent_size != 0) {
         index_scan_header = std::string(intent_size - 2, ' ');
@@ -998,7 +1033,9 @@ Status ExplainLogicalPlan::Explain(const LogicalIndexScan *index_scan_node, std:
     return Status::OK();
 }
 
-Status ExplainLogicalPlan::Explain(const LogicalKnnScan *knn_scan_node, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size) {
+Status ExplainLogicalPlan::Explain(const LogicalKnnScan *knn_scan_node,
+                                   std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result,
+                                   i64 intent_size) {
     std::string knn_scan_header;
     if (intent_size != 0) {
         knn_scan_header = std::string(intent_size - 2, ' ');
@@ -1081,7 +1118,9 @@ Status ExplainLogicalPlan::Explain(const LogicalKnnScan *knn_scan_node, std::sha
     return Status::OK();
 }
 
-Status ExplainLogicalPlan::Explain(const LogicalAggregate *aggregate_node, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size) {
+Status ExplainLogicalPlan::Explain(const LogicalAggregate *aggregate_node,
+                                   std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result,
+                                   i64 intent_size) {
     size_t groups_count = aggregate_node->groups_.size();
     size_t aggregates_count = aggregate_node->aggregates_.size();
     if (groups_count == 0 && aggregate_node == 0) {
@@ -1147,7 +1186,8 @@ Status ExplainLogicalPlan::Explain(const LogicalAggregate *aggregate_node, std::
     return Status::OK();
 }
 
-Status ExplainLogicalPlan::Explain(const LogicalSort *sort_node, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size) {
+Status
+ExplainLogicalPlan::Explain(const LogicalSort *sort_node, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size) {
     {
         std::string sort_header;
         if (intent_size != 0) {
@@ -1201,7 +1241,8 @@ Status ExplainLogicalPlan::Explain(const LogicalSort *sort_node, std::shared_ptr
     return Status::OK();
 }
 
-Status ExplainLogicalPlan::Explain(const LogicalLimit *limit_node, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size) {
+Status
+ExplainLogicalPlan::Explain(const LogicalLimit *limit_node, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size) {
     {
         std::string limit_header;
         if (intent_size != 0) {
@@ -1305,7 +1346,9 @@ Status ExplainLogicalPlan::Explain(const LogicalTop *top_node, std::shared_ptr<s
     return Status::OK();
 }
 
-Status ExplainLogicalPlan::Explain(const LogicalCrossProduct *cross_product_node, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size) {
+Status ExplainLogicalPlan::Explain(const LogicalCrossProduct *cross_product_node,
+                                   std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result,
+                                   i64 intent_size) {
     {
         std::string cross_product_header;
         if (intent_size != 0) {
@@ -1337,7 +1380,8 @@ Status ExplainLogicalPlan::Explain(const LogicalCrossProduct *cross_product_node
     return Status::OK();
 }
 
-Status ExplainLogicalPlan::Explain(const LogicalJoin *join_node, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size) {
+Status
+ExplainLogicalPlan::Explain(const LogicalJoin *join_node, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size) {
     {
         std::string join_header;
         if (intent_size != 0) {
@@ -1386,7 +1430,8 @@ Status ExplainLogicalPlan::Explain(const LogicalJoin *join_node, std::shared_ptr
     return Status::OK();
 }
 
-Status ExplainLogicalPlan::Explain(const LogicalShow *show_node, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size) {
+Status
+ExplainLogicalPlan::Explain(const LogicalShow *show_node, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size) {
     switch (show_node->show_type()) {
         case ShowStmtType::kInvalid: {
             UnrecoverableError("Invalid show statement type");
@@ -2288,7 +2333,8 @@ Status ExplainLogicalPlan::Explain(const BaseExpression *base_expression, std::s
     return Status::OK();
 }
 
-Status ExplainLogicalPlan::Explain(const LogicalImport *import_node, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size) {
+Status
+ExplainLogicalPlan::Explain(const LogicalImport *import_node, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size) {
     {
         std::string import_header_str;
         if (intent_size != 0) {
@@ -2305,19 +2351,20 @@ Status ExplainLogicalPlan::Explain(const LogicalImport *import_node, std::shared
     }
 
     {
-        std::shared_ptr<std::string> schema_name =
-            std::make_shared<std::string>(fmt::format("{} - database name: {}", std::string(intent_size, ' '), *(import_node->table_info()->db_name_)));
+        std::shared_ptr<std::string> schema_name = std::make_shared<std::string>(
+            fmt::format("{} - database name: {}", std::string(intent_size, ' '), *(import_node->table_info()->db_name_)));
         result->emplace_back(schema_name);
     }
 
     {
-        std::shared_ptr<std::string> table_name =
-            std::make_shared<std::string>(fmt::format("{} - table name: {}", std::string(intent_size, ' '), *(import_node->table_info()->table_name_)));
+        std::shared_ptr<std::string> table_name = std::make_shared<std::string>(
+            fmt::format("{} - table name: {}", std::string(intent_size, ' '), *(import_node->table_info()->table_name_)));
         result->emplace_back(table_name);
     }
 
     {
-        std::shared_ptr<std::string> path = std::make_shared<std::string>(fmt::format("{} - file: {}", std::string(intent_size, ' '), import_node->file_path()));
+        std::shared_ptr<std::string> path =
+            std::make_shared<std::string>(fmt::format("{} - file: {}", std::string(intent_size, ' '), import_node->file_path()));
         result->emplace_back(path);
     }
 
@@ -2376,7 +2423,8 @@ Status ExplainLogicalPlan::Explain(const LogicalImport *import_node, std::shared
     return Status::OK();
 }
 
-Status ExplainLogicalPlan::Explain(const LogicalExport *export_node, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size) {
+Status
+ExplainLogicalPlan::Explain(const LogicalExport *export_node, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size) {
     {
         std::string export_header_str;
         if (intent_size != 0) {
@@ -2399,12 +2447,14 @@ Status ExplainLogicalPlan::Explain(const LogicalExport *export_node, std::shared
     }
 
     {
-        std::shared_ptr<std::string> table_name = std::make_shared<std::string>(fmt::format("{} - table name: {}", std::string(intent_size, ' '), export_node->table_name()));
+        std::shared_ptr<std::string> table_name =
+            std::make_shared<std::string>(fmt::format("{} - table name: {}", std::string(intent_size, ' '), export_node->table_name()));
         result->emplace_back(table_name);
     }
 
     {
-        std::shared_ptr<std::string> path = std::make_shared<std::string>(fmt::format("{} - file: {}", std::string(intent_size, ' '), export_node->file_path()));
+        std::shared_ptr<std::string> path =
+            std::make_shared<std::string>(fmt::format("{} - file: {}", std::string(intent_size, ' '), export_node->file_path()));
         result->emplace_back(path);
     }
 
@@ -2463,7 +2513,8 @@ Status ExplainLogicalPlan::Explain(const LogicalExport *export_node, std::shared
     return Status::OK();
 }
 
-Status ExplainLogicalPlan::Explain(const LogicalFlush *flush_node, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size) {
+Status
+ExplainLogicalPlan::Explain(const LogicalFlush *flush_node, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size) {
     std::string flush_header_str;
     if (intent_size != 0) {
         flush_header_str = std::string(intent_size - 2, ' ');
@@ -2498,7 +2549,9 @@ Status ExplainLogicalPlan::Explain(const LogicalFlush *flush_node, std::shared_p
     return Status::OK();
 }
 
-Status ExplainLogicalPlan::Explain(const LogicalOptimize *optimize_node, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size) {
+Status ExplainLogicalPlan::Explain(const LogicalOptimize *optimize_node,
+                                   std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result,
+                                   i64 intent_size) {
     std::string optimize_header_str;
     if (intent_size != 0) {
         optimize_header_str = std::string(intent_size - 2, ' ');
@@ -2511,7 +2564,8 @@ Status ExplainLogicalPlan::Explain(const LogicalOptimize *optimize_node, std::sh
     return Status::OK();
 }
 
-Status ExplainLogicalPlan::Explain(const LogicalMatch *match_node, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size) {
+Status
+ExplainLogicalPlan::Explain(const LogicalMatch *match_node, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size) {
     std::istringstream iss(match_node->ToString(intent_size));
     std::string line;
     while (std::getline(iss, line)) {
@@ -2520,7 +2574,9 @@ Status ExplainLogicalPlan::Explain(const LogicalMatch *match_node, std::shared_p
     return Status::OK();
 }
 
-Status ExplainLogicalPlan::Explain(const LogicalMatchSparseScan *match_node, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size) {
+Status ExplainLogicalPlan::Explain(const LogicalMatchSparseScan *match_node,
+                                   std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result,
+                                   i64 intent_size) {
     std::istringstream iss(match_node->ToString(intent_size));
     std::string line;
     while (std::getline(iss, line)) {
@@ -2529,7 +2585,9 @@ Status ExplainLogicalPlan::Explain(const LogicalMatchSparseScan *match_node, std
     return Status::OK();
 }
 
-Status ExplainLogicalPlan::Explain(const LogicalMatchTensorScan *match_tensor_node, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size) {
+Status ExplainLogicalPlan::Explain(const LogicalMatchTensorScan *match_tensor_node,
+                                   std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result,
+                                   i64 intent_size) {
     std::istringstream iss(match_tensor_node->ToString(intent_size));
     std::string line;
     while (std::getline(iss, line)) {
@@ -2538,7 +2596,8 @@ Status ExplainLogicalPlan::Explain(const LogicalMatchTensorScan *match_tensor_no
     return Status::OK();
 }
 
-Status ExplainLogicalPlan::Explain(const LogicalFusion *fusion_node, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size) {
+Status
+ExplainLogicalPlan::Explain(const LogicalFusion *fusion_node, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size) {
     std::istringstream iss(fusion_node->ToString(intent_size));
     std::string line;
     while (std::getline(iss, line)) {
@@ -2547,7 +2606,8 @@ Status ExplainLogicalPlan::Explain(const LogicalFusion *fusion_node, std::shared
     return Status::OK();
 }
 
-Status ExplainLogicalPlan::Explain(const LogicalCheck *check_node, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size) {
+Status
+ExplainLogicalPlan::Explain(const LogicalCheck *check_node, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size) {
     switch (check_node->check_type()) {
         case CheckStmtType::kInvalid: {
             UnrecoverableError("Invalid check statement type");

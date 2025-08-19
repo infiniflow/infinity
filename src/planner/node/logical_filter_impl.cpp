@@ -29,7 +29,9 @@ std::vector<ColumnBinding> LogicalFilter::GetColumnBindings() const { return Log
 
 std::shared_ptr<std::vector<std::string>> LogicalFilter::GetOutputNames() const { return LogicalCommonFunctionUsingLoadMeta::GetOutputNames(*this); }
 
-std::shared_ptr<std::vector<std::shared_ptr<DataType>>> LogicalFilter::GetOutputTypes() const { return LogicalCommonFunctionUsingLoadMeta::GetOutputTypes(*this); }
+std::shared_ptr<std::vector<std::shared_ptr<DataType>>> LogicalFilter::GetOutputTypes() const {
+    return LogicalCommonFunctionUsingLoadMeta::GetOutputTypes(*this);
+}
 
 std::string LogicalFilter::ToString(i64 &space) const {
     std::stringstream ss;

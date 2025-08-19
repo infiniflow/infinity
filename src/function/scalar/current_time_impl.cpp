@@ -42,8 +42,8 @@ struct CurrentTimeFunction {
 
 template <>
 inline void CurrentTimeFunction::Run(TimeT &result) {
-    InfinityContext& infinityContext = InfinityContext::instance();
-    Config* config = infinityContext.config();
+    InfinityContext &infinityContext = InfinityContext::instance();
+    Config *config = infinityContext.config();
     auto now = system_clock::now() + config->hour_offset_;
     auto sys_days = std::chrono::floor<std::chrono::days>(now);
     auto sys_secs = std::chrono::floor<std::chrono::seconds>(now);
@@ -56,10 +56,7 @@ void RegisterCurrentTimeFunction(NewCatalog *catalog_ptr) {
 
     std::shared_ptr<ScalarFunctionSet> function_set_ptr = std::make_shared<ScalarFunctionSet>(func_name);
 
-    ScalarFunction current_time_function(func_name,
-                                  {},
-                                  DataType(LogicalType::kTime),
-                                  &ScalarFunction::NullaryFunction<TimeT, CurrentTimeFunction>);
+    ScalarFunction current_time_function(func_name, {}, DataType(LogicalType::kTime), &ScalarFunction::NullaryFunction<TimeT, CurrentTimeFunction>);
     function_set_ptr->AddFunction(current_time_function);
 
     NewCatalog::AddFunctionSet(catalog_ptr, function_set_ptr);

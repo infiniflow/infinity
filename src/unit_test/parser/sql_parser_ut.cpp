@@ -126,38 +126,38 @@ TEST_F(SQLParserTest, good_test2) {
 
     {
         std::string input_sql = "create table t1 (a boolean primary key not null null unique,"
-                           "                 b tinyint not null null unique, "
-                           "                 c smallint null not null, "
-                           "                 d integer not null, "
-                           "                 e bigint null,"
-                           "                 f hugeint unique,"
-                           "                 g float primary key,"
-                           "                 h double primary key not null,"
-                           "                 i real primary key null,"
-                           "                 j date primary key unique,"
-                           "                 k time primary key not null null,"
-                           "                 l datetime primary key not null unique, "
-                           "                 m timestamp not null unique, "
-                           "                 n uuid null unique, "
-                           "                 o point, "
-                           "                 p line, "
-                           "                 q lseg, "
-                           "                 r box, "
-                           //                           "                 s path, "
-                           //                           "                 t polygon, "
-                           "                 u circle, "
-                           "                 w varchar, "
-                           "                 x decimal, "
-                           "                 y decimal(10), "
-                           "                 z decimal(14, 12), "
-                           //                           "                 aa blob(10), "
-                           //                           "                 ab bitmap(16), "
-                           "                 ac embedding(bit, 256), "
-                           "                 ad vector(float, 512), "
-                           "                 primary key (a, b), "
-                           "                 unique (c, d), "
-                           "                 ae int not null, "
-                           "                 af embedding(int, 32)); ";
+                                "                 b tinyint not null null unique, "
+                                "                 c smallint null not null, "
+                                "                 d integer not null, "
+                                "                 e bigint null,"
+                                "                 f hugeint unique,"
+                                "                 g float primary key,"
+                                "                 h double primary key not null,"
+                                "                 i real primary key null,"
+                                "                 j date primary key unique,"
+                                "                 k time primary key not null null,"
+                                "                 l datetime primary key not null unique, "
+                                "                 m timestamp not null unique, "
+                                "                 n uuid null unique, "
+                                "                 o point, "
+                                "                 p line, "
+                                "                 q lseg, "
+                                "                 r box, "
+                                //                           "                 s path, "
+                                //                           "                 t polygon, "
+                                "                 u circle, "
+                                "                 w varchar, "
+                                "                 x decimal, "
+                                "                 y decimal(10), "
+                                "                 z decimal(14, 12), "
+                                //                           "                 aa blob(10), "
+                                //                           "                 ab bitmap(16), "
+                                "                 ac embedding(bit, 256), "
+                                "                 ad vector(float, 512), "
+                                "                 primary key (a, b), "
+                                "                 unique (c, d), "
+                                "                 ae int not null, "
+                                "                 af embedding(int, 32)); ";
 
         parser->Parse(input_sql, result.get());
 
@@ -488,7 +488,7 @@ TEST_F(SQLParserTest, bad_test1) {
 
     {
         std::string input_sql = "create table t1 (a boolean primary key not null null unique,"
-                           "                 b tinyint not null null unique,";
+                                "                 b tinyint not null null unique,";
         parser->Parse(input_sql, result.get());
 
         EXPECT_FALSE(result->error_message_.empty());
@@ -499,8 +499,8 @@ TEST_F(SQLParserTest, bad_test1) {
 
     {
         std::string input_sql = "create table t1 (a boolean primary key not null null unique,"
-                           "                 b tinyint not null null unique "
-                           "                 c smallint unique);";
+                                "                 b tinyint not null null unique "
+                                "                 c smallint unique);";
         parser->Parse(input_sql, result.get());
 
         EXPECT_FALSE(result->error_message_.empty());

@@ -50,7 +50,7 @@ public:
         value_ = input[idx];
     }
 
-    [[nodiscard]] inline char * Finalize() const { return (char *)&value_; }
+    [[nodiscard]] inline char *Finalize() const { return (char *)&value_; }
 
     inline static size_t Size(const DataType &) { return sizeof(FirstState<ValueType, ResultType>); }
 };
@@ -81,7 +81,7 @@ public:
         value_ = input[idx];
     }
 
-    inline char * Finalize() { return (char *)&value_; }
+    inline char *Finalize() { return (char *)&value_; }
 
     inline static size_t Size(const DataType &) { return sizeof(FirstState<VarcharT, VarcharT>); }
 };

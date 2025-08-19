@@ -1353,8 +1353,9 @@ std::unique_ptr<MatchSparseExpr> HTTPSearch::ParseMatchSparse(std::string_view j
                 match_sparse_expr->SetMetricType(value.get<std::string>());
             } catch (std::exception &e) {
                 response["error_code"] = ErrorCode::kInvalidExpression;
-                response["error_message"] =
-                    fmt::format("Invalid metric_type: {}, error info: {}", static_cast<std::string>(field_json_obj.value().get<std::string>()), e.what());
+                response["error_message"] = fmt::format("Invalid metric_type: {}, error info: {}",
+                                                        static_cast<std::string>(field_json_obj.value().get<std::string>()),
+                                                        e.what());
                 return nullptr;
             }
         } else if (key == "topn") {
@@ -1512,7 +1513,8 @@ std::unique_ptr<ConstantExpr> HTTPSearch::ParseSparseVector(std::string_view jso
     return const_sparse_expr;
 }
 
-std::tuple<i64, void *> HTTPSearch::ParseVector(std::string_view json_sv, EmbeddingDataType elem_type, HTTPStatus &http_status, nlohmann::json &response) {
+std::tuple<i64, void *>
+HTTPSearch::ParseVector(std::string_view json_sv, EmbeddingDataType elem_type, HTTPStatus &http_status, nlohmann::json &response) {
     simdjson::padded_string json_pad(json_sv);
     simdjson::parser parser;
     simdjson::document doc = parser.iterate(json_pad);

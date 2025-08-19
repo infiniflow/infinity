@@ -79,12 +79,12 @@ std::string KnnExpression::ToString() const {
     }
 
     std::string expr_str = fmt::format("MATCH VECTOR ({}, {}, {}, {}, {}{})",
-                                  arguments_.at(0)->Name(),
-                                  EmbeddingT::Embedding2String(query_embedding_, embedding_data_type_, dimension_),
-                                  EmbeddingT::EmbeddingDataType2String(embedding_data_type_),
-                                  KnnDistanceType2Str(distance_type_),
-                                  topn_,
-                                  optional_filter_ ? fmt::format(", WHERE {}", optional_filter_->ToString()) : "");
+                                       arguments_.at(0)->Name(),
+                                       EmbeddingT::Embedding2String(query_embedding_, embedding_data_type_, dimension_),
+                                       EmbeddingT::EmbeddingDataType2String(embedding_data_type_),
+                                       KnnDistanceType2Str(distance_type_),
+                                       topn_,
+                                       optional_filter_ ? fmt::format(", WHERE {}", optional_filter_->ToString()) : "");
 
     return expr_str;
 }

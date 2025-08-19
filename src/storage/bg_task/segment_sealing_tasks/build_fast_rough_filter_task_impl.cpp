@@ -77,9 +77,7 @@ public:
     static constexpr infinity::DateTimeT lowest() {
         return infinity::DateTimeT(std::numeric_limits<i32>::lowest(), std::numeric_limits<i32>::lowest());
     };
-    static constexpr infinity::DateTimeT max() {
-        return infinity::DateTimeT(std::numeric_limits<i32>::max(), std::numeric_limits<i32>::max());
-    }
+    static constexpr infinity::DateTimeT max() { return infinity::DateTimeT(std::numeric_limits<i32>::max(), std::numeric_limits<i32>::max()); }
 };
 
 template <>
@@ -88,9 +86,7 @@ public:
     static constexpr infinity::TimestampT lowest() {
         return infinity::TimestampT(std::numeric_limits<i32>::lowest(), std::numeric_limits<i32>::lowest());
     };
-    static constexpr infinity::TimestampT max() {
-        return infinity::TimestampT(std::numeric_limits<i32>::max(), std::numeric_limits<i32>::max());
-    }
+    static constexpr infinity::TimestampT max() { return infinity::TimestampT(std::numeric_limits<i32>::max(), std::numeric_limits<i32>::max()); }
 };
 
 namespace infinity {

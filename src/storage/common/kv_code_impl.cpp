@@ -113,7 +113,9 @@ std::string KeyEncode::CatalogTableKey(const std::string &db_id, const std::stri
     return fmt::format("catalog|tbl|{}|{}|{}", db_id, table_name, ts);
 }
 
-std::string KeyEncode::CatalogTablePrefix(const std::string &db_id, const std::string &table_name) { return fmt::format("catalog|tbl|{}|{}|", db_id, table_name); }
+std::string KeyEncode::CatalogTablePrefix(const std::string &db_id, const std::string &table_name) {
+    return fmt::format("catalog|tbl|{}|{}|", db_id, table_name);
+}
 std::string KeyEncode::CatalogDbTablePrefix(const std::string &db_id) { return fmt::format("catalog|tbl|{}|", db_id); }
 
 std::string KeyEncode::CatalogTableTagKey(const std::string &db_id, const std::string &table_id, const std::string &tag_name) {
@@ -130,17 +132,22 @@ std::string KeyEncode::CatalogIndexKey(const std::string &db_id, const std::stri
 std::string KeyEncode::CatalogIndexPrefix(const std::string &db_id, const std::string &table_id, const std::string &index_name) {
     return fmt::format("catalog|idx|{}|{}|{}|", db_id, table_id, index_name);
 }
-std::string KeyEncode::CatalogTableIndexPrefix(const std::string &db_id, const std::string &table_id) { return fmt::format("catalog|idx|{}|{}|", db_id, table_id); }
+std::string KeyEncode::CatalogTableIndexPrefix(const std::string &db_id, const std::string &table_id) {
+    return fmt::format("catalog|idx|{}|{}|", db_id, table_id);
+}
 
-std::string KeyEncode::CatalogIndexTagKey(const std::string &db_id, const std::string &table_id, const std::string &index_id, const std::string &tag_name) {
+std::string
+KeyEncode::CatalogIndexTagKey(const std::string &db_id, const std::string &table_id, const std::string &index_id, const std::string &tag_name) {
     return fmt::format("idx|{}|{}|{}|{}", db_id, table_id, index_id, tag_name);
 }
 
-std::string KeyEncode::CatalogIndexTagKeyPrefix(const std::string &db_id, const std::string &table_id, const std::string &index_id, const std::string &tag_name) {
+std::string
+KeyEncode::CatalogIndexTagKeyPrefix(const std::string &db_id, const std::string &table_id, const std::string &index_id, const std::string &tag_name) {
     return fmt::format("idx|{}|{}|{}|{}|", db_id, table_id, index_id, tag_name);
 }
 
-std::string KeyEncode::CatalogIdxSegmentKey(const std::string &db_id, const std::string &table_id, const std::string &index_id, SegmentID segment_id) {
+std::string
+KeyEncode::CatalogIdxSegmentKey(const std::string &db_id, const std::string &table_id, const std::string &index_id, SegmentID segment_id) {
     return fmt::format("idx_seg|{}|{}|{}|{}", db_id, table_id, index_id, segment_id);
 }
 
@@ -149,27 +156,32 @@ std::string KeyEncode::CatalogIdxSegmentKeyPrefix(const std::string &db_id, cons
 }
 
 std::string KeyEncode::CatalogIdxSegmentTagKey(const std::string &db_id,
-                                          const std::string &table_id,
-                                          const std::string &index_id,
-                                          SegmentID segment_id,
-                                          const std::string &tag_name) {
+                                               const std::string &table_id,
+                                               const std::string &index_id,
+                                               SegmentID segment_id,
+                                               const std::string &tag_name) {
     return fmt::format("idx_seg|{}|{}|{}|{}|{}", db_id, table_id, index_id, segment_id, tag_name);
 }
 
-std::string KeyEncode::CatalogIdxChunkKey(const std::string &db_id, const std::string &table_id, const std::string &index_id, SegmentID segment_id, ChunkID chunk_id) {
+std::string KeyEncode::CatalogIdxChunkKey(const std::string &db_id,
+                                          const std::string &table_id,
+                                          const std::string &index_id,
+                                          SegmentID segment_id,
+                                          ChunkID chunk_id) {
     return fmt::format("idx_chunk|{}|{}|{}|{}|{}", db_id, table_id, index_id, segment_id, chunk_id);
 }
 
-std::string KeyEncode::CatalogIdxChunkPrefix(const std::string &db_id, const std::string &table_id, const std::string &index_id, SegmentID segment_id) {
+std::string
+KeyEncode::CatalogIdxChunkPrefix(const std::string &db_id, const std::string &table_id, const std::string &index_id, SegmentID segment_id) {
     return fmt::format("idx_chunk|{}|{}|{}|{}|", db_id, table_id, index_id, segment_id);
 }
 
 std::string KeyEncode::CatalogIdxChunkTagKey(const std::string &db_id,
-                                        const std::string &table_id,
-                                        const std::string &index_id,
-                                        SegmentID segment_id,
-                                        ChunkID chunk_id,
-                                        const std::string &tag_name) {
+                                             const std::string &table_id,
+                                             const std::string &index_id,
+                                             SegmentID segment_id,
+                                             ChunkID chunk_id,
+                                             const std::string &tag_name) {
     return fmt::format("idx_chunk|{}|{}|{}|{}|{}|{}", db_id, table_id, index_id, segment_id, chunk_id, tag_name);
 }
 
@@ -177,13 +189,16 @@ std::string KeyEncode::TableColumnKey(const std::string &db_id, const std::strin
     return fmt::format("tbl|col|{}|{}|{}|{}", db_id, table_id, column_name, ts);
 }
 
-std::string KeyEncode::TableColumnPrefix(const std::string &db_id, const std::string &table_id) { return fmt::format("tbl|col|{}|{}|", db_id, table_id); }
+std::string KeyEncode::TableColumnPrefix(const std::string &db_id, const std::string &table_id) {
+    return fmt::format("tbl|col|{}|{}|", db_id, table_id);
+}
 
 std::string KeyEncode::TableColumnPrefix(const std::string &db_id, const std::string &table_id, const std::string &column_name) {
     return fmt::format("tbl|col|{}|{}|{}", db_id, table_id, column_name);
 }
 
-std::string KeyEncode::TableColumnTagKey(const std::string &db_id, const std::string &table_id, const std::string &column_id, const std::string &tag_name) {
+std::string
+KeyEncode::TableColumnTagKey(const std::string &db_id, const std::string &table_id, const std::string &column_id, const std::string &tag_name) {
     return fmt::format("col|{}|{}|{}|{}", db_id, table_id, column_id, tag_name);
 }
 
@@ -193,7 +208,8 @@ std::string KeyEncode::CatalogTableSegmentKey(const std::string &db_id, const st
 std::string KeyEncode::CatalogTableSegmentKeyPrefix(const std::string &db_id, const std::string &table_id) {
     return fmt::format("catalog|seg|{}|{}|", db_id, table_id);
 }
-std::string KeyEncode::CatalogTableSegmentTagKey(const std::string &db_id, const std::string &table_id, SegmentID segment_id, const std::string &tag_name) {
+std::string
+KeyEncode::CatalogTableSegmentTagKey(const std::string &db_id, const std::string &table_id, SegmentID segment_id, const std::string &tag_name) {
     return fmt::format("seg|{}|{}|{}|{}", db_id, table_id, segment_id, tag_name);
 }
 std::string KeyEncode::CatalogTableSegmentBlockKey(const std::string &db_id, const std::string &table_id, SegmentID segment_id, BlockID block_id) {
@@ -203,18 +219,18 @@ std::string KeyEncode::CatalogTableSegmentBlockKeyPrefix(const std::string &db_i
     return fmt::format("catalog|blk|{}|{}|{}|", db_id, table_id, segment_id);
 }
 std::string KeyEncode::CatalogTableSegmentBlockTagKey(const std::string &db_id,
-                                                 const std::string &table_id,
-                                                 SegmentID segment_id,
-                                                 BlockID block_id,
-                                                 const std::string &tag_name) {
+                                                      const std::string &table_id,
+                                                      SegmentID segment_id,
+                                                      BlockID block_id,
+                                                      const std::string &tag_name) {
     return fmt::format("blk|{}|{}|{}|{}|{}", db_id, table_id, segment_id, block_id, tag_name);
 }
 std::string KeyEncode::CatalogTableSegmentBlockColumnKey(const std::string &db_id,
-                                                    const std::string &table_id,
-                                                    SegmentID segment_id,
-                                                    BlockID block_id,
-                                                    ColumnID column_id,
-                                                    TxnTimeStamp ts) {
+                                                         const std::string &table_id,
+                                                         SegmentID segment_id,
+                                                         BlockID block_id,
+                                                         ColumnID column_id,
+                                                         TxnTimeStamp ts) {
     return fmt::format("catalog|blk_col|{}|{}|{}|{}|{}|{}", db_id, table_id, segment_id, block_id, column_id, ts);
 }
 std::string KeyEncode::CatalogTableSegmentBlockColumnKeyPrefix(const std::string &db_id,
@@ -225,11 +241,11 @@ std::string KeyEncode::CatalogTableSegmentBlockColumnKeyPrefix(const std::string
     return fmt::format("catalog|blk_col|{}|{}|{}|{}|", db_id, table_id, segment_id, block_id);
 }
 std::string KeyEncode::CatalogTableSegmentBlockColumnTagKey(const std::string &db_id,
-                                                       const std::string &table_id,
-                                                       SegmentID segment_id,
-                                                       BlockID block_id,
-                                                       ColumnID column_id,
-                                                       const std::string &tag_name) {
+                                                            const std::string &table_id,
+                                                            SegmentID segment_id,
+                                                            BlockID block_id,
+                                                            ColumnID column_id,
+                                                            const std::string &tag_name) {
     return fmt::format("blk_col|{}|{}|{}|{}|{}|{}", db_id, table_id, segment_id, block_id, column_id, tag_name);
 }
 
@@ -239,7 +255,9 @@ std::string KeyEncode::DatabasePrefix(const std::string &db_name) { return fmt::
 std::string KeyEncode::TableKey(const std::string &db_name, const std::string &tbl_name, TxnTimeStamp ts) {
     return fmt::format("tbl|{}|{}|{}", db_name, tbl_name, ts);
 }
-std::string KeyEncode::TableKeyPrefix(const std::string &db_name, const std::string &tbl_name) { return fmt::format("tbl|{}|{}|", db_name, tbl_name); }
+std::string KeyEncode::TableKeyPrefix(const std::string &db_name, const std::string &tbl_name) {
+    return fmt::format("tbl|{}|{}|", db_name, tbl_name);
+}
 
 std::string KeyEncode::TableSegmentKey(const std::string &db_name, const std::string &tbl_name, SegmentID segment_id, TxnTimeStamp ts) {
     return fmt::format("seg|{}|{}|{}|{}", db_name, tbl_name, segment_id, ts);
@@ -248,7 +266,8 @@ std::string KeyEncode::TableSegmentKeyPrefix(const std::string &db_name, const s
     return fmt::format("seg|{}|{}|{}|", db_name, tbl_name, segment_id);
 }
 
-std::string KeyEncode::TableSegmentBlockKey(const std::string &db_name, const std::string &tbl_name, SegmentID segment_id, BlockID block_id, TxnTimeStamp ts) {
+std::string
+KeyEncode::TableSegmentBlockKey(const std::string &db_name, const std::string &tbl_name, SegmentID segment_id, BlockID block_id, TxnTimeStamp ts) {
     return fmt::format("blk|{}|{}|{}|{}|{}", db_name, tbl_name, segment_id, block_id, ts);
 }
 std::string KeyEncode::TableSegmentBlockKeyPrefix(const std::string &db_name, const std::string &tbl_name, SegmentID segment_id, BlockID block_id) {
@@ -256,18 +275,18 @@ std::string KeyEncode::TableSegmentBlockKeyPrefix(const std::string &db_name, co
 }
 
 std::string KeyEncode::TableSegmentBlockColumnKey(const std::string &db_name,
-                                             const std::string &tbl_name,
-                                             SegmentID segment_id,
-                                             BlockID block_id,
-                                             ColumnID column_id,
-                                             TxnTimeStamp ts) {
+                                                  const std::string &tbl_name,
+                                                  SegmentID segment_id,
+                                                  BlockID block_id,
+                                                  ColumnID column_id,
+                                                  TxnTimeStamp ts) {
     return fmt::format("col|{}|{}|{}|{}|{}|{}", db_name, tbl_name, segment_id, block_id, column_id, ts);
 }
 std::string KeyEncode::TableSegmentBlockColumnKeyPrefix(const std::string &db_name,
-                                                   const std::string &tbl_name,
-                                                   SegmentID segment_id,
-                                                   BlockID block_id,
-                                                   ColumnID column_id) {
+                                                        const std::string &tbl_name,
+                                                        SegmentID segment_id,
+                                                        BlockID block_id,
+                                                        ColumnID column_id) {
     return fmt::format("col|{}|{}|{}|{}|{}|", db_name, tbl_name, segment_id, block_id, column_id);
 }
 
@@ -278,8 +297,11 @@ std::string KeyEncode::TableIndexKeyPrefix(const std::string &db_name, const std
     return fmt::format("idx|{}|{}|{}|", db_name, tbl_name, index_name);
 }
 
-std::string
-KeyEncode::TableIndexSegmentKey(const std::string &db_name, const std::string &tbl_name, const std::string &index_name, SegmentID segment_id, TxnTimeStamp ts) {
+std::string KeyEncode::TableIndexSegmentKey(const std::string &db_name,
+                                            const std::string &tbl_name,
+                                            const std::string &index_name,
+                                            SegmentID segment_id,
+                                            TxnTimeStamp ts) {
     return fmt::format("idx_seg|{}|{}|{}|{}|{}", db_name, tbl_name, index_name, segment_id, ts);
 }
 
@@ -288,11 +310,11 @@ std::string KeyEncode::TableIndexSegmentKeyPrefix(const std::string &db_name, co
 }
 
 std::string KeyEncode::TableIndexChunkKey(const std::string &db_name,
-                                     const std::string &tbl_name,
-                                     const std::string &index_name,
-                                     SegmentID segment_id,
-                                     ChunkID chunk_id,
-                                     TxnTimeStamp ts) {
+                                          const std::string &tbl_name,
+                                          const std::string &index_name,
+                                          SegmentID segment_id,
+                                          ChunkID chunk_id,
+                                          TxnTimeStamp ts) {
     return fmt::format("idx_chunk|{}|{}|{}|{}|{}|{}", db_name, tbl_name, index_name, segment_id, chunk_id, ts);
 }
 std::string KeyEncode::TableIndexChunkKeyPrefix(const std::string &db_name, const std::string &tbl_name, const std::string &index_name) {
@@ -311,11 +333,13 @@ std::string KeyEncode::DropDBKey(const std::string &db_name, const TxnTimeStamp 
     return fmt::format("drop|db|{}/{}/{}", db_name, commit_ts, db_id_str);
 }
 
-std::string KeyEncode::DropTableKey(const std::string &db_id_str, const std::string &table_name, const std::string &table_id_str, TxnTimeStamp create_ts) {
+std::string
+KeyEncode::DropTableKey(const std::string &db_id_str, const std::string &table_name, const std::string &table_id_str, TxnTimeStamp create_ts) {
     return fmt::format("drop|tbl|{}/{}/{}/{}", db_id_str, table_name, create_ts, table_id_str);
 }
 
-std::string KeyEncode::RenameTableKey(const std::string &db_id_str, const std::string &table_name, const std::string &table_id_str, TxnTimeStamp create_ts) {
+std::string
+KeyEncode::RenameTableKey(const std::string &db_id_str, const std::string &table_name, const std::string &table_id_str, TxnTimeStamp create_ts) {
     return fmt::format("drop|tbl_name|{}/{}/{}/{}", db_id_str, table_name, create_ts, table_id_str);
 }
 
@@ -331,35 +355,37 @@ std::string KeyEncode::DropBlockKey(const std::string &db_id_str, const std::str
     return fmt::format("drop|blk|{}/{}/{}/{}", db_id_str, table_id_str, segment_id, block_id);
 }
 
-std::string KeyEncode::DropTableColumnKey(const std::string &db_id_str, const std::string &table_id_str, const std::string &column_name, TxnTimeStamp create_ts) {
+std::string
+KeyEncode::DropTableColumnKey(const std::string &db_id_str, const std::string &table_id_str, const std::string &column_name, TxnTimeStamp create_ts) {
     return fmt::format("drop|tbl_col|{}/{}/{}/{}", db_id_str, table_id_str, column_name, create_ts);
 }
 
 std::string KeyEncode::DropBlockColumnKey(const std::string &db_id_str,
-                                     const std::string &table_id_str,
-                                     SegmentID segment_id,
-                                     BlockID block_id,
-                                     const std::shared_ptr<ColumnDef> &column_def) {
+                                          const std::string &table_id_str,
+                                          SegmentID segment_id,
+                                          BlockID block_id,
+                                          const std::shared_ptr<ColumnDef> &column_def) {
     return fmt::format("drop|blk_col|{}/{}/{}/{}/{}", db_id_str, table_id_str, segment_id, block_id, column_def->ToJson().dump());
 }
 
 std::string KeyEncode::DropTableIndexKey(const std::string &db_id_str,
-                                    const std::string &table_id_str,
-                                    const std::string &index_name,
-                                    const TxnTimeStamp &commit_ts,
-                                    const std::string &index_id_str) {
+                                         const std::string &table_id_str,
+                                         const std::string &index_name,
+                                         const TxnTimeStamp &commit_ts,
+                                         const std::string &index_id_str) {
     return fmt::format("drop|idx|{}/{}/{}/{}/{}", db_id_str, table_id_str, index_name, commit_ts, index_id_str);
 }
 
-std::string KeyEncode::DropSegmentIndexKey(const std::string &db_id_str, const std::string &table_id_str, const std::string &index_id_str, SegmentID segment_id) {
+std::string
+KeyEncode::DropSegmentIndexKey(const std::string &db_id_str, const std::string &table_id_str, const std::string &index_id_str, SegmentID segment_id) {
     return fmt::format("drop|idx_seg|{}/{}/{}/{}", db_id_str, table_id_str, index_id_str, segment_id);
 }
 
 std::string KeyEncode::DropChunkIndexKey(const std::string &db_id_str,
-                                    const std::string &table_id_str,
-                                    const std::string &index_id_str,
-                                    SegmentID segment_id,
-                                    ChunkID chunk_id) {
+                                         const std::string &table_id_str,
+                                         const std::string &index_id_str,
+                                         SegmentID segment_id,
+                                         ChunkID chunk_id) {
     return fmt::format("drop|idx_chunk|{}/{}/{}/{}/{}", db_id_str, table_id_str, index_id_str, segment_id, chunk_id);
 }
 

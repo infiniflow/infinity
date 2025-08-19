@@ -471,7 +471,6 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
                     //     checkpoint_task->ExecuteWithNewTxn();
                     // }
 
-
                     // // wait for checkpoint to complete
                     // while (wal_manager->LastCheckpointTS() + 2 < begin_ts) {
                     //     std::this_thread::sleep_for(std::chrono::milliseconds(10));

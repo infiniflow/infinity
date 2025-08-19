@@ -31,7 +31,7 @@ import :infinity_exception;
 
 namespace infinity {
 
-void PhysicalFilter::Init(QueryContext* query_context) {
+void PhysicalFilter::Init(QueryContext *query_context) {
     //    executor.Init({condition_});
     //    input_table_ = left_->output();
     //    ExecutorAssert(input_table_ != nullptr, "No input.");

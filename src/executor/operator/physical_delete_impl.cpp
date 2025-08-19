@@ -35,7 +35,7 @@ import logical_type;
 
 namespace infinity {
 
-void PhysicalDelete::Init(QueryContext* query_context) {}
+void PhysicalDelete::Init(QueryContext *query_context) {}
 
 bool PhysicalDelete::Execute(QueryContext *query_context, OperatorState *operator_state) {
     StorageMode storage_mode = InfinityContext::instance().storage()->GetStorageMode();

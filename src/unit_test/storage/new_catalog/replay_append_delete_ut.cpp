@@ -302,7 +302,8 @@ TEST_P(TestTxnReplayAppend, test_replay_append_with_index0) {
         EXPECT_TRUE(status.ok());
     }
     auto create_index = [&](const std::shared_ptr<IndexBase> &index_base) {
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("create index {}", *index_base->index_name_)), TransactionType::kNormal);
+        auto *txn =
+            new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("create index {}", *index_base->index_name_)), TransactionType::kNormal);
         Status status = txn->CreateIndex(*db_name, *table_name, index_base, ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
@@ -365,7 +366,8 @@ TEST_P(TestTxnReplayAppend, test_replay_append_with_index0) {
         EXPECT_EQ(row_cnt, block_row_cnt * 2);
     };
 
-    auto check_index = [&](const std::string &index_name, const std::function<std::pair<RowID, u32>(const std::shared_ptr<MemIndex> &)> &check_mem_index) {
+    auto check_index = [&](const std::string &index_name,
+                           const std::function<std::pair<RowID, u32>(const std::shared_ptr<MemIndex> &)> &check_mem_index) {
         auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("check index"), TransactionType::kNormal);
 
         std::optional<DBMeeta> db_meta;

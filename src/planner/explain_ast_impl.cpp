@@ -47,7 +47,6 @@ import create_index_info;
 import create_collection_info;
 import drop_collection_info;
 
-
 namespace infinity {
 
 Status ExplainAST::Explain(const BaseStatement *statement, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &stmt_string, i64 intent_size) {
@@ -92,7 +91,9 @@ Status ExplainAST::Explain(const BaseStatement *statement, std::shared_ptr<std::
     return Status::OK();
 }
 
-Status ExplainAST::BuildCreate(const CreateStatement *create_statement, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size) {
+Status ExplainAST::BuildCreate(const CreateStatement *create_statement,
+                               std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result,
+                               i64 intent_size) {
 
     switch (create_statement->ddl_type()) {
         case DDLType::kInvalid: {
@@ -168,7 +169,9 @@ Status ExplainAST::BuildCreate(const CreateStatement *create_statement, std::sha
     return Status::OK();
 }
 
-Status ExplainAST::BuildInsert(const InsertStatement *insert_statement, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size) {
+Status ExplainAST::BuildInsert(const InsertStatement *insert_statement,
+                               std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result,
+                               i64 intent_size) {
     result->emplace_back(std::make_shared<std::string>("INSERT: "));
     intent_size += 2;
     std::string schema_name = std::string(intent_size, ' ') + "database: " + insert_statement->schema_name_;
@@ -214,7 +217,8 @@ Status ExplainAST::BuildInsert(const InsertStatement *insert_statement, std::sha
     return Status::OK();
 }
 
-Status ExplainAST::BuildDrop(const DropStatement *drop_statement, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size) {
+Status
+ExplainAST::BuildDrop(const DropStatement *drop_statement, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size) {
     switch (drop_statement->ddl_type()) {
         case DDLType::kInvalid: {
             UnrecoverableError("Invalid DDL type.");
@@ -420,7 +424,9 @@ Status ExplainAST::BuildSelect(const SelectStatement *select_statement,
     return Status::OK();
 }
 
-Status ExplainAST::BuildBaseTableRef(const BaseTableReference *base_table_ref, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size) {
+Status ExplainAST::BuildBaseTableRef(const BaseTableReference *base_table_ref,
+                                     std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result,
+                                     i64 intent_size) {
     std::string from_str;
     switch (base_table_ref->type_) {
         case TableRefType::kCrossProduct: {
@@ -503,7 +509,8 @@ Status ExplainAST::BuildBaseTableRef(const BaseTableReference *base_table_ref, s
     return Status::OK();
 }
 
-Status ExplainAST::BuildShow(const ShowStatement *show_statement, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size) {
+Status
+ExplainAST::BuildShow(const ShowStatement *show_statement, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size) {
 
     switch (show_statement->show_type_) {
         case ShowStmtType::kDatabase: {
@@ -787,12 +794,14 @@ Status ExplainAST::BuildFlush(const FlushStatement *flush_statement, std::shared
     return Status::OK();
 }
 
-Status ExplainAST::BuildOptimize(const OptimizeStatement *optimize_statement, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64) {
+Status
+ExplainAST::BuildOptimize(const OptimizeStatement *optimize_statement, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64) {
     result->emplace_back(std::make_shared<std::string>("OPTIMIZE TABLE"));
     return Status::OK();
 }
 
-Status ExplainAST::BuildCopy(const CopyStatement *copy_statement, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size) {
+Status
+ExplainAST::BuildCopy(const CopyStatement *copy_statement, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size) {
     if (copy_statement->copy_from_) {
         // IMPORT
         result->emplace_back(std::make_shared<std::string>("IMPORT DATA:"));
@@ -801,7 +810,8 @@ Status ExplainAST::BuildCopy(const CopyStatement *copy_statement, std::shared_pt
         result->emplace_back(std::make_shared<std::string>("EXPORT DATA:"));
     }
 
-    std::shared_ptr<std::string> schema_name = std::make_shared<std::string>(std::string(intent_size, ' ') + "database: " + copy_statement->schema_name_);
+    std::shared_ptr<std::string> schema_name =
+        std::make_shared<std::string>(std::string(intent_size, ' ') + "database: " + copy_statement->schema_name_);
     result->emplace_back(schema_name);
 
     std::shared_ptr<std::string> table_name = std::make_shared<std::string>(std::string(intent_size, ' ') + "table: " + copy_statement->table_name_);
@@ -815,18 +825,23 @@ Status ExplainAST::BuildCopy(const CopyStatement *copy_statement, std::shared_pt
             std::shared_ptr<std::string> file_type = std::make_shared<std::string>(std::string(intent_size, ' ') + "file type: CSV");
             result->emplace_back(file_type);
 
-            std::shared_ptr<std::string> header = std::make_shared<std::string>(std::string(intent_size, ' ') + "header: " + (copy_statement->header_ ? "Yes" : "No"));
+            std::shared_ptr<std::string> header =
+                std::make_shared<std::string>(std::string(intent_size, ' ') + "header: " + (copy_statement->header_ ? "Yes" : "No"));
             result->emplace_back(header);
 
-            std::shared_ptr<std::string> delimiter = std::make_shared<std::string>(std::string(intent_size, ' ') + "delimiter: " + copy_statement->delimiter_);
+            std::shared_ptr<std::string> delimiter =
+                std::make_shared<std::string>(std::string(intent_size, ' ') + "delimiter: " + copy_statement->delimiter_);
             result->emplace_back(delimiter);
             if (!copy_statement->copy_from_) {
                 // export
-                std::shared_ptr<std::string> offset = std::make_shared<std::string>(std::string(intent_size, ' ') + fmt::format("offset: {}", copy_statement->offset_));
+                std::shared_ptr<std::string> offset =
+                    std::make_shared<std::string>(std::string(intent_size, ' ') + fmt::format("offset: {}", copy_statement->offset_));
                 result->emplace_back(offset);
-                std::shared_ptr<std::string> limit = std::make_shared<std::string>(std::string(intent_size, ' ') + fmt::format("limit: {}", copy_statement->limit_));
+                std::shared_ptr<std::string> limit =
+                    std::make_shared<std::string>(std::string(intent_size, ' ') + fmt::format("limit: {}", copy_statement->limit_));
                 result->emplace_back(limit);
-                std::shared_ptr<std::string> row_limit = std::make_shared<std::string>(std::string(intent_size, ' ') + fmt::format("row_limit: {}", copy_statement->row_limit_));
+                std::shared_ptr<std::string> row_limit =
+                    std::make_shared<std::string>(std::string(intent_size, ' ') + fmt::format("row_limit: {}", copy_statement->row_limit_));
                 result->emplace_back(row_limit);
             }
             break;
@@ -836,11 +851,14 @@ Status ExplainAST::BuildCopy(const CopyStatement *copy_statement, std::shared_pt
             result->emplace_back(file_type);
             if (!copy_statement->copy_from_) {
                 // export
-                std::shared_ptr<std::string> offset = std::make_shared<std::string>(std::string(intent_size, ' ') + fmt::format("offset: {}", copy_statement->offset_));
+                std::shared_ptr<std::string> offset =
+                    std::make_shared<std::string>(std::string(intent_size, ' ') + fmt::format("offset: {}", copy_statement->offset_));
                 result->emplace_back(offset);
-                std::shared_ptr<std::string> limit = std::make_shared<std::string>(std::string(intent_size, ' ') + fmt::format("limit: {}", copy_statement->limit_));
+                std::shared_ptr<std::string> limit =
+                    std::make_shared<std::string>(std::string(intent_size, ' ') + fmt::format("limit: {}", copy_statement->limit_));
                 result->emplace_back(limit);
-                std::shared_ptr<std::string> row_limit = std::make_shared<std::string>(std::string(intent_size, ' ') + fmt::format("row_limit: {}", copy_statement->row_limit_));
+                std::shared_ptr<std::string> row_limit =
+                    std::make_shared<std::string>(std::string(intent_size, ' ') + fmt::format("row_limit: {}", copy_statement->row_limit_));
                 result->emplace_back(row_limit);
             }
             break;
@@ -850,11 +868,14 @@ Status ExplainAST::BuildCopy(const CopyStatement *copy_statement, std::shared_pt
             result->emplace_back(file_type);
             if (!copy_statement->copy_from_) {
                 // export
-                std::shared_ptr<std::string> offset = std::make_shared<std::string>(std::string(intent_size, ' ') + fmt::format("offset: {}", copy_statement->offset_));
+                std::shared_ptr<std::string> offset =
+                    std::make_shared<std::string>(std::string(intent_size, ' ') + fmt::format("offset: {}", copy_statement->offset_));
                 result->emplace_back(offset);
-                std::shared_ptr<std::string> limit = std::make_shared<std::string>(std::string(intent_size, ' ') + fmt::format("limit: {}", copy_statement->limit_));
+                std::shared_ptr<std::string> limit =
+                    std::make_shared<std::string>(std::string(intent_size, ' ') + fmt::format("limit: {}", copy_statement->limit_));
                 result->emplace_back(limit);
-                std::shared_ptr<std::string> row_limit = std::make_shared<std::string>(std::string(intent_size, ' ') + fmt::format("row_limit: {}", copy_statement->row_limit_));
+                std::shared_ptr<std::string> row_limit =
+                    std::make_shared<std::string>(std::string(intent_size, ' ') + fmt::format("row_limit: {}", copy_statement->row_limit_));
                 result->emplace_back(row_limit);
             }
             break;
@@ -864,11 +885,14 @@ Status ExplainAST::BuildCopy(const CopyStatement *copy_statement, std::shared_pt
             result->emplace_back(file_type);
             if (!copy_statement->copy_from_) {
                 // export
-                std::shared_ptr<std::string> offset = std::make_shared<std::string>(std::string(intent_size, ' ') + fmt::format("offset: {}", copy_statement->offset_));
+                std::shared_ptr<std::string> offset =
+                    std::make_shared<std::string>(std::string(intent_size, ' ') + fmt::format("offset: {}", copy_statement->offset_));
                 result->emplace_back(offset);
-                std::shared_ptr<std::string> limit = std::make_shared<std::string>(std::string(intent_size, ' ') + fmt::format("limit: {}", copy_statement->limit_));
+                std::shared_ptr<std::string> limit =
+                    std::make_shared<std::string>(std::string(intent_size, ' ') + fmt::format("limit: {}", copy_statement->limit_));
                 result->emplace_back(limit);
-                std::shared_ptr<std::string> row_limit = std::make_shared<std::string>(std::string(intent_size, ' ') + fmt::format("row_limit: {}", copy_statement->row_limit_));
+                std::shared_ptr<std::string> row_limit =
+                    std::make_shared<std::string>(std::string(intent_size, ' ') + fmt::format("row_limit: {}", copy_statement->row_limit_));
                 result->emplace_back(row_limit);
             }
             break;
@@ -895,7 +919,8 @@ Status ExplainAST::BuildCopy(const CopyStatement *copy_statement, std::shared_pt
     return Status::OK();
 }
 
-Status ExplainAST::BuildCheck(const CheckStatement *check_statement, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size) {
+Status
+ExplainAST::BuildCheck(const CheckStatement *check_statement, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size) {
     switch (check_statement->check_type_) {
         case CheckStmtType::kSystem: {
             result->emplace_back(std::make_shared<std::string>("CHECK SYSTEM"));

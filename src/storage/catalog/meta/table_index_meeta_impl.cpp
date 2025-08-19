@@ -64,7 +64,8 @@ Status TableIndexMeeta::SetIndexBase(const std::shared_ptr<IndexBase> &index_bas
 }
 
 std::shared_ptr<std::string> TableIndexMeeta::GetTableIndexDir() {
-    return std::make_shared<std::string>(fmt::format("db_{}/tbl_{}/idx_{}", table_meta_.db_id_str(), table_meta_.GetTableDir()->c_str(), index_id_str_));
+    return std::make_shared<std::string>(
+        fmt::format("db_{}/tbl_{}/idx_{}", table_meta_.db_id_str(), table_meta_.GetTableDir()->c_str(), index_id_str_));
 }
 
 std::tuple<std::shared_ptr<ColumnDef>, Status> TableIndexMeeta::GetColumnDef() {

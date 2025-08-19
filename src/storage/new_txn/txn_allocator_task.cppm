@@ -38,10 +38,10 @@ public:
     }
 
     Status status_{};
+
 private:
     NewTxn *new_txn_{};
     bool stop_task_{false};
-
 
     bool complete_{false};
     std::mutex mutex_{};

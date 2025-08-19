@@ -30,7 +30,10 @@ import row_id;
 
 namespace infinity {
 
-TermDocIterator::TermDocIterator(std::unique_ptr<PostingIterator> &&iter, const u64 column_id, const float weight, const FulltextSimilarity ft_similarity)
+TermDocIterator::TermDocIterator(std::unique_ptr<PostingIterator> &&iter,
+                                 const u64 column_id,
+                                 const float weight,
+                                 const FulltextSimilarity ft_similarity)
     : column_id_(column_id), iter_(std::move(iter)), weight_(weight), ft_similarity_(ft_similarity) {
     doc_freq_ = iter_->GetDocFreq();
     term_freq_ = 0;
@@ -51,7 +54,10 @@ TermDocIterator::~TermDocIterator() {
     }
 }
 
-void TermDocIterator::InitBM25Info(std::unique_ptr<FullTextColumnLengthReader> &&column_length_reader, const float delta, const float k1, const float b) {
+void TermDocIterator::InitBM25Info(std::unique_ptr<FullTextColumnLengthReader> &&column_length_reader,
+                                   const float delta,
+                                   const float k1,
+                                   const float b) {
     column_length_reader_ = std::move(column_length_reader);
     avg_column_len_ = column_length_reader_->GetAvgColumnLength();
     if (avg_column_len_ <= 1e-6f) {

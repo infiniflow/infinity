@@ -34,7 +34,6 @@ struct ReverseFunction {
         Status status = Status::NotSupport("Not implemented");
         RecoverableError(status);
     }
-
 };
 
 template <>
@@ -53,11 +52,10 @@ void RegisterReverseFunction(NewCatalog *catalog_ptr) {
     std::shared_ptr<ScalarFunctionSet> function_set_ptr = std::make_shared<ScalarFunctionSet>(func_name);
 
     ScalarFunction resverse_function(func_name,
-                                  {DataType(LogicalType::kVarchar)},
-                                  {DataType(LogicalType::kVarchar)},
-                                  &ScalarFunction::UnaryFunctionVarlenToVarlen<VarcharT, VarcharT, ReverseFunction>);
+                                     {DataType(LogicalType::kVarchar)},
+                                     {DataType(LogicalType::kVarchar)},
+                                     &ScalarFunction::UnaryFunctionVarlenToVarlen<VarcharT, VarcharT, ReverseFunction>);
     function_set_ptr->AddFunction(resverse_function);
-
 
     NewCatalog::AddFunctionSet(catalog_ptr, function_set_ptr);
 }

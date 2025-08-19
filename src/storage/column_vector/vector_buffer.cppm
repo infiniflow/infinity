@@ -68,9 +68,9 @@ public:
 
     void ResetToInit(VectorBufferType type);
 
-    void Copy(char * input, size_t size);
+    void Copy(char *input, size_t size);
 
-    [[nodiscard]] char * GetDataMut() {
+    [[nodiscard]] char *GetDataMut() {
         if (std::holds_alternative<std::unique_ptr<char[]>>(ptr_)) {
             return std::get<std::unique_ptr<char[]>>(ptr_).get();
         } else {
@@ -78,7 +78,7 @@ public:
         }
     }
 
-    [[nodiscard]] const char * GetData() const {
+    [[nodiscard]] const char *GetData() const {
         if (std::holds_alternative<std::unique_ptr<char[]>>(ptr_)) {
             return std::get<std::unique_ptr<char[]>>(ptr_).get();
         } else {

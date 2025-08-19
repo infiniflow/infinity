@@ -360,22 +360,23 @@ Status NewCatalog::MemIndexCommit(NewTxn *new_txn) {
 }
 
 Status NewCatalog::GetAllMemIndexes(NewTxn *txn, std::vector<std::shared_ptr<MemIndex>> &mem_indexes, std::vector<MemIndexID> &mem_index_ids) {
-    auto TraverseTableIndex = [&](TableIndexMeeta &table_index_meta, const std::string &db_name, const std::string &table_name, const std::string &index_name) {
-        auto [index_segment_ids_ptr, status] = table_index_meta.GetSegmentIndexIDs1();
-        if (!status.ok()) {
-            return status;
-        }
-        for (SegmentID segment_id : *index_segment_ids_ptr) {
-            SegmentIndexMeta segment_index_meta(segment_id, table_index_meta);
-            std::shared_ptr<MemIndex> mem_index = segment_index_meta.GetMemIndex();
-            if (mem_index == nullptr) {
-                continue;
+    auto TraverseTableIndex =
+        [&](TableIndexMeeta &table_index_meta, const std::string &db_name, const std::string &table_name, const std::string &index_name) {
+            auto [index_segment_ids_ptr, status] = table_index_meta.GetSegmentIndexIDs1();
+            if (!status.ok()) {
+                return status;
             }
-            mem_indexes.push_back(mem_index);
-            mem_index_ids.push_back(MemIndexID{db_name, table_name, index_name, segment_id});
-        }
-        return Status::OK();
-    };
+            for (SegmentID segment_id : *index_segment_ids_ptr) {
+                SegmentIndexMeta segment_index_meta(segment_id, table_index_meta);
+                std::shared_ptr<MemIndex> mem_index = segment_index_meta.GetMemIndex();
+                if (mem_index == nullptr) {
+                    continue;
+                }
+                mem_indexes.push_back(mem_index);
+                mem_index_ids.push_back(MemIndexID{db_name, table_name, index_name, segment_id});
+            }
+            return Status::OK();
+        };
     auto TraverseTable = [&](TableMeeta &table_meta, const std::string &db_name, const std::string &table_name) {
         std::vector<std::string> *index_id_strs_ptr = nullptr;
         std::vector<std::string> *index_names_ptr = nullptr;
@@ -621,7 +622,8 @@ Status NewCatalog::AddNewSegment1(TableMeeta &table_meta, TxnTimeStamp commit_ts
     return segment_meta->InitSet();
 }
 
-Status NewCatalog::AddNewSegmentWithID(TableMeeta &table_meta, TxnTimeStamp commit_ts, std::optional<SegmentMeta> &segment_meta, SegmentID segment_id) {
+Status
+NewCatalog::AddNewSegmentWithID(TableMeeta &table_meta, TxnTimeStamp commit_ts, std::optional<SegmentMeta> &segment_meta, SegmentID segment_id) {
     Status status = table_meta.AddSegmentWithID(commit_ts, segment_id);
     if (!status.ok()) {
         return status;
@@ -952,17 +954,18 @@ Status NewCatalog::AddNewBlockColumn(BlockMeta &block_meta, size_t column_idx, s
     return Status::OK();
 }
 
-Status NewCatalog::AddNewBlockColumnForTransform(BlockMeta &block_meta, size_t column_idx, std::optional<ColumnMeta> &column_meta, TxnTimeStamp commit_ts) {
+Status
+NewCatalog::AddNewBlockColumnForTransform(BlockMeta &block_meta, size_t column_idx, std::optional<ColumnMeta> &column_meta, TxnTimeStamp commit_ts) {
     auto &kv_instance = block_meta.kv_instance();
     column_meta.emplace(column_idx, block_meta);
     auto &segment_meta = block_meta.segment_meta();
     auto &table_meta = segment_meta.table_meta();
     std::string block_id_key = KeyEncode::CatalogTableSegmentBlockColumnKey(table_meta.db_id_str(),
-                                                                       table_meta.table_id_str(),
-                                                                       segment_meta.segment_id(),
-                                                                       block_meta.block_id(),
-                                                                       column_idx,
-                                                                       commit_ts);
+                                                                            table_meta.table_id_str(),
+                                                                            segment_meta.segment_id(),
+                                                                            block_meta.block_id(),
+                                                                            column_idx,
+                                                                            commit_ts);
     std::string commit_ts_str = fmt::format("{}", commit_ts);
     Status status = kv_instance.Put(block_id_key, commit_ts_str);
     // {
@@ -1289,7 +1292,10 @@ Status NewCatalog::GetDBFilePaths(TxnTimeStamp begin_ts, TxnTimeStamp commit_ts,
     return Status::OK();
 }
 
-Status NewCatalog::GetTableFilePaths(TxnTimeStamp begin_ts, TableMeeta &table_meta, std::vector<std::string> &file_paths, std::shared_ptr<ColumnDef> column_def) {
+Status NewCatalog::GetTableFilePaths(TxnTimeStamp begin_ts,
+                                     TableMeeta &table_meta,
+                                     std::vector<std::string> &file_paths,
+                                     std::shared_ptr<ColumnDef> column_def) {
     std::vector<SegmentID> *segment_ids_ptr = nullptr;
     Status status;
     std::tie(segment_ids_ptr, status) = table_meta.GetSegmentIDs1();
@@ -1318,8 +1324,10 @@ Status NewCatalog::GetTableFilePaths(TxnTimeStamp begin_ts, TableMeeta &table_me
     return Status::OK();
 }
 
-Status
-NewCatalog::GetSegmentFilePaths(TxnTimeStamp begin_ts, SegmentMeta &segment_meta, std::vector<std::string> &file_paths, std::shared_ptr<ColumnDef> column_def) {
+Status NewCatalog::GetSegmentFilePaths(TxnTimeStamp begin_ts,
+                                       SegmentMeta &segment_meta,
+                                       std::vector<std::string> &file_paths,
+                                       std::shared_ptr<ColumnDef> column_def) {
     std::vector<BlockID> *block_ids_ptr = nullptr;
     Status status;
     std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1();
@@ -1374,7 +1382,10 @@ Status NewCatalog::GetBlockColumnFilePaths(ColumnMeta &column_meta, std::vector<
     return Status::OK();
 }
 
-Status NewCatalog::GetColumnFilePaths(TxnTimeStamp begin_ts, TableMeeta &table_meta, std::shared_ptr<ColumnDef> column_def, std::vector<std::string> &file_paths) {
+Status NewCatalog::GetColumnFilePaths(TxnTimeStamp begin_ts,
+                                      TableMeeta &table_meta,
+                                      std::shared_ptr<ColumnDef> column_def,
+                                      std::vector<std::string> &file_paths) {
     return NewCatalog::GetTableFilePaths(begin_ts, table_meta, file_paths, column_def);
 }
 
@@ -1582,9 +1593,9 @@ void NewCatalog::AddSpecialFunction(NewCatalog *catalog, const std::shared_ptr<S
         }
     }
     auto special_column_def = std::make_unique<ColumnDef>(special_function->extra_idx(),
-                                                    std::make_shared<DataType>(special_function->data_type()),
-                                                    special_function->name(),
-                                                    std::set<ConstraintType>());
+                                                          std::make_shared<DataType>(special_function->data_type()),
+                                                          special_function->name(),
+                                                          std::set<ConstraintType>());
     catalog->special_columns_.emplace(name, std::move(special_column_def));
 }
 

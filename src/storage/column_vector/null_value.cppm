@@ -198,7 +198,7 @@ inline UuidT NullValue() {
 
 template <>
 inline EmbeddingT NullValue() {
-    char * ptr = std::numeric_limits<char *>::infinity();
+    char *ptr = std::numeric_limits<char *>::infinity();
     EmbeddingT embedding(std::move(ptr), false);
     return embedding;
 }

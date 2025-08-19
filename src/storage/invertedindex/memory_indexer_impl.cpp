@@ -78,7 +78,11 @@ bool MemoryIndexer::KeyComp::operator()(const std::string &lhs, const std::strin
 
 MemoryIndexer::PostingTable::PostingTable() {}
 
-MemoryIndexer::MemoryIndexer(const std::string &index_dir, const std::string &base_name, RowID base_row_id, optionflag_t flag, const std::string &analyzer)
+MemoryIndexer::MemoryIndexer(const std::string &index_dir,
+                             const std::string &base_name,
+                             RowID base_row_id,
+                             optionflag_t flag,
+                             const std::string &analyzer)
     : index_dir_(index_dir), base_name_(base_name), base_row_id_(base_row_id), flag_(flag), posting_format_(PostingFormatOption(flag_)),
       analyzer_(analyzer), inverting_thread_pool_(infinity::InfinityContext::instance().GetFulltextInvertingThreadPool()),
       commiting_thread_pool_(infinity::InfinityContext::instance().GetFulltextCommitingThreadPool()), ring_inverted_(15UL), ring_sorted_(13UL) {
@@ -530,7 +534,11 @@ void MemoryIndexer::Reset() {
 }
 
 MemIndexTracerInfo MemoryIndexer::GetInfo() const {
-    return MemIndexTracerInfo(std::make_shared<std::string>(index_name_), std::make_shared<std::string>(table_name_), std::make_shared<std::string>(db_name_), MemUsed(), doc_count_);
+    return MemIndexTracerInfo(std::make_shared<std::string>(index_name_),
+                              std::make_shared<std::string>(table_name_),
+                              std::make_shared<std::string>(db_name_),
+                              MemUsed(),
+                              doc_count_);
 }
 
 const ChunkIndexMetaInfo MemoryIndexer::GetChunkIndexMetaInfo() const { return ChunkIndexMetaInfo{base_name_, base_row_id_, GetDocCount(), 0}; }
@@ -699,7 +707,8 @@ void MemoryIndexer::OfflineDump() {
         std::make_unique<SortMergerTermTuple<TermTuple, u32>>(spill_full_path_.c_str(), num_runs_, buffer_size_of_each_run * num_runs_, 2);
     std::vector<std::unique_ptr<std::thread>> threads;
     merger->Run(threads);
-    std::unique_ptr<std::thread> output_thread = std::make_unique<std::thread>(std::bind(&MemoryIndexer::TupleListToIndexFile, this, std::ref(merger)));
+    std::unique_ptr<std::thread> output_thread =
+        std::make_unique<std::thread>(std::bind(&MemoryIndexer::TupleListToIndexFile, this, std::ref(merger)));
     threads.emplace_back(std::move(output_thread));
 
     merger->JoinThreads(threads);

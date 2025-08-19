@@ -46,7 +46,7 @@ private:
 
     std::atomic<u64> task_count_{};
 
-    SystemCache* system_cache_{};
+    SystemCache *system_cache_{};
 };
 
 } // namespace infinity

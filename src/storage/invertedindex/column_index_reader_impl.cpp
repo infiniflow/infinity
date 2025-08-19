@@ -94,8 +94,12 @@ Status ColumnIndexReader::Open(optionflag_t flag, TableIndexMeeta &table_index_m
                     return status;
                 }
             }
-            std::shared_ptr<DiskIndexSegmentReader> segment_reader =
-                std::make_shared<DiskIndexSegmentReader>(segment_id, chunk_id, *index_dir, chunk_info_ptr->base_name_, chunk_info_ptr->base_row_id_, flag);
+            std::shared_ptr<DiskIndexSegmentReader> segment_reader = std::make_shared<DiskIndexSegmentReader>(segment_id,
+                                                                                                              chunk_id,
+                                                                                                              *index_dir,
+                                                                                                              chunk_info_ptr->base_name_,
+                                                                                                              chunk_info_ptr->base_row_id_,
+                                                                                                              flag);
             segment_readers_.push_back(std::move(segment_reader));
 
             BufferObj *index_buffer = nullptr;
@@ -232,7 +236,8 @@ std::shared_ptr<IndexReader> TableIndexReaderCache::GetIndexReader(NewTxn *txn) 
         return index_reader;
     }
 
-    index_reader->column_index_readers_ = std::make_shared<FlatHashMap<u64, std::shared_ptr<std::map<std::string, std::shared_ptr<ColumnIndexReader>>>, detail::Hash<u64>>>();
+    index_reader->column_index_readers_ =
+        std::make_shared<FlatHashMap<u64, std::shared_ptr<std::map<std::string, std::shared_ptr<ColumnIndexReader>>>, detail::Hash<u64>>>();
 
     TableMeeta table_meta(db_id_str_, table_id_str_, txn);
     std::vector<std::string> *index_id_strs = nullptr;

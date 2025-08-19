@@ -112,8 +112,8 @@ void CompactionProcessor::NewDoCompact() {
     }
 
     auto compact_table = [&](const std::string &db_name, const std::string &table_name, std::shared_ptr<BGTaskInfo> &bg_task_info) {
-        auto new_txn_shared =
-            new_txn_mgr->BeginTxnShared(std::make_unique<std::string>(fmt::format("compact table {}.{}", db_name, table_name)), TransactionType::kNormal);
+        auto new_txn_shared = new_txn_mgr->BeginTxnShared(std::make_unique<std::string>(fmt::format("compact table {}.{}", db_name, table_name)),
+                                                          TransactionType::kNormal);
         LOG_INFO(fmt::format("Compact begin ts: {}", new_txn_shared->BeginTS()));
         Status status = Status::OK();
         DeferFn defer_fn([&] {
@@ -127,12 +127,12 @@ void CompactionProcessor::NewDoCompact() {
                 if (compact_txn_store != nullptr) {
                     // Record compact info
                     std::string task_text = fmt::format("Txn: {}, commit: {}, compact table: {}.{} with segments: {} into {}",
-                                                   new_txn_shared->TxnID(),
-                                                   new_txn_shared->CommitTS(),
-                                                   db_name,
-                                                   table_name,
-                                                   fmt::join(compact_txn_store->deprecated_segment_ids_, ","),
-                                                   compact_txn_store->new_segment_id_);
+                                                        new_txn_shared->TxnID(),
+                                                        new_txn_shared->CommitTS(),
+                                                        db_name,
+                                                        table_name,
+                                                        fmt::join(compact_txn_store->deprecated_segment_ids_, ","),
+                                                        compact_txn_store->new_segment_id_);
 
                     bg_task_info->task_info_list_.emplace_back(task_text);
                     if (commit_status.ok()) {
@@ -212,7 +212,8 @@ Status CompactionProcessor::NewManualCompact(const std::string &db_name, const s
     std::unique_ptr<std::string> result_msg;
     //    LOG_TRACE(fmt::format("Compact command triggered compaction: {}.{}", db_name, table_name));
     auto *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
-    auto *new_txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("compact table {}.{}", db_name, table_name)), TransactionType::kNormal);
+    auto *new_txn =
+        new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("compact table {}.{}", db_name, table_name)), TransactionType::kNormal);
 
     std::optional<DBMeeta> db_meta;
     std::optional<TableMeeta> table_meta;
@@ -278,14 +279,14 @@ void CompactionProcessor::NewScanAndOptimize() {
                     chunk_ids[i] = store_entry.new_chunk_infos_[i].chunk_id_;
                 }
                 std::string task_text = fmt::format("Txn: {}, commit: {}, optimize index: {}.{}.{} segment: {} with chunks: {} into {}",
-                                               new_txn_shared->TxnID(),
-                                               new_txn_shared->CommitTS(),
-                                               store_entry.db_name_,
-                                               store_entry.table_name_,
-                                               store_entry.index_name_,
-                                               store_entry.segment_id_,
-                                               fmt::join(store_entry.deprecate_chunks_, ","),
-                                               fmt::join(chunk_ids, ","));
+                                                    new_txn_shared->TxnID(),
+                                                    new_txn_shared->CommitTS(),
+                                                    store_entry.db_name_,
+                                                    store_entry.table_name_,
+                                                    store_entry.index_name_,
+                                                    store_entry.segment_id_,
+                                                    fmt::join(store_entry.deprecate_chunks_, ","),
+                                                    fmt::join(chunk_ids, ","));
 
                 bg_task_info->task_info_list_.emplace_back(task_text);
                 if (commit_status.ok()) {

@@ -46,7 +46,9 @@ size_t PhysicalOperator::TaskletCount() { return 1; }
 
 std::string PhysicalOperator::GetName() const { return PhysicalOperatorToString(operator_type_); }
 
-void PhysicalOperator::InputLoad(QueryContext *query_context, OperatorState *operator_state, std::unordered_map<size_t, std::shared_ptr<BaseTableRef>> &table_refs) {
+void PhysicalOperator::InputLoad(QueryContext *query_context,
+                                 OperatorState *operator_state,
+                                 std::unordered_map<size_t, std::shared_ptr<BaseTableRef>> &table_refs) {
     if (load_metas_.get() == nullptr || load_metas_->empty()) {
         return;
     }

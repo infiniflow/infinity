@@ -37,7 +37,6 @@ struct DayOfYearFunction {
         RecoverableError(status);
         return false;
     }
-
 };
 
 template <>
@@ -82,21 +81,21 @@ void RegisterDayOfYearFunction(NewCatalog *catalog_ptr) {
     std::shared_ptr<ScalarFunctionSet> function_set_ptr = std::make_shared<ScalarFunctionSet>(func_name);
 
     ScalarFunction day_of_year_date_function(func_name,
-                                  {DataType(LogicalType::kDate)},
-                                  {DataType(LogicalType::kBigInt)},
-                                  &ScalarFunction::UnaryFunctionWithFailure<DateT, BigIntT, DayOfYearFunction>);
+                                             {DataType(LogicalType::kDate)},
+                                             {DataType(LogicalType::kBigInt)},
+                                             &ScalarFunction::UnaryFunctionWithFailure<DateT, BigIntT, DayOfYearFunction>);
     function_set_ptr->AddFunction(day_of_year_date_function);
 
     ScalarFunction day_of_year_datetime_function(func_name,
-                                  {DataType(LogicalType::kDateTime)},
-                                  {DataType(LogicalType::kBigInt)},
-                                  &ScalarFunction::UnaryFunctionWithFailure<DateTimeT, BigIntT, DayOfYearFunction>);
+                                                 {DataType(LogicalType::kDateTime)},
+                                                 {DataType(LogicalType::kBigInt)},
+                                                 &ScalarFunction::UnaryFunctionWithFailure<DateTimeT, BigIntT, DayOfYearFunction>);
     function_set_ptr->AddFunction(day_of_year_datetime_function);
 
     ScalarFunction day_of_year_timestamp_function(func_name,
-                                  {DataType(LogicalType::kTimestamp)},
-                                  {DataType(LogicalType::kBigInt)},
-                                  &ScalarFunction::UnaryFunctionWithFailure<TimestampT, BigIntT, DayOfYearFunction>);
+                                                  {DataType(LogicalType::kTimestamp)},
+                                                  {DataType(LogicalType::kBigInt)},
+                                                  &ScalarFunction::UnaryFunctionWithFailure<TimestampT, BigIntT, DayOfYearFunction>);
     function_set_ptr->AddFunction(day_of_year_timestamp_function);
 
     NewCatalog::AddFunctionSet(catalog_ptr, function_set_ptr);

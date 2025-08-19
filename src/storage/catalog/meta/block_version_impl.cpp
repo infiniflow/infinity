@@ -73,7 +73,9 @@ std::pair<BlockOffset, i32> BlockVersion::GetCommitRowCount(TxnTimeStamp commit_
         return {};
     }
     std::shared_lock<std::shared_mutex> lock(rw_mutex_);
-    auto iter = std::lower_bound(created_.begin(), created_.end(), commit_ts, [](const CreateField &field, TxnTimeStamp ts) { return field.create_ts_ < ts; });
+    auto iter = std::lower_bound(created_.begin(), created_.end(), commit_ts, [](const CreateField &field, TxnTimeStamp ts) {
+        return field.create_ts_ < ts;
+    });
     if (iter == created_.end() || iter->create_ts_ != commit_ts) {
         return {};
     }
@@ -140,13 +142,15 @@ bool BlockVersion::SaveToFile(TxnTimeStamp checkpoint_ts, LocalFileHandle &file_
             file_handle.Append(&dump_ts, sizeof(dump_ts));
         }
     }
-     
+
     LOG_TRACE(fmt::format("Flush block version, ckp ts: {}, write create: {}, delete {}, is_modified: {}",
-                          checkpoint_ts, create_size, deleted_row_count, is_modified));
-   
+                          checkpoint_ts,
+                          create_size,
+                          deleted_row_count,
+                          is_modified));
+
     return !is_modified;
 }
- 
 
 void BlockVersion::SpillToFile(LocalFileHandle *file_handle) const {
     std::unique_lock<std::shared_mutex> lock(rw_mutex_);
@@ -289,9 +293,9 @@ void BlockVersion::RestoreFromSnapshot(TxnTimeStamp commit_ts) {
     // set all the create timestamp to commit_ts
     auto row_count = created_.back().row_count_;
     created_.clear();
-    created_.emplace_back(commit_ts,row_count);
-    for(auto &ts:deleted_){
-        if(ts!=0){
+    created_.emplace_back(commit_ts, row_count);
+    for (auto &ts : deleted_) {
+        if (ts != 0) {
             ts = commit_ts;
         }
     }

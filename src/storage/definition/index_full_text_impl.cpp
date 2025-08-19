@@ -43,10 +43,10 @@ void ToLowerString(std::string &lower) {
 }
 
 std::shared_ptr<IndexBase> IndexFullText::Make(std::shared_ptr<std::string> index_name,
-                                         std::shared_ptr<std::string> index_comment,
-                                         const std::string &file_name,
-                                         std::vector<std::string> column_names,
-                                         const std::vector<InitParameter *> &index_param_list) {
+                                               std::shared_ptr<std::string> index_comment,
+                                               const std::string &file_name,
+                                               std::vector<std::string> column_names,
+                                               const std::vector<InitParameter *> &index_param_list) {
     std::string analyzer_name{};
     optionflag_t flag = OPTION_FLAG_ALL;
     size_t param_count = index_param_list.size();

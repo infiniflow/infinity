@@ -86,8 +86,8 @@ std::unique_ptr<OperatorState> MakeTableScanState(PhysicalTableScan *physical_ta
     std::unique_ptr<OperatorState> operator_state = std::make_unique<TableScanOperatorState>();
     auto *table_scan_op_state_ptr = static_cast<TableScanOperatorState *>(operator_state.get());
     table_scan_op_state_ptr->table_scan_function_data_ = std::make_unique<TableScanFunctionData>(physical_table_scan->GetBlockIndex(),
-                                                                                           table_scan_source_state->global_ids_,
-                                                                                           physical_table_scan->ColumnIDs());
+                                                                                                 table_scan_source_state->global_ids_,
+                                                                                                 physical_table_scan->ColumnIDs());
     return operator_state;
 }
 
@@ -143,15 +143,17 @@ std::unique_ptr<OperatorState> MakeKnnScanState(PhysicalKnnScan *physical_knn_sc
         case FragmentType::kSerialMaterialize: {
             auto *serial_materialize_fragment_ctx = static_cast<SerialMaterializedFragmentCtx *>(fragment_ctx);
             knn_scan_op_state_ptr->knn_scan_function_data_ =
-                std::make_unique<KnnScanFunctionData>(serial_materialize_fragment_ctx->knn_scan_shared_data_.get(), task->TaskID(), execute_block_scan_job);
+                std::make_unique<KnnScanFunctionData>(serial_materialize_fragment_ctx->knn_scan_shared_data_.get(),
+                                                      task->TaskID(),
+                                                      execute_block_scan_job);
             break;
         }
         case FragmentType::kParallelMaterialize: {
             auto *parallel_materialize_fragment_ctx = static_cast<ParallelMaterializedFragmentCtx *>(fragment_ctx);
             knn_scan_op_state_ptr->knn_scan_function_data_ =
                 std::make_unique<KnnScanFunctionData>(parallel_materialize_fragment_ctx->knn_scan_shared_data_.get(),
-                                                task->TaskID(),
-                                                execute_block_scan_job);
+                                                      task->TaskID(),
+                                                      execute_block_scan_job);
             break;
         }
         default: {
@@ -190,10 +192,10 @@ std::unique_ptr<OperatorState> MakeMergeKnnState(PhysicalMergeKnn *physical_merg
     auto *merge_knn_op_state_ptr = static_cast<MergeKnnOperatorState *>(operator_state.get());
     // Set fake parallel number here. It will be set in SetMergeKnnState
     merge_knn_op_state_ptr->merge_knn_function_data_ = std::make_shared<MergeKnnFunctionData>(1,
-                                                                                        knn_expr->topn_,
-                                                                                        knn_expr->embedding_data_type_,
-                                                                                        knn_expr->distance_type_,
-                                                                                        physical_merge_knn->base_table_ref_);
+                                                                                              knn_expr->topn_,
+                                                                                              knn_expr->embedding_data_type_,
+                                                                                              knn_expr->distance_type_,
+                                                                                              physical_merge_knn->base_table_ref_);
 
     return operator_state;
 }
@@ -637,33 +639,34 @@ size_t InitKnnScanFragmentContext(PhysicalKnnScan *knn_scan_operator, FragmentCo
     switch (fragment_context->ContextType()) {
         case FragmentType::kSerialMaterialize: {
             auto *serial_materialize_fragment_ctx = static_cast<SerialMaterializedFragmentCtx *>(fragment_context);
-            serial_materialize_fragment_ctx->knn_scan_shared_data_ = std::make_unique<KnnScanSharedData>(knn_scan_operator->base_table_ref_,
-                                                                                                   std::move(knn_scan_operator->block_metas_),
-                                                                                                   std::move(knn_scan_operator->table_index_meta_),
-                                                                                                   std::move(knn_scan_operator->segment_index_metas_),
-                                                                                                   std::move(knn_expr->opt_params_),
-                                                                                                   knn_expr->topn_,
-                                                                                                   knn_expr->dimension_,
-                                                                                                   1,
-                                                                                                   knn_scan_operator->real_knn_query_embedding_ptr_,
-                                                                                                   knn_scan_operator->real_knn_query_elem_type_,
-                                                                                                   knn_expr->distance_type_);
+            serial_materialize_fragment_ctx->knn_scan_shared_data_ =
+                std::make_unique<KnnScanSharedData>(knn_scan_operator->base_table_ref_,
+                                                    std::move(knn_scan_operator->block_metas_),
+                                                    std::move(knn_scan_operator->table_index_meta_),
+                                                    std::move(knn_scan_operator->segment_index_metas_),
+                                                    std::move(knn_expr->opt_params_),
+                                                    knn_expr->topn_,
+                                                    knn_expr->dimension_,
+                                                    1,
+                                                    knn_scan_operator->real_knn_query_embedding_ptr_,
+                                                    knn_scan_operator->real_knn_query_elem_type_,
+                                                    knn_expr->distance_type_);
             break;
         }
         case FragmentType::kParallelMaterialize: {
             auto *parallel_materialize_fragment_ctx = static_cast<ParallelMaterializedFragmentCtx *>(fragment_context);
             parallel_materialize_fragment_ctx->knn_scan_shared_data_ =
                 std::make_unique<KnnScanSharedData>(knn_scan_operator->base_table_ref_,
-                                              std::move(knn_scan_operator->block_metas_),
-                                              std::move(knn_scan_operator->table_index_meta_),
-                                              std::move(knn_scan_operator->segment_index_metas_),
-                                              std::move(knn_expr->opt_params_),
-                                              knn_expr->topn_,
-                                              knn_expr->dimension_,
-                                              1,
-                                              knn_scan_operator->real_knn_query_embedding_ptr_,
-                                              knn_scan_operator->real_knn_query_elem_type_,
-                                              knn_expr->distance_type_);
+                                                    std::move(knn_scan_operator->block_metas_),
+                                                    std::move(knn_scan_operator->table_index_meta_),
+                                                    std::move(knn_scan_operator->segment_index_metas_),
+                                                    std::move(knn_expr->opt_params_),
+                                                    knn_expr->topn_,
+                                                    knn_expr->dimension_,
+                                                    1,
+                                                    knn_scan_operator->real_knn_query_embedding_ptr_,
+                                                    knn_scan_operator->real_knn_query_elem_type_,
+                                                    knn_expr->distance_type_);
             break;
         }
         default: {
@@ -844,7 +847,8 @@ void FragmentContext::MakeSourceState(i64 parallel_count) {
             std::vector<std::shared_ptr<std::vector<SegmentID>>> segment_group =
                 match_sparse_scan_operator->PlanWithIndex(blocks_group, parallel_count, query_context_);
             for (i64 task_id = 0; task_id < parallel_count; ++task_id) {
-                tasks_[task_id]->source_state_ = std::make_unique<MatchSparseScanSourceState>(std::move(blocks_group[task_id]), segment_group[task_id]);
+                tasks_[task_id]->source_state_ =
+                    std::make_unique<MatchSparseScanSourceState>(std::move(blocks_group[task_id]), segment_group[task_id]);
             }
             break;
         }
@@ -1272,9 +1276,9 @@ std::shared_ptr<DataTable> SerialMaterializedFragmentCtx::GetResultInternal() {
             column_defs.reserve(column_count);
             for (size_t col_idx = 0; col_idx < column_count; ++col_idx) {
                 column_defs.emplace_back(std::make_shared<ColumnDef>(col_idx,
-                                                               materialize_sink_state->column_types_->at(col_idx),
-                                                               materialize_sink_state->column_names_->at(col_idx),
-                                                               std::set<ConstraintType>()));
+                                                                     materialize_sink_state->column_types_->at(col_idx),
+                                                                     materialize_sink_state->column_names_->at(col_idx),
+                                                                     std::set<ConstraintType>()));
             }
 
             std::shared_ptr<DataTable> result_table = DataTable::MakeResultTable(column_defs);
@@ -1354,9 +1358,9 @@ std::shared_ptr<DataTable> ParallelMaterializedFragmentCtx::GetResultInternal() 
     column_defs.reserve(column_count);
     for (size_t col_idx = 0; col_idx < column_count; ++col_idx) {
         column_defs.emplace_back(std::make_shared<ColumnDef>(col_idx,
-                                                       first_materialize_sink_state->column_types_->at(col_idx),
-                                                       first_materialize_sink_state->column_names_->at(col_idx),
-                                                       std::set<ConstraintType>()));
+                                                             first_materialize_sink_state->column_types_->at(col_idx),
+                                                             first_materialize_sink_state->column_names_->at(col_idx),
+                                                             std::set<ConstraintType>()));
     }
 
     size_t total_hits_count = 0;
@@ -1406,9 +1410,9 @@ std::shared_ptr<DataTable> ParallelStreamFragmentCtx::GetResultInternal() {
     column_defs.reserve(column_count);
     for (size_t col_idx = 0; col_idx < column_count; ++col_idx) {
         column_defs.emplace_back(std::make_shared<ColumnDef>(col_idx,
-                                                       first_materialize_sink_state->column_types_->at(col_idx),
-                                                       first_materialize_sink_state->column_names_->at(col_idx),
-                                                       std::set<ConstraintType>()));
+                                                             first_materialize_sink_state->column_types_->at(col_idx),
+                                                             first_materialize_sink_state->column_names_->at(col_idx),
+                                                             std::set<ConstraintType>()));
     }
 
     for (const auto &task : tasks_) {

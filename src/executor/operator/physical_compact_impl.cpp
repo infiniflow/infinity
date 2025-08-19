@@ -23,8 +23,7 @@ import std;
 
 namespace infinity {
 
-void PhysicalCompact::Init(QueryContext *query_context) {
-}
+void PhysicalCompact::Init(QueryContext *query_context) {}
 
 bool PhysicalCompact::Execute(QueryContext *query_context, OperatorState *operator_state) {
     auto *compact_operator_state = static_cast<CompactOperatorState *>(operator_state);

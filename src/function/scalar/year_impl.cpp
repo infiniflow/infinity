@@ -34,7 +34,6 @@ struct YearFunction {
         RecoverableError(Status::NotSupport("Not implemented"));
         return false;
     }
-
 };
 
 template <>
@@ -61,21 +60,21 @@ void RegisterYearFunction(NewCatalog *catalog_ptr) {
     std::shared_ptr<ScalarFunctionSet> function_set_ptr = std::make_shared<ScalarFunctionSet>(func_name);
 
     ScalarFunction year_date_function(func_name,
-                                  {DataType(LogicalType::kDate)},
-                                  {DataType(LogicalType::kBigInt)},
-                                  &ScalarFunction::UnaryFunctionWithFailure<DateT, BigIntT, YearFunction>);
+                                      {DataType(LogicalType::kDate)},
+                                      {DataType(LogicalType::kBigInt)},
+                                      &ScalarFunction::UnaryFunctionWithFailure<DateT, BigIntT, YearFunction>);
     function_set_ptr->AddFunction(year_date_function);
 
     ScalarFunction year_datetime_function(func_name,
-                                  {DataType(LogicalType::kDateTime)},
-                                  {DataType(LogicalType::kBigInt)},
-                                  &ScalarFunction::UnaryFunctionWithFailure<DateTimeT, BigIntT, YearFunction>);
+                                          {DataType(LogicalType::kDateTime)},
+                                          {DataType(LogicalType::kBigInt)},
+                                          &ScalarFunction::UnaryFunctionWithFailure<DateTimeT, BigIntT, YearFunction>);
     function_set_ptr->AddFunction(year_datetime_function);
 
     ScalarFunction year_timestamp_function(func_name,
-                                  {DataType(LogicalType::kTimestamp)},
-                                  {DataType(LogicalType::kBigInt)},
-                                  &ScalarFunction::UnaryFunctionWithFailure<TimestampT, BigIntT, YearFunction>);
+                                           {DataType(LogicalType::kTimestamp)},
+                                           {DataType(LogicalType::kBigInt)},
+                                           &ScalarFunction::UnaryFunctionWithFailure<TimestampT, BigIntT, YearFunction>);
     function_set_ptr->AddFunction(year_timestamp_function);
 
     NewCatalog::AddFunctionSet(catalog_ptr, function_set_ptr);

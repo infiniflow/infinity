@@ -169,7 +169,7 @@ private:
 
     KVStore *kv_store_;
 
-    std::map<TxnTimeStamp, u64> begin_txn_map_{};               // Used for clean up TS and txn conflict check txns
+    std::map<TxnTimeStamp, u64> begin_txn_map_{};                     // Used for clean up TS and txn conflict check txns
     std::map<TxnTimeStamp, std::shared_ptr<NewTxn>> check_txn_map_{}; // sorted by commit ts
     std::map<TxnTimeStamp, std::shared_ptr<NewTxn>> bottom_txns_;     // sorted by commit ts
 

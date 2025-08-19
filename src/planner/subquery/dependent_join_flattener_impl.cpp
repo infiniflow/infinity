@@ -101,11 +101,11 @@ std::shared_ptr<LogicalNode> DependentJoinFlattener::PushDependentJoinInternal(c
             for (size_t idx = 0; idx < column_count; ++idx) {
                 std::shared_ptr<ColumnExpression> correlated_column = bind_context_ptr_->correlated_column_exprs_[idx];
                 std::shared_ptr<ColumnExpression> new_column = ColumnExpression::Make(correlated_column->Type(),
-                                                                                correlated_column->table_name(),
-                                                                                base_binding_.table_idx,
-                                                                                correlated_column->column_name(),
-                                                                                base_binding_.column_idx + idx,
-                                                                                0);
+                                                                                      correlated_column->table_name(),
+                                                                                      base_binding_.table_idx,
+                                                                                      correlated_column->column_name(),
+                                                                                      base_binding_.column_idx + idx,
+                                                                                      0);
                 aggregate_node->groups_.emplace_back(new_column);
             }
 
@@ -162,12 +162,13 @@ std::shared_ptr<LogicalNode> DependentJoinFlattener::PushDependentJoinInternal(c
                 size_t left_correlated_column_index = left_correlated_binding.column_idx + idx;
                 size_t right_correlated_column_index = right_correlated_binding.column_idx + idx;
 
-                std::shared_ptr<ColumnExpression> left_column_expr = ColumnExpression::Make(bind_context_ptr_->correlated_column_exprs_[idx]->Type(),
-                                                                                      bind_context_ptr_->correlated_column_exprs_[idx]->table_name(),
-                                                                                      left_correlated_binding.table_idx,
-                                                                                      bind_context_ptr_->correlated_column_exprs_[idx]->column_name(),
-                                                                                      left_correlated_column_index,
-                                                                                      0);
+                std::shared_ptr<ColumnExpression> left_column_expr =
+                    ColumnExpression::Make(bind_context_ptr_->correlated_column_exprs_[idx]->Type(),
+                                           bind_context_ptr_->correlated_column_exprs_[idx]->table_name(),
+                                           left_correlated_binding.table_idx,
+                                           bind_context_ptr_->correlated_column_exprs_[idx]->column_name(),
+                                           left_correlated_column_index,
+                                           0);
 
                 std::shared_ptr<ColumnExpression> right_column_expr =
                     ColumnExpression::Make(bind_context_ptr_->correlated_column_exprs_[idx]->Type(),
@@ -194,11 +195,11 @@ std::shared_ptr<LogicalNode> DependentJoinFlattener::PushDependentJoinInternal(c
             std::string alias = "logical_join";
             alias += std::to_string(logical_node_id);
             std::shared_ptr<LogicalJoin> logical_join = std::make_shared<LogicalJoin>(logical_node_id,
-                                                                          JoinType::kInner,
-                                                                          alias,
-                                                                          join_conditions,
-                                                                          subquery_plan->left_node(),
-                                                                          subquery_plan->right_node());
+                                                                                      JoinType::kInner,
+                                                                                      alias,
+                                                                                      join_conditions,
+                                                                                      subquery_plan->left_node(),
+                                                                                      subquery_plan->right_node());
 
             return logical_join;
         }
@@ -235,11 +236,11 @@ std::shared_ptr<LogicalNode> DependentJoinFlattener::PushDependentJoinInternal(c
             for (size_t idx = 0; idx < column_count; ++idx) {
                 std::shared_ptr<ColumnExpression> correlated_column = bind_context_ptr_->correlated_column_exprs_[idx];
                 std::shared_ptr<ColumnExpression> new_column = ColumnExpression::Make(correlated_column->Type(),
-                                                                                correlated_column->table_name(),
-                                                                                base_binding_.table_idx,
-                                                                                correlated_column->column_name(),
-                                                                                base_binding_.column_idx + idx,
-                                                                                0);
+                                                                                      correlated_column->table_name(),
+                                                                                      base_binding_.table_idx,
+                                                                                      correlated_column->column_name(),
+                                                                                      base_binding_.column_idx + idx,
+                                                                                      0);
                 project_node->expressions_.emplace_back(new_column);
             }
 
@@ -329,20 +330,22 @@ std::shared_ptr<LogicalNode> DependentJoinFlattener::BuildNoCorrelatedInternal(c
     //    Catalog *catalog = query_context_->storage()->catalog();
 
     std::shared_ptr<BaseTableRef> base_table_ref = std::make_shared<BaseTableRef>(table_binding_ptr->table_info_,
-                                                                      column_ids,
-                                                                      table_binding_ptr->block_index_,
-                                                                      table_binding_ptr->table_name_,
-                                                                      table_index,
-                                                                      column_names,
-                                                                      column_types);
+                                                                                  column_ids,
+                                                                                  table_binding_ptr->block_index_,
+                                                                                  table_binding_ptr->table_name_,
+                                                                                  table_index,
+                                                                                  column_names,
+                                                                                  column_types);
 
-    std::shared_ptr<LogicalTableScan> logical_table_scan = std::make_shared<LogicalTableScan>(bind_context_ptr_->GetNewLogicalNodeId(), base_table_ref);
+    std::shared_ptr<LogicalTableScan> logical_table_scan =
+        std::make_shared<LogicalTableScan>(bind_context_ptr_->GetNewLogicalNodeId(), base_table_ref);
 
     // Generate cross product
     u64 logical_node_id = bind_context_ptr_->GetNewLogicalNodeId();
     std::string alias = "cross_product";
     alias += std::to_string(logical_node_id);
-    std::shared_ptr<LogicalCrossProduct> cross_product_node = std::make_shared<LogicalCrossProduct>(logical_node_id, alias, subquery_plan, logical_table_scan);
+    std::shared_ptr<LogicalCrossProduct> cross_product_node =
+        std::make_shared<LogicalCrossProduct>(logical_node_id, alias, subquery_plan, logical_table_scan);
 
     this->base_binding_.table_idx = table_index;
     this->base_binding_.column_idx = 0;

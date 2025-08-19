@@ -2556,7 +2556,8 @@ ExplainType InfinityThriftService::GetExplainTypeFromProto(const infinity_thrift
     }
 }
 
-std::tuple<void *, i64, Status> InfinityThriftService::GetEmbeddingDataTypeDataPtrFromProto(const infinity_thrift_rpc::EmbeddingData &embedding_data) {
+std::tuple<void *, i64, Status>
+InfinityThriftService::GetEmbeddingDataTypeDataPtrFromProto(const infinity_thrift_rpc::EmbeddingData &embedding_data) {
     if (embedding_data.__isset.u8_array_value) {
         auto ptr_i16 = (int16_t *)(embedding_data.u8_array_value.data());
         auto ptr_u8 = (uint8_t *)(embedding_data.u8_array_value.data());
@@ -2882,8 +2883,9 @@ void InfinityThriftService::ProcessDataBlocks(const QueryResult &result,
     HandleColumnDef(response, result.result_table_->ColumnCount(), result.result_table_->definition_ptr_, columns);
 }
 
-Status
-InfinityThriftService::ProcessColumns(const std::shared_ptr<DataBlock> &data_block, size_t column_count, std::vector<infinity_thrift_rpc::ColumnField> &columns) {
+Status InfinityThriftService::ProcessColumns(const std::shared_ptr<DataBlock> &data_block,
+                                             size_t column_count,
+                                             std::vector<infinity_thrift_rpc::ColumnField> &columns) {
     auto row_count = data_block->row_count();
     for (size_t col_index = 0; col_index < column_count; ++col_index) {
         auto &result_column_vector = data_block->column_vectors[col_index];
@@ -3020,7 +3022,7 @@ void InfinityThriftService::HandlePodType(infinity_thrift_rpc::ColumnField &outp
 
 #define DECLARE_HANDLE_ARRAY_TYPE_RECURSIVELY(TYPE)                                                                                                  \
     template <>                                                                                                                                      \
-    void InfinityThriftService::HandleArrayTypeRecursively(std::string &output_str,                                                                       \
+    void InfinityThriftService::HandleArrayTypeRecursively(std::string &output_str,                                                                  \
                                                            const DataType &data_type,                                                                \
                                                            const TYPE &data_value,                                                                   \
                                                            const std::shared_ptr<ColumnVector> &column_vector);
@@ -3224,7 +3226,8 @@ void InfinityThriftService::HandleArrayTypeRecursively(std::string &output_str,
                                                        const TensorArrayT &data_value,
                                                        const std::shared_ptr<ColumnVector> &column_vector) {
     const auto embedding_info = dynamic_cast<const EmbeddingInfo *>(data_type.type_info().get());
-    const std::vector<std::pair<std::span<const char>, size_t>> tensor_data = column_vector->GetTensorArray(data_value, column_vector->buffer_.get(), embedding_info);
+    const std::vector<std::pair<std::span<const char>, size_t>> tensor_data =
+        column_vector->GetTensorArray(data_value, column_vector->buffer_.get(), embedding_info);
     const i32 tensor_num = tensor_data.size();
     output_str.append(reinterpret_cast<const char *>(&tensor_num), sizeof(i32));
     for (const auto [raw_data, embedding_num] : tensor_data) {

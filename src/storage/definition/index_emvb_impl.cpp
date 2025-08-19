@@ -62,10 +62,10 @@ constexpr std::array<u32, 8> accepable_residual_pq_subspace_num = {1, 2, 4, 8, 1
 constexpr std::array<u32, 2> accepable_residual_pq_subspace_bits = {8, 16};
 
 std::shared_ptr<IndexBase> IndexEMVB::Make(std::shared_ptr<std::string> index_name,
-                                     std::shared_ptr<std::string> index_comment,
-                                     const std::string &file_name,
-                                     std::vector<std::string> column_names,
-                                     const std::vector<InitParameter *> &index_param_list) {
+                                           std::shared_ptr<std::string> index_comment,
+                                           const std::string &file_name,
+                                           std::vector<std::string> column_names,
+                                           const std::vector<InitParameter *> &index_param_list) {
     u32 residual_pq_subspace_num = 0;
     u32 residual_pq_subspace_bits = 0;
     for (auto para : index_param_list) {
@@ -98,7 +98,12 @@ std::shared_ptr<IndexBase> IndexEMVB::Make(std::shared_ptr<std::string> index_na
         Status status = Status::InvalidIndexParam("pq_subspace_bits");
         RecoverableError(status);
     }
-    return std::make_shared<IndexEMVB>(index_name, index_comment, file_name, std::move(column_names), residual_pq_subspace_num, residual_pq_subspace_bits);
+    return std::make_shared<IndexEMVB>(index_name,
+                                       index_comment,
+                                       file_name,
+                                       std::move(column_names),
+                                       residual_pq_subspace_num,
+                                       residual_pq_subspace_bits);
 }
 
 i32 IndexEMVB::GetSizeInBytes() const {

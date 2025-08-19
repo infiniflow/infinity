@@ -97,7 +97,10 @@ void Highlighter::GetHighlightWithoutStemmer(const std::vector<std::string> &que
     }
 }
 
-void Highlighter::GetHighlightWithStemmer(const std::vector<std::string> &query, const std::string &raw_text, std::string &output, Analyzer *analyzer) {
+void Highlighter::GetHighlightWithStemmer(const std::vector<std::string> &query,
+                                          const std::string &raw_text,
+                                          std::string &output,
+                                          Analyzer *analyzer) {
     analyzer->SetCharOffset(true);
     TermList term_list;
     analyzer->Analyze(raw_text, term_list);

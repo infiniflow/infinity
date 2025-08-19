@@ -150,7 +150,9 @@ std::vector<size_t> LoadedColumn(const std::vector<LoadMeta> *load_metas, BaseTa
 std::shared_ptr<BaseExpression> CleanScan::VisitReplace(const std::shared_ptr<ColumnExpression> &expression) { return expression; }
 
 template <typename LogicalNodeSubType>
-inline void CleanScanVisitBaseTableRefNode(LogicalNode &op, std::shared_ptr<std::vector<LoadMeta>> &last_op_load_metas_, std::vector<size_t> &scan_table_indexes_) {
+inline void CleanScanVisitBaseTableRefNode(LogicalNode &op,
+                                           std::shared_ptr<std::vector<LoadMeta>> &last_op_load_metas_,
+                                           std::vector<size_t> &scan_table_indexes_) {
     auto &node = static_cast<LogicalNodeSubType &>(op);
     // node base table ref has two parts:
     // 1. the columns used by next operator

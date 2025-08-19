@@ -132,16 +132,16 @@ std::shared_ptr<IndexBase> IndexBase::ReadAdv(const char *&ptr, int32_t maxbytes
                 lsg_config = LSGConfig::ReadAdv(ptr);
             }
             res = std::make_shared<IndexHnsw>(index_name,
-                                        index_comment,
-                                        file_name,
-                                        column_names,
-                                        metric_type,
-                                        encode_type,
-                                        build_type,
-                                        M,
-                                        ef_construction,
-                                        block_size,
-                                        lsg_config);
+                                              index_comment,
+                                              file_name,
+                                              column_names,
+                                              metric_type,
+                                              encode_type,
+                                              build_type,
+                                              M,
+                                              ef_construction,
+                                              block_size,
+                                              lsg_config);
             break;
         }
         case IndexType::kDiskAnn: {
@@ -169,11 +169,11 @@ std::shared_ptr<IndexBase> IndexBase::ReadAdv(const char *&ptr, int32_t maxbytes
             u32 residual_pq_subspace_num = ReadBufAdv<u32>(ptr);
             u32 residual_pq_subspace_bits = ReadBufAdv<u32>(ptr);
             res = std::make_shared<IndexEMVB>(index_name,
-                                        index_comment,
-                                        file_name,
-                                        std::move(column_names),
-                                        residual_pq_subspace_num,
-                                        residual_pq_subspace_bits);
+                                              index_comment,
+                                              file_name,
+                                              std::move(column_names),
+                                              residual_pq_subspace_num,
+                                              residual_pq_subspace_bits);
             break;
         }
         case IndexType::kBMP: {
@@ -259,16 +259,16 @@ std::shared_ptr<IndexBase> IndexBase::Deserialize(std::string_view index_def_str
                 lsg_config = LSGConfig::FromString(lsg_config_json);
             }
             res = std::make_shared<IndexHnsw>(index_name,
-                                        index_comment,
-                                        file_name,
-                                        std::move(column_names),
-                                        metric_type,
-                                        encode_type,
-                                        build_type,
-                                        M,
-                                        ef_construction,
-                                        block_size,
-                                        lsg_config);
+                                              index_comment,
+                                              file_name,
+                                              std::move(column_names),
+                                              metric_type,
+                                              encode_type,
+                                              build_type,
+                                              M,
+                                              ef_construction,
+                                              block_size,
+                                              lsg_config);
             break;
         }
         case IndexType::kDiskAnn: {
@@ -279,15 +279,15 @@ std::shared_ptr<IndexBase> IndexBase::Deserialize(std::string_view index_def_str
             MetricType metric_type = StringToMetricType(doc["metric_type"].get<std::string>());
             DiskAnnEncodeType encode_type = StringToDiskAnnEncodeType(doc["encode_type"].get<std::string>());
             res = std::make_shared<IndexDiskAnn>(index_name,
-                                           index_comment,
-                                           file_name,
-                                           std::move(column_names),
-                                           metric_type,
-                                           encode_type,
-                                           R,
-                                           L,
-                                           num_pq_chunks,
-                                           num_parts);
+                                                 index_comment,
+                                                 file_name,
+                                                 std::move(column_names),
+                                                 metric_type,
+                                                 encode_type,
+                                                 R,
+                                                 L,
+                                                 num_pq_chunks,
+                                                 num_parts);
             break;
         }
         case IndexType::kFullText: {
@@ -310,11 +310,11 @@ std::shared_ptr<IndexBase> IndexBase::Deserialize(std::string_view index_def_str
             u32 residual_pq_subspace_num = doc["pq_subspace_num"].get<u32>();
             u32 residual_pq_subspace_bits = doc["pq_subspace_bits"].get<u32>();
             res = std::make_shared<IndexEMVB>(index_name,
-                                        index_comment,
-                                        file_name,
-                                        std::move(column_names),
-                                        residual_pq_subspace_num,
-                                        residual_pq_subspace_bits);
+                                              index_comment,
+                                              file_name,
+                                              std::move(column_names),
+                                              residual_pq_subspace_num,
+                                              residual_pq_subspace_bits);
             break;
         }
         case IndexType::kBMP: {

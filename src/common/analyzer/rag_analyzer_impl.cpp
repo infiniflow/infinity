@@ -47,7 +47,8 @@ static const std::string WORDNET_PATH = "wordnet";
 
 static const std::string OPENCC_PATH = "opencc";
 
-static const std::string REGEX_SPLIT_CHAR = R"#(([ ,\.<>/?;'\[\]\`!@#$%^&*$$\{\}\|_+=《》，。？、；‘’：“”【】~！￥%……（）——-]+|[a-zA-Z\.-]+|[0-9,\.-]+))#";
+static const std::string REGEX_SPLIT_CHAR =
+    R"#(([ ,\.<>/?;'\[\]\`!@#$%^&*$$\{\}\|_+=《》，。？、；‘’：“”【】~！￥%……（）——-]+|[a-zA-Z\.-]+|[0-9,\.-]+))#";
 
 static const std::string NLTK_TOKENIZE_PATTERN =
     R"((?:\-{2,}|\.{2,}|(?:\.\s){2,}\.)|(?=[^\(\"\`{\[:;&\#\*@\)}\]\-,])\S+?(?=\s|$|(?:[)\";}\]\*:@\'\({\[\?!])|(?:\-{2,}|\.{2,}|(?:\.\s){2,}\.)|,(?=$|\s|(?:[)\";}\]\*:@\'\({\[\?!])|(?:\-{2,}|\.{2,}|(?:\.\s){2,}\.)))|\S)";
@@ -309,13 +310,13 @@ class MacIntyreContractions {
 public:
     // List of contractions adapted from Robert MacIntyre's tokenizer.
     std::vector<std::string> CONTRACTIONS2 = {R"((?i)\b(can)(?#X)(not)\b)",
-                                    R"((?i)\b(d)(?#X)('ye)\b)",
-                                    R"((?i)\b(gim)(?#X)(me)\b)",
-                                    R"((?i)\b(gon)(?#X)(na)\b)",
-                                    R"((?i)\b(got)(?#X)(ta)\b)",
-                                    R"((?i)\b(lem)(?#X)(me)\b)",
-                                    R"((?i)\b(more)(?#X)('n)\b)",
-                                    R"((?i)\b(wan)(?#X)(na)(?=\s))"};
+                                              R"((?i)\b(d)(?#X)('ye)\b)",
+                                              R"((?i)\b(gim)(?#X)(me)\b)",
+                                              R"((?i)\b(gon)(?#X)(na)\b)",
+                                              R"((?i)\b(got)(?#X)(ta)\b)",
+                                              R"((?i)\b(lem)(?#X)(me)\b)",
+                                              R"((?i)\b(more)(?#X)('n)\b)",
+                                              R"((?i)\b(wan)(?#X)(na)(?=\s))"};
     std::vector<std::string> CONTRACTIONS3 = {R"((?i) ('t)(?#X)(is)\b)", R"((?i) ('t)(?#X)(was)\b)"};
     std::vector<std::string> CONTRACTIONS4 = {R"((?i)\b(whad)(dd)(ya)\b)", R"((?i)\b(wha)(t)(cha)\b)"};
 };
@@ -325,40 +326,43 @@ class NLTKWordTokenizer {
 
 public:
     // Starting quotes.
-    std::vector<std::pair<std::string, std::string>> STARTING_QUOTES = {{std::string(R"(([«“‘„]|[`]+))"), std::string(R"( $1 )")},
-                                                    {std::string(R"(^\")"), std::string(R"(``)")},
-                                                    {std::string(R"((``))"), std::string(R"( $1 )")},
-                                                    {std::string(R"(([ \(\[{<])(\"|\'{2}))"), std::string(R"($1 `` )")},
-                                                    {std::string(R"((?i)(\')(?!re|ve|ll|m|t|s|d|n)(\w)\b)"), std::string(R"($1 $2)")}};
+    std::vector<std::pair<std::string, std::string>> STARTING_QUOTES = {
+        {std::string(R"(([«“‘„]|[`]+))"), std::string(R"( $1 )")},
+        {std::string(R"(^\")"), std::string(R"(``)")},
+        {std::string(R"((``))"), std::string(R"( $1 )")},
+        {std::string(R"(([ \(\[{<])(\"|\'{2}))"), std::string(R"($1 `` )")},
+        {std::string(R"((?i)(\')(?!re|ve|ll|m|t|s|d|n)(\w)\b)"), std::string(R"($1 $2)")}};
 
     // Ending quotes.
-    std::vector<std::pair<std::string, std::string>> ENDING_QUOTES = {{std::string(R"(([»”’]))"), std::string(R"( $1 )")},
-                                                  {std::string(R"('')"), std::string(R"( '' )")},
-                                                  {std::string(R"(")"), std::string(R"( '' )")},
-                                                  {std::string(R"(\s+)"), std::string(R"( )")},
-                                                  {std::string(R"(([^' ])('[sS]|'[mM]|'[dD]|') )"), std::string(R"($1 $2 )")},
-                                                  {std::string(R"(([^' ])('ll|'LL|'re|'RE|'ve|'VE|n't|N'T) )"), std::string(R"($1 $2 )")}};
+    std::vector<std::pair<std::string, std::string>> ENDING_QUOTES = {
+        {std::string(R"(([»”’]))"), std::string(R"( $1 )")},
+        {std::string(R"('')"), std::string(R"( '' )")},
+        {std::string(R"(")"), std::string(R"( '' )")},
+        {std::string(R"(\s+)"), std::string(R"( )")},
+        {std::string(R"(([^' ])('[sS]|'[mM]|'[dD]|') )"), std::string(R"($1 $2 )")},
+        {std::string(R"(([^' ])('ll|'LL|'re|'RE|'ve|'VE|n't|N'T) )"), std::string(R"($1 $2 )")}};
 
     // Punctuation.
-    std::vector<std::pair<std::string, std::string>> PUNCTUATION = {{std::string(R"(([^\.])(\.)([\]\)}>"\'»”’ ]*)\s*$)"), std::string(R"($1 $2 $3 )")},
-                                                {std::string(R"(([:,])([^\d]))"), std::string(R"( $1 $2)")},
-                                                {std::string(R"(([:,])$)"), std::string(R"($1 )")},
-                                                {std::string(R"(\.{2,})"), std::string(R"($0 )")},
-                                                {std::string(R"([;@#$%&])"), std::string(R"($0 )")},
-                                                {std::string(R"(([^\.])(\.)([\]\)}>"\']*)\s*$)"), std::string(R"($1 $2 $3 )")},
-                                                {std::string(R"([?!])"), std::string(R"($0 )")},
-                                                {std::string(R"(([^'])' )"), std::string(R"($1 ' )")},
-                                                {std::string(R"([*])"), std::string(R"($0 )")}};
+    std::vector<std::pair<std::string, std::string>> PUNCTUATION = {
+        {std::string(R"(([^\.])(\.)([\]\)}>"\'»”’ ]*)\s*$)"), std::string(R"($1 $2 $3 )")},
+        {std::string(R"(([:,])([^\d]))"), std::string(R"( $1 $2)")},
+        {std::string(R"(([:,])$)"), std::string(R"($1 )")},
+        {std::string(R"(\.{2,})"), std::string(R"($0 )")},
+        {std::string(R"([;@#$%&])"), std::string(R"($0 )")},
+        {std::string(R"(([^\.])(\.)([\]\)}>"\']*)\s*$)"), std::string(R"($1 $2 $3 )")},
+        {std::string(R"([?!])"), std::string(R"($0 )")},
+        {std::string(R"(([^'])' )"), std::string(R"($1 ' )")},
+        {std::string(R"([*])"), std::string(R"($0 )")}};
 
     // Pads parentheses
     std::pair<std::string, std::string> PARENS_BRACKETS = {std::string(R"([\]\[\(\)\{\}\<\>])"), std::string(R"( $0 )")};
 
     std::vector<std::pair<std::string, std::string>> CONVERT_PARENTHESES = {{std::string(R"(\()"), std::string("-LRB-")},
-                                                        {std::string(R"(\))"), std::string("-RRB-")},
-                                                        {std::string(R"(\[)"), std::string("-LSB-")},
-                                                        {std::string(R"(\])"), std::string("-RSB-")},
-                                                        {std::string(R"(\{)"), std::string("-LCB-")},
-                                                        {std::string(R"(\})"), std::string("-RCB-")}};
+                                                                            {std::string(R"(\))"), std::string("-RRB-")},
+                                                                            {std::string(R"(\[)"), std::string("-LSB-")},
+                                                                            {std::string(R"(\])"), std::string("-RSB-")},
+                                                                            {std::string(R"(\{)"), std::string("-LCB-")},
+                                                                            {std::string(R"(\})"), std::string("-RCB-")}};
 
     std::pair<std::string, std::string> DOUBLE_DASHES = {std::string(R"(--)"), std::string(R"( -- )")};
 
@@ -683,7 +687,8 @@ std::pair<std::vector<std::string>, double> RAGAnalyzer::Score(const std::vector
     return {std::move(tokens), score};
 }
 
-void RAGAnalyzer::SortTokens(const std::vector<std::vector<std::pair<std::string, int>>> &token_list, std::vector<std::pair<std::vector<std::string>, double>> &res) {
+void RAGAnalyzer::SortTokens(const std::vector<std::vector<std::pair<std::string, int>>> &token_list,
+                             std::vector<std::pair<std::vector<std::string>, double>> &res) {
     for (const auto &tfts : token_list) {
         res.push_back(Score(tfts));
     }

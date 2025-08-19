@@ -35,7 +35,6 @@ struct SecondFunction {
         RecoverableError(status);
         return false;
     }
-
 };
 
 template <>
@@ -62,24 +61,22 @@ void RegisterSecondFunction(NewCatalog *catalog_ptr) {
     std::shared_ptr<ScalarFunctionSet> function_set_ptr = std::make_shared<ScalarFunctionSet>(func_name);
 
     ScalarFunction second_datetime_function(func_name,
-                                  {DataType(LogicalType::kDateTime)},
-                                  {DataType(LogicalType::kBigInt)},
-                                  &ScalarFunction::UnaryFunctionWithFailure<DateTimeT, BigIntT, SecondFunction>);
+                                            {DataType(LogicalType::kDateTime)},
+                                            {DataType(LogicalType::kBigInt)},
+                                            &ScalarFunction::UnaryFunctionWithFailure<DateTimeT, BigIntT, SecondFunction>);
     function_set_ptr->AddFunction(second_datetime_function);
 
     ScalarFunction second_time_function(func_name,
-                                  {DataType(LogicalType::kTime)},
-                                  {DataType(LogicalType::kBigInt)},
-                                  &ScalarFunction::UnaryFunctionWithFailure<TimeT, BigIntT, SecondFunction>);
+                                        {DataType(LogicalType::kTime)},
+                                        {DataType(LogicalType::kBigInt)},
+                                        &ScalarFunction::UnaryFunctionWithFailure<TimeT, BigIntT, SecondFunction>);
     function_set_ptr->AddFunction(second_time_function);
 
-
     ScalarFunction second_timestamp_function(func_name,
-                                  {DataType(LogicalType::kTimestamp)},
-                                  {DataType(LogicalType::kBigInt)},
-                                  &ScalarFunction::UnaryFunctionWithFailure<TimestampT, BigIntT, SecondFunction>);
+                                             {DataType(LogicalType::kTimestamp)},
+                                             {DataType(LogicalType::kBigInt)},
+                                             &ScalarFunction::UnaryFunctionWithFailure<TimestampT, BigIntT, SecondFunction>);
     function_set_ptr->AddFunction(second_timestamp_function);
-
 
     NewCatalog::AddFunctionSet(catalog_ptr, function_set_ptr);
 }

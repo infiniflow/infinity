@@ -42,7 +42,7 @@ PhysicalMergeLimit::PhysicalMergeLimit(u64 id,
     counter_ = std::make_unique<UnSyncCounter>(offset, limit);
 }
 
-void PhysicalMergeLimit::Init(QueryContext* query_context) {}
+void PhysicalMergeLimit::Init(QueryContext *query_context) {}
 
 bool PhysicalMergeLimit::Execute(QueryContext *query_context, OperatorState *operator_state) {
     MergeLimitOperatorState *limit_op_state = (MergeLimitOperatorState *)operator_state;

@@ -172,7 +172,8 @@ TEST_F(TestTxnManagerTest, test_parallel_ts) {
                     if (status.ok()) {
                         status = new_txn_mgr->CommitTxn(txn);
                         if (!status.ok()) {
-                            LOG_WARN(fmt::format("std::thread: {}, txn_id: {}, CreateDatabase CommitTxn failed: {}", thread_i, txn_id, status.message()));
+                            LOG_WARN(
+                                fmt::format("std::thread: {}, txn_id: {}, CreateDatabase CommitTxn failed: {}", thread_i, txn_id, status.message()));
                         } else {
                             LOG_TRACE(fmt::format("std::thread: {}, txn_id: {}, CreateDatabase CommitTxn success", thread_i, txn_id));
                         }
@@ -190,7 +191,8 @@ TEST_F(TestTxnManagerTest, test_parallel_ts) {
                     if (status.ok()) {
                         status = new_txn_mgr->CommitTxn(txn);
                         if (!status.ok()) {
-                            LOG_WARN(fmt::format("std::thread: {}, txn_id: {}, DropDatabase CommitTxn failed: {}", thread_i, txn_id, status.message()));
+                            LOG_WARN(
+                                fmt::format("std::thread: {}, txn_id: {}, DropDatabase CommitTxn failed: {}", thread_i, txn_id, status.message()));
                         } else {
                             LOG_TRACE(fmt::format("std::thread: {}, txn_id: {}, DropDatabase CommitTxn success", thread_i, txn_id));
                         }

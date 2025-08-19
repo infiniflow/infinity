@@ -78,11 +78,11 @@ TEST_P(BlockVersionTest, SaveAndLoad2) {
         BufferManager buffer_mgr(1 << 20 /*memory limit*/, data_dir, temp_dir, nullptr);
 
         auto file_worker = std::make_unique<VersionFileWorker>(std::make_shared<std::string>(std::string(GetFullDataDir())),
-                                                         std::make_shared<std::string>(std::string(GetFullTmpDir())),
-                                                         block_dir,
-                                                         version_file_name,
-                                                         8192,
-                                                         nullptr);
+                                                               std::make_shared<std::string>(std::string(GetFullTmpDir())),
+                                                               block_dir,
+                                                               version_file_name,
+                                                               8192,
+                                                               nullptr);
         auto *buffer_obj = buffer_mgr.AllocateBufferObject(std::move(file_worker));
 
         {
@@ -102,11 +102,11 @@ TEST_P(BlockVersionTest, SaveAndLoad2) {
         BufferManager buffer_mgr(1 << 20 /*memory limit*/, data_dir, temp_dir, nullptr);
 
         auto file_worker = std::make_unique<VersionFileWorker>(std::make_shared<std::string>(std::string(GetFullDataDir())),
-                                                         std::make_shared<std::string>(std::string(GetFullTmpDir())),
-                                                         block_dir,
-                                                         version_file_name,
-                                                         8192,
-                                                         nullptr);
+                                                               std::make_shared<std::string>(std::string(GetFullTmpDir())),
+                                                               block_dir,
+                                                               version_file_name,
+                                                               8192,
+                                                               nullptr);
         auto *buffer_obj = buffer_mgr.GetBufferObject(std::move(file_worker));
 
         {
@@ -131,11 +131,11 @@ TEST_P(BlockVersionTest, SaveAndLoad2) {
         BufferManager buffer_mgr(1 << 20 /*memory limit*/, data_dir, temp_dir, nullptr);
 
         auto file_worker = std::make_unique<VersionFileWorker>(std::make_shared<std::string>(std::string(GetFullDataDir())),
-                                                         std::make_shared<std::string>(std::string(GetFullTmpDir())),
-                                                         block_dir,
-                                                         version_file_name,
-                                                         8192,
-                                                         nullptr);
+                                                               std::make_shared<std::string>(std::string(GetFullTmpDir())),
+                                                               block_dir,
+                                                               version_file_name,
+                                                               8192,
+                                                               nullptr);
         auto *buffer_obj = buffer_mgr.GetBufferObject(std::move(file_worker));
 
         {

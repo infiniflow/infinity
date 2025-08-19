@@ -350,8 +350,10 @@ TEST_F(BufferObjTest, test_hnsw_index_buffer_obj_shutdown) {
                 std::make_shared<ColumnDef>(column_id, std::make_shared<DataType>(LogicalType::kEmbedding, embedding_info), "col1", constraints);
             column_defs.emplace_back(column_def_ptr);
         }
-        auto tbl1_def =
-            std::make_unique<TableDef>(std::make_shared<std::string>("default_db"), std::make_shared<std::string>("test_hnsw"), std::make_shared<std::string>("test_comment"), column_defs);
+        auto tbl1_def = std::make_unique<TableDef>(std::make_shared<std::string>("default_db"),
+                                                   std::make_shared<std::string>("test_hnsw"),
+                                                   std::make_shared<std::string>("test_comment"),
+                                                   column_defs);
         auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
         auto status = txn->CreateTable("default_db", std::move(tbl1_def), ConflictType::kError);
         EXPECT_TRUE(status.ok());
@@ -367,7 +369,8 @@ TEST_F(BufferObjTest, test_hnsw_index_buffer_obj_shutdown) {
         parameters1.emplace_back(new InitParameter("m", "16"));
         parameters1.emplace_back(new InitParameter("ef_construction", "200"));
 
-        auto index_base_hnsw = IndexHnsw::Make(index_name, std::make_shared<std::string>("test_comment"), "hnsw_index_test_hnsw", columns1, parameters1);
+        auto index_base_hnsw =
+            IndexHnsw::Make(index_name, std::make_shared<std::string>("test_comment"), "hnsw_index_test_hnsw", columns1, parameters1);
         for (auto *init_parameter : parameters1) {
             delete init_parameter;
         }
@@ -482,7 +485,8 @@ TEST_F(BufferObjTest, test_big_with_gc_and_cleanup) {
     {
         std::set<ConstraintType> constraints;
         ColumnID column_id = 0;
-        column_defs.push_back(std::make_shared<ColumnDef>(column_id++, std::make_shared<DataType>(DataType(LogicalType::kBigInt)), *column_name, constraints));
+        column_defs.push_back(
+            std::make_shared<ColumnDef>(column_id++, std::make_shared<DataType>(DataType(LogicalType::kBigInt)), *column_name, constraints));
     }
     {
         auto table_def = std::make_unique<TableDef>(db_name, table_name, table_comment, column_defs);
@@ -613,7 +617,8 @@ TEST_F(BufferObjTest, DISABLED_test_multiple_threads_read) {
     {
         std::set<ConstraintType> constraints;
         ColumnID column_id = 0;
-        column_defs.push_back(std::make_shared<ColumnDef>(column_id++, std::make_shared<DataType>(DataType(LogicalType::kBigInt)), *column_name, constraints));
+        column_defs.push_back(
+            std::make_shared<ColumnDef>(column_id++, std::make_shared<DataType>(DataType(LogicalType::kBigInt)), *column_name, constraints));
     }
     {
         auto table_def = std::make_unique<TableDef>(db_name, table_name, table_comment, column_defs);

@@ -27,7 +27,9 @@ namespace infinity {
 
 std::vector<ColumnBinding> LogicalUnnestAggregate::GetColumnBindings() const { return LogicalCommonFunctionUsingLoadMeta::GetColumnBindings(*this); }
 
-std::shared_ptr<std::vector<std::string>> LogicalUnnestAggregate::GetOutputNames() const { return LogicalCommonFunctionUsingLoadMeta::GetOutputNames(*this); }
+std::shared_ptr<std::vector<std::string>> LogicalUnnestAggregate::GetOutputNames() const {
+    return LogicalCommonFunctionUsingLoadMeta::GetOutputNames(*this);
+}
 
 std::shared_ptr<std::vector<std::shared_ptr<DataType>>> LogicalUnnestAggregate::GetOutputTypes() const {
     return LogicalCommonFunctionUsingLoadMeta::GetOutputTypes(*this);
