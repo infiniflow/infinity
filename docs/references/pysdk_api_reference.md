@@ -1404,7 +1404,7 @@ table_object.insert([
 
 **Benefits of FDE:**
 - Dynamically generates embeddings from feature matrices.
-- No need to pre-compute embeddings.
+- Eliminates the need to compute embeddings beforehand.
 - Flexible input tensor dimensions.
 - Automatic conversion to fixed-dimension vectors.
 
