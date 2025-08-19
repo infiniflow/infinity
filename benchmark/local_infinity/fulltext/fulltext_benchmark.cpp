@@ -139,7 +139,11 @@ void BenchmarkImport(std::shared_ptr<Infinity> infinity, const String &db_name, 
     profiler.End();
 }
 
-void BenchmarkInsert(std::shared_ptr<Infinity> infinity, const String &db_name, const String &table_name, const String &insert_from, size_t insert_batch) {
+void BenchmarkInsert(std::shared_ptr<Infinity> infinity,
+                     const String &db_name,
+                     const String &table_name,
+                     const String &insert_from,
+                     size_t insert_batch) {
     std::ifstream input_file(insert_from);
     if (!input_file.is_open()) {
         LOG_ERROR(fmt::format("Failed to open file {}", insert_from));
