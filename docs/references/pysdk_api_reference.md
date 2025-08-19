@@ -1385,7 +1385,7 @@ table_object.insert([
     },
     {
         "id": 2,
-        "embedding_col": FDE(
+        "vector_col": FDE(
             tensor_data=[
                 [2.5, 1.5, 3.5, 2.5],
                 [1.0, 3.0, 2.0, 4.0],
@@ -1399,14 +1399,14 @@ table_object.insert([
 ```
 
 **FDE Parameters:**
-- `tensor_data`: A 2D list (matrix) of numeric values representing input features
-- `target_dimension`: The desired output embedding dimension (must match the vector column dimension)
+- `tensor_data`: A 2D list (matrix) of numeric values representing input features.
+- `target_dimension`: The desired output embedding dimension (must match the vector column dimension).
 
 **Benefits of FDE:**
-- Generate embeddings dynamically from feature matrices
-- No need to pre-compute embeddings
-- Flexible input tensor dimensions
-- Automatic conversion to fixed-dimension vectors
+- Dynamically generates embeddings from feature matrices.
+- No need to pre-compute embeddings.
+- Flexible input tensor dimensions.
+- Automatic conversion to fixed-dimension vectors.
 
 ##### Insert sparse vectors
 
@@ -2190,7 +2190,7 @@ fde_query = FDE(tensor_data, target_dimension)
 table_object.match_dense(vector_column_name, fde_query, embedding_data_type, distance_type, topn, knn_params)
 ```
 
-Creates a dense vector search expression using FDE (Feature Dimension Expansion) function to identify the closest top n rows. The FDE function takes a 2D tensor as input and expands it to the target dimension for vector similarity search.
+Creates a dense vector search expression using FDE (Feature Dimension Expansion) function to identify the closest top n rows. The FDE function takes a 2D tensor as input and expands it to the target dimension for a vector search.
 
 :::tip NOTE
 To display your query results, you must chain this method with `output(columns)`, which specifies the columns to output, and a method such as `to_pl()`, `to_df()`, or `to_arrow()` to format the query results.
@@ -2226,7 +2226,7 @@ The data type of the embedding vector. Commonly used types include:
 
 ##### distance_type: `str`, *Required*
 
-The distance metric to use in similarity search:
+The distance metric to use in a similarity search:
 
 - `"ip"`: Inner product
 - `"l2"`: Euclidean distance
@@ -2234,15 +2234,15 @@ The distance metric to use in similarity search:
 
 ##### topn: `int`, *Required*
 
-An integer indicating the number of nearest neighbors to return.
+An integer specifying the number of nearest neighbors to return.
 
 ##### knn_params: `dict`, *Optional*
 
 Additional parameters for the KNN search. Defaults to `None`.
 
-- `"ef"`: `str` - Recommended value: one to ten times the value of `topn`
-- `"threshold"`: `str` - A threshold value for the search
-- `"nprobe"`: `str` - The number of cells to search in the IVF index
+- `"ef"`: `str` - Recommended value: one to ten times the `topn` value.
+- `"threshold"`: `str` - A threshold value for the search.
+- `"nprobe"`: `str` - The number of cells to search in the IVF index.
 
 #### Returns
 
@@ -2285,10 +2285,10 @@ table_object.output(["*"]).match_dense("vec_col", query_tensor, 64, "float", "co
 ```
 
 :::tip NOTE
-- The FDE function allows you to use 2D tensor input instead of pre-computed embeddings
-- The target dimension can be specified dynamically and must match the vector column dimension
-- All existing distance metrics and KNN parameters are supported
-- FDE is particularly useful when you have feature matrices that need to be transformed into embeddings for search
+- The FDE function allows you to use 2D tensor input instead of pre-computed embeddings.
+- The target dimension can be specified dynamically and must match the vector column dimension.
+- All existing distance metrics and KNN parameters are supported.
+- FDE is particularly useful when you have feature matrices that need to be transformed into embeddings for search.
 :::
 
 ---
