@@ -44,6 +44,4 @@ class TestDrop:
             except Exception as e:
                 assert e.error_code == ErrorCode.TABLE_NOT_EXIST
 
-            db_obj.drop_table("test_drop")
-
         part2()
