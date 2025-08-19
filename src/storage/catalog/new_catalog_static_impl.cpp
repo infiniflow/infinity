@@ -597,34 +597,6 @@ Status NewCatalog::CleanTableIndex(TableIndexMeeta &table_index_meta, UsageFlag 
     return Status::OK();
 }
 
-// Status NewCatalog::AddNewSegment(TableMeeta &table_meta, SegmentID segment_id, Optional<SegmentMeta> &segment_meta) {
-//     {
-//         Status status = table_meta.AddSegmentID(segment_id);
-//         if (!status.ok()) {
-//             return status;
-//         }
-//     }
-//     segment_meta.emplace(segment_id, table_meta);
-//     {
-//         Status status = segment_meta->InitSet();
-//         if (!status.ok()) {
-//             return status;
-//         }
-//     }
-//     return Status::OK();
-// }
-
-Status NewCatalog::AddNewSegment1(TableMeeta &table_meta, TxnTimeStamp commit_ts, Optional<SegmentMeta> &segment_meta) {
-    Status status;
-    SegmentID segment_id = 0;
-    std::tie(segment_id, status) = table_meta.AddSegmentID1(commit_ts);
-    if (!status.ok()) {
-        return status;
-    }
-    segment_meta.emplace(segment_id, table_meta);
-    return segment_meta->InitSet();
-}
-
 Status NewCatalog::AddNewSegmentWithID(TableMeeta &table_meta, TxnTimeStamp commit_ts, Optional<SegmentMeta> &segment_meta, SegmentID segment_id) {
     Status status = table_meta.AddSegmentWithID(commit_ts, segment_id);
     if (!status.ok()) {

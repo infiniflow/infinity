@@ -156,7 +156,7 @@ private:
     Optional<String> comment_;
     SharedPtr<Vector<SharedPtr<ColumnDef>>> column_defs_;
     // Optional<Vector<SegmentID>> segment_ids_;
-    Optional<Vector<SegmentID>> segment_ids1_;
+    SharedPtr<Vector<SegmentID>> segment_ids1_;
 
     Optional<Vector<String>> index_id_strs_;
     Optional<Vector<String>> index_names_;

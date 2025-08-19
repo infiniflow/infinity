@@ -176,7 +176,7 @@ Status TableMeeta::RemoveSegmentIDs1(const Vector<SegmentID> &segment_ids) {
         }
     }
 
-    if (segment_ids1_) {
+    if (segment_ids1_ != nullptr) {
         for (auto iter = segment_ids1_->begin(); iter != segment_ids1_->end();) {
             if (segment_ids_set.contains(*iter)) {
                 iter = segment_ids1_->erase(iter);
@@ -783,7 +783,7 @@ SharedPtr<String> TableMeeta::GetTableDir() { return {MakeShared<String>(table_i
 
 Tuple<Vector<SegmentID> *, Status> TableMeeta::GetSegmentIDs1() {
     std::lock_guard<std::mutex> lock(mtx_);
-    if (!segment_ids1_) {
+    if (segment_ids1_.get() == nullptr) {
         segment_ids1_ = infinity::GetTableSegments(kv_instance_, db_id_str_, table_id_str_, begin_ts_, commit_ts_);
     }
     return {&*segment_ids1_, Status::OK()};

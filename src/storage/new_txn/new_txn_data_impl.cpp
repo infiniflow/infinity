@@ -77,7 +77,6 @@ struct NewTxnCompactState {
     NewTxnCompactState() = default;
 
     static Status Make(TableMeeta &table_meta, TxnTimeStamp commit_ts, NewTxnCompactState &state, SegmentID segment_id) {
-        // Status status = NewCatalog::AddNewSegment1(table_meta, commit_ts, state.new_segment_meta_);
         Status status = NewCatalog::AddNewSegmentWithID(table_meta, commit_ts, state.new_segment_meta_, segment_id);
         if (!status.ok()) {
             return status;
@@ -202,7 +201,6 @@ Status NewTxn::Import(const String &db_name, const String &table_name, const Vec
 
     TxnTimeStamp fake_commit_ts = txn_context_ptr_->begin_ts_;
 
-    // status = NewCatalog::AddNewSegment1(table_meta, fake_commit_ts, segment_meta);
     u64 db_id = std::stoull(table_meta.db_id_str());
     u64 table_id = std::stoull(table_meta.table_id_str());
     SystemCache *system_cache = txn_mgr_->GetSystemCachePtr();

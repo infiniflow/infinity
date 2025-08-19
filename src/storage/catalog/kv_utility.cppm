@@ -25,7 +25,8 @@ namespace infinity {
 class KVInstance;
 class IndexBase;
 
-export Vector<SegmentID> GetTableSegments(KVInstance *kv_instance, const String &db_id_str, const String &table_id_str, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts);
+export SharedPtr<Vector<SegmentID>>
+GetTableSegments(KVInstance *kv_instance, const String &db_id_str, const String &table_id_str, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts);
 
 export Vector<SegmentID> GetTableIndexSegments(KVInstance *kv_instance,
                                                const String &db_id_str,
@@ -65,8 +66,8 @@ export SizeT GetSegmentRowCount(KVInstance *kv_instance,
                                 TxnTimeStamp begin_ts,
                                 TxnTimeStamp commit_ts);
 
-export String GetLastPartOfKey(const String& key, char delimiter = '|');
+export String GetLastPartOfKey(const String &key, char delimiter = '|');
 
-export u64 GetTimestampFromKey(const String& key);
+export u64 GetTimestampFromKey(const String &key);
 
 } // namespace infinity

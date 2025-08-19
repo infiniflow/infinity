@@ -40,9 +40,9 @@ import :config;
 
 namespace infinity {
 
-Vector<SegmentID>
+SharedPtr<Vector<SegmentID>>
 GetTableSegments(KVInstance *kv_instance, const String &db_id_str, const String &table_id_str, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts) {
-    Vector<SegmentID> segment_ids;
+    SharedPtr<Vector<SegmentID>> segment_ids = MakeShared<Vector<SegmentID>>();
 
     String segment_id_prefix = KeyEncode::CatalogTableSegmentKeyPrefix(db_id_str, table_id_str);
     auto iter = kv_instance->GetIterator();
@@ -60,11 +60,11 @@ GetTableSegments(KVInstance *kv_instance, const String &db_id_str, const String 
         kv_instance->Get(KeyEncode::DropSegmentKey(db_id_str, table_id_str, segment_id), drop_segment_ts);
 
         if (drop_segment_ts.empty() || (std::stoull(drop_segment_ts) > begin_ts && std::stoull(drop_segment_ts) != commit_ts)) {
-            segment_ids.push_back(segment_id);
+            segment_ids->push_back(segment_id);
         }
         iter->Next();
     }
-    std::sort(segment_ids.begin(), segment_ids.end());
+    std::sort(segment_ids->begin(), segment_ids->end());
     return segment_ids;
 }
 
@@ -173,7 +173,7 @@ SizeT GetBlockRowCount(KVInstance *kv_instance,
                        BlockID block_id,
                        TxnTimeStamp begin_ts,
                        TxnTimeStamp commit_ts) {
-    
+
     NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
     String block_lock_key = KeyEncode::CatalogTableSegmentBlockTagKey(db_id_str, table_id_str, segment_id, block_id, "lock");
 
@@ -206,7 +206,7 @@ SizeT GetBlockRowCount(KVInstance *kv_instance,
         auto [offset, commit_cnt] = block_version->GetCommitRowCount(commit_ts);
         row_cnt += commit_cnt;
     }
-    
+
     return row_cnt;
 }
 
@@ -217,13 +217,13 @@ SizeT GetSegmentRowCount(KVInstance *kv_instance,
                          TxnTimeStamp begin_ts,
                          TxnTimeStamp commit_ts) {
     Vector<BlockID> blocks = GetTableSegmentBlocks(kv_instance, db_id_str, table_id_str, segment_id, begin_ts, commit_ts);
-    
+
     SizeT segment_row_count = 0;
     for (BlockID block_id : blocks) {
         SizeT block_row_cnt = GetBlockRowCount(kv_instance, db_id_str, table_id_str, segment_id, block_id, begin_ts, commit_ts);
         segment_row_count += block_row_cnt;
     }
-    
+
     return segment_row_count;
 }
 

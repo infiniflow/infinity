@@ -105,8 +105,12 @@ public:
     u64 commit_ts() const final;
     String detail() const final;
     bool is_dropped() const final;
+
     SharedPtr<Vector<SharedPtr<ColumnDef>>> get_columns() const;
     void set_columns(const SharedPtr<Vector<SharedPtr<ColumnDef>>> &columns);
+
+    SharedPtr<Vector<SegmentID>> get_segments() const;
+    void set_segments(const SharedPtr<Vector<SegmentID>> &segments);
 
 private:
     u64 db_id_{};
@@ -115,6 +119,7 @@ private:
     u64 commit_ts_{};
     String table_key_{};
     SharedPtr<Vector<SharedPtr<ColumnDef>>> columns_{};
+    SharedPtr<Vector<SegmentID>> segment_ids_{};
 };
 
 export class MetaIndexCache final : public MetaBaseCache {
