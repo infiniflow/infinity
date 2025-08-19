@@ -670,16 +670,13 @@ void NewTxnManager::CleanupTxnBottomNolock(TransactionID txn_id, TxnTimeStamp be
 }
 
 void NewTxnManager::PrintAllKeyValue() const {
-    // std::cout << String("All store key and value: ") << std::endl;
     std::println("All store key and value: ");
-    // std::cout << kv_store_->ToString() << std::endl;
     std::println("{}", kv_store_->ToString());
-    // std::cout << String(" -------------- ") << std::endl;
     std::println(" -------------- ");
 }
 
 void NewTxnManager::PrintPMKeyValue() const {
-    std::cout << String("Persistence Manager keys and values: ") << std::endl;
+    LOG_TRACE("Persistence Manager keys and values: ");
 
     // Get all key-value pairs from the KV store
     Vector<Pair<String, String>> all_key_values = kv_store_->GetAllKeyValue();
@@ -687,14 +684,14 @@ void NewTxnManager::PrintPMKeyValue() const {
     for (const auto &[key, value] : all_key_values) {
         // Check if the key is a PM key by looking for "pm|" prefix
         if (key.find("pm|") == 0) {
-            std::cout << "PM Key: " << key << " -> Value: " << value << std::endl;
+            LOG_TRACE(fmt::format("PM key: {}, value: {}", key, value));
         }
     }
-    std::cout << String(" -------------- ") << std::endl;
+    LOG_TRACE("------------------------------------");
 }
 
 void NewTxnManager::PrintAllDroppedKeys() const {
-    std::cout << String("All dropped keys: ") << std::endl;
+    LOG_TRACE("All dropped keys: ");
 
     // Get all key-value pairs from the KV store
     Vector<Pair<String, String>> all_key_values = kv_store_->GetAllKeyValue();
@@ -702,10 +699,10 @@ void NewTxnManager::PrintAllDroppedKeys() const {
     for (const auto &[key, value] : all_key_values) {
         // Check if the key is a dropped key by looking for "drop|" prefix
         if (key.find("drop|") == 0) {
-            std::cout << "Dropped Key: " << key << " -> Value: " << value << std::endl;
-            std::cout << " -------------- " << std::endl;
+            LOG_TRACE(fmt::format("Dropped key: {}, value: {}", key, value));
         }
     }
+    LOG_TRACE("------------------------------------");
 }
 
 SizeT NewTxnManager::KeyValueNum() const { return kv_store_->KeyValueNum(); }
