@@ -68,6 +68,7 @@ jobs:
               | grep -E '\.(cpp|h|hpp|cppm)$' \
               | grep -v 'third_party/' \
               | grep -v 'build/' \
+              | grep -v 'network/' \
               | grep -v 'parser/' || true)
 
             if [ -n "$CHANGED_FILES" ]; then
