@@ -100,7 +100,7 @@ Status CatalogMeta::GetDBID(const String &db_name, String &db_key, String &db_id
     }
 
     if (txn_ != nullptr) {
-        txn_->AddMetaCache(MakeShared<MetaDbCache>(db_name, std::stoull(db_id_str), max_commit_ts, db_key, false));
+        txn_->AddMetaCache(MakeShared<MetaDbCache>(db_name, std::stoull(db_id_str), max_commit_ts, db_key, false, txn_->TxnID()));
     }
 
     create_ts = max_commit_ts;

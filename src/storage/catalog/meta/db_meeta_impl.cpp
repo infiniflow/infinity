@@ -224,7 +224,7 @@ Status DBMeeta::GetTableID(const String &table_name,
     }
 
     if (txn_ != nullptr) {
-        txn_->AddMetaCache(MakeShared<MetaTableCache>(db_id, table_name, std::stoull(table_id_str), max_commit_ts, table_key, false));
+        txn_->AddMetaCache(MakeShared<MetaTableCache>(db_id, table_name, std::stoull(table_id_str), max_commit_ts, table_key, false, txn_->TxnID()));
     }
 
     create_table_ts = max_commit_ts;

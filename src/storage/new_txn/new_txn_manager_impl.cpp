@@ -463,7 +463,7 @@ void NewTxnManager::CommitKVInstance(NewTxn *txn) {
     }
 
     MetaCache *meta_cache_ptr = this->storage_->meta_cache();
-    Status status = meta_cache_ptr->Erase(items_to_erase, txn->kv_instance_.get());
+    Status status = meta_cache_ptr->Erase(items_to_erase, txn->kv_instance_.get(), commit_ts);
     if (!status.ok()) {
         UnrecoverableError(fmt::format("Put cache: {}", status.message()));
     }

@@ -45,7 +45,8 @@ export enum class EraseCacheType {
 
 class MetaBaseCache {
 public:
-    explicit MetaBaseCache(MetaCacheType type, bool is_dropped) : type_(type), is_dropped_(is_dropped) {}
+    explicit MetaBaseCache(MetaCacheType type, bool is_dropped, TransactionID reader_txn_id)
+        : type_(type), is_dropped_(is_dropped), reader_txn_id_(reader_txn_id) {}
     virtual ~MetaBaseCache() = default;
 
     MetaCacheType type() const;
@@ -58,12 +59,15 @@ protected:
     mutable std::mutex mtx_{};
     MetaCacheType type_{MetaCacheType::kInvalid};
     bool is_dropped_{false};
+    TransactionID reader_txn_id_{MAX_TXN_ID};
+    TxnTimeStamp reader_commit_ts_{};
 };
 
 export class MetaDbCache final : public MetaBaseCache {
 public:
-    MetaDbCache(const String &db_name, u64 db_id, u64 commit_ts, const String &db_key, bool is_dropped)
-        : MetaBaseCache(MetaCacheType::kCreateDB, is_dropped), db_name_(db_name), db_id_(db_id), commit_ts_(commit_ts), db_key_(db_key) {}
+    MetaDbCache(const String &db_name, u64 db_id, u64 commit_ts, const String &db_key, bool is_dropped, TransactionID reader_txn_id)
+        : MetaBaseCache(MetaCacheType::kCreateDB, is_dropped, reader_txn_id), db_name_(db_name), db_id_(db_id), commit_ts_(commit_ts),
+          db_key_(db_key) {}
     ~MetaDbCache() final = default;
 
     String name() const final;
@@ -93,9 +97,15 @@ private:
 
 export class MetaTableCache final : public MetaBaseCache {
 public:
-    MetaTableCache(u64 db_id, const String &table_name, u64 table_id, u64 commit_ts, const String &table_key, bool is_dropped)
-        : MetaBaseCache(MetaCacheType::kCreateTable, is_dropped), db_id_(db_id), table_name_(table_name), table_id_(table_id), commit_ts_(commit_ts),
-          table_key_(table_key) {}
+    MetaTableCache(u64 db_id,
+                   const String &table_name,
+                   u64 table_id,
+                   u64 commit_ts,
+                   const String &table_key,
+                   bool is_dropped,
+                   TransactionID reader_txn_id)
+        : MetaBaseCache(MetaCacheType::kCreateTable, is_dropped, reader_txn_id), db_id_(db_id), table_name_(table_name), table_id_(table_id),
+          commit_ts_(commit_ts), table_key_(table_key) {}
     ~MetaTableCache() final = default;
 
     String name() const final;
@@ -124,9 +134,16 @@ private:
 
 export class MetaIndexCache final : public MetaBaseCache {
 public:
-    MetaIndexCache(u64 db_id, u64 table_id, const String &index_name, u64 index_id, u64 commit_ts, const String &index_key, bool is_dropped)
-        : MetaBaseCache(MetaCacheType::kCreateIndex, is_dropped), db_id_(db_id), table_id_(table_id), index_name_(index_name), index_id_(index_id),
-          index_key_(index_key), commit_ts_(commit_ts) {};
+    MetaIndexCache(u64 db_id,
+                   u64 table_id,
+                   const String &index_name,
+                   u64 index_id,
+                   u64 commit_ts,
+                   const String &index_key,
+                   bool is_dropped,
+                   TransactionID reader_txn_id)
+        : MetaBaseCache(MetaCacheType::kCreateIndex, is_dropped, reader_txn_id), db_id_(db_id), table_id_(table_id), index_name_(index_name),
+          index_id_(index_id), index_key_(index_key), commit_ts_(commit_ts) {};
     ~MetaIndexCache() final = default;
 
     String name() const final;
@@ -183,6 +200,7 @@ struct TableNameID {
 };
 
 export class MetaCache {
+private:
     mutable std::mutex cache_mtx_{};
     HashMap<String, Map<u64, List<CacheItem>::iterator>> dbs_;     // db_name -> (commit_ts -> MetaDbCache)
     HashMap<String, Map<u64, List<CacheItem>::iterator>> tables_;  // table_name -> (commit_ts -> MetaTableCache)
@@ -190,13 +208,14 @@ export class MetaCache {
 
     SizeT capacity_{0};
     List<CacheItem> lru_{};
+    TxnTimeStamp latest_erased_ts_{};
 
 public:
     explicit MetaCache(SizeT capacity) : capacity_(capacity) {};
 
-    void Put(const Vector<SharedPtr<MetaBaseCache>> &cache_items);
+    void Put(const Vector<SharedPtr<MetaBaseCache>> &cache_items, TxnTimeStamp begin_ts);
 
-    Status Erase(const Vector<SharedPtr<EraseBaseCache>> &cache_items, KVInstance *kv_instance);
+    Status Erase(const Vector<SharedPtr<EraseBaseCache>> &cache_items, KVInstance *kv_instance, TxnTimeStamp commit_ts);
 
     Status PutOrErase(const Vector<SharedPtr<MetaBaseCache>> &cache_items, KVInstance *kv_instance);
 

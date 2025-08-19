@@ -6259,7 +6259,7 @@ void NewTxn::SaveMetaCache() {
         return;
     }
     MetaCache *meta_cache_ptr = txn_mgr_->storage()->meta_cache();
-    meta_cache_ptr->Put(meta_cache_items_);
+    meta_cache_ptr->Put(meta_cache_items_, this->BeginTS());
 }
 
 } // namespace infinity
