@@ -1,11 +1,11 @@
-cmake_minimum_required(VERSION 4.0.3)
+cmake_minimum_required(VERSION 4.0.3...4.1.0)
 
 cmake_policy(SET CMP0167 OLD)
 
+set(CMAKE_SUPPRESS_DEVELOPER_WARNINGS TRUE)
+
 if (CMAKE_VERSION GREATER_EQUAL 4.0.3 AND CMAKE_VERSION LESS_EQUAL 4.1.0)
     set(CMAKE_EXPERIMENTAL_CXX_IMPORT_STD "d0edc3af-4c50-42ea-a356-e2862fe7a444")
-else ()
-    message(FATAL_ERROR "The CMake version must be between 4.0.3 and 4.1.0.")
 endif ()
 
 # Auto-detect and set vcpkg toolchain if not already set
@@ -22,16 +22,6 @@ if (NOT CMAKE_TOOLCHAIN_FILE)
         message(STATUS "Using vcpkg toolchain from VCPKG_ROOT: ${CMAKE_TOOLCHAIN_FILE}")
     endif ()
 endif ()
-
-
-#set(VCPKG_ROOT "VCPKG_ROOT" CACHE STRING "VCPKG_ROOT")
-#
-#if (NOT DEFINED VCPKG_ROOT)
-#    message(FATAL_ERROR "MISSING ROOT FOR VCPKG setting to C:/vcpkg")
-#    set(VCPKG_ROOT "C:/vcpkg")
-#endif()
-#
-#set(CMAKE_TOOLCHAIN_FILE "${VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake")
 
 project(infinity VERSION 0.6.0)
 
@@ -64,7 +54,7 @@ if (CLANG_VERSION_STRING VERSION_GREATER_EQUAL 20)
     # add_compile_options(-ftime-trace)
     #    add_compile_options(-fmodule-header)
     add_link_options(-fuse-ld=mold)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Wno-unused-parameter -Wno-unused-private-field -flto")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Wno-unused-parameter -Wno-unused-private-field")
 
     add_link_options(-L/usr/local/lib)
     set(CMAKE_FIND_PACKAGE_SORT_ORDER NATURAL)
@@ -84,40 +74,41 @@ elseif (CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64)$")
     set(X86_64 TRUE)
 endif ()
 
+#strength, for image maintainer
 set(GCC_SEARCH_ROOTS
         /usr
         /usr/local
 )
-
-set(GCC15_SUFFIXES
-        #        lib
-        lib/gcc/15
-        lib/gcc/x86_64-linux-gnu/15
-        lib/gcc/x86_64-pc-linux-gnu/15.1.0
-        lib64/gcc/x86_64-linux-gnu/15
-        lib64/gcc/15
-        lib64/gcc/x86_64-pc-linux-gnu/15.1.0
-)
-
-find_library(STDCXX15_STATIC
-        NAMES libstdc++.a
-        PATHS ${GCC_SEARCH_ROOTS}
-        PATH_SUFFIXES ${GCC15_SUFFIXES}
-        REQUIRED
-        NO_DEFAULT_PATH
-)
-
-find_library(STDCXX15EXP_STATIC
-        NAMES libstdc++exp.a
-        PATHS ${GCC_SEARCH_ROOTS}
-        PATH_SUFFIXES ${GCC15_SUFFIXES}
-        REQUIRED
-        NO_DEFAULT_PATH
-)
-
-get_filename_component(GCC15_LIB_DIR ${STDCXX15_STATIC} DIRECTORY)
-
-set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -L${GCC15_LIB_DIR} -static-libstdc++ -static-libgcc")
+#
+#set(GCC15_SUFFIXES
+#        #        lib
+#        lib/gcc/15
+#        lib/gcc/x86_64-linux-gnu/15
+#        lib/gcc/x86_64-pc-linux-gnu/15.1.0
+#        lib64/gcc/x86_64-linux-gnu/15
+#        lib64/gcc/15
+#        lib64/gcc/x86_64-pc-linux-gnu/15.1.0
+#)
+#
+#find_library(STDCXX15_STATIC
+#        NAMES libstdc++.a
+#        PATHS ${GCC_SEARCH_ROOTS}
+#        PATH_SUFFIXES ${GCC15_SUFFIXES}
+#        REQUIRED
+#        NO_DEFAULT_PATH
+#)
+#
+#find_library(STDCXX15EXP_STATIC
+#        NAMES libstdc++exp.a
+#        PATHS ${GCC_SEARCH_ROOTS}
+#        PATH_SUFFIXES ${GCC15_SUFFIXES}
+#        REQUIRED
+#        NO_DEFAULT_PATH
+#)
+#
+#get_filename_component(GCC15_LIB_DIR ${STDCXX15_STATIC} DIRECTORY)
+#
+#set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -L${GCC15_LIB_DIR} -static-libstdc++ -static-libgcc")
 
 find_package(absl CONFIG REQUIRED)
 find_package(Arrow CONFIG REQUIRED)
@@ -176,13 +167,29 @@ include_directories(${OATPP_INCLUDE_DIRS})
 message(STATUS "Using vcpkg toolchain - automatic package discovery enabled")
 
 # https://youtrack.jetbrains.com/issue/CPP-39632/import-std-CLion-cant-resolve-module-std-in-case-of-clang
-#add_library(unused_std_target STATIC)
-#target_sources(unused_std_target
-#        PRIVATE
-#        FILE_SET CXX_MODULES
-#        BASE_DIRS /usr/include/c++/15
-#        FILES /usr/include/c++/15/bits/std.cc /usr/include/c++/15/bits/std.compat.cc
-#)
+add_library(unused_std_target STATIC)
+
+# just tmp solution
+set(LIBSTDCXX_MODULE_FILE_PATH_SUFFIX
+        include/c++/15/bits
+        include/c++/15.2.0/bits
+)
+
+find_file(LIBSTDCXX_MODULE_FILE
+        NAMES std.cc
+        PATHS ${GCC_SEARCH_ROOTS}
+        PATH_SUFFIXES include/c++/15/bits
+        REQUIRED
+)
+
+get_filename_component(LIBSTDCXX_MODULE_FILE_DIR ${LIBSTDCXX_MODULE_FILE} DIRECTORY)
+
+target_sources(unused_std_target
+        PRIVATE
+        FILE_SET CXX_MODULES
+        BASE_DIRS ${LIBSTDCXX_MODULE_FILE_DIR}
+        FILES ${LIBSTDCXX_MODULE_FILE_DIR}/std.cc ${LIBSTDCXX_MODULE_FILE_DIR}/std.compat.cc
+)
 
 # Get current system time and print the build time
 execute_process(COMMAND "date" +"%Y-%m-%d %H:%M.%S" OUTPUT_VARIABLE CURRENT_SYS_TIME)
