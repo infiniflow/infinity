@@ -81,36 +81,38 @@ set(GCC_SEARCH_ROOTS
         /usr
         /usr/local
 )
-#
-#set(GCC15_SUFFIXES
-#        #        lib
-#        lib/gcc/15
-#        lib/gcc/x86_64-linux-gnu/15
-#        lib/gcc/x86_64-pc-linux-gnu/15.1.0
-#        lib64/gcc/x86_64-linux-gnu/15
-#        lib64/gcc/15
-#        lib64/gcc/x86_64-pc-linux-gnu/15.1.0
-#)
-#
-#find_library(STDCXX15_STATIC
-#        NAMES libstdc++.a
-#        PATHS ${GCC_SEARCH_ROOTS}
-#        PATH_SUFFIXES ${GCC15_SUFFIXES}
-#        REQUIRED
-#        NO_DEFAULT_PATH
-#)
-#
-#find_library(STDCXX15EXP_STATIC
-#        NAMES libstdc++exp.a
-#        PATHS ${GCC_SEARCH_ROOTS}
-#        PATH_SUFFIXES ${GCC15_SUFFIXES}
-#        REQUIRED
-#        NO_DEFAULT_PATH
-#)
-#
-#get_filename_component(GCC15_LIB_DIR ${STDCXX15_STATIC} DIRECTORY)
-#
-#set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -L${GCC15_LIB_DIR} -static-libstdc++ -static-libgcc")
+
+#if you encounter a problem, try commenting out the code below.
+set(GCC15_SUFFIXES
+        #        lib
+        lib/gcc/15
+        lib/gcc/x86_64-linux-gnu/15
+        lib/gcc/x86_64-pc-linux-gnu/15.1.0
+        lib64/gcc/x86_64-linux-gnu/15
+        lib64/gcc/15
+        lib64/gcc/x86_64-pc-linux-gnu/15.1.0
+)
+
+find_library(STDCXX15_STATIC
+        NAMES libstdc++.a
+        PATHS ${GCC_SEARCH_ROOTS}
+        PATH_SUFFIXES ${GCC15_SUFFIXES}
+        REQUIRED
+        NO_DEFAULT_PATH
+)
+
+find_library(STDCXX15EXP_STATIC
+        NAMES libstdc++exp.a
+        PATHS ${GCC_SEARCH_ROOTS}
+        PATH_SUFFIXES ${GCC15_SUFFIXES}
+        REQUIRED
+        NO_DEFAULT_PATH
+)
+
+get_filename_component(GCC15_LIB_DIR ${STDCXX15_STATIC} DIRECTORY)
+
+set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -L${GCC15_LIB_DIR} -static-libstdc++ -static-libgcc")
+########
 
 find_package(absl CONFIG REQUIRED)
 find_package(Arrow CONFIG REQUIRED)
