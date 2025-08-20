@@ -26,19 +26,19 @@ namespace infinity {
 export class ColumnExpression final : public BaseExpression {
 public:
     static inline std::shared_ptr<ColumnExpression> Make(DataType data_type,
-                                                   std::string table_name,
-                                                   u64 table_index,
-                                                   std::string column_name,
-                                                   i64 column_index,
-                                                   i64 depth,
-                                                   std::optional<SpecialType> special = std::nullopt) {
+                                                         std::string table_name,
+                                                         u64 table_index,
+                                                         std::string column_name,
+                                                         i64 column_index,
+                                                         i64 depth,
+                                                         std::optional<SpecialType> special = std::nullopt) {
         return std::make_shared<ColumnExpression>(std::move(data_type),
-                                            std::move(table_name),
-                                            table_index,
-                                            std::move(column_name),
-                                            column_index,
-                                            depth,
-                                            special);
+                                                  std::move(table_name),
+                                                  table_index,
+                                                  std::move(column_name),
+                                                  column_index,
+                                                  depth,
+                                                  special);
     }
 
 public:

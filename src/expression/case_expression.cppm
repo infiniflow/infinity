@@ -16,7 +16,6 @@ module;
 
 export module infinity_core:case_expression;
 
-
 import :base_expression;
 
 import logical_type;

@@ -16,7 +16,6 @@ module;
 
 export module infinity_core:reference_expression;
 
-
 import :expression_type;
 import :base_expression;
 
@@ -27,8 +26,13 @@ namespace infinity {
 
 export class ReferenceExpression : public BaseExpression {
 public:
-    static inline std::shared_ptr<ReferenceExpression> Make(DataType data_type, std::string table_name, std::string column_name, std::string alias, size_t column_idx) {
-        return std::make_shared<ReferenceExpression>(std::move(data_type), std::move(table_name), std::move(column_name), std::move(alias), column_idx);
+    static inline std::shared_ptr<ReferenceExpression>
+    Make(DataType data_type, std::string table_name, std::string column_name, std::string alias, size_t column_idx) {
+        return std::make_shared<ReferenceExpression>(std::move(data_type),
+                                                     std::move(table_name),
+                                                     std::move(column_name),
+                                                     std::move(alias),
+                                                     column_idx);
     }
 
 public:

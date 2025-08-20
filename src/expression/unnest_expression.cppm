@@ -16,7 +16,6 @@ module;
 
 export module infinity_core:unnest_expression;
 
-
 import :base_expression;
 
 import data_type;

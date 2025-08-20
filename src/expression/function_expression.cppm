@@ -16,7 +16,6 @@ module;
 
 export module infinity_core:function_expression;
 
-
 import :base_expression;
 import :scalar_function;
 

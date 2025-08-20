@@ -42,7 +42,8 @@ export struct SourcePosition {
 
 export class BaseExpression : public std::enable_shared_from_this<BaseExpression> {
 public:
-    explicit BaseExpression(ExpressionType type, std::vector<std::shared_ptr<BaseExpression>> arguments) : type_(type), arguments_(std::move(arguments)) {};
+    explicit BaseExpression(ExpressionType type, std::vector<std::shared_ptr<BaseExpression>> arguments)
+        : type_(type), arguments_(std::move(arguments)) {};
 
     explicit BaseExpression(ExpressionType type, std::vector<std::shared_ptr<BaseExpression>> arguments, std::string alias)
         : alias_(std::move(alias)), type_(type), arguments_(std::move(arguments)) {};
