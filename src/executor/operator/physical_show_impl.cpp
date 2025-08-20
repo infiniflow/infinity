@@ -155,6 +155,7 @@ void PhysicalShow::Init(QueryContext *query_context) {
 
             output_names_->emplace_back("database");
             output_names_->emplace_back("table");
+            output_names_->emplace_back("table_id");
             output_names_->emplace_back("column_count");
             output_names_->emplace_back("block_count");
             output_names_->emplace_back("block_capacity");
@@ -162,6 +163,7 @@ void PhysicalShow::Init(QueryContext *query_context) {
             output_names_->emplace_back("segment_capacity");
             output_names_->emplace_back("comment");
 
+            output_types_->emplace_back(varchar_type);
             output_types_->emplace_back(varchar_type);
             output_types_->emplace_back(varchar_type);
             output_types_->emplace_back(bigint_type);
@@ -174,8 +176,8 @@ void PhysicalShow::Init(QueryContext *query_context) {
         }
         case ShowStmtType::kColumns: {
 
-            output_names_->reserve(3);
-            output_types_->reserve(3);
+            output_names_->reserve(4);
+            output_types_->reserve(4);
 
             output_names_->emplace_back("name");
             output_names_->emplace_back("type");
@@ -989,22 +991,6 @@ void PhysicalShow::ExecuteShowTable(QueryContext *query_context, ShowOperatorSta
         }
     }
 
-    {
-        size_t column_id = 0;
-        {
-            Value value = Value::MakeVarchar("row_count");
-            ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
-        }
-
-        ++column_id;
-        {
-            Value value = Value::MakeVarchar(std::to_string(table_info->row_count_));
-            ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
-        }
-    }
-
     output_block_ptr->Finalize();
     show_operator_state->output_.emplace_back(std::move(output_block_ptr));
 }
@@ -1554,6 +1540,15 @@ void PhysicalShow::ExecuteShowTables(QueryContext *query_context, ShowOperatorSt
             // Append table name to the 1 column
             const std::string *table_name = table_detail_ptr->table_name_.get();
             Value value = Value::MakeVarchar(*table_name);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+
+        ++column_id;
+        {
+            // Append table id to the 2 column
+            const std::string *table_id = table_detail_ptr->table_id_.get();
+            Value value = Value::MakeVarchar(*table_id);
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
         }

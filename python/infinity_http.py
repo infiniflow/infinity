@@ -15,6 +15,7 @@ import pyarrow as pa
 from infinity.table import ExplainType
 from typing import List
 from dataclasses import dataclass
+from collections import namedtuple
 
 
 class http_network_util:
@@ -350,7 +351,7 @@ class infinity_http:
         r = self.net.request(url, "get", h)
         self.net.raise_exception(r)
         response_data = r.json()
-        
+
         # Extract snapshots from response
         snapshots = []
         if "snapshots" in response_data:
@@ -359,9 +360,9 @@ class infinity_http:
                 class SnapshotInfo:
                     def __init__(self, name):
                         self.name = name
-                
+
                 snapshots.append(SnapshotInfo(snapshot_info.get("name", "")))
-        
+
         return database_result(data=response_data, snapshots=snapshots)
 
     def show_snapshot(self, snapshot_name):
@@ -490,7 +491,7 @@ class database_http:
         h = self.net.set_up_header(["accept"])
         r = self.net.request(url, "get", h)
         self.net.raise_exception(r)
-        return database_result()
+        return convert_to_list_tables_result(r.json())
 
     def show_table(self, table_name):
         check_valid_name(table_name)
@@ -498,7 +499,7 @@ class database_http:
         h = self.net.set_up_header(["accept"])
         r = self.net.request(url, "get", h)
         self.net.raise_exception(r)
-        # self.table_name = table_name
+        return convert_to_show_table_result(r.json())
 
     def get_all_tables(self):
         url = f"databases/{self.database_name}/tables"
@@ -521,12 +522,6 @@ class database_http:
         r = self.net.request(url, "get", h)
         self.net.raise_exception(r)
         return table_http(self.net, self.database_name, table_name)
-
-    # not implemented, just to pass test
-    def show_tables(self):
-        self.get_all_tables()
-        return database_result(columns=["database", "table", "column_count", "block_count", "block_capacity",
-                                        "segment_count", "segment_capacity", "comment"])
 
     # table snapshot operations
     def create_table_snapshot(self, snapshot_name, table_name):
@@ -822,6 +817,7 @@ class table_http:
         self.net.raise_exception(r)
         return pd.DataFrame(r.json()['blocks'])
 
+
 class table_http_result:
     def __init__(self, output: list, table_http: table_http):
         self.table_http = table_http
@@ -869,33 +865,34 @@ class table_http_result:
             tmp["option"] = self._option
         # print(tmp)
         d = self.table_http.net.set_up_data([], tmp)
-        
+
         # Add timing measurement for network transfer and JSON parsing
         import time
         import json
-        
+
         # Time the network transfer
         start_network = time.perf_counter()
         r = self.table_http.net.request(url, "get", h, d)
         end_network = time.perf_counter()
-        
+
         network_time = (end_network - start_network) * 1000
         response_size = len(r.content)
-        
+
         # Time JSON parsing
         start_parse = time.perf_counter()
         result_json = r.json()
         end_parse = time.perf_counter()
-        
+
         parse_time = (end_parse - start_parse) * 1000
-        
+
         # Print timing information for large responses
         if response_size > 100000:  # Only print for responses > 100KB
-            print(f"HTTP Timing - Network: {network_time:.2f}ms, Parse: {parse_time:.2f}ms, Size: {response_size:,} bytes")
+            print(
+                f"HTTP Timing - Network: {network_time:.2f}ms, Parse: {parse_time:.2f}ms, Size: {response_size:,} bytes")
             if "output" in result_json:
                 row_count = len(result_json["output"])
-                print(f"  Rows: {row_count:,}, Avg row size: {response_size/row_count:.1f} bytes")
-        
+                print(f"  Rows: {row_count:,}, Avg row size: {response_size / row_count:.1f} bytes")
+
         self.table_http.net.raise_exception(r)
         # print(r.json())
         if "output" in result_json:
@@ -989,11 +986,11 @@ class table_http_result:
     def offset(self, offset):
         self._offset = offset
         return self
-    
+
     def group_by(self, group_by_list):
         self._group_by = group_by_list
         return self
-    
+
     def having(self, having_expr):
         self._having = having_expr
         return self
@@ -1072,13 +1069,13 @@ class table_http_result:
 
     def to_result(self):
         import time
-        
+
         if self.output_res == []:
             self.select()
 
         # Time the data processing
         start_process = time.perf_counter()
-        
+
         df_dict = {}
         col_types = self.table_http.show_columns_type()
         for output_col in self._output:
@@ -1165,14 +1162,14 @@ class table_http_result:
                     if (function_name in bool_functions):
                         df_type[k] = dtype('bool')
                         break
-        
+
         end_process = time.perf_counter()
         process_time = (end_process - start_process) * 1000
-        
+
         # Print timing for large datasets
         if len(self.output_res) > 1000:  # Only print for datasets with > 1000 rows
             print(f"HTTP Data Processing - Time: {process_time:.2f}ms, Rows: {len(self.output_res):,}")
-        
+
         return df_dict, df_type, extra_result
 
     def to_pl(self):
@@ -1181,25 +1178,26 @@ class table_http_result:
 
     def to_df(self):
         import time
-        
+
         # Time the to_result() call (data processing)
         start_result = time.perf_counter()
         df_dict, df_type, extra_result = self.to_result()
         end_result = time.perf_counter()
-        
+
         result_time = (end_result - start_result) * 1000
-        
+
         # Time DataFrame construction
         start_df = time.perf_counter()
         df = pd.DataFrame(df_dict).astype(df_type)
         end_df = time.perf_counter()
-        
+
         df_time = (end_df - start_df) * 1000
-        
+
         # Print timing for large DataFrames
         if len(df) > 1000:  # Only print for DataFrames with > 1000 rows
-            print(f"HTTP DataFrame Timing - Processing: {result_time:.2f}ms, Construction: {df_time:.2f}ms, Rows: {len(df):,}")
-        
+            print(
+                f"HTTP DataFrame Timing - Processing: {result_time:.2f}ms, Construction: {df_time:.2f}ms, Rows: {len(df):,}")
+
         return df, extra_result
 
     def to_arrow(self):
@@ -1210,7 +1208,8 @@ class table_http_result:
 @dataclass
 class database_result():
     def __init__(self, list=[], database_name: str = "", error_code=ErrorCode.OK, columns=[], index_list=[],
-                 node_name="", node_role="", node_status="", index_comment=None, deleted_rows=0, data={}, nodes=[], error_msg="", snapshots=[]):
+                 node_name="", node_role="", node_status="", index_comment=None, deleted_rows=0, data={}, nodes=[],
+                 error_msg="", snapshots=[]):
         self.db_names = list
         self.database_name = database_name  # get database
         self.error_code = error_code
@@ -1225,6 +1224,44 @@ class database_result():
         self.nodes = nodes
         self.error_msg = error_msg
         self.snapshots = snapshots
+
+
+list_tables_result = namedtuple('list_tables_result', [
+    'error_code',
+    'error_msg',
+    'table_names',
+])
+
+
+def convert_to_list_tables_result(data_dict):
+    return list_tables_result(
+        error_code=data_dict.get('error_code'),
+        error_msg=data_dict.get('error_msg'),
+        table_names=data_dict.get('table_names'),
+    )
+
+
+show_table_result = namedtuple('show_table_result', [
+    'error_code',
+    'error_msg',
+    'database_name',
+    'table_name',
+    'store_dir',
+    'column_count',
+    'segment_count'
+])
+
+
+def convert_to_show_table_result(data_dict):
+    return show_table_result(
+        error_code=data_dict.get('error_code'),
+        error_msg=data_dict.get('error_msg'),
+        database_name=data_dict.get('database_name'),
+        table_name=data_dict.get('table_name'),
+        store_dir=data_dict.get('storage_directory'),
+        column_count=int(data_dict.get('column_count')),
+        segment_count=int(data_dict.get('segment_count')),
+    )
 
 
 identifier_limit = 65536

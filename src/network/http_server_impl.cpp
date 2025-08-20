@@ -592,7 +592,7 @@ public:
                     // Column 1: table name
                     Value value = data_block->GetValue(1, row);
                     const std::string &column_value = value.ToString();
-                    json_response["tables"].push_back(column_value);
+                    json_response["table_names"].push_back(column_value);
                 }
             }
 

@@ -1234,7 +1234,7 @@ void InfinityThriftService::ListTable(infinity_thrift_rpc::ListTableResponse &re
         return;
     }
 
-    auto result = infinity->ListTables(request.db_name);
+    auto result = infinity->ShowTables(request.db_name);
     if (result.IsOk()) {
         for (auto &data_block : result.result_table_->data_blocks_) {
             auto row_count = data_block->row_count();
@@ -1302,7 +1302,7 @@ void InfinityThriftService::ShowTable(infinity_thrift_rpc::ShowTableResponse &re
     if (result.IsOk()) {
         std::shared_ptr<DataBlock> data_block = result.result_table_->GetDataBlockById(0);
         auto row_count = data_block->row_count();
-        if (row_count != 7) {
+        if (row_count != 6) {
             UnrecoverableError("ShowTable: query result is invalid.");
         }
 
@@ -1340,12 +1340,6 @@ void InfinityThriftService::ShowTable(infinity_thrift_rpc::ShowTableResponse &re
             // segment count
             Value value = data_block->GetValue(1, 5);
             response.segment_count = std::stol(value.GetVarchar());
-        }
-
-        {
-            // row count
-            Value value = data_block->GetValue(1, 6);
-            response.row_count = std::stol(value.GetVarchar());
         }
 
         response.__set_error_code((i64)(result.ErrorCode()));
