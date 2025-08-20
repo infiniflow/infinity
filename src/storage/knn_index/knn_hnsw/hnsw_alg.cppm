@@ -81,6 +81,7 @@ public:
             mult_ = std::exchange(other.mult_, 0.0);
             data_store_ = std::move(other.data_store_);
             distance_ = std::move(other.distance_);
+            prefetch_step_ = L1_CACHE_SIZE / data_store_.vec_store_meta().GetVecSizeInBytes();
         }
         return *this;
     }
