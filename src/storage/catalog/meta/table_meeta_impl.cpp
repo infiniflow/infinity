@@ -605,8 +605,21 @@ Status TableMeeta::LoadColumnDefs() {
 }
 
 Status TableMeeta::LoadIndexIDs() {
-    Vector<String> index_id_strs;
-    Vector<String> index_names;
+
+    if (table_cache_.get() != nullptr) {
+        auto [index_ids_ptr, index_names_ptr] = table_cache_->get_index_ids();
+        if (index_ids_ptr != nullptr and index_names_ptr != nullptr) {
+            index_id_strs_ = *index_ids_ptr;
+            index_names_ = *index_names_ptr;
+            return Status::OK();
+        }
+    }
+
+    SharedPtr<Vector<String>> index_ids_ptr = MakeShared<Vector<String>>();
+    SharedPtr<Vector<String>> index_names_ptr = MakeShared<Vector<String>>();
+
+    Vector<String> &index_id_strs = *index_ids_ptr;
+    Vector<String> &index_names = *index_names_ptr;
     Map<String, Vector<Pair<String, String>>> index_kvs_map;
     String index_prefix = KeyEncode::CatalogTableIndexPrefix(db_id_str_, table_id_str_);
     auto iter = kv_instance_->GetIterator();
@@ -645,8 +658,12 @@ Status TableMeeta::LoadIndexIDs() {
         }
     }
 
-    index_id_strs_ = std::move(index_id_strs);
-    index_names_ = std::move(index_names);
+    if (table_cache_.get() != nullptr) {
+        table_cache_->set_index_ids(index_ids_ptr, index_names_ptr);
+    }
+
+    index_id_strs_ = index_id_strs;
+    index_names_ = index_names;
     return Status::OK();
 }
 

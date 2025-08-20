@@ -121,6 +121,9 @@ public:
     SharedPtr<Vector<SegmentID>> get_segments() const;
     void set_segments(const SharedPtr<Vector<SegmentID>> &segments);
 
+    Tuple<SharedPtr<Vector<String>>, SharedPtr<Vector<String>>> get_index_ids() const;
+    void set_index_ids(const SharedPtr<Vector<String>> &index_names_ptr, const SharedPtr<Vector<String>> &index_ids_ptr);
+
 private:
     u64 db_id_{};
     String table_name_{};
@@ -129,6 +132,8 @@ private:
     String table_key_{};
     SharedPtr<Vector<SharedPtr<ColumnDef>>> columns_{};
     SharedPtr<Vector<SegmentID>> segment_ids_{};
+    SharedPtr<Vector<String>> index_names_ptr_{};
+    SharedPtr<Vector<String>> index_ids_ptr_{};
 };
 
 export class MetaIndexCache final : public MetaBaseCache {

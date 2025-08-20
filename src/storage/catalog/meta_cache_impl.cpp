@@ -140,6 +140,18 @@ void MetaTableCache::set_segments(const SharedPtr<Vector<SegmentID>> &segments) 
     segment_ids_ = segments;
 }
 
+Tuple<SharedPtr<Vector<String>>, SharedPtr<Vector<String>>> MetaTableCache::get_index_ids() const {
+    std::unique_lock lock(mtx_);
+    return {index_ids_ptr_, index_names_ptr_};
+}
+
+void MetaTableCache::set_index_ids(const SharedPtr<Vector<String>> &index_ids, const SharedPtr<Vector<String>> &index_names) {
+    std::unique_lock lock(mtx_);
+
+    index_ids_ptr_ = index_ids;
+    index_names_ptr_ = index_names;
+}
+
 String MetaIndexCache::name() const {
     std::unique_lock lock(mtx_);
     return index_name_;
