@@ -228,7 +228,9 @@ Status MetaCache::Erase(const Vector<SharedPtr<EraseBaseCache>> &cache_items, KV
         }
     }
 
-    latest_erased_ts_ = commit_ts;
+    if (!cache_items.empty()) {
+        latest_erased_ts_ = commit_ts;
+    }
 
     if (kv_instance != nullptr) {
         return kv_instance->Commit();
@@ -295,12 +297,14 @@ void MetaCache::PutDbNolock(const SharedPtr<MetaDbCache> &db_cache) {
 SharedPtr<MetaDbCache> MetaCache::GetDb(const String &db_name, TxnTimeStamp begin_ts) {
     String name = KeyEncode::CatalogDbPrefix(db_name);
     std::unique_lock lock(cache_mtx_);
+    ++db_request_count_;
     auto iter = dbs_.find(name);
     if (iter != dbs_.end()) {
         Map<u64, List<CacheItem>::iterator> &db_map_ref = iter->second;
         for (auto r_cache_iter = db_map_ref.rbegin(); r_cache_iter != db_map_ref.rend(); ++r_cache_iter) {
             TxnTimeStamp commit_ts = r_cache_iter->first;
             if (begin_ts > commit_ts) {
+                ++db_hit_count_;
                 TouchNolock(r_cache_iter->second);
                 return std::static_pointer_cast<MetaDbCache>(r_cache_iter->second->meta_cache_);
             }
@@ -345,6 +349,7 @@ SharedPtr<MetaTableCache> MetaCache::GetTable(u64 db_id, const String &table_nam
     String name = KeyEncode::CatalogTablePrefix(std::to_string(db_id), table_name);
 
     std::unique_lock lock(cache_mtx_);
+    ++table_request_count_;
     auto iter = tables_.find(name);
     if (iter != tables_.end()) {
         LOG_TRACE(fmt::format("Find table cache name: {}", name));
@@ -352,6 +357,7 @@ SharedPtr<MetaTableCache> MetaCache::GetTable(u64 db_id, const String &table_nam
         for (auto r_cache_iter = table_map_ref.rbegin(); r_cache_iter != table_map_ref.rend(); ++r_cache_iter) {
             TxnTimeStamp commit_ts = r_cache_iter->first;
             if (begin_ts > commit_ts) {
+                ++table_hit_count_;
                 TouchNolock(r_cache_iter->second);
                 return std::static_pointer_cast<MetaTableCache>(r_cache_iter->second->meta_cache_);
             }
@@ -400,12 +406,14 @@ SharedPtr<MetaIndexCache> MetaCache::GetIndex(u64 db_id, u64 table_id, const Str
     String name = KeyEncode::CatalogIndexPrefix(std::to_string(db_id), std::to_string(table_id), index_name);
 
     std::unique_lock lock(cache_mtx_);
+    ++index_request_count_;
     auto iter = indexes_.find(name);
     if (iter != indexes_.end()) {
         Map<u64, List<CacheItem>::iterator> &index_map_ref = iter->second;
         for (auto r_cache_iter = index_map_ref.rbegin(); r_cache_iter != index_map_ref.rend(); ++r_cache_iter) {
             TxnTimeStamp commit_ts = r_cache_iter->first;
             if (begin_ts > commit_ts) {
+                ++index_hit_count_;
                 TouchNolock(r_cache_iter->second);
                 return std::static_pointer_cast<MetaIndexCache>(r_cache_iter->second->meta_cache_);
             }

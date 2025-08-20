@@ -60,7 +60,6 @@ protected:
     MetaCacheType type_{MetaCacheType::kInvalid};
     bool is_dropped_{false};
     TransactionID reader_txn_id_{MAX_TXN_ID};
-    TxnTimeStamp reader_commit_ts_{};
 };
 
 export class MetaDbCache final : public MetaBaseCache {

@@ -6638,7 +6638,7 @@ void PhysicalShow::ExecuteShowCache(QueryContext *query_context, ShowOperatorSta
         CacheStatus table_cache_status = meta_cache->GetCacheStatus(MetaCacheType::kCreateTable);
         {
             // cache_type
-            Value value = Value::MakeVarchar("database");
+            Value value = Value::MakeVarchar("table");
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
         }
@@ -6681,7 +6681,7 @@ void PhysicalShow::ExecuteShowCache(QueryContext *query_context, ShowOperatorSta
         CacheStatus index_cache_status = meta_cache->GetCacheStatus(MetaCacheType::kCreateIndex);
         {
             // cache_type
-            Value value = Value::MakeVarchar("database");
+            Value value = Value::MakeVarchar("index");
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
         }

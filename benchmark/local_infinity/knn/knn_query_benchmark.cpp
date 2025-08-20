@@ -270,5 +270,22 @@ int main(int argc, char *argv[]) {
     float elapsed_s_avg = elapsed_s_sum / total_times;
     std::cout << "Average cost : " << elapsed_s_avg << " s" << std::endl;
 
+    std::shared_ptr<Infinity> infinity = Infinity::LocalConnect();
+    QueryResult cache_result = infinity->ShowCache();
+
+    auto &vectors = cache_result.result_table_->GetDataBlockById(0)->column_vectors;
+    std::cout << "columns: " << vectors.size() << std::endl;
+    auto column1 = reinterpret_cast<const u64 *>(vectors[1]->data());
+    auto column2 = reinterpret_cast<const u64 *>(vectors[2]->data());
+    auto column3 = reinterpret_cast<const u64 *>(vectors[3]->data());
+    auto column4 = reinterpret_cast<const double *>(vectors[4]->data());
+
+    std::cout << "Cache db, items: " << column1[0] << ", hits: " << column2[0] << ", request: " << column3[0] << ", hit rate: " << column4[0]
+              << std::endl;
+    std::cout << "Cache table, items: " << column1[1] << ", hits: " << column2[1] << ", request: " << column3[1] << ", hit rate: " << column4[1]
+              << std::endl;
+    std::cout << "Cache index, items: " << column1[2] << ", hits: " << column2[2] << ", request: " << column3[2] << ", hit rate: " << column4[2]
+              << std::endl;
+
     Infinity::LocalUnInit();
 }
