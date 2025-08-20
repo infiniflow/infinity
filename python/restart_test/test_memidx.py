@@ -164,7 +164,7 @@ class TestMemIdx:
             )
             table_obj.insert([{"c1": 2, "c2": [0.1, 0.2, 0.3, -0.2]} for i in range(row_n)])
             # wait for 1024 lines to dump
-            time.sleep(3)
+            time.sleep(5)
 
         @decorator1
         def part2(infinity_obj):
