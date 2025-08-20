@@ -84,6 +84,7 @@ public:
             mult_ = std::exchange(other.mult_, 0.0);
             data_store_ = std::move(other.data_store_);
             distance_ = std::move(other.distance_);
+            prefetch_step_ = L1_CACHE_SIZE / data_store_.vec_store_meta().GetVecSizeInBytes();
         }
         return *this;
     }
@@ -181,10 +182,10 @@ protected:
             }
 
             const auto [neighbors_p, neighbor_size] = data_store_.GetNeighbors(c_idx, layer_idx);
-            int prefetch_start = neighbor_size - 1;
-            for (int i = neighbor_size - 1; i >= 0; --i) {
-                for (int j = prefetch_step_; prefetch_start >= 0 && j > 0; --j) {
-                    data_store_.PrefetchVec(neighbors_p[prefetch_start--]);
+            i32 prefetch_start = 0;
+            for (i32 i = 0; i < neighbor_size; ++i) {
+                for (SizeT j = prefetch_step_; prefetch_start < neighbor_size && j > 0; --j) {
+                    data_store_.PrefetchVec(neighbors_p[prefetch_start++]);
                 }
                 VertexType n_idx = neighbors_p[i];
                 if (n_idx >= (VertexType)cur_vec_num || visited[n_idx]) {

@@ -43,6 +43,9 @@ export template <typename Iterator, typename RtnType, typename LabelType>
 concept DataIteratorConcept = requires(Iterator iter) {
     typename std::decay_t<Iterator>::ValueType;
     { iter.Next() } -> std::same_as<Optional<Pair<RtnType, LabelType>>>;
+    // HnswIndexInMem::InsertVecs<Iter> needs row count which might be different with the vector count,
+    // for example MemIndexInserterIter1<MultiVectorRef<ElementT>>.
+    { iter.GetRowCount() } -> std::same_as<SizeT>;
 };
 
 export template <typename DataType, typename LabelType>
@@ -68,6 +71,8 @@ public:
         ptr_ += dim_;
         return std::make_pair(ret, label_++);
     }
+
+    SizeT GetRowCount() const { return (ptr_end_ - ptr_) / dim_; }
 
     Split split() && {
         Split res;
@@ -111,6 +116,8 @@ public:
         ++indptr_;
         return std::make_pair(SparseVecRef<DataType, IdxType>(nnz, indice, data), label_++);
     }
+
+    SizeT GetRowCount() const { return indptr_end_ - indptr_ - 1; }
 };
 
 export template <typename LabelType>
