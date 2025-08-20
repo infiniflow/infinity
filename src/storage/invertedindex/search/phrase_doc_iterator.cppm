@@ -106,10 +106,10 @@ private:
     RowID block_min_possible_doc_id_ = INVALID_ROWID;
     RowID block_last_doc_id_ = INVALID_ROWID;
 
-    float tf_ = 0.0f;          // current doc_id_'s tf
-    u32 estimate_doc_freq_{0}; // estimated at the beginning
-    float phrase_freq_{0.0f};  // increase during search
-    std::vector<float> all_tf_;     // increase during search
+    float tf_ = 0.0f;           // current doc_id_'s tf
+    u32 estimate_doc_freq_{0};  // estimated at the beginning
+    float phrase_freq_{0.0f};   // increase during search
+    std::vector<float> all_tf_; // increase during search
 
     // debug statistics
     u32 calc_score_cnt_ = 0;

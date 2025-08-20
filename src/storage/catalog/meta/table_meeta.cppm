@@ -41,14 +41,13 @@ public:
 
     TxnTimeStamp begin_ts() const { return begin_ts_; }
     TxnTimeStamp commit_ts() const { return commit_ts_; }
-    
 
     /**
      * Get the table creation timestamp from KV instance
      * @return std::tuple containing the create timestamp and status
      * @note This parses the actual key in KV store to get the creation timestamp
      */
-    std::tuple<TxnTimeStamp, Status> GetCreateTimestampFromKV(const std::string &table_name) ;
+    std::tuple<TxnTimeStamp, Status> GetCreateTimestampFromKV(const std::string &table_name);
 
     KVInstance *kv_instance() const { return kv_instance_; }
 
@@ -114,7 +113,7 @@ public:
     Status GetNextColumnID(ColumnID &next_column_id);
 
     Status SetNextColumnID(ColumnID next_column_id);
-    
+
     Status GetNextRowID(RowID &next_row_id);
 
     std::tuple<std::string, Status> GetNextIndexID();
@@ -123,13 +122,11 @@ public:
 
     std::tuple<std::shared_ptr<TableSnapshotInfo>, Status> MapMetaToSnapShotInfo(const std::string &db_name, const std::string &table_name);
 
-
     Status RestoreFromSnapshot(WalCmdRestoreTableSnapshot *restore_table_snapshot_cmd, bool is_link_files = false);
 
     Status SetBeginTS(TxnTimeStamp begin_ts);
 
-    std::tuple<size_t,Status> GetTableRowCount();
-
+    std::tuple<size_t, Status> GetTableRowCount();
 
 private:
     Status LoadComment();

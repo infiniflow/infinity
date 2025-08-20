@@ -27,13 +27,20 @@ namespace infinity {
 
 export class LogicalCreateTable : public LogicalNode {
 public:
-    static inline std::shared_ptr<LogicalCreateTable>
-    Make(u64 node_id, const std::shared_ptr<std::string> &schema_name, const std::shared_ptr<TableDef> &table_def_ptr, u64 table_index, ConflictType conflict_type) {
+    static inline std::shared_ptr<LogicalCreateTable> Make(u64 node_id,
+                                                           const std::shared_ptr<std::string> &schema_name,
+                                                           const std::shared_ptr<TableDef> &table_def_ptr,
+                                                           u64 table_index,
+                                                           ConflictType conflict_type) {
         return std::make_shared<LogicalCreateTable>(node_id, schema_name, table_def_ptr, table_index, conflict_type);
     }
 
 public:
-    LogicalCreateTable(u64 node_id, std::shared_ptr<std::string> schema_name, std::shared_ptr<TableDef> table_def_ptr, u64 table_index, ConflictType conflict_type)
+    LogicalCreateTable(u64 node_id,
+                       std::shared_ptr<std::string> schema_name,
+                       std::shared_ptr<TableDef> table_def_ptr,
+                       u64 table_index,
+                       ConflictType conflict_type)
         : LogicalNode(node_id, LogicalNodeType::kCreateTable), schema_name_(std::move(schema_name)), table_definition_(std::move(table_def_ptr)),
           table_index_(table_index), conflict_type_(conflict_type) {}
 

@@ -62,16 +62,16 @@ public:
 
     // return docid: start from start_segment_offset
     std::tuple<u32, std::unique_ptr<f32[]>, std::unique_ptr<u32[]>> GetQueryResult(const f32 *query_ptr,
-                                                                  u32 nprobe,
-                                                                  f32 thresh,
-                                                                  u32 n_doc_to_score,
-                                                                  u32 out_second_stage,
-                                                                  u32 k,
-                                                                  f32 thresh_query,
-                                                                  Bitmask &bitmask,
-                                                                  u32 start_segment_offset,
-                                                                  const BlockIndex *block_index,
-                                                                  TxnTimeStamp begin_ts) const;
+                                                                                   u32 nprobe,
+                                                                                   f32 thresh,
+                                                                                   u32 n_doc_to_score,
+                                                                                   u32 out_second_stage,
+                                                                                   u32 k,
+                                                                                   f32 thresh_query,
+                                                                                   Bitmask &bitmask,
+                                                                                   u32 start_segment_offset,
+                                                                                   const BlockIndex *block_index,
+                                                                                   TxnTimeStamp begin_ts) const;
 
 private:
     auto find_candidate_docs(const f32 *centroids_scores, u32 nprobe, f32 th) const;

@@ -52,7 +52,7 @@ private:
     const PositionListFormat *pos_list_format_;
 
     mutable std::shared_mutex rw_mutex_; // Protect total_pos_count_ and pos_skiplist_writer_
-    u32 total_pos_count_; // 4byte
+    u32 total_pos_count_;                // 4byte
     std::shared_ptr<SkipListWriter> pos_skiplist_writer_;
 };
 

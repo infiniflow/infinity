@@ -32,7 +32,7 @@ class SegmentMeta;
 
 export class IVFDataAccessorBase {
 public:
-    virtual const char * GetEmbedding(size_t offset) = 0;
+    virtual const char *GetEmbedding(size_t offset) = 0;
 
     virtual std::pair<std::span<const char>, size_t> GetMultiVector(size_t offset) = 0;
 };

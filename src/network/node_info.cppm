@@ -28,7 +28,14 @@ export std::string ToString(NodeStatus);
 
 export class NodeInfo {
 public:
-    NodeInfo(NodeRole role, NodeStatus status, const std::string &name, const std::string &ip_addr, i64 port, i64 txn_ts, u64 update_ts, u64 heartbeat_count);
+    NodeInfo(NodeRole role,
+             NodeStatus status,
+             const std::string &name,
+             const std::string &ip_addr,
+             i64 port,
+             i64 txn_ts,
+             u64 update_ts,
+             u64 heartbeat_count);
     NodeInfo(NodeRole role, NodeStatus status, const std::string &name, const std::string &ip_addr, i64 port, i64 txn_ts, u64 update_ts);
     NodeInfo(NodeRole role, NodeStatus status, const std::string &name, const std::string &ip_addr, i64 port, u64 update_ts);
     NodeInfo(NodeRole role, const std::string &ip_addr, i64 port);

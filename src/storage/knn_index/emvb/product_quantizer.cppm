@@ -38,7 +38,8 @@ protected:
     static constexpr u32 subspace_centroid_num_ = std::numeric_limits<SUBSPACE_CENTROID_TAG>::max() + 1;
     const u32 subspace_dimension_;                             // dimension of each subspace
     const u32 dimension_ = SUBSPACE_NUM * subspace_dimension_; // dimension of each embedding
-    std::array<std::vector<f32>, SUBSPACE_NUM> subspace_centroids_ = {}; // centroids for each subspace, size: subspace_centroid_num_ * subspace_dimension_
+    std::array<std::vector<f32>, SUBSPACE_NUM> subspace_centroids_ =
+        {}; // centroids for each subspace, size: subspace_centroid_num_ * subspace_dimension_
     std::array<std::array<f32, subspace_centroid_num_>, SUBSPACE_NUM> subspace_centroid_norms_neg_half =
         {}; // (-0.5 * norm) for each centroid, size: subspace_centroid_num_
     std::deque<std::array<SUBSPACE_CENTROID_TAG, SUBSPACE_NUM>> encoded_embedding_data_;

@@ -345,9 +345,9 @@ private:
     u32 R_;
     u32 maxc_;
 
-    std::vector<Neighbor> pool_;              // store all neighbors explored from best_l_nodes_
+    std::vector<Neighbor> pool_;         // store all neighbors explored from best_l_nodes_
     NeighborPriorityQueue best_l_nodes_; // store best L nodes
-    std::vector<f32> occlude_factor_;         // used in OccludeList()
+    std::vector<f32> occlude_factor_;    // used in OccludeList()
     std::unordered_set<u32> inserted_into_pool_rs_;
     boost::dynamic_bitset<> *inserted_into_pool_bs_;
 
@@ -365,7 +365,7 @@ public:
     DataType *coord_scratch_ = nullptr; // at least [sizeof(DataType) * data_dim]
 
     char *sector_scratch_ = nullptr; // at least [MAX_N_SECTOR_READS * SECTOR_LEN]
-    size_t sector_idx_ = 0;           // index of the next [SECTOR_LEN] scratch to use
+    size_t sector_idx_ = 0;          // index of the next [SECTOR_LEN] scratch to use
 
     std::unordered_set<size_t> visited_;
     NeighborPriorityQueue retset_;

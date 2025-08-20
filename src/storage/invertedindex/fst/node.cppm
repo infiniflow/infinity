@@ -641,8 +641,8 @@ public:
             return Output::Zero();
         }
         size_t at = data_len - 1 - NtransLen() - 1                     // pack size
-                   - TotalTransSize(sizes, ntrans) - (ntrans * osize) // output values
-                   - osize;                                           // the desired output value
+                    - TotalTransSize(sizes, ntrans) - (ntrans * osize) // output values
+                    - osize;                                           // the desired output value
         return Output(UnpackUint(data_ptr + at, u8(osize)));
     }
 
@@ -662,16 +662,16 @@ public:
         assert(i < node.ntrans_);
         size_t tsize = node.sizes_.TransitionPackSize();
         size_t at = node.start_ - NtransLen() - 1                 // pack size
-                   - TransIndexSize(node.ntrans_) - node.ntrans_ // inputs
-                   - (i * tsize)                                 // the previous transition addresses
-                   - tsize;                                      // the desired transition address
+                    - TransIndexSize(node.ntrans_) - node.ntrans_ // inputs
+                    - (i * tsize)                                 // the previous transition addresses
+                    - tsize;                                      // the desired transition address
         return State::UnpackDelta(node.data_ptr_ + at, tsize, node.end_);
     }
 
     /// InputAt returns the input byte for the transition at the given index.
     u8 InputAt(const Node &node, size_t i) const {
         size_t at = node.start_ - NtransLen() - 1           // pack size
-                   - TransIndexSize(node.ntrans_) - i - 1; // the input byte
+                    - TransIndexSize(node.ntrans_) - i - 1; // the input byte
         return node.data_ptr_[at];
     }
 
@@ -688,7 +688,7 @@ public:
             }
         } else {
             size_t start = node.start_ - NtransLen() - 1 // pack size
-                          - node.ntrans_;               // inputs
+                           - node.ntrans_;               // inputs
             size_t end = start + node.ntrans_;
             for (size_t i = start; i < end; i++) {
                 if (node.data_ptr_[i] == b) {
@@ -707,8 +707,8 @@ public:
             return Output::Zero();
         }
         size_t at = node.start_ - NtransLen() - 1                             // pack size
-                   - TotalTransSize(node.sizes_, node.ntrans_) - (i * osize) // the previous output values
-                   - osize;                                                  // the desired output value
+                    - TotalTransSize(node.sizes_, node.ntrans_) - (i * osize) // the previous output values
+                    - osize;                                                  // the desired output value
         return Output(UnpackUint(node.data_ptr_ + at, osize));
     }
 

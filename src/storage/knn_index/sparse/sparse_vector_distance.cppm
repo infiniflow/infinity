@@ -19,7 +19,8 @@ import std.compat;
 namespace infinity {
 
 export template <typename DataType, typename IndexType, typename ResultType = DataType>
-ResultType SparseIPDistance(const DataType *data1, const IndexType *index1, size_t nnz1, const DataType *data2, const IndexType *index2, size_t nnz2) {
+ResultType
+SparseIPDistance(const DataType *data1, const IndexType *index1, size_t nnz1, const DataType *data2, const IndexType *index2, size_t nnz2) {
     ResultType distance{};
     size_t i = 0, j = 0;
     while (i < nnz1 && j < nnz2) {

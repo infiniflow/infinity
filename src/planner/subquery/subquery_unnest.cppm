@@ -33,21 +33,21 @@ public:
                                  const std::shared_ptr<BindContext> &bind_context);
 
     static std::shared_ptr<BaseExpression> UnnestSubquery(std::shared_ptr<BaseExpression> &expr_ptr,
-                                                    std::shared_ptr<LogicalNode> &root,
-                                                    QueryContext *query_context,
-                                                    const std::shared_ptr<BindContext> &bind_context);
+                                                          std::shared_ptr<LogicalNode> &root,
+                                                          QueryContext *query_context,
+                                                          const std::shared_ptr<BindContext> &bind_context);
 
     static std::shared_ptr<BaseExpression> UnnestUncorrelated(SubqueryExpression *expr_ptr,
-                                                        std::shared_ptr<LogicalNode> &root,
-                                                        std::shared_ptr<LogicalNode> &subquery_plan,
-                                                        QueryContext *query_context,
-                                                        const std::shared_ptr<BindContext> &bind_context);
+                                                              std::shared_ptr<LogicalNode> &root,
+                                                              std::shared_ptr<LogicalNode> &subquery_plan,
+                                                              QueryContext *query_context,
+                                                              const std::shared_ptr<BindContext> &bind_context);
 
     static std::shared_ptr<BaseExpression> UnnestCorrelated(SubqueryExpression *expr_ptr,
-                                                      std::shared_ptr<LogicalNode> &root,
-                                                      std::shared_ptr<LogicalNode> &subquery_plan,
-                                                      QueryContext *query_context,
-                                                      const std::shared_ptr<BindContext> &bind_context);
+                                                            std::shared_ptr<LogicalNode> &root,
+                                                            std::shared_ptr<LogicalNode> &subquery_plan,
+                                                            QueryContext *query_context,
+                                                            const std::shared_ptr<BindContext> &bind_context);
 
 private:
     static void GenerateJoinConditions(QueryContext *query_context,

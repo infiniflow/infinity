@@ -30,7 +30,9 @@ export class MatchTensorScanFunctionData final : public TableFunctionData {
 public:
     using TensorResultHandler = MergeKnnResultHandler<float>;
 
-    explicit MatchTensorScanFunctionData(const u32 topn, const std::optional<f32> knn_threshold) : topn_(topn), knn_threshold_(knn_threshold) { Init(); }
+    explicit MatchTensorScanFunctionData(const u32 topn, const std::optional<f32> knn_threshold) : topn_(topn), knn_threshold_(knn_threshold) {
+        Init();
+    }
 
     void Init() {
         score_result_ = std::make_unique_for_overwrite<float[]>(topn_);

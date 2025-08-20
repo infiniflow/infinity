@@ -82,7 +82,9 @@ private:
 
     std::shared_ptr<TableRef> BuildJoin(QueryContext *query_context, const JoinReference *join_reference);
 
-    void UnfoldStarExpression(QueryContext *query_context, const std::vector<ParsedExpr *> &input_select_list, std::vector<ParsedExpr *> &output_select_list);
+    void UnfoldStarExpression(QueryContext *query_context,
+                              const std::vector<ParsedExpr *> &input_select_list,
+                              std::vector<ParsedExpr *> &output_select_list);
 
     void GenerateColumns(const std::shared_ptr<Binding> &binding, const std::string &table_name, std::vector<ParsedExpr *> &output_select_list);
 

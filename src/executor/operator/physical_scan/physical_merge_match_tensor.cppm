@@ -44,13 +44,15 @@ public:
                              std::shared_ptr<std::vector<LoadMeta>> load_metas,
                              bool cache_result);
 
-    void Init(QueryContext* query_context) override;
+    void Init(QueryContext *query_context) override;
 
     bool Execute(QueryContext *query_context, OperatorState *operator_state) override;
 
     std::shared_ptr<std::vector<std::string>> GetOutputNames() const override { return PhysicalCommonFunctionUsingLoadMeta::GetOutputNames(*this); }
 
-    std::shared_ptr<std::vector<std::shared_ptr<DataType>>> GetOutputTypes() const override { return PhysicalCommonFunctionUsingLoadMeta::GetOutputTypes(*this); }
+    std::shared_ptr<std::vector<std::shared_ptr<DataType>>> GetOutputTypes() const override {
+        return PhysicalCommonFunctionUsingLoadMeta::GetOutputTypes(*this);
+    }
 
     size_t TaskletCount() override;
 
@@ -74,7 +76,8 @@ public:
 
     const std::shared_ptr<MatchTensorScanIndexOptions> &index_options() const { return index_options_; }
 
-    void AddCache(QueryContext *query_context, ResultCacheManager *cache_mgr, const std::vector<std::unique_ptr<DataBlock>> &output_data_blocks) const;
+    void
+    AddCache(QueryContext *query_context, ResultCacheManager *cache_mgr, const std::vector<std::unique_ptr<DataBlock>> &output_data_blocks) const;
 
 private:
     u64 table_index_ = 0;

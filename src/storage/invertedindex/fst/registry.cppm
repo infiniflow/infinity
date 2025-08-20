@@ -34,7 +34,7 @@ struct RegistryEntry {
     bool found_{false};
     union {
         size_t slot_; // valid iff found==false
-        Val value_;  // valid iff found==true
+        Val value_;   // valid iff found==true
     };
     RegistryEntry() = default;
 };

@@ -36,12 +36,12 @@ using AggregateFinalizeFuncType = std::function<char *(char *)>;
 class AggregateOperation {
 public:
     template <typename AggregateState>
-    static inline void StateInitialize(const char * state) {
+    static inline void StateInitialize(const char *state) {
         ((AggregateState *)state)->Initialize();
     }
 
     template <typename AggregateState, typename InputType>
-    static inline void StateUpdate(const char * state, const std::shared_ptr<ColumnVector> &input_column_vector) {
+    static inline void StateUpdate(const char *state, const std::shared_ptr<ColumnVector> &input_column_vector) {
         // Loop execute state update according to the input column vector
 
         switch (input_column_vector->vector_type()) {
@@ -92,9 +92,9 @@ public:
     }
 
     template <typename AggregateState, typename ResultType>
-    static inline char * StateFinalize(const char * state) {
+    static inline char *StateFinalize(const char *state) {
         // Loop execute state update according to the input column vector
-        char * result = ((AggregateState *)state)->Finalize();
+        char *result = ((AggregateState *)state)->Finalize();
         return result;
     }
 };

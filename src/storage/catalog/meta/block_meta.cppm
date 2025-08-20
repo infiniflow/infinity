@@ -88,7 +88,7 @@ private:
     TxnTimeStamp commit_ts_;
     KVInstance &kv_instance_;
     SegmentMeta &segment_meta_;
-    BlockID block_id_;  
+    BlockID block_id_;
     std::optional<std::vector<ColumnID>> column_ids1_; // stored in columndefs in kv
 
     std::shared_ptr<std::string> block_dir_;

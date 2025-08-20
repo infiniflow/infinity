@@ -87,6 +87,7 @@ public:
     inline bool header() const { return header_; }
 
     inline char delimiter() const { return delimiter_; }
+
 private:
     static void NewCSVHeaderHandler(void *);
 

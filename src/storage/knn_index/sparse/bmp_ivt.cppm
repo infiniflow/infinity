@@ -35,7 +35,8 @@ struct BlockData {};
 export template <typename DataType>
 struct BlockData<DataType, BMPCompressType::kCompressed, BMPOwnMem::kTrue> {
 private:
-    BlockData(std::vector<BMPBlockID> block_ids, std::vector<DataType> max_scores) : block_ids_(std::move(block_ids)), max_scores_(std::move(max_scores)) {}
+    BlockData(std::vector<BMPBlockID> block_ids, std::vector<DataType> max_scores)
+        : block_ids_(std::move(block_ids)), max_scores_(std::move(max_scores)) {}
 
 public:
     BlockData() = default;
@@ -74,7 +75,8 @@ public:
         return res;
     }
 
-    static void GetSizeToPtr(char *&p, const std::vector<const BlockData<DataType, BMPCompressType::kCompressed, BMPOwnMem::kTrue> *> &block_data_list) {
+    static void GetSizeToPtr(char *&p,
+                             const std::vector<const BlockData<DataType, BMPCompressType::kCompressed, BMPOwnMem::kTrue> *> &block_data_list) {
         GetSizeInBytesVecAligned<size_t>(p, block_data_list.size() + 1);
         size_t num_sum = 0;
         for (const auto *block_data : block_data_list) {
@@ -84,7 +86,8 @@ public:
         GetSizeInBytesVecAligned<DataType>(p, num_sum);
     }
 
-    static void WriteToPtr(char *&p, const std::vector<const BlockData<DataType, BMPCompressType::kCompressed, BMPOwnMem::kTrue> *> &block_data_list) {
+    static void WriteToPtr(char *&p,
+                           const std::vector<const BlockData<DataType, BMPCompressType::kCompressed, BMPOwnMem::kTrue> *> &block_data_list) {
         size_t num_sum = 0;
         std::vector<size_t> block_data_prefix_sum;
         block_data_prefix_sum.push_back(0);

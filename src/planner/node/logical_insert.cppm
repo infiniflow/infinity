@@ -27,7 +27,10 @@ namespace infinity {
 
 export class LogicalInsert : public LogicalNode {
 public:
-    explicit inline LogicalInsert(u64 node_id, std::shared_ptr<TableInfo> table_info, u64 table_index, std::vector<std::vector<std::shared_ptr<BaseExpression>>> value_list)
+    explicit inline LogicalInsert(u64 node_id,
+                                  std::shared_ptr<TableInfo> table_info,
+                                  u64 table_index,
+                                  std::vector<std::vector<std::shared_ptr<BaseExpression>>> value_list)
         : LogicalNode(node_id, LogicalNodeType::kInsert), table_info_(std::move(table_info)), value_list_(std::move(value_list)),
           table_index_(table_index) {};
 
@@ -43,8 +46,8 @@ public:
 
     inline void set_value_list(const std::vector<std::vector<std::shared_ptr<BaseExpression>>> &value_list) { value_list_ = value_list; }
 
-    inline std::shared_ptr<TableInfo>& table_info() { return table_info_; }
-    inline const std::shared_ptr<TableInfo>& table_info() const { return table_info_; }
+    inline std::shared_ptr<TableInfo> &table_info() { return table_info_; }
+    inline const std::shared_ptr<TableInfo> &table_info() const { return table_info_; }
 
     inline std::vector<std::vector<std::shared_ptr<BaseExpression>>> &value_list() { return value_list_; }
 

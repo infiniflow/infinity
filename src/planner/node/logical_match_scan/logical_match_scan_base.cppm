@@ -30,7 +30,10 @@ namespace infinity {
 
 export class LogicalMatchScanBase : public LogicalNode {
 public:
-    LogicalMatchScanBase(u64 node_id, LogicalNodeType node_type, std::shared_ptr<BaseTableRef> base_table_ref, std::shared_ptr<BaseExpression> query_expression);
+    LogicalMatchScanBase(u64 node_id,
+                         LogicalNodeType node_type,
+                         std::shared_ptr<BaseTableRef> base_table_ref,
+                         std::shared_ptr<BaseExpression> query_expression);
 
     [[nodiscard]] std::vector<ColumnBinding> GetColumnBindings() const override;
 

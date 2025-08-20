@@ -49,7 +49,9 @@ export struct MatchTensorScanIndexOptions {
 
 export class LogicalMatchTensorScan final : public LogicalMatchScanBase {
 public:
-    explicit LogicalMatchTensorScan(u64 node_id, std::shared_ptr<BaseTableRef> base_table_ref, std::shared_ptr<MatchTensorExpression> match_tensor_expr)
+    explicit LogicalMatchTensorScan(u64 node_id,
+                                    std::shared_ptr<BaseTableRef> base_table_ref,
+                                    std::shared_ptr<MatchTensorExpression> match_tensor_expr)
         : LogicalMatchScanBase(node_id, LogicalNodeType::kMatchTensorScan, base_table_ref, match_tensor_expr) {}
 
     std::string name() override { return "LogicalMatchTensorScan"; }

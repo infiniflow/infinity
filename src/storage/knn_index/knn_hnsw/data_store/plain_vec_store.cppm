@@ -104,8 +104,12 @@ public:
         file_handle.Append(ptr_.get(), sizeof(OtherDataType) * cur_vec_num * meta.dim());
     }
 
-    static void
-    SaveToPtr(LocalFileHandle &file_handle, const std::vector<const This *> &inners, const Meta &meta, size_t ck_size, size_t chunk_num, size_t last_chunk_size) {
+    static void SaveToPtr(LocalFileHandle &file_handle,
+                          const std::vector<const This *> &inners,
+                          const Meta &meta,
+                          size_t ck_size,
+                          size_t chunk_num,
+                          size_t last_chunk_size) {
         for (size_t i = 0; i < chunk_num; ++i) {
             size_t chunk_size = (i < chunk_num - 1) ? ck_size : last_chunk_size;
             file_handle.Append(inners[i]->ptr_.get(), sizeof(OtherDataType) * chunk_size * meta.dim());

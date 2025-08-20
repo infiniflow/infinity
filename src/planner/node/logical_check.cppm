@@ -14,7 +14,10 @@ export std::string ToString(CheckStmtType type);
 
 export class LogicalCheck : public LogicalNode {
 public:
-    explicit LogicalCheck(u64 node_id, CheckStmtType type, std::optional<std::string> schema_name = std::nullopt, std::optional<std::string> table_name = std::nullopt)
+    explicit LogicalCheck(u64 node_id,
+                          CheckStmtType type,
+                          std::optional<std::string> schema_name = std::nullopt,
+                          std::optional<std::string> table_name = std::nullopt)
         : LogicalNode(node_id, LogicalNodeType::kCheck), check_type_(type), schema_name_(std::move(schema_name)), table_name_(std::move(table_name)) {
     }
 

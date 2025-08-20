@@ -65,10 +65,10 @@ export struct IndexFilterEvaluatorSecondary : IndexFilterEvaluator {
     virtual bool IsValid() const = 0;
     virtual void Merge(IndexFilterEvaluatorSecondary &other, Type op) = 0;
     static std::unique_ptr<IndexFilterEvaluatorSecondary> Make(const BaseExpression *src_filter_secondary_index_expressions,
-                                                         ColumnID column_id,
-                                                         std::shared_ptr<TableIndexMeeta> new_secondary_index,
-                                                         FilterCompareType compare_type,
-                                                         const Value &val);
+                                                               ColumnID column_id,
+                                                               std::shared_ptr<TableIndexMeeta> new_secondary_index,
+                                                               FilterCompareType compare_type,
+                                                               const Value &val);
 
 protected:
     IndexFilterEvaluatorSecondary(const BaseExpression *src_expr,

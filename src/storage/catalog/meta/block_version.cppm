@@ -83,7 +83,7 @@ export struct BlockVersion {
 private:
     mutable std::shared_mutex rw_mutex_{};
     std::vector<CreateField> created_{}; // second field width is same as timestamp, otherwise Valgrind will issue BlockVersion::SaveToFile has
-                                    // risk to write uninitialized buffer. (ts, rows)
+                                         // risk to write uninitialized buffer. (ts, rows)
     std::vector<TxnTimeStamp> deleted_{};
 
     TxnTimeStamp latest_change_ts_{}; // used by checkpoint to decide if the version file need to be flushed or not.

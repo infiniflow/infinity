@@ -68,7 +68,8 @@ protected:
                    QueryContext *query_context,
                    OperatorState *operator_state) const;
 
-    void AddCache(QueryContext *query_context, ResultCacheManager *cache_mgr, const std::vector<std::unique_ptr<DataBlock>> &output_data_blocks) const;
+    void
+    AddCache(QueryContext *query_context, ResultCacheManager *cache_mgr, const std::vector<std::unique_ptr<DataBlock>> &output_data_blocks) const;
 
 public:
     u64 table_index_ = 0;

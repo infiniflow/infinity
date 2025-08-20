@@ -40,13 +40,15 @@ public:
     std::shared_ptr<LogicalNode> BuildPlan(QueryContext *query_context) final;
 
     std::shared_ptr<LogicalKnnScan> BuildInitialKnnScan(std::shared_ptr<TableRef> &table_ref,
-                                                  std::shared_ptr<KnnExpression> knn_expr,
-                                                  QueryContext *query_context,
-                                                  const std::shared_ptr<BindContext> &bind_context);
+                                                        std::shared_ptr<KnnExpression> knn_expr,
+                                                        QueryContext *query_context,
+                                                        const std::shared_ptr<BindContext> &bind_context);
 
-    std::shared_ptr<LogicalNode> BuildFrom(std::shared_ptr<TableRef> &table_ref, QueryContext *query_context, const std::shared_ptr<BindContext> &bind_context);
+    std::shared_ptr<LogicalNode>
+    BuildFrom(std::shared_ptr<TableRef> &table_ref, QueryContext *query_context, const std::shared_ptr<BindContext> &bind_context);
 
-    std::shared_ptr<LogicalNode> BuildBaseTable(std::shared_ptr<TableRef> &table_ref, QueryContext *query_context, const std::shared_ptr<BindContext> &bind_context);
+    std::shared_ptr<LogicalNode>
+    BuildBaseTable(std::shared_ptr<TableRef> &table_ref, QueryContext *query_context, const std::shared_ptr<BindContext> &bind_context);
 
     std::shared_ptr<LogicalNode>
     BuildSubqueryTable(std::shared_ptr<TableRef> &table_ref, QueryContext *query_context, const std::shared_ptr<BindContext> &bind_context);
@@ -54,19 +56,21 @@ public:
     std::shared_ptr<LogicalNode>
     BuildCrossProductTable(std::shared_ptr<TableRef> &table_ref, QueryContext *query_context, const std::shared_ptr<BindContext> &bind_context);
 
-    std::shared_ptr<LogicalNode> BuildJoinTable(std::shared_ptr<TableRef> &table_ref, QueryContext *query_context, const std::shared_ptr<BindContext> &bind_context);
+    std::shared_ptr<LogicalNode>
+    BuildJoinTable(std::shared_ptr<TableRef> &table_ref, QueryContext *query_context, const std::shared_ptr<BindContext> &bind_context);
 
-    std::shared_ptr<LogicalNode> BuildDummyTable(std::shared_ptr<TableRef> &table_ref, QueryContext *query_context, const std::shared_ptr<BindContext> &bind_context);
+    std::shared_ptr<LogicalNode>
+    BuildDummyTable(std::shared_ptr<TableRef> &table_ref, QueryContext *query_context, const std::shared_ptr<BindContext> &bind_context);
 
     std::shared_ptr<LogicalNode> BuildFilter(std::shared_ptr<LogicalNode> &root,
-                                       std::vector<std::shared_ptr<BaseExpression>> &conditions,
-                                       QueryContext *query_context,
-                                       const std::shared_ptr<BindContext> &bind_context);
+                                             std::vector<std::shared_ptr<BaseExpression>> &conditions,
+                                             QueryContext *query_context,
+                                             const std::shared_ptr<BindContext> &bind_context);
 
     std::shared_ptr<LogicalNode> BuildUnnest(std::shared_ptr<LogicalNode> &root,
-                                       std::vector<std::shared_ptr<BaseExpression>> &expressions,
-                                       QueryContext *query_context,
-                                       const std::shared_ptr<BindContext> &bind_context);
+                                             std::vector<std::shared_ptr<BaseExpression>> &expressions,
+                                             QueryContext *query_context,
+                                             const std::shared_ptr<BindContext> &bind_context);
 
     void BuildSubquery(std::shared_ptr<LogicalNode> &root,
                        std::shared_ptr<BaseExpression> &condition,
@@ -74,9 +78,9 @@ public:
                        const std::shared_ptr<BindContext> &bind_context);
 
     std::shared_ptr<BaseExpression> UnnestSubquery(std::shared_ptr<LogicalNode> &root,
-                                             std::shared_ptr<BaseExpression> &condition,
-                                             QueryContext *query_context,
-                                             const std::shared_ptr<BindContext> &bind_context);
+                                                   std::shared_ptr<BaseExpression> &condition,
+                                                   QueryContext *query_context,
+                                                   const std::shared_ptr<BindContext> &bind_context);
 
 public:
     std::shared_ptr<BindContext> bind_context_{};

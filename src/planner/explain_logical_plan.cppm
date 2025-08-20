@@ -59,21 +59,28 @@ export class ExplainLogicalPlan {
 public:
     static Status Explain(const LogicalNode *logical_node, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size = 0);
 
-    static Status Explain(const LogicalCreateSchema *create_node, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size = 0);
+    static Status
+    Explain(const LogicalCreateSchema *create_node, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size = 0);
 
-    static Status Explain(const LogicalCreateTable *create_node, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size = 0);
+    static Status
+    Explain(const LogicalCreateTable *create_node, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size = 0);
 
-    static Status Explain(const LogicalCreateIndex *create_node, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size = 0);
+    static Status
+    Explain(const LogicalCreateIndex *create_node, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size = 0);
 
-    static Status Explain(const LogicalCreateCollection *create_node, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size = 0);
+    static Status
+    Explain(const LogicalCreateCollection *create_node, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size = 0);
 
-    static Status Explain(const LogicalCreateView *create_node, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size = 0);
+    static Status
+    Explain(const LogicalCreateView *create_node, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size = 0);
 
-    static Status Explain(const LogicalDropSchema *drop_node, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size = 0);
+    static Status
+    Explain(const LogicalDropSchema *drop_node, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size = 0);
 
     static Status Explain(const LogicalDropTable *drop_node, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size = 0);
 
-    static Status Explain(const LogicalDropCollection *drop_node, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size = 0);
+    static Status
+    Explain(const LogicalDropCollection *drop_node, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size = 0);
 
     static Status Explain(const LogicalDropView *drop_node, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size = 0);
 
@@ -83,21 +90,28 @@ public:
 
     static Status Explain(const LogicalUpdate *update_node, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size = 0);
 
-    static Status Explain(const LogicalProject *project_node, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size = 0);
+    static Status
+    Explain(const LogicalProject *project_node, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size = 0);
 
     static Status Explain(const LogicalFilter *filter_node, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size = 0);
 
     static Status Explain(const LogicalUnnest *unnest_node, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size = 0);
 
-    static Status Explain(const LogicalUnnestAggregate *unnest_aggregate_node, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size = 0);
+    static Status Explain(const LogicalUnnestAggregate *unnest_aggregate_node,
+                          std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result,
+                          i64 intent_size = 0);
 
-    static Status Explain(const LogicalTableScan *table_scan_node, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size = 0);
+    static Status
+    Explain(const LogicalTableScan *table_scan_node, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size = 0);
 
-    static Status Explain(const LogicalIndexScan *table_scan_node, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size = 0);
+    static Status
+    Explain(const LogicalIndexScan *table_scan_node, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size = 0);
 
-    static Status Explain(const LogicalKnnScan *knn_scan_node, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size = 0);
+    static Status
+    Explain(const LogicalKnnScan *knn_scan_node, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size = 0);
 
-    static Status Explain(const LogicalAggregate *aggregate_node, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size = 0);
+    static Status
+    Explain(const LogicalAggregate *aggregate_node, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size = 0);
 
     static Status Explain(const LogicalSort *sort_node, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size = 0);
 
@@ -105,7 +119,8 @@ public:
 
     static Status Explain(const LogicalTop *top_node, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size);
 
-    static Status Explain(const LogicalCrossProduct *cross_product_node, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size = 0);
+    static Status
+    Explain(const LogicalCrossProduct *cross_product_node, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size = 0);
 
     static Status Explain(const LogicalJoin *join_node, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size = 0);
 
@@ -117,13 +132,16 @@ public:
 
     static Status Explain(const LogicalFlush *show_node, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size = 0);
 
-    static Status Explain(const LogicalOptimize *optimize_node, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size = 0);
+    static Status
+    Explain(const LogicalOptimize *optimize_node, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size = 0);
 
     static Status Explain(const LogicalMatch *match_node, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size = 0);
 
-    static Status Explain(const LogicalMatchSparseScan *match_node, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size = 0);
+    static Status
+    Explain(const LogicalMatchSparseScan *match_node, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size = 0);
 
-    static Status Explain(const LogicalMatchTensorScan *match_tensor_node, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size = 0);
+    static Status
+    Explain(const LogicalMatchTensorScan *match_tensor_node, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size = 0);
 
     static Status Explain(const LogicalFusion *fusion_node, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size = 0);
 

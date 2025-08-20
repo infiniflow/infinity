@@ -27,9 +27,9 @@ namespace infinity {
 export class LogicalCreateView : public LogicalNode {
 public:
     static inline std::shared_ptr<LogicalCreateView> Make(u64 node_id,
-                                                    const std::shared_ptr<std::vector<std::string>> &names_ptr,
-                                                    const std::shared_ptr<std::vector<std::shared_ptr<DataType>>> &types_ptr,
-                                                    const std::shared_ptr<CreateViewInfo> &create_view_info) {
+                                                          const std::shared_ptr<std::vector<std::string>> &names_ptr,
+                                                          const std::shared_ptr<std::vector<std::shared_ptr<DataType>>> &types_ptr,
+                                                          const std::shared_ptr<CreateViewInfo> &create_view_info) {
         return std::make_shared<LogicalCreateView>(node_id, names_ptr, types_ptr, create_view_info);
     }
 

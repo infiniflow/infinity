@@ -24,7 +24,10 @@ class PhysicalScanBase;
 
 export class CachedScanBase : public CachedNodeBase {
 public:
-    CachedScanBase(LogicalNodeType type, const BaseTableRef *base_table_ref, TxnTimeStamp query_ts, std::shared_ptr<std::vector<std::string>> output_names);
+    CachedScanBase(LogicalNodeType type,
+                   const BaseTableRef *base_table_ref,
+                   TxnTimeStamp query_ts,
+                   std::shared_ptr<std::vector<std::string>> output_names);
 
     CachedScanBase(LogicalNodeType type, const PhysicalScanBase *physical_scan_base, TxnTimeStamp query_ts);
 

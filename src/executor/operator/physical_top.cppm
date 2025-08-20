@@ -39,12 +39,16 @@ export class CompareTwoRowAndPreferLeft {
 public:
     CompareTwoRowAndPreferLeft() = default;
     explicit CompareTwoRowAndPreferLeft(
-        std::vector<std::function<std::strong_ordering(const std::shared_ptr<ColumnVector> &, u32, const std::shared_ptr<ColumnVector> &, u32)>> &&sort_functions)
+        std::vector<std::function<std::strong_ordering(const std::shared_ptr<ColumnVector> &, u32, const std::shared_ptr<ColumnVector> &, u32)>>
+            &&sort_functions)
         : sort_functions_(std::move(sort_functions)) {
         sort_expr_count_ = sort_functions_.size();
     }
     ~CompareTwoRowAndPreferLeft() = default;
-    bool Compare(const std::vector<std::shared_ptr<ColumnVector>> &left, u32 left_id, const std::vector<std::shared_ptr<ColumnVector>> &right, u32 right_id) const {
+    bool Compare(const std::vector<std::shared_ptr<ColumnVector>> &left,
+                 u32 left_id,
+                 const std::vector<std::shared_ptr<ColumnVector>> &right,
+                 u32 right_id) const {
         for (u32 i = 0; i < sort_expr_count_; ++i) {
             auto compare_result = sort_functions_[i](left[i], left_id, right[i], right_id);
             if (compare_result != std::strong_ordering::equal) {
@@ -76,13 +80,17 @@ public:
 
     ~PhysicalTop() override = default;
 
-    void Init(QueryContext* query_context) override;
+    void Init(QueryContext *query_context) override;
 
     bool Execute(QueryContext *query_context, OperatorState *operator_state) final;
 
-    inline std::shared_ptr<std::vector<std::string>> GetOutputNames() const final { return PhysicalCommonFunctionUsingLoadMeta::GetOutputNames(*this); }
+    inline std::shared_ptr<std::vector<std::string>> GetOutputNames() const final {
+        return PhysicalCommonFunctionUsingLoadMeta::GetOutputNames(*this);
+    }
 
-    inline std::shared_ptr<std::vector<std::shared_ptr<DataType>>> GetOutputTypes() const final { return PhysicalCommonFunctionUsingLoadMeta::GetOutputTypes(*this); }
+    inline std::shared_ptr<std::vector<std::shared_ptr<DataType>>> GetOutputTypes() const final {
+        return PhysicalCommonFunctionUsingLoadMeta::GetOutputTypes(*this);
+    }
 
     size_t TaskletCount() override { return left_->TaskletCount(); }
 
@@ -106,20 +114,20 @@ public:
 
     // for Top and MergeTop
     static std::vector<std::vector<std::shared_ptr<ColumnVector>>> GetEvalColumns(const std::vector<std::shared_ptr<BaseExpression>> &expressions,
-                                                                  std::vector<std::shared_ptr<ExpressionState>> &expr_states,
-                                                                  const std::vector<std::unique_ptr<DataBlock>> &data_block_array);
+                                                                                  std::vector<std::shared_ptr<ExpressionState>> &expr_states,
+                                                                                  const std::vector<std::unique_ptr<DataBlock>> &data_block_array);
 
     // for Top and Sort
     static std::function<std::strong_ordering(const std::shared_ptr<ColumnVector> &, u32, const std::shared_ptr<ColumnVector> &, u32)>
     GenerateSortFunction(OrderType compare_order, std::shared_ptr<BaseExpression> &sort_expression);
 
 private:
-    u32 limit_{};                                        // limit value
-    u32 offset_{};                                       // offset value
-    u32 sort_expr_count_{};                              // number of expressions to sort
-    std::vector<OrderType> order_by_types_;                   // ASC or DESC
+    u32 limit_{};                                                   // limit value
+    u32 offset_{};                                                  // offset value
+    u32 sort_expr_count_{};                                         // number of expressions to sort
+    std::vector<OrderType> order_by_types_;                         // ASC or DESC
     std::vector<std::shared_ptr<BaseExpression>> sort_expressions_; // expressions to sort
-    CompareTwoRowAndPreferLeft prefer_left_function_;    // compare function
+    CompareTwoRowAndPreferLeft prefer_left_function_;               // compare function
     bool total_hits_count_flag_{};
     // TODO: save a common threshold value for all tasks
 };

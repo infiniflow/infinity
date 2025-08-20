@@ -48,8 +48,8 @@ public:
 
     std::shared_ptr<TableInfo> table_info_{};
     std::vector<std::pair<size_t, std::shared_ptr<BaseExpression>>> update_columns_; // Column ID = Expression
-    std::vector<std::shared_ptr<BaseExpression>> all_columns_in_table_{};      // columns in the table
-    std::vector<std::shared_ptr<BaseExpression>> final_result_columns_{};      // columns for the new blocks
+    std::vector<std::shared_ptr<BaseExpression>> all_columns_in_table_{};            // columns in the table
+    std::vector<std::shared_ptr<BaseExpression>> final_result_columns_{};            // columns for the new blocks
 };
 
 } // namespace infinity

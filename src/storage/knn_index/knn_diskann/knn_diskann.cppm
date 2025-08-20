@@ -113,7 +113,7 @@ private:
     const DistType *queries_{};
 
     size_t query_count_{}; // maybe unused
-    size_t top_k_{}; // maybe unused
+    size_t top_k_{};       // maybe unused
 
     bool begin_{false};
 };

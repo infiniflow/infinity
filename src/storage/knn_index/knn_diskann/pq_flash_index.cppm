@@ -376,7 +376,8 @@ public:
         frontier_nhoods.reserve(2 * beam_width);
         std::vector<AlignedRead> frontier_read_reqs;
         frontier_read_reqs.reserve(2 * beam_width);
-        std::vector<std::pair<size_t, std::pair<u32, size_t *>>> cached_nhoods; // cached id and neighbors while searching, [node_id, (num_nbrs, nbrs*)]
+        std::vector<std::pair<size_t, std::pair<u32, size_t *>>>
+            cached_nhoods; // cached id and neighbors while searching, [node_id, (num_nbrs, nbrs*)]
         cached_nhoods.reserve(2 * beam_width);
 
         while (retset.HasUnexpandedNode() && num_ios < io_limit) {
@@ -557,9 +558,9 @@ private:
         this->centroid_data_.reset(reinterpret_cast<f32 *>(tmp_centroid_data_ptr));
         memset(this->centroid_data_.get(), 0, sizeof(f32) * this->aligned_dim_ * this->num_medoids_);
 
-        std::vector<size_t> nodes_to_read;          // node ids to read
-        std::vector<VectorDataType *> medoid_bufs; // store the data of the medoid nodes
-        std::vector<std::pair<u32, size_t *>> nbr_bufs;  // node's id and its neighbors' ids
+        std::vector<size_t> nodes_to_read;              // node ids to read
+        std::vector<VectorDataType *> medoid_bufs;      // store the data of the medoid nodes
+        std::vector<std::pair<u32, size_t *>> nbr_bufs; // node's id and its neighbors' ids
         for (u64 i = 0; i < this->num_medoids_; i++) {
             nodes_to_read.push_back(this->medoids_[i]);
             medoid_bufs.push_back(new VectorDataType[this->data_dim_]);
@@ -583,7 +584,8 @@ private:
 
     // process a batch of read requests of nodes data in disk index file
     // return a vector of bool indicating whether each node is read successfully or not
-    std::vector<bool> ReadNodes(const std::vector<size_t> &node_ids, std::vector<VectorDataType *> &coord_buffers, std::vector<std::pair<u32, size_t *>> &nbr_buffers) {
+    std::vector<bool>
+    ReadNodes(const std::vector<size_t> &node_ids, std::vector<VectorDataType *> &coord_buffers, std::vector<std::pair<u32, size_t *>> &nbr_buffers) {
         std::vector<AlignedRead> read_reqs;
         std::vector<bool> retval(node_ids.size(), true);
 
@@ -703,7 +705,7 @@ private:
 
     // PQ data
     std::unique_ptr<u8[]> data_;                  // npts * [u8 * n_chunks_], store pq compressed vector
-    u64 n_chunks_;                          // num of pq chunks
+    u64 n_chunks_;                                // num of pq chunks
     std::unique_ptr<FixedChunkPQTable> pq_table_; // store the PQ table
 
     u64 max_node_len_;      // max bytes of a node in the disk index
@@ -712,8 +714,8 @@ private:
     u64 sector_num_;        // num of sectors in the disk index
     u64 disk_index_size_;   // bytes of the disk index file
 
-    std::unique_ptr<size_t[]> medoids_;                                                   // one entry point by default
-    size_t num_medoids_;                                                            // defaults to 1
+    std::unique_ptr<size_t[]> medoids_;                                            // one entry point by default
+    size_t num_medoids_;                                                           // defaults to 1
     std::unique_ptr<f32[], decltype([](f32 *p) { std::free(p); })> centroid_data_; // centroid data for the medoids node
 
     u64 num_frozen_points_; // number of frozen points in the disk index
@@ -731,7 +733,7 @@ private:
         nhood_cache_; // each node's ptr in nhood_cache_buf_, u32 is the number of neighbors, size_t * is the ptr to the neighbors
     // coord cache
     std::unique_ptr<VectorDataType[], decltype([](VectorDataType *p) { std::free(p); })>
-        coord_cache_buf_;                                     // cache buffer for all cached node's coord data
+        coord_cache_buf_;                                      // cache buffer for all cached node's coord data
     std::unordered_map<size_t, VectorDataType *> coord_cache_; // each node's ptr in coord_cache_buf_
 
     DiskAnnMetricType metric_;
@@ -742,7 +744,7 @@ private:
 
     // filter support
     std::unordered_map<LabelType, std::vector<size_t>> filter_to_medoid_ids_;
-    std::unordered_set<size_t> dummy_pts_;                // dummy points for filter
+    std::unordered_set<size_t> dummy_pts_;                 // dummy points for filter
     std::unordered_map<size_t, size_t> dummy_to_real_map_; // map the dummy point to its real point
 };
 

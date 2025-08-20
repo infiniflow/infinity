@@ -26,8 +26,11 @@ namespace infinity {
 
 export class LogicalCreateCollection : public LogicalNode {
 public:
-    static inline std::shared_ptr<LogicalCreateCollection>
-    Make(u64 node_id, const std::shared_ptr<std::string> &schema_name, const std::shared_ptr<std::string> &collection_name, u64 table_index, ConflictType conflict_type) {
+    static inline std::shared_ptr<LogicalCreateCollection> Make(u64 node_id,
+                                                                const std::shared_ptr<std::string> &schema_name,
+                                                                const std::shared_ptr<std::string> &collection_name,
+                                                                u64 table_index,
+                                                                ConflictType conflict_type) {
         return std::make_shared<LogicalCreateCollection>(node_id, schema_name, collection_name, table_index, conflict_type);
     }
 

@@ -32,18 +32,18 @@ public:
     virtual ~Binding();
 
     static std::shared_ptr<Binding> MakeBinding(BindingType binding_type,
-                                          const std::string &name,
-                                          u64 table_index,
-                                          std::shared_ptr<std::vector<std::shared_ptr<DataType>>> column_types,
-                                          std::shared_ptr<std::vector<std::string>> column_names);
+                                                const std::string &name,
+                                                u64 table_index,
+                                                std::shared_ptr<std::vector<std::shared_ptr<DataType>>> column_types,
+                                                std::shared_ptr<std::vector<std::string>> column_names);
 
     static std::shared_ptr<Binding> MakeBinding(BindingType binding_type,
-                                          const std::string &name,
-                                          u64 table_index,
-                                          std::shared_ptr<TableInfo> table_info,
-                                          std::shared_ptr<std::vector<std::shared_ptr<DataType>>> column_types,
-                                          std::shared_ptr<std::vector<std::string>> column_names,
-                                          std::shared_ptr<BlockIndex> block_index);
+                                                const std::string &name,
+                                                u64 table_index,
+                                                std::shared_ptr<TableInfo> table_info,
+                                                std::shared_ptr<std::vector<std::shared_ptr<DataType>>> column_types,
+                                                std::shared_ptr<std::vector<std::string>> column_names,
+                                                std::shared_ptr<BlockIndex> block_index);
 
     // Binding type
     BindingType binding_type_{BindingType::kInvalid};

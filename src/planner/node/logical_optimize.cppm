@@ -27,7 +27,11 @@ namespace infinity {
 
 export class LogicalOptimize : public LogicalNode {
 public:
-    explicit LogicalOptimize(u64 node_id, std::string schema_name, std::string table_name, std::string index_name, std::vector<std::unique_ptr<InitParameter>> opt_params)
+    explicit LogicalOptimize(u64 node_id,
+                             std::string schema_name,
+                             std::string table_name,
+                             std::string index_name,
+                             std::vector<std::unique_ptr<InitParameter>> opt_params)
         : LogicalNode(node_id, LogicalNodeType::kOptimize), schema_name_(std::move(schema_name)), table_name_(std::move(table_name)),
           index_name_(std::move(index_name)), opt_params_(std::move(opt_params)) {}
 

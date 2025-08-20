@@ -49,7 +49,7 @@ public:
 
     ~PhysicalSink() override = default;
 
-    void Init(QueryContext* query_context) override;
+    void Init(QueryContext *query_context) override;
 
     bool Execute(QueryContext *query_context, OperatorState *output_state) final;
 

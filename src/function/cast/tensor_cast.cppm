@@ -75,7 +75,10 @@ void TensorTryCastToTensorMultiVectorImpl(const TensorT &source,
                 target_tmp_ptr[i / 8] |= (1u << (i % 8));
             }
         }
-        ColumnVectorSetResult(target, target_vector_ptr->buffer_.get(), std::span<const char>(target_tmp_ptr.get(), target_size), target_embedding_info);
+        ColumnVectorSetResult(target,
+                              target_vector_ptr->buffer_.get(),
+                              std::span<const char>(target_tmp_ptr.get(), target_size),
+                              target_embedding_info);
     } else {
         const auto target_size = source_total_dim * sizeof(TargetValueType);
         auto target_tmp_ptr = std::make_unique_for_overwrite<TargetValueType[]>(source_total_dim);

@@ -89,7 +89,9 @@ public:
         return Calculate(vec1.indices_, vec1.nnz_, vec2.indices_, vec2.nnz_);
     }
 
-    ResultType Calculate(const IndexType *index1, size_t nnz1, const IndexType *index2, size_t nnz2) { return dist_func_(index1, nnz1, index2, nnz2); }
+    ResultType Calculate(const IndexType *index1, size_t nnz1, const IndexType *index2, size_t nnz2) {
+        return dist_func_(index1, nnz1, index2, nnz2);
+    }
 
 public:
     using DistFunc = ResultType (*)(const IndexType *raw1, size_t nnz1, const IndexType *raw2, size_t nnz2);
@@ -101,7 +103,8 @@ export class MatchSparseScanFunctionData : public TableFunctionData {
 public:
     MatchSparseScanFunctionData() = default;
 
-    MatchSparseScanFunctionData(const std::shared_ptr<std::vector<GlobalBlockID>> &global_block_ids, const std::shared_ptr<std::vector<SegmentID>> &segment_ids)
+    MatchSparseScanFunctionData(const std::shared_ptr<std::vector<GlobalBlockID>> &global_block_ids,
+                                const std::shared_ptr<std::vector<SegmentID>> &segment_ids)
         : global_block_ids_(global_block_ids), segment_ids_(segment_ids), query_data_(DataBlock::Make()) {}
 
 public:

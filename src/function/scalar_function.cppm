@@ -135,7 +135,8 @@ struct UnaryOpDirectToVarlenWrapper {
 template <typename Operator>
 struct BinaryOpDirectToVarlenWrapper {
     template <typename LeftValueType, typename RightValueType, typename TargetValueType>
-    inline static void Execute(LeftValueType left, RightValueType right, TargetValueType &result, Bitmask *, size_t, void *, void *, void *state_ptr) {
+    inline static void
+    Execute(LeftValueType left, RightValueType right, TargetValueType &result, Bitmask *, size_t, void *, void *, void *state_ptr) {
         auto *function_data_ptr = (ScalarFunctionData *)(state_ptr);
         return Operator::template Run<LeftValueType, RightValueType, TargetValueType>(left, right, result, function_data_ptr->column_vector_ptr_);
     }

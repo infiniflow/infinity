@@ -29,12 +29,15 @@ namespace infinity {
 
 export class PhysicalCrossProduct final : public PhysicalOperator {
 public:
-    explicit PhysicalCrossProduct(u64 id, std::unique_ptr<PhysicalOperator> left, std::unique_ptr<PhysicalOperator> right, std::shared_ptr<std::vector<LoadMeta>> load_metas)
+    explicit PhysicalCrossProduct(u64 id,
+                                  std::unique_ptr<PhysicalOperator> left,
+                                  std::unique_ptr<PhysicalOperator> right,
+                                  std::shared_ptr<std::vector<LoadMeta>> load_metas)
         : PhysicalOperator(PhysicalOperatorType::kCrossProduct, std::move(left), std::move(right), id, load_metas) {}
 
     ~PhysicalCrossProduct() override = default;
 
-    void Init(QueryContext* query_context) override;
+    void Init(QueryContext *query_context) override;
 
     bool Execute(QueryContext *query_context, OperatorState *operator_state) final;
 

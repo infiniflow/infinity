@@ -154,7 +154,8 @@ public:
 
     f32 GetDistance(DataType *query, size_t loc) const { return distance_fn_.Compare(query, data_ + loc * aligned_dim_, aligned_dim_); }
 
-    void GetDistance(DataType *query, size_t *locations, const size_t location_count, f32 *distances, AbstractScratch<DataType> *query_scratch) const {
+    void
+    GetDistance(DataType *query, size_t *locations, const size_t location_count, f32 *distances, AbstractScratch<DataType> *query_scratch) const {
         for (size_t i = 0; i < location_count; i++) {
             distances[i] = distance_fn_.Compare(query, data_ + locations[i] * aligned_dim_, aligned_dim_);
         }
@@ -164,7 +165,8 @@ public:
         return distance_fn_.Compare(data_ + loc1 * aligned_dim_, data_ + loc2 * aligned_dim_, aligned_dim_);
     }
 
-    void GetDistance(DataType *preprocessed_query, std::vector<size_t> &ids, std::vector<f32> &distances, AbstractScratch<DataType> *query_scratch) const {
+    void
+    GetDistance(DataType *preprocessed_query, std::vector<size_t> &ids, std::vector<f32> &distances, AbstractScratch<DataType> *query_scratch) const {
         if (distances.size() < ids.size()) {
             distances.resize(ids.size());
         }

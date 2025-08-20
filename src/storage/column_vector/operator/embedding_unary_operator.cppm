@@ -26,7 +26,11 @@ namespace infinity {
 export class EmbeddingUnaryOperator {
 public:
     template <typename InputElemType, typename OutputElemType, typename Operator>
-    static void inline Execute(const std::shared_ptr<ColumnVector> &input, std::shared_ptr<ColumnVector> &result, size_t count, void *state_ptr, bool nullable) {
+    static void inline Execute(const std::shared_ptr<ColumnVector> &input,
+                               std::shared_ptr<ColumnVector> &result,
+                               size_t count,
+                               void *state_ptr,
+                               bool nullable) {
         const auto *input_ptr = (const InputElemType *)(input->data());
         const std::shared_ptr<Bitmask> &input_null = input->nulls_ptr_;
 

@@ -25,7 +25,8 @@ namespace infinity {
 
 export class KeywordIterator final : public MultiDocIterator {
 public:
-    KeywordIterator(std::vector<std::unique_ptr<DocIterator>> iterators, const float weight) : MultiDocIterator(std::move(iterators)), weight_(weight) {
+    KeywordIterator(std::vector<std::unique_ptr<DocIterator>> iterators, const float weight)
+        : MultiDocIterator(std::move(iterators)), weight_(weight) {
         bm25_score_upper_bound_ = weight;
         estimate_iterate_cost_ = {};
         for (u32 i = 0; i < children_.size(); ++i) {

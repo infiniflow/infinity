@@ -25,7 +25,9 @@ class BlockIndex;
 
 export class TableScanFunctionData : public TableFunctionData {
 public:
-    TableScanFunctionData(const BlockIndex *block_index, const std::shared_ptr<std::vector<GlobalBlockID>> &global_block_ids, const std::vector<size_t> &column_ids);
+    TableScanFunctionData(const BlockIndex *block_index,
+                          const std::shared_ptr<std::vector<GlobalBlockID>> &global_block_ids,
+                          const std::vector<size_t> &column_ids);
 
     const BlockIndex *block_index_{};
     const std::shared_ptr<std::vector<GlobalBlockID>> &global_block_ids_{};

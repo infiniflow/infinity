@@ -52,7 +52,8 @@ export struct DBMetaKey final : public MetaKey {
 };
 
 export struct DBTagMetaKey final : public MetaKey {
-    DBTagMetaKey(std::string db_id_str, std::string tag_name) : MetaKey(MetaType::kDBTag), db_id_str_(std::move(db_id_str)), tag_name_(std::move(tag_name)) {}
+    DBTagMetaKey(std::string db_id_str, std::string tag_name)
+        : MetaKey(MetaType::kDBTag), db_id_str_(std::move(db_id_str)), tag_name_(std::move(tag_name)) {}
 
     std::string db_id_str_{};
     std::string tag_name_{};
@@ -77,7 +78,8 @@ export struct TableMetaKey final : public MetaKey {
 
 export struct TableNameMetaKey final : public MetaKey {
     TableNameMetaKey(std::string db_id_str, std::string table_id_str, const std::string &table_name)
-        : MetaKey(MetaType::kTableName), db_id_str_(std::move(db_id_str)), table_id_str_(std::move(table_id_str)), table_name_(std::move(table_name)) {}
+        : MetaKey(MetaType::kTableName), db_id_str_(std::move(db_id_str)), table_id_str_(std::move(table_id_str)),
+          table_name_(std::move(table_name)) {}
 
     std::string db_id_str_{};
     std::string table_id_str_{};
@@ -268,7 +270,12 @@ export struct ChunkIndexMetaKey final : public MetaKey {
 };
 
 export struct ChunkIndexTagMetaKey final : public MetaKey {
-    ChunkIndexTagMetaKey(std::string db_id_str, std::string table_id_str, std::string index_id_str, SegmentID segment_id, ChunkID chunk_id, std::string tag_name)
+    ChunkIndexTagMetaKey(std::string db_id_str,
+                         std::string table_id_str,
+                         std::string index_id_str,
+                         SegmentID segment_id,
+                         ChunkID chunk_id,
+                         std::string tag_name)
         : MetaKey(MetaType::kChunkIndexTag), db_id_str_(std::move(db_id_str)), table_id_str_(std::move(table_id_str)),
           index_id_str_(std::move(index_id_str)), segment_id_(segment_id), chunk_id_(chunk_id), tag_name_(std::move(tag_name)) {}
 

@@ -171,7 +171,7 @@ public:
 
     // Used by dump index / create index, index_id -> table_index_cache
     std::map<u64, std::shared_ptr<TableIndexCache>> index_cache_map_{}; // index_id -> table_index_cache
-    std::map<std::string, u64> index_name_map_{};                      // index_name -> index_id
+    std::map<std::string, u64> index_name_map_{};                       // index_name -> index_id
 
     std::map<TransactionID, std::shared_ptr<ImportPrepareInfo>> import_prepare_info_map_{};   // txn_id -> import_prepare_info
     std::map<TransactionID, std::shared_ptr<CompactPrepareInfo>> compact_prepare_info_map_{}; // txn_id -> import_prepare_info
@@ -220,7 +220,8 @@ public:
     void CommitImportSegments(u64 db_id, u64 table_id, const std::shared_ptr<ImportPrepareInfo> &import_prepare_info, TransactionID txn_id);
 
     // Compact segments
-    std::shared_ptr<CompactPrepareInfo> PrepareCompactSegments(u64 db_id, u64 table_id, const std::vector<SegmentID> &segment_ids, TransactionID txn_id);
+    std::shared_ptr<CompactPrepareInfo>
+    PrepareCompactSegments(u64 db_id, u64 table_id, const std::vector<SegmentID> &segment_ids, TransactionID txn_id);
     void CommitCompactSegments(u64 db_id, u64 table_id, const std::shared_ptr<CompactPrepareInfo> &compact_prepare_info, TransactionID txn_id);
 
     std::vector<SegmentID> ApplySegmentIDs(u64 db_id, u64 table_id, u64 segment_count);

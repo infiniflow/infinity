@@ -24,13 +24,18 @@ namespace infinity {
 export class TableDef {
 
 public:
-    static inline std::shared_ptr<TableDef>
-    Make(std::shared_ptr<std::string> schema, std::shared_ptr<std::string> table_name, std::shared_ptr<std::string> table_comment, std::vector<std::shared_ptr<ColumnDef>> columns) {
+    static inline std::shared_ptr<TableDef> Make(std::shared_ptr<std::string> schema,
+                                                 std::shared_ptr<std::string> table_name,
+                                                 std::shared_ptr<std::string> table_comment,
+                                                 std::vector<std::shared_ptr<ColumnDef>> columns) {
         return std::make_shared<TableDef>(std::move(schema), std::move(table_name), std::move(table_comment), std::move(columns));
     }
 
 public:
-    explicit TableDef(std::shared_ptr<std::string> schema, std::shared_ptr<std::string> table_name, std::shared_ptr<std::string> table_comment,  std::vector<std::shared_ptr<ColumnDef>> columns)
+    explicit TableDef(std::shared_ptr<std::string> schema,
+                      std::shared_ptr<std::string> table_name,
+                      std::shared_ptr<std::string> table_comment,
+                      std::vector<std::shared_ptr<ColumnDef>> columns)
         : schema_name_(std::move(schema)), table_name_(std::move(table_name)), table_comment_(std::move(table_comment)),
           columns_(std::move(columns)) {
         size_t column_count = columns_.size();

@@ -234,7 +234,8 @@ struct KeyAddress<TermTuple, LenType> {
 
 class CycleBuffer {
 public:
-    CycleBuffer(size_t total_buffers, size_t buffer_size) : total_buffers_(total_buffers), buffer_size_(buffer_size), head_(0), tail_(0), full_(false) {
+    CycleBuffer(size_t total_buffers, size_t buffer_size)
+        : total_buffers_(total_buffers), buffer_size_(buffer_size), head_(0), tail_(0), full_(false) {
         buffer_array_.resize(total_buffers);
         buffer_real_size_.resize(total_buffers);
         buffer_real_num_.resize(total_buffers);

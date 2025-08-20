@@ -198,30 +198,38 @@ struct TryCastValueEmbedding {
 export struct ColumnVectorCast {
 
     template <class SourceType, class TargetType, class Operator>
-    static bool
-    GenericTryCastColumnVector(const std::shared_ptr<ColumnVector> &source, std::shared_ptr<ColumnVector> &result, size_t count, CastParameters &parameters) {
+    static bool GenericTryCastColumnVector(const std::shared_ptr<ColumnVector> &source,
+                                           std::shared_ptr<ColumnVector> &result,
+                                           size_t count,
+                                           CastParameters &parameters) {
         ColumnVectorCastData input(parameters.strict, source.get(), result.get(), *source->data_type(), *result->data_type());
         UnaryOperator::Execute<SourceType, TargetType, Operator>(source, result, count, nullptr, &input, true);
         return input.all_converted_;
     }
 
     template <class SourceType, class TargetType, class Operator>
-    inline static bool
-    TryCastColumnVector(const std::shared_ptr<ColumnVector> &source, std::shared_ptr<ColumnVector> &target, size_t count, CastParameters &parameters) {
+    inline static bool TryCastColumnVector(const std::shared_ptr<ColumnVector> &source,
+                                           std::shared_ptr<ColumnVector> &target,
+                                           size_t count,
+                                           CastParameters &parameters) {
         bool result = GenericTryCastColumnVector<SourceType, TargetType, TryCastValue<Operator>>(source, target, count, parameters);
         return result;
     }
 
     template <class SourceType, class TargetType, class Operator>
-    inline static bool
-    TryCastVarlenColumnVector(const std::shared_ptr<ColumnVector> &source, std::shared_ptr<ColumnVector> &target, size_t count, CastParameters &parameters) {
+    inline static bool TryCastVarlenColumnVector(const std::shared_ptr<ColumnVector> &source,
+                                                 std::shared_ptr<ColumnVector> &target,
+                                                 size_t count,
+                                                 CastParameters &parameters) {
         bool result = GenericTryCastColumnVector<SourceType, TargetType, TryCastVarlenToValue<Operator>>(source, target, count, parameters);
         return result;
     }
 
     template <class SourceType, class TargetType, class Operator>
-    inline static bool
-    TryCastColumnVectorToVarlen(const std::shared_ptr<ColumnVector> &source, std::shared_ptr<ColumnVector> &target, size_t count, CastParameters &parameters) {
+    inline static bool TryCastColumnVectorToVarlen(const std::shared_ptr<ColumnVector> &source,
+                                                   std::shared_ptr<ColumnVector> &target,
+                                                   size_t count,
+                                                   CastParameters &parameters) {
         bool result = GenericTryCastColumnVector<SourceType, TargetType, TryCastValueToVarlen<Operator>>(source, target, count, parameters);
         return result;
     }
@@ -236,15 +244,19 @@ export struct ColumnVectorCast {
     }
 
     template <class SourceType, class TargetType, class Operator>
-    inline static bool
-    TryCastColumnVectorWithType(const std::shared_ptr<ColumnVector> &source, std::shared_ptr<ColumnVector> &target, size_t count, CastParameters &parameters) {
+    inline static bool TryCastColumnVectorWithType(const std::shared_ptr<ColumnVector> &source,
+                                                   std::shared_ptr<ColumnVector> &target,
+                                                   size_t count,
+                                                   CastParameters &parameters) {
         bool result = GenericTryCastColumnVector<SourceType, TargetType, TryCastValueWithType<Operator>>(source, target, count, parameters);
         return result;
     }
 
     template <class SourceElemType, class TargetElemType, class Operator>
-    inline static bool
-    TryCastColumnVectorEmbedding(const std::shared_ptr<ColumnVector> &source, std::shared_ptr<ColumnVector> &target, size_t count, CastParameters &parameters) {
+    inline static bool TryCastColumnVectorEmbedding(const std::shared_ptr<ColumnVector> &source,
+                                                    std::shared_ptr<ColumnVector> &target,
+                                                    size_t count,
+                                                    CastParameters &parameters) {
         ColumnVectorCastData input(parameters.strict, source.get(), target.get(), *source->data_type(), *target->data_type());
         EmbeddingUnaryOperator::Execute<SourceElemType, TargetElemType, TryCastValueEmbedding<Operator>>(source, target, count, &input, true);
         return input.all_converted_;

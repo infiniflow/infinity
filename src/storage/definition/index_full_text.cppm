@@ -29,10 +29,10 @@ namespace infinity {
 export class IndexFullText final : public IndexBase {
 public:
     static std::shared_ptr<IndexBase> Make(std::shared_ptr<std::string> index_name,
-                                     std::shared_ptr<std::string> index_comment,
-                                     const std::string &file_name,
-                                     std::vector<std::string> column_names,
-                                     const std::vector<InitParameter *> &index_param_list);
+                                           std::shared_ptr<std::string> index_comment,
+                                           const std::string &file_name,
+                                           std::vector<std::string> column_names,
+                                           const std::vector<InitParameter *> &index_param_list);
 
     IndexFullText(std::shared_ptr<std::string> index_name,
                   std::shared_ptr<std::string> index_comment,

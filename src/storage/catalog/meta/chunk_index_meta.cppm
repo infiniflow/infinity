@@ -84,8 +84,6 @@ private:
 
     std::string GetChunkIndexTag(const std::string &tag) const;
 
-
-
 private:
     mutable std::mutex mtx_;
 

@@ -61,9 +61,10 @@ public:
 
     CacheResultMap(size_t cache_num_capacity) : cache_num_capacity_(cache_num_capacity) {}
 
-    bool AddCache(std::unique_ptr<CachedNodeBase> cached_node,
-                  std::vector<std::unique_ptr<DataBlock>> data_blocks,
-                  const std::function<void(std::unique_ptr<CachedNodeBase>, CacheContent &, std::vector<std::unique_ptr<DataBlock>>)> &update_content_func);
+    bool AddCache(
+        std::unique_ptr<CachedNodeBase> cached_node,
+        std::vector<std::unique_ptr<DataBlock>> data_blocks,
+        const std::function<void(std::unique_ptr<CachedNodeBase>, CacheContent &, std::vector<std::unique_ptr<DataBlock>>)> &update_content_func);
 
     std::shared_ptr<CacheContent> GetCache(const CachedNodeBase &cached_node);
 

@@ -24,7 +24,8 @@ namespace infinity {
 export struct DeleteState {
     //    std::unordered_map<u64, std::vector<RowID>> rows_; // key is pair<segment_id, block_id>
     // std::unordered_map<<segment, block_id>, block_offset>
-    std::unordered_map<SegmentID, std::unordered_map<BlockID, std::vector<BlockOffset>>> rows_; // use segment id, as the first level key, block id as the second level key
+    std::unordered_map<SegmentID, std::unordered_map<BlockID, std::vector<BlockOffset>>>
+        rows_; // use segment id, as the first level key, block id as the second level key
 };
 
 export struct AccessState {

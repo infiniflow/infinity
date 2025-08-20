@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-
 export module infinity_core:snapshot;
 
 import :status;
@@ -23,9 +22,9 @@ class QueryContext;
 
 export class Snapshot {
 public:
-    static Status CreateTableSnapshot(QueryContext *query_context, const std::string &snapshot_name, const std::string& table_name);
+    static Status CreateTableSnapshot(QueryContext *query_context, const std::string &snapshot_name, const std::string &table_name);
     static Status RestoreTableSnapshot(QueryContext *query_context, const std::string &snapshot_name);
-    static Status CreateDatabaseSnapshot(QueryContext *query_context, const std::string &snapshot_name, const std::string& db_name);
+    static Status CreateDatabaseSnapshot(QueryContext *query_context, const std::string &snapshot_name, const std::string &db_name);
     static Status RestoreDatabaseSnapshot(QueryContext *query_context, const std::string &snapshot_name);
     static Status DropSnapshot(QueryContext *query_context, const std::string &snapshot_name);
 };

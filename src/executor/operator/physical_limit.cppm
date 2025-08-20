@@ -96,7 +96,7 @@ public:
 
     ~PhysicalLimit() final = default;
 
-    void Init(QueryContext* query_context) final;
+    void Init(QueryContext *query_context) final;
 
     static bool Execute(QueryContext *query_context,
                         const std::vector<std::unique_ptr<DataBlock>> &input_blocks,

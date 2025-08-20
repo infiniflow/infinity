@@ -52,7 +52,7 @@ public:
 
     ~PhysicalMatchTensorScan() override;
 
-    void Init(QueryContext* query_context) override;
+    void Init(QueryContext *query_context) override;
 
     bool Execute(QueryContext *query_context, OperatorState *operator_state) override;
 
@@ -72,7 +72,7 @@ public:
 
     [[nodiscard]] inline std::string TableAlias() const { return base_table_ref_->alias_; }
 
-//    [[nodiscard]] inline TableInfo *table_info() const { return base_table_ref_->table_info_.get(); }
+    //    [[nodiscard]] inline TableInfo *table_info() const { return base_table_ref_->table_info_.get(); }
 
     [[nodiscard]] inline const std::shared_ptr<MatchTensorExpression> &match_tensor_expr() const { return src_match_tensor_expr_; }
 

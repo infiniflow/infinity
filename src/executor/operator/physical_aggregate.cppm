@@ -50,11 +50,13 @@ public:
 
     ~PhysicalAggregate() override = default;
 
-    void Init(QueryContext* query_context) override;
+    void Init(QueryContext *query_context) override;
 
     bool Execute(QueryContext *query_context, OperatorState *operator_state) final;
 
-    void GroupByInputTable(const std::vector<std::unique_ptr<DataBlock>> &input_blocks, std::vector<std::unique_ptr<DataBlock>> &output_blocks, HashTable &hash_table);
+    void GroupByInputTable(const std::vector<std::unique_ptr<DataBlock>> &input_blocks,
+                           std::vector<std::unique_ptr<DataBlock>> &output_blocks,
+                           HashTable &hash_table);
 
     void GenerateGroupByResult(const std::shared_ptr<DataTable> &input_table, std::shared_ptr<DataTable> &output_table, HashTable &hash_table);
 

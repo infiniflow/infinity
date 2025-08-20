@@ -187,11 +187,15 @@ public:
                             std::shared_ptr<std::vector<std::shared_ptr<DataType>>> column_types,
                             std::shared_ptr<std::vector<std::string>> column_names);
 
-    void
-    AddCTEBinding(const std::string &name, u64 table_index, std::shared_ptr<std::vector<std::shared_ptr<DataType>>> column_types, std::shared_ptr<std::vector<std::string>> column_names);
+    void AddCTEBinding(const std::string &name,
+                       u64 table_index,
+                       std::shared_ptr<std::vector<std::shared_ptr<DataType>>> column_types,
+                       std::shared_ptr<std::vector<std::string>> column_names);
 
-    void
-    AddViewBinding(const std::string &name, u64 table_index, std::shared_ptr<std::vector<std::shared_ptr<DataType>>> column_types, std::shared_ptr<std::vector<std::string>> column_names);
+    void AddViewBinding(const std::string &name,
+                        u64 table_index,
+                        std::shared_ptr<std::vector<std::shared_ptr<DataType>>> column_types,
+                        std::shared_ptr<std::vector<std::string>> column_names);
 
     void AddTableBinding(const std::string &name,
                          u64 table_index,

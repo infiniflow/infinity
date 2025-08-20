@@ -476,20 +476,23 @@ public:
         auto block_fwd = BlockFwd<DataType, IdxType, BMPOwnMem::kFalse>::LoadFromPtr(p);
         size_t doc_num = ReadBufAdvAligned<size_t>(p);
         const BMPDocID *doc_ids = ReadBufVecAdvAligned<BMPDocID>(p, doc_num);
-        
+
         // DEBUG: Validate consistency between block structure and doc_ids
         size_t expected_doc_count = block_fwd.block_num() * block_fwd.block_size();
         if (doc_num != expected_doc_count) {
-            LOG_ERROR(fmt::format("BMP INCONSISTENCY: doc_num {} != expected_doc_count {} (block_num: {}, block_size: {})", 
-                                 doc_num, expected_doc_count, block_fwd.block_num(), block_fwd.block_size()));
+            LOG_ERROR(fmt::format("BMP INCONSISTENCY: doc_num {} != expected_doc_count {} (block_num: {}, block_size: {})",
+                                  doc_num,
+                                  expected_doc_count,
+                                  block_fwd.block_num(),
+                                  block_fwd.block_size()));
         }
-        
+
         if (size_t(p - start) != size) {
             UnrecoverableError(fmt::format("BMPAlg::LoadFromPtr: p - start != size: {} != {}", p - start, size));
         }
         return std::make_unique<BMPAlg<DataType, IdxType, CompressType, BMPOwnMem::kFalse>>(std::move(bm_ivt),
-                                                                                      std::move(block_fwd),
-                                                                                      VecPtr<BMPDocID, BMPOwnMem::kFalse>(doc_ids, doc_num));
+                                                                                            std::move(block_fwd),
+                                                                                            VecPtr<BMPDocID, BMPOwnMem::kFalse>(doc_ids, doc_num));
     }
 
 private:

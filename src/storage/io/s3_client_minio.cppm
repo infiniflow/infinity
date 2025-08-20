@@ -33,8 +33,10 @@ public:
     Status DownloadObject(const std::string &bucket_name, const std::string &object_name, const std::string &file_path) final;
     Status UploadObject(const std::string &bucket_name, const std::string &object_name, const std::string &file_path) final;
     Status RemoveObject(const std::string &bucket_name, const std::string &object_name) final;
-    Status
-    CopyObject(const std::string &src_bucket_name, const std::string &src_object_name, const std::string &dst_bucket_name, const std::string &dst_object_name) final;
+    Status CopyObject(const std::string &src_bucket_name,
+                      const std::string &src_object_name,
+                      const std::string &dst_bucket_name,
+                      const std::string &dst_object_name) final;
     Status BucketExists(const std::string &bucket_name) final;
     Status MakeBucket(const std::string &bucket_name) final;
 

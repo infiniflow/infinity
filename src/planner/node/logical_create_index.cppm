@@ -39,7 +39,10 @@ public:
     inline std::string name() override { return "LogicalCreateIndex"; }
 
 public:
-    inline LogicalCreateIndex(u64 node_id, std::shared_ptr<BaseTableRef> base_table_ref, std::shared_ptr<IndexBase> index_base, ConflictType conflict_type)
+    inline LogicalCreateIndex(u64 node_id,
+                              std::shared_ptr<BaseTableRef> base_table_ref,
+                              std::shared_ptr<IndexBase> index_base,
+                              ConflictType conflict_type)
         : LogicalNode(node_id, LogicalNodeType::kCreateIndex), base_table_ref_(base_table_ref), index_definition_(index_base),
           conflict_type_(conflict_type) {}
 

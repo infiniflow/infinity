@@ -34,9 +34,11 @@ public:
 
     std::shared_ptr<LogicalNode> BuildPlan(QueryContext *query_context) final;
 
-    std::shared_ptr<LogicalNode> BuildFrom(std::shared_ptr<TableRef> &table_ref, QueryContext *query_context, const std::shared_ptr<BindContext> &bind_context);
+    std::shared_ptr<LogicalNode>
+    BuildFrom(std::shared_ptr<TableRef> &table_ref, QueryContext *query_context, const std::shared_ptr<BindContext> &bind_context);
 
-    std::shared_ptr<LogicalNode> BuildBaseTable(std::shared_ptr<TableRef> &table_ref, QueryContext *query_context, const std::shared_ptr<BindContext> &bind_context);
+    std::shared_ptr<LogicalNode>
+    BuildBaseTable(std::shared_ptr<TableRef> &table_ref, QueryContext *query_context, const std::shared_ptr<BindContext> &bind_context);
 
 public:
     std::shared_ptr<BindContext> bind_context_{};

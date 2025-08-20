@@ -88,7 +88,6 @@ private:
     template <CanBuildMinMaxFilterAndBloomFilter ValueType>
     static void BuildMinMaxAndBloomFilter(NewBuildFastRoughFilterArg &arg);
 
-
     template <typename ValueType>
     static void BuildFilter(NewBuildFastRoughFilterArg &arg, bool build_min_max_filter, bool build_bloom_filter);
 

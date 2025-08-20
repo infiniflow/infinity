@@ -33,7 +33,7 @@ namespace infinity {
 
 export class PhysicalAlter : public PhysicalOperator {
 public:
-    explicit PhysicalAlter(const std::shared_ptr<TableInfo>& table_info,
+    explicit PhysicalAlter(const std::shared_ptr<TableInfo> &table_info,
                            AlterStatementType type,
                            std::shared_ptr<std::vector<std::string>> output_names,
                            std::shared_ptr<std::vector<std::shared_ptr<DataType>>> output_types,
@@ -57,7 +57,7 @@ protected:
 
 export class PhysicalRenameTable final : public PhysicalAlter {
 public:
-    PhysicalRenameTable(const std::shared_ptr<TableInfo>& table_info,
+    PhysicalRenameTable(const std::shared_ptr<TableInfo> &table_info,
                         std::string &&new_table_name,
                         std::shared_ptr<std::vector<std::string>> output_names,
                         std::shared_ptr<std::vector<std::shared_ptr<DataType>>> output_types,
@@ -66,7 +66,7 @@ public:
         : PhysicalAlter(table_info, AlterStatementType::kRenameTable, std::move(output_names), std::move(output_types), id, load_metas),
           new_table_name_(std::move(new_table_name)) {}
 
-    void Init(QueryContext* query_context) override;
+    void Init(QueryContext *query_context) override;
 
     bool Execute(QueryContext *query_context, OperatorState *operator_state) override;
 
@@ -76,7 +76,7 @@ private:
 
 export class PhysicalAddColumns final : public PhysicalAlter {
 public:
-    PhysicalAddColumns(const std::shared_ptr<TableInfo>& table_info,
+    PhysicalAddColumns(const std::shared_ptr<TableInfo> &table_info,
                        const std::vector<std::shared_ptr<ColumnDef>> &column_defs,
                        std::shared_ptr<std::vector<std::string>> output_names,
                        std::shared_ptr<std::vector<std::shared_ptr<DataType>>> output_types,
@@ -85,7 +85,7 @@ public:
         : PhysicalAlter(table_info, AlterStatementType::kAddColumns, std::move(output_names), std::move(output_types), id, load_metas),
           column_defs_(column_defs) {}
 
-    void Init(QueryContext* query_context) override;
+    void Init(QueryContext *query_context) override;
 
     bool Execute(QueryContext *query_context, OperatorState *operator_state) override;
 
@@ -95,7 +95,7 @@ private:
 
 export class PhysicalDropColumns final : public PhysicalAlter {
 public:
-    PhysicalDropColumns(const std::shared_ptr<TableInfo>& table_info,
+    PhysicalDropColumns(const std::shared_ptr<TableInfo> &table_info,
                         const std::vector<std::string> &column_names,
                         std::shared_ptr<std::vector<std::string>> output_names,
                         std::shared_ptr<std::vector<std::shared_ptr<DataType>>> output_types,
@@ -104,7 +104,7 @@ public:
         : PhysicalAlter(table_info, AlterStatementType::kDropColumns, std::move(output_names), std::move(output_types), id, load_metas),
           column_names_(column_names) {}
 
-    void Init(QueryContext* query_context) override;
+    void Init(QueryContext *query_context) override;
 
     bool Execute(QueryContext *query_context, OperatorState *operator_state) override;
 

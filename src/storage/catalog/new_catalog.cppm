@@ -207,7 +207,8 @@ public:
     std::unordered_map<std::string, std::unique_ptr<ColumnDef>> special_columns_{};
 
 public:
-    Status GetCleanedMeta(TxnTimeStamp ts, KVInstance *kv_instance, std::vector<std::unique_ptr<MetaKey>> &metas, std::vector<std::string> &drop_keys) const;
+    Status
+    GetCleanedMeta(TxnTimeStamp ts, KVInstance *kv_instance, std::vector<std::unique_ptr<MetaKey>> &metas, std::vector<std::string> &drop_keys) const;
     std::vector<std::string> GetEncodeKeys(std::vector<std::unique_ptr<MetaKey>> &metas) const;
 
     // Profile related methods
@@ -297,7 +298,8 @@ public:
 
     static Status AddNewBlockColumn(BlockMeta &block_meta, size_t column_idx, std::optional<ColumnMeta> &column_meta);
 
-    static Status AddNewBlockColumnForTransform(BlockMeta &block_meta, size_t column_idx, std::optional<ColumnMeta> &column_meta, TxnTimeStamp commit_ts);
+    static Status
+    AddNewBlockColumnForTransform(BlockMeta &block_meta, size_t column_idx, std::optional<ColumnMeta> &column_meta, TxnTimeStamp commit_ts);
 
     static Status CleanBlockColumn(ColumnMeta &column_meta, const ColumnDef *column_def, UsageFlag usage_flag);
 
@@ -307,8 +309,10 @@ public:
                                           std::optional<SegmentIndexMeta> &segment_index_meta,
                                           ChunkID next_chunk_id);
 
-    static Status
-    AddNewSegmentIndex1(TableIndexMeeta &table_index_meta, NewTxn *new_txn, SegmentID segment_id, std::optional<SegmentIndexMeta> &segment_index_meta);
+    static Status AddNewSegmentIndex1(TableIndexMeeta &table_index_meta,
+                                      NewTxn *new_txn,
+                                      SegmentID segment_id,
+                                      std::optional<SegmentIndexMeta> &segment_index_meta);
 
     static Status CleanSegmentIndex(SegmentIndexMeta &segment_index_meta, UsageFlag usage_flag);
 
@@ -345,17 +349,22 @@ public:
 
     static Status GetDBFilePaths(TxnTimeStamp begin_ts, TxnTimeStamp commit_ts, DBMeeta &db_meta, std::vector<std::string> &file_paths);
 
-    static Status
-    GetTableFilePaths(TxnTimeStamp begin_ts, TableMeeta &table_meta, std::vector<std::string> &file_paths, std::shared_ptr<ColumnDef> column_def = nullptr);
+    static Status GetTableFilePaths(TxnTimeStamp begin_ts,
+                                    TableMeeta &table_meta,
+                                    std::vector<std::string> &file_paths,
+                                    std::shared_ptr<ColumnDef> column_def = nullptr);
 
-    static Status
-    GetSegmentFilePaths(TxnTimeStamp begin_ts, SegmentMeta &segment_meta, std::vector<std::string> &file_paths, std::shared_ptr<ColumnDef> column_def = nullptr);
+    static Status GetSegmentFilePaths(TxnTimeStamp begin_ts,
+                                      SegmentMeta &segment_meta,
+                                      std::vector<std::string> &file_paths,
+                                      std::shared_ptr<ColumnDef> column_def = nullptr);
 
     static Status GetBlockFilePaths(BlockMeta &block_meta, std::vector<std::string> &file_paths, std::shared_ptr<ColumnDef> column_def = nullptr);
 
     static Status GetBlockColumnFilePaths(ColumnMeta &column_meta, std::vector<std::string> &file_paths);
 
-    static Status GetColumnFilePaths(TxnTimeStamp begin_ts, TableMeeta &table_meta, std::shared_ptr<ColumnDef> column_def, std::vector<std::string> &file_paths);
+    static Status
+    GetColumnFilePaths(TxnTimeStamp begin_ts, TableMeeta &table_meta, std::shared_ptr<ColumnDef> column_def, std::vector<std::string> &file_paths);
 
     static Status GetTableIndexFilePaths(TableIndexMeeta &table_index_meta, std::vector<std::string> &file_paths);
 

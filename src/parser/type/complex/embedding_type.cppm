@@ -9,4 +9,4 @@ namespace infinity {
 export using infinity::EmbeddingDataType;
 export using infinity::EmbeddingType;
 
-};
+}; // namespace infinity

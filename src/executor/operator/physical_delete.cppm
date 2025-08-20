@@ -29,7 +29,10 @@ namespace infinity {
 
 export class PhysicalDelete final : public PhysicalOperator {
 public:
-    explicit PhysicalDelete(u64 id, std::unique_ptr<PhysicalOperator> left, std::shared_ptr<TableInfo> table_info, std::shared_ptr<std::vector<LoadMeta>> load_metas)
+    explicit PhysicalDelete(u64 id,
+                            std::unique_ptr<PhysicalOperator> left,
+                            std::shared_ptr<TableInfo> table_info,
+                            std::shared_ptr<std::vector<LoadMeta>> load_metas)
         : PhysicalOperator(PhysicalOperatorType::kDelete, std::move(left), nullptr, id, load_metas), table_info_(std::move(table_info)) {}
 
     ~PhysicalDelete() override = default;

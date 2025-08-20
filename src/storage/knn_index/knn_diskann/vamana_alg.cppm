@@ -220,7 +220,7 @@ private:
         data_store_.GetVector(location, scratch->AlignedQuery());
         IterateToFixedPoint(scratch, Lindex, init_ids);
 
-        auto &pool = scratch->Pool();             // pool is the expanded list of IterateToFixedPoint()
+        auto &pool = scratch->Pool();              // pool is the expanded list of IterateToFixedPoint()
         for (size_t i = 0; i < pool.size(); i++) { // remove self from pool
             if (pool[i].id == location) {
                 pool.erase(pool.begin() + i);
@@ -238,7 +238,8 @@ private:
 
     // used in SearchForPointAndPrune()
     // abtain search path of location starting from init_ids
-    std::pair<u32, u32> IterateToFixedPoint(InMemQueryScratch *scratch, const u32 Lsize, std::vector<size_t> &init_ids, bool search_invocations = false) {
+    std::pair<u32, u32>
+    IterateToFixedPoint(InMemQueryScratch *scratch, const u32 Lsize, std::vector<size_t> &init_ids, bool search_invocations = false) {
         std::vector<Neighbor> &expanded_nodes = scratch->Pool();
         NeighborPriorityQueue &best_l_nodes = scratch->BestLNodes();
         best_l_nodes.Reserve(Lsize);
@@ -253,7 +254,7 @@ private:
         assert(expanded_nodes.size() == 0 && id_scratch.size() == 0);
 
         size_t total_num_points = max_points_ + num_frozen_pts_;
-        const size_t MAX_POINTS_FOR_USING_BITSET = 10000000;                    // 10M points for using bitset
+        const size_t MAX_POINTS_FOR_USING_BITSET = 10000000;                   // 10M points for using bitset
         bool fast_iterate = (total_num_points <= MAX_POINTS_FOR_USING_BITSET); // turn on fast iterate for small datasets(1e7)
 
         if (fast_iterate) {
@@ -503,7 +504,7 @@ private:
 
     // indexing parameters
     size_t maxc_ = 750; // Maximum number of candidate neighbours to be considered
-    f32 alpha_ = 1.2f; // alpha in RobustPrune
+    f32 alpha_ = 1.2f;  // alpha in RobustPrune
     ConcurrentQueue<InMemQueryScratch *> query_scratch_;
     u32 indexingThreads_ = 1; // number of threads for indexing
     // size_t num_rnds_ = 2; // number of rounds in index building
@@ -519,7 +520,7 @@ private:
     // size_t aligned_dim_; // in data_store_
 
     std::unique_ptr<f32[]> centroid_; // global centroid data to calculate enterpoint
-    size_t start_;               // enterpoint
+    size_t start_;                    // enterpoint
     std::unordered_map<LabelType, size_t> tag_to_location_;
     std::unordered_map<size_t, LabelType> location_to_tag_;
     std::vector<std::mutex> locks_; // Per node lock

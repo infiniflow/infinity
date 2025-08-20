@@ -63,10 +63,10 @@ export struct IndexIVFOption {
 export class IndexIVF final : public IndexBase {
 public:
     static std::shared_ptr<IndexIVF> Make(std::shared_ptr<std::string> index_name,
-                                    std::shared_ptr<std::string> index_comment,
-                                    const std::string &file_name,
-                                    std::vector<std::string> column_names,
-                                    const std::vector<InitParameter *> &index_param_list);
+                                          std::shared_ptr<std::string> index_comment,
+                                          const std::string &file_name,
+                                          std::vector<std::string> column_names,
+                                          const std::vector<InitParameter *> &index_param_list);
 
     IndexIVF(std::shared_ptr<std::string> index_name,
              std::shared_ptr<std::string> index_comment,

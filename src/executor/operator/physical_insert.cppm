@@ -42,12 +42,12 @@ public:
 
     ~PhysicalInsert() override = default;
 
-    void Init(QueryContext* query_context) override;
+    void Init(QueryContext *query_context) override;
 
     bool Execute(QueryContext *query_context, OperatorState *operator_state) final;
 
-    inline std::shared_ptr<TableInfo>& table_info() { return table_info_; }
-    inline const std::shared_ptr<TableInfo>& table_info() const { return table_info_; }
+    inline std::shared_ptr<TableInfo> &table_info() { return table_info_; }
+    inline const std::shared_ptr<TableInfo> &table_info() const { return table_info_; }
 
     inline const std::vector<std::vector<std::shared_ptr<BaseExpression>>> &value_list() const { return value_list_; }
 

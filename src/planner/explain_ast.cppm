@@ -32,11 +32,14 @@ namespace infinity {
 
 export class ExplainAST {
 public:
-    static Status Explain(const BaseStatement *statement, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &stmt_string, i64 intent_size = 0);
+    static Status
+    Explain(const BaseStatement *statement, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &stmt_string, i64 intent_size = 0);
 
-    static Status BuildCreate(const CreateStatement *statement, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &stmt_string, i64 intent_size);
+    static Status
+    BuildCreate(const CreateStatement *statement, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &stmt_string, i64 intent_size);
 
-    static Status BuildInsert(const InsertStatement *statement, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &stmt_string, i64 intent_size);
+    static Status
+    BuildInsert(const InsertStatement *statement, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &stmt_string, i64 intent_size);
 
     static Status BuildCopy(const CopyStatement *statement, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &stmt_string, i64 intent_size);
 
@@ -47,15 +50,18 @@ public:
                               i64 intent_size,
                               std::shared_ptr<std::string> alias_ptr = nullptr);
 
-    static Status BuildBaseTableRef(const BaseTableReference *table_ref, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &stmt_string, i64 intent_size);
+    static Status
+    BuildBaseTableRef(const BaseTableReference *table_ref, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &stmt_string, i64 intent_size);
 
     static Status BuildShow(const ShowStatement *statement, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &stmt_string, i64 intent_size);
 
-    static Status BuildFlush(const FlushStatement *flush_statement, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size);
+    static Status
+    BuildFlush(const FlushStatement *flush_statement, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size);
 
     static Status BuildOptimize(const OptimizeStatement *optimize_statement, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64);
 
-    static Status BuildCheck(const CheckStatement *check_statement, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size);
+    static Status
+    BuildCheck(const CheckStatement *check_statement, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size);
 };
 
 } // namespace infinity

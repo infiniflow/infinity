@@ -56,7 +56,9 @@ public:
 
     ~QueryBuilder();
 
-    std::map<std::string, std::string> GetColumn2Analyzer(const std::vector<std::string> &hints) const { return index_reader_->GetColumn2Analyzer(hints); }
+    std::map<std::string, std::string> GetColumn2Analyzer(const std::vector<std::string> &hints) const {
+        return index_reader_->GetColumn2Analyzer(hints);
+    }
 
     std::unique_ptr<DocIterator> CreateSearch(FullTextQueryContext &context);
 

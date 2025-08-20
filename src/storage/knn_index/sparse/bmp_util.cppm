@@ -52,8 +52,10 @@ public:
     const T *data() const { return vec_.data(); }
     size_t size() const { return vec_.size(); }
 
-    template<typename U>
-    void push_back(U&& val) { vec_.push_back(std::forward<U>(val)); }
+    template <typename U>
+    void push_back(U &&val) {
+        vec_.push_back(std::forward<U>(val));
+    }
 
     std::vector<T> exchange(std::vector<T> vec) { return std::exchange(vec_, std::move(vec)); }
 

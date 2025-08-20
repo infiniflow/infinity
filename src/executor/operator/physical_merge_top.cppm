@@ -46,13 +46,17 @@ public:
 
     ~PhysicalMergeTop() override = default;
 
-    void Init(QueryContext* query_context) override;
+    void Init(QueryContext *query_context) override;
 
     bool Execute(QueryContext *query_context, OperatorState *operator_state) final;
 
-    inline std::shared_ptr<std::vector<std::string>> GetOutputNames() const final { return PhysicalCommonFunctionUsingLoadMeta::GetOutputNames(*this); }
+    inline std::shared_ptr<std::vector<std::string>> GetOutputNames() const final {
+        return PhysicalCommonFunctionUsingLoadMeta::GetOutputNames(*this);
+    }
 
-    inline std::shared_ptr<std::vector<std::shared_ptr<DataType>>> GetOutputTypes() const final { return PhysicalCommonFunctionUsingLoadMeta::GetOutputTypes(*this); }
+    inline std::shared_ptr<std::vector<std::shared_ptr<DataType>>> GetOutputTypes() const final {
+        return PhysicalCommonFunctionUsingLoadMeta::GetOutputTypes(*this);
+    }
 
     size_t TaskletCount() override { return left_->TaskletCount(); }
 
@@ -75,13 +79,13 @@ public:
     }
 
 private:
-    std::shared_ptr<BaseTableRef> base_table_ref_;             // necessary for InputLoad
-    u32 limit_{};                                        // limit value
-    u32 offset_{};                                       // offset value
-    u32 sort_expr_count_{};                              // number of expressions to sort
-    std::vector<OrderType> order_by_types_;                   // ASC or DESC
+    std::shared_ptr<BaseTableRef> base_table_ref_;                  // necessary for InputLoad
+    u32 limit_{};                                                   // limit value
+    u32 offset_{};                                                  // offset value
+    u32 sort_expr_count_{};                                         // number of expressions to sort
+    std::vector<OrderType> order_by_types_;                         // ASC or DESC
     std::vector<std::shared_ptr<BaseExpression>> sort_expressions_; // expressions to sort
-    CompareTwoRowAndPreferLeft prefer_left_function_;    // compare function
+    CompareTwoRowAndPreferLeft prefer_left_function_;               // compare function
 };
 
 } // namespace infinity

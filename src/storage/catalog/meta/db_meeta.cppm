@@ -38,7 +38,7 @@ public:
 
     Status GetTableIDs(std::vector<std::string> *&table_id_strs, std::vector<std::string> **table_names = nullptr);
 
-    Status GetTableID(const std::string &table_name, std::string &table_key, std::string &table_id_str, TxnTimeStamp& create_table_ts);
+    Status GetTableID(const std::string &table_name, std::string &table_key, std::string &table_id_str, TxnTimeStamp &create_table_ts);
 
     std::tuple<std::shared_ptr<DatabaseInfo>, Status> GetDatabaseInfo();
 

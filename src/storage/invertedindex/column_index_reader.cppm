@@ -123,7 +123,8 @@ export struct IndexReader {
     }
 
     // column_id -> [index_name -> column_index_reader]
-    std::shared_ptr<FlatHashMap<u64, std::shared_ptr<std::map<std::string, std::shared_ptr<ColumnIndexReader>>>, detail::Hash<u64>>> column_index_readers_;
+    std::shared_ptr<FlatHashMap<u64, std::shared_ptr<std::map<std::string, std::shared_ptr<ColumnIndexReader>>>, detail::Hash<u64>>>
+        column_index_readers_;
 };
 
 export class TableIndexReaderCache {
@@ -141,7 +142,8 @@ private:
     std::string table_id_str_;
 
     TxnTimeStamp cache_ts_ = UNCOMMIT_TS;
-    std::shared_ptr<FlatHashMap<u64, std::shared_ptr<std::map<std::string, std::shared_ptr<ColumnIndexReader>>>, detail::Hash<u64>>> cache_column_readers_;
+    std::shared_ptr<FlatHashMap<u64, std::shared_ptr<std::map<std::string, std::shared_ptr<ColumnIndexReader>>>, detail::Hash<u64>>>
+        cache_column_readers_;
 };
 
 } // namespace infinity

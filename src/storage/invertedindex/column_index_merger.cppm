@@ -24,7 +24,10 @@ public:
 private:
     std::shared_ptr<PostingMerger> CreatePostingMerger();
 
-    void MergeTerm(const std::string &term, TermMeta &term_meta, const std::vector<SegmentTermPosting *> &merging_term_postings, const RowID &merge_base_rowid);
+    void MergeTerm(const std::string &term,
+                   TermMeta &term_meta,
+                   const std::vector<SegmentTermPosting *> &merging_term_postings,
+                   const RowID &merge_base_rowid);
 
     std::string index_dir_;
     optionflag_t flag_;

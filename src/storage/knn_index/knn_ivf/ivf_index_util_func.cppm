@@ -40,7 +40,8 @@ std::pair<const f32 *, std::unique_ptr<f32[]>> GetF32Ptr(const ColumnEmbeddingEl
 }
 
 export template <IsAnyOf<u8, i8, f32> QueryDataType, IsAnyOf<u8, i8, f64, f32, Float16T, BFloat16T> ColumnEmbeddingElementT>
-std::pair<const QueryDataType *, std::unique_ptr<QueryDataType[]>> GetSearchCalcPtr(const ColumnEmbeddingElementT *src_data_ptr, const u32 src_data_cnt) {
+std::pair<const QueryDataType *, std::unique_ptr<QueryDataType[]>> GetSearchCalcPtr(const ColumnEmbeddingElementT *src_data_ptr,
+                                                                                    const u32 src_data_cnt) {
     if constexpr (std::is_same_v<QueryDataType, ColumnEmbeddingElementT>) {
         return {src_data_ptr, nullptr};
     } else {

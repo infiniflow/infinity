@@ -24,12 +24,17 @@ namespace infinity {
 // Does not need any extra member.
 export class IndexSecondary final : public IndexBase {
 public:
-    static std::shared_ptr<IndexBase>
-    Make(std::shared_ptr<std::string> index_name, std::shared_ptr<std::string> index_comment, const std::string &file_name, std::vector<std::string> column_names) {
+    static std::shared_ptr<IndexBase> Make(std::shared_ptr<std::string> index_name,
+                                           std::shared_ptr<std::string> index_comment,
+                                           const std::string &file_name,
+                                           std::vector<std::string> column_names) {
         return std::make_shared<IndexSecondary>(index_name, index_comment, file_name, std::move(column_names));
     }
 
-    IndexSecondary(std::shared_ptr<std::string> index_name, std::shared_ptr<std::string> index_comment, const std::string &file_name, std::vector<std::string> column_names)
+    IndexSecondary(std::shared_ptr<std::string> index_name,
+                   std::shared_ptr<std::string> index_comment,
+                   const std::string &file_name,
+                   std::vector<std::string> column_names)
         : IndexBase(IndexType::kSecondary, index_name, index_comment, file_name, std::move(column_names)) {}
 
     ~IndexSecondary() final = default;

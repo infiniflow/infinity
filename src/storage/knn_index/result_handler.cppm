@@ -161,8 +161,14 @@ public:
     }
 
     // bitmask is for the segment
-    void
-    AddResults(size_t i_start, size_t i_end, size_t j0, size_t j1, const DistType *dis_tab, u32 segment_id, u32 segment_offset_start, Bitmask &bitmask) {
+    void AddResults(size_t i_start,
+                    size_t i_end,
+                    size_t j0,
+                    size_t j1,
+                    const DistType *dis_tab,
+                    u32 segment_id,
+                    u32 segment_offset_start,
+                    Bitmask &bitmask) {
         for (size_t q_id = i_start; q_id < i_end; ++q_id) {
             u32 &size = sizes[q_id];
             auto distance = distance_ptr + q_id * top_k - 1;
@@ -474,8 +480,14 @@ public:
         }
     }
 
-    void
-    AddResults(size_t i_start, size_t i_end, size_t j0, size_t j1, const DistType *dis_tab, u32 segment_id, u32 segment_offset_start, Bitmask &bitmask) {
+    void AddResults(size_t i_start,
+                    size_t i_end,
+                    size_t j0,
+                    size_t j1,
+                    const DistType *dis_tab,
+                    u32 segment_id,
+                    u32 segment_offset_start,
+                    Bitmask &bitmask) {
         for (size_t i = i_start; i < i_end; i++) {
             auto dis_tab_i = dis_tab + (j1 - j0) * (i - i_start) - j0;
             for (size_t j = j0; j < j1; j++) {

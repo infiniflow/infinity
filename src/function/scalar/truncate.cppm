@@ -7,4 +7,4 @@ namespace infinity {
 class NewCatalog;
 export void RegisterTruncFunction(NewCatalog *catalog_ptr);
 
-}
+} // namespace infinity
