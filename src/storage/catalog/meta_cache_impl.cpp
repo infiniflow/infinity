@@ -70,7 +70,7 @@ u64 MetaDbCache::commit_ts() const {
 String MetaDbCache::detail() const {
     std::unique_lock lock(mtx_);
     String extend = is_dropped_ ? "dropped" : "created";
-    return fmt::format("db_name: {}, db_id: {}, {}", db_name_, db_id_, extend);
+    return fmt::format("db_name: {}, db_id: {}, commit_ts: {},  {}", db_name_, db_id_, commit_ts_, extend);
 }
 bool MetaDbCache::is_dropped() const {
     std::unique_lock lock(mtx_);
@@ -113,7 +113,7 @@ u64 MetaTableCache::commit_ts() const {
 String MetaTableCache::detail() const {
     std::unique_lock lock(mtx_);
     String extend = is_dropped_ ? "dropped" : "created";
-    return fmt::format("db_id: {}, table_name: {}, table_id: {}, {}", db_id_, table_name_, table_id_, extend);
+    return fmt::format("db_id: {}, table_name: {}, table_id: {}, commit_ts: {}, {}", db_id_, table_name_, table_id_, commit_ts_, extend);
 }
 bool MetaTableCache::is_dropped() const {
     std::unique_lock lock(mtx_);
@@ -159,7 +159,14 @@ u64 MetaIndexCache::commit_ts() const {
 String MetaIndexCache::detail() const {
     std::unique_lock lock(mtx_);
     String extend = is_dropped_ ? "dropped" : "created";
-    return fmt::format("db_id: {}, table_id: {}, index_name: {}, index_id: {}, {}", db_id_, table_id_, table_id_, index_name_, index_id_, extend);
+    return fmt::format("db_id: {}, table_id: {}, index_name: {}, index_id: {}, commit_ts: {}, {}",
+                       db_id_,
+                       table_id_,
+                       table_id_,
+                       index_name_,
+                       index_id_,
+                       commit_ts_,
+                       extend);
 }
 bool MetaIndexCache::is_dropped() const {
     std::unique_lock lock(mtx_);
@@ -405,6 +412,25 @@ SharedPtr<MetaIndexCache> MetaCache::GetIndex(u64 db_id, u64 table_id, const Str
         }
     }
     return nullptr;
+}
+
+CacheStatus MetaCache::GetCacheStatus(MetaCacheType cache_type) const {
+    std::unique_lock lock(cache_mtx_);
+    switch (cache_type) {
+        case MetaCacheType::kCreateDB: {
+            return {dbs_.size(), db_request_count_, db_hit_count_};
+        }
+        case MetaCacheType::kCreateTable: {
+            return {tables_.size(), table_request_count_, table_hit_count_};
+        }
+        case MetaCacheType::kCreateIndex: {
+            return {indexes_.size(), index_request_count_, index_hit_count_};
+        }
+        default: {
+            UnrecoverableError("Unexpected error");
+        }
+    }
+    return {};
 }
 
 void MetaCache::PrintLRU() const {

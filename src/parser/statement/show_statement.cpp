@@ -196,6 +196,10 @@ std::string ShowStatement::ToString() const {
             ss << "List caches";
             break;
         }
+        case ShowStmtType::kShowCache: {
+            ss << "Show cache";
+            break;
+        }
     }
     return ss.str();
 }

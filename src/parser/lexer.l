@@ -49,6 +49,7 @@ BLOCK           { return BLOCK; }
 BLOCKS          { return BLOCKS; }
 BUFFER          { return BUFFER; }
 BY              { return BY; }
+CACHE           { return CACHE; }
 CACHES          { return CACHES; }
 CASE            { return CASE; }
 CAST            { return CAST; }

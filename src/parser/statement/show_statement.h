@@ -63,7 +63,8 @@ enum class ShowStmtType {
     kFunction,
     kListSnapshots,
     kShowSnapshot,
-    kListCaches
+    kListCaches,
+    kShowCache,
 };
 
 class ShowStatement : public BaseStatement {

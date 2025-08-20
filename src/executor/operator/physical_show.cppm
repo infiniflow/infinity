@@ -163,6 +163,8 @@ private:
 
     void ExecuteListCaches(QueryContext *query_context, ShowOperatorState *operator_state);
 
+    void ExecuteShowCache(QueryContext *query_context, ShowOperatorState *operator_state);
+
 private:
     ShowStmtType show_type_{ShowStmtType::kInvalid};
     String db_name_{};

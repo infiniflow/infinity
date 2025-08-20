@@ -1898,6 +1898,23 @@ Status LogicalPlanner::BuildShow(ShowStatement *statement, SharedPtr<BindContext
                                                           None);
             break;
         }
+        case ShowStmtType::kShowCache: {
+            this->logical_plan_ = MakeShared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
+                                                          ShowStmtType::kShowCache,
+                                                          "",
+                                                          None,
+                                                          bind_context_ptr->GenerateTableIndex(),
+                                                          None,
+                                                          None,
+                                                          None,
+                                                          None,
+                                                          None,
+                                                          None,
+                                                          None,
+                                                          None,
+                                                          None);
+            break;
+        }
         default: {
             String error_message = "Unexpected show statement type.";
             UnrecoverableError(error_message);

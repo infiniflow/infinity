@@ -1920,6 +1920,24 @@ void ExplainPhysicalPlan::Explain(const PhysicalShow *show_node, SharedPtr<Vecto
             result->emplace_back(MakeShared<String>(output_columns_str));
             break;
         }
+        case ShowStmtType::kShowCache: {
+            String show_str;
+            if (intent_size != 0) {
+                show_str = String(intent_size - 2, ' ');
+                show_str += "-> SHOW CACHE ";
+            } else {
+                show_str = "SHOW CACHE ";
+            }
+            show_str += "(";
+            show_str += std::to_string(show_node->node_id());
+            show_str += ")";
+            result->emplace_back(MakeShared<String>(show_str));
+
+            String output_columns_str = String(intent_size, ' ');
+            output_columns_str += " - output columns: [cache_type, number, request_count, hit_count, hit_rate]";
+            result->emplace_back(MakeShared<String>(output_columns_str));
+            break;
+        }
         case ShowStmtType::kInvalid: {
             String error_message = "Invalid show type";
             UnrecoverableError(error_message);

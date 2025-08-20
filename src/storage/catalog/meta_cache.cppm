@@ -199,12 +199,26 @@ struct TableNameID {
     MetaCacheType meta_type_{MetaCacheType::kInvalid};
 };
 
+export struct CacheStatus {
+    u64 item_count_;
+    u64 request_count_;
+    u64 hit_count_;
+};
+
 export class MetaCache {
 private:
     mutable std::mutex cache_mtx_{};
     HashMap<String, Map<u64, List<CacheItem>::iterator>> dbs_;     // db_name -> (commit_ts -> MetaDbCache)
     HashMap<String, Map<u64, List<CacheItem>::iterator>> tables_;  // table_name -> (commit_ts -> MetaTableCache)
     HashMap<String, Map<u64, List<CacheItem>::iterator>> indexes_; // index_name -> (commit_ts -> MetaIndexCache)
+
+    u64 db_request_count_{};
+    u64 table_request_count_{};
+    u64 index_request_count_{};
+
+    u64 db_hit_count_{};
+    u64 table_hit_count_{};
+    u64 index_hit_count_{};
 
     SizeT capacity_{0};
     List<CacheItem> lru_{};
@@ -224,6 +238,8 @@ public:
     SharedPtr<MetaTableCache> GetTable(u64 db_id, const String &table_name, TxnTimeStamp begin_ts);
 
     SharedPtr<MetaIndexCache> GetIndex(u64 db_id, u64 table_id, const String &index_name, TxnTimeStamp begin_ts);
+
+    CacheStatus GetCacheStatus(MetaCacheType type) const;
 
     void PrintLRU() const;
 
