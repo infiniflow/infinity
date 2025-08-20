@@ -1706,7 +1706,7 @@ Status NewTxn::Checkpoint(TxnTimeStamp last_ckp_ts) {
     CheckpointOption option{checkpoint_ts};
 
     current_ckp_ts_ = checkpoint_ts;
-    LOG_INFO(fmt::format("checkpoint ts: {}", current_ckp_ts_));
+    LOG_INFO(fmt::format("checkpoint ts: {}, txn: {}", current_ckp_ts_, txn_context_ptr_->txn_id_));
 
     if (last_ckp_ts > 0 and last_ckp_ts + 2 >= checkpoint_ts) {
         // last checkpoint ts: last checkpoint txn begin ts. checkpoint is the begin_ts of current txn
@@ -6202,7 +6202,7 @@ Status NewTxn::CheckpointforSnapshot(TxnTimeStamp last_ckp_ts, CheckpointTxnStor
     CheckpointOption option{checkpoint_ts};
 
     current_ckp_ts_ = checkpoint_ts;
-    LOG_INFO(fmt::format("checkpoint ts: {}", current_ckp_ts_));
+    LOG_INFO(fmt::format("checkpoint ts for snapshot: {}", current_ckp_ts_));
 
     if (last_ckp_ts > 0 and last_ckp_ts + 2 >= checkpoint_ts) {
         // last checkpoint ts: last checkpoint txn begin ts. checkpoint is the begin_ts of current txn

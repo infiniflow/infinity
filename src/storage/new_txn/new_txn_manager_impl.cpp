@@ -122,8 +122,9 @@ SharedPtr<NewTxn> NewTxnManager::BeginTxnShared(UniquePtr<String> txn_text, Tran
             LOG_DEBUG(fmt::format("Checkpoint txn is started in {}", begin_ts));
             ckp_begin_ts_ = begin_ts;
         } else {
-            LOG_WARN(fmt::format("Another checkpoint txn is started in {}, new checkpoint {} will do nothing, not start this txn",
+            LOG_WARN(fmt::format("Another checkpoint txn is started in {}, new txn: {} checkpoint start at {} will do nothing, not start this txn",
                                  ckp_begin_ts_,
+                                 new_txn_id,
                                  begin_ts));
             return nullptr;
         }
