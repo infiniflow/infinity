@@ -288,6 +288,7 @@ public:
     template <typename Iter>
     void InsertVecs(Iter iter, const HnswInsertConfig &config = kDefaultHnswInsertConfig, bool trace = true) {
         SizeT mem_usage = hnsw_handler_->InsertVecs(std::move(iter), config, kBuildBucketSize);
+        row_count_ += iter.GetRowCount();
         if (trace) {
             IncreaseMemoryUsageBase(mem_usage);
         }
@@ -311,6 +312,7 @@ private:
     static constexpr SizeT kBuildBucketSize = 1024;
 
     RowID begin_row_id_ = {};
+    SizeT row_count_ = 0;
     HnswHandlerPtr hnsw_handler_;
     bool trace_{};
     bool own_memory_{};

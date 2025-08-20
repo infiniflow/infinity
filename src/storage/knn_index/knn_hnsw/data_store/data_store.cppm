@@ -772,7 +772,8 @@ public:
     using InnerIter = DataStoreInnerIter<VecStoreT, LabelType>;
     using ValueType = StoreType;
 
-    DataStoreIter(const DataStore<VecStoreT, LabelType, true> *data_store) : data_store_iter_(data_store), inner_iter_(None) {}
+    DataStoreIter(const DataStore<VecStoreT, LabelType, true> *data_store)
+        : data_store_iter_(data_store), inner_iter_(None), row_count_(data_store->cur_vec_num()) {}
 
     Optional<Pair<StoreType, LabelType>> Next() {
         if (!inner_iter_.has_value()) {
@@ -792,9 +793,12 @@ public:
         return vec_opt.value();
     }
 
+    SizeT GetRowCount() const { return row_count_; }
+
 private:
     DataStoreChunkIter<VecStoreT, LabelType> data_store_iter_;
     Optional<InnerIter> inner_iter_;
+    SizeT row_count_ = 0;
 };
 
 template <typename VecStoreT, typename LabelType, bool OwnMem>
