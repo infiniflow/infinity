@@ -25,10 +25,10 @@ struct ColumnVector;
 export class ExpressionSelector {
 public:
     size_t Select(const std::shared_ptr<BaseExpression> &expr,
-                 std::shared_ptr<ExpressionState> &state,
-                 const DataBlock *input_data_block,
-                 DataBlock *output_data_block,
-                 size_t count);
+                  std::shared_ptr<ExpressionState> &state,
+                  const DataBlock *input_data_block,
+                  DataBlock *output_data_block,
+                  size_t count);
 
     void Select(const std::shared_ptr<BaseExpression> &expr,
                 std::shared_ptr<ExpressionState> &state,
@@ -37,7 +37,10 @@ public:
                 std::shared_ptr<Selection> &output_true_select,
                 std::shared_ptr<Selection> &output_false_select);
 
-    void Select(const std::shared_ptr<BaseExpression> &expr, std::shared_ptr<ExpressionState> &state, size_t count, std::shared_ptr<Selection> &output_true_select);
+    void Select(const std::shared_ptr<BaseExpression> &expr,
+                std::shared_ptr<ExpressionState> &state,
+                size_t count,
+                std::shared_ptr<Selection> &output_true_select);
 
     static void Select(const std::shared_ptr<ColumnVector> &bool_column, size_t count, std::shared_ptr<Selection> &output_true_select, bool nullable);
 

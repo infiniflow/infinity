@@ -25,7 +25,10 @@ export struct CastParameters {
     bool strict{false};
 };
 
-using cast_function_t = bool (*)(const std::shared_ptr<ColumnVector> &source, std::shared_ptr<ColumnVector> &result, size_t count, CastParameters &parameters);
+using cast_function_t = bool (*)(const std::shared_ptr<ColumnVector> &source,
+                                 std::shared_ptr<ColumnVector> &result,
+                                 size_t count,
+                                 CastParameters &parameters);
 
 export struct BoundCastFunc {
     explicit inline BoundCastFunc(cast_function_t func) : function(func) {};
