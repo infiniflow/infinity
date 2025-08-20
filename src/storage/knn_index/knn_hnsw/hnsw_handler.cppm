@@ -118,7 +118,8 @@ public:
     }
 
     template <typename DistanceT, typename LabelT, bool WithLock = true>
-    std::tuple<size_t, std::unique_ptr<DistanceT[]>, std::unique_ptr<LabelT[]>> SearchIndex(const auto *q, size_t k, const KnnSearchOption &option = {}) const {
+    std::tuple<size_t, std::unique_ptr<DistanceT[]>, std::unique_ptr<LabelT[]>>
+    SearchIndex(const auto *q, size_t k, const KnnSearchOption &option = {}) const {
         std::tuple<size_t, std::unique_ptr<DistanceT[]>, std::unique_ptr<LabelT[]>> res{};
         std::visit(
             [&](auto &&index) {
@@ -174,11 +175,11 @@ private:
 
 public:
     size_t InsertVecs(SegmentOffset block_offset,
-                     const ColumnVector &col,
-                     BlockOffset offset,
-                     BlockOffset row_count,
-                     const HnswInsertConfig &config = kDefaultHnswInsertConfig,
-                     size_t kBuildBucketSize = 1024);
+                      const ColumnVector &col,
+                      BlockOffset offset,
+                      BlockOffset row_count,
+                      const HnswInsertConfig &config = kDefaultHnswInsertConfig,
+                      size_t kBuildBucketSize = 1024);
 
     template <typename Iter>
     size_t InsertVecs(Iter iter, const HnswInsertConfig &config = kDefaultHnswInsertConfig, size_t kBuildBucketSize = 1024) {
@@ -202,7 +203,8 @@ public:
     }
 
     template <typename LabelT>
-    std::pair<VertexType, VertexType> StoreData(const auto *data, size_t dim, size_t vec_num, const HnswInsertConfig &option = kDefaultHnswInsertConfig) {
+    std::pair<VertexType, VertexType>
+    StoreData(const auto *data, size_t dim, size_t vec_num, const HnswInsertConfig &option = kDefaultHnswInsertConfig) {
         std::pair<VertexType, VertexType> res{};
         std::visit(
             [&](auto &&index) {
@@ -285,6 +287,7 @@ public:
     template <typename Iter>
     void InsertVecs(Iter iter, const HnswInsertConfig &config = kDefaultHnswInsertConfig, bool trace = true) {
         size_t mem_usage = hnsw_handler_->InsertVecs(std::move(iter), config, kBuildBucketSize);
+        row_count_ += iter.GetRowCount();
         if (trace) {
             IncreaseMemoryUsageBase(mem_usage);
         }
@@ -308,6 +311,7 @@ private:
     static constexpr size_t kBuildBucketSize = 1024;
 
     RowID begin_row_id_ = {};
+    size_t row_count_ = 0;
     HnswHandlerPtr hnsw_handler_;
     bool trace_{};
     bool own_memory_{};

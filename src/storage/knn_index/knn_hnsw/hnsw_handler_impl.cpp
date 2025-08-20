@@ -485,6 +485,7 @@ void HnswIndexInMem::InsertVecs(SegmentOffset block_offset,
                                 BlockOffset row_count,
                                 const HnswInsertConfig &config) {
     size_t mem_usage = hnsw_handler_->InsertVecs(block_offset, col, offset, row_count, config, kBuildBucketSize);
+    row_count_ += row_count;
     this->IncreaseMemoryUsageBase(mem_usage);
 }
 
@@ -504,7 +505,7 @@ void HnswIndexInMem::Dump(BufferObj *buffer_obj, size_t *dump_size_ptr) {
 
 void HnswIndexInMem::SetLSGParam(float alpha, std::unique_ptr<float[]> avg) { hnsw_handler_->SetLSGParam(alpha, std::move(avg)); }
 
-size_t HnswIndexInMem::GetRowCount() const { return hnsw_handler_->GetRowCount(); }
+size_t HnswIndexInMem::GetRowCount() const { return row_count_; }
 
 size_t HnswIndexInMem::GetSizeInBytes() const { return hnsw_handler_->GetSizeInBytes(); }
 

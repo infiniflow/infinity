@@ -224,7 +224,7 @@ public:
             const VertexL0 *v = GetLevel0(vertex_i, meta);
             size += sizeof(v->layer_n_) + sizeof(v->neighbor_n_) + sizeof(VertexType) * v->neighbor_n_;
             for (i32 layer_i = 1; layer_i <= v->layer_n_; ++layer_i) {
-                const VertexLX *vx = GetLevelX(v->layers_p_, vertex_i, layer_i, meta);
+                const VertexLX *vx = GetLevelX(v->layers_p_, layer_i, meta);
                 size += sizeof(vx->neighbor_n_) + sizeof(VertexType) * vx->neighbor_n_;
             }
         }
@@ -236,7 +236,7 @@ public:
         if (layer_i == 0) {
             return {v->neighbors_, v->neighbor_n_};
         }
-        const VertexLX *vx = GetLevelX(v->layers_p_, vertex_i, layer_i, meta);
+        const VertexLX *vx = GetLevelX(v->layers_p_, layer_i, meta);
         return {vx->neighbors_, vx->neighbor_n_};
     }
 
@@ -245,7 +245,7 @@ protected:
         return reinterpret_cast<const VertexL0 *>(graph_.get() + vertex_i * meta.level0_size());
     }
 
-    const VertexLX *GetLevelX(const char *layer_p, VertexType vertex_i, i32 layer_i, const GraphStoreMeta &meta) const {
+    const VertexLX *GetLevelX(const char *layer_p, i32 layer_i, const GraphStoreMeta &meta) const {
         assert(layer_i > 0);
         if constexpr (OwnMem) {
             return reinterpret_cast<const VertexLX *>(layer_p + (layer_i - 1) * meta.levelx_size());
@@ -278,7 +278,7 @@ public:
                 assert(neighbor_idx != out_vertex_i);
             }
             for (int layer_i = 1; layer_i <= v->layer_n_; ++layer_i) {
-                const VertexLX *vx = GetLevelX(v->layers_p_, vertex_i, layer_i, meta);
+                const VertexLX *vx = GetLevelX(v->layers_p_, layer_i, meta);
                 for (int i = 0; i < vx->neighbor_n_; ++i) {
                     VertexType neighbor_idx = vx->neighbors_[i];
                     assert(neighbor_idx < (VertexType)cur_vec_num && neighbor_idx >= 0);
@@ -318,7 +318,7 @@ public:
                     neighbors = v->neighbors_;
                     neighbor_n = v->neighbor_n_;
                 } else {
-                    const VertexLX *vx = GetLevelX(v->layers_p_, vertex_i, layer, meta);
+                    const VertexLX *vx = GetLevelX(v->layers_p_, layer, meta);
                     neighbors = vx->neighbors_;
                     neighbor_n = vx->neighbor_n_;
                 }
@@ -419,7 +419,7 @@ public:
             mem_usage += meta.levelx_size() * layer_n;
 
             for (i32 layer_i = 1; layer_i <= layer_n; ++layer_i) {
-                VertexLX *vx = GetLevelX(v->layers_p_, vertex_i, layer_i, meta);
+                VertexLX *vx = GetLevelX(v->layers_p_, layer_i, meta);
                 vx->neighbor_n_ = 0;
             }
         } else {
@@ -432,7 +432,7 @@ public:
         if (layer_i == 0) {
             return {v->neighbors_, &v->neighbor_n_};
         }
-        VertexLX *vx = GetLevelX(v->layers_p_, vertex_i, layer_i, meta);
+        VertexLX *vx = GetLevelX(v->layers_p_, layer_i, meta);
         return {vx->neighbors_, &vx->neighbor_n_};
     }
 
@@ -440,7 +440,7 @@ private:
     VertexL0 *GetLevel0(VertexType vertex_i, const GraphStoreMeta &meta) {
         return reinterpret_cast<VertexL0 *>(this->graph_.get() + vertex_i * meta.level0_size());
     }
-    VertexLX *GetLevelX(char *layer_p, VertexType vertex_i, i32 layer_i, const GraphStoreMeta &meta) {
+    VertexLX *GetLevelX(char *layer_p, i32 layer_i, const GraphStoreMeta &meta) {
         assert(layer_i > 0);
         return reinterpret_cast<VertexLX *>(layer_p + (layer_i - 1) * meta.levelx_size());
     }

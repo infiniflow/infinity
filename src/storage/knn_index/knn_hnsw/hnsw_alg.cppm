@@ -79,6 +79,7 @@ public:
             mult_ = std::exchange(other.mult_, 0.0);
             data_store_ = std::move(other.data_store_);
             distance_ = std::move(other.distance_);
+            prefetch_step_ = L1_CACHE_SIZE / data_store_.vec_store_meta().GetVecSizeInBytes();
         }
         return *this;
     }
@@ -506,9 +507,9 @@ public:
             CompressedDistance distance = std::move(this->distance_).ToLVQDistance(this->data_store_.dim());
             auto compressed_datastore = std::move(this->data_store_).template CompressToLVQ<CompressVecStoreType>();
             return std::make_unique<KnnHnsw<CompressVecStoreType, LabelType>>(this->M_,
-                                                                        this->ef_construction_,
-                                                                        std::move(compressed_datastore),
-                                                                        std::move(distance));
+                                                                              this->ef_construction_,
+                                                                              std::move(compressed_datastore),
+                                                                              std::move(distance));
         }
     }
 };

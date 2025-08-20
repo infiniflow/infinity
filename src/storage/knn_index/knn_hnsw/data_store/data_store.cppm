@@ -343,7 +343,9 @@ public:
         return inner.GetNeighbors(idx, layer_i, this->graph_store_meta_);
     }
 
-    std::pair<i32, VertexType> TryUpdateEnterPoint(i32 layer, VertexType vertex_i) { return this->graph_store_meta_.TryUpdateEnterPoint(layer, vertex_i); }
+    std::pair<i32, VertexType> TryUpdateEnterPoint(i32 layer, VertexType vertex_i) {
+        return this->graph_store_meta_.TryUpdateEnterPoint(layer, vertex_i);
+    }
 
     // other
     LabelType GetLabel(size_t vec_i) const {
@@ -725,7 +727,7 @@ public:
             return std::nullopt;
         }
         auto ret = std::pair<const Inner *, size_t>(&data_store_->inners_[cur_chunk_i_],
-                                              (cur_chunk_i_ == chunk_num_ - 1) ? last_chunk_size_ : data_store_->chunk_size_);
+                                                    (cur_chunk_i_ == chunk_num_ - 1) ? last_chunk_size_ : data_store_->chunk_size_);
         ++cur_chunk_i_;
         return ret;
     }
@@ -772,7 +774,8 @@ public:
     using InnerIter = DataStoreInnerIter<VecStoreT, LabelType>;
     using ValueType = StoreType;
 
-    DataStoreIter(const DataStore<VecStoreT, LabelType, true> *data_store) : data_store_iter_(data_store), inner_iter_(std::nullopt) {}
+    DataStoreIter(const DataStore<VecStoreT, LabelType, true> *data_store)
+        : data_store_iter_(data_store), inner_iter_(std::nullopt), row_count_(data_store->cur_vec_num()) {}
 
     std::optional<std::pair<StoreType, LabelType>> Next() {
         if (!inner_iter_.has_value()) {
@@ -792,9 +795,12 @@ public:
         return vec_opt.value();
     }
 
+    size_t GetRowCount() const { return row_count_; }
+
 private:
     DataStoreChunkIter<VecStoreT, LabelType> data_store_iter_;
     std::optional<InnerIter> inner_iter_;
+    size_t row_count_ = 0;
 };
 
 template <typename VecStoreT, typename LabelType, bool OwnMem>

@@ -45,7 +45,7 @@ jobs:
 
       - name: Check out code
         if: ${{ !cancelled() && !failure() }}
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 0
           fetch-tags: false
@@ -339,7 +339,7 @@ jobs:
 
       - name: Check out code
         if: ${{ !cancelled() && !failure() }}
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Start builder container
         if: ${{ !cancelled() && !failure() }}

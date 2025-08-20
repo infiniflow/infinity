@@ -32,7 +32,7 @@ public:
     using ValueType = const DataType *;
 
     MemIndexInserterIter1(SegmentOffset block_offset, const ColumnVector &col, BlockOffset offset, BlockOffset row_cnt)
-        : block_offset_(block_offset), col_(col), ele_size_(col.data_type()->Size()), cur_(offset), end_(offset + row_cnt) {}
+        : block_offset_(block_offset), col_(col), ele_size_(col.data_type()->Size()), cur_(offset), end_(offset + row_cnt), row_count_(row_cnt) {}
 
     std::optional<std::pair<const DataType *, SegmentOffset>> Next() {
         if (cur_ == end_) {
@@ -43,6 +43,8 @@ public:
         return std::make_pair(v_ptr, block_offset_ + cur_++);
     }
 
+    size_t GetRowCount() const { return row_count_; }
+
     const ColumnVector *column_vector() const { return &col_; }
 
 private:
@@ -51,6 +53,7 @@ private:
     size_t ele_size_;
     BlockOffset cur_;
     BlockOffset end_;
+    size_t row_count_ = 0;
 };
 
 export template <typename ElementT>
@@ -59,7 +62,8 @@ public:
     using ValueType = const ElementT *;
 
     MemIndexInserterIter1(SegmentOffset block_offset, const ColumnVector &col, BlockOffset offset, BlockOffset row_cnt)
-        : block_offset_(block_offset), col_(col), ele_size_(col.data_type()->type_info()->Size()), cur_(offset), end_(offset + row_cnt) {}
+        : block_offset_(block_offset), col_(col), ele_size_(col.data_type()->type_info()->Size()), cur_(offset), end_(offset + row_cnt),
+          row_count_(row_cnt) {}
 
     std::optional<std::pair<const ElementT *, SegmentOffset>> Next() {
         // prepare multi-vector data
@@ -76,6 +80,8 @@ public:
         return std::make_pair(v_ptr, block_offset_ + cur_ - 1);
     }
 
+    size_t GetRowCount() const { return row_count_; }
+
     const ColumnVector *column_vector() const { return &col_; }
 
 private:
@@ -86,6 +92,7 @@ private:
     BlockOffset end_;
     MultiVectorRef<ElementT> multi_vector_ref_ = {};
     size_t multi_vector_cur_ = 0;
+    size_t row_count_ = 0;
 };
 
 export template <typename DataType, typename IdxType>
@@ -94,7 +101,7 @@ public:
     using ValueType = SparseVecRef<DataType, IdxType>;
 
     MemIndexInserterIter1(SegmentOffset block_offset, const ColumnVector &col, BlockOffset offset, BlockOffset row_cnt)
-        : block_offset_(block_offset), col_(col), ele_size_(col.data_type()->Size()), cur_(offset), end_(offset + row_cnt) {}
+        : block_offset_(block_offset), col_(col), ele_size_(col.data_type()->Size()), cur_(offset), end_(offset + row_cnt), row_count_(row_cnt) {}
 
     std::optional<std::pair<SparseVecRef<DataType, IdxType>, SegmentOffset>> Next() {
         if (cur_ == end_) {
@@ -106,12 +113,15 @@ public:
         return std::make_pair(SparseVecRef<DataType, IdxType>(nnz, index_ptr, data_ptr), block_offset_ + cur_ - 1);
     }
 
+    size_t GetRowCount() const { return row_count_; }
+
 private:
     SegmentOffset block_offset_;
     const ColumnVector &col_;
     size_t ele_size_;
     BlockOffset cur_;
     BlockOffset end_;
+    size_t row_count_ = 0;
 };
 
 } // namespace infinity
