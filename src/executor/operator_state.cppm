@@ -155,7 +155,8 @@ export struct KnnScanOperatorState : public OperatorState {
 export struct MergeKnnOperatorState : public OperatorState {
     inline explicit MergeKnnOperatorState() : OperatorState(PhysicalOperatorType::kMergeKnn) {}
 
-    std::unique_ptr<DataBlock> input_data_block_{nullptr}; // Since merge knn is the first op, no previous operator state. This ptr is to get input data.
+    std::unique_ptr<DataBlock> input_data_block_{
+        nullptr}; // Since merge knn is the first op, no previous operator state. This ptr is to get input data.
     bool input_complete_{false};
     std::shared_ptr<MergeKnnFunctionData> merge_knn_function_data_{};
 };
@@ -217,7 +218,8 @@ export struct LimitOperatorState : public OperatorState {
 export struct MergeLimitOperatorState : public OperatorState {
     inline explicit MergeLimitOperatorState() : OperatorState(PhysicalOperatorType::kMergeLimit) {}
 
-    std::vector<std::unique_ptr<DataBlock>> input_data_blocks_{}; // Since merge knn is the first op, no previous operator state. This ptr is to get input data.
+    std::vector<std::unique_ptr<DataBlock>>
+        input_data_blocks_{}; // Since merge knn is the first op, no previous operator state. This ptr is to get input data.
     bool input_complete_{false};
 };
 
@@ -414,7 +416,7 @@ export struct UnnestAggregateOperatorState : public OperatorState {
     inline explicit UnnestAggregateOperatorState() : OperatorState(PhysicalOperatorType::kUnnestAggregate) {}
 };
 
-//Check
+// Check
 export struct CheckOperatorState : public OperatorState {
     inline explicit CheckOperatorState() : OperatorState(PhysicalOperatorType::kCheck) {}
 
