@@ -67,7 +67,8 @@ private:
 
     static std::pair<std::vector<std::string>, double> Score(const std::vector<std::pair<std::string, int>> &token_freqs);
 
-    static void SortTokens(const std::vector<std::vector<std::pair<std::string, int>>> &token_list, std::vector<std::pair<std::vector<std::string>, double>> &res);
+    static void SortTokens(const std::vector<std::vector<std::pair<std::string, int>>> &token_list,
+                           std::vector<std::pair<std::vector<std::string>, double>> &res);
 
     std::pair<std::vector<std::string>, double> MaxForward(const std::string &line) const;
 
