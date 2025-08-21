@@ -75,6 +75,16 @@ jobs:
     runs-on: [ "self-hosted", "debug" ]
     needs: debug_tests_clang_format
     steps:
+      - name: Start builder container
+        if: ${{ !cancelled() && !failure() }}
+        run: |
+          BUILDER_CONTAINER=infinity_build_$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')
+          CPUS=${CPUS:-$(nproc)}
+          echo "BUILDER_CONTAINER=${BUILDER_CONTAINER}" >> $GITHUB_ENV
+          echo "CPUS=${CPUS}" >> $GITHUB_ENV
+          TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
+          sudo docker rm -f -v ${BUILDER_CONTAINER} && sudo docker run --privileged --cap-add=NET_ADMIN -d --name ${BUILDER_CONTAINER} -e TZ=$TZ -e CMAKE_BUILD_PARALLEL_LEVEL=${CPUS} -v $PWD:/infinity -v /var/run/docker.sock:/var/run/docker.sock --cpus ${CPUS} infiniflow/infinity_builder:ubuntu20_clang20
+
       - name: Configure debug version
         if: ${{ !cancelled() && !failure() }}
         run: sudo docker exec ${BUILDER_CONTAINER} bash -c "git config --global safe.directory \"*\" && cd /infinity && rm -fr cmake-build-debug && mkdir -p cmake-build-debug && cmake -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_JOB_POOLS:STRING=link=8 -DCI=ON -S /infinity -B /infinity/cmake-build-debug"
@@ -83,6 +93,12 @@ jobs:
         if: ${{ !cancelled() && !failure() }}
         run: sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity && cmake --build /infinity/cmake-build-debug --target infinity"
 
+      - name: Destroy builder container
+        if: always()  # always run this step even if previous steps failed
+        run: |
+          if [ -n "${BUILDER_CONTAINER}" ]; then
+            sudo docker rm -f -v ${BUILDER_CONTAINER}
+          fi
 
 #  debug_tests:
 #    name: debug_tests
