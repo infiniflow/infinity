@@ -123,7 +123,7 @@ AbstractHnsw InitAbstractIndexT(const IndexHnsw *index_hnsw) {
 }
 
 template <bool OwnMem>
-AbstractHnsw InitAbstractIndexT(const IndexBase *index_base, const ColumnDef *column_def) {
+AbstractHnsw InitAbstractIndexT(const IndexBase *index_base, std::shared_ptr<ColumnDef> column_def) {
     const auto *index_hnsw = static_cast<const IndexHnsw *>(index_base);
     const auto *embedding_info = static_cast<const EmbeddingInfo *>(column_def->type()->type_info().get());
 
@@ -143,7 +143,7 @@ AbstractHnsw InitAbstractIndexT(const IndexBase *index_base, const ColumnDef *co
     }
 }
 
-AbstractHnsw HnswHandler::InitAbstractIndex(const IndexBase *index_base, const ColumnDef *column_def, bool own_mem) {
+AbstractHnsw HnswHandler::InitAbstractIndex(const IndexBase *index_base, std::shared_ptr<ColumnDef> column_def, bool own_mem) {
     if (own_mem) {
         return InitAbstractIndexT<true>(index_base, column_def);
     } else {
@@ -151,7 +151,7 @@ AbstractHnsw HnswHandler::InitAbstractIndex(const IndexBase *index_base, const C
     }
 }
 
-HnswHandler::HnswHandler(const IndexBase *index_base, const ColumnDef *column_def, bool own_mem)
+HnswHandler::HnswHandler(const IndexBase *index_base, std::shared_ptr<ColumnDef> column_def, bool own_mem)
     : hnsw_(InitAbstractIndex(index_base, column_def, own_mem)) {
     if (!own_mem)
         return;
@@ -171,6 +171,9 @@ HnswHandler::HnswHandler(const IndexBase *index_base, const ColumnDef *column_de
                 using IndexT = std::decay_t<decltype(*index)>;
                 if constexpr (IndexT::kOwnMem) {
                     index = IndexT::Make(chunk_size, max_chunk_num, dim, M, ef_construction);
+                    if constexpr (IndexT::LSG) {
+                        index->InitLSGBuilder(index_hnsw, column_def);
+                    }
                 } else {
                     UnrecoverableError("HnswHandler::HnswHandler: index does not own memory");
                 }
@@ -179,7 +182,7 @@ HnswHandler::HnswHandler(const IndexBase *index_base, const ColumnDef *column_de
         hnsw_);
 }
 
-std::unique_ptr<HnswHandler> HnswHandler::Make(const IndexBase *index_base, const ColumnDef *column_def, bool own_mem) {
+std::unique_ptr<HnswHandler> HnswHandler::Make(const IndexBase *index_base, std::shared_ptr<ColumnDef> column_def, bool own_mem) {
     return std::make_unique<HnswHandler>(index_base, column_def, own_mem);
 }
 
@@ -220,6 +223,83 @@ size_t HnswHandler::InsertVecs(SegmentOffset block_offset,
         },
         hnsw_);
     return mem_usage;
+}
+
+size_t
+HnswHandler::InsertSampleVecs(size_t sample_num, SegmentOffset block_offset, BlockOffset offset, const ColumnVector &col, BlockOffset row_count) {
+    size_t insert_num = 0;
+    std::visit(
+        [&](auto &&index) {
+            using T = std::decay_t<decltype(index)>;
+            if constexpr (!std::is_same_v<T, std::nullptr_t>) {
+                using IndexT = std::decay_t<decltype(*index)>;
+                using DataType = typename IndexT::DataType;
+                switch (const auto &column_data_type = col.data_type(); column_data_type->type()) {
+                    case LogicalType::kEmbedding: {
+                        MemIndexInserterIter1<DataType> iter(block_offset, col, offset, row_count);
+                        insert_num = index->InsertSampleVecs(iter, sample_num);
+                        break;
+                    }
+                    case LogicalType::kMultiVector: {
+                        MemIndexInserterIter1<MultiVectorRef<DataType>> iter(block_offset, col, offset, row_count);
+                        insert_num = index->InsertSampleVecs(iter, sample_num);
+                        break;
+                    }
+                    default: {
+                        UnrecoverableError(fmt::format("Unsupported column type for HNSW index: {}", column_data_type->ToString()));
+                        break;
+                    }
+                }
+            }
+        },
+        hnsw_);
+    return insert_num;
+}
+
+void HnswHandler::InsertLSAvg(SegmentOffset block_offset, BlockOffset offset, const ColumnVector &col, BlockOffset row_count) {
+    std::visit(
+        [&](auto &&index) {
+            using T = std::decay_t<decltype(index)>;
+            if constexpr (!std::is_same_v<T, std::nullptr_t>) {
+                using IndexT = std::decay_t<decltype(*index)>;
+                using DataType = typename IndexT::DataType;
+                switch (const auto &column_data_type = col.data_type(); column_data_type->type()) {
+                    case LogicalType::kEmbedding: {
+                        MemIndexInserterIter1<DataType> iter(block_offset, col, offset, row_count);
+                        index->InsertLSAvg(iter, row_count);
+                        break;
+                    }
+                    case LogicalType::kMultiVector: {
+                        MemIndexInserterIter1<MultiVectorRef<DataType>> iter(block_offset, col, offset, row_count);
+                        index->InsertLSAvg(iter, row_count);
+                        break;
+                    }
+                    default: {
+                        UnrecoverableError(fmt::format("Unsupported column type for HNSW index: {}", column_data_type->ToString()));
+                        break;
+                    }
+                }
+            }
+        },
+        hnsw_);
+}
+
+void HnswHandler::SetLSGParam() {
+    std::visit(
+        [&](auto &&index) {
+            using T = std::decay_t<decltype(index)>;
+            if constexpr (std::is_same_v<T, std::nullptr_t>) {
+                UnrecoverableError("Invalid index type.");
+            } else {
+                using IndexT = std::decay_t<decltype(*index)>;
+                if constexpr (IndexT::LSG) {
+                    index->SetLSGParam();
+                } else {
+                    UnrecoverableError("Invalid index type.");
+                }
+            }
+        },
+        hnsw_);
 }
 
 size_t HnswHandler::MemUsage() const {
@@ -276,24 +356,6 @@ void HnswHandler::Check() const {
                 UnrecoverableError("Invalid index type.");
             } else {
                 index->Check();
-            }
-        },
-        hnsw_);
-}
-
-void HnswHandler::SetLSGParam(float alpha, std::unique_ptr<float[]> avg) {
-    std::visit(
-        [&](auto &&index) {
-            using T = std::decay_t<decltype(index)>;
-            if constexpr (std::is_same_v<T, std::nullptr_t>) {
-                UnrecoverableError("Invalid index type.");
-            } else {
-                using IndexT = std::decay_t<decltype(*index)>;
-                if constexpr (IndexT::LSG) {
-                    index->distance().SetLSGParam(alpha, std::move(avg));
-                } else {
-                    UnrecoverableError("Invalid index type.");
-                }
             }
         },
         hnsw_);
@@ -447,7 +509,8 @@ HnswIndexInMem::~HnswIndexInMem() {
     }
 }
 
-std::unique_ptr<HnswIndexInMem> HnswIndexInMem::Make(RowID begin_row_id, const IndexBase *index_base, const ColumnDef *column_def, bool trace) {
+std::unique_ptr<HnswIndexInMem>
+HnswIndexInMem::Make(RowID begin_row_id, const IndexBase *index_base, std::shared_ptr<ColumnDef> column_def, bool trace) {
     auto memidx = std::make_unique<HnswIndexInMem>(begin_row_id, index_base, column_def, trace);
     if (trace) {
         auto *memindex_tracer = InfinityContext::instance().storage()->memindex_tracer();
@@ -458,7 +521,7 @@ std::unique_ptr<HnswIndexInMem> HnswIndexInMem::Make(RowID begin_row_id, const I
     return memidx;
 }
 
-std::unique_ptr<HnswIndexInMem> HnswIndexInMem::Make(const IndexBase *index_base, const ColumnDef *column_def, bool trace) {
+std::unique_ptr<HnswIndexInMem> HnswIndexInMem::Make(const IndexBase *index_base, std::shared_ptr<ColumnDef> column_def, bool trace) {
     RowID begin_row_id{0, 0};
     auto memidx = std::make_unique<HnswIndexInMem>(begin_row_id, index_base, column_def, trace);
     if (trace) {
@@ -503,7 +566,16 @@ void HnswIndexInMem::Dump(BufferObj *buffer_obj, size_t *dump_size_ptr) {
     chunk_handle_ = std::move(handle);
 }
 
-void HnswIndexInMem::SetLSGParam(float alpha, std::unique_ptr<float[]> avg) { hnsw_handler_->SetLSGParam(alpha, std::move(avg)); }
+size_t
+HnswIndexInMem::InsertSampleVecs(size_t sample_num, SegmentOffset block_offset, BlockOffset offset, const ColumnVector &col, BlockOffset row_count) {
+    return hnsw_handler_->InsertSampleVecs(sample_num, block_offset, offset, col, row_count);
+}
+
+void HnswIndexInMem::InsertLSAvg(SegmentOffset block_offset, BlockOffset offset, const ColumnVector &col, BlockOffset row_count) {
+    hnsw_handler_->InsertLSAvg(block_offset, offset, col, row_count);
+}
+
+void HnswIndexInMem::SetLSGParam() { hnsw_handler_->SetLSGParam(); }
 
 size_t HnswIndexInMem::GetRowCount() const { return row_count_; }
 

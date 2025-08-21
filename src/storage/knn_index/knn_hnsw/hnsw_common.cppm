@@ -16,6 +16,7 @@ export module infinity_core:hnsw_common;
 
 import :infinity_exception;
 import :sparse_util;
+import :default_values;
 
 namespace infinity {
 
@@ -49,12 +50,14 @@ class DenseVectorIter {
     LabelType label_;
 
 public:
+    using This = DenseVectorIter<DataType, LabelType>;
+    using Split = std::vector<This>;
     using ValueType = const DataType *;
 
-    DenseVectorIter(const DataType *ptr, size_t dim, size_t vec_num, LabelType offset = 0)
+    DenseVectorIter(ValueType ptr, size_t dim, size_t vec_num, LabelType offset = 0)
         : ptr_(ptr), dim_(dim), ptr_end_(ptr_ + dim * vec_num), label_(offset) {}
 
-    std::optional<std::pair<const DataType *, LabelType>> Next() {
+    std::optional<std::pair<ValueType, LabelType>> Next() {
         auto ret = ptr_;
         if (ret == ptr_end_) {
             return std::nullopt;
@@ -64,6 +67,23 @@ public:
     }
 
     size_t GetRowCount() const { return (ptr_end_ - ptr_) / dim_; }
+
+    Split split() && {
+        Split res;
+        LabelType vec_num = 0;
+        ValueType head = ptr_;
+        while (ptr_ != ptr_end_) {
+            if (vec_num == DEFAULT_ITER_BATCH_SIZE) {
+                res.emplace_back(head, dim_, DEFAULT_ITER_BATCH_SIZE, label_ + res.size() * DEFAULT_ITER_BATCH_SIZE);
+                vec_num = 0;
+                head = ptr_;
+            }
+            ptr_ += dim_;
+            ++vec_num;
+        }
+        res.emplace_back(head, dim_, vec_num, label_ + res.size() * DEFAULT_ITER_BATCH_SIZE);
+        return res;
+    }
 };
 
 export template <typename DataType, typename IdxType, typename LabelType>

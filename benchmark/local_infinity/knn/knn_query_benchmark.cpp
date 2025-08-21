@@ -68,11 +68,7 @@ int main(int argc, char *argv[]) {
                   << std::endl;
         return 1;
     }
-    bool sift = true;
-    if (strcmp(argv[1], "sift") && strcmp(argv[1], "gist")) {
-        return 1;
-    }
-    sift = strcmp(argv[1], "sift") == 0;
+    std::string dataset = std::string(argv[1]);
     size_t ef = std::stoull(argv[2]);
     bool rerank = false;
     if (argc >= 4) {
@@ -114,16 +110,24 @@ int main(int argc, char *argv[]) {
 
     std::string db_name = "default_db";
     std::string table_name;
-    if (sift) {
+    if (dataset == "sift") {
         dimension = 128;
         query_path += "/benchmark/sift_1m/sift_query.fvecs";
         groundtruth_path += "/benchmark/sift_1m/sift_groundtruth.ivecs";
         table_name = "sift_benchmark";
-    } else {
+    } else if (dataset == "gist") {
         dimension = 960;
         query_path += "/benchmark/gist_1m/gist_query.fvecs";
         groundtruth_path += "/benchmark/gist_1m/gist_groundtruth.ivecs";
         table_name = "gist_benchmark";
+    } else if (dataset == "msmarco") {
+        dimension = 1024;
+        query_path += "/benchmark/msmarco_1m/msmarco_query.fvecs";
+        groundtruth_path += "/benchmark/msmarco_1m/msmarco_groundtruth.ivecs";
+        table_name = "msmarco_benchmark";
+    } else {
+        std::cerr << "dataset: " << dataset << " doesn't support" << std::endl;
+        exit(-1);
     }
     std::cout << "query from: " << query_path << std::endl;
     std::cout << "groundtruth is: " << groundtruth_path << std::endl;
@@ -173,6 +177,7 @@ int main(int argc, char *argv[]) {
         }
     }
     float elapsed_s_sum = 0;
+    float recall_1 = 0, recall_10 = 0, recall_100 = 0;
     for (size_t times = 0; times < total_times + 2; ++times) {
         std::cout << "--- Start to run search benchmark: " << std::endl;
         std::vector<std::vector<uint64_t>> query_results(query_count);
@@ -252,9 +257,12 @@ int main(int argc, char *argv[]) {
                     }
                 }
             }
-            results.push_back(fmt::format("R@1:   {:.3f}", float(correct_1) / float(query_count * 1)));
-            results.push_back(fmt::format("R@10:  {:.3f}", float(correct_10) / float(query_count * 10)));
-            results.push_back(fmt::format("R@100: {:.3f}", float(correct_100) / float(query_count * 100)));
+            recall_1 = float(correct_1) / float(query_count * 1);
+            recall_10 = float(correct_10) / float(query_count * 10);
+            recall_100 = float(correct_100) / float(query_count * 100);
+            results.push_back(fmt::format("R@1:   {:.4f}", recall_1));
+            results.push_back(fmt::format("R@10:  {:.4f}", recall_10));
+            results.push_back(fmt::format("R@100: {:.4f}", recall_100));
         }
     }
 
@@ -263,7 +271,16 @@ int main(int argc, char *argv[]) {
         std::cout << item << std::endl;
     }
     float elapsed_s_avg = elapsed_s_sum / total_times;
-    std::cout << "Average cost : " << elapsed_s_avg << " s" << std::endl;
+    size_t QPS = query_count / elapsed_s_avg;
+    std::cout << fmt::format("thread : {}, ef : {}, Average cost : {:.4f} s, QPS : {}, Recall@1 : {:.4f}, Recall@10 : {:.4f}, Recall@100 : {:.4f}",
+                             thread_num,
+                             ef,
+                             elapsed_s_avg,
+                             QPS,
+                             recall_1,
+                             recall_10,
+                             recall_100)
+              << std::endl;
 
     std::shared_ptr<Infinity> infinity = Infinity::LocalConnect();
     QueryResult cache_result = infinity->ShowCache();
