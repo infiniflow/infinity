@@ -12,18 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
-#include <iostream>
-#include <memory>
-
 module infinity_core:infinity.impl;
 
 import :infinity;
+import :query_result;
+import :infinity_context;
+import :query_context;
+import :session_manager;
+import :utility;
 
-import :stl;
+import std;
+
 import create_statement;
-// import extra_ddl_info;
 import drop_statement;
 import create_schema_info;
 import drop_schema_info;
@@ -50,21 +50,10 @@ import table_reference;
 import optimize_statement;
 import alter_statement;
 import admin_statement;
-import :query_result;
-import :infinity_context;
-import :query_context;
-import :session_manager;
-// import query_options;
-// import extra_ddl_info;
-
-// import drop_table_info;
-// import :third_party;
-// import :defer_op;
-// import :infinity_exception
 
 namespace infinity {
 
-std::variant<UniquePtr<QueryContext>, QueryResult> Infinity::GetQueryContext(bool is_admin_stmt, bool is_admin_show_node) const {
+std::variant<std::unique_ptr<QueryContext>, QueryResult> Infinity::GetQueryContext(bool is_admin_stmt, bool is_admin_show_node) const {
     InfinityContext &context = InfinityContext::instance();
     if (!context.InfinityContextInited()) {
         QueryResult query_result;
@@ -80,7 +69,7 @@ std::variant<UniquePtr<QueryContext>, QueryResult> Infinity::GetQueryContext(boo
         query_result.status_ = Status::InfinityIsStarting();
         return query_result;
     }
-    UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>(session_.get());
+    std::unique_ptr<QueryContext> query_context_ptr = std::make_unique<QueryContext>(session_.get());
     query_context_ptr->Init(InfinityContext::instance().config(),
                             InfinityContext::instance().task_scheduler(),
                             InfinityContext::instance().storage(),
@@ -95,20 +84,20 @@ std::variant<UniquePtr<QueryContext>, QueryResult> Infinity::GetQueryContext(boo
     if (std::holds_alternative<QueryResult>(result)) {                                                                                               \
         return std::get<QueryResult>(result);                                                                                                        \
     }                                                                                                                                                \
-    query_context_ptr = std::move(std::get<UniquePtr<QueryContext>>(result));                                                                        \
+    query_context_ptr = std::move(std::get<std::unique_ptr<QueryContext>>(result));                                                                  \
     query_context_ptr->CreateQueryProfiler();
 
 u64 Infinity::GetSessionId() { return session_->session_id(); }
 
 void Infinity::Hello() { fmt::print("hello infinity\n"); }
 
-void Infinity::LocalInit(const String &path, const String &config_path) {
+void Infinity::LocalInit(const std::string &path, const std::string &config_path) {
     if (!config_path.empty() && VirtualStore::Exists(config_path)) {
-        SharedPtr<String> config_path_ptr = MakeShared<String>(config_path);
+        std::shared_ptr<std::string> config_path_ptr = std::make_shared<std::string>(config_path);
         InfinityContext::instance().InitPhase1(config_path_ptr);
     } else {
         LOG_WARN(fmt::format("Infinity::LocalInit cannot find config: {}", config_path));
-        UniquePtr<DefaultConfig> default_config = MakeUnique<DefaultConfig>();
+        std::unique_ptr<DefaultConfig> default_config = std::make_unique<DefaultConfig>();
         default_config->default_log_dir_ = fmt::format("{}/log", path);
         default_config->default_data_dir_ = fmt::format("{}/data", path);
         default_config->default_catalog_dir_ = fmt::format("{}/catalog", path);
@@ -126,8 +115,8 @@ void Infinity::LocalInit(const String &path, const String &config_path) {
 
 void Infinity::LocalUnInit() { InfinityContext::instance().UnInit(); }
 
-SharedPtr<Infinity> Infinity::LocalConnect() {
-    SharedPtr<Infinity> infinity_ptr = MakeShared<Infinity>();
+std::shared_ptr<Infinity> Infinity::LocalConnect() {
+    std::shared_ptr<Infinity> infinity_ptr = std::make_shared<Infinity>();
 
     SessionManager *session_mgr = InfinityContext::instance().session_manager();
     infinity_ptr->session_ = session_mgr->CreateLocalSession();
@@ -140,10 +129,10 @@ void Infinity::LocalDisconnect() {
     session_.reset();
 }
 
-SharedPtr<Infinity> Infinity::RemoteConnect() {
-    SharedPtr<Infinity> infinity_ptr = MakeShared<Infinity>();
+std::shared_ptr<Infinity> Infinity::RemoteConnect() {
+    std::shared_ptr<Infinity> infinity_ptr = std::make_shared<Infinity>();
     SessionManager *session_mgr = InfinityContext::instance().session_manager();
-    SharedPtr<RemoteSession> remote_session = session_mgr->CreateRemoteSession();
+    std::shared_ptr<RemoteSession> remote_session = session_mgr->CreateRemoteSession();
     if (remote_session == nullptr) {
         return nullptr;
     }
@@ -157,11 +146,11 @@ void Infinity::RemoteDisconnect() {
     session_.reset();
 }
 
-QueryResult Infinity::CreateDatabase(const String &schema_name, const CreateDatabaseOptions &create_db_options, const String &comment) {
-    UniquePtr<QueryContext> query_context_ptr;
+QueryResult Infinity::CreateDatabase(const std::string &schema_name, const CreateDatabaseOptions &create_db_options, const std::string &comment) {
+    std::unique_ptr<QueryContext> query_context_ptr;
     GET_QUERY_CONTEXT(GetQueryContext(), query_context_ptr);
-    UniquePtr<CreateStatement> create_statement = MakeUnique<CreateStatement>();
-    SharedPtr<CreateSchemaInfo> create_schema_info = MakeShared<CreateSchemaInfo>();
+    std::unique_ptr<CreateStatement> create_statement = std::make_unique<CreateStatement>();
+    std::shared_ptr<CreateSchemaInfo> create_schema_info = std::make_shared<CreateSchemaInfo>();
 
     create_schema_info->schema_name_ = schema_name;
     ToLower(create_schema_info->schema_name_);
@@ -172,11 +161,11 @@ QueryResult Infinity::CreateDatabase(const String &schema_name, const CreateData
     return query_result;
 }
 
-QueryResult Infinity::DropDatabase(const String &schema_name, const DropDatabaseOptions &drop_database_options) {
-    UniquePtr<QueryContext> query_context_ptr;
+QueryResult Infinity::DropDatabase(const std::string &schema_name, const DropDatabaseOptions &drop_database_options) {
+    std::unique_ptr<QueryContext> query_context_ptr;
     GET_QUERY_CONTEXT(GetQueryContext(), query_context_ptr);
-    UniquePtr<DropStatement> drop_statement = MakeUnique<DropStatement>();
-    SharedPtr<DropSchemaInfo> drop_schema_info = MakeShared<DropSchemaInfo>();
+    std::unique_ptr<DropStatement> drop_statement = std::make_unique<DropStatement>();
+    std::shared_ptr<DropSchemaInfo> drop_schema_info = std::make_shared<DropSchemaInfo>();
 
     drop_schema_info->schema_name_ = schema_name;
     ToLower(drop_schema_info->schema_name_);
@@ -188,31 +177,31 @@ QueryResult Infinity::DropDatabase(const String &schema_name, const DropDatabase
 }
 
 QueryResult Infinity::ListDatabases() {
-    UniquePtr<QueryContext> query_context_ptr;
+    std::unique_ptr<QueryContext> query_context_ptr;
     GET_QUERY_CONTEXT(GetQueryContext(), query_context_ptr);
-    UniquePtr<ShowStatement> show_statement = MakeUnique<ShowStatement>();
+    std::unique_ptr<ShowStatement> show_statement = std::make_unique<ShowStatement>();
     show_statement->show_type_ = ShowStmtType::kDatabases;
     QueryResult result = query_context_ptr->QueryStatement(show_statement.get());
     return result;
 }
 
-QueryResult Infinity::GetDatabase(const String &schema_name) {
-    UniquePtr<QueryContext> query_context_ptr;
+QueryResult Infinity::GetDatabase(const std::string &schema_name) {
+    std::unique_ptr<QueryContext> query_context_ptr;
     GET_QUERY_CONTEXT(GetQueryContext(), query_context_ptr);
-    UniquePtr<CommandStatement> command_statement = MakeUnique<CommandStatement>();
+    std::unique_ptr<CommandStatement> command_statement = std::make_unique<CommandStatement>();
 
-    String db_name = schema_name;
+    std::string db_name = schema_name;
     ToLower(db_name);
 
-    command_statement->command_info_ = MakeUnique<UseCmd>(db_name.c_str());
+    command_statement->command_info_ = std::make_unique<UseCmd>(db_name.c_str());
     QueryResult result = query_context_ptr->QueryStatement(command_statement.get());
     return result;
 }
 
-QueryResult Infinity::ShowDatabase(const String &schema_name) {
-    UniquePtr<QueryContext> query_context_ptr;
+QueryResult Infinity::ShowDatabase(const std::string &schema_name) {
+    std::unique_ptr<QueryContext> query_context_ptr;
     GET_QUERY_CONTEXT(GetQueryContext(), query_context_ptr);
-    UniquePtr<ShowStatement> show_statement = MakeUnique<ShowStatement>();
+    std::unique_ptr<ShowStatement> show_statement = std::make_unique<ShowStatement>();
     show_statement->show_type_ = ShowStmtType::kDatabase;
 
     show_statement->schema_name_ = schema_name;
@@ -222,21 +211,21 @@ QueryResult Infinity::ShowDatabase(const String &schema_name) {
     return result;
 }
 
-QueryResult Infinity::Query(const String &query_text) {
-    UniquePtr<QueryContext> query_context_ptr;
+QueryResult Infinity::Query(const std::string &query_text) {
+    std::unique_ptr<QueryContext> query_context_ptr;
     GET_QUERY_CONTEXT(GetQueryContext(), query_context_ptr);
 
-    String query_text_internal = query_text;
+    std::string query_text_internal = query_text;
     ToLower(query_text_internal);
 
     QueryResult result = query_context_ptr->Query(query_text_internal);
     return result;
 }
 
-QueryResult Infinity::Flush(const String &flush_type) {
-    UniquePtr<QueryContext> query_context_ptr;
+QueryResult Infinity::Flush(const std::string &flush_type) {
+    std::unique_ptr<QueryContext> query_context_ptr;
     GET_QUERY_CONTEXT(GetQueryContext(), query_context_ptr);
-    UniquePtr<FlushStatement> flush_statement = MakeUnique<FlushStatement>();
+    std::unique_ptr<FlushStatement> flush_statement = std::make_unique<FlushStatement>();
 
     if (flush_type == "data") {
         flush_statement->type_ = FlushType::kData;
@@ -253,10 +242,10 @@ QueryResult Infinity::Flush(const String &flush_type) {
     return result;
 }
 
-QueryResult Infinity::Compact(const String &db_name, const String &table_name) {
-    UniquePtr<QueryContext> query_context_ptr;
+QueryResult Infinity::Compact(const std::string &db_name, const std::string &table_name) {
+    std::unique_ptr<QueryContext> query_context_ptr;
     GET_QUERY_CONTEXT(GetQueryContext(), query_context_ptr);
-    auto compact_statement = MakeUnique<ManualCompactStatement>(db_name, table_name);
+    auto compact_statement = std::make_unique<ManualCompactStatement>(db_name, table_name);
 
     ToLower(compact_statement->db_name_);
     ToLower(compact_statement->table_name_);
@@ -265,63 +254,63 @@ QueryResult Infinity::Compact(const String &db_name, const String &table_name) {
     return result;
 }
 
-QueryResult Infinity::SetVariableOrConfig(const String &name, bool value, SetScope scope) {
-    UniquePtr<QueryContext> query_context_ptr;
+QueryResult Infinity::SetVariableOrConfig(const std::string &name, bool value, SetScope scope) {
+    std::unique_ptr<QueryContext> query_context_ptr;
     GET_QUERY_CONTEXT(GetQueryContext(), query_context_ptr);
 
-    String var_name = name;
+    std::string var_name = name;
     ToLower(var_name);
 
-    UniquePtr<CommandStatement> command_statement = MakeUnique<CommandStatement>();
-    command_statement->command_info_ = MakeUnique<SetCmd>(scope, SetVarType::kBool, var_name, value);
+    std::unique_ptr<CommandStatement> command_statement = std::make_unique<CommandStatement>();
+    command_statement->command_info_ = std::make_unique<SetCmd>(scope, SetVarType::kBool, var_name, value);
     QueryResult result = query_context_ptr->QueryStatement(command_statement.get());
     return result;
 }
 
-QueryResult Infinity::SetVariableOrConfig(const String &name, i64 value, SetScope scope) {
-    UniquePtr<QueryContext> query_context_ptr;
+QueryResult Infinity::SetVariableOrConfig(const std::string &name, i64 value, SetScope scope) {
+    std::unique_ptr<QueryContext> query_context_ptr;
     GET_QUERY_CONTEXT(GetQueryContext(), query_context_ptr);
 
-    String var_name = name;
+    std::string var_name = name;
     ToLower(var_name);
 
-    UniquePtr<CommandStatement> command_statement = MakeUnique<CommandStatement>();
-    command_statement->command_info_ = MakeUnique<SetCmd>(scope, SetVarType::kInteger, var_name, value);
+    std::unique_ptr<CommandStatement> command_statement = std::make_unique<CommandStatement>();
+    command_statement->command_info_ = std::make_unique<SetCmd>(scope, SetVarType::kInteger, var_name, value);
     QueryResult result = query_context_ptr->QueryStatement(command_statement.get());
     return result;
 }
 
-QueryResult Infinity::SetVariableOrConfig(const String &name, double value, SetScope scope) {
-    UniquePtr<QueryContext> query_context_ptr;
+QueryResult Infinity::SetVariableOrConfig(const std::string &name, double value, SetScope scope) {
+    std::unique_ptr<QueryContext> query_context_ptr;
     GET_QUERY_CONTEXT(GetQueryContext(), query_context_ptr);
 
-    String var_name = name;
+    std::string var_name = name;
     ToLower(var_name);
 
-    UniquePtr<CommandStatement> command_statement = MakeUnique<CommandStatement>();
-    command_statement->command_info_ = MakeUnique<SetCmd>(scope, SetVarType::kDouble, var_name, value);
+    std::unique_ptr<CommandStatement> command_statement = std::make_unique<CommandStatement>();
+    command_statement->command_info_ = std::make_unique<SetCmd>(scope, SetVarType::kDouble, var_name, value);
     QueryResult result = query_context_ptr->QueryStatement(command_statement.get());
     return result;
 }
 
-QueryResult Infinity::SetVariableOrConfig(const String &name, String value, SetScope scope) {
-    UniquePtr<QueryContext> query_context_ptr;
+QueryResult Infinity::SetVariableOrConfig(const std::string &name, std::string value, SetScope scope) {
+    std::unique_ptr<QueryContext> query_context_ptr;
     GET_QUERY_CONTEXT(GetQueryContext(), query_context_ptr);
 
-    String var_name = name;
+    std::string var_name = name;
     ToLower(var_name);
 
-    UniquePtr<CommandStatement> command_statement = MakeUnique<CommandStatement>();
-    command_statement->command_info_ = MakeUnique<SetCmd>(scope, SetVarType::kString, var_name, value);
+    std::unique_ptr<CommandStatement> command_statement = std::make_unique<CommandStatement>();
+    command_statement->command_info_ = std::make_unique<SetCmd>(scope, SetVarType::kString, var_name, value);
     QueryResult result = query_context_ptr->QueryStatement(command_statement.get());
     return result;
 }
 
-QueryResult Infinity::ShowVariable(const String &variable_name, SetScope scope) {
-    UniquePtr<QueryContext> query_context_ptr;
+QueryResult Infinity::ShowVariable(const std::string &variable_name, SetScope scope) {
+    std::unique_ptr<QueryContext> query_context_ptr;
     GET_QUERY_CONTEXT(GetQueryContext(), query_context_ptr);
 
-    UniquePtr<ShowStatement> show_statement = MakeUnique<ShowStatement>();
+    std::unique_ptr<ShowStatement> show_statement = std::make_unique<ShowStatement>();
     show_statement->var_name_ = variable_name;
     ToLower(show_statement->var_name_);
     switch (scope) {
@@ -334,8 +323,7 @@ QueryResult Infinity::ShowVariable(const String &variable_name, SetScope scope) 
             break;
         }
         default: {
-            String error_message = "Invalid set scope.";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Invalid set scope.");
         }
     }
 
@@ -344,10 +332,10 @@ QueryResult Infinity::ShowVariable(const String &variable_name, SetScope scope) 
 }
 
 QueryResult Infinity::ShowVariables(SetScope scope) {
-    UniquePtr<QueryContext> query_context_ptr;
+    std::unique_ptr<QueryContext> query_context_ptr;
     GET_QUERY_CONTEXT(GetQueryContext(), query_context_ptr);
 
-    UniquePtr<ShowStatement> show_statement = MakeUnique<ShowStatement>();
+    std::unique_ptr<ShowStatement> show_statement = std::make_unique<ShowStatement>();
     switch (scope) {
         case SetScope::kGlobal: {
             show_statement->show_type_ = ShowStmtType::kGlobalVariables;
@@ -358,8 +346,7 @@ QueryResult Infinity::ShowVariables(SetScope scope) {
             break;
         }
         default: {
-            String error_message = "Invalid set scope.";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Invalid set scope.");
         }
     }
 
@@ -367,11 +354,11 @@ QueryResult Infinity::ShowVariables(SetScope scope) {
     return result;
 }
 
-QueryResult Infinity::ShowConfig(const String &config_name) {
-    UniquePtr<QueryContext> query_context_ptr;
+QueryResult Infinity::ShowConfig(const std::string &config_name) {
+    std::unique_ptr<QueryContext> query_context_ptr;
     GET_QUERY_CONTEXT(GetQueryContext(), query_context_ptr);
 
-    UniquePtr<ShowStatement> show_statement = MakeUnique<ShowStatement>();
+    std::unique_ptr<ShowStatement> show_statement = std::make_unique<ShowStatement>();
     show_statement->var_name_ = config_name;
     ToLower(show_statement->var_name_);
 
@@ -382,20 +369,20 @@ QueryResult Infinity::ShowConfig(const String &config_name) {
 }
 
 QueryResult Infinity::ShowConfigs() {
-    UniquePtr<QueryContext> query_context_ptr;
+    std::unique_ptr<QueryContext> query_context_ptr;
     GET_QUERY_CONTEXT(GetQueryContext(), query_context_ptr);
 
-    UniquePtr<ShowStatement> show_statement = MakeUnique<ShowStatement>();
+    std::unique_ptr<ShowStatement> show_statement = std::make_unique<ShowStatement>();
     show_statement->show_type_ = ShowStmtType::kConfigs;
 
     QueryResult result = query_context_ptr->QueryStatement(show_statement.get());
     return result;
 }
 
-QueryResult Infinity::CreateTable(const String &db_name,
-                                  const String &table_name,
-                                  Vector<ColumnDef *> column_defs,
-                                  Vector<TableConstraint *> constraints,
+QueryResult Infinity::CreateTable(const std::string &db_name,
+                                  const std::string &table_name,
+                                  std::vector<ColumnDef *> column_defs,
+                                  std::vector<TableConstraint *> constraints,
                                   CreateTableOptions create_table_options) {
     DeferFn free_create_table([&]() {
         for (auto &column_def : column_defs) {
@@ -408,10 +395,10 @@ QueryResult Infinity::CreateTable(const String &db_name,
         }
     });
 
-    UniquePtr<QueryContext> query_context_ptr;
+    std::unique_ptr<QueryContext> query_context_ptr;
     GET_QUERY_CONTEXT(GetQueryContext(), query_context_ptr);
-    UniquePtr<CreateStatement> create_statement = MakeUnique<CreateStatement>();
-    SharedPtr<CreateTableInfo> create_table_info = MakeShared<CreateTableInfo>();
+    std::unique_ptr<CreateStatement> create_statement = std::make_unique<CreateStatement>();
+    std::shared_ptr<CreateTableInfo> create_table_info = std::make_shared<CreateTableInfo>();
     create_table_info->schema_name_ = db_name;
     ToLower(create_table_info->schema_name_);
 
@@ -434,11 +421,11 @@ QueryResult Infinity::CreateTable(const String &db_name,
     return result;
 }
 
-QueryResult Infinity::DropTable(const String &db_name, const String &table_name, const DropTableOptions &options) {
-    UniquePtr<QueryContext> query_context_ptr;
+QueryResult Infinity::DropTable(const std::string &db_name, const std::string &table_name, const DropTableOptions &options) {
+    std::unique_ptr<QueryContext> query_context_ptr;
     GET_QUERY_CONTEXT(GetQueryContext(), query_context_ptr);
-    UniquePtr<DropStatement> drop_statement = MakeUnique<DropStatement>();
-    SharedPtr<DropTableInfo> drop_table_info = MakeShared<DropTableInfo>();
+    std::unique_ptr<DropStatement> drop_statement = std::make_unique<DropStatement>();
+    std::shared_ptr<DropTableInfo> drop_table_info = std::make_shared<DropTableInfo>();
     drop_table_info->schema_name_ = db_name;
     ToLower(drop_table_info->schema_name_);
 
@@ -451,10 +438,10 @@ QueryResult Infinity::DropTable(const String &db_name, const String &table_name,
     return result;
 }
 
-QueryResult Infinity::ListTables(const String &db_name) {
-    UniquePtr<QueryContext> query_context_ptr;
+QueryResult Infinity::ListTables(const std::string &db_name) {
+    std::unique_ptr<QueryContext> query_context_ptr;
     GET_QUERY_CONTEXT(GetQueryContext(), query_context_ptr);
-    UniquePtr<ShowStatement> show_statement = MakeUnique<ShowStatement>();
+    std::unique_ptr<ShowStatement> show_statement = std::make_unique<ShowStatement>();
     show_statement->schema_name_ = db_name;
     ToLower(show_statement->schema_name_);
     show_statement->show_type_ = ShowStmtType::kTables;
@@ -462,10 +449,10 @@ QueryResult Infinity::ListTables(const String &db_name) {
     return result;
 }
 
-QueryResult Infinity::ShowTable(const String &db_name, const String &table_name) {
-    UniquePtr<QueryContext> query_context_ptr;
+QueryResult Infinity::ShowTable(const std::string &db_name, const std::string &table_name) {
+    std::unique_ptr<QueryContext> query_context_ptr;
     GET_QUERY_CONTEXT(GetQueryContext(), query_context_ptr);
-    UniquePtr<ShowStatement> show_statement = MakeUnique<ShowStatement>();
+    std::unique_ptr<ShowStatement> show_statement = std::make_unique<ShowStatement>();
     show_statement->schema_name_ = db_name;
     ToLower(show_statement->schema_name_);
 
@@ -477,10 +464,10 @@ QueryResult Infinity::ShowTable(const String &db_name, const String &table_name)
     return result;
 }
 
-QueryResult Infinity::ShowColumns(const String &db_name, const String &table_name) {
-    UniquePtr<QueryContext> query_context_ptr;
+QueryResult Infinity::ShowColumns(const std::string &db_name, const std::string &table_name) {
+    std::unique_ptr<QueryContext> query_context_ptr;
     GET_QUERY_CONTEXT(GetQueryContext(), query_context_ptr);
-    UniquePtr<ShowStatement> show_statement = MakeUnique<ShowStatement>();
+    std::unique_ptr<ShowStatement> show_statement = std::make_unique<ShowStatement>();
     show_statement->schema_name_ = db_name;
     ToLower(show_statement->schema_name_);
 
@@ -492,10 +479,10 @@ QueryResult Infinity::ShowColumns(const String &db_name, const String &table_nam
     return result;
 }
 
-QueryResult Infinity::ShowTables(const String &db_name) {
-    UniquePtr<QueryContext> query_context_ptr;
+QueryResult Infinity::ShowTables(const std::string &db_name) {
+    std::unique_ptr<QueryContext> query_context_ptr;
     GET_QUERY_CONTEXT(GetQueryContext(), query_context_ptr);
-    UniquePtr<ShowStatement> show_statement = MakeUnique<ShowStatement>();
+    std::unique_ptr<ShowStatement> show_statement = std::make_unique<ShowStatement>();
     show_statement->schema_name_ = db_name;
     ToLower(show_statement->schema_name_);
 
@@ -504,8 +491,8 @@ QueryResult Infinity::ShowTables(const String &db_name) {
     return result;
 }
 
-QueryResult Infinity::GetTable(const String &db_name, const String &table_name) {
-    UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>(session_.get());
+QueryResult Infinity::GetTable(const std::string &db_name, const std::string &table_name) {
+    std::unique_ptr<QueryContext> query_context_ptr = std::make_unique<QueryContext>(session_.get());
     query_context_ptr->set_current_schema(db_name);
     query_context_ptr->Init(InfinityContext::instance().config(),
                             InfinityContext::instance().task_scheduler(),
@@ -513,20 +500,20 @@ QueryResult Infinity::GetTable(const String &db_name, const String &table_name) 
                             InfinityContext::instance().resource_manager(),
                             InfinityContext::instance().session_manager(),
                             InfinityContext::instance().persistence_manager());
-    UniquePtr<CommandStatement> command_statement = MakeUnique<CommandStatement>();
+    std::unique_ptr<CommandStatement> command_statement = std::make_unique<CommandStatement>();
 
-    String table_name_internal = table_name;
+    std::string table_name_internal = table_name;
     ToLower(table_name_internal);
 
-    command_statement->command_info_ = MakeUnique<CheckTable>(table_name_internal.c_str());
+    command_statement->command_info_ = std::make_unique<CheckTable>(table_name_internal.c_str());
     QueryResult result = query_context_ptr->QueryStatement(command_statement.get());
     return result;
 }
 
-QueryResult Infinity::ListTableIndexes(const String &db_name, const String &table_name) {
-    UniquePtr<QueryContext> query_context_ptr;
+QueryResult Infinity::ListTableIndexes(const std::string &db_name, const std::string &table_name) {
+    std::unique_ptr<QueryContext> query_context_ptr;
     GET_QUERY_CONTEXT(GetQueryContext(), query_context_ptr);
-    UniquePtr<ShowStatement> show_statement = MakeUnique<ShowStatement>();
+    std::unique_ptr<ShowStatement> show_statement = std::make_unique<ShowStatement>();
     show_statement->schema_name_ = db_name;
     ToLower(show_statement->schema_name_);
 
@@ -538,17 +525,17 @@ QueryResult Infinity::ListTableIndexes(const String &db_name, const String &tabl
     return result;
 }
 
-QueryResult Infinity::CreateIndex(const String &db_name,
-                                  const String &table_name,
-                                  const String &index_name,
-                                  const String &index_comment,
+QueryResult Infinity::CreateIndex(const std::string &db_name,
+                                  const std::string &table_name,
+                                  const std::string &index_name,
+                                  const std::string &index_comment,
                                   IndexInfo *index_info_ptr,
                                   const CreateIndexOptions &create_index_options) {
-    UniquePtr<QueryContext> query_context_ptr;
+    std::unique_ptr<QueryContext> query_context_ptr;
     GET_QUERY_CONTEXT(GetQueryContext(), query_context_ptr);
 
-    UniquePtr<CreateStatement> create_statement = MakeUnique<CreateStatement>();
-    SharedPtr<CreateIndexInfo> create_index_info = MakeShared<CreateIndexInfo>();
+    std::unique_ptr<CreateStatement> create_statement = std::make_unique<CreateStatement>();
+    std::shared_ptr<CreateIndexInfo> create_index_info = std::make_shared<CreateIndexInfo>();
 
     create_index_info->schema_name_ = db_name;
     ToLower(create_index_info->schema_name_);
@@ -577,12 +564,14 @@ QueryResult Infinity::CreateIndex(const String &db_name,
     return result;
 }
 
-QueryResult
-Infinity::DropIndex(const String &db_name, const String &table_name, const String &index_name, const DropIndexOptions &drop_index_options) {
-    UniquePtr<QueryContext> query_context_ptr;
+QueryResult Infinity::DropIndex(const std::string &db_name,
+                                const std::string &table_name,
+                                const std::string &index_name,
+                                const DropIndexOptions &drop_index_options) {
+    std::unique_ptr<QueryContext> query_context_ptr;
     GET_QUERY_CONTEXT(GetQueryContext(), query_context_ptr);
-    UniquePtr<DropStatement> drop_statement = MakeUnique<DropStatement>();
-    SharedPtr<DropIndexInfo> drop_index_info = MakeShared<DropIndexInfo>();
+    std::unique_ptr<DropStatement> drop_statement = std::make_unique<DropStatement>();
+    std::shared_ptr<DropIndexInfo> drop_index_info = std::make_shared<DropIndexInfo>();
 
     drop_index_info->schema_name_ = db_name;
     ToLower(drop_index_info->schema_name_);
@@ -601,17 +590,17 @@ Infinity::DropIndex(const String &db_name, const String &table_name, const Strin
     return result;
 }
 
-QueryResult Infinity::ShowIndex(const String &db_name, const String &table_name, const String &index_name) {
-    UniquePtr<QueryContext> query_context_ptr;
+QueryResult Infinity::ShowIndex(const std::string &db_name, const std::string &table_name, const std::string &index_name) {
+    std::unique_ptr<QueryContext> query_context_ptr;
     GET_QUERY_CONTEXT(GetQueryContext(), query_context_ptr);
-    UniquePtr<ShowStatement> show_statement = MakeUnique<ShowStatement>();
+    std::unique_ptr<ShowStatement> show_statement = std::make_unique<ShowStatement>();
     show_statement->schema_name_ = db_name;
     ToLower(show_statement->schema_name_);
 
     show_statement->table_name_ = table_name;
     ToLower(show_statement->table_name_);
 
-    String index_name_internal = index_name;
+    std::string index_name_internal = index_name;
     ToLower(index_name_internal);
 
     show_statement->index_name_ = index_name_internal;
@@ -621,17 +610,18 @@ QueryResult Infinity::ShowIndex(const String &db_name, const String &table_name,
     return result;
 }
 
-QueryResult Infinity::ShowIndexSegment(const String &db_name, const String &table_name, const String &index_name, SegmentID segment_id) {
-    UniquePtr<QueryContext> query_context_ptr;
+QueryResult
+Infinity::ShowIndexSegment(const std::string &db_name, const std::string &table_name, const std::string &index_name, SegmentID segment_id) {
+    std::unique_ptr<QueryContext> query_context_ptr;
     GET_QUERY_CONTEXT(GetQueryContext(), query_context_ptr);
-    UniquePtr<ShowStatement> show_statement = MakeUnique<ShowStatement>();
+    std::unique_ptr<ShowStatement> show_statement = std::make_unique<ShowStatement>();
     show_statement->schema_name_ = db_name;
     ToLower(show_statement->schema_name_);
 
     show_statement->table_name_ = table_name;
     ToLower(show_statement->table_name_);
 
-    String index_name_internal = index_name;
+    std::string index_name_internal = index_name;
     ToLower(index_name_internal);
 
     show_statement->index_name_ = index_name_internal;
@@ -642,18 +632,21 @@ QueryResult Infinity::ShowIndexSegment(const String &db_name, const String &tabl
     return result;
 }
 
-QueryResult
-Infinity::ShowIndexChunk(const String &db_name, const String &table_name, const String &index_name, SegmentID segment_id, ChunkID chunk_id) {
-    UniquePtr<QueryContext> query_context_ptr;
+QueryResult Infinity::ShowIndexChunk(const std::string &db_name,
+                                     const std::string &table_name,
+                                     const std::string &index_name,
+                                     SegmentID segment_id,
+                                     ChunkID chunk_id) {
+    std::unique_ptr<QueryContext> query_context_ptr;
     GET_QUERY_CONTEXT(GetQueryContext(), query_context_ptr);
-    UniquePtr<ShowStatement> show_statement = MakeUnique<ShowStatement>();
+    std::unique_ptr<ShowStatement> show_statement = std::make_unique<ShowStatement>();
     show_statement->schema_name_ = db_name;
     ToLower(show_statement->schema_name_);
 
     show_statement->table_name_ = table_name;
     ToLower(show_statement->table_name_);
 
-    String index_name_internal = index_name;
+    std::string index_name_internal = index_name;
     ToLower(index_name_internal);
 
     show_statement->index_name_ = index_name_internal;
@@ -665,10 +658,10 @@ Infinity::ShowIndexChunk(const String &db_name, const String &table_name, const 
     return result;
 }
 
-QueryResult Infinity::ShowSegment(const String &db_name, const String &table_name, const SegmentID &segment_id) {
-    UniquePtr<QueryContext> query_context_ptr;
+QueryResult Infinity::ShowSegment(const std::string &db_name, const std::string &table_name, const SegmentID &segment_id) {
+    std::unique_ptr<QueryContext> query_context_ptr;
     GET_QUERY_CONTEXT(GetQueryContext(), query_context_ptr);
-    UniquePtr<ShowStatement> show_statement = MakeUnique<ShowStatement>();
+    std::unique_ptr<ShowStatement> show_statement = std::make_unique<ShowStatement>();
     show_statement->schema_name_ = db_name;
     ToLower(show_statement->schema_name_);
 
@@ -681,10 +674,10 @@ QueryResult Infinity::ShowSegment(const String &db_name, const String &table_nam
     return result;
 }
 
-QueryResult Infinity::ShowSegments(const String &db_name, const String &table_name) {
-    UniquePtr<QueryContext> query_context_ptr;
+QueryResult Infinity::ShowSegments(const std::string &db_name, const std::string &table_name) {
+    std::unique_ptr<QueryContext> query_context_ptr;
     GET_QUERY_CONTEXT(GetQueryContext(), query_context_ptr);
-    UniquePtr<ShowStatement> show_statement = MakeUnique<ShowStatement>();
+    std::unique_ptr<ShowStatement> show_statement = std::make_unique<ShowStatement>();
     show_statement->schema_name_ = db_name;
     ToLower(show_statement->schema_name_);
 
@@ -696,10 +689,10 @@ QueryResult Infinity::ShowSegments(const String &db_name, const String &table_na
     return result;
 }
 
-QueryResult Infinity::ShowBlock(const String &db_name, const String &table_name, const SegmentID &segment_id, const BlockID &block_id) {
-    UniquePtr<QueryContext> query_context_ptr;
+QueryResult Infinity::ShowBlock(const std::string &db_name, const std::string &table_name, const SegmentID &segment_id, const BlockID &block_id) {
+    std::unique_ptr<QueryContext> query_context_ptr;
     GET_QUERY_CONTEXT(GetQueryContext(), query_context_ptr);
-    UniquePtr<ShowStatement> show_statement = MakeUnique<ShowStatement>();
+    std::unique_ptr<ShowStatement> show_statement = std::make_unique<ShowStatement>();
     show_statement->schema_name_ = db_name;
     ToLower(show_statement->schema_name_);
 
@@ -713,10 +706,10 @@ QueryResult Infinity::ShowBlock(const String &db_name, const String &table_name,
     return result;
 }
 
-QueryResult Infinity::ShowBlocks(const String &db_name, const String &table_name, const SegmentID &segment_id) {
-    UniquePtr<QueryContext> query_context_ptr;
+QueryResult Infinity::ShowBlocks(const std::string &db_name, const std::string &table_name, const SegmentID &segment_id) {
+    std::unique_ptr<QueryContext> query_context_ptr;
     GET_QUERY_CONTEXT(GetQueryContext(), query_context_ptr);
-    UniquePtr<ShowStatement> show_statement = MakeUnique<ShowStatement>();
+    std::unique_ptr<ShowStatement> show_statement = std::make_unique<ShowStatement>();
     show_statement->schema_name_ = db_name;
     ToLower(show_statement->schema_name_);
 
@@ -729,15 +722,15 @@ QueryResult Infinity::ShowBlocks(const String &db_name, const String &table_name
     return result;
 }
 
-QueryResult Infinity::ShowBlockColumn(const String &db_name,
-                                      const String &table_name,
+QueryResult Infinity::ShowBlockColumn(const std::string &db_name,
+                                      const std::string &table_name,
                                       const SegmentID &segment_id,
                                       const BlockID &block_id,
-                                      const SizeT &column_id) {
+                                      const size_t &column_id) {
 
-    UniquePtr<QueryContext> query_context_ptr;
+    std::unique_ptr<QueryContext> query_context_ptr;
     GET_QUERY_CONTEXT(GetQueryContext(), query_context_ptr);
-    UniquePtr<ShowStatement> show_statement = MakeUnique<ShowStatement>();
+    std::unique_ptr<ShowStatement> show_statement = std::make_unique<ShowStatement>();
     show_statement->schema_name_ = db_name;
     ToLower(show_statement->schema_name_);
 
@@ -753,45 +746,45 @@ QueryResult Infinity::ShowBlockColumn(const String &db_name,
 }
 
 QueryResult Infinity::ShowBuffer() {
-    UniquePtr<QueryContext> query_context_ptr;
+    std::unique_ptr<QueryContext> query_context_ptr;
     GET_QUERY_CONTEXT(GetQueryContext(), query_context_ptr);
-    UniquePtr<ShowStatement> show_statement = MakeUnique<ShowStatement>();
+    std::unique_ptr<ShowStatement> show_statement = std::make_unique<ShowStatement>();
     show_statement->show_type_ = ShowStmtType::kBuffer;
     QueryResult result = query_context_ptr->QueryStatement(show_statement.get());
     return result;
 }
 
 QueryResult Infinity::ShowProfiles() {
-    UniquePtr<QueryContext> query_context_ptr;
+    std::unique_ptr<QueryContext> query_context_ptr;
     GET_QUERY_CONTEXT(GetQueryContext(), query_context_ptr);
-    UniquePtr<ShowStatement> show_statement = MakeUnique<ShowStatement>();
+    std::unique_ptr<ShowStatement> show_statement = std::make_unique<ShowStatement>();
     show_statement->show_type_ = ShowStmtType::kProfiles;
     QueryResult result = query_context_ptr->QueryStatement(show_statement.get());
     return result;
 }
 
 QueryResult Infinity::ShowMemindex() {
-    UniquePtr<QueryContext> query_context_ptr;
+    std::unique_ptr<QueryContext> query_context_ptr;
     GET_QUERY_CONTEXT(GetQueryContext(), query_context_ptr);
-    UniquePtr<ShowStatement> show_statement = MakeUnique<ShowStatement>();
+    std::unique_ptr<ShowStatement> show_statement = std::make_unique<ShowStatement>();
     show_statement->show_type_ = ShowStmtType::kMemIndex;
     QueryResult result = query_context_ptr->QueryStatement(show_statement.get());
     return result;
 }
 
 QueryResult Infinity::ShowQueries() {
-    UniquePtr<QueryContext> query_context_ptr;
+    std::unique_ptr<QueryContext> query_context_ptr;
     GET_QUERY_CONTEXT(GetQueryContext(), query_context_ptr);
-    UniquePtr<ShowStatement> show_statement = MakeUnique<ShowStatement>();
+    std::unique_ptr<ShowStatement> show_statement = std::make_unique<ShowStatement>();
     show_statement->show_type_ = ShowStmtType::kQueries;
     QueryResult result = query_context_ptr->QueryStatement(show_statement.get());
     return result;
 }
 
 QueryResult Infinity::ShowQuery(u64 query_index) {
-    UniquePtr<QueryContext> query_context_ptr;
+    std::unique_ptr<QueryContext> query_context_ptr;
     GET_QUERY_CONTEXT(GetQueryContext(), query_context_ptr);
-    UniquePtr<ShowStatement> show_statement = MakeUnique<ShowStatement>();
+    std::unique_ptr<ShowStatement> show_statement = std::make_unique<ShowStatement>();
     show_statement->show_type_ = ShowStmtType::kQueries;
     show_statement->session_id_ = query_index;
     QueryResult result = query_context_ptr->QueryStatement(show_statement.get());
@@ -799,36 +792,36 @@ QueryResult Infinity::ShowQuery(u64 query_index) {
 }
 
 QueryResult Infinity::ShowTransactions() {
-    UniquePtr<QueryContext> query_context_ptr;
+    std::unique_ptr<QueryContext> query_context_ptr;
     GET_QUERY_CONTEXT(GetQueryContext(), query_context_ptr);
-    UniquePtr<ShowStatement> show_statement = MakeUnique<ShowStatement>();
+    std::unique_ptr<ShowStatement> show_statement = std::make_unique<ShowStatement>();
     show_statement->show_type_ = ShowStmtType::kQueries;
     QueryResult result = query_context_ptr->QueryStatement(show_statement.get());
     return result;
 }
 
 QueryResult Infinity::ShowLogs() {
-    UniquePtr<QueryContext> query_context_ptr;
+    std::unique_ptr<QueryContext> query_context_ptr;
     GET_QUERY_CONTEXT(GetQueryContext(), query_context_ptr);
-    UniquePtr<ShowStatement> show_statement = MakeUnique<ShowStatement>();
+    std::unique_ptr<ShowStatement> show_statement = std::make_unique<ShowStatement>();
     show_statement->show_type_ = ShowStmtType::kLogs;
     QueryResult result = query_context_ptr->QueryStatement(show_statement.get());
     return result;
 }
 
 QueryResult Infinity::ShowObjects() {
-    UniquePtr<QueryContext> query_context_ptr;
+    std::unique_ptr<QueryContext> query_context_ptr;
     GET_QUERY_CONTEXT(GetQueryContext(), query_context_ptr);
-    UniquePtr<ShowStatement> show_statement = MakeUnique<ShowStatement>();
+    std::unique_ptr<ShowStatement> show_statement = std::make_unique<ShowStatement>();
     show_statement->show_type_ = ShowStmtType::kPersistenceObjects;
     QueryResult result = query_context_ptr->QueryStatement(show_statement.get());
     return result;
 }
 
-QueryResult Infinity::ShowObject(const String &filename) {
-    UniquePtr<QueryContext> query_context_ptr;
+QueryResult Infinity::ShowObject(const std::string &filename) {
+    std::unique_ptr<QueryContext> query_context_ptr;
     GET_QUERY_CONTEXT(GetQueryContext(), query_context_ptr);
-    UniquePtr<ShowStatement> show_statement = MakeUnique<ShowStatement>();
+    std::unique_ptr<ShowStatement> show_statement = std::make_unique<ShowStatement>();
     show_statement->show_type_ = ShowStmtType::kPersistenceObject;
     show_statement->file_name_ = filename;
     QueryResult result = query_context_ptr->QueryStatement(show_statement.get());
@@ -836,52 +829,52 @@ QueryResult Infinity::ShowObject(const String &filename) {
 }
 
 QueryResult Infinity::ShowFilesInObject() {
-    UniquePtr<QueryContext> query_context_ptr;
+    std::unique_ptr<QueryContext> query_context_ptr;
     GET_QUERY_CONTEXT(GetQueryContext(), query_context_ptr);
-    UniquePtr<ShowStatement> show_statement = MakeUnique<ShowStatement>();
+    std::unique_ptr<ShowStatement> show_statement = std::make_unique<ShowStatement>();
     show_statement->show_type_ = ShowStmtType::kPersistenceFiles;
     QueryResult result = query_context_ptr->QueryStatement(show_statement.get());
     return result;
 }
 
 QueryResult Infinity::ShowMemory() {
-    UniquePtr<QueryContext> query_context_ptr;
+    std::unique_ptr<QueryContext> query_context_ptr;
     GET_QUERY_CONTEXT(GetQueryContext(), query_context_ptr);
-    UniquePtr<ShowStatement> show_statement = MakeUnique<ShowStatement>();
+    std::unique_ptr<ShowStatement> show_statement = std::make_unique<ShowStatement>();
     show_statement->show_type_ = ShowStmtType::kMemory;
     QueryResult result = query_context_ptr->QueryStatement(show_statement.get());
     return result;
 }
 
 QueryResult Infinity::ShowMemoryObjects() {
-    UniquePtr<QueryContext> query_context_ptr;
+    std::unique_ptr<QueryContext> query_context_ptr;
     GET_QUERY_CONTEXT(GetQueryContext(), query_context_ptr);
-    UniquePtr<ShowStatement> show_statement = MakeUnique<ShowStatement>();
+    std::unique_ptr<ShowStatement> show_statement = std::make_unique<ShowStatement>();
     show_statement->show_type_ = ShowStmtType::kMemoryObjects;
     QueryResult result = query_context_ptr->QueryStatement(show_statement.get());
     return result;
 }
 
 QueryResult Infinity::ShowMemoryAllocations() {
-    UniquePtr<QueryContext> query_context_ptr;
+    std::unique_ptr<QueryContext> query_context_ptr;
     GET_QUERY_CONTEXT(GetQueryContext(), query_context_ptr);
-    UniquePtr<ShowStatement> show_statement = MakeUnique<ShowStatement>();
+    std::unique_ptr<ShowStatement> show_statement = std::make_unique<ShowStatement>();
     show_statement->show_type_ = ShowStmtType::kMemoryAllocation;
     QueryResult result = query_context_ptr->QueryStatement(show_statement.get());
     return result;
 }
 
-QueryResult Infinity::ShowFunction(const String &function_name) {
-    UniquePtr<QueryContext> query_context_ptr;
+QueryResult Infinity::ShowFunction(const std::string &function_name) {
+    std::unique_ptr<QueryContext> query_context_ptr;
     GET_QUERY_CONTEXT(GetQueryContext(), query_context_ptr);
-    UniquePtr<ShowStatement> show_statement = MakeUnique<ShowStatement>();
+    std::unique_ptr<ShowStatement> show_statement = std::make_unique<ShowStatement>();
     show_statement->show_type_ = ShowStmtType::kFunction;
     show_statement->function_name_ = function_name;
     QueryResult result = query_context_ptr->QueryStatement(show_statement.get());
     return result;
 }
 
-QueryResult Infinity::Insert(const String &db_name, const String &table_name, Vector<InsertRowExpr *> *&insert_rows) {
+QueryResult Infinity::Insert(const std::string &db_name, const std::string &table_name, std::vector<InsertRowExpr *> *&insert_rows) {
     DeferFn free_insert_rows([&]() {
         if (insert_rows != nullptr) {
             for (auto &insert_row : *insert_rows) {
@@ -894,9 +887,9 @@ QueryResult Infinity::Insert(const String &db_name, const String &table_name, Ve
             insert_rows = nullptr;
         }
     });
-    UniquePtr<QueryContext> query_context_ptr;
+    std::unique_ptr<QueryContext> query_context_ptr;
     GET_QUERY_CONTEXT(GetQueryContext(), query_context_ptr);
-    UniquePtr<InsertStatement> insert_statement = MakeUnique<InsertStatement>();
+    std::unique_ptr<InsertStatement> insert_statement = std::make_unique<InsertStatement>();
     insert_statement->schema_name_ = db_name;
     ToLower(insert_statement->schema_name_);
     insert_statement->table_name_ = table_name;
@@ -915,11 +908,11 @@ QueryResult Infinity::Insert(const String &db_name, const String &table_name, Ve
     return result;
 }
 
-QueryResult Infinity::Import(const String &db_name, const String &table_name, const String &path, ImportOptions import_options) {
+QueryResult Infinity::Import(const std::string &db_name, const std::string &table_name, const std::string &path, ImportOptions import_options) {
 
-    UniquePtr<QueryContext> query_context_ptr;
+    std::unique_ptr<QueryContext> query_context_ptr;
     GET_QUERY_CONTEXT(GetQueryContext(), query_context_ptr);
-    UniquePtr<CopyStatement> import_statement = MakeUnique<CopyStatement>();
+    std::unique_ptr<CopyStatement> import_statement = std::make_unique<CopyStatement>();
 
     import_statement->copy_from_ = true;
     import_statement->file_path_ = path;
@@ -938,8 +931,11 @@ QueryResult Infinity::Import(const String &db_name, const String &table_name, co
     return result;
 }
 
-QueryResult
-Infinity::Export(const String &db_name, const String &table_name, Vector<ParsedExpr *> *columns, const String &path, ExportOptions export_options) {
+QueryResult Infinity::Export(const std::string &db_name,
+                             const std::string &table_name,
+                             std::vector<ParsedExpr *> *columns,
+                             const std::string &path,
+                             ExportOptions export_options) {
     DeferFn free_column_expressions([&]() {
         if (columns != nullptr) {
             for (auto &column_expr : *columns) {
@@ -951,9 +947,9 @@ Infinity::Export(const String &db_name, const String &table_name, Vector<ParsedE
         }
     });
 
-    UniquePtr<QueryContext> query_context_ptr;
+    std::unique_ptr<QueryContext> query_context_ptr;
     GET_QUERY_CONTEXT(GetQueryContext(), query_context_ptr);
-    UniquePtr<CopyStatement> export_statement = MakeUnique<CopyStatement>();
+    std::unique_ptr<CopyStatement> export_statement = std::make_unique<CopyStatement>();
 
     export_statement->copy_from_ = false;
     export_statement->file_path_ = path;
@@ -980,10 +976,10 @@ Infinity::Export(const String &db_name, const String &table_name, Vector<ParsedE
     return result;
 }
 
-QueryResult Infinity::Delete(const String &db_name, const String &table_name, ParsedExpr *filter) {
-    UniquePtr<QueryContext> query_context_ptr;
+QueryResult Infinity::Delete(const std::string &db_name, const std::string &table_name, ParsedExpr *filter) {
+    std::unique_ptr<QueryContext> query_context_ptr;
     GET_QUERY_CONTEXT(GetQueryContext(), query_context_ptr);
-    UniquePtr<DeleteStatement> delete_statement = MakeUnique<DeleteStatement>();
+    std::unique_ptr<DeleteStatement> delete_statement = std::make_unique<DeleteStatement>();
 
     delete_statement->schema_name_ = db_name;
     ToLower(delete_statement->schema_name_);
@@ -997,7 +993,7 @@ QueryResult Infinity::Delete(const String &db_name, const String &table_name, Pa
     return result;
 }
 
-QueryResult Infinity::Update(const String &db_name, const String &table_name, ParsedExpr *filter, Vector<UpdateExpr *> *update_list) {
+QueryResult Infinity::Update(const std::string &db_name, const std::string &table_name, ParsedExpr *filter, std::vector<UpdateExpr *> *update_list) {
     DeferFn free_update_list([&]() {
         if (update_list != nullptr) {
             for (auto &update_expr : *update_list) {
@@ -1009,9 +1005,9 @@ QueryResult Infinity::Update(const String &db_name, const String &table_name, Pa
         }
     });
 
-    UniquePtr<QueryContext> query_context_ptr;
+    std::unique_ptr<QueryContext> query_context_ptr;
     GET_QUERY_CONTEXT(GetQueryContext(), query_context_ptr);
-    UniquePtr<UpdateStatement> update_statement = MakeUnique<UpdateStatement>();
+    std::unique_ptr<UpdateStatement> update_statement = std::make_unique<UpdateStatement>();
 
     update_statement->schema_name_ = db_name;
     update_statement->table_name_ = table_name;
@@ -1029,17 +1025,17 @@ QueryResult Infinity::Update(const String &db_name, const String &table_name, Pa
     return result;
 }
 
-QueryResult Infinity::Explain(const String &db_name,
-                              const String &table_name,
+QueryResult Infinity::Explain(const std::string &db_name,
+                              const std::string &table_name,
                               ExplainType explain_type,
                               SearchExpr *&search_expr,
                               ParsedExpr *filter,
                               ParsedExpr *limit,
                               ParsedExpr *offset,
-                              Vector<ParsedExpr *> *output_columns,
-                              Vector<ParsedExpr *> *highlight_columns,
-                              Vector<OrderByExpr *> *order_by_list,
-                              Vector<ParsedExpr *> *group_by_list,
+                              std::vector<ParsedExpr *> *output_columns,
+                              std::vector<ParsedExpr *> *highlight_columns,
+                              std::vector<OrderByExpr *> *order_by_list,
+                              std::vector<ParsedExpr *> *group_by_list,
                               ParsedExpr *having) {
     DeferFn free_output_columns([&]() {
         if (output_columns != nullptr) {
@@ -1082,9 +1078,9 @@ QueryResult Infinity::Explain(const String &db_name,
         }
     });
 
-    UniquePtr<QueryContext> query_context_ptr;
+    std::unique_ptr<QueryContext> query_context_ptr;
     GET_QUERY_CONTEXT(GetQueryContext(), query_context_ptr);
-    UniquePtr<ExplainStatement> explain_statement = MakeUnique<ExplainStatement>();
+    std::unique_ptr<ExplainStatement> explain_statement = std::make_unique<ExplainStatement>();
     explain_statement->type_ = explain_type;
 
     SelectStatement *select_statement = new SelectStatement();
@@ -1123,16 +1119,16 @@ QueryResult Infinity::Explain(const String &db_name,
     return result;
 }
 
-QueryResult Infinity::Search(const String &db_name,
-                             const String &table_name,
+QueryResult Infinity::Search(const std::string &db_name,
+                             const std::string &table_name,
                              SearchExpr *&search_expr,
                              ParsedExpr *filter,
                              ParsedExpr *limit,
                              ParsedExpr *offset,
-                             Vector<ParsedExpr *> *&output_columns,
-                             Vector<ParsedExpr *> *highlight_columns,
-                             Vector<OrderByExpr *> *order_by_list,
-                             Vector<ParsedExpr *> *group_by_list,
+                             std::vector<ParsedExpr *> *&output_columns,
+                             std::vector<ParsedExpr *> *highlight_columns,
+                             std::vector<OrderByExpr *> *order_by_list,
+                             std::vector<ParsedExpr *> *group_by_list,
                              ParsedExpr *having,
                              bool total_hits_count_flag) {
     if (total_hits_count_flag) {
@@ -1184,9 +1180,9 @@ QueryResult Infinity::Search(const String &db_name,
             group_by_list = nullptr;
         }
     });
-    UniquePtr<QueryContext> query_context_ptr;
+    std::unique_ptr<QueryContext> query_context_ptr;
     GET_QUERY_CONTEXT(GetQueryContext(), query_context_ptr);
-    UniquePtr<SelectStatement> select_statement = MakeUnique<SelectStatement>();
+    std::unique_ptr<SelectStatement> select_statement = std::make_unique<SelectStatement>();
 
     auto *table_ref = new TableReference();
 
@@ -1221,10 +1217,10 @@ QueryResult Infinity::Search(const String &db_name,
     return result;
 }
 
-QueryResult Infinity::Optimize(const String &db_name, const String &table_name, OptimizeOptions optimize_option) {
-    UniquePtr<QueryContext> query_context_ptr;
+QueryResult Infinity::Optimize(const std::string &db_name, const std::string &table_name, OptimizeOptions optimize_option) {
+    std::unique_ptr<QueryContext> query_context_ptr;
     GET_QUERY_CONTEXT(GetQueryContext(), query_context_ptr);
-    UniquePtr<OptimizeStatement> optimize_statement = MakeUnique<OptimizeStatement>();
+    std::unique_ptr<OptimizeStatement> optimize_statement = std::make_unique<OptimizeStatement>();
 
     optimize_statement->schema_name_ = db_name;
     ToLower(optimize_statement->schema_name_);
@@ -1236,7 +1232,7 @@ QueryResult Infinity::Optimize(const String &db_name, const String &table_name, 
         optimize_statement->index_name_ = std::move(optimize_option.index_name_);
         ToLower(optimize_statement->index_name_);
         for (auto *param_ptr : optimize_option.opt_params_) {
-            auto param = MakeUnique<InitParameter>(std::move(param_ptr->param_name_), std::move(param_ptr->param_value_));
+            auto param = std::make_unique<InitParameter>(std::move(param_ptr->param_name_), std::move(param_ptr->param_value_));
             optimize_statement->opt_params_.push_back(std::move(param));
             delete param_ptr;
         }
@@ -1246,22 +1242,22 @@ QueryResult Infinity::Optimize(const String &db_name, const String &table_name, 
     return result;
 }
 
-QueryResult Infinity::AddColumns(const String &db_name, const String &table_name, Vector<SharedPtr<ColumnDef>> column_defs) {
-    UniquePtr<QueryContext> query_context_ptr;
+QueryResult Infinity::AddColumns(const std::string &db_name, const std::string &table_name, std::vector<std::shared_ptr<ColumnDef>> column_defs) {
+    std::unique_ptr<QueryContext> query_context_ptr;
     GET_QUERY_CONTEXT(GetQueryContext(), query_context_ptr);
 
-    auto add_columns_statement = MakeUnique<AddColumnsStatement>(db_name.c_str(), table_name.c_str());
+    auto add_columns_statement = std::make_unique<AddColumnsStatement>(db_name.c_str(), table_name.c_str());
     add_columns_statement->column_defs_ = std::move(column_defs);
 
     QueryResult result = query_context_ptr->QueryStatement(add_columns_statement.get());
     return result;
 }
 
-QueryResult Infinity::DropColumns(const String &db_name, const String &table_name, Vector<String> column_names) {
-    UniquePtr<QueryContext> query_context_ptr;
+QueryResult Infinity::DropColumns(const std::string &db_name, const std::string &table_name, std::vector<std::string> column_names) {
+    std::unique_ptr<QueryContext> query_context_ptr;
     GET_QUERY_CONTEXT(GetQueryContext(), query_context_ptr);
 
-    auto drop_columns_statement = MakeUnique<DropColumnsStatement>(db_name.c_str(), table_name.c_str());
+    auto drop_columns_statement = std::make_unique<DropColumnsStatement>(db_name.c_str(), table_name.c_str());
     drop_columns_statement->column_names_ = std::move(column_names);
 
     QueryResult result = query_context_ptr->QueryStatement(drop_columns_statement.get());
@@ -1269,34 +1265,34 @@ QueryResult Infinity::DropColumns(const String &db_name, const String &table_nam
 }
 
 QueryResult Infinity::Cleanup() {
-    UniquePtr<QueryContext> query_context_ptr;
+    std::unique_ptr<QueryContext> query_context_ptr;
     GET_QUERY_CONTEXT(GetQueryContext(), query_context_ptr);
 
-    auto command_statement = MakeUnique<CommandStatement>();
+    auto command_statement = std::make_unique<CommandStatement>();
 
-    command_statement->command_info_ = MakeUnique<CleanupCmd>();
+    command_statement->command_info_ = std::make_unique<CleanupCmd>();
 
     QueryResult result = query_context_ptr->QueryStatement(command_statement.get());
     return result;
 }
 
-QueryResult Infinity::DumpIndex(const String &db_name, const String &table_name, const String &index_name) {
-    UniquePtr<QueryContext> query_context_ptr;
+QueryResult Infinity::DumpIndex(const std::string &db_name, const std::string &table_name, const std::string &index_name) {
+    std::unique_ptr<QueryContext> query_context_ptr;
     GET_QUERY_CONTEXT(GetQueryContext(), query_context_ptr);
 
-    auto command_statement = MakeUnique<CommandStatement>();
+    auto command_statement = std::make_unique<CommandStatement>();
 
-    command_statement->command_info_ = MakeUnique<DumpIndexCmd>(db_name.c_str(), table_name.c_str(), index_name.c_str());
+    command_statement->command_info_ = std::make_unique<DumpIndexCmd>(db_name.c_str(), table_name.c_str(), index_name.c_str());
 
     QueryResult result = query_context_ptr->QueryStatement(command_statement.get());
     return result;
 }
 
 QueryResult Infinity::ForceCheckpoint() {
-    UniquePtr<QueryContext> query_context_ptr;
+    std::unique_ptr<QueryContext> query_context_ptr;
     GET_QUERY_CONTEXT(GetQueryContext(), query_context_ptr);
 
-    auto flush_statement = MakeUnique<FlushStatement>();
+    auto flush_statement = std::make_unique<FlushStatement>();
     flush_statement->type_ = infinity::FlushType::kData;
 
     QueryResult result = query_context_ptr->QueryStatement(flush_statement.get());
@@ -1304,144 +1300,144 @@ QueryResult Infinity::ForceCheckpoint() {
     return result;
 }
 
-QueryResult Infinity::CompactTable(const String &db_name, const String &table_name) {
-    UniquePtr<QueryContext> query_context_ptr;
+QueryResult Infinity::CompactTable(const std::string &db_name, const std::string &table_name) {
+    std::unique_ptr<QueryContext> query_context_ptr;
     GET_QUERY_CONTEXT(GetQueryContext(), query_context_ptr);
 
-    auto compact_statement = MakeUnique<ManualCompactStatement>(db_name, table_name);
+    auto compact_statement = std::make_unique<ManualCompactStatement>(db_name, table_name);
 
     QueryResult result = query_context_ptr->QueryStatement(compact_statement.get());
 
     return result;
 }
 
-QueryResult Infinity::TestCommand(const String &command_content) {
-    UniquePtr<QueryContext> query_context_ptr;
+QueryResult Infinity::TestCommand(const std::string &command_content) {
+    std::unique_ptr<QueryContext> query_context_ptr;
     GET_QUERY_CONTEXT(GetQueryContext(), query_context_ptr);
 
-    auto command_statement = MakeUnique<CommandStatement>();
-    command_statement->command_info_ = MakeUnique<TestCmd>(command_content);
+    auto command_statement = std::make_unique<CommandStatement>();
+    command_statement->command_info_ = std::make_unique<TestCmd>(command_content);
 
     QueryResult result = query_context_ptr->QueryStatement(command_statement.get());
 
     return result;
 }
 
-QueryResult Infinity::CreateTableSnapshot(const String &db_name, const String &table_name, const String &snapshot_name) {
-    UniquePtr<QueryContext> query_context_ptr;
+QueryResult Infinity::CreateTableSnapshot(const std::string &db_name, const std::string &table_name, const std::string &snapshot_name) {
+    std::unique_ptr<QueryContext> query_context_ptr;
     GET_QUERY_CONTEXT(GetQueryContext(), query_context_ptr);
 
-    auto command_statement = MakeUnique<CommandStatement>();
-    command_statement->command_info_ = MakeUnique<SnapshotCmd>(snapshot_name, SnapshotOp::kCreate, SnapshotScope::kTable, table_name);
-    
+    auto command_statement = std::make_unique<CommandStatement>();
+    command_statement->command_info_ = std::make_unique<SnapshotCmd>(snapshot_name, SnapshotOp::kCreate, SnapshotScope::kTable, table_name);
+
     QueryResult result = query_context_ptr->QueryStatement(command_statement.get());
     return result;
 }
 
-QueryResult Infinity::CreateDatabaseSnapshot(const String &db_name, const String &snapshot_name) {
-    UniquePtr<QueryContext> query_context_ptr;
+QueryResult Infinity::CreateDatabaseSnapshot(const std::string &db_name, const std::string &snapshot_name) {
+    std::unique_ptr<QueryContext> query_context_ptr;
     GET_QUERY_CONTEXT(GetQueryContext(), query_context_ptr);
 
-    auto command_statement = MakeUnique<CommandStatement>();
-    command_statement->command_info_ = MakeUnique<SnapshotCmd>(snapshot_name, SnapshotOp::kCreate, SnapshotScope::kDatabase, db_name);
-    
+    auto command_statement = std::make_unique<CommandStatement>();
+    command_statement->command_info_ = std::make_unique<SnapshotCmd>(snapshot_name, SnapshotOp::kCreate, SnapshotScope::kDatabase, db_name);
+
     QueryResult result = query_context_ptr->QueryStatement(command_statement.get());
     return result;
 }
 
-QueryResult Infinity::CreateSystemSnapshot(const String &snapshot_name) {
-    UniquePtr<QueryContext> query_context_ptr;
+QueryResult Infinity::CreateSystemSnapshot(const std::string &snapshot_name) {
+    std::unique_ptr<QueryContext> query_context_ptr;
     GET_QUERY_CONTEXT(GetQueryContext(), query_context_ptr);
 
-    auto command_statement = MakeUnique<CommandStatement>();
-    command_statement->command_info_ = MakeUnique<SnapshotCmd>(snapshot_name, SnapshotOp::kCreate, SnapshotScope::kSystem);
-    
+    auto command_statement = std::make_unique<CommandStatement>();
+    command_statement->command_info_ = std::make_unique<SnapshotCmd>(snapshot_name, SnapshotOp::kCreate, SnapshotScope::kSystem);
+
     QueryResult result = query_context_ptr->QueryStatement(command_statement.get());
     return result;
 }
 
-QueryResult Infinity::RestoreTableSnapshot(const String &snapshot_name) {
-    UniquePtr<QueryContext> query_context_ptr;
+QueryResult Infinity::RestoreTableSnapshot(const std::string &snapshot_name) {
+    std::unique_ptr<QueryContext> query_context_ptr;
     GET_QUERY_CONTEXT(GetQueryContext(), query_context_ptr);
 
-    auto command_statement = MakeUnique<CommandStatement>();
-    command_statement->command_info_ = MakeUnique<SnapshotCmd>(snapshot_name, SnapshotOp::kRestore, SnapshotScope::kTable);
-    
+    auto command_statement = std::make_unique<CommandStatement>();
+    command_statement->command_info_ = std::make_unique<SnapshotCmd>(snapshot_name, SnapshotOp::kRestore, SnapshotScope::kTable);
+
     QueryResult result = query_context_ptr->QueryStatement(command_statement.get());
     return result;
 }
 
-QueryResult Infinity::RestoreDatabaseSnapshot(const String &snapshot_name) {
-    UniquePtr<QueryContext> query_context_ptr;
+QueryResult Infinity::RestoreDatabaseSnapshot(const std::string &snapshot_name) {
+    std::unique_ptr<QueryContext> query_context_ptr;
     GET_QUERY_CONTEXT(GetQueryContext(), query_context_ptr);
 
-    auto command_statement = MakeUnique<CommandStatement>();
-    command_statement->command_info_ = MakeUnique<SnapshotCmd>(snapshot_name, SnapshotOp::kRestore, SnapshotScope::kDatabase);
-    
+    auto command_statement = std::make_unique<CommandStatement>();
+    command_statement->command_info_ = std::make_unique<SnapshotCmd>(snapshot_name, SnapshotOp::kRestore, SnapshotScope::kDatabase);
+
     QueryResult result = query_context_ptr->QueryStatement(command_statement.get());
     return result;
 }
 
-QueryResult Infinity::RestoreSystemSnapshot(const String &snapshot_name) {
-    UniquePtr<QueryContext> query_context_ptr;
+QueryResult Infinity::RestoreSystemSnapshot(const std::string &snapshot_name) {
+    std::unique_ptr<QueryContext> query_context_ptr;
     GET_QUERY_CONTEXT(GetQueryContext(), query_context_ptr);
 
-    auto command_statement = MakeUnique<CommandStatement>();
-    command_statement->command_info_ = MakeUnique<SnapshotCmd>(snapshot_name, SnapshotOp::kRestore, SnapshotScope::kSystem);
-    
+    auto command_statement = std::make_unique<CommandStatement>();
+    command_statement->command_info_ = std::make_unique<SnapshotCmd>(snapshot_name, SnapshotOp::kRestore, SnapshotScope::kSystem);
+
     QueryResult result = query_context_ptr->QueryStatement(command_statement.get());
     return result;
 }
 
-QueryResult Infinity::DropSnapshot(const String &snapshot_name) {
-    UniquePtr<QueryContext> query_context_ptr;
+QueryResult Infinity::DropSnapshot(const std::string &snapshot_name) {
+    std::unique_ptr<QueryContext> query_context_ptr;
     GET_QUERY_CONTEXT(GetQueryContext(), query_context_ptr);
 
-    auto command_statement = MakeUnique<CommandStatement>();
-    command_statement->command_info_ = MakeUnique<SnapshotCmd>(snapshot_name, SnapshotOp::kDrop, SnapshotScope::kIgnore);
-    
+    auto command_statement = std::make_unique<CommandStatement>();
+    command_statement->command_info_ = std::make_unique<SnapshotCmd>(snapshot_name, SnapshotOp::kDrop, SnapshotScope::kIgnore);
+
     QueryResult result = query_context_ptr->QueryStatement(command_statement.get());
     return result;
 }
 
-QueryResult Infinity::ShowSnapshot(const String &snapshot_name) {
-    UniquePtr<QueryContext> query_context_ptr;
+QueryResult Infinity::ShowSnapshot(const std::string &snapshot_name) {
+    std::unique_ptr<QueryContext> query_context_ptr;
     GET_QUERY_CONTEXT(GetQueryContext(), query_context_ptr);
 
-    auto show_statement = MakeUnique<ShowStatement>();
+    auto show_statement = std::make_unique<ShowStatement>();
     show_statement->show_type_ = ShowStmtType::kShowSnapshot;
     show_statement->snapshot_name_ = snapshot_name;
-    
+
     QueryResult result = query_context_ptr->QueryStatement(show_statement.get());
     return result;
 }
 
 QueryResult Infinity::ListSnapshots() {
-    UniquePtr<QueryContext> query_context_ptr;
+    std::unique_ptr<QueryContext> query_context_ptr;
     GET_QUERY_CONTEXT(GetQueryContext(), query_context_ptr);
 
-    auto show_statement = MakeUnique<ShowStatement>();
+    auto show_statement = std::make_unique<ShowStatement>();
     show_statement->show_type_ = ShowStmtType::kListSnapshots;
-    
+
     QueryResult result = query_context_ptr->QueryStatement(show_statement.get());
     return result;
 }
 
 QueryResult Infinity::AdminShowLogs() {
-    UniquePtr<QueryContext> query_context_ptr;
+    std::unique_ptr<QueryContext> query_context_ptr;
     GET_QUERY_CONTEXT(GetQueryContext(true), query_context_ptr);
 
-    auto admin_statement = MakeUnique<AdminStatement>();
+    auto admin_statement = std::make_unique<AdminStatement>();
     admin_statement->admin_type_ = AdminStmtType::kListLogFiles;
     QueryResult result = query_context_ptr->QueryStatement(admin_statement.get());
     return result;
 }
 
 QueryResult Infinity::AdminShowLog(i64 index) {
-    UniquePtr<QueryContext> query_context_ptr;
+    std::unique_ptr<QueryContext> query_context_ptr;
     GET_QUERY_CONTEXT(GetQueryContext(true), query_context_ptr);
 
-    auto admin_statement = MakeUnique<AdminStatement>();
+    auto admin_statement = std::make_unique<AdminStatement>();
     admin_statement->admin_type_ = AdminStmtType::kShowLogFile;
     admin_statement->log_file_index_ = index;
     QueryResult result = query_context_ptr->QueryStatement(admin_statement.get());
@@ -1449,30 +1445,30 @@ QueryResult Infinity::AdminShowLog(i64 index) {
 }
 
 QueryResult Infinity::AdminShowConfigs() {
-    UniquePtr<QueryContext> query_context_ptr;
+    std::unique_ptr<QueryContext> query_context_ptr;
     GET_QUERY_CONTEXT(GetQueryContext(true), query_context_ptr);
 
-    auto admin_statement = MakeUnique<AdminStatement>();
+    auto admin_statement = std::make_unique<AdminStatement>();
     admin_statement->admin_type_ = AdminStmtType::kListConfigs;
     QueryResult result = query_context_ptr->QueryStatement(admin_statement.get());
     return result;
 }
 
 QueryResult Infinity::AdminShowVariables() {
-    UniquePtr<QueryContext> query_context_ptr;
+    std::unique_ptr<QueryContext> query_context_ptr;
     GET_QUERY_CONTEXT(GetQueryContext(true), query_context_ptr);
 
-    auto admin_statement = MakeUnique<AdminStatement>();
+    auto admin_statement = std::make_unique<AdminStatement>();
     admin_statement->admin_type_ = AdminStmtType::kListVariables;
     QueryResult result = query_context_ptr->QueryStatement(admin_statement.get());
     return result;
 }
 
-QueryResult Infinity::AdminShowVariable(String var_name) {
-    UniquePtr<QueryContext> query_context_ptr;
+QueryResult Infinity::AdminShowVariable(std::string var_name) {
+    std::unique_ptr<QueryContext> query_context_ptr;
     GET_QUERY_CONTEXT(GetQueryContext(true), query_context_ptr);
 
-    auto admin_statement = MakeUnique<AdminStatement>();
+    auto admin_statement = std::make_unique<AdminStatement>();
     admin_statement->admin_type_ = AdminStmtType::kShowVariable;
     ToLower(var_name);
     admin_statement->variable_name_ = var_name;
@@ -1481,20 +1477,20 @@ QueryResult Infinity::AdminShowVariable(String var_name) {
 }
 
 QueryResult Infinity::AdminShowNodes() {
-    UniquePtr<QueryContext> query_context_ptr;
+    std::unique_ptr<QueryContext> query_context_ptr;
     GET_QUERY_CONTEXT(GetQueryContext(), query_context_ptr);
 
-    auto admin_statement = MakeUnique<AdminStatement>();
+    auto admin_statement = std::make_unique<AdminStatement>();
     admin_statement->admin_type_ = AdminStmtType::kListNodes;
     QueryResult result = query_context_ptr->QueryStatement(admin_statement.get());
     return result;
 }
 
-QueryResult Infinity::AdminShowNode(String node_name) {
-    UniquePtr<QueryContext> query_context_ptr;
+QueryResult Infinity::AdminShowNode(std::string node_name) {
+    std::unique_ptr<QueryContext> query_context_ptr;
     GET_QUERY_CONTEXT(GetQueryContext(true, true), query_context_ptr);
 
-    auto admin_statement = MakeUnique<AdminStatement>();
+    auto admin_statement = std::make_unique<AdminStatement>();
     admin_statement->admin_type_ = AdminStmtType::kShowNode;
     ToLower(node_name);
     admin_statement->node_name_ = node_name;
@@ -1503,20 +1499,20 @@ QueryResult Infinity::AdminShowNode(String node_name) {
 }
 
 QueryResult Infinity::AdminShowCurrentNode() {
-    UniquePtr<QueryContext> query_context_ptr;
+    std::unique_ptr<QueryContext> query_context_ptr;
     GET_QUERY_CONTEXT(GetQueryContext(true), query_context_ptr);
 
-    auto admin_statement = MakeUnique<AdminStatement>();
+    auto admin_statement = std::make_unique<AdminStatement>();
     admin_statement->admin_type_ = AdminStmtType::kShowCurrentNode;
     QueryResult result = query_context_ptr->QueryStatement(admin_statement.get());
     return result;
 }
 
-QueryResult Infinity::AdminRemoveNode(String node_name) {
-    UniquePtr<QueryContext> query_context_ptr;
+QueryResult Infinity::AdminRemoveNode(std::string node_name) {
+    std::unique_ptr<QueryContext> query_context_ptr;
     GET_QUERY_CONTEXT(GetQueryContext(true), query_context_ptr);
 
-    auto admin_statement = MakeUnique<AdminStatement>();
+    auto admin_statement = std::make_unique<AdminStatement>();
     ToLower(node_name);
     admin_statement->admin_type_ = AdminStmtType::kRemoveNode;
     admin_statement->node_name_ = node_name;
@@ -1525,10 +1521,10 @@ QueryResult Infinity::AdminRemoveNode(String node_name) {
 }
 
 QueryResult Infinity::AdminSetAdmin() {
-    UniquePtr<QueryContext> query_context_ptr;
+    std::unique_ptr<QueryContext> query_context_ptr;
     GET_QUERY_CONTEXT(GetQueryContext(true), query_context_ptr);
 
-    auto admin_statement = MakeUnique<AdminStatement>();
+    auto admin_statement = std::make_unique<AdminStatement>();
     admin_statement->admin_type_ = AdminStmtType::kSetRole;
     admin_statement->node_role_ = NodeRole::kAdmin;
     QueryResult result = query_context_ptr->QueryStatement(admin_statement.get());
@@ -1536,21 +1532,21 @@ QueryResult Infinity::AdminSetAdmin() {
 }
 
 QueryResult Infinity::AdminSetStandalone() {
-    UniquePtr<QueryContext> query_context_ptr;
+    std::unique_ptr<QueryContext> query_context_ptr;
     GET_QUERY_CONTEXT(GetQueryContext(true), query_context_ptr);
 
-    auto admin_statement = MakeUnique<AdminStatement>();
+    auto admin_statement = std::make_unique<AdminStatement>();
     admin_statement->admin_type_ = AdminStmtType::kSetRole;
     admin_statement->node_role_ = NodeRole::kStandalone;
     QueryResult result = query_context_ptr->QueryStatement(admin_statement.get());
     return result;
 }
 
-QueryResult Infinity::AdminSetLeader(String node_name) {
-    UniquePtr<QueryContext> query_context_ptr;
+QueryResult Infinity::AdminSetLeader(std::string node_name) {
+    std::unique_ptr<QueryContext> query_context_ptr;
     GET_QUERY_CONTEXT(GetQueryContext(true), query_context_ptr);
 
-    auto admin_statement = MakeUnique<AdminStatement>();
+    auto admin_statement = std::make_unique<AdminStatement>();
     admin_statement->admin_type_ = AdminStmtType::kSetRole;
     admin_statement->node_role_ = NodeRole::kLeader;
     ToLower(node_name);
@@ -1559,11 +1555,11 @@ QueryResult Infinity::AdminSetLeader(String node_name) {
     return result;
 }
 
-QueryResult Infinity::AdminSetFollower(String node_name, const String &leader_address) {
-    UniquePtr<QueryContext> query_context_ptr;
+QueryResult Infinity::AdminSetFollower(std::string node_name, const std::string &leader_address) {
+    std::unique_ptr<QueryContext> query_context_ptr;
     GET_QUERY_CONTEXT(GetQueryContext(true), query_context_ptr);
 
-    auto admin_statement = MakeUnique<AdminStatement>();
+    auto admin_statement = std::make_unique<AdminStatement>();
     admin_statement->admin_type_ = AdminStmtType::kSetRole;
     admin_statement->node_role_ = NodeRole::kFollower;
     admin_statement->leader_address_ = leader_address;
@@ -1573,11 +1569,11 @@ QueryResult Infinity::AdminSetFollower(String node_name, const String &leader_ad
     return result;
 }
 
-QueryResult Infinity::AdminSetLearner(String node_name, const String &leader_address) {
-    UniquePtr<QueryContext> query_context_ptr;
+QueryResult Infinity::AdminSetLearner(std::string node_name, const std::string &leader_address) {
+    std::unique_ptr<QueryContext> query_context_ptr;
     GET_QUERY_CONTEXT(GetQueryContext(true), query_context_ptr);
 
-    auto admin_statement = MakeUnique<AdminStatement>();
+    auto admin_statement = std::make_unique<AdminStatement>();
     admin_statement->admin_type_ = AdminStmtType::kSetRole;
     admin_statement->node_role_ = NodeRole::kLearner;
     admin_statement->leader_address_ = leader_address;

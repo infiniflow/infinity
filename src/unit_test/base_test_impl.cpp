@@ -13,24 +13,14 @@
 // limitations under the License.
 module;
 
-#include "gtest/gtest.h"
-#include <filesystem>
-#include <stdlib.h>
-#include <sys/stat.h>
-#include <type_traits>
-#include <unistd.h>
+#include "gtest_expand.h"
 
-#ifdef CI
-module base_test;
-import infinity_core;
-#else
 module infinity_core:ut.base_test.impl;
 
 import :ut.base_test;
-import :stl;
+
 import :infinity_context;
 import :infinity_exception;
-#endif
 
 import column_def;
 import data_type;
@@ -39,11 +29,11 @@ import logical_type;
 namespace infinity {
 
 template <typename T>
-SharedPtr<DataBlock> BaseTestWithParam<T>::MakeInputBlock(const Value &v1, const Value &v2, SizeT row_cnt) {
+std::shared_ptr<DataBlock> BaseTestWithParam<T>::MakeInputBlock(const Value &v1, const Value &v2, size_t row_cnt) {
     auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
     auto column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
 
-    auto input_block = MakeShared<DataBlock>();
+    auto input_block = std::make_shared<DataBlock>();
     {
         auto col1 = ColumnVector::Make(column_def1->type());
         col1->Initialize();
@@ -65,10 +55,10 @@ SharedPtr<DataBlock> BaseTestWithParam<T>::MakeInputBlock(const Value &v1, const
 };
 
 template <typename T>
-SharedPtr<DataBlock> BaseTestWithParam<T>::MakeInputBlock1(SizeT row_cnt) {
+std::shared_ptr<DataBlock> BaseTestWithParam<T>::MakeInputBlock1(size_t row_cnt) {
     auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
     auto column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
-    auto input_block = MakeShared<DataBlock>();
+    auto input_block = std::make_shared<DataBlock>();
     {
         auto col1 = ColumnVector::Make(column_def1->type());
         col1->Initialize();
@@ -90,10 +80,10 @@ SharedPtr<DataBlock> BaseTestWithParam<T>::MakeInputBlock1(SizeT row_cnt) {
 };
 
 template <typename T>
-SharedPtr<DataBlock> BaseTestWithParam<T>::MakeInputBlock2(SizeT row_cnt) {
+std::shared_ptr<DataBlock> BaseTestWithParam<T>::MakeInputBlock2(size_t row_cnt) {
     auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
     auto column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
-    auto input_block = MakeShared<DataBlock>();
+    auto input_block = std::make_shared<DataBlock>();
     {
         auto col1 = ColumnVector::Make(column_def1->type());
         col1->Initialize();
@@ -115,10 +105,10 @@ SharedPtr<DataBlock> BaseTestWithParam<T>::MakeInputBlock2(SizeT row_cnt) {
 };
 
 template <typename T>
-void BaseTestWithParam<T>::CheckFilePaths(Vector<String> &delete_file_paths, Vector<String> &exist_file_paths) {
+void BaseTestWithParam<T>::CheckFilePaths(std::vector<std::string> &delete_file_paths, std::vector<std::string> &exist_file_paths) {
     auto *pm = infinity::InfinityContext::instance().persistence_manager();
     if (pm == nullptr) {
-        Path data_dir = this->GetFullDataDir();
+        std::filesystem::path data_dir = this->GetFullDataDir();
         for (auto &file_path : delete_file_paths) {
             file_path = data_dir / file_path;
         }
@@ -131,7 +121,7 @@ void BaseTestWithParam<T>::CheckFilePaths(Vector<String> &delete_file_paths, Vec
             }
             EXPECT_FALSE(std::filesystem::exists(file_path));
 
-            auto path = static_cast<Path>(file_path).parent_path();
+            auto path = static_cast<std::filesystem::path>(file_path).parent_path();
             EXPECT_TRUE(!std::filesystem::exists(path) || std::filesystem::is_directory(path) && !std::filesystem::is_empty(path) ||
                         std::filesystem::is_directory(path) && std::filesystem::is_empty(path) && path == data_dir);
         }

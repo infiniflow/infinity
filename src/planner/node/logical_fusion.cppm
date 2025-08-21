@@ -12,15 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:logical_fusion;
 
-import :stl;
 import :logical_node_type;
 import :column_binding;
 import :logical_node;
-
 import :fusion_expression;
 import :match_expression;
 import :base_table_ref;
@@ -32,21 +28,21 @@ namespace infinity {
 
 export class LogicalFusion : public LogicalNode {
 public:
-    explicit LogicalFusion(u64 node_id, SharedPtr<BaseTableRef> base_table_ref, SharedPtr<FusionExpression> fusion_expr);
+    explicit LogicalFusion(u64 node_id, std::shared_ptr<BaseTableRef> base_table_ref, std::shared_ptr<FusionExpression> fusion_expr);
 
-    Vector<ColumnBinding> GetColumnBindings() const final { return left_node_->GetColumnBindings(); };
+    std::vector<ColumnBinding> GetColumnBindings() const final { return left_node_->GetColumnBindings(); };
 
-    SharedPtr<Vector<String>> GetOutputNames() const final { return left_node_->GetOutputNames(); };
+    std::shared_ptr<std::vector<std::string>> GetOutputNames() const final { return left_node_->GetOutputNames(); };
 
-    SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const final { return left_node_->GetOutputTypes(); };
+    std::shared_ptr<std::vector<std::shared_ptr<DataType>>> GetOutputTypes() const final { return left_node_->GetOutputTypes(); };
 
-    String ToString(i64 &space) const final;
+    std::string ToString(i64 &space) const final;
 
-    inline String name() final { return "LogicalFusion"; }
+    inline std::string name() final { return "LogicalFusion"; }
 
-    Vector<SharedPtr<LogicalNode>> other_children_{};
-    SharedPtr<BaseTableRef> base_table_ref_{};
-    SharedPtr<FusionExpression> fusion_expr_{};
+    std::vector<std::shared_ptr<LogicalNode>> other_children_{};
+    std::shared_ptr<BaseTableRef> base_table_ref_{};
+    std::shared_ptr<FusionExpression> fusion_expr_{};
 };
 
 } // namespace infinity

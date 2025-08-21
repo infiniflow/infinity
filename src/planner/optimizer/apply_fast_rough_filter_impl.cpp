@@ -12,14 +12,9 @@
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
 
-module;
-
-#include <vector>
 module infinity_core:apply_fast_rough_filter.impl;
 
 import :apply_fast_rough_filter;
-
-import :stl;
 import :logical_node;
 import :logical_node_type;
 import :logical_filter;
@@ -32,17 +27,18 @@ import :logical_fusion;
 import :query_context;
 import :logical_node_visitor;
 import :infinity_exception;
-import :logger;
-import :third_party;
 import :filter_expression_push_down;
 import :fast_rough_filter;
 import :logical_match_scan_base;
+
+import std;
+import third_party;
 
 namespace infinity {
 
 class ApplyFastRoughFilterMethod {
 public:
-    inline static void VisitNode(SharedPtr<LogicalNode> &op) {
+    inline static void VisitNode(std::shared_ptr<LogicalNode> &op) {
         if (!op) {
             return;
         }
@@ -51,8 +47,7 @@ public:
                 auto &filter = static_cast<LogicalFilter &>(*op);
                 auto &filter_expression = filter.expression();
                 if (op->right_node().get() != nullptr) {
-                    String error_message = "BuildSecondaryIndexScan: Logical filter node shouldn't have right child.";
-                    UnrecoverableError(error_message);
+                    UnrecoverableError("BuildSecondaryIndexScan: Logical filter node shouldn't have right child.");
                 } else if (op->left_node()->operator_type() == LogicalNodeType::kTableScan) {
                     auto &table_scan = static_cast<LogicalTableScan &>(*(op->left_node()));
                     table_scan.fast_rough_filter_evaluator_ = FilterExpressionPushDown::PushDownToFastRoughFilter(filter_expression);
@@ -81,8 +76,7 @@ public:
                 break;
             }
             case LogicalNodeType::kIndexScan: {
-                String error_message = "ApplyFastRoughFilterMethod: IndexScan optimizer should not happen before ApplyFastRoughFilter optimizer.";
-                UnrecoverableError(error_message);
+                UnrecoverableError("ApplyFastRoughFilterMethod: IndexScan optimizer should not happen before ApplyFastRoughFilter optimizer.");
                 break;
             }
             default: {
@@ -100,6 +94,8 @@ public:
     }
 };
 
-void ApplyFastRoughFilter::ApplyToPlan(QueryContext *, SharedPtr<LogicalNode> &logical_plan) { ApplyFastRoughFilterMethod::VisitNode(logical_plan); }
+void ApplyFastRoughFilter::ApplyToPlan(QueryContext *, std::shared_ptr<LogicalNode> &logical_plan) {
+    ApplyFastRoughFilterMethod::VisitNode(logical_plan);
+}
 
 } // namespace infinity

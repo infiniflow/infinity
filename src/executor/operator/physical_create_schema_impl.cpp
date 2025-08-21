@@ -12,17 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:physical_create_schema.impl;
 
 import :physical_create_schema;
-
-import :stl;
 import :query_context;
 import :table_def;
 import :data_table;
-
 import :physical_operator_type;
 import :operator_state;
 import :wal_manager;

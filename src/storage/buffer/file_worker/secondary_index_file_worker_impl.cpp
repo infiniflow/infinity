@@ -12,22 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:secondary_index_file_worker.impl;
 
 import :secondary_index_file_worker;
-import :stl;
 import :index_file_worker;
 import :file_worker;
-
 import :logger;
 import :index_base;
 import :index_secondary;
 import :secondary_index_data;
 import :infinity_exception;
-import :third_party;
 import :persistence_manager;
+
+import third_party;
 
 namespace infinity {
 
@@ -72,7 +69,7 @@ bool SecondaryIndexFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_succ
     return true;
 }
 
-void SecondaryIndexFileWorker::ReadFromFileImpl(SizeT file_size, bool from_spill) {
+void SecondaryIndexFileWorker::ReadFromFileImpl(size_t file_size, bool from_spill) {
     if (!data_) [[likely]] {
         auto index = GetSecondaryIndexData(column_def_->type(), row_count_, false);
         index->ReadIndexInner(*file_handle_);

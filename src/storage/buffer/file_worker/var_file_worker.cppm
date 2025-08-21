@@ -12,11 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:var_file_worker;
 
-import :stl;
 import :file_worker;
 import :file_worker_type;
 import :buffer_obj;
@@ -26,11 +23,11 @@ namespace infinity {
 
 export class VarFileWorker : public FileWorker {
 public:
-    explicit VarFileWorker(SharedPtr<String> data_dir,
-                           SharedPtr<String> temp_dir,
-                           SharedPtr<String> file_dir,
-                           SharedPtr<String> file_name,
-                           SizeT buffer_size,
+    explicit VarFileWorker(std::shared_ptr<std::string> data_dir,
+                           std::shared_ptr<std::string> temp_dir,
+                           std::shared_ptr<std::string> file_dir,
+                           std::shared_ptr<std::string> file_name,
+                           size_t buffer_size,
                            PersistenceManager *persistence_manager);
 
     virtual ~VarFileWorker() override;
@@ -42,25 +39,25 @@ public:
 
     void FreeInMemory() override;
 
-    SizeT GetMemoryCost() const override;
+    size_t GetMemoryCost() const override;
 
-    SizeT GetBufferSize() const { return buffer_size_; }
+    size_t GetBufferSize() const { return buffer_size_; }
 
-    void SetBufferSize(SizeT buffer_size) { buffer_size_ = buffer_size; }
+    void SetBufferSize(size_t buffer_size) { buffer_size_ = buffer_size; }
 
     FileWorkerType Type() const override { return FileWorkerType::kVarFile; }
 
 protected:
     bool WriteToFileImpl(bool to_spill, bool &prepare_success, const FileWorkerSaveCtx &ctx) override;
 
-    void ReadFromFileImpl(SizeT file_size, bool from_spill) override;
+    void ReadFromFileImpl(size_t file_size, bool from_spill) override;
 
-    bool ReadFromMmapImpl(const void *ptr, SizeT size) override;
+    bool ReadFromMmapImpl(const void *ptr, size_t size) override;
 
     void FreeFromMmapImpl() override;
 
 private:
-    SizeT buffer_size_ = 0;
+    size_t buffer_size_ = 0;
     BufferObj *buffer_obj_ = nullptr;
 };
 

@@ -1,11 +1,10 @@
 module;
 
 #include <cstdlib>
+
 module infinity_core:posting_buffer.impl;
 
 import :posting_buffer;
-import :stl;
-
 import :index_defines;
 import :posting_field;
 import :file_writer;
@@ -32,7 +31,7 @@ bool PostingBuffer::Reallocate() {
     }
 
     // Calculate new buffer size
-    SizeT total_buffer_size = expanded_capacity * field_configuration_->GetTotalSize();
+    size_t total_buffer_size = expanded_capacity * field_configuration_->GetTotalSize();
     u8 *expanded_buffer = (u8 *)malloc(total_buffer_size);
 
     // Copy existing data to new buffer
@@ -72,7 +71,7 @@ void PostingBuffer::BufferMemoryCopy(u8 *destination, u8 dest_columns, u8 *sourc
 }
 
 // Dump buffer contents to file
-void PostingBuffer::Dump(const SharedPtr<FileWriter> &output_file) {
+void PostingBuffer::Dump(const std::shared_ptr<FileWriter> &output_file) {
     output_file->WriteVInt(current_size_);
     output_file->WriteVInt(column_capacity_);
 
@@ -87,7 +86,7 @@ void PostingBuffer::Dump(const SharedPtr<FileWriter> &output_file) {
 }
 
 // Load buffer contents from file
-void PostingBuffer::Load(const SharedPtr<FileReader> &input_file) {
+void PostingBuffer::Load(const std::shared_ptr<FileReader> &input_file) {
     current_size_ = input_file->ReadVInt();
     column_capacity_ = input_file->ReadVInt();
 
@@ -155,7 +154,7 @@ void PostingBuffer::Reserve(u8 required_capacity) {
     }
 
     // Calculate total memory needed
-    SizeT total_memory_size = required_capacity * field_configuration_->GetTotalSize();
+    size_t total_memory_size = required_capacity * field_configuration_->GetTotalSize();
     u8 *new_buffer_ptr = (u8 *)malloc(total_memory_size);
 
     // Copy existing data if present

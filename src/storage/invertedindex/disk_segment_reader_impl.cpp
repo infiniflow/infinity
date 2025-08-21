@@ -20,9 +20,6 @@ module;
 module infinity_core:disk_index_segment_reader.impl;
 
 import :disk_index_segment_reader;
-
-import :stl;
-
 import :segment_posting;
 import :index_defines;
 import :index_segment_reader;
@@ -31,8 +28,6 @@ import :dict_reader;
 import :term_meta;
 import :byte_slice;
 import :posting_list_format;
-import internal_types;
-import :third_party;
 import :byte_slice_reader;
 import :infinity_exception;
 import :status;
@@ -42,22 +37,25 @@ import :infinity_context;
 import :persist_result_handler;
 import :virtual_store;
 
+import internal_types;
+import third_party;
+
 namespace infinity {
 
 DiskIndexSegmentReader::DiskIndexSegmentReader(SegmentID segment_id,
                                                ChunkID chunk_id,
-                                               const String &index_dir,
-                                               const String &base_name,
+                                               const std::string &index_dir,
+                                               const std::string &base_name,
                                                RowID base_row_id,
                                                optionflag_t flag)
     : IndexSegmentReader(segment_id, chunk_id), base_row_id_(base_row_id) {
-    Path path = Path(InfinityContext::instance().config()->DataDir()) / index_dir / base_name;
-    String path_str = path.string();
+    std::filesystem::path path = std::filesystem::path(InfinityContext::instance().config()->DataDir()) / index_dir / base_name;
+    std::string path_str = path.string();
     PersistenceManager *pm = InfinityContext::instance().persistence_manager();
 
     posting_file_ = path_str;
     posting_file_.append(POSTING_SUFFIX);
-    String posting_file = posting_file_;
+    std::string posting_file = posting_file_;
     if (nullptr != pm) {
         PersistResultHandler handler(pm);
         PersistReadResult result = pm->GetObjCache(posting_file);
@@ -83,7 +81,7 @@ DiskIndexSegmentReader::DiskIndexSegmentReader(SegmentID segment_id,
 
     dict_file_ = path_str;
     dict_file_.append(DICT_SUFFIX);
-    String dict_file = dict_file_;
+    std::string dict_file = dict_file_;
     if (nullptr != pm) {
         PersistResultHandler handler(pm);
         PersistReadResult result = pm->GetObjCache(dict_file);
@@ -91,14 +89,14 @@ DiskIndexSegmentReader::DiskIndexSegmentReader(SegmentID segment_id,
         const ObjAddr &obj_addr = handler.HandleReadResult(result);
         dict_file = pm->GetObjPath(obj_addr.obj_key_);
     }
-    dict_reader_ = MakeShared<DictionaryReader>(dict_file, PostingFormatOption(flag));
+    dict_reader_ = std::make_shared<DictionaryReader>(dict_file, PostingFormatOption(flag));
 }
 
 DiskIndexSegmentReader::~DiskIndexSegmentReader() {
     if (data_len_ == 0)
         return;
     PersistenceManager *pm = InfinityContext::instance().persistence_manager();
-    String posting_file = posting_file_;
+    std::string posting_file = posting_file_;
     if (nullptr != pm) {
         posting_file = posting_file_obj_;
     }
@@ -119,14 +117,14 @@ DiskIndexSegmentReader::~DiskIndexSegmentReader() {
     }
 }
 
-bool DiskIndexSegmentReader::GetSegmentPosting(const String &term, SegmentPosting &seg_posting, bool fetch_position) const {
+bool DiskIndexSegmentReader::GetSegmentPosting(const std::string &term, SegmentPosting &seg_posting, bool fetch_position) const {
     TermMeta term_meta;
     if (!dict_reader_.get() || !dict_reader_->Lookup(term, term_meta)) {
         return false;
     }
     u64 file_length = fetch_position ? (term_meta.pos_end_ - term_meta.doc_start_) : (term_meta.pos_start_ - term_meta.doc_start_);
     ByteSlice *slice = ByteSlice::NewSlice(data_ptr_ + term_meta.doc_start_, file_length);
-    SharedPtr<ByteSliceList> byte_slice_list = MakeShared<ByteSliceList>(slice);
+    std::shared_ptr<ByteSliceList> byte_slice_list = std::make_shared<ByteSliceList>(slice);
     seg_posting.Init(std::move(byte_slice_list), base_row_id_, term_meta.doc_freq_, term_meta);
     return true;
 }

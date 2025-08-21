@@ -12,19 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
-#include <cassert>
-
 export module infinity_core:ivf_index_storage;
 
-import :stl;
 import :index_ivf;
+import :ivf_index_util_func;
+import :infinity_exception;
+
 import internal_types;
 import logical_type;
 import data_type;
-import :ivf_index_util_func;
-import :infinity_exception;
 
 namespace infinity {
 
@@ -37,30 +33,30 @@ export class IVF_Index_Storage;
 class IVF_Centroids_Storage {
     u32 embedding_dimension_ = 0;
     u32 centroids_num_ = 0;
-    Vector<f32> centroids_data_ = {};
-    mutable Vector<f32> normalized_centroids_data_cache_ = {};
+    std::vector<f32> centroids_data_ = {};
+    mutable std::vector<f32> normalized_centroids_data_cache_ = {};
 
 public:
     IVF_Centroids_Storage() = default;
-    IVF_Centroids_Storage(u32 embedding_dimension, u32 centroids_num, Vector<f32> &&centroids_data);
+    IVF_Centroids_Storage(u32 embedding_dimension, u32 centroids_num, std::vector<f32> &&centroids_data);
     const f32 *data() const { return centroids_data_.data(); }
     u32 embedding_dimension() const { return embedding_dimension_; }
     u32 centroids_num() const { return centroids_num_; }
     void Save(LocalFileHandle &file_handle) const;
     void Load(LocalFileHandle &file_handle);
-    Pair<u32, const f32 *> GetCentroidDataForMetric(const KnnDistanceBase1 *knn_distance) const;
-    inline SizeT MemoryUsed() const { return sizeof(u32) * 2 + sizeof(f32) * (centroids_data_.size() + normalized_centroids_data_cache_.size()); }
+    std::pair<u32, const f32 *> GetCentroidDataForMetric(const KnnDistanceBase1 *knn_distance) const;
+    inline size_t MemoryUsed() const { return sizeof(u32) * 2 + sizeof(f32) * (centroids_data_.size() + normalized_centroids_data_cache_.size()); }
 };
 
 class IVF_Parts_Storage {
     const u32 embedding_dimension_ = 0;
     const u32 centroids_num_ = 0;
-    SizeT memory_used_ = 0;
+    size_t memory_used_ = 0;
 
 protected:
-    void IncreaseMemoryUsage(SizeT mem_usage) { memory_used_ += mem_usage; }
-    void DecMemUsed(SizeT mem_decreased) { memory_used_ -= mem_decreased; }
-    SizeT row_memory_cost_ = 0;
+    void IncreaseMemoryUsage(size_t mem_usage) { memory_used_ += mem_usage; }
+    void DecMemUsed(size_t mem_decreased) { memory_used_ -= mem_decreased; }
+    size_t row_memory_cost_ = 0;
     explicit IVF_Parts_Storage(const u32 embedding_dimension, const u32 centroids_num)
         : embedding_dimension_(embedding_dimension), centroids_num_(centroids_num) {}
     virtual void
@@ -68,7 +64,7 @@ protected:
 
 public:
     virtual ~IVF_Parts_Storage() = default;
-    static UniquePtr<IVF_Parts_Storage>
+    static std::unique_ptr<IVF_Parts_Storage>
     Make(u32 embedding_dimension, u32 centroids_num, EmbeddingDataType embedding_data_type, const IndexIVFStorageOption &ivf_storage_option);
     [[nodiscard]] u32 embedding_dimension() const { return embedding_dimension_; }
     [[nodiscard]] u32 centroids_num() const { return centroids_num_; }
@@ -85,14 +81,14 @@ public:
         AppendOneEmbedding(part_id, embedding_ptr, segment_offset, ivf_centroids_storage);
     }
 
-    virtual void SearchIndex(const Vector<u32> &part_ids,
+    virtual void SearchIndex(const std::vector<u32> &part_ids,
                              const IVF_Index_Storage *ivf_index_storage,
                              const KnnDistanceBase1 *knn_distance,
                              const void *query_ptr,
                              EmbeddingDataType query_element_type,
                              const std::function<bool(SegmentOffset)> &satisfy_filter_func,
                              const std::function<void(f32, SegmentOffset)> &add_result_func) const = 0;
-    SizeT MemoryUsed() const { return memory_used_; }
+    size_t MemoryUsed() const { return memory_used_; }
 };
 
 class IVF_Index_Storage {
@@ -103,7 +99,7 @@ class IVF_Index_Storage {
     u32 row_count_ = 0;
     u32 embedding_count_ = 0;
     IVF_Centroids_Storage ivf_centroids_storage_ = {};
-    UniquePtr<IVF_Parts_Storage> ivf_parts_storage_ = {};
+    std::unique_ptr<IVF_Parts_Storage> ivf_parts_storage_ = {};
 
 public:
     IVF_Index_Storage(const IndexIVFOption &ivf_option,
@@ -133,7 +129,7 @@ public:
     void GetMemData(IVF_Index_Storage &&mem_data);
     void Save(LocalFileHandle &file_handle) const;
     void Load(LocalFileHandle &file_handle);
-    SizeT MemoryUsed() const;
+    size_t MemoryUsed() const;
 
 private:
     template <EmbeddingDataType embedding_data_type>

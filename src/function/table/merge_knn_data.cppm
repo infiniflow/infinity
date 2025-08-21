@@ -12,15 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:merge_knn_data;
 
-import :stl;
 import :table_function;
-
 import :base_table_ref;
 import :merge_knn;
+
 import knn_expr;
 import internal_types;
 
@@ -39,7 +36,7 @@ public:
                                   i64 topk,
                                   EmbeddingDataType elem_type,
                                   KnnDistanceType knn_distance_type,
-                                  SharedPtr<BaseTableRef> table_ref);
+                                  std::shared_ptr<BaseTableRef> table_ref);
 
 private:
     template <typename DatType, typename DistType>
@@ -50,8 +47,8 @@ public:
     i64 topk_{};
     EmbeddingDataType elem_type_{EmbeddingDataType::kElemInvalid};
     MergeKnnHeapType heap_type_{MergeKnnHeapType::kInvalid};
-    SharedPtr<BaseTableRef> table_ref_{};
+    std::shared_ptr<BaseTableRef> table_ref_{};
 
-    SharedPtr<MergeKnnBase> merge_knn_base_{};
+    std::shared_ptr<MergeKnnBase> merge_knn_base_{};
 };
 } // namespace infinity

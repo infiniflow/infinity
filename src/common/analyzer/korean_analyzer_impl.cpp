@@ -20,27 +20,23 @@ module;
 #include <mecab_wrapper.h>
 #pragma clang diagnostic pop
 
-#include <cstring>
-#include <filesystem>
-#include <iostream>
-
 module infinity_core:korean_analyzer.impl;
 
-import :stl;
 import :term;
 import :analyzer;
 import :common_analyzer;
-import :logger;
 import :status;
 import :ijma;
 import :korean_analyzer;
 
+import std;
+
 namespace fs = std::filesystem;
 
 namespace infinity {
-static const String KNOWLEDGE_PATH = "mecab/ko-dic";
+static const std::string KNOWLEDGE_PATH = "mecab/ko-dic";
 
-KoreanAnalyzer::KoreanAnalyzer(const String &base_path) {
+KoreanAnalyzer::KoreanAnalyzer(const std::string &base_path) {
     cjk_ = true;
     own_mecab_ = true;
     fs::path root(base_path);

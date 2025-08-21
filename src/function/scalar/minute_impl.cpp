@@ -11,21 +11,20 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-module;
+
 module infinity_core:minute.impl;
 
 import :minute;
-import :stl;
 import :new_catalog;
 import :status;
-import logical_type;
+import :column_vector;
 import :infinity_exception;
 import :scalar_function;
 import :scalar_function_set;
-import :third_party;
+
 import internal_types;
 import data_type;
-import :column_vector;
+import logical_type;
 
 namespace infinity {
 
@@ -36,7 +35,6 @@ struct MinuteFunction {
         RecoverableError(status);
         return false;
     }
-
 };
 
 template <>
@@ -58,26 +56,26 @@ inline bool MinuteFunction::Run(TimestampT left, BigIntT &result) {
 }
 
 void RegisterMinuteFunction(NewCatalog *catalog_ptr) {
-    String func_name = "minute";
+    std::string func_name = "minute";
 
-    SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
+    std::shared_ptr<ScalarFunctionSet> function_set_ptr = std::make_shared<ScalarFunctionSet>(func_name);
 
     ScalarFunction minute_datetime_function(func_name,
-                                  {DataType(LogicalType::kDateTime)},
-                                  {DataType(LogicalType::kBigInt)},
-                                  &ScalarFunction::UnaryFunctionWithFailure<DateTimeT, BigIntT, MinuteFunction>);
+                                            {DataType(LogicalType::kDateTime)},
+                                            {DataType(LogicalType::kBigInt)},
+                                            &ScalarFunction::UnaryFunctionWithFailure<DateTimeT, BigIntT, MinuteFunction>);
     function_set_ptr->AddFunction(minute_datetime_function);
 
     ScalarFunction minute_time_function(func_name,
-                                  {DataType(LogicalType::kTime)},
-                                  {DataType(LogicalType::kBigInt)},
-                                  &ScalarFunction::UnaryFunctionWithFailure<TimeT, BigIntT, MinuteFunction>);
+                                        {DataType(LogicalType::kTime)},
+                                        {DataType(LogicalType::kBigInt)},
+                                        &ScalarFunction::UnaryFunctionWithFailure<TimeT, BigIntT, MinuteFunction>);
     function_set_ptr->AddFunction(minute_time_function);
 
     ScalarFunction minute_timestamp_function(func_name,
-                                  {DataType(LogicalType::kTimestamp)},
-                                  {DataType(LogicalType::kBigInt)},
-                                  &ScalarFunction::UnaryFunctionWithFailure<TimestampT, BigIntT, MinuteFunction>);
+                                             {DataType(LogicalType::kTimestamp)},
+                                             {DataType(LogicalType::kBigInt)},
+                                             &ScalarFunction::UnaryFunctionWithFailure<TimestampT, BigIntT, MinuteFunction>);
     function_set_ptr->AddFunction(minute_timestamp_function);
 
     NewCatalog::AddFunctionSet(catalog_ptr, function_set_ptr);

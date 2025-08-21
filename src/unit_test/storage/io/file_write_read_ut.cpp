@@ -12,27 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifdef CI
-#include <gtest/gtest.h>
-import infinity_core;
-import base_test;
-#else
 module;
 
-#include <gtest/gtest.h>
+#include "unit_test/gtest_expand.h"
 
 module infinity_core:ut.file_write_read;
 
 import :ut.base_test;
 import :infinity_exception;
-import :stl;
-import :third_party;
+import third_party;
 import :logger;
 import :file_writer;
 import :file_reader;
 import :infinity_context;
 import :virtual_store;
-#endif
 
 import global_resource_usage;
 
@@ -42,19 +35,19 @@ class FileWriteReadTest : public BaseTest {};
 
 TEST_F(FileWriteReadTest, test1) {
     using namespace infinity;
-    String path = String(GetFullTmpDir()) + "/test_file1.abc";
+    std::string path = std::string(GetFullTmpDir()) + "/test_file1.abc";
     FileWriter file_writer(path, 128);
 
-    for (SizeT i = 0; i < 128; ++i) {
-        String buffer = "abc";
+    for (size_t i = 0; i < 128; ++i) {
+        std::string buffer = "abc";
         file_writer.Write(buffer.c_str(), buffer.size());
     }
     file_writer.Flush();
     EXPECT_EQ(file_writer.GetFileSize(), 128 * 3);
-    EXPECT_EQ(file_writer.total_written_, (SizeT)128 * 3);
+    EXPECT_EQ(file_writer.total_written_, (size_t)128 * 3);
 
     FileReader file_reader(path, 128);
-    String read_str;
+    std::string read_str;
     read_str.resize(4);
     file_reader.Read(read_str.data(), 4);
     EXPECT_STREQ(read_str.c_str(), "abca");
@@ -64,7 +57,7 @@ TEST_F(FileWriteReadTest, test1) {
 
 TEST_F(FileWriteReadTest, test2) {
     using namespace infinity;
-    String path = String(GetFullTmpDir()) + "/test_file2.abc";
+    std::string path = std::string(GetFullTmpDir()) + "/test_file2.abc";
     FileWriter file_writer(path, 128);
 
     for (u32 i = 0; i < 128; ++i) {
@@ -82,14 +75,14 @@ TEST_F(FileWriteReadTest, test2) {
 
 TEST_F(FileWriteReadTest, test3) {
     using namespace infinity;
-    String path = String(GetFullTmpDir()) + "/test_file3.abc";
+    std::string path = std::string(GetFullTmpDir()) + "/test_file3.abc";
     FileWriter file_writer(path, 128);
 
     for (u32 i = 0; i < 128; ++i) {
         file_writer.WriteVInt(i);
     }
-    for (SizeT i = 0; i < 3; ++i) {
-        String buffer = "abc";
+    for (size_t i = 0; i < 3; ++i) {
+        std::string buffer = "abc";
         file_writer.Write(buffer.c_str(), buffer.size());
     }
     for (u32 i = 0; i < 128; ++i) {
@@ -102,7 +95,7 @@ TEST_F(FileWriteReadTest, test3) {
         u32 a = file_reader.ReadVInt();
         EXPECT_EQ(a, i);
     }
-    String read_str;
+    std::string read_str;
     read_str.resize(9);
     file_reader.Read(read_str.data(), 9);
     EXPECT_STREQ(read_str.c_str(), "abcabcabc");
@@ -115,14 +108,14 @@ TEST_F(FileWriteReadTest, test3) {
 
 TEST_F(FileWriteReadTest, TestExceedWriterTotalSize) {
     using namespace infinity;
-    String path = String(GetFullTmpDir()) + "/test_file_write_bytes.abc";
+    std::string path = std::string(GetFullTmpDir()) + "/test_file_write_bytes.abc";
     FileWriter file_writer(path, 128);
 
     for (i32 i = 0; i < 1024; ++i) {
         file_writer.WriteInt(i);
     }
 
-    String buffer = "abcabcabc";
+    std::string buffer = "abcabcabc";
     file_writer.Write(buffer.c_str(), buffer.size());
     file_writer.Sync();
 
@@ -131,7 +124,7 @@ TEST_F(FileWriteReadTest, TestExceedWriterTotalSize) {
         i32 a = file_reader.ReadInt();
         EXPECT_EQ(a, i);
     }
-    String read_str;
+    std::string read_str;
     read_str.resize(9);
     file_reader.Read(read_str.data(), 9);
     EXPECT_STREQ(read_str.c_str(), "abcabcabc");
@@ -142,7 +135,7 @@ TEST_F(FileWriteReadTest, TestExceedWriterTotalSize) {
 
 TEST_F(FileWriteReadTest, TestFilePointerSeek) {
     using namespace infinity;
-    String path = String(GetFullTmpDir()) + "/test_file_write_bytes.abc";
+    std::string path = std::string(GetFullTmpDir()) + "/test_file_write_bytes.abc";
     FileWriter file_writer(path, 128);
 
     for (i32 i = 0; i < 1024; i++) {
@@ -171,10 +164,10 @@ TEST_F(FileWriteReadTest, TestFilePointerSeek) {
 
 TEST_F(FileWriteReadTest, TestFileReadOverflowBuffer) {
     using namespace infinity;
-    String path = String(GetFullTmpDir()) + "/test_file_write_bytes.abc";
+    std::string path = std::string(GetFullTmpDir()) + "/test_file_write_bytes.abc";
     FileWriter file_writer(path, 128);
 
-    String s;
+    std::string s;
     for (i32 i = 0; i < 1000; i++) {
         s += "abc";
     }
@@ -182,7 +175,7 @@ TEST_F(FileWriteReadTest, TestFileReadOverflowBuffer) {
     file_writer.Write(s.c_str(), s.size());
     file_writer.Sync();
 
-    String read_s;
+    std::string read_s;
     read_s.resize(s.size());
     FileReader file_reader(path, 128);
     file_reader.Read(read_s.data(), read_s.size());
@@ -193,7 +186,7 @@ TEST_F(FileWriteReadTest, TestFileReadOverflowBuffer) {
 TEST_F(FileWriteReadTest, TestFileIODataTypes) {
 
     using namespace infinity;
-    String path = String(GetFullTmpDir()) + "/test_io_alltypes.abc";
+    std::string path = std::string(GetFullTmpDir()) + "/test_io_alltypes.abc";
     FileWriter file_writer(path, 128);
 
     file_writer.WriteByte('a');
@@ -203,7 +196,7 @@ TEST_F(FileWriteReadTest, TestFileIODataTypes) {
     file_writer.WriteVLong(45639);
     file_writer.WriteShort(328);
 
-    String s = "linelineline";
+    std::string s = "linelineline";
     file_writer.Write(s.data(), s.size());
     file_writer.Sync();
 

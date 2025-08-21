@@ -19,22 +19,23 @@ module;
 module infinity_core:blockmax_wand_iterator.impl;
 
 import :blockmax_wand_iterator;
-import :stl;
-import :third_party;
 import :index_defines;
 import :blockmax_leaf_iterator;
 import :multi_doc_iterator;
-import internal_types;
 import :logger;
 import :infinity_exception;
+
+import third_party;
+
+import internal_types;
 
 namespace infinity {
 
 BlockMaxWandIterator::~BlockMaxWandIterator() {
     if (SHOULD_LOG_TRACE()) {
-        String msg = "BlockMaxWandIterator pivot_history: ";
-        SizeT num_history = pivot_history_.size();
-        for (SizeT i = 0; i < num_history; i++) {
+        std::string msg = "BlockMaxWandIterator pivot_history: ";
+        size_t num_history = pivot_history_.size();
+        for (size_t i = 0; i < num_history; i++) {
             auto &p = pivot_history_[i];
             u32 pivot = std::get<0>(p);
             u64 row_id = std::get<1>(p);
@@ -51,12 +52,12 @@ BlockMaxWandIterator::~BlockMaxWandIterator() {
     }
 }
 
-BlockMaxWandIterator::BlockMaxWandIterator(Vector<UniquePtr<DocIterator>> &&iterators)
+BlockMaxWandIterator::BlockMaxWandIterator(std::vector<std::unique_ptr<DocIterator>> &&iterators)
     : MultiDocIterator(std::move(iterators)), pivot_(sorted_iterators_.size()) {
     bm25_score_upper_bound_ = 0.0f;
     estimate_iterate_cost_ = {};
-    SizeT num_iterators = children_.size();
-    for (SizeT i = 0; i < num_iterators; i++) {
+    size_t num_iterators = children_.size();
+    for (size_t i = 0; i < num_iterators; i++) {
         BlockMaxLeafIterator *tdi = dynamic_cast<BlockMaxLeafIterator *>(children_[i].get());
         if (tdi == nullptr) {
             UnrecoverableError("BMW only supports BlockMaxLeafIterator");
@@ -119,8 +120,8 @@ void BlockMaxWandIterator::UpdateScoreThreshold(const float threshold) {
     if (threshold > threshold_) {
         threshold_ = threshold;
         const float base_threshold = threshold - BM25ScoreUpperBound();
-        SizeT num_iterators = sorted_iterators_.size();
-        for (SizeT i = 0; i < num_iterators; i++) {
+        size_t num_iterators = sorted_iterators_.size();
+        for (size_t i = 0; i < num_iterators; i++) {
             auto &it = sorted_iterators_[i];
             float new_threshold = base_threshold + it->BM25ScoreUpperBound();
             it->UpdateScoreThreshold(new_threshold);
@@ -133,10 +134,10 @@ void BlockMaxWandIterator::UpdateScoreThreshold(const float threshold) {
 bool BlockMaxWandIterator::Next(RowID doc_id) {
     assert(doc_id != INVALID_ROWID);
     bm25_score_cached_ = false;
-    SizeT num_iterators = sorted_iterators_.size();
+    size_t num_iterators = sorted_iterators_.size();
     if (doc_id_ == INVALID_ROWID) {
         // Initialize children once.
-        for (SizeT i = 0; i < num_iterators; i++) {
+        for (size_t i = 0; i < num_iterators; i++) {
             sorted_iterators_[i]->Next(0);
         }
     } else if (doc_id_ >= doc_id) {
@@ -145,7 +146,7 @@ bool BlockMaxWandIterator::Next(RowID doc_id) {
         assert(pivot_ < num_iterators);
         assert(doc_id_ < doc_id);
         // Move all pointers from lists[0] to lists[p] by calling Next(list, d + 1)
-        for (SizeT i = 0; i <= pivot_ && sorted_iterators_[i]->DocID() < doc_id; i++) {
+        for (size_t i = 0; i <= pivot_ && sorted_iterators_[i]->DocID() < doc_id; i++) {
             sorted_iterators_[i]->Next(doc_id);
         }
     }
@@ -175,7 +176,7 @@ bool BlockMaxWandIterator::Next(RowID doc_id) {
         // remove exhausted lists
         for (int i = int(num_iterators) - 1; i >= 0 && sorted_iterators_[i]->DocID() == INVALID_ROWID; i--) {
             if (SHOULD_LOG_TRACE()) {
-                OStringStream oss;
+                std::ostringstream oss;
                 sorted_iterators_[i]->PrintTree(oss, "Exhaused: ", true);
                 LOG_TRACE(oss.str());
             }
@@ -190,14 +191,14 @@ bool BlockMaxWandIterator::Next(RowID doc_id) {
         }
 
         // Optimized pivot calculation using binary search for large keyword sets
-        SizeT pivot;
+        size_t pivot;
         if (num_iterators > SORT_SKIP_THRESHOLD && should_sort) {
             pivot = FindPivotOptimized(threshold_);
         } else {
             // Fallback to linear search for smaller sets or when skipping sort
             pivot = num_iterators;
             float sum_score_ub = 0.0f;
-            for (SizeT i = 0; i < num_iterators; i++) {
+            for (size_t i = 0; i < num_iterators; i++) {
                 sum_score_ub += sorted_iterators_[i]->BM25ScoreUpperBound();
                 if (sum_score_ub > threshold_) {
                     pivot = i;
@@ -218,13 +219,13 @@ bool BlockMaxWandIterator::Next(RowID doc_id) {
         // NextShallow iterators 0..pivot to d, sum the blockmax score, and purge exhausted lists
         float sum_score_bm = 0.0f;
         bool found_exhausted_it = false;
-        for (SizeT i = 0; i <= pivot; i++) {
+        for (size_t i = 0; i <= pivot; i++) {
             bool ok = sorted_iterators_[i]->NextShallow(d);
             if (ok) [[likely]] {
                 sum_score_bm += sorted_iterators_[i]->BlockMaxBM25Score();
             } else {
                 if (SHOULD_LOG_TRACE()) {
-                    OStringStream oss;
+                    std::ostringstream oss;
                     sorted_iterators_[i]->PrintTree(oss, "Exhausted: ", true);
                     LOG_TRACE(oss.str());
                 }
@@ -242,7 +243,7 @@ bool BlockMaxWandIterator::Next(RowID doc_id) {
             if (sorted_iterators_[0]->DocID() == d) {
                 // EvaluatePartial(d , p);
                 float sum_score = 0.0f;
-                for (SizeT i = 0; i <= pivot; i++) {
+                for (size_t i = 0; i <= pivot; i++) {
                     sum_score += sorted_iterators_[i]->BM25Score();
                 }
                 if (sum_score > threshold_) {
@@ -254,13 +255,13 @@ bool BlockMaxWandIterator::Next(RowID doc_id) {
                     return true;
                 } else {
                     next_sum_score_low_cnt_++;
-                    for (SizeT i = 0; i <= pivot; i++) {
+                    for (size_t i = 0; i <= pivot; i++) {
                         sorted_iterators_[i]->Next(d + 1);
                     }
                 }
             } else {
                 next_it0_docid_mismatch_cnt_++;
-                for (SizeT i = 0; i < pivot && sorted_iterators_[i]->DocID() < d; i++) {
+                for (size_t i = 0; i < pivot && sorted_iterators_[i]->DocID() < d; i++) {
                     sorted_iterators_[i]->Next(d);
                 }
             }
@@ -279,7 +280,7 @@ bool BlockMaxWandIterator::Next(RowID doc_id) {
             // sum_score_bm_0 is the sum of block_max of [1..pivot]
             float sum_score_bm_0 = sum_score_bm - sorted_iterators_[0]->BlockMaxBM25Score();
             RowID block_last_doc_id_0 = sorted_iterators_[0]->BlockLastDocID();
-            SizeT cnt_next_shallow = 0;
+            size_t cnt_next_shallow = 0;
             while (block_last_doc_id_0 < up_to) {
                 shallowed_did = block_last_doc_id_0 + 1;
                 cnt_next_shallow++;
@@ -306,20 +307,19 @@ bool BlockMaxWandIterator::Next(RowID doc_id) {
                 next_sum_score_bm_low_cnt_dist_[cnt_next_shallow]++;
             }
             if (shallowed_did != INVALID_ROWID) {
-                for (SizeT i = 0; i <= pivot; i++) {
+                for (size_t i = 0; i <= pivot; i++) {
                     if (sorted_iterators_[i]->DocID() < shallowed_did)
                         sorted_iterators_[i]->Next(shallowed_did);
                 }
             } else {
-                for (SizeT i = 0; i <= pivot; i++) {
+                for (size_t i = 0; i <= pivot; i++) {
                     sorted_iterators_[i]->Next(up_to);
                 }
             }
         }
     }
 
-    String error_message = "Should not reach here!";
-    UnrecoverableError(error_message);
+    UnrecoverableError("Should not reach here!");
     return false;
 }
 
@@ -327,13 +327,13 @@ float BlockMaxWandIterator::BM25Score() {
     if (bm25_score_cached_) [[unlikely]] {
         return bm25_score_cache_;
     }
-    SizeT num_iterators = sorted_iterators_.size();
+    size_t num_iterators = sorted_iterators_.size();
     if (doc_id_ == INVALID_ROWID || pivot_ >= num_iterators) [[unlikely]] {
         return 0.0f;
     }
     float sum_score = 0.0f;
     RowID d = sorted_iterators_[pivot_]->DocID();
-    for (SizeT i = 0; i < num_iterators && sorted_iterators_[i]->DocID() == d; i++) {
+    for (size_t i = 0; i < num_iterators && sorted_iterators_[i]->DocID() == d; i++) {
         sum_score += sorted_iterators_[i]->BM25Score();
     }
     bm25_score_cache_ = sum_score;

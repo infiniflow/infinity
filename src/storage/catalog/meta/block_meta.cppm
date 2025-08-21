@@ -12,11 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:block_meta;
 
-import :stl;
 import :status;
 import :default_values;
 import :meta_info;
@@ -41,11 +38,11 @@ public:
 
     BlockID block_id() const { return block_id_; }
 
-    SizeT block_capacity() const { return DEFAULT_BLOCK_CAPACITY; }
+    size_t block_capacity() const { return DEFAULT_BLOCK_CAPACITY; }
 
-    SharedPtr<String> GetBlockDir();
+    std::shared_ptr<std::string> GetBlockDir();
 
-    Status GetBlockLock(SharedPtr<BlockLock> &block_lock);
+    Status GetBlockLock(std::shared_ptr<BlockLock> &block_lock);
 
     Status InitSet();
 
@@ -57,32 +54,32 @@ public:
 
     Status UninitSet(UsageFlag usage_flag);
 
-    // Tuple<SizeT, Status> GetRowCnt();
+    // std::tuple<size_t, Status> GetRowCnt();
     TxnTimeStamp GetCreateTimestampFromKV() const;
 
-    Tuple<SizeT, Status> GetRowCnt1();
+    std::tuple<size_t, Status> GetRowCnt1();
 
-    Tuple<BufferObj *, Status> GetVersionBuffer();
+    std::tuple<BufferObj *, Status> GetVersionBuffer();
 
-    Vector<String> FilePaths();
+    std::vector<std::string> FilePaths();
 
-    Tuple<SharedPtr<BlockInfo>, Status> GetBlockInfo();
+    std::tuple<std::shared_ptr<BlockInfo>, Status> GetBlockInfo();
 
-    Tuple<SharedPtr<BlockColumnInfo>, Status> GetBlockColumnInfo(ColumnID column_id);
+    std::tuple<std::shared_ptr<BlockColumnInfo>, Status> GetBlockColumnInfo(ColumnID column_id);
 
-    // Pair<ColumnID, Status> AddBlockColumnID1(TxnTimeStamp commit_ts);
+    // std::pair<ColumnID, Status> AddBlockColumnID1(TxnTimeStamp commit_ts);
     //
-    Tuple<Vector<ColumnID> *, Status> GetBlockColumnIDs1();
+    std::tuple<std::vector<ColumnID> *, Status> GetBlockColumnIDs1();
 
-    String GetBlockTag(const String &tag) const;
+    std::string GetBlockTag(const std::string &tag) const;
 
-    Status GetFastRoughFilter(SharedPtr<FastRoughFilter> &fast_rough_filter);
+    Status GetFastRoughFilter(std::shared_ptr<FastRoughFilter> &fast_rough_filter);
 
-    Status SetFastRoughFilter(SharedPtr<FastRoughFilter> fast_rough_filter);
+    Status SetFastRoughFilter(std::shared_ptr<FastRoughFilter> fast_rough_filter);
 
     Status RestoreFromSnapshot();
 
-    Tuple<SharedPtr<BlockSnapshotInfo>, Status> MapMetaToSnapShotInfo();
+    std::tuple<std::shared_ptr<BlockSnapshotInfo>, Status> MapMetaToSnapShotInfo();
 
 private:
     mutable std::mutex mtx_;
@@ -91,14 +88,14 @@ private:
     TxnTimeStamp commit_ts_;
     KVInstance &kv_instance_;
     SegmentMeta &segment_meta_;
-    BlockID block_id_;  
-    Optional<Vector<ColumnID>> column_ids1_; // stored in columndefs in kv
+    BlockID block_id_;
+    std::optional<std::vector<ColumnID>> column_ids1_; // stored in columndefs in kv
 
-    SharedPtr<String> block_dir_;
-    Optional<SizeT> row_cnt_; // stored in the block version file
+    std::shared_ptr<std::string> block_dir_;
+    std::optional<size_t> row_cnt_; // stored in the block version file
 
     BufferObj *version_buffer_ = nullptr;
-    SharedPtr<FastRoughFilter> fast_rough_filter_;
+    std::shared_ptr<FastRoughFilter> fast_rough_filter_;
 };
 
 } // namespace infinity

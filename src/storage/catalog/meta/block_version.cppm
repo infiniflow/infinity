@@ -12,11 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:block_version;
 
-import :stl;
 import :local_file_handle;
 import :status;
 
@@ -41,28 +38,28 @@ struct CreateField {
 export struct BlockVersion {
     constexpr static std::string_view PATH = "version";
 
-    static SharedPtr<String> FileName() { return MakeShared<String>(PATH); }
+    static std::shared_ptr<std::string> FileName() { return std::make_shared<std::string>(PATH); }
 
-    explicit BlockVersion(SizeT capacity) : deleted_(capacity, 0) {}
+    explicit BlockVersion(size_t capacity) : deleted_(capacity, 0) {}
     BlockVersion() = default;
 
     bool operator==(const BlockVersion &rhs) const;
     bool operator!=(const BlockVersion &rhs) const { return !(*this == rhs); };
 
-    Pair<BlockOffset, i32> GetCommitRowCount(TxnTimeStamp commit_ts) const;
+    std::pair<BlockOffset, i32> GetCommitRowCount(TxnTimeStamp commit_ts) const;
     i32 GetRowCount(TxnTimeStamp begin_ts) const;
     i64 GetRowCount() const;
 
-    Tuple<i32, Status> GetRowCountForUpdate(TxnTimeStamp begin_ts) const;
+    std::tuple<i32, Status> GetRowCountForUpdate(TxnTimeStamp begin_ts) const;
 
     bool SaveToFile(TxnTimeStamp checkpoint_ts, LocalFileHandle &file_handler) const;
 
     void SpillToFile(LocalFileHandle *file_handle) const;
-    static UniquePtr<BlockVersion> LoadFromFile(LocalFileHandle *file_handle);
+    static std::unique_ptr<BlockVersion> LoadFromFile(LocalFileHandle *file_handle);
 
-    void GetCreateTS(SizeT offset, SizeT size, ColumnVector &res) const;
+    void GetCreateTS(size_t offset, size_t size, ColumnVector &res) const;
 
-    void GetDeleteTS(SizeT offset, SizeT size, ColumnVector &res) const;
+    void GetDeleteTS(size_t offset, size_t size, ColumnVector &res) const;
 
     void Append(TxnTimeStamp commit_ts, i32 row_count);
 
@@ -85,9 +82,9 @@ export struct BlockVersion {
 
 private:
     mutable std::shared_mutex rw_mutex_{};
-    Vector<CreateField> created_{}; // second field width is same as timestamp, otherwise Valgrind will issue BlockVersion::SaveToFile has
-                                    // risk to write uninitialized buffer. (ts, rows)
-    Vector<TxnTimeStamp> deleted_{};
+    std::vector<CreateField> created_{}; // second field width is same as timestamp, otherwise Valgrind will issue BlockVersion::SaveToFile has
+                                         // risk to write uninitialized buffer. (ts, rows)
+    std::vector<TxnTimeStamp> deleted_{};
 
     TxnTimeStamp latest_change_ts_{}; // used by checkpoint to decide if the version file need to be flushed or not.
 };

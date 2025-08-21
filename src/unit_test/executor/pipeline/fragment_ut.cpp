@@ -12,26 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifdef CI
-#include "gtest/gtest.h"
-import infinity_core;
-import base_test;
-import sql_runner;
-#else
 module;
 
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 
 module infinity_core:ut.fragment;
 
 import :ut.base_test;
 import :ut.sql_runner;
 import :infinity_exception;
-import :third_party;
+import third_party;
 import :logger;
-import :stl;
 import :infinity_context;
-#endif
 
 import global_resource_usage;
 

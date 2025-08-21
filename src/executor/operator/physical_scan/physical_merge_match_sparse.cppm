@@ -12,20 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:physical_merge_match_sparse;
 
-import :stl;
 import :query_context;
 import :operator_state;
 import :physical_operator;
 import :match_sparse_expression;
 import :base_table_ref;
-import data_type;
 import :physical_scan_base;
-import match_sparse_expr;
 import :base_expression;
+
+import data_type;
+import match_sparse_expr;
 
 namespace infinity {
 struct LoadMeta;
@@ -33,27 +31,29 @@ struct LoadMeta;
 export class PhysicalMergeMatchSparse final : public PhysicalScanBase {
 public:
     PhysicalMergeMatchSparse(u64 id,
-                             UniquePtr<PhysicalOperator> left,
+                             std::unique_ptr<PhysicalOperator> left,
                              u64 table_index,
-                             SharedPtr<BaseTableRef> base_table_ref,
-                             SharedPtr<MatchSparseExpression> match_sparse_expr,
-                             SharedPtr<BaseExpression> filter_expression,
-                             SharedPtr<Vector<LoadMeta>> load_metas,
+                             std::shared_ptr<BaseTableRef> base_table_ref,
+                             std::shared_ptr<MatchSparseExpression> match_sparse_expr,
+                             std::shared_ptr<BaseExpression> filter_expression,
+                             std::shared_ptr<std::vector<LoadMeta>> load_metas,
                              bool cache_result);
 
-    void Init(QueryContext* query_context) override;
+    void Init(QueryContext *query_context) override;
 
     bool Execute(QueryContext *query_context, OperatorState *operator_state) override;
 
-    SharedPtr<Vector<String>> GetOutputNames() const override { return PhysicalCommonFunctionUsingLoadMeta::GetOutputNames(*this); }
+    std::shared_ptr<std::vector<std::string>> GetOutputNames() const override { return PhysicalCommonFunctionUsingLoadMeta::GetOutputNames(*this); }
 
-    SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const override { return PhysicalCommonFunctionUsingLoadMeta::GetOutputTypes(*this); }
+    std::shared_ptr<std::vector<std::shared_ptr<DataType>>> GetOutputTypes() const override {
+        return PhysicalCommonFunctionUsingLoadMeta::GetOutputTypes(*this);
+    }
 
-    SizeT TaskletCount() override;
+    size_t TaskletCount() override;
 
-    const SharedPtr<MatchSparseExpression> &match_sparse_expr() const { return match_sparse_expr_; }
+    const std::shared_ptr<MatchSparseExpression> &match_sparse_expr() const { return match_sparse_expr_; }
 
-    const SharedPtr<BaseExpression> &filter_expression() const { return filter_expression_; }
+    const std::shared_ptr<BaseExpression> &filter_expression() const { return filter_expression_; }
 
     i64 GetTopN() const { return match_sparse_expr_->topn_; }
 
@@ -65,8 +65,8 @@ private:
     void ExecuteInner(QueryContext *query_context, MergeMatchSparseOperatorState *operator_state);
 
 private:
-    SharedPtr<MatchSparseExpression> match_sparse_expr_;
-    SharedPtr<BaseExpression> filter_expression_{};
+    std::shared_ptr<MatchSparseExpression> match_sparse_expr_;
+    std::shared_ptr<BaseExpression> filter_expression_{};
 };
 
 } // namespace infinity

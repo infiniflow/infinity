@@ -1,13 +1,13 @@
-module;
-
 module infinity_core:memory_chunk.impl;
 
-import :stl;
 import :memory_chunk;
+import :infinity_type;
+
+import std.compat;
 
 namespace infinity {
 
-void *MemoryChunk::Allocate(SizeT num_bytes) {
+void *MemoryChunk::Allocate(size_t num_bytes) {
     if (size_ - pos_ < num_bytes) {
         return nullptr;
     }
@@ -16,7 +16,7 @@ void *MemoryChunk::Allocate(SizeT num_bytes) {
     return ptr;
 }
 
-MemoryChunk *ChunkAllocator::Allocate(SizeT num_bytes) {
+MemoryChunk *ChunkAllocator::Allocate(size_t num_bytes) {
     u32 alloc_size = num_bytes + sizeof(ChainedMemoryChunk);
     if (alloc_size <= chunk_size_) {
         alloc_size = chunk_size_;
@@ -57,7 +57,7 @@ MemoryChunk *ChunkAllocator::Allocate(SizeT num_bytes) {
     return current_chunk_;
 }
 
-SizeT ChunkAllocator::Release() {
+size_t ChunkAllocator::Release() {
     ChainedMemoryChunk *pChunk = chunk_header_;
     ChainedMemoryChunk *pChunk2 = nullptr;
     while (pChunk) {
@@ -66,13 +66,13 @@ SizeT ChunkAllocator::Release() {
         delete[] (char *)pChunk2;
     }
     chunk_header_ = current_chunk_ = nullptr;
-    SizeT total_bytes = total_bytes_;
+    size_t total_bytes = total_bytes_;
     used_bytes_ = total_bytes_ = 0;
     return total_bytes;
 }
 
-SizeT ChunkAllocator::Reset() {
-    SizeT total_bytes = total_bytes_;
+size_t ChunkAllocator::Reset() {
+    size_t total_bytes = total_bytes_;
     if (current_chunk_ == nullptr) {
         // skip useless reset to avoid cache-miss
         return total_bytes;

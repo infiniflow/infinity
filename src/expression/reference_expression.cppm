@@ -16,9 +16,9 @@ module;
 
 export module infinity_core:reference_expression;
 
-import :stl;
 import :expression_type;
 import :base_expression;
+
 import data_type;
 import internal_types;
 
@@ -26,20 +26,25 @@ namespace infinity {
 
 export class ReferenceExpression : public BaseExpression {
 public:
-    static inline SharedPtr<ReferenceExpression> Make(DataType data_type, String table_name, String column_name, String alias, SizeT column_idx) {
-        return MakeShared<ReferenceExpression>(std::move(data_type), std::move(table_name), std::move(column_name), std::move(alias), column_idx);
+    static inline std::shared_ptr<ReferenceExpression>
+    Make(DataType data_type, std::string table_name, std::string column_name, std::string alias, size_t column_idx) {
+        return std::make_shared<ReferenceExpression>(std::move(data_type),
+                                                     std::move(table_name),
+                                                     std::move(column_name),
+                                                     std::move(alias),
+                                                     column_idx);
     }
 
 public:
-    explicit ReferenceExpression(DataType data_type, String table_name, String column_name, String alias, SizeT column_idx)
+    explicit ReferenceExpression(DataType data_type, std::string table_name, std::string column_name, std::string alias, size_t column_idx)
         : BaseExpression(ExpressionType::kReference, {}, std::move(alias)), data_type_(std::move(data_type)), table_name_(std::move(table_name)),
           column_name_(std::move(column_name)), column_index_(column_idx) {}
 
-    inline SizeT column_index() const { return column_index_; }
+    inline size_t column_index() const { return column_index_; }
 
     inline DataType Type() const override { return data_type_; };
 
-    String ToString() const override;
+    std::string ToString() const override;
 
     u64 Hash() const override;
 
@@ -48,11 +53,11 @@ public:
 private:
     DataType data_type_;
 
-    String table_name_{};
+    std::string table_name_{};
 
-    String column_name_{};
+    std::string column_name_{};
 
-    SizeT column_index_{};
+    size_t column_index_{};
 };
 
 } // namespace infinity

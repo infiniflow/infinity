@@ -1,8 +1,8 @@
-module;
-
 export module infinity_core:flush_info;
 
-import :stl;
+import :infinity_type;
+
+import std;
 
 namespace infinity {
 
@@ -45,7 +45,7 @@ public:
     static const u64 MASK_FLUSH_LENGTH = 0xFFFFFFFE;
     static const u64 MASK_FLUSH_COUNT = 0xFFFFFFFF00000000;
 
-    Atomic<u64> flush_info_{};
+    std::atomic<u64> flush_info_{};
 };
 
 } // namespace infinity

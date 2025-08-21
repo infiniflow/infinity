@@ -12,10 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:emvb_shared_vec;
-import :stl;
+
+import :infinity_type;
+
+import std;
 
 namespace infinity {
 
@@ -24,7 +25,7 @@ namespace infinity {
 export template <typename T>
 class EMVBSharedVec {
     mutable std::shared_mutex rw_mutex_; // mutex for read-write operations
-    SharedPtr<T[]> data_;
+    std::shared_ptr<T[]> data_;
     u32 capacity_ = 0;
     u32 size_ = 0;
 
@@ -51,7 +52,7 @@ public:
         return *this;
     }
 
-    [[nodiscard]] Pair<SharedPtr<T[]>, u32> GetData() const {
+    [[nodiscard]] std::pair<std::shared_ptr<T[]>, u32> GetData() const {
         std::shared_lock lock(rw_mutex_);
         return {data_, size_};
     }

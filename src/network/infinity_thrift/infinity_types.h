@@ -283,6 +283,8 @@ class InitParameter;
 
 class ConstantExpr;
 
+class FunctionExpr;
+
 class KnnExpr;
 
 class MatchSparseExpr;
@@ -296,8 +298,6 @@ class GenericMatchExpr;
 class FusionExpr;
 
 class SearchExpr;
-
-class FunctionExpr;
 
 class BetweenExpr;
 
@@ -1207,8 +1207,48 @@ void swap(ConstantExpr &a, ConstantExpr &b);
 
 std::ostream& operator<<(std::ostream& out, const ConstantExpr& obj);
 
+typedef struct _FunctionExpr__isset {
+  _FunctionExpr__isset() : function_name(false), arguments(false) {}
+  bool function_name :1;
+  bool arguments :1;
+} _FunctionExpr__isset;
+
+class FunctionExpr : public virtual ::apache::thrift::TBase {
+ public:
+
+  FunctionExpr(const FunctionExpr&);
+  FunctionExpr& operator=(const FunctionExpr&);
+  FunctionExpr() noexcept;
+
+  virtual ~FunctionExpr() noexcept;
+  std::string function_name;
+  std::vector<ParsedExpr>  arguments;
+
+  _FunctionExpr__isset __isset;
+
+  void __set_function_name(const std::string& val);
+
+  void __set_arguments(const std::vector<ParsedExpr> & val);
+
+  bool operator == (const FunctionExpr & rhs) const;
+  bool operator != (const FunctionExpr &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const FunctionExpr & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
+
+  virtual void printTo(std::ostream& out) const;
+};
+
+void swap(FunctionExpr &a, FunctionExpr &b);
+
+std::ostream& operator<<(std::ostream& out, const FunctionExpr& obj);
+
 typedef struct _KnnExpr__isset {
-  _KnnExpr__isset() : column_expr(false), embedding_data(false), embedding_data_type(false), distance_type(false), topn(false), opt_params(true), filter_expr(false) {}
+  _KnnExpr__isset() : column_expr(false), embedding_data(false), embedding_data_type(false), distance_type(false), topn(false), opt_params(true), filter_expr(false), query_embedding_expr(false) {}
   bool column_expr :1;
   bool embedding_data :1;
   bool embedding_data_type :1;
@@ -1216,6 +1256,7 @@ typedef struct _KnnExpr__isset {
   bool topn :1;
   bool opt_params :1;
   bool filter_expr :1;
+  bool query_embedding_expr :1;
 } _KnnExpr__isset;
 
 class KnnExpr : public virtual ::apache::thrift::TBase {
@@ -1241,6 +1282,7 @@ class KnnExpr : public virtual ::apache::thrift::TBase {
   int64_t topn;
   std::vector<InitParameter>  opt_params;
   ParsedExpr filter_expr;
+  FunctionExpr query_embedding_expr;
 
   _KnnExpr__isset __isset;
 
@@ -1257,6 +1299,8 @@ class KnnExpr : public virtual ::apache::thrift::TBase {
   void __set_opt_params(const std::vector<InitParameter> & val);
 
   void __set_filter_expr(const ParsedExpr& val);
+
+  void __set_query_embedding_expr(const FunctionExpr& val);
 
   bool operator == (const KnnExpr & rhs) const;
   bool operator != (const KnnExpr &rhs) const {
@@ -1570,46 +1614,6 @@ class SearchExpr : public virtual ::apache::thrift::TBase {
 void swap(SearchExpr &a, SearchExpr &b);
 
 std::ostream& operator<<(std::ostream& out, const SearchExpr& obj);
-
-typedef struct _FunctionExpr__isset {
-  _FunctionExpr__isset() : function_name(false), arguments(false) {}
-  bool function_name :1;
-  bool arguments :1;
-} _FunctionExpr__isset;
-
-class FunctionExpr : public virtual ::apache::thrift::TBase {
- public:
-
-  FunctionExpr(const FunctionExpr&);
-  FunctionExpr& operator=(const FunctionExpr&);
-  FunctionExpr() noexcept;
-
-  virtual ~FunctionExpr() noexcept;
-  std::string function_name;
-  std::vector<ParsedExpr>  arguments;
-
-  _FunctionExpr__isset __isset;
-
-  void __set_function_name(const std::string& val);
-
-  void __set_arguments(const std::vector<ParsedExpr> & val);
-
-  bool operator == (const FunctionExpr & rhs) const;
-  bool operator != (const FunctionExpr &rhs) const {
-    return !(*this == rhs);
-  }
-
-  bool operator < (const FunctionExpr & ) const;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
-
-  virtual void printTo(std::ostream& out) const;
-};
-
-void swap(FunctionExpr &a, FunctionExpr &b);
-
-std::ostream& operator<<(std::ostream& out, const FunctionExpr& obj);
 
 typedef struct _BetweenExpr__isset {
   _BetweenExpr__isset() : value(false), upper_bound(false), lower_bound(false) {}

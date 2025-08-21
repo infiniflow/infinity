@@ -14,13 +14,10 @@
 
 module;
 
-#include <vector>
-
 module infinity_core:expression_transformer.impl;
 
 import :expression_transformer;
 
-import :stl;
 import :base_expression;
 import :aggregate_expression;
 import :between_expression;
@@ -30,17 +27,18 @@ import :function_expression;
 import :in_expression;
 import :conjunction_expression;
 import :expression_type;
-
 import :infinity_exception;
-import :third_party;
-import :logger;
+
+import std;
 
 namespace infinity {
 
-Vector<SharedPtr<BaseExpression>> SplitExpressionByDelimiter(const SharedPtr<BaseExpression> &expression, ConjunctionType delimiter) {
-    Vector<SharedPtr<BaseExpression>> result;
+std::vector<std::shared_ptr<BaseExpression>> SplitExpressionByDelimiter(const std::shared_ptr<BaseExpression> &expression,
+                                                                        ConjunctionType delimiter) {
+    std::vector<std::shared_ptr<BaseExpression>> result;
 
-    std::function<VisitControlType(SharedPtr<BaseExpression> & child)> func = [&](const SharedPtr<BaseExpression> &expr_ptr) -> VisitControlType {
+    std::function<VisitControlType(std::shared_ptr<BaseExpression> & child)> func =
+        [&](const std::shared_ptr<BaseExpression> &expr_ptr) -> VisitControlType {
         if (expr_ptr->type() == ExpressionType::kConjunction) {
             const auto conjunction_expr_ptr = std::static_pointer_cast<ConjunctionExpression>(expr_ptr);
             if (conjunction_expr_ptr->conjunction_type() == delimiter)
@@ -55,20 +53,22 @@ Vector<SharedPtr<BaseExpression>> SplitExpressionByDelimiter(const SharedPtr<Bas
     return result;
 }
 
-SharedPtr<BaseExpression> ComposeExpressionWithDelimiter(const Vector<SharedPtr<BaseExpression>> &expressions, ConjunctionType conjunction_type) {
+std::shared_ptr<BaseExpression> ComposeExpressionWithDelimiter(const std::vector<std::shared_ptr<BaseExpression>> &expressions,
+                                                               ConjunctionType conjunction_type) {
     auto expr_count = expressions.size();
     if (expr_count == 0) {
         return nullptr;
     }
-    SharedPtr<BaseExpression> result = expressions[0];
-    for (SizeT i = 1; i < expr_count; ++i) {
-        result = MakeShared<ConjunctionExpression>(conjunction_type, result, expressions[i]);
+    std::shared_ptr<BaseExpression> result = expressions[0];
+    for (size_t i = 1; i < expr_count; ++i) {
+        result = std::make_shared<ConjunctionExpression>(conjunction_type, result, expressions[i]);
     }
     return result;
 }
 
-void VisitExpression(const SharedPtr<BaseExpression> &expression, const std::function<VisitControlType(SharedPtr<BaseExpression> &child)> &visitor) {
-    Queue<SharedPtr<BaseExpression>> queue;
+void VisitExpression(const std::shared_ptr<BaseExpression> &expression,
+                     const std::function<VisitControlType(std::shared_ptr<BaseExpression> &child)> &visitor) {
+    std::queue<std::shared_ptr<BaseExpression>> queue;
     queue.push(expression);
 
     while (!queue.empty()) {
@@ -83,31 +83,31 @@ void VisitExpression(const SharedPtr<BaseExpression> &expression, const std::fun
     }
 }
 
-void VisitExpression(const SharedPtr<BaseExpression> &expression, const std::function<void(SharedPtr<BaseExpression> &child)> &visitor) {
+void VisitExpression(const std::shared_ptr<BaseExpression> &expression, const std::function<void(std::shared_ptr<BaseExpression> &child)> &visitor) {
     switch (expression->type()) {
         case ExpressionType::kAggregate: {
-            AggregateExpression *agg_expr = (AggregateExpression *)expression.get();
+            auto *agg_expr = static_cast<AggregateExpression *>(expression.get());
             for (auto &argument : agg_expr->arguments()) {
                 visitor(argument);
             }
             break;
         }
         case ExpressionType::kBetween: {
-            BetweenExpression *between_expr = (BetweenExpression *)expression.get();
+            auto *between_expr = static_cast<BetweenExpression *>(expression.get());
             for (auto &argument : between_expr->arguments()) {
                 visitor(argument);
             }
             break;
         }
         case ExpressionType::kCast: {
-            CastExpression *cast_expr = (CastExpression *)expression.get();
+            auto *cast_expr = static_cast<CastExpression *>(expression.get());
             for (auto &argument : cast_expr->arguments()) {
                 visitor(argument);
             }
             break;
         }
         case ExpressionType::kCase: {
-            CaseExpression *case_expr = (CaseExpression *)expression.get();
+            auto *case_expr = static_cast<CaseExpression *>(expression.get());
             for (auto &argument : case_expr->arguments()) {
                 visitor(argument);
             }
@@ -120,21 +120,21 @@ void VisitExpression(const SharedPtr<BaseExpression> &expression, const std::fun
         }
 
         case ExpressionType::kConjunction: {
-            ConjunctionExpression *conjunction_expr = (ConjunctionExpression *)expression.get();
+            auto *conjunction_expr = static_cast<ConjunctionExpression *>(expression.get());
             for (auto &argument : conjunction_expr->arguments()) {
                 visitor(argument);
             }
             break;
         }
         case ExpressionType::kFunction: {
-            FunctionExpression *function_expr = (FunctionExpression *)expression.get();
+            auto *function_expr = static_cast<FunctionExpression *>(expression.get());
             for (auto &argument : function_expr->arguments()) {
                 visitor(argument);
             }
             break;
         }
         case ExpressionType::kIn: {
-            InExpression *function_expr = (InExpression *)expression.get();
+            auto *function_expr = static_cast<InExpression *>(expression.get());
             visitor(function_expr->left_operand());
 
             for (auto &argument : function_expr->arguments()) {
@@ -149,8 +149,7 @@ void VisitExpression(const SharedPtr<BaseExpression> &expression, const std::fun
         case ExpressionType::kFilterFullText:
             break;
         default: {
-            String error_message = fmt::format("Unsupported expression type: {}", expression->Name());
-            UnrecoverableError(error_message);
+            UnrecoverableError(fmt::format("Unsupported expression type: {}", expression->Name()));
         }
     }
 }

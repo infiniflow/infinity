@@ -24,7 +24,7 @@ import pyarrow as pa
 from pyarrow import Table
 from sqlglot import condition, maybe_parse
 
-from infinity.common import VEC, SparseVector, InfinityException, SortType
+from infinity.common import VEC, SparseVector, InfinityException, SortType, FDE
 from infinity.errors import ErrorCode
 from infinity.remote_thrift.infinity_thrift_rpc.ttypes import *
 from infinity.remote_thrift.types import (
@@ -127,7 +127,14 @@ class InfinityThriftQueryBuilder(ABC):
                 ErrorCode.INVALID_TOPK_TYPE, f"Invalid topn, type should be embedded, but get {type(topn)}"
             )
 
-        # type casting
+        # Check if this is an FDE object
+        if isinstance(embedding_data, FDE):
+            # Handle FDE function call
+            return self._handle_fde_match_dense(
+                column_expr, embedding_data, embedding_data_type, distance_type, topn, knn_params
+            )
+
+        # type casting for regular embedding data
         if isinstance(embedding_data, list):
             embedding_data = embedding_data
         elif isinstance(embedding_data, tuple):
@@ -587,3 +594,91 @@ class InfinityThriftQueryBuilder(ABC):
             explain_type=explain_type,
         )
         return self._table._explain_query(query)
+
+    def _handle_fde_match_dense(
+            self,
+            column_expr: ColumnExpr,
+            fde_data: FDE,
+            embedding_data_type: str,
+            distance_type: str,
+            topn: int,
+            knn_params: {} = None,
+    ) -> InfinityThriftQueryBuilder:
+        """Handle FDE function call in match_dense"""
+
+        # Create FDE function expression
+        fde_function = FunctionExpr()
+        fde_function.function_name = "FDE"
+        fde_function.arguments = []
+
+        # Create tensor data constant expression
+        tensor_constant = ConstantExpr()
+        tensor_constant.literal_type = LiteralType.DoubleTensor
+        tensor_constant.f64_tensor_value = fde_data.tensor_data
+
+        # Create target dimension constant expression
+        target_dim_constant = ConstantExpr()
+        target_dim_constant.literal_type = LiteralType.Int64
+        target_dim_constant.i64_value = fde_data.target_dimension
+
+        # Add arguments to function
+        tensor_parsed_expr = ParsedExpr()
+        tensor_parsed_expr.type = ParsedExprType(constant_expr=tensor_constant)
+        fde_function.arguments.append(tensor_parsed_expr)
+
+        target_dim_parsed_expr = ParsedExpr()
+        target_dim_parsed_expr.type = ParsedExprType(constant_expr=target_dim_constant)
+        fde_function.arguments.append(target_dim_parsed_expr)
+
+        # Convert distance type
+        dist_type = KnnDistanceType.L2
+        if distance_type == "l2":
+            dist_type = KnnDistanceType.L2
+        elif distance_type == "cosine" or distance_type == "cos":
+            dist_type = KnnDistanceType.Cosine
+        elif distance_type == "ip":
+            dist_type = KnnDistanceType.InnerProduct
+        elif distance_type == "hamming":
+            dist_type = KnnDistanceType.Hamming
+        else:
+            raise InfinityException(ErrorCode.INVALID_KNN_DISTANCE_TYPE, f"Invalid distance type {distance_type}")
+
+        # Convert embedding data type
+        elem_type = ElementType.ElementFloat32
+        if embedding_data_type in ["float", "float32"]:
+            elem_type = ElementType.ElementFloat32
+        elif embedding_data_type in ["double", "float64"]:
+            elem_type = ElementType.ElementFloat64
+        elif embedding_data_type == "float16":
+            elem_type = ElementType.ElementFloat16
+        elif embedding_data_type == "bfloat16":
+            elem_type = ElementType.ElementBFloat16
+        else:
+            raise InfinityException(ErrorCode.INVALID_EMBEDDING_DATA_TYPE,
+                                    f"Invalid embedding data type {embedding_data_type}")
+
+        # Handle optional parameters
+        knn_opt_params = []
+        optional_filter = None
+        if knn_params is not None:
+            optional_filter = get_search_optional_filter_from_opt_params(knn_params)
+            for k, v in knn_params.items():
+                key = k.lower()
+                value = v.lower()
+                knn_opt_params.append(InitParameter(key, value))
+
+        # Create KnnExpr with FDE function as query_embedding_expr
+        knn_expr = KnnExpr(
+            column_expr=column_expr,
+            embedding_data_type=elem_type,
+            distance_type=dist_type,
+            topn=topn,
+            opt_params=knn_opt_params,
+            filter_expr=optional_filter,
+            query_embedding_expr=fde_function,  # This is the key difference
+        )
+        # Don't set embedding_data at all for FDE queries
+
+        generic_match_expr = GenericMatchExpr(match_vector_expr=knn_expr)
+        self._search.match_exprs.append(generic_match_expr)
+        return self

@@ -12,11 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:physical_index_scan;
-
-import :stl;
 
 import :query_context;
 import :operator_state;
@@ -26,8 +22,6 @@ import :physical_scan_base;
 import :base_expression;
 import :load_meta;
 import :infinity_exception;
-import internal_types;
-import data_type;
 import :base_table_ref;
 import :value;
 import :knn_filter;
@@ -36,6 +30,9 @@ import :fast_rough_filter;
 import :global_block_id;
 import :roaring_bitmap;
 import :filter_expression_push_down;
+
+import internal_types;
+import data_type;
 
 namespace infinity {
 
@@ -48,36 +45,36 @@ namespace infinity {
 export class PhysicalIndexScan final : public PhysicalScanBase {
 public:
     explicit PhysicalIndexScan(u64 id,
-                               SharedPtr<BaseTableRef> base_table_ref,
-                               SharedPtr<BaseExpression> index_filter,
-                               UniquePtr<IndexFilterEvaluator> &&index_filter_evaluator,
-                               UniquePtr<FastRoughFilterEvaluator> &&fast_rough_filter_evaluator,
-                               SharedPtr<Vector<LoadMeta>> load_metas,
-                               SharedPtr<Vector<String>> output_names,
-                               SharedPtr<Vector<SharedPtr<DataType>>> output_types,
+                               std::shared_ptr<BaseTableRef> base_table_ref,
+                               std::shared_ptr<BaseExpression> index_filter,
+                               std::unique_ptr<IndexFilterEvaluator> &&index_filter_evaluator,
+                               std::unique_ptr<FastRoughFilterEvaluator> &&fast_rough_filter_evaluator,
+                               std::shared_ptr<std::vector<LoadMeta>> load_metas,
+                               std::shared_ptr<std::vector<std::string>> output_names,
+                               std::shared_ptr<std::vector<std::shared_ptr<DataType>>> output_types,
                                bool add_row_id = true,
                                bool cache_result = false);
 
     ~PhysicalIndexScan() final = default;
 
-    void Init(QueryContext* query_context) override;
+    void Init(QueryContext *query_context) override;
 
     bool Execute(QueryContext *query_context, OperatorState *operator_state) override;
 
-    inline SharedPtr<Vector<String>> GetOutputNames() const final { return output_names_; }
+    inline std::shared_ptr<std::vector<std::string>> GetOutputNames() const final { return output_names_; }
 
-    inline SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const final { return output_types_; }
+    inline std::shared_ptr<std::vector<std::shared_ptr<DataType>>> GetOutputTypes() const final { return output_types_; }
 
     // different from table scan:
     // table scan: one tasklet scan one block
     // index scan: one tasklet scan one segment
-    SizeT TaskletCount() final;
+    size_t TaskletCount() final;
 
-    Vector<SharedPtr<Vector<GlobalBlockID>>> PlanBlockEntries(i64) const override;
+    std::vector<std::shared_ptr<std::vector<GlobalBlockID>>> PlanBlockEntries(i64) const override;
 
-    Vector<UniquePtr<Vector<SegmentID>>> PlanSegments(u32 parallel_count) const;
+    std::vector<std::unique_ptr<std::vector<SegmentID>>> PlanSegments(u32 parallel_count) const;
 
-    inline String table_alias() const { return base_table_ref_->alias_; }
+    inline std::string table_alias() const { return base_table_ref_->alias_; }
 
     inline u64 TableIndex() const { return base_table_ref_->table_index_; }
 
@@ -88,15 +85,15 @@ private:
 
 private:
     // input from optimizer
-    SharedPtr<BaseExpression> index_filter_{};
-    UniquePtr<IndexFilterEvaluator> index_filter_evaluator_{};
+    std::shared_ptr<BaseExpression> index_filter_{};
+    std::unique_ptr<IndexFilterEvaluator> index_filter_evaluator_{};
 
-    UniquePtr<FastRoughFilterEvaluator> fast_rough_filter_evaluator_{};
+    std::unique_ptr<FastRoughFilterEvaluator> fast_rough_filter_evaluator_{};
 
-    SharedPtr<Vector<String>> output_names_{};
-    SharedPtr<Vector<SharedPtr<DataType>>> output_types_{};
+    std::shared_ptr<std::vector<std::string>> output_names_{};
+    std::shared_ptr<std::vector<std::shared_ptr<DataType>>> output_types_{};
     bool add_row_id_{};
-    mutable Vector<SizeT> column_ids_{};
+    mutable std::vector<size_t> column_ids_{};
 };
 
 } // namespace infinity

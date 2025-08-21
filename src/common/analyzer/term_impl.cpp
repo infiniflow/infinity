@@ -12,16 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:term.impl;
 
-import :stl;
 import :term;
+
+import std;
 
 namespace infinity {
 
-String PLACE_HOLDER("<PH>");
+std::string PLACE_HOLDER("<PH>");
 
 void Term::Reset() {
     text_.clear();

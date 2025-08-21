@@ -12,27 +12,25 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:batch_or_iterator;
 
-import :stl;
 import :index_defines;
 import :doc_iterator;
 import :multi_doc_iterator;
+
 import internal_types;
 
 namespace infinity {
 
 export class BatchOrIterator : public MultiDocIterator {
 public:
-    explicit BatchOrIterator(Vector<UniquePtr<DocIterator>> &&iterators);
+    explicit BatchOrIterator(std::vector<std::unique_ptr<DocIterator>> &&iterators);
 
     ~BatchOrIterator() override;
 
     DocIteratorType GetType() const override { return DocIteratorType::kBatchOrIterator; }
 
-    String Name() const override { return "BatchOrIterator"; }
+    std::string Name() const override { return "BatchOrIterator"; }
 
     void UpdateScoreThreshold(float threshold) override {}
 
@@ -50,9 +48,9 @@ private:
     // Dynamic batch sizing based on keyword count
     u32 CalculateOptimalBatchSize(u32 num_keywords) const;
 
-    Vector<f32> f1_;
-    Vector<f32> f2_;
-    Vector<f32> bm25_common_score_;
+    std::vector<f32> f1_;
+    std::vector<f32> f2_;
+    std::vector<f32> bm25_common_score_;
     RowID buffer_start_doc_id_ = INVALID_ROWID;
     u32 batch_size_ = 128; // Dynamic batch size instead of fixed BATCH_OR_LEN
     u32 memset_bytes_ = 0;

@@ -4,7 +4,6 @@ module;
 
 export module infinity_core:posting_buffer;
 
-import :stl;
 import :posting_field;
 import :file_writer;
 import :file_reader;
@@ -43,7 +42,7 @@ public:
     // Initialization with field configuration
     void Init(const PostingFields *field_definitions) {
         field_configuration_ = field_definitions;
-        for (SizeT index = 0; index < field_definitions->GetSize(); ++index) {
+        for (size_t index = 0; index < field_definitions->GetSize(); ++index) {
             row_offsets_[index] = field_definitions->GetValue(index)->offset_;
         }
     }
@@ -58,7 +57,7 @@ public:
     // Capacity and size queries
     u8 Capacity() const { return column_capacity_; }
     u8 Size() const { return current_size_; }
-    inline SizeT GetSizeInBytes() const { return column_capacity_ * field_configuration_->GetTotalSize(); }
+    inline size_t GetSizeInBytes() const { return column_capacity_ * field_configuration_->GetTotalSize(); }
     u8 GetRowCount() const { return field_configuration_->GetSize(); }
 
     // Typed row access methods

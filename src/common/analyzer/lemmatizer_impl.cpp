@@ -15,30 +15,24 @@
 module;
 
 #include <cassert>
-#include <filesystem>
-#include <fstream>
-#include <iostream>
-#include <sstream>
-#include <unordered_map>
-#include <iterator>
 
 module infinity_core:lemmatizer.impl;
 
-import :stl;
-import :third_party;
 import :lemmatizer;
+
+import std;
 
 namespace fs = std::filesystem;
 
 namespace infinity {
 
-static const String ADJ = "a";
-static const String ADJ_SAT = "s";
-static const String ADV = "r";
-static const String NOUN = "n";
-static const String VERB = "v";
+static const std::string ADJ = "a";
+static const std::string ADJ_SAT = "s";
+static const std::string ADV = "r";
+static const std::string NOUN = "n";
+static const std::string VERB = "v";
 
-Lemmatizer::Lemmatizer(const String &path) : path_(path) {}
+Lemmatizer::Lemmatizer(const std::string &path) : path_(path) {}
 
 Lemmatizer::~Lemmatizer() {}
 
@@ -53,7 +47,7 @@ Status Lemmatizer::Load() {
         {ADJ_SAT, {{"er", ""}, {"est", ""}, {"er", "e"}, {"est", "e"}}}};
 
     pos_names_ = [this] {
-        HashMap<int, String> names;
+        std::unordered_map<int, std::string> names;
         for (const auto &pair : pos_numbers_) {
             names[pair.second] = pair.first;
         }
@@ -71,7 +65,7 @@ Status Lemmatizer::Load() {
 Status Lemmatizer::LoadLemmaPosOffsetMap() {
     fs::path root(path_);
     for (const auto &pair : file_map_) {
-        const String &pos = pair.second;
+        const std::string &pos = pair.second;
         fs::path dict_path(root / ("index." + pos));
 
         std::ifstream file(dict_path.string());
@@ -79,7 +73,7 @@ Status Lemmatizer::LoadLemmaPosOffsetMap() {
             return Status::InvalidAnalyzerFile(fmt::format("Failed to load wordnet lemmatizer, index.{}", pos));
         }
 
-        String line;
+        std::string line;
 
         while (std::getline(file, line)) {
             if (line.empty() || line[0] == ' ') {
@@ -88,8 +82,8 @@ Status Lemmatizer::LoadLemmaPosOffsetMap() {
 
             std::istringstream stream(line);
             try {
-                String lemma;
-                String pos;
+                std::string lemma;
+                std::string pos;
                 std::getline(stream, lemma, ' ');
                 std::getline(stream, pos, ' ');
 
@@ -101,7 +95,7 @@ Status Lemmatizer::LoadLemmaPosOffsetMap() {
                 stream >> n_pointers;
                 // Ignore pointer symbols
                 for (int i = 0; i < n_pointers; ++i) {
-                    String pointer_symbol;
+                    std::string pointer_symbol;
                     stream >> pointer_symbol; // Dummy read
                 }
 
@@ -114,12 +108,12 @@ Status Lemmatizer::LoadLemmaPosOffsetMap() {
                 stream >> n_ranked_senses;
 
                 // Get synset offsets
-                Vector<int> synset_offsets(n_synsets);
+                std::vector<int> synset_offsets(n_synsets);
                 for (int i = 0; i < n_synsets; ++i) {
                     stream >> synset_offsets[i];
                 }
 
-                // Map lemmas and parts of speech to synsets
+                // std::map lemmas and parts of speech to synsets
                 lemma_pos_offset_map_[lemma][pos] = synset_offsets;
 
                 if (pos == ADJ) {
@@ -145,21 +139,21 @@ void Lemmatizer::LoadExceptionMap() {
         std::ifstream file(dict_path.string());
         exception_map_[pos] = {};
 
-        String line;
+        std::string line;
         while (std::getline(file, line)) {
             std::istringstream stream(line);
-            String term;
+            std::string term;
             stream >> term;
-            Vector<String> exceptions{std::istream_iterator<String>{stream}, std::istream_iterator<String>{}};
+            std::vector<std::string> exceptions{std::istream_iterator<std::string>{stream}, std::istream_iterator<std::string>{}};
             exception_map_[pos][term] = exceptions;
         }
     }
     exception_map_[ADJ_SAT] = exception_map_.at(ADJ);
 }
 
-Vector<String> Lemmatizer::ApplyRules(const Vector<String> &forms, const String &pos) {
+std::vector<std::string> Lemmatizer::ApplyRules(const std::vector<std::string> &forms, const std::string &pos) {
     const auto &substitutions = MORPHOLOGICAL_SUBSTITUTIONS.at(pos);
-    Vector<String> results;
+    std::vector<std::string> results;
     for (const auto &form : forms) {
         for (const auto &[old, new_suffix] : substitutions) {
             if (form.size() >= old.size() && form.compare(form.size() - old.size(), old.size(), old) == 0) {
@@ -170,9 +164,9 @@ Vector<String> Lemmatizer::ApplyRules(const Vector<String> &forms, const String 
     return results;
 }
 
-Vector<String> Lemmatizer::FilterForms(const Vector<String> &forms, const String &pos) {
-    Vector<String> result;
-    Set<String> seen;
+std::vector<std::string> Lemmatizer::FilterForms(const std::vector<std::string> &forms, const std::string &pos) {
+    std::vector<std::string> result;
+    std::set<std::string> seen;
     for (const auto &form : forms) {
         // Check if form exists in lemma_pos_offset_map_
         if (lemma_pos_offset_map_.find(form) != lemma_pos_offset_map_.end()) {
@@ -187,10 +181,10 @@ Vector<String> Lemmatizer::FilterForms(const Vector<String> &forms, const String
     return result;
 }
 
-Vector<String> Lemmatizer::Morphy(const String &form, const String &pos, bool check_exceptions) {
+std::vector<std::string> Lemmatizer::Morphy(const std::string &form, const std::string &pos, bool check_exceptions) {
     const auto &exceptions = exception_map_.at(pos);
 
-    Vector<String> forms;
+    std::vector<std::string> forms;
 
     if (check_exceptions && exceptions.find(form) != exceptions.end()) {
         forms = exceptions.at(form);
@@ -202,9 +196,9 @@ Vector<String> Lemmatizer::Morphy(const String &form, const String &pos, bool ch
     return FilterForms(forms, pos);
 }
 
-String Lemmatizer::Lemmatize(const String &form, const String &pos) {
+std::string Lemmatizer::Lemmatize(const std::string &form, const std::string &pos) {
     // If pos is specified, create a vector with that pos, otherwise use all POS_LIST
-    Vector<String> parts_of_speech;
+    std::vector<std::string> parts_of_speech;
     if (!pos.empty()) {
         parts_of_speech.push_back(pos);
     } else {

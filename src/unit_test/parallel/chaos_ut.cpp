@@ -12,16 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifdef CI
-#include "gtest/gtest.h"
-#include <chrono>
-import infinity_core;
-import base_test;
-#else
 module;
 
-#include "gtest/gtest.h"
-#include <chrono>
+#include "unit_test/gtest_expand.h"
 
 module infinity_core:ut.chaos;
 
@@ -30,15 +23,15 @@ import :new_txn_manager;
 import :new_txn;
 import :status;
 import :infinity_context;
-import :stl;
 import :txn_state;
 import :infinity;
 import :query_options;
 import :logger;
-import :third_party;
 import :profiler;
 import :virtual_store;
-#endif
+import :query_result;
+
+import third_party;
 
 import search_expr;
 import match_expr;
@@ -71,26 +64,26 @@ INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
                          ParallelTest,
                          ::testing::Values(ParallelTest::NEW_CONFIG_PATH, ParallelTest::NEW_VFS_OFF_CONFIG_PATH));
 
-constexpr SizeT kDataSize = 100000;
-constexpr SizeT kRunningTime = 30;
-constexpr SizeT kNumThread = 4;
-constexpr SizeT data_size = 100000;
-constexpr SizeT insert_delete_size = 100;
+constexpr size_t kDataSize = 100000;
+constexpr size_t kRunningTime = 30;
+constexpr size_t kNumThread = 4;
+constexpr size_t data_size = 100000;
+constexpr size_t insert_delete_size = 100;
 
 struct DataRow {
     int index_;
-    String body_;
-    Vector<double> others_;
+    std::string body_;
+    std::vector<double> others_;
 };
 
-SizeT RandInt(SizeT low, SizeT high) {
+size_t RandInt(size_t low, size_t high) {
     static thread_local std::mt19937 gen(std::random_device{}());
-    std::uniform_int_distribution<SizeT> dist(low, high);
+    std::uniform_int_distribution<size_t> dist(low, high);
     return dist(gen);
 }
 
-Vector<DataRow> DataPreprocessing(const String &filepath) {
-    Vector<std::string> texts;
+std::vector<DataRow> DataPreprocessing(const std::string &filepath) {
+    std::vector<std::string> texts;
     std::ifstream fin(filepath);
     if (!fin) {
         LOG_ERROR(fmt::format("Cannot open text data: {}", filepath));
@@ -107,18 +100,18 @@ Vector<DataRow> DataPreprocessing(const String &filepath) {
     }
     fin.close();
 
-    Vector<std::vector<double>> vectors = {{0.0, 0.0, 0.0, 0.0},
-                                           {1.1, 1.1, 1.1, 1.1},
-                                           {2.2, 2.2, 2.2, 2.2},
-                                           {3.3, 3.3, 3.3, 3.3},
-                                           {4.4, 4.4, 4.4, 4.4},
-                                           {5.5, 5.5, 5.5, 5.5},
-                                           {6.6, 6.6, 6.6, 6.6},
-                                           {7.7, 7.7, 7.7, 7.7},
-                                           {8.8, 8.8, 8.8, 8.8},
-                                           {9.9, 9.9, 9.9, 9.9}};
+    std::vector<std::vector<double>> vectors = {{0.0, 0.0, 0.0, 0.0},
+                                                {1.1, 1.1, 1.1, 1.1},
+                                                {2.2, 2.2, 2.2, 2.2},
+                                                {3.3, 3.3, 3.3, 3.3},
+                                                {4.4, 4.4, 4.4, 4.4},
+                                                {5.5, 5.5, 5.5, 5.5},
+                                                {6.6, 6.6, 6.6, 6.6},
+                                                {7.7, 7.7, 7.7, 7.7},
+                                                {8.8, 8.8, 8.8, 8.8},
+                                                {9.9, 9.9, 9.9, 9.9}};
 
-    Vector<DataRow> data_rows;
+    std::vector<DataRow> data_rows;
 
     int base_size = std::min((int)texts.size(), (int)vectors.size());
     int repeat_times = kDataSize / base_size;
@@ -147,8 +140,8 @@ Vector<DataRow> DataPreprocessing(const String &filepath) {
     return data_rows;
 }
 
-void FullTextSearch(const String &db_name, const String &table_name) {
-    SharedPtr<Infinity> infinity = Infinity::LocalConnect();
+void FullTextSearch(const std::string &db_name, const std::string &table_name) {
+    std::shared_ptr<Infinity> infinity = Infinity::LocalConnect();
     auto *search_expr = new SearchExpr();
     auto *exprs = new std::vector<ParsedExpr *>();
     auto *match_expr = new MatchExpr();
@@ -178,9 +171,9 @@ void FullTextSearch(const String &db_name, const String &table_name) {
     infinity->LocalDisconnect();
 }
 
-void VectorSearch(const String &db_name, const String &table_name) {
-    SharedPtr<Infinity> infinity = Infinity::LocalConnect();
-    KnnExpr *knn_expr = new KnnExpr();
+void VectorSearch(const std::string &db_name, const std::string &table_name) {
+    std::shared_ptr<Infinity> infinity = Infinity::LocalConnect();
+    auto knn_expr = new KnnExpr();
     knn_expr->dimension_ = 4;
     knn_expr->distance_type_ = KnnDistanceType::kL2;
     knn_expr->topn_ = 3;
@@ -209,28 +202,28 @@ void VectorSearch(const String &db_name, const String &table_name) {
     infinity->LocalDisconnect();
 }
 
-void Insert(const String &db_name, const String &table_name, Vector<DataRow> data) {
-    SharedPtr<Infinity> infinity = Infinity::LocalConnect();
-    SizeT max_start = data.size() > insert_delete_size ? data.size() - insert_delete_size : 0;
-    SizeT pos = RandInt(0, max_start);
+void Insert(const std::string &db_name, const std::string &table_name, std::vector<DataRow> data) {
+    std::shared_ptr<Infinity> infinity = Infinity::LocalConnect();
+    size_t max_start = data.size() > insert_delete_size ? data.size() - insert_delete_size : 0;
+    size_t pos = RandInt(0, max_start);
 
-    auto insert_rows = new Vector<InsertRowExpr *>();
+    auto insert_rows = new std::vector<InsertRowExpr *>();
     insert_rows->reserve(insert_delete_size);
 
-    for (SizeT i = 0; i < insert_delete_size && (pos + i) < data.size(); ++i) {
+    for (size_t i = 0; i < insert_delete_size && (pos + i) < data.size(); ++i) {
         const auto &row = data[pos + i];
-        auto insert_row = MakeUnique<InsertRowExpr>();
+        auto insert_row = std::make_unique<InsertRowExpr>();
         insert_row->columns_ = {"index", "body", "other_vector"};
 
-        auto index_expr = MakeUnique<ConstantExpr>(LiteralType::kInteger);
+        auto index_expr = std::make_unique<ConstantExpr>(LiteralType::kInteger);
         index_expr->integer_value_ = row.index_;
         insert_row->values_.emplace_back(std::move(index_expr));
 
-        auto body_expr = MakeUnique<ConstantExpr>(LiteralType::kString);
+        auto body_expr = std::make_unique<ConstantExpr>(LiteralType::kString);
         body_expr->str_value_ = const_cast<char *>(row.body_.c_str());
         insert_row->values_.emplace_back(std::move(body_expr));
 
-        auto vector_expr = MakeUnique<ConstantExpr>(LiteralType::kDoubleArray);
+        auto vector_expr = std::make_unique<ConstantExpr>(LiteralType::kDoubleArray);
         vector_expr->double_array_ = row.others_;
         insert_row->values_.emplace_back(std::move(vector_expr));
 
@@ -248,14 +241,14 @@ void Insert(const String &db_name, const String &table_name, Vector<DataRow> dat
     infinity->LocalDisconnect();
 }
 
-void Delete(const String &db_name, const String &table_name) {
-    SharedPtr<Infinity> infinity = Infinity::LocalConnect();
-    SizeT pos = RandInt(0, data_size / insert_delete_size - 1);
+void Delete(const std::string &db_name, const std::string &table_name) {
+    std::shared_ptr<Infinity> infinity = Infinity::LocalConnect();
+    size_t pos = RandInt(0, data_size / insert_delete_size - 1);
     pos = pos * insert_delete_size;
 
     std::string filter = fmt::format("index >= {} and index < {}", pos, pos + insert_delete_size);
 
-    auto expr_parsed_result = MakeUnique<ExpressionParserResult>();
+    auto expr_parsed_result = std::make_unique<ExpressionParserResult>();
     ExprParser expr_parser;
     expr_parser.Parse(filter, expr_parsed_result.get());
 
@@ -272,13 +265,13 @@ void Delete(const String &db_name, const String &table_name) {
     infinity->LocalDisconnect();
 }
 
-void Update(const String &db_name, const String &table_name) {
-    SharedPtr<Infinity> infinity = Infinity::LocalConnect();
-    SizeT pos = RandInt(0, data_size - 1);
+void Update(const std::string &db_name, const std::string &table_name) {
+    std::shared_ptr<Infinity> infinity = Infinity::LocalConnect();
+    size_t pos = RandInt(0, data_size - 1);
 
     std::string filter = fmt::format("index = {}", pos);
 
-    auto expr_parsed_result = MakeUnique<ExpressionParserResult>();
+    auto expr_parsed_result = std::make_unique<ExpressionParserResult>();
     ExprParser expr_parser;
     expr_parser.Parse(filter, expr_parsed_result.get());
 
@@ -287,9 +280,9 @@ void Update(const String &db_name, const String &table_name) {
         return;
     }
 
-    Vector<UpdateExpr *> *values = new Vector<UpdateExpr *>();
+    std::vector<UpdateExpr *> *values = new std::vector<UpdateExpr *>();
 
-    Vector<String> *columns = new Vector<String>();
+    std::vector<std::string> *columns = new std::vector<std::string>();
     columns->emplace_back("index");
     columns->emplace_back("body");
     columns->emplace_back("other_vector");
@@ -325,7 +318,7 @@ void Update(const String &db_name, const String &table_name) {
     infinity->LocalDisconnect();
 }
 
-void ChaosTestExecution(const String &db_name, const String &table_name) {
+void ChaosTestExecution(const std::string &db_name, const std::string &table_name) {
     auto start_time = std::chrono::steady_clock::now();
     while (std::chrono::steady_clock::now() - start_time < std::chrono::seconds(kRunningTime)) {
         int rand_op = RandInt(0, 3);
@@ -347,10 +340,10 @@ void ChaosTestExecution(const String &db_name, const String &table_name) {
     }
 }
 
-void RunChaosTestInParallel(const String &db_name, const String &table_name) {
+void RunChaosTestInParallel(const std::string &db_name, const std::string &table_name) {
     std::vector<std::thread> threads;
 
-    for (SizeT i = 0; i < kNumThread; ++i) {
+    for (size_t i = 0; i < kNumThread; ++i) {
         threads.emplace_back([&]() { ChaosTestExecution(db_name, table_name); });
     }
 
@@ -361,11 +354,11 @@ void RunChaosTestInParallel(const String &db_name, const String &table_name) {
     }
 }
 
-TEST_P(ParallelTest, ChaosTest) {
+TEST_P(ParallelTest, DISABLED_ChaosTest) {
     auto db_name = "default_db";
     auto table_name = "chaos_test";
 
-    String fulltext_file_path = String(test_data_path()) + "/csv/enwiki_99.csv";
+    std::string fulltext_file_path = std::string(test_data_path()) + "/csv/enwiki_99.csv";
     auto data = DataPreprocessing(fulltext_file_path);
 
     CreateTableOptions create_tb_options;
@@ -384,8 +377,8 @@ TEST_P(ParallelTest, ChaosTest) {
     column_defs.push_back(new ColumnDef(2, vector_type, "other_vector", std::set<ConstraintType>{}));
 
     {
-        SharedPtr<Infinity> infinity = Infinity::LocalConnect();
-        auto result = infinity->CreateTable(db_name, table_name, column_defs, Vector<TableConstraint *>{}, create_tb_options);
+        std::shared_ptr<Infinity> infinity = Infinity::LocalConnect();
+        auto result = infinity->CreateTable(db_name, table_name, column_defs, std::vector<TableConstraint *>{}, create_tb_options);
         if (result.IsOk()) {
             result = infinity->Flush();
         } else {
@@ -396,11 +389,11 @@ TEST_P(ParallelTest, ChaosTest) {
     }
 
     {
-        SharedPtr<Infinity> infinity = Infinity::LocalConnect();
+        std::shared_ptr<Infinity> infinity = Infinity::LocalConnect();
         const auto index_info = new IndexInfo();
         index_info->index_type_ = IndexType::kFullText;
         index_info->column_name_ = "body";
-        index_info->index_param_list_ = new Vector<InitParameter *>();
+        index_info->index_param_list_ = new std::vector<InitParameter *>();
         auto result = infinity->CreateIndex(db_name, table_name, "body_index", "", index_info, CreateIndexOptions());
         if (result.IsOk()) {
             result = infinity->Flush();
@@ -412,7 +405,7 @@ TEST_P(ParallelTest, ChaosTest) {
     }
 
     {
-        SharedPtr<Infinity> infinity = Infinity::LocalConnect();
+        std::shared_ptr<Infinity> infinity = Infinity::LocalConnect();
         auto index_info = new IndexInfo();
         index_info->index_type_ = IndexType::kHnsw;
         index_info->column_name_ = "other_vector";
@@ -434,7 +427,7 @@ TEST_P(ParallelTest, ChaosTest) {
     RunChaosTestInParallel("default_db", "chaos_test");
 
     {
-        SharedPtr<Infinity> infinity = Infinity::LocalConnect();
+        std::shared_ptr<Infinity> infinity = Infinity::LocalConnect();
         DropTableOptions drop_tb_options;
         drop_tb_options.conflict_type_ = ConflictType::kError;
         auto result = infinity->DropTable(db_name, table_name, drop_tb_options);

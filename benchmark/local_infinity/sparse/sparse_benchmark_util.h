@@ -16,10 +16,9 @@
 
 #include "CLI11.hpp"
 
-import :stl;
 import :virtual_store;
 import :infinity_exception;
-import :third_party;
+import third_party;
 import :infinity_exception;
 import :sparse_util;
 import compilation_config;
@@ -38,14 +37,14 @@ SparseMatrix<f32, i32> DecodeSparseDataset(const Path &data_path) {
     return SparseMatrix<f32, i32>::Load(*file_handle);
 }
 
-Vector<SizeT> ShuffleSparseMatrix(SparseMatrix<f32, i32> &mat) {
-    Vector<SizeT> idx(mat.nrow_);
+std::vector<size_t> ShuffleSparseMatrix(SparseMatrix<f32, i32> &mat) {
+    std::vector<size_t> idx(mat.nrow_);
     std::iota(idx.begin(), idx.end(), 0);
     std::shuffle(idx.begin(), idx.end(), std::mt19937(std::random_device()()));
 
-    auto indptr = MakeUniqueForOverwrite<i64[]>(mat.nrow_ + 1);
-    auto indices = MakeUniqueForOverwrite<i32[]>(mat.nnz_);
-    auto data = MakeUniqueForOverwrite<f32[]>(mat.nnz_);
+    auto indptr = std::make_unique_for_overwrite<i64[]>(mat.nrow_ + 1);
+    auto indices = std::make_unique_for_overwrite<i32[]>(mat.nnz_);
+    auto data = std::make_unique_for_overwrite<f32[]>(mat.nnz_);
 
     indptr[0] = 0;
     for (i64 i = 0; i < mat.nrow_; ++i) {
@@ -67,7 +66,7 @@ void SaveSparseMatrix(const SparseMatrix<f32, i32> &mat, const Path &data_path) 
     mat.Save(*file_handle);
 }
 
-Tuple<u32, u32, UniquePtr<i32[]>, UniquePtr<f32[]>> DecodeGroundtruth(const Path &groundtruth_path, bool meta) {
+Tuple<u32, u32, std::unique_ptr<i32[]>, std::unique_ptr<f32[]>> DecodeGroundtruth(const Path &groundtruth_path, bool meta) {
     auto [file_handle, status] = VirtualStore::Open(groundtruth_path.string(), FileAccessMode::kRead);
     if (!status.ok()) {
         UnrecoverableError(fmt::format("Can't open file: {}, reason: {}", groundtruth_path.string(), status.message()));
@@ -77,7 +76,7 @@ Tuple<u32, u32, UniquePtr<i32[]>, UniquePtr<f32[]>> DecodeGroundtruth(const Path
     u32 query_n = 0;
     file_handle->Read(&query_n, sizeof(query_n));
     file_handle->Read(&top_k, sizeof(top_k));
-    SizeT file_size = file_handle->FileSize();
+    size_t file_size = file_handle->FileSize();
     if (file_size != sizeof(u32) * 2 + (sizeof(i32) + sizeof(float)) * (query_n * top_k)) {
         UnrecoverableError("Invalid groundtruth file format");
     }
@@ -85,9 +84,9 @@ Tuple<u32, u32, UniquePtr<i32[]>, UniquePtr<f32[]>> DecodeGroundtruth(const Path
         return {top_k, query_n, nullptr, nullptr};
     }
 
-    auto indices = MakeUnique<i32[]>(query_n * top_k);
+    auto indices = std::make_unique<i32[]>(query_n * top_k);
     file_handle->Read(indices.get(), sizeof(i32) * query_n * top_k);
-    auto scores = MakeUnique<f32[]>(query_n * top_k);
+    auto scores = std::make_unique<f32[]>(query_n * top_k);
     file_handle->Read(scores.get(), sizeof(f32) * query_n * top_k);
     return {top_k, query_n, std::move(indices), std::move(scores)};
 }
@@ -105,14 +104,15 @@ void SaveGroundtruth(u32 top_k, u32 query_n, const i32 *indices, const f32 *scor
 
 const int kQueryLogInterval = 100;
 
-Vector<Pair<Vector<u32>, Vector<f32>>> Search(i32 thread_n,
-                                              const SparseMatrix<f32, i32> &query_mat,
-                                              u32 top_k,
-                                              i64 query_n,
-                                              std::function<Pair<Vector<u32>, Vector<f32>>(const SparseVecRef<f32, i32> &, u32)> search_fn) {
+std::vector<Pair<std::vector<u32>, std::vector<f32>>>
+Search(i32 thread_n,
+       const SparseMatrix<f32, i32> &query_mat,
+       u32 top_k,
+       i64 query_n,
+       std::function<Pair<std::vector<u32>, std::vector<f32>>(const SparseVecRef<f32, i32> &, u32)> search_fn) {
     Vector<Pair<Vector<u32>, Vector<f32>>> res(query_n);
     Atomic<i64> query_idx = 0;
-    Vector<Thread> threads;
+    Vector<std::thread> threads;
     for (i32 thread_id = 0; thread_id < thread_n; ++thread_id) {
         threads.emplace_back([&]() {
             while (true) {
@@ -153,7 +153,7 @@ void PrintQuery(u32 query_id, const i32 *gt_indices, const f32 *gt_scores, u32 g
 f32 CheckGroundtruth(i32 *gt_indices_list, f32 *gt_score_list, const Vector<Pair<Vector<u32>, Vector<f32>>> &results, u32 top_k) {
     u32 query_n = results.size();
 
-    SizeT recall_n = 0;
+    size_t recall_n = 0;
     for (u32 i = 0; i < results.size(); ++i) {
         const auto &[indices, scores] = results[i];
         const i32 *gt_indices = gt_indices_list + i * top_k;
@@ -205,7 +205,7 @@ public:
             ->transform(CLI::CheckedTransformer(dataset_type_map, CLI::ignore_case));
         app_.add_option("--shuffled", shuffled_, "Shuffled data")->required(false)->transform(CLI::TypeValidator<bool>());
         app_.add_option("--query_n", query_n_, "Test query number")->required(false)->transform(CLI::TypeValidator<i64>());
-        app_.add_option("--thread_n", thread_n_, "Thread number")->required(false)->transform(CLI::Range(1, 1024));
+        app_.add_option("--thread_n", thread_n_, "std::thread number")->required(false)->transform(CLI::Range(1, 1024));
         ParseInner(app_);
         app_.parse(argc, argv);
 
@@ -328,7 +328,7 @@ public:
     BMPCompressType type_ = BMPCompressType::kCompressed;
     bool bp_reorder_ = false;
     i32 topk_ = 10;
-    SizeT block_size_ = 8;
+    size_t block_size_ = 8;
     f32 alpha_ = 1.0;
     f32 beta_ = 1.0;
 };

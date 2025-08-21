@@ -12,19 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
-#include <memory>
-#include <ostream>
-#include <string>
-#include <vector>
-
 export module infinity_core:query_node;
 
-import :stl;
 import :meta_info;
 import :doc_iterator;
 import :parse_fulltext_options;
+
+import std;
+import std.compat;
 
 namespace infinity {
 

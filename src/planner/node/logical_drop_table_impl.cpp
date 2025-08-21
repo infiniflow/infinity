@@ -12,46 +12,43 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
-#include <sstream>
-
 module infinity_core:logical_drop_table.impl;
 
 import :logical_drop_table;
-
-import :stl;
 import :column_binding;
 import :logical_node_type;
+import :logical_drop_table;
+
+import std;
+
 import logical_type;
 import internal_types;
-import :logical_drop_table;
 import data_type;
 
 namespace infinity {
 
-Vector<ColumnBinding> LogicalDropTable::GetColumnBindings() const { return {}; }
+std::vector<ColumnBinding> LogicalDropTable::GetColumnBindings() const { return {}; }
 
-SharedPtr<Vector<String>> LogicalDropTable::GetOutputNames() const {
-    SharedPtr<Vector<String>> result = MakeShared<Vector<String>>();
+std::shared_ptr<std::vector<std::string>> LogicalDropTable::GetOutputNames() const {
+    std::shared_ptr<std::vector<std::string>> result = std::make_shared<std::vector<std::string>>();
     result->emplace_back("OK");
     return result;
 }
 
-SharedPtr<Vector<SharedPtr<DataType>>> LogicalDropTable::GetOutputTypes() const {
-    SharedPtr<Vector<SharedPtr<DataType>>> result_type = MakeShared<Vector<SharedPtr<DataType>>>();
-    result_type->emplace_back(MakeShared<DataType>(LogicalType::kInteger));
+std::shared_ptr<std::vector<std::shared_ptr<DataType>>> LogicalDropTable::GetOutputTypes() const {
+    std::shared_ptr<std::vector<std::shared_ptr<DataType>>> result_type = std::make_shared<std::vector<std::shared_ptr<DataType>>>();
+    result_type->emplace_back(std::make_shared<DataType>(LogicalType::kInteger));
     return result_type;
 }
 
-String LogicalDropTable::ToString(i64 &space) const {
+std::string LogicalDropTable::ToString(i64 &space) const {
     std::stringstream ss;
-    String arrow_str;
+    std::string arrow_str;
     if (space > 3) {
         space -= 4;
         arrow_str = "->  ";
     }
-    ss << String(space, ' ') << arrow_str << "Drop Table: " << *schema_name_ << "." << *table_name_;
+    ss << std::string(space, ' ') << arrow_str << "Drop Table: " << *schema_name_ << "." << *table_name_;
     space += arrow_str.size();
 
     return ss.str();

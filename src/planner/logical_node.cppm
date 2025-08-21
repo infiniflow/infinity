@@ -15,10 +15,13 @@
 module;
 
 export module infinity_core:logical_node;
-import :stl;
+
 import :logical_node_type;
 import :column_binding;
 import :load_meta;
+
+import std;
+
 import data_type;
 import internal_types;
 
@@ -30,35 +33,35 @@ public:
 
     virtual ~LogicalNode() = default;
 
-    [[nodiscard]] virtual Vector<ColumnBinding> GetColumnBindings() const = 0;
+    [[nodiscard]] virtual std::vector<ColumnBinding> GetColumnBindings() const = 0;
 
-    virtual SharedPtr<Vector<String>> GetOutputNames() const = 0;
+    virtual std::shared_ptr<std::vector<std::string>> GetOutputNames() const = 0;
 
-    virtual SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const = 0;
+    virtual std::shared_ptr<std::vector<std::shared_ptr<DataType>>> GetOutputTypes() const = 0;
 
-    [[nodiscard]] inline SharedPtr<LogicalNode> &left_node() { return left_node_; }
+    [[nodiscard]] inline std::shared_ptr<LogicalNode> &left_node() { return left_node_; }
 
-    [[nodiscard]] inline const SharedPtr<LogicalNode> &left_node() const { return left_node_; }
+    [[nodiscard]] inline const std::shared_ptr<LogicalNode> &left_node() const { return left_node_; }
 
-    [[nodiscard]] inline SharedPtr<LogicalNode> &right_node() { return right_node_; }
+    [[nodiscard]] inline std::shared_ptr<LogicalNode> &right_node() { return right_node_; }
 
-    [[nodiscard]] inline const SharedPtr<LogicalNode> &right_node() const { return right_node_; }
+    [[nodiscard]] inline const std::shared_ptr<LogicalNode> &right_node() const { return right_node_; }
 
-    void set_left_node(const SharedPtr<LogicalNode> &left) { left_node_ = left; }
+    void set_left_node(const std::shared_ptr<LogicalNode> &left) { left_node_ = left; }
 
-    void set_right_node(const SharedPtr<LogicalNode> &right) { right_node_ = right; };
+    void set_right_node(const std::shared_ptr<LogicalNode> &right) { right_node_ = right; };
 
     [[nodiscard]] u64 node_id() const { return node_id_; }
 
     void set_node_id(u64 node_id) { node_id_ = node_id; }
 
-    [[nodiscard]] SharedPtr<Vector<LoadMeta>> load_metas() const { return load_metas_; }
+    [[nodiscard]] std::shared_ptr<std::vector<LoadMeta>> load_metas() const { return load_metas_; }
 
-    void set_load_metas(SharedPtr<Vector<LoadMeta>> load_metas) { load_metas_ = load_metas; }
+    void set_load_metas(std::shared_ptr<std::vector<LoadMeta>> load_metas) { load_metas_ = load_metas; }
 
-    virtual String ToString(i64 &space) const = 0;
+    virtual std::string ToString(i64 &space) const = 0;
 
-    virtual String name() = 0;
+    virtual std::string name() = 0;
 
     [[nodiscard]] LogicalNodeType operator_type() const { return operator_type_; }
 
@@ -66,10 +69,10 @@ protected:
     u64 node_id_{};
     LogicalNodeType operator_type_ = LogicalNodeType::kInvalid;
 
-    SharedPtr<LogicalNode> left_node_{};
-    SharedPtr<LogicalNode> right_node_{};
+    std::shared_ptr<LogicalNode> left_node_{};
+    std::shared_ptr<LogicalNode> right_node_{};
 
-    SharedPtr<Vector<LoadMeta>> load_metas_{};
+    std::shared_ptr<std::vector<LoadMeta>> load_metas_{};
 
 public:
     template <class TARGET>
@@ -87,11 +90,11 @@ public:
 
 // three common implementations for logical node member function when load_metas_ is applied
 export struct LogicalCommonFunctionUsingLoadMeta {
-    static Vector<ColumnBinding> GetColumnBindings(const LogicalNode &op);
+    static std::vector<ColumnBinding> GetColumnBindings(const LogicalNode &op);
 
-    static SharedPtr<Vector<String>> GetOutputNames(const LogicalNode &op);
+    static std::shared_ptr<std::vector<std::string>> GetOutputNames(const LogicalNode &op);
 
-    static SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes(const LogicalNode &op);
+    static std::shared_ptr<std::vector<std::shared_ptr<DataType>>> GetOutputTypes(const LogicalNode &op);
 };
 
 } // namespace infinity

@@ -1,10 +1,6 @@
-module;
-
 module infinity_core:posting_byte_slice.impl;
 
 import :posting_byte_slice;
-import :stl;
-
 import :posting_field;
 import :flush_info;
 import :file_writer;
@@ -19,12 +15,12 @@ PostingByteSlice::PostingByteSlice() : data_buffer_(), slice_writer_() {}
 void PostingByteSlice::Init(const PostingFields *field_config) { data_buffer_.Init(field_config); }
 
 // Internal flush implementation - encode all posting fields to writer
-SizeT PostingByteSlice::DoFlush() {
+size_t PostingByteSlice::DoFlush() {
     u32 total_flush_size = 0;
     const PostingFields *field_definitions = data_buffer_.GetPostingFields();
 
     // Iterate through all posting fields and encode them
-    for (SizeT field_index = 0; field_index < field_definitions->GetSize(); ++field_index) {
+    for (size_t field_index = 0; field_index < field_definitions->GetSize(); ++field_index) {
         PostingField *current_field = field_definitions->GetValue(field_index);
         u8 *row_buffer = data_buffer_.GetRow(current_field->location_);
         SizeT encoded_size = current_field->Encode(slice_writer_, row_buffer, data_buffer_.Size() * current_field->GetSize());
@@ -34,14 +30,14 @@ SizeT PostingByteSlice::DoFlush() {
 }
 
 // Main flush operation - flush buffer to persistent storage
-SizeT PostingByteSlice::Flush() {
+size_t PostingByteSlice::Flush() {
     // Early return if buffer is empty
     if (data_buffer_.Size() == 0) {
         return 0;
     }
 
     // Perform the actual flush operation
-    SizeT bytes_flushed = DoFlush();
+    size_t bytes_flushed = DoFlush();
 
     // Update flush metadata
     FlushInfo updated_flush_info;
@@ -56,7 +52,7 @@ SizeT PostingByteSlice::Flush() {
 }
 
 // Dump operation - write data to file with optional spill handling
-void PostingByteSlice::Dump(const SharedPtr<FileWriter> &output_file, bool enable_spill) {
+void PostingByteSlice::Dump(const std::shared_ptr<FileWriter> &output_file, bool enable_spill) {
     if (enable_spill) {
         // Write buffer data first
         data_buffer_.Dump(output_file);
@@ -78,7 +74,7 @@ void PostingByteSlice::Dump(const SharedPtr<FileWriter> &output_file, bool enabl
 }
 
 // Load operation - read data from file
-void PostingByteSlice::Load(const SharedPtr<FileReader> &input_file) {
+void PostingByteSlice::Load(const std::shared_ptr<FileReader> &input_file) {
     // Load buffer data
     data_buffer_.Load(input_file);
 

@@ -1946,6 +1946,7 @@ uint32_t ParsedExprType::read(::apache::thrift::protocol::TProtocol* iprot) {
           if (this->knn_expr->__isset.topn) { wasSet = true; }
           if (this->knn_expr->__isset.opt_params) { wasSet = true; }
           if (this->knn_expr->__isset.filter_expr) { wasSet = true; }
+          if (this->knn_expr->__isset.query_embedding_expr) { wasSet = true; }
           if (!wasSet) { this->knn_expr.reset(); }
           this->__isset.knn_expr = true;
         } else {
@@ -3931,6 +3932,150 @@ void ConstantExpr::printTo(std::ostream& out) const {
 }
 
 
+FunctionExpr::~FunctionExpr() noexcept {
+}
+
+FunctionExpr::FunctionExpr() noexcept
+   : function_name() {
+}
+
+void FunctionExpr::__set_function_name(const std::string& val) {
+  this->function_name = val;
+}
+
+void FunctionExpr::__set_arguments(const std::vector<ParsedExpr> & val) {
+  this->arguments = val;
+}
+std::ostream& operator<<(std::ostream& out, const FunctionExpr& obj)
+{
+  obj.printTo(out);
+  return out;
+}
+
+
+uint32_t FunctionExpr::read(::apache::thrift::protocol::TProtocol* iprot) {
+
+  ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
+
+  xfer += iprot->readStructBegin(fname);
+
+  using ::apache::thrift::protocol::TProtocolException;
+
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 1:
+        if (ftype == ::apache::thrift::protocol::T_STRING) {
+          xfer += iprot->readString(this->function_name);
+          this->__isset.function_name = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 2:
+        if (ftype == ::apache::thrift::protocol::T_LIST) {
+          {
+            this->arguments.clear();
+            uint32_t _size195;
+            ::apache::thrift::protocol::TType _etype198;
+            xfer += iprot->readListBegin(_etype198, _size195);
+            this->arguments.resize(_size195);
+            uint32_t _i199;
+            for (_i199 = 0; _i199 < _size195; ++_i199)
+            {
+              xfer += this->arguments[_i199].read(iprot);
+            }
+            xfer += iprot->readListEnd();
+          }
+          this->__isset.arguments = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
+    }
+    xfer += iprot->readFieldEnd();
+  }
+
+  xfer += iprot->readStructEnd();
+
+  return xfer;
+}
+
+uint32_t FunctionExpr::write(::apache::thrift::protocol::TProtocol* oprot) const {
+  uint32_t xfer = 0;
+  ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
+  xfer += oprot->writeStructBegin("FunctionExpr");
+
+  xfer += oprot->writeFieldBegin("function_name", ::apache::thrift::protocol::T_STRING, 1);
+  xfer += oprot->writeString(this->function_name);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("arguments", ::apache::thrift::protocol::T_LIST, 2);
+  {
+    xfer += oprot->writeListBegin(::apache::thrift::protocol::T_STRUCT, static_cast<uint32_t>(this->arguments.size()));
+    std::vector<ParsedExpr> ::const_iterator _iter200;
+    for (_iter200 = this->arguments.begin(); _iter200 != this->arguments.end(); ++_iter200)
+    {
+      xfer += (*_iter200).write(oprot);
+    }
+    xfer += oprot->writeListEnd();
+  }
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
+}
+
+void swap(FunctionExpr &a, FunctionExpr &b) {
+  using ::std::swap;
+  swap(a.function_name, b.function_name);
+  swap(a.arguments, b.arguments);
+  swap(a.__isset, b.__isset);
+}
+
+bool FunctionExpr::operator==(const FunctionExpr & rhs) const
+{
+  if (!(function_name == rhs.function_name))
+    return false;
+  if (!(arguments == rhs.arguments))
+    return false;
+  return true;
+}
+
+FunctionExpr::FunctionExpr(const FunctionExpr& other201) {
+  function_name = other201.function_name;
+  arguments = other201.arguments;
+  __isset = other201.__isset;
+}
+FunctionExpr& FunctionExpr::operator=(const FunctionExpr& other202) {
+  function_name = other202.function_name;
+  arguments = other202.arguments;
+  __isset = other202.__isset;
+  return *this;
+}
+void FunctionExpr::printTo(std::ostream& out) const {
+  using ::apache::thrift::to_string;
+  out << "FunctionExpr(";
+  out << "function_name=" << to_string(function_name);
+  out << ", " << "arguments=" << to_string(arguments);
+  out << ")";
+}
+
+
 KnnExpr::~KnnExpr() noexcept {
 }
 
@@ -3968,6 +4113,11 @@ void KnnExpr::__set_opt_params(const std::vector<InitParameter> & val) {
 void KnnExpr::__set_filter_expr(const ParsedExpr& val) {
   this->filter_expr = val;
 __isset.filter_expr = true;
+}
+
+void KnnExpr::__set_query_embedding_expr(const FunctionExpr& val) {
+  this->query_embedding_expr = val;
+__isset.query_embedding_expr = true;
 }
 std::ostream& operator<<(std::ostream& out, const KnnExpr& obj)
 {
@@ -4015,9 +4165,9 @@ uint32_t KnnExpr::read(::apache::thrift::protocol::TProtocol* iprot) {
         break;
       case 3:
         if (ftype == ::apache::thrift::protocol::T_I32) {
-          int32_t ecast195;
-          xfer += iprot->readI32(ecast195);
-          this->embedding_data_type = static_cast<ElementType::type>(ecast195);
+          int32_t ecast203;
+          xfer += iprot->readI32(ecast203);
+          this->embedding_data_type = static_cast<ElementType::type>(ecast203);
           this->__isset.embedding_data_type = true;
         } else {
           xfer += iprot->skip(ftype);
@@ -4025,9 +4175,9 @@ uint32_t KnnExpr::read(::apache::thrift::protocol::TProtocol* iprot) {
         break;
       case 4:
         if (ftype == ::apache::thrift::protocol::T_I32) {
-          int32_t ecast196;
-          xfer += iprot->readI32(ecast196);
-          this->distance_type = static_cast<KnnDistanceType::type>(ecast196);
+          int32_t ecast204;
+          xfer += iprot->readI32(ecast204);
+          this->distance_type = static_cast<KnnDistanceType::type>(ecast204);
           this->__isset.distance_type = true;
         } else {
           xfer += iprot->skip(ftype);
@@ -4045,14 +4195,14 @@ uint32_t KnnExpr::read(::apache::thrift::protocol::TProtocol* iprot) {
         if (ftype == ::apache::thrift::protocol::T_LIST) {
           {
             this->opt_params.clear();
-            uint32_t _size197;
-            ::apache::thrift::protocol::TType _etype200;
-            xfer += iprot->readListBegin(_etype200, _size197);
-            this->opt_params.resize(_size197);
-            uint32_t _i201;
-            for (_i201 = 0; _i201 < _size197; ++_i201)
+            uint32_t _size205;
+            ::apache::thrift::protocol::TType _etype208;
+            xfer += iprot->readListBegin(_etype208, _size205);
+            this->opt_params.resize(_size205);
+            uint32_t _i209;
+            for (_i209 = 0; _i209 < _size205; ++_i209)
             {
-              xfer += this->opt_params[_i201].read(iprot);
+              xfer += this->opt_params[_i209].read(iprot);
             }
             xfer += iprot->readListEnd();
           }
@@ -4065,6 +4215,14 @@ uint32_t KnnExpr::read(::apache::thrift::protocol::TProtocol* iprot) {
         if (ftype == ::apache::thrift::protocol::T_STRUCT) {
           xfer += this->filter_expr.read(iprot);
           this->__isset.filter_expr = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 8:
+        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+          xfer += this->query_embedding_expr.read(iprot);
+          this->__isset.query_embedding_expr = true;
         } else {
           xfer += iprot->skip(ftype);
         }
@@ -4109,10 +4267,10 @@ uint32_t KnnExpr::write(::apache::thrift::protocol::TProtocol* oprot) const {
   xfer += oprot->writeFieldBegin("opt_params", ::apache::thrift::protocol::T_LIST, 6);
   {
     xfer += oprot->writeListBegin(::apache::thrift::protocol::T_STRUCT, static_cast<uint32_t>(this->opt_params.size()));
-    std::vector<InitParameter> ::const_iterator _iter202;
-    for (_iter202 = this->opt_params.begin(); _iter202 != this->opt_params.end(); ++_iter202)
+    std::vector<InitParameter> ::const_iterator _iter210;
+    for (_iter210 = this->opt_params.begin(); _iter210 != this->opt_params.end(); ++_iter210)
     {
-      xfer += (*_iter202).write(oprot);
+      xfer += (*_iter210).write(oprot);
     }
     xfer += oprot->writeListEnd();
   }
@@ -4121,6 +4279,11 @@ uint32_t KnnExpr::write(::apache::thrift::protocol::TProtocol* oprot) const {
   if (this->__isset.filter_expr) {
     xfer += oprot->writeFieldBegin("filter_expr", ::apache::thrift::protocol::T_STRUCT, 7);
     xfer += this->filter_expr.write(oprot);
+    xfer += oprot->writeFieldEnd();
+  }
+  if (this->__isset.query_embedding_expr) {
+    xfer += oprot->writeFieldBegin("query_embedding_expr", ::apache::thrift::protocol::T_STRUCT, 8);
+    xfer += this->query_embedding_expr.write(oprot);
     xfer += oprot->writeFieldEnd();
   }
   xfer += oprot->writeFieldStop();
@@ -4137,6 +4300,7 @@ void swap(KnnExpr &a, KnnExpr &b) {
   swap(a.topn, b.topn);
   swap(a.opt_params, b.opt_params);
   swap(a.filter_expr, b.filter_expr);
+  swap(a.query_embedding_expr, b.query_embedding_expr);
   swap(a.__isset, b.__isset);
 }
 
@@ -4158,28 +4322,34 @@ bool KnnExpr::operator==(const KnnExpr & rhs) const
     return false;
   else if (__isset.filter_expr && !(filter_expr == rhs.filter_expr))
     return false;
+  if (__isset.query_embedding_expr != rhs.__isset.query_embedding_expr)
+    return false;
+  else if (__isset.query_embedding_expr && !(query_embedding_expr == rhs.query_embedding_expr))
+    return false;
   return true;
 }
 
-KnnExpr::KnnExpr(const KnnExpr& other203) {
-  column_expr = other203.column_expr;
-  embedding_data = other203.embedding_data;
-  embedding_data_type = other203.embedding_data_type;
-  distance_type = other203.distance_type;
-  topn = other203.topn;
-  opt_params = other203.opt_params;
-  filter_expr = other203.filter_expr;
-  __isset = other203.__isset;
+KnnExpr::KnnExpr(const KnnExpr& other211) {
+  column_expr = other211.column_expr;
+  embedding_data = other211.embedding_data;
+  embedding_data_type = other211.embedding_data_type;
+  distance_type = other211.distance_type;
+  topn = other211.topn;
+  opt_params = other211.opt_params;
+  filter_expr = other211.filter_expr;
+  query_embedding_expr = other211.query_embedding_expr;
+  __isset = other211.__isset;
 }
-KnnExpr& KnnExpr::operator=(const KnnExpr& other204) {
-  column_expr = other204.column_expr;
-  embedding_data = other204.embedding_data;
-  embedding_data_type = other204.embedding_data_type;
-  distance_type = other204.distance_type;
-  topn = other204.topn;
-  opt_params = other204.opt_params;
-  filter_expr = other204.filter_expr;
-  __isset = other204.__isset;
+KnnExpr& KnnExpr::operator=(const KnnExpr& other212) {
+  column_expr = other212.column_expr;
+  embedding_data = other212.embedding_data;
+  embedding_data_type = other212.embedding_data_type;
+  distance_type = other212.distance_type;
+  topn = other212.topn;
+  opt_params = other212.opt_params;
+  filter_expr = other212.filter_expr;
+  query_embedding_expr = other212.query_embedding_expr;
+  __isset = other212.__isset;
   return *this;
 }
 void KnnExpr::printTo(std::ostream& out) const {
@@ -4192,6 +4362,7 @@ void KnnExpr::printTo(std::ostream& out) const {
   out << ", " << "topn=" << to_string(topn);
   out << ", " << "opt_params=" << to_string(opt_params);
   out << ", " << "filter_expr="; (__isset.filter_expr ? (out << to_string(filter_expr)) : (out << "<null>"));
+  out << ", " << "query_embedding_expr="; (__isset.query_embedding_expr ? (out << to_string(query_embedding_expr)) : (out << "<null>"));
   out << ")";
 }
 
@@ -4293,14 +4464,14 @@ uint32_t MatchSparseExpr::read(::apache::thrift::protocol::TProtocol* iprot) {
         if (ftype == ::apache::thrift::protocol::T_LIST) {
           {
             this->opt_params.clear();
-            uint32_t _size205;
-            ::apache::thrift::protocol::TType _etype208;
-            xfer += iprot->readListBegin(_etype208, _size205);
-            this->opt_params.resize(_size205);
-            uint32_t _i209;
-            for (_i209 = 0; _i209 < _size205; ++_i209)
+            uint32_t _size213;
+            ::apache::thrift::protocol::TType _etype216;
+            xfer += iprot->readListBegin(_etype216, _size213);
+            this->opt_params.resize(_size213);
+            uint32_t _i217;
+            for (_i217 = 0; _i217 < _size213; ++_i217)
             {
-              xfer += this->opt_params[_i209].read(iprot);
+              xfer += this->opt_params[_i217].read(iprot);
             }
             xfer += iprot->readListEnd();
           }
@@ -4353,10 +4524,10 @@ uint32_t MatchSparseExpr::write(::apache::thrift::protocol::TProtocol* oprot) co
   xfer += oprot->writeFieldBegin("opt_params", ::apache::thrift::protocol::T_LIST, 5);
   {
     xfer += oprot->writeListBegin(::apache::thrift::protocol::T_STRUCT, static_cast<uint32_t>(this->opt_params.size()));
-    std::vector<InitParameter> ::const_iterator _iter210;
-    for (_iter210 = this->opt_params.begin(); _iter210 != this->opt_params.end(); ++_iter210)
+    std::vector<InitParameter> ::const_iterator _iter218;
+    for (_iter218 = this->opt_params.begin(); _iter218 != this->opt_params.end(); ++_iter218)
     {
-      xfer += (*_iter210).write(oprot);
+      xfer += (*_iter218).write(oprot);
     }
     xfer += oprot->writeListEnd();
   }
@@ -4402,23 +4573,23 @@ bool MatchSparseExpr::operator==(const MatchSparseExpr & rhs) const
   return true;
 }
 
-MatchSparseExpr::MatchSparseExpr(const MatchSparseExpr& other211) {
-  column_expr = other211.column_expr;
-  query_sparse_expr = other211.query_sparse_expr;
-  metric_type = other211.metric_type;
-  topn = other211.topn;
-  opt_params = other211.opt_params;
-  filter_expr = other211.filter_expr;
-  __isset = other211.__isset;
+MatchSparseExpr::MatchSparseExpr(const MatchSparseExpr& other219) {
+  column_expr = other219.column_expr;
+  query_sparse_expr = other219.query_sparse_expr;
+  metric_type = other219.metric_type;
+  topn = other219.topn;
+  opt_params = other219.opt_params;
+  filter_expr = other219.filter_expr;
+  __isset = other219.__isset;
 }
-MatchSparseExpr& MatchSparseExpr::operator=(const MatchSparseExpr& other212) {
-  column_expr = other212.column_expr;
-  query_sparse_expr = other212.query_sparse_expr;
-  metric_type = other212.metric_type;
-  topn = other212.topn;
-  opt_params = other212.opt_params;
-  filter_expr = other212.filter_expr;
-  __isset = other212.__isset;
+MatchSparseExpr& MatchSparseExpr::operator=(const MatchSparseExpr& other220) {
+  column_expr = other220.column_expr;
+  query_sparse_expr = other220.query_sparse_expr;
+  metric_type = other220.metric_type;
+  topn = other220.topn;
+  opt_params = other220.opt_params;
+  filter_expr = other220.filter_expr;
+  __isset = other220.__isset;
   return *this;
 }
 void MatchSparseExpr::printTo(std::ostream& out) const {
@@ -4513,9 +4684,9 @@ uint32_t MatchTensorExpr::read(::apache::thrift::protocol::TProtocol* iprot) {
         break;
       case 3:
         if (ftype == ::apache::thrift::protocol::T_I32) {
-          int32_t ecast213;
-          xfer += iprot->readI32(ecast213);
-          this->embedding_data_type = static_cast<ElementType::type>(ecast213);
+          int32_t ecast221;
+          xfer += iprot->readI32(ecast221);
+          this->embedding_data_type = static_cast<ElementType::type>(ecast221);
           this->__isset.embedding_data_type = true;
         } else {
           xfer += iprot->skip(ftype);
@@ -4622,23 +4793,23 @@ bool MatchTensorExpr::operator==(const MatchTensorExpr & rhs) const
   return true;
 }
 
-MatchTensorExpr::MatchTensorExpr(const MatchTensorExpr& other214) {
-  search_method = other214.search_method;
-  column_expr = other214.column_expr;
-  embedding_data_type = other214.embedding_data_type;
-  embedding_data = other214.embedding_data;
-  extra_options = other214.extra_options;
-  filter_expr = other214.filter_expr;
-  __isset = other214.__isset;
+MatchTensorExpr::MatchTensorExpr(const MatchTensorExpr& other222) {
+  search_method = other222.search_method;
+  column_expr = other222.column_expr;
+  embedding_data_type = other222.embedding_data_type;
+  embedding_data = other222.embedding_data;
+  extra_options = other222.extra_options;
+  filter_expr = other222.filter_expr;
+  __isset = other222.__isset;
 }
-MatchTensorExpr& MatchTensorExpr::operator=(const MatchTensorExpr& other215) {
-  search_method = other215.search_method;
-  column_expr = other215.column_expr;
-  embedding_data_type = other215.embedding_data_type;
-  embedding_data = other215.embedding_data;
-  extra_options = other215.extra_options;
-  filter_expr = other215.filter_expr;
-  __isset = other215.__isset;
+MatchTensorExpr& MatchTensorExpr::operator=(const MatchTensorExpr& other223) {
+  search_method = other223.search_method;
+  column_expr = other223.column_expr;
+  embedding_data_type = other223.embedding_data_type;
+  embedding_data = other223.embedding_data;
+  extra_options = other223.extra_options;
+  filter_expr = other223.filter_expr;
+  __isset = other223.__isset;
   return *this;
 }
 void MatchTensorExpr::printTo(std::ostream& out) const {
@@ -4802,19 +4973,19 @@ bool MatchExpr::operator==(const MatchExpr & rhs) const
   return true;
 }
 
-MatchExpr::MatchExpr(const MatchExpr& other216) {
-  fields = other216.fields;
-  matching_text = other216.matching_text;
-  options_text = other216.options_text;
-  filter_expr = other216.filter_expr;
-  __isset = other216.__isset;
+MatchExpr::MatchExpr(const MatchExpr& other224) {
+  fields = other224.fields;
+  matching_text = other224.matching_text;
+  options_text = other224.options_text;
+  filter_expr = other224.filter_expr;
+  __isset = other224.__isset;
 }
-MatchExpr& MatchExpr::operator=(const MatchExpr& other217) {
-  fields = other217.fields;
-  matching_text = other217.matching_text;
-  options_text = other217.options_text;
-  filter_expr = other217.filter_expr;
-  __isset = other217.__isset;
+MatchExpr& MatchExpr::operator=(const MatchExpr& other225) {
+  fields = other225.fields;
+  matching_text = other225.matching_text;
+  options_text = other225.options_text;
+  filter_expr = other225.filter_expr;
+  __isset = other225.__isset;
   return *this;
 }
 void MatchExpr::printTo(std::ostream& out) const {
@@ -4899,6 +5070,7 @@ uint32_t GenericMatchExpr::read(::apache::thrift::protocol::TProtocol* iprot) {
           if (this->match_vector_expr->__isset.topn) { wasSet = true; }
           if (this->match_vector_expr->__isset.opt_params) { wasSet = true; }
           if (this->match_vector_expr->__isset.filter_expr) { wasSet = true; }
+          if (this->match_vector_expr->__isset.query_embedding_expr) { wasSet = true; }
           if (!wasSet) { this->match_vector_expr.reset(); }
           this->__isset.match_vector_expr = true;
         } else {
@@ -5052,19 +5224,19 @@ bool GenericMatchExpr::operator==(const GenericMatchExpr & rhs) const
   return true;
 }
 
-GenericMatchExpr::GenericMatchExpr(const GenericMatchExpr& other218) {
-  match_vector_expr = other218.match_vector_expr;
-  match_sparse_expr = other218.match_sparse_expr;
-  match_tensor_expr = other218.match_tensor_expr;
-  match_text_expr = other218.match_text_expr;
-  __isset = other218.__isset;
+GenericMatchExpr::GenericMatchExpr(const GenericMatchExpr& other226) {
+  match_vector_expr = other226.match_vector_expr;
+  match_sparse_expr = other226.match_sparse_expr;
+  match_tensor_expr = other226.match_tensor_expr;
+  match_text_expr = other226.match_text_expr;
+  __isset = other226.__isset;
 }
-GenericMatchExpr& GenericMatchExpr::operator=(const GenericMatchExpr& other219) {
-  match_vector_expr = other219.match_vector_expr;
-  match_sparse_expr = other219.match_sparse_expr;
-  match_tensor_expr = other219.match_tensor_expr;
-  match_text_expr = other219.match_text_expr;
-  __isset = other219.__isset;
+GenericMatchExpr& GenericMatchExpr::operator=(const GenericMatchExpr& other227) {
+  match_vector_expr = other227.match_vector_expr;
+  match_sparse_expr = other227.match_sparse_expr;
+  match_tensor_expr = other227.match_tensor_expr;
+  match_text_expr = other227.match_text_expr;
+  __isset = other227.__isset;
   return *this;
 }
 void GenericMatchExpr::printTo(std::ostream& out) const {
@@ -5206,17 +5378,17 @@ bool FusionExpr::operator==(const FusionExpr & rhs) const
   return true;
 }
 
-FusionExpr::FusionExpr(const FusionExpr& other220) {
-  method = other220.method;
-  options_text = other220.options_text;
-  optional_match_tensor_expr = other220.optional_match_tensor_expr;
-  __isset = other220.__isset;
+FusionExpr::FusionExpr(const FusionExpr& other228) {
+  method = other228.method;
+  options_text = other228.options_text;
+  optional_match_tensor_expr = other228.optional_match_tensor_expr;
+  __isset = other228.__isset;
 }
-FusionExpr& FusionExpr::operator=(const FusionExpr& other221) {
-  method = other221.method;
-  options_text = other221.options_text;
-  optional_match_tensor_expr = other221.optional_match_tensor_expr;
-  __isset = other221.__isset;
+FusionExpr& FusionExpr::operator=(const FusionExpr& other229) {
+  method = other229.method;
+  options_text = other229.options_text;
+  optional_match_tensor_expr = other229.optional_match_tensor_expr;
+  __isset = other229.__isset;
   return *this;
 }
 void FusionExpr::printTo(std::ostream& out) const {
@@ -5276,14 +5448,14 @@ uint32_t SearchExpr::read(::apache::thrift::protocol::TProtocol* iprot) {
         if (ftype == ::apache::thrift::protocol::T_LIST) {
           {
             this->match_exprs.clear();
-            uint32_t _size222;
-            ::apache::thrift::protocol::TType _etype225;
-            xfer += iprot->readListBegin(_etype225, _size222);
-            this->match_exprs.resize(_size222);
-            uint32_t _i226;
-            for (_i226 = 0; _i226 < _size222; ++_i226)
+            uint32_t _size230;
+            ::apache::thrift::protocol::TType _etype233;
+            xfer += iprot->readListBegin(_etype233, _size230);
+            this->match_exprs.resize(_size230);
+            uint32_t _i234;
+            for (_i234 = 0; _i234 < _size230; ++_i234)
             {
-              xfer += this->match_exprs[_i226].read(iprot);
+              xfer += this->match_exprs[_i234].read(iprot);
             }
             xfer += iprot->readListEnd();
           }
@@ -5296,14 +5468,14 @@ uint32_t SearchExpr::read(::apache::thrift::protocol::TProtocol* iprot) {
         if (ftype == ::apache::thrift::protocol::T_LIST) {
           {
             this->fusion_exprs.clear();
-            uint32_t _size227;
-            ::apache::thrift::protocol::TType _etype230;
-            xfer += iprot->readListBegin(_etype230, _size227);
-            this->fusion_exprs.resize(_size227);
-            uint32_t _i231;
-            for (_i231 = 0; _i231 < _size227; ++_i231)
+            uint32_t _size235;
+            ::apache::thrift::protocol::TType _etype238;
+            xfer += iprot->readListBegin(_etype238, _size235);
+            this->fusion_exprs.resize(_size235);
+            uint32_t _i239;
+            for (_i239 = 0; _i239 < _size235; ++_i239)
             {
-              xfer += this->fusion_exprs[_i231].read(iprot);
+              xfer += this->fusion_exprs[_i239].read(iprot);
             }
             xfer += iprot->readListEnd();
           }
@@ -5333,10 +5505,10 @@ uint32_t SearchExpr::write(::apache::thrift::protocol::TProtocol* oprot) const {
     xfer += oprot->writeFieldBegin("match_exprs", ::apache::thrift::protocol::T_LIST, 1);
     {
       xfer += oprot->writeListBegin(::apache::thrift::protocol::T_STRUCT, static_cast<uint32_t>(this->match_exprs.size()));
-      std::vector<GenericMatchExpr> ::const_iterator _iter232;
-      for (_iter232 = this->match_exprs.begin(); _iter232 != this->match_exprs.end(); ++_iter232)
+      std::vector<GenericMatchExpr> ::const_iterator _iter240;
+      for (_iter240 = this->match_exprs.begin(); _iter240 != this->match_exprs.end(); ++_iter240)
       {
-        xfer += (*_iter232).write(oprot);
+        xfer += (*_iter240).write(oprot);
       }
       xfer += oprot->writeListEnd();
     }
@@ -5346,10 +5518,10 @@ uint32_t SearchExpr::write(::apache::thrift::protocol::TProtocol* oprot) const {
     xfer += oprot->writeFieldBegin("fusion_exprs", ::apache::thrift::protocol::T_LIST, 2);
     {
       xfer += oprot->writeListBegin(::apache::thrift::protocol::T_STRUCT, static_cast<uint32_t>(this->fusion_exprs.size()));
-      std::vector<FusionExpr> ::const_iterator _iter233;
-      for (_iter233 = this->fusion_exprs.begin(); _iter233 != this->fusion_exprs.end(); ++_iter233)
+      std::vector<FusionExpr> ::const_iterator _iter241;
+      for (_iter241 = this->fusion_exprs.begin(); _iter241 != this->fusion_exprs.end(); ++_iter241)
       {
-        xfer += (*_iter233).write(oprot);
+        xfer += (*_iter241).write(oprot);
       }
       xfer += oprot->writeListEnd();
     }
@@ -5380,15 +5552,15 @@ bool SearchExpr::operator==(const SearchExpr & rhs) const
   return true;
 }
 
-SearchExpr::SearchExpr(const SearchExpr& other234) {
-  match_exprs = other234.match_exprs;
-  fusion_exprs = other234.fusion_exprs;
-  __isset = other234.__isset;
+SearchExpr::SearchExpr(const SearchExpr& other242) {
+  match_exprs = other242.match_exprs;
+  fusion_exprs = other242.fusion_exprs;
+  __isset = other242.__isset;
 }
-SearchExpr& SearchExpr::operator=(const SearchExpr& other235) {
-  match_exprs = other235.match_exprs;
-  fusion_exprs = other235.fusion_exprs;
-  __isset = other235.__isset;
+SearchExpr& SearchExpr::operator=(const SearchExpr& other243) {
+  match_exprs = other243.match_exprs;
+  fusion_exprs = other243.fusion_exprs;
+  __isset = other243.__isset;
   return *this;
 }
 void SearchExpr::printTo(std::ostream& out) const {
@@ -5396,150 +5568,6 @@ void SearchExpr::printTo(std::ostream& out) const {
   out << "SearchExpr(";
   out << "match_exprs="; (__isset.match_exprs ? (out << to_string(match_exprs)) : (out << "<null>"));
   out << ", " << "fusion_exprs="; (__isset.fusion_exprs ? (out << to_string(fusion_exprs)) : (out << "<null>"));
-  out << ")";
-}
-
-
-FunctionExpr::~FunctionExpr() noexcept {
-}
-
-FunctionExpr::FunctionExpr() noexcept
-   : function_name() {
-}
-
-void FunctionExpr::__set_function_name(const std::string& val) {
-  this->function_name = val;
-}
-
-void FunctionExpr::__set_arguments(const std::vector<ParsedExpr> & val) {
-  this->arguments = val;
-}
-std::ostream& operator<<(std::ostream& out, const FunctionExpr& obj)
-{
-  obj.printTo(out);
-  return out;
-}
-
-
-uint32_t FunctionExpr::read(::apache::thrift::protocol::TProtocol* iprot) {
-
-  ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
-  uint32_t xfer = 0;
-  std::string fname;
-  ::apache::thrift::protocol::TType ftype;
-  int16_t fid;
-
-  xfer += iprot->readStructBegin(fname);
-
-  using ::apache::thrift::protocol::TProtocolException;
-
-
-  while (true)
-  {
-    xfer += iprot->readFieldBegin(fname, ftype, fid);
-    if (ftype == ::apache::thrift::protocol::T_STOP) {
-      break;
-    }
-    switch (fid)
-    {
-      case 1:
-        if (ftype == ::apache::thrift::protocol::T_STRING) {
-          xfer += iprot->readString(this->function_name);
-          this->__isset.function_name = true;
-        } else {
-          xfer += iprot->skip(ftype);
-        }
-        break;
-      case 2:
-        if (ftype == ::apache::thrift::protocol::T_LIST) {
-          {
-            this->arguments.clear();
-            uint32_t _size236;
-            ::apache::thrift::protocol::TType _etype239;
-            xfer += iprot->readListBegin(_etype239, _size236);
-            this->arguments.resize(_size236);
-            uint32_t _i240;
-            for (_i240 = 0; _i240 < _size236; ++_i240)
-            {
-              xfer += this->arguments[_i240].read(iprot);
-            }
-            xfer += iprot->readListEnd();
-          }
-          this->__isset.arguments = true;
-        } else {
-          xfer += iprot->skip(ftype);
-        }
-        break;
-      default:
-        xfer += iprot->skip(ftype);
-        break;
-    }
-    xfer += iprot->readFieldEnd();
-  }
-
-  xfer += iprot->readStructEnd();
-
-  return xfer;
-}
-
-uint32_t FunctionExpr::write(::apache::thrift::protocol::TProtocol* oprot) const {
-  uint32_t xfer = 0;
-  ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
-  xfer += oprot->writeStructBegin("FunctionExpr");
-
-  xfer += oprot->writeFieldBegin("function_name", ::apache::thrift::protocol::T_STRING, 1);
-  xfer += oprot->writeString(this->function_name);
-  xfer += oprot->writeFieldEnd();
-
-  xfer += oprot->writeFieldBegin("arguments", ::apache::thrift::protocol::T_LIST, 2);
-  {
-    xfer += oprot->writeListBegin(::apache::thrift::protocol::T_STRUCT, static_cast<uint32_t>(this->arguments.size()));
-    std::vector<ParsedExpr> ::const_iterator _iter241;
-    for (_iter241 = this->arguments.begin(); _iter241 != this->arguments.end(); ++_iter241)
-    {
-      xfer += (*_iter241).write(oprot);
-    }
-    xfer += oprot->writeListEnd();
-  }
-  xfer += oprot->writeFieldEnd();
-
-  xfer += oprot->writeFieldStop();
-  xfer += oprot->writeStructEnd();
-  return xfer;
-}
-
-void swap(FunctionExpr &a, FunctionExpr &b) {
-  using ::std::swap;
-  swap(a.function_name, b.function_name);
-  swap(a.arguments, b.arguments);
-  swap(a.__isset, b.__isset);
-}
-
-bool FunctionExpr::operator==(const FunctionExpr & rhs) const
-{
-  if (!(function_name == rhs.function_name))
-    return false;
-  if (!(arguments == rhs.arguments))
-    return false;
-  return true;
-}
-
-FunctionExpr::FunctionExpr(const FunctionExpr& other242) {
-  function_name = other242.function_name;
-  arguments = other242.arguments;
-  __isset = other242.__isset;
-}
-FunctionExpr& FunctionExpr::operator=(const FunctionExpr& other243) {
-  function_name = other243.function_name;
-  arguments = other243.arguments;
-  __isset = other243.__isset;
-  return *this;
-}
-void FunctionExpr::printTo(std::ostream& out) const {
-  using ::apache::thrift::to_string;
-  out << "FunctionExpr(";
-  out << "function_name=" << to_string(function_name);
-  out << ", " << "arguments=" << to_string(arguments);
   out << ")";
 }
 

@@ -12,20 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifdef CI
-import infinity_core;
-import base_test;
-#else
 module;
 
 module infinity_core:ut.user_defined_analyzer;
 
 import :ut.base_test;
-import :stl;
 import :status;
 import :user_defined_analyzer;
 import :python_instance;
-#endif
 
 import compilation_config;
 
@@ -52,10 +46,10 @@ TEST_F(UserDefinedAnalyzerTest, test1) {
 TEST_F(UserDefinedAnalyzerTest, test2) {
     PythonInstance::Init();
 
-    SizeT thread_count = 1;
+    size_t thread_count = 1;
     std::vector<std::thread> threads;
     threads.reserve(thread_count);
-    for (SizeT i = 0; i < thread_count; ++i) {
+    for (size_t i = 0; i < thread_count; ++i) {
         threads.push_back(std::thread([&] {
             UserDefinedAnalyzer analyzer(std::string(test_data_path()) + "/scripts/uda1.py");
             auto [term_vector, status] = analyzer.Analyze("text1 text2 text3");
@@ -66,7 +60,7 @@ TEST_F(UserDefinedAnalyzerTest, test2) {
         }));
     }
 
-    for (SizeT i = 0; i < thread_count; ++i) {
+    for (size_t i = 0; i < thread_count; ++i) {
         threads[i].join();
     }
 

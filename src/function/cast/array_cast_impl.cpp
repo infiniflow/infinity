@@ -12,28 +12,24 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:array_cast.impl;
 
 import :array_cast;
-import :stl;
 import :column_vector;
 import :vector_buffer;
 import :bound_cast_func;
 import :column_vector_cast;
-import :third_party;
-import :logger;
-import :status;
-import logical_type;
-import internal_types;
-import data_type;
-import array_info;
 import :infinity_exception;
 import :value;
 import :cast_function;
 import :default_values;
 import :bound_cast_func;
+import :status;
+
+import logical_type;
+import internal_types;
+import data_type;
+import array_info;
 
 namespace infinity {
 
@@ -65,7 +61,7 @@ bool ArrayTryCastToArray::Run<ArrayT, ArrayT>(const ArrayT &source,
         UnrecoverableError(fmt::format("Source Array type error: expected {}, got {}.", source_type.ToString(), src_value.type().ToString()));
     }
     const auto &src_elems = src_value.GetArray();
-    Vector<Value> result_elements;
+    std::vector<Value> result_elements;
     if (!src_elems.empty()) {
         // non-empty array, need to cast each element
         const auto &src_elem_type = dynamic_cast<const ArrayInfo *>(src_value.type().type_info().get())->ElemType();
@@ -75,17 +71,17 @@ bool ArrayTryCastToArray::Run<ArrayT, ArrayT>(const ArrayT &source,
             UnrecoverableError("Error: source and target element types are the same. No need to cast.");
         }
         const auto cast_func = CastFunction::GetBoundFunc(src_elem_type, target_elem_type);
-        const auto src_elem_type_ptr = MakeShared<DataType>(src_elem_type);
-        const auto target_elem_type_ptr = MakeShared<DataType>(target_elem_type);
+        const auto src_elem_type_ptr = std::make_shared<DataType>(src_elem_type);
+        const auto target_elem_type_ptr = std::make_shared<DataType>(target_elem_type);
         const u64 num_elements = src_elems.size();
         for (u64 next_job_idx = 0; next_job_idx < num_elements;) {
             const u64 job_size = std::min(num_elements - next_job_idx, static_cast<u64>(DEFAULT_VECTOR_SIZE));
-            auto src_elem_column_vector = MakeShared<ColumnVector>(src_elem_type_ptr);
+            auto src_elem_column_vector = std::make_shared<ColumnVector>(src_elem_type_ptr);
             src_elem_column_vector->Initialize(ColumnVectorType::kFlat, DEFAULT_VECTOR_SIZE);
             for (u64 i = 0; i < job_size; ++i) {
                 src_elem_column_vector->AppendValue(src_elems[next_job_idx + i]);
             }
-            auto cast_elem_column_vector = MakeShared<ColumnVector>(target_elem_type_ptr);
+            auto cast_elem_column_vector = std::make_shared<ColumnVector>(target_elem_type_ptr);
             cast_elem_column_vector->Initialize(ColumnVectorType::kFlat, DEFAULT_VECTOR_SIZE);
             CastParameters cast_parameters;
             cast_func.function(src_elem_column_vector, cast_elem_column_vector, job_size, cast_parameters);

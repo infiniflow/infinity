@@ -11,22 +11,23 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-module;
 
 export module infinity_core:value;
 
-import :stl;
-import type_info;
-import logical_type;
 import :infinity_exception;
+import :status;
+
+import std;
+import std.compat;
+
 import internal_types;
 import embedding_info;
 import sparse_info;
 import data_type;
 import knn_expr;
-import :third_party;
-import :status;
 import global_resource_usage;
+import type_info;
+import logical_type;
 
 namespace infinity {
 
@@ -70,8 +71,7 @@ public:
     template <class T>
     T &Get() {
         if (type_ != T::TYPE) {
-            String error_message = "ExtraValueInfo type mismatch";
-            UnrecoverableError(error_message);
+            UnrecoverableError("ExtraValueInfo type mismatch");
         }
         return (T &)*this;
     }
@@ -81,21 +81,21 @@ protected:
 };
 
 //===--------------------------------------------------------------------===//
-// String Value Info
+// std::string Value Info
 //===--------------------------------------------------------------------===//
 struct StringValueInfo : public ExtraValueInfo {
     static constexpr ExtraValueInfoType TYPE = ExtraValueInfoType::STRING_VALUE_INFO;
 
 public:
     explicit StringValueInfo(const std::string_view str_view) : ExtraValueInfo(ExtraValueInfoType::STRING_VALUE_INFO), str_(str_view) {}
-    explicit StringValueInfo(String &&str_p) : ExtraValueInfo(ExtraValueInfoType::STRING_VALUE_INFO), str_(std::move(str_p)) {}
+    explicit StringValueInfo(std::string &&str_p) : ExtraValueInfo(ExtraValueInfoType::STRING_VALUE_INFO), str_(std::move(str_p)) {}
 
-    const String &GetString() { return str_; }
+    const std::string &GetString() { return str_; }
 
 protected:
-    bool EqualsInternal(ExtraValueInfo *other_p) const override { return IsEqual(str_, other_p->Get<StringValueInfo>().str_); }
+    bool EqualsInternal(ExtraValueInfo *other_p) const override { return str_ == other_p->Get<StringValueInfo>().str_; }
 
-    String str_;
+    std::string str_;
 };
 
 //===--------------------------------------------------------------------===//
@@ -107,51 +107,51 @@ export struct EmbeddingValueInfo : public ExtraValueInfo {
 public:
     EmbeddingValueInfo() : ExtraValueInfo(ExtraValueInfoType::EMBEDDING_VALUE_INFO) {}
 
-    EmbeddingValueInfo(const char *data_ptr, SizeT bytes) : ExtraValueInfo(ExtraValueInfoType::EMBEDDING_VALUE_INFO) {
+    EmbeddingValueInfo(const char *data_ptr, size_t bytes) : ExtraValueInfo(ExtraValueInfoType::EMBEDDING_VALUE_INFO) {
         len_ = bytes;
-        data_ = MakeUnique<char[]>(bytes);
+        data_ = std::make_unique<char[]>(bytes);
         std::memcpy(data_.get(), data_ptr, bytes);
     }
 
-    EmbeddingValueInfo(const Vector<Pair<ptr_t, SizeT>> &ptr_bytes);
+    EmbeddingValueInfo(const std::vector<std::pair<char *, size_t>> &ptr_bytes);
 
     template <typename T>
-    explicit EmbeddingValueInfo(const Vector<T> &values_p) : ExtraValueInfo(ExtraValueInfoType::EMBEDDING_VALUE_INFO) {
+    explicit EmbeddingValueInfo(const std::vector<T> &values_p) : ExtraValueInfo(ExtraValueInfoType::EMBEDDING_VALUE_INFO) {
         len_ = values_p.size() * sizeof(T);
-        data_ = MakeUnique<char[]>(len_);
+        data_ = std::make_unique<char[]>(len_);
         std::memcpy(data_.get(), values_p.data(), len_);
     }
 
     template <>
-    explicit EmbeddingValueInfo(const Vector<bool> &values_p) : ExtraValueInfo(ExtraValueInfoType::EMBEDDING_VALUE_INFO) {
+    explicit EmbeddingValueInfo(const std::vector<bool> &values_p) : ExtraValueInfo(ExtraValueInfoType::EMBEDDING_VALUE_INFO) {
         len_ = values_p.size() / 8;
-        data_ = MakeUnique<char[]>(len_);
+        data_ = std::make_unique<char[]>(len_);
         auto *data_ptr = reinterpret_cast<u8 *>(data_.get());
-        for (SizeT i = 0; i < values_p.size(); i++) {
+        for (size_t i = 0; i < values_p.size(); i++) {
             if (values_p[i]) {
                 data_ptr[i / 8] |= (1u << (i % 8));
             }
         }
     }
 
-    EmbeddingValueInfo(UniquePtr<char[]> data, SizeT len)
+    EmbeddingValueInfo(std::unique_ptr<char[]> data, size_t len)
         : ExtraValueInfo(ExtraValueInfoType::EMBEDDING_VALUE_INFO), data_(std::move(data)), len_(len) {}
 
     // Also used for tensor info
-    static SharedPtr<EmbeddingValueInfo> MakeTensorValueInfo(const_ptr_t ptr, SizeT bytes);
+    static std::shared_ptr<EmbeddingValueInfo> MakeTensorValueInfo(const char *ptr, size_t bytes);
 
-    static SharedPtr<EmbeddingValueInfo> MakeTensorValueInfo(const Vector<Pair<ptr_t, SizeT>> &ptr_bytes);
+    static std::shared_ptr<EmbeddingValueInfo> MakeTensorValueInfo(const std::vector<std::pair<char *, size_t>> &ptr_bytes);
 
     // Also used for multivector info
-    static SharedPtr<EmbeddingValueInfo> MakeMultiVectorValueInfo(const_ptr_t ptr, SizeT bytes);
+    static std::shared_ptr<EmbeddingValueInfo> MakeMultiVectorValueInfo(const char *ptr, size_t bytes);
 
-    static SharedPtr<EmbeddingValueInfo> MakeMultiVectorValueInfo(const Vector<Pair<ptr_t, SizeT>> &ptr_bytes);
+    static std::shared_ptr<EmbeddingValueInfo> MakeMultiVectorValueInfo(const std::vector<std::pair<char *, size_t>> &ptr_bytes);
 
-    Span<char> GetData() const { return {data_.get(), len_}; }
+    std::span<char> GetData() const { return {data_.get(), len_}; }
 
 private:
-    UniquePtr<char[]> data_;
-    SizeT len_;
+    std::unique_ptr<char[]> data_;
+    size_t len_;
 };
 
 //===--------------------------------------------------------------------===//
@@ -161,11 +161,11 @@ export struct TensorArrayValueInfo : public ExtraValueInfo {
     static constexpr ExtraValueInfoType TYPE = ExtraValueInfoType::TENSORARRAY_VALUE_INFO;
     friend struct Value;
     TensorArrayValueInfo() : ExtraValueInfo(ExtraValueInfoType::TENSORARRAY_VALUE_INFO) {}
-    void AppendTensor(const_ptr_t ptr, SizeT bytes) { member_tensor_data_.emplace_back(EmbeddingValueInfo::MakeTensorValueInfo(ptr, bytes)); }
-    void AppendTensor(const Vector<Pair<ptr_t, SizeT>> &ptr_bytes) {
+    void AppendTensor(const char *ptr, size_t bytes) { member_tensor_data_.emplace_back(EmbeddingValueInfo::MakeTensorValueInfo(ptr, bytes)); }
+    void AppendTensor(const std::vector<std::pair<char *, size_t>> &ptr_bytes) {
         member_tensor_data_.emplace_back(EmbeddingValueInfo::MakeTensorValueInfo(ptr_bytes));
     }
-    Vector<SharedPtr<EmbeddingValueInfo>> member_tensor_data_;
+    std::vector<std::shared_ptr<EmbeddingValueInfo>> member_tensor_data_;
 };
 
 //===--------------------------------------------------------------------===//
@@ -177,24 +177,24 @@ export struct SparseValueInfo : public ExtraValueInfo {
     friend struct Value;
 
     template <typename Idx, typename T>
-    SparseValueInfo(const Vector<Idx> &indices_vec, const Vector<T> &data_vec)
+    SparseValueInfo(const std::vector<Idx> &indices_vec, const std::vector<T> &data_vec)
         : ExtraValueInfo(ExtraValueInfoType::SPARSE_VALUE_INFO), nnz_(indices_vec.size()), indices_(indices_vec), data_(data_vec) {}
 
-    SparseValueInfo(SizeT nnz, const char *raw_indice_ptr, SizeT raw_indice_len, const char *raw_data_ptr, SizeT raw_data_len)
+    SparseValueInfo(size_t nnz, const char *raw_indice_ptr, size_t raw_indice_len, const char *raw_data_ptr, size_t raw_data_len)
         : ExtraValueInfo(ExtraValueInfoType::SPARSE_VALUE_INFO), nnz_(nnz), indices_(EmbeddingValueInfo(raw_indice_ptr, raw_indice_len)),
           data_(EmbeddingValueInfo(raw_data_ptr, raw_data_len)) {}
 
-    SparseValueInfo(SizeT nnz, UniquePtr<char[]> indice_ptr, SizeT indice_len, UniquePtr<char[]> data_ptr, SizeT data_len)
+    SparseValueInfo(size_t nnz, std::unique_ptr<char[]> indice_ptr, size_t indice_len, std::unique_ptr<char[]> data_ptr, size_t data_len)
         : ExtraValueInfo(ExtraValueInfoType::SPARSE_VALUE_INFO), nnz_(nnz), indices_(EmbeddingValueInfo(std::move(indice_ptr), indice_len)),
           data_(EmbeddingValueInfo(std::move(data_ptr), data_len)) {}
 
-    Tuple<SizeT, Span<char>, Span<char>> GetData() const {
-        Span<char> indice_span = indices_.GetData();
-        Span<char> data_span = data_.GetData();
+    std::tuple<size_t, std::span<char>, std::span<char>> GetData() const {
+        std::span<char> indice_span = indices_.GetData();
+        std::span<char> data_span = data_.GetData();
         return {nnz_, indice_span, data_span};
     }
 
-    SizeT nnz_{};
+    size_t nnz_{};
     EmbeddingValueInfo indices_;
     EmbeddingValueInfo data_;
 };
@@ -231,7 +231,7 @@ public:
 
     static Value MakeBFloat16(BFloat16T input);
 
-    static Value MakeDecimal(DecimalT input, SharedPtr<TypeInfo> type_info_ptr);
+    static Value MakeDecimal(DecimalT input, std::shared_ptr<TypeInfo> type_info_ptr);
 
     static Value MakeDate(DateT input);
 
@@ -265,43 +265,43 @@ public:
 
     static Value MakeRow(RowID input);
 
-    static Value MakeVarchar(String str);
+    static Value MakeVarchar(std::string str);
 
     static Value MakeVarchar(std::string_view str_view);
 
     static Value MakeVarchar(const char *ptr);
 
-    static Value MakeVarchar(const char *ptr, SizeT len);
+    static Value MakeVarchar(const char *ptr, size_t len);
 
     static Value MakeVarchar(const VarcharT &input_ref);
 
     template <class T>
-    static Value MakeEmbedding(const Vector<T> &vec) {
+    static Value MakeEmbedding(const std::vector<T> &vec) {
         auto embedding_info_ptr = EmbeddingInfo::Make(ToEmbeddingDataType<T>(), vec.size());
         Value value(LogicalType::kEmbedding, embedding_info_ptr);
-        value.value_info_ = MakeShared<EmbeddingValueInfo>(vec);
+        value.value_info_ = std::make_shared<EmbeddingValueInfo>(vec);
         return value;
     }
 
-    static Value MakeEmbedding(const_ptr_t ptr, SharedPtr<TypeInfo> type_info_ptr);
+    static Value MakeEmbedding(const char *ptr, std::shared_ptr<TypeInfo> type_info_ptr);
 
-    static Value MakeMultiVector(const_ptr_t ptr, SizeT bytes, SharedPtr<TypeInfo> type_info_ptr);
+    static Value MakeMultiVector(const char *ptr, size_t bytes, std::shared_ptr<TypeInfo> type_info_ptr);
 
-    static Value MakeMultiVector(const Vector<Pair<ptr_t, SizeT>> &ptr_bytes, SharedPtr<TypeInfo> type_info_ptr);
+    static Value MakeMultiVector(const std::vector<std::pair<char *, size_t>> &ptr_bytes, std::shared_ptr<TypeInfo> type_info_ptr);
 
-    static Value MakeTensor(const_ptr_t ptr, SizeT bytes, SharedPtr<TypeInfo> type_info_ptr);
+    static Value MakeTensor(const char *ptr, size_t bytes, std::shared_ptr<TypeInfo> type_info_ptr);
 
-    static Value MakeTensor(const Vector<Pair<ptr_t, SizeT>> &ptr_bytes, SharedPtr<TypeInfo> type_info_ptr);
+    static Value MakeTensor(const std::vector<std::pair<char *, size_t>> &ptr_bytes, std::shared_ptr<TypeInfo> type_info_ptr);
 
-    static Value MakeTensorArray(SharedPtr<TypeInfo> type_info_ptr);
+    static Value MakeTensorArray(std::shared_ptr<TypeInfo> type_info_ptr);
 
-    static Value MakeArray(Vector<Value> array_elements, SharedPtr<TypeInfo> type_info_ptr);
+    static Value MakeArray(std::vector<Value> array_elements, std::shared_ptr<TypeInfo> type_info_ptr);
 
     template <typename Idx, typename T>
-    static Value MakeSparse(const Pair<Vector<Idx>, Vector<T>> &vec) {
+    static Value MakeSparse(const std::pair<std::vector<Idx>, std::vector<T>> &vec) {
         const auto &[indice_vec, data_vec] = vec;
         {
-            HashSet<Idx> indice_set(indice_vec.begin(), indice_vec.end());
+            std::unordered_set<Idx> indice_set(indice_vec.begin(), indice_vec.end());
             if (indice_set.size() != indice_vec.size()) {
                 RecoverableError(Status::InvalidDataType());
             }
@@ -309,7 +309,7 @@ public:
         if (indice_vec.size() != data_vec.size() && !data_vec.empty()) {
             UnrecoverableError("Sparse data size mismatch.");
         }
-        SizeT sparse_dim = 0;
+        size_t sparse_dim = 0;
         if (!indice_vec.empty()) {
             if (std::any_of(indice_vec.begin(), indice_vec.end(), [](Idx idx) { return idx < 0; })) {
                 RecoverableError(Status::ParserError("Sparse indice should not be negative."));
@@ -318,43 +318,45 @@ public:
         }
         auto sparse_info_ptr = SparseInfo::Make(ToEmbeddingDataType<T>(), ToEmbeddingDataType<Idx>(), sparse_dim, SparseStoreType::kSorted);
         Value value(LogicalType::kSparse, sparse_info_ptr);
-        value.value_info_ = MakeShared<SparseValueInfo>(indice_vec, data_vec);
+        value.value_info_ = std::make_shared<SparseValueInfo>(indice_vec, data_vec);
 
         return value;
     }
 
-    static Value MakeSparse(const char *raw_data_ptr, const char *raw_idx_ptr, SizeT nnz, const SharedPtr<TypeInfo> type_info);
+    static Value MakeSparse(const char *raw_data_ptr, const char *raw_idx_ptr, size_t nnz, const std::shared_ptr<TypeInfo> type_info);
 
-    static Value MakeSparse(SizeT nnz, UniquePtr<char[]> indice_ptr, UniquePtr<char[]> data_ptr, const SharedPtr<TypeInfo> type_info);
+    static Value
+    MakeSparse(size_t nnz, std::unique_ptr<char[]> indice_ptr, std::unique_ptr<char[]> data_ptr, const std::shared_ptr<TypeInfo> type_info);
 
-    void AppendToTensorArray(const_ptr_t ptr, SizeT bytes);
+    void AppendToTensorArray(const char *ptr, size_t bytes);
 
-    void AppendToTensorArray(const Vector<Pair<ptr_t, SizeT>> &ptr_bytes);
+    void AppendToTensorArray(const std::vector<std::pair<char *, size_t>> &ptr_bytes);
 
     // Object member
 public:
     // Value getter template for all types in union
     template <class T>
     T GetValue() const {
-        String error_message = "Not implemented value getter.";
-        UnrecoverableError(error_message);
+        UnrecoverableError("Not implemented value getter.");
         return T();
     }
 
     // Value getter for each type outside union
-    const String &GetVarchar() const { return this->value_info_->Get<StringValueInfo>().GetString(); }
+    const std::string &GetVarchar() const { return this->value_info_->Get<StringValueInfo>().GetString(); }
 
-    Span<char> GetEmbedding() const { return this->value_info_->Get<EmbeddingValueInfo>().GetData(); }
+    std::span<char> GetEmbedding() const { return this->value_info_->Get<EmbeddingValueInfo>().GetData(); }
 
-    const Vector<SharedPtr<EmbeddingValueInfo>> &GetTensorArray() const { return this->value_info_->Get<TensorArrayValueInfo>().member_tensor_data_; }
+    const std::vector<std::shared_ptr<EmbeddingValueInfo>> &GetTensorArray() const {
+        return this->value_info_->Get<TensorArrayValueInfo>().member_tensor_data_;
+    }
 
-    const Vector<Value> &GetArray() const;
+    const std::vector<Value> &GetArray() const;
 
-    Tuple<SizeT, Span<char>, Span<char>> GetSparse() const { return this->value_info_->Get<SparseValueInfo>().GetData(); }
+    std::tuple<size_t, std::span<char>, std::span<char>> GetSparse() const { return this->value_info_->Get<SparseValueInfo>().GetData(); }
 
     [[nodiscard]] const DataType &type() const { return type_; }
 
-    [[nodiscard]] String ToString() const;
+    [[nodiscard]] std::string ToString() const;
 
     [[nodiscard]] i64 ToInteger() const;
 
@@ -364,14 +366,14 @@ public:
 
     void Reset();
 
-    void AppendToJson(const String &name, nlohmann::json &json) const;
+    void AppendToJson(const std::string &name, nlohmann::json &json) const;
 
     void AppendToArrowArray(const DataType &data_type, arrow::ArrayBuilder *array_builder) const;
 
     // Member method
 public:
     explicit Value(const DataType &type);
-    explicit Value(LogicalType type, SharedPtr<TypeInfo> typeinfo_ptr = nullptr);
+    explicit Value(LogicalType type, std::shared_ptr<TypeInfo> typeinfo_ptr = nullptr);
     Value(const Value &other);
     Value(Value &&other) noexcept;
     ~Value();
@@ -412,7 +414,7 @@ public:
         UuidT uuid;
         RowID row;
     } value_ = {};
-    SharedPtr<ExtraValueInfo> value_info_ = {}; // NOLINT
+    std::shared_ptr<ExtraValueInfo> value_info_ = {}; // NOLINT
 };
 
 // Value getter
@@ -503,10 +505,10 @@ RowID Value::GetValue() const;
 export struct ArrayValueInfo : public ExtraValueInfo {
     static constexpr ExtraValueInfoType TYPE = ExtraValueInfoType::ARRAY_VALUE_INFO;
     friend struct Value;
-    explicit ArrayValueInfo(Vector<Value> array_elements)
+    explicit ArrayValueInfo(std::vector<Value> array_elements)
         : ExtraValueInfo(ExtraValueInfoType::ARRAY_VALUE_INFO), array_elements_(std::move(array_elements)) {}
     void AppendValue(Value v) { array_elements_.emplace_back(std::move(v)); }
-    Vector<Value> array_elements_;
+    std::vector<Value> array_elements_;
 };
 
 } // namespace infinity

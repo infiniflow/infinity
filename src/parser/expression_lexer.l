@@ -2,7 +2,7 @@
 
 #include "expression_parser.h"
 #include "expression_parser_result.h"
-#include <sstream>
+import std;
 
 static thread_local std::stringstream string_buffer;
 

@@ -16,7 +16,6 @@ module;
 
 export module infinity_core:day_of_week;
 
-import :stl;
 namespace infinity {
 
 class NewCatalog;

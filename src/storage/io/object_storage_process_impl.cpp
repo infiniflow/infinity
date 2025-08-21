@@ -15,46 +15,45 @@
 module;
 
 #include <cassert>
-#include <filesystem>
 
 module infinity_core:object_storage_process.impl;
 
 import :object_storage_process;
-
-import :stl;
 import :object_storage_task;
 import :logger;
 import :blocking_queue;
 import :infinity_exception;
-import :third_party;
 import :virtual_store;
+
+import std;
+import third_party;
 
 namespace fs = std::filesystem;
 
 namespace infinity {
 
 void ObjectStorageProcess::Start() {
-    processor_thread_ = Thread([this] { Process(); });
+    processor_thread_ = std::thread([this] { Process(); });
     LOG_INFO("Object storage processor is started.");
 }
 
 void ObjectStorageProcess::Stop() {
     LOG_INFO("Object storage processor is stopping.");
-    SharedPtr<StopObjectStorageProcessTask> stop_task = MakeShared<StopObjectStorageProcessTask>();
+    std::shared_ptr<StopObjectStorageProcessTask> stop_task = std::make_shared<StopObjectStorageProcessTask>();
     task_queue_.Enqueue(stop_task);
     stop_task->Wait();
     processor_thread_.join();
     LOG_INFO("Object storage processor is stopped.");
 }
 
-void ObjectStorageProcess::Submit(SharedPtr<BaseObjectStorageTask> object_storage_task) {
+void ObjectStorageProcess::Submit(std::shared_ptr<BaseObjectStorageTask> object_storage_task) {
     ++task_count_;
     task_queue_.Enqueue(std::move(object_storage_task));
 }
 
 void ObjectStorageProcess::Process() {
     bool running{true};
-    Deque<SharedPtr<BaseObjectStorageTask>> tasks;
+    std::deque<std::shared_ptr<BaseObjectStorageTask>> tasks;
     while (running) {
         task_queue_.DequeueBulk(tasks);
         for (const auto &object_storage_task : tasks) {
@@ -114,8 +113,7 @@ void ObjectStorageProcess::Process() {
                     break;
                 }
                 default: {
-                    String error_message = fmt::format("Invalid object storage: {}", (u8)object_storage_task->type_);
-                    UnrecoverableError(error_message);
+                    UnrecoverableError(fmt::format("Invalid object storage: {}", (u8)object_storage_task->type_));
                     break;
                 }
             }

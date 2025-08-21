@@ -11,21 +11,20 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-module;
+
 module infinity_core:second.impl;
 
 import :second;
-import :stl;
 import :new_catalog;
 import :status;
-import logical_type;
 import :infinity_exception;
 import :scalar_function;
 import :scalar_function_set;
-import :third_party;
+import :column_vector;
+
 import internal_types;
 import data_type;
-import :column_vector;
+import logical_type;
 
 namespace infinity {
 
@@ -36,7 +35,6 @@ struct SecondFunction {
         RecoverableError(status);
         return false;
     }
-
 };
 
 template <>
@@ -58,29 +56,27 @@ inline bool SecondFunction::Run(TimestampT left, BigIntT &result) {
 }
 
 void RegisterSecondFunction(NewCatalog *catalog_ptr) {
-    String func_name = "second";
+    std::string func_name = "second";
 
-    SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
+    std::shared_ptr<ScalarFunctionSet> function_set_ptr = std::make_shared<ScalarFunctionSet>(func_name);
 
     ScalarFunction second_datetime_function(func_name,
-                                  {DataType(LogicalType::kDateTime)},
-                                  {DataType(LogicalType::kBigInt)},
-                                  &ScalarFunction::UnaryFunctionWithFailure<DateTimeT, BigIntT, SecondFunction>);
+                                            {DataType(LogicalType::kDateTime)},
+                                            {DataType(LogicalType::kBigInt)},
+                                            &ScalarFunction::UnaryFunctionWithFailure<DateTimeT, BigIntT, SecondFunction>);
     function_set_ptr->AddFunction(second_datetime_function);
 
     ScalarFunction second_time_function(func_name,
-                                  {DataType(LogicalType::kTime)},
-                                  {DataType(LogicalType::kBigInt)},
-                                  &ScalarFunction::UnaryFunctionWithFailure<TimeT, BigIntT, SecondFunction>);
+                                        {DataType(LogicalType::kTime)},
+                                        {DataType(LogicalType::kBigInt)},
+                                        &ScalarFunction::UnaryFunctionWithFailure<TimeT, BigIntT, SecondFunction>);
     function_set_ptr->AddFunction(second_time_function);
 
-
     ScalarFunction second_timestamp_function(func_name,
-                                  {DataType(LogicalType::kTimestamp)},
-                                  {DataType(LogicalType::kBigInt)},
-                                  &ScalarFunction::UnaryFunctionWithFailure<TimestampT, BigIntT, SecondFunction>);
+                                             {DataType(LogicalType::kTimestamp)},
+                                             {DataType(LogicalType::kBigInt)},
+                                             &ScalarFunction::UnaryFunctionWithFailure<TimestampT, BigIntT, SecondFunction>);
     function_set_ptr->AddFunction(second_timestamp_function);
-
 
     NewCatalog::AddFunctionSet(catalog_ptr, function_set_ptr);
 }

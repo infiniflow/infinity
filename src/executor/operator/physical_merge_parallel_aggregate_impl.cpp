@@ -17,7 +17,6 @@ module;
 module infinity_core:physical_merge_parallel_aggregate.impl;
 
 import :physical_merge_parallel_aggregate;
-
 import :query_context;
 import :operator_state;
 import :physical_merge_parallel_aggregate;

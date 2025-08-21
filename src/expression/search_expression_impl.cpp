@@ -14,11 +14,10 @@
 
 module;
 
-#include <sstream>
 module infinity_core:search_expression.impl;
 
 import :search_expression;
-import :stl;
+
 import :expression_type;
 import :scalar_function;
 import :match_expression;
@@ -26,17 +25,21 @@ import :knn_expression;
 import :match_tensor_expression;
 import :fusion_expression;
 
+import std;
+
 namespace infinity {
 
-SearchExpression::SearchExpression(Vector<SharedPtr<BaseExpression>> &match_exprs, Vector<SharedPtr<FusionExpression>> &fusion_exprs)
-    : BaseExpression(ExpressionType::kSearch, Vector<SharedPtr<BaseExpression>>()), match_exprs_(match_exprs), fusion_exprs_(fusion_exprs) {}
+SearchExpression::SearchExpression(std::vector<std::shared_ptr<BaseExpression>> &match_exprs,
+                                   std::vector<std::shared_ptr<FusionExpression>> &fusion_exprs)
+    : BaseExpression(ExpressionType::kSearch, std::vector<std::shared_ptr<BaseExpression>>()), match_exprs_(match_exprs),
+      fusion_exprs_(fusion_exprs) {}
 
-String SearchExpression::ToString() const {
+std::string SearchExpression::ToString() const {
     if (!alias_.empty()) {
         return alias_;
     }
 
-    OStringStream oss;
+    std::ostringstream oss;
     oss << "SEARCH(";
     int cnt = 0;
     for (auto &match_expr : match_exprs_) {

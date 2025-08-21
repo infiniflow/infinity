@@ -12,11 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:parse_fulltext_options;
 
-import :stl;
+import :infinity_type;
+
+import std;
 
 namespace infinity {
 
@@ -29,9 +29,9 @@ struct MinimumShouldMatchPercentage {
     i8 value_ = 0;
 };
 
-using SingleMinimumShouldMatchOption = Pair<u32, std::variant<MinimumShouldMatchCount, MinimumShouldMatchPercentage>>;
+using SingleMinimumShouldMatchOption = std::pair<u32, std::variant<MinimumShouldMatchCount, MinimumShouldMatchPercentage>>;
 
-export using MinimumShouldMatchOption = Vector<SingleMinimumShouldMatchOption>;
+export using MinimumShouldMatchOption = std::vector<SingleMinimumShouldMatchOption>;
 
 export MinimumShouldMatchOption ParseMinimumShouldMatchOption(std::string_view input_str);
 
@@ -50,12 +50,12 @@ export struct BM25Params {
 };
 
 export struct RankFeatureOption {
-    String field_;
-    String feature_;
+    std::string field_;
+    std::string feature_;
     float boost_;
 };
 
-export using RankFeaturesOption = Vector<RankFeatureOption>;
+export using RankFeaturesOption = std::vector<RankFeatureOption>;
 
 export RankFeaturesOption ParseRankFeaturesOption(std::string_view input_str);
 

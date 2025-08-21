@@ -12,19 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:filter_iterator;
 
-import :stl;
 import :doc_iterator;
 import :query_node;
-import internal_types;
 import :index_defines;
 import :common_query_filter;
 import :base_expression;
 import :roaring_bitmap;
 import :column_index_reader;
+
+import internal_types;
 
 namespace infinity {
 // struct BM25Params;
@@ -40,7 +38,7 @@ export class FilterIterator final : public DocIterator {
         const BM25Params &bm25_params;
         u32 minimum_should_match;
         u32 topn;
-        const Vector<String> &index_names_;
+        const std::vector<std::string> &index_names_;
 
         [[nodiscard]] CreateSearchParams RemoveMSM() const {
             CreateSearchParams copy_value = *this;
@@ -50,11 +48,11 @@ export class FilterIterator final : public DocIterator {
     };
 
 public:
-    explicit FilterIterator(CommonQueryFilter *common_query_filter, UniquePtr<DocIterator> &&query_iterator)
+    explicit FilterIterator(CommonQueryFilter *common_query_filter, std::unique_ptr<DocIterator> &&query_iterator)
         : common_query_filter_(common_query_filter), query_iterator_(std::move(query_iterator)) {}
 
     DocIteratorType GetType() const override { return DocIteratorType::kFilterIterator; }
-    String Name() const override { return "FilterIterator"; };
+    std::string Name() const override { return "FilterIterator"; };
 
     bool Next(RowID doc_id) override {
         while (true) {
@@ -79,24 +77,24 @@ public:
     // for minimum_should_match parameter
     u32 MatchCount() const override { return query_iterator_->MatchCount(); }
 
-    void PrintTree(std::ostream &os, const String &prefix, bool is_final) const override;
+    void PrintTree(std::ostream &os, const std::string &prefix, bool is_final) const override;
 
 private:
     CommonQueryFilter *common_query_filter_{};
-    UniquePtr<DocIterator> query_iterator_{};
+    std::unique_ptr<DocIterator> query_iterator_{};
 };
 
 // use QueryNodeType::FILTER
 export struct FilterQueryNode final : public QueryNode {
     // search iterator
-    UniquePtr<QueryNode> query_tree_{};
+    std::unique_ptr<QueryNode> query_tree_{};
     // filter info
     CommonQueryFilter *common_query_filter_{};
-    const SizeT filter_result_count_ = common_query_filter_->filter_result_count_;
-    const Map<SegmentID, Bitmask> *filter_result_ptr_ = &common_query_filter_->filter_result_;
+    const size_t filter_result_count_ = common_query_filter_->filter_result_count_;
+    const std::map<SegmentID, Bitmask> *filter_result_ptr_ = &common_query_filter_->filter_result_;
     const BaseExpression *filter_expression = common_query_filter_->original_filter_.get();
 
-    explicit FilterQueryNode(CommonQueryFilter *common_query_filter, UniquePtr<QueryNode> &&query_tree)
+    explicit FilterQueryNode(CommonQueryFilter *common_query_filter, std::unique_ptr<QueryNode> &&query_tree)
         : QueryNode(QueryNodeType::FILTER), query_tree_(std::move(query_tree)), common_query_filter_(common_query_filter) {}
 
     void FilterOptimizeQueryTree() override {
@@ -108,11 +106,11 @@ export struct FilterQueryNode final : public QueryNode {
 
     void PushDownWeight(const float factor) override { MultiplyWeight(factor); }
 
-    UniquePtr<DocIterator> CreateSearch(CreateSearchParams params, bool is_top_level) const override;
+    std::unique_ptr<DocIterator> CreateSearch(CreateSearchParams params, bool is_top_level) const override;
 
-    void PrintTree(std::ostream &os, const String &prefix, bool is_final) const override;
+    void PrintTree(std::ostream &os, const std::string &prefix, bool is_final) const override;
 
-    void GetQueryColumnsTerms(Vector<String> &columns, Vector<String> &terms) const override {}
+    void GetQueryColumnsTerms(std::vector<std::string> &columns, std::vector<std::string> &terms) const override {}
 };
 
 } // namespace infinity

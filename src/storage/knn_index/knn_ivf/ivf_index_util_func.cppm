@@ -12,23 +12,21 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:ivf_index_util_func;
 
-import :stl;
-import internal_types;
 import :column_vector;
+
+import internal_types;
 
 namespace infinity {
 
 export template <IsAnyOf<u8, i8, f64, f32, Float16T, BFloat16T> ColumnEmbeddingElementT>
-Pair<const f32 *, UniquePtr<f32[]>> GetF32Ptr(const ColumnEmbeddingElementT *src_data_ptr, const u32 src_data_cnt) {
-    Pair<const f32 *, UniquePtr<f32[]>> dst_data_ptr;
+std::pair<const f32 *, std::unique_ptr<f32[]>> GetF32Ptr(const ColumnEmbeddingElementT *src_data_ptr, const u32 src_data_cnt) {
+    std::pair<const f32 *, std::unique_ptr<f32[]>> dst_data_ptr;
     if constexpr (std::is_same_v<f32, ColumnEmbeddingElementT>) {
         dst_data_ptr.first = src_data_ptr;
     } else {
-        dst_data_ptr.second = MakeUniqueForOverwrite<f32[]>(src_data_cnt);
+        dst_data_ptr.second = std::make_unique_for_overwrite<f32[]>(src_data_cnt);
         dst_data_ptr.first = dst_data_ptr.second.get();
         for (u32 i = 0; i < src_data_cnt; ++i) {
             if constexpr (std::is_same_v<f64, ColumnEmbeddingElementT>) {
@@ -42,7 +40,8 @@ Pair<const f32 *, UniquePtr<f32[]>> GetF32Ptr(const ColumnEmbeddingElementT *src
 }
 
 export template <IsAnyOf<u8, i8, f32> QueryDataType, IsAnyOf<u8, i8, f64, f32, Float16T, BFloat16T> ColumnEmbeddingElementT>
-Pair<const QueryDataType *, UniquePtr<QueryDataType[]>> GetSearchCalcPtr(const ColumnEmbeddingElementT *src_data_ptr, const u32 src_data_cnt) {
+std::pair<const QueryDataType *, std::unique_ptr<QueryDataType[]>> GetSearchCalcPtr(const ColumnEmbeddingElementT *src_data_ptr,
+                                                                                    const u32 src_data_cnt) {
     if constexpr (std::is_same_v<QueryDataType, ColumnEmbeddingElementT>) {
         return {src_data_ptr, nullptr};
     } else {

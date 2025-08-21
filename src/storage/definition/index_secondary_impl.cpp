@@ -12,39 +12,30 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
-#include <algorithm>
-#include <sstream>
-#include <string>
-
 module infinity_core:index_secondary.impl;
 
 import :index_secondary;
-
-import :stl;
 import :status;
 import :base_table_ref;
 import :infinity_exception;
-import :third_party;
-import :logger;
+
+import std;
+import third_party;
 
 namespace infinity {
 
-void IndexSecondary::ValidateColumnDataType(const SharedPtr<BaseTableRef> &base_table_ref, const String &column_name) {
+void IndexSecondary::ValidateColumnDataType(const std::shared_ptr<BaseTableRef> &base_table_ref, const std::string &column_name) {
     auto &column_names_vector = *(base_table_ref->column_names_);
     auto &column_types_vector = *(base_table_ref->column_types_);
-    SizeT column_id = std::find(column_names_vector.begin(), column_names_vector.end(), column_name) - column_names_vector.begin();
+    size_t column_id = std::find(column_names_vector.begin(), column_names_vector.end(), column_name) - column_names_vector.begin();
     if (column_id == column_names_vector.size()) {
-        Status status = Status::ColumnNotExist(column_name);
-        RecoverableError(status);
+        RecoverableError(Status::ColumnNotExist(column_name));
     } else if (auto &data_type = column_types_vector[column_id]; !(data_type->CanBuildSecondaryIndex())) {
-        Status status =
-            Status::InvalidIndexDefinition(fmt::format("Attempt to create index on column: {}, data type: {}.", column_name, data_type->ToString()));
-        RecoverableError(status);
+        RecoverableError(
+            Status::InvalidIndexDefinition(fmt::format("Attempt to create index on column: {}, data type: {}.", column_name, data_type->ToString())));
     }
 }
 
-String IndexSecondary::BuildOtherParamsString() const { return ""; }
+std::string IndexSecondary::BuildOtherParamsString() const { return ""; }
 
 } // namespace infinity

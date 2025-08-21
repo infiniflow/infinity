@@ -1,14 +1,10 @@
-module;
-
 export module infinity_core:byte_slice_writer;
 
-import :stl;
 import :byte_slice;
 import :memory_chunk;
 import :default_values;
 import :file_writer;
 import :file_reader;
-
 import :infinity_exception;
 
 namespace infinity {
@@ -31,7 +27,7 @@ public:
 
     void WriteUInt32(u32 value);
 
-    void Write(const void *value, SizeT len);
+    void Write(const void *value, size_t len);
 
     void Write(ByteSliceList &src);
 
@@ -44,15 +40,15 @@ public:
 
     u32 WriteVLong(u64 value);
 
-    SizeT GetSize() const;
+    size_t GetSize() const;
 
     ByteSliceList *GetByteSliceList() { return slice_list_; }
 
     const ByteSliceList *GetByteSliceList() const { return slice_list_; }
 
-    void Dump(const SharedPtr<FileWriter> &file);
+    void Dump(const std::shared_ptr<FileWriter> &file);
 
-    void Load(const SharedPtr<FileReader> &file, u32 size);
+    void Load(const std::shared_ptr<FileReader> &file, u32 size);
 
     void Reset();
 

@@ -12,11 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:object_storage_task;
 
-import :stl;
+import std;
 
 namespace infinity {
 
@@ -52,49 +50,49 @@ export struct BaseObjectStorageTask {
         cv_.notify_one();
     }
 
-    virtual String ToString() const = 0;
+    virtual std::string ToString() const = 0;
 };
 
 export struct DownloadTask final : public BaseObjectStorageTask {
-    DownloadTask(const String &_file_dir, const String &_object_name)
+    DownloadTask(const std::string &_file_dir, const std::string &_object_name)
         : BaseObjectStorageTask(ObjectStorageTaskType::kDownload), file_dir(_file_dir), object_name(_object_name) {}
 
     ~DownloadTask() = default;
 
-    String ToString() const final { return "Download Task"; }
-    String file_dir;
-    String object_name;
+    std::string ToString() const final { return "Download Task"; }
+    std::string file_dir;
+    std::string object_name;
 };
 
 export struct UploadTask final : public BaseObjectStorageTask {
-    UploadTask(const String &_file_dir, const String &_object_name)
+    UploadTask(const std::string &_file_dir, const std::string &_object_name)
         : BaseObjectStorageTask(ObjectStorageTaskType::kUpload), file_dir(_file_dir), object_name(_object_name) {}
 
     ~UploadTask() = default;
 
-    String ToString() const final { return "Download Task"; }
-    String file_dir;
-    String object_name;
+    std::string ToString() const final { return "Download Task"; }
+    std::string file_dir;
+    std::string object_name;
 };
 
 export struct CopyTask final : public BaseObjectStorageTask {
-    CopyTask(const String &_src_object_name, const String &_dst_object_name)
+    CopyTask(const std::string &_src_object_name, const std::string &_dst_object_name)
         : BaseObjectStorageTask(ObjectStorageTaskType::kCopy), src_object_name(_src_object_name), dst_object_name(_dst_object_name) {}
 
     ~CopyTask() = default;
 
-    String ToString() const final { return "Copy Task"; }
-    String src_object_name;
-    String dst_object_name;
+    std::string ToString() const final { return "Copy Task"; }
+    std::string src_object_name;
+    std::string dst_object_name;
 };
 
 export struct RemoveTask final : public BaseObjectStorageTask {
-    RemoveTask(const String &_object_name) : BaseObjectStorageTask(ObjectStorageTaskType::kRemove), object_name(_object_name) {}
+    RemoveTask(const std::string &_object_name) : BaseObjectStorageTask(ObjectStorageTaskType::kRemove), object_name(_object_name) {}
 
     ~RemoveTask() = default;
 
-    String ToString() const final { return "Remove Task"; }
-    String object_name;
+    std::string ToString() const final { return "Remove Task"; }
+    std::string object_name;
 };
 
 export struct StopObjectStorageProcessTask final : public BaseObjectStorageTask {
@@ -102,16 +100,16 @@ export struct StopObjectStorageProcessTask final : public BaseObjectStorageTask 
 
     ~StopObjectStorageProcessTask() = default;
 
-    String ToString() const final { return "Stop processor"; }
+    std::string ToString() const final { return "Stop processor"; }
 };
 
 export struct LocalDropTask final : public BaseObjectStorageTask {
-    LocalDropTask(String drop_path) : BaseObjectStorageTask(ObjectStorageTaskType::kLocalDrop), drop_path_(drop_path) {}
+    LocalDropTask(std::string drop_path) : BaseObjectStorageTask(ObjectStorageTaskType::kLocalDrop), drop_path_(drop_path) {}
 
     ~LocalDropTask() = default;
 
-    String ToString() const final { return "Local Drop Task"; }
-    String drop_path_;
+    std::string ToString() const final { return "Local Drop Task"; }
+    std::string drop_path_;
 };
 
 } // namespace infinity

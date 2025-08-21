@@ -12,19 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifdef CI
-#include "gtest/gtest.h"
-import infinity_core;
-import base_test;
-#else
 module;
 
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 
 module infinity_core:ut.current_date_functions;
 
 import :ut.base_test;
-import :stl;
+
 import :infinity_exception;
 import :infinity_context;
 import :new_catalog;
@@ -40,11 +35,10 @@ import :function;
 import :scalar_function;
 import :scalar_function_set;
 import :current_date;
-import :third_party;
+import third_party;
 import :config;
 import :status;
 import :kv_store;
-#endif
 
 import global_resource_usage;
 import data_type;
@@ -58,41 +52,41 @@ class CurrentDateFunctionsTest : public BaseTest {};
 TEST_F(CurrentDateFunctionsTest, current_date_func) {
     using namespace infinity;
 
-    UniquePtr<Config> config_ptr = MakeUnique<Config>();
+    std::unique_ptr<Config> config_ptr = std::make_unique<Config>();
     Status status = config_ptr->Init(nullptr, nullptr);
     EXPECT_TRUE(status.ok());
-    UniquePtr<KVStore> kv_store_ptr = MakeUnique<KVStore>();
+    std::unique_ptr<KVStore> kv_store_ptr = std::make_unique<KVStore>();
     status = kv_store_ptr->Init(config_ptr->CatalogDir());
     EXPECT_TRUE(status.ok());
     InfinityContext::instance().SetConfig(std::move(config_ptr));
-    UniquePtr<NewCatalog> catalog_ptr = MakeUnique<NewCatalog>(kv_store_ptr.get());
+    std::unique_ptr<NewCatalog> catalog_ptr = std::make_unique<NewCatalog>(kv_store_ptr.get());
 
     RegisterCurrentDateFunction(catalog_ptr.get());
 
-    String op = "current_date";
+    std::string op = "current_date";
 
-    SharedPtr<FunctionSet> function_set = NewCatalog::GetFunctionSetByName(catalog_ptr.get(), op);
+    std::shared_ptr<FunctionSet> function_set = NewCatalog::GetFunctionSetByName(catalog_ptr.get(), op);
     EXPECT_EQ(function_set->type_, FunctionType::kScalar);
-    SharedPtr<ScalarFunctionSet> scalar_function_set = std::static_pointer_cast<ScalarFunctionSet>(function_set);
+    std::shared_ptr<ScalarFunctionSet> scalar_function_set = std::static_pointer_cast<ScalarFunctionSet>(function_set);
 
     {
-        Vector<SharedPtr<BaseExpression>> inputs;
+        std::vector<std::shared_ptr<BaseExpression>> inputs;
 
         DataType data_type1(LogicalType::kVarchar);
-        SharedPtr<DataType> result_type = MakeShared<DataType>(LogicalType::kDate);
+        std::shared_ptr<DataType> result_type = std::make_shared<DataType>(LogicalType::kDate);
         ScalarFunction func = scalar_function_set->GetMostMatchFunction(inputs);
         EXPECT_STREQ("current_date()", func.ToString().c_str());
 
-        Vector<SharedPtr<DataType>> column_types;
-        column_types.emplace_back(MakeShared<DataType>(data_type1));
+        std::vector<std::shared_ptr<DataType>> column_types;
+        column_types.emplace_back(std::make_shared<DataType>(data_type1));
 
         DataBlock data_block;
 
-        SharedPtr<ColumnVector> result = MakeShared<ColumnVector>(result_type);
+        std::shared_ptr<ColumnVector> result = std::make_shared<ColumnVector>(result_type);
         result->Initialize();
         func.function_(data_block, result);
 
-        for (SizeT i = 0; i < 1; ++i) {
+        for (size_t i = 0; i < 1; ++i) {
             Value v = result->GetValueByIndex(i);
             EXPECT_EQ(v.type_.type(), LogicalType::kDate);
         }

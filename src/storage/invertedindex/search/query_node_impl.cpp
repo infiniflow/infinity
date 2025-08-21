@@ -1,14 +1,10 @@
 module;
 
 #include <cassert>
-#include <chrono>
-#include <cmath>
 
 module infinity_core:query_node.impl;
 
 import :query_node;
-import :stl;
-import :third_party;
 import :status;
 import :meta_info;
 import :column_index_reader;
@@ -17,7 +13,6 @@ import :index_defines;
 import :column_length_io;
 import :infinity_exception;
 import :logger;
-
 import :doc_iterator;
 import :and_iterator;
 import :and_not_iterator;
@@ -33,6 +28,10 @@ import :batch_or_iterator;
 import :blockmax_leaf_iterator;
 import :rank_feature_doc_iterator;
 import :rank_features_doc_iterator;
+
+import std;
+import std.compat;
+import third_party;
 
 namespace infinity {
 
@@ -54,7 +53,7 @@ std::unique_ptr<QueryNode> QueryNode::GetOptimizedQueryTree(std::unique_ptr<Quer
     std::chrono::time_point<std::chrono::high_resolution_clock> start_time{};
     if (SHOULD_LOG_DEBUG()) {
         start_time = std::chrono::high_resolution_clock::now();
-        OStringStream oss;
+        std::ostringstream oss;
         oss << "Query tree before optimization:\n";
         if (root) {
             root->PrintTree(oss);
@@ -102,7 +101,7 @@ std::unique_ptr<QueryNode> QueryNode::GetOptimizedQueryTree(std::unique_ptr<Quer
     if (SHOULD_LOG_DEBUG()) {
         auto end_time = std::chrono::high_resolution_clock::now();
         auto duration = std::chrono::duration_cast<std::chrono::duration<float, std::milli>>(end_time - start_time);
-        OStringStream oss;
+        std::ostringstream oss;
         oss << "Query tree optimization time cost: " << duration << std::endl;
         oss << "Query tree after optimization:\n";
         if (optimized_root) {
@@ -432,10 +431,10 @@ std::unique_ptr<DocIterator> TermQueryNode::CreateSearch(const CreateSearchParam
     if (!posting_iterator) {
         return nullptr;
     }
-    auto search = MakeUnique<TermDocIterator>(std::move(posting_iterator), column_id, GetWeight(), params.ft_similarity);
+    auto search = std::make_unique<TermDocIterator>(std::move(posting_iterator), column_id, GetWeight(), params.ft_similarity);
     search->term_ptr_ = &term_;
     search->column_name_ptr_ = &column_;
-    auto column_length_reader = MakeUnique<FullTextColumnLengthReader>(column_index_reader);
+    auto column_length_reader = std::make_unique<FullTextColumnLengthReader>(column_index_reader);
     if (column_length_reader->GetAvgColumnLength() <= 1e-6f) {
         LOG_WARN("avg_column_len is 0.0f");
         return nullptr;
@@ -457,7 +456,7 @@ std::unique_ptr<DocIterator> RankFeatureQueryNode::CreateSearch(const CreateSear
     if (!posting_iterator) {
         return nullptr;
     }
-    auto search = MakeUnique<RankFeatureDocIterator>(std::move(posting_iterator), column_id, boost_);
+    auto search = std::make_unique<RankFeatureDocIterator>(std::move(posting_iterator), column_id, boost_);
     search->term_ptr_ = &term_;
     search->column_name_ptr_ = &column_;
     return search;
@@ -475,7 +474,7 @@ std::unique_ptr<DocIterator> PhraseQueryNode::CreateSearch(const CreateSearchPar
     if (option_flag & OptionFlag::of_position_list) {
         fetch_position = true;
     }
-    Vector<std::unique_ptr<PostingIterator>> posting_iterators;
+    std::vector<std::unique_ptr<PostingIterator>> posting_iterators;
     for (auto &term : terms_) {
         auto posting_iterator = column_index_reader->Lookup(term, fetch_position);
         if (nullptr == posting_iterator) {
@@ -483,16 +482,16 @@ std::unique_ptr<DocIterator> PhraseQueryNode::CreateSearch(const CreateSearchPar
         }
         posting_iterators.emplace_back(std::move(posting_iterator));
     }
-    auto search = MakeUnique<PhraseDocIterator>(std::move(posting_iterators), GetWeight(), slop_, params.ft_similarity);
+    auto search = std::make_unique<PhraseDocIterator>(std::move(posting_iterators), GetWeight(), slop_, params.ft_similarity);
     search->terms_ptr_ = &terms_;
     search->column_name_ptr_ = &column_;
-    auto column_length_reader = MakeUnique<FullTextColumnLengthReader>(column_index_reader);
+    auto column_length_reader = std::make_unique<FullTextColumnLengthReader>(column_index_reader);
     search->InitBM25Info(std::move(column_length_reader), params.bm25_params.delta_phrase, params.bm25_params.k1, params.bm25_params.b);
     return search;
 }
 
 std::unique_ptr<DocIterator> AndQueryNode::CreateSearch(const CreateSearchParams params, const bool is_top_level) const {
-    Vector<std::unique_ptr<DocIterator>> sub_doc_iters;
+    std::vector<std::unique_ptr<DocIterator>> sub_doc_iters;
     sub_doc_iters.reserve(children_.size());
     const auto next_params = params.RemoveMSM();
     for (auto &child : children_) {
@@ -508,15 +507,15 @@ std::unique_ptr<DocIterator> AndQueryNode::CreateSearch(const CreateSearchParams
     } else if (sub_doc_iters.size() == 1) {
         return children_.front()->CreateSearch(params, is_top_level);
     } else if (params.minimum_should_match <= sub_doc_iters.size()) {
-        return MakeUnique<AndIterator>(std::move(sub_doc_iters));
+        return std::make_unique<AndIterator>(std::move(sub_doc_iters));
     } else {
         assert(params.minimum_should_match > 2u);
-        return MakeUnique<MinimumShouldMatchWrapper<AndIterator>>(std::move(sub_doc_iters), params.minimum_should_match);
+        return std::make_unique<MinimumShouldMatchWrapper<AndIterator>>(std::move(sub_doc_iters), params.minimum_should_match);
     }
 }
 
 std::unique_ptr<DocIterator> AndNotQueryNode::CreateSearch(const CreateSearchParams params, const bool is_top_level) const {
-    Vector<std::unique_ptr<DocIterator>> sub_doc_iters;
+    std::vector<std::unique_ptr<DocIterator>> sub_doc_iters;
     sub_doc_iters.reserve(children_.size());
     // check if the first child is a valid query
     auto first_iter = children_.front()->CreateSearch(params, is_top_level);
@@ -535,13 +534,13 @@ std::unique_ptr<DocIterator> AndNotQueryNode::CreateSearch(const CreateSearchPar
     if (sub_doc_iters.size() == 1) {
         return std::move(sub_doc_iters[0]);
     } else {
-        return MakeUnique<AndNotIterator>(std::move(sub_doc_iters));
+        return std::make_unique<AndNotIterator>(std::move(sub_doc_iters));
     }
 }
 
 std::unique_ptr<DocIterator> OrQueryNode::CreateSearch(const CreateSearchParams params, const bool is_top_level) const {
-    Vector<std::unique_ptr<DocIterator>> sub_doc_iters;
-    Vector<std::unique_ptr<DocIterator>> keyword_iters;
+    std::vector<std::unique_ptr<DocIterator>> sub_doc_iters;
+    std::vector<std::unique_ptr<DocIterator>> keyword_iters;
     sub_doc_iters.reserve(children_.size());
     bool all_are_term_or_phrase = true; // describe sub_doc_iters
     const QueryNode *only_child = nullptr;
@@ -573,31 +572,31 @@ std::unique_ptr<DocIterator> OrQueryNode::CreateSearch(const CreateSearchParams 
                 sub_doc_iters.insert(sub_doc_iters.end(),
                                      std::make_move_iterator(keyword_iters.begin()),
                                      std::make_move_iterator(keyword_iters.end()));
-                return MakeUnique<OrIterator>(std::move(sub_doc_iters));
+                return std::make_unique<OrIterator>(std::move(sub_doc_iters));
             }
-            auto msm_iter = MakeUnique<T>(std::move(sub_doc_iters));
+            auto msm_iter = std::make_unique<T>(std::move(sub_doc_iters));
             if (keyword_iters.empty()) {
                 return msm_iter;
             } else {
                 keyword_iters.emplace_back(std::move(msm_iter));
-                return MakeUnique<OrIterator>(std::move(keyword_iters));
+                return std::make_unique<OrIterator>(std::move(keyword_iters));
             }
         } else {
             // must use minimum_should_match
-            UniquePtr<DocIterator> msm_iter;
+            std::unique_ptr<DocIterator> msm_iter;
             if (params.minimum_should_match <= 1) {
-                msm_iter = MakeUnique<T>(std::move(sub_doc_iters));
+                msm_iter = std::make_unique<T>(std::move(sub_doc_iters));
             } else if (params.minimum_should_match < sub_doc_iters.size()) {
                 using MSM_T = std::conditional_t<std::is_same_v<T, OrIterator>, MinimumShouldMatchIterator, MinimumShouldMatchWrapper<T>>;
-                msm_iter = MakeUnique<MSM_T>(std::move(sub_doc_iters), params.minimum_should_match);
+                msm_iter = std::make_unique<MSM_T>(std::move(sub_doc_iters), params.minimum_should_match);
             } else {
-                msm_iter = MakeUnique<AndIterator>(std::move(sub_doc_iters));
+                msm_iter = std::make_unique<AndIterator>(std::move(sub_doc_iters));
             }
             if (keyword_iters.empty()) {
                 return msm_iter;
             } else {
                 keyword_iters.insert(keyword_iters.begin(), std::move(msm_iter));
-                return MakeUnique<MustFirstIterator>(std::move(keyword_iters));
+                return std::make_unique<MustFirstIterator>(std::move(keyword_iters));
             }
         }
     };
@@ -684,8 +683,8 @@ std::unique_ptr<DocIterator> OrQueryNode::CreateSearch(const CreateSearchParams 
     if ((params.early_term_algo == EarlyTermAlgo::kAuto || params.early_term_algo == EarlyTermAlgo::kBatch) &&
         params.ft_similarity == FulltextSimilarity::kBM25 && term_children_need_batch()) {
         // term_iters will be non-empty
-        Vector<std::unique_ptr<DocIterator>> term_iters;
-        Vector<std::unique_ptr<DocIterator>> not_term_iters = std::move(keyword_iters);
+        std::vector<std::unique_ptr<DocIterator>> term_iters;
+        std::vector<std::unique_ptr<DocIterator>> not_term_iters = std::move(keyword_iters);
         for (auto &iter : sub_doc_iters) {
             if (iter->GetType() == DocIteratorType::kTermDocIterator) {
                 term_iters.emplace_back(std::move(iter));
@@ -699,13 +698,13 @@ std::unique_ptr<DocIterator> OrQueryNode::CreateSearch(const CreateSearchParams 
             keyword_iters.clear();
             return GetIterResultT.template operator()<BatchOrIterator>();
         }
-        auto batch_or_iter = MakeUnique<BatchOrIterator>(std::move(term_iters));
+        auto batch_or_iter = std::make_unique<BatchOrIterator>(std::move(term_iters));
         not_term_iters.emplace_back(std::move(batch_or_iter));
         // now at least 2 children in not_term_iters
         if (params.minimum_should_match <= 0) {
-            return MakeUnique<OrIterator>(std::move(not_term_iters));
+            return std::make_unique<OrIterator>(std::move(not_term_iters));
         } else {
-            return MakeUnique<MinimumShouldMatchWrapper<OrIterator>>(std::move(not_term_iters), params.minimum_should_match);
+            return std::make_unique<MinimumShouldMatchWrapper<OrIterator>>(std::move(not_term_iters), params.minimum_should_match);
         }
     }
     if (all_are_term_or_phrase) {
@@ -713,14 +712,14 @@ std::unique_ptr<DocIterator> OrQueryNode::CreateSearch(const CreateSearchParams 
     }
     sub_doc_iters.insert(sub_doc_iters.end(), std::make_move_iterator(keyword_iters.begin()), std::make_move_iterator(keyword_iters.end()));
     if (params.minimum_should_match <= 0) {
-        return MakeUnique<OrIterator>(std::move(sub_doc_iters));
+        return std::make_unique<OrIterator>(std::move(sub_doc_iters));
     } else {
-        return MakeUnique<MinimumShouldMatchWrapper<OrIterator>>(std::move(sub_doc_iters), params.minimum_should_match);
+        return std::make_unique<MinimumShouldMatchWrapper<OrIterator>>(std::move(sub_doc_iters), params.minimum_should_match);
     }
 }
 
 std::unique_ptr<DocIterator> RankFeaturesQueryNode::CreateSearch(const CreateSearchParams params, const bool is_top_level) const {
-    Vector<std::unique_ptr<DocIterator>> sub_doc_iters;
+    std::vector<std::unique_ptr<DocIterator>> sub_doc_iters;
     sub_doc_iters.reserve(children_.size());
     const auto next_params = params.RemoveMSM();
     for (auto &child : children_) {
@@ -734,12 +733,12 @@ std::unique_ptr<DocIterator> RankFeaturesQueryNode::CreateSearch(const CreateSea
     if (sub_doc_iters.empty()) {
         return nullptr;
     } else {
-        return MakeUnique<RankFeaturesDocIterator>(std::move(sub_doc_iters));
+        return std::make_unique<RankFeaturesDocIterator>(std::move(sub_doc_iters));
     }
 }
 
 std::unique_ptr<DocIterator> KeywordQueryNode::CreateSearch(const CreateSearchParams params, bool) const {
-    Vector<std::unique_ptr<DocIterator>> sub_doc_iters;
+    std::vector<std::unique_ptr<DocIterator>> sub_doc_iters;
     sub_doc_iters.reserve(children_.size());
     for (const auto &child : children_) {
         if (child->GetType() != QueryNodeType::TERM) {

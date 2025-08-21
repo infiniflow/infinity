@@ -12,21 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifdef CI
-#include "unit_test/gtest_expand.h"
-#include "gtest/gtest.h"
-import infinity_core;
-import base_test;
-#else
 module;
 
 #include "unit_test/gtest_expand.h"
-#include "gtest/gtest.h"
 
 module infinity_core:ut.date_type_old;
 
 import :ut.base_test;
-#endif
 
 import global_resource_usage;
 import internal_types;
@@ -77,7 +69,7 @@ TEST_F(DateTypeOldTest, TestEqStdChronoForward) {
 
     for (i32 i = 0; i < 30000; i++) {
         year_month_day ymd = year_month_day(sysdays);
-        String ymd_s = format("{:%Y-%m-%d}", ymd);
+        std::string ymd_s = format("{:%Y-%m-%d}", ymd);
         EXPECT_STREQ(date.ToString().c_str(), ymd_s.c_str());
 
         sysdays += days{1};
@@ -105,7 +97,7 @@ TEST_F(DateTypeOldTest, TestEqStdChronoBackward) {
 
     for (i32 i = 0; i < 30000; i++) {
         year_month_day ymd = year_month_day(sysdays);
-        String ymd_s = format("{:%Y-%m-%d}", ymd);
+        std::string ymd_s = format("{:%Y-%m-%d}", ymd);
         EXPECT_STREQ(date.ToString().c_str(), ymd_s.c_str());
 
         sysdays -= days{1};

@@ -4,7 +4,6 @@ module;
 
 export module infinity_core:posting_byte_slice_reader;
 
-import :stl;
 import :byte_slice;
 import :byte_slice_reader;
 import :posting_byte_slice;
@@ -29,7 +28,7 @@ public:
     }
 
     bool Seek(u32 pos) {
-        SizeT ret = byte_slice_reader_.Seek(pos);
+        size_t ret = byte_slice_reader_.Seek(pos);
         location_cursor_ = 0;
         posting_buffer_cursor_ = 0;
         if (ret == ByteSliceReader::BYTE_SLICE_EOF)
@@ -40,7 +39,7 @@ public:
     u32 Tell() const { return byte_slice_reader_.Tell(); }
 
     template <typename T>
-    bool Decode(T *buffer, SizeT count, SizeT &decode_count);
+    bool Decode(T *buffer, size_t count, size_t &decode_count);
 
 private:
     void IncValueCursor() {
@@ -66,7 +65,7 @@ private:
 };
 
 template <typename T>
-bool PostingByteSliceReader::Decode(T *buffer, SizeT count, SizeT &decode_count) {
+bool PostingByteSliceReader::Decode(T *buffer, size_t count, size_t &decode_count) {
     if (count == 0)
         return false;
 
@@ -80,7 +79,7 @@ bool PostingByteSliceReader::Decode(T *buffer, SizeT count, SizeT &decode_count)
     PostingField *current_value = posting_fields_->GetValue(location_cursor_);
 
     if (byte_slice_reader_.Tell() >= byte_slice_size) {
-        SizeT buffer_size = posting_byte_slice_->GetBufferSize();
+        size_t buffer_size = posting_byte_slice_->GetBufferSize();
 
         // Runtime bounds check instead of just assertion
         if (buffer_size > count) {

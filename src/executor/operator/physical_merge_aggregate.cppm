@@ -12,8 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:physical_merge_aggregate;
 
 import :base_table_ref;
@@ -22,44 +20,42 @@ import :query_context;
 import :operator_state;
 import :physical_operator;
 import :physical_operator_type;
-
 import :infinity_exception;
 import :value;
 import :data_block;
-import :stl;
+import :logger;
 
 import internal_types;
 import data_type;
-import :logger;
 
 namespace infinity {
 
 export class PhysicalMergeAggregate final : public PhysicalOperator {
 public:
     explicit PhysicalMergeAggregate(u64 id,
-                                    SharedPtr<BaseTableRef> table_ref,
-                                    UniquePtr<PhysicalOperator> left,
-                                    SharedPtr<Vector<String>> output_names,
-                                    SharedPtr<Vector<SharedPtr<DataType>>> output_types,
-                                    SharedPtr<Vector<LoadMeta>> load_metas)
+                                    std::shared_ptr<BaseTableRef> table_ref,
+                                    std::unique_ptr<PhysicalOperator> left,
+                                    std::shared_ptr<std::vector<std::string>> output_names,
+                                    std::shared_ptr<std::vector<std::shared_ptr<DataType>>> output_types,
+                                    std::shared_ptr<std::vector<LoadMeta>> load_metas)
         : PhysicalOperator(PhysicalOperatorType::kMergeAggregate, std::move(left), nullptr, id, load_metas), output_names_(std::move(output_names)),
           output_types_(std::move(output_types)), table_ref_(std::move(table_ref)) {}
 
     ~PhysicalMergeAggregate() override = default;
 
-    void Init(QueryContext* query_context) override;
+    void Init(QueryContext *query_context) override;
 
     bool Execute(QueryContext *query_context, OperatorState *operator_state) final;
 
-    inline SharedPtr<Vector<String>> GetOutputNames() const final { return output_names_; }
+    inline std::shared_ptr<std::vector<std::string>> GetOutputNames() const final { return output_names_; }
 
-    inline SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const final { return output_types_; }
-
-    template <typename T>
-    T GetInputData(MergeAggregateOperatorState *op_state, SizeT block_index, SizeT col_idx, SizeT row_idx);
+    inline std::shared_ptr<std::vector<std::shared_ptr<DataType>>> GetOutputTypes() const final { return output_types_; }
 
     template <typename T>
-    T GetOutputData(MergeAggregateOperatorState *op_state, SizeT block_index, SizeT col_idx, SizeT row_idx);
+    T GetInputData(MergeAggregateOperatorState *op_state, size_t block_index, size_t col_idx, size_t row_idx);
+
+    template <typename T>
+    T GetOutputData(MergeAggregateOperatorState *op_state, size_t block_index, size_t col_idx, size_t row_idx);
 
     template <typename T>
     using MathOperation = std::function<T(T, T)>;
@@ -71,48 +67,47 @@ public:
     template <typename T>
     void UpdateData(MergeAggregateOperatorState *op_state,
                     MathOperation<T> operation,
-                    SizeT col_idx,
-                    const Pair<SizeT, SizeT> &input_block_row_id,
-                    const Pair<SizeT, SizeT> &output_block_row_id);
+                    size_t col_idx,
+                    const std::pair<size_t, size_t> &input_block_row_id,
+                    const std::pair<size_t, size_t> &output_block_row_id);
 
     template <typename T>
-    void WriteValueAtPosition(MergeAggregateOperatorState *op_state, SizeT block_index, SizeT col_idx, SizeT row_idx, T value);
+    void WriteValueAtPosition(MergeAggregateOperatorState *op_state, size_t block_index, size_t col_idx, size_t row_idx, T value);
 
     template <typename T>
     void HandleSum(MergeAggregateOperatorState *op_state,
-                   SizeT col_idx,
-                   const Pair<SizeT, SizeT> &input_block_row_id,
-                   const Pair<SizeT, SizeT> &output_block_row_id);
+                   size_t col_idx,
+                   const std::pair<size_t, size_t> &input_block_row_id,
+                   const std::pair<size_t, size_t> &output_block_row_id);
 
     template <typename T>
     void HandleCount(MergeAggregateOperatorState *op_state,
-                     SizeT col_idx,
-                     const Pair<SizeT, SizeT> &input_block_row_id,
-                     const Pair<SizeT, SizeT> &output_block_row_id);
+                     size_t col_idx,
+                     const std::pair<size_t, size_t> &input_block_row_id,
+                     const std::pair<size_t, size_t> &output_block_row_id);
 
     template <typename T>
     void HandleMin(MergeAggregateOperatorState *op_state,
-                   SizeT col_idx,
-                   const Pair<SizeT, SizeT> &input_block_row_id,
-                   const Pair<SizeT, SizeT> &output_block_row_id);
+                   size_t col_idx,
+                   const std::pair<size_t, size_t> &input_block_row_id,
+                   const std::pair<size_t, size_t> &output_block_row_id);
 
     template <typename T>
     void HandleMax(MergeAggregateOperatorState *op_state,
-                   SizeT col_idx,
-                   const Pair<SizeT, SizeT> &input_block_row_id,
-                   const Pair<SizeT, SizeT> &output_block_row_id);
+                   size_t col_idx,
+                   const std::pair<size_t, size_t> &input_block_row_id,
+                   const std::pair<size_t, size_t> &output_block_row_id);
 
     template <typename T>
-    void HandleAggregateFunction(const String &function_name,
+    void HandleAggregateFunction(const std::string &function_name,
                                  MergeAggregateOperatorState *op_state,
-                                 SizeT col_idx,
-                                 const Pair<SizeT, SizeT> &input_block_row_id = {0, 0},
-                                 const Pair<SizeT, SizeT> &output_block_row_id = {0, 0});
+                                 size_t col_idx,
+                                 const std::pair<size_t, size_t> &input_block_row_id = {0, 0},
+                                 const std::pair<size_t, size_t> &output_block_row_id = {0, 0});
 
     template <typename T>
     Value CreateValue(T value) {
-        String error_message = "Unhandled type for makeValue";
-        UnrecoverableError(error_message);
+        UnrecoverableError("Unhandled type for makeValue");
     }
 
     template <>
@@ -146,11 +141,11 @@ public:
     }
 
 private:
-    SharedPtr<Vector<String>> output_names_{};
-    SharedPtr<Vector<SharedPtr<DataType>>> output_types_{};
+    std::shared_ptr<std::vector<std::string>> output_names_{};
+    std::shared_ptr<std::vector<std::shared_ptr<DataType>>> output_types_{};
 
 public:
-    SharedPtr<BaseTableRef> table_ref_{};
+    std::shared_ptr<BaseTableRef> table_ref_{};
 };
 
 } // namespace infinity

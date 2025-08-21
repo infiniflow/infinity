@@ -12,33 +12,29 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:where_binder.impl;
 
 import :where_binder;
-import :stl;
 import :base_expression;
-
 import :function;
 import :bind_context;
-
 import :infinity_exception;
-import :third_party;
 import :bind_alias_proxy;
+import :status;
+
+import third_party;
+
 import parsed_expr;
 import column_expr;
-import :status;
-import :logger;
 
 namespace infinity {
 
-SharedPtr<BaseExpression> WhereBinder::BuildExpression(const ParsedExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root) {
-    SharedPtr<BaseExpression> result = ExpressionBinder::BuildExpression(expr, bind_context_ptr, depth, root);
+std::shared_ptr<BaseExpression> WhereBinder::BuildExpression(const ParsedExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root) {
+    std::shared_ptr<BaseExpression> result = ExpressionBinder::BuildExpression(expr, bind_context_ptr, depth, root);
     return result;
 }
 
-SharedPtr<BaseExpression> WhereBinder::BuildColExpr(const ColumnExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root) {
+std::shared_ptr<BaseExpression> WhereBinder::BuildColExpr(const ColumnExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root) {
     // Step 1. Trying to bind the column to current binding. (done)
     // Step 2. Trying to bind the column to current select list alias. (done)
 
@@ -65,8 +61,7 @@ SharedPtr<BaseExpression> WhereBinder::BuildColExpr(const ColumnExpr &expr, Bind
 
 void WhereBinder::CheckFuncType(FunctionType func_type) const {
     if (func_type != FunctionType::kScalar) {
-        String error_message = "Only scalar function are allowed in where clause";
-        UnrecoverableError(error_message);
+        UnrecoverableError("Only scalar function are allowed in where clause");
     }
 }
 

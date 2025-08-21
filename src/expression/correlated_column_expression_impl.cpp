@@ -14,23 +14,23 @@
 
 module;
 
-#include <sstream>
-
 module infinity_core:correlated_column_expression.impl;
 
 import :correlated_column_expression;
 
-import :stl;
 import :expression_type;
+import :correlated_column_expression;
+
+import std;
+
 import data_type;
 import internal_types;
-import :correlated_column_expression;
 
 namespace infinity {
 
-CorrelatedColumnExpression::CorrelatedColumnExpression(DataType data_type, String column_name)
+CorrelatedColumnExpression::CorrelatedColumnExpression(DataType data_type, std::string column_name)
     : BaseExpression(ExpressionType::kCorrelatedColumn, {}), data_type_(std::move(data_type)), column_name_(std::move(column_name)) {}
 
-String CorrelatedColumnExpression::ToString() const { return {}; }
+std::string CorrelatedColumnExpression::ToString() const { return {}; }
 
 } // namespace infinity

@@ -12,16 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
-#include <type_traits>
-
 export module infinity_core:result_cache_manager;
 
-import :stl;
 import :cached_node_base;
 import :data_block;
 import :logical_read_cache;
+
+import std;
+
 import global_resource_usage;
 
 namespace infinity {
@@ -31,20 +29,20 @@ class PhysicalOperator;
 
 export struct CacheContent {
 public:
-    CacheContent(Vector<UniquePtr<DataBlock>> data_blocks, SharedPtr<Vector<String>> column_names)
+    CacheContent(std::vector<std::unique_ptr<DataBlock>> data_blocks, std::shared_ptr<std::vector<std::string>> column_names)
         : data_blocks_(std::move(data_blocks)), column_names_(std::move(column_names)) {}
 
-    UniquePtr<CacheContent> AppendColumns(const CacheContent &other, const Vector<SizeT> &column_idxes) const;
+    std::unique_ptr<CacheContent> AppendColumns(const CacheContent &other, const std::vector<size_t> &column_idxes) const;
 
-    UniquePtr<CacheContent> Clone() const;
+    std::unique_ptr<CacheContent> Clone() const;
 
-    Vector<UniquePtr<DataBlock>> data_blocks_;
-    SharedPtr<Vector<String>> column_names_;
+    std::vector<std::unique_ptr<DataBlock>> data_blocks_;
+    std::shared_ptr<std::vector<std::string>> column_names_;
 };
 
 export struct CacheOutput {
-    SharedPtr<CacheContent> cache_content_;
-    Vector<SizeT> column_map_;
+    std::shared_ptr<CacheContent> cache_content_;
+    std::vector<size_t> column_map_;
 };
 
 class CacheResultMap {
@@ -52,7 +50,7 @@ public:
     struct CachedLogicalMatchBaseHash {
         using is_transparent = std::true_type;
 
-        SizeT operator()(const CachedNodeBase *key) const { return key->Hash(); }
+        size_t operator()(const CachedNodeBase *key) const { return key->Hash(); }
     };
 
     struct CachedLogicalMatchBaseEq {
@@ -61,45 +59,46 @@ public:
         bool operator()(const CachedNodeBase *key1, const CachedNodeBase *key2) const { return key1->Eq(*key2); }
     };
 
-    CacheResultMap(SizeT cache_num_capacity) : cache_num_capacity_(cache_num_capacity) {}
+    CacheResultMap(size_t cache_num_capacity) : cache_num_capacity_(cache_num_capacity) {}
 
-    bool AddCache(UniquePtr<CachedNodeBase> cached_node,
-                  Vector<UniquePtr<DataBlock>> data_blocks,
-                  const std::function<void(UniquePtr<CachedNodeBase>, CacheContent &, Vector<UniquePtr<DataBlock>>)> &update_content_func);
+    bool AddCache(
+        std::unique_ptr<CachedNodeBase> cached_node,
+        std::vector<std::unique_ptr<DataBlock>> data_blocks,
+        const std::function<void(std::unique_ptr<CachedNodeBase>, CacheContent &, std::vector<std::unique_ptr<DataBlock>>)> &update_content_func);
 
-    SharedPtr<CacheContent> GetCache(const CachedNodeBase &cached_node);
+    std::shared_ptr<CacheContent> GetCache(const CachedNodeBase &cached_node);
 
-    SizeT DropIF(std::function<bool(const CachedNodeBase &)> pred);
+    size_t DropIF(std::function<bool(const CachedNodeBase &)> pred);
 
-    void ResetCacheNumCapacity(SizeT cache_num_capacity);
+    void ResetCacheNumCapacity(size_t cache_num_capacity);
 
     void ClearCache();
 
-    SizeT cache_num_capacity() const { return cache_num_capacity_; }
+    size_t cache_num_capacity() const { return cache_num_capacity_; }
 
-    SizeT cache_num_used() {
+    size_t cache_num_used() {
         std::lock_guard<std::mutex> lock(mtx_);
         return lru_map_.size();
     }
 
 private:
     struct LRUEntry {
-        UniquePtr<CachedNodeBase> cached_node_;
-        SharedPtr<CacheContent> cache_content_;
+        std::unique_ptr<CachedNodeBase> cached_node_;
+        std::shared_ptr<CacheContent> cache_content_;
     };
-    using LRUList = List<LRUEntry>;
-    using LRUMap = HashMap<CachedNodeBase *, LRUList::iterator, CachedLogicalMatchBaseHash, CachedLogicalMatchBaseEq>;
+    using LRUList = std::list<LRUEntry>;
+    using LRUMap = std::unordered_map<CachedNodeBase *, LRUList::iterator, CachedLogicalMatchBaseHash, CachedLogicalMatchBaseEq>;
 
     std::mutex mtx_;
 
-    SizeT cache_num_capacity_;
+    size_t cache_num_capacity_;
     LRUList lru_list_;
     LRUMap lru_map_;
 };
 
 export class ResultCacheManager {
 public:
-    ResultCacheManager(SizeT cache_num_capacity) : cache_map_(cache_num_capacity) {
+    ResultCacheManager(size_t cache_num_capacity) : cache_map_(cache_num_capacity) {
 #ifdef INFINITY_DEBUG
         GlobalResourceUsage::IncrObjectCount("ResultCacheManager");
 #endif
@@ -110,19 +109,19 @@ public:
 #endif
     }
 
-    bool AddCache(UniquePtr<CachedNodeBase> cached_node, Vector<UniquePtr<DataBlock>> data_blocks);
+    bool AddCache(std::unique_ptr<CachedNodeBase> cached_node, std::vector<std::unique_ptr<DataBlock>> data_blocks);
 
-    Optional<CacheOutput> GetCache(const CachedNodeBase &cached_node);
+    std::optional<CacheOutput> GetCache(const CachedNodeBase &cached_node);
 
-    SizeT DropTable(const String &schema_name, const String &table_name);
+    size_t DropTable(const std::string &schema_name, const std::string &table_name);
 
-    void ResetCacheNumCapacity(SizeT cache_num_capacity) { cache_map_.ResetCacheNumCapacity(cache_num_capacity); }
+    void ResetCacheNumCapacity(size_t cache_num_capacity) { cache_map_.ResetCacheNumCapacity(cache_num_capacity); }
 
     void ClearCache() { cache_map_.ClearCache(); }
 
-    SizeT cache_num_capacity() const { return cache_map_.cache_num_capacity(); }
+    size_t cache_num_capacity() const { return cache_map_.cache_num_capacity(); }
 
-    SizeT cache_num_used() { return cache_map_.cache_num_used(); }
+    size_t cache_num_used() { return cache_map_.cache_num_used(); }
 
 private:
     CacheResultMap cache_map_;

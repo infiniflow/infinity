@@ -12,26 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifdef CI
-#include "unit_test/gtest_expand.h"
-#include "gtest/gtest.h"
-import infinity_core;
-import base_test;
-#else
 module;
 
 #include "unit_test/gtest_expand.h"
-#include "gtest/gtest.h"
 
 module infinity_core:ut.bitmap_type;
 
 import :ut.base_test;
 import :infinity_exception;
-import :third_party;
+import third_party;
 import :logger;
-import :stl;
 import :infinity_context;
-#endif
 
 import global_resource_usage;
 import parser_assert;

@@ -15,25 +15,23 @@
 module;
 
 #include <cassert>
-#include <concepts>
-#include <vector>
 
 module infinity_core:secondary_index_data.impl;
 
 import :secondary_index_data;
-
-import :stl;
-
 import :default_values;
 import :index_base;
 import :local_file_handle;
 import :infinity_exception;
-import :third_party;
 import :secondary_index_pgm;
 import :logger;
 import :buffer_handle;
 import :buffer_obj;
 import :table_index_meeta;
+
+import std;
+import third_party;
+
 import logical_type;
 import internal_types;
 import data_type;
@@ -69,9 +67,12 @@ struct SecondaryIndexChunkDataReader {
 template <typename RawValueType>
 struct SecondaryIndexChunkMerger {
     using OrderedKeyType = ConvertToOrderedType<RawValueType>;
-    Vector<SecondaryIndexChunkDataReader<RawValueType>> readers_;
-    std::priority_queue<Tuple<OrderedKeyType, u32, u32>, Vector<Tuple<OrderedKeyType, u32, u32>>, std::greater<Tuple<OrderedKeyType, u32, u32>>> pq_;
-    explicit SecondaryIndexChunkMerger(const Vector<Pair<u32, BufferObj *>> &buffer_objs) {
+    std::vector<SecondaryIndexChunkDataReader<RawValueType>> readers_;
+    std::priority_queue<std::tuple<OrderedKeyType, u32, u32>,
+                        std::vector<std::tuple<OrderedKeyType, u32, u32>>,
+                        std::greater<std::tuple<OrderedKeyType, u32, u32>>>
+        pq_;
+    explicit SecondaryIndexChunkMerger(const std::vector<std::pair<u32, BufferObj *>> &buffer_objs) {
         readers_.reserve(buffer_objs.size());
         for (const auto &[row_count, buffer_obj] : buffer_objs) {
             readers_.emplace_back(buffer_obj, row_count);
@@ -105,14 +106,14 @@ struct SecondaryIndexChunkMerger {
 template <typename RawValueType>
 class SecondaryIndexDataT final : public SecondaryIndexDataBase<HighCardinalityTag> {
     using OrderedKeyType = ConvertToOrderedType<RawValueType>;
-    UniquePtr<OrderedKeyType[]> key_;
-    UniquePtr<SegmentOffset[]> offset_;
+    std::unique_ptr<OrderedKeyType[]> key_;
+    std::unique_ptr<SegmentOffset[]> offset_;
 
 public:
     SecondaryIndexDataT(const u32 chunk_row_count, const bool allocate) : SecondaryIndexDataBase<HighCardinalityTag>(chunk_row_count) {
         pgm_index_ = GenerateSecondaryPGMIndex<OrderedKeyType>();
-        key_ = MakeUnique<OrderedKeyType[]>(chunk_row_count_);
-        offset_ = MakeUnique<SegmentOffset[]>(chunk_row_count_);
+        key_ = std::make_unique<OrderedKeyType[]>(chunk_row_count_);
+        offset_ = std::make_unique<SegmentOffset[]>(chunk_row_count_);
         key_ptr_ = key_.get();
         offset_ptr_ = offset_.get();
     }
@@ -130,7 +131,7 @@ public:
     }
 
     void InsertData(const void *ptr) override {
-        auto map_ptr = static_cast<const MultiMap<OrderedKeyType, u32> *>(ptr);
+        auto map_ptr = static_cast<const std::multimap<OrderedKeyType, u32> *>(ptr);
         if (!map_ptr) {
             UnrecoverableError("InsertData(): error: map_ptr type error.");
         }
@@ -149,7 +150,7 @@ public:
         pgm_index_->BuildIndex(chunk_row_count_, key_.get());
     }
 
-    void InsertMergeData(const Vector<Pair<u32, BufferObj *>> &old_chunks) override {
+    void InsertMergeData(const std::vector<std::pair<u32, BufferObj *>> &old_chunks) override {
         SecondaryIndexChunkMerger<RawValueType> merger(old_chunks);
         OrderedKeyType key = {};
         u32 offset = 0;
@@ -170,8 +171,8 @@ public:
 template <typename RawValueType>
 class SecondaryIndexDataLowCardinalityT final : public SecondaryIndexDataBase<LowCardinalityTag> {
     using OrderedKeyType = ConvertToOrderedType<RawValueType>;
-    Vector<OrderedKeyType> unique_keys_;
-    Vector<Bitmap> offset_bitmaps_;
+    std::vector<OrderedKeyType> unique_keys_;
+    std::vector<Bitmap> offset_bitmaps_;
     u32 unique_key_count_ = 0;
 
 public:
@@ -195,7 +196,7 @@ public:
                 i32 bitmap_size = const_cast<Bitmap &>(bitmap).GetSizeInBytes();
                 file_handle.Append(&bitmap_size, sizeof(bitmap_size));
 
-                Vector<char> bitmap_data(bitmap_size);
+                std::vector<char> bitmap_data(bitmap_size);
                 char *ptr = bitmap_data.data();
                 bitmap.WriteAdv(ptr);
                 file_handle.Append(bitmap_data.data(), bitmap_size);
@@ -219,7 +220,7 @@ public:
                 i32 bitmap_size;
                 file_handle.Read(&bitmap_size, sizeof(bitmap_size));
 
-                Vector<char> bitmap_data(bitmap_size);
+                std::vector<char> bitmap_data(bitmap_size);
                 file_handle.Read(bitmap_data.data(), bitmap_size);
 
                 // Use static ReadAdv method to deserialize
@@ -234,7 +235,7 @@ public:
     }
 
     void InsertData(const void *ptr) override {
-        auto map_ptr = static_cast<const MultiMap<OrderedKeyType, u32> *>(ptr);
+        auto map_ptr = static_cast<const std::multimap<OrderedKeyType, u32> *>(ptr);
         if (!map_ptr) {
             UnrecoverableError("InsertData(): error: map_ptr type error.");
         }
@@ -243,7 +244,7 @@ public:
         }
 
         // Build unique keys and corresponding bitmaps
-        Map<OrderedKeyType, Vector<u32>> key_to_offsets;
+        std::map<OrderedKeyType, std::vector<u32>> key_to_offsets;
         for (const auto &[key, offset] : *map_ptr) {
             key_to_offsets[key].push_back(offset);
         }
@@ -268,11 +269,11 @@ public:
         SetupCompatibilityPointers();
     }
 
-    void InsertMergeData(const Vector<Pair<u32, BufferObj *>> &old_chunks) override {
+    void InsertMergeData(const std::vector<std::pair<u32, BufferObj *>> &old_chunks) override {
         SecondaryIndexChunkMerger<RawValueType> merger(old_chunks);
 
         // Build unique keys and corresponding bitmaps from merged data
-        Map<OrderedKeyType, Vector<u32>> key_to_offsets;
+        std::map<OrderedKeyType, std::vector<u32>> key_to_offsets;
         OrderedKeyType key = {};
         u32 offset = 0;
         u32 total_count = 0;
@@ -330,7 +331,7 @@ public:
 
     u32 GetUniqueKeyCount() const override { return unique_key_count_; }
 
-    const Vector<OrderedKeyType> &GetUniqueKeys() const { return unique_keys_; }
+    const std::vector<OrderedKeyType> &GetUniqueKeys() const { return unique_keys_; }
 
     // Virtual method implementations for base class interface
     const void *GetUniqueKeysPtr() const override { return static_cast<const void *>(unique_keys_.data()); }
@@ -342,7 +343,7 @@ public:
 };
 
 SecondaryIndexDataBase<HighCardinalityTag> *
-GetSecondaryIndexData(const SharedPtr<DataType> &data_type, const u32 chunk_row_count, const bool allocate) {
+GetSecondaryIndexData(const std::shared_ptr<DataType> &data_type, const u32 chunk_row_count, const bool allocate) {
     if (!(data_type->CanBuildSecondaryIndex())) {
         UnrecoverableError(fmt::format("Cannot build secondary index on data type: {}", data_type->ToString()));
         return nullptr;
@@ -391,14 +392,14 @@ GetSecondaryIndexData(const SharedPtr<DataType> &data_type, const u32 chunk_row_
 // Template specialization for HighCardinalityTag
 template <>
 SecondaryIndexDataBase<HighCardinalityTag> *
-GetSecondaryIndexDataWithCardinality<HighCardinalityTag>(const SharedPtr<DataType> &data_type, const u32 chunk_row_count, const bool allocate) {
+GetSecondaryIndexDataWithCardinality<HighCardinalityTag>(const std::shared_ptr<DataType> &data_type, const u32 chunk_row_count, const bool allocate) {
     return GetSecondaryIndexData(data_type, chunk_row_count, allocate);
 }
 
 // Template specialization for LowCardinalityTag
 template <>
 SecondaryIndexDataBase<LowCardinalityTag> *
-GetSecondaryIndexDataWithCardinality<LowCardinalityTag>(const SharedPtr<DataType> &data_type, const u32 chunk_row_count, const bool allocate) {
+GetSecondaryIndexDataWithCardinality<LowCardinalityTag>(const std::shared_ptr<DataType> &data_type, const u32 chunk_row_count, const bool allocate) {
     if (!(data_type->CanBuildSecondaryIndex())) {
         UnrecoverableError(fmt::format("Cannot build secondary index on data type: {}", data_type->ToString()));
         return nullptr;
@@ -444,7 +445,7 @@ GetSecondaryIndexDataWithCardinality<LowCardinalityTag>(const SharedPtr<DataType
     }
 }
 
-void *GetSecondaryIndexDataWithMeeta(const SharedPtr<DataType> &data_type,
+void *GetSecondaryIndexDataWithMeeta(const std::shared_ptr<DataType> &data_type,
                                      const u32 chunk_row_count,
                                      const bool allocate,
                                      TableIndexMeeta *table_index_meeta) {

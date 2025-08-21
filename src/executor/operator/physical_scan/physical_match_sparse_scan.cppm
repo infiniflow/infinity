@@ -12,11 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:physical_match_sparse_scan;
 
-import :stl;
 import :query_context;
 import :operator_state;
 import :physical_operator;
@@ -39,27 +36,27 @@ export class PhysicalMatchSparseScan final : public PhysicalFilterScanBase {
 public:
     PhysicalMatchSparseScan(u64 id,
                             u64 table_index,
-                            SharedPtr<BaseTableRef> base_table_ref,
-                            SharedPtr<MatchSparseExpression> match_sparse_expression,
-                            const SharedPtr<CommonQueryFilter> &common_query_filter,
-                            SharedPtr<Vector<LoadMeta>> load_metas);
+                            std::shared_ptr<BaseTableRef> base_table_ref,
+                            std::shared_ptr<MatchSparseExpression> match_sparse_expression,
+                            const std::shared_ptr<CommonQueryFilter> &common_query_filter,
+                            std::shared_ptr<std::vector<LoadMeta>> load_metas);
 
     void Init(QueryContext *query_context) override;
 
     bool Execute(QueryContext *query_context, OperatorState *operator_state) override;
 
-    SharedPtr<Vector<String>> GetOutputNames() const override;
+    std::shared_ptr<std::vector<std::string>> GetOutputNames() const override;
 
-    SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const override;
+    std::shared_ptr<std::vector<std::shared_ptr<DataType>>> GetOutputTypes() const override;
 
-    SizeT TaskletCount() override;
+    size_t TaskletCount() override;
 
     void PlanWithIndex(QueryContext *query_context);
 
-    Vector<SharedPtr<Vector<SegmentID>>>
-    PlanWithIndex(Vector<SharedPtr<Vector<GlobalBlockID>>> &block_groups, i64 parallel_count, QueryContext *query_context);
+    std::vector<std::shared_ptr<std::vector<SegmentID>>>
+    PlanWithIndex(std::vector<std::shared_ptr<std::vector<GlobalBlockID>>> &block_groups, i64 parallel_count, QueryContext *query_context);
 
-    SharedPtr<MatchSparseExpression> match_sparse_expr() const { return match_sparse_expr_; }
+    std::shared_ptr<MatchSparseExpression> match_sparse_expr() const { return match_sparse_expr_; }
 
 private:
     template <typename DataType>
@@ -82,7 +79,7 @@ private:
     ExecuteInnerT(DistFunc *dist_func, MergeHeap *merge_heap, QueryContext *query_context, MatchSparseScanOperatorState *match_sparse_scan_state);
 
 private:
-    SharedPtr<MatchSparseExpression> match_sparse_expr_;
+    std::shared_ptr<MatchSparseExpression> match_sparse_expr_;
 
     // column to search
     ColumnID search_column_id_ = 0;

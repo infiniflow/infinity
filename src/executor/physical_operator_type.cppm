@@ -12,11 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:physical_operator_type;
 
-import :stl;
+import :infinity_type;
+
+import std;
 
 namespace infinity {
 
@@ -110,6 +110,6 @@ export enum class PhysicalOperatorType : i8 {
     kCheck,
 };
 
-export String PhysicalOperatorToString(PhysicalOperatorType type);
+export std::string PhysicalOperatorToString(PhysicalOperatorType type);
 
 } // namespace infinity

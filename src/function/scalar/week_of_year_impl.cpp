@@ -11,22 +11,22 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-module;
-#include <chrono>
+
 module infinity_core:week_of_year.impl;
 
 import :week_of_year;
-import :stl;
 import :new_catalog;
 import :status;
-import logical_type;
 import :infinity_exception;
 import :scalar_function;
 import :scalar_function_set;
-import :third_party;
+import :column_vector;
+
+import std;
+
 import internal_types;
 import data_type;
-import :column_vector;
+import logical_type;
 
 namespace infinity {
 
@@ -39,7 +39,6 @@ struct WeekOfYearFunction {
         RecoverableError(status);
         return false;
     }
-
 };
 
 template <>
@@ -80,26 +79,26 @@ inline bool WeekOfYearFunction::Run(TimestampT left, BigIntT &result) {
 }
 
 void RegisterWeekOfYearFunction(NewCatalog *catalog_ptr) {
-    String func_name = "weekofyear";
+    std::string func_name = "weekofyear";
 
-    SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
+    std::shared_ptr<ScalarFunctionSet> function_set_ptr = std::make_shared<ScalarFunctionSet>(func_name);
 
     ScalarFunction week_of_year_date_function(func_name,
-                                  {DataType(LogicalType::kDate)},
-                                  {DataType(LogicalType::kBigInt)},
-                                  &ScalarFunction::UnaryFunctionWithFailure<DateT, BigIntT, WeekOfYearFunction>);
+                                              {DataType(LogicalType::kDate)},
+                                              {DataType(LogicalType::kBigInt)},
+                                              &ScalarFunction::UnaryFunctionWithFailure<DateT, BigIntT, WeekOfYearFunction>);
     function_set_ptr->AddFunction(week_of_year_date_function);
 
     ScalarFunction week_of_year_datetime_function(func_name,
-                                  {DataType(LogicalType::kDateTime)},
-                                  {DataType(LogicalType::kBigInt)},
-                                  &ScalarFunction::UnaryFunctionWithFailure<DateTimeT, BigIntT, WeekOfYearFunction>);
+                                                  {DataType(LogicalType::kDateTime)},
+                                                  {DataType(LogicalType::kBigInt)},
+                                                  &ScalarFunction::UnaryFunctionWithFailure<DateTimeT, BigIntT, WeekOfYearFunction>);
     function_set_ptr->AddFunction(week_of_year_datetime_function);
 
     ScalarFunction week_of_year_timestamp_function(func_name,
-                                  {DataType(LogicalType::kTimestamp)},
-                                  {DataType(LogicalType::kBigInt)},
-                                  &ScalarFunction::UnaryFunctionWithFailure<TimestampT, BigIntT, WeekOfYearFunction>);
+                                                   {DataType(LogicalType::kTimestamp)},
+                                                   {DataType(LogicalType::kBigInt)},
+                                                   &ScalarFunction::UnaryFunctionWithFailure<TimestampT, BigIntT, WeekOfYearFunction>);
     function_set_ptr->AddFunction(week_of_year_timestamp_function);
 
     NewCatalog::AddFunctionSet(catalog_ptr, function_set_ptr);

@@ -12,15 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:logical_filter;
 
-import :stl;
 import :logical_node_type;
 import :column_binding;
 import :logical_node;
 import :base_expression;
+
 import data_type;
 import internal_types;
 
@@ -28,25 +26,25 @@ namespace infinity {
 
 export class LogicalFilter : public LogicalNode {
 public:
-    explicit LogicalFilter(u64 node_id, SharedPtr<BaseExpression> expression)
+    explicit LogicalFilter(u64 node_id, std::shared_ptr<BaseExpression> expression)
         : LogicalNode(node_id, LogicalNodeType::kFilter), expression_(std::move(expression)) {}
 
-    [[nodiscard]] Vector<ColumnBinding> GetColumnBindings() const;
+    [[nodiscard]] std::vector<ColumnBinding> GetColumnBindings() const;
 
-    [[nodiscard]] SharedPtr<Vector<String>> GetOutputNames() const;
+    [[nodiscard]] std::shared_ptr<std::vector<std::string>> GetOutputNames() const;
 
-    [[nodiscard]] SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const;
+    [[nodiscard]] std::shared_ptr<std::vector<std::shared_ptr<DataType>>> GetOutputTypes() const;
 
-    String ToString(i64 &space) const final;
+    std::string ToString(i64 &space) const final;
 
-    inline String name() final { return "LogicalFilter"; }
+    inline std::string name() final { return "LogicalFilter"; }
 
-    [[nodiscard]] inline SharedPtr<BaseExpression> &expression() { return expression_; }
+    [[nodiscard]] inline std::shared_ptr<BaseExpression> &expression() { return expression_; }
 
-    [[nodiscard]] inline const SharedPtr<BaseExpression> &expression() const { return expression_; }
+    [[nodiscard]] inline const std::shared_ptr<BaseExpression> &expression() const { return expression_; }
 
 private:
-    SharedPtr<BaseExpression> expression_{};
+    std::shared_ptr<BaseExpression> expression_{};
 };
 
 } // namespace infinity

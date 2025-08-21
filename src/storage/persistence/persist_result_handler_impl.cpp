@@ -14,36 +14,37 @@
 
 module;
 
-#include <vector>
-
 module infinity_core:persist_result_handler.impl;
 
 import :persist_result_handler;
 import :infinity_exception;
-import :third_party;
 import :virtual_store;
 import :infinity_context;
 import :peer_task;
 import :logger;
-import admin_statement;
 import :obj_status;
+
+import std;
+import third_party;
+
+import admin_statement;
 
 namespace infinity {
 
 void PersistResultHandler::HandleWriteResult(const PersistWriteResult &result) {
-    for (const String &persist_key : result.persist_keys_) {
-        String persist_path = pm_->GetObjPath(persist_key);
+    for (const std::string &persist_key : result.persist_keys_) {
+        std::string persist_path = pm_->GetObjPath(persist_key);
         if (InfinityContext::instance().GetServerRole() == NodeRole::kLeader or
             InfinityContext::instance().GetServerRole() == NodeRole::kStandalone) {
             VirtualStore::UploadObject(persist_path, persist_key);
         }
     }
-    for (const String &drop_key : result.drop_keys_) {
-        String drop_path = pm_->GetObjPath(drop_key);
+    for (const std::string &drop_key : result.drop_keys_) {
+        std::string drop_path = pm_->GetObjPath(drop_key);
         VirtualStore::DeleteFileBG(drop_path);
     }
-    for (const String &drop_key : result.drop_from_remote_keys_) {
-        String drop_path = pm_->GetObjPath(drop_key);
+    for (const std::string &drop_key : result.drop_from_remote_keys_) {
+        std::string drop_path = pm_->GetObjPath(drop_key);
         VirtualStore::DeleteFileBG(drop_path);
         if (InfinityContext::instance().GetServerRole() == NodeRole::kLeader or
             InfinityContext::instance().GetServerRole() == NodeRole::kStandalone) {
@@ -55,10 +56,10 @@ void PersistResultHandler::HandleWriteResult(const PersistWriteResult &result) {
 ObjAddr PersistResultHandler::HandleReadResult(const PersistReadResult &result) {
     if (result.obj_stat_ != nullptr) {
         ObjCached expect = ObjCached::kNotCached;
-        Atomic<ObjCached> &cached = result.obj_stat_->cached_;
+        std::atomic<ObjCached> &cached = result.obj_stat_->cached_;
         if (cached.compare_exchange_strong(expect, ObjCached::kDownloading)) {
             VirtualStore::AddRequestCount();
-            String read_path = InfinityContext::instance().persistence_manager()->GetObjPath(result.obj_addr_.obj_key_);
+            std::string read_path = InfinityContext::instance().persistence_manager()->GetObjPath(result.obj_addr_.obj_key_);
             LOG_TRACE(fmt::format("GetObjCache download object {}.", read_path));
             VirtualStore::DownloadObject(read_path, result.obj_addr_.obj_key_);
             LOG_TRACE(fmt::format("GetObjCache download object {} done.", read_path));

@@ -12,23 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifdef CI
-#include "unit_test/gtest_expand.h"
-#include "gtest/gtest.h"
-import infinity_core;
-import base_test;
-#else
 module;
 
 #include "unit_test/gtest_expand.h"
-#include "gtest/gtest.h"
 
 module infinity_core:ut.data_block;
 
 import :ut.base_test;
 import :infinity_exception;
-import :stl;
-import :third_party;
+import third_party;
 import :logger;
 import :table_def;
 import :data_block;
@@ -36,7 +28,6 @@ import :default_values;
 import :profiler;
 import :value;
 import :infinity_context;
-#endif
 
 import global_resource_usage;
 import internal_types;
@@ -59,85 +50,85 @@ TEST_P(DataBlockTest, test1) {
     using namespace infinity;
 
     DataBlock data_block;
-    Vector<SharedPtr<DataType>> column_types;
+    std::vector<std::shared_ptr<DataType>> column_types;
     // Bool * 1
-    column_types.emplace_back(MakeShared<DataType>(LogicalType::kBoolean));
+    column_types.emplace_back(std::make_shared<DataType>(LogicalType::kBoolean));
 
     // Integer * 5
-    column_types.emplace_back(MakeShared<DataType>(LogicalType::kTinyInt));
-    column_types.emplace_back(MakeShared<DataType>(LogicalType::kSmallInt));
-    column_types.emplace_back(MakeShared<DataType>(LogicalType::kInteger));
-    column_types.emplace_back(MakeShared<DataType>(LogicalType::kBigInt));
-    column_types.emplace_back(MakeShared<DataType>(LogicalType::kHugeInt));
+    column_types.emplace_back(std::make_shared<DataType>(LogicalType::kTinyInt));
+    column_types.emplace_back(std::make_shared<DataType>(LogicalType::kSmallInt));
+    column_types.emplace_back(std::make_shared<DataType>(LogicalType::kInteger));
+    column_types.emplace_back(std::make_shared<DataType>(LogicalType::kBigInt));
+    column_types.emplace_back(std::make_shared<DataType>(LogicalType::kHugeInt));
 
     // Float * 2
-    column_types.emplace_back(MakeShared<DataType>(LogicalType::kFloat));
-    column_types.emplace_back(MakeShared<DataType>(LogicalType::kDouble));
+    column_types.emplace_back(std::make_shared<DataType>(LogicalType::kFloat));
+    column_types.emplace_back(std::make_shared<DataType>(LogicalType::kDouble));
 
     // Decimal * 1
-    column_types.emplace_back(MakeShared<DataType>(LogicalType::kDecimal, DecimalInfo::Make(38, 2)));
+    column_types.emplace_back(std::make_shared<DataType>(LogicalType::kDecimal, DecimalInfo::Make(38, 2)));
 
     // Varchar * 1
-    column_types.emplace_back(MakeShared<DataType>(LogicalType::kVarchar));
+    column_types.emplace_back(std::make_shared<DataType>(LogicalType::kVarchar));
 
     // Date and Time * 6
-    column_types.emplace_back(MakeShared<DataType>(LogicalType::kDate));
-    column_types.emplace_back(MakeShared<DataType>(LogicalType::kTime));
-    column_types.emplace_back(MakeShared<DataType>(LogicalType::kDateTime));
-    column_types.emplace_back(MakeShared<DataType>(LogicalType::kTimestamp));
-    column_types.emplace_back(MakeShared<DataType>(LogicalType::kInterval));
+    column_types.emplace_back(std::make_shared<DataType>(LogicalType::kDate));
+    column_types.emplace_back(std::make_shared<DataType>(LogicalType::kTime));
+    column_types.emplace_back(std::make_shared<DataType>(LogicalType::kDateTime));
+    column_types.emplace_back(std::make_shared<DataType>(LogicalType::kTimestamp));
+    column_types.emplace_back(std::make_shared<DataType>(LogicalType::kInterval));
 
     // Nested types * 2
-    column_types.emplace_back(MakeShared<DataType>(LogicalType::kArray, ArrayInfo::Make(DataType(LogicalType::kBigInt))));
+    column_types.emplace_back(std::make_shared<DataType>(LogicalType::kArray, ArrayInfo::Make(DataType(LogicalType::kBigInt))));
 
     // TODO: how to handle Tuple type?
     // column_types.emplace_back(LogicalType::kTuple);
 
     // Geography * 7
-    column_types.emplace_back(MakeShared<DataType>(LogicalType::kPoint));
-    column_types.emplace_back(MakeShared<DataType>(LogicalType::kLine));
-    column_types.emplace_back(MakeShared<DataType>(LogicalType::kLineSeg));
-    column_types.emplace_back(MakeShared<DataType>(LogicalType::kBox));
-    //    column_types.emplace_back(MakeShared<DataType>(LogicalType::kPath));
-    //    column_types.emplace_back(MakeShared<DataType>(LogicalType::kPolygon));
-    column_types.emplace_back(MakeShared<DataType>(LogicalType::kCircle));
+    column_types.emplace_back(std::make_shared<DataType>(LogicalType::kPoint));
+    column_types.emplace_back(std::make_shared<DataType>(LogicalType::kLine));
+    column_types.emplace_back(std::make_shared<DataType>(LogicalType::kLineSeg));
+    column_types.emplace_back(std::make_shared<DataType>(LogicalType::kBox));
+    //    column_types.emplace_back(std::make_shared<DataType>(LogicalType::kPath));
+    //    column_types.emplace_back(std::make_shared<DataType>(LogicalType::kPolygon));
+    column_types.emplace_back(std::make_shared<DataType>(LogicalType::kCircle));
 
     // Other * 4
-    //    column_types.emplace_back(MakeShared<DataType>(LogicalType::kBitmap));
-    column_types.emplace_back(MakeShared<DataType>(LogicalType::kUuid));
-    //    column_types.emplace_back(MakeShared<DataType>(LogicalType::kBlob));
+    //    column_types.emplace_back(std::make_shared<DataType>(LogicalType::kBitmap));
+    column_types.emplace_back(std::make_shared<DataType>(LogicalType::kUuid));
+    //    column_types.emplace_back(std::make_shared<DataType>(LogicalType::kBlob));
 
     // 32 dimension * float vector
-    column_types.emplace_back(MakeShared<DataType>(LogicalType::kEmbedding, EmbeddingInfo::Make(EmbeddingDataType::kElemFloat, 32)));
+    column_types.emplace_back(std::make_shared<DataType>(LogicalType::kEmbedding, EmbeddingInfo::Make(EmbeddingDataType::kElemFloat, 32)));
 
     // Heterogeneous type * 1
-    column_types.emplace_back(MakeShared<DataType>(LogicalType::kMixed));
+    column_types.emplace_back(std::make_shared<DataType>(LogicalType::kMixed));
 
-    SizeT row_count = DEFAULT_VECTOR_SIZE;
+    size_t row_count = DEFAULT_VECTOR_SIZE;
 
     data_block.Init(column_types);
 
     // Boolean: Test DataBlock::AppendValue
-    constexpr SizeT BoolColumnIndex = 0;
-    for (SizeT i = 0; i < row_count; ++i) {
+    constexpr size_t BoolColumnIndex = 0;
+    for (size_t i = 0; i < row_count; ++i) {
         data_block.AppendValue(BoolColumnIndex, Value::MakeBool(i % 2 == 0));
     }
 
     // Boolean: Test DataBlock::GetValue
-    for (SizeT i = 0; i < row_count; ++i) {
+    for (size_t i = 0; i < row_count; ++i) {
         Value value = data_block.GetValue(BoolColumnIndex, i);
         EXPECT_EQ(value.type().type(), LogicalType::kBoolean);
         EXPECT_EQ(value.value_.boolean, (i % 2 == 0));
     }
 
     // TinyInt: Test DataBlock::AppendValue
-    constexpr SizeT TinyIntColumnIndex = 1;
-    for (SizeT i = 0; i < row_count; ++i) {
+    constexpr size_t TinyIntColumnIndex = 1;
+    for (size_t i = 0; i < row_count; ++i) {
         data_block.AppendValue(TinyIntColumnIndex, Value::MakeTinyInt(static_cast<i8>(i)));
     }
 
     // Test DataBlock::GetValue
-    for (SizeT i = 0; i < row_count; ++i) {
+    for (size_t i = 0; i < row_count; ++i) {
         Value value = data_block.GetValue(TinyIntColumnIndex, i);
         EXPECT_EQ(value.type().type(), LogicalType::kTinyInt);
         EXPECT_EQ(value.value_.tiny_int, i8(i));
@@ -145,11 +136,11 @@ TEST_P(DataBlockTest, test1) {
 
     // Test DataBlock::Reset
     data_block.Reset();
-    for (SizeT i = 0; i < row_count; ++i) {
+    for (size_t i = 0; i < row_count; ++i) {
         data_block.AppendValue(0, Value::MakeBool(i % 2 == 0));
     }
 
-    for (SizeT i = 0; i < row_count; ++i) {
+    for (size_t i = 0; i < row_count; ++i) {
         Value value = data_block.GetValue(0, i);
         EXPECT_EQ(value.type().type(), LogicalType::kBoolean);
         EXPECT_EQ(value.value_.boolean, (i % 2 == 0));
@@ -160,8 +151,8 @@ TEST_P(DataBlockTest, test2) {
     using namespace infinity;
 
     DataBlock data_block;
-    Vector<SharedPtr<DataType>> column_types;
-    column_types.emplace_back(MakeShared<DataType>(LogicalType::kBoolean));
+    std::vector<std::shared_ptr<DataType>> column_types;
+    column_types.emplace_back(std::make_shared<DataType>(LogicalType::kBoolean));
 
     u16 row_count = DEFAULT_VECTOR_SIZE;
 
@@ -180,7 +171,7 @@ TEST_P(DataBlockTest, test2) {
 
     EXPECT_EQ(data_block.row_count(), row_count);
 
-    SharedPtr<Vector<RowID>> row_ids = MakeShared<Vector<RowID>>();
+    std::shared_ptr<std::vector<RowID>> row_ids = std::make_shared<std::vector<RowID>>();
     row_ids->reserve(row_count);
     data_block.FillRowIDVector(row_ids, 1);
     for (u16 row_id = 0; row_id < row_count; ++row_id) {
@@ -197,10 +188,10 @@ TEST_P(DataBlockTest, test3) {
     profiler.Begin();
 
     DataBlock data_block;
-    Vector<SharedPtr<DataType>> column_types;
-    column_types.emplace_back(MakeShared<DataType>(LogicalType::kTinyInt));
+    std::vector<std::shared_ptr<DataType>> column_types;
+    column_types.emplace_back(std::make_shared<DataType>(LogicalType::kTinyInt));
 
-    SizeT row_count = DEFAULT_VECTOR_SIZE;
+    size_t row_count = DEFAULT_VECTOR_SIZE;
 
     data_block.Init(column_types);
 
@@ -215,7 +206,7 @@ TEST_P(DataBlockTest, test3) {
 
     // Test DataBlock::AppendValue
     profiler.Begin();
-    for (SizeT i = 0; i < row_count; ++i) {
+    for (size_t i = 0; i < row_count; ++i) {
         data_block.AppendValue(0, Value::MakeTinyInt(static_cast<i8>(i)));
     }
     profiler.End();
@@ -224,7 +215,7 @@ TEST_P(DataBlockTest, test3) {
     data_block.Finalize();
 
     // Validate the inserted data.
-    for (SizeT i = 0; i < row_count; ++i) {
+    for (size_t i = 0; i < row_count; ++i) {
         auto v = Value::MakeTinyInt(static_cast<i8>(i));
         auto vx = data_block.GetValue(0, i);
         EXPECT_EQ(vx.type().type(), LogicalType::kTinyInt);
@@ -236,77 +227,77 @@ TEST_P(DataBlockTest, ReadWrite) {
     using namespace infinity;
 
     DataBlock data_block;
-    Vector<SharedPtr<DataType>> column_types;
+    std::vector<std::shared_ptr<DataType>> column_types;
     // Bool * 1
-    column_types.emplace_back(MakeShared<DataType>(LogicalType::kBoolean));
+    column_types.emplace_back(std::make_shared<DataType>(LogicalType::kBoolean));
 
     // Integer * 5
-    column_types.emplace_back(MakeShared<DataType>(LogicalType::kTinyInt));
-    /*     column_types.emplace_back(MakeShared<DataType>(LogicalType::kSmallInt));
-        column_types.emplace_back(MakeShared<DataType>(LogicalType::kInteger));
-        column_types.emplace_back(MakeShared<DataType>(LogicalType::kBigInt));
-        column_types.emplace_back(MakeShared<DataType>(LogicalType::kHugeInt));
+    column_types.emplace_back(std::make_shared<DataType>(LogicalType::kTinyInt));
+    /*     column_types.emplace_back(std::make_shared<DataType>(LogicalType::kSmallInt));
+        column_types.emplace_back(std::make_shared<DataType>(LogicalType::kInteger));
+        column_types.emplace_back(std::make_shared<DataType>(LogicalType::kBigInt));
+        column_types.emplace_back(std::make_shared<DataType>(LogicalType::kHugeInt));
 
         // Float * 2
-        column_types.emplace_back(MakeShared<DataType>(LogicalType::kFloat));
-        column_types.emplace_back(MakeShared<DataType>(LogicalType::kDouble));
+        column_types.emplace_back(std::make_shared<DataType>(LogicalType::kFloat));
+        column_types.emplace_back(std::make_shared<DataType>(LogicalType::kDouble));
 
         // Decimal * 1
-        column_types.emplace_back(MakeShared<DataType>(LogicalType::kDecimal, DecimalInfo::Make(38, 2)));
+        column_types.emplace_back(std::make_shared<DataType>(LogicalType::kDecimal, DecimalInfo::Make(38, 2)));
 
         // Varchar * 1
-        //column_types.emplace_back(MakeShared<DataType>(LogicalType::kVarchar));
+        //column_types.emplace_back(std::make_shared<DataType>(LogicalType::kVarchar));
 
         // Date and Time * 6
-        column_types.emplace_back(MakeShared<DataType>(LogicalType::kDate));
-        column_types.emplace_back(MakeShared<DataType>(LogicalType::kTime));
-        column_types.emplace_back(MakeShared<DataType>(LogicalType::kDateTime));
-        column_types.emplace_back(MakeShared<DataType>(LogicalType::kTimestamp));
-        column_types.emplace_back(MakeShared<DataType>(LogicalType::kInterval));
+        column_types.emplace_back(std::make_shared<DataType>(LogicalType::kDate));
+        column_types.emplace_back(std::make_shared<DataType>(LogicalType::kTime));
+        column_types.emplace_back(std::make_shared<DataType>(LogicalType::kDateTime));
+        column_types.emplace_back(std::make_shared<DataType>(LogicalType::kTimestamp));
+        column_types.emplace_back(std::make_shared<DataType>(LogicalType::kInterval));
 
         // Nested types * 2
-        //column_types.emplace_back(MakeShared<DataType>(LogicalType::kArray, ArrayInfo::Make(DataType(LogicalType::kBigInt))));
+        //column_types.emplace_back(std::make_shared<DataType>(LogicalType::kArray, ArrayInfo::Make(DataType(LogicalType::kBigInt))));
 
         // TODO: how to handle Tuple type?
         // column_types.emplace_back(LogicalType::kTuple);
 
         // Geography * 7
-        column_types.emplace_back(MakeShared<DataType>(LogicalType::kPoint));
-        column_types.emplace_back(MakeShared<DataType>(LogicalType::kLine));
-        column_types.emplace_back(MakeShared<DataType>(LogicalType::kLineSeg));
-        column_types.emplace_back(MakeShared<DataType>(LogicalType::kBox));
-        //column_types.emplace_back(MakeShared<DataType>(LogicalType::kPath));
-        //column_types.emplace_back(MakeShared<DataType>(LogicalType::kPolygon));
-        column_types.emplace_back(MakeShared<DataType>(LogicalType::kCircle));
+        column_types.emplace_back(std::make_shared<DataType>(LogicalType::kPoint));
+        column_types.emplace_back(std::make_shared<DataType>(LogicalType::kLine));
+        column_types.emplace_back(std::make_shared<DataType>(LogicalType::kLineSeg));
+        column_types.emplace_back(std::make_shared<DataType>(LogicalType::kBox));
+        //column_types.emplace_back(std::make_shared<DataType>(LogicalType::kPath));
+        //column_types.emplace_back(std::make_shared<DataType>(LogicalType::kPolygon));
+        column_types.emplace_back(std::make_shared<DataType>(LogicalType::kCircle));
 
         // Other * 4
-        //column_types.emplace_back(MakeShared<DataType>(LogicalType::kBitmap));
-        column_types.emplace_back(MakeShared<DataType>(LogicalType::kUuid));
-        //column_types.emplace_back(MakeShared<DataType>(LogicalType::kBlob));
+        //column_types.emplace_back(std::make_shared<DataType>(LogicalType::kBitmap));
+        column_types.emplace_back(std::make_shared<DataType>(LogicalType::kUuid));
+        //column_types.emplace_back(std::make_shared<DataType>(LogicalType::kBlob));
 
         // 32 dimension * float vector
-        //column_types.emplace_back(MakeShared<DataType>(LogicalType::kEmbedding, EmbeddingInfo::Make(EmbeddingDataType::kElemFloat, 32)));
+        //column_types.emplace_back(std::make_shared<DataType>(LogicalType::kEmbedding, EmbeddingInfo::Make(EmbeddingDataType::kElemFloat, 32)));
 
         // Heterogeneous type * 1
-        //column_types.emplace_back(MakeShared<DataType>(LogicalType::kMixed));
+        //column_types.emplace_back(std::make_shared<DataType>(LogicalType::kMixed));
      */
-    SizeT row_count = DEFAULT_VECTOR_SIZE;
+    size_t row_count = DEFAULT_VECTOR_SIZE;
     data_block.Init(column_types);
-    for (SizeT i = 0; i < row_count; ++i) {
+    for (size_t i = 0; i < row_count; ++i) {
         data_block.AppendValue(0, Value::MakeBool(i % 2 == 0));
         data_block.AppendValue(1, Value::MakeTinyInt(static_cast<i8>(i)));
     }
     data_block.Finalize();
 
     int32_t exp_size = data_block.GetSizeInBytes();
-    Vector<char> buf(exp_size);
+    std::vector<char> buf(exp_size);
     char *ptr = buf.data();
 
     data_block.WriteAdv(ptr);
     EXPECT_EQ(ptr - buf.data(), exp_size);
 
     const char *ptr_r = buf.data();
-    SharedPtr<DataBlock> data_block2 = DataBlock::ReadAdv(ptr_r, exp_size);
+    std::shared_ptr<DataBlock> data_block2 = DataBlock::ReadAdv(ptr_r, exp_size);
     EXPECT_EQ(ptr_r - buf.data(), exp_size);
     EXPECT_NE(data_block2, nullptr);
     EXPECT_EQ(data_block == *data_block2, true);

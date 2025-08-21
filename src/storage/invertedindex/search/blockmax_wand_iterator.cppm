@@ -12,14 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:blockmax_wand_iterator;
-import :stl;
+
 import :index_defines;
 import :doc_iterator;
 import :blockmax_leaf_iterator;
 import :multi_doc_iterator;
+
 import internal_types;
 
 namespace infinity {
@@ -27,13 +26,13 @@ namespace infinity {
 // Refers to https://engineering.nyu.edu/~suel/papers/bmw.pdf
 export class BlockMaxWandIterator : public MultiDocIterator {
 public:
-    explicit BlockMaxWandIterator(Vector<UniquePtr<DocIterator>> &&iterators);
+    explicit BlockMaxWandIterator(std::vector<std::unique_ptr<DocIterator>> &&iterators);
 
     ~BlockMaxWandIterator() override;
 
     DocIteratorType GetType() const override { return DocIteratorType::kBMWIterator; }
 
-    String Name() const override { return "BlockMaxWandIterator"; }
+    std::string Name() const override { return "BlockMaxWandIterator"; }
 
     void UpdateScoreThreshold(float threshold) override;
 
@@ -55,9 +54,9 @@ private:
     RowID common_block_min_possible_doc_id_{}; // not always exist
     RowID common_block_last_doc_id_{};
     float common_block_max_bm25_score_{};
-    Vector<BlockMaxLeafIterator *> sorted_iterators_; // sort by DocID(), in ascending order
-    Vector<BlockMaxLeafIterator *> backup_iterators_;
-    SizeT pivot_;
+    std::vector<BlockMaxLeafIterator *> sorted_iterators_; // sort by DocID(), in ascending order
+    std::vector<BlockMaxLeafIterator *> backup_iterators_;
+    size_t pivot_;
 
     // Optimization for many keywords
     static constexpr u32 SORT_SKIP_THRESHOLD = 20; // Skip sorting when keyword count > threshold
@@ -69,13 +68,13 @@ private:
     // bm25 score cache
     bool bm25_score_cached_ = false;
     float bm25_score_cache_ = 0.0f;
-    Vector<Tuple<u32, u64, float>> pivot_history_; // pivot, row_id, score
+    std::vector<std::tuple<u32, u64, float>> pivot_history_; // pivot, row_id, score
     // debug info
     u32 next_sort_cnt_ = 0;
     u32 next_it0_docid_mismatch_cnt_ = 0;
     u32 next_sum_score_low_cnt_ = 0;
     u32 next_sum_score_bm_low_cnt_ = 0;
-    Vector<SizeT> next_sum_score_bm_low_cnt_dist_{};
+    std::vector<size_t> next_sum_score_bm_low_cnt_dist_{};
 };
 
 } // namespace infinity

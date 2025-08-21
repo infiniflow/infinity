@@ -38,7 +38,7 @@ struct InfinityClient {
     std::shared_ptr<TTransport> socket;
     std::shared_ptr<TTransport> transport;
     std::shared_ptr<TProtocol> protocol;
-    UniquePtr<InfinityServiceClient> client;
+    std::unique_ptr<InfinityServiceClient> client;
     int64_t session_id;
     InfinityClient() {
         socket.reset(new TSocket("127.0.0.1", 23817));
@@ -62,7 +62,7 @@ struct InfinityClient {
 };
 
 template <typename T>
-UniquePtr<T[]> load_data(const std::string &filename, size_t &num, int &dim) {
+std::unique_ptr<T[]> load_data(const std::string &filename, size_t &num, int &dim) {
     std::ifstream in(filename, std::ios::binary);
     if (!in.is_open()) {
         std::cout << "open file error" << std::endl;
@@ -105,7 +105,7 @@ inline void ParallelFor(size_t start, size_t end, size_t numThreads, auto fn) {
         id_begin = id_end;
     }
 
-    for(auto& thread: threads) {
+    for (auto &thread : threads) {
         thread.join();
     }
 }
@@ -122,7 +122,7 @@ int main() {
     std::cin >> ef;
 
     std::cout << ">>> Query Benchmark Start <<<" << std::endl;
-    std::cout << "Thread Num: " << thread_num << ", Times: " << total_times << std::endl;
+    std::cout << "std::thread Num: " << thread_num << ", Times: " << total_times << std::endl;
 
     std::vector<std::string> results;
 
@@ -136,7 +136,7 @@ int main() {
         std::cerr << "File: " << sift_groundtruth_path << " doesn't exist" << std::endl;
         exit(-1);
     }
-    UniquePtr<float[]> queries_ptr;
+    std::unique_ptr<float[]> queries_ptr;
     size_t query_count;
     int64_t dimension = 128;
     {
@@ -148,7 +148,7 @@ int main() {
     int64_t topk = 100;
     std::vector<std::unordered_set<int>> ground_truth_sets_1, ground_truth_sets_10, ground_truth_sets_100;
     {
-        UniquePtr<int[]> gt;
+        std::unique_ptr<int[]> gt;
         size_t gt_count;
         int gt_top_k;
         {

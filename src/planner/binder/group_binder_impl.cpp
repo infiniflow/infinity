@@ -12,42 +12,39 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:group_binder.impl;
 
 import :group_binder;
-import :stl;
 import :base_expression;
 import :subquery_expression;
-
 import :bind_context;
 import :function;
 import :expression_binder;
 import :status;
 import :infinity_exception;
-import :logger;
-import :third_party;
 import :function_set;
 import :bind_alias_proxy;
+import :new_catalog;
+import :query_context;
+
+import third_party;
+
 import parsed_expr;
 import constant_expr;
 import column_expr;
 import function_expr;
 import subquery_expr;
 import knn_expr;
-import :new_catalog;
-import :query_context;
 
 namespace infinity {
 
-SharedPtr<BaseExpression> GroupBinder::BuildExpression(const ParsedExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root) {
-    SharedPtr<BaseExpression> result = nullptr;
+std::shared_ptr<BaseExpression> GroupBinder::BuildExpression(const ParsedExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root) {
+    std::shared_ptr<BaseExpression> result = nullptr;
 
     if (depth == 0 && root) {
         switch (expr.type_) {
             case ParsedExprType::kConstant: {
-                ConstantExpr &const_expr = (ConstantExpr &)expr;
+                auto &const_expr = (ConstantExpr &)expr;
                 if (const_expr.literal_type_ == LiteralType::kInteger) {
                     // Group by the expression of the given index in select list;
                     // For example: select a, sum(a) from t1 group by 1; # group by a
@@ -74,11 +71,10 @@ SharedPtr<BaseExpression> GroupBinder::BuildExpression(const ParsedExpr &expr, B
     }
 
     if (root) {
-        String expr_name = expr.GetName();
+        std::string expr_name = expr.GetName();
 
         if (bind_context_ptr->group_index_by_name_.contains(expr_name)) {
-            Status status = Status::SyntaxError(fmt::format("Duplicated group by expression: {}", expr_name));
-            RecoverableError(status);
+            RecoverableError(Status::SyntaxError(fmt::format("Duplicated group by expression: {}", expr_name)));
         }
 
         // Add the group by expression into bind context
@@ -89,14 +85,14 @@ SharedPtr<BaseExpression> GroupBinder::BuildExpression(const ParsedExpr &expr, B
     return result;
 }
 
-SharedPtr<BaseExpression> GroupBinder::BindColumnReference(const ColumnExpr &expr, BindContext *bind_context_ptr) {
+std::shared_ptr<BaseExpression> GroupBinder::BindColumnReference(const ColumnExpr &expr, BindContext *bind_context_ptr) {
     // TODO: refactor:
     // - Check if the column is from base table.
     // - Check if the column is from an alias of select list expression.
     // - Check if the column is from outer queries.
 
     // Either the expr is a column or a alias
-    String column_name = expr.GetName();
+    std::string column_name = expr.GetName();
 
     // Check if the column is from select list alias
     if (bind_context_ptr->select_alias2index_.contains(column_name)) {
@@ -113,32 +109,30 @@ SharedPtr<BaseExpression> GroupBinder::BindColumnReference(const ColumnExpr &exp
     }
 
     // Bind it anyway.
-    SharedPtr<BaseExpression> result = this->Bind(expr, bind_context_ptr, 0, false);
+    std::shared_ptr<BaseExpression> result = this->Bind(expr, bind_context_ptr, 0, false);
     return result;
 }
 
-SharedPtr<BaseExpression> GroupBinder::BindConstantExpression(const ConstantExpr &expr, BindContext *bind_context_ptr) {
+std::shared_ptr<BaseExpression> GroupBinder::BindConstantExpression(const ConstantExpr &expr, BindContext *bind_context_ptr) {
     if (expr.literal_type_ != LiteralType::kInteger) {
-        String error_message = "Not an integer.";
-        UnrecoverableError(error_message);
+        UnrecoverableError("Not an integer.");
     }
     i64 select_idx = expr.integer_value_;
 
-    Vector<ParsedExpr *> &expr_array = bind_context_ptr->select_expression_;
-    if (select_idx > (i64)expr_array.size() or select_idx < 1) {
-        Status status = Status::SyntaxError(fmt::format("GROUP BY clause out of range - should be from 1 to {}", expr_array.size()));
-        RecoverableError(status);
+    std::vector<ParsedExpr *> &expr_array = bind_context_ptr->select_expression_;
+    if (select_idx > static_cast<i64>(expr_array.size()) or select_idx < 1) {
+        RecoverableError(Status::SyntaxError(fmt::format("GROUP BY clause out of range - should be from 1 to {}", expr_array.size())));
     }
 
     select_idx -= 1;
 
-    ColumnExpr &col_expr = (ColumnExpr &)(*expr_array[select_idx]);
+    auto &col_expr = static_cast<ColumnExpr &>(*expr_array[select_idx]);
 
-    SharedPtr<BaseExpression> result = ExpressionBinder::BuildColExpr(col_expr, bind_context_ptr, 0, false);
+    std::shared_ptr<BaseExpression> result = ExpressionBinder::BuildColExpr(col_expr, bind_context_ptr, 0, false);
     return result;
 }
 
-SharedPtr<BaseExpression> GroupBinder::BuildColExpr(const ColumnExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root) {
+std::shared_ptr<BaseExpression> GroupBinder::BuildColExpr(const ColumnExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root) {
 
     // Check if the column is using an alias from select list.
     auto result = bind_alias_proxy_->BindAlias(*this, expr, bind_context_ptr, depth, root);
@@ -150,31 +144,27 @@ SharedPtr<BaseExpression> GroupBinder::BuildColExpr(const ColumnExpr &expr, Bind
     return result;
 }
 
-SharedPtr<BaseExpression> GroupBinder::BuildFuncExpr(const FunctionExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root) {
-    SharedPtr<FunctionSet> function_set_ptr = FunctionSet::GetFunctionSet(query_context_->storage()->new_catalog(), expr);
+std::shared_ptr<BaseExpression> GroupBinder::BuildFuncExpr(const FunctionExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root) {
+    std::shared_ptr<FunctionSet> function_set_ptr = FunctionSet::GetFunctionSet(query_context_->storage()->new_catalog(), expr);
     if (function_set_ptr->type_ != FunctionType::kScalar) {
-        Status status = Status::SyntaxError("Only scalar function is supported in group by list.");
-        RecoverableError(status);
+        RecoverableError(Status::SyntaxError("Only scalar function is supported in group by list."));
     }
     return ExpressionBinder::BuildFuncExpr(expr, bind_context_ptr, depth, root);
 }
 
 void GroupBinder::CheckFuncType(FunctionType func_type) const {
     if (func_type != FunctionType::kScalar) {
-        Status status = Status::SyntaxError("Only scalar function is supported in group by list.");
-        RecoverableError(status);
+        RecoverableError(Status::SyntaxError("Only scalar function is supported in group by list."));
     }
 }
 
-SharedPtr<SubqueryExpression> GroupBinder::BuildSubquery(const SubqueryExpr &, BindContext *, SubqueryType, i64, bool) {
-    Status status = Status::SyntaxError("Subquery isn't supported in group by list.");
-    RecoverableError(status);
+std::shared_ptr<SubqueryExpression> GroupBinder::BuildSubquery(const SubqueryExpr &, BindContext *, SubqueryType, i64, bool) {
+    RecoverableError(Status::SyntaxError("Subquery isn't supported in group by list."));
     return nullptr;
 }
 
-SharedPtr<BaseExpression> GroupBinder::BuildKnnExpr(const KnnExpr &, BindContext *, i64, bool) {
-    Status status = Status::SyntaxError("KNN expression isn't supported in group by list");
-    RecoverableError(status);
+std::shared_ptr<BaseExpression> GroupBinder::BuildKnnExpr(const KnnExpr &, BindContext *, i64, bool) {
+    RecoverableError(Status::SyntaxError("KNN expression isn't supported in group by list"));
     return nullptr;
 }
 

@@ -1,11 +1,8 @@
-module;
-
-#include <stdexcept>
-#include <string>
-
 export module infinity_core:character_util;
 
-import :stl;
+import :infinity_type;
+
+import std;
 
 namespace infinity {
 
@@ -101,8 +98,7 @@ public:
             } else if ((utf8_view[0] & 0xF8) == 0xF0) { // 4-byte character
                 if (utf8_view.size() < 4)
                     throw std::invalid_argument("Invalid UTF-8 sequence");
-                u32 code_point =
-                    ((utf8_view[0] & 0x07) << 18) | ((utf8_view[1] & 0x3F) << 12) | ((utf8_view[2] & 0x3F) << 6) | (utf8_view[3] & 0x3F);
+                u32 code_point = ((utf8_view[0] & 0x07) << 18) | ((utf8_view[1] & 0x3F) << 12) | ((utf8_view[2] & 0x3F) << 6) | (utf8_view[3] & 0x3F);
                 if (code_point <= 0xFFFF) {
                     utf16_str.push_back(static_cast<wchar_t>(code_point));
                 } else {

@@ -12,23 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifdef CI
-#include "gtest/gtest.h"
-#include <cstdio>
-#include <random>
-import infinity_core;
-import base_test;
-#else
 module;
 
-#include "gtest/gtest.h"
-#include <cstdio>
-#include <random>
+#include "unit_test/gtest_expand.h"
 
 module infinity_core:ut.test_lsg_build;
 
 import :ut.base_test;
-import :stl;
 import :hnsw_lsg_builder;
 import :index_hnsw;
 import :hnsw_common;
@@ -36,7 +26,6 @@ import :index_base;
 import :hnsw_handler;
 import :infinity_exception;
 import :hnsw_alg;
-#endif
 
 import column_def;
 import embedding_info;
@@ -55,7 +44,7 @@ protected:
         dim = 128;
         element_size = 8192;
 
-        index_name = MakeShared<String>("index_name");
+        index_name = std::make_shared<std::string>("index_name");
         filename = "filename";
         column_names = {"col_name"};
         metric_type = MetricType::kMetricL2;
@@ -64,31 +53,31 @@ protected:
         lsg_config = LSGConfig();
     }
 
-    UniquePtr<IndexHnsw> MakeIndexHnsw() {
-        return MakeUnique<
+    std::shared_ptr<IndexHnsw> MakeIndexHnsw() {
+        return std::make_shared<
             IndexHnsw>(index_name, nullptr, filename, column_names, metric_type, encode_type, build_type, M, ef_construction, block_size, lsg_config);
     }
 
-    UniquePtr<ColumnDef> MakeColumnDef() {
-        auto embeddingInfo = MakeShared<EmbeddingInfo>(EmbeddingDataType::kElemFloat, dim);
-        auto data_type = MakeShared<DataType>(LogicalType::kEmbedding, embeddingInfo);
-        return MakeUnique<ColumnDef>(0, data_type, column_names[0], std::set<ConstraintType>());
+    std::shared_ptr<ColumnDef> MakeColumnDef() {
+        auto embeddingInfo = std::make_shared<EmbeddingInfo>(EmbeddingDataType::kElemFloat, dim);
+        auto data_type = std::make_shared<DataType>(LogicalType::kEmbedding, embeddingInfo);
+        return std::make_shared<ColumnDef>(0, data_type, column_names[0], std::set<ConstraintType>());
     }
 
 protected:
-    SizeT M;
-    SizeT ef_construction;
-    SizeT block_size;
-    SizeT dim;
-    SizeT element_size;
+    size_t M;
+    size_t ef_construction;
+    size_t block_size;
+    size_t dim;
+    size_t element_size;
 
-    SharedPtr<String> index_name;
-    String filename;
-    Vector<String> column_names;
+    std::shared_ptr<std::string> index_name;
+    std::string filename;
+    std::vector<std::string> column_names;
     MetricType metric_type;
     HnswEncodeType encode_type;
     HnswBuildType build_type;
-    Optional<LSGConfig> lsg_config;
+    std::optional<LSGConfig> lsg_config;
 
     using LabelT = u32;
 };
@@ -97,11 +86,11 @@ TEST_F(LSGBuildTest, test_avg) {
     element_size = 128;
     lsg_config->sample_ratio_ = 0.1;
 
-    auto data = MakeUnique<float[]>(dim * element_size);
+    auto data = std::make_unique<float[]>(dim * element_size);
     std::mt19937 rng;
     rng.seed(0);
     std::uniform_real_distribution<float> distrib_real;
-    for (SizeT i = 0; i < dim * element_size; ++i) {
+    for (size_t i = 0; i < dim * element_size; ++i) {
         data[i] = distrib_real(rng);
     }
 
@@ -110,20 +99,22 @@ TEST_F(LSGBuildTest, test_avg) {
     auto index_hnsw = MakeIndexHnsw();
     auto column_def = MakeColumnDef();
 
-    HnswLSGBuilder lsg_builder(index_hnsw.get(), std::move(column_def));
+    HnswLSGBuilder<f32, f32> lsg_builder(index_hnsw.get(), column_def);
 
-    auto avg = lsg_builder.GetLSAvg<decltype(iter), f32, f32>(std::move(iter), element_size, RowID(0, 0));
+    lsg_builder.InsertSampleVec(iter);
+    lsg_builder.InsertLSAvg<decltype(iter)>(std::move(iter), element_size);
+    auto avg = lsg_builder.avg();
 
-    auto avg_gt = MakeUnique<float[]>(element_size);
+    auto avg_gt = std::make_unique<float[]>(element_size);
     {
-        SizeT ls_k = std::min(lsg_config->ls_k_, element_size);
-        auto distances = MakeUnique<float[]>(element_size);
-        for (SizeT i = 0; i < element_size; ++i) {
+        size_t ls_k = std::min(lsg_config->ls_k_, element_size);
+        auto distances = std::make_unique<float[]>(element_size);
+        for (size_t i = 0; i < element_size; ++i) {
             const float *v = data.get() + i * dim;
-            for (SizeT j = 0; j < element_size; ++j) {
+            for (size_t j = 0; j < element_size; ++j) {
                 const float *v2 = data.get() + j * dim;
                 float sum = 0;
-                for (SizeT k = 0; k < dim; ++k) {
+                for (size_t k = 0; k < dim; ++k) {
                     float diff = v[k] - v2[k];
                     sum += diff * diff;
                 }
@@ -133,7 +124,7 @@ TEST_F(LSGBuildTest, test_avg) {
             }
             std::sort(distances.get(), distances.get() + element_size);
             float distance_sum = 0;
-            for (SizeT j = 0; j < ls_k; ++j) {
+            for (size_t j = 0; j < ls_k; ++j) {
                 distance_sum += distances[j];
             }
             avg_gt[i] = distance_sum / ls_k;
@@ -150,33 +141,35 @@ TEST_F(LSGBuildTest, test1) {
     dim = 16;
     lsg_config->sample_ratio_ = 0.1;
 
-    auto data = MakeUnique<float[]>(dim * element_size);
+    auto data = std::make_unique<float[]>(dim * element_size);
 
     std::mt19937 rng;
     rng.seed(0);
     std::uniform_real_distribution<float> distrib_real;
-    for (SizeT i = 0; i < dim * element_size; ++i) {
+    for (size_t i = 0; i < dim * element_size; ++i) {
         data[i] = distrib_real(rng);
     }
 
     auto index_hnsw = MakeIndexHnsw();
     auto column_def = MakeColumnDef();
 
-    HnswLSGBuilder lsg_builder(index_hnsw.get(), std::move(column_def));
-
     auto iter = DenseVectorIter<f32, LabelT>(data.get(), dim, element_size);
 
-    UniquePtr<HnswIndexInMem> hnsw_index = lsg_builder.MakeImplIter<decltype(iter), f32, f32>(std::move(iter), element_size, RowID(0, 0), false);
+    auto hnsw_index = HnswIndexInMem::Make(index_hnsw.get(), column_def);
+    hnsw_index->InsertSampleVecs(iter);
+    hnsw_index->InsertLSAvg(iter, element_size);
+    hnsw_index->SetLSGParam();
+    hnsw_index->InsertVecs(std::move(iter), kDefaultHnswInsertConfig, false);
 
     u32 correct_count = 0;
     i32 topk = 1;
-    KnnSearchOption search_option{.ef_ = SizeT(topk) * 10};
-    for (SizeT i = 0; i < element_size; ++i) {
+    KnnSearchOption search_option{.ef_ = size_t(topk) * 10};
+    for (size_t i = 0; i < element_size; ++i) {
         const float *query = data.get() + i * dim;
         HnswHandlerPtr hnsw_handler = hnsw_index->get();
         auto [result_n, d_ptr, v_ptr] = hnsw_handler->SearchIndex<float, LabelT>(query, topk, search_option);
-        Vector<Pair<f32, LabelT>> res(result_n);
-        for (SizeT i = 0; i < result_n; ++i) {
+        std::vector<std::pair<f32, LabelT>> res(result_n);
+        for (size_t i = 0; i < result_n; ++i) {
             res[i] = {d_ptr[i], hnsw_handler->GetLabel<LabelT>(v_ptr[i])};
         }
         std::sort(res.begin(), res.end(), [](const auto &a, const auto &b) { return a.first < b.first; });

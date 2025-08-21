@@ -12,23 +12,21 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
-#include <vector>
-#include <string>
-
 module infinity_core:cluster_manager_leader.impl;
 
 import :cluster_manager;
-
-import admin_statement;
 import :config;
 import :infinity_context;
 import :peer_thrift_client;
 
+import std;
+import third_party;
+
+import admin_statement;
+
 namespace infinity {
 
-Status ClusterManager::InitAsLeader(const String &node_name) {
+Status ClusterManager::InitAsLeader(const std::string &node_name) {
 
     Config *config_ptr = InfinityContext::instance().config();
     auto now = std::chrono::system_clock::now();
@@ -39,12 +37,12 @@ Status ClusterManager::InitAsLeader(const String &node_name) {
         return Status::ErrorInit("Init node as leader error: already initialized.");
     }
 
-    this_node_ = MakeShared<NodeInfo>(NodeRole::kLeader,
-                                      NodeStatus::kAlive,
-                                      node_name,
-                                      config_ptr->PeerServerIP(),
-                                      config_ptr->PeerServerPort(),
-                                      std::chrono::duration_cast<std::chrono::seconds>(time_since_epoch).count());
+    this_node_ = std::make_shared<NodeInfo>(NodeRole::kLeader,
+                                            NodeStatus::kAlive,
+                                            node_name,
+                                            config_ptr->PeerServerIP(),
+                                            config_ptr->PeerServerPort(),
+                                            std::chrono::duration_cast<std::chrono::seconds>(time_since_epoch).count());
 
     current_node_role_ = NodeRole::kLeader;
     return Status::OK();
@@ -53,18 +51,16 @@ Status ClusterManager::InitAsLeader(const String &node_name) {
 void ClusterManager::CheckHeartBeat() {
     std::unique_lock<std::mutex> cluster_lock(cluster_mutex_);
     if (current_node_role_ != NodeRole::kLeader) {
-        String error_message = "Invalid node role.";
-        UnrecoverableError(error_message);
+        UnrecoverableError("Invalid node role.");
     }
     hb_running_ = true;
     this_node_->set_heartbeat_interval(1000);
-    hb_periodic_thread_ = MakeShared<Thread>([this] { this->CheckHeartBeatThread(); });
+    hb_periodic_thread_ = std::make_shared<std::thread>([this] { this->CheckHeartBeatThread(); });
 }
 
 void ClusterManager::CheckHeartBeatThread() {
     if (current_node_role_ != NodeRole::kLeader) {
-        String error_message = "Invalid node role.";
-        UnrecoverableError(error_message);
+        UnrecoverableError("Invalid node role.");
     }
     // this_node_ is the leader;
     auto hb_interval = std::chrono::milliseconds(this_node_->heartbeat_interval());
@@ -97,15 +93,14 @@ void ClusterManager::CheckHeartBeatThread() {
     }
 }
 
-Status ClusterManager::AddNodeInfo(const SharedPtr<NodeInfo> &other_node) {
+Status ClusterManager::AddNodeInfo(const std::shared_ptr<NodeInfo> &other_node) {
     // Only used by Leader on follower/learner registration.
 
-    String other_node_name = other_node->node_name();
+    std::string other_node_name = other_node->node_name();
     {
         std::unique_lock<std::mutex> cluster_lock(cluster_mutex_);
         if (current_node_role_ != NodeRole::kLeader) {
-            String error_message = "Non-leader role can't add other node.";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Non-leader role can't add other node.");
         }
 
         if (other_node_name == this_node_->node_name()) {
@@ -138,8 +133,7 @@ Status ClusterManager::AddNodeInfo(const SharedPtr<NodeInfo> &other_node) {
                     break;
                 }
                 default: {
-                    String error_message = "Non-follower / learner role should be here.";
-                    UnrecoverableError(error_message);
+                    UnrecoverableError("Non-follower / learner role should be here.");
                 }
             }
         }
@@ -175,8 +169,7 @@ Status ClusterManager::AddNodeInfo(const SharedPtr<NodeInfo> &other_node) {
     if (log_sending_status.ok()) {
         std::unique_lock<std::mutex> cluster_lock(cluster_mutex_);
         if (current_node_role_ != NodeRole::kLeader) {
-            String error_message = "Non-leader role can't add other node.";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Non-leader role can't add other node.");
         }
 
         // Add by register
@@ -196,7 +189,7 @@ Status ClusterManager::AddNodeInfo(const SharedPtr<NodeInfo> &other_node) {
     return log_sending_status;
 }
 
-Status ClusterManager::RemoveNodeInfo(const String &node_name) {
+Status ClusterManager::RemoveNodeInfo(const std::string &node_name) {
     // Used by leader to remove node
     if (node_name == this_node_->node_name()) {
         return Status::InvalidNodeRole(fmt::format("Can't remove current node: {}", node_name));
@@ -207,7 +200,7 @@ Status ClusterManager::RemoveNodeInfo(const String &node_name) {
         return Status::InvalidNodeRole(fmt::format("Can't remove node in {} mode", ToString(server_role)));
     }
 
-    SharedPtr<PeerClient> client_{nullptr};
+    std::shared_ptr<PeerClient> client_{nullptr};
     NodeStatus old_status = NodeStatus::kInvalid;
     {
         std::unique_lock<std::mutex> cluster_lock(cluster_mutex_);
@@ -229,7 +222,7 @@ Status ClusterManager::RemoveNodeInfo(const String &node_name) {
     }
 
     if (old_status == NodeStatus::kAlive) {
-        SharedPtr<ChangeRoleTask> change_role_task = MakeShared<ChangeRoleTask>(node_name, "admin");
+        std::shared_ptr<ChangeRoleTask> change_role_task = std::make_shared<ChangeRoleTask>(node_name, "admin");
         client_->Send(change_role_task);
         change_role_task->Wait();
 
@@ -237,7 +230,7 @@ Status ClusterManager::RemoveNodeInfo(const String &node_name) {
             Status status = Status::OK();
             LOG_ERROR(fmt::format("Fail to change {} to the role of ADMIN, error: ", node_name, change_role_task->error_message_));
             status.code_ = static_cast<ErrorCode>(change_role_task->error_code_);
-            status.msg_ = MakeUnique<String>(change_role_task->error_message_);
+            status.msg_ = std::make_unique<std::string>(change_role_task->error_message_);
             return status;
         }
     }
@@ -250,7 +243,7 @@ Status ClusterManager::RemoveNodeInfo(const String &node_name) {
     return Status::OK();
 }
 
-Status ClusterManager::UpdateNodeByLeader(const String &node_name, UpdateNodeOp update_node_op) {
+Status ClusterManager::UpdateNodeByLeader(const std::string &node_name, UpdateNodeOp update_node_op) {
     // Only used in leader mode.
     std::unique_lock<std::mutex> cluster_lock(cluster_mutex_);
 
@@ -294,8 +287,8 @@ Status ClusterManager::UpdateNodeByLeader(const String &node_name, UpdateNodeOp 
     return Status::OK();
 }
 
-Status ClusterManager::UpdateNodeInfoByHeartBeat(const SharedPtr<NodeInfo> &non_leader_node,
-                                                 Vector<infinity_peer_server::NodeInfo> &other_nodes,
+Status ClusterManager::UpdateNodeInfoByHeartBeat(const std::shared_ptr<NodeInfo> &non_leader_node,
+                                                 std::vector<infinity_peer_server::NodeInfo> &other_nodes,
                                                  i64 &leader_term,
                                                  infinity_peer_server::NodeStatus::type &sender_status) {
     // Used by leader
@@ -310,12 +303,12 @@ Status ClusterManager::UpdateNodeInfoByHeartBeat(const SharedPtr<NodeInfo> &non_
     bool non_leader_node_found{false};
     for (const auto &node_info_pair : other_node_map_) {
         NodeInfo *other_node = node_info_pair.second.get();
-        String other_node_name = other_node->node_name();
-        String other_node_ip = other_node->node_ip();
+        std::string other_node_name = other_node->node_name();
+        std::string other_node_ip = other_node->node_ip();
         i64 other_node_port = other_node->node_port();
         if (other_node_name == non_leader_node->node_name()) {
             if (other_node_ip != non_leader_node->node_ip() or other_node_port != non_leader_node->node_port()) {
-                String error_message =
+                std::string error_message =
                     fmt::format("Node {}, IP address: {} or port: {} is changed.", other_node_name, other_node_ip, other_node->node_port());
                 sender_status = infinity_peer_server::NodeStatus::type::kTimeout;
                 return Status::NodeInfoUpdated(ToString(other_node->node_role()));
@@ -373,7 +366,7 @@ Status ClusterManager::UpdateNodeInfoByHeartBeat(const SharedPtr<NodeInfo> &non_
                     break;
                 }
                 default: {
-                    String error_message = fmt::format("Invalid node role of node: {}", other_node_name);
+                    std::string error_message = fmt::format("Invalid node role of node: {}", other_node_name);
                     return Status::InvalidNodeRole(ToString(other_node_role));
                 }
             }
@@ -388,7 +381,7 @@ Status ClusterManager::UpdateNodeInfoByHeartBeat(const SharedPtr<NodeInfo> &non_
                     break;
                 }
                 default: {
-                    String error_message = fmt::format("Invalid node status : {} of node: {}", ToString(other_node_status), other_node_name);
+                    std::string error_message = fmt::format("Invalid node status : {} of node: {}", ToString(other_node_status), other_node_name);
                     return Status::InvalidNodeStatus(error_message);
                 }
             }
@@ -405,48 +398,48 @@ Status ClusterManager::UpdateNodeInfoByHeartBeat(const SharedPtr<NodeInfo> &non_
     return Status::OK();
 }
 
-Status ClusterManager::SyncLogsOnRegistration(const SharedPtr<NodeInfo> &non_leader_node, const SharedPtr<PeerClient> &peer_client) {
+Status ClusterManager::SyncLogsOnRegistration(const std::shared_ptr<NodeInfo> &non_leader_node, const std::shared_ptr<PeerClient> &peer_client) {
     // Used by leader on registration phase
 
     // Check leader WAL and get the diff log
     LOG_TRACE("Leader will get the log diff");
     Storage *storage_ptr = InfinityContext::instance().storage();
     WalManager *wal_manager = storage_ptr->wal_manager();
-    Vector<SharedPtr<String>> wal_strings = wal_manager->GetDiffWalEntryString(non_leader_node->txn_ts());
+    std::vector<std::shared_ptr<std::string>> wal_strings = wal_manager->GetDiffWalEntryString(non_leader_node->txn_ts());
 
     // Leader will send the WALs
-    String non_leader_node_name = non_leader_node->node_name();
+    std::string non_leader_node_name = non_leader_node->node_name();
     LOG_TRACE(fmt::format("Leader will send the diff logs count: {} to {} synchronously", wal_strings.size(), non_leader_node_name));
     return SendLogs(non_leader_node_name, peer_client, wal_strings, true, true);
 }
 
-void ClusterManager::PrepareLogs(const SharedPtr<String> &log_string) { logs_to_sync_.emplace_back(log_string); }
+void ClusterManager::PrepareLogs(const std::shared_ptr<std::string> &log_string) { logs_to_sync_.emplace_back(log_string); }
 
 Status ClusterManager::SyncLogs() {
     LOG_TRACE("Sync logs to follower and async logs to learner");
-    Set<String> sent_nodes;
+    std::set<std::string> sent_nodes;
     while (true) {
         // Get follower and learner node
-        Vector<SharedPtr<NodeInfo>> followers;
-        Vector<SharedPtr<PeerClient>> follower_clients;
-        Vector<SharedPtr<NodeInfo>> learners;
-        Vector<SharedPtr<PeerClient>> learner_clients;
+        std::vector<std::shared_ptr<NodeInfo>> followers;
+        std::vector<std::shared_ptr<PeerClient>> follower_clients;
+        std::vector<std::shared_ptr<NodeInfo>> learners;
+        std::vector<std::shared_ptr<PeerClient>> learner_clients;
 
         Status status = GetReadersInfo(followers, follower_clients, learners, learner_clients);
         if (!status.ok()) {
             return status;
         }
 
-        SizeT follower_count = followers.size();
-        SizeT learner_count = learners.size();
+        size_t follower_count = followers.size();
+        size_t learner_count = learners.size();
 
         if (follower_count != follower_clients.size() && learner_count != learner_clients.size()) {
             return Status::UnexpectedError("Node info and node client count isn't match");
         }
 
         // Replicate logs to follower
-        for (SizeT idx = 0; idx < follower_count; ++idx) {
-            const String &follower_name = followers[idx]->node_name();
+        for (size_t idx = 0; idx < follower_count; ++idx) {
+            const std::string &follower_name = followers[idx]->node_name();
             if (!sent_nodes.contains(follower_name)) {
                 status = SendLogs(follower_name, follower_clients[idx], logs_to_sync_, true, false);
                 if (status.ok()) {
@@ -456,8 +449,8 @@ Status ClusterManager::SyncLogs() {
         }
 
         // Replicate logs to learner
-        for (SizeT idx = 0; idx < learner_count; ++idx) {
-            const String &learner_name = learners[idx]->node_name();
+        for (size_t idx = 0; idx < learner_count; ++idx) {
+            const std::string &learner_name = learners[idx]->node_name();
             if (!sent_nodes.contains(learner_name)) {
                 status = SendLogs(learner_name, learner_clients[idx], logs_to_sync_, false, false);
                 if (status.ok()) {
@@ -474,7 +467,7 @@ Status ClusterManager::SyncLogs() {
     return Status::OK();
 }
 
-Status ClusterManager::SetFollowerNumber(SizeT new_follower_number) {
+Status ClusterManager::SetFollowerNumber(size_t new_follower_number) {
     if (new_follower_number > 5) {
         return Status::NotSupport("Attempt to set follower count larger than 5.");
     }
@@ -484,14 +477,14 @@ Status ClusterManager::SetFollowerNumber(SizeT new_follower_number) {
     return Status::OK();
 }
 
-SizeT ClusterManager::GetFollowerLimit() const { return follower_limit_; }
+size_t ClusterManager::GetFollowerLimit() const { return follower_limit_; }
 
-Status ClusterManager::SendLogs(const String &node_name,
-                                const SharedPtr<PeerClient> &peer_client,
-                                const Vector<SharedPtr<String>> &logs,
+Status ClusterManager::SendLogs(const std::string &node_name,
+                                const std::shared_ptr<PeerClient> &peer_client,
+                                const std::vector<std::shared_ptr<std::string>> &logs,
                                 bool synchronize,
                                 bool on_register) {
-    SharedPtr<SyncLogTask> sync_log_task = MakeShared<SyncLogTask>(node_name, logs, on_register);
+    std::shared_ptr<SyncLogTask> sync_log_task = std::make_shared<SyncLogTask>(node_name, logs, on_register);
     peer_client->Send(sync_log_task);
 
     Status status = Status::OK();
@@ -504,15 +497,15 @@ Status ClusterManager::SendLogs(const String &node_name,
     if (sync_log_task->error_code_ != 0) {
         LOG_ERROR(fmt::format("Fail to send log follower: {}, error message: {}", node_name, sync_log_task->error_message_));
         status.code_ = static_cast<ErrorCode>(sync_log_task->error_code_);
-        status.msg_ = MakeUnique<String>(sync_log_task->error_message_);
+        status.msg_ = std::make_unique<std::string>(sync_log_task->error_message_);
     }
     return status;
 }
 
-Status ClusterManager::GetReadersInfo(Vector<SharedPtr<NodeInfo>> &followers,
-                                      Vector<SharedPtr<PeerClient>> &follower_clients,
-                                      Vector<SharedPtr<NodeInfo>> &learners,
-                                      Vector<SharedPtr<PeerClient>> &learner_clients) {
+Status ClusterManager::GetReadersInfo(std::vector<std::shared_ptr<NodeInfo>> &followers,
+                                      std::vector<std::shared_ptr<PeerClient>> &follower_clients,
+                                      std::vector<std::shared_ptr<NodeInfo>> &learners,
+                                      std::vector<std::shared_ptr<PeerClient>> &learner_clients) {
     std::unique_lock<std::mutex> cluster_lock(cluster_mutex_);
     if (current_node_role_ != NodeRole::kLeader) {
         return Status::InvalidNodeRole("Expect leader node");

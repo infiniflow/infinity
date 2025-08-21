@@ -12,22 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
-#include <cstdio>
-
 export module infinity_core:column_inverter;
 
-import :stl;
 import :analyzer;
 import :column_vector;
 import :term;
 import :string_ref;
-import internal_types;
 import :posting_writer;
 import :vector_with_lock;
 import :buf_writer;
 import :mem_usage_change;
+
+import std.compat;
+
+import internal_types;
 
 namespace infinity {
 
@@ -40,15 +38,15 @@ public:
     ColumnInverter &operator=(const ColumnInverter &&) = delete;
     ~ColumnInverter();
 
-    void InitAnalyzer(const String &analyzer);
+    void InitAnalyzer(const std::string &analyzer);
 
-    SizeT InvertColumn(SharedPtr<ColumnVector> column_vector, u32 row_offset, u32 row_count, u32 begin_doc_id);
+    size_t InvertColumn(std::shared_ptr<ColumnVector> column_vector, u32 row_offset, u32 row_count, u32 begin_doc_id);
 
     void SortForOfflineDump();
 
     void Merge(ColumnInverter &rhs);
 
-    static void Merge(Vector<SharedPtr<ColumnInverter>> &inverters);
+    static void Merge(std::vector<std::shared_ptr<ColumnInverter>> &inverters);
 
     void Sort();
 
@@ -75,16 +73,16 @@ public:
         }
     };
 
-    void SpillSortResults(FILE *spill_file, u64 &tuple_count, UniquePtr<BufWriter> &buf_writer);
+    void SpillSortResults(FILE *spill_file, u64 &tuple_count, std::unique_ptr<BufWriter> &buf_writer);
 
     void AddSema(std::binary_semaphore *sema) { semas_.push_back(sema); }
 
-    const Vector<std::binary_semaphore *> &semas() const { return semas_; }
+    const std::vector<std::binary_semaphore *> &semas() const { return semas_; }
 
 private:
-    using TermBuffer = Vector<char>;
-    using PosInfoVec = Vector<PosInfo>;
-    using U32Vec = Vector<u32>;
+    using TermBuffer = std::vector<char>;
+    using PosInfoVec = std::vector<PosInfo>;
+    using U32Vec = std::vector<u32>;
 
     struct CompareTermRef {
         const char *const term_buffer_;
@@ -96,7 +94,7 @@ private:
         bool operator()(const u32 lhs, const u32 rhs) const;
     };
 
-    SizeT InvertColumn(u32 doc_id, const String &val);
+    size_t InvertColumn(u32 doc_id, const std::string &val);
 
     const char *GetTermFromRef(u32 term_ref) const { return &terms_[term_ref << 2]; }
 
@@ -118,16 +116,16 @@ private:
 
     void MergePrepare();
 
-    UniquePtr<Analyzer> analyzer_{nullptr};
+    std::unique_ptr<Analyzer> analyzer_{nullptr};
     u32 begin_doc_id_{0};
     u32 doc_count_{0};
     u32 merged_{1};
     TermBuffer terms_;
     PosInfoVec positions_;
     U32Vec term_refs_;
-    Vector<Pair<u32, UniquePtr<TermList>>> terms_per_doc_;
+    std::vector<std::pair<u32, std::unique_ptr<TermList>>> terms_per_doc_;
     PostingWriterProvider posting_writer_provider_{};
     VectorWithLock<u32> &column_lengths_;
-    Vector<std::binary_semaphore *> semas_{};
+    std::vector<std::binary_semaphore *> semas_{};
 };
 } // namespace infinity

@@ -1,8 +1,4 @@
-module;
-
 export module infinity_core:posting_byte_slice;
-
-import :stl;
 
 import :byte_slice;
 import :byte_slice_writer;
@@ -67,28 +63,28 @@ public:
     const PostingBuffer &GetBuffer() const { return data_buffer_; }
 
     // Get current buffer size
-    SizeT GetBufferSize() const { return data_buffer_.Size(); }
+    size_t GetBufferSize() const { return data_buffer_.Size(); }
 
     // Calculate total count including flushed and buffered data
-    SizeT GetTotalCount() const { return flush_metadata_.GetFlushCount() + data_buffer_.Size(); }
+    size_t GetTotalCount() const { return flush_metadata_.GetFlushCount() + data_buffer_.Size(); }
 
     // Get flush information
     FlushInfo GetFlushInfo() const { return flush_metadata_; }
 
     // Flush buffer to persistent storage
-    SizeT Flush();
+    size_t Flush();
 
     // Dump data to file with optional spill flag
-    void Dump(const SharedPtr<FileWriter> &output_file, bool enable_spill = false);
+    void Dump(const std::shared_ptr<FileWriter> &output_file, bool enable_spill = false);
 
     // Load data from file
-    void Load(const SharedPtr<FileReader> &input_file);
+    void Load(const std::shared_ptr<FileReader> &input_file);
 
     // Estimate size needed for dump operation
-    SizeT EstimateDumpSize() const { return slice_writer_.GetSize(); }
+    size_t EstimateDumpSize() const { return slice_writer_.GetSize(); }
 
     // Calculate total memory usage
-    inline SizeT GetSizeInBytes() const { return data_buffer_.GetSizeInBytes() + slice_writer_.GetSize(); }
+    inline size_t GetSizeInBytes() const { return data_buffer_.GetSizeInBytes() + slice_writer_.GetSize(); }
 };
 
 // Template implementation for type-safe data insertion

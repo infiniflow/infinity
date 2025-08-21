@@ -12,36 +12,35 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
-#include <sstream>
-
 module infinity_core:logical_filter.impl;
 
 import :logical_filter;
-
-import :stl;
 import :column_binding;
 import :logical_node;
+
+import std;
+
 import internal_types;
 import data_type;
 
 namespace infinity {
 
-Vector<ColumnBinding> LogicalFilter::GetColumnBindings() const { return LogicalCommonFunctionUsingLoadMeta::GetColumnBindings(*this); }
+std::vector<ColumnBinding> LogicalFilter::GetColumnBindings() const { return LogicalCommonFunctionUsingLoadMeta::GetColumnBindings(*this); }
 
-SharedPtr<Vector<String>> LogicalFilter::GetOutputNames() const { return LogicalCommonFunctionUsingLoadMeta::GetOutputNames(*this); }
+std::shared_ptr<std::vector<std::string>> LogicalFilter::GetOutputNames() const { return LogicalCommonFunctionUsingLoadMeta::GetOutputNames(*this); }
 
-SharedPtr<Vector<SharedPtr<DataType>>> LogicalFilter::GetOutputTypes() const { return LogicalCommonFunctionUsingLoadMeta::GetOutputTypes(*this); }
+std::shared_ptr<std::vector<std::shared_ptr<DataType>>> LogicalFilter::GetOutputTypes() const {
+    return LogicalCommonFunctionUsingLoadMeta::GetOutputTypes(*this);
+}
 
-String LogicalFilter::ToString(i64 &space) const {
+std::string LogicalFilter::ToString(i64 &space) const {
     std::stringstream ss;
-    String arrow_str;
+    std::string arrow_str;
     if (space > 3) {
         space -= 4;
         arrow_str = "->  ";
     }
-    ss << String(space, ' ') << arrow_str << "Logical Filter: " << expression_->Name();
+    ss << std::string(space, ' ') << arrow_str << "Logical Filter: " << expression_->Name();
     space += arrow_str.size();
     return ss.str();
 }

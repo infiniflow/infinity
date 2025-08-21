@@ -12,21 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:blockmax_leaf_iterator;
 
-import :stl;
-import internal_types;
 import :doc_iterator;
 import :column_length_io;
+
+import internal_types;
 
 namespace infinity {
 
 export class BlockMaxLeafIterator : public DocIterator {
 public:
     // ref: https://en.wikipedia.org/wiki/Okapi_BM25
-    virtual void InitBM25Info(UniquePtr<FullTextColumnLengthReader> &&column_length_reader, float delta, float k1, float b) = 0;
+    virtual void InitBM25Info(std::unique_ptr<FullTextColumnLengthReader> &&column_length_reader, float delta, float k1, float b) = 0;
 
     virtual RowID BlockMinPossibleDocID() const = 0;
 

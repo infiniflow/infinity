@@ -12,15 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:physical_fusion;
 
-import :stl;
 import :physical_operator;
 import :base_table_ref;
 import :fusion_expression;
 import :operator_state;
+
 import row_id;
 
 namespace infinity {
@@ -33,48 +31,48 @@ export enum class FusionMethod { kRRF, kWeightedSum, kMatchTensor };
 export class PhysicalFusion final : public PhysicalOperator {
 public:
     explicit PhysicalFusion(u64 id,
-                            SharedPtr<BaseTableRef> base_table_ref,
-                            UniquePtr<PhysicalOperator> left,
-                            UniquePtr<PhysicalOperator> right,
-                            Vector<UniquePtr<PhysicalOperator>> other_children,
-                            SharedPtr<FusionExpression> fusion_expr,
-                            SharedPtr<Vector<LoadMeta>> load_metas);
+                            std::shared_ptr<BaseTableRef> base_table_ref,
+                            std::unique_ptr<PhysicalOperator> left,
+                            std::unique_ptr<PhysicalOperator> right,
+                            std::vector<std::unique_ptr<PhysicalOperator>> other_children,
+                            std::shared_ptr<FusionExpression> fusion_expr,
+                            std::shared_ptr<std::vector<LoadMeta>> load_metas);
     ~PhysicalFusion() override;
 
-    void Init(QueryContext* query_context) override;
+    void Init(QueryContext *query_context) override;
 
     bool Execute(QueryContext *query_context, OperatorState *operator_state) override;
 
-    SharedPtr<Vector<String>> GetOutputNames() const override { return output_names_; }
+    std::shared_ptr<std::vector<std::string>> GetOutputNames() const override { return output_names_; }
 
-    SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const override { return output_types_; }
+    std::shared_ptr<std::vector<std::shared_ptr<DataType>>> GetOutputTypes() const override { return output_types_; }
 
-    SizeT TaskletCount() override { return 1; }
+    size_t TaskletCount() override { return 1; }
 
-    void FillingTableRefs(HashMap<SizeT, SharedPtr<BaseTableRef>> &table_refs) override {
+    void FillingTableRefs(std::unordered_map<size_t, std::shared_ptr<BaseTableRef>> &table_refs) override {
         table_refs.insert({base_table_ref_->table_index_, base_table_ref_});
     }
 
-    String ToString(i64 &space) const;
+    std::string ToString(i64 &space) const;
 
-    Vector<UniquePtr<PhysicalOperator>> other_children_{};
-    SharedPtr<BaseTableRef> base_table_ref_{};
-    SharedPtr<FusionExpression> fusion_expr_;
+    std::vector<std::unique_ptr<PhysicalOperator>> other_children_{};
+    std::shared_ptr<BaseTableRef> base_table_ref_{};
+    std::shared_ptr<FusionExpression> fusion_expr_;
 
 private:
     bool ExecuteFirstOp(QueryContext *query_context, FusionOperatorState *fusion_operator_state) const;
     bool ExecuteNotFirstOp(QueryContext *query_context, OperatorState *operator_state) const;
     // RRF and WeightedSum have multiple input sources, must be first fusion op
-    void ExecuteRRFWeighted(const Map<u64, Vector<UniquePtr<DataBlock>>> &input_data_blocks,
-                            Vector<UniquePtr<DataBlock>> &output_data_block_array) const;
+    void ExecuteRRFWeighted(const std::map<u64, std::vector<std::unique_ptr<DataBlock>>> &input_data_blocks,
+                            std::vector<std::unique_ptr<DataBlock>> &output_data_block_array) const;
     // MatchTensor may have multiple or single input source, can be first or not first fusion op
     void ExecuteMatchTensor(QueryContext *query_context,
-                            const Map<u64, Vector<UniquePtr<DataBlock>>> &input_data_blocks,
-                            Vector<UniquePtr<DataBlock>> &output_data_block_array) const;
+                            const std::map<u64, std::vector<std::unique_ptr<DataBlock>>> &input_data_blocks,
+                            std::vector<std::unique_ptr<DataBlock>> &output_data_block_array) const;
 
     FusionMethod fusion_method_;
-    SharedPtr<Vector<String>> output_names_;
-    SharedPtr<Vector<SharedPtr<DataType>>> output_types_;
+    std::shared_ptr<std::vector<std::string>> output_names_;
+    std::shared_ptr<std::vector<std::shared_ptr<DataType>>> output_types_;
 };
 
 export struct MatchTensorRerankDoc {
