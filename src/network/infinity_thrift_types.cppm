@@ -20,7 +20,7 @@ import std.compat;
 #define _SHARED_PTR_ATOMIC_H 1
 #define _BACKWARD_AUTO_PTR_H 1
 #define _GLIBCXX_OUT_PTR_H 1
-#define _GLIBCXX_STRING	1
+#define _GLIBCXX_STRING 1
 #define _GLIBCXX_MAP 1
 #define _GLIBCXX_LIST 1
 #define _GLIBCXX_SET 1
