@@ -308,7 +308,8 @@ public:
     virtual ~HnswIndexInMem();
 
 public:
-    static std::unique_ptr<HnswIndexInMem> Make(RowID begin_row_id, const IndexBase *index_base, std::shared_ptr<ColumnDef> column_def, bool trace = false);
+    static std::unique_ptr<HnswIndexInMem>
+    Make(RowID begin_row_id, const IndexBase *index_base, std::shared_ptr<ColumnDef> column_def, bool trace = false);
 
     static std::unique_ptr<HnswIndexInMem> Make(const IndexBase *index_base, std::shared_ptr<ColumnDef> column_def, bool trace = false);
 

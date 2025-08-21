@@ -225,11 +225,8 @@ size_t HnswHandler::InsertVecs(SegmentOffset block_offset,
     return mem_usage;
 }
 
-size_t HnswHandler::InsertSampleVecs(size_t sample_num,
-                                    SegmentOffset block_offset,
-                                    BlockOffset offset,
-                                    const ColumnVector &col,
-                                    BlockOffset row_count) {
+size_t
+HnswHandler::InsertSampleVecs(size_t sample_num, SegmentOffset block_offset, BlockOffset offset, const ColumnVector &col, BlockOffset row_count) {
     size_t insert_num = 0;
     std::visit(
         [&](auto &&index) {
@@ -512,7 +509,8 @@ HnswIndexInMem::~HnswIndexInMem() {
     }
 }
 
-std::unique_ptr<HnswIndexInMem> HnswIndexInMem::Make(RowID begin_row_id, const IndexBase *index_base, std::shared_ptr<ColumnDef> column_def, bool trace) {
+std::unique_ptr<HnswIndexInMem>
+HnswIndexInMem::Make(RowID begin_row_id, const IndexBase *index_base, std::shared_ptr<ColumnDef> column_def, bool trace) {
     auto memidx = std::make_unique<HnswIndexInMem>(begin_row_id, index_base, column_def, trace);
     if (trace) {
         auto *memindex_tracer = InfinityContext::instance().storage()->memindex_tracer();
@@ -568,11 +566,8 @@ void HnswIndexInMem::Dump(BufferObj *buffer_obj, size_t *dump_size_ptr) {
     chunk_handle_ = std::move(handle);
 }
 
-size_t HnswIndexInMem::InsertSampleVecs(size_t sample_num,
-                                       SegmentOffset block_offset,
-                                       BlockOffset offset,
-                                       const ColumnVector &col,
-                                       BlockOffset row_count) {
+size_t
+HnswIndexInMem::InsertSampleVecs(size_t sample_num, SegmentOffset block_offset, BlockOffset offset, const ColumnVector &col, BlockOffset row_count) {
     return hnsw_handler_->InsertSampleVecs(sample_num, block_offset, offset, col, row_count);
 }
 
