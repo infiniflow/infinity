@@ -193,7 +193,10 @@ void BenchmarkInsert(std::shared_ptr<Infinity> infinity,
     profiler.End();
 }
 
-void BenchmarkCreateIndex(std::shared_ptr<Infinity> infinity, const std::string &db_name, const std::string &table_name, const std::string &index_name) {
+void BenchmarkCreateIndex(std::shared_ptr<Infinity> infinity,
+                          const std::string &db_name,
+                          const std::string &table_name,
+                          const std::string &index_name) {
     BaseProfiler profiler;
     profiler.Begin();
     auto index_info = new IndexInfo();
